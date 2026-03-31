@@ -69,7 +69,7 @@ describe('EmailService', () => {
         'user@example.com',
         'John Doe',
         'email-verification-code',
-        { token: '123456' }
+        { code: '123456' }
       );
 
       expect(jwt.sign).toHaveBeenCalledWith({ sub: 'test-project-123' }, 'test-jwt-secret', {
@@ -82,7 +82,7 @@ describe('EmailService', () => {
           email: 'user@example.com',
           name: 'John Doe',
           template: 'email-verification-code',
-          variables: { token: '123456' },
+          variables: { code: '123456' },
         },
         {
           headers: {
@@ -103,14 +103,14 @@ describe('EmailService', () => {
         'user@example.com',
         'John Doe',
         'email-verification-link',
-        { magic_link: 'https://example.com/verify?token=abc123' }
+        { link: 'https://example.com/verify?token=abc123' }
       );
 
       expect(axios.post).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
           template: 'email-verification-link',
-          variables: { magic_link: 'https://example.com/verify?token=abc123' },
+          variables: { link: 'https://example.com/verify?token=abc123' },
         }),
         expect.any(Object)
       );
@@ -122,14 +122,14 @@ describe('EmailService', () => {
       });
 
       await emailService.sendWithTemplate('user@example.com', 'Jane Smith', 'reset-password-code', {
-        token: 'reset123',
+        code: 'reset123',
       });
 
       expect(axios.post).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
           template: 'reset-password-code',
-          variables: { token: 'reset123' },
+          variables: { code: 'reset123' },
         }),
         expect.any(Object)
       );
@@ -141,14 +141,14 @@ describe('EmailService', () => {
       });
 
       await emailService.sendWithTemplate('user@example.com', 'Jane Smith', 'reset-password-link', {
-        magic_link: 'https://example.com/reset?token=xyz789',
+        link: 'https://example.com/reset?token=xyz789',
       });
 
       expect(axios.post).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
           template: 'reset-password-link',
-          variables: { magic_link: 'https://example.com/reset?token=xyz789' },
+          variables: { link: 'https://example.com/reset?token=xyz789' },
         }),
         expect.any(Object)
       );

@@ -11,6 +11,7 @@ import TablesPage from '@/features/database/pages/TablesPage';
 import AuthenticationLayout from '@/features/auth/components/AuthenticationLayout';
 import UsersPage from '@/features/auth/pages/UsersPage';
 import AuthMethodsPage from '@/features/auth/pages/AuthMethodsPage';
+import EmailPage from '@/features/auth/pages/EmailPage';
 import LogsLayout from '@/features/logs/components/LogsLayout';
 import LogsPage from '@/features/logs/pages/LogsPage';
 import FunctionLogsPage from '@/features/logs/pages/FunctionLogsPage';
@@ -69,6 +70,7 @@ export function AppRoutes() {
                   <Route index element={<Navigate to="users" replace />} />
                   <Route path="users" element={<UsersPage />} />
                   <Route path="auth-methods" element={<AuthMethodsPage />} />
+                  <Route path="email" element={<EmailPage />} />
                 </Route>
                 <Route path="/dashboard/database" element={<DatabaseLayout />}>
                   <Route index element={<Navigate to="tables" replace />} />
