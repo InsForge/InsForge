@@ -17,6 +17,12 @@ import {
 } from 'lucide-react';
 import { postMessageToParent } from './cloudMessaging';
 
+export interface SecondaryMenuItem {
+  id: string;
+  label: string;
+  href: string;
+}
+
 export interface PrimaryMenuItem {
   id: string;
   label: string;
@@ -25,6 +31,7 @@ export interface PrimaryMenuItem {
   onClick?: () => void;
   external?: boolean;
   sectionEnd?: boolean;
+  secondaryMenu?: SecondaryMenuItem[];
 }
 
 /**
@@ -43,6 +50,23 @@ export const staticMenuItems: PrimaryMenuItem[] = [
     label: 'Authentication',
     href: '/dashboard/authentication',
     icon: Lock,
+    secondaryMenu: [
+      {
+        id: 'users-list',
+        label: 'Users',
+        href: '/dashboard/authentication/users',
+      },
+      {
+        id: 'auth-methods',
+        label: 'Auth Methods',
+        href: '/dashboard/authentication/auth-methods',
+      },
+      {
+        id: 'email',
+        label: 'Email',
+        href: '/dashboard/authentication/email',
+      },
+    ],
   },
   {
     id: 'database',
