@@ -18,5 +18,9 @@ export function useIsCloudHostingMode() {
 }
 
 export function useIsEmbeddedDashboard() {
-  return useIsCloudHostingMode();
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  return window.self !== window.top;
 }

@@ -23,16 +23,29 @@ export function useDashboardModal() {
 
 interface DashboardModalProviderProps {
   children: ReactNode;
+  connectDialogOpen?: boolean;
+  onConnectDialogOpenChange?: (open: boolean) => void;
 }
 
-export function DashboardModalProvider({ children }: DashboardModalProviderProps) {
-  const [isConnectDialogOpen, setIsConnectDialogOpenState] = useState(false);
+export function DashboardModalProvider({
+  children,
+  connectDialogOpen,
+  onConnectDialogOpenChange,
+}: DashboardModalProviderProps) {
+  const [uncontrolledConnectDialogOpen, setUncontrolledConnectDialogOpen] = useState(false);
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
   const [settingsDefaultTab, setSettingsDefaultTab] = useState<DashboardSettingsTab>('info');
+  const isConnectDialogControlled = connectDialogOpen !== undefined;
+  const isConnectDialogOpen = isConnectDialogControlled
+    ? connectDialogOpen
+    : uncontrolledConnectDialogOpen;
 
   const setConnectDialogOpen = useCallback((open: boolean) => {
-    setIsConnectDialogOpenState(open);
-  }, []);
+    if (!isConnectDialogControlled) {
+      setUncontrolledConnectDialogOpen(open);
+    }
+    onConnectDialogOpenChange?.(open);
+  }, [isConnectDialogControlled, onConnectDialogOpenChange]);
 
   const openSettingsDialog = useCallback((tab: DashboardSettingsTab = 'info') => {
     setSettingsDefaultTab(tab);
