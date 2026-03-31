@@ -24,7 +24,11 @@ import {
 } from '@insforge/ui';
 import type { InstanceInfoEvent } from '@insforge/shared-schemas';
 import { useApiKey } from '../../../lib/hooks/useMetadata';
-import { useDashboardHost, useIsEmbeddedDashboard } from '../../../lib/config/DashboardHostContext';
+import {
+  useDashboardHost,
+  useIsCloudHostingMode,
+  useIsEmbeddedDashboard,
+} from '../../../lib/config/DashboardHostContext';
 import { useHealth } from '../../../lib/hooks/useHealth';
 import {
   CLOUD_PROJECT_INFO_QUERY_KEY,
@@ -52,6 +56,7 @@ const INFO_FIELD_CLASS =
 
 export default function ProjectSettingsMenuDialog() {
   const host = useDashboardHost();
+  const isCloudHostingMode = useIsCloudHostingMode();
   const isEmbeddedDashboard = useIsEmbeddedDashboard();
   const { isSettingsDialogOpen, settingsDefaultTab, closeSettingsDialog } = useModal();
   const [activeTab, setActiveTab] = useState<TabType>('info');
@@ -74,7 +79,7 @@ export default function ProjectSettingsMenuDialog() {
 
   const isCloud = isInsForgeCloudProject();
   const isInIframe = isIframe();
-  const canUseCloudHost = isCloud && (isInIframe || isEmbeddedDashboard);
+  const canUseCloudHost = isCloud && (isInIframe || isEmbeddedDashboard || isCloudHostingMode);
   const projectUrl = useMemo(() => `${getBackendUrl().replace(/\/$/, '')}/`, []);
 
   const maskedApiKey = apiKey ? `ik_${'*'.repeat(22)}` : 'ik_**********************';

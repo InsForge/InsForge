@@ -30,7 +30,10 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useApiKey, useMetadata } from '../../../lib/hooks/useMetadata';
-import { useIsEmbeddedDashboard } from '../../../lib/config/DashboardHostContext';
+import {
+  useIsCloudHostingMode,
+  useIsEmbeddedDashboard,
+} from '../../../lib/config/DashboardHostContext';
 import { useCloudProjectInfo } from '../../../lib/hooks/useCloudProjectInfo';
 import { useMcpUsage } from '../../logs/hooks/useMcpUsage';
 import { useModal } from '../../../lib/contexts/ModalContext';
@@ -364,10 +367,12 @@ function DashboardLoadingState() {
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { setConnectDialogOpen } = useModal();
+  const isCloudHostingMode = useIsCloudHostingMode();
   const isEmbeddedDashboard = useIsEmbeddedDashboard();
   const isCloudProject = isInsForgeCloudProject();
   const isInIframe = isIframe();
-  const canShowCliGettingStarted = isCloudProject && (isInIframe || isEmbeddedDashboard);
+  const canShowCliGettingStarted =
+    isCloudProject && (isInIframe || isEmbeddedDashboard || isCloudHostingMode);
   const {
     metadata,
     tables,

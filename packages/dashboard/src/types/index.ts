@@ -58,8 +58,11 @@ export interface DashboardInstanceInfo {
 export interface DashboardSharedProps {
   backendUrl: string;
   initialPath?: string;
+  showNavbar?: boolean;
   project?: DashboardProjectInfo;
   capabilities?: DashboardCapabilities;
+  connectDialogOpen?: boolean;
+  onConnectDialogOpenChange?: (open: boolean) => void;
   onRouteChange?: (route: DashboardRoute) => void;
   onOpenSettings?: () => void;
   onNavigateToUsage?: () => void;

@@ -60,7 +60,10 @@ function SelfHostingDashboard({
           <SocketProvider>
             <ToastProvider>
               <PostHogAnalyticsProvider>
-                <ModalProvider>
+                <ModalProvider
+                  connectDialogOpen={host.connectDialogOpen}
+                  onConnectDialogOpenChange={host.onConnectDialogOpenChange}
+                >
                   <SQLEditorProvider>
                     <AppRoutes />
                   </SQLEditorProvider>
@@ -84,7 +87,10 @@ function CloudHostingDashboard(props: CloudHostingDashboardProps) {
             <SocketProvider>
               <ToastProvider>
                 <PostHogAnalyticsProvider>
-                  <ModalProvider>
+                  <ModalProvider
+                    connectDialogOpen={props.connectDialogOpen}
+                    onConnectDialogOpenChange={props.onConnectDialogOpenChange}
+                  >
                     <SQLEditorProvider>
                       <AppRoutes />
                     </SQLEditorProvider>

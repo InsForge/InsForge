@@ -201,7 +201,7 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
     <TooltipProvider disableHoverableContent delayDuration={300}>
       <aside
         className={cn(
-          'bg-semantic-2 border-r border-border h-full flex flex-col flex-shrink-0 px-2 pt-3 pb-2',
+          'bg-semantic-2 border-r border-[var(--alpha-8)] h-full flex flex-col flex-shrink-0 px-2 pt-3 pb-2',
           'transition-[width] duration-300 ease-in-out overflow-hidden',
           isCollapsed ? 'w-[52px]' : 'w-[200px]'
         )}
