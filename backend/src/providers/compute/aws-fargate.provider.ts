@@ -240,11 +240,13 @@ export class AwsFargateProvider implements ComputeProvider {
             },
           ],
         },
-      }),
+      })
     );
 
     const taskArn = result.tasks?.[0]?.taskArn;
-    if (!taskArn) throw new Error('Failed to run task: no task ARN returned');
+    if (!taskArn) {
+      throw new Error('Failed to run task: no task ARN returned');
+    }
     return { taskArn };
   }
 
@@ -257,18 +259,20 @@ export class AwsFargateProvider implements ComputeProvider {
       new DescribeTasksCommand({
         cluster: config.compute.ecsClusterArn,
         tasks: [taskArn],
-      }),
+      })
     );
 
     const task = result.tasks?.[0];
-    if (!task) throw new Error(`Task not found: ${taskArn}`);
+    if (!task) {
+      throw new Error(`Task not found: ${taskArn}`);
+    }
 
     const container = task.containers?.[0];
     const lastStatus = task.lastStatus?.toUpperCase();
 
     let status: TaskStatus['status'];
     if (lastStatus === 'STOPPED') {
-      status = (container?.exitCode === 0) ? 'succeeded' : 'failed';
+      status = container?.exitCode === 0 ? 'succeeded' : 'failed';
     } else if (lastStatus === 'RUNNING') {
       status = 'running';
     } else {
@@ -293,7 +297,7 @@ export class AwsFargateProvider implements ComputeProvider {
         cluster: config.compute.ecsClusterArn,
         task: taskArn,
         reason: 'Stopped by user via InsForge Compute',
-      }),
+      })
     );
   }
 
@@ -357,7 +361,9 @@ export class AwsFargateProvider implements ComputeProvider {
     );
 
     const taskDefinitionArn = result.taskDefinition?.taskDefinitionArn;
-    if (!taskDefinitionArn) throw new Error('Failed to register task definition: no ARN returned');
+    if (!taskDefinitionArn) {
+      throw new Error('Failed to register task definition: no ARN returned');
+    }
     return taskDefinitionArn;
   }
 
@@ -390,7 +396,9 @@ export class AwsFargateProvider implements ComputeProvider {
     );
 
     const targetGroupArn = tgResult.TargetGroups?.[0]?.TargetGroupArn;
-    if (!targetGroupArn) throw new Error('Failed to create target group: no ARN returned');
+    if (!targetGroupArn) {
+      throw new Error('Failed to create target group: no ARN returned');
+    }
     const hostHeader = `${projectSlug}.${config.compute.domain}`;
 
     // Retry loop for priority collisions
@@ -407,7 +415,9 @@ export class AwsFargateProvider implements ComputeProvider {
           })
         );
         ruleArn = ruleResult.Rules?.[0]?.RuleArn;
-        if (!ruleArn) throw new Error('Failed to create ALB rule: no ARN returned');
+        if (!ruleArn) {
+          throw new Error('Failed to create ALB rule: no ARN returned');
+        }
         break;
       } catch (err: unknown) {
         if (
@@ -433,7 +443,9 @@ export class AwsFargateProvider implements ComputeProvider {
       }
     }
 
-    if (!ruleArn) throw new Error('Failed to create ALB rule: no ARN returned after retries');
+    if (!ruleArn) {
+      throw new Error('Failed to create ALB rule: no ARN returned after retries');
+    }
     return {
       targetGroupArn,
       ruleArn,
@@ -482,7 +494,9 @@ export class AwsFargateProvider implements ComputeProvider {
     );
 
     const serviceArn = result.service?.serviceArn;
-    if (!serviceArn) throw new Error('Failed to create ECS service: no ARN returned');
+    if (!serviceArn) {
+      throw new Error('Failed to create ECS service: no ARN returned');
+    }
     return serviceArn;
   }
 

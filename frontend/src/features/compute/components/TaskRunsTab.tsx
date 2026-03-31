@@ -7,13 +7,16 @@ interface TaskRunsTabProps {
 }
 
 export function TaskRunsTab({ taskRuns, isLoading, onStop }: TaskRunsTabProps) {
-  if (isLoading) return <div className="p-4 text-sm text-muted-foreground">Loading runs...</div>;
-  if (taskRuns.length === 0)
+  if (isLoading) {
+    return <div className="p-4 text-sm text-muted-foreground">Loading runs...</div>;
+  }
+  if (taskRuns.length === 0) {
     return (
       <div className="p-4 text-sm text-muted-foreground">
         No runs yet. Click &quot;Run&quot; to start a task.
       </div>
     );
+  }
 
   return (
     <div className="space-y-2">
@@ -77,7 +80,9 @@ function StatusBadge({ status }: { status: string }) {
     stopped: 'bg-gray-100 text-gray-800',
   };
   return (
-    <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${colors[status] ?? 'bg-gray-100'}`}>
+    <span
+      className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${colors[status] ?? 'bg-gray-100'}`}
+    >
       {status}
     </span>
   );

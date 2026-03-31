@@ -87,9 +87,7 @@ export default function ComputePage() {
             <div className="flex items-center justify-center py-12">
               <p className="text-sm text-red-500">
                 Failed to load containers:{' '}
-                {containersError instanceof Error
-                  ? containersError.message
-                  : 'Unknown error'}
+                {containersError instanceof Error ? containersError.message : 'Unknown error'}
               </p>
             </div>
           ) : containers.length === 0 ? (

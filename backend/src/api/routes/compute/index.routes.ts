@@ -9,11 +9,11 @@ import {
   updateContainerSchema,
   deployContainerSchema,
   rollbackContainerSchema,
+  type ContainerSchema,
 } from '@insforge/shared-schemas';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import { successResponse } from '@/utils/response.js';
-import type { ContainerSchema } from '@insforge/shared-schemas';
 
 const computeRouter = Router();
 const computeService = ComputeService.getInstance();
@@ -36,7 +36,7 @@ function broadcastUpdate() {
 async function getContainerForProject(
   id: string,
   projectId: string,
-  service: ComputeService,
+  service: ComputeService
 ): Promise<ContainerSchema> {
   const container = await service.getContainer(id);
   if (!container || container.projectId !== projectId) {
@@ -361,8 +361,7 @@ computeRouter.post(
       const projectId = getProjectId(req);
       await getContainerForProject(req.params.id, projectId, computeService);
 
-      const triggeredBy: 'manual' | 'api' =
-        req.body?.triggeredBy === 'api' ? 'api' : 'manual';
+      const triggeredBy: 'manual' | 'api' = req.body?.triggeredBy === 'api' ? 'api' : 'manual';
 
       const taskRun = await computeService.runTask(req.params.id, triggeredBy);
 

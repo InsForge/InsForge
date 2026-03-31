@@ -71,13 +71,7 @@ export const containerDeploymentSchema = z.object({
   updatedAt: z.string(),
 });
 
-export const taskRunStatusEnum = z.enum([
-  'pending',
-  'running',
-  'succeeded',
-  'failed',
-  'stopped',
-]);
+export const taskRunStatusEnum = z.enum(['pending', 'running', 'succeeded', 'failed', 'stopped']);
 
 export const taskRunSchema = z.object({
   id: z.string().uuid(),

@@ -5,7 +5,12 @@ import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { AwsFargateProvider } from '@/providers/compute/aws-fargate.provider.js';
 import type { ComputeProvider } from '@/providers/compute/base.provider.js';
-import type { ContainerSchema, ContainerDeploymentSchema, TaskRunSchema, TaskRunStatus } from '@insforge/shared-schemas';
+import type {
+  ContainerSchema,
+  ContainerDeploymentSchema,
+  TaskRunSchema,
+  TaskRunStatus,
+} from '@insforge/shared-schemas';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 
 interface ContainerRow {
@@ -515,10 +520,10 @@ export class ComputeService {
 
       if (container.runMode === 'task') {
         // Task mode: store the task definition ARN, mark as ready
-        await pool.query(
-          `UPDATE compute.containers SET task_definition_arn = $1 WHERE id = $2`,
-          [taskDefArn, container.id]
-        );
+        await pool.query(`UPDATE compute.containers SET task_definition_arn = $1 WHERE id = $2`, [
+          taskDefArn,
+          container.id,
+        ]);
 
         // Mark deployment as live, deactivate previous
         await pool.query(
@@ -670,10 +675,7 @@ export class ComputeService {
     return taskRun;
   }
 
-  private async executeTaskRun(
-    container: ContainerSchema,
-    taskRun: TaskRunSchema
-  ): Promise<void> {
+  private async executeTaskRun(container: ContainerSchema, taskRun: TaskRunSchema): Promise<void> {
     try {
       if (!this.provider.isConfigured()) {
         throw new Error('Compute provider is not configured');
