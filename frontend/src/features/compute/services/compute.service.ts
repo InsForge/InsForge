@@ -6,6 +6,7 @@ import type {
   UpdateContainerRequest,
   DeployContainerRequest,
   RollbackContainerRequest,
+  TaskRunSchema,
 } from '@insforge/shared-schemas';
 
 interface ListContainersResponse {
@@ -92,6 +93,37 @@ class ComputeApiService {
     return apiClient.request(`/compute/containers/${containerId}/logs`, {
       headers: apiClient.withAccessToken(),
     });
+  }
+
+  async runTask(containerId: string, triggeredBy: string = 'manual'): Promise<TaskRunSchema> {
+    const json = await apiClient.request(`/compute/containers/${containerId}/run`, {
+      method: 'POST',
+      headers: apiClient.withAccessToken(),
+      body: JSON.stringify({ triggeredBy }),
+    });
+    return json.data.taskRun;
+  }
+
+  async stopTask(containerId: string, taskRunId: string): Promise<void> {
+    return apiClient.request(`/compute/containers/${containerId}/runs/${taskRunId}/stop`, {
+      method: 'POST',
+      headers: apiClient.withAccessToken(),
+    });
+  }
+
+  async listTaskRuns(containerId: string): Promise<TaskRunSchema[]> {
+    const json = await apiClient.request(`/compute/containers/${containerId}/runs`, {
+      headers: apiClient.withAccessToken(),
+    });
+    return json.data.data;
+  }
+
+  async getTaskRunLogs(containerId: string, taskRunId: string): Promise<LogStream> {
+    const json = await apiClient.request(
+      `/compute/containers/${containerId}/runs/${taskRunId}/logs`,
+      { headers: apiClient.withAccessToken() }
+    );
+    return json.data;
   }
 }
 

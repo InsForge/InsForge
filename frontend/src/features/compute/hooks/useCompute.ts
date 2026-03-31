@@ -44,6 +44,15 @@ export function useCompute() {
 
   const deployments = useMemo(() => deploymentsData ?? [], [deploymentsData]);
 
+  const { data: taskRunsData, isLoading: isLoadingTaskRuns } = useQuery({
+    queryKey: ['compute', 'taskRuns', selectedContainer?.id],
+    queryFn: () => computeService.listTaskRuns(selectedContainer!.id),
+    enabled: !!selectedContainer && selectedContainer.runMode === 'task',
+    staleTime: 15_000,
+  });
+
+  const taskRuns = useMemo(() => taskRunsData ?? [], [taskRunsData]);
+
   const selectContainer = useCallback((container: ContainerSchema | null) => {
     setSelectedContainer(container);
   }, []);
@@ -111,17 +120,43 @@ export function useCompute() {
     },
   });
 
+  const runTaskMutation = useMutation({
+    mutationFn: (containerId: string) => computeService.runTask(containerId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['compute', 'taskRuns'] });
+      showToast('Task started', 'success');
+    },
+    onError: (error: Error) => {
+      showToast(error.message || 'Failed to start task', 'error');
+    },
+  });
+
+  const stopTaskMutation = useMutation({
+    mutationFn: ({ containerId, taskRunId }: { containerId: string; taskRunId: string }) =>
+      computeService.stopTask(containerId, taskRunId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['compute', 'taskRuns'] });
+      showToast('Task stopped', 'success');
+    },
+    onError: (error: Error) => {
+      showToast(error.message || 'Failed to stop task', 'error');
+    },
+  });
+
   return {
     containers,
     selectedContainer,
     deployments,
+    taskRuns,
 
     isLoadingContainers,
     isLoadingDeployments,
+    isLoadingTaskRuns,
     isCreating: createContainerMutation.isPending,
     isUpdating: updateContainerMutation.isPending,
     isDeleting: deleteContainerMutation.isPending,
     isDeploying: deployMutation.isPending,
+    isRunningTask: runTaskMutation.isPending,
 
     containersError,
     deploymentsError,
@@ -148,6 +183,15 @@ export function useCompute() {
       (containerId: string, deploymentId: string) =>
         rollbackMutation.mutateAsync({ containerId, deploymentId }),
       [rollbackMutation]
+    ),
+    runTask: useCallback(
+      (containerId: string) => runTaskMutation.mutate(containerId),
+      [runTaskMutation]
+    ),
+    stopTask: useCallback(
+      (containerId: string, taskRunId: string) =>
+        stopTaskMutation.mutate({ containerId, taskRunId }),
+      [stopTaskMutation]
     ),
   };
 }
