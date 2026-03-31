@@ -79,7 +79,7 @@ function SelfHostingDashboard({
 
 function CloudHostingDashboard(props: CloudHostingDashboardProps) {
   return (
-    <div className="if-dashboard flex h-full min-h-0 flex-col">
+    <div className="if-dashboard flex h-full min-h-0 min-w-0 flex-col">
       <MemoryRouter initialEntries={[props.initialPath || '/dashboard']}>
         <DashboardAppShell {...props}>
           <RouteChangeNotifier />

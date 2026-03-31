@@ -40,12 +40,15 @@ export function DashboardModalProvider({
     ? connectDialogOpen
     : uncontrolledConnectDialogOpen;
 
-  const setConnectDialogOpen = useCallback((open: boolean) => {
-    if (!isConnectDialogControlled) {
-      setUncontrolledConnectDialogOpen(open);
-    }
-    onConnectDialogOpenChange?.(open);
-  }, [isConnectDialogControlled, onConnectDialogOpenChange]);
+  const setConnectDialogOpen = useCallback(
+    (open: boolean) => {
+      if (!isConnectDialogControlled) {
+        setUncontrolledConnectDialogOpen(open);
+      }
+      onConnectDialogOpenChange?.(open);
+    },
+    [isConnectDialogControlled, onConnectDialogOpenChange]
+  );
 
   const openSettingsDialog = useCallback((tab: DashboardSettingsTab = 'info') => {
     setSettingsDefaultTab(tab);
