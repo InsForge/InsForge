@@ -5,7 +5,7 @@ import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { AwsFargateProvider } from '@/providers/compute/aws-fargate.provider.js';
 import type { ComputeProvider } from '@/providers/compute/base.provider.js';
-import type { ContainerSchema, ContainerDeploymentSchema } from '@insforge/shared-schemas';
+import type { ContainerSchema, ContainerDeploymentSchema, TaskRunSchema, TaskRunStatus } from '@insforge/shared-schemas';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 
 interface ContainerRow {
@@ -24,6 +24,8 @@ interface ContainerRow {
   auto_deploy: boolean;
   status: string;
   endpoint_url: string | null;
+  run_mode: string;
+  task_definition_arn: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -51,6 +53,34 @@ interface RouteRow {
   endpoint_url: string | null;
 }
 
+interface TaskRunRow {
+  id: string;
+  container_id: string;
+  ecs_task_arn: string | null;
+  status: string;
+  exit_code: number | null;
+  triggered_by: string;
+  error_message: string | null;
+  started_at: Date | null;
+  finished_at: Date | null;
+  created_at: Date;
+}
+
+function mapTaskRunRow(row: TaskRunRow): TaskRunSchema {
+  return {
+    id: row.id,
+    containerId: row.container_id,
+    ecsTaskArn: row.ecs_task_arn,
+    status: row.status as TaskRunStatus,
+    exitCode: row.exit_code,
+    triggeredBy: row.triggered_by as 'manual' | 'api',
+    errorMessage: row.error_message,
+    startedAt: row.started_at?.toISOString() ?? null,
+    finishedAt: row.finished_at?.toISOString() ?? null,
+    createdAt: row.created_at.toISOString(),
+  };
+}
+
 function mapContainerRow(row: ContainerRow): ContainerSchema {
   return {
     id: row.id,
@@ -68,6 +98,8 @@ function mapContainerRow(row: ContainerRow): ContainerSchema {
     autoDeploy: row.auto_deploy,
     status: row.status as ContainerSchema['status'],
     endpointUrl: row.endpoint_url,
+    runMode: row.run_mode as 'service' | 'task',
+    taskDefinitionArn: row.task_definition_arn,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -142,11 +174,12 @@ export class ComputeService {
     port: number;
     healthCheckPath: string;
     autoDeploy: boolean;
+    runMode?: 'service' | 'task';
   }): Promise<ContainerSchema> {
     const result = await this.getPool().query<ContainerRow>(
       `INSERT INTO compute.containers
-         (project_id, name, source_type, github_repo, github_branch, dockerfile_path, image_url, cpu, memory, port, health_check_path, auto_deploy)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         (project_id, name, source_type, github_repo, github_branch, dockerfile_path, image_url, cpu, memory, port, health_check_path, auto_deploy, run_mode)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING *`,
       [
         input.projectId,
@@ -161,6 +194,7 @@ export class ComputeService {
         input.port,
         input.healthCheckPath,
         input.autoDeploy,
+        input.runMode ?? 'service',
       ]
     );
     return mapContainerRow(result.rows[0]);
@@ -222,39 +256,70 @@ export class ComputeService {
   async deleteContainer(id: string): Promise<void> {
     const pool = this.getPool();
 
-    // Fetch route info before attempting teardown
-    const routeResult = await pool.query<RouteRow>(
-      `SELECT * FROM compute.container_routes WHERE container_id = $1`,
+    const containerResult = await pool.query<ContainerRow>(
+      `SELECT * FROM compute.containers WHERE id = $1`,
       [id]
     );
-    const route = routeResult.rows[0];
+    const container = containerResult.rows[0];
+    if (!container) {
+      throw new AppError('Container not found', 404, ERROR_CODES.NOT_FOUND);
+    }
 
-    // If we have cloud resources, tear them down FIRST
-    if (route?.service_arn && this.provider.isConfigured()) {
-      try {
-        await this.provider.teardown({
-          serviceArn: route.service_arn,
-          targetGroupArn: route.target_group_arn ?? '',
-          ruleArn: route.rule_arn ?? '',
-        });
-      } catch (error) {
-        // Mark container as teardown_failed — do NOT delete the row
-        logger.error('AWS teardown failed, keeping DB rows for retry', {
-          containerId: id,
-          error: String(error),
-        });
-        await pool.query(`UPDATE compute.containers SET status = 'teardown_failed' WHERE id = $1`, [
-          id,
-        ]);
-        throw new AppError(
-          'Failed to tear down cloud resources. Container marked for retry.',
-          500,
-          ERROR_CODES.COMPUTE_TEARDOWN_FAILED
+    if (container.run_mode === 'service') {
+      // For services: tear down cloud resources (ECS service, ALB, etc.)
+      const routeResult = await pool.query<RouteRow>(
+        `SELECT * FROM compute.container_routes WHERE container_id = $1`,
+        [id]
+      );
+      const route = routeResult.rows[0];
+
+      if (route?.service_arn && this.provider.isConfigured()) {
+        try {
+          await this.provider.teardown({
+            serviceArn: route.service_arn,
+            targetGroupArn: route.target_group_arn ?? '',
+            ruleArn: route.rule_arn ?? '',
+          });
+        } catch (error) {
+          logger.error('AWS teardown failed, keeping DB rows for retry', {
+            containerId: id,
+            error: String(error),
+          });
+          await pool.query(
+            `UPDATE compute.containers SET status = 'teardown_failed' WHERE id = $1`,
+            [id]
+          );
+          throw new AppError(
+            'Failed to tear down cloud resources. Container marked for retry.',
+            500,
+            ERROR_CODES.COMPUTE_TEARDOWN_FAILED
+          );
+        }
+      }
+    } else {
+      // For tasks: stop any running task runs
+      if (this.provider.isConfigured()) {
+        const runningTasks = await pool.query<TaskRunRow>(
+          `SELECT * FROM compute.task_runs WHERE container_id = $1 AND status IN ('pending', 'running')`,
+          [id]
         );
+        for (const task of runningTasks.rows) {
+          if (task.ecs_task_arn) {
+            try {
+              await this.provider.stopTask(task.ecs_task_arn);
+            } catch (error) {
+              logger.error('Failed to stop task during container deletion', {
+                containerId: id,
+                taskRunId: task.id,
+                error: String(error),
+              });
+            }
+          }
+        }
       }
     }
 
-    // Teardown succeeded (or no cloud resources) — safe to delete
+    // Cloud resources cleaned up (or none existed) — safe to delete
     await pool.query(`DELETE FROM compute.containers WHERE id = $1`, [id]);
   }
 
@@ -287,6 +352,7 @@ export class ComputeService {
     containerId: string;
     triggeredBy: string;
     githubToken?: string;
+    imageUri?: string;
   }): Promise<ContainerDeploymentSchema> {
     const pool = this.getPool();
     const client = await pool.connect();
@@ -319,10 +385,10 @@ export class ComputeService {
       }
 
       const deployResult = await client.query<DeploymentRow>(
-        `INSERT INTO compute.deployments (container_id, status, triggered_by)
-         VALUES ($1, 'pending', $2)
+        `INSERT INTO compute.deployments (container_id, status, triggered_by, image_uri)
+         VALUES ($1, 'pending', $2, $3)
          RETURNING *`,
-        [input.containerId, input.triggeredBy]
+        [input.containerId, input.triggeredBy, input.imageUri ?? null]
       );
 
       await client.query('COMMIT');
@@ -361,19 +427,13 @@ export class ComputeService {
       );
     }
 
-    // Create a new deployment record for the rollback
-    const deployment = await this.deploy({
+    // Create a new deployment with the target's imageUri pre-set so
+    // executeDeploy picks it up immediately (no race condition)
+    return this.deploy({
       containerId: input.containerId,
       triggeredBy: 'rollback',
+      imageUri: targetDeployment.imageUri,
     });
-
-    // Override the image URI on the new deployment so executeDeploy uses it
-    await this.getPool().query(
-      `UPDATE compute.deployments SET image_uri = $1, image_tag = $2 WHERE id = $3`,
-      [targetDeployment.imageUri, targetDeployment.imageTag, deployment.id]
-    );
-
-    return deployment;
   }
 
   // ─── Logs ─────────────────────────────────────────────────────────────────────
@@ -442,6 +502,35 @@ export class ComputeService {
 
       // Resolve env vars
       const envVars = await this.getDecryptedEnvVars(container.id);
+
+      // Register task definition (needed for both service and task run modes)
+      const taskDefArn = await this.provider.registerTaskDefinition({
+        containerId: container.id,
+        imageUri,
+        port: container.port,
+        cpu: container.cpu,
+        memory: container.memory,
+        envVars,
+      });
+
+      if (container.runMode === 'task') {
+        // Task mode: store the task definition ARN, mark as ready
+        await pool.query(
+          `UPDATE compute.containers SET task_definition_arn = $1 WHERE id = $2`,
+          [taskDefArn, container.id]
+        );
+
+        // Mark deployment as live, deactivate previous
+        await pool.query(
+          `UPDATE compute.deployments SET is_active = (id = $1) WHERE container_id = $2`,
+          [deployment.id, container.id]
+        );
+        await this.setDeploymentStatus(deployment.id, 'live');
+        await this.setContainerStatus(container.id, 'ready');
+        return;
+      }
+
+      // Service mode: provision or update ECS service
       const projectSlug = container.name
         .toLowerCase()
         .replace(/[^a-z0-9-]/g, '-')
@@ -521,14 +610,179 @@ export class ComputeService {
         containerId: container.id,
         error: errorMessage,
       });
-      await this.setDeploymentStatus(deployment.id, 'failed', errorMessage);
+      try {
+        await this.setDeploymentStatus(deployment.id, 'failed', errorMessage);
+        const current = await this.getContainer(container.id);
+        if (current && current.status === 'deploying') {
+          await this.setContainerStatus(container.id, 'failed');
+        }
+      } catch (innerErr) {
+        console.error(`[ComputeService] Failed to update status after deploy error:`, innerErr);
+      }
+      console.error(`[ComputeService] Deploy failed for container ${container.id}:`, err);
+    }
+  }
 
-      // Only mark container as failed if it wasn't already running
-      const current = await this.getContainer(container.id);
-      if (current && current.status !== 'running') {
-        await this.setContainerStatus(container.id, 'failed');
+  // ─── Task Execution ──────────────────────────────────────────────────────────
+
+  async runTask(
+    containerId: string,
+    triggeredBy: 'manual' | 'api' = 'manual'
+  ): Promise<TaskRunSchema> {
+    const container = await this.getContainer(containerId);
+    if (!container) {
+      throw new AppError('Container not found', 404, ERROR_CODES.NOT_FOUND);
+    }
+    if (container.runMode !== 'task') {
+      throw new AppError(
+        'Container is not configured for task execution',
+        400,
+        ERROR_CODES.COMPUTE_INVALID_RUN_MODE
+      );
+    }
+    if (container.status !== 'ready') {
+      throw new AppError(
+        'Container is not ready. Deploy first.',
+        400,
+        ERROR_CODES.COMPUTE_NOT_READY
+      );
+    }
+    if (!container.taskDefinitionArn) {
+      throw new AppError(
+        'No task definition registered. Deploy first.',
+        400,
+        ERROR_CODES.COMPUTE_NOT_READY
+      );
+    }
+
+    const result = await this.getPool().query<TaskRunRow>(
+      `INSERT INTO compute.task_runs (container_id, status, triggered_by)
+       VALUES ($1, 'pending', $2)
+       RETURNING *`,
+      [containerId, triggeredBy]
+    );
+
+    const taskRun = mapTaskRunRow(result.rows[0]);
+
+    // Fire-and-forget the async task execution
+    void this.executeTaskRun(container, taskRun);
+
+    return taskRun;
+  }
+
+  private async executeTaskRun(
+    container: ContainerSchema,
+    taskRun: TaskRunSchema
+  ): Promise<void> {
+    try {
+      if (!this.provider.isConfigured()) {
+        throw new Error('Compute provider is not configured');
+      }
+
+      const envVars = await this.getDecryptedEnvVars(container.id);
+
+      const { taskArn } = await this.provider.runTask({
+        containerId: container.id,
+        taskDefinitionArn: container.taskDefinitionArn!,
+        envVars,
+        cpu: container.cpu,
+        memory: container.memory,
+      });
+
+      await this.getPool().query(
+        `UPDATE compute.task_runs SET ecs_task_arn = $1, status = 'running' WHERE id = $2`,
+        [taskArn, taskRun.id]
+      );
+
+      await this.pollTaskCompletion(taskRun.id, taskArn);
+    } catch (err) {
+      const errorMessage = (err as Error).message;
+      try {
+        await this.getPool().query(
+          `UPDATE compute.task_runs SET status = 'failed', error_message = $1 WHERE id = $2`,
+          [errorMessage, taskRun.id]
+        );
+      } catch (innerErr) {
+        console.error(`[ComputeService] Failed to update task run status after error:`, innerErr);
+      }
+      console.error(`[ComputeService] Task run failed for container ${container.id}:`, err);
+    }
+  }
+
+  private async pollTaskCompletion(taskRunId: string, taskArn: string): Promise<void> {
+    const MAX_POLLS = 360; // 30 minutes at 5s intervals
+    const POLL_INTERVAL_MS = 5000;
+
+    for (let i = 0; i < MAX_POLLS; i++) {
+      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+
+      try {
+        const status = await this.provider.getTaskStatus(taskArn);
+
+        if (status.status === 'running') {
+          continue;
+        }
+
+        // Task completed (succeeded, failed, or stopped)
+        await this.getPool().query(
+          `UPDATE compute.task_runs
+           SET status = $1, exit_code = $2, finished_at = NOW()
+           WHERE id = $3`,
+          [status.status, status.exitCode, taskRunId]
+        );
+        return;
+      } catch (err) {
+        logger.error('Error polling task status', {
+          taskRunId,
+          taskArn,
+          error: String(err),
+        });
       }
     }
+
+    // Timed out
+    await this.getPool().query(
+      `UPDATE compute.task_runs
+       SET status = 'failed', error_message = 'Task timed out after 30 minutes', finished_at = NOW()
+       WHERE id = $1`,
+      [taskRunId]
+    );
+  }
+
+  async stopTask(taskRunId: string): Promise<void> {
+    const result = await this.getPool().query<TaskRunRow>(
+      `SELECT * FROM compute.task_runs WHERE id = $1`,
+      [taskRunId]
+    );
+    const taskRun = result.rows[0];
+    if (!taskRun) {
+      throw new AppError('Task run not found', 404, ERROR_CODES.COMPUTE_TASK_NOT_FOUND);
+    }
+
+    if (taskRun.ecs_task_arn && (taskRun.status === 'running' || taskRun.status === 'pending')) {
+      await this.provider.stopTask(taskRun.ecs_task_arn);
+    }
+
+    await this.getPool().query(
+      `UPDATE compute.task_runs SET status = 'stopped', finished_at = NOW() WHERE id = $1`,
+      [taskRunId]
+    );
+  }
+
+  async listTaskRuns(containerId: string): Promise<TaskRunSchema[]> {
+    const result = await this.getPool().query<TaskRunRow>(
+      `SELECT * FROM compute.task_runs WHERE container_id = $1 ORDER BY created_at DESC`,
+      [containerId]
+    );
+    return result.rows.map(mapTaskRunRow);
+  }
+
+  async getTaskRun(taskRunId: string): Promise<TaskRunSchema | null> {
+    const result = await this.getPool().query<TaskRunRow>(
+      `SELECT * FROM compute.task_runs WHERE id = $1`,
+      [taskRunId]
+    );
+    return result.rows[0] ? mapTaskRunRow(result.rows[0]) : null;
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────────
