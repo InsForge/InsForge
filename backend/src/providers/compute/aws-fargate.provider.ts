@@ -10,6 +10,8 @@ import type {
   UpdateServiceResult,
   TeardownParams,
   LogStream,
+  RunTaskParams,
+  TaskStatus,
 } from './base.provider.js';
 
 const MAX_PRIORITY_RETRIES = 5;
@@ -59,7 +61,7 @@ export class AwsFargateProvider implements ComputeProvider {
       envOverrides.push({
         name: 'GITHUB_TOKEN',
         value: params.githubToken,
-        type: 'SECRETS_MANAGER',
+        type: 'PLAINTEXT',
       });
     }
 
@@ -125,7 +127,6 @@ export class AwsFargateProvider implements ComputeProvider {
       port: params.port,
       cpu: params.cpu,
       memory: params.memory,
-      healthCheckPath: params.healthCheckPath,
       envVars: params.envVars,
     });
 
@@ -204,16 +205,107 @@ export class AwsFargateProvider implements ComputeProvider {
     };
   }
 
+  // ─── Task methods ─────────────────────────────────────────────────────────────
+
+  async runTask(params: RunTaskParams): Promise<{ taskArn: string }> {
+    const { RunTaskCommand, ECSClient } = await import('@aws-sdk/client-ecs');
+
+    const ecsClient = new ECSClient(this.clientConfig());
+
+    const envOverrides = Object.entries(params.envVars).map(([name, value]) => ({
+      name,
+      value,
+    }));
+
+    const result = await ecsClient.send(
+      new RunTaskCommand({
+        cluster: config.compute.ecsClusterArn,
+        taskDefinition: params.taskDefinitionArn,
+        launchType: 'FARGATE',
+        networkConfiguration: {
+          awsvpcConfiguration: {
+            subnets: config.compute.subnetIds,
+            securityGroups: [config.compute.securityGroupId],
+            assignPublicIp: 'ENABLED',
+          },
+        },
+        overrides: {
+          containerOverrides: [
+            {
+              name: params.containerId,
+              environment: envOverrides,
+              cpu: params.cpu,
+              memory: params.memory,
+            },
+          ],
+        },
+      }),
+    );
+
+    const taskArn = result.tasks?.[0]?.taskArn;
+    if (!taskArn) throw new Error('Failed to run task: no task ARN returned');
+    return { taskArn };
+  }
+
+  async getTaskStatus(taskArn: string): Promise<TaskStatus> {
+    const { DescribeTasksCommand, ECSClient } = await import('@aws-sdk/client-ecs');
+
+    const ecsClient = new ECSClient(this.clientConfig());
+
+    const result = await ecsClient.send(
+      new DescribeTasksCommand({
+        cluster: config.compute.ecsClusterArn,
+        tasks: [taskArn],
+      }),
+    );
+
+    const task = result.tasks?.[0];
+    if (!task) throw new Error(`Task not found: ${taskArn}`);
+
+    const container = task.containers?.[0];
+    const lastStatus = task.lastStatus?.toUpperCase();
+
+    let status: TaskStatus['status'];
+    if (lastStatus === 'STOPPED') {
+      status = (container?.exitCode === 0) ? 'succeeded' : 'failed';
+    } else if (lastStatus === 'RUNNING') {
+      status = 'running';
+    } else {
+      status = 'running';
+    }
+
+    return {
+      status,
+      exitCode: container?.exitCode ?? null,
+      startedAt: task.startedAt ?? null,
+      stoppedAt: task.stoppedAt ?? null,
+    };
+  }
+
+  async stopTask(taskArn: string): Promise<void> {
+    const { StopTaskCommand, ECSClient } = await import('@aws-sdk/client-ecs');
+
+    const ecsClient = new ECSClient(this.clientConfig());
+
+    await ecsClient.send(
+      new StopTaskCommand({
+        cluster: config.compute.ecsClusterArn,
+        task: taskArn,
+        reason: 'Stopped by user via InsForge Compute',
+      }),
+    );
+  }
+
   // ─── Private helpers ──────────────────────────────────────────────────────────
 
   private clientConfig() {
     return { region: config.compute.awsRegion };
   }
 
-  private async registerTaskDefinition(
+  async registerTaskDefinition(
     params: Pick<
       ProvisionParams,
-      'containerId' | 'imageUri' | 'port' | 'cpu' | 'memory' | 'healthCheckPath' | 'envVars'
+      'containerId' | 'imageUri' | 'port' | 'cpu' | 'memory' | 'envVars'
     >
   ): Promise<string> {
     const { RegisterTaskDefinitionCommand, ECSClient } = await import('@aws-sdk/client-ecs');
@@ -263,7 +355,9 @@ export class AwsFargateProvider implements ComputeProvider {
       })
     );
 
-    return result.taskDefinition?.taskDefinitionArn ?? '';
+    const taskDefinitionArn = result.taskDefinition?.taskDefinitionArn;
+    if (!taskDefinitionArn) throw new Error('Failed to register task definition: no ARN returned');
+    return taskDefinitionArn;
   }
 
   private async createRoute(
@@ -294,11 +388,12 @@ export class AwsFargateProvider implements ComputeProvider {
       })
     );
 
-    const targetGroupArn = tgResult.TargetGroups?.[0]?.TargetGroupArn ?? '';
+    const targetGroupArn = tgResult.TargetGroups?.[0]?.TargetGroupArn;
+    if (!targetGroupArn) throw new Error('Failed to create target group: no ARN returned');
     const hostHeader = `${projectSlug}.${config.compute.domain}`;
 
     // Retry loop for priority collisions
-    let ruleArn = '';
+    let ruleArn: string | undefined;
     for (let attempt = 0; attempt < MAX_PRIORITY_RETRIES; attempt++) {
       try {
         const priority = await this.getNextRulePriority(elbClient);
@@ -310,7 +405,8 @@ export class AwsFargateProvider implements ComputeProvider {
             Actions: [{ Type: 'forward', TargetGroupArn: targetGroupArn }],
           })
         );
-        ruleArn = ruleResult.Rules?.[0]?.RuleArn ?? '';
+        ruleArn = ruleResult.Rules?.[0]?.RuleArn;
+        if (!ruleArn) throw new Error('Failed to create ALB rule: no ARN returned');
         break;
       } catch (err: unknown) {
         if (
@@ -336,6 +432,7 @@ export class AwsFargateProvider implements ComputeProvider {
       }
     }
 
+    if (!ruleArn) throw new Error('Failed to create ALB rule: no ARN returned after retries');
     return {
       targetGroupArn,
       ruleArn,
@@ -383,7 +480,9 @@ export class AwsFargateProvider implements ComputeProvider {
       })
     );
 
-    return result.service?.serviceArn ?? '';
+    const serviceArn = result.service?.serviceArn;
+    if (!serviceArn) throw new Error('Failed to create ECS service: no ARN returned');
+    return serviceArn;
   }
 
   private async deleteRoute(targetGroupArn: string, ruleArn: string): Promise<void> {

@@ -59,6 +59,21 @@ export interface TeardownParams {
   ruleArn: string;
 }
 
+export interface RunTaskParams {
+  containerId: string;
+  taskDefinitionArn: string;
+  envVars: Record<string, string>;
+  cpu: number;
+  memory: number;
+}
+
+export interface TaskStatus {
+  status: 'running' | 'succeeded' | 'failed' | 'stopped';
+  exitCode: number | null;
+  startedAt: Date | null;
+  stoppedAt: Date | null;
+}
+
 export interface LogEntry {
   timestamp: number;
   message: string;
@@ -90,4 +105,16 @@ export interface ComputeProvider {
     containerId: string,
     options?: { limit?: number; startTime?: number; nextToken?: string }
   ): Promise<LogStream>;
+
+  runTask(params: RunTaskParams): Promise<{ taskArn: string }>;
+  getTaskStatus(taskArn: string): Promise<TaskStatus>;
+  stopTask(taskArn: string): Promise<void>;
+  registerTaskDefinition(params: {
+    containerId: string;
+    imageUri: string;
+    port: number;
+    cpu: number;
+    memory: number;
+    envVars: Record<string, string>;
+  }): Promise<string>;
 }
