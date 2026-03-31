@@ -3,7 +3,6 @@ import { CLOUD_LOGIN_PATH, DASHBOARD_LOGIN_PATH, DashboardProtectedBoundary } fr
 import { useDashboardHost } from '../config/DashboardHostContext';
 import { useAuth } from '../contexts/AuthContext';
 import { LoadingState } from '../../components/LoadingState';
-import { isIframe } from '../utils/utils';
 
 interface RequireAuthProps {
   children: ReactNode;
@@ -12,7 +11,7 @@ interface RequireAuthProps {
 export const RequireAuth = ({ children }: RequireAuthProps) => {
   const host = useDashboardHost();
   const { isAuthenticated, isLoading } = useAuth();
-  const shouldUseCloudLogin = host.mode === 'cloud-hosting' || isIframe();
+  const shouldUseCloudLogin = host.mode === 'cloud-hosting';
 
   return (
     <DashboardProtectedBoundary

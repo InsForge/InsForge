@@ -13,7 +13,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import { useAuth } from './AuthContext';
 import { getDashboardBackendUrl } from '../config/runtime';
-import { postMessageToParent } from '../utils/cloudMessaging';
 import type { SocketMessage } from '@insforge/shared-schemas';
 import { useMcpUsage } from '../../features/logs/hooks/useMcpUsage';
 import { trackPostHog, getFeatureFlag } from '../analytics/posthog';
@@ -219,8 +218,6 @@ export function SocketProvider({ children }: SocketProviderProps) {
   // Send onboarding success only on first MCP connection
   const onMcpConnectedSuccess = useCallback((toolName: string) => {
     if (mcpUsageCount === 0) {
-      postMessageToParent({ type: 'ONBOARDING_SUCCESS' });
-
       trackPostHog('onboarding_completed', {
         experiment_variant: getFeatureFlag('onboarding-method-experiment'),
         tool_name: toolName,
@@ -308,15 +305,6 @@ export function SocketProvider({ children }: SocketProviderProps) {
       void queryClient.invalidateQueries({ queryKey: ['mcp-usage'] });
 
       const toolName = message.tool_name as string;
-      const timestamp = message.created_at as string;
-
-      // Notify parent window (for cloud onboarding)
-      postMessageToParent({
-        type: 'MCP_CONNECTION_STATUS',
-        connected: true,
-        tool_name: toolName,
-        timestamp: timestamp,
-      });
 
       onMcpConnectedSuccess(toolName);
     };

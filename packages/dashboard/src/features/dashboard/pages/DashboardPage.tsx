@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge, Button } from '@insforge/ui';
 import { Skeleton } from '../../../components';
@@ -30,14 +30,11 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useApiKey, useMetadata } from '../../../lib/hooks/useMetadata';
-import {
-  useIsCloudHostingMode,
-  useIsEmbeddedDashboard,
-} from '../../../lib/config/DashboardHostContext';
+import { useIsCloudHostingMode } from '../../../lib/config/DashboardHostContext';
 import { useCloudProjectInfo } from '../../../lib/hooks/useCloudProjectInfo';
 import { useMcpUsage } from '../../logs/hooks/useMcpUsage';
 import { useModal } from '../../../lib/contexts/ModalContext';
-import { getBackendUrl, isIframe, isInsForgeCloudProject } from '../../../lib/utils/utils';
+import { getBackendUrl, isInsForgeCloudProject } from '../../../lib/utils/utils';
 import { useUsers } from '../../auth';
 import { CLISection, MCPSection } from '../components/connect';
 const REGION_COUNTRY_CODE_MAP: Record<string, 'us' | 'de' | 'sg'> = {
@@ -300,9 +297,9 @@ function MetricCard({ label, value, unit, icon }: MetricCardProps) {
 
 function DashboardLoadingState() {
   return (
-    <main className="h-full overflow-hidden bg-semantic-0">
-      <div className="flex h-full flex-col xl:flex-row">
-        <section className="w-full overflow-y-auto border-b border-[var(--alpha-8)] px-10 py-10 xl:w-[480px] xl:border-b-0 xl:border-r">
+    <main className="h-full overflow-y-auto bg-semantic-0 lg:overflow-hidden">
+      <div className="flex min-h-full flex-col lg:h-full lg:flex-row">
+        <section className="w-full shrink-0 border-b border-[var(--alpha-8)] px-10 py-10 lg:w-[480px] lg:border-b-0 lg:border-r">
           <div className="mx-auto flex w-full max-w-[400px] flex-col gap-12">
             <div className="flex flex-col gap-12">
               <div className="flex items-center gap-2">
@@ -336,7 +333,7 @@ function DashboardLoadingState() {
           </div>
         </section>
 
-        <section className="relative min-h-[420px] flex-1 overflow-hidden bg-semantic-0">
+        <section className="relative min-h-[420px] flex-1 overflow-hidden bg-semantic-0 lg:min-h-0">
           <div
             className="absolute inset-0 dark:hidden"
             style={{
@@ -368,11 +365,8 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const { setConnectDialogOpen } = useModal();
   const isCloudHostingMode = useIsCloudHostingMode();
-  const isEmbeddedDashboard = useIsEmbeddedDashboard();
   const isCloudProject = isInsForgeCloudProject();
-  const isInIframe = isIframe();
-  const canShowCliGettingStarted =
-    isCloudProject && (isInIframe || isEmbeddedDashboard || isCloudHostingMode);
+  const canShowCliGettingStarted = isCloudProject && isCloudHostingMode;
   const {
     metadata,
     tables,
@@ -385,6 +379,7 @@ export default function DashboardPage() {
   const { totalUsers } = useUsers();
   const { hasCompletedOnboarding, recordsCount, isLoading: isMcpUsageLoading } = useMcpUsage();
   const [previewFitVersion, setPreviewFitVersion] = useState(0);
+  const previewContainerRef = useRef<HTMLDivElement | null>(null);
   const appUrl = getBackendUrl();
 
   const tableCount = tables?.length ?? 0;
@@ -505,14 +500,47 @@ export default function DashboardPage() {
     setPreviewFitVersion((current) => current + 1);
   }, [initialPreviewNodes, initialPreviewEdges, setNodes, setEdges]);
 
+  useEffect(() => {
+    const previewContainer = previewContainerRef.current;
+    if (!previewContainer || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+
+    let lastWidth = 0;
+    let lastHeight = 0;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) {
+        return;
+      }
+
+      const nextWidth = Math.round(entry.contentRect.width);
+      const nextHeight = Math.round(entry.contentRect.height);
+      if (nextWidth <= 0 || nextHeight <= 0) {
+        return;
+      }
+
+      if (nextWidth === lastWidth && nextHeight === lastHeight) {
+        return;
+      }
+
+      lastWidth = nextWidth;
+      lastHeight = nextHeight;
+      setPreviewFitVersion((current) => current + 1);
+    });
+
+    observer.observe(previewContainer);
+    return () => observer.disconnect();
+  }, []);
+
   if (shouldShowLoadingState) {
     return <DashboardLoadingState />;
   }
 
   return (
-    <main className="h-full overflow-hidden bg-semantic-0">
-      <div className="flex h-full flex-col xl:flex-row">
-        <section className="w-full overflow-y-auto border-b border-[var(--alpha-8)] px-10 py-10 xl:w-[480px] xl:border-b-0 xl:border-r">
+    <main className="h-full min-w-0 overflow-y-auto bg-semantic-0 lg:overflow-hidden">
+      <div className="flex min-h-full min-w-0 flex-col lg:h-full lg:flex-row">
+        <section className="w-full min-w-0 shrink-0 border-b border-[var(--alpha-8)] px-10 py-10 lg:w-[480px] lg:border-b-0 lg:border-r">
           <div className="mx-auto flex w-full max-w-[400px] flex-col gap-12">
             <div className="flex flex-col gap-12">
               <div className="flex items-center gap-2">
@@ -596,7 +624,7 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        <section className="relative min-h-[420px] flex-1 overflow-hidden bg-semantic-0">
+        <section className="relative min-h-[420px] min-w-0 flex-1 overflow-hidden bg-semantic-0 lg:min-h-0">
           <div
             className="absolute inset-0 dark:hidden"
             style={{
@@ -612,7 +640,7 @@ export default function DashboardPage() {
             }}
           />
 
-          <div className="relative z-10 h-full w-full">
+          <div ref={previewContainerRef} className="relative z-10 h-full w-full min-w-0">
             <ReactFlow
               nodes={nodes}
               edges={edges}

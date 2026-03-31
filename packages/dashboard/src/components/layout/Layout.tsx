@@ -3,11 +3,10 @@ import { DashboardFrame } from '../../layout/DashboardFrame';
 import AppSidebar from './AppSidebar';
 import AppHeader from './AppHeader';
 import { ThemeProvider } from '../../lib/contexts/ThemeContext';
-import { useDashboardHost, useIsEmbeddedDashboard } from '../../lib/config/DashboardHostContext';
+import { useDashboardHost } from '../../lib/config/DashboardHostContext';
 import { ConnectDialog } from '../../features/dashboard/components/connect';
 import { ProjectSettingsMenuDialog } from '../../features/dashboard/components';
 import { cn } from '../../lib/utils/utils';
-import { isIframe } from '../../lib/utils/utils';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -15,12 +14,12 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const host = useDashboardHost();
-  const isEmbeddedDashboard = useIsEmbeddedDashboard() || isIframe();
   const isContainedHostLayout = host.mode === 'cloud-hosting';
-  const showNavbar = host.showNavbar ?? !isEmbeddedDashboard;
+  const showNavbar = host.showNavbar ?? true;
+  const forcedTheme = host.mode === 'cloud-hosting' ? 'dark' : undefined;
 
   return (
-    <ThemeProvider forcedTheme={isEmbeddedDashboard ? 'dark' : undefined}>
+    <ThemeProvider forcedTheme={forcedTheme}>
       <DashboardFrame
         showHeader={showNavbar}
         header={<AppHeader />}
@@ -28,7 +27,7 @@ export default function Layout({ children }: LayoutProps) {
           'min-h-0 bg-semantic-0 flex flex-col',
           isContainedHostLayout ? 'h-full' : 'h-screen'
         )}
-        contentClassName="min-h-0 flex-1 flex overflow-hidden"
+        contentClassName="min-h-0 min-w-0 flex-1 flex overflow-hidden"
         sidebar={({ isSidebarCollapsed, toggleSidebar }) => (
           <AppSidebar isCollapsed={isSidebarCollapsed} onToggleCollapse={toggleSidebar} />
         )}

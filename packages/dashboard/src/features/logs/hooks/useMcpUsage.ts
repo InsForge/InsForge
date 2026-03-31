@@ -1,9 +1,7 @@
-import { useMemo, useEffect, useRef, useState } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../../lib/contexts/AuthContext';
 import { usageService, McpUsageRecord } from '../services/usage.service';
-import { isInsForgeCloudProject } from '../../../lib/utils/utils';
-import { postMessageToParent } from '../../../lib/utils/cloudMessaging';
 import { LOGS_PAGE_SIZE } from '../helpers';
 
 // ============================================================================
@@ -22,7 +20,6 @@ interface UseMcpUsageOptions {
  * Features:
  * - Fetches MCP logs from backend
  * - Provides helper functions for data access
- * - Handles initial parent window notification for onboarding (if in iframe)
  * - Supports search and pagination
  *
  */
@@ -35,9 +32,6 @@ export function useMcpUsage(options: UseMcpUsageOptions = {}) {
   // State
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-
-  // Refs
-  const hasNotifiedInitialStatus = useRef(false);
 
   // Query to fetch all MCP logs
   const {
@@ -80,28 +74,6 @@ export function useMcpUsage(options: UseMcpUsageOptions = {}) {
     () => filteredRecords.slice(startIndex, endIndex),
     [filteredRecords, startIndex, endIndex]
   );
-
-  // Notify parent window of initial onboarding status (ONLY ONCE)
-  useEffect(() => {
-    if (
-      hasNotifiedInitialStatus.current ||
-      isLoading ||
-      !records.length ||
-      !isInsForgeCloudProject()
-    ) {
-      return;
-    }
-
-    hasNotifiedInitialStatus.current = true;
-
-    const latestRecord = records[0];
-    postMessageToParent({
-      type: 'MCP_CONNECTION_STATUS',
-      connected: true,
-      tool_name: latestRecord.tool_name,
-      timestamp: latestRecord.created_at,
-    });
-  }, [isLoading, records]);
 
   // Computed values
   const hasCompletedOnboarding = useMemo(() => !!records.length, [records]);

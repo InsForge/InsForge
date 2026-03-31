@@ -1,14 +1,9 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { loginService } from '../../features/login/services/login.service';
-import { partnershipService } from '../../features/login/services/partnership.service';
 import { useDashboardHost } from '../config/DashboardHostContext';
 import { apiClient } from '../api/client';
-import { postMessageToParent } from '../utils/cloudMessaging';
-import { isInsForgeCloudProject, isIframe } from '../utils/utils';
 import type { UserSchema } from '@insforge/shared-schemas';
-
-const CLOUD_AUTH_TIMEOUT = 30000;
 
 interface AuthContextType {
   user: UserSchema | null;
@@ -42,17 +37,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
   const queryClient = useQueryClient();
-
-  // Ref for pending refresh request (resolves when AUTHORIZATION_CODE is received)
-  const pendingRefreshRef = useRef<{
-    requestId: symbol;
-    promise: Promise<boolean>;
-    resolve: (success: boolean) => void;
-    timeoutId: ReturnType<typeof setTimeout>;
-  } | null>(null);
-
-  // Ref to track if auth is in progress (prevents duplicate AUTHORIZATION_CODE processing)
-  const authInProgressRef = useRef<boolean>(false);
 
   const handleAuthError = useCallback(() => {
     setUser(null);
@@ -93,114 +77,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     [invalidateAuthQueries]
   );
 
-  const requestAuthorizationCodeFromParent = useCallback((): Promise<boolean> => {
-    if (!isIframe()) {
-      return Promise.resolve(false);
-    }
-
-    if (pendingRefreshRef.current) {
-      return pendingRefreshRef.current.promise;
-    }
-
-    let resolvePromise!: (success: boolean) => void;
-    const promise = new Promise<boolean>((resolve) => {
-      resolvePromise = resolve;
-    });
-
-    const requestId = Symbol('cloud-auth-request');
-    const timeoutId = setTimeout(() => {
-      if (pendingRefreshRef.current?.requestId !== requestId) {
-        return;
-      }
-      pendingRefreshRef.current = null;
-      resolvePromise(false);
-    }, CLOUD_AUTH_TIMEOUT);
-
-    pendingRefreshRef.current = {
-      requestId,
-      promise,
-      timeoutId,
-      resolve: (success: boolean) => {
-        if (pendingRefreshRef.current?.requestId !== requestId) {
-          return;
-        }
-        clearTimeout(timeoutId);
-        pendingRefreshRef.current = null;
-        resolvePromise(success);
-      },
-    };
-
-    postMessageToParent({ type: 'REQUEST_AUTHORIZATION_CODE' });
-    return promise;
-  }, []);
-
-  // Handle AUTHORIZATION_CODE from parent window
-  const handleAuthorizationCode = useCallback(
-    async (code: string, origin: string) => {
-      // Skip if auth is in progress (deduplication)
-      // Skip if already authenticated, unless there's a pending refresh request
-      if (authInProgressRef.current || (isAuthenticated && !pendingRefreshRef.current)) {
-        return;
-      }
-      authInProgressRef.current = true;
-
-      try {
-        const success = await loginWithAuthorizationCode(code);
-
-        // Resolve pending refresh if any
-        if (pendingRefreshRef.current) {
-          pendingRefreshRef.current.resolve(success);
-        }
-
-        // Notify parent
-        if (success) {
-          postMessageToParent({ type: 'AUTH_SUCCESS' }, origin);
-        } else {
-          postMessageToParent(
-            { type: 'AUTH_ERROR', message: 'Authorization code validation failed' },
-            origin
-          );
-        }
-      } finally {
-        authInProgressRef.current = false;
-      }
-    },
-    [isAuthenticated, loginWithAuthorizationCode]
-  );
-
-  // Persistent AUTHORIZATION_CODE listener for cloud projects
-  useEffect(() => {
-    if (host.mode === 'cloud-hosting' || !isInsForgeCloudProject()) {
-      return;
-    }
-
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type !== 'AUTHORIZATION_CODE' || !event.data?.code) {
-        return;
-      }
-
-      // Validate origin - allow insforge.dev, *.insforge.dev and partner domains
-      const isInsforgeOrigin =
-        event.origin.endsWith('.insforge.dev') || event.origin === 'https://insforge.dev';
-
-      if (isInsforgeOrigin) {
-        void handleAuthorizationCode(event.data.code, event.origin);
-      } else {
-        // Check partner origins asynchronously
-        void partnershipService.fetchConfig().then((config) => {
-          if (config?.partner_sites?.includes(event.origin)) {
-            void handleAuthorizationCode(event.data.code, event.origin);
-          }
-        });
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-    return () => {
-      window.removeEventListener('message', handleMessage);
-    };
-  }, [handleAuthorizationCode, host.mode]);
-
   // Access token refresh handler
   useEffect(() => {
     const handleRefreshAccessToken = (): Promise<boolean> => {
@@ -209,11 +85,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           .getAuthorizationCode()
           .then((code) => loginWithAuthorizationCode(code))
           .catch(() => false);
-      } else if (isIframe()) {
-        // In iframe: request new auth code from parent, persistent listener will handle it
-        return requestAuthorizationCodeFromParent();
       } else {
-        // Not in iframe: use cookie-based refresh
         return loginService.refreshAccessToken();
       }
     };
@@ -221,13 +93,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     apiClient.setRefreshAccessTokenHandler(handleRefreshAccessToken);
     return () => {
       apiClient.setRefreshAccessTokenHandler(undefined);
-      // Clear any pending refresh timeout
-      if (pendingRefreshRef.current) {
-        clearTimeout(pendingRefreshRef.current.timeoutId);
-        pendingRefreshRef.current = null;
-      }
     };
-  }, [host, loginWithAuthorizationCode, requestAuthorizationCodeFromParent]);
+  }, [host, loginWithAuthorizationCode]);
 
   const checkAuthStatus = useCallback(async () => {
     try {
