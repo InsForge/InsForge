@@ -187,6 +187,7 @@ export function createStorageColumns(
         // Type-safe access to the key property
         const fileKey = row.key || String(row['key'] || '');
         const isFileDownloading = isDownloading?.(fileKey) || false;
+        const canRename = Boolean(onRename) && fileKey !== '' && !fileKey.endsWith('/');
 
         return (
           <div className="flex w-full items-center justify-center gap-2">
@@ -219,14 +220,14 @@ export function createStorageColumns(
                 <Download className="h-5 w-5 stroke-[1.5]" />
               </Button>
             )}
-            {onRename && (
+            {canRename && (
               <Button
                 variant="ghost"
                 size="icon"
                 className="h-6 w-6 rounded p-0 text-muted-foreground hover:bg-[var(--alpha-4)] hover:text-foreground active:bg-[var(--alpha-8)]"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onRename(row as StorageFileSchema);
+                  onRename?.(row as StorageFileSchema);
                 }}
                 title="Rename file"
               >

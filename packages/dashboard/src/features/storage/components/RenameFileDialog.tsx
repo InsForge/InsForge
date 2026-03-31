@@ -21,6 +21,14 @@ interface RenameFileDialogProps {
   isRenaming?: boolean;
 }
 
+function getCurrentFileName(key?: string): string {
+  if (!key || key.endsWith('/')) {
+    return '';
+  }
+
+  return key.split('/').pop() || '';
+}
+
 export function RenameFileDialog({
   file,
   open,
@@ -32,7 +40,7 @@ export function RenameFileDialog({
   const [error, setError] = useState('');
 
   const currentName = useMemo(() => {
-    return file?.key.split('/').pop() || '';
+    return getCurrentFileName(file?.key);
   }, [file]);
 
   useEffect(() => {
@@ -52,6 +60,11 @@ export function RenameFileDialog({
     const trimmedName = newName.trim();
     if (!trimmedName) {
       setError('File name is required');
+      return;
+    }
+
+    if (!currentName) {
+      setError('Only files can be renamed');
       return;
     }
 
@@ -114,7 +127,7 @@ export function RenameFileDialog({
             <Button
               type="submit"
               className="h-8 px-2"
-              disabled={isRenaming || !newName.trim() || newName.trim() === currentName}
+              disabled={isRenaming || !currentName || !newName.trim() || newName.trim() === currentName}
             >
               {isRenaming ? 'Renaming...' : 'Rename'}
             </Button>

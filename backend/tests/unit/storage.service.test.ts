@@ -139,6 +139,9 @@ describe('StorageService.renameObject', () => {
     await expect(
       service.renameObject('assets', 'photo.png', 'photo.png', 'user-1', true)
     ).rejects.toThrow('different');
+    await expect(
+      service.renameObject('assets', 'folder/', 'banner.png', 'user-1', true)
+    ).rejects.toThrow('Only files can be renamed');
 
     expect(provider.renameObject).not.toHaveBeenCalled();
   });

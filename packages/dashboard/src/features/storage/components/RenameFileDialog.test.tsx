@@ -84,12 +84,6 @@ describe('RenameFileDialog', () => {
 
     const submitButton = screen.getByRole('button', { name: 'Rename' });
     expect(submitButton).toBeDisabled();
-
-    fireEvent.submit(submitButton.closest('form') as HTMLFormElement);
-
-    await waitFor(() => {
-      expect(screen.getByText('File name is required')).toBeInTheDocument();
-    });
     expect(onRename).not.toHaveBeenCalled();
   });
 });

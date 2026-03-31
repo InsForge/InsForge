@@ -132,10 +132,14 @@ export class S3StorageProvider implements StorageProvider {
 
     const sourceKey = this.getS3Key(bucket, oldKey);
     const destinationKey = this.getS3Key(bucket, newKey);
+    const encodedCopySource = `${this.s3Bucket}/${sourceKey
+      .split('/')
+      .map((segment) => encodeURIComponent(segment))
+      .join('/')}`;
 
     const copyCommand = new CopyObjectCommand({
       Bucket: this.s3Bucket,
-      CopySource: `${this.s3Bucket}/${sourceKey}`,
+      CopySource: encodedCopySource,
       Key: destinationKey,
     });
 

@@ -99,6 +99,11 @@ export class StorageService {
 
     const trimmedName = newName.trim();
     const keyParts = oldKey.split('/');
+
+    if (!keyParts[keyParts.length - 1]) {
+      throw new Error('Invalid object key. Only files can be renamed.');
+    }
+
     keyParts[keyParts.length - 1] = trimmedName;
 
     const newKey = keyParts.join('/');
