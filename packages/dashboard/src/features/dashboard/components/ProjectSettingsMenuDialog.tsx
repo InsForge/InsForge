@@ -27,7 +27,6 @@ import { useApiKey } from '../../../lib/hooks/useMetadata';
 import {
   useDashboardHost,
   useIsCloudHostingMode,
-  useIsEmbeddedDashboard,
 } from '../../../lib/config/DashboardHostContext';
 import { useHealth } from '../../../lib/hooks/useHealth';
 import {
@@ -42,11 +41,9 @@ import {
   cn,
   compareVersions,
   getBackendUrl,
-  isIframe,
   isInsForgeCloudProject,
 } from '../../../lib/utils/utils';
 import { MCPSection, CLISection, ConnectionStringSection } from './connect';
-import { postMessageToParent } from '../../../lib/utils/cloudMessaging';
 import { metadataService } from '../../../lib/services/metadata.service';
 
 type TabType = 'info' | 'compute' | 'connect';
@@ -57,7 +54,6 @@ const INFO_FIELD_CLASS =
 export default function ProjectSettingsMenuDialog() {
   const host = useDashboardHost();
   const isCloudHostingMode = useIsCloudHostingMode();
-  const isEmbeddedDashboard = useIsEmbeddedDashboard();
   const { isSettingsDialogOpen, settingsDefaultTab, closeSettingsDialog } = useModal();
   const [activeTab, setActiveTab] = useState<TabType>('info');
   const [isVersionOutdated, setIsVersionOutdated] = useState(false);
@@ -78,8 +74,7 @@ export default function ProjectSettingsMenuDialog() {
   const queryClient = useQueryClient();
 
   const isCloud = isInsForgeCloudProject();
-  const isInIframe = isIframe();
-  const canUseCloudHost = isCloud && (isInIframe || isEmbeddedDashboard || isCloudHostingMode);
+  const canUseCloudHost = isCloud && isCloudHostingMode;
   const projectUrl = useMemo(() => `${getBackendUrl().replace(/\/$/, '')}/`, []);
 
   const maskedApiKey = apiKey ? `ik_${'*'.repeat(22)}` : 'ik_**********************';
@@ -159,57 +154,6 @@ export default function ProjectSettingsMenuDialog() {
   }, [canUseCloudHost, isSettingsDialogOpen, projectInfo.name, settingsDefaultTab]);
 
   useEffect(() => {
-    if (!isCloud || !isInIframe) {
-      return;
-    }
-
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'VERSION_UPDATE_STARTED') {
-        setIsUpdatingVersion(true);
-      }
-
-      if (event.data?.type === 'INSTANCE_INFO') {
-        setInstanceInfo({
-          currentInstanceType: event.data.currentInstanceType,
-          planName: event.data.planName,
-          computeCredits: event.data.computeCredits,
-          currentOrgComputeCost: event.data.currentOrgComputeCost,
-          instanceTypes: event.data.instanceTypes,
-          projects: event.data.projects,
-        });
-        setSelectedInstanceType(null);
-      }
-
-      if (event.data?.type === 'INSTANCE_TYPE_CHANGE_RESULT') {
-        setIsChangingInstanceType(false);
-
-        if (event.data.success) {
-          const nextInstanceType = event.data.instanceType;
-          if (nextInstanceType) {
-            setInstanceInfo((prev) =>
-              prev
-                ? {
-                    ...prev,
-                    currentInstanceType: nextInstanceType,
-                  }
-                : prev
-            );
-            setSelectedInstanceType(null);
-          }
-          postMessageToParent({ type: 'REQUEST_INSTANCE_INFO' }, '*');
-          return;
-        }
-
-        showToast(event.data.error || 'Failed to update compute size', 'error');
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-
-    return () => window.removeEventListener('message', handleMessage);
-  }, [isCloud, isInIframe, showToast]);
-
-  useEffect(() => {
     if (version && latestVersion) {
       const comparison = compareVersions(version, latestVersion);
       setIsVersionOutdated(comparison < 0);
@@ -251,10 +195,6 @@ export default function ProjectSettingsMenuDialog() {
       }
       return;
     }
-
-    if (isInIframe) {
-      postMessageToParent({ type: 'REQUEST_INSTANCE_INFO' }, '*');
-    }
   }
 
   const handleDeleteProject = async () => {
@@ -279,7 +219,6 @@ export default function ProjectSettingsMenuDialog() {
       return;
     }
 
-    postMessageToParent({ type: 'DELETE_PROJECT' }, '*');
   };
 
   const handleUpdateVersion = async () => {
@@ -294,7 +233,6 @@ export default function ProjectSettingsMenuDialog() {
       return;
     }
 
-    postMessageToParent({ type: 'UPDATE_PROJECT_VERSION' }, '*');
   };
 
   const handleCancelProjectNameEdit = () => {
@@ -317,13 +255,7 @@ export default function ProjectSettingsMenuDialog() {
         return;
       }
     } else {
-      postMessageToParent(
-        {
-          type: 'UPDATE_PROJECT_NAME',
-          name: nextProjectName,
-        },
-        '*'
-      );
+      return;
     }
 
     queryClient.setQueryData<CloudProjectInfo>(CLOUD_PROJECT_INFO_QUERY_KEY, (previous = {}) => ({
@@ -410,13 +342,6 @@ export default function ProjectSettingsMenuDialog() {
       return;
     }
 
-    postMessageToParent(
-      {
-        type: 'REQUEST_INSTANCE_TYPE_CHANGE',
-        instanceType: selectedInstanceType,
-      },
-      '*'
-    );
   };
 
   return (
@@ -701,11 +626,7 @@ export default function ProjectSettingsMenuDialog() {
                             <Button
                               type="button"
                               className="h-8 rounded px-3 text-sm font-medium"
-                              onClick={() =>
-                                host.mode === 'cloud-hosting' && host.onNavigateToSubscription
-                                  ? host.onNavigateToSubscription()
-                                  : postMessageToParent({ type: 'SHOW_PLAN_MODAL' }, '*')
-                              }
+                              onClick={() => host.onNavigateToSubscription?.()}
                             >
                               Upgrade Plan
                             </Button>

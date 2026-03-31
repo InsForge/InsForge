@@ -172,10 +172,6 @@ export const getBackendUrl = () => {
   return getDashboardBackendUrl();
 };
 
-export const isIframe = () => {
-  return window.self !== window.top;
-};
-
 /**
  * Formats a timestamp string to a human-readable format with time
  * Used consistently across the application for displaying timestamps

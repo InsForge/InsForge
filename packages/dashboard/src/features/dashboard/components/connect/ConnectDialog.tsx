@@ -18,12 +18,8 @@ import { ConnectionStringSection } from './ConnectionStringSection';
 import { CLISection } from './CLISection';
 import { useApiKey } from '../../../../lib/hooks/useMetadata';
 import { useAnonToken } from '../../../auth/hooks/useAnonToken';
-import {
-  useIsCloudHostingMode,
-  useIsEmbeddedDashboard,
-} from '../../../../lib/config/DashboardHostContext';
-import { cn, getBackendUrl, isIframe, isInsForgeCloudProject } from '../../../../lib/utils/utils';
-import { parseCloudEvent } from '../../../../lib/utils/cloudMessaging';
+import { useIsCloudHostingMode } from '../../../../lib/config/DashboardHostContext';
+import { cn, getBackendUrl, isInsForgeCloudProject } from '../../../../lib/utils/utils';
 import { useModal } from '../../../../lib/hooks/useModal';
 import DiscordIcon from '../../../../assets/logos/discord.svg?react';
 
@@ -46,9 +42,8 @@ const CONNECT_TABS: ConnectTab[] = [
 export function ConnectDialog() {
   const { isConnectDialogOpen, setConnectDialogOpen } = useModal();
   const isCloudHostingMode = useIsCloudHostingMode();
-  const isEmbeddedDashboard = useIsEmbeddedDashboard();
   const isCloudProject = isInsForgeCloudProject();
-  const canShowCli = isCloudProject && (isIframe() || isEmbeddedDashboard || isCloudHostingMode);
+  const canShowCli = isCloudProject && isCloudHostingMode;
   const [activeTab, setActiveTab] = useState<ConnectTabId>(canShowCli ? 'cli' : 'mcp');
 
   const { apiKey, isLoading: isApiKeyLoading } = useApiKey();
@@ -80,22 +75,6 @@ export function ConnectDialog() {
       setActiveTab(canShowCli ? 'cli' : 'mcp');
     }
   }, [canShowCli, isConnectDialogOpen]);
-
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      const parsed = parseCloudEvent(event.data);
-      // Cloud host still sends the legacy event name to trigger opening the connect dialog.
-      if (!parsed.ok || parsed.data.type !== 'SHOW_ONBOARDING_OVERLAY') {
-        return;
-      }
-      setConnectDialogOpen(true);
-    };
-
-    window.addEventListener('message', handleMessage);
-    return () => {
-      window.removeEventListener('message', handleMessage);
-    };
-  }, [setConnectDialogOpen]);
 
   const handleModalClose = (nextOpen: boolean) => {
     setConnectDialogOpen(nextOpen);

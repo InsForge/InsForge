@@ -16,11 +16,3 @@ export function useDashboardHost() {
 export function useIsCloudHostingMode() {
   return useDashboardHost().mode === 'cloud-hosting';
 }
-
-export function useIsEmbeddedDashboard() {
-  if (typeof window === 'undefined') {
-    return false;
-  }
-
-  return window.self !== window.top;
-}

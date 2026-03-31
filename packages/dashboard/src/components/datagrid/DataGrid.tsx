@@ -282,12 +282,15 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
 
   return (
     <div
-      className={cn('h-full flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]', className)}
+      className={cn(
+        'min-w-0 h-full flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]',
+        className
+      )}
     >
       <div className={cn('flex min-h-0 flex-1 overflow-hidden', !noPadding && 'px-3')}>
         <div
           className={cn(
-            'relative overflow-hidden bg-[rgb(var(--semantic-1))]',
+            'relative min-w-0 overflow-hidden bg-[rgb(var(--semantic-1))]',
             rightPanel ? 'rounded-r-none' : 'flex-1',
             gridContainerClassName
           )}

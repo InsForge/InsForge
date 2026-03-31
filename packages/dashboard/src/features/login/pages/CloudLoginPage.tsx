@@ -3,8 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { LockIcon } from 'lucide-react';
 import { useDashboardHost } from '../../../lib/config/DashboardHostContext';
 import { useAuth } from '../../../lib/contexts/AuthContext';
-import { postMessageToParent } from '../../../lib/utils/cloudMessaging';
-import { isInsForgeCloudProject, isIframe } from '../../../lib/utils/utils';
 import type { DashboardAuthConfig } from '../../../types';
 
 export default function CloudLoginPage() {
@@ -47,13 +45,6 @@ export default function CloudLoginPage() {
       void authenticate();
       return;
     }
-
-    if (!isInsForgeCloudProject() || !isIframe()) {
-      return;
-    }
-
-    hasRequestedAuthRef.current = true;
-    postMessageToParent({ type: 'REQUEST_AUTHORIZATION_CODE' });
   }, [error, host, isAuthenticated, loginWithAuthorizationCode]);
 
   useEffect(() => {

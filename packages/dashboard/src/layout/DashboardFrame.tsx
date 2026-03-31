@@ -36,7 +36,7 @@ export function DashboardFrame({
         {showHeader ? header : null}
         <div className={contentClassName}>
           {sidebar({ isSidebarCollapsed, toggleSidebar })}
-          <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
+          <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
             {children}
           </main>
         </div>
