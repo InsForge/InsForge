@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { containerSchema, containerDeploymentSchema, fargateMemoryMap } from './compute.schema.js';
+import { containerSchema, containerDeploymentSchema, fargateMemoryMap, taskRunSchema } from './compute.schema.js';
 
 export const createContainerSchema = z
   .object({
@@ -14,6 +14,7 @@ export const createContainerSchema = z
     port: z.number().min(1).max(65535).default(8080),
     healthCheckPath: z.string().default('/health'),
     autoDeploy: z.boolean().default(true),
+    runMode: z.enum(['service', 'task']).default('service'),
   })
   .refine(
     (data) => {
@@ -79,7 +80,17 @@ export const listComputeDeploymentsResponseSchema = z.object({
   deployments: z.array(containerDeploymentSchema),
 });
 
+export const runTaskResponseSchema = z.object({
+  taskRunId: z.string().uuid(),
+});
+
+export const listTaskRunsResponseSchema = z.object({
+  data: z.array(taskRunSchema),
+});
+
 export type CreateContainerRequest = z.infer<typeof createContainerSchema>;
 export type UpdateContainerRequest = z.infer<typeof updateContainerSchema>;
 export type DeployContainerRequest = z.infer<typeof deployContainerSchema>;
 export type RollbackContainerRequest = z.infer<typeof rollbackContainerSchema>;
+export type RunTaskResponse = z.infer<typeof runTaskResponseSchema>;
+export type ListTaskRunsResponse = z.infer<typeof listTaskRunsResponseSchema>;

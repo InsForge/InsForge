@@ -4,6 +4,7 @@ export const containerStatusEnum = z.enum([
   'created',
   'deploying',
   'running',
+  'ready',
   'failed',
   'stopped',
   'teardown_failed',
@@ -51,6 +52,8 @@ export const containerSchema = z.object({
   autoDeploy: z.boolean(),
   status: containerStatusEnum,
   endpointUrl: z.string().nullable(),
+  runMode: z.enum(['service', 'task']).default('service'),
+  taskDefinitionArn: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -68,8 +71,31 @@ export const containerDeploymentSchema = z.object({
   updatedAt: z.string(),
 });
 
+export const taskRunStatusEnum = z.enum([
+  'pending',
+  'running',
+  'succeeded',
+  'failed',
+  'stopped',
+]);
+
+export const taskRunSchema = z.object({
+  id: z.string().uuid(),
+  containerId: z.string().uuid(),
+  ecsTaskArn: z.string().nullable(),
+  status: taskRunStatusEnum,
+  exitCode: z.number().int().nullable(),
+  triggeredBy: z.enum(['manual', 'api']),
+  errorMessage: z.string().nullable(),
+  startedAt: z.string().datetime().nullable(),
+  finishedAt: z.string().datetime().nullable(),
+  createdAt: z.string().datetime(),
+});
+
 export type ContainerSchema = z.infer<typeof containerSchema>;
 export type ContainerDeploymentSchema = z.infer<typeof containerDeploymentSchema>;
 export type ContainerStatus = z.infer<typeof containerStatusEnum>;
 export type DeploymentStatus = z.infer<typeof deploymentStatusEnum>;
 export type SourceType = z.infer<typeof sourceTypeEnum>;
+export type TaskRunSchema = z.infer<typeof taskRunSchema>;
+export type TaskRunStatus = z.infer<typeof taskRunStatusEnum>;
