@@ -180,7 +180,7 @@ export class AwsFargateProvider implements ComputeProvider {
 
   async getLogs(
     containerId: string,
-    options?: { limit?: number; startTime?: number; nextToken?: string }
+    options?: { limit?: number; startTime?: number; nextToken?: string; logStreamPrefix?: string }
   ): Promise<LogStream> {
     const { FilterLogEventsCommand, CloudWatchLogsClient } =
       await import('@aws-sdk/client-cloudwatch-logs');
@@ -193,6 +193,7 @@ export class AwsFargateProvider implements ComputeProvider {
         limit: options?.limit ?? 100,
         startTime: options?.startTime,
         nextToken: options?.nextToken,
+        ...(options?.logStreamPrefix ? { logStreamNamePrefix: options.logStreamPrefix } : {}),
       })
     );
 

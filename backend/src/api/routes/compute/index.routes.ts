@@ -13,6 +13,7 @@ import {
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import { successResponse } from '@/utils/response.js';
+import type { ContainerSchema } from '@insforge/shared-schemas';
 
 const computeRouter = Router();
 const computeService = ComputeService.getInstance();
@@ -32,6 +33,24 @@ function broadcastUpdate() {
   );
 }
 
+async function getContainerForProject(
+  id: string,
+  projectId: string,
+  service: ComputeService,
+): Promise<ContainerSchema> {
+  const container = await service.getContainer(id);
+  if (!container || container.projectId !== projectId) {
+    throw new AppError('Container not found', 404, ERROR_CODES.NOT_FOUND);
+  }
+  return container;
+}
+
+function getProjectId(req: AuthRequest): string {
+  return typeof req.query.project_id === 'string' && req.query.project_id
+    ? req.query.project_id
+    : 'default';
+}
+
 /**
  * GET /api/compute/containers
  */
@@ -40,10 +59,7 @@ computeRouter.get(
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const projectId =
-        typeof req.query.project_id === 'string' && req.query.project_id
-          ? req.query.project_id
-          : 'default';
+      const projectId = getProjectId(req);
       const containers = await computeService.listContainers(projectId);
       successResponse(res, { containers });
     } catch (error) {
@@ -60,10 +76,8 @@ computeRouter.get(
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const container = await computeService.getContainer(req.params.id);
-      if (!container) {
-        throw new AppError('Container not found', 404, ERROR_CODES.NOT_FOUND);
-      }
+      const projectId = getProjectId(req);
+      const container = await getContainerForProject(req.params.id, projectId, computeService);
       successResponse(res, container);
     } catch (error) {
       next(error);
@@ -88,10 +102,7 @@ computeRouter.post(
         );
       }
 
-      const projectId =
-        typeof req.query.project_id === 'string' && req.query.project_id
-          ? req.query.project_id
-          : 'default';
+      const projectId = getProjectId(req);
 
       const container = await computeService.createContainer({
         ...validation.data,
@@ -134,6 +145,9 @@ computeRouter.patch(
         );
       }
 
+      const projectId = getProjectId(req);
+      await getContainerForProject(req.params.id, projectId, computeService);
+
       const container = await computeService.updateContainer(req.params.id, validation.data);
 
       await auditService.log({
@@ -159,6 +173,9 @@ computeRouter.delete(
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      const projectId = getProjectId(req);
+      await getContainerForProject(req.params.id, projectId, computeService);
+
       await computeService.deleteContainer(req.params.id);
 
       await auditService.log({
@@ -192,6 +209,9 @@ computeRouter.post(
           ERROR_CODES.INVALID_INPUT
         );
       }
+
+      const projectId = getProjectId(req);
+      await getContainerForProject(req.params.id, projectId, computeService);
 
       const deployment = await computeService.deploy({
         containerId: req.params.id,
@@ -235,6 +255,17 @@ computeRouter.post(
         );
       }
 
+      const projectId = getProjectId(req);
+      const container = await getContainerForProject(req.params.id, projectId, computeService);
+
+      if (container.runMode === 'task') {
+        throw new AppError(
+          'Rollback is not supported for task containers',
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
       const deployment = await computeService.rollback({
         containerId: req.params.id,
         deploymentId: validation.data.deploymentId,
@@ -267,6 +298,17 @@ computeRouter.get(
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      const projectId = getProjectId(req);
+      const container = await getContainerForProject(req.params.id, projectId, computeService);
+
+      if (container.runMode === 'task') {
+        throw new AppError(
+          'Deployments list is not available for task containers',
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
       const deployments = await computeService.listDeployments(req.params.id);
       successResponse(res, { deployments });
     } catch (error) {
@@ -283,6 +325,9 @@ computeRouter.get(
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      const projectId = getProjectId(req);
+      await getContainerForProject(req.params.id, projectId, computeService);
+
       const limitRaw = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
       const limit = limitRaw !== undefined && !isNaN(limitRaw) ? limitRaw : undefined;
       const startTimeRaw = req.query.start_time
@@ -296,6 +341,158 @@ computeRouter.get(
         limit,
         startTime,
         nextToken,
+      });
+      successResponse(res, logs);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /api/compute/containers/:id/run
+ * Trigger task execution (task containers only)
+ */
+computeRouter.post(
+  '/containers/:id/run',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const projectId = getProjectId(req);
+      await getContainerForProject(req.params.id, projectId, computeService);
+
+      const triggeredBy: 'manual' | 'api' =
+        req.body?.triggeredBy === 'api' ? 'api' : 'manual';
+
+      const taskRun = await computeService.runTask(req.params.id, triggeredBy);
+
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'RUN_TASK',
+        module: 'COMPUTE',
+        details: { containerId: req.params.id, taskRunId: taskRun.id, triggeredBy },
+      });
+
+      broadcastUpdate();
+      successResponse(res, taskRun, 202);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * GET /api/compute/containers/:id/runs
+ * List task runs for a container
+ */
+computeRouter.get(
+  '/containers/:id/runs',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const projectId = getProjectId(req);
+      await getContainerForProject(req.params.id, projectId, computeService);
+
+      const runs = await computeService.listTaskRuns(req.params.id);
+      successResponse(res, { runs });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * GET /api/compute/containers/:id/runs/:runId
+ * Get a single task run
+ */
+computeRouter.get(
+  '/containers/:id/runs/:runId',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const projectId = getProjectId(req);
+      await getContainerForProject(req.params.id, projectId, computeService);
+
+      const taskRun = await computeService.getTaskRun(req.params.runId);
+      if (!taskRun || taskRun.containerId !== req.params.id) {
+        throw new AppError('Task run not found', 404, ERROR_CODES.NOT_FOUND);
+      }
+
+      successResponse(res, taskRun);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /api/compute/containers/:id/runs/:runId/stop
+ * Stop a running task
+ */
+computeRouter.post(
+  '/containers/:id/runs/:runId/stop',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const projectId = getProjectId(req);
+      await getContainerForProject(req.params.id, projectId, computeService);
+
+      // Verify the run belongs to this container
+      const taskRun = await computeService.getTaskRun(req.params.runId);
+      if (!taskRun || taskRun.containerId !== req.params.id) {
+        throw new AppError('Task run not found', 404, ERROR_CODES.NOT_FOUND);
+      }
+
+      await computeService.stopTask(req.params.runId);
+
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'STOP_TASK',
+        module: 'COMPUTE',
+        details: { containerId: req.params.id, taskRunId: req.params.runId },
+      });
+
+      broadcastUpdate();
+      successResponse(res, { message: 'Task stopped' });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * GET /api/compute/containers/:id/runs/:runId/logs
+ * Get logs for a specific task run
+ */
+computeRouter.get(
+  '/containers/:id/runs/:runId/logs',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const projectId = getProjectId(req);
+      await getContainerForProject(req.params.id, projectId, computeService);
+
+      const taskRun = await computeService.getTaskRun(req.params.runId);
+      if (!taskRun || taskRun.containerId !== req.params.id) {
+        throw new AppError('Task run not found', 404, ERROR_CODES.NOT_FOUND);
+      }
+
+      const limitRaw = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+      const limit = limitRaw !== undefined && !isNaN(limitRaw) ? limitRaw : undefined;
+      const startTimeRaw = req.query.start_time
+        ? parseInt(req.query.start_time as string, 10)
+        : undefined;
+      const startTime =
+        startTimeRaw !== undefined && !isNaN(startTimeRaw) ? startTimeRaw : undefined;
+      const nextToken = (req.query.next_token as string) || undefined;
+
+      const logStreamPrefix = taskRun.ecsTaskArn?.split('/').pop();
+
+      const logs = await computeService.getContainerLogs(req.params.id, {
+        limit,
+        startTime,
+        nextToken,
+        logStreamPrefix,
       });
       successResponse(res, logs);
     } catch (error) {

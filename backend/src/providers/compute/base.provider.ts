@@ -103,7 +103,7 @@ export interface ComputeProvider {
   /** Retrieve container logs. */
   getLogs(
     containerId: string,
-    options?: { limit?: number; startTime?: number; nextToken?: string }
+    options?: { limit?: number; startTime?: number; nextToken?: string; logStreamPrefix?: string }
   ): Promise<LogStream>;
 
   runTask(params: RunTaskParams): Promise<{ taskArn: string }>;

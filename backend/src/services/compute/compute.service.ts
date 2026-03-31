@@ -440,7 +440,7 @@ export class ComputeService {
 
   async getContainerLogs(
     containerId: string,
-    options?: { limit?: number; startTime?: number; nextToken?: string }
+    options?: { limit?: number; startTime?: number; nextToken?: string; logStreamPrefix?: string }
   ) {
     if (!this.provider.isConfigured()) {
       throw new AppError(
