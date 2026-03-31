@@ -216,14 +216,17 @@ export function SocketProvider({ children }: SocketProviderProps) {
   }, [disconnect]);
 
   // Send onboarding success only on first MCP connection
-  const onMcpConnectedSuccess = useCallback((toolName: string) => {
-    if (mcpUsageCount === 0) {
-      trackPostHog('onboarding_completed', {
-        experiment_variant: getFeatureFlag('onboarding-method-experiment'),
-        tool_name: toolName,
-      });
-    }
-  }, [mcpUsageCount]);
+  const onMcpConnectedSuccess = useCallback(
+    (toolName: string) => {
+      if (mcpUsageCount === 0) {
+        trackPostHog('onboarding_completed', {
+          experiment_variant: getFeatureFlag('onboarding-method-experiment'),
+          tool_name: toolName,
+        });
+      }
+    },
+    [mcpUsageCount]
+  );
 
   // Register business event handlers when socket is connected
   useEffect(() => {

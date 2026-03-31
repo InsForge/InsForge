@@ -287,7 +287,7 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
         className
       )}
     >
-      <div className={cn('flex min-h-0 flex-1 overflow-hidden', !noPadding && 'px-3')}>
+      <div className={cn('flex min-h-0 min-w-0 flex-1 overflow-hidden', !noPadding && 'px-3')}>
         <div
           className={cn(
             'relative min-w-0 overflow-hidden bg-[rgb(var(--semantic-1))]',

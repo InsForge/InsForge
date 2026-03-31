@@ -24,10 +24,7 @@ import {
 } from '@insforge/ui';
 import type { InstanceInfoEvent } from '@insforge/shared-schemas';
 import { useApiKey } from '../../../lib/hooks/useMetadata';
-import {
-  useDashboardHost,
-  useIsCloudHostingMode,
-} from '../../../lib/config/DashboardHostContext';
+import { useDashboardHost, useIsCloudHostingMode } from '../../../lib/config/DashboardHostContext';
 import { useHealth } from '../../../lib/hooks/useHealth';
 import {
   CLOUD_PROJECT_INFO_QUERY_KEY,
@@ -218,7 +215,6 @@ export default function ProjectSettingsMenuDialog() {
       }
       return;
     }
-
   };
 
   const handleUpdateVersion = async () => {
@@ -228,11 +224,13 @@ export default function ProjectSettingsMenuDialog() {
         await host.onUpdateVersion();
       } catch (error) {
         setIsUpdatingVersion(false);
-        showToast(error instanceof Error ? error.message : 'Failed to update project version', 'error');
+        showToast(
+          error instanceof Error ? error.message : 'Failed to update project version',
+          'error'
+        );
       }
       return;
     }
-
   };
 
   const handleCancelProjectNameEdit = () => {
@@ -251,7 +249,10 @@ export default function ProjectSettingsMenuDialog() {
       try {
         await host.onRenameProject(nextProjectName);
       } catch (error) {
-        showToast(error instanceof Error ? error.message : 'Failed to update project name', 'error');
+        showToast(
+          error instanceof Error ? error.message : 'Failed to update project name',
+          'error'
+        );
         return;
       }
     } else {
@@ -337,11 +338,13 @@ export default function ProjectSettingsMenuDialog() {
         showToast(result.error || 'Failed to update compute size', 'error');
       } catch (error) {
         setIsChangingInstanceType(false);
-        showToast(error instanceof Error ? error.message : 'Failed to update compute size', 'error');
+        showToast(
+          error instanceof Error ? error.message : 'Failed to update compute size',
+          'error'
+        );
       }
       return;
     }
-
   };
 
   return (
@@ -414,7 +417,9 @@ export default function ProjectSettingsMenuDialog() {
                         </div>
                         <div className="flex min-w-0 flex-1 items-start gap-1.5">
                           <Input
-                            value={canUseCloudHost && isProjectInfoLoading ? 'Loading...' : projectName}
+                            value={
+                              canUseCloudHost && isProjectInfoLoading ? 'Loading...' : projectName
+                            }
                             onChange={(event) => setProjectName(event.target.value)}
                             onFocus={() => setIsProjectNameFocused(true)}
                             onBlur={() => setIsProjectNameFocused(false)}

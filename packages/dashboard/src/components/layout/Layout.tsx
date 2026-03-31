@@ -24,7 +24,7 @@ export default function Layout({ children }: LayoutProps) {
         showHeader={showNavbar}
         header={<AppHeader />}
         className={cn(
-          'min-h-0 bg-semantic-0 flex flex-col',
+          'min-h-0 min-w-0 bg-semantic-0 flex flex-col',
           isContainedHostLayout ? 'h-full' : 'h-screen'
         )}
         contentClassName="min-h-0 min-w-0 flex-1 flex overflow-hidden"

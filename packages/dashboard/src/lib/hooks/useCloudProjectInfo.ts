@@ -15,7 +15,7 @@ interface UseCloudProjectInfoOptions {
 
 export const CLOUD_PROJECT_INFO_QUERY_KEY = ['cloud-project-info'];
 
-export function useCloudProjectInfo(options?: UseCloudProjectInfoOptions) {
+export function useCloudProjectInfo(_options?: UseCloudProjectInfoOptions) {
   const host = useDashboardHost();
   const emptyProjectInfo: CloudProjectInfo = {};
   const hostProjectInfo: CloudProjectInfo = host.project
@@ -31,7 +31,7 @@ export function useCloudProjectInfo(options?: UseCloudProjectInfoOptions) {
       projectInfo: hostProjectInfo,
       isLoading: false,
       error: null,
-      refetch: async () => ({ data: hostProjectInfo }),
+      refetch: () => Promise.resolve({ data: hostProjectInfo }),
     };
   }
 
@@ -39,6 +39,6 @@ export function useCloudProjectInfo(options?: UseCloudProjectInfoOptions) {
     projectInfo: emptyProjectInfo,
     isLoading: false,
     error: null,
-    refetch: async () => ({ data: emptyProjectInfo }),
+    refetch: () => Promise.resolve({ data: emptyProjectInfo }),
   };
 }

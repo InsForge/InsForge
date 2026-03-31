@@ -297,9 +297,9 @@ function MetricCard({ label, value, unit, icon }: MetricCardProps) {
 
 function DashboardLoadingState() {
   return (
-    <main className="h-full overflow-y-auto bg-semantic-0 lg:overflow-hidden">
-      <div className="flex min-h-full flex-col lg:h-full lg:flex-row">
-        <section className="w-full shrink-0 border-b border-[var(--alpha-8)] px-10 py-10 lg:w-[480px] lg:border-b-0 lg:border-r">
+    <main className="h-full min-h-0 min-w-0 overflow-y-auto bg-semantic-0 lg:overflow-hidden">
+      <div className="flex min-h-full min-w-0 flex-col lg:h-full lg:min-h-0 lg:flex-row">
+        <section className="w-full min-w-0 shrink-0 border-b border-[var(--alpha-8)] px-10 py-10 lg:w-[480px] lg:border-b-0 lg:border-r">
           <div className="mx-auto flex w-full max-w-[400px] flex-col gap-12">
             <div className="flex flex-col gap-12">
               <div className="flex items-center gap-2">
@@ -538,8 +538,8 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="h-full min-w-0 overflow-y-auto bg-semantic-0 lg:overflow-hidden">
-      <div className="flex min-h-full min-w-0 flex-col lg:h-full lg:flex-row">
+    <main className="h-full min-h-0 min-w-0 overflow-y-auto bg-semantic-0 lg:overflow-hidden">
+      <div className="flex min-h-full min-w-0 flex-col lg:h-full lg:min-h-0 lg:flex-row">
         <section className="w-full min-w-0 shrink-0 border-b border-[var(--alpha-8)] px-10 py-10 lg:w-[480px] lg:border-b-0 lg:border-r">
           <div className="mx-auto flex w-full max-w-[400px] flex-col gap-12">
             <div className="flex flex-col gap-12">
@@ -640,7 +640,7 @@ export default function DashboardPage() {
             }}
           />
 
-          <div ref={previewContainerRef} className="relative z-10 h-full w-full min-w-0">
+          <div ref={previewContainerRef} className="relative z-10 h-full w-full min-h-0 min-w-0">
             <ReactFlow
               nodes={nodes}
               edges={edges}
