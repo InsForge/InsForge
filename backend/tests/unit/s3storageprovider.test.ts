@@ -23,7 +23,7 @@ vi.mock('@aws-sdk/client-s3', () => {
   class MockS3Client {
     send = sendMock;
 
-    constructor(_config: Record<string, unknown>) {}
+    constructor() {}
   }
 
   class MockCopyObjectCommand {

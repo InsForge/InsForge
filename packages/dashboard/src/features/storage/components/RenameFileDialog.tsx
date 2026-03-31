@@ -127,7 +127,9 @@ export function RenameFileDialog({
             <Button
               type="submit"
               className="h-8 px-2"
-              disabled={isRenaming || !currentName || !newName.trim() || newName.trim() === currentName}
+              disabled={
+                isRenaming || !currentName || !newName.trim() || newName.trim() === currentName
+              }
             >
               {isRenaming ? 'Renaming...' : 'Rename'}
             </Button>
