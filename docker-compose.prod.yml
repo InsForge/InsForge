@@ -1,7 +1,7 @@
 services:
   postgres:
     image: ghcr.io/insforge/postgres:v15.13.2
-    container_name: insforge-postgres
+
     command: postgres -c config_file=/etc/postgresql/postgresql.conf -c app.encryption_key='${ENCRYPTION_KEY:-${JWT_SECRET:-dev-secret-please-change-in-production}}'
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
@@ -13,7 +13,7 @@ services:
       - ./deploy/docker-init/db/jwt.sql:/docker-entrypoint-initdb.d/02-jwt.sql
       - ./deploy/docker-init/db/postgresql.conf:/etc/postgresql/postgresql.conf
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     networks:
       - insforge-network
     healthcheck:
@@ -26,7 +26,7 @@ services:
 
   postgrest:
     image: postgrest/postgrest:v12.2.12
-    container_name: insforge-postgrest
+
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
@@ -40,7 +40,7 @@ services:
       PGRST_DB_ANON_ROLE: anon
       PGRST_JWT_SECRET: ${JWT_SECRET:-dev-secret-please-change-in-production}
     ports:
-      - "5430:3000"
+      - "${POSTGREST_PORT:-5430}:3000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -55,13 +55,13 @@ services:
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:7130}
         VITE_PUBLIC_POSTHOG_KEY: ${VITE_PUBLIC_POSTHOG_KEY:-}
-    container_name: insforge
+
     depends_on:
       postgres:
         condition: service_healthy
     ports:
-      - "7130:7130"
-      - "7131:7131"
+      - "${APP_PORT:-7130}:7130"
+      - "${AUTH_PORT:-7131}:7131"
     environment:
       - PORT=7130
       - PROJECT_ROOT=/app
@@ -129,7 +129,7 @@ services:
   # Deno serverless runtime for edge functions
   deno:
     image: denoland/deno:alpine-2.0.6
-    container_name: insforge-deno
+
     working_dir: /app
     security_opt:
       - no-new-privileges:true
@@ -137,7 +137,7 @@ services:
       - postgres
       - postgrest
     ports:
-      - "7133:7133"
+      - "${DENO_PORT:-7133}:7133"
     environment:
       - PORT=7133
       - DENO_ENV=${DENO_ENV:-production}
@@ -170,7 +170,7 @@ services:
 
   # Vector.dev for log collection and shipping
   vector:
-    container_name: insforge-vector
+
     image: timberio/vector:0.28.1-alpine
     restart: unless-stopped
     security_opt:
