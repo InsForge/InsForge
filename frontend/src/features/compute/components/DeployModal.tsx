@@ -20,6 +20,7 @@ interface DeployModalProps {
 }
 
 export function DeployModal({ open, onOpenChange, onSubmit, isSubmitting }: DeployModalProps) {
+  const [runMode, setRunMode] = useState<'service' | 'task'>('service');
   const [sourceType, setSourceType] = useState<SourceType>('github');
   const [name, setName] = useState('');
   const [githubRepo, setGithubRepo] = useState('');
@@ -31,6 +32,7 @@ export function DeployModal({ open, onOpenChange, onSubmit, isSubmitting }: Depl
 
   useEffect(() => {
     if (open) {
+      setRunMode('service');
       setSourceType('github');
       setName('');
       setGithubRepo('');
@@ -51,9 +53,10 @@ export function DeployModal({ open, onOpenChange, onSubmit, isSubmitting }: Depl
 
     const base = {
       name: name.trim(),
+      runMode,
       sourceType,
       port: parsedPort,
-      healthCheckPath,
+      healthCheckPath: runMode === 'task' ? undefined : healthCheckPath,
       cpu: 256 as number,
       memory: 512 as number,
       autoDeploy: true,
@@ -78,6 +81,34 @@ export function DeployModal({ open, onOpenChange, onSubmit, isSubmitting }: Depl
 
         <form onSubmit={handleSubmit}>
           <DialogBody className="space-y-4">
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-foreground">Run Mode</label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="runMode"
+                    value="service"
+                    checked={runMode === 'service'}
+                    onChange={() => setRunMode('service')}
+                  />
+                  <span className="text-sm">Service</span>
+                  <span className="text-xs text-muted-foreground">Always-on with public URL</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="runMode"
+                    value="task"
+                    checked={runMode === 'task'}
+                    onChange={() => setRunMode('task')}
+                  />
+                  <span className="text-sm">Task</span>
+                  <span className="text-xs text-muted-foreground">Run-to-completion</span>
+                </label>
+              </div>
+            </div>
+
             <div>
               <label className="text-sm font-medium text-foreground">Name</label>
               <Input
@@ -152,13 +183,15 @@ export function DeployModal({ open, onOpenChange, onSubmit, isSubmitting }: Depl
                 <label className="text-sm font-medium text-foreground">Port</label>
                 <Input value={port} onChange={(e) => setPort(e.target.value)} />
               </div>
-              <div>
-                <label className="text-sm font-medium text-foreground">Health Check Path</label>
-                <Input
-                  value={healthCheckPath}
-                  onChange={(e) => setHealthCheckPath(e.target.value)}
-                />
-              </div>
+              {runMode !== 'task' && (
+                <div>
+                  <label className="text-sm font-medium text-foreground">Health Check Path</label>
+                  <Input
+                    value={healthCheckPath}
+                    onChange={(e) => setHealthCheckPath(e.target.value)}
+                  />
+                </div>
+              )}
             </div>
           </DialogBody>
 

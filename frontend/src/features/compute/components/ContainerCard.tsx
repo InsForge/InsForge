@@ -5,6 +5,7 @@ import { ExternalLink } from 'lucide-react';
 interface ContainerCardProps {
   container: ContainerSchema;
   onClick: () => void;
+  badge?: string;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -16,7 +17,7 @@ const STATUS_COLORS: Record<string, string> = {
   teardown_failed: 'bg-orange-500',
 };
 
-export function ContainerCard({ container, onClick }: ContainerCardProps) {
+export function ContainerCard({ container, onClick, badge }: ContainerCardProps) {
   const source =
     container.sourceType === 'github'
       ? container.githubRepo
@@ -40,10 +41,11 @@ export function ContainerCard({ container, onClick }: ContainerCardProps) {
       </div>
 
       <div className="flex items-center gap-3 shrink-0 ml-4">
+        {badge && <Badge className="text-xs">{badge}</Badge>}
         <Badge className="text-xs capitalize">{container.status.replace(/_/g, ' ')}</Badge>
-        {container.endpointUrl && (
+        {container.endpointUrl && container.runMode !== 'task' && (
           <a
-            href={container.endpointUrl}
+            href={container.endpointUrl.startsWith('https://') ? container.endpointUrl : '#'}
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}

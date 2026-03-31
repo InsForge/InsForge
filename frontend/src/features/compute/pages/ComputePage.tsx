@@ -11,17 +11,23 @@ export default function ComputePage() {
     containers,
     selectedContainer,
     deployments,
+    taskRuns,
     isLoadingContainers,
+    isLoadingTaskRuns,
     isCreating,
     isUpdating,
     isDeleting,
     isDeploying,
+    isRunningTask,
+    containersError,
     selectContainer,
     createContainer,
     updateContainer,
     deleteContainer,
     deploy,
     rollback,
+    runTask,
+    stopTask,
   } = useCompute();
 
   const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
@@ -34,9 +40,12 @@ export default function ComputePage() {
             <ContainerDetail
               container={selectedContainer}
               deployments={deployments}
+              taskRuns={taskRuns}
               isUpdating={isUpdating}
               isDeploying={isDeploying}
               isDeleting={isDeleting}
+              isLoadingTaskRuns={isLoadingTaskRuns}
+              isRunningTask={isRunningTask}
               onBack={() => selectContainer(null)}
               onUpdate={updateContainer}
               onDeploy={(id) => void deploy(id)}
@@ -44,6 +53,8 @@ export default function ComputePage() {
               onDelete={(id) => {
                 void deleteContainer(id).then(() => selectContainer(null));
               }}
+              onRunTask={(id) => runTask(id)}
+              onStopTask={(cId, rId) => stopTask(cId, rId)}
             />
           </div>
         </div>
@@ -72,6 +83,15 @@ export default function ComputePage() {
             <div className="flex items-center justify-center py-12">
               <p className="text-sm text-muted-foreground">Loading containers...</p>
             </div>
+          ) : containersError ? (
+            <div className="flex items-center justify-center py-12">
+              <p className="text-sm text-red-500">
+                Failed to load containers:{' '}
+                {containersError instanceof Error
+                  ? containersError.message
+                  : 'Unknown error'}
+              </p>
+            </div>
           ) : containers.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <Container className="w-10 h-10 text-muted-foreground/50 mb-4" />
@@ -91,6 +111,7 @@ export default function ComputePage() {
                   key={container.id}
                   container={container}
                   onClick={() => selectContainer(container)}
+                  badge={container.runMode === 'task' ? 'Task' : 'Service'}
                 />
               ))}
             </div>

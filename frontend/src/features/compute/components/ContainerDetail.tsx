@@ -2,38 +2,50 @@ import { useState } from 'react';
 import type {
   ContainerSchema,
   ContainerDeploymentSchema,
+  TaskRunSchema,
   UpdateContainerRequest,
 } from '@insforge/shared-schemas';
 import { Button, Badge, Tabs, Tab, ConfirmDialog } from '@insforge/ui';
-import { ArrowLeft, Rocket, ExternalLink, Trash2 } from 'lucide-react';
+import { ArrowLeft, Rocket, ExternalLink, Trash2, Play } from 'lucide-react';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { EnvVarsTab } from './EnvVarsTab';
 import { DeploymentsTab } from './DeploymentsTab';
+import { TaskRunsTab } from './TaskRunsTab';
 
 interface ContainerDetailProps {
   container: ContainerSchema;
   deployments: ContainerDeploymentSchema[];
+  taskRuns: TaskRunSchema[];
   isUpdating: boolean;
   isDeploying: boolean;
   isDeleting: boolean;
+  isLoadingTaskRuns: boolean;
+  isRunningTask: boolean;
   onBack: () => void;
   onUpdate: (id: string, data: UpdateContainerRequest) => Promise<unknown>;
   onDeploy: (containerId: string) => void;
   onRollback: (containerId: string, deploymentId: string) => void;
   onDelete: (containerId: string) => void;
+  onRunTask: (containerId: string) => void;
+  onStopTask: (containerId: string, taskRunId: string) => void;
 }
 
 export function ContainerDetail({
   container,
   deployments,
+  taskRuns,
   isUpdating,
   isDeploying,
   isDeleting,
+  isLoadingTaskRuns,
+  isRunningTask,
   onBack,
   onUpdate,
   onDeploy,
   onRollback,
   onDelete,
+  onRunTask,
+  onStopTask,
 }: ContainerDetailProps) {
   const [activeTab, setActiveTab] = useState('overview');
   const { confirm, confirmDialogProps } = useConfirm();
@@ -66,18 +78,29 @@ export function ContainerDetail({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {container.endpointUrl && (
+          {container.runMode !== 'task' && container.endpointUrl && (
             <Button variant="outline" size="sm" asChild>
-              <a href={container.endpointUrl} target="_blank" rel="noopener noreferrer">
+              <a
+                href={container.endpointUrl.startsWith('https://') ? container.endpointUrl : '#'}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 <ExternalLink className="w-3.5 h-3.5 mr-1" />
                 Open
               </a>
             </Button>
           )}
-          <Button size="sm" onClick={() => onDeploy(container.id)} disabled={isDeploying}>
-            <Rocket className="w-3.5 h-3.5 mr-1" />
-            {isDeploying ? 'Deploying...' : 'Deploy'}
-          </Button>
+          {container.runMode === 'task' ? (
+            <Button size="sm" onClick={() => onRunTask(container.id)} disabled={isRunningTask}>
+              <Play className="w-3.5 h-3.5 mr-1" />
+              {isRunningTask ? 'Starting...' : 'Run'}
+            </Button>
+          ) : (
+            <Button size="sm" onClick={() => onDeploy(container.id)} disabled={isDeploying}>
+              <Rocket className="w-3.5 h-3.5 mr-1" />
+              {isDeploying ? 'Deploying...' : 'Deploy'}
+            </Button>
+          )}
           <Button
             variant="destructive"
             size="sm"
@@ -106,7 +129,11 @@ export function ContainerDetail({
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <Tab value="overview">Overview</Tab>
         <Tab value="envvars">Environment</Tab>
-        <Tab value="deployments">Deployments</Tab>
+        {container.runMode === 'task' ? (
+          <Tab value="taskruns">Runs</Tab>
+        ) : (
+          <Tab value="deployments">Deployments</Tab>
+        )}
       </Tabs>
 
       {/* Tab content */}
@@ -115,11 +142,14 @@ export function ContainerDetail({
           <InfoRow label="Status">
             <Badge className="capitalize">{container.status.replace(/_/g, ' ')}</Badge>
           </InfoRow>
+          <InfoRow label="Run Mode" value={container.runMode === 'task' ? 'Task' : 'Service'} />
           <InfoRow label="Source Type" value={container.sourceType} />
           <InfoRow label="CPU" value={`${container.cpu} units`} />
           <InfoRow label="Memory" value={`${container.memory} MB`} />
           <InfoRow label="Port" value={String(container.port)} />
-          <InfoRow label="Health Check" value={container.healthCheckPath} />
+          {container.runMode !== 'task' && (
+            <InfoRow label="Health Check" value={container.healthCheckPath} />
+          )}
           <InfoRow label="Auto Deploy" value={container.autoDeploy ? 'Yes' : 'No'} />
           <InfoRow label="Created" value={new Date(container.createdAt).toLocaleDateString()} />
         </div>
@@ -133,11 +163,19 @@ export function ContainerDetail({
         />
       )}
 
-      {activeTab === 'deployments' && (
+      {activeTab === 'deployments' && container.runMode !== 'task' && (
         <DeploymentsTab
           deployments={deployments}
           onRollback={(deploymentId) => onRollback(container.id, deploymentId)}
           isRollingBack={isDeploying}
+        />
+      )}
+
+      {activeTab === 'taskruns' && container.runMode === 'task' && (
+        <TaskRunsTab
+          taskRuns={taskRuns}
+          isLoading={isLoadingTaskRuns}
+          onStop={(taskRunId) => onStopTask(container.id, taskRunId)}
         />
       )}
     </div>
