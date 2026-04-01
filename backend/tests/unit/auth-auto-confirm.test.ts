@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Set required env vars before any imports
 process.env.ADMIN_EMAIL = 'admin@test.com';
@@ -94,13 +94,27 @@ vi.mock('../../src/services/email/email.service', () => ({
 
 // Mock all OAuth providers the constructor initializes
 const mockOAuthProvider = { getInstance: () => ({}) };
-vi.mock('../../src/providers/oauth/google.oauth.provider', () => ({ GoogleOAuthProvider: mockOAuthProvider }));
-vi.mock('../../src/providers/oauth/github.oauth.provider', () => ({ GitHubOAuthProvider: mockOAuthProvider }));
-vi.mock('../../src/providers/oauth/discord.oauth.provider', () => ({ DiscordOAuthProvider: mockOAuthProvider }));
-vi.mock('../../src/providers/oauth/facebook.oauth.provider', () => ({ FacebookOAuthProvider: mockOAuthProvider }));
-vi.mock('../../src/providers/oauth/microsoft.oauth.provider', () => ({ MicrosoftOAuthProvider: mockOAuthProvider }));
-vi.mock('../../src/providers/oauth/x.oauth.provider', () => ({ XOAuthProvider: mockOAuthProvider }));
-vi.mock('../../src/providers/oauth/apple.oauth.provider', () => ({ AppleOAuthProvider: mockOAuthProvider }));
+vi.mock('../../src/providers/oauth/google.oauth.provider', () => ({
+  GoogleOAuthProvider: mockOAuthProvider,
+}));
+vi.mock('../../src/providers/oauth/github.oauth.provider', () => ({
+  GitHubOAuthProvider: mockOAuthProvider,
+}));
+vi.mock('../../src/providers/oauth/discord.oauth.provider', () => ({
+  DiscordOAuthProvider: mockOAuthProvider,
+}));
+vi.mock('../../src/providers/oauth/facebook.oauth.provider', () => ({
+  FacebookOAuthProvider: mockOAuthProvider,
+}));
+vi.mock('../../src/providers/oauth/microsoft.oauth.provider', () => ({
+  MicrosoftOAuthProvider: mockOAuthProvider,
+}));
+vi.mock('../../src/providers/oauth/x.oauth.provider', () => ({
+  XOAuthProvider: mockOAuthProvider,
+}));
+vi.mock('../../src/providers/oauth/apple.oauth.provider', () => ({
+  AppleOAuthProvider: mockOAuthProvider,
+}));
 
 vi.mock('../../src/infra/config/app.config', () => ({
   config: {
@@ -129,6 +143,7 @@ describe('AuthService.register – autoConfirm', () => {
     (AuthService as any).instance = undefined;
     authService = AuthService.getInstance();
     // Mock getUserById to return a user record after INSERT
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.spyOn(authService as any, 'getUserById').mockResolvedValue({
       id: 'test-user-id',
       email: 'test@example.com',
@@ -151,7 +166,7 @@ describe('AuthService.register – autoConfirm', () => {
 
     // Verify INSERT was called with email_verified=true (5th param)
     const insertCall = mockClient.query.mock.calls.find(
-      (call: any[]) => typeof call[0] === 'string' && call[0].includes('INSERT INTO auth.users')
+      (call: unknown[]) => typeof call[0] === 'string' && call[0].includes('INSERT INTO auth.users')
     );
     expect(insertCall).toBeDefined();
     expect(insertCall![1][4]).toBe(true);
@@ -170,7 +185,7 @@ describe('AuthService.register – autoConfirm', () => {
     );
 
     const insertCall = mockClient.query.mock.calls.find(
-      (call: any[]) => typeof call[0] === 'string' && call[0].includes('INSERT INTO auth.users')
+      (call: unknown[]) => typeof call[0] === 'string' && call[0].includes('INSERT INTO auth.users')
     );
     expect(insertCall).toBeDefined();
     expect(insertCall![1][4]).toBe(false);
@@ -179,7 +194,7 @@ describe('AuthService.register – autoConfirm', () => {
   });
 
   it('ignores autoConfirm=true when isAdminCreation is false', async () => {
-    const result = await authService.register(
+    await authService.register(
       'test@example.com',
       'password123',
       'Test',
@@ -188,7 +203,7 @@ describe('AuthService.register – autoConfirm', () => {
     );
 
     const insertCall = mockClient.query.mock.calls.find(
-      (call: any[]) => typeof call[0] === 'string' && call[0].includes('INSERT INTO auth.users')
+      (call: unknown[]) => typeof call[0] === 'string' && call[0].includes('INSERT INTO auth.users')
     );
     expect(insertCall).toBeDefined();
     expect(insertCall![1][4]).toBe(false);
@@ -204,7 +219,7 @@ describe('AuthService.register – autoConfirm', () => {
     );
 
     const insertCall = mockClient.query.mock.calls.find(
-      (call: any[]) => typeof call[0] === 'string' && call[0].includes('INSERT INTO auth.users')
+      (call: unknown[]) => typeof call[0] === 'string' && call[0].includes('INSERT INTO auth.users')
     );
     expect(insertCall).toBeDefined();
     expect(insertCall![1][4]).toBe(false);

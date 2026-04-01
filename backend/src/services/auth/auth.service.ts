@@ -183,7 +183,13 @@ export class AuthService {
       await client.query(
         `INSERT INTO auth.users (id, email, password, profile, email_verified, created_at, updated_at)
          VALUES ($1, $2, $3, $4::jsonb, $5, NOW(), NOW())`,
-        [userId, email, hashedPassword, profile, options?.autoConfirm && options?.isAdminCreation ? true : false]
+        [
+          userId,
+          email,
+          hashedPassword,
+          profile,
+          options?.autoConfirm && options?.isAdminCreation ? true : false,
+        ]
       );
 
       await client.query('COMMIT');

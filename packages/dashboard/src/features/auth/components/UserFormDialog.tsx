@@ -261,9 +261,7 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
                 </div>
 
                 <div className="grid grid-cols-[200px_minmax(0,1fr)] items-center gap-6">
-                  <label className="text-sm leading-5 text-foreground">
-                    Auto-confirm
-                  </label>
+                  <label className="text-sm leading-5 text-foreground">Auto-confirm</label>
                   <div className="min-w-0 flex justify-end">
                     <Switch
                       id="auto-confirm"
