@@ -102,10 +102,14 @@ export class JobQueueService {
   }
 
   private async processNextJob(): Promise<void> {
-    if (this.queue.length === 0) return;
+    if (this.queue.length === 0) {
+      return;
+    }
 
     const job = this.queue.shift();
-    if (!job) return;
+    if (!job) {
+      return;
+    }
 
     logger.debug(`Processing job: ${job.id}`, { type: job.type, retries: job.retries });
 
@@ -129,7 +133,9 @@ export class JobQueueService {
   }
 
   private async worker(): Promise<void> {
-    if (this.processing || this.queue.length === 0) return;
+    if (this.processing || this.queue.length === 0) {
+      return;
+    }
 
     this.processing = true;
 

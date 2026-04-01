@@ -38,7 +38,7 @@ import { AuthService } from '@/services/auth/auth.service.js';
 import packageJson from '../../package.json';
 import { schedulesRouter } from '@/api/routes/schedules/index.routes.js';
 import { jobQueue, JobType } from '@/services/job-queue.service.js';
-import { EmailService } from '@/services/email/email.service.js';
+// import { EmailService } from '@/services/email/email.service.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
