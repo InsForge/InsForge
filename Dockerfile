@@ -149,3 +149,12 @@ FROM node:20-alpine AS dev
 COPY --from=deno-bin /bin/deno /usr/local/bin/deno
 
 WORKDIR /app
+
+# Ensure the node user (uid 1000) owns the working directory and
+# volume mount points so npm install doesn't hit EACCES errors.
+RUN mkdir -p /app/node_modules /app/backend/node_modules /app/frontend/node_modules \
+             /app/shared-schemas/node_modules /app/ui/node_modules \
+             /insforge-storage /insforge-logs && \
+    chown -R node:node /app /insforge-storage /insforge-logs
+
+USER node
