@@ -298,7 +298,7 @@ function DashboardLoadingState() {
   return (
     <main className="h-full overflow-hidden bg-semantic-0">
       <div className="flex h-full flex-col xl:flex-row">
-        <section className="w-full border-b border-[var(--alpha-8)] px-10 py-10 xl:w-[480px] xl:border-b-0 xl:border-r">
+        <section className="w-full overflow-y-auto border-b border-[var(--alpha-8)] px-10 py-10 xl:w-[480px] xl:border-b-0 xl:border-r">
           <div className="mx-auto flex w-full max-w-[400px] flex-col gap-12">
             <div className="flex flex-col gap-12">
               <div className="flex items-center gap-2">
@@ -505,7 +505,7 @@ export default function DashboardPage() {
   return (
     <main className="h-full overflow-hidden bg-semantic-0">
       <div className="flex h-full flex-col xl:flex-row">
-        <section className="w-full border-b border-[var(--alpha-8)] px-10 py-10 xl:w-[480px] xl:border-b-0 xl:border-r">
+        <section className="w-full overflow-y-auto border-b border-[var(--alpha-8)] px-10 py-10 xl:w-[480px] xl:border-b-0 xl:border-r">
           <div className="mx-auto flex w-full max-w-[400px] flex-col gap-12">
             <div className="flex flex-col gap-12">
               <div className="flex items-center gap-2">
