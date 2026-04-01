@@ -22,6 +22,7 @@ export const nameSchema = z
   .trim();
 
 export const roleSchema = z.enum(['anon', 'authenticated', 'project_admin']);
+export const adminSourceSchema = z.enum(['bootstrap', 'user']);
 
 export const verificationMethodSchema = z.enum(['code', 'link']);
 
@@ -48,6 +49,8 @@ export const userSchema = z.object({
   id: userIdSchema,
   email: emailSchema,
   emailVerified: z.boolean(),
+  isProjectAdmin: z.boolean(),
+  adminSource: adminSourceSchema,
   providers: z.array(z.string()).optional(),
   createdAt: z.string(), // PostgreSQL timestamp
   updatedAt: z.string(), // PostgreSQL timestamp
@@ -131,6 +134,7 @@ export type UserIdSchema = z.infer<typeof userIdSchema>;
 export type EmailSchema = z.infer<typeof emailSchema>;
 export type PasswordSchema = z.infer<typeof passwordSchema>;
 export type RoleSchema = z.infer<typeof roleSchema>;
+export type AdminSourceSchema = z.infer<typeof adminSourceSchema>;
 export type VerificationMethodSchema = z.infer<typeof verificationMethodSchema>;
 export type ProfileSchema = z.infer<typeof profileSchema>;
 export type UserSchema = z.infer<typeof userSchema>;

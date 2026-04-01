@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { TokenManager } from '@/infra/security/token.manager.js';
+import { AuthService } from '@/services/auth/auth.service.js';
 import { AppError } from './error.js';
 import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
@@ -18,6 +19,7 @@ export interface AuthRequest extends Request {
 
 const tokenManager = TokenManager.getInstance();
 const secretService = SecretService.getInstance();
+const authService = AuthService.getInstance();
 
 // Helper function to extract Bearer token (exported for optional auth checks)
 export function extractBearerToken(authHeader: string | undefined): string | null {
@@ -92,6 +94,16 @@ export async function verifyAdmin(req: AuthRequest, res: Response, next: NextFun
     const payload = tokenManager.verifyToken(token);
 
     if (payload.role !== 'project_admin') {
+      throw new AppError(
+        'Admin access required',
+        403,
+        ERROR_CODES.AUTH_UNAUTHORIZED,
+        NEXT_ACTION.CHECK_ADMIN_TOKEN
+      );
+    }
+
+    const dbUser = await authService.getUserById(payload.sub);
+    if (!dbUser || !dbUser.is_project_admin) {
       throw new AppError(
         'Admin access required',
         403,

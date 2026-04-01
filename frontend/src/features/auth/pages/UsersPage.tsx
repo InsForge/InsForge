@@ -19,11 +19,20 @@ import { SortColumn } from 'react-data-grid';
 import { UserSchema } from '@insforge/shared-schemas';
 import { useToast } from '@/lib/hooks/useToast';
 import { useUsers } from '@/features/auth/hooks/useUsers';
+import type { UserRoleFilter } from '@/features/auth/services/user.service';
+import { formatDeleteUsersToastMessage } from '@/features/auth/utils/userFeedback';
 import { usePageSize } from '@/lib/hooks/usePageSize';
+
+const FILTER_OPTIONS: { label: string; value: UserRoleFilter }[] = [
+  { label: 'Users', value: 'users' },
+  { label: 'Admins', value: 'admins' },
+  { label: 'All', value: 'all' },
+];
 
 export default function UsersPage() {
   const [searchValue, setSearchValue] = useState('');
   const searchQuery = searchValue.trim();
+  const [roleFilter, setRoleFilter] = useState<UserRoleFilter>('users');
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
@@ -46,11 +55,12 @@ export default function UsersPage() {
     totalPages,
     refetch,
     deleteUsers,
-  } = useUsers({ searchQuery, pageSize });
+    updateUserAdminStatus,
+  } = useUsers({ searchQuery, pageSize, roleFilter });
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, setCurrentPage]);
+  }, [roleFilter, searchQuery, setCurrentPage]);
 
   // Listen for refresh events
   useEffect(() => {
@@ -66,10 +76,19 @@ export default function UsersPage() {
     return () => window.removeEventListener('refreshUsers', handleRefreshEvent);
   }, [refetch]);
 
-  // Clear selection when page changes or search changes
+  const visibleUserIds = useMemo(
+    () =>
+      users
+        .map((user) => user.id)
+        .sort()
+        .join(','),
+    [users]
+  );
+
+  // Clear selection when the visible dataset changes
   useEffect(() => {
     setSelectedRows(new Set());
-  }, [currentPage, searchQuery]);
+  }, [currentPage, roleFilter, searchQuery, visibleUserIds]);
 
   // Apply sorting to users data
   const sortedUsers = useMemo(() => {
@@ -120,13 +139,10 @@ export default function UsersPage() {
 
     try {
       const userIds = Array.from(selectedRows);
-      await deleteUsers(userIds);
+      const result = await deleteUsers(userIds);
       void refetch();
       setSelectedRows(new Set());
-      showToast(
-        `${userIds.length} user${userIds.length > 1 ? 's' : ''} deleted successfully`,
-        'success'
-      );
+      showToast(formatDeleteUsersToastMessage(userIds.length, result.deletedCount), 'success');
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Failed to delete users', 'error');
     }
@@ -141,6 +157,20 @@ export default function UsersPage() {
       await refetch();
     } finally {
       setIsRefreshing(false);
+    }
+  };
+
+  const handleToggleAdminStatus = async (user: UserSchema) => {
+    try {
+      const nextStatus = !user.isProjectAdmin;
+      await updateUserAdminStatus({ userId: user.id, isProjectAdmin: nextStatus });
+      await refetch();
+      showToast(
+        nextStatus ? `${user.email} promoted to admin` : `${user.email} removed from admins`,
+        'success'
+      );
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to update admin status', 'error');
     }
   };
 
@@ -213,6 +243,21 @@ export default function UsersPage() {
             </div>
           )
         }
+        rightActions={
+          <div className="flex items-center gap-1 rounded-lg border border-[var(--alpha-8)] p-0.5">
+            {FILTER_OPTIONS.map((option) => (
+              <Button
+                key={option.value}
+                variant={roleFilter === option.value ? 'secondary' : 'ghost'}
+                size="sm"
+                className="h-8 rounded-md px-3"
+                onClick={() => setRoleFilter(option.value)}
+              >
+                {option.label}
+              </Button>
+            ))}
+          </div>
+        }
         searchValue={searchValue}
         onSearchChange={setSearchValue}
         searchDebounceTime={300}
@@ -239,6 +284,9 @@ export default function UsersPage() {
             setCurrentPage(1);
           }}
           emptyState={emptyState}
+          onToggleAdminStatus={(user) => {
+            void handleToggleAdminStatus(user);
+          }}
         />
       </div>
 
@@ -257,7 +305,9 @@ export default function UsersPage() {
         confirmText="Delete"
         cancelText="Cancel"
         destructive
-        onConfirm={handleBulkDelete}
+        onConfirm={() => {
+          void handleBulkDelete();
+        }}
       />
     </div>
   );
