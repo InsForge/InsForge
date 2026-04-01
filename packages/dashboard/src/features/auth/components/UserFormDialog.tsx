@@ -132,7 +132,7 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
         name: name.trim() || undefined,
         email,
         password,
-        autoConfirm: autoConfirm || undefined,
+        autoConfirm: autoConfirm === true ? true : undefined,
       });
       void refetch();
       onOpenChange(false);
@@ -254,22 +254,26 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
               </div>
             </div>
 
-            <div className="flex h-5 items-center">
-              <div className="h-px w-full bg-[var(--alpha-8)]" />
-            </div>
+            {!user && (
+              <>
+                <div className="flex h-5 items-center">
+                  <div className="h-px w-full bg-[var(--alpha-8)]" />
+                </div>
 
-            <div className="grid grid-cols-[200px_minmax(0,1fr)] items-center gap-6">
-              <label className="text-sm leading-5 text-foreground">
-                Auto-confirm
-              </label>
-              <div className="min-w-0 flex justify-end">
-                <Switch
-                  id="auto-confirm"
-                  checked={autoConfirm}
-                  onCheckedChange={setAutoConfirm}
-                />
-              </div>
-            </div>
+                <div className="grid grid-cols-[200px_minmax(0,1fr)] items-center gap-6">
+                  <label className="text-sm leading-5 text-foreground">
+                    Auto-confirm
+                  </label>
+                  <div className="min-w-0 flex justify-end">
+                    <Switch
+                      id="auto-confirm"
+                      checked={autoConfirm}
+                      onCheckedChange={setAutoConfirm}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           <DialogFooter className="gap-3 px-4 py-4">
