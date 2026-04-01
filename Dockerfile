@@ -150,11 +150,11 @@ COPY --from=deno-bin /bin/deno /usr/local/bin/deno
 
 WORKDIR /app
 
-# Ensure the node user (uid 1000) owns the working directory and
-# volume mount points so npm install doesn't hit EACCES errors.
+# Pre-create volume mount points so Docker initializes named volumes
+# with these directories instead of creating them as root-owned.
+# No USER node here: dev containers use bind mounts for source code,
+# which inherit host user ownership. Running as node would break
+# npm install on root-owned bind mounts (e.g. in CI).
 RUN mkdir -p /app/node_modules /app/backend/node_modules /app/frontend/node_modules \
              /app/shared-schemas/node_modules /app/ui/node_modules \
-             /insforge-storage /insforge-logs && \
-    chown -R node:node /app /insforge-storage /insforge-logs
-
-USER node
+             /insforge-storage /insforge-logs
