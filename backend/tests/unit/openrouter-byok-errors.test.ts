@@ -22,7 +22,6 @@ vi.mock('../../src/services/secrets/secret.service.js', () => ({
 
 // Import after mocks
 import { OpenRouterProvider } from '../../src/providers/ai/openrouter.provider.js';
-import { AppError } from '../../src/api/middlewares/error.js';
 import { ERROR_CODES } from '../../src/types/error-constants.js';
 
 function createAPIError(status: number, message: string): OpenAI.APIError {
@@ -37,9 +36,11 @@ describe('OpenRouterProvider — BYOK error handling', () => {
     provider = OpenRouterProvider.getInstance();
 
     // Patch private methods for testing
-    (provider as any).getApiKeyWithSource = mockGetApiKeyWithSource;
-    (provider as any).getClient = mockGetClient.mockResolvedValue(new OpenAI({ apiKey: 'test' }));
-    (provider as any).renewCloudApiKey = mockRenewCloudApiKey;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const p = provider as Record<string, any>;
+    p.getApiKeyWithSource = mockGetApiKeyWithSource;
+    p.getClient = mockGetClient.mockResolvedValue(new OpenAI({ apiKey: 'test' }));
+    p.renewCloudApiKey = mockRenewCloudApiKey;
   });
 
   it('throws AppError with AI_INVALID_API_KEY for BYOK 401', async () => {
