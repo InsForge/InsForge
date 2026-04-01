@@ -194,13 +194,10 @@ describe('AuthService.register – autoConfirm', () => {
   });
 
   it('ignores autoConfirm=true when isAdminCreation is false', async () => {
-    await authService.register(
-      'test@example.com',
-      'password123',
-      'Test',
-      undefined,
-      { isAdminCreation: false, autoConfirm: true }
-    );
+    await authService.register('test@example.com', 'password123', 'Test', undefined, {
+      isAdminCreation: false,
+      autoConfirm: true,
+    });
 
     const insertCall = mockClient.query.mock.calls.find(
       (call: unknown[]) => typeof call[0] === 'string' && call[0].includes('INSERT INTO auth.users')
