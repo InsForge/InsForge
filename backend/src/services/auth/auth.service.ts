@@ -42,6 +42,7 @@ import { ADMIN_ID } from '@/utils/constants.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { EmailService } from '@/services/email/email.service.js';
+import { jobQueue, JobType, JobPriority } from '@/services/job-queue.service.js';
 import { XOAuthProvider } from '@/providers/oauth/x.provider.js';
 import { AppleOAuthProvider } from '@/providers/oauth/apple.provider.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
@@ -216,12 +217,12 @@ export class AuthService {
 
       try {
         if (verifiedRedirectTo) {
-          await this.sendVerificationEmailWithLink(email, verifiedRedirectTo);
+          this.queueVerificationEmail(email, 'link', verifiedRedirectTo);
         } else {
-          await this.sendVerificationEmailWithCode(email);
+          this.queueVerificationEmail(email, 'code');
         }
       } catch (error) {
-        logger.warn('Verification email send failed during register', { error });
+        logger.warn('Verification email enqueue failed during register', { error });
       }
       return {
         accessToken: null,
@@ -241,6 +242,32 @@ export class AuthService {
       accessToken,
       requireEmailVerification: false,
     };
+  }
+
+  private queueVerificationEmail(email: string, type: 'code' | 'link', redirectTo?: string): void {
+    jobQueue.enqueue(
+      JobType.EMAIL,
+      {
+        action: 'verification',
+        email,
+        type,
+        redirectTo,
+      },
+      JobPriority.HIGH
+    );
+  }
+
+  private queuePasswordResetEmail(email: string, type: 'code' | 'link', redirectTo?: string): void {
+    jobQueue.enqueue(
+      JobType.EMAIL,
+      {
+        action: 'password-reset',
+        email,
+        type,
+        redirectTo,
+      },
+      JobPriority.HIGH
+    );
   }
 
   /**
