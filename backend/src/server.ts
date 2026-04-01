@@ -34,8 +34,11 @@ import { seedBackend } from '@/utils/seed.js';
 import logger from '@/utils/logger.js';
 import { initSqlParser } from '@/utils/sql-parser.js';
 import { FunctionService } from '@/services/functions/function.service.js';
+import { AuthService } from '@/services/auth/auth.service.js';
 import packageJson from '../../package.json';
 import { schedulesRouter } from '@/api/routes/schedules/index.routes.js';
+import { jobQueue, JobType } from '@/services/job-queue.service.js';
+import { EmailService } from '@/services/email/email.service.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -60,6 +63,32 @@ export async function createApp() {
   // Initialize logs service
   const logService = LogService.getInstance();
   await logService.initialize(); // connect to CloudWatch
+
+  // Initialize job queue service and register handlers
+  jobQueue.registerHandler(JobType.EMAIL, async (payload) => {
+    const { action, email, type, redirectTo } = payload as {
+      action: string;
+      email: string;
+      type: string;
+      redirectTo?: string;
+    };
+    const authService = AuthService.getInstance();
+
+    if (action === 'verification') {
+      if (type === 'link' && redirectTo) {
+        await authService.sendVerificationEmailWithLink(email, redirectTo);
+      } else {
+        await authService.sendVerificationEmailWithCode(email);
+      }
+    } else if (action === 'password-reset') {
+      if (type === 'link' && redirectTo) {
+        await authService.sendResetPasswordEmailWithLink(email, redirectTo);
+      } else {
+        await authService.sendResetPasswordEmailWithCode(email);
+      }
+    }
+  });
+  jobQueue.start();
 
   // Initialize SQL parser WASM module
   await initSqlParser();
