@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Cpu, HardDrive, Plug, RefreshCw, Settings } from 'lucide-react';
 import {
@@ -123,6 +123,22 @@ export default function ProjectSettingsMenuDialog() {
     };
   }, [instanceInfo, selectedInstanceType]);
 
+  const requestInstanceInfo = useCallback(async () => {
+    if (host.mode === 'cloud-hosting' && host.onRequestInstanceInfo) {
+      try {
+        const nextInstanceInfo = await host.onRequestInstanceInfo();
+        setInstanceInfo(nextInstanceInfo);
+        setSelectedInstanceType(null);
+      } catch (error) {
+        showToast(
+          error instanceof Error ? error.message : 'Failed to load compute options',
+          'error'
+        );
+      }
+      return;
+    }
+  }, [host, showToast]);
+
   useEffect(() => {
     if (isSettingsDialogOpen) {
       const cloudProjectName = projectInfo.name ?? '';
@@ -148,7 +164,13 @@ export default function ProjectSettingsMenuDialog() {
     setIsChangingInstanceType(false);
     setIsProjectNameFocused(false);
     setSelectedInstanceType(null);
-  }, [canUseCloudHost, isSettingsDialogOpen, projectInfo.name, settingsDefaultTab]);
+  }, [
+    canUseCloudHost,
+    isSettingsDialogOpen,
+    projectInfo.name,
+    requestInstanceInfo,
+    settingsDefaultTab,
+  ]);
 
   useEffect(() => {
     if (version && latestVersion) {
@@ -177,22 +199,6 @@ export default function ProjectSettingsMenuDialog() {
     isProjectNameFocused,
     projectInfo.name,
   ]);
-
-  async function requestInstanceInfo() {
-    if (host.mode === 'cloud-hosting' && host.onRequestInstanceInfo) {
-      try {
-        const nextInstanceInfo = await host.onRequestInstanceInfo();
-        setInstanceInfo(nextInstanceInfo);
-        setSelectedInstanceType(null);
-      } catch (error) {
-        showToast(
-          error instanceof Error ? error.message : 'Failed to load compute options',
-          'error'
-        );
-      }
-      return;
-    }
-  }
 
   const handleDeleteProject = async () => {
     const confirmed = await confirm({
@@ -709,7 +715,9 @@ export default function ProjectSettingsMenuDialog() {
                 </Button>
                 <Button
                   type="button"
-                  onClick={handleSaveProjectName}
+                  onClick={() => {
+                    void handleSaveProjectName();
+                  }}
                   disabled={!isProjectNameDirty}
                   className="h-8 rounded px-3 text-sm font-medium"
                 >
@@ -740,7 +748,9 @@ export default function ProjectSettingsMenuDialog() {
                 </Button>
                 <Button
                   type="button"
-                  onClick={handleChangeInstanceType}
+                  onClick={() => {
+                    void handleChangeInstanceType();
+                  }}
                   disabled={isChangingInstanceType}
                   className="h-8 rounded px-3 text-sm font-medium"
                 >

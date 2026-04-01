@@ -1,6 +1,6 @@
 {
   "name": "@insforge/dashboard",
-  "version": "0.0.0-dev.5",
+  "version": "0.0.0-dev.7",
   "description": "Shared InsForge dashboard package for self-hosting and cloud-hosting hosts",
   "license": "Apache-2.0",
   "type": "module",
@@ -23,8 +23,7 @@
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
-    "./styles.css": "./dist/styles.css",
-    "./self-hosting.css": "./dist/styles.css"
+    "./styles.css": "./dist/styles.css"
   },
   "scripts": {
     "build": "vite build && tsc -p tsconfig.build.json",

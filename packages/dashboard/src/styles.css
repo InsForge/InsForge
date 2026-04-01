@@ -1,7 +1,7 @@
-@import '../rdg.css';
+@import './rdg.css';
 @import '@insforge/ui/styles.css';
 @import 'tailwindcss';
-@config "../../tailwind.config.js";
+@config "../tailwind.config.js";
 
 @layer utilities {
   :root {
@@ -48,57 +48,50 @@
     --fontFamilyManrope: 'Manrope', sans-serif;
   }
 
-  html,
-  body {
+  .if-dashboard {
     overflow: hidden;
     height: 100%;
-  }
-
-  body {
     font-family: var(--fontFamilyBase);
     font-size: var(--baseFontSize);
     font-weight: var(--fontWeightNormal);
   }
 
-  h1 {
+  .if-dashboard h1 {
     font-size: var(--xlFontSize);
     font-weight: var(--fontWeightSemibold);
     line-height: 1.3;
   }
 
-  h2 {
+  .if-dashboard h2 {
     font-size: var(--lgFontSize);
     font-weight: var(--fontWeightSemibold);
     line-height: 1.3;
   }
 
-  .text-xs {
+  .if-dashboard .text-xs {
     font-size: var(--xsFontSize);
   }
 
-  .text-sm {
+  .if-dashboard .text-sm {
     font-size: var(--smFontSize);
   }
 
-  .font-mono {
+  .if-dashboard .font-mono {
     font-family: var(--fontFamilyMono);
   }
 
-  .scrollbar-gutter-stable {
+  .if-dashboard .scrollbar-gutter-stable {
     scrollbar-gutter: stable;
   }
 }
 
 @layer components {
-  button {
+  .if-dashboard button {
     cursor: pointer;
   }
 
-  input:focus {
-    outline: none !important;
-  }
-
-  button:focus {
+  .if-dashboard input:focus,
+  .if-dashboard button:focus {
     outline: none !important;
   }
 }

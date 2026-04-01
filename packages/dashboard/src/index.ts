@@ -1,3 +1,5 @@
+import './styles.css';
+
 export { InsForgeDashboard } from './app/InsforgeDashboard';
 export { DashboardAppShell } from './app/DashboardAppShell';
 export { createDashboardQueryClient } from './app/createDashboardQueryClient';
