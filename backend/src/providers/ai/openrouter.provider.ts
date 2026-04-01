@@ -469,6 +469,29 @@ export class OpenRouterProvider {
           }
         }
       }
+
+      // Convert upstream API errors to actionable responses
+      if (error instanceof OpenAI.APIError) {
+        if (error.status === 401 || error.status === 403) {
+          throw new AppError(
+            source === 'byok'
+              ? 'Your BYOK API key is invalid or has been revoked. Please update it in Gateway settings.'
+              : 'AI provider authentication failed. Check your API key configuration.',
+            401,
+            ERROR_CODES.AI_INVALID_API_KEY,
+            'Update your API key in the Gateway credentials page.'
+          );
+        }
+        if (error.status === 429) {
+          throw new AppError(
+            'AI provider rate limit exceeded. Please wait before retrying.',
+            429,
+            ERROR_CODES.RATE_LIMITED,
+            'Wait a moment and retry, or check your API key rate limits.'
+          );
+        }
+      }
+
       throw error;
     }
   }
