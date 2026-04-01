@@ -34,6 +34,7 @@ export const createUserRequestSchema = z.object({
   password: passwordSchema,
   name: nameSchema.optional(),
   redirectTo: z.string().url().optional(),
+  autoConfirm: z.boolean().optional(),
 });
 
 /**

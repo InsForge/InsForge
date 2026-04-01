@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
+  Switch,
 } from '@insforge/ui';
 import { useToast } from '../../../lib/hooks/useToast';
 import { useUsers } from '../hooks/useUsers';
@@ -57,6 +58,7 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [autoConfirm, setAutoConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -78,6 +80,7 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
       setEmail('');
       setPassword('');
     }
+    setAutoConfirm(false);
     setError('');
     setEmailError('');
     setPasswordError('');
@@ -129,6 +132,7 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
         name: name.trim() || undefined,
         email,
         password,
+        autoConfirm: autoConfirm || undefined,
       });
       void refetch();
       onOpenChange(false);
@@ -246,6 +250,23 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
                     'h-8 rounded bg-[var(--alpha-4)] px-1.5 py-1.5 text-[13px] leading-[18px]',
                     passwordError && showValidation && 'border-destructive focus:shadow-none'
                   )}
+                />
+              </div>
+            </div>
+
+            <div className="flex h-5 items-center">
+              <div className="h-px w-full bg-[var(--alpha-8)]" />
+            </div>
+
+            <div className="grid grid-cols-[200px_minmax(0,1fr)] items-center gap-6">
+              <label className="text-sm leading-5 text-foreground">
+                Auto-confirm
+              </label>
+              <div className="min-w-0 flex justify-end">
+                <Switch
+                  id="auto-confirm"
+                  checked={autoConfirm}
+                  onCheckedChange={setAutoConfirm}
                 />
               </div>
             </div>

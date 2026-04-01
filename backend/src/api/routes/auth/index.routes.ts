@@ -357,13 +357,14 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
       );
     }
 
-    const { email, password, name, redirectTo } = validationResult.data;
+    const { email, password, name, redirectTo, autoConfirm: bodyAutoConfirm } = validationResult.data;
+    const autoConfirm = adminCreatingUser ? bodyAutoConfirm : false;
     const result: CreateUserResponse = await authService.register(
       email,
       password,
       name,
       redirectTo,
-      { isAdminCreation: adminCreatingUser }
+      { isAdminCreation: adminCreatingUser, autoConfirm }
     );
 
     // Set refresh token based on client type (skip when admin is adding a user)

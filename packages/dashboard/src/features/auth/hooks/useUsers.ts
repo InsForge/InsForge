@@ -49,8 +49,8 @@ export function useUsers(options: UseUsersOptions = {}) {
 
   // Register user mutation
   const registerMutation = useMutation({
-    mutationFn: ({ email, password, name }: { email: string; password: string; name?: string }) =>
-      userService.register(email, password, name),
+    mutationFn: ({ email, password, name, autoConfirm }: { email: string; password: string; name?: string; autoConfirm?: boolean }) =>
+      userService.register(email, password, name, autoConfirm),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['users'] });
     },
