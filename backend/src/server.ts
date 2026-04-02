@@ -73,7 +73,13 @@ export async function createApp() {
     windowMs: 15 * 60 * 1000,
     max: 3000,
     message: 'Too many requests from this IP',
-    skip: (req) => req.path === '/api/health',
+    skip: (req) => req.path === '/api/health' || req.path.startsWith('/api/ai'),
+  });
+
+  const aiLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 60,
+    message: 'Too many AI requests from this IP',
   });
 
   // Basic middleware
@@ -186,7 +192,7 @@ export async function createApp() {
   apiRouter.use('/functions', functionsRouter);
   apiRouter.use('/secrets', secretsRouter);
   apiRouter.use('/usage', usageRouter);
-  apiRouter.use('/ai', aiRouter);
+  apiRouter.use('/ai', aiLimiter, aiRouter);
   apiRouter.use('/realtime', realtimeRouter);
   apiRouter.use('/email', emailRouter);
   apiRouter.use('/deployments', deploymentsRouter);
