@@ -1,0 +1,37 @@
+import posthog from 'posthog-js';
+import { PostHogProvider } from 'posthog-js/react';
+
+const POSTHOG_KEY = import.meta.env.VITE_PUBLIC_POSTHOG_KEY || '';
+
+if (POSTHOG_KEY) {
+  try {
+    posthog.init(POSTHOG_KEY, {
+      api_host: 'https://us.i.posthog.com',
+      capture_exceptions: true,
+      debug: import.meta.env.DEV,
+    });
+  } catch (error) {
+    console.error('[PostHog] ❌ Error initializing PostHog', error);
+  }
+}
+
+export const PostHogAnalyticsProvider = ({ children }: { children: React.ReactNode }) => {
+  if (POSTHOG_KEY) {
+    return <PostHogProvider client={posthog}>{children}</PostHogProvider>;
+  }
+  return <>{children}</>;
+};
+
+export const trackPostHog = (eventName: string, properties?: Record<string, unknown>) => {
+  if (!POSTHOG_KEY) {
+    return;
+  }
+  posthog.capture(eventName, properties);
+};
+
+export const getFeatureFlag = (featureFlag: string): string | boolean | undefined => {
+  if (!POSTHOG_KEY) {
+    return undefined;
+  }
+  return posthog.getFeatureFlag(featureFlag);
+};
