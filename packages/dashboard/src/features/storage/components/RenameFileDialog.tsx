@@ -63,10 +63,22 @@ export function RenameFileDialog({
       return;
     }
 
+    if (trimmedName === '.' || trimmedName === '..') {
+      setError('Invalid file name');
+      return;
+    }
+
+    if (trimmedName.includes('/') || trimmedName.includes('\\')) {
+      setError('File name cannot contain "/" or "\\"');
+      return;
+    }
+
     if (!currentName) {
       setError('Only files can be renamed');
       return;
     }
+
+    setError('');
 
     try {
       await onRename(trimmedName);

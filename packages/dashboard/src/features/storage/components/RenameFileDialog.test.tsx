@@ -86,4 +86,35 @@ describe('RenameFileDialog', () => {
     expect(submitButton).toBeDisabled();
     expect(onRename).not.toHaveBeenCalled();
   });
+
+  it.each([
+    { value: '.', message: 'Invalid file name' },
+    { value: '..', message: 'Invalid file name' },
+    { value: 'folder/cover.png', message: 'File name cannot contain "/" or "\\\\"' },
+  ])('rejects invalid rename input: $value', async ({ value, message }) => {
+    render(
+      <RenameFileDialog
+        open={true}
+        onOpenChange={onOpenChange}
+        onRename={onRename}
+        file={{
+          bucket: 'assets',
+          key: 'photo.png',
+          size: 10,
+          mimeType: 'image/png',
+          uploadedAt: '2026-03-31T12:00:00.000Z',
+          url: '/photo.png',
+        }}
+      />
+    );
+
+    const input = screen.getByLabelText('File Name');
+    fireEvent.change(input, { target: { value } });
+    fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
+
+    await waitFor(() => {
+      expect(screen.getByText(message.replace('\\\\', '\\'))).toBeInTheDocument();
+    });
+    expect(onRename).not.toHaveBeenCalled();
+  });
 });

@@ -329,6 +329,11 @@ export class StorageService {
         throw new AppError('Object not found', 404, ERROR_CODES.NOT_FOUND);
       }
 
+      const sourceExists = await this.provider.verifyObjectExists(bucket, oldKey);
+      if (!sourceExists.exists) {
+        throw new AppError('Object file not found in storage', 404, ERROR_CODES.NOT_FOUND);
+      }
+
       const destinationResult = await client.query(
         'SELECT 1 FROM storage.objects WHERE bucket = $1 AND key = $2',
         [bucket, newKey]

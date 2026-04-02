@@ -11,7 +11,16 @@ export const updateBucketRequestSchema = z.object({
 });
 
 export const renameObjectRequestSchema = z.object({
-  newName: z.string().min(1, 'New name cannot be empty'),
+  newName: z
+    .string()
+    .trim()
+    .min(1, 'Invalid file name. New name cannot be empty.')
+    .refine((value) => value !== '.' && value !== '..', {
+      message: 'Invalid file name. "." and ".." are not allowed.',
+    })
+    .refine((value) => !/[\\/]/.test(value), {
+      message: 'Invalid file name. Path separators are not allowed.',
+    }),
 });
 
 export const listObjectsResponseSchema = z.object({

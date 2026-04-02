@@ -24,6 +24,7 @@ vi.mock('@/infra/database/database.manager.js', () => ({
 describe('StorageService.renameObject', () => {
   const provider = {
     renameObject: vi.fn(),
+    verifyObjectExists: vi.fn(),
   };
 
   const client = {
@@ -42,6 +43,7 @@ describe('StorageService.renameObject', () => {
     service.pool = {
       connect: vi.fn().mockResolvedValue(client),
     };
+    provider.verifyObjectExists.mockResolvedValue({ exists: true });
   });
 
   it('renames a root-level file and preserves metadata', async () => {
@@ -160,6 +162,38 @@ describe('StorageService.renameObject', () => {
       service.renameObject('assets', 'missing.png', 'cover.png', 'user-1', true)
     ).rejects.toMatchObject<AppError>({
       statusCode: 404,
+    });
+
+    expect(provider.renameObject).not.toHaveBeenCalled();
+    expect(client.query).toHaveBeenLastCalledWith('ROLLBACK');
+  });
+
+  it('returns 404 when metadata exists but the source file is missing in storage', async () => {
+    provider.verifyObjectExists.mockResolvedValueOnce({ exists: false });
+
+    client.query
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            bucket: 'assets',
+            key: 'photo.png',
+            size: 120,
+            mime_type: 'image/png',
+            uploaded_at: '2026-03-31T12:00:00.000Z',
+            uploaded_by: 'user-1',
+          },
+        ],
+      })
+      .mockResolvedValueOnce(undefined);
+
+    const service = StorageService.getInstance();
+
+    await expect(
+      service.renameObject('assets', 'photo.png', 'cover.png', 'user-1', true)
+    ).rejects.toMatchObject<AppError>({
+      statusCode: 404,
+      message: 'Object file not found in storage',
     });
 
     expect(provider.renameObject).not.toHaveBeenCalled();
