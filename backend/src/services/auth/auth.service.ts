@@ -129,6 +129,7 @@ export class AuthService {
     redirectTo?: string,
     options?: {
       isAdminCreation?: boolean;
+      autoConfirm?: boolean;
     }
   ): Promise<CreateUserResponse> {
     // Get email auth configuration and validate password
@@ -182,7 +183,13 @@ export class AuthService {
       await client.query(
         `INSERT INTO auth.users (id, email, password, profile, email_verified, created_at, updated_at)
          VALUES ($1, $2, $3, $4::jsonb, $5, NOW(), NOW())`,
-        [userId, email, hashedPassword, profile, false]
+        [
+          userId,
+          email,
+          hashedPassword,
+          profile,
+          options?.autoConfirm && options?.isAdminCreation ? true : false,
+        ]
       );
 
       await client.query('COMMIT');
@@ -208,6 +215,12 @@ export class AuthService {
         logger.info('Skipping verification email during admin user creation', {
           email,
         });
+        if (isAdminCreation && options?.autoConfirm) {
+          return {
+            accessToken: null,
+            requireEmailVerification: false,
+          };
+        }
         return {
           accessToken: null,
           requireEmailVerification: true,

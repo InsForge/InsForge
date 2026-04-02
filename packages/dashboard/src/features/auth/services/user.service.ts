@@ -38,10 +38,15 @@ export class UserService {
     return apiClient.request(`/auth/users/${id}`);
   }
 
-  async register(email: string, password: string, name?: string): Promise<CreateUserResponse> {
+  async register(
+    email: string,
+    password: string,
+    name?: string,
+    autoConfirm?: boolean
+  ): Promise<CreateUserResponse> {
     return apiClient.request('/auth/users', {
       method: 'POST',
-      body: JSON.stringify({ email, password, name }),
+      body: JSON.stringify({ email, password, name, autoConfirm }),
     });
   }
 
