@@ -40,6 +40,7 @@ export enum DataUpdateResourceType {
   BUCKETS = 'buckets',
   FUNCTIONS = 'functions',
   REALTIME = 'realtime',
+  COMPUTE = 'compute',
 }
 
 /**

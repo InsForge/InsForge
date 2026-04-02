@@ -19,6 +19,7 @@ import { aiRouter } from '@/api/routes/ai/index.routes.js';
 import { realtimeRouter } from '@/api/routes/realtime/index.routes.js';
 import { emailRouter } from '@/api/routes/email/index.routes.js';
 import { deploymentsRouter } from '@/api/routes/deployments/index.routes.js';
+import { computeRouter } from '@/api/routes/compute/index.routes.js';
 import { webhooksRouter } from '@/api/routes/webhooks/index.routes.js';
 import { errorMiddleware } from '@/api/middlewares/error.js';
 import { destroyEmailCooldownInterval } from '@/api/middlewares/rate-limiters.js';
@@ -189,6 +190,7 @@ export async function createApp() {
   apiRouter.use('/realtime', realtimeRouter);
   apiRouter.use('/email', emailRouter);
   apiRouter.use('/deployments', deploymentsRouter);
+  apiRouter.use('/compute', computeRouter);
   apiRouter.use('/schedules', schedulesRouter);
 
   // Mount all API routes under /api prefix
