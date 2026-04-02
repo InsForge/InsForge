@@ -11,7 +11,7 @@ concurrency:
 env:
   BNS_TOKEN: ${{ secrets.BUNNYSHELL_TOKEN }}
   BNS_ORG: "4818"
-  BNS_PROJECT: "6134"
+  BNS_PROJECT: "WzayyzVaxY"
   ENV_NAME: "pr-${{ github.event.pull_request.number }}"
 
 jobs:
@@ -34,7 +34,7 @@ jobs:
             --project "$BNS_PROJECT" \
             --search "$ENV_NAME" \
             --non-interactive \
-            -o json 2>/dev/null | jq -r '.data[0].id // empty')
+            -o json 2>/dev/null | jq -r '._embedded.item[0].id // empty')
           echo "env_id=$ENV_ID" >> "$GITHUB_OUTPUT"
 
       - name: Create environment
@@ -50,7 +50,7 @@ jobs:
             --from-git-branch "${{ github.head_ref }}" \
             --deploy \
             --non-interactive \
-            -o json | jq -r '.data.id')
+            -o json | jq -r '.id')
           echo "env_id=$ENV_ID" >> "$GITHUB_OUTPUT"
 
       - name: Update environment on push
@@ -77,7 +77,7 @@ jobs:
               --token "$BNS_TOKEN" \
               --id "$FINAL_ENV_ID" \
               --non-interactive \
-              -o json 2>/dev/null | jq -r '.data[0].url // empty')
+              -o json 2>/dev/null | jq -r '._embedded.item[0].url // empty')
             if [ -n "$URL" ]; then
               echo "url=$URL" >> "$GITHUB_OUTPUT"
               echo "env_id=$FINAL_ENV_ID" >> "$GITHUB_OUTPUT"
@@ -145,7 +145,7 @@ jobs:
             --project "$BNS_PROJECT" \
             --search "$ENV_NAME" \
             --non-interactive \
-            -o json 2>/dev/null | jq -r '.data[0].id // empty')
+            -o json 2>/dev/null | jq -r '._embedded.item[0].id // empty')
 
           if [ -n "$ENV_ID" ]; then
             echo "Destroying environment $ENV_ID"
