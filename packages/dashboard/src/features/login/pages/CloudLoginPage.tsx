@@ -4,6 +4,7 @@ import { LockIcon } from 'lucide-react';
 import { useDashboardHost } from '../../../lib/config/DashboardHostContext';
 import { useAuth } from '../../../lib/contexts/AuthContext';
 import type { DashboardAuthConfig } from '../../../types';
+import LoginPage from './LoginPage';
 
 export default function CloudLoginPage() {
   const navigate = useNavigate();
@@ -11,9 +12,10 @@ export default function CloudLoginPage() {
   const { isAuthenticated, error, loginWithAuthorizationCode } = useAuth();
   const hasRequestedAuthRef = useRef(false);
   const [requestError, setRequestError] = useState<Error | null>(null);
+  const shouldUseSessionLogin = host.mode === 'cloud-hosting' && host.auth.strategy === 'session';
 
   useEffect(() => {
-    if (hasRequestedAuthRef.current || isAuthenticated || error) {
+    if (shouldUseSessionLogin || hasRequestedAuthRef.current || isAuthenticated || error) {
       return;
     }
 
@@ -45,13 +47,17 @@ export default function CloudLoginPage() {
       void authenticate();
       return;
     }
-  }, [error, host, isAuthenticated, loginWithAuthorizationCode]);
+  }, [error, host, isAuthenticated, loginWithAuthorizationCode, shouldUseSessionLogin]);
 
   useEffect(() => {
     if (isAuthenticated) {
       void navigate('/dashboard', { replace: true });
     }
   }, [isAuthenticated, navigate]);
+
+  if (shouldUseSessionLogin) {
+    return <LoginPage />;
+  }
 
   // Show error state if authentication failed
   const displayError = requestError ?? error;

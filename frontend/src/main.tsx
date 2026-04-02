@@ -1,3 +1,4 @@
+import '@insforge/dashboard/styles.css';
 import './styles.css';
 
 import React from 'react';

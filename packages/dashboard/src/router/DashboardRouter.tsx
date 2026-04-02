@@ -17,10 +17,10 @@ function RouteChangeNotifier() {
 
 function PlaceholderPage({ title, description }: { title: string; description: string }) {
   return (
-    <section className="if-dashboard__placeholder">
-      <p className="if-dashboard__eyebrow">Shared Dashboard Package</p>
-      <h1 className="if-dashboard__title">{title}</h1>
-      <p className="if-dashboard__description">{description}</p>
+    <section className="insforge-dashboard__placeholder">
+      <p className="insforge-dashboard__eyebrow">Shared Dashboard Package</p>
+      <h1 className="insforge-dashboard__title">{title}</h1>
+      <p className="insforge-dashboard__description">{description}</p>
     </section>
   );
 }

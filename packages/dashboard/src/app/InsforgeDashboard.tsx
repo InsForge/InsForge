@@ -38,7 +38,7 @@ function SelfHostingDashboard({
 
   return (
     <BrowserRouter>
-      <div className="if-dashboard flex h-full min-h-0 min-w-0 w-full flex-col">
+      <div className="insforge-dashboard flex h-full min-h-0 min-w-0 flex-col">
         <DashboardAppShell
           {...host}
           mode="self-hosting"
@@ -70,7 +70,7 @@ function SelfHostingDashboard({
 
 function CloudHostingDashboard(props: CloudHostingDashboardProps) {
   return (
-    <div className="if-dashboard flex h-full min-h-0 min-w-0 w-full flex-col">
+    <div className="insforge-dashboard flex h-full min-h-0 min-w-0 flex-col">
       <MemoryRouter initialEntries={[props.initialPath || '/dashboard']}>
         <DashboardAppShell {...props}>
           <RouteChangeNotifier />
