@@ -334,6 +334,8 @@ export class StorageService {
         throw new AppError('Object file not found in storage', 404, ERROR_CODES.NOT_FOUND);
       }
 
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`${bucket}/${newKey}`]);
+
       const destinationResult = await client.query(
         'SELECT 1 FROM storage.objects WHERE bucket = $1 AND key = $2',
         [bucket, newKey]

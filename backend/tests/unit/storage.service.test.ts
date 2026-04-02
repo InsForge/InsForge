@@ -61,6 +61,7 @@ describe('StorageService.renameObject', () => {
           },
         ],
       })
+      .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
         rows: [
@@ -87,6 +88,11 @@ describe('StorageService.renameObject', () => {
       uploadedAt: '2026-03-31T12:00:00.000Z',
     });
     expect(client.query).toHaveBeenNthCalledWith(1, 'BEGIN');
+    expect(client.query).toHaveBeenNthCalledWith(
+      3,
+      'SELECT pg_advisory_xact_lock(hashtext($1))',
+      ['assets/cover.png']
+    );
     expect(client.query).toHaveBeenLastCalledWith('COMMIT');
   });
 
@@ -105,6 +111,7 @@ describe('StorageService.renameObject', () => {
           },
         ],
       })
+      .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
         rows: [
@@ -215,6 +222,7 @@ describe('StorageService.renameObject', () => {
           },
         ],
       })
+      .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce({ rows: [{ exists: true }] })
       .mockResolvedValueOnce(undefined);
 
@@ -227,6 +235,11 @@ describe('StorageService.renameObject', () => {
     });
 
     expect(provider.renameObject).not.toHaveBeenCalled();
+    expect(client.query).toHaveBeenNthCalledWith(
+      3,
+      'SELECT pg_advisory_xact_lock(hashtext($1))',
+      ['assets/cover.png']
+    );
     expect(client.query).toHaveBeenLastCalledWith('ROLLBACK');
   });
 });

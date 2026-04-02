@@ -91,6 +91,7 @@ describe('RenameFileDialog', () => {
     { value: '.', message: 'Invalid file name' },
     { value: '..', message: 'Invalid file name' },
     { value: 'folder/cover.png', message: 'File name cannot contain "/" or "\\\\"' },
+    { value: 'folder\\cover.png', message: 'File name cannot contain "/" or "\\\\"' },
   ])('rejects invalid rename input: $value', async ({ value, message }) => {
     render(
       <RenameFileDialog
