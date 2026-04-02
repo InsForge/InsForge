@@ -49,4 +49,4 @@ Use this skill for `backend/` work in the InsForge repository.
 - `cd backend && npm test`
 - `cd backend && npm run build`
 
-For contract changes, also validate `shared-schemas/` and any affected frontend consumers.
+For contract changes, also validate `packages/shared-schemas/` and any affected dashboard consumers.
