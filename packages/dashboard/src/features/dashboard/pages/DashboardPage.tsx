@@ -299,7 +299,7 @@ function DashboardLoadingState() {
   return (
     <main className="h-full min-h-0 min-w-0 overflow-y-auto bg-semantic-0 lg:overflow-hidden">
       <div className="flex min-h-full min-w-0 flex-col lg:h-full lg:min-h-0 lg:flex-row">
-        <section className="w-full min-w-0 shrink-0 border-b border-[var(--alpha-8)] px-10 py-10 lg:w-[480px] lg:border-b-0 lg:border-r">
+        <section className="insforge-dashboard-home-sidebar min-w-0 shrink-0 border-b border-[var(--alpha-8)] px-10 py-10 lg:border-r lg:border-b-0">
           <div className="mx-auto flex w-full max-w-[400px] flex-col gap-12">
             <div className="flex flex-col gap-12">
               <div className="flex items-center gap-2">
@@ -333,7 +333,7 @@ function DashboardLoadingState() {
           </div>
         </section>
 
-        <section className="relative min-h-[420px] flex-1 overflow-hidden bg-semantic-0 lg:min-h-0">
+        <section className="relative min-h-[420px] min-w-0 flex-1 overflow-hidden bg-semantic-0 lg:min-h-0">
           <div
             className="absolute inset-0 dark:hidden"
             style={{
@@ -540,7 +540,7 @@ export default function DashboardPage() {
   return (
     <main className="h-full min-h-0 min-w-0 overflow-y-auto bg-semantic-0 lg:overflow-hidden">
       <div className="flex min-h-full min-w-0 flex-col lg:h-full lg:min-h-0 lg:flex-row">
-        <section className="w-full min-w-0 shrink-0 border-b border-[var(--alpha-8)] px-10 py-10 lg:w-[480px] lg:border-b-0 lg:border-r">
+        <section className="insforge-dashboard-home-sidebar min-w-0 shrink-0 border-b border-[var(--alpha-8)] px-10 py-10 lg:border-r lg:border-b-0">
           <div className="mx-auto flex w-full max-w-[400px] flex-col gap-12">
             <div className="flex flex-col gap-12">
               <div className="flex items-center gap-2">

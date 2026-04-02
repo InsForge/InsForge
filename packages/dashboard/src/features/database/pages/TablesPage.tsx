@@ -392,7 +392,7 @@ export default function TablesPage() {
   }
 
   return (
-    <div className="flex h-full min-h-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
+    <div className="flex h-full min-h-0 min-w-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
       {/* Secondary Sidebar - Table List */}
       <DatabaseSidebar
         tables={tables}
