@@ -1,0 +1,17 @@
+kind: Environment
+name: "insforge-preview-{{ env.unique }}"
+type: primary
+
+components:
+  - kind: DockerCompose
+    name: insforge-stack
+    gitRepo: "https://github.com/InsForge/InsForge.git"
+    gitBranch: "{{ env.vars.GIT_BRANCH }}"
+    gitApplicationPath: "/"
+    dockerCompose:
+      files:
+        - docker-compose.prod.yml
+    hosts:
+      - hostname: "insforge-{{ env.unique }}.bunnyshell.com"
+        service: insforge
+        port: 7130
