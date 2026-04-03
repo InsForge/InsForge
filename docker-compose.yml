@@ -61,11 +61,11 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - "${APP_PORT:-7130}:7130"
+      - "${APP_PORT:-7130}:${APP_PORT:-7130}"
       - "${AUTH_PORT:-7131}:7131"
       - "${UI_PORT:-7132}:7132"
     environment:
-      - PORT=7130
+      - PORT=${APP_PORT:-7130}
       - PROJECT_ROOT=/app
       - API_BASE_URL=${API_BASE_URL:-}
       - VITE_API_BASE_URL=${VITE_API_BASE_URL:-}
