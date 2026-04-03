@@ -103,10 +103,14 @@ WORKDIR /app
 
 # Run as non-root using the built-in node user (uid 1000)
 # /data: database dir (matches DatabaseManager default)
-# /app/insforge-storage, /app/insforge-logs: app defaults for standalone docker run
-# /insforge-storage, /insforge-logs: docker-compose volume mount points (overridden via STORAGE_DIR/LOGS_DIR env vars)
-RUN mkdir -p /data /app/insforge-storage /app/insforge-logs /insforge-storage /insforge-logs && \
-    chown node:node /data /app/insforge-storage /app/insforge-logs /insforge-storage /insforge-logs
+# Default STORAGE_DIR and LOGS_DIR so every containerised deployment
+# (docker run, Compose, Zeabur, Render, etc.) writes to the well-known
+# mount points. Compose and PaaS env vars override these when set.
+ENV STORAGE_DIR=/insforge-storage
+ENV LOGS_DIR=/insforge-logs
+
+RUN mkdir -p /data /insforge-storage /insforge-logs && \
+    chown node:node /data /insforge-storage /insforge-logs
 
 # tsx is a devDependency but required at runtime for migrate:bootstrap
 RUN npm install -g "tsx@^4.7.1" && npm cache clean --force
@@ -157,6 +161,10 @@ FROM node:20-alpine AS dev
 COPY --from=deno-bin /bin/deno /usr/local/bin/deno
 
 WORKDIR /app
+
+# Default mount points (same as runner stage — see comments there)
+ENV STORAGE_DIR=/insforge-storage
+ENV LOGS_DIR=/insforge-logs
 
 # Pre-create volume mount points so Docker initializes named volumes
 # with these directories instead of creating them as root-owned.
