@@ -640,7 +640,7 @@ InsForge's Docker image already follows non-root best practices:
 **Verify the container user:**
 
 ```bash
-docker exec insforge-insforge-1 whoami
+docker compose exec insforge whoami
 # Expected output: node
 ```
 
@@ -793,7 +793,8 @@ tmpfs:
 cd ~/insforge
 
 # Create a timestamped database backup
-docker compose exec -T postgres pg_dump -U postgres insforge \
+docker compose exec -T postgres pg_dump \
+  -U "${POSTGRES_USER:-postgres}" "${POSTGRES_DB:-insforge}" \
   > backup_$(date +%Y%m%d_%H%M%S).sql
 
 # Verify size is reasonable
@@ -919,10 +920,12 @@ Only restore the database if the update included a database migration that cause
 docker compose up -d postgres
 
 # Wait for it to be healthy
-docker compose exec postgres pg_isready -U postgres
+docker compose exec postgres pg_isready -U "${POSTGRES_USER:-postgres}"
 
 # Restore from backup
-cat backup_YYYYMMDD_HHMMSS.sql | docker compose exec -T postgres psql -U postgres -d insforge
+cat backup_YYYYMMDD_HHMMSS.sql | \
+  docker compose exec -T postgres psql \
+  -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-insforge}"
 
 # Start remaining services
 docker compose up -d
@@ -964,7 +967,8 @@ mkdir -p "$BACKUP_DIR"
 
 # Dump the database
 docker compose -f "$HOME/insforge/docker-compose.yml" exec -T postgres \
-  pg_dump -U postgres insforge > "$BACKUP_DIR/db_$TIMESTAMP.sql"
+  pg_dump -U "${POSTGRES_USER:-postgres}" "${POSTGRES_DB:-insforge}" \
+  > "$BACKUP_DIR/db_$TIMESTAMP.sql"
 
 # Copy the environment file
 cp "$HOME/insforge/.env" "$BACKUP_DIR/env_$TIMESTAMP.bak"
@@ -1067,8 +1071,8 @@ docker compose logs -f insforge   # Follow specific service
 docker stats --no-stream          # Resource usage
 
 # ── Database ──────────────────────────────────
-docker compose exec -T postgres pg_dump -U postgres insforge > backup.sql   # Backup
-cat backup.sql | docker compose exec -T postgres psql -U postgres -d insforge  # Restore
+docker compose exec -T postgres pg_dump -U "${POSTGRES_USER:-postgres}" "${POSTGRES_DB:-insforge}" > backup.sql  # Backup
+cat backup.sql | docker compose exec -T postgres psql -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-insforge}"  # Restore
 
 # ── Updates ───────────────────────────────────
 docker compose pull               # Pull new images
@@ -1161,7 +1165,7 @@ docker compose ps postgres
 docker compose logs postgres
 
 # Connect to the database directly
-docker compose exec postgres psql -U postgres -d insforge
+docker compose exec postgres psql -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-insforge}"
 ```
 
 ---
