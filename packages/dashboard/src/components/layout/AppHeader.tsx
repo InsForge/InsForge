@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { LogOut, ChevronDown, Plug } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import {
   Button,
   DropdownMenu,
@@ -12,6 +13,7 @@ import { cn } from '../../lib/utils/utils';
 import { useTheme } from '../../lib/contexts/ThemeContext';
 import { useAuth } from '../../lib/contexts/AuthContext';
 import { useModal } from '../../lib/hooks/useModal';
+import { DASHBOARD_HOME_PATH } from '../../router';
 
 // Import SVG icons
 import DiscordIcon from '../../assets/logos/discord.svg?react';
@@ -20,6 +22,7 @@ import InsForgeLogoLight from '../../assets/logos/insforge_light.svg';
 import InsForgeLogoDark from '../../assets/logos/insforge_dark.svg';
 
 export default function AppHeader() {
+  const navigate = useNavigate();
   const { resolvedTheme } = useTheme();
   const { user, logout } = useAuth();
   const { setConnectDialogOpen } = useModal();
@@ -71,6 +74,10 @@ export default function AppHeader() {
       'bg-indigo-500',
     ];
     return colors[hash % colors.length];
+  };
+
+  const redirectToDashboardHome = () => {
+    navigate(DASHBOARD_HOME_PATH);
   };
 
   return (
@@ -130,23 +137,41 @@ export default function AppHeader() {
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <button className="w-50 flex items-center gap-3 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[8px] pr-3 transition-all duration-200 group">
-                <Avatar className="h-8 w-8 ring-2 ring-white dark:ring-gray-700 shadow-sm">
-                  <AvatarFallback
-                    className={cn(
-                      'text-white font-medium text-sm',
-                      getAvatarColor(user?.email ?? '')
-                    )}
-                  >
-                    {getUserInitials(user?.email ?? '')}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="text-left hidden md:block">
-                  <p className="text-sm font-medium text-zinc-950 dark:text-zinc-100 leading-tight">
-                    Admin
-                  </p>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    {user?.email || 'Administrator'}
-                  </p>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    redirectToDashboardHome();
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      redirectToDashboardHome();
+                    }
+                  }}
+                  className="flex items-center gap-3 flex-1 cursor-pointer"
+                  aria-label="Go to dashboard home"
+                >
+                  <Avatar className="h-8 w-8 ring-2 ring-white dark:ring-gray-700 shadow-sm">
+                    <AvatarFallback
+                      className={cn(
+                        'text-white font-medium text-sm',
+                        getAvatarColor(user?.email ?? '')
+                      )}
+                    >
+                      {getUserInitials(user?.email ?? '')}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="text-left hidden md:block">
+                    <p className="text-sm font-medium text-zinc-950 dark:text-zinc-100 leading-tight">
+                      Admin
+                    </p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                      {user?.email || 'Administrator'}
+                    </p>
+                  </div>
                 </div>
                 <ChevronDown className="h-5 w-5 text-black dark:text-white hidden md:block ml-auto" />
               </button>
