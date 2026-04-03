@@ -66,13 +66,21 @@ export async function createApp() {
 
   // Initialize job queue service and register handlers
   jobQueue.registerHandler(JobType.EMAIL, async (payload) => {
-    const { action, email, type, redirectTo } = payload as {
-      action: string;
-      email: string;
-      type: string;
-      redirectTo?: string;
-    };
     const authService = AuthService.getInstance();
+
+    if (
+      typeof payload !== 'object' ||
+      payload === null ||
+      !('action' in payload) ||
+      !('email' in payload)
+    ) {
+      throw new Error('Invalid payload: missing action or email');
+    }
+
+    const action = String(payload.action);
+    const email = String(payload.email);
+    const type = payload.type ? String(payload.type) : 'code';
+    const redirectTo = payload.redirectTo ? String(payload.redirectTo) : undefined;
 
     if (action === 'verification') {
       if (type === 'link' && redirectTo) {
@@ -86,6 +94,8 @@ export async function createApp() {
       } else {
         await authService.sendResetPasswordEmailWithCode(email);
       }
+    } else {
+      throw new Error(`Unknown email action: ${action}`);
     }
   });
   jobQueue.start();
@@ -388,6 +398,14 @@ async function cleanup() {
     destroyEmailCooldownInterval();
   } catch (error) {
     logger.error('Error clearing email cooldown interval', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  try {
+    jobQueue.stop();
+  } catch (error) {
+    logger.error('Error stopping job queue', {
       error: error instanceof Error ? error.message : String(error),
     });
   }
