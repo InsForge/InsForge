@@ -5,13 +5,6 @@ export interface AppConfig {
     apiKey: string;
     logLevel: string;
   };
-  database: {
-    host: string;
-    port: number;
-    username: string;
-    password: string;
-    databaseName: string;
-  };
   cloud: {
     storageBucket: string;
     instanceProfile: string;
@@ -35,13 +28,6 @@ export const config: AppConfig = {
     jwtSecret: process.env.JWT_SECRET || 'your_jwt_secret',
     apiKey: process.env.ACCESS_API_KEY || 'your_api_key',
     logLevel: process.env.LOG_LEVEL || 'info',
-  },
-  database: {
-    host: process.env.POSTGRES_HOST || 'localhost',
-    port: parseInt(process.env.POSTGRES_PORT || '5432', 10),
-    username: process.env.POSTGRES_USERNAME || 'user',
-    password: process.env.POSTGRES_PASSWORD || 'password',
-    databaseName: process.env.POSTGRES_NAME || 'insforge',
   },
   cloud: {
     storageBucket: process.env.AWS_S3_BUCKET || 'insforge-test-bucket',
