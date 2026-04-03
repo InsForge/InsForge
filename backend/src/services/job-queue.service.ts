@@ -1,5 +1,9 @@
 import logger from '@/utils/logger.js';
 
+// NOTE: This is an in-memory job queue. All pending jobs (verification emails, password resets)
+// will be lost on process restart/deploy. For production, consider using database-backed
+// storage (e.g., Postgres with a jobs table) for persistence.
+
 export enum JobType {
   EMAIL = 'email',
   AUDIT = 'audit',
@@ -43,6 +47,7 @@ export class JobQueueService {
   private retryDelays = [1000, 5000, 15000];
   private pollInterval = 1000;
   private workerInterval: NodeJS.Timeout | null = null;
+  private retryTimers: Map<string, NodeJS.Timeout> = new Map();
 
   private constructor() {
     logger.info('JobQueueService initialized');
@@ -121,10 +126,13 @@ export class JobQueueService {
 
       logger.info(`Scheduling job retry: ${job.id}`, { retry: job.retries, delay });
 
-      setTimeout(() => {
+      const timer = setTimeout(() => {
+        this.retryTimers.delete(job.id);
         this.queue.push(job);
         this.queue.sort((a, b) => a.priority - b.priority);
       }, delay);
+
+      this.retryTimers.set(job.id, timer);
     } else if (!result.success) {
       logger.error(`Job failed after max retries: ${job.id}`, { type: job.type });
     } else {
@@ -169,6 +177,13 @@ export class JobQueueService {
       this.workerInterval = null;
       logger.info('Job queue worker stopped');
     }
+
+    this.retryTimers.forEach((timer) => {
+      clearTimeout(timer);
+    });
+    this.retryTimers.clear();
+    this.queue = [];
+    logger.info('Cleared pending job retry timers and queue');
   }
 
   public getStats(): { queued: number; processing: boolean } {
