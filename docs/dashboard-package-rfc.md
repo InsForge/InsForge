@@ -93,9 +93,6 @@ Primary export:
     canOpenUsagePage: true,
     canOpenSubscriptionPage: true,
   }}
-  onRouteChange={(route) => {
-    console.log(route.path);
-  }}
   onOpenSettings={() => {
     // host-owned modal or panel
   }}
@@ -127,10 +124,6 @@ Primary export:
 
 ```ts
 export type DashboardMode = 'self-hosting' | 'cloud-hosting';
-
-export interface DashboardRoute {
-  path: string;
-}
 
 export interface DashboardProjectInfo {
   id: string;
@@ -190,7 +183,6 @@ export interface DashboardProps {
   auth: DashboardAuthConfig;
   project?: DashboardProjectInfo;
   capabilities?: DashboardCapabilities;
-  onRouteChange?: (route: DashboardRoute) => void;
   onOpenSettings?: () => void;
   onNavigateToUsage?: () => void;
   onNavigateToSubscription?: () => void;
@@ -206,14 +198,16 @@ export interface DashboardProps {
 
 ## Routing Model
 
-The package should use an internal `MemoryRouter`.
+The package uses host-appropriate routing:
+
+- `BrowserRouter` for self-hosting so the local app URL stays in sync with dashboard navigation
+- `MemoryRouter` for cloud-hosting so the embedded dashboard can manage its own internal state
 
 Why:
 
-- avoids collisions with Next.js routing in the host app
+- avoids collisions with the cloud host router
 - keeps the dashboard portable across OSS and cloud
 - allows the host to pass `initialPath`
-- lets the package report route changes with `onRouteChange`
 
 Recommended internal routes:
 
@@ -265,7 +259,6 @@ packages/dashboard/
       InsForgeDashboard.tsx
       DashboardProviders.tsx
     router/
-      DashboardRouter.tsx
       routes.tsx
     lib/
       api/
