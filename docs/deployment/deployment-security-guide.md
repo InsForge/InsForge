@@ -528,14 +528,18 @@ These ports are used **only** for internal Docker service-to-service communicati
 | 7131  | Auth        | Internal auth service                            |
 | 7133  | Deno        | Internal serverless runtime                      |
 
-> 💡 **Best Practice**: The `docker-compose.yml` exposes ports to `127.0.0.1` (localhost) by default when used behind a reverse proxy. You can make this explicit:
+> ⚠️ **Critical**: The default `docker-compose.yml` binds ports to `0.0.0.0` (all interfaces), **not** `127.0.0.1`. This means Docker will expose services directly to the internet, **bypassing UFW entirely** (Docker manipulates iptables directly). You **MUST** add the `127.0.0.1:` prefix to every published port in your `docker-compose.yml`:
 >
 > ```yaml
 > ports:
->   - "127.0.0.1:7130:7130"
+>   - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"     # PostgreSQL
+>   - "127.0.0.1:${POSTGREST_PORT:-5430}:3000"     # PostgREST
+>   - "127.0.0.1:${APP_PORT:-7130}:7130"            # InsForge
+>   - "127.0.0.1:${AUTH_PORT:-7131}:7131"           # Auth
+>   - "127.0.0.1:${DENO_PORT:-7133}:7133"           # Deno
 > ```
 >
-> This ensures Docker does not bypass the firewall (see next section).
+> Without this prefix, anyone on the internet can reach these services directly — including PostgreSQL with default credentials. See [Section 9.2](#92-docker-and-ufw-caveat) for details.
 
 ---
 
@@ -791,6 +795,7 @@ tmpfs:
 
 ```bash
 cd ~/insforge
+source .env
 
 # Create a timestamped database backup
 docker compose exec -T postgres pg_dump \
@@ -916,6 +921,9 @@ image: ghcr.io/insforge/insforge-oss:v1.4.0
 Only restore the database if the update included a database migration that caused issues:
 
 ```bash
+cd ~/insforge
+source .env
+
 # Start only PostgreSQL
 docker compose up -d postgres
 
@@ -956,6 +964,10 @@ nano ~/insforge/backup.sh
 set -euo pipefail
 
 # InsForge Automated Backup Script
+# Load .env so POSTGRES_USER / POSTGRES_DB are available outside Docker Compose
+set -a
+source "$HOME/insforge/.env"
+set +a
 
 BACKUP_DIR="$HOME/insforge/backups"
 RETENTION_DAYS=14
@@ -1070,7 +1082,8 @@ docker compose logs -f            # Follow all logs
 docker compose logs -f insforge   # Follow specific service
 docker stats --no-stream          # Resource usage
 
-# ── Database ──────────────────────────────────
+# ── Database (source .env first for vars) ────
+source ~/insforge/.env
 docker compose exec -T postgres pg_dump -U "${POSTGRES_USER:-postgres}" "${POSTGRES_DB:-insforge}" > backup.sql  # Backup
 cat backup.sql | docker compose exec -T postgres psql -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-insforge}"  # Restore
 
