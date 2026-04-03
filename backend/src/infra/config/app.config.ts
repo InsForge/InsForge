@@ -39,9 +39,9 @@ export const config: AppConfig = {
   database: {
     host: process.env.POSTGRES_HOST || 'localhost',
     port: parseInt(process.env.POSTGRES_PORT || '5432', 10),
-    username: process.env.POSTGRES_USERNAME || 'user',
-    password: process.env.POSTGRES_PASSWORD || 'password',
-    databaseName: process.env.POSTGRES_NAME || 'insforge',
+    username: process.env.POSTGRES_USER || 'postgres',
+    password: process.env.POSTGRES_PASSWORD || 'postgres',
+    databaseName: process.env.POSTGRES_DB || 'insforge',
   },
   cloud: {
     storageBucket: process.env.AWS_S3_BUCKET || 'insforge-test-bucket',

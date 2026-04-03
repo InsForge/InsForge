@@ -242,6 +242,16 @@ async function seedLocalOAuthConfigs(): Promise<void> {
         clientIdEnv: 'MICROSOFT_CLIENT_ID',
         clientSecretEnv: 'MICROSOFT_CLIENT_SECRET',
       },
+      {
+        provider: 'x',
+        clientIdEnv: 'X_CLIENT_ID',
+        clientSecretEnv: 'X_CLIENT_SECRET',
+      },
+      {
+        provider: 'apple',
+        clientIdEnv: 'APPLE_CLIENT_ID',
+        clientSecretEnv: 'APPLE_CLIENT_SECRET',
+      },
     ];
 
     for (const { provider, clientIdEnv, clientSecretEnv } of envMappings) {
