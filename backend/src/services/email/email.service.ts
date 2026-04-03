@@ -1,35 +1,26 @@
 import { EmailProvider } from '@/providers/email/base.provider.js';
 import { CloudEmailProvider } from '@/providers/email/cloud.provider.js';
+import { SmtpEmailProvider } from '@/providers/email/smtp.provider.js';
+import { SmtpConfigService, RawSmtpConfig } from '@/services/email/smtp-config.service.js';
+import { AppError } from '@/api/middlewares/error.js';
+import { ERROR_CODES } from '@/types/error-constants.js';
 import { EmailTemplate } from '@/types/email.js';
 import { SendRawEmailRequest } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 
 /**
- * Email service that orchestrates different email providers
+ * Email service — resolves provider per-call so SMTP config changes take effect without restart
  */
 export class EmailService {
   private static instance: EmailService;
-  private provider: EmailProvider;
+  private cloudProvider = new CloudEmailProvider();
+  private smtpProvider = new SmtpEmailProvider();
+  private lastEmailSentAt = new Map<string, number>();
 
   private constructor() {
-    // For now, we only support cloud provider
-    // In the future, this can be configured via environment variables
-    // Example:
-    // if (process.env.EMAIL_PROVIDER === 'smtp') {
-    //   this.provider = new SMTPEmailProvider(config.email.smtp);
-    // } else if (process.env.EMAIL_PROVIDER === 'sendgrid') {
-    //   this.provider = new SendGridEmailProvider(config.email.sendgrid);
-    // } else {
-    //   this.provider = new CloudEmailProvider();
-    // }
-
-    this.provider = new CloudEmailProvider();
-    logger.info('Using email provider: Cloud (Insforge)');
+    logger.info('EmailService initialized');
   }
 
-  /**
-   * Get singleton instance of EmailService
-   */
   public static getInstance(): EmailService {
     if (!EmailService.instance) {
       EmailService.instance = new EmailService();
@@ -37,37 +28,99 @@ export class EmailService {
     return EmailService.instance;
   }
 
-  /**
-   * Send email using predefined template
-   * @param email - Recipient email address
-   * @param name - Recipient name
-   * @param template - Template type
-   * @param variables - Variables to use in the email template
-   */
+  private async resolveProvider(): Promise<[EmailProvider, RawSmtpConfig | null]> {
+    try {
+      const smtpConfig = await SmtpConfigService.getInstance().getRawSmtpConfig();
+      if (smtpConfig) {
+        return [this.smtpProvider, smtpConfig];
+      }
+    } catch (error) {
+      logger.warn('Error checking SMTP config, falling back to cloud provider', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+    return [this.cloudProvider, null];
+  }
+
+  // -------------------------------------------------------------------------
+  // Rate limiting — check before send, record after success
+  // -------------------------------------------------------------------------
+
+  private checkMinInterval(email: string, minIntervalSeconds: number): void {
+    if (minIntervalSeconds <= 0) {
+      return;
+    }
+
+    const now = Date.now();
+    const lastSent = this.lastEmailSentAt.get(email);
+
+    if (lastSent && now - lastSent < minIntervalSeconds * 1000) {
+      const retryAfter = Math.ceil((minIntervalSeconds * 1000 - (now - lastSent)) / 1000);
+      throw new AppError(
+        `Too many emails to this address. Retry after ${retryAfter}s.`,
+        429,
+        ERROR_CODES.RATE_LIMITED
+      );
+    }
+  }
+
+  private recordEmailSent(email: string, minIntervalSeconds: number): void {
+    this.lastEmailSentAt.set(email, Date.now());
+
+    // Prune stale entries to prevent unbounded memory growth
+    if (this.lastEmailSentAt.size > 10000) {
+      const cutoff = Date.now() - minIntervalSeconds * 2000;
+      for (const [key, ts] of this.lastEmailSentAt) {
+        if (ts < cutoff) {
+          this.lastEmailSentAt.delete(key);
+        }
+      }
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Public API
+  // -------------------------------------------------------------------------
+
   public async sendWithTemplate(
     email: string,
     name: string,
     template: EmailTemplate,
     variables?: Record<string, string>
   ): Promise<void> {
-    return this.provider.sendWithTemplate(email, name, template, variables);
+    const [provider, smtpConfig] = await this.resolveProvider();
+
+    if (smtpConfig) {
+      this.checkMinInterval(email, smtpConfig.minIntervalSeconds);
+    }
+
+    await provider.sendWithTemplate(email, name, template, variables);
+
+    if (smtpConfig) {
+      this.recordEmailSent(email, smtpConfig.minIntervalSeconds);
+    }
   }
 
-  /**
-   * Send custom/raw email
-   * @param options - Email options (to, subject, html, cc, bcc, from, replyTo)
-   */
   public async sendRaw(options: SendRawEmailRequest): Promise<void> {
-    if (!this.provider.sendRaw) {
+    const [provider, smtpConfig] = await this.resolveProvider();
+
+    const recipients = Array.isArray(options.to) ? options.to : [options.to];
+
+    if (smtpConfig) {
+      for (const recipient of recipients) {
+        this.checkMinInterval(recipient, smtpConfig.minIntervalSeconds);
+      }
+    }
+
+    if (!provider.sendRaw) {
       throw new Error('Current email provider does not support raw email sending');
     }
-    return this.provider.sendRaw(options);
-  }
+    await provider.sendRaw(options);
 
-  /**
-   * Check if current provider supports templates
-   */
-  public supportsTemplates(): boolean {
-    return this.provider.supportsTemplates();
+    if (smtpConfig) {
+      for (const recipient of recipients) {
+        this.recordEmailSent(recipient, smtpConfig.minIntervalSeconds);
+      }
+    }
   }
 }
