@@ -27,8 +27,13 @@ const auditService = AuditService.getInstance();
  */
 function invalidateColumnTypeCacheFromChanges(changes: DatabaseResourceUpdate[]): void {
   for (const change of changes) {
-    if (change.type === 'table' && change.name) {
-      DatabaseManager.clearColumnTypeCache(change.name);
+    if (change.type === 'table' || change.type === 'tables') {
+      if (change.name) {
+        DatabaseManager.clearColumnTypeCache(change.name);
+      } else {
+        // DROP TABLE / CREATE TABLE don't preserve table name in the parser — clear all
+        DatabaseManager.clearColumnTypeCache();
+      }
     }
   }
 }
