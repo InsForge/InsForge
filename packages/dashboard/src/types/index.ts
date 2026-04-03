@@ -1,9 +1,5 @@
 export type DashboardMode = 'self-hosting' | 'cloud-hosting';
 
-export interface DashboardRoute {
-  path: string;
-}
-
 export interface DashboardProjectInfo {
   id: string;
   name: string;
@@ -63,7 +59,6 @@ export interface DashboardSharedProps {
   capabilities?: DashboardCapabilities;
   connectDialogOpen?: boolean;
   onConnectDialogOpenChange?: (open: boolean) => void;
-  onRouteChange?: (route: DashboardRoute) => void;
   onOpenSettings?: () => void;
   onNavigateToUsage?: () => void;
   onNavigateToSubscription?: () => void;

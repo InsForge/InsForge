@@ -1,9 +1,4 @@
-import {
-  DashboardHostRoutes,
-  DASHBOARD_AUTH_USERS_PATH,
-  DASHBOARD_DATABASE_TABLES_PATH,
-  DASHBOARD_HOME_PATH,
-} from '../../router';
+import { DashboardHostRoutes } from '../../router';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { RequireAuth } from './RequireAuth';
 import Layout from '../../components/layout/Layout';
@@ -57,18 +52,10 @@ export function AppRoutes() {
         <RequireAuth>
           <Layout>
             <Routes>
-              <Route path="/" element={<Navigate to={DASHBOARD_HOME_PATH} replace />} />
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<DashboardLayout />}>
                 <Route index element={<DashboardPage />} />
               </Route>
-              <Route
-                path="/dashboard/users"
-                element={<Navigate to={DASHBOARD_AUTH_USERS_PATH} replace />}
-              />
-              <Route
-                path="/dashboard/tables"
-                element={<Navigate to={DASHBOARD_DATABASE_TABLES_PATH} replace />}
-              />
               <Route path="/dashboard/authentication" element={<AuthenticationLayout />}>
                 <Route index element={<Navigate to="users" replace />} />
                 <Route path="users" element={<UsersPage />} />
@@ -125,7 +112,7 @@ export function AppRoutes() {
                 <Route path="env-vars" element={<DeploymentEnvVarsPage />} />
                 <Route path="domains" element={<DeploymentDomainsPage />} />
               </Route>
-              <Route path="*" element={<Navigate to={DASHBOARD_HOME_PATH} replace />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </Layout>
         </RequireAuth>
