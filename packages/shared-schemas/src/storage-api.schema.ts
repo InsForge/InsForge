@@ -73,5 +73,10 @@ export type UploadStrategyResponse = z.infer<typeof uploadStrategyResponseSchema
 export type DownloadStrategyRequest = z.infer<typeof downloadStrategyRequestSchema>;
 export type DownloadStrategyResponse = z.infer<typeof downloadStrategyResponseSchema>;
 export type ConfirmUploadRequest = z.infer<typeof confirmUploadRequestSchema>;
+export const renameObjectRequestSchema = z.object({
+  newKey: z.string().min(1).max(1024),
+});
+
 export type UpdateStorageConfigRequest = z.infer<typeof updateStorageConfigRequestSchema>;
 export type GetStorageConfigResponse = z.infer<typeof getStorageConfigResponseSchema>;
+export type RenameObjectRequest = z.infer<typeof renameObjectRequestSchema>;
