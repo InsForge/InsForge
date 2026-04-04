@@ -24,6 +24,7 @@ const newColumn: TableFormColumnSchema = {
   isNullable: true,
   isUnique: false,
   defaultValue: '',
+  encrypted: false,
   isSystemColumn: false,
   isNewColumn: true,
 };
@@ -111,6 +112,7 @@ export function TableForm({
           isNullable: col.isNullable,
           isUnique: col.isUnique || false,
           defaultValue: col.defaultValue || '',
+          encrypted: col.encrypted || false,
           originalName: col.columnName, // Track original name for rename detection
           isSystemColumn: SYSTEM_FIELDS.includes(col.columnName),
           isNewColumn: false,
@@ -208,6 +210,8 @@ export function TableForm({
           isNullable: col.isNullable,
           isUnique: col.isUnique,
           defaultValue: col.defaultValue,
+          // Mark column for encryption
+          ...(col.encrypted && { encrypted: true }),
           // Embed foreign key information directly in the column
           ...(foreignKey && {
             foreignKey: {
@@ -469,13 +473,14 @@ export function TableForm({
             </div>
 
             <div className="overflow-x-auto">
-              <div className="min-w-[860px]">
+              <div className="min-w-[960px]">
                 <div className="flex h-8 items-center border-y border-[var(--alpha-8)] pl-1.5 pr-0 text-[13px] leading-[18px] text-muted-foreground">
                   <div className="flex flex-1 items-center px-2.5">Name</div>
                   <div className="flex flex-1 items-center px-2.5">Type</div>
                   <div className="flex flex-1 items-center px-2.5">Default Value</div>
                   <div className="flex w-[100px] items-center justify-center px-2.5">Nullable</div>
                   <div className="flex w-[100px] items-center justify-center px-2.5">Unique</div>
+                  <div className="flex w-[100px] items-center justify-center px-2.5">Encrypted</div>
                   <div className="w-[52px]" />
                 </div>
 

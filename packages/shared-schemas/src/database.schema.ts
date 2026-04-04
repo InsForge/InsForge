@@ -49,6 +49,7 @@ export const columnSchema = z.object({
   isNullable: z.boolean(),
   isUnique: z.boolean(),
   foreignKey: foreignKeySchema.optional(),
+  encrypted: z.boolean().optional(),
 });
 
 export const tableSchema = z.object({

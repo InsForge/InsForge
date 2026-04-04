@@ -23,6 +23,7 @@ import {
 } from '@insforge/shared-schemas';
 import { validateIdentifier } from '@/utils/validations.js';
 import { convertSqlTypeToColumnType } from '@/utils/utils.js';
+import { EncryptedColumnService } from '@/services/database/encrypted-column.service.js';
 
 const reservedColumns = {
   id: ColumnType.UUID,
@@ -198,14 +199,13 @@ export class DatabaseTableService {
       const columnDefs = validatedColumns
         .map((col: ColumnSchema) => {
           const fieldType = COLUMN_TYPES[col.type as ColumnType];
-          const sqlType = fieldType.sqlType;
+          // Encrypted columns are stored as TEXT regardless of declared type
+          const sqlType = col.encrypted ? 'TEXT' : fieldType.sqlType;
 
-          // Handle default values
-          const defaultClause = formatDefaultValue(
-            col.defaultValue,
-            col.type as ColumnType,
-            col.isNullable
-          );
+          // Handle default values (skip system defaults for encrypted columns)
+          const defaultClause = col.encrypted
+            ? ''
+            : formatDefaultValue(col.defaultValue, col.type as ColumnType, col.isNullable);
 
           const nullable = col.isNullable ? '' : 'NOT NULL';
           const unique = col.isUnique ? 'UNIQUE' : '';
@@ -258,15 +258,22 @@ export class DatabaseTableService {
         `
       );
 
-      // Update metadata
-      // Metadata is now updated on-demand
+      // Register encrypted columns in the registry
+      const encryptedCols = validatedColumns.filter((col) => col.encrypted);
+      if (encryptedCols.length > 0) {
+        const encryptedColumnService = EncryptedColumnService.getInstance();
+        for (const col of encryptedCols) {
+          const originalSqlType = COLUMN_TYPES[col.type as ColumnType].sqlType.toLowerCase();
+          await encryptedColumnService.registerColumn(table_name, col.columnName, originalSqlType);
+        }
+      }
 
       return {
         message: 'table created successfully',
         tableName: table_name,
         columns: validatedColumns.map((col) => ({
           ...col,
-          sqlType: COLUMN_TYPES[col.type as ColumnType].sqlType,
+          sqlType: col.encrypted ? 'TEXT' : COLUMN_TYPES[col.type as ColumnType].sqlType,
         })),
         autoFields: ['id', 'created_at', 'updated_at'],
         nextActions:
@@ -378,15 +385,24 @@ export class DatabaseTableService {
       const uniqueColumns = uniqueColumnsResult.rows;
       const uniqueSet = new Set(uniqueColumns.map((u: { column_name: string }) => u.column_name));
 
-      // Get row count
-      const rowCountResult = await client.query(`SELECT COUNT(*) as row_count FROM "${table}"`);
+      // Get row count and encrypted columns in parallel
+      const encryptedColumnService = EncryptedColumnService.getInstance();
+      const [rowCountResult, encryptedColumns] = await Promise.all([
+        client.query(`SELECT COUNT(*) as row_count FROM "${table}"`),
+        encryptedColumnService.getEncryptedColumns(table),
+      ]);
       const row_count = rowCountResult.rows[0].row_count;
 
       return {
         tableName: table,
         columns: columns.map((col: ColumnInfo) => {
-          // For USER-DEFINED types (extensions like pgvector), use udt_name
-          const effectiveType = col.data_type === 'USER-DEFINED' ? col.udt_name : col.data_type;
+          const encEntry = encryptedColumns.get(col.column_name);
+          // For encrypted columns, report the original type instead of TEXT
+          const effectiveType = encEntry
+            ? encEntry.originalType
+            : col.data_type === 'USER-DEFINED'
+              ? col.udt_name
+              : col.data_type;
           return {
             columnName: col.column_name,
             type: convertSqlTypeToColumnType(effectiveType),
@@ -397,6 +413,7 @@ export class DatabaseTableService {
             ...(foreignKeyMap.has(col.column_name) && {
               foreignKey: foreignKeyMap.get(col.column_name),
             }),
+            ...(encEntry && { encrypted: true }),
           };
         }),
         recordCount: row_count,
@@ -502,6 +519,10 @@ export class DatabaseTableService {
               DROP COLUMN ${this.quoteIdentifier(col)}
             `
           );
+
+          // Clean up encrypted column registration if it was encrypted
+          const encryptedColumnService = EncryptedColumnService.getInstance();
+          await encryptedColumnService.unregisterColumn(tableName, col);
 
           completedOperations.push(`Dropped column: ${col}`);
         }
@@ -648,8 +669,9 @@ export class DatabaseTableService {
     try {
       await client.query(`DROP TABLE IF EXISTS ${this.quoteIdentifier(table)} CASCADE`);
 
-      // Update metadata
-      // Metadata is now updated on-demand
+      // Clean up encrypted column registrations
+      const encryptedColumnService = EncryptedColumnService.getInstance();
+      await encryptedColumnService.unregisterTable(table);
 
       // enable postgrest to query this table
       await client.query(
