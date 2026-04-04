@@ -8,12 +8,33 @@ import { createServiceSchema, updateServiceSchema } from '@insforge/shared-schem
 import { AuditService } from '@/services/logs/audit.service.js';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
+import logger from '@/utils/logger.js';
 
 const router = Router();
 const auditService = AuditService.getInstance();
 
 function getProjectId(req: AuthRequest): string {
   return (req.query.project_id as string) || 'default';
+}
+
+function bestEffortAudit(params: Parameters<typeof auditService.log>[0]) {
+  auditService.log(params).catch((err) => {
+    logger.error('Audit log failed (best-effort)', { error: err });
+  });
+}
+
+function bestEffortBroadcast() {
+  try {
+    const socket = SocketManager.getInstance();
+    socket.broadcastToRoom(
+      'role:project_admin',
+      ServerEvents.DATA_UPDATE,
+      { resource: DataUpdateResourceType.COMPUTE_SERVICES },
+      'system'
+    );
+  } catch (err) {
+    logger.error('Socket broadcast failed (best-effort)', { error: err });
+  }
 }
 
 // List services
@@ -60,23 +81,16 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
     const projectId = getProjectId(req);
     const service = await svc.createService({ ...validation.data, projectId });
 
-    await auditService.log({
+    successResponse(res, service, 201);
+
+    bestEffortAudit({
       actor: req.user?.email || 'api-key',
       action: 'CREATE_COMPUTE_SERVICE',
       module: 'COMPUTE',
       details: { serviceName: validation.data.name, projectId },
       ip_address: req.ip,
     });
-
-    const socket = SocketManager.getInstance();
-    socket.broadcastToRoom(
-      'role:project_admin',
-      ServerEvents.DATA_UPDATE,
-      { resource: DataUpdateResourceType.COMPUTE_SERVICES },
-      'system'
-    );
-
-    successResponse(res, service, 201);
+    bestEffortBroadcast();
   } catch (error) {
     next(error);
   }
@@ -104,23 +118,16 @@ router.patch('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: 
 
     const service = await svc.updateService(req.params.id, validation.data);
 
-    await auditService.log({
+    successResponse(res, service);
+
+    bestEffortAudit({
       actor: req.user?.email || 'api-key',
       action: 'UPDATE_COMPUTE_SERVICE',
       module: 'COMPUTE',
       details: { serviceId: req.params.id, changes: validation.data },
       ip_address: req.ip,
     });
-
-    const socket = SocketManager.getInstance();
-    socket.broadcastToRoom(
-      'role:project_admin',
-      ServerEvents.DATA_UPDATE,
-      { resource: DataUpdateResourceType.COMPUTE_SERVICES },
-      'system'
-    );
-
-    successResponse(res, service);
+    bestEffortBroadcast();
   } catch (error) {
     next(error);
   }
@@ -138,23 +145,16 @@ router.delete('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next:
 
     await svc.deleteService(req.params.id);
 
-    await auditService.log({
+    successResponse(res, { message: 'Service deleted' });
+
+    bestEffortAudit({
       actor: req.user?.email || 'api-key',
       action: 'DELETE_COMPUTE_SERVICE',
       module: 'COMPUTE',
       details: { serviceId: req.params.id, serviceName: existing.name },
       ip_address: req.ip,
     });
-
-    const socket = SocketManager.getInstance();
-    socket.broadcastToRoom(
-      'role:project_admin',
-      ServerEvents.DATA_UPDATE,
-      { resource: DataUpdateResourceType.COMPUTE_SERVICES },
-      'system'
-    );
-
-    successResponse(res, { message: 'Service deleted' });
+    bestEffortBroadcast();
   } catch (error) {
     next(error);
   }
@@ -175,23 +175,16 @@ router.post(
 
       const service = await svc.stopService(req.params.id);
 
-      await auditService.log({
+      successResponse(res, service);
+
+      bestEffortAudit({
         actor: req.user?.email || 'api-key',
         action: 'STOP_COMPUTE_SERVICE',
         module: 'COMPUTE',
         details: { serviceId: req.params.id, serviceName: existing.name },
         ip_address: req.ip,
       });
-
-      const socket = SocketManager.getInstance();
-      socket.broadcastToRoom(
-        'role:project_admin',
-        ServerEvents.DATA_UPDATE,
-        { resource: DataUpdateResourceType.COMPUTE_SERVICES },
-        'system'
-      );
-
-      successResponse(res, service);
+      bestEffortBroadcast();
     } catch (error) {
       next(error);
     }
@@ -213,23 +206,16 @@ router.post(
 
       const service = await svc.startService(req.params.id);
 
-      await auditService.log({
+      successResponse(res, service);
+
+      bestEffortAudit({
         actor: req.user?.email || 'api-key',
         action: 'START_COMPUTE_SERVICE',
         module: 'COMPUTE',
         details: { serviceId: req.params.id, serviceName: existing.name },
         ip_address: req.ip,
       });
-
-      const socket = SocketManager.getInstance();
-      socket.broadcastToRoom(
-        'role:project_admin',
-        ServerEvents.DATA_UPDATE,
-        { resource: DataUpdateResourceType.COMPUTE_SERVICES },
-        'system'
-      );
-
-      successResponse(res, service);
+      bestEffortBroadcast();
     } catch (error) {
       next(error);
     }
@@ -249,7 +235,7 @@ router.get(
         throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
       }
 
-      const limit = Math.min(Number(req.query.limit) || 100, 1000);
+      const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 1000);
       const logs = await svc.getServiceLogs(req.params.id, { limit });
 
       successResponse(res, logs);

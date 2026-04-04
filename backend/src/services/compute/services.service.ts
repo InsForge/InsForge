@@ -65,7 +65,9 @@ function mapRowToSchema(row: ServiceRow): ServiceSchema {
 }
 
 function makeFlyAppName(name: string, projectId: string): string {
-  return `${name}-${projectId}`.substring(0, 60);
+  const suffix = `-${projectId}`;
+  const maxNameLength = 60 - suffix.length;
+  return (name.length > maxNameLength ? name.slice(0, maxNameLength) : name) + suffix;
 }
 
 function makeNetwork(projectId: string): string {
@@ -175,6 +177,13 @@ export class ComputeServicesService {
       return mapRowToSchema(updateResult.rows[0]);
     } catch (error) {
       logger.error('Failed to deploy compute service', { serviceId, error });
+
+      // Clean up orphaned Fly app
+      try {
+        await fly.destroyApp(flyAppName);
+      } catch (destroyError) {
+        logger.error('Failed to clean up orphaned Fly app', { flyAppName, error: destroyError });
+      }
 
       // Mark as failed
       await this.getPool().query(`UPDATE compute.services SET status = $1 WHERE id = $2`, [
