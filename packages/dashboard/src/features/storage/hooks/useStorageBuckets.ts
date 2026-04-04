@@ -97,7 +97,7 @@ export function useStorageBuckets() {
     mutationFn: ({ bucketName, config }: { bucketName: string; config: { isPublic: boolean } }) =>
       storageService.editBucket(bucketName, config),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['storage'] });
+      void queryClient.invalidateQueries({ queryKey: ['storage', 'buckets'] });
       showToast('Bucket updated successfully', 'success');
     },
     onError: (error: Error) => {
