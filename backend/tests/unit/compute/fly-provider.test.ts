@@ -35,7 +35,7 @@ describe('FlyProvider', () => {
     it('calls correct URL with correct body', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({}),
+        text: () => Promise.resolve(''),
       });
       vi.stubGlobal('fetch', mockFetch);
 
@@ -77,7 +77,7 @@ describe('FlyProvider', () => {
     it('calls correct URL, returns machineId, sets correct body', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ id: 'machine-abc123' }),
+        text: () => Promise.resolve(JSON.stringify({ id: 'machine-abc123' })),
       });
       vi.stubGlobal('fetch', mockFetch);
 
@@ -115,7 +115,7 @@ describe('FlyProvider', () => {
     it('calls POST to stop endpoint', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({}),
+        text: () => Promise.resolve(''),
       });
       vi.stubGlobal('fetch', mockFetch);
 
@@ -132,7 +132,7 @@ describe('FlyProvider', () => {
     it('calls DELETE to machine endpoint', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({}),
+        text: () => Promise.resolve(''),
       });
       vi.stubGlobal('fetch', mockFetch);
 
@@ -149,7 +149,7 @@ describe('FlyProvider', () => {
     it('calls DELETE to app endpoint', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({}),
+        text: () => Promise.resolve(''),
       });
       vi.stubGlobal('fetch', mockFetch);
 
