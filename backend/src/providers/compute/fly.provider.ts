@@ -139,18 +139,18 @@ export class FlyProvider {
   }
 
   async getMachineStatus(appId: string, machineId: string): Promise<{ state: string }> {
-    const result = await this.request<{ state: string }>(
-      `/apps/${appId}/machines/${machineId}`,
-    );
+    const result = await this.request<{ state: string }>(`/apps/${appId}/machines/${machineId}`);
     return { state: result.state };
   }
 
   async getLogs(
     appId: string,
-    options?: { limit?: number },
+    options?: { limit?: number }
   ): Promise<{ timestamp: number; message: string }[]> {
     const params = new URLSearchParams();
-    if (options?.limit) params.set('limit', String(options.limit));
+    if (options?.limit) {
+      params.set('limit', String(options.limit));
+    }
     const result = await this.request<{
       data: { timestamp: string; message: string }[];
     }>(`/apps/${appId}/logs?${params.toString()}`);
@@ -162,7 +162,7 @@ export class FlyProvider {
 
   private mapCpuTier(
     cpu: string,
-    memory: number,
+    memory: number
   ): { cpu_kind: string; cpus: number; memory_mb: number } {
     const tiers: Record<string, { cpu_kind: string; cpus: number }> = {
       'shared-1x': { cpu_kind: 'shared', cpus: 1 },

@@ -99,16 +99,13 @@ export class ComputeServicesService {
   async listServices(projectId: string): Promise<ServiceSchema[]> {
     const result = await this.getPool().query(
       `SELECT * FROM compute.services WHERE project_id = $1 ORDER BY created_at DESC`,
-      [projectId],
+      [projectId]
     );
     return result.rows.map(mapRowToSchema);
   }
 
   async getService(id: string): Promise<ServiceSchema> {
-    const result = await this.getPool().query(
-      `SELECT * FROM compute.services WHERE id = $1`,
-      [id],
-    );
+    const result = await this.getPool().query(`SELECT * FROM compute.services WHERE id = $1`, [id]);
     if (!result.rows.length) {
       throw new Error(ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
     }
@@ -131,7 +128,16 @@ export class ComputeServicesService {
       `INSERT INTO compute.services (project_id, name, image_url, port, cpu, memory, region, env_vars_encrypted, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'creating')
        RETURNING *`,
-      [input.projectId, input.name, input.imageUrl, input.port, input.cpu, input.memory, input.region, envVarsEncrypted],
+      [
+        input.projectId,
+        input.name,
+        input.imageUrl,
+        input.port,
+        input.cpu,
+        input.memory,
+        input.region,
+        envVarsEncrypted,
+      ]
     );
 
     const row: ServiceRow = insertResult.rows[0];
@@ -162,7 +168,7 @@ export class ComputeServicesService {
          SET fly_app_id = $1, fly_machine_id = $2, endpoint_url = $3, status = $4
          WHERE id = $5
          RETURNING *`,
-        [flyAppName, machineId, endpointUrl, 'running', serviceId],
+        [flyAppName, machineId, endpointUrl, 'running', serviceId]
       );
 
       logger.info('Compute service deployed', { serviceId, flyAppName, machineId });
@@ -171,10 +177,10 @@ export class ComputeServicesService {
       logger.error('Failed to deploy compute service', { serviceId, error });
 
       // Mark as failed
-      await this.getPool().query(
-        `UPDATE compute.services SET status = $1 WHERE id = $2`,
-        ['failed', serviceId],
-      );
+      await this.getPool().query(`UPDATE compute.services SET status = $1 WHERE id = $2`, [
+        'failed',
+        serviceId,
+      ]);
 
       throw new Error(ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED);
     }
@@ -219,7 +225,7 @@ export class ComputeServicesService {
     values.push(id);
     const result = await this.getPool().query(
       `UPDATE compute.services SET ${updates.join(', ')} WHERE id = $${paramIdx} RETURNING *`,
-      values,
+      values
     );
 
     const updated = mapRowToSchema(result.rows[0]);
@@ -284,7 +290,7 @@ export class ComputeServicesService {
 
     const result = await this.getPool().query(
       `UPDATE compute.services SET status = 'stopped' WHERE id = $1 RETURNING *`,
-      [id],
+      [id]
     );
 
     logger.info('Compute service stopped', { id });
@@ -302,7 +308,7 @@ export class ComputeServicesService {
 
     const result = await this.getPool().query(
       `UPDATE compute.services SET status = 'running' WHERE id = $1 RETURNING *`,
-      [id],
+      [id]
     );
 
     logger.info('Compute service started', { id });
@@ -311,7 +317,7 @@ export class ComputeServicesService {
 
   async getServiceLogs(
     id: string,
-    options?: { limit?: number },
+    options?: { limit?: number }
   ): Promise<{ timestamp: number; message: string }[]> {
     const svc = await this.getService(id);
 
@@ -323,7 +329,9 @@ export class ComputeServicesService {
   }
 
   private decryptEnvVars(encrypted: string | null): Record<string, string> {
-    if (!encrypted) return {};
+    if (!encrypted) {
+      return {};
+    }
     try {
       return JSON.parse(EncryptionManager.decrypt(encrypted));
     } catch {
