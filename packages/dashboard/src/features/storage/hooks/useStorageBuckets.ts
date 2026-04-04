@@ -29,23 +29,18 @@ export function useStorageBuckets() {
         const currentBuckets = buckets || [];
         const promises = currentBuckets.map(async (bucket) => {
           try {
-            const result = await storageService.listObjects(bucket.name, { limit: 1000 });
-            const objects = result.objects;
-            const totalSize = objects.reduce((sum, file) => sum + file.size, 0);
+            const result = await storageService.listObjects(bucket.name, { limit: 1 });
             return {
               bucketName: bucket.name,
               stats: {
                 fileCount: result.pagination.total,
-                totalSize: totalSize,
+                totalSize: 0,
                 public: bucket.public,
                 createdAt: bucket.createdAt,
               },
             };
           } catch (error) {
-            if (error) {
-              console.error(error);
-              return null;
-            }
+            console.error(error);
             return {
               bucketName: bucket.name,
               stats: {
