@@ -23,5 +23,6 @@
     }
   },
   "include": ["src", "../packages/dashboard"],
+  "exclude": ["../packages/dashboard/**/*.test.ts", "../packages/dashboard/**/*.test.tsx"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

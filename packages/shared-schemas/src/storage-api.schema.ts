@@ -10,6 +10,19 @@ export const updateBucketRequestSchema = z.object({
   isPublic: z.boolean(),
 });
 
+export const renameObjectRequestSchema = z.object({
+  newName: z
+    .string()
+    .trim()
+    .min(1, 'Invalid file name. New name cannot be empty.')
+    .refine((value) => value !== '.' && value !== '..', {
+      message: 'Invalid file name. "." and ".." are not allowed.',
+    })
+    .refine((value) => !/[\\/]/.test(value), {
+      message: 'Invalid file name. Path separators are not allowed.',
+    }),
+});
+
 export const listObjectsResponseSchema = z.object({
   objects: z.array(storageFileSchema),
   pagination: z.object({
@@ -67,6 +80,7 @@ export const getStorageConfigResponseSchema = storageConfigSchema;
 
 export type CreateBucketRequest = z.infer<typeof createBucketRequestSchema>;
 export type UpdateBucketRequest = z.infer<typeof updateBucketRequestSchema>;
+export type RenameObjectRequest = z.infer<typeof renameObjectRequestSchema>;
 export type ListObjectsResponseSchema = z.infer<typeof listObjectsResponseSchema>;
 export type UploadStrategyRequest = z.infer<typeof uploadStrategyRequestSchema>;
 export type UploadStrategyResponse = z.infer<typeof uploadStrategyResponseSchema>;
