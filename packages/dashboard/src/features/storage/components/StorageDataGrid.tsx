@@ -438,7 +438,9 @@ export function StorageDataGrid({
 
   const handleRenameSubmit = useCallback(
     async (newKey: string) => {
-      if (!renameFile) return;
+      if (!renameFile) {
+        return;
+      }
       await renameObject({ bucket: bucketName, oldKey: renameFile.key, newKey });
     },
     [bucketName, renameFile, renameObject]
@@ -528,7 +530,9 @@ export function StorageDataGrid({
       <RenameFileDialog
         open={!!renameFile}
         onOpenChange={(open) => {
-          if (!open) setRenameFile(null);
+          if (!open) {
+            setRenameFile(null);
+          }
         }}
         currentKey={renameFile?.key || ''}
         onRename={handleRenameSubmit}

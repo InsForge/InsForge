@@ -108,4 +108,39 @@ describe('S3StorageProvider.copyObject', () => {
       Key: 'app-key/user-bucket/new-file.txt',
     });
   });
+
+  it('URI-encodes CopySource path segments for special characters', async () => {
+    vi.resetModules();
+    const mockSend = vi.fn().mockResolvedValue({});
+
+    vi.doMock('@aws-sdk/client-s3', () => ({
+      S3Client: vi.fn().mockImplementation(() => ({
+        send: mockSend,
+      })),
+      CopyObjectCommand: vi.fn().mockImplementation((params) => ({
+        ...params,
+        _type: 'CopyObjectCommand',
+      })),
+      PutObjectCommand: vi.fn(),
+      GetObjectCommand: vi.fn(),
+      DeleteObjectCommand: vi.fn(),
+      HeadObjectCommand: vi.fn(),
+      ListObjectsV2Command: vi.fn(),
+      CreateBucketCommand: vi.fn(),
+      DeleteBucketCommand: vi.fn(),
+    }));
+
+    const { S3StorageProvider } = await import('../../src/providers/storage/s3.provider.ts');
+    const provider = new S3StorageProvider('my-s3-bucket', 'app-key', 'us-east-1');
+    provider.initialize();
+
+    await provider.copyObject('user-bucket', 'my file (1).txt', 'my file (2).txt');
+
+    const { CopyObjectCommand: MockedCmd } = await import('@aws-sdk/client-s3');
+    expect(MockedCmd).toHaveBeenCalledWith({
+      Bucket: 'my-s3-bucket',
+      CopySource: 'my-s3-bucket/app-key/user-bucket/my%20file%20(1).txt',
+      Key: 'app-key/user-bucket/my file (2).txt',
+    });
+  });
 });

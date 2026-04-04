@@ -282,16 +282,6 @@ export class StorageService {
           );
 
       if (!result.rowCount || result.rowCount === 0) {
-        // No row updated: old key not found or not owned by user. Clean up the copy.
-        try {
-          await this.provider.deleteObject(bucket, newKey);
-        } catch (cleanupError) {
-          logger.warn('Failed to clean up copied object after rename miss', {
-            error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
-            bucket,
-            newKey,
-          });
-        }
         throw new Error(`Object "${oldKey}" not found in bucket "${bucket}"`);
       }
 
@@ -317,18 +307,19 @@ export class StorageService {
         url: `${getApiBaseUrl()}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(newKey)}`,
       };
     } catch (error) {
+      // Any failure after copy: clean up the copied object
+      try {
+        await this.provider.deleteObject(bucket, newKey);
+      } catch (cleanupError) {
+        logger.warn('Failed to clean up copied object during rename rollback', {
+          error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+          bucket,
+          newKey,
+        });
+      }
+
       // Postgres unique constraint violation → 409
       if ((error as { code?: string }).code === '23505') {
-        // Clean up the copy we just made
-        try {
-          await this.provider.deleteObject(bucket, newKey);
-        } catch (cleanupError) {
-          logger.warn('Failed to clean up copied object after unique constraint violation', {
-            error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
-            bucket,
-            newKey,
-          });
-        }
         throw new Error(`Object "${newKey}" already exists in bucket "${bucket}"`);
       }
       throw error;

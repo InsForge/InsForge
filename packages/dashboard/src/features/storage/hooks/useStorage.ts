@@ -163,15 +163,8 @@ export function useStorage() {
 
   // Mutation to rename an object
   const renameObjectMutation = useMutation({
-    mutationFn: ({
-      bucket,
-      oldKey,
-      newKey,
-    }: {
-      bucket: string;
-      oldKey: string;
-      newKey: string;
-    }) => storageService.renameObject(bucket, oldKey, newKey),
+    mutationFn: ({ bucket, oldKey, newKey }: { bucket: string; oldKey: string; newKey: string }) =>
+      storageService.renameObject(bucket, oldKey, newKey),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['storage'] });
       showToast('File renamed successfully', 'success');

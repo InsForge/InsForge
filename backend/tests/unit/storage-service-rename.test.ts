@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 const mockQuery = vi.fn();
 const mockConnect = vi.fn();
-const mockRelease = vi.fn();
 const mockPool = {
   query: mockQuery,
   connect: mockConnect,
@@ -130,13 +129,14 @@ describe('StorageService.renameObject', () => {
   it('cleans up newKey copy if DB update fails with generic error', async () => {
     mockCopyObject.mockResolvedValue(undefined);
     mockQuery.mockRejectedValue(new Error('connection lost'));
+    mockDeleteObject.mockResolvedValue(undefined);
 
     await expect(
       service.renameObject('my-bucket', 'old.txt', 'new.txt', 'user-1', false)
     ).rejects.toThrow('connection lost');
 
-    // Generic errors are re-thrown; cleanup only happens for 23505 and rowCount=0
-    // The generic error path re-throws without cleanup (by design)
+    // All DB failures clean up the copied object
+    expect(mockDeleteObject).toHaveBeenCalledWith('my-bucket', 'new.txt');
   });
 
   it('logs warning if deleteObject(oldKey) fails after successful rename', async () => {
