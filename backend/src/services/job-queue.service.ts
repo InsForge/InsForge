@@ -42,6 +42,7 @@ export class JobQueueService {
   private queue: Job[] = [];
   private handlers: Map<JobType, JobHandler> = new Map();
   private processing = false;
+  private running = false;
   private workerConcurrency = 3;
   private maxRetries = 3;
   private retryDelays = [1000, 5000, 15000];
@@ -141,7 +142,7 @@ export class JobQueueService {
   }
 
   private async worker(): Promise<void> {
-    if (this.processing || this.queue.length === 0) {
+    if (this.processing || this.queue.length === 0 || !this.running) {
       return;
     }
 
@@ -162,6 +163,7 @@ export class JobQueueService {
   }
 
   public start(): void {
+    this.running = true;
     if (this.workerInterval) {
       logger.warn('Job queue worker already running');
       return;
@@ -169,21 +171,6 @@ export class JobQueueService {
 
     this.workerInterval = setInterval(() => this.worker(), this.pollInterval);
     logger.info('Job queue worker started');
-  }
-
-  public stop(): void {
-    if (this.workerInterval) {
-      clearInterval(this.workerInterval);
-      this.workerInterval = null;
-      logger.info('Job queue worker stopped');
-    }
-
-    this.retryTimers.forEach((timer) => {
-      clearTimeout(timer);
-    });
-    this.retryTimers.clear();
-    this.queue = [];
-    logger.info('Cleared pending job retry timers and queue');
   }
 
   public getStats(): { queued: number; processing: boolean } {
@@ -194,8 +181,38 @@ export class JobQueueService {
   }
 
   public clearQueue(): void {
+    this.retryTimers.forEach((timer) => {
+      clearTimeout(timer);
+    });
+    this.retryTimers.clear();
     this.queue = [];
     logger.info('Job queue cleared');
+  }
+
+  public async drain(timeoutMs: number = 5000): Promise<void> {
+    const startTime = Date.now();
+
+    this.retryTimers.forEach((timer) => {
+      clearTimeout(timer);
+    });
+    this.retryTimers.clear();
+
+    while (this.processing && Date.now() - startTime < timeoutMs) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+
+    this.queue = [];
+    logger.info('Job queue drained');
+  }
+
+  public stop(): void {
+    this.running = false;
+    this.retryTimers.forEach((timer) => {
+      clearTimeout(timer);
+    });
+    this.retryTimers.clear();
+    this.queue = [];
+    logger.info('Job queue stopped');
   }
 }
 

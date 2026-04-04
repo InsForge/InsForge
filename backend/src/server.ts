@@ -403,9 +403,9 @@ async function cleanup() {
   }
 
   try {
-    jobQueue.stop();
+    await jobQueue.drain(5000);
   } catch (error) {
-    logger.error('Error stopping job queue', {
+    logger.error('Error draining job queue', {
       error: error instanceof Error ? error.message : String(error),
     });
   }
