@@ -54,9 +54,7 @@ export function useStorageBuckets() {
         });
         const results = await Promise.all(promises);
         results.forEach((result) => {
-          if (result) {
-            stats[result.bucketName] = result.stats;
-          }
+          stats[result.bucketName] = result.stats;
         });
         return stats;
       },
@@ -74,8 +72,7 @@ export function useStorageBuckets() {
       showToast('Bucket created successfully', 'success');
     },
     onError: (error: Error) => {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to create bucket';
-      showToast(errorMessage, 'error');
+      showToast(error.message ?? 'Failed to create bucket', 'error');
     },
   });
 
@@ -87,8 +84,7 @@ export function useStorageBuckets() {
       showToast('Bucket deleted successfully', 'success');
     },
     onError: (error: Error) => {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to delete bucket';
-      showToast(errorMessage, 'error');
+      showToast(error.message ?? 'Failed to delete bucket', 'error');
     },
   });
 
@@ -101,8 +97,7 @@ export function useStorageBuckets() {
       showToast('Bucket updated successfully', 'success');
     },
     onError: (error: Error) => {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to update bucket';
-      showToast(errorMessage, 'error');
+      showToast(error.message ?? 'Failed to update bucket', 'error');
     },
   });
 
