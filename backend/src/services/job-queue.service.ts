@@ -202,12 +202,17 @@ export class JobQueueService {
     });
     this.retryTimers.clear();
 
-    while (this.processing && Date.now() - startTime < timeoutMs) {
+    while ((this.processing || this.queue.length > 0) && Date.now() - startTime < timeoutMs) {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
 
+    if (this.queue.length > 0) {
+      logger.warn(`Job queue drained with ${this.queue.length} jobs remaining`);
+    } else {
+      logger.info('Job queue drained');
+    }
+
     this.queue = [];
-    logger.info('Job queue drained');
   }
 
   public stop(): void {
