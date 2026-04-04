@@ -30,6 +30,7 @@ export interface Job {
 
 export interface JobResult {
   success: boolean;
+  retryable?: boolean;
   error?: Error;
   result?: unknown;
 }
@@ -94,7 +95,11 @@ export class JobQueueService {
     const handler = this.handlers.get(job.type);
     if (!handler) {
       logger.error(`No handler registered for job type: ${job.type}`);
-      return { success: false, error: new Error(`No handler for job type: ${job.type}`) };
+      return {
+        success: false,
+        retryable: false,
+        error: new Error(`No handler for job type: ${job.type}`),
+      };
     }
 
     try {
@@ -103,7 +108,7 @@ export class JobQueueService {
     } catch (error) {
       const err = error as Error;
       logger.error(`Job failed: ${job.id}`, { error: err, type: job.type, retries: job.retries });
-      return { success: false, error: err };
+      return { success: false, retryable: true, error: err };
     }
   }
 
@@ -121,7 +126,7 @@ export class JobQueueService {
 
     const result = await this.processJob(job);
 
-    if (!result.success && job.retries < job.maxRetries) {
+    if (!result.success && result.retryable && job.retries < job.maxRetries) {
       job.retries++;
       const delay = this.retryDelays[Math.min(job.retries - 1, this.retryDelays.length - 1)];
 
@@ -135,7 +140,7 @@ export class JobQueueService {
 
       this.retryTimers.set(job.id, timer);
     } else if (!result.success) {
-      logger.error(`Job failed after max retries: ${job.id}`, { type: job.type });
+      logger.error(`Job failed permanently: ${job.id}`, { type: job.type });
     } else {
       logger.debug(`Job completed: ${job.id}`, { type: job.type });
     }
@@ -207,6 +212,10 @@ export class JobQueueService {
 
   public stop(): void {
     this.running = false;
+    if (this.workerInterval) {
+      clearInterval(this.workerInterval);
+      this.workerInterval = null;
+    }
     this.retryTimers.forEach((timer) => {
       clearTimeout(timer);
     });
