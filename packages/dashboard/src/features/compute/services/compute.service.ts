@@ -15,10 +15,11 @@ interface LogsResponse {
 
 class ComputeServicesApiService {
   async list(): Promise<ServiceSchema[]> {
-    const response: ListServicesResponse = await apiClient.request('/compute/services', {
+    const response = await apiClient.request('/compute/services', {
       headers: apiClient.withAccessToken(),
     });
-    return response.services ?? [];
+    // successResponse sends array directly; handle both shapes for safety
+    return Array.isArray(response) ? response : ((response as ListServicesResponse).services ?? []);
   }
 
   async get(id: string): Promise<ServiceSchema> {
