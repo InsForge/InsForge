@@ -4,6 +4,7 @@ import {
   serviceStatusEnum,
   createServiceSchema,
   updateServiceSchema,
+  listServicesResponseSchema,
 } from '@insforge/shared-schemas';
 
 describe('serviceStatusEnum', () => {
@@ -54,6 +55,15 @@ describe('createServiceSchema', () => {
     expect(result.success).toBe(false);
   });
 
+  it('rejects name ending with dash', () => {
+    const result = createServiceSchema.safeParse({
+      name: 'my-api-',
+      imageUrl: 'node:20',
+      port: 8080,
+    });
+    expect(result.success).toBe(false);
+  });
+
   it('rejects missing imageUrl', () => {
     const result = createServiceSchema.safeParse({
       name: 'my-api',
@@ -79,6 +89,16 @@ describe('createServiceSchema', () => {
       cpu: 'mega-cpu',
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('listServicesResponseSchema', () => {
+  it('parses an empty services list', () => {
+    const result = listServicesResponseSchema.safeParse({ services: [] });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.services).toEqual([]);
+    }
   });
 });
 

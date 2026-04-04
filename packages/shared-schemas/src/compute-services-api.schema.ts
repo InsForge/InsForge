@@ -4,7 +4,7 @@ import { serviceSchema, cpuTierEnum } from './compute-services.schema.js';
 const envVarKeyRegex = /^[A-Z_][A-Z0-9_]*$/;
 
 export const createServiceSchema = z.object({
-  name: z.string().min(1).max(63).regex(/^[a-z0-9][a-z0-9-]*$/, {
+  name: z.string().min(1).max(63).regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/, {
     message: 'Name must be DNS-safe: lowercase letters, numbers, and dashes only, must start with a letter or number',
   }),
   imageUrl: z.string().min(1),
@@ -40,3 +40,4 @@ export const listServicesResponseSchema = z.object({
 
 export type CreateServiceRequest = z.infer<typeof createServiceSchema>;
 export type UpdateServiceRequest = z.infer<typeof updateServiceSchema>;
+export type ListServicesResponse = z.infer<typeof listServicesResponseSchema>;
