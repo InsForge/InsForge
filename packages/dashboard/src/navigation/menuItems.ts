@@ -6,6 +6,7 @@ import {
   HardDrive,
   Code2,
   Radio,
+  Server,
   Sparkles,
   ChartLine,
   Settings,
@@ -67,6 +68,12 @@ export const dashboardStaticMenuItems: DashboardPrimaryMenuItem[] = [
     label: 'Realtime',
     href: '/dashboard/realtime',
     icon: Radio,
+  },
+  {
+    id: 'compute',
+    label: 'Compute',
+    href: '/dashboard/compute',
+    icon: Server,
   },
   {
     id: 'ai',

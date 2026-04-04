@@ -20,6 +20,12 @@ export interface AppConfig {
     organizationId: string;
     domain: string;
   };
+  fly: {
+    enabled: boolean;
+    apiToken: string;
+    org: string;
+    domain: string;
+  };
 }
 
 export const config: AppConfig = {
@@ -43,5 +49,11 @@ export const config: AppConfig = {
     token: process.env.DENO_SUBHOSTING_TOKEN || '',
     organizationId: process.env.DENO_SUBHOSTING_ORG_ID || '',
     domain: 'functions.insforge.app',
+  },
+  fly: {
+    enabled: process.env.COMPUTE_SERVICES_ENABLED === 'true',
+    apiToken: process.env.FLY_API_TOKEN || '',
+    org: process.env.FLY_ORG || 'insforge',
+    domain: process.env.COMPUTE_DOMAIN || 'compute.insforge.dev',
   },
 };
