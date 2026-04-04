@@ -40,7 +40,7 @@ export function useStorageBuckets() {
               },
             };
           } catch (error) {
-            console.error(error);
+            console.error(`Failed to fetch stats for bucket "${bucket.name}":`, error);
             return {
               bucketName: bucket.name,
               stats: {
