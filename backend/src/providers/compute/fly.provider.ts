@@ -37,7 +37,11 @@ export class FlyProvider {
       throw new Error(`Fly API error (${response.status}): ${text}`);
     }
 
-    return response.json() as Promise<T>;
+    const text = await response.text();
+    if (!text) {
+      return undefined as T;
+    }
+    return JSON.parse(text) as T;
   }
 
   async createApp(params: {
