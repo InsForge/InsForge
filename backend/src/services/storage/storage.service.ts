@@ -251,6 +251,90 @@ export class StorageService {
     return false;
   }
 
+  async renameObject(
+    bucket: string,
+    oldKey: string,
+    newKey: string,
+    userId: string,
+    isAdmin: boolean
+  ): Promise<StorageFileSchema> {
+    this.validateBucketName(bucket);
+    this.validateKey(oldKey);
+    this.validateKey(newKey);
+
+    // Step 1: Copy object in storage provider (if this fails, no state change)
+    await this.provider.copyObject(bucket, oldKey, newKey);
+
+    // Step 2: Update DB key (catch unique constraint violation as 409)
+    try {
+      const result = isAdmin
+        ? await this.getPool().query(
+            `UPDATE storage.objects SET key = $1
+             WHERE bucket = $2 AND key = $3
+             RETURNING size, mime_type, uploaded_at as "uploadedAt"`,
+            [newKey, bucket, oldKey]
+          )
+        : await this.getPool().query(
+            `UPDATE storage.objects SET key = $1
+             WHERE bucket = $2 AND key = $3 AND uploaded_by = $4
+             RETURNING size, mime_type, uploaded_at as "uploadedAt"`,
+            [newKey, bucket, oldKey, userId]
+          );
+
+      if (!result.rowCount || result.rowCount === 0) {
+        // No row updated: old key not found or not owned by user. Clean up the copy.
+        try {
+          await this.provider.deleteObject(bucket, newKey);
+        } catch (cleanupError) {
+          logger.warn('Failed to clean up copied object after rename miss', {
+            error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+            bucket,
+            newKey,
+          });
+        }
+        throw new Error(`Object "${oldKey}" not found in bucket "${bucket}"`);
+      }
+
+      const row = result.rows[0];
+
+      // Step 3: Delete old key from storage (non-critical; log warning on failure)
+      try {
+        await this.provider.deleteObject(bucket, oldKey);
+      } catch (deleteError) {
+        logger.warn('Failed to delete old key after rename, orphaned file in storage', {
+          error: deleteError instanceof Error ? deleteError.message : String(deleteError),
+          bucket,
+          oldKey,
+        });
+      }
+
+      return {
+        bucket,
+        key: newKey,
+        size: row.size,
+        mimeType: row.mime_type,
+        uploadedAt: row.uploadedAt,
+        url: `${getApiBaseUrl()}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(newKey)}`,
+      };
+    } catch (error) {
+      // Postgres unique constraint violation → 409
+      if ((error as { code?: string }).code === '23505') {
+        // Clean up the copy we just made
+        try {
+          await this.provider.deleteObject(bucket, newKey);
+        } catch (cleanupError) {
+          logger.warn('Failed to clean up copied object after unique constraint violation', {
+            error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+            bucket,
+            newKey,
+          });
+        }
+        throw new Error(`Object "${newKey}" already exists in bucket "${bucket}"`);
+      }
+      throw error;
+    }
+  }
+
   async listObjects(
     bucket: string,
     prefix?: string,

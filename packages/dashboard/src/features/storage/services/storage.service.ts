@@ -162,4 +162,20 @@ export const storageService = {
       body: JSON.stringify(config),
     });
   },
+
+  // Rename an object in a bucket
+  async renameObject(
+    bucketName: string,
+    oldKey: string,
+    newKey: string
+  ): Promise<StorageFileSchema> {
+    return apiClient.request(
+      `/storage/buckets/${encodeURIComponent(bucketName)}/objects/${encodeURIComponent(oldKey)}`,
+      {
+        method: 'PATCH',
+        headers: apiClient.withAccessToken(),
+        body: JSON.stringify({ newKey }),
+      }
+    );
+  },
 };

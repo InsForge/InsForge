@@ -6,6 +6,7 @@ import {
   ListObjectsV2Command,
   DeleteObjectsCommand,
   HeadObjectCommand,
+  CopyObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
@@ -122,6 +123,32 @@ export class S3StorageProvider implements StorageProvider {
       Key: this.getS3Key(bucket, key),
     });
     await this.s3Client.send(command);
+  }
+
+  async copyObject(bucket: string, sourceKey: string, destKey: string): Promise<void> {
+    if (!this.s3Client) {
+      throw new Error('S3 client not initialized');
+    }
+    const sourceS3Key = this.getS3Key(bucket, sourceKey);
+    const destS3Key = this.getS3Key(bucket, destKey);
+
+    const command = new CopyObjectCommand({
+      Bucket: this.s3Bucket,
+      CopySource: `${this.s3Bucket}/${sourceS3Key}`,
+      Key: destS3Key,
+    });
+
+    try {
+      await this.s3Client.send(command);
+    } catch (error) {
+      logger.error('S3 Copy error', {
+        error: error instanceof Error ? error.message : String(error),
+        bucket,
+        sourceKey,
+        destKey,
+      });
+      throw error;
+    }
   }
 
   async createBucket(_bucket: string): Promise<void> {

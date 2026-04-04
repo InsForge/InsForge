@@ -161,6 +161,27 @@ export function useStorage() {
     },
   });
 
+  // Mutation to rename an object
+  const renameObjectMutation = useMutation({
+    mutationFn: ({
+      bucket,
+      oldKey,
+      newKey,
+    }: {
+      bucket: string;
+      oldKey: string;
+      newKey: string;
+    }) => storageService.renameObject(bucket, oldKey, newKey),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['storage'] });
+      showToast('File renamed successfully', 'success');
+    },
+    onError: (error: Error) => {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to rename file';
+      showToast(errorMessage, 'error');
+    },
+  });
+
   // Mutation to edit a bucket
   const editBucketMutation = useMutation({
     mutationFn: ({ bucketName, config }: { bucketName: string; config: { isPublic: boolean } }) =>
@@ -187,6 +208,7 @@ export function useStorage() {
     isCreatingBucket: createBucketMutation.isPending,
     isDeletingBucket: deleteBucketMutation.isPending,
     isEditingBucket: editBucketMutation.isPending,
+    isRenamingObject: renameObjectMutation.isPending,
 
     // Errors
     bucketsError,
@@ -197,6 +219,7 @@ export function useStorage() {
     createBucket: createBucketMutation.mutateAsync,
     deleteBucket: deleteBucketMutation.mutateAsync,
     editBucket: editBucketMutation.mutateAsync,
+    renameObject: renameObjectMutation.mutateAsync,
     refetchBuckets,
 
     // Helpers
