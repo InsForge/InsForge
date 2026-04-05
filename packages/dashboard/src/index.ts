@@ -1,7 +1,6 @@
 import './styles.css';
 
 export { InsForgeDashboard } from './app/InsforgeDashboard';
-export { DashboardFrame } from './layout/DashboardFrame';
 export { DashboardModalProvider, useDashboardModal } from './modals/DashboardModalContext';
 export {
   dashboardDeploymentsMenuItem,
@@ -23,7 +22,6 @@ export type {
   InsForgeDashboardProps,
   SelfHostingDashboardProps,
 } from './types';
-export type { DashboardFrameProps, DashboardFrameRenderProps } from './layout/DashboardFrame';
 export type { DashboardPrimaryMenuItem } from './navigation/menuItems';
 export type { DashboardSettingsTab } from './modals/DashboardModalContext';
 export type { DashboardHostRoutesProps } from './router/DashboardHostRoutes';
