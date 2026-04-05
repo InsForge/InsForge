@@ -52,7 +52,7 @@ router.post(
 
       if (!parseResult.success) {
         throw new AppError(
-          parseResult.error.errors.map((e) => e.message).join(', '),
+          parseResult.error.issues.map((e) => e.message).join(', '),
           400,
           ERROR_CODES.INVALID_INPUT
         );

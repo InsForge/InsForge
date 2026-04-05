@@ -13,9 +13,6 @@ CREATE TABLE IF NOT EXISTS system.encrypted_columns (
   UNIQUE (table_schema, table_name, column_name)
 );
 
-CREATE INDEX IF NOT EXISTS idx_encrypted_columns_table
-  ON system.encrypted_columns (table_schema, table_name);
-
 -- Add updated_at trigger
 CREATE TRIGGER encrypted_columns_update_timestamp
   BEFORE UPDATE ON system.encrypted_columns

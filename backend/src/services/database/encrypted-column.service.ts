@@ -180,16 +180,8 @@ export class EncryptedColumnService {
       if (row[colName] !== undefined && row[colName] !== null && typeof row[colName] === 'string') {
         try {
           const decrypted = EncryptionManager.decrypt(row[colName] as string);
-          // If the original type was json/jsonb, parse it back
-          if (entry.originalType === 'jsonb' || entry.originalType === 'json') {
-            try {
-              row[colName] = JSON.parse(decrypted);
-            } catch {
-              row[colName] = decrypted;
-            }
-          } else {
-            row[colName] = decrypted;
-          }
+          // Convert decrypted string back to the original scalar type
+          row[colName] = this.castDecryptedValue(decrypted, entry.originalType);
         } catch (err) {
           logger.warn(`Failed to decrypt column ${colName} in ${entry.tableName}`, {
             error: err instanceof Error ? err.message : String(err),
@@ -370,6 +362,46 @@ export class EncryptedColumnService {
       throw err;
     } finally {
       client.release();
+    }
+  }
+
+  /**
+   * Convert a decrypted string back to the original column type.
+   */
+  private castDecryptedValue(decrypted: string, originalType: string): unknown {
+    switch (originalType) {
+      case 'json':
+      case 'jsonb':
+        try {
+          return JSON.parse(decrypted);
+        } catch {
+          return decrypted;
+        }
+      case 'boolean':
+      case 'bool':
+        return decrypted === 'true';
+      case 'integer':
+      case 'int':
+      case 'int4':
+      case 'smallint':
+      case 'int2':
+      case 'bigint':
+      case 'int8': {
+        const parsed = parseInt(decrypted, 10);
+        return isNaN(parsed) ? decrypted : parsed;
+      }
+      case 'float':
+      case 'float4':
+      case 'float8':
+      case 'double precision':
+      case 'real':
+      case 'numeric':
+      case 'decimal': {
+        const parsed = parseFloat(decrypted);
+        return isNaN(parsed) ? decrypted : parsed;
+      }
+      default:
+        return decrypted;
     }
   }
 
