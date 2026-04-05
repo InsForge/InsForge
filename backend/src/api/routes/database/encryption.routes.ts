@@ -93,8 +93,10 @@ router.post(
         originalType
       );
 
-      // Clear column type cache since we changed the column type
+      // Clear column type cache and notify PostgREST of schema change
       DatabaseManager.clearColumnTypeCache(tableName);
+      const pool2 = DatabaseManager.getInstance().getPool();
+      await pool2.query(`NOTIFY pgrst, 'reload schema'`);
 
       await auditService.log({
         actor: req.user?.email || 'api-key',

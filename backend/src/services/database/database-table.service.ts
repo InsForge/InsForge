@@ -387,8 +387,9 @@ export class DatabaseTableService {
 
       // Get row count and encrypted columns in parallel
       const encryptedColumnService = EncryptedColumnService.getInstance();
+      const safeTable = this.quoteIdentifier(table);
       const [rowCountResult, encryptedColumns] = await Promise.all([
-        client.query(`SELECT COUNT(*) as row_count FROM "${table}"`),
+        client.query(`SELECT COUNT(*) as row_count FROM ${safeTable}`),
         encryptedColumnService.getEncryptedColumns(table),
       ]);
       const row_count = rowCountResult.rows[0].row_count;
@@ -569,6 +570,15 @@ export class DatabaseTableService {
               RENAME COLUMN ${this.quoteIdentifier(column.columnName)} TO ${this.quoteIdentifier(column.newColumnName as string)}
             `
             );
+
+            // Update encrypted column registry if this column was encrypted
+            const encSvc = EncryptedColumnService.getInstance();
+            const encCols = await encSvc.getEncryptedColumns(tableName);
+            const entry = encCols.get(column.columnName);
+            if (entry) {
+              await encSvc.unregisterColumn(tableName, column.columnName);
+              await encSvc.registerColumn(tableName, column.newColumnName, entry.originalType);
+            }
           }
           completedOperations.push(`Updated column: ${column.columnName}`);
         }
@@ -579,20 +589,20 @@ export class DatabaseTableService {
         // Validate and filter reserved fields
         const columnsToAdd = this.validateReservedFields(addColumns);
 
+        const encryptedColumnService = EncryptedColumnService.getInstance();
         for (const col of columnsToAdd) {
           const fieldType = COLUMN_TYPES[col.type as ColumnType];
-          let sqlType = fieldType.sqlType;
-          if (col.type === ColumnType.UUID) {
+          // Encrypted columns are stored as TEXT regardless of declared type
+          let sqlType = col.encrypted ? 'TEXT' : fieldType.sqlType;
+          if (!col.encrypted && col.type === ColumnType.UUID) {
             sqlType = 'UUID';
           }
 
           const nullable = col.isNullable !== false ? '' : 'NOT NULL';
           const unique = col.isUnique ? 'UNIQUE' : '';
-          const defaultClause = formatDefaultValue(
-            col.defaultValue,
-            col.type as ColumnType,
-            col.isNullable
-          );
+          const defaultClause = col.encrypted
+            ? ''
+            : formatDefaultValue(col.defaultValue, col.type as ColumnType, col.isNullable);
 
           await client.query(
             `
@@ -600,6 +610,12 @@ export class DatabaseTableService {
               ADD COLUMN ${this.quoteIdentifier(col.columnName)} ${sqlType} ${nullable} ${unique} ${defaultClause}
             `
           );
+
+          // Register encrypted column in the registry
+          if (col.encrypted) {
+            const originalSqlType = fieldType.sqlType.toLowerCase();
+            await encryptedColumnService.registerColumn(tableName, col.columnName, originalSqlType);
+          }
 
           completedOperations.push(`Added column: ${col.columnName}`);
         }
@@ -637,6 +653,16 @@ export class DatabaseTableService {
             RENAME TO ${safeNewTableName}
           `
         );
+
+        // Update encrypted column registry for renamed table
+        const encSvc = EncryptedColumnService.getInstance();
+        const encCols = await encSvc.getEncryptedColumns(tableName);
+        if (encCols.size > 0) {
+          for (const [colName, entry] of encCols) {
+            await encSvc.unregisterColumn(tableName, colName);
+            await encSvc.registerColumn(renameTable.newTableName, colName, entry.originalType);
+          }
+        }
 
         completedOperations.push(`Renamed table from ${tableName} to ${renameTable.newTableName}`);
       }

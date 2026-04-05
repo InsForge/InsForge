@@ -32,6 +32,11 @@ export class EncryptedColumnService {
 
   private constructor() {}
 
+  /** Safely quote a SQL identifier to prevent injection */
+  private quoteIdentifier(identifier: string): string {
+    return `"${identifier.replace(/"/g, '""')}"`;
+  }
+
   private getPool(): Pool {
     if (!this.pool) {
       this.pool = DatabaseManager.getInstance().getPool();
@@ -153,9 +158,10 @@ export class EncryptedColumnService {
   ): Record<string, unknown> {
     for (const [colName, _entry] of encryptedColumns) {
       if (row[colName] !== undefined && row[colName] !== null) {
-        const value = typeof row[colName] === 'string'
-          ? row[colName] as string
-          : JSON.stringify(row[colName]);
+        const value =
+          typeof row[colName] === 'string'
+            ? (row[colName] as string)
+            : JSON.stringify(row[colName]);
         row[colName] = EncryptionManager.encryptVersioned(value);
       }
     }
@@ -208,9 +214,10 @@ export class EncryptedColumnService {
   ): Promise<number> {
     const pool = this.getPool();
     const client = await pool.connect();
-    const qualifiedTable = tableSchema === 'public'
-      ? `"${tableName}"`
-      : `"${tableSchema}"."${tableName}"`;
+    const safeTable = this.quoteIdentifier(tableName);
+    const safeSchema = this.quoteIdentifier(tableSchema);
+    const qualifiedTable = tableSchema === 'public' ? safeTable : `${safeSchema}.${safeTable}`;
+    const safeColumn = this.quoteIdentifier(columnName);
 
     let totalMigrated = 0;
 
@@ -220,18 +227,19 @@ export class EncryptedColumnService {
       // Alter column type to TEXT if it isn't already
       if (originalType !== 'text') {
         await client.query(
-          `ALTER TABLE ${qualifiedTable} ALTER COLUMN "${columnName}" TYPE TEXT USING "${columnName}"::TEXT`
+          `ALTER TABLE ${qualifiedTable} ALTER COLUMN ${safeColumn} TYPE TEXT USING ${safeColumn}::TEXT`
         );
       }
 
-      // Process in batches using ctid for cursor-free pagination
+      // Process in batches, skipping already-encrypted rows
       let hasMore = true;
       let lastCtid = '(0,0)';
 
       while (hasMore) {
         const batch = await client.query(
-          `SELECT ctid, "${columnName}" FROM ${qualifiedTable}
-           WHERE ctid > $1::tid AND "${columnName}" IS NOT NULL
+          `SELECT ctid, ${safeColumn} FROM ${qualifiedTable}
+           WHERE ctid > $1::tid AND ${safeColumn} IS NOT NULL
+             AND ${safeColumn} !~ '^v[0-9]+:[0-9a-f]+:[0-9a-f]+:[0-9a-f]+$'
            ORDER BY ctid LIMIT $2`,
           [lastCtid, batchSize]
         );
@@ -242,18 +250,12 @@ export class EncryptedColumnService {
         }
 
         for (const row of batch.rows) {
-          const plaintext = typeof row[columnName] === 'string'
-            ? row[columnName]
-            : JSON.stringify(row[columnName]);
-
-          // Skip if already encrypted (idempotent)
-          if (/^v\d+:[0-9a-f]+:[0-9a-f]+:[0-9a-f]+$/.test(plaintext)) {
-            continue;
-          }
+          const plaintext =
+            typeof row[columnName] === 'string' ? row[columnName] : JSON.stringify(row[columnName]);
 
           const encrypted = EncryptionManager.encryptVersioned(plaintext);
           await client.query(
-            `UPDATE ${qualifiedTable} SET "${columnName}" = $1 WHERE ctid = $2::tid`,
+            `UPDATE ${qualifiedTable} SET ${safeColumn} = $1 WHERE ctid = $2::tid`,
             [encrypted, row.ctid]
           );
           totalMigrated++;
@@ -300,9 +302,11 @@ export class EncryptedColumnService {
   ): Promise<number> {
     const pool = this.getPool();
     const client = await pool.connect();
-    const qualifiedTable = tableSchema === 'public'
-      ? `"${tableName}"`
-      : `"${tableSchema}"."${tableName}"`;
+    const safeTable = this.quoteIdentifier(tableName);
+    const safeSchema = this.quoteIdentifier(tableSchema);
+    const qualifiedTable = tableSchema === 'public' ? safeTable : `${safeSchema}.${safeTable}`;
+    const safeColumn = this.quoteIdentifier(columnName);
+    const currentPrefix = `v${EncryptionManager.getCurrentKeyVersion()}:`;
 
     let totalReEncrypted = 0;
 
@@ -313,11 +317,13 @@ export class EncryptedColumnService {
       let lastCtid = '(0,0)';
 
       while (hasMore) {
+        // Skip rows already encrypted with the current key version
         const batch = await client.query(
-          `SELECT ctid, "${columnName}" FROM ${qualifiedTable}
-           WHERE ctid > $1::tid AND "${columnName}" IS NOT NULL
+          `SELECT ctid, ${safeColumn} FROM ${qualifiedTable}
+           WHERE ctid > $1::tid AND ${safeColumn} IS NOT NULL
+             AND ${safeColumn} NOT LIKE $3
            ORDER BY ctid LIMIT $2`,
-          [lastCtid, batchSize]
+          [lastCtid, batchSize, `${currentPrefix}%`]
         );
 
         if (batch.rows.length === 0) {
@@ -327,13 +333,15 @@ export class EncryptedColumnService {
 
         for (const row of batch.rows) {
           const ciphertext = row[columnName] as string;
-          if (!ciphertext) continue;
+          if (!ciphertext) {
+            continue;
+          }
 
           const decrypted = EncryptionManager.decrypt(ciphertext);
           const reEncrypted = EncryptionManager.encryptVersioned(decrypted);
 
           await client.query(
-            `UPDATE ${qualifiedTable} SET "${columnName}" = $1 WHERE ctid = $2::tid`,
+            `UPDATE ${qualifiedTable} SET ${safeColumn} = $1 WHERE ctid = $2::tid`,
             [reEncrypted, row.ctid]
           );
           totalReEncrypted++;
