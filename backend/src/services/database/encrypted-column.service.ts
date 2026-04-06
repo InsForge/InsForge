@@ -427,13 +427,15 @@ export class EncryptedColumnService {
       case 'boolean':
       case 'bool':
         return decrypted === 'true';
+      case 'bigint':
+      case 'int8':
+        // Return as string to preserve precision beyond Number.MAX_SAFE_INTEGER
+        return decrypted;
       case 'integer':
       case 'int':
       case 'int4':
       case 'smallint':
-      case 'int2':
-      case 'bigint':
-      case 'int8': {
+      case 'int2': {
         const parsed = parseInt(decrypted, 10);
         return isNaN(parsed) ? decrypted : parsed;
       }
