@@ -28,7 +28,8 @@
   "scripts": {
     "build": "vite build && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "lint": "eslint src/"
   },
   "dependencies": {
     "@codemirror/lang-javascript": "^6.2.4",

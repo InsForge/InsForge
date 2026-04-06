@@ -23,3 +23,6 @@ deno.lock
 better-auth/
 .mcp.json
 backend/logs/*
+
+# Turborepo
+.turbo
