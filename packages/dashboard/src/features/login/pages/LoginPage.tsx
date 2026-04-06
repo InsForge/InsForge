@@ -215,9 +215,7 @@ function CloudHostingLoginView() {
         <h2 className="text-xl font-semibold text-white mb-2">
           {isLoading ? 'Authenticating...' : 'Preparing dashboard...'}
         </h2>
-        <p className="text-sm text-gray-400">
-          Please wait while we verify your identity
-        </p>
+        <p className="text-sm text-gray-400">Please wait while we verify your identity</p>
       </div>
     </div>
   );

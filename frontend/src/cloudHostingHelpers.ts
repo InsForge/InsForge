@@ -26,13 +26,17 @@ type PendingRequest<T> = {
   timeoutId: number;
 };
 
+type PendingRequestValues = {
+  authCode: string;
+  instanceInfo: DashboardInstanceInfo;
+  instanceTypeChange: InstanceTypeChangeResult;
+  renameProject: void;
+  deleteProject: void;
+  updateVersion: void;
+};
+
 type PendingRequests = {
-  authCode?: PendingRequest<string>;
-  instanceInfo?: PendingRequest<DashboardInstanceInfo>;
-  instanceTypeChange?: PendingRequest<InstanceTypeChangeResult>;
-  renameProject?: PendingRequest<void>;
-  deleteProject?: PendingRequest<void>;
-  updateVersion?: PendingRequest<void>;
+  [K in PendingRequestKey]?: PendingRequest<PendingRequestValues[K]>;
 };
 
 const DEFAULT_TIMEOUT_MS = 15000;
@@ -115,6 +119,37 @@ export function useCloudHostingBridge(backendUrl: string) {
   const parentOriginRef = useRef<string | null>(getParentOrigin());
   const pendingRequestsRef = useRef<PendingRequests>({});
 
+  const setPendingRequest = useCallback(
+    <K extends PendingRequestKey>(
+      key: K,
+      pendingRequest: PendingRequest<PendingRequestValues[K]>
+    ) => {
+      switch (key) {
+        case 'authCode':
+          pendingRequestsRef.current.authCode = pendingRequest as PendingRequest<string>;
+          return;
+        case 'instanceInfo':
+          pendingRequestsRef.current.instanceInfo =
+            pendingRequest as PendingRequest<DashboardInstanceInfo>;
+          return;
+        case 'instanceTypeChange':
+          pendingRequestsRef.current.instanceTypeChange =
+            pendingRequest as PendingRequest<InstanceTypeChangeResult>;
+          return;
+        case 'renameProject':
+          pendingRequestsRef.current.renameProject = pendingRequest as PendingRequest<void>;
+          return;
+        case 'deleteProject':
+          pendingRequestsRef.current.deleteProject = pendingRequest as PendingRequest<void>;
+          return;
+        case 'updateVersion':
+          pendingRequestsRef.current.updateVersion = pendingRequest as PendingRequest<void>;
+          return;
+      }
+    },
+    []
+  );
+
   const clearPendingRequest = useCallback((key: PendingRequestKey) => {
     const pendingRequest = pendingRequestsRef.current[key];
     if (!pendingRequest) {
@@ -126,7 +161,7 @@ export function useCloudHostingBridge(backendUrl: string) {
   }, []);
 
   const rejectPendingRequest = useCallback(
-    (key: PendingRequestKey, message: string) => {
+    <K extends PendingRequestKey>(key: K, message: string) => {
       const pendingRequest = pendingRequestsRef.current[key];
       if (!pendingRequest) {
         return;
@@ -139,8 +174,8 @@ export function useCloudHostingBridge(backendUrl: string) {
   );
 
   const resolvePendingRequest = useCallback(
-    <T,>(key: PendingRequestKey, value: T) => {
-      const pendingRequest = pendingRequestsRef.current[key] as PendingRequest<T> | undefined;
+    <K extends PendingRequestKey>(key: K, value: PendingRequestValues[K]) => {
+      const pendingRequest = pendingRequestsRef.current[key];
       if (!pendingRequest) {
         return;
       }
@@ -161,8 +196,8 @@ export function useCloudHostingBridge(backendUrl: string) {
   }, []);
 
   const createPendingRequest = useCallback(
-    <T,>(key: PendingRequestKey, actionLabel: string, timeoutMs = DEFAULT_TIMEOUT_MS) =>
-      new Promise<T>((resolve, reject) => {
+    <K extends PendingRequestKey>(key: K, actionLabel: string, timeoutMs = DEFAULT_TIMEOUT_MS) =>
+      new Promise<PendingRequestValues[K]>((resolve, reject) => {
         if (pendingRequestsRef.current[key]) {
           reject(new Error(`${actionLabel} is already in progress`));
           return;
@@ -172,16 +207,18 @@ export function useCloudHostingBridge(backendUrl: string) {
           rejectPendingRequest(key, `${actionLabel} timed out`);
         }, timeoutMs);
 
-        pendingRequestsRef.current[key] = {
-          resolve,
-          reject,
+        setPendingRequest(key, {
+          resolve: resolve as (value: PendingRequestValues[K]) => void,
+          reject: (error: Error) => reject(error),
           timeoutId,
-        } as PendingRequests[PendingRequestKey];
+        });
       }),
-    [rejectPendingRequest]
+    [rejectPendingRequest, setPendingRequest]
   );
 
   useEffect(() => {
+    const pendingRequests = pendingRequestsRef.current;
+
     const handleMessage = (event: MessageEvent<BridgeMessage>) => {
       if (typeof window === 'undefined' || event.source !== window.parent) {
         return;
@@ -218,7 +255,10 @@ export function useCloudHostingBridge(backendUrl: string) {
         case 'AUTH_ERROR': {
           rejectPendingRequest(
             'authCode',
-            getErrorMessage(message.error ?? message.message, 'Failed to generate authorization code')
+            getErrorMessage(
+              message.error ?? message.message,
+              'Failed to generate authorization code'
+            )
           );
           return;
         }
@@ -296,7 +336,6 @@ export function useCloudHostingBridge(backendUrl: string) {
     return () => {
       window.removeEventListener('message', handleMessage);
 
-      const pendingRequests = pendingRequestsRef.current;
       (Object.keys(pendingRequests) as PendingRequestKey[]).forEach((key) => {
         rejectPendingRequest(key, 'Cloud hosting bridge was disposed');
       });
@@ -324,7 +363,7 @@ export function useCloudHostingBridge(backendUrl: string) {
       throw new Error('Unable to request an authorization code from the parent window');
     }
 
-    return createPendingRequest<string>('authCode', 'Authorization code request');
+    return createPendingRequest('authCode', 'Authorization code request');
   }, [createPendingRequest, postMessageToParent]);
 
   const requestInstanceInfo = useCallback(async (): Promise<DashboardInstanceInfo> => {
@@ -332,7 +371,7 @@ export function useCloudHostingBridge(backendUrl: string) {
       throw new Error('Unable to request instance information from the parent window');
     }
 
-    return createPendingRequest<DashboardInstanceInfo>('instanceInfo', 'Instance info request');
+    return createPendingRequest('instanceInfo', 'Instance info request');
   }, [createPendingRequest, postMessageToParent]);
 
   const requestInstanceTypeChange = useCallback(
@@ -341,7 +380,7 @@ export function useCloudHostingBridge(backendUrl: string) {
         throw new Error('Unable to request an instance type change from the parent window');
       }
 
-      return createPendingRequest<InstanceTypeChangeResult>(
+      return createPendingRequest(
         'instanceTypeChange',
         'Instance type change',
         INSTANCE_CHANGE_TIMEOUT_MS
@@ -356,7 +395,7 @@ export function useCloudHostingBridge(backendUrl: string) {
         throw new Error('Unable to request a project rename from the parent window');
       }
 
-      return createPendingRequest<void>('renameProject', 'Project rename');
+      return createPendingRequest('renameProject', 'Project rename');
     },
     [createPendingRequest, postMessageToParent]
   );
@@ -366,7 +405,7 @@ export function useCloudHostingBridge(backendUrl: string) {
       throw new Error('Unable to request project deletion from the parent window');
     }
 
-    return createPendingRequest<void>('deleteProject', 'Project deletion');
+    return createPendingRequest('deleteProject', 'Project deletion');
   }, [createPendingRequest, postMessageToParent]);
 
   const updateVersion = useCallback(async (): Promise<void> => {
@@ -374,7 +413,7 @@ export function useCloudHostingBridge(backendUrl: string) {
       throw new Error('Unable to request a project version update from the parent window');
     }
 
-    return createPendingRequest<void>('updateVersion', 'Project version update');
+    return createPendingRequest('updateVersion', 'Project version update');
   }, [createPendingRequest, postMessageToParent]);
 
   const navigateToSubscription = useCallback(() => {
