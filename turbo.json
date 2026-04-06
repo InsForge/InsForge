@@ -4,7 +4,8 @@
     "build": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**", "../dist/**"],
-      "inputs": ["src/**", "tsconfig*.json", "package.json", "vite.config.*", "tsup.config.*"]
+      "inputs": ["src/**", "tsconfig*.json", "package.json", "vite.config.*", "tsup.config.*"],
+      "env": ["VITE_*"]
     },
     "typecheck": {
       "dependsOn": ["^build"],
