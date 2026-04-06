@@ -34,8 +34,23 @@ export const getTableSchemaResponseSchema = tableSchema;
 export const updateTableSchemaRequestSchema = z.object({
   addColumns: z
     .array(
-      columnSchema.omit({
-        foreignKey: true,
+      columnSchema.omit({ foreignKey: true }).superRefine((data, ctx) => {
+        if (data.encrypted) {
+          if (data.isPrimaryKey) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: 'Encrypted columns cannot be primary keys',
+              path: ['isPrimaryKey'],
+            });
+          }
+          if (data.isUnique) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: 'Encrypted columns cannot have a unique constraint',
+              path: ['isUnique'],
+            });
+          }
+        }
       })
     )
     .optional(),

@@ -84,7 +84,7 @@ export const tableSchema = z.object({
     .string()
     .min(1, 'Table name cannot be empty')
     .max(64, 'Table name must be less than 64 characters'),
-  columns: z.array(columnSchema).min(1, 'At least one column is required'),
+  columns: z.array(validatedColumnSchema).min(1, 'At least one column is required'),
   recordCount: z.number().optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),

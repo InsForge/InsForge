@@ -3,6 +3,11 @@ import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 import logger from '@/utils/logger.js';
 
+/** Minimal query interface satisfied by both Pool and PoolClient */
+interface Queryable {
+  query(text: string, values?: unknown[]): Promise<{ rows: Record<string, unknown>[] }>;
+}
+
 interface EncryptedColumnEntry {
   id: string;
   tableSchema: string;
@@ -93,9 +98,18 @@ export class EncryptedColumnService {
 
   /**
    * Check if any encrypted columns exist system-wide.
+   * Returns false if the registry table hasn't been created yet (fresh DB).
    */
   async hasAnyEncryptedColumns(): Promise<boolean> {
-    const result = await this.getPool().query(
+    const pool = this.getPool();
+
+    // Guard: check if the registry table exists (migration 029 may not have run yet)
+    const tableCheck = await pool.query(`SELECT to_regclass('system.encrypted_columns') AS rel`);
+    if (!tableCheck.rows[0]?.rel) {
+      return false;
+    }
+
+    const result = await pool.query(
       `SELECT EXISTS (SELECT 1 FROM system.encrypted_columns) AS has_any`
     );
     return result.rows[0]?.has_any === true;
@@ -103,49 +117,67 @@ export class EncryptedColumnService {
 
   /**
    * Register a column as encrypted.
+   * @param executor Optional transaction client; when supplied the caller is responsible for committing and clearing cache.
    */
   async registerColumn(
     tableName: string,
     columnName: string,
     originalType: string,
-    tableSchema = 'public'
+    tableSchema = 'public',
+    executor?: Queryable
   ): Promise<void> {
-    await this.getPool().query(
+    const target = executor ?? this.getPool();
+    await target.query(
       `INSERT INTO system.encrypted_columns (table_schema, table_name, column_name, original_type, key_version)
        VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (table_schema, table_name, column_name) DO UPDATE
        SET original_type = EXCLUDED.original_type, key_version = EXCLUDED.key_version, updated_at = now()`,
       [tableSchema, tableName, columnName, originalType, EncryptionManager.getCurrentKeyVersion()]
     );
-    this.clearCache(tableName, tableSchema);
+    if (!executor) {
+      this.clearCache(tableName, tableSchema);
+    }
   }
 
   /**
    * Unregister a column (e.g., when dropping it or the table).
+   * @param executor Optional transaction client; when supplied the caller is responsible for committing and clearing cache.
    */
   async unregisterColumn(
     tableName: string,
     columnName: string,
-    tableSchema = 'public'
+    tableSchema = 'public',
+    executor?: Queryable
   ): Promise<void> {
-    await this.getPool().query(
+    const target = executor ?? this.getPool();
+    await target.query(
       `DELETE FROM system.encrypted_columns
        WHERE table_schema = $1 AND table_name = $2 AND column_name = $3`,
       [tableSchema, tableName, columnName]
     );
-    this.clearCache(tableName, tableSchema);
+    if (!executor) {
+      this.clearCache(tableName, tableSchema);
+    }
   }
 
   /**
    * Unregister all columns for a table (e.g., when dropping the table).
+   * @param executor Optional transaction client; when supplied the caller is responsible for committing and clearing cache.
    */
-  async unregisterTable(tableName: string, tableSchema = 'public'): Promise<void> {
-    await this.getPool().query(
+  async unregisterTable(
+    tableName: string,
+    tableSchema = 'public',
+    executor?: Queryable
+  ): Promise<void> {
+    const target = executor ?? this.getPool();
+    await target.query(
       `DELETE FROM system.encrypted_columns
        WHERE table_schema = $1 AND table_name = $2`,
       [tableSchema, tableName]
     );
-    this.clearCache(tableName, tableSchema);
+    if (!executor) {
+      this.clearCache(tableName, tableSchema);
+    }
   }
 
   /**
@@ -216,12 +248,19 @@ export class EncryptedColumnService {
     try {
       await client.query('BEGIN');
 
+      // Lock the table to prevent concurrent plaintext writes during migration
+      await client.query(`LOCK TABLE ${qualifiedTable} IN ACCESS EXCLUSIVE MODE`);
+
       // Alter column type to TEXT if it isn't already
       if (originalType !== 'text') {
         await client.query(
           `ALTER TABLE ${qualifiedTable} ALTER COLUMN ${safeColumn} TYPE TEXT USING ${safeColumn}::TEXT`
         );
       }
+
+      // Skip predicate: exclude both versioned (v1:iv:tag:data) and legacy (iv:tag:data) ciphertext.
+      // EncryptionManager uses 16-byte IV (32 hex chars) and 16-byte auth tag (32 hex chars).
+      const CIPHERTEXT_SKIP_RE = '^(v[0-9]+:)?[0-9a-f]{32}:[0-9a-f]{32}:[0-9a-f]+$';
 
       // Process in batches, skipping already-encrypted rows
       let hasMore = true;
@@ -231,7 +270,7 @@ export class EncryptedColumnService {
         const batch = await client.query(
           `SELECT ctid, ${safeColumn} FROM ${qualifiedTable}
            WHERE ctid > $1::tid AND ${safeColumn} IS NOT NULL
-             AND ${safeColumn} !~ '^v[0-9]+:[0-9a-f]+:[0-9a-f]+:[0-9a-f]+$'
+             AND ${safeColumn} !~ '${CIPHERTEXT_SKIP_RE}'
            ORDER BY ctid LIMIT $2`,
           [lastCtid, batchSize]
         );
