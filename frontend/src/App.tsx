@@ -1,7 +1,9 @@
 import { InsForgeDashboard } from '@insforge/dashboard';
 import { isCloudHostingBackend, useCloudHostingBridge } from './cloudHostingHelpers';
 
-const backendUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:7130';
+const backendUrl =
+  import.meta.env.VITE_API_BASE_URL ||
+  (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:7130');
 
 function CloudHostedApp() {
   const bridge = useCloudHostingBridge(backendUrl);
