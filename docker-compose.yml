@@ -130,6 +130,7 @@ services:
     volumes:
       - ./package.json:/app/package.json
       - ./package-lock.json:/app/package-lock.json
+      - ./turbo.json:/app/turbo.json
       - ./backend:/app/backend
       - ./frontend:/app/frontend
       - ./packages:/app/packages
