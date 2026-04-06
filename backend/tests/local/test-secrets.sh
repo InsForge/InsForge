@@ -45,6 +45,36 @@ else
     track_test_failure
 fi
 
+# 3b. Verify JWT_SECRET was seeded from env
+print_info "3b. Verifying JWT_SECRET was seeded during initialization"
+if echo "$response" | jq -e '.secrets | map(select(.key == "JWT_SECRET")) | length == 1' >/dev/null 2>&1; then
+    print_success "System secret JWT_SECRET exists"
+
+    # Verify it's reserved
+    IS_RESERVED=$(echo "$response" | jq -r '.secrets[] | select(.key == "JWT_SECRET") | .isReserved')
+    if [ "$IS_RESERVED" = "true" ]; then
+        print_success "JWT_SECRET is marked as reserved"
+    else
+        print_fail "JWT_SECRET should be reserved"
+        track_test_failure
+    fi
+
+    # Verify value matches env
+    jwt_response=$(curl -s "$API_BASE/secrets/JWT_SECRET" \
+        -H "Authorization: Bearer $ADMIN_TOKEN")
+    jwt_value=$(echo "$jwt_response" | jq -r '.value')
+    if [ -n "$jwt_value" ] && [ "$jwt_value" != "null" ]; then
+        print_success "JWT_SECRET value is retrievable via API"
+    else
+        print_fail "JWT_SECRET value is empty or null"
+        track_test_failure
+    fi
+else
+    print_fail "Expected JWT_SECRET secret to exist (seeded from env)"
+    echo "Response: $response"
+    track_test_failure
+fi
+
 # 4. Create a test secret
 print_info "4. Creating a test secret"
 TEST_KEY="TEST_SECRET_$(date +%s)"
