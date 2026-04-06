@@ -1,9 +1,8 @@
 import { ReactNode } from 'react';
-import { CLOUD_LOGIN_PATH, DASHBOARD_LOGIN_PATH } from './paths';
-import { DashboardProtectedBoundary } from './DashboardProtectedBoundary';
-import { useDashboardHost } from '../lib/config/DashboardHostContext';
-import { useAuth } from '../lib/contexts/AuthContext';
-import { LoadingState } from '../components/LoadingState';
+import { CLOUD_LOGIN_PATH, DASHBOARD_LOGIN_PATH, DashboardProtectedBoundary } from '../../router';
+import { useDashboardHost } from '../config/DashboardHostContext';
+import { useAuth } from '../contexts/AuthContext';
+import { LoadingState } from '../../components/LoadingState';
 
 interface RequireAuthProps {
   children: ReactNode;

@@ -10,6 +10,9 @@ export {
   type FeatureSidebarListItem,
 } from './FeatureSidebar';
 
+// layout components
+export * from './layout';
+
 // Core radix/ui components
 export * from './radix';
 
