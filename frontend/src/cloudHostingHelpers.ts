@@ -191,7 +191,11 @@ export function useCloudHostingBridge(backendUrl: string) {
       return false;
     }
 
-    window.parent.postMessage(message, parentOriginRef.current ?? '*');
+    if (!parentOriginRef.current) {
+      return false;
+    }
+
+    window.parent.postMessage(message, parentOriginRef.current);
     return true;
   }, []);
 
@@ -217,14 +221,12 @@ export function useCloudHostingBridge(backendUrl: string) {
   );
 
   useEffect(() => {
-    const pendingRequests = pendingRequestsRef.current;
-
     const handleMessage = (event: MessageEvent<BridgeMessage>) => {
       if (typeof window === 'undefined' || event.source !== window.parent) {
         return;
       }
 
-      if (parentOriginRef.current && event.origin !== parentOriginRef.current) {
+      if (!parentOriginRef.current || event.origin !== parentOriginRef.current) {
         return;
       }
 
@@ -267,7 +269,22 @@ export function useCloudHostingBridge(backendUrl: string) {
           return;
         }
         case 'INSTANCE_INFO': {
-          resolvePendingRequest('instanceInfo', message as unknown as DashboardInstanceInfo);
+          resolvePendingRequest('instanceInfo', {
+            currentInstanceType:
+              typeof message.currentInstanceType === 'string' ? message.currentInstanceType : '',
+            planName: typeof message.planName === 'string' ? message.planName : '',
+            computeCredits: typeof message.computeCredits === 'number' ? message.computeCredits : 0,
+            currentOrgComputeCost:
+              typeof message.currentOrgComputeCost === 'number'
+                ? message.currentOrgComputeCost
+                : 0,
+            instanceTypes: Array.isArray(message.instanceTypes)
+              ? (message.instanceTypes as DashboardInstanceInfo['instanceTypes'])
+              : [],
+            projects: Array.isArray(message.projects)
+              ? (message.projects as DashboardInstanceInfo['projects'])
+              : [],
+          });
           return;
         }
         case 'INSTANCE_TYPE_CHANGE_RESULT': {
@@ -336,7 +353,7 @@ export function useCloudHostingBridge(backendUrl: string) {
     return () => {
       window.removeEventListener('message', handleMessage);
 
-      (Object.keys(pendingRequests) as PendingRequestKey[]).forEach((key) => {
+      (Object.keys(pendingRequestsRef.current) as PendingRequestKey[]).forEach((key) => {
         rejectPendingRequest(key, 'Cloud hosting bridge was disposed');
       });
     };

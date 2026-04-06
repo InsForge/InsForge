@@ -104,6 +104,8 @@ export class LoginService {
         apiClient.setAccessToken(data.accessToken);
         if (data.csrfToken) {
           apiClient.setCsrfToken(data.csrfToken);
+        } else {
+          apiClient.clearCsrfToken();
         }
         return true;
       }

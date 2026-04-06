@@ -53,21 +53,13 @@ function DashboardProviderTree({ host }: { host: InsForgeDashboardProps }) {
 }
 
 export function InsForgeDashboard(props: InsForgeDashboardProps) {
-  const host = useMemo<InsForgeDashboardProps>(() => {
-    const normalizedBackendUrl = props.backendUrl.replace(/\/$/, '');
-
-    if (props.mode === 'self-hosting') {
-      return {
-        ...props,
-        backendUrl: normalizedBackendUrl,
-      };
-    }
-
-    return {
+  const host = useMemo<InsForgeDashboardProps>(
+    () => ({
       ...props,
-      backendUrl: normalizedBackendUrl,
-    };
-  }, [props]);
+      backendUrl: props.backendUrl.replace(/\/$/, ''),
+    }),
+    [props]
+  );
 
   return (
     <div className="insforge-dashboard flex h-full min-h-0 min-w-0 flex-col">
