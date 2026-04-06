@@ -275,9 +275,7 @@ export function useCloudHostingBridge(backendUrl: string) {
             planName: typeof message.planName === 'string' ? message.planName : '',
             computeCredits: typeof message.computeCredits === 'number' ? message.computeCredits : 0,
             currentOrgComputeCost:
-              typeof message.currentOrgComputeCost === 'number'
-                ? message.currentOrgComputeCost
-                : 0,
+              typeof message.currentOrgComputeCost === 'number' ? message.currentOrgComputeCost : 0,
             instanceTypes: Array.isArray(message.instanceTypes)
               ? (message.instanceTypes as DashboardInstanceInfo['instanceTypes'])
               : [],
@@ -349,11 +347,13 @@ export function useCloudHostingBridge(backendUrl: string) {
       }
     };
 
+    const pendingRequests = pendingRequestsRef.current;
+
     window.addEventListener('message', handleMessage);
     return () => {
       window.removeEventListener('message', handleMessage);
 
-      (Object.keys(pendingRequestsRef.current) as PendingRequestKey[]).forEach((key) => {
+      (Object.keys(pendingRequests) as PendingRequestKey[]).forEach((key) => {
         rejectPendingRequest(key, 'Cloud hosting bridge was disposed');
       });
     };
