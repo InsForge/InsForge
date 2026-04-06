@@ -31,61 +31,78 @@ export const createTableResponseSchema = tableSchema
 
 export const getTableSchemaResponseSchema = tableSchema;
 
-export const updateTableSchemaRequestSchema = z.object({
-  addColumns: z
-    .array(
-      columnSchema.omit({ foreignKey: true }).superRefine((data, ctx) => {
-        if (data.encrypted) {
-          if (data.isPrimaryKey) {
-            ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              message: 'Encrypted columns cannot be primary keys',
-              path: ['isPrimaryKey'],
-            });
+export const updateTableSchemaRequestSchema = z
+  .object({
+    addColumns: z
+      .array(
+        columnSchema.omit({ foreignKey: true }).superRefine((data, ctx) => {
+          if (data.encrypted) {
+            if (data.isPrimaryKey) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'Encrypted columns cannot be primary keys',
+                path: ['isPrimaryKey'],
+              });
+            }
+            if (data.isUnique) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'Encrypted columns cannot have a unique constraint',
+                path: ['isUnique'],
+              });
+            }
           }
-          if (data.isUnique) {
-            ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              message: 'Encrypted columns cannot have a unique constraint',
-              path: ['isUnique'],
-            });
-          }
-        }
-      })
-    )
-    .optional(),
-  dropColumns: z.array(z.string()).optional(),
-  updateColumns: z
-    .array(
-      z.object({
-        columnName: z.string(),
-        defaultValue: z.string().optional(),
-        newColumnName: z
+        })
+      )
+      .optional(),
+    dropColumns: z.array(z.string()).optional(),
+    updateColumns: z
+      .array(
+        z.object({
+          columnName: z.string(),
+          defaultValue: z.string().optional(),
+          newColumnName: z
+            .string()
+            .min(1, 'New column name cannot be empty')
+            .max(64, 'New column name must be less than 64 characters')
+            .optional(),
+        })
+      )
+      .optional(),
+    addForeignKeys: z
+      .array(
+        z.object({
+          columnName: z.string().min(1, 'Column name is required for adding foreign key'),
+          foreignKey: foreignKeySchema,
+        })
+      )
+      .optional(),
+    dropForeignKeys: z.array(z.string()).optional(),
+    renameTable: z
+      .object({
+        newTableName: z
           .string()
-          .min(1, 'New column name cannot be empty')
-          .max(64, 'New column name must be less than 64 characters')
-          .optional(),
+          .min(1, 'New table name cannot be empty')
+          .max(64, 'New table name must be less than 64 characters'),
       })
-    )
-    .optional(),
-  addForeignKeys: z
-    .array(
-      z.object({
-        columnName: z.string().min(1, 'Column name is required for adding foreign key'),
-        foreignKey: foreignKeySchema,
-      })
-    )
-    .optional(),
-  dropForeignKeys: z.array(z.string()).optional(),
-  renameTable: z
-    .object({
-      newTableName: z
-        .string()
-        .min(1, 'New table name cannot be empty')
-        .max(64, 'New table name must be less than 64 characters'),
-    })
-    .optional(),
-});
+      .optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.addColumns && data.addForeignKeys) {
+      const encryptedNames = new Set(
+        data.addColumns.filter((col) => col.encrypted).map((col) => col.columnName)
+      );
+      data.addForeignKeys.forEach((fk, index) => {
+        if (encryptedNames.has(fk.columnName)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Cannot add foreign key to an encrypted column',
+            path: ['addForeignKeys', index, 'columnName'],
+          });
+        }
+      });
+    }
+  });
 
 export const updateTableSchemaResponse = z.object({
   message: z.string(),

@@ -1,12 +1,6 @@
 import { describe, test, expect } from 'vitest';
-import {
-  validatedColumnSchema,
-  tableSchema,
-} from '@insforge/shared-schemas';
-import {
-  createTableRequestSchema,
-  updateTableSchemaRequestSchema,
-} from '@insforge/shared-schemas';
+import { validatedColumnSchema, tableSchema } from '@insforge/shared-schemas';
+import { createTableRequestSchema, updateTableSchemaRequestSchema } from '@insforge/shared-schemas';
 
 describe('Encrypted column schema validation', () => {
   // ========================
@@ -211,6 +205,36 @@ describe('Encrypted column schema validation', () => {
         ],
       });
       expect(result.success).toBe(true);
+    });
+
+    test('rejects addForeignKeys referencing an encrypted addColumn', () => {
+      const result = updateTableSchemaRequestSchema.safeParse({
+        addColumns: [
+          {
+            columnName: 'secret_ref',
+            type: 'uuid',
+            isNullable: false,
+            isUnique: false,
+            encrypted: true,
+          },
+        ],
+        addForeignKeys: [
+          {
+            columnName: 'secret_ref',
+            foreignKey: {
+              referenceTable: 'other_table',
+              referenceColumn: 'id',
+              onDelete: 'CASCADE',
+              onUpdate: 'CASCADE',
+            },
+          },
+        ],
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        const messages = result.error.issues.map((i) => i.message);
+        expect(messages).toContain('Cannot add foreign key to an encrypted column');
+      }
     });
   });
 });

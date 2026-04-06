@@ -69,7 +69,15 @@ export class EncryptedColumnService {
       return cached.columns;
     }
 
-    const result = await this.getPool().query(
+    const pool = this.getPool();
+
+    // Guard: return empty map if the registry table hasn't been created yet
+    const tableCheck = await pool.query(`SELECT to_regclass('system.encrypted_columns') AS rel`);
+    if (!tableCheck.rows[0]?.rel) {
+      return new Map<string, EncryptedColumnEntry>();
+    }
+
+    const result = await pool.query(
       `SELECT id, table_schema, table_name, column_name, original_type, key_version
        FROM system.encrypted_columns
        WHERE table_schema = $1 AND table_name = $2`,

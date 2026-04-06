@@ -21,8 +21,10 @@ vi.mock('../../src/infra/database/database.manager', () => ({
 // Mock EncryptionManager — keep it deterministic
 vi.mock('../../src/infra/security/encryption.manager', () => ({
   EncryptionManager: {
-    encrypt: (v: string) => `iv32hex_____________________:tag32hex_____________________:${Buffer.from(v).toString('hex')}`,
-    encryptVersioned: (v: string) => `v1:iv32hex_____________________:tag32hex_____________________:${Buffer.from(v).toString('hex')}`,
+    encrypt: (v: string) =>
+      `iv32hex_____________________:tag32hex_____________________:${Buffer.from(v).toString('hex')}`,
+    encryptVersioned: (v: string) =>
+      `v1:iv32hex_____________________:tag32hex_____________________:${Buffer.from(v).toString('hex')}`,
     decrypt: (v: string) => {
       // Strip version prefix if present
       const stripped = v.replace(/^v\d+:/, '');
@@ -40,8 +42,8 @@ vi.mock('../../src/infra/security/encryption.manager', () => ({
 
 /** Reset singleton so each test gets a fresh instance */
 function freshService(): EncryptedColumnService {
-  // Clear the singleton via any-cast
-  (EncryptedColumnService as any).instance = undefined;
+  // Clear the private singleton for test isolation
+  (EncryptedColumnService as unknown as Record<string, unknown>)['instance'] = undefined;
   return EncryptedColumnService.getInstance();
 }
 
@@ -125,8 +127,10 @@ describe('EncryptedColumnService', () => {
       const txQuery = vi.fn().mockResolvedValue({ rows: [] });
       const executor = { query: txQuery };
 
-      // Prime the cache
-      mockQuery.mockResolvedValueOnce({ rows: [] });
+      // Prime the cache (to_regclass + SELECT)
+      mockQuery
+        .mockResolvedValueOnce({ rows: [{ rel: 'system.encrypted_columns' }] })
+        .mockResolvedValueOnce({ rows: [] });
       await service.getEncryptedColumns('users');
 
       const clearSpy = vi.spyOn(service, 'clearCache');
@@ -337,34 +341,46 @@ describe('EncryptedColumnService', () => {
   // ========================================================================
   describe('cache', () => {
     test('second call uses cache and does not query DB again', async () => {
-      mockQuery.mockResolvedValue({
-        rows: [
-          {
-            id: '1',
-            table_schema: 'public',
-            table_name: 'users',
-            column_name: 'ssn',
-            original_type: 'string',
-            key_version: 1,
-          },
-        ],
-      });
+      // First call: to_regclass check, then actual SELECT
+      mockQuery
+        .mockResolvedValueOnce({ rows: [{ rel: 'system.encrypted_columns' }] })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: '1',
+              table_schema: 'public',
+              table_name: 'users',
+              column_name: 'ssn',
+              original_type: 'string',
+              key_version: 1,
+            },
+          ],
+        });
 
       const first = await service.getEncryptedColumns('users');
       const second = await service.getEncryptedColumns('users');
 
       expect(first).toBe(second); // same reference
-      expect(mockQuery).toHaveBeenCalledTimes(1); // only one DB call
+      expect(mockQuery).toHaveBeenCalledTimes(2); // to_regclass + SELECT, then cache hit
     });
 
     test('clearCache forces next call to hit DB', async () => {
-      mockQuery.mockResolvedValue({ rows: [] });
+      // First call: to_regclass + SELECT
+      mockQuery
+        .mockResolvedValueOnce({ rows: [{ rel: 'system.encrypted_columns' }] })
+        .mockResolvedValueOnce({ rows: [] });
 
       await service.getEncryptedColumns('users');
       service.clearCache('users');
+
+      // Second call after cache clear: to_regclass + SELECT again
+      mockQuery
+        .mockResolvedValueOnce({ rows: [{ rel: 'system.encrypted_columns' }] })
+        .mockResolvedValueOnce({ rows: [] });
+
       await service.getEncryptedColumns('users');
 
-      expect(mockQuery).toHaveBeenCalledTimes(2);
+      expect(mockQuery).toHaveBeenCalledTimes(4); // 2 calls × 2 queries each
     });
   });
 });
