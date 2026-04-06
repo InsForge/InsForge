@@ -226,7 +226,10 @@ export function useCloudHostingBridge(backendUrl: string) {
         return;
       }
 
-      if (!parentOriginRef.current || event.origin !== parentOriginRef.current) {
+      if (!parentOriginRef.current) {
+        // Adopt the origin from the first verified parent message when referrer is unavailable
+        parentOriginRef.current = event.origin;
+      } else if (event.origin !== parentOriginRef.current) {
         return;
       }
 
