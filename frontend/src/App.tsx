@@ -24,7 +24,7 @@ function CloudHostedApp() {
 }
 
 function App() {
-  if (isCloudHostingBackend(backendUrl)) {
+  if (isCloudHostingBackend()) {
     return <CloudHostedApp />;
   }
 

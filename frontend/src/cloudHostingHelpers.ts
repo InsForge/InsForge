@@ -104,12 +104,12 @@ function normalizeProjectInfo(
   };
 }
 
-export function isCloudHostingBackend(backendUrl: string): boolean {
-  try {
-    return new URL(backendUrl).hostname.endsWith('.insforge.app');
-  } catch {
+export function isCloudHostingBackend(): boolean {
+  if (typeof window === 'undefined') {
     return false;
   }
+
+  return window.location.origin.endsWith('.insforge.app');
 }
 
 export function useCloudHostingBridge(backendUrl: string) {
