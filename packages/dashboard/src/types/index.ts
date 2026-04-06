@@ -10,25 +10,6 @@ export interface DashboardProjectInfo {
   status?: 'active' | 'paused' | 'restoring' | string;
 }
 
-export interface DashboardCapabilities {
-  canManageProjectSettings?: boolean;
-  canDeleteProject?: boolean;
-  canRenameProject?: boolean;
-  canManageInstance?: boolean;
-  canManageVersion?: boolean;
-  canOpenUsagePage?: boolean;
-  canOpenSubscriptionPage?: boolean;
-}
-
-export type DashboardAuthConfig =
-  | {
-      strategy: 'session';
-    }
-  | {
-      strategy: 'authorization-code';
-      getAuthorizationCode: () => Promise<string>;
-    };
-
 export interface DashboardInstanceInfo {
   currentInstanceType: string;
   planName: string;
@@ -51,16 +32,13 @@ export interface DashboardInstanceInfo {
   }>;
 }
 
-export interface DashboardSharedProps {
+export interface DashboardProps {
   backendUrl: string;
-  initialPath?: string;
   showNavbar?: boolean;
   project?: DashboardProjectInfo;
-  capabilities?: DashboardCapabilities;
   connectDialogOpen?: boolean;
   onConnectDialogOpenChange?: (open: boolean) => void;
   onOpenSettings?: () => void;
-  onNavigateToUsage?: () => void;
   onNavigateToSubscription?: () => void;
   onRenameProject?: (name: string) => Promise<void>;
   onDeleteProject?: () => Promise<void>;
@@ -71,15 +49,14 @@ export interface DashboardSharedProps {
   onUpdateVersion?: () => Promise<void>;
 }
 
-export interface SelfHostingDashboardProps extends DashboardSharedProps {
+export interface SelfHostingDashboardProps extends DashboardProps {
   mode: 'self-hosting';
-  auth?: Extract<DashboardAuthConfig, { strategy: 'session' }>;
+  getAuthorizationCode?: never;
 }
 
-export interface CloudHostingDashboardProps extends DashboardSharedProps {
+export interface CloudHostingDashboardProps extends DashboardProps {
   mode: 'cloud-hosting';
-  auth: DashboardAuthConfig;
+  getAuthorizationCode: () => Promise<string>;
 }
 
-export type DashboardProps = SelfHostingDashboardProps | CloudHostingDashboardProps;
-export type InsForgeDashboardProps = DashboardProps;
+export type InsForgeDashboardProps = SelfHostingDashboardProps | CloudHostingDashboardProps;

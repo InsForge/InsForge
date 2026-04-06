@@ -9,16 +9,13 @@ export {
 } from './navigation/menuItems';
 export { DashboardHostRoutes } from './router/DashboardHostRoutes';
 export { DashboardProtectedBoundary } from './router/DashboardProtectedBoundary';
-export { CLOUD_LOGIN_PATH, DASHBOARD_LOGIN_PATH } from './router/paths';
+export { DASHBOARD_LOGIN_PATH } from './router/paths';
 export type {
-  DashboardAuthConfig,
-  DashboardCapabilities,
   CloudHostingDashboardProps,
   DashboardInstanceInfo,
   DashboardMode,
   DashboardProjectInfo,
   DashboardProps,
-  DashboardSharedProps,
   InsForgeDashboardProps,
   SelfHostingDashboardProps,
 } from './types';
