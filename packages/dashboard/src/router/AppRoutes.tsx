@@ -3,7 +3,6 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { RequireAuth } from './RequireAuth';
 import AppLayout from '../layout/AppLayout';
 import LoginPage from '../features/login/pages/LoginPage';
-import CloudLoginPage from '../features/login/pages/CloudLoginPage';
 import DashboardLayout from '../features/dashboard/components/DashboardLayout';
 import DashboardPage from '../features/dashboard/pages/DashboardPage';
 import DatabaseLayout from '../features/database/components/DatabaseLayout';
@@ -47,7 +46,6 @@ export function AppRoutes() {
   return (
     <DashboardHostRoutes
       loginPage={<LoginPage />}
-      cloudLoginPage={<CloudLoginPage />}
       protectedApp={
         <RequireAuth>
           <AppLayout>

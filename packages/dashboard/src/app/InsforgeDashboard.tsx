@@ -10,11 +10,9 @@ import { ModalProvider } from '../lib/contexts/ModalContext';
 import { SQLEditorProvider } from '../features/database/contexts/SQLEditorContext';
 import { DashboardHostProvider } from '../lib/config/DashboardHostContext';
 import { setDashboardBackendUrl } from '../lib/config/runtime';
-import type { DashboardProps } from '../types';
+import type { InsForgeDashboardProps } from '../types';
 
-const DEFAULT_SELF_HOSTING_AUTH = { strategy: 'session' } as const;
-
-function DashboardProviderTree({ host }: { host: DashboardProps }) {
+function DashboardProviderTree({ host }: { host: InsForgeDashboardProps }) {
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -54,8 +52,8 @@ function DashboardProviderTree({ host }: { host: DashboardProps }) {
   );
 }
 
-export function InsForgeDashboard(props: DashboardProps) {
-  const host = useMemo<DashboardProps>(() => {
+export function InsForgeDashboard(props: InsForgeDashboardProps) {
+  const host = useMemo<InsForgeDashboardProps>(() => {
     const normalizedBackendUrl = props.backendUrl.replace(/\/$/, '');
 
     if (props.mode === 'self-hosting') {
@@ -63,7 +61,6 @@ export function InsForgeDashboard(props: DashboardProps) {
         ...props,
         backendUrl: normalizedBackendUrl,
         initialPath: props.initialPath ?? '/dashboard',
-        auth: props.auth ?? DEFAULT_SELF_HOSTING_AUTH,
       };
     }
 

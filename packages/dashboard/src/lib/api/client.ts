@@ -24,9 +24,13 @@ export class ApiClient {
     document.cookie = `${CSRF_COOKIE_NAME}=${encodeURIComponent(csrfToken)}; expires=${expires}; path=/; SameSite=Lax`;
   }
 
+  clearCsrfToken() {
+    document.cookie = `${CSRF_COOKIE_NAME}=; max-age=0; path=/; SameSite=Lax`;
+  }
+
   clearTokens() {
     this.accessToken = null;
-    document.cookie = `${CSRF_COOKIE_NAME}=; max-age=0; path=/; SameSite=Lax`;
+    this.clearCsrfToken();
   }
 
   getAccessToken() {
