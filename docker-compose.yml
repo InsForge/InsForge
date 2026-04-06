@@ -141,7 +141,7 @@ services:
       - ui_node_modules:/app/packages/ui/node_modules
       - shared-logs:/insforge-logs
       - storage-data:/insforge-storage
-    command: sh -c "npm install && npm run build:shared-schemas && npm run build:ui && cd backend && npm run migrate:up && cd .. && npm run dev"
+    command: sh -c "npm install && npx turbo run build --filter=@insforge/shared-schemas --filter=@insforge/ui && cd backend && npm run migrate:up && cd .. && npm run dev"
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
