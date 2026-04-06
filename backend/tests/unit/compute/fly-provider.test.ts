@@ -145,6 +145,29 @@ describe('FlyProvider', () => {
     });
   });
 
+  describe('listMachines', () => {
+    it('calls GET on machines endpoint and returns array', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(JSON.stringify([
+          { id: 'machine-1', state: 'started', region: 'iad' },
+          { id: 'machine-2', state: 'stopped', region: 'iad' },
+        ])),
+      });
+      vi.stubGlobal('fetch', mockFetch);
+
+      const result = await provider.listMachines('my-app');
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        `${FLY_API_BASE}/apps/my-app/machines`,
+        expect.objectContaining({ headers: expect.any(Object) }),
+      );
+      expect(result).toHaveLength(2);
+      expect(result[0].id).toBe('machine-1');
+      expect(result[1].state).toBe('stopped');
+    });
+  });
+
   describe('destroyApp', () => {
     it('calls DELETE to app endpoint', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
