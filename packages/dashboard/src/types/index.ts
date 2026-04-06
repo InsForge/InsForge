@@ -34,7 +34,6 @@ export interface DashboardInstanceInfo {
 
 export interface DashboardProps {
   backendUrl: string;
-  initialPath?: string;
   showNavbar?: boolean;
   project?: DashboardProjectInfo;
   connectDialogOpen?: boolean;

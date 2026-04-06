@@ -60,7 +60,6 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
       return {
         ...props,
         backendUrl: normalizedBackendUrl,
-        initialPath: props.initialPath ?? '/dashboard',
       };
     }
 
@@ -77,7 +76,7 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
           <DashboardProviderTree host={host} />
         </BrowserRouter>
       ) : (
-        <MemoryRouter initialEntries={[host.initialPath || '/dashboard']}>
+        <MemoryRouter initialEntries={['/dashboard']}>
           <DashboardProviderTree host={host} />
         </MemoryRouter>
       )}
