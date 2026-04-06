@@ -9,12 +9,12 @@ describe('seedBackend JWT_SECRET initialization', () => {
   const seedSource = fs.readFileSync(seedPath, 'utf8');
 
   it('reads JWT_SECRET from process.env', () => {
-    expect(seedSource).toContain("process.env.JWT_SECRET");
+    expect(seedSource).toContain('process.env.JWT_SECRET');
   });
 
   it('stores JWT_SECRET as a reserved secret', () => {
     expect(seedSource).toContain("key: 'JWT_SECRET'");
-    expect(seedSource).toContain("isReserved: true");
+    expect(seedSource).toContain('isReserved: true');
   });
 
   it('only creates JWT_SECRET if it does not already exist', () => {
