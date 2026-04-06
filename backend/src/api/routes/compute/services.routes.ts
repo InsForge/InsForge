@@ -96,6 +96,64 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
   }
 });
 
+// Prepare for deploy (create DB record + Fly app, no machine)
+router.post('/deploy', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const validation = createServiceSchema.safeParse(req.body);
+    if (!validation.success) {
+      throw new AppError(
+        validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT,
+        'Please check the request body, it must conform with the CreateServiceRequest schema.'
+      );
+    }
+
+    const svc = ComputeServicesService.getInstance();
+    const projectId = getProjectId(req);
+    const service = await svc.prepareForDeploy({ ...validation.data, projectId });
+
+    successResponse(res, service, 201);
+
+    bestEffortAudit({
+      actor: req.user?.email || 'api-key',
+      action: 'PREPARE_COMPUTE_DEPLOY',
+      module: 'COMPUTE',
+      details: { serviceName: validation.data.name, projectId },
+      ip_address: req.ip,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Sync after flyctl deploy (update machine info from Fly)
+router.patch('/:id/sync', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const svc = ComputeServicesService.getInstance();
+    const existing = await svc.getService(req.params.id);
+
+    if (existing.projectId !== getProjectId(req)) {
+      throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
+    }
+
+    const service = await svc.syncAfterDeploy(req.params.id);
+
+    successResponse(res, service);
+
+    bestEffortAudit({
+      actor: req.user?.email || 'api-key',
+      action: 'SYNC_COMPUTE_DEPLOY',
+      module: 'COMPUTE',
+      details: { serviceId: req.params.id, status: service.status },
+      ip_address: req.ip,
+    });
+    bestEffortBroadcast();
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Update service
 router.patch('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {

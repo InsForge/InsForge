@@ -135,11 +135,38 @@ export class FlyProvider {
   }
 
   async startMachine(appId: string, machineId: string): Promise<void> {
+    // Wait for machine to reach a startable state (stopped/created)
+    await this.waitForState(appId, machineId, ['stopped', 'created'], 30_000);
     await this.request(`/apps/${appId}/machines/${machineId}/start`, { method: 'POST' });
+  }
+
+  async waitForState(
+    appId: string,
+    machineId: string,
+    targetStates: string[],
+    timeoutMs: number = 30_000
+  ): Promise<string> {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const { state } = await this.getMachineStatus(appId, machineId);
+      if (targetStates.includes(state)) {
+        return state;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    throw new Error(`Machine did not reach state [${targetStates.join(',')}] within ${timeoutMs}ms`);
   }
 
   async destroyMachine(appId: string, machineId: string): Promise<void> {
     await this.request(`/apps/${appId}/machines/${machineId}`, { method: 'DELETE' });
+  }
+
+  async listMachines(
+    appId: string
+  ): Promise<{ id: string; state: string; region: string }[]> {
+    return this.request<{ id: string; state: string; region: string }[]>(
+      `/apps/${appId}/machines`
+    ) ?? [];
   }
 
   async getMachineStatus(appId: string, machineId: string): Promise<{ state: string }> {
@@ -149,19 +176,20 @@ export class FlyProvider {
 
   async getLogs(
     appId: string,
+    machineId: string,
     options?: { limit?: number }
   ): Promise<{ timestamp: number; message: string }[]> {
-    const params = new URLSearchParams();
-    if (options?.limit) {
-      params.set('limit', String(options.limit));
-    }
-    const result = await this.request<{
-      data: { timestamp: string; message: string }[];
-    }>(`/apps/${appId}/logs?${params.toString()}`);
-    return (result.data ?? []).map((e) => ({
-      timestamp: new Date(e.timestamp).getTime(),
-      message: e.message,
+    const events = await this.request<
+      { type: string; status: string; source: string; timestamp: number }[]
+    >(`/apps/${appId}/machines/${machineId}/events`);
+
+    const mapped = (events ?? []).map((e) => ({
+      timestamp: e.timestamp,
+      message: `[${e.source}] ${e.type}: ${e.status}`,
     }));
+
+    const limit = options?.limit ?? 100;
+    return mapped.slice(0, limit);
   }
 
   private mapCpuTier(

@@ -195,6 +195,90 @@ export class ComputeServicesService {
     }
   }
 
+  async prepareForDeploy(input: CreateServiceInput): Promise<ServiceSchema> {
+    const fly = this.getFly();
+
+    if (!fly.isConfigured()) {
+      throw new Error(ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED);
+    }
+
+    const envVarsEncrypted = input.envVars
+      ? EncryptionManager.encrypt(JSON.stringify(input.envVars))
+      : null;
+
+    const flyAppName = makeFlyAppName(input.name, input.projectId);
+    const network = makeNetwork(input.projectId);
+    const endpointUrl = `https://${flyAppName}.fly.dev`;
+
+    // Insert row
+    const insertResult = await this.getPool().query(
+      `INSERT INTO compute.services (project_id, name, image_url, port, cpu, memory, region, env_vars_encrypted, fly_app_id, endpoint_url, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'deploying')
+       RETURNING *`,
+      [
+        input.projectId,
+        input.name,
+        input.imageUrl || 'dockerfile',
+        input.port,
+        input.cpu,
+        input.memory,
+        input.region,
+        envVarsEncrypted,
+        flyAppName,
+        endpointUrl,
+      ]
+    );
+
+    // Create Fly app (no machine — flyctl deploy will create it)
+    try {
+      await fly.createApp({ name: flyAppName, network, org: config.fly.org });
+    } catch (error) {
+      // App might already exist from a previous deploy attempt — ignore 422
+      const msg = error instanceof Error ? error.message : '';
+      if (!msg.includes('422')) {
+        // Clean up DB record and rethrow
+        await this.getPool().query(`DELETE FROM compute.services WHERE id = $1`, [
+          insertResult.rows[0].id,
+        ]);
+        throw error;
+      }
+    }
+
+    logger.info('Compute service prepared for deploy', { flyAppName });
+    return mapRowToSchema(insertResult.rows[0]);
+  }
+
+  async syncAfterDeploy(id: string): Promise<ServiceSchema> {
+    const svc = await this.getService(id);
+
+    if (!svc.flyAppId) {
+      throw new Error(ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
+    }
+
+    const fly = this.getFly();
+    const machines = await fly.listMachines(svc.flyAppId);
+
+    if (machines.length === 0) {
+      // Deploy may have failed — mark as failed
+      await this.getPool().query(
+        `UPDATE compute.services SET status = 'failed' WHERE id = $1`,
+        [id]
+      );
+      return this.getService(id);
+    }
+
+    const machine = machines[0];
+    const status = machine.state === 'started' || machine.state === 'running' ? 'running' : machine.state === 'stopped' ? 'stopped' : 'deploying';
+
+    const result = await this.getPool().query(
+      `UPDATE compute.services SET fly_machine_id = $1, status = $2 WHERE id = $3 RETURNING *`,
+      [machine.id, status, id]
+    );
+
+    logger.info('Compute service synced after deploy', { id, machineId: machine.id, status });
+    return mapRowToSchema(result.rows[0]);
+  }
+
   async updateService(id: string, data: UpdateServiceInput): Promise<ServiceSchema> {
     const existing = await this.getService(id);
 
@@ -330,11 +414,11 @@ export class ComputeServicesService {
   ): Promise<{ timestamp: number; message: string }[]> {
     const svc = await this.getService(id);
 
-    if (!svc.flyAppId) {
+    if (!svc.flyAppId || !svc.flyMachineId) {
       throw new Error(ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
     }
 
-    return this.getFly().getLogs(svc.flyAppId, options);
+    return this.getFly().getLogs(svc.flyAppId, svc.flyMachineId, options);
   }
 
   private decryptEnvVars(encrypted: string | null): Record<string, string> {

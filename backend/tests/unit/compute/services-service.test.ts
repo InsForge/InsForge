@@ -43,6 +43,7 @@ const mockStopMachine = vi.fn();
 const mockStartMachine = vi.fn();
 const mockDestroyMachine = vi.fn();
 const mockGetLogs = vi.fn();
+const mockListMachines = vi.fn();
 const mockIsConfigured = vi.fn();
 
 vi.mock('@/providers/compute/fly.provider.js', () => ({
@@ -56,6 +57,7 @@ vi.mock('@/providers/compute/fly.provider.js', () => ({
       startMachine: mockStartMachine,
       destroyMachine: mockDestroyMachine,
       getLogs: mockGetLogs,
+      listMachines: mockListMachines,
       isConfigured: mockIsConfigured,
     }),
   },
@@ -295,7 +297,7 @@ describe('ComputeServicesService', () => {
       expect(deleteCall[1]).toEqual([serviceId]);
     });
 
-    it('still deletes from DB even if Fly destroy fails (best-effort)', async () => {
+    it('still deletes from DB even if Fly destroy fails (best-effort) ', async () => {
       const serviceId = 'svc-delete-2';
 
       // getService query
@@ -330,6 +332,266 @@ describe('ComputeServicesService', () => {
       // Should still delete from DB
       const deleteCall = mockQuery.mock.calls[1];
       expect(deleteCall[0]).toContain('DELETE FROM compute.services');
+    });
+  });
+
+  describe('prepareForDeploy', () => {
+    const input = {
+      projectId: 'proj-123',
+      name: 'my-api',
+      imageUrl: 'dockerfile',
+      port: 8080,
+      cpu: 'shared-1x' as const,
+      memory: 512,
+      region: 'iad',
+    };
+
+    it('inserts DB record with deploying status and creates Fly app (no machine)', async () => {
+      const serviceId = 'svc-deploy-1';
+
+      mockQuery.mockResolvedValueOnce({
+        rows: [{
+          id: serviceId,
+          project_id: input.projectId,
+          name: input.name,
+          image_url: input.imageUrl,
+          port: input.port,
+          cpu: input.cpu,
+          memory: input.memory,
+          region: input.region,
+          fly_app_id: 'my-api-proj-123',
+          fly_machine_id: null,
+          status: 'deploying',
+          endpoint_url: 'https://my-api-proj-123.fly.dev',
+          env_vars_encrypted: null,
+          created_at: '2026-01-01T00:00:00Z',
+          updated_at: '2026-01-01T00:00:00Z',
+        }],
+      });
+
+      mockCreateApp.mockResolvedValue({ appId: 'my-api-proj-123' });
+
+      const result = await service.prepareForDeploy(input);
+
+      // Verify INSERT
+      const insertCall = mockQuery.mock.calls[0];
+      expect(insertCall[0]).toContain('INSERT INTO compute.services');
+      expect(insertCall[0]).toContain("'deploying'");
+      expect(insertCall[1]).toContain(input.projectId);
+      expect(insertCall[1]).toContain('my-api-proj-123'); // flyAppId
+
+      // Verify Fly app created
+      expect(mockCreateApp).toHaveBeenCalledWith({
+        name: 'my-api-proj-123',
+        network: 'proj-123-network',
+        org: 'test-org',
+      });
+
+      // Verify NO machine launched
+      expect(mockLaunchMachine).not.toHaveBeenCalled();
+
+      // Verify returned shape
+      expect(result.id).toBe(serviceId);
+      expect(result.status).toBe('deploying');
+      expect(result.flyAppId).toBe('my-api-proj-123');
+      expect(result.flyMachineId).toBeNull();
+      expect(result.endpointUrl).toBe('https://my-api-proj-123.fly.dev');
+    });
+
+    it('throws COMPUTE_SERVICE_NOT_CONFIGURED when provider is not configured', async () => {
+      mockIsConfigured.mockReturnValue(false);
+      await expect(service.prepareForDeploy(input)).rejects.toThrow('COMPUTE_SERVICE_NOT_CONFIGURED');
+    });
+
+    it('ignores 422 error from createApp (app already exists)', async () => {
+      const serviceId = 'svc-deploy-2';
+
+      mockQuery.mockResolvedValueOnce({
+        rows: [{
+          id: serviceId,
+          project_id: input.projectId,
+          name: input.name,
+          image_url: input.imageUrl,
+          port: input.port,
+          cpu: input.cpu,
+          memory: input.memory,
+          region: input.region,
+          fly_app_id: 'my-api-proj-123',
+          fly_machine_id: null,
+          status: 'deploying',
+          endpoint_url: 'https://my-api-proj-123.fly.dev',
+          env_vars_encrypted: null,
+          created_at: '2026-01-01T00:00:00Z',
+          updated_at: '2026-01-01T00:00:00Z',
+        }],
+      });
+
+      mockCreateApp.mockRejectedValue(new Error('Fly API error (422): app already exists'));
+
+      const result = await service.prepareForDeploy(input);
+
+      expect(result.id).toBe(serviceId);
+      expect(result.status).toBe('deploying');
+    });
+
+    it('cleans up DB record and rethrows on non-422 Fly error', async () => {
+      const serviceId = 'svc-deploy-3';
+
+      mockQuery.mockResolvedValueOnce({
+        rows: [{
+          id: serviceId,
+          project_id: input.projectId,
+          name: input.name,
+          image_url: input.imageUrl,
+          port: input.port,
+          cpu: input.cpu,
+          memory: input.memory,
+          region: input.region,
+          fly_app_id: 'my-api-proj-123',
+          fly_machine_id: null,
+          status: 'deploying',
+          endpoint_url: 'https://my-api-proj-123.fly.dev',
+          env_vars_encrypted: null,
+          created_at: '2026-01-01T00:00:00Z',
+          updated_at: '2026-01-01T00:00:00Z',
+        }],
+      });
+
+      mockCreateApp.mockRejectedValue(new Error('Fly API error (500): internal error'));
+
+      // DELETE cleanup
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+
+      await expect(service.prepareForDeploy(input)).rejects.toThrow('Fly API error (500)');
+
+      // Verify cleanup DELETE
+      const deleteCall = mockQuery.mock.calls[1];
+      expect(deleteCall[0]).toContain('DELETE FROM compute.services');
+      expect(deleteCall[1]).toEqual([serviceId]);
+    });
+  });
+
+  describe('syncAfterDeploy', () => {
+    it('queries Fly for machines and updates DB with machineId and running status', async () => {
+      const serviceId = 'svc-sync-1';
+
+      // getService query
+      mockQuery.mockResolvedValueOnce({
+        rows: [{
+          id: serviceId,
+          project_id: 'proj-123',
+          name: 'my-api',
+          image_url: 'dockerfile',
+          port: 8080,
+          cpu: 'shared-1x',
+          memory: 512,
+          region: 'iad',
+          fly_app_id: 'my-api-proj-123',
+          fly_machine_id: null,
+          status: 'deploying',
+          endpoint_url: 'https://my-api-proj-123.fly.dev',
+          env_vars_encrypted: null,
+          created_at: '2026-01-01T00:00:00Z',
+          updated_at: '2026-01-01T00:00:00Z',
+        }],
+      });
+
+      mockListMachines.mockResolvedValue([
+        { id: 'machine-new-1', state: 'started', region: 'iad' },
+      ]);
+
+      // UPDATE query
+      mockQuery.mockResolvedValueOnce({
+        rows: [{
+          id: serviceId,
+          project_id: 'proj-123',
+          name: 'my-api',
+          image_url: 'dockerfile',
+          port: 8080,
+          cpu: 'shared-1x',
+          memory: 512,
+          region: 'iad',
+          fly_app_id: 'my-api-proj-123',
+          fly_machine_id: 'machine-new-1',
+          status: 'running',
+          endpoint_url: 'https://my-api-proj-123.fly.dev',
+          env_vars_encrypted: null,
+          created_at: '2026-01-01T00:00:00Z',
+          updated_at: '2026-01-01T00:00:00Z',
+        }],
+      });
+
+      const result = await service.syncAfterDeploy(serviceId);
+
+      expect(mockListMachines).toHaveBeenCalledWith('my-api-proj-123');
+
+      const updateCall = mockQuery.mock.calls[1];
+      expect(updateCall[0]).toContain('UPDATE compute.services');
+      expect(updateCall[1]).toContain('machine-new-1');
+      expect(updateCall[1]).toContain('running');
+
+      expect(result.flyMachineId).toBe('machine-new-1');
+      expect(result.status).toBe('running');
+    });
+
+    it('marks as failed when no machines found', async () => {
+      const serviceId = 'svc-sync-2';
+
+      // getService query
+      mockQuery.mockResolvedValueOnce({
+        rows: [{
+          id: serviceId,
+          project_id: 'proj-123',
+          name: 'my-api',
+          image_url: 'dockerfile',
+          port: 8080,
+          cpu: 'shared-1x',
+          memory: 512,
+          region: 'iad',
+          fly_app_id: 'my-api-proj-123',
+          fly_machine_id: null,
+          status: 'deploying',
+          endpoint_url: 'https://my-api-proj-123.fly.dev',
+          env_vars_encrypted: null,
+          created_at: '2026-01-01T00:00:00Z',
+          updated_at: '2026-01-01T00:00:00Z',
+        }],
+      });
+
+      mockListMachines.mockResolvedValue([]);
+
+      // UPDATE to failed
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+
+      // getService for return (after failed update)
+      mockQuery.mockResolvedValueOnce({
+        rows: [{
+          id: serviceId,
+          project_id: 'proj-123',
+          name: 'my-api',
+          image_url: 'dockerfile',
+          port: 8080,
+          cpu: 'shared-1x',
+          memory: 512,
+          region: 'iad',
+          fly_app_id: 'my-api-proj-123',
+          fly_machine_id: null,
+          status: 'failed',
+          endpoint_url: 'https://my-api-proj-123.fly.dev',
+          env_vars_encrypted: null,
+          created_at: '2026-01-01T00:00:00Z',
+          updated_at: '2026-01-01T00:00:00Z',
+        }],
+      });
+
+      const result = await service.syncAfterDeploy(serviceId);
+
+      // Verify status set to failed (status is inline in SQL, not a param)
+      const failedCall = mockQuery.mock.calls[1];
+      expect(failedCall[0]).toContain('UPDATE compute.services');
+      expect(failedCall[0]).toContain("'failed'");
+
+      expect(result.status).toBe('failed');
     });
   });
 });

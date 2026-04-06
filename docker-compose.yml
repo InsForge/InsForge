@@ -129,6 +129,11 @@ services:
       - X_CLIENT_SECRET=${X_CLIENT_SECRET:-}
       - APPLE_CLIENT_ID=${APPLE_CLIENT_ID:-}
       - APPLE_CLIENT_SECRET=${APPLE_CLIENT_SECRET:-}
+      # Compute Services (Fly.io)
+      - COMPUTE_SERVICES_ENABLED=${COMPUTE_SERVICES_ENABLED:-false}
+      - FLY_API_TOKEN=${FLY_API_TOKEN:-}
+      - FLY_ORG=${FLY_ORG:-}
+      - COMPUTE_DOMAIN=${COMPUTE_DOMAIN:-}
       # Logs directory
       - LOGS_DIR=/insforge-logs
       # Storage directory (for local file storage when S3 is not configured)
