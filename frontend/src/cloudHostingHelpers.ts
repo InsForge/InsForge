@@ -379,9 +379,10 @@ export function useCloudHostingBridge(backendUrl: string) {
       return code;
     }
 
-    if (!postMessageToParent({ type: 'REQUEST_AUTHORIZATION_CODE' })) {
-      throw new Error('Unable to request an authorization code from the parent window');
-    }
+    // Try to request a code from the parent. Even if the send fails (e.g. parent
+    // origin not yet known), still create a pending request so the proactive
+    // AUTHORIZATION_CODE message from the parent can resolve it when it arrives.
+    postMessageToParent({ type: 'REQUEST_AUTHORIZATION_CODE' });
 
     return createPendingRequest('authCode', 'Authorization code request');
   }, [createPendingRequest, postMessageToParent]);
