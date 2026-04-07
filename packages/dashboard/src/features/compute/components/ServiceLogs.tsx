@@ -28,7 +28,12 @@ export function ServiceLogs({ serviceId }: ServiceLogsProps) {
             {logs.map((entry, i) => (
               <div key={i}>
                 <span className="text-foreground/60">
-                  {new Date(entry.timestamp).toISOString().replace('T', ' ').slice(0, 19)}
+                  {(() => {
+                    const d = new Date(entry.timestamp);
+                    return isNaN(d.getTime())
+                      ? String(entry.timestamp)
+                      : d.toISOString().replace('T', ' ').slice(0, 19);
+                  })()}
                 </span>
                 {'  '}
                 {entry.message}
