@@ -96,6 +96,7 @@ export class FlyProvider {
         region: params.region,
       }),
     });
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Fly launch always returns JSON
     return { machineId: result!.id };
   }
 
@@ -178,6 +179,7 @@ export class FlyProvider {
   async getMachineStatus(appId: string, machineId: string): Promise<{ state: string }> {
     // Fly Machines GET always returns a JSON body with machine state
     const result = await this.request<{ state: string }>(`/apps/${appId}/machines/${machineId}`);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Fly GET always returns JSON
     return { state: result!.state };
   }
 
