@@ -3,9 +3,25 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", "../dist/**"],
       "inputs": ["src/**", "tsconfig*.json", "package.json", "vite.config.*", "tsup.config.*"],
       "env": ["VITE_*"]
+    },
+    "@insforge/backend#build": {
+      "outputs": ["../dist/server.js", "../dist/server.js.map"]
+    },
+    "frontend#build": {
+      "//": "dependsOn is empty because vite.config.ts aliases workspace packages to source (not dist), so upstream builds are unnecessary",
+      "dependsOn": [],
+      "outputs": ["../dist/frontend/**"]
+    },
+    "@insforge/ui#build": {
+      "outputs": ["dist/**"]
+    },
+    "@insforge/dashboard#build": {
+      "outputs": ["dist/**"]
+    },
+    "@insforge/shared-schemas#build": {
+      "outputs": ["dist/**"]
     },
     "typecheck": {
       "dependsOn": ["^build"],
