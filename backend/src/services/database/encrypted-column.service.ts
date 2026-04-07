@@ -42,6 +42,65 @@ export class EncryptedColumnService {
     return `"${identifier.replace(/"/g, '""')}"`;
   }
 
+  /** Build the qualified table name "schema"."table" (or just "table" for public schema) */
+  private qualifiedTableName(tableName: string, tableSchema: string): string {
+    const safeTable = this.quoteIdentifier(tableName);
+    if (tableSchema === 'public') {
+      return safeTable;
+    }
+    return `${this.quoteIdentifier(tableSchema)}.${safeTable}`;
+  }
+
+  /**
+   * Constraint name for the ciphertext-format CHECK guard on a column.
+   * Length-bounded to fit within Postgres' 63-byte identifier limit even for long column names.
+   */
+  private formatConstraintName(columnName: string): string {
+    const trimmed = columnName.length > 50 ? columnName.substring(0, 50) : columnName;
+    return `enc_fmt_${trimmed}`;
+  }
+
+  /**
+   * POSIX regex used by the CHECK constraint to enforce ciphertext format.
+   * Matches both versioned (v<N>:iv:tag:data) and legacy (iv:tag:data) ciphertext.
+   * IV and auth tag are 16 bytes each → 32 hex chars.
+   */
+  private static readonly CIPHERTEXT_FORMAT_REGEX =
+    '^(v[0-9]+:)?[0-9a-f]{32}:[0-9a-f]{32}:[0-9a-f]+$';
+
+  /**
+   * Install a CHECK constraint that rejects any plaintext write to an encrypted column.
+   * This is the defense-in-depth that prevents bypass via raw SQL, RPC, bulk upsert, and import.
+   */
+  private async installFormatConstraint(
+    target: Queryable,
+    tableName: string,
+    columnName: string,
+    tableSchema: string
+  ): Promise<void> {
+    const qualifiedTable = this.qualifiedTableName(tableName, tableSchema);
+    const safeColumn = this.quoteIdentifier(columnName);
+    const constraintName = this.quoteIdentifier(this.formatConstraintName(columnName));
+    // Drop first in case it already exists from a prior partial run
+    await target.query(`ALTER TABLE ${qualifiedTable} DROP CONSTRAINT IF EXISTS ${constraintName}`);
+    await target.query(
+      `ALTER TABLE ${qualifiedTable} ADD CONSTRAINT ${constraintName} ` +
+        `CHECK (${safeColumn} IS NULL OR ${safeColumn} ~ '${EncryptedColumnService.CIPHERTEXT_FORMAT_REGEX}')`
+    );
+  }
+
+  /** Drop the format CHECK constraint from a column. Safe to call if it doesn't exist. */
+  private async dropFormatConstraint(
+    target: Queryable,
+    tableName: string,
+    columnName: string,
+    tableSchema: string
+  ): Promise<void> {
+    const qualifiedTable = this.qualifiedTableName(tableName, tableSchema);
+    const constraintName = this.quoteIdentifier(this.formatConstraintName(columnName));
+    await target.query(`ALTER TABLE ${qualifiedTable} DROP CONSTRAINT IF EXISTS ${constraintName}`);
+  }
+
   private getPool(): Pool {
     if (!this.pool) {
       this.pool = DatabaseManager.getInstance().getPool();
@@ -142,6 +201,8 @@ export class EncryptedColumnService {
        SET original_type = EXCLUDED.original_type, key_version = EXCLUDED.key_version, updated_at = now()`,
       [tableSchema, tableName, columnName, originalType, EncryptionManager.getCurrentKeyVersion()]
     );
+    // Install the ciphertext-format CHECK constraint to block plaintext writes from any path
+    await this.installFormatConstraint(target, tableName, columnName, tableSchema);
     if (!executor) {
       this.clearCache(tableName, tableSchema);
     }
@@ -163,6 +224,18 @@ export class EncryptedColumnService {
        WHERE table_schema = $1 AND table_name = $2 AND column_name = $3`,
       [tableSchema, tableName, columnName]
     );
+    // Best-effort drop of the format CHECK constraint. If the table itself was already
+    // dropped (cascading from a DROP TABLE), this will throw — swallow that case.
+    try {
+      await this.dropFormatConstraint(target, tableName, columnName, tableSchema);
+    } catch (err) {
+      logger.warn(
+        `Failed to drop format constraint for ${tableSchema}.${tableName}.${columnName}`,
+        {
+          error: err instanceof Error ? err.message : String(err),
+        }
+      );
+    }
     if (!executor) {
       this.clearCache(tableName, tableSchema);
     }
@@ -315,6 +388,9 @@ export class EncryptedColumnService {
          SET original_type = EXCLUDED.original_type, key_version = EXCLUDED.key_version, updated_at = now()`,
         [tableSchema, tableName, columnName, originalType, EncryptionManager.getCurrentKeyVersion()]
       );
+
+      // Install ciphertext-format CHECK constraint to block plaintext writes from any path
+      await this.installFormatConstraint(client, tableName, columnName, tableSchema);
 
       await client.query('COMMIT');
       this.clearCache(tableName, tableSchema);

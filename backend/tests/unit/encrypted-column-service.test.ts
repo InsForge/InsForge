@@ -102,12 +102,16 @@ describe('EncryptedColumnService', () => {
   // ========================================================================
   describe('registerColumn with executor', () => {
     test('uses pool when no executor is provided', async () => {
-      mockQuery.mockResolvedValueOnce({ rows: [] });
+      mockQuery.mockResolvedValue({ rows: [] });
 
       await service.registerColumn('users', 'ssn', 'string');
 
-      expect(mockQuery).toHaveBeenCalledTimes(1);
+      // Expect 3 queries: INSERT into registry, DROP CONSTRAINT IF EXISTS, ADD CONSTRAINT
+      expect(mockQuery).toHaveBeenCalledTimes(3);
       expect(mockQuery.mock.calls[0][0]).toContain('INSERT INTO system.encrypted_columns');
+      expect(mockQuery.mock.calls[1][0]).toContain('DROP CONSTRAINT IF EXISTS');
+      expect(mockQuery.mock.calls[2][0]).toContain('ADD CONSTRAINT');
+      expect(mockQuery.mock.calls[2][0]).toContain('CHECK');
     });
 
     test('uses executor when provided', async () => {
@@ -118,9 +122,10 @@ describe('EncryptedColumnService', () => {
 
       // Pool should NOT have been called
       expect(mockQuery).not.toHaveBeenCalled();
-      // Executor should have been called
-      expect(txQuery).toHaveBeenCalledTimes(1);
+      // Executor: INSERT + DROP CONSTRAINT IF EXISTS + ADD CONSTRAINT
+      expect(txQuery).toHaveBeenCalledTimes(3);
       expect(txQuery.mock.calls[0][0]).toContain('INSERT INTO system.encrypted_columns');
+      expect(txQuery.mock.calls[2][0]).toContain('CHECK');
     });
 
     test('does NOT clear cache when executor is provided', async () => {
@@ -152,8 +157,10 @@ describe('EncryptedColumnService', () => {
       await service.unregisterColumn('users', 'ssn', 'public', executor);
 
       expect(mockQuery).not.toHaveBeenCalled();
-      expect(txQuery).toHaveBeenCalledTimes(1);
+      // DELETE + DROP CONSTRAINT IF EXISTS
+      expect(txQuery).toHaveBeenCalledTimes(2);
       expect(txQuery.mock.calls[0][0]).toContain('DELETE FROM system.encrypted_columns');
+      expect(txQuery.mock.calls[1][0]).toContain('DROP CONSTRAINT IF EXISTS');
     });
   });
 
