@@ -95,16 +95,16 @@ export const dashboardStaticMenuItems: DashboardPrimaryMenuItem[] = [
     icon: Radio,
   },
   {
-    id: 'compute',
-    label: 'Compute',
-    href: '/dashboard/compute',
-    icon: Server,
-  },
-  {
     id: 'ai',
     label: 'Model Gateway',
     href: '/dashboard/ai',
     icon: Sparkles,
+  },
+  {
+    id: 'compute',
+    label: 'Compute',
+    href: '/dashboard/compute',
+    icon: Server,
     sectionEnd: true,
   },
   {
