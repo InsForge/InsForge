@@ -257,7 +257,7 @@ describe('ComputeServicesService', () => {
   });
 
   describe('deleteService', () => {
-    it('destroys Fly resources and deletes from DB', async () => {
+    it('marks as destroying, destroys Fly resources, and deletes from DB', async () => {
       const serviceId = 'svc-delete-1';
 
       // getService query
@@ -284,7 +284,8 @@ describe('ComputeServicesService', () => {
       mockDestroyMachine.mockResolvedValue(undefined);
       mockDestroyApp.mockResolvedValue(undefined);
 
-      // DELETE query
+      // UPDATE (destroying) + DELETE queries
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
       mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
 
       await service.deleteService(serviceId);
@@ -292,12 +293,17 @@ describe('ComputeServicesService', () => {
       expect(mockDestroyMachine).toHaveBeenCalledWith('app-del-proj-123', 'machine-del');
       expect(mockDestroyApp).toHaveBeenCalledWith('app-del-proj-123');
 
-      const deleteCall = mockQuery.mock.calls[1];
+      // First DB call after getService is the status update to 'destroying'
+      const destroyingCall = mockQuery.mock.calls[1];
+      expect(destroyingCall[0]).toContain('destroying');
+
+      // Last DB call is the DELETE
+      const deleteCall = mockQuery.mock.calls[mockQuery.mock.calls.length - 1];
       expect(deleteCall[0]).toContain('DELETE FROM compute.services');
       expect(deleteCall[1]).toEqual([serviceId]);
     });
 
-    it('still deletes from DB even if Fly destroy fails (best-effort) ', async () => {
+    it('marks as failed and throws if Fly destroy fails (preserves DB reference)', async () => {
       const serviceId = 'svc-delete-2';
 
       // getService query
@@ -322,16 +328,16 @@ describe('ComputeServicesService', () => {
       });
 
       mockDestroyMachine.mockRejectedValue(new Error('Fly error'));
-      mockDestroyApp.mockRejectedValue(new Error('Fly error'));
 
-      // DELETE query
+      // UPDATE (destroying) + UPDATE (failed) queries
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
       mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
 
-      await service.deleteService(serviceId);
+      await expect(service.deleteService(serviceId)).rejects.toThrow('COMPUTE_SERVICE_DEPLOY_FAILED');
 
-      // Should still delete from DB
-      const deleteCall = mockQuery.mock.calls[1];
-      expect(deleteCall[0]).toContain('DELETE FROM compute.services');
+      // DB row should be preserved (marked failed, not deleted)
+      const failedCall = mockQuery.mock.calls[2];
+      expect(failedCall[0]).toContain('failed');
     });
   });
 
