@@ -104,15 +104,7 @@ function normalizeProjectInfo(
   };
 }
 
-export function isCloudHostingBackend(backendUrl: string): boolean {
-  try {
-    return new URL(backendUrl).hostname.endsWith('.insforge.app');
-  } catch {
-    return false;
-  }
-}
-
-export function useCloudHostingBridge(backendUrl: string) {
+export function useCloudHostBridge(backendUrl: string) {
   const [projectInfo, setProjectInfo] = useState<DashboardProjectInfo>();
   const initialAuthorizationCodeRef = useRef<string | null>(getInitialAuthorizationCode());
   const queuedAuthorizationCodeRef = useRef<string | null>(null);
@@ -227,7 +219,7 @@ export function useCloudHostingBridge(backendUrl: string) {
       }
 
       if (!parentOriginRef.current) {
-        // Adopt the origin from the first verified parent message when referrer is unavailable
+        // Adopt the origin from the first verified parent message when referrer is unavailable.
         parentOriginRef.current = event.origin;
       } else if (event.origin !== parentOriginRef.current) {
         return;
@@ -357,7 +349,7 @@ export function useCloudHostingBridge(backendUrl: string) {
       window.removeEventListener('message', handleMessage);
 
       (Object.keys(pendingRequests) as PendingRequestKey[]).forEach((key) => {
-        rejectPendingRequest(key, 'Cloud hosting bridge was disposed');
+        rejectPendingRequest(key, 'Cloud host bridge was disposed');
       });
     };
   }, [backendUrl, rejectPendingRequest, resolvePendingRequest]);
@@ -379,9 +371,8 @@ export function useCloudHostingBridge(backendUrl: string) {
       return code;
     }
 
-    // Try to request a code from the parent. Even if the send fails (e.g. parent
-    // origin not yet known), still create a pending request so the proactive
-    // AUTHORIZATION_CODE message from the parent can resolve it when it arrives.
+    // Even if the send fails, keep the pending request open so a proactive parent message
+    // can still resolve it when the bridge finishes initializing.
     postMessageToParent({ type: 'REQUEST_AUTHORIZATION_CODE' });
 
     return createPendingRequest('authCode', 'Authorization code request');
