@@ -227,6 +227,7 @@ export class AuthService {
         };
       }
 
+      let emailError: string | undefined;
       try {
         if (verifiedRedirectTo) {
           await this.sendVerificationEmailWithLink(email, verifiedRedirectTo);
@@ -234,11 +235,13 @@ export class AuthService {
           await this.sendVerificationEmailWithCode(email);
         }
       } catch (error) {
-        logger.warn('Verification email send failed during register', { error });
+        emailError = error instanceof Error ? error.message : 'Failed to send verification email';
+        logger.warn('Verification email send failed during register', { error: emailError });
       }
       return {
         accessToken: null,
         requireEmailVerification: true,
+        ...(emailError && { emailError }),
       };
     }
 
