@@ -292,7 +292,9 @@ export class ComputeServicesService {
     } catch (error) {
       // App might already exist from a previous deploy attempt — ignore "already exists"
       const msg = error instanceof Error ? error.message : '';
-      const isAlreadyExists = msg.includes('422') && msg.toLowerCase().includes('already exists');
+      const status = (error as { status?: number }).status;
+      const isAlreadyExists =
+        (status === 422 || msg.includes('422')) && msg.toLowerCase().includes('already exists');
       if (!isAlreadyExists) {
         // Clean up DB record and rethrow
         await this.getPool().query(`DELETE FROM compute.services WHERE id = $1`, [
