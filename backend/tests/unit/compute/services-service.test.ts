@@ -181,7 +181,7 @@ describe('ComputeServicesService', () => {
     it('throws COMPUTE_SERVICE_NOT_CONFIGURED when provider is not configured', async () => {
       mockIsConfigured.mockReturnValue(false);
 
-      await expect(service.createService(input)).rejects.toThrow('Compute services not configured');
+      await expect(service.createService(input)).rejects.toThrow('Compute services are not enabled on this project.');
     });
 
     it('sets status to failed when Fly deploy fails', async () => {
@@ -421,7 +421,7 @@ describe('ComputeServicesService', () => {
     it('throws COMPUTE_SERVICE_NOT_CONFIGURED when provider is not configured', async () => {
       mockIsConfigured.mockReturnValue(false);
       await expect(service.prepareForDeploy(input)).rejects.toThrow(
-        'Compute services not configured'
+        'Compute services are not enabled on this project.'
       );
     });
 

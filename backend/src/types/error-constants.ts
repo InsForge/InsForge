@@ -108,6 +108,18 @@ export const NEXT_ACTION = {
   CHECK_RLS_POLICY:
     'A row-level security policy denied this operation. Verify the calling user owns the row (uploaded_by / user_id matches the JWT sub), or that an appropriate INSERT/UPDATE/DELETE policy exists for this role.',
 
+  // Compute next actions
+  ENABLE_COMPUTE:
+    'Compute services are not enabled. Self-hosted: set COMPUTE_SERVICES_ENABLED=true and FLY_API_TOKEN in your .env, then restart. Cloud: contact your project admin to enable compute.',
+  CHECK_COMPUTE_SERVICE_EXISTS:
+    'The compute service was not found. Run `compute list` to see available services.',
+  CHECK_DOCKER_IMAGE:
+    'Check the Docker image URL is valid and accessible. Ensure the image exists in the registry.',
+  CHECK_FLY_CAPACITY:
+    'Compute service deployment failed. Check the Fly.io region has capacity, or try a different region.',
+  RETRY_COMPUTE_OPERATION:
+    'The operation failed due to a transient error. Wait a moment and try again.',
+
   // Add more next actions as needed
 } as const;
 
