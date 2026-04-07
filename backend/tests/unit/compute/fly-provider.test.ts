@@ -54,7 +54,7 @@ describe('FlyProvider', () => {
             org_slug: 'test-org',
             network: 'default',
           }),
-        }),
+        })
       );
       expect(result).toEqual({ appId: 'my-app' });
     });
@@ -68,7 +68,7 @@ describe('FlyProvider', () => {
       vi.stubGlobal('fetch', mockFetch);
 
       await expect(
-        provider.createApp({ name: 'my-app', network: 'default', org: 'test-org' }),
+        provider.createApp({ name: 'my-app', network: 'default', org: 'test-org' })
       ).rejects.toThrow('Fly API error (422): app already exists');
     });
   });
@@ -123,7 +123,7 @@ describe('FlyProvider', () => {
 
       expect(mockFetch).toHaveBeenCalledWith(
         `${FLY_API_BASE}/apps/my-app/machines/machine-123/stop`,
-        expect.objectContaining({ method: 'POST' }),
+        expect.objectContaining({ method: 'POST' })
       );
     });
   });
@@ -140,7 +140,7 @@ describe('FlyProvider', () => {
 
       expect(mockFetch).toHaveBeenCalledWith(
         `${FLY_API_BASE}/apps/my-app/machines/machine-123`,
-        expect.objectContaining({ method: 'DELETE' }),
+        expect.objectContaining({ method: 'DELETE' })
       );
     });
   });
@@ -149,10 +149,13 @@ describe('FlyProvider', () => {
     it('calls GET on machines endpoint and returns array', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        text: () => Promise.resolve(JSON.stringify([
-          { id: 'machine-1', state: 'started', region: 'iad' },
-          { id: 'machine-2', state: 'stopped', region: 'iad' },
-        ])),
+        text: () =>
+          Promise.resolve(
+            JSON.stringify([
+              { id: 'machine-1', state: 'started', region: 'iad' },
+              { id: 'machine-2', state: 'stopped', region: 'iad' },
+            ])
+          ),
       });
       vi.stubGlobal('fetch', mockFetch);
 
@@ -160,7 +163,7 @@ describe('FlyProvider', () => {
 
       expect(mockFetch).toHaveBeenCalledWith(
         `${FLY_API_BASE}/apps/my-app/machines`,
-        expect.objectContaining({ headers: expect.any(Object) }),
+        expect.objectContaining({ headers: expect.any(Object) })
       );
       expect(result).toHaveLength(2);
       expect(result[0].id).toBe('machine-1');
@@ -180,7 +183,7 @@ describe('FlyProvider', () => {
 
       expect(mockFetch).toHaveBeenCalledWith(
         `${FLY_API_BASE}/apps/my-app`,
-        expect.objectContaining({ method: 'DELETE' }),
+        expect.objectContaining({ method: 'DELETE' })
       );
     });
   });

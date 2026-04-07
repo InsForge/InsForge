@@ -91,23 +91,25 @@ describe('ComputeServicesService', () => {
 
       // INSERT returns the new row
       mockQuery.mockResolvedValueOnce({
-        rows: [{
-          id: serviceId,
-          project_id: input.projectId,
-          name: input.name,
-          image_url: input.imageUrl,
-          port: input.port,
-          cpu: input.cpu,
-          memory: input.memory,
-          region: input.region,
-          fly_app_id: null,
-          fly_machine_id: null,
-          status: 'creating',
-          endpoint_url: null,
-          env_vars_encrypted: null,
-          created_at: '2026-01-01T00:00:00Z',
-          updated_at: '2026-01-01T00:00:00Z',
-        }],
+        rows: [
+          {
+            id: serviceId,
+            project_id: input.projectId,
+            name: input.name,
+            image_url: input.imageUrl,
+            port: input.port,
+            cpu: input.cpu,
+            memory: input.memory,
+            region: input.region,
+            fly_app_id: null,
+            fly_machine_id: null,
+            status: 'creating',
+            endpoint_url: null,
+            env_vars_encrypted: null,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
       });
 
       mockCreateApp.mockResolvedValue({ appId: 'my-api-proj-123' });
@@ -115,23 +117,25 @@ describe('ComputeServicesService', () => {
 
       // UPDATE after deploy
       mockQuery.mockResolvedValueOnce({
-        rows: [{
-          id: serviceId,
-          project_id: input.projectId,
-          name: input.name,
-          image_url: input.imageUrl,
-          port: input.port,
-          cpu: input.cpu,
-          memory: input.memory,
-          region: input.region,
-          fly_app_id: 'my-api-proj-123',
-          fly_machine_id: 'machine-abc',
-          status: 'running',
-          endpoint_url: 'https://my-api-proj-123.fly.dev',
-          env_vars_encrypted: null,
-          created_at: '2026-01-01T00:00:00Z',
-          updated_at: '2026-01-01T00:00:00Z',
-        }],
+        rows: [
+          {
+            id: serviceId,
+            project_id: input.projectId,
+            name: input.name,
+            image_url: input.imageUrl,
+            port: input.port,
+            cpu: input.cpu,
+            memory: input.memory,
+            region: input.region,
+            fly_app_id: 'my-api-proj-123',
+            fly_machine_id: 'machine-abc',
+            status: 'running',
+            endpoint_url: 'https://my-api-proj-123.fly.dev',
+            env_vars_encrypted: null,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
       });
 
       const result = await service.createService(input);
@@ -157,7 +161,7 @@ describe('ComputeServicesService', () => {
           cpu: input.cpu,
           memory: input.memory,
           region: input.region,
-        }),
+        })
       );
 
       // Verify status update
@@ -185,23 +189,25 @@ describe('ComputeServicesService', () => {
 
       // INSERT
       mockQuery.mockResolvedValueOnce({
-        rows: [{
-          id: serviceId,
-          project_id: input.projectId,
-          name: input.name,
-          image_url: input.imageUrl,
-          port: input.port,
-          cpu: input.cpu,
-          memory: input.memory,
-          region: input.region,
-          fly_app_id: null,
-          fly_machine_id: null,
-          status: 'creating',
-          endpoint_url: null,
-          env_vars_encrypted: null,
-          created_at: '2026-01-01T00:00:00Z',
-          updated_at: '2026-01-01T00:00:00Z',
-        }],
+        rows: [
+          {
+            id: serviceId,
+            project_id: input.projectId,
+            name: input.name,
+            image_url: input.imageUrl,
+            port: input.port,
+            cpu: input.cpu,
+            memory: input.memory,
+            region: input.region,
+            fly_app_id: null,
+            fly_machine_id: null,
+            status: 'creating',
+            endpoint_url: null,
+            env_vars_encrypted: null,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
       });
 
       mockCreateApp.mockRejectedValue(new Error('Fly API error'));
@@ -262,23 +268,25 @@ describe('ComputeServicesService', () => {
 
       // getService query
       mockQuery.mockResolvedValueOnce({
-        rows: [{
-          id: serviceId,
-          project_id: 'proj-123',
-          name: 'app-del',
-          image_url: 'img:1',
-          port: 8080,
-          cpu: 'shared-1x',
-          memory: 256,
-          region: 'iad',
-          fly_app_id: 'app-del-proj-123',
-          fly_machine_id: 'machine-del',
-          status: 'running',
-          endpoint_url: 'https://app-del-proj-123.fly.dev',
-          env_vars_encrypted: null,
-          created_at: '2026-01-01T00:00:00Z',
-          updated_at: '2026-01-01T00:00:00Z',
-        }],
+        rows: [
+          {
+            id: serviceId,
+            project_id: 'proj-123',
+            name: 'app-del',
+            image_url: 'img:1',
+            port: 8080,
+            cpu: 'shared-1x',
+            memory: 256,
+            region: 'iad',
+            fly_app_id: 'app-del-proj-123',
+            fly_machine_id: 'machine-del',
+            status: 'running',
+            endpoint_url: 'https://app-del-proj-123.fly.dev',
+            env_vars_encrypted: null,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
       });
 
       mockDestroyMachine.mockResolvedValue(undefined);
@@ -308,23 +316,25 @@ describe('ComputeServicesService', () => {
 
       // getService query
       mockQuery.mockResolvedValueOnce({
-        rows: [{
-          id: serviceId,
-          project_id: 'proj-123',
-          name: 'app-del2',
-          image_url: 'img:1',
-          port: 8080,
-          cpu: 'shared-1x',
-          memory: 256,
-          region: 'iad',
-          fly_app_id: 'app-del2-proj-123',
-          fly_machine_id: 'machine-del2',
-          status: 'running',
-          endpoint_url: 'https://app-del2-proj-123.fly.dev',
-          env_vars_encrypted: null,
-          created_at: '2026-01-01T00:00:00Z',
-          updated_at: '2026-01-01T00:00:00Z',
-        }],
+        rows: [
+          {
+            id: serviceId,
+            project_id: 'proj-123',
+            name: 'app-del2',
+            image_url: 'img:1',
+            port: 8080,
+            cpu: 'shared-1x',
+            memory: 256,
+            region: 'iad',
+            fly_app_id: 'app-del2-proj-123',
+            fly_machine_id: 'machine-del2',
+            status: 'running',
+            endpoint_url: 'https://app-del2-proj-123.fly.dev',
+            env_vars_encrypted: null,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
       });
 
       mockDestroyMachine.mockRejectedValue(new Error('Fly error'));
@@ -333,7 +343,9 @@ describe('ComputeServicesService', () => {
       mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
       mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
 
-      await expect(service.deleteService(serviceId)).rejects.toThrow('Failed to delete compute service');
+      await expect(service.deleteService(serviceId)).rejects.toThrow(
+        'Failed to delete compute service'
+      );
 
       // DB row should be preserved (marked failed, not deleted)
       const failedCall = mockQuery.mock.calls[2];
@@ -356,23 +368,25 @@ describe('ComputeServicesService', () => {
       const serviceId = 'svc-deploy-1';
 
       mockQuery.mockResolvedValueOnce({
-        rows: [{
-          id: serviceId,
-          project_id: input.projectId,
-          name: input.name,
-          image_url: input.imageUrl,
-          port: input.port,
-          cpu: input.cpu,
-          memory: input.memory,
-          region: input.region,
-          fly_app_id: 'my-api-proj-123',
-          fly_machine_id: null,
-          status: 'deploying',
-          endpoint_url: 'https://my-api-proj-123.fly.dev',
-          env_vars_encrypted: null,
-          created_at: '2026-01-01T00:00:00Z',
-          updated_at: '2026-01-01T00:00:00Z',
-        }],
+        rows: [
+          {
+            id: serviceId,
+            project_id: input.projectId,
+            name: input.name,
+            image_url: input.imageUrl,
+            port: input.port,
+            cpu: input.cpu,
+            memory: input.memory,
+            region: input.region,
+            fly_app_id: 'my-api-proj-123',
+            fly_machine_id: null,
+            status: 'deploying',
+            endpoint_url: 'https://my-api-proj-123.fly.dev',
+            env_vars_encrypted: null,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
       });
 
       mockCreateApp.mockResolvedValue({ appId: 'my-api-proj-123' });
@@ -406,30 +420,34 @@ describe('ComputeServicesService', () => {
 
     it('throws COMPUTE_SERVICE_NOT_CONFIGURED when provider is not configured', async () => {
       mockIsConfigured.mockReturnValue(false);
-      await expect(service.prepareForDeploy(input)).rejects.toThrow('Compute services not configured');
+      await expect(service.prepareForDeploy(input)).rejects.toThrow(
+        'Compute services not configured'
+      );
     });
 
     it('ignores 422 error from createApp (app already exists)', async () => {
       const serviceId = 'svc-deploy-2';
 
       mockQuery.mockResolvedValueOnce({
-        rows: [{
-          id: serviceId,
-          project_id: input.projectId,
-          name: input.name,
-          image_url: input.imageUrl,
-          port: input.port,
-          cpu: input.cpu,
-          memory: input.memory,
-          region: input.region,
-          fly_app_id: 'my-api-proj-123',
-          fly_machine_id: null,
-          status: 'deploying',
-          endpoint_url: 'https://my-api-proj-123.fly.dev',
-          env_vars_encrypted: null,
-          created_at: '2026-01-01T00:00:00Z',
-          updated_at: '2026-01-01T00:00:00Z',
-        }],
+        rows: [
+          {
+            id: serviceId,
+            project_id: input.projectId,
+            name: input.name,
+            image_url: input.imageUrl,
+            port: input.port,
+            cpu: input.cpu,
+            memory: input.memory,
+            region: input.region,
+            fly_app_id: 'my-api-proj-123',
+            fly_machine_id: null,
+            status: 'deploying',
+            endpoint_url: 'https://my-api-proj-123.fly.dev',
+            env_vars_encrypted: null,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
       });
 
       mockCreateApp.mockRejectedValue(new Error('Fly API error (422): app already exists'));
@@ -444,23 +462,25 @@ describe('ComputeServicesService', () => {
       const serviceId = 'svc-deploy-3';
 
       mockQuery.mockResolvedValueOnce({
-        rows: [{
-          id: serviceId,
-          project_id: input.projectId,
-          name: input.name,
-          image_url: input.imageUrl,
-          port: input.port,
-          cpu: input.cpu,
-          memory: input.memory,
-          region: input.region,
-          fly_app_id: 'my-api-proj-123',
-          fly_machine_id: null,
-          status: 'deploying',
-          endpoint_url: 'https://my-api-proj-123.fly.dev',
-          env_vars_encrypted: null,
-          created_at: '2026-01-01T00:00:00Z',
-          updated_at: '2026-01-01T00:00:00Z',
-        }],
+        rows: [
+          {
+            id: serviceId,
+            project_id: input.projectId,
+            name: input.name,
+            image_url: input.imageUrl,
+            port: input.port,
+            cpu: input.cpu,
+            memory: input.memory,
+            region: input.region,
+            fly_app_id: 'my-api-proj-123',
+            fly_machine_id: null,
+            status: 'deploying',
+            endpoint_url: 'https://my-api-proj-123.fly.dev',
+            env_vars_encrypted: null,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
       });
 
       mockCreateApp.mockRejectedValue(new Error('Fly API error (500): internal error'));
@@ -483,23 +503,25 @@ describe('ComputeServicesService', () => {
 
       // getService query
       mockQuery.mockResolvedValueOnce({
-        rows: [{
-          id: serviceId,
-          project_id: 'proj-123',
-          name: 'my-api',
-          image_url: 'dockerfile',
-          port: 8080,
-          cpu: 'shared-1x',
-          memory: 512,
-          region: 'iad',
-          fly_app_id: 'my-api-proj-123',
-          fly_machine_id: null,
-          status: 'deploying',
-          endpoint_url: 'https://my-api-proj-123.fly.dev',
-          env_vars_encrypted: null,
-          created_at: '2026-01-01T00:00:00Z',
-          updated_at: '2026-01-01T00:00:00Z',
-        }],
+        rows: [
+          {
+            id: serviceId,
+            project_id: 'proj-123',
+            name: 'my-api',
+            image_url: 'dockerfile',
+            port: 8080,
+            cpu: 'shared-1x',
+            memory: 512,
+            region: 'iad',
+            fly_app_id: 'my-api-proj-123',
+            fly_machine_id: null,
+            status: 'deploying',
+            endpoint_url: 'https://my-api-proj-123.fly.dev',
+            env_vars_encrypted: null,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
       });
 
       mockListMachines.mockResolvedValue([
@@ -508,23 +530,25 @@ describe('ComputeServicesService', () => {
 
       // UPDATE query
       mockQuery.mockResolvedValueOnce({
-        rows: [{
-          id: serviceId,
-          project_id: 'proj-123',
-          name: 'my-api',
-          image_url: 'dockerfile',
-          port: 8080,
-          cpu: 'shared-1x',
-          memory: 512,
-          region: 'iad',
-          fly_app_id: 'my-api-proj-123',
-          fly_machine_id: 'machine-new-1',
-          status: 'running',
-          endpoint_url: 'https://my-api-proj-123.fly.dev',
-          env_vars_encrypted: null,
-          created_at: '2026-01-01T00:00:00Z',
-          updated_at: '2026-01-01T00:00:00Z',
-        }],
+        rows: [
+          {
+            id: serviceId,
+            project_id: 'proj-123',
+            name: 'my-api',
+            image_url: 'dockerfile',
+            port: 8080,
+            cpu: 'shared-1x',
+            memory: 512,
+            region: 'iad',
+            fly_app_id: 'my-api-proj-123',
+            fly_machine_id: 'machine-new-1',
+            status: 'running',
+            endpoint_url: 'https://my-api-proj-123.fly.dev',
+            env_vars_encrypted: null,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
       });
 
       const result = await service.syncAfterDeploy(serviceId);
@@ -545,23 +569,25 @@ describe('ComputeServicesService', () => {
 
       // getService query
       mockQuery.mockResolvedValueOnce({
-        rows: [{
-          id: serviceId,
-          project_id: 'proj-123',
-          name: 'my-api',
-          image_url: 'dockerfile',
-          port: 8080,
-          cpu: 'shared-1x',
-          memory: 512,
-          region: 'iad',
-          fly_app_id: 'my-api-proj-123',
-          fly_machine_id: null,
-          status: 'deploying',
-          endpoint_url: 'https://my-api-proj-123.fly.dev',
-          env_vars_encrypted: null,
-          created_at: '2026-01-01T00:00:00Z',
-          updated_at: '2026-01-01T00:00:00Z',
-        }],
+        rows: [
+          {
+            id: serviceId,
+            project_id: 'proj-123',
+            name: 'my-api',
+            image_url: 'dockerfile',
+            port: 8080,
+            cpu: 'shared-1x',
+            memory: 512,
+            region: 'iad',
+            fly_app_id: 'my-api-proj-123',
+            fly_machine_id: null,
+            status: 'deploying',
+            endpoint_url: 'https://my-api-proj-123.fly.dev',
+            env_vars_encrypted: null,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
       });
 
       mockListMachines.mockResolvedValue([]);
@@ -571,23 +597,25 @@ describe('ComputeServicesService', () => {
 
       // getService for return (after failed update)
       mockQuery.mockResolvedValueOnce({
-        rows: [{
-          id: serviceId,
-          project_id: 'proj-123',
-          name: 'my-api',
-          image_url: 'dockerfile',
-          port: 8080,
-          cpu: 'shared-1x',
-          memory: 512,
-          region: 'iad',
-          fly_app_id: 'my-api-proj-123',
-          fly_machine_id: null,
-          status: 'failed',
-          endpoint_url: 'https://my-api-proj-123.fly.dev',
-          env_vars_encrypted: null,
-          created_at: '2026-01-01T00:00:00Z',
-          updated_at: '2026-01-01T00:00:00Z',
-        }],
+        rows: [
+          {
+            id: serviceId,
+            project_id: 'proj-123',
+            name: 'my-api',
+            image_url: 'dockerfile',
+            port: 8080,
+            cpu: 'shared-1x',
+            memory: 512,
+            region: 'iad',
+            fly_app_id: 'my-api-proj-123',
+            fly_machine_id: null,
+            status: 'failed',
+            endpoint_url: 'https://my-api-proj-123.fly.dev',
+            env_vars_encrypted: null,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
       });
 
       const result = await service.syncAfterDeploy(serviceId);
