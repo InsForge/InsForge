@@ -10,7 +10,6 @@
       "outputs": ["../dist/server.js", "../dist/server.js.map"]
     },
     "frontend#build": {
-      "//": "dependsOn is empty because vite.config.ts aliases workspace packages to source (not dist), so upstream builds are unnecessary",
       "dependsOn": [],
       "outputs": ["../dist/frontend/**"]
     },
