@@ -45,7 +45,7 @@ class ComputeServicesApiService {
   }
 
   async remove(id: string): Promise<void> {
-    return apiClient.request(`/compute/services/${id}`, {
+    await apiClient.request(`/compute/services/${id}`, {
       method: 'DELETE',
       headers: apiClient.withAccessToken(),
     });

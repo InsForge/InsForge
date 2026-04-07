@@ -14,7 +14,9 @@ const router = Router();
 const auditService = AuditService.getInstance();
 
 function getProjectId(req: AuthRequest): string {
-  return (req.query.project_id as string) || 'default';
+  // Cloud: projectId is set by verifyCloudBackend from the JWT claim
+  // Self-hosted: fall back to the server-level PROJECT_ID env var
+  return req.projectId || process.env.PROJECT_ID || 'default';
 }
 
 function bestEffortAudit(params: Parameters<typeof auditService.log>[0]) {
