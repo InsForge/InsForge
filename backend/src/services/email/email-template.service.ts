@@ -64,7 +64,7 @@ export class EmailTemplateService {
           body_html as "bodyHtml",
           created_at as "createdAt",
           updated_at as "updatedAt"
-         FROM auth.email_templates
+         FROM email.templates
          ORDER BY template_type`
       );
 
@@ -89,7 +89,7 @@ export class EmailTemplateService {
           body_html as "bodyHtml",
           created_at as "createdAt",
           updated_at as "updatedAt"
-         FROM auth.email_templates
+         FROM email.templates
          WHERE template_type = $1`,
         [templateType]
       );
@@ -121,7 +121,7 @@ export class EmailTemplateService {
   ): Promise<EmailTemplateSchema> {
     try {
       const result = await this.getPool().query(
-        `UPDATE auth.email_templates
+        `UPDATE email.templates
          SET
            subject = $1,
            body_html = $2,

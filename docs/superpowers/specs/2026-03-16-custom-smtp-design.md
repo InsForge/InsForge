@@ -14,7 +14,7 @@ Currently all emails (verification, password reset, raw) route through InsForge'
 
 ```
 EmailService.sendWithTemplate() / sendRaw()
-  -> Check auth.smtp_configs (enabled?)
+  -> Check email.config (enabled?)
     -> YES: SmtpEmailProvider (nodemailer) + local template rendering
     -> NO:  CloudEmailProvider (current behavior, unchanged)
 ```
@@ -23,7 +23,7 @@ No breaking changes. The `EmailProvider` interface (`sendWithTemplate`, `sendRaw
 
 ## Database
 
-### Table: `auth.smtp_configs` (singleton)
+### Table: `email.config` (singleton)
 
 | Column | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -41,7 +41,7 @@ No breaking changes. The `EmailProvider` interface (`sendWithTemplate`, `sendRaw
 
 Singleton enforced via unique index on constant expression (same pattern as `auth.configs`).
 
-### Table: `auth.email_templates`
+### Table: `email.templates`
 
 | Column | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -82,19 +82,19 @@ Seeded on migration. Clean, minimal HTML with inline CSS. Example for `email-ver
 
 - Implements `EmailProvider` interface
 - Uses `nodemailer` to send emails
-- `sendWithTemplate()`: queries `auth.email_templates WHERE template_type = $1` using the `EmailTemplate` string value, replaces placeholders via string interpolation (all placeholder values are HTML-escaped before interpolation to prevent XSS), sends via SMTP
+- `sendWithTemplate()`: queries `email.templates WHERE template_type = $1` using the `EmailTemplate` string value, replaces placeholders via string interpolation (all placeholder values are HTML-escaped before interpolation to prevent XSS), sends via SMTP
 - `sendRaw()`: sends directly with provided to/subject/html/cc/bcc. The `from` field is always overridden with `sender_email`/`sender_name` from SMTP config (prevents spoofing)
 - `supportsTemplates()`: returns `true`
 - TLS auto-detected by nodemailer based on port (465 = implicit TLS, 587 = STARTTLS)
 - Transporter created on-demand from DB config (config changes take effect without restart)
 
-**Note:** Enabling SMTP automatically switches from cloud-rendered templates to locally-rendered templates from `auth.email_templates`, even if the user has not customized them. The seeded defaults ensure this works out of the box.
+**Note:** Enabling SMTP automatically switches from cloud-rendered templates to locally-rendered templates from `email.templates`, even if the user has not customized them. The seeded defaults ensure this works out of the box.
 
 ### Modified: `EmailService`
 
 **Location:** `backend/src/services/email/email.service.ts`
 
-- On each send call, check `auth.smtp_configs` for an enabled config
+- On each send call, check `email.config` for an enabled config
 - If enabled: delegate to `SmtpEmailProvider`
 - If not enabled: delegate to `CloudEmailProvider` (current default)
 - Provider is resolved per-call, not cached at startup
@@ -202,8 +202,8 @@ A new tab added alongside existing tabs (General, Email Verification, Password).
 
 **New migration file:** `backend/src/infra/database/migrations/0XX_create-smtp-config-and-email-templates.sql`
 
-1. Create `auth.smtp_configs` table with singleton constraint
-2. Create `auth.email_templates` table
+1. Create `email.config` table with singleton constraint
+2. Create `email.templates` table
 3. Seed 4 default templates with subjects and HTML bodies
 
 ## Dependencies

@@ -161,7 +161,7 @@ export class SmtpConfigService {
   async getSmtpConfig(): Promise<SmtpConfigSchema> {
     try {
       const result = await this.getPool().query(
-        `SELECT ${SMTP_CONFIG_COLUMNS} FROM auth.smtp_configs LIMIT 1`
+        `SELECT ${SMTP_CONFIG_COLUMNS} FROM email.config LIMIT 1`
       );
       if (!result.rows.length) {
         const now = new Date().toISOString();
@@ -177,7 +177,7 @@ export class SmtpConfigService {
   async getRawSmtpConfig(): Promise<RawSmtpConfig | null> {
     try {
       const result = await this.getPool().query(
-        `SELECT ${SMTP_CONFIG_COLUMNS} FROM auth.smtp_configs LIMIT 1`
+        `SELECT ${SMTP_CONFIG_COLUMNS} FROM email.config LIMIT 1`
       );
       if (!result.rows.length) {
         return null;
@@ -236,7 +236,7 @@ export class SmtpConfigService {
       }
 
       const result = await client.query(
-        `UPDATE auth.smtp_configs SET
+        `UPDATE email.config SET
            enabled = $1, host = $2, port = $3, username = $4,
            password_encrypted = $5, sender_email = $6, sender_name = $7,
            min_interval_seconds = $8, updated_at = NOW()
@@ -284,12 +284,12 @@ export class SmtpConfigService {
     client: PoolClient
   ): Promise<{ id: string; password_encrypted: string }> {
     let result = await client.query(
-      'SELECT id, password_encrypted FROM auth.smtp_configs LIMIT 1 FOR UPDATE'
+      'SELECT id, password_encrypted FROM email.config LIMIT 1 FOR UPDATE'
     );
 
     if (!result.rows.length) {
       const insertResult = await client.query(
-        `INSERT INTO auth.smtp_configs DEFAULT VALUES
+        `INSERT INTO email.config DEFAULT VALUES
          ON CONFLICT DO NOTHING
          RETURNING id, password_encrypted`
       );
@@ -299,7 +299,7 @@ export class SmtpConfigService {
       } else {
         // Race: another connection inserted — re-fetch with lock
         result = await client.query(
-          'SELECT id, password_encrypted FROM auth.smtp_configs LIMIT 1 FOR UPDATE'
+          'SELECT id, password_encrypted FROM email.config LIMIT 1 FOR UPDATE'
         );
       }
     }

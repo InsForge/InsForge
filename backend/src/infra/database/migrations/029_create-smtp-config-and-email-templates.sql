@@ -1,11 +1,13 @@
 -- Migration: Create SMTP configuration and email templates tables
 -- These tables support custom SMTP email delivery as an alternative to InsForge cloud
 
+CREATE SCHEMA IF NOT EXISTS email;
+
 -- ============================================================================
 -- SMTP Configuration (singleton)
 -- ============================================================================
 
-CREATE TABLE IF NOT EXISTS auth.smtp_configs (
+CREATE TABLE IF NOT EXISTS email.config (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   enabled BOOLEAN NOT NULL DEFAULT FALSE,
   host TEXT NOT NULL DEFAULT '',
@@ -20,10 +22,10 @@ CREATE TABLE IF NOT EXISTS auth.smtp_configs (
 );
 
 -- Singleton constraint: only one row allowed
-CREATE UNIQUE INDEX IF NOT EXISTS smtp_configs_singleton_idx ON auth.smtp_configs ((1));
+CREATE UNIQUE INDEX IF NOT EXISTS email_config_singleton_idx ON email.config ((1));
 
 -- Insert default row (disabled)
-INSERT INTO auth.smtp_configs (enabled)
+INSERT INTO email.config (enabled)
 VALUES (FALSE)
 ON CONFLICT DO NOTHING;
 
@@ -31,7 +33,7 @@ ON CONFLICT DO NOTHING;
 -- Email Templates
 -- ============================================================================
 
-CREATE TABLE IF NOT EXISTS auth.email_templates (
+CREATE TABLE IF NOT EXISTS email.templates (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   template_type TEXT NOT NULL,
   subject TEXT NOT NULL,
@@ -42,7 +44,7 @@ CREATE TABLE IF NOT EXISTS auth.email_templates (
 );
 
 -- Seed default templates
-INSERT INTO auth.email_templates (template_type, subject, body_html) VALUES
+INSERT INTO email.templates (template_type, subject, body_html) VALUES
 (
   'email-verification-code',
   'Verify your email',
