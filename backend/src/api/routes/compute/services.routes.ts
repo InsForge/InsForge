@@ -184,11 +184,20 @@ router.patch('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: 
 
     successResponse(res, service);
 
+    // Redact envVars — only log the key names, never secret values
+    const auditDetails: Record<string, unknown> = {
+      serviceId: req.params.id,
+      changes: Object.keys(validation.data),
+    };
+    if ('envVars' in validation.data) {
+      auditDetails.envVarsUpdated = true;
+    }
+
     bestEffortAudit({
       actor: req.user?.email || 'api-key',
       action: 'UPDATE_COMPUTE_SERVICE',
       module: 'COMPUTE',
-      details: { serviceId: req.params.id, changes: Object.keys(validation.data) },
+      details: auditDetails,
       ip_address: req.ip,
     });
     bestEffortBroadcast();

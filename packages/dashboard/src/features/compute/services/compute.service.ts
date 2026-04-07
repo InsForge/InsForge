@@ -17,7 +17,9 @@ class ComputeServicesApiService {
       headers: apiClient.withAccessToken(),
     });
     // successResponse sends array directly; handle both shapes for safety
-    return Array.isArray(response) ? response : ((response as ListServicesResponse).services ?? []);
+    return Array.isArray(response)
+      ? response
+      : ((response as ListServicesResponse)?.services ?? []);
   }
 
   async get(id: string): Promise<ServiceSchema> {
@@ -42,6 +44,7 @@ class ComputeServicesApiService {
     });
   }
 
+  // Backend returns { message: 'Service deleted' } but callers don't use the return value.
   async remove(id: string): Promise<void> {
     await apiClient.request(`/compute/services/${id}`, {
       method: 'DELETE',
@@ -69,7 +72,7 @@ class ComputeServicesApiService {
       headers: apiClient.withAccessToken(),
     });
     // successResponse sends array directly; handle both shapes
-    return Array.isArray(response) ? response : ((response as { logs: LogEntry[] }).logs ?? []);
+    return Array.isArray(response) ? response : ((response as { logs: LogEntry[] })?.logs ?? []);
   }
 }
 
