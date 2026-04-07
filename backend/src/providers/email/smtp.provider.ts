@@ -90,7 +90,7 @@ export class SmtpEmailProvider implements EmailProvider {
       logger.info('Email sent via SMTP', logContext);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown SMTP error';
-      logger.error('Failed to send email via SMTP', { ...logContext, error: message });
+      logger.error(`Failed to send email via SMTP: ${message}`, logContext);
       throw new AppError(
         `Failed to send email via SMTP: ${message}`,
         500,
