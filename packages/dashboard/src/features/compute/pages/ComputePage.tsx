@@ -16,7 +16,7 @@ export default function ComputePage() {
 
   // Keep selected service in sync with latest data
   const currentService = selectedService
-    ? services.find((s) => s.id === selectedService.id) ?? selectedService
+    ? (services.find((s) => s.id === selectedService.id) ?? selectedService)
     : null;
 
   const handleDelete = async (id: string) => {
@@ -161,20 +161,26 @@ export default function ComputePage() {
               </dl>
             </div>
 
-            {currentService.flyMachineId && (
-              <ServiceLogs serviceId={currentService.id} />
-            )}
+            {currentService.flyMachineId && <ServiceLogs serviceId={currentService.id} />}
           </div>
         </div>
 
         <ConfirmDialog
           open={deleteTarget !== null}
-          onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+          onOpenChange={(open) => {
+            if (!open) {
+              setDeleteTarget(null);
+            }
+          }}
           title="Delete service"
           description={`This will permanently delete "${currentService.name}" and destroy its Fly.io resources. This cannot be undone.`}
           confirmText="Delete"
           destructive
-          onConfirm={() => handleDelete(deleteTarget!)}
+          onConfirm={() => {
+            if (deleteTarget) {
+              return handleDelete(deleteTarget);
+            }
+          }}
         />
       </div>
     );
@@ -244,13 +250,19 @@ export default function ComputePage() {
 
       <ConfirmDialog
         open={deleteTarget !== null}
-        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteTarget(null);
+          }
+        }}
         title="Delete service"
         description="This will permanently delete this service and destroy its Fly.io resources. This cannot be undone."
         confirmText="Delete"
         destructive
         onConfirm={() => {
-          if (deleteTarget) return handleDelete(deleteTarget);
+          if (deleteTarget) {
+            return handleDelete(deleteTarget);
+          }
         }}
       />
     </div>

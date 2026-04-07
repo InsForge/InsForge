@@ -13,12 +13,7 @@ export function ServiceLogs({ serviceId }: ServiceLogsProps) {
     <div className="bg-card border border-[var(--alpha-8)] rounded-lg overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--alpha-8)]">
         <h3 className="text-sm font-medium text-foreground">Logs</h3>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => void refetch()}
-          disabled={isFetching}
-        >
+        <Button variant="ghost" size="sm" onClick={() => void refetch()} disabled={isFetching}>
           <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} />
           Refresh
         </Button>
