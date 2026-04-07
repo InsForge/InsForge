@@ -1,4 +1,5 @@
 import { Pool } from 'pg';
+import { createHash } from 'crypto';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 import { FlyProvider } from '@/providers/compute/fly.provider.js';
@@ -66,8 +67,14 @@ function mapRowToSchema(row: ServiceRow): ServiceSchema {
 
 function makeFlyAppName(name: string, projectId: string): string {
   const suffix = `-${projectId}`;
-  const maxNameLength = 60 - suffix.length;
-  return (name.length > maxNameLength ? name.slice(0, maxNameLength) : name) + suffix;
+  const maxBase = 60 - suffix.length;
+  if (name.length <= maxBase) {
+    return name + suffix;
+  }
+  // When truncating, append a short hash of the full name to avoid collisions
+  const hash = createHash('sha256').update(name).digest('hex').slice(0, 6);
+  const truncated = name.slice(0, maxBase - 7); // 6 chars hash + 1 dash
+  return `${truncated}-${hash}${suffix}`;
 }
 
 function makeNetwork(projectId: string): string {
@@ -324,6 +331,10 @@ export class ComputeServicesService {
       `UPDATE compute.services SET ${updates.join(', ')} WHERE id = $${paramIdx} RETURNING *`,
       values
     );
+
+    if (!result.rows.length) {
+      throw new Error(ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
+    }
 
     const updated = mapRowToSchema(result.rows[0]);
 
