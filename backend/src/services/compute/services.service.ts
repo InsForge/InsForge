@@ -4,7 +4,7 @@ import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 import { FlyProvider } from '@/providers/compute/fly.provider.js';
 import { config } from '@/infra/config/app.config.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
 import { AppError } from '@/api/middlewares/error.js';
 import logger from '@/utils/logger.js';
 import type { ServiceSchema } from '@insforge/shared-schemas';
@@ -117,7 +117,7 @@ export class ComputeServicesService {
   async getService(id: string): Promise<ServiceSchema> {
     const result = await this.getPool().query(`SELECT * FROM compute.services WHERE id = $1`, [id]);
     if (!result.rows.length) {
-      throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
+      throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND, NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS);
     }
     return mapRowToSchema(result.rows[0]);
   }
@@ -127,9 +127,10 @@ export class ComputeServicesService {
 
     if (!fly.isConfigured()) {
       throw new AppError(
-        'Compute services not configured',
+        'Compute services are not enabled on this project.',
         503,
-        ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED
+        ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED,
+        NEXT_ACTION.ENABLE_COMPUTE
       );
     }
 
@@ -241,9 +242,10 @@ export class ComputeServicesService {
 
     if (!fly.isConfigured()) {
       throw new AppError(
-        'Compute services not configured',
+        'Compute services are not enabled on this project.',
         503,
-        ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED
+        ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED,
+        NEXT_ACTION.ENABLE_COMPUTE
       );
     }
 
@@ -312,7 +314,7 @@ export class ComputeServicesService {
     const svc = await this.getService(id);
 
     if (!svc.flyAppId) {
-      throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
+      throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND, NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS);
     }
 
     const fly = this.getFly();
@@ -426,7 +428,7 @@ export class ComputeServicesService {
     );
 
     if (!result.rows.length) {
-      throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
+      throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND, NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS);
     }
 
     return mapRowToSchema(result.rows[0]);
@@ -492,7 +494,7 @@ export class ComputeServicesService {
     const svc = await this.getService(id);
 
     if (!svc.flyAppId || !svc.flyMachineId) {
-      throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
+      throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND, NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS);
     }
 
     try {
@@ -519,7 +521,7 @@ export class ComputeServicesService {
     const svc = await this.getService(id);
 
     if (!svc.flyAppId || !svc.flyMachineId) {
-      throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
+      throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND, NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS);
     }
 
     try {
@@ -549,7 +551,7 @@ export class ComputeServicesService {
     const svc = await this.getService(id);
 
     if (!svc.flyAppId || !svc.flyMachineId) {
-      throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
+      throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND, NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS);
     }
 
     return this.getFly().getLogs(svc.flyAppId, svc.flyMachineId, options);
