@@ -9,9 +9,7 @@ interface ListServicesResponse {
   services: ServiceSchema[];
 }
 
-interface LogsResponse {
-  logs: { timestamp: number; message: string }[];
-}
+type LogEntry = { timestamp: number; message: string };
 
 class ComputeServicesApiService {
   async list(): Promise<ServiceSchema[]> {
@@ -65,11 +63,13 @@ class ComputeServicesApiService {
     });
   }
 
-  async logs(id: string, limit?: number): Promise<LogsResponse> {
+  async logs(id: string, limit?: number): Promise<LogEntry[]> {
     const params = limit ? `?limit=${limit}` : '';
-    return apiClient.request(`/compute/services/${id}/logs${params}`, {
+    const response = await apiClient.request(`/compute/services/${id}/logs${params}`, {
       headers: apiClient.withAccessToken(),
     });
+    // successResponse sends array directly; handle both shapes
+    return Array.isArray(response) ? response : ((response as { logs: LogEntry[] }).logs ?? []);
   }
 }
 
