@@ -234,7 +234,8 @@ export class AuthService {
           await this.sendVerificationEmailWithCode(email);
         }
       } catch (error) {
-        logger.warn('Verification email send failed during register', { error });
+        const msg = error instanceof Error ? error.message : 'Unknown error';
+        logger.warn(`Verification email send failed during register: ${msg}`);
       }
       return {
         accessToken: null,
@@ -326,7 +327,7 @@ export class AuthService {
     const emailService = EmailService.getInstance();
     const userName = dbUser.profile?.name || 'User';
     await emailService.sendWithTemplate(email, userName, 'email-verification-code', {
-      token: code,
+      code,
     });
   }
 
@@ -515,7 +516,7 @@ export class AuthService {
     const emailService = EmailService.getInstance();
     const userName = dbUser.profile?.name || 'User';
     await emailService.sendWithTemplate(email, userName, 'reset-password-code', {
-      token: code,
+      code,
     });
   }
 

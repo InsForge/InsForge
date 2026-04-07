@@ -14,6 +14,12 @@ import {
   SquarePen,
 } from 'lucide-react';
 
+export interface DashboardSecondaryMenuItem {
+  id: string;
+  label: string;
+  href: string;
+}
+
 export interface DashboardPrimaryMenuItem {
   id: string;
   label: string;
@@ -22,6 +28,7 @@ export interface DashboardPrimaryMenuItem {
   onClick?: () => void;
   external?: boolean;
   sectionEnd?: boolean;
+  secondaryMenu?: DashboardSecondaryMenuItem[];
 }
 
 export const dashboardStaticMenuItems: DashboardPrimaryMenuItem[] = [
@@ -36,6 +43,23 @@ export const dashboardStaticMenuItems: DashboardPrimaryMenuItem[] = [
     label: 'Authentication',
     href: '/dashboard/authentication',
     icon: Lock,
+    secondaryMenu: [
+      {
+        id: 'users-list',
+        label: 'Users',
+        href: '/dashboard/authentication/users',
+      },
+      {
+        id: 'auth-methods',
+        label: 'Auth Methods',
+        href: '/dashboard/authentication/auth-methods',
+      },
+      {
+        id: 'email',
+        label: 'Email',
+        href: '/dashboard/authentication/email',
+      },
+    ],
   },
   {
     id: 'database',

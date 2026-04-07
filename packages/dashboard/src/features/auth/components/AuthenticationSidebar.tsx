@@ -18,6 +18,11 @@ const AUTHENTICATION_SIDEBAR_ITEMS: FeatureSidebarListItem[] = [
     label: 'Auth Methods',
     href: '/dashboard/authentication/auth-methods',
   },
+  {
+    id: 'email',
+    label: 'Custom SMTP',
+    href: '/dashboard/authentication/email',
+  },
 ];
 
 const AUTHENTICATION_SETTINGS_LABEL = 'Authentication Settings';
