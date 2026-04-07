@@ -93,3 +93,12 @@ export function useComputeServices() {
     start: startMutation.mutateAsync,
   };
 }
+
+export function useServiceLogs(serviceId: string | null) {
+  return useQuery({
+    queryKey: ['compute', 'services', serviceId, 'logs'],
+    queryFn: () => computeServicesApi.logs(serviceId!, 50),
+    enabled: !!serviceId,
+    staleTime: 0,
+  });
+}
