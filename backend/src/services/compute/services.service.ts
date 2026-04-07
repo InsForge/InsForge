@@ -277,9 +277,10 @@ export class ComputeServicesService {
     try {
       await fly.createApp({ name: flyAppName, network, org: config.fly.org });
     } catch (error) {
-      // App might already exist from a previous deploy attempt — ignore 422
+      // App might already exist from a previous deploy attempt — ignore "already exists"
       const msg = error instanceof Error ? error.message : '';
-      if (!msg.includes('422')) {
+      const isAlreadyExists = msg.includes('422') && msg.toLowerCase().includes('already exists');
+      if (!isAlreadyExists) {
         // Clean up DB record and rethrow
         await this.getPool().query(`DELETE FROM compute.services WHERE id = $1`, [
           insertResult.rows[0].id,
@@ -452,19 +453,25 @@ export class ComputeServicesService {
     ]);
 
     // Fly cleanup — abort delete if cleanup fails to preserve the reference
+    // Treat 404 as success (resource already destroyed)
     if (svc.flyMachineId && svc.flyAppId) {
       try {
         await this.getFly().destroyMachine(svc.flyAppId, svc.flyMachineId);
       } catch (error) {
-        logger.error('Failed to destroy Fly machine during delete', { id, error });
-        await this.getPool().query(`UPDATE compute.services SET status = 'failed' WHERE id = $1`, [
-          id,
-        ]);
-        throw new AppError(
-          'Failed to delete compute service',
-          502,
-          ERROR_CODES.COMPUTE_SERVICE_DELETE_FAILED
-        );
+        const msg = error instanceof Error ? error.message : '';
+        if (!msg.includes('404')) {
+          logger.error('Failed to destroy Fly machine during delete', { id, error });
+          await this.getPool().query(
+            `UPDATE compute.services SET status = 'failed' WHERE id = $1`,
+            [id]
+          );
+          throw new AppError(
+            'Failed to delete compute service',
+            502,
+            ERROR_CODES.COMPUTE_SERVICE_DELETE_FAILED
+          );
+        }
+        logger.info('Fly machine already destroyed (404), continuing delete', { id });
       }
     }
 
@@ -472,15 +479,20 @@ export class ComputeServicesService {
       try {
         await this.getFly().destroyApp(svc.flyAppId);
       } catch (error) {
-        logger.error('Failed to destroy Fly app during delete', { id, error });
-        await this.getPool().query(`UPDATE compute.services SET status = 'failed' WHERE id = $1`, [
-          id,
-        ]);
-        throw new AppError(
-          'Failed to delete compute service',
-          502,
-          ERROR_CODES.COMPUTE_SERVICE_DELETE_FAILED
-        );
+        const msg = error instanceof Error ? error.message : '';
+        if (!msg.includes('404')) {
+          logger.error('Failed to destroy Fly app during delete', { id, error });
+          await this.getPool().query(
+            `UPDATE compute.services SET status = 'failed' WHERE id = $1`,
+            [id]
+          );
+          throw new AppError(
+            'Failed to delete compute service',
+            502,
+            ERROR_CODES.COMPUTE_SERVICE_DELETE_FAILED
+          );
+        }
+        logger.info('Fly app already destroyed (404), continuing delete', { id });
       }
     }
 
@@ -562,8 +574,14 @@ export class ComputeServicesService {
     try {
       return JSON.parse(EncryptionManager.decrypt(encrypted));
     } catch (error) {
-      logger.warn('Failed to decrypt env vars, using empty object', { error });
-      return {};
+      logger.error('Failed to decrypt env vars — refusing to proceed with empty object', {
+        error,
+      });
+      throw new AppError(
+        'Failed to decrypt service environment variables',
+        500,
+        ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED
+      );
     }
   }
 }
