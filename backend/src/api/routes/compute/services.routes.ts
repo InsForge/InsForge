@@ -128,31 +128,35 @@ router.post('/deploy', verifyAdmin, async (req: AuthRequest, res: Response, next
 });
 
 // Sync after flyctl deploy (update machine info from Fly)
-router.patch('/:id/sync', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const svc = ComputeServicesService.getInstance();
-    const existing = await svc.getService(req.params.id);
+router.patch(
+  '/:id/sync',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const svc = ComputeServicesService.getInstance();
+      const existing = await svc.getService(req.params.id);
 
-    if (existing.projectId !== getProjectId(req)) {
-      throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
+      if (existing.projectId !== getProjectId(req)) {
+        throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
+      }
+
+      const service = await svc.syncAfterDeploy(req.params.id);
+
+      successResponse(res, service);
+
+      bestEffortAudit({
+        actor: req.user?.email || 'api-key',
+        action: 'SYNC_COMPUTE_DEPLOY',
+        module: 'COMPUTE',
+        details: { serviceId: req.params.id, status: service.status },
+        ip_address: req.ip,
+      });
+      bestEffortBroadcast();
+    } catch (error) {
+      next(error);
     }
-
-    const service = await svc.syncAfterDeploy(req.params.id);
-
-    successResponse(res, service);
-
-    bestEffortAudit({
-      actor: req.user?.email || 'api-key',
-      action: 'SYNC_COMPUTE_DEPLOY',
-      module: 'COMPUTE',
-      details: { serviceId: req.params.id, status: service.status },
-      ip_address: req.ip,
-    });
-    bestEffortBroadcast();
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // Update service
 router.patch('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -182,7 +186,7 @@ router.patch('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: 
       actor: req.user?.email || 'api-key',
       action: 'UPDATE_COMPUTE_SERVICE',
       module: 'COMPUTE',
-      details: { serviceId: req.params.id, changes: validation.data },
+      details: { serviceId: req.params.id, changes: Object.keys(validation.data) },
       ip_address: req.ip,
     });
     bestEffortBroadcast();

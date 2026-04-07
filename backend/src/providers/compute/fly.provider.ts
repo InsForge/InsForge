@@ -109,7 +109,7 @@ export class FlyProvider {
   }): Promise<void> {
     const guest = this.mapCpuTier(params.cpu, params.memory);
     await this.request(`/apps/${params.appId}/machines/${params.machineId}`, {
-      method: 'PATCH',
+      method: 'POST',
       body: JSON.stringify({
         config: {
           image: params.image,
@@ -148,25 +148,30 @@ export class FlyProvider {
   ): Promise<string> {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
-      const { state } = await this.getMachineStatus(appId, machineId);
-      if (targetStates.includes(state)) {
-        return state;
+      try {
+        const { state } = await this.getMachineStatus(appId, machineId);
+        if (targetStates.includes(state)) {
+          return state;
+        }
+      } catch (error) {
+        logger.warn('Transient error polling machine state, retrying', { appId, machineId, error });
       }
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
-    throw new Error(`Machine did not reach state [${targetStates.join(',')}] within ${timeoutMs}ms`);
+    throw new Error(
+      `Machine did not reach state [${targetStates.join(',')}] within ${timeoutMs}ms`
+    );
   }
 
   async destroyMachine(appId: string, machineId: string): Promise<void> {
     await this.request(`/apps/${appId}/machines/${machineId}`, { method: 'DELETE' });
   }
 
-  async listMachines(
-    appId: string
-  ): Promise<{ id: string; state: string; region: string }[]> {
-    return this.request<{ id: string; state: string; region: string }[]>(
+  async listMachines(appId: string): Promise<{ id: string; state: string; region: string }[]> {
+    const machines = await this.request<{ id: string; state: string; region: string }[]>(
       `/apps/${appId}/machines`
-    ) ?? [];
+    );
+    return machines ?? [];
   }
 
   async getMachineStatus(appId: string, machineId: string): Promise<{ state: string }> {
