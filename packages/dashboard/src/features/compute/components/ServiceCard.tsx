@@ -25,7 +25,11 @@ export function ServiceCard({ service, onClick, onStop, onStart, onDelete }: Ser
       role="button"
       tabIndex={0}
       onClick={onClick}
-      onKeyDown={(e) => { if (e.key === 'Enter') onClick(); }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          onClick();
+        }
+      }}
       className="w-full text-left bg-card border border-[var(--alpha-8)] rounded-lg p-4 hover:border-foreground/20 transition-colors cursor-pointer"
     >
       <div className="flex items-center justify-between mb-3">
@@ -58,10 +62,7 @@ export function ServiceCard({ service, onClick, onStop, onStart, onDelete }: Ser
               {(service.status === 'running' || service.status === 'stopped') && (
                 <DropdownMenuSeparator />
               )}
-              <DropdownMenuItem
-                onClick={() => onDelete(service.id)}
-                className="text-destructive"
-              >
+              <DropdownMenuItem onClick={() => onDelete(service.id)} className="text-destructive">
                 <Trash2 className="h-3.5 w-3.5" />
                 Delete
               </DropdownMenuItem>

@@ -97,6 +97,7 @@ export function useComputeServices() {
 export function useServiceLogs(serviceId: string | null) {
   return useQuery({
     queryKey: ['compute', 'services', serviceId, 'logs'],
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by enabled
     queryFn: () => computeServicesApi.logs(serviceId!, 50),
     enabled: !!serviceId,
     staleTime: 0,
