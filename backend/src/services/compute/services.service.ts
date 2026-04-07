@@ -117,7 +117,12 @@ export class ComputeServicesService {
   async getService(id: string): Promise<ServiceSchema> {
     const result = await this.getPool().query(`SELECT * FROM compute.services WHERE id = $1`, [id]);
     if (!result.rows.length) {
-      throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND, NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS);
+      throw new AppError(
+        'Service not found',
+        404,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
+        NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS
+      );
     }
     return mapRowToSchema(result.rows[0]);
   }
@@ -314,7 +319,12 @@ export class ComputeServicesService {
     const svc = await this.getService(id);
 
     if (!svc.flyAppId) {
-      throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND, NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS);
+      throw new AppError(
+        'Service not found',
+        404,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
+        NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS
+      );
     }
 
     const fly = this.getFly();
@@ -428,7 +438,12 @@ export class ComputeServicesService {
     );
 
     if (!result.rows.length) {
-      throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND, NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS);
+      throw new AppError(
+        'Service not found',
+        404,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
+        NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS
+      );
     }
 
     return mapRowToSchema(result.rows[0]);
@@ -494,7 +509,12 @@ export class ComputeServicesService {
     const svc = await this.getService(id);
 
     if (!svc.flyAppId || !svc.flyMachineId) {
-      throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND, NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS);
+      throw new AppError(
+        'Service not found',
+        404,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
+        NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS
+      );
     }
 
     try {
@@ -521,7 +541,12 @@ export class ComputeServicesService {
     const svc = await this.getService(id);
 
     if (!svc.flyAppId || !svc.flyMachineId) {
-      throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND, NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS);
+      throw new AppError(
+        'Service not found',
+        404,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
+        NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS
+      );
     }
 
     try {
@@ -551,7 +576,12 @@ export class ComputeServicesService {
     const svc = await this.getService(id);
 
     if (!svc.flyAppId || !svc.flyMachineId) {
-      throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND, NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS);
+      throw new AppError(
+        'Service not found',
+        404,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
+        NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS
+      );
     }
 
     return this.getFly().getLogs(svc.flyAppId, svc.flyMachineId, options);
