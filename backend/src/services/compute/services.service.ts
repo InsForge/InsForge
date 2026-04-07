@@ -172,6 +172,7 @@ export class ComputeServicesService {
     const network = makeNetwork(input.projectId);
     const endpointUrl = `https://${flyAppName}.${config.fly.domain}`;
 
+    let flyMachineId: string | undefined;
     try {
       await fly.createApp({
         name: flyAppName,
@@ -188,6 +189,7 @@ export class ComputeServicesService {
         envVars: input.envVars ?? {},
         region: input.region,
       });
+      flyMachineId = machineId;
 
       const updateResult = await this.getPool().query(
         `UPDATE compute.services
@@ -202,7 +204,18 @@ export class ComputeServicesService {
     } catch (error) {
       logger.error('Failed to deploy compute service', { serviceId, error });
 
-      // Clean up orphaned Fly app
+      // Clean up orphaned Fly resources (machine + app) to avoid leaked infrastructure
+      if (flyMachineId) {
+        try {
+          await fly.destroyMachine(flyAppName, flyMachineId);
+        } catch (destroyError) {
+          logger.error('Failed to clean up orphaned Fly machine', {
+            flyAppName,
+            flyMachineId,
+            error: destroyError,
+          });
+        }
+      }
       try {
         await fly.destroyApp(flyAppName);
       } catch (destroyError) {
@@ -331,13 +344,6 @@ export class ComputeServicesService {
   async updateService(id: string, data: UpdateServiceInput): Promise<ServiceSchema> {
     const existing = await this.getService(id);
 
-    // Fetch existing encrypted env vars for revert (not in ServiceSchema)
-    const existingRow = await this.getPool().query(
-      `SELECT env_vars_encrypted FROM compute.services WHERE id = $1`,
-      [id]
-    );
-    const existingEnvVarsEncrypted: string | null = existingRow.rows[0]?.env_vars_encrypted ?? null;
-
     const updates: string[] = [];
     const values: unknown[] = [];
     let paramIdx = 1;
@@ -371,6 +377,46 @@ export class ComputeServicesService {
       return existing;
     }
 
+    // If deployment-affecting fields changed and a machine exists, update Fly FIRST.
+    // Only commit to DB after Fly accepts the new config to avoid stale DB state.
+    const deployFields = ['imageUrl', 'port', 'cpu', 'memory', 'envVars'] as const;
+    const hasDeployChange = deployFields.some((f) => data[f] !== undefined);
+
+    if (hasDeployChange && existing.flyAppId && existing.flyMachineId) {
+      // Fetch existing encrypted env vars to merge with update
+      const existingRow = await this.getPool().query(
+        `SELECT env_vars_encrypted FROM compute.services WHERE id = $1`,
+        [id]
+      );
+      const existingEnvVarsEncrypted: string | null =
+        existingRow.rows[0]?.env_vars_encrypted ?? null;
+      const envVars = data.envVars ?? this.decryptEnvVars(existingEnvVarsEncrypted);
+
+      // NOTE: Region changes are persisted in the DB but Fly machine region cannot
+      // be changed in-place via updateMachine — a region change requires redeployment
+      // (destroy + recreate). The region field is stored for the next deploy.
+      try {
+        await this.getFly().updateMachine({
+          appId: existing.flyAppId,
+          machineId: existing.flyMachineId,
+          image: data.imageUrl ?? existing.imageUrl,
+          port: data.port ?? existing.port,
+          cpu: data.cpu ?? existing.cpu,
+          memory: data.memory ?? existing.memory,
+          envVars,
+        });
+        logger.info('Compute service machine updated', { id });
+      } catch (error) {
+        logger.error('Failed to update machine on Fly', { id, error });
+        throw new AppError(
+          'Compute service operation failed',
+          502,
+          ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED
+        );
+      }
+    }
+
+    // Fly accepted the update (or no Fly update was needed) — now commit to DB
     values.push(id);
     const result = await this.getPool().query(
       `UPDATE compute.services SET ${updates.join(', ')} WHERE id = $${paramIdx} RETURNING *`,
@@ -381,67 +427,7 @@ export class ComputeServicesService {
       throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
     }
 
-    const updated = mapRowToSchema(result.rows[0]);
-
-    // If deployment-affecting fields changed and a machine exists, update it on Fly
-    const deployFields = ['imageUrl', 'port', 'cpu', 'memory', 'envVars'] as const;
-    const hasDeployChange = deployFields.some((f) => data[f] !== undefined);
-
-    if (hasDeployChange && existing.flyAppId && existing.flyMachineId) {
-      const envVars = data.envVars ?? this.decryptEnvVars(existingEnvVarsEncrypted);
-      try {
-        await this.getFly().updateMachine({
-          appId: existing.flyAppId,
-          machineId: existing.flyMachineId,
-          image: updated.imageUrl,
-          port: updated.port,
-          cpu: updated.cpu,
-          memory: updated.memory,
-          envVars,
-        });
-        logger.info('Compute service machine updated', { id });
-      } catch (error) {
-        logger.error('Failed to update machine on Fly, reverting DB', { id, error });
-        // Revert DB to previous values so DB and Fly stay in sync
-        const revertUpdates: string[] = [];
-        const revertValues: unknown[] = [];
-        let ri = 1;
-        if (data.imageUrl !== undefined) {
-          revertUpdates.push(`image_url = $${ri++}`);
-          revertValues.push(existing.imageUrl);
-        }
-        if (data.port !== undefined) {
-          revertUpdates.push(`port = $${ri++}`);
-          revertValues.push(existing.port);
-        }
-        if (data.cpu !== undefined) {
-          revertUpdates.push(`cpu = $${ri++}`);
-          revertValues.push(existing.cpu);
-        }
-        if (data.memory !== undefined) {
-          revertUpdates.push(`memory = $${ri++}`);
-          revertValues.push(existing.memory);
-        }
-        if (data.envVars !== undefined) {
-          revertUpdates.push(`env_vars_encrypted = $${ri++}`);
-          revertValues.push(existingEnvVarsEncrypted);
-        }
-        if (revertUpdates.length > 0) {
-          revertValues.push(id);
-          await this.getPool().query(
-            `UPDATE compute.services SET ${revertUpdates.join(', ')} WHERE id = $${ri}`,
-            revertValues
-          );
-        }
-        throw new AppError(
-          'Compute service operation failed',
-          502,
-          ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED
-        );
-      }
-    }
-
-    return updated;
+    return mapRowToSchema(result.rows[0]);
   }
 
   async deleteService(id: string): Promise<void> {
