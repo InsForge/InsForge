@@ -27,3 +27,4 @@ backend/logs/*
 
 # Turborepo
 .turbo
+.gstack/
