@@ -74,11 +74,7 @@ export function CreateServiceDialog({
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium text-foreground">Name</label>
-              <Input
-                placeholder="my-api"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
+              <Input placeholder="my-api" value={name} onChange={(e) => setName(e.target.value)} />
               <p className="text-xs text-muted-foreground">DNS-safe: lowercase, numbers, dashes</p>
             </div>
 
@@ -94,11 +90,7 @@ export function CreateServiceDialog({
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-foreground">Port</label>
-                <Input
-                  type="number"
-                  value={port}
-                  onChange={(e) => setPort(e.target.value)}
-                />
+                <Input type="number" value={port} onChange={(e) => setPort(e.target.value)} />
               </div>
 
               <div className="flex flex-col gap-1.5">
