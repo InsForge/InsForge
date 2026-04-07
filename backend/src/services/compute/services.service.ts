@@ -5,6 +5,7 @@ import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 import { FlyProvider } from '@/providers/compute/fly.provider.js';
 import { config } from '@/infra/config/app.config.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/api/middlewares/error.js';
 import logger from '@/utils/logger.js';
 import type { ServiceSchema } from '@insforge/shared-schemas';
 
@@ -116,7 +117,7 @@ export class ComputeServicesService {
   async getService(id: string): Promise<ServiceSchema> {
     const result = await this.getPool().query(`SELECT * FROM compute.services WHERE id = $1`, [id]);
     if (!result.rows.length) {
-      throw new Error(ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
+      throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
     }
     return mapRowToSchema(result.rows[0]);
   }
@@ -125,29 +126,45 @@ export class ComputeServicesService {
     const fly = this.getFly();
 
     if (!fly.isConfigured()) {
-      throw new Error(ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED);
+      throw new AppError(
+        'Compute services not configured',
+        503,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED
+      );
     }
 
     const envVarsEncrypted = input.envVars
       ? EncryptionManager.encrypt(JSON.stringify(input.envVars))
       : null;
 
-    // Insert initial row
-    const insertResult = await this.getPool().query(
-      `INSERT INTO compute.services (project_id, name, image_url, port, cpu, memory, region, env_vars_encrypted, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'creating')
-       RETURNING *`,
-      [
-        input.projectId,
-        input.name,
-        input.imageUrl,
-        input.port,
-        input.cpu,
-        input.memory,
-        input.region,
-        envVarsEncrypted,
-      ]
-    );
+    // Insert initial row — check for duplicate name before calling Fly APIs
+    let insertResult;
+    try {
+      insertResult = await this.getPool().query(
+        `INSERT INTO compute.services (project_id, name, image_url, port, cpu, memory, region, env_vars_encrypted, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'creating')
+         RETURNING *`,
+        [
+          input.projectId,
+          input.name,
+          input.imageUrl,
+          input.port,
+          input.cpu,
+          input.memory,
+          input.region,
+          envVarsEncrypted,
+        ]
+      );
+    } catch (error: unknown) {
+      if ((error as { code?: string }).code === '23505') {
+        throw new AppError(
+          'A service with this name already exists',
+          409,
+          ERROR_CODES.COMPUTE_SERVICE_ALREADY_EXISTS
+        );
+      }
+      throw error;
+    }
 
     const row: ServiceRow = insertResult.rows[0];
     const serviceId = row.id;
@@ -198,7 +215,11 @@ export class ComputeServicesService {
         serviceId,
       ]);
 
-      throw new Error(ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED);
+      throw new AppError(
+        'Compute service operation failed',
+        502,
+        ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED
+      );
     }
   }
 
@@ -206,7 +227,11 @@ export class ComputeServicesService {
     const fly = this.getFly();
 
     if (!fly.isConfigured()) {
-      throw new Error(ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED);
+      throw new AppError(
+        'Compute services not configured',
+        503,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED
+      );
     }
 
     const envVarsEncrypted = input.envVars
@@ -217,24 +242,36 @@ export class ComputeServicesService {
     const network = makeNetwork(input.projectId);
     const endpointUrl = `https://${flyAppName}.${config.fly.domain}`;
 
-    // Insert row
-    const insertResult = await this.getPool().query(
-      `INSERT INTO compute.services (project_id, name, image_url, port, cpu, memory, region, env_vars_encrypted, fly_app_id, endpoint_url, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'deploying')
-       RETURNING *`,
-      [
-        input.projectId,
-        input.name,
-        input.imageUrl || 'dockerfile',
-        input.port,
-        input.cpu,
-        input.memory,
-        input.region,
-        envVarsEncrypted,
-        flyAppName,
-        endpointUrl,
-      ]
-    );
+    // Insert row — check for duplicate name before calling Fly APIs
+    let insertResult;
+    try {
+      insertResult = await this.getPool().query(
+        `INSERT INTO compute.services (project_id, name, image_url, port, cpu, memory, region, env_vars_encrypted, fly_app_id, endpoint_url, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'deploying')
+         RETURNING *`,
+        [
+          input.projectId,
+          input.name,
+          input.imageUrl || 'dockerfile',
+          input.port,
+          input.cpu,
+          input.memory,
+          input.region,
+          envVarsEncrypted,
+          flyAppName,
+          endpointUrl,
+        ]
+      );
+    } catch (error: unknown) {
+      if ((error as { code?: string }).code === '23505') {
+        throw new AppError(
+          'A service with this name already exists',
+          409,
+          ERROR_CODES.COMPUTE_SERVICE_ALREADY_EXISTS
+        );
+      }
+      throw error;
+    }
 
     // Create Fly app (no machine — flyctl deploy will create it)
     try {
@@ -259,7 +296,7 @@ export class ComputeServicesService {
     const svc = await this.getService(id);
 
     if (!svc.flyAppId) {
-      throw new Error(ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
+      throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
     }
 
     const fly = this.getFly();
@@ -292,6 +329,13 @@ export class ComputeServicesService {
 
   async updateService(id: string, data: UpdateServiceInput): Promise<ServiceSchema> {
     const existing = await this.getService(id);
+
+    // Fetch existing encrypted env vars for revert (not in ServiceSchema)
+    const existingRow = await this.getPool().query(
+      `SELECT env_vars_encrypted FROM compute.services WHERE id = $1`,
+      [id]
+    );
+    const existingEnvVarsEncrypted: string | null = existingRow.rows[0]?.env_vars_encrypted ?? null;
 
     const updates: string[] = [];
     const values: unknown[] = [];
@@ -333,7 +377,7 @@ export class ComputeServicesService {
     );
 
     if (!result.rows.length) {
-      throw new Error(ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
+      throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
     }
 
     const updated = mapRowToSchema(result.rows[0]);
@@ -343,7 +387,7 @@ export class ComputeServicesService {
     const hasDeployChange = deployFields.some((f) => data[f] !== undefined);
 
     if (hasDeployChange && existing.flyAppId && existing.flyMachineId) {
-      const envVars = data.envVars ?? this.decryptEnvVars(result.rows[0].env_vars_encrypted);
+      const envVars = data.envVars ?? this.decryptEnvVars(existingEnvVarsEncrypted);
       try {
         await this.getFly().updateMachine({
           appId: existing.flyAppId,
@@ -379,7 +423,7 @@ export class ComputeServicesService {
         }
         if (data.envVars !== undefined) {
           revertUpdates.push(`env_vars_encrypted = $${ri++}`);
-          revertValues.push(result.rows[0].env_vars_encrypted);
+          revertValues.push(existingEnvVarsEncrypted);
         }
         if (revertUpdates.length > 0) {
           revertValues.push(id);
@@ -388,7 +432,11 @@ export class ComputeServicesService {
             revertValues
           );
         }
-        throw new Error(ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED);
+        throw new AppError(
+          'Compute service operation failed',
+          502,
+          ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED
+        );
       }
     }
 
@@ -412,7 +460,11 @@ export class ComputeServicesService {
         await this.getPool().query(`UPDATE compute.services SET status = 'failed' WHERE id = $1`, [
           id,
         ]);
-        throw new Error(ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED);
+        throw new AppError(
+          'Failed to delete compute service',
+          502,
+          ERROR_CODES.COMPUTE_SERVICE_DELETE_FAILED
+        );
       }
     }
 
@@ -424,7 +476,11 @@ export class ComputeServicesService {
         await this.getPool().query(`UPDATE compute.services SET status = 'failed' WHERE id = $1`, [
           id,
         ]);
-        throw new Error(ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED);
+        throw new AppError(
+          'Failed to delete compute service',
+          502,
+          ERROR_CODES.COMPUTE_SERVICE_DELETE_FAILED
+        );
       }
     }
 
@@ -436,14 +492,18 @@ export class ComputeServicesService {
     const svc = await this.getService(id);
 
     if (!svc.flyAppId || !svc.flyMachineId) {
-      throw new Error(ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
+      throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
     }
 
     try {
       await this.getFly().stopMachine(svc.flyAppId, svc.flyMachineId);
     } catch (error) {
       logger.error('Failed to stop compute service', { id, error });
-      throw new Error(ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED);
+      throw new AppError(
+        'Failed to stop compute service',
+        502,
+        ERROR_CODES.COMPUTE_SERVICE_STOP_FAILED
+      );
     }
 
     const result = await this.getPool().query(
@@ -459,14 +519,18 @@ export class ComputeServicesService {
     const svc = await this.getService(id);
 
     if (!svc.flyAppId || !svc.flyMachineId) {
-      throw new Error(ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
+      throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
     }
 
     try {
       await this.getFly().startMachine(svc.flyAppId, svc.flyMachineId);
     } catch (error) {
       logger.error('Failed to start compute service', { id, error });
-      throw new Error(ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED);
+      throw new AppError(
+        'Failed to start compute service',
+        502,
+        ERROR_CODES.COMPUTE_SERVICE_START_FAILED
+      );
     }
 
     const result = await this.getPool().query(
@@ -485,7 +549,7 @@ export class ComputeServicesService {
     const svc = await this.getService(id);
 
     if (!svc.flyAppId || !svc.flyMachineId) {
-      throw new Error(ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
+      throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
     }
 
     return this.getFly().getLogs(svc.flyAppId, svc.flyMachineId, options);

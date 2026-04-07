@@ -2,16 +2,8 @@ import { useState } from 'react';
 import { Loader2, ArrowLeft } from 'lucide-react';
 import { useComputeServices } from '../hooks/useComputeServices';
 import { ServiceCard } from '../components/ServiceCard';
-import type { ServiceSchema, ServiceStatus } from '@insforge/shared-schemas';
-
-const statusColors: Record<ServiceStatus, string> = {
-  running: 'bg-green-500',
-  deploying: 'bg-yellow-500',
-  creating: 'bg-yellow-500',
-  stopped: 'bg-gray-400',
-  failed: 'bg-red-500',
-  destroying: 'bg-orange-500',
-};
+import { statusColors } from '../constants';
+import type { ServiceSchema } from '@insforge/shared-schemas';
 
 export default function ComputePage() {
   const { services, isLoading } = useComputeServices();
