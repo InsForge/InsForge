@@ -74,6 +74,7 @@ export class FlyProvider {
     region: string;
   }): Promise<{ machineId: string }> {
     const guest = this.mapCpuTier(params.cpu, params.memory);
+    // Fly Machines launch always returns a JSON body with the machine ID
     const result = await this.request<{ id: string }>(`/apps/${params.appId}/machines`, {
       method: 'POST',
       body: JSON.stringify({
@@ -95,7 +96,7 @@ export class FlyProvider {
         region: params.region,
       }),
     });
-    return { machineId: result.id };
+    return { machineId: result!.id };
   }
 
   async updateMachine(params: {
@@ -175,8 +176,9 @@ export class FlyProvider {
   }
 
   async getMachineStatus(appId: string, machineId: string): Promise<{ state: string }> {
+    // Fly Machines GET always returns a JSON body with machine state
     const result = await this.request<{ state: string }>(`/apps/${appId}/machines/${machineId}`);
-    return { state: result.state };
+    return { state: result!.state };
   }
 
   async getLogs(
