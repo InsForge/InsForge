@@ -1,13 +1,31 @@
 import { useState } from 'react';
-import { Loader2, ArrowLeft } from 'lucide-react';
+import { Loader2, ArrowLeft, Plus, Play, Square, Trash2, AlertTriangle } from 'lucide-react';
+import { Button, ConfirmDialog } from '@insforge/ui';
 import { useComputeServices } from '../hooks/useComputeServices';
 import { ServiceCard } from '../components/ServiceCard';
-import { statusColors } from '../constants';
+import { ServiceLogs } from '../components/ServiceLogs';
+import { CreateServiceDialog } from '../components/CreateServiceDialog';
+import { statusColors, getReachableUrl } from '../constants';
 import type { ServiceSchema } from '@insforge/shared-schemas';
 
 export default function ComputePage() {
-  const { services, isLoading } = useComputeServices();
+  const { services, isLoading, create, remove, stop, start, isCreating } = useComputeServices();
   const [selectedService, setSelectedService] = useState<ServiceSchema | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+
+  // Keep selected service in sync with latest data
+  const currentService = selectedService
+    ? services.find((s) => s.id === selectedService.id) ?? selectedService
+    : null;
+
+  const handleDelete = async (id: string) => {
+    await remove(id);
+    if (selectedService?.id === id) {
+      setSelectedService(null);
+    }
+    setDeleteTarget(null);
+  };
 
   if (isLoading) {
     return (
@@ -17,11 +35,13 @@ export default function ComputePage() {
     );
   }
 
-  if (selectedService) {
+  if (currentService) {
+    const reachableUrl = getReachableUrl(currentService);
+
     return (
       <div className="h-full flex flex-col bg-[rgb(var(--semantic-0))]">
-        <div className="flex flex-col items-center px-10">
-          <div className="max-w-[1024px] w-full flex flex-col gap-6 pt-10 pb-6">
+        <div className="flex-1 min-h-0 overflow-y-auto px-10">
+          <div className="max-w-[1024px] w-full mx-auto flex flex-col gap-6 pt-10 pb-6">
             <button
               type="button"
               onClick={() => setSelectedService(null)}
@@ -31,47 +51,107 @@ export default function ComputePage() {
               Back to services
             </button>
 
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-medium text-foreground leading-8">
-                {selectedService.name}
-              </h1>
-              <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                <span
-                  className={`inline-block h-2 w-2 rounded-full ${statusColors[selectedService.status]}`}
-                />
-                {selectedService.status}
-              </span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-medium text-foreground leading-8">
+                  {currentService.name}
+                </h1>
+                <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <span
+                    className={`inline-block h-2 w-2 rounded-full ${statusColors[currentService.status]}`}
+                  />
+                  {currentService.status}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {currentService.status === 'running' && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void stop(currentService.id)}
+                  >
+                    <Square className="h-3.5 w-3.5" />
+                    Stop
+                  </Button>
+                )}
+                {currentService.status === 'stopped' && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void start(currentService.id)}
+                  >
+                    <Play className="h-3.5 w-3.5" />
+                    Start
+                  </Button>
+                )}
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setDeleteTarget(currentService.id)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete
+                </Button>
+              </div>
             </div>
+
+            {currentService.status === 'failed' && (
+              <div className="flex items-center gap-2 px-4 py-3 bg-destructive/10 border border-destructive/20 rounded-lg text-sm text-destructive">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                This service failed to deploy. You can delete it and try again.
+              </div>
+            )}
 
             <div className="bg-card border border-[var(--alpha-8)] rounded-lg p-6">
               <dl className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <dt className="text-muted-foreground mb-1">Image</dt>
-                  <dd className="text-foreground break-all">{selectedService.imageUrl}</dd>
+                  <dd className="text-foreground break-all">
+                    {currentService.imageUrl === 'dockerfile'
+                      ? 'Built from Dockerfile'
+                      : currentService.imageUrl}
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-muted-foreground mb-1">Port</dt>
-                  <dd className="text-foreground">{selectedService.port}</dd>
+                  <dd className="text-foreground">{currentService.port}</dd>
                 </div>
                 <div>
                   <dt className="text-muted-foreground mb-1">CPU</dt>
-                  <dd className="text-foreground">{selectedService.cpu}</dd>
+                  <dd className="text-foreground">{currentService.cpu}</dd>
                 </div>
                 <div>
                   <dt className="text-muted-foreground mb-1">Memory</dt>
-                  <dd className="text-foreground">{selectedService.memory} MB</dd>
+                  <dd className="text-foreground">{currentService.memory} MB</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground mb-1">Region</dt>
+                  <dd className="text-foreground">{currentService.region}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground mb-1">Created</dt>
+                  <dd className="text-foreground">
+                    {new Date(currentService.createdAt).toLocaleDateString(undefined, {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </dd>
                 </div>
                 <div className="col-span-2">
                   <dt className="text-muted-foreground mb-1">Endpoint URL</dt>
                   <dd className="text-foreground">
-                    {selectedService.endpointUrl ? (
+                    {reachableUrl ? (
                       <a
-                        href={selectedService.endpointUrl}
+                        href={reachableUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-primary hover:underline"
                       >
-                        {selectedService.endpointUrl}
+                        {reachableUrl}
                       </a>
                     ) : (
                       <span className="text-muted-foreground">Not available</span>
@@ -80,8 +160,22 @@ export default function ComputePage() {
                 </div>
               </dl>
             </div>
+
+            {currentService.flyMachineId && (
+              <ServiceLogs serviceId={currentService.id} />
+            )}
           </div>
         </div>
+
+        <ConfirmDialog
+          open={deleteTarget !== null}
+          onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+          title="Delete service"
+          description={`This will permanently delete "${currentService.name}" and destroy its Fly.io resources. This cannot be undone.`}
+          confirmText="Delete"
+          destructive
+          onConfirm={() => handleDelete(deleteTarget!)}
+        />
       </div>
     );
   }
@@ -92,20 +186,26 @@ export default function ComputePage() {
         <div className="max-w-[1024px] w-full mx-auto flex flex-col gap-8 pt-10 pb-6">
           {/* Services Section */}
           <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1">
-              <h1 className="text-2xl font-medium text-foreground leading-8">Services</h1>
-              <p className="text-sm leading-5 text-muted-foreground">
-                Deploy and manage long-running containers on your infrastructure.
-              </p>
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-1">
+                <h1 className="text-2xl font-medium text-foreground leading-8">Services</h1>
+                <p className="text-sm leading-5 text-muted-foreground">
+                  Deploy and manage long-running containers on your infrastructure.
+                </p>
+              </div>
+              <Button variant="primary" size="sm" onClick={() => setCreateOpen(true)}>
+                <Plus className="h-4 w-4" />
+                Create Service
+              </Button>
             </div>
 
             {services.length === 0 ? (
               <div className="bg-card border border-[var(--alpha-8)] rounded-lg p-8 text-center">
                 <p className="text-sm text-muted-foreground mb-2">No services deployed yet.</p>
-                <p className="text-xs text-muted-foreground">
-                  Create a service using the CLI:{' '}
+                <p className="text-xs text-muted-foreground mb-4">
+                  Create a service using the button above or the CLI:{' '}
                   <code className="px-1.5 py-0.5 bg-muted rounded text-xs">
-                    insforge compute services create
+                    insforge compute create --name my-api --image nginx:alpine
                   </code>
                 </p>
               </div>
@@ -116,6 +216,9 @@ export default function ComputePage() {
                     key={service.id}
                     service={service}
                     onClick={() => setSelectedService(service)}
+                    onStop={(id) => void stop(id)}
+                    onStart={(id) => void start(id)}
+                    onDelete={setDeleteTarget}
                   />
                 ))}
               </div>
@@ -131,6 +234,25 @@ export default function ComputePage() {
           </div>
         </div>
       </div>
+
+      <CreateServiceDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreate={create}
+        isCreating={isCreating}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        title="Delete service"
+        description="This will permanently delete this service and destroy its Fly.io resources. This cannot be undone."
+        confirmText="Delete"
+        destructive
+        onConfirm={() => {
+          if (deleteTarget) return handleDelete(deleteTarget);
+        }}
+      />
     </div>
   );
 }
