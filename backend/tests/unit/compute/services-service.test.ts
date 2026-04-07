@@ -177,7 +177,7 @@ describe('ComputeServicesService', () => {
     it('throws COMPUTE_SERVICE_NOT_CONFIGURED when provider is not configured', async () => {
       mockIsConfigured.mockReturnValue(false);
 
-      await expect(service.createService(input)).rejects.toThrow('COMPUTE_SERVICE_NOT_CONFIGURED');
+      await expect(service.createService(input)).rejects.toThrow('Compute services not configured');
     });
 
     it('sets status to failed when Fly deploy fails', async () => {
@@ -333,7 +333,7 @@ describe('ComputeServicesService', () => {
       mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
       mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
 
-      await expect(service.deleteService(serviceId)).rejects.toThrow('COMPUTE_SERVICE_DEPLOY_FAILED');
+      await expect(service.deleteService(serviceId)).rejects.toThrow('Failed to delete compute service');
 
       // DB row should be preserved (marked failed, not deleted)
       const failedCall = mockQuery.mock.calls[2];
@@ -406,7 +406,7 @@ describe('ComputeServicesService', () => {
 
     it('throws COMPUTE_SERVICE_NOT_CONFIGURED when provider is not configured', async () => {
       mockIsConfigured.mockReturnValue(false);
-      await expect(service.prepareForDeploy(input)).rejects.toThrow('COMPUTE_SERVICE_NOT_CONFIGURED');
+      await expect(service.prepareForDeploy(input)).rejects.toThrow('Compute services not configured');
     });
 
     it('ignores 422 error from createApp (app already exists)', async () => {
