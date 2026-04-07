@@ -146,7 +146,7 @@ export class ComputeServicesService {
     const serviceId = row.id;
     const flyAppName = makeFlyAppName(input.name, input.projectId);
     const network = makeNetwork(input.projectId);
-    const endpointUrl = `https://${flyAppName}.fly.dev`;
+    const endpointUrl = `https://${flyAppName}.${config.fly.domain}`;
 
     try {
       await fly.createApp({
@@ -208,7 +208,7 @@ export class ComputeServicesService {
 
     const flyAppName = makeFlyAppName(input.name, input.projectId);
     const network = makeNetwork(input.projectId);
-    const endpointUrl = `https://${flyAppName}.fly.dev`;
+    const endpointUrl = `https://${flyAppName}.${config.fly.domain}`;
 
     // Insert row
     const insertResult = await this.getPool().query(
@@ -260,15 +260,19 @@ export class ComputeServicesService {
 
     if (machines.length === 0) {
       // Deploy may have failed — mark as failed
-      await this.getPool().query(
-        `UPDATE compute.services SET status = 'failed' WHERE id = $1`,
-        [id]
-      );
+      await this.getPool().query(`UPDATE compute.services SET status = 'failed' WHERE id = $1`, [
+        id,
+      ]);
       return this.getService(id);
     }
 
     const machine = machines[0];
-    const status = machine.state === 'started' || machine.state === 'running' ? 'running' : machine.state === 'stopped' ? 'stopped' : 'deploying';
+    const status =
+      machine.state === 'started' || machine.state === 'running'
+        ? 'running'
+        : machine.state === 'stopped'
+          ? 'stopped'
+          : 'deploying';
 
     const result = await this.getPool().query(
       `UPDATE compute.services SET fly_machine_id = $1, status = $2 WHERE id = $3 RETURNING *`,
@@ -328,8 +332,8 @@ export class ComputeServicesService {
     const hasDeployChange = deployFields.some((f) => data[f] !== undefined);
 
     if (hasDeployChange && existing.flyAppId && existing.flyMachineId) {
+      const envVars = data.envVars ?? this.decryptEnvVars(result.rows[0].env_vars_encrypted);
       try {
-        const envVars = data.envVars ?? this.decryptEnvVars(result.rows[0].env_vars_encrypted);
         await this.getFly().updateMachine({
           appId: existing.flyAppId,
           machineId: existing.flyMachineId,
@@ -341,7 +345,39 @@ export class ComputeServicesService {
         });
         logger.info('Compute service machine updated', { id });
       } catch (error) {
-        logger.error('Failed to update machine on Fly', { id, error });
+        logger.error('Failed to update machine on Fly, reverting DB', { id, error });
+        // Revert DB to previous values so DB and Fly stay in sync
+        const revertUpdates: string[] = [];
+        const revertValues: unknown[] = [];
+        let ri = 1;
+        if (data.imageUrl !== undefined) {
+          revertUpdates.push(`image_url = $${ri++}`);
+          revertValues.push(existing.imageUrl);
+        }
+        if (data.port !== undefined) {
+          revertUpdates.push(`port = $${ri++}`);
+          revertValues.push(existing.port);
+        }
+        if (data.cpu !== undefined) {
+          revertUpdates.push(`cpu = $${ri++}`);
+          revertValues.push(existing.cpu);
+        }
+        if (data.memory !== undefined) {
+          revertUpdates.push(`memory = $${ri++}`);
+          revertValues.push(existing.memory);
+        }
+        if (data.envVars !== undefined) {
+          revertUpdates.push(`env_vars_encrypted = $${ri++}`);
+          revertValues.push(result.rows[0].env_vars_encrypted);
+        }
+        if (revertUpdates.length > 0) {
+          revertValues.push(id);
+          await this.getPool().query(
+            `UPDATE compute.services SET ${revertUpdates.join(', ')} WHERE id = $${ri}`,
+            revertValues
+          );
+        }
+        throw new Error(ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED);
       }
     }
 
@@ -351,12 +387,21 @@ export class ComputeServicesService {
   async deleteService(id: string): Promise<void> {
     const svc = await this.getService(id);
 
-    // Best-effort Fly cleanup
+    // Mark as destroying first so it's visible in the UI
+    await this.getPool().query(`UPDATE compute.services SET status = 'destroying' WHERE id = $1`, [
+      id,
+    ]);
+
+    // Fly cleanup — abort delete if cleanup fails to preserve the reference
     if (svc.flyMachineId && svc.flyAppId) {
       try {
         await this.getFly().destroyMachine(svc.flyAppId, svc.flyMachineId);
       } catch (error) {
         logger.error('Failed to destroy Fly machine during delete', { id, error });
+        await this.getPool().query(`UPDATE compute.services SET status = 'failed' WHERE id = $1`, [
+          id,
+        ]);
+        throw new Error(ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED);
       }
     }
 
@@ -365,6 +410,10 @@ export class ComputeServicesService {
         await this.getFly().destroyApp(svc.flyAppId);
       } catch (error) {
         logger.error('Failed to destroy Fly app during delete', { id, error });
+        await this.getPool().query(`UPDATE compute.services SET status = 'failed' WHERE id = $1`, [
+          id,
+        ]);
+        throw new Error(ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED);
       }
     }
 
@@ -379,7 +428,12 @@ export class ComputeServicesService {
       throw new Error(ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
     }
 
-    await this.getFly().stopMachine(svc.flyAppId, svc.flyMachineId);
+    try {
+      await this.getFly().stopMachine(svc.flyAppId, svc.flyMachineId);
+    } catch (error) {
+      logger.error('Failed to stop compute service', { id, error });
+      throw new Error(ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED);
+    }
 
     const result = await this.getPool().query(
       `UPDATE compute.services SET status = 'stopped' WHERE id = $1 RETURNING *`,
@@ -397,7 +451,12 @@ export class ComputeServicesService {
       throw new Error(ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
     }
 
-    await this.getFly().startMachine(svc.flyAppId, svc.flyMachineId);
+    try {
+      await this.getFly().startMachine(svc.flyAppId, svc.flyMachineId);
+    } catch (error) {
+      logger.error('Failed to start compute service', { id, error });
+      throw new Error(ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED);
+    }
 
     const result = await this.getPool().query(
       `UPDATE compute.services SET status = 'running' WHERE id = $1 RETURNING *`,
@@ -427,7 +486,8 @@ export class ComputeServicesService {
     }
     try {
       return JSON.parse(EncryptionManager.decrypt(encrypted));
-    } catch {
+    } catch (error) {
+      logger.warn('Failed to decrypt env vars, using empty object', { error });
       return {};
     }
   }
