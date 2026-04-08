@@ -1,17 +1,12 @@
 import { InsForgeDashboard } from '@insforge/dashboard';
 import { useCloudHostBridge } from './useCloudHostBridge';
 
-type CloudHostingDashboardProps = {
-  backendUrl: string;
-};
-
-export function CloudHostingDashboard({ backendUrl }: CloudHostingDashboardProps) {
-  const bridge = useCloudHostBridge(backendUrl);
+export function CloudHostingDashboard() {
+  const bridge = useCloudHostBridge();
 
   return (
     <InsForgeDashboard
       mode="cloud-hosting"
-      backendUrl={backendUrl}
       showNavbar={false}
       getAuthorizationCode={bridge.getAuthorizationCode}
       project={bridge.projectInfo}
