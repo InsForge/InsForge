@@ -33,7 +33,7 @@ export interface DashboardInstanceInfo {
 }
 
 export interface DashboardProps {
-  backendUrl: string;
+  backendUrl?: string;
   showNavbar?: boolean;
   project?: DashboardProjectInfo;
   connectDialogOpen?: boolean;

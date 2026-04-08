@@ -12,6 +12,10 @@ import { DashboardHostProvider } from '../lib/config/DashboardHostContext';
 import { setDashboardBackendUrl } from '../lib/config/runtime';
 import type { InsForgeDashboardProps } from '../types';
 
+function normalizeBackendUrl(url?: string) {
+  return url?.replace(/\/$/, '') || undefined;
+}
+
 function DashboardProviderTree({ host }: { host: InsForgeDashboardProps }) {
   const [queryClient] = useState(
     () =>
@@ -56,7 +60,7 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
   const host = useMemo<InsForgeDashboardProps>(
     () => ({
       ...props,
-      backendUrl: props.backendUrl.replace(/\/$/, ''),
+      backendUrl: normalizeBackendUrl(props.backendUrl),
     }),
     [props]
   );

@@ -42,6 +42,10 @@ type PendingRequests = {
 const DEFAULT_TIMEOUT_MS = 15000;
 const INSTANCE_CHANGE_TIMEOUT_MS = 5 * 60 * 1000;
 
+function normalizeUrl(url: string) {
+  return url.replace(/\/$/, '');
+}
+
 function getParentOrigin(): string | null {
   if (typeof window === 'undefined' || window.parent === window) {
     return null;
@@ -66,17 +70,25 @@ function getInitialAuthorizationCode(): string | null {
   return new URL(window.location.href).searchParams.get('authorizationCode');
 }
 
+function getCurrentOrigin(): string {
+  if (typeof window !== 'undefined') {
+    return normalizeUrl(window.location.origin);
+  }
+
+  return '';
+}
+
 function getErrorMessage(message: unknown, fallback: string): string {
   return typeof message === 'string' && message.trim() ? message : fallback;
 }
 
 function normalizeProjectInfo(
   previous: DashboardProjectInfo | undefined,
-  backendUrl: string,
+  origin: string,
   message: BridgeMessage
 ): DashboardProjectInfo {
   const previousInfo = previous ?? {
-    id: backendUrl,
+    id: origin,
     name: 'Project',
     region: '',
     instanceType: '',
@@ -104,7 +116,8 @@ function normalizeProjectInfo(
   };
 }
 
-export function useCloudHostBridge(backendUrl: string) {
+export function useCloudHostBridge() {
+  const currentOrigin = getCurrentOrigin();
   const [projectInfo, setProjectInfo] = useState<DashboardProjectInfo>();
   const initialAuthorizationCodeRef = useRef<string | null>(getInitialAuthorizationCode());
   const queuedAuthorizationCodeRef = useRef<string | null>(null);
@@ -260,7 +273,7 @@ export function useCloudHostBridge(backendUrl: string) {
           return;
         }
         case 'PROJECT_INFO': {
-          setProjectInfo((previous) => normalizeProjectInfo(previous, backendUrl, message));
+          setProjectInfo((previous) => normalizeProjectInfo(previous, currentOrigin, message));
           return;
         }
         case 'INSTANCE_INFO': {
@@ -293,7 +306,7 @@ export function useCloudHostBridge(backendUrl: string) {
           if (message.success === true) {
             if (typeof message.name === 'string' && message.name.trim()) {
               setProjectInfo((previous) =>
-                normalizeProjectInfo(previous, backendUrl, {
+                normalizeProjectInfo(previous, currentOrigin, {
                   type: 'PROJECT_INFO',
                   name: message.name,
                 })
@@ -352,7 +365,7 @@ export function useCloudHostBridge(backendUrl: string) {
         rejectPendingRequest(key, 'Cloud host bridge was disposed');
       });
     };
-  }, [backendUrl, rejectPendingRequest, resolvePendingRequest]);
+  }, [currentOrigin, rejectPendingRequest, resolvePendingRequest]);
 
   useEffect(() => {
     void postMessageToParent({ type: 'REQUEST_PROJECT_INFO' });
