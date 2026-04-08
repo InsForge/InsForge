@@ -81,15 +81,27 @@ export class StorageService {
     const trimmedName = newName.trim();
 
     if (!trimmedName) {
-      throw new Error('Invalid file name. New name cannot be empty.');
+      throw new AppError(
+        'Invalid file name. New name cannot be empty.',
+        400,
+        ERROR_CODES.STORAGE_INVALID_PARAMETER
+      );
     }
 
     if (trimmedName === '.' || trimmedName === '..') {
-      throw new Error('Invalid file name. "." and ".." are not allowed.');
+      throw new AppError(
+        'Invalid file name. "." and ".." are not allowed.',
+        400,
+        ERROR_CODES.STORAGE_INVALID_PARAMETER
+      );
     }
 
     if (trimmedName.includes('/') || trimmedName.includes('\\')) {
-      throw new Error('Invalid file name. Path separators are not allowed.');
+      throw new AppError(
+        'Invalid file name. Path separators are not allowed.',
+        400,
+        ERROR_CODES.STORAGE_INVALID_PARAMETER
+      );
     }
   }
 
@@ -101,7 +113,11 @@ export class StorageService {
     const keyParts = oldKey.split('/');
 
     if (!keyParts[keyParts.length - 1]) {
-      throw new Error('Invalid object key. Only files can be renamed.');
+      throw new AppError(
+        'Invalid object key. Only files can be renamed.',
+        400,
+        ERROR_CODES.STORAGE_INVALID_PARAMETER
+      );
     }
 
     keyParts[keyParts.length - 1] = trimmedName;
@@ -110,7 +126,11 @@ export class StorageService {
     this.validateKey(newKey);
 
     if (newKey === oldKey) {
-      throw new Error('New file name must be different from the current name.');
+      throw new AppError(
+        'New file name must be different from the current name.',
+        400,
+        ERROR_CODES.STORAGE_INVALID_PARAMETER
+      );
     }
 
     return newKey;

@@ -145,6 +145,10 @@ export class S3StorageProvider implements StorageProvider {
 
     await this.s3Client.send(copyCommand);
 
+    // TODO: S3 rename is not atomic — if the delete below fails after a successful copy,
+    // the object will exist under both the old and new keys (orphaned duplicate).
+    // For v1 this is acceptable, but a future fix should use S3 Object Lock or a
+    // cleanup/reconciliation job to detect and remove orphaned originals.
     const deleteCommand = new DeleteObjectCommand({
       Bucket: this.s3Bucket,
       Key: sourceKey,

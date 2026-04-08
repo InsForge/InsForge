@@ -389,15 +389,7 @@ router.patch(
 
       successResponse(res, renamedFile, 200);
     } catch (error) {
-      if (error instanceof AppError) {
-        next(error);
-      } else if (error instanceof Error && error.message.includes('Invalid')) {
-        next(new AppError(error.message, 400, ERROR_CODES.STORAGE_INVALID_PARAMETER));
-      } else if (error instanceof Error && error.message.includes('different')) {
-        next(new AppError(error.message, 400, ERROR_CODES.STORAGE_INVALID_PARAMETER));
-      } else {
-        next(error);
-      }
+      next(error);
     }
   }
 );
