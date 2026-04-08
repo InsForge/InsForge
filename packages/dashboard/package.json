@@ -62,14 +62,18 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.11",
-    "@vitejs/plugin-react": "^4.7.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
+    "@vitejs/plugin-react": "^4.7.0",
+    "jsdom": "^29.0.2",
     "tailwindcss": "^4.1.11",
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^5.8.3",
     "vite": "^7.0.5",
-    "vite-plugin-svgr": "^4.3.0"
+    "vite-plugin-svgr": "^4.3.0",
+    "vitest": "^3.2.4"
   },
   "peerDependencies": {
     "react": "^19.0.0",
