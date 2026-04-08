@@ -36,12 +36,7 @@ async function seedFile(bucket: string, key: string, content = 'hello'): Promise
 }
 
 /** Insert a row into storage.objects (FK to storage.buckets must exist). */
-async function seedObjectRow(
-  pool: Pool,
-  bucket: string,
-  key: string,
-  size = 5
-): Promise<void> {
+async function seedObjectRow(pool: Pool, bucket: string, key: string, size = 5): Promise<void> {
   await pool.query(
     `INSERT INTO storage.objects (bucket, key, size, mime_type)
      VALUES ($1, $2, $3, $4)
@@ -93,7 +88,9 @@ describe('StorageService.renameObject (integration)', () => {
     // Wipe all files inside the bucket dir
     const bucketDir = path.join(STORAGE_DIR, TEST_BUCKET);
     const entries = await fs.readdir(bucketDir).catch(() => []);
-    await Promise.all(entries.map((e) => fs.rm(path.join(bucketDir, e), { recursive: true, force: true })));
+    await Promise.all(
+      entries.map((e) => fs.rm(path.join(bucketDir, e), { recursive: true, force: true }))
+    );
   });
 
   // ── tests ─────────────────────────────────────────────────────────────
@@ -109,21 +106,15 @@ describe('StorageService.renameObject (integration)', () => {
     expect(result.key).toBe('cover.png');
     expect(result.bucket).toBe(TEST_BUCKET);
 
-    const { rows } = await pool.query(
-      'SELECT key FROM storage.objects WHERE bucket = $1',
-      [TEST_BUCKET]
-    );
+    const { rows } = await pool.query('SELECT key FROM storage.objects WHERE bucket = $1', [
+      TEST_BUCKET,
+    ]);
     expect(rows).toHaveLength(1);
     expect(rows[0].key).toBe('cover.png');
 
     // Old file gone, new file present
-    await expect(
-      fs.access(path.join(STORAGE_DIR, TEST_BUCKET, 'photo.png'))
-    ).rejects.toThrow();
-    const newContent = await fs.readFile(
-      path.join(STORAGE_DIR, TEST_BUCKET, 'cover.png'),
-      'utf8'
-    );
+    await expect(fs.access(path.join(STORAGE_DIR, TEST_BUCKET, 'photo.png'))).rejects.toThrow();
+    const newContent = await fs.readFile(path.join(STORAGE_DIR, TEST_BUCKET, 'cover.png'), 'utf8');
     expect(newContent).toBe('hello');
   });
 
