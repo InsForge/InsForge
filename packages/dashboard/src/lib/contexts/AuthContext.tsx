@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useLocation } from 'react-router-dom';
 import { loginService } from '../../features/login/services/login.service';
 import { useDashboardHost } from '../config/DashboardHostContext';
 import { apiClient } from '../api/client';
@@ -31,12 +32,15 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const host = useDashboardHost();
+  const location = useLocation();
   const [user, setUser] = useState<UserSchema | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
   const queryClient = useQueryClient();
   const cloudAuthenticationRef = useRef<Promise<UserSchema | null> | null>(null);
+  const shouldAttemptCloudAuthentication =
+    host.mode === 'cloud-hosting' && !location.pathname.startsWith('/dashboard/login');
 
   const handleAuthError = useCallback(() => {
     setUser(null);
@@ -85,7 +89,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   );
 
   const authenticateCloudSession = useCallback(async (): Promise<UserSchema | null> => {
-    if (host.mode !== 'cloud-hosting') {
+    if (!shouldAttemptCloudAuthentication) {
       return null;
     }
 
@@ -107,7 +111,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
 
     return cloudAuthenticationRef.current;
-  }, [exchangeAuthorizationCode, host]);
+  }, [exchangeAuthorizationCode, host, shouldAttemptCloudAuthentication]);
 
   const loginWithPassword = useCallback(
     async (email: string, password: string): Promise<boolean> => {
@@ -126,37 +130,46 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Access token refresh handler
   useEffect(() => {
-    const handleRefreshAccessToken = (): Promise<boolean> => {
-      if (host.mode === 'cloud-hosting') {
-        return authenticateCloudSession().then((authenticatedUser) => authenticatedUser !== null);
+    const handleRefreshAccessToken = async (): Promise<boolean> => {
+      const refreshed = await loginService.refreshAccessToken();
+      if (refreshed) {
+        return true;
       }
 
-      return loginService.refreshAccessToken();
+      if (!shouldAttemptCloudAuthentication) {
+        return false;
+      }
+
+      const authenticatedUser = await authenticateCloudSession();
+      return authenticatedUser !== null;
     };
 
     apiClient.setRefreshAccessTokenHandler(handleRefreshAccessToken);
     return () => {
       apiClient.setRefreshAccessTokenHandler(undefined);
     };
-  }, [authenticateCloudSession, host.mode]);
+  }, [authenticateCloudSession, shouldAttemptCloudAuthentication]);
 
   const checkAuthStatus = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
 
-      if (host.mode === 'cloud-hosting' && !apiClient.getAccessToken()) {
-        return await authenticateCloudSession();
-      }
-
       const currentUser = await loginService.getCurrentUser();
-      if (!currentUser && host.mode === 'cloud-hosting') {
+      if (currentUser) {
+        setUser(currentUser);
+        setIsAuthenticated(true);
+        return currentUser;
+      }
+
+      setUser(null);
+      setIsAuthenticated(false);
+
+      if (shouldAttemptCloudAuthentication) {
         return await authenticateCloudSession();
       }
 
-      setUser(currentUser);
-      setIsAuthenticated(!!currentUser);
-      return currentUser;
+      return null;
     } catch (err) {
       setUser(null);
       setIsAuthenticated(false);
@@ -167,7 +180,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [authenticateCloudSession, host.mode]);
+  }, [authenticateCloudSession, shouldAttemptCloudAuthentication]);
 
   const logout = useCallback(async () => {
     await loginService.logout();

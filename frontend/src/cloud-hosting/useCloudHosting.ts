@@ -46,12 +46,24 @@ function normalizeUrl(url: string) {
   return url.replace(/\/$/, '');
 }
 
-function getParentOrigin(): string | null {
+function getParentWindow(): Window | null {
   if (typeof window === 'undefined' || window.parent === window) {
     return null;
   }
 
-  if (!document.referrer) {
+  return window.parent;
+}
+
+function getOpenerWindow(): Window | null {
+  if (typeof window === 'undefined' || !window.opener || window.opener.closed) {
+    return null;
+  }
+
+  return window.opener;
+}
+
+function getParentOrigin(): string | null {
+  if (typeof window === 'undefined' || !getParentWindow() || !document.referrer) {
     return null;
   }
 
@@ -60,14 +72,6 @@ function getParentOrigin(): string | null {
   } catch {
     return null;
   }
-}
-
-function getInitialAuthorizationCode(): string | null {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  return new URL(window.location.href).searchParams.get('authorizationCode');
 }
 
 function getCurrentOrigin(): string {
@@ -119,9 +123,9 @@ function normalizeProjectInfo(
 export function useCloudHosting() {
   const currentOrigin = getCurrentOrigin();
   const [projectInfo, setProjectInfo] = useState<DashboardProjectInfo>();
-  const initialAuthorizationCodeRef = useRef<string | null>(getInitialAuthorizationCode());
   const queuedAuthorizationCodeRef = useRef<string | null>(null);
   const parentOriginRef = useRef<string | null>(getParentOrigin());
+  const openerOriginRef = useRef<string | null>(null);
   const pendingRequestsRef = useRef<PendingRequests>({});
 
   const setPendingRequest = useCallback(
@@ -192,15 +196,12 @@ export function useCloudHosting() {
   );
 
   const postMessageToParent = useCallback((message: CloudHostingMessage): boolean => {
-    if (typeof window === 'undefined' || window.parent === window) {
+    const parentWindow = getParentWindow();
+    if (!parentWindow || !parentOriginRef.current) {
       return false;
     }
 
-    if (!parentOriginRef.current) {
-      return false;
-    }
-
-    window.parent.postMessage(message, parentOriginRef.current);
+    parentWindow.postMessage(message, parentOriginRef.current);
     return true;
   }, []);
 
@@ -227,19 +228,36 @@ export function useCloudHosting() {
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent<CloudHostingMessage>) => {
-      if (typeof window === 'undefined' || event.source !== window.parent) {
+      const isParentMessage = event.source === getParentWindow();
+      const isOpenerMessage = event.source === getOpenerWindow();
+
+      if (!isParentMessage && !isOpenerMessage) {
         return;
       }
 
-      if (!parentOriginRef.current) {
-        // Adopt the origin from the first verified parent message when referrer is unavailable.
-        parentOriginRef.current = event.origin;
-      } else if (event.origin !== parentOriginRef.current) {
+      if (isParentMessage) {
+        if (!parentOriginRef.current) {
+          parentOriginRef.current = event.origin;
+        } else if (event.origin !== parentOriginRef.current) {
+          return;
+        }
+      } else if (!openerOriginRef.current) {
+        openerOriginRef.current = event.origin;
+      } else if (event.origin !== openerOriginRef.current) {
         return;
       }
 
       const message = event.data;
       if (!message || typeof message !== 'object' || typeof message.type !== 'string') {
+        return;
+      }
+
+      if (
+        isOpenerMessage &&
+        message.type !== 'AUTHORIZATION_CODE' &&
+        message.type !== 'AUTHORIZATION_CODE_ERROR' &&
+        message.type !== 'AUTH_ERROR'
+      ) {
         return;
       }
 
@@ -372,20 +390,14 @@ export function useCloudHosting() {
   }, [postMessageToParent]);
 
   const getAuthorizationCode = useCallback(async (): Promise<string> => {
-    if (initialAuthorizationCodeRef.current) {
-      const code = initialAuthorizationCodeRef.current;
-      initialAuthorizationCodeRef.current = null;
-      return code;
-    }
-
     if (queuedAuthorizationCodeRef.current) {
       const code = queuedAuthorizationCodeRef.current;
       queuedAuthorizationCodeRef.current = null;
       return code;
     }
 
-    // Even if the send fails, keep the pending request open so a proactive parent message
-    // can still resolve it when the cloud hosting transport finishes initializing.
+    // Even if the send fails, keep the pending request open so a proactive parent or opener
+    // message can still resolve it when the cloud hosting transport finishes initializing.
     postMessageToParent({ type: 'REQUEST_AUTHORIZATION_CODE' });
 
     return createPendingRequest('authCode', 'Authorization code request');
