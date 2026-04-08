@@ -1,4 +1,5 @@
 import { InsForgeDashboard } from '@insforge/dashboard';
+import { isInIframe } from '../helpers';
 import { useCloudHosting } from './useCloudHosting';
 
 export function CloudHostingDashboard() {
@@ -16,7 +17,7 @@ export function CloudHostingDashboard() {
   return (
     <InsForgeDashboard
       mode="cloud-hosting"
-      showNavbar={false}
+      showNavbar={!isInIframe()}
       getAuthorizationCode={getAuthorizationCode}
       project={projectInfo}
       onNavigateToSubscription={navigateToSubscription}
