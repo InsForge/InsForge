@@ -7,7 +7,7 @@ type InstanceTypeChangeResult = {
   error?: string;
 };
 
-type BridgeMessage = {
+type CloudHostingMessage = {
   type: string;
   [key: string]: unknown;
 };
@@ -85,7 +85,7 @@ function getErrorMessage(message: unknown, fallback: string): string {
 function normalizeProjectInfo(
   previous: DashboardProjectInfo | undefined,
   origin: string,
-  message: BridgeMessage
+  message: CloudHostingMessage
 ): DashboardProjectInfo {
   const previousInfo = previous ?? {
     id: origin,
@@ -116,7 +116,7 @@ function normalizeProjectInfo(
   };
 }
 
-export function useCloudHostBridge() {
+export function useCloudHosting() {
   const currentOrigin = getCurrentOrigin();
   const [projectInfo, setProjectInfo] = useState<DashboardProjectInfo>();
   const initialAuthorizationCodeRef = useRef<string | null>(getInitialAuthorizationCode());
@@ -191,7 +191,7 @@ export function useCloudHostBridge() {
     [clearPendingRequest]
   );
 
-  const postMessageToParent = useCallback((message: BridgeMessage): boolean => {
+  const postMessageToParent = useCallback((message: CloudHostingMessage): boolean => {
     if (typeof window === 'undefined' || window.parent === window) {
       return false;
     }
@@ -226,7 +226,7 @@ export function useCloudHostBridge() {
   );
 
   useEffect(() => {
-    const handleMessage = (event: MessageEvent<BridgeMessage>) => {
+    const handleMessage = (event: MessageEvent<CloudHostingMessage>) => {
       if (typeof window === 'undefined' || event.source !== window.parent) {
         return;
       }
@@ -362,7 +362,7 @@ export function useCloudHostBridge() {
       window.removeEventListener('message', handleMessage);
 
       (Object.keys(pendingRequests) as PendingRequestKey[]).forEach((key) => {
-        rejectPendingRequest(key, 'Cloud host bridge was disposed');
+        rejectPendingRequest(key, 'Cloud hosting was disposed');
       });
     };
   }, [currentOrigin, rejectPendingRequest, resolvePendingRequest]);
@@ -385,7 +385,7 @@ export function useCloudHostBridge() {
     }
 
     // Even if the send fails, keep the pending request open so a proactive parent message
-    // can still resolve it when the bridge finishes initializing.
+    // can still resolve it when the cloud hosting transport finishes initializing.
     postMessageToParent({ type: 'REQUEST_AUTHORIZATION_CODE' });
 
     return createPendingRequest('authCode', 'Authorization code request');
