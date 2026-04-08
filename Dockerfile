@@ -108,6 +108,8 @@ WORKDIR /app
 # mount points. Compose and PaaS env vars override these when set.
 ENV STORAGE_DIR=/insforge-storage
 ENV LOGS_DIR=/insforge-logs
+ENV MAX_JSON_BODY_SIZE=100mb
+ENV MAX_URLENCODED_BODY_SIZE=10mb
 
 RUN mkdir -p /data /insforge-storage /insforge-logs && \
     chown node:node /data /insforge-storage /insforge-logs
@@ -165,6 +167,8 @@ WORKDIR /app
 # Default mount points (same as runner stage — see comments there)
 ENV STORAGE_DIR=/insforge-storage
 ENV LOGS_DIR=/insforge-logs
+ENV MAX_JSON_BODY_SIZE=100mb
+ENV MAX_URLENCODED_BODY_SIZE=10mb
 
 # Pre-create volume mount points so Docker initializes named volumes
 # with these directories instead of creating them as root-owned.
