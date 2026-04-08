@@ -130,6 +130,7 @@ services:
     volumes:
       - ./package.json:/app/package.json
       - ./package-lock.json:/app/package-lock.json
+      - ./turbo.json:/app/turbo.json
       - ./backend:/app/backend
       - ./frontend:/app/frontend
       - ./packages:/app/packages
@@ -141,7 +142,7 @@ services:
       - ui_node_modules:/app/packages/ui/node_modules
       - shared-logs:/insforge-logs
       - storage-data:/insforge-storage
-    command: sh -c "npm install && npm run build:shared-schemas && npm run build:ui && cd backend && npm run migrate:up && cd .. && npm run dev"
+    command: sh -c 'npm install && npx turbo run build --filter=@insforge/shared-schemas --filter=@insforge/ui --filter=@insforge/dashboard && cd backend && npm run migrate:up && cd .. && npx concurrently -n backend,frontend -c cyan,magenta "npm run dev:backend" "npm run dev:frontend"'
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
