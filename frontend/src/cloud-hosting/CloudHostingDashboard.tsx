@@ -1,21 +1,30 @@
 import { InsForgeDashboard } from '@insforge/dashboard';
-import { useCloudHostBridge } from './useCloudHostBridge';
+import { useCloudHosting } from './useCloudHosting';
 
 export function CloudHostingDashboard() {
-  const bridge = useCloudHostBridge();
+  const {
+    getAuthorizationCode,
+    projectInfo,
+    navigateToSubscription,
+    renameProject,
+    deleteProject,
+    requestInstanceInfo,
+    requestInstanceTypeChange,
+    updateVersion,
+  } = useCloudHosting();
 
   return (
     <InsForgeDashboard
       mode="cloud-hosting"
       showNavbar={false}
-      getAuthorizationCode={bridge.getAuthorizationCode}
-      project={bridge.projectInfo}
-      onNavigateToSubscription={bridge.navigateToSubscription}
-      onRenameProject={bridge.renameProject}
-      onDeleteProject={bridge.deleteProject}
-      onRequestInstanceInfo={bridge.requestInstanceInfo}
-      onRequestInstanceTypeChange={bridge.requestInstanceTypeChange}
-      onUpdateVersion={bridge.updateVersion}
+      getAuthorizationCode={getAuthorizationCode}
+      project={projectInfo}
+      onNavigateToSubscription={navigateToSubscription}
+      onRenameProject={renameProject}
+      onDeleteProject={deleteProject}
+      onRequestInstanceInfo={requestInstanceInfo}
+      onRequestInstanceTypeChange={requestInstanceTypeChange}
+      onUpdateVersion={updateVersion}
     />
   );
 }
