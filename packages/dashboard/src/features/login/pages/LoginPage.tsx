@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -20,12 +20,11 @@ import {
   FormMessage,
 } from '../../../components';
 import { Button, Input } from '@insforge/ui';
-import { useDashboardHost } from '../../../lib/config/DashboardHostContext';
 import { useAuth } from '../../../lib/contexts/AuthContext';
 import { useMcpUsage } from '../../logs/hooks/useMcpUsage';
 import { loginFormSchema, LoginForm } from '../../../lib/utils/schemaValidations';
 
-function SelfHostingLoginView() {
+export default function LoginPage() {
   const navigate = useNavigate();
   const { loginWithPassword, isAuthenticated } = useAuth();
   const { hasCompletedOnboarding, isLoading: isMcpUsageLoading } = useMcpUsage();
@@ -160,73 +159,4 @@ function SelfHostingLoginView() {
       </div>
     </div>
   );
-}
-
-function CloudHostingLoginView() {
-  const navigate = useNavigate();
-  const { isAuthenticated, isLoading, error, refreshAuth } = useAuth();
-  const hasRequestedAuthRef = useRef(false);
-
-  useEffect(() => {
-    if (hasRequestedAuthRef.current || isAuthenticated || isLoading || error) {
-      return;
-    }
-
-    hasRequestedAuthRef.current = true;
-    void refreshAuth();
-  }, [error, isAuthenticated, isLoading, refreshAuth]);
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      void navigate('/dashboard', { replace: true });
-    }
-  }, [isAuthenticated, navigate]);
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-neutral-800 flex items-center justify-center px-4">
-        <div className="text-center text-white max-w-md">
-          <Lock className="h-12 w-12 mx-auto mb-4 text-red-400" />
-          <h2 className="text-xl font-semibold mb-2">Authentication Failed</h2>
-          <p className="text-gray-400 text-sm">{error.message}</p>
-          <Button
-            className="mt-6"
-            onClick={() => {
-              void refreshAuth();
-            }}
-          >
-            Retry
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-neutral-800 flex items-center justify-center px-4">
-      <div className="text-center">
-        {isLoading ? (
-          <div className="animate-spin mb-4">
-            <Lock className="h-12 w-12 text-white mx-auto" />
-          </div>
-        ) : (
-          <Lock className="h-12 w-12 text-white mx-auto mb-4" />
-        )}
-        <h2 className="text-xl font-semibold text-white mb-2">
-          {isLoading ? 'Authenticating...' : 'Preparing dashboard...'}
-        </h2>
-        <p className="text-sm text-gray-400">Please wait while we verify your identity</p>
-      </div>
-    </div>
-  );
-}
-
-export default function LoginPage() {
-  const host = useDashboardHost();
-
-  if (host.mode === 'cloud-hosting') {
-    return <CloudHostingLoginView />;
-  }
-
-  return <SelfHostingLoginView />;
 }
