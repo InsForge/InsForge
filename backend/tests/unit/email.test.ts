@@ -25,6 +25,20 @@ vi.mock('../../src/infra/config/app.config', () => ({
     },
   },
 }));
+vi.mock('../../src/services/email/resend-config.service', () => ({
+  ResendConfigService: {
+    getInstance: () => ({
+      getRawResendConfig: vi.fn().mockResolvedValue(null),
+    }),
+  },
+}));
+vi.mock('../../src/services/email/smtp-config.service', () => ({
+  SmtpConfigService: {
+    getInstance: () => ({
+      getRawSmtpConfig: vi.fn().mockResolvedValue(null),
+    }),
+  },
+}));
 
 describe('EmailService', () => {
   let emailService: EmailService;

@@ -123,36 +123,34 @@ export class ResendConfigService {
   }
 
   async getRawResendConfig(): Promise<RawResendConfig | null> {
-    try {
-      const result = await this.getPool().query(
-        `SELECT ${RESEND_CONFIG_COLUMNS} FROM email.resend_config LIMIT 1`
-      );
-      if (!result.rows.length) {
-        return null;
-      }
-
-      const row = result.rows[0];
-      if (!row.enabled) {
-        return null;
-      }
-
-      const apiKey = this.getDecryptedApiKey(row.api_key_encrypted);
-      if (apiKey === null) {
-        logger.error('Resend config has undecryptable API key — treating as unconfigured');
-        return null;
-      }
-
-      return {
-        id: row.id,
-        enabled: row.enabled,
-        apiKey,
-        senderEmail: row.senderEmail,
-        senderName: row.senderName,
-      };
-    } catch (error) {
-      logger.error('Failed to get raw Resend config', { error });
+    const result = await this.getPool().query(
+      `SELECT ${RESEND_CONFIG_COLUMNS} FROM email.resend_config LIMIT 1`
+    );
+    if (!result.rows.length) {
       return null;
     }
+
+    const row = result.rows[0];
+    if (!row.enabled) {
+      return null;
+    }
+
+    const apiKey = this.getDecryptedApiKey(row.api_key_encrypted);
+    if (apiKey === null) {
+      throw new AppError(
+        'Resend API key is corrupted — cannot decrypt stored credentials',
+        500,
+        ERROR_CODES.EMAIL_RESEND_CONNECTION_FAILED
+      );
+    }
+
+    return {
+      id: row.id,
+      enabled: row.enabled,
+      apiKey,
+      senderEmail: row.senderEmail,
+      senderName: row.senderName,
+    };
   }
 
   // -------------------------------------------------------------------------

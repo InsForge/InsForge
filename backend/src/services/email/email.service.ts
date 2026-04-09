@@ -39,27 +39,15 @@ export class EmailService {
 
   private async resolveProvider(): Promise<ResolvedProvider> {
     // Resend takes priority — simplest setup (just API key)
-    try {
-      const resendConfig = await ResendConfigService.getInstance().getRawResendConfig();
-      if (resendConfig) {
-        return { provider: this.resendProvider, smtpConfig: null };
-      }
-    } catch (error) {
-      logger.warn('Error checking Resend config, trying SMTP fallback', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
+    const resendConfig = await ResendConfigService.getInstance().getRawResendConfig();
+    if (resendConfig) {
+      return { provider: this.resendProvider, smtpConfig: null };
     }
 
     // SMTP fallback
-    try {
-      const smtpConfig = await SmtpConfigService.getInstance().getRawSmtpConfig();
-      if (smtpConfig) {
-        return { provider: this.smtpProvider, smtpConfig };
-      }
-    } catch (error) {
-      logger.warn('Error checking SMTP config, falling back to cloud provider', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
+    const smtpConfig = await SmtpConfigService.getInstance().getRawSmtpConfig();
+    if (smtpConfig) {
+      return { provider: this.smtpProvider, smtpConfig };
     }
 
     return { provider: this.cloudProvider, smtpConfig: null };

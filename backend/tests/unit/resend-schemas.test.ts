@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  resendConfigSchema,
-  upsertResendConfigRequestSchema,
-} from '@insforge/shared-schemas';
+import { resendConfigSchema, upsertResendConfigRequestSchema } from '@insforge/shared-schemas';
 
 describe('Resend schemas', () => {
   describe('resendConfigSchema', () => {
@@ -34,7 +31,7 @@ describe('Resend schemas', () => {
   });
 
   describe('upsertResendConfigRequestSchema', () => {
-    it('accepts a valid upsert request with API key', () => {
+    it('accepts a valid enabled request with API key', () => {
       const result = upsertResendConfigRequestSchema.safeParse({
         enabled: true,
         apiKey: 're_test_key_123',
@@ -44,7 +41,7 @@ describe('Resend schemas', () => {
       expect(result.success).toBe(true);
     });
 
-    it('accepts request without API key (optional for updates)', () => {
+    it('accepts enabled request without API key (optional for updates)', () => {
       const result = upsertResendConfigRequestSchema.safeParse({
         enabled: true,
         senderEmail: 'noreply@example.com',
@@ -53,7 +50,14 @@ describe('Resend schemas', () => {
       expect(result.success).toBe(true);
     });
 
-    it('rejects request with invalid sender email', () => {
+    it('accepts disabled request without sender fields', () => {
+      const result = upsertResendConfigRequestSchema.safeParse({
+        enabled: false,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects enabled request with invalid sender email', () => {
       const result = upsertResendConfigRequestSchema.safeParse({
         enabled: true,
         apiKey: 're_test_key_123',
@@ -63,7 +67,7 @@ describe('Resend schemas', () => {
       expect(result.success).toBe(false);
     });
 
-    it('rejects request with empty sender name', () => {
+    it('rejects enabled request with empty sender name', () => {
       const result = upsertResendConfigRequestSchema.safeParse({
         enabled: true,
         apiKey: 're_test_key_123',
@@ -73,7 +77,7 @@ describe('Resend schemas', () => {
       expect(result.success).toBe(false);
     });
 
-    it('rejects request with empty API key string', () => {
+    it('rejects enabled request with empty API key string', () => {
       const result = upsertResendConfigRequestSchema.safeParse({
         enabled: true,
         apiKey: '',
@@ -83,7 +87,7 @@ describe('Resend schemas', () => {
       expect(result.success).toBe(false);
     });
 
-    it('rejects request without required fields', () => {
+    it('rejects enabled request without required fields', () => {
       const result = upsertResendConfigRequestSchema.safeParse({
         enabled: true,
       });

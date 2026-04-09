@@ -370,13 +370,22 @@ export const getPublicAuthConfigResponseSchema = z.object({
 
 /**
  * PUT /api/auth/resend-config - Upsert Resend configuration
+ * Sender fields are only required when enabling Resend.
  */
-export const upsertResendConfigRequestSchema = z.object({
-  enabled: z.boolean(),
-  apiKey: z.string().min(1, 'Resend API key is required').optional(),
-  senderEmail: z.string().email('Invalid sender email'),
-  senderName: z.string().min(1, 'Sender name is required'),
-});
+export const upsertResendConfigRequestSchema = z.discriminatedUnion('enabled', [
+  z.object({
+    enabled: z.literal(false),
+    apiKey: z.string().optional(),
+    senderEmail: z.string().optional().default(''),
+    senderName: z.string().optional().default(''),
+  }),
+  z.object({
+    enabled: z.literal(true),
+    apiKey: z.string().min(1, 'Resend API key is required').optional(),
+    senderEmail: z.string().email('Invalid sender email'),
+    senderName: z.string().min(1, 'Sender name is required'),
+  }),
+]);
 
 /**
  * Response for GET /api/auth/resend-config
