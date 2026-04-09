@@ -3,7 +3,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Upload } from 'lucide-react';
 import PencilIcon from '../../../assets/icons/pencil.svg?react';
 import RefreshIcon from '../../../assets/icons/refresh.svg?react';
-import { useStorage } from '../hooks/useStorage';
+import { useStorageBuckets } from '../hooks/useStorageBuckets';
+import { useStorageObjects } from '../hooks/useStorageObjects';
 import { StorageSidebar } from '../components/StorageSidebar';
 import { StorageDataGrid } from '../components/StorageDataGrid';
 import { BucketFormDialog } from '../components/BucketFormDialog';
@@ -63,11 +64,13 @@ export default function BucketsPage() {
     isLoadingBuckets: isLoading,
     bucketsError,
     refetchBuckets,
+    deleteBucket,
+  } = useStorageBuckets();
+  const {
     useBucketStats,
     uploadObject,
     deleteObjects,
-    deleteBucket,
-  } = useStorage();
+  } = useStorageObjects();
   const selectedBucket = useMemo(() => {
     if (isLoading || !buckets.length) {
       return null;
@@ -96,7 +99,7 @@ export default function BucketsPage() {
     [searchParams, setSearchParams]
   );
 
-  const { data: bucketStats } = useBucketStats();
+  const { data: bucketStats } = useBucketStats(buckets);
 
   // Build bucket info map
   const bucketInfo = React.useMemo(() => {

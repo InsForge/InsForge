@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useStorage } from '../hooks/useStorage';
+import { useStorageBuckets } from '../hooks/useStorageBuckets';
 import { isInsForgeCloudProject } from '../../../lib/utils/utils';
 import DiscordIcon from '../../../assets/logos/discord.svg?react';
 import {
@@ -56,7 +56,7 @@ export function BucketFormDialog({
   const [isPublic, setIsPublic] = useState(initialIsPublic);
   const [error, setError] = useState('');
 
-  const { createBucket, editBucket, isCreatingBucket, isEditingBucket } = useStorage();
+  const { createBucket, editBucket, isCreatingBucket, isEditingBucket } = useStorageBuckets();
 
   useEffect(() => {
     if (open) {
