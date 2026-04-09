@@ -1,6 +1,5 @@
 import { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
-import { DASHBOARD_LOGIN_PATH } from './paths';
 import { useAuth } from '../lib/contexts/AuthContext';
 import { useDashboardHost } from '../lib/config/DashboardHostContext';
 import { LoadingState } from '../components/LoadingState';
@@ -10,7 +9,7 @@ interface RequireAuthProps {
 }
 
 export const RequireAuth = ({ children }: RequireAuthProps) => {
-  const { isAuthenticated, isLoading, error } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const host = useDashboardHost();
   const isCloudHosting = host.mode === 'cloud-hosting';
 
@@ -27,13 +26,7 @@ export const RequireAuth = ({ children }: RequireAuthProps) => {
   }
 
   if (!isAuthenticated) {
-    // In cloud-hosting mode, stay on a loading screen while auth resolves
-    // instead of flashing the login page — the user never enters credentials.
-    if (isCloudHosting && !error) {
-      return loadingFallback;
-    }
-
-    return <Navigate to={DASHBOARD_LOGIN_PATH} replace />;
+    return <Navigate to={isCloudHosting ? '/cloud/login' : '/dashboard/login'} replace />;
   }
 
   return <>{children}</>;

@@ -7,7 +7,7 @@ type InstanceTypeChangeResult = {
   error?: string;
 };
 
-type BridgeMessage = {
+type CloudHostingMessage = {
   type: string;
   [key: string]: unknown;
 };
@@ -42,12 +42,28 @@ type PendingRequests = {
 const DEFAULT_TIMEOUT_MS = 15000;
 const INSTANCE_CHANGE_TIMEOUT_MS = 5 * 60 * 1000;
 
-function getParentOrigin(): string | null {
+function normalizeUrl(url: string) {
+  return url.replace(/\/$/, '');
+}
+
+function getParentWindow(): Window | null {
   if (typeof window === 'undefined' || window.parent === window) {
     return null;
   }
 
-  if (!document.referrer) {
+  return window.parent;
+}
+
+function getOpenerWindow(): Window | null {
+  if (typeof window === 'undefined' || !window.opener || window.opener.closed) {
+    return null;
+  }
+
+  return window.opener;
+}
+
+function getParentOrigin(): string | null {
+  if (typeof window === 'undefined' || !getParentWindow() || !document.referrer) {
     return null;
   }
 
@@ -58,12 +74,12 @@ function getParentOrigin(): string | null {
   }
 }
 
-function getInitialAuthorizationCode(): string | null {
-  if (typeof window === 'undefined') {
-    return null;
+function getCurrentOrigin(): string {
+  if (typeof window !== 'undefined') {
+    return normalizeUrl(window.location.origin);
   }
 
-  return new URL(window.location.href).searchParams.get('authorizationCode');
+  return '';
 }
 
 function getErrorMessage(message: unknown, fallback: string): string {
@@ -72,11 +88,11 @@ function getErrorMessage(message: unknown, fallback: string): string {
 
 function normalizeProjectInfo(
   previous: DashboardProjectInfo | undefined,
-  backendUrl: string,
-  message: BridgeMessage
+  origin: string,
+  message: CloudHostingMessage
 ): DashboardProjectInfo {
   const previousInfo = previous ?? {
-    id: backendUrl,
+    id: origin,
     name: 'Project',
     region: '',
     instanceType: '',
@@ -104,19 +120,12 @@ function normalizeProjectInfo(
   };
 }
 
-export function isCloudHostingBackend(backendUrl: string): boolean {
-  try {
-    return new URL(backendUrl).hostname.endsWith('.insforge.app');
-  } catch {
-    return false;
-  }
-}
-
-export function useCloudHostingBridge(backendUrl: string) {
+export function useCloudHosting() {
+  const currentOrigin = getCurrentOrigin();
   const [projectInfo, setProjectInfo] = useState<DashboardProjectInfo>();
-  const initialAuthorizationCodeRef = useRef<string | null>(getInitialAuthorizationCode());
   const queuedAuthorizationCodeRef = useRef<string | null>(null);
   const parentOriginRef = useRef<string | null>(getParentOrigin());
+  const openerOriginRef = useRef<string | null>(null);
   const pendingRequestsRef = useRef<PendingRequests>({});
 
   const setPendingRequest = useCallback(
@@ -186,16 +195,13 @@ export function useCloudHostingBridge(backendUrl: string) {
     [clearPendingRequest]
   );
 
-  const postMessageToParent = useCallback((message: BridgeMessage): boolean => {
-    if (typeof window === 'undefined' || window.parent === window) {
+  const postMessageToParent = useCallback((message: CloudHostingMessage): boolean => {
+    const parentWindow = getParentWindow();
+    if (!parentWindow || !parentOriginRef.current) {
       return false;
     }
 
-    if (!parentOriginRef.current) {
-      return false;
-    }
-
-    window.parent.postMessage(message, parentOriginRef.current);
+    parentWindow.postMessage(message, parentOriginRef.current);
     return true;
   }, []);
 
@@ -221,20 +227,37 @@ export function useCloudHostingBridge(backendUrl: string) {
   );
 
   useEffect(() => {
-    const handleMessage = (event: MessageEvent<BridgeMessage>) => {
-      if (typeof window === 'undefined' || event.source !== window.parent) {
+    const handleMessage = (event: MessageEvent<CloudHostingMessage>) => {
+      const isParentMessage = event.source === getParentWindow();
+      const isOpenerMessage = event.source === getOpenerWindow();
+
+      if (!isParentMessage && !isOpenerMessage) {
         return;
       }
 
-      if (!parentOriginRef.current) {
-        // Adopt the origin from the first verified parent message when referrer is unavailable
-        parentOriginRef.current = event.origin;
-      } else if (event.origin !== parentOriginRef.current) {
+      if (isParentMessage) {
+        if (!parentOriginRef.current) {
+          parentOriginRef.current = event.origin;
+        } else if (event.origin !== parentOriginRef.current) {
+          return;
+        }
+      } else if (!openerOriginRef.current) {
+        openerOriginRef.current = event.origin;
+      } else if (event.origin !== openerOriginRef.current) {
         return;
       }
 
       const message = event.data;
       if (!message || typeof message !== 'object' || typeof message.type !== 'string') {
+        return;
+      }
+
+      if (
+        isOpenerMessage &&
+        message.type !== 'AUTHORIZATION_CODE' &&
+        message.type !== 'AUTHORIZATION_CODE_ERROR' &&
+        message.type !== 'AUTH_ERROR'
+      ) {
         return;
       }
 
@@ -268,7 +291,7 @@ export function useCloudHostingBridge(backendUrl: string) {
           return;
         }
         case 'PROJECT_INFO': {
-          setProjectInfo((previous) => normalizeProjectInfo(previous, backendUrl, message));
+          setProjectInfo((previous) => normalizeProjectInfo(previous, currentOrigin, message));
           return;
         }
         case 'INSTANCE_INFO': {
@@ -301,7 +324,7 @@ export function useCloudHostingBridge(backendUrl: string) {
           if (message.success === true) {
             if (typeof message.name === 'string' && message.name.trim()) {
               setProjectInfo((previous) =>
-                normalizeProjectInfo(previous, backendUrl, {
+                normalizeProjectInfo(previous, currentOrigin, {
                   type: 'PROJECT_INFO',
                   name: message.name,
                 })
@@ -357,31 +380,24 @@ export function useCloudHostingBridge(backendUrl: string) {
       window.removeEventListener('message', handleMessage);
 
       (Object.keys(pendingRequests) as PendingRequestKey[]).forEach((key) => {
-        rejectPendingRequest(key, 'Cloud hosting bridge was disposed');
+        rejectPendingRequest(key, 'Cloud hosting was disposed');
       });
     };
-  }, [backendUrl, rejectPendingRequest, resolvePendingRequest]);
+  }, [currentOrigin, rejectPendingRequest, resolvePendingRequest]);
 
   useEffect(() => {
     void postMessageToParent({ type: 'REQUEST_PROJECT_INFO' });
   }, [postMessageToParent]);
 
   const getAuthorizationCode = useCallback(async (): Promise<string> => {
-    if (initialAuthorizationCodeRef.current) {
-      const code = initialAuthorizationCodeRef.current;
-      initialAuthorizationCodeRef.current = null;
-      return code;
-    }
-
     if (queuedAuthorizationCodeRef.current) {
       const code = queuedAuthorizationCodeRef.current;
       queuedAuthorizationCodeRef.current = null;
       return code;
     }
 
-    // Try to request a code from the parent. Even if the send fails (e.g. parent
-    // origin not yet known), still create a pending request so the proactive
-    // AUTHORIZATION_CODE message from the parent can resolve it when it arrives.
+    // Even if the send fails, keep the pending request open so a proactive parent or opener
+    // message can still resolve it when the cloud hosting transport finishes initializing.
     postMessageToParent({ type: 'REQUEST_AUTHORIZATION_CODE' });
 
     return createPendingRequest('authCode', 'Authorization code request');
