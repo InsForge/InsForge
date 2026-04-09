@@ -38,7 +38,6 @@ export interface DashboardProps {
   project?: DashboardProjectInfo;
   connectDialogOpen?: boolean;
   onConnectDialogOpenChange?: (open: boolean) => void;
-  onOpenSettings?: () => void;
   onNavigateToSubscription?: () => void;
   onRenameProject?: (name: string) => Promise<void>;
   onDeleteProject?: () => Promise<void>;
@@ -51,7 +50,6 @@ export interface DashboardProps {
 
 export interface SelfHostingDashboardProps extends DashboardProps {
   mode: 'self-hosting';
-  getAuthorizationCode?: never;
 }
 
 export interface CloudHostingDashboardProps extends DashboardProps {

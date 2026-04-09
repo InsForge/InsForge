@@ -1,7 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Button, ConfirmDialog } from '@insforge/ui';
 import {
-  ConnectCTA,
   DataGrid,
   type DataGridProps,
   DataGridEmptyState,
@@ -471,12 +470,9 @@ export function StorageDataGrid({
           onDelete={(file) => void handleDelete(file)}
           isDownloading={isDownloading}
           emptyState={
-            <div className="flex flex-col items-center">
-              <DataGridEmptyState
-                message={searchQuery ? 'No files match your search criteria' : 'No files found'}
-              />
-              {!searchQuery && <ConnectCTA />}
-            </div>
+            <DataGridEmptyState
+              message={searchQuery ? 'No files match your search criteria' : 'No files found'}
+            />
           }
         />
       </div>
