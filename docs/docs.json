@@ -89,6 +89,12 @@
             ]
           },
           {
+            "group": "Self-Hosting",
+            "pages": [
+              "deployment/deployment-security-guide"
+            ]
+          },
+          {
             "group": "Community Showcase",
             "pages": ["showcase"]
           },

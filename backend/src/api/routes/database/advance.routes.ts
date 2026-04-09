@@ -1,6 +1,7 @@
 import { Router, Response, NextFunction } from 'express';
 import { DatabaseAdvanceService } from '@/services/database/database-advance.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
+import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
@@ -20,6 +21,22 @@ import { analyzeQuery, DatabaseResourceUpdate } from '@/utils/sql-parser.js';
 const router = Router();
 const dbAdvanceService = DatabaseAdvanceService.getInstance();
 const auditService = AuditService.getInstance();
+
+/**
+ * Invalidate column type cache for tables affected by schema-changing SQL
+ */
+function invalidateColumnTypeCacheFromChanges(changes: DatabaseResourceUpdate[]): void {
+  for (const change of changes) {
+    if (change.type === 'table' || change.type === 'tables') {
+      if (change.name) {
+        DatabaseManager.clearColumnTypeCache(change.name);
+      } else {
+        // DROP TABLE / CREATE TABLE don't preserve table name in the parser — clear all
+        DatabaseManager.clearColumnTypeCache();
+      }
+    }
+  }
+}
 
 /**
  * Execute raw SQL query with relaxed sanitization (Power User Mode)
@@ -68,6 +85,7 @@ router.post(
       // Broadcast changes if any modifying statements detected
       const changes = analyzeQuery(query);
       if (changes.length > 0) {
+        invalidateColumnTypeCacheFromChanges(changes);
         const socket = SocketManager.getInstance();
         socket.broadcastToRoom(
           'role:project_admin',
@@ -126,6 +144,7 @@ router.post('/rawsql', verifyAdmin, async (req: AuthRequest, res: Response, next
     // Broadcast changes if any modifying statements detected
     const changes = analyzeQuery(query);
     if (changes.length > 0) {
+      invalidateColumnTypeCacheFromChanges(changes);
       const socket = SocketManager.getInstance();
       socket.broadcastToRoom(
         'role:project_admin',
@@ -318,6 +337,9 @@ router.post(
         },
         ip_address: req.ip,
       });
+
+      // Import may contain DDL — clear all column type caches
+      DatabaseManager.clearColumnTypeCache();
 
       const socket = SocketManager.getInstance();
       socket.broadcastToRoom(

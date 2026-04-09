@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react';
-import type { DashboardProps } from '../../types';
+import type { InsForgeDashboardProps } from '../../types';
 
-const DashboardHostContext = createContext<DashboardProps | null>(null);
+const DashboardHostContext = createContext<InsForgeDashboardProps | null>(null);
 
 export const DashboardHostProvider = DashboardHostContext.Provider;
 

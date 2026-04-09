@@ -1,105 +1,68 @@
-import { useEffect, useMemo } from 'react';
-import { BrowserRouter, MemoryRouter, useLocation } from 'react-router-dom';
-import { DashboardAppShell } from './DashboardAppShell';
+import { useMemo, useState } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from '../lib/contexts/AuthContext';
-import { AppRoutes } from '../lib/routing/AppRoutes';
+import { AppRoutes } from '../router/AppRoutes';
 import { ToastProvider } from '../lib/hooks/useToast';
 import { SocketProvider } from '../lib/contexts/SocketContext';
 import { PostHogAnalyticsProvider } from '../lib/analytics/posthog';
 import { ModalProvider } from '../lib/contexts/ModalContext';
 import { SQLEditorProvider } from '../features/database/contexts/SQLEditorContext';
-import { useDashboardHost } from '../lib/config/DashboardHostContext';
-import type {
-  CloudHostingDashboardProps,
-  DashboardProps,
-  SelfHostingDashboardProps,
-} from '../types';
+import { DashboardHostProvider } from '../lib/config/DashboardHostContext';
+import { setDashboardBackendUrl } from '../lib/config/runtime';
+import type { InsForgeDashboardProps } from '../types';
 
-function RouteChangeNotifier() {
-  const location = useLocation();
-  const host = useDashboardHost();
-
-  useEffect(() => {
-    host.onRouteChange?.({
-      path: `${location.pathname}${location.search}${location.hash}`,
-    });
-  }, [host, location.hash, location.pathname, location.search]);
-
-  return null;
+function normalizeBackendUrl(url?: string) {
+  return url?.replace(/\/$/, '') || undefined;
 }
 
-function SelfHostingDashboard({
-  backendUrl,
-  initialPath = '/dashboard',
-  auth,
-  ...host
-}: SelfHostingDashboardProps) {
-  const normalizedBackendUrl = useMemo(() => backendUrl.replace(/\/$/, ''), [backendUrl]);
-
-  return (
-    <BrowserRouter>
-      <div className="insforge-dashboard flex h-full min-h-0 min-w-0 flex-col">
-        <DashboardAppShell
-          {...host}
-          mode="self-hosting"
-          backendUrl={normalizedBackendUrl}
-          initialPath={initialPath}
-          auth={auth ?? { strategy: 'session' }}
-        >
-          <AuthProvider>
-            <SocketProvider>
-              <ToastProvider>
-                <PostHogAnalyticsProvider>
-                  <ModalProvider
-                    connectDialogOpen={host.connectDialogOpen}
-                    onConnectDialogOpenChange={host.onConnectDialogOpenChange}
-                  >
-                    <SQLEditorProvider>
-                      <AppRoutes />
-                    </SQLEditorProvider>
-                  </ModalProvider>
-                </PostHogAnalyticsProvider>
-              </ToastProvider>
-            </SocketProvider>
-          </AuthProvider>
-        </DashboardAppShell>
-      </div>
-    </BrowserRouter>
+export function InsForgeDashboard(props: InsForgeDashboardProps) {
+  const host = useMemo<InsForgeDashboardProps>(
+    () => ({
+      ...props,
+      backendUrl: normalizeBackendUrl(props.backendUrl),
+    }),
+    [props]
   );
-}
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            staleTime: 5 * 60 * 1000,
+            gcTime: 10 * 60 * 1000,
+            refetchOnWindowFocus: false,
+          },
+        },
+      })
+  );
 
-function CloudHostingDashboard(props: CloudHostingDashboardProps) {
+  setDashboardBackendUrl(host.backendUrl);
+
   return (
     <div className="insforge-dashboard flex h-full min-h-0 min-w-0 flex-col">
-      <MemoryRouter initialEntries={[props.initialPath || '/dashboard']}>
-        <DashboardAppShell {...props}>
-          <RouteChangeNotifier />
-          <AuthProvider>
-            <SocketProvider>
-              <ToastProvider>
-                <PostHogAnalyticsProvider>
-                  <ModalProvider
-                    connectDialogOpen={props.connectDialogOpen}
-                    onConnectDialogOpenChange={props.onConnectDialogOpenChange}
-                  >
-                    <SQLEditorProvider>
-                      <AppRoutes />
-                    </SQLEditorProvider>
-                  </ModalProvider>
-                </PostHogAnalyticsProvider>
-              </ToastProvider>
-            </SocketProvider>
-          </AuthProvider>
-        </DashboardAppShell>
-      </MemoryRouter>
+      <BrowserRouter>
+        <QueryClientProvider client={queryClient}>
+          <DashboardHostProvider value={host}>
+            <AuthProvider>
+              <SocketProvider>
+                <ToastProvider>
+                  <PostHogAnalyticsProvider>
+                    <ModalProvider
+                      connectDialogOpen={host.connectDialogOpen}
+                      onConnectDialogOpenChange={host.onConnectDialogOpenChange}
+                    >
+                      <SQLEditorProvider>
+                        <AppRoutes />
+                      </SQLEditorProvider>
+                    </ModalProvider>
+                  </PostHogAnalyticsProvider>
+                </ToastProvider>
+              </SocketProvider>
+            </AuthProvider>
+          </DashboardHostProvider>
+        </QueryClientProvider>
+      </BrowserRouter>
     </div>
   );
-}
-
-export function InsForgeDashboard(props: DashboardProps) {
-  if (props.mode === 'self-hosting') {
-    return <SelfHostingDashboard {...props} />;
-  }
-
-  return <CloudHostingDashboard {...props} />;
 }

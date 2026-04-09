@@ -1,8 +1,11 @@
 /**
  * Email template types supported by email providers
  */
-export type EmailTemplate =
-  | 'email-verification-code' // Numeric OTP for email verification
-  | 'email-verification-link' // Magic link for email verification
-  | 'reset-password-code' // Numeric OTP for password reset
-  | 'reset-password-link'; // Magic link for password reset
+export const EMAIL_TEMPLATE_TYPES = [
+  'email-verification-code',
+  'email-verification-link',
+  'reset-password-code',
+  'reset-password-link',
+] as const;
+
+export type EmailTemplate = (typeof EMAIL_TEMPLATE_TYPES)[number];

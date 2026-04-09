@@ -1,9 +1,13 @@
-import { InsForgeDashboard } from '@insforge/dashboard';
-
-const backendUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:7130';
+import { CloudHostingDashboard } from './cloud-hosting/CloudHostingDashboard';
+import { isCloudHosting } from './helpers';
+import { SelfHostingDashboard } from './self-hosting/SelfHostingDashboard';
 
 function App() {
-  return <InsForgeDashboard mode="self-hosting" backendUrl={backendUrl} />;
+  if (isCloudHosting()) {
+    return <CloudHostingDashboard />;
+  }
+
+  return <SelfHostingDashboard />;
 }
 
 export default App;
