@@ -20,7 +20,7 @@ const AUTHENTICATION_SIDEBAR_ITEMS: FeatureSidebarListItem[] = [
   },
   {
     id: 'email',
-    label: 'Custom SMTP',
+    label: 'Email Providers',
     href: '/dashboard/authentication/email',
   },
 ];
