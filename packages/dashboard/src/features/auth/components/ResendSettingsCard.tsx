@@ -3,13 +3,16 @@ import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button, Input, Switch } from '@insforge/ui';
 import { z } from 'zod';
-import {
-  upsertResendConfigRequestSchema,
-  type ResendConfigSchema,
-  type UpsertResendConfigRequest,
-} from '@insforge/shared-schemas';
+import { type ResendConfigSchema, type UpsertResendConfigRequest } from '@insforge/shared-schemas';
 
-type ResendFormValues = z.input<typeof upsertResendConfigRequestSchema>;
+const resendFormSchema = z.object({
+  enabled: z.boolean(),
+  apiKey: z.string().optional(),
+  senderEmail: z.string(),
+  senderName: z.string(),
+});
+
+type ResendFormValues = z.infer<typeof resendFormSchema>;
 
 interface ResendSettingsCardProps {
   config: ResendConfigSchema | undefined;
@@ -76,7 +79,7 @@ export function ResendSettingsCard({
   onSave,
 }: ResendSettingsCardProps) {
   const form = useForm<ResendFormValues>({
-    resolver: zodResolver(upsertResendConfigRequestSchema),
+    resolver: zodResolver(resendFormSchema),
     defaultValues,
   });
 
@@ -87,8 +90,10 @@ export function ResendSettingsCard({
   }, [config, form]);
 
   useEffect(() => {
-    resetForm();
-  }, [resetForm]);
+    if (!form.formState.isDirty) {
+      resetForm();
+    }
+  }, [form.formState.isDirty, resetForm]);
 
   const handleSubmit = () => {
     void form.handleSubmit((data) => {
