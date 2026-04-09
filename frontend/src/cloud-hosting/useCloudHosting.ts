@@ -41,7 +41,6 @@ type PendingRequests = {
 
 const DEFAULT_TIMEOUT_MS = 15000;
 const INSTANCE_CHANGE_TIMEOUT_MS = 5 * 60 * 1000;
-
 function normalizeUrl(url: string) {
   return url.replace(/\/$/, '');
 }
@@ -123,6 +122,7 @@ function normalizeProjectInfo(
 export function useCloudHosting() {
   const currentOrigin = getCurrentOrigin();
   const [projectInfo, setProjectInfo] = useState<DashboardProjectInfo>();
+  const [connectDialogOpen, setConnectDialogOpen] = useState(false);
   const queuedAuthorizationCodeRef = useRef<string | null>(null);
   const parentOriginRef = useRef<string | null>(getParentOrigin());
   const openerOriginRef = useRef<string | null>(null);
@@ -262,6 +262,11 @@ export function useCloudHosting() {
       }
 
       switch (message.type) {
+        case 'SHOW_ONBOARDING_OVERLAY':
+        case 'SHOW_CONNECT_OVERLAY': {
+          setConnectDialogOpen(true);
+          return;
+        }
         case 'AUTHORIZATION_CODE': {
           const code =
             typeof message.code === 'string' && message.code.trim() ? message.code : null;
@@ -458,6 +463,8 @@ export function useCloudHosting() {
   }, [postMessageToParent]);
 
   return {
+    connectDialogOpen,
+    setConnectDialogOpen,
     projectInfo,
     getAuthorizationCode,
     requestInstanceInfo,

@@ -4,6 +4,8 @@ import { useCloudHosting } from './useCloudHosting';
 
 export function CloudHostingDashboard() {
   const {
+    connectDialogOpen,
+    setConnectDialogOpen,
     getAuthorizationCode,
     projectInfo,
     navigateToSubscription,
@@ -18,6 +20,8 @@ export function CloudHostingDashboard() {
     <InsForgeDashboard
       mode="cloud-hosting"
       showNavbar={!isInIframe()}
+      connectDialogOpen={connectDialogOpen}
+      onConnectDialogOpenChange={setConnectDialogOpen}
       getAuthorizationCode={getAuthorizationCode}
       project={projectInfo}
       onNavigateToSubscription={navigateToSubscription}
