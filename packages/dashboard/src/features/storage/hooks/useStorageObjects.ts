@@ -44,10 +44,7 @@ export function useStorageObjects() {
               },
             };
           } catch (error) {
-            if (error) {
-              console.error(error);
-              return null;
-            }
+            console.error(error);
             return {
               bucketName: bucket.name,
               stats: {

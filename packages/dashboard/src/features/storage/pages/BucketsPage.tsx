@@ -66,11 +66,7 @@ export default function BucketsPage() {
     refetchBuckets,
     deleteBucket,
   } = useStorageBuckets();
-  const {
-    useBucketStats,
-    uploadObject,
-    deleteObjects,
-  } = useStorageObjects();
+  const { useBucketStats, uploadObject, deleteObjects } = useStorageObjects();
   const selectedBucket = useMemo(() => {
     if (isLoading || !buckets.length) {
       return null;
@@ -101,10 +97,22 @@ export default function BucketsPage() {
 
   const { data: bucketStats } = useBucketStats(buckets);
 
-  // Build bucket info map
-  const bucketInfo = React.useMemo(() => {
-    return bucketStats || {};
-  }, [bucketStats]);
+  // Build bucket info map: use buckets as source of truth, layer stats on top
+  const bucketInfo = useMemo(
+    () =>
+      Object.fromEntries(
+        buckets.map((bucket) => [
+          bucket.name,
+          {
+            fileCount: bucketStats?.[bucket.name]?.fileCount ?? 0,
+            totalSize: bucketStats?.[bucket.name]?.totalSize ?? 0,
+            public: bucket.public,
+            createdAt: bucket.createdAt,
+          },
+        ])
+      ),
+    [buckets, bucketStats]
+  );
 
   // Keep URL query param in sync with active bucket selection with fallback-to-first behavior.
   useEffect(() => {
@@ -304,7 +312,7 @@ export default function BucketsPage() {
     <div className="flex h-full min-h-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
       {/* Secondary Sidebar - Bucket List */}
       <StorageSidebar
-        buckets={Object.keys(bucketInfo)}
+        buckets={buckets.map((bucket) => bucket.name)}
         selectedBucket={selectedBucket || undefined}
         onBucketSelect={(bucketName) => selectBucket(bucketName)}
         loading={isLoading}
