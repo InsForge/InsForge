@@ -10,7 +10,14 @@ CREATE TABLE IF NOT EXISTS email.resend_config (
   sender_email TEXT NOT NULL DEFAULT '',
   sender_name TEXT NOT NULL DEFAULT '',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT resend_config_enabled_requires_values CHECK (
+    NOT enabled OR (
+      api_key_encrypted <> '' AND
+      sender_email <> '' AND
+      sender_name <> ''
+    )
+  )
 );
 
 -- Singleton constraint: only one row allowed
