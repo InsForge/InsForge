@@ -12,7 +12,11 @@ import {
 } from '@insforge/ui';
 import { useAIUsageSummary, useAIUsageRecords } from '../hooks/useAIUsage';
 import { formatTime } from '../../../lib/utils/utils';
-import type { AIUsageSummarySchema, AIUsageRecordSchema } from '@insforge/shared-schemas';
+import type {
+  AIUsageSummarySchema,
+  AIUsageRecordSchema,
+  ModalitySchema,
+} from '@insforge/shared-schemas';
 
 type DateRangeOption = 'thisWeek' | 'thisMonth' | 'allTime';
 
@@ -38,7 +42,33 @@ function getDateRange(range: DateRangeOption): DateRange {
   return { startDate: start.toISOString(), endDate };
 }
 
+/** Derive a human-readable request type from the record's output modality. */
+function deriveRequestType(outputModality: ModalitySchema[] | null): string {
+  if (!outputModality || outputModality.length === 0) {
+    return '—';
+  }
+  if (outputModality.includes('image')) {
+    return 'Image';
+  }
+  if (outputModality.includes('audio')) {
+    return 'Audio';
+  }
+  if (outputModality.includes('text')) {
+    return 'Text';
+  }
+  return outputModality.join(', ');
+}
+
+interface PerModelRow {
+  model: string;
+  requests: number;
+  inputTokens: number;
+  outputTokens: number;
+}
+
 const PAGE_SIZE = 25;
+/** Fetch limit used solely for the per-model aggregation view. */
+const AGGREGATE_LIMIT = '200';
 
 function SummaryCard({ label, value }: { label: string; value: string | number }) {
   return (
@@ -60,13 +90,50 @@ function SummaryCards({ summary }: { summary: AIUsageSummarySchema }) {
   );
 }
 
+function PerModelTable({ rows }: { rows: PerModelRow[] }) {
+  if (rows.length === 0) {
+    return null;
+  }
+  return (
+    <div className="bg-card border border-[var(--alpha-8)] rounded flex flex-col">
+      <div className="px-4 py-2.5 border-b border-[var(--alpha-8)]">
+        <h2 className="text-sm font-medium text-foreground">Usage by model</h2>
+      </div>
+      <div className="grid grid-cols-[minmax(0,2fr)_1fr_1fr_1fr] gap-x-2.5 h-8 items-center text-sm leading-5 text-muted-foreground px-4 border-b border-[var(--alpha-8)]">
+        <div>Model</div>
+        <div>Requests</div>
+        <div>Input tokens</div>
+        <div>Output tokens</div>
+      </div>
+      {rows.map((row) => (
+        <div
+          key={row.model}
+          className="grid grid-cols-[minmax(0,2fr)_1fr_1fr_1fr] gap-x-2.5 min-h-10 items-center px-4 border-b border-[var(--alpha-8)] last:border-b-0"
+        >
+          <p className="truncate text-[13px] text-foreground">{row.model}</p>
+          <p className="text-[13px] tabular-nums text-foreground">
+            {row.requests.toLocaleString()}
+          </p>
+          <p className="text-[13px] tabular-nums text-foreground">
+            {row.inputTokens.toLocaleString()}
+          </p>
+          <p className="text-[13px] tabular-nums text-foreground">
+            {row.outputTokens.toLocaleString()}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function RecordRow({ record }: { record: AIUsageRecordSchema }) {
   const createdAtStr = String(record.createdAt);
   return (
-    <div className="grid grid-cols-[minmax(0,2fr)_1fr_1fr_1fr_1fr_1fr] gap-x-2.5 min-h-10 items-center text-sm leading-5 text-foreground px-4 border-b border-[var(--alpha-8)] last:border-b-0">
+    <div className="grid grid-cols-[minmax(0,2fr)_1fr_1fr_1fr_1fr_1fr_1fr] gap-x-2.5 min-h-10 items-center text-sm leading-5 text-foreground px-4 border-b border-[var(--alpha-8)] last:border-b-0">
       <p className="truncate text-[13px] text-muted-foreground">{formatTime(createdAtStr)}</p>
       <p className="truncate text-[13px]">{record.model ?? record.modelId ?? '—'}</p>
       <p className="truncate text-[13px]">{record.provider ?? '—'}</p>
+      <p className="truncate text-[13px]">{deriveRequestType(record.outputModality)}</p>
       <p className="truncate text-[13px] tabular-nums">
         {record.inputTokens !== null && record.inputTokens !== undefined
           ? record.inputTokens.toLocaleString()
@@ -98,6 +165,15 @@ export default function AIUsagePage() {
     error: summaryError,
   } = useAIUsageSummary({ startDate, endDate });
 
+  // High-limit fetch used to build the per-model breakdown table.
+  const { data: aggregateData, isLoading: aggregateLoading } = useAIUsageRecords({
+    startDate,
+    endDate,
+    limit: AGGREGATE_LIMIT,
+    offset: '0',
+  });
+
+  // Separate paginated fetch for the detailed records table.
   const {
     data: recordsData,
     isLoading: recordsLoading,
@@ -109,6 +185,25 @@ export default function AIUsagePage() {
     offset: String((page - 1) * PAGE_SIZE),
   });
 
+  /** Per-model breakdown derived by grouping the aggregate records. */
+  const perModelRows = useMemo((): PerModelRow[] => {
+    if (!aggregateData?.records) {
+      return [];
+    }
+    const map = new Map<string, PerModelRow>();
+    for (const record of aggregateData.records) {
+      const key = record.model ?? record.modelId ?? 'Unknown';
+      const existing = map.get(key) ?? { model: key, requests: 0, inputTokens: 0, outputTokens: 0 };
+      map.set(key, {
+        model: key,
+        requests: existing.requests + 1,
+        inputTokens: existing.inputTokens + (record.inputTokens ?? 0),
+        outputTokens: existing.outputTokens + (record.outputTokens ?? 0),
+      });
+    }
+    return Array.from(map.values()).sort((a, b) => b.requests - a.requests);
+  }, [aggregateData]);
+
   const totalPages = recordsData ? Math.max(1, Math.ceil(recordsData.total / PAGE_SIZE)) : 1;
 
   const handleDateRangeChange = (value: string) => {
@@ -116,7 +211,7 @@ export default function AIUsagePage() {
     setPage(1);
   };
 
-  const isLoading = summaryLoading || recordsLoading;
+  const isLoading = summaryLoading || recordsLoading || aggregateLoading;
   const error = summaryError ?? recordsError;
 
   return (
@@ -172,13 +267,20 @@ export default function AIUsagePage() {
               {/* Summary cards */}
               {summary && <SummaryCards summary={summary} />}
 
+              {/* Per-model breakdown */}
+              <PerModelTable rows={perModelRows} />
+
               {/* Records table */}
               <div className="bg-card border border-[var(--alpha-8)] rounded flex flex-col">
                 {/* Table Header */}
-                <div className="grid grid-cols-[minmax(0,2fr)_1fr_1fr_1fr_1fr_1fr] gap-x-2.5 h-8 items-center text-sm leading-5 text-muted-foreground px-4 border-b border-[var(--alpha-8)]">
+                <div className="px-4 py-2.5 border-b border-[var(--alpha-8)]">
+                  <h2 className="text-sm font-medium text-foreground">Usage records</h2>
+                </div>
+                <div className="grid grid-cols-[minmax(0,2fr)_1fr_1fr_1fr_1fr_1fr_1fr] gap-x-2.5 h-8 items-center text-sm leading-5 text-muted-foreground px-4 border-b border-[var(--alpha-8)]">
                   <div>Time</div>
                   <div>Model</div>
                   <div>Provider</div>
+                  <div>Type</div>
                   <div>Input tokens</div>
                   <div>Output tokens</div>
                   <div>Images</div>
