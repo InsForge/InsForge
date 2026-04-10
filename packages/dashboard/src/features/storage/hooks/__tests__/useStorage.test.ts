@@ -8,7 +8,9 @@ import { createWrapper } from './test-utils';
 vi.mock('../../services/storage.service', () => ({
   storageService: {
     listBuckets: vi.fn().mockResolvedValue([]),
-    listObjects: vi.fn().mockResolvedValue({ objects: [], pagination: { offset: 0, limit: 20, total: 0 } }),
+    listObjects: vi
+      .fn()
+      .mockResolvedValue({ objects: [], pagination: { offset: 0, limit: 20, total: 0 } }),
     createBucket: vi.fn(),
     deleteBucket: vi.fn(),
     editBucket: vi.fn(),

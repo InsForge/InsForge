@@ -8,16 +8,18 @@ import { createWrapper } from './test-utils';
 const mockListObjects = vi.fn();
 const mockUploadObject = vi.fn();
 const mockDeleteObjects = vi.fn();
-const mockGetDownloadUrl = vi.fn((bucket: string, key: string) => `/api/storage/buckets/${bucket}/objects/${key}`);
+const mockGetDownloadUrl = vi.fn(
+  (bucket: string, key: string) => `/api/storage/buckets/${bucket}/objects/${key}`
+);
 const mockDownloadObject = vi.fn();
 
 vi.mock('../../services/storage.service', () => ({
   storageService: {
-    listObjects: (...args: unknown[]) => mockListObjects(...args),
-    uploadObject: (...args: unknown[]) => mockUploadObject(...args),
-    deleteObjects: (...args: unknown[]) => mockDeleteObjects(...args),
-    getDownloadUrl: (...args: unknown[]) => mockGetDownloadUrl(...args),
-    downloadObject: (...args: unknown[]) => mockDownloadObject(...args),
+    listObjects: (...args: any[]) => mockListObjects(...args),
+    uploadObject: (...args: any[]) => mockUploadObject(...args),
+    deleteObjects: (...args: any[]) => mockDeleteObjects(...args),
+    getDownloadUrl: (...args: any[]) => mockGetDownloadUrl(...args),
+    downloadObject: (...args: any[]) => mockDownloadObject(...args),
   },
 }));
 
@@ -63,7 +65,11 @@ describe('useStorageObjects', () => {
 
       await waitFor(() => expect(result.current.listHook.data).toBeDefined());
 
-      expect(mockListObjects).toHaveBeenCalledWith('my-bucket', { limit: 20, offset: 0 }, undefined);
+      expect(mockListObjects).toHaveBeenCalledWith(
+        'my-bucket',
+        { limit: 20, offset: 0 },
+        undefined
+      );
       expect(result.current.listHook.data).toEqual(mockResponse);
     });
 

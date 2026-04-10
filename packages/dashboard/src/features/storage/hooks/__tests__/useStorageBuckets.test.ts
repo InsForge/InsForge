@@ -13,11 +13,11 @@ const mockEditBucket = vi.fn();
 
 vi.mock('../../services/storage.service', () => ({
   storageService: {
-    listBuckets: (...args: unknown[]) => mockListBuckets(...args),
-    listObjects: (...args: unknown[]) => mockListObjects(...args),
-    createBucket: (...args: unknown[]) => mockCreateBucket(...args),
-    deleteBucket: (...args: unknown[]) => mockDeleteBucket(...args),
-    editBucket: (...args: unknown[]) => mockEditBucket(...args),
+    listBuckets: (...args: any[]) => mockListBuckets(...args),
+    listObjects: (...args: any[]) => mockListObjects(...args),
+    createBucket: (...args: any[]) => mockCreateBucket(...args),
+    deleteBucket: (...args: any[]) => mockDeleteBucket(...args),
+    editBucket: (...args: any[]) => mockEditBucket(...args),
   },
 }));
 
@@ -201,7 +201,10 @@ describe('useStorageBuckets', () => {
 
     it('is disabled when no buckets exist', async () => {
       mockListBuckets.mockResolvedValue([]);
-      mockListObjects.mockResolvedValue({ objects: [], pagination: { offset: 0, limit: 1, total: 0 } });
+      mockListObjects.mockResolvedValue({
+        objects: [],
+        pagination: { offset: 0, limit: 1, total: 0 },
+      });
 
       const { result } = renderHook(
         () => {
