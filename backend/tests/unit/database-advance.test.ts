@@ -418,6 +418,28 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
     });
   });
 
+  describe('strict vs relaxed mode behavior', () => {
+    test('strict mode blocks INSERT on system schema', () => {
+      const query = "INSERT INTO system.secrets (key, value) VALUES ('a', 'b')";
+      expect(() => service.sanitizeQuery(query, 'strict')).toThrow(AppError);
+    });
+
+    test('relaxed mode allows INSERT on system schema', () => {
+      const query = "INSERT INTO system.secrets (key, value) VALUES ('a', 'b')";
+      expect(() => service.sanitizeQuery(query, 'relaxed')).not.toThrow();
+    });
+
+    test('relaxed mode still blocks destructive operations on system schema', () => {
+      const query = "UPDATE system.secrets SET value = 'x' WHERE key = 'a'";
+      expect(() => service.sanitizeQuery(query, 'relaxed')).toThrow(AppError);
+    });
+
+    test('relaxed mode still blocks dangerous database-level operations', () => {
+      const query = 'DROP DATABASE testdb';
+      expect(() => service.sanitizeQuery(query, 'relaxed')).toThrow(AppError);
+    });
+  });
+
   describe('other blocked operations', () => {
     test('blocks DROP DATABASE', () => {
       const query = 'DROP DATABASE testdb';

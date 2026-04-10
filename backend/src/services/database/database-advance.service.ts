@@ -13,6 +13,7 @@ import {
   parseSQLStatements,
   checkAuthSchemaOperations,
   checkSystemSchemaOperations,
+  checkSystemSchemaOperationsRelaxed,
 } from '@/utils/sql-parser.js';
 import { validateTableName } from '@/utils/validations.js';
 import pgFormat from 'pg-format';
@@ -85,7 +86,7 @@ export class DatabaseAdvanceService {
    * - CREATE TRIGGER on auth tables (for automatic profile creation, etc.)
    * - Other DDL operations on auth schema (ALTER TABLE for indexes, etc.)
    */
-  sanitizeQuery(query: string, _mode: 'strict' | 'relaxed' = 'strict'): string {
+  sanitizeQuery(query: string, mode: 'strict' | 'relaxed' = 'strict'): string {
     // Block database-level operations
     const dangerousPatterns = [
       /DROP\s+DATABASE/i,
@@ -109,8 +110,13 @@ export class DatabaseAdvanceService {
       throw new AppError(authError, 403, ERROR_CODES.FORBIDDEN);
     }
 
-    // Block DDL/DML on system schema
-    const systemError = checkSystemSchemaOperations(query);
+    // Block unsafe system-schema operations by mode.
+    // - strict: blocks system DDL/DML (except SELECT)
+    // - relaxed: allows system INSERT for power-user workflows, still blocks destructive ops
+    const systemError =
+      mode === 'relaxed'
+        ? checkSystemSchemaOperationsRelaxed(query)
+        : checkSystemSchemaOperations(query);
     if (systemError) {
       logger.warn('Blocked operation on system schema', {
         query: query.substring(0, 100),
