@@ -172,12 +172,10 @@ export default function ProjectSettingsMenuDialog({
     setIsChangingInstanceType(false);
     setIsProjectNameFocused(false);
     setSelectedInstanceType(null);
-  }, [
-    canUseCloudHost,
-    open,
-    requestInstanceInfo,
-    defaultTab,
-  ]);
+    // We intentionally do not depend on projectInfo.name here because the effect should only
+    // initialize dialog state on open/close transitions, not reset the dialog during rename syncs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canUseCloudHost, open, requestInstanceInfo, defaultTab]);
 
   useEffect(() => {
     if (version && latestVersion) {
@@ -363,10 +361,7 @@ export default function ProjectSettingsMenuDialog({
   return (
     <>
       <ConfirmDialog {...confirmDialogProps} />
-      <MenuDialog
-        open={open}
-        onOpenChange={onOpenChange}
-      >
+      <MenuDialog open={open} onOpenChange={onOpenChange}>
         <MenuDialogContent>
           <MenuDialogSideNav>
             <MenuDialogSideNavHeader>

@@ -7,39 +7,56 @@ import { ToastProvider } from '../lib/hooks/useToast';
 import { SocketProvider } from '../lib/contexts/SocketContext';
 import { PostHogAnalyticsProvider } from '../lib/analytics/posthog';
 import { SQLEditorProvider } from '../features/database/contexts/SQLEditorContext';
-import { DashboardHostProvider, DashboardProjectProvider } from '../lib/config/DashboardHostContext';
+import {
+  DashboardHostProvider,
+  DashboardProjectProvider,
+} from '../lib/config/DashboardHostContext';
 import { setDashboardBackendUrl } from '../lib/config/runtime';
-import type {
-  CloudHostingDashboardProps,
-  InsForgeDashboardProps,
-  SelfHostingDashboardProps,
-} from '../types';
+import type { InsForgeDashboardProps } from '../types';
 
 function normalizeBackendUrl(url?: string) {
   return url?.replace(/\/$/, '') || undefined;
 }
 
 export function InsForgeDashboard(props: InsForgeDashboardProps) {
-  const { project, ...hostProps } = props;
-  const host = useMemo<
-    | Omit<SelfHostingDashboardProps, 'project'>
-    | Omit<CloudHostingDashboardProps, 'project'>
-  >(
+  const {
+    project,
+    backendUrl,
+    mode,
+    showNavbar,
+    onNavigateToSubscription,
+    onRenameProject,
+    onDeleteProject,
+    onRequestInstanceInfo,
+    onRequestInstanceTypeChange,
+    onUpdateVersion,
+  } = props;
+  const getAuthorizationCode =
+    props.mode === 'cloud-hosting' ? props.getAuthorizationCode : undefined;
+  const host = useMemo(
     () => ({
-      ...hostProps,
-      backendUrl: normalizeBackendUrl(hostProps.backendUrl),
+      backendUrl: normalizeBackendUrl(backendUrl),
+      mode,
+      showNavbar,
+      getAuthorizationCode,
+      onNavigateToSubscription,
+      onRenameProject,
+      onDeleteProject,
+      onRequestInstanceInfo,
+      onRequestInstanceTypeChange,
+      onUpdateVersion,
     }),
     [
-      hostProps.backendUrl,
-      hostProps.mode,
-      hostProps.showNavbar,
-      hostProps.onNavigateToSubscription,
-      hostProps.onRenameProject,
-      hostProps.onDeleteProject,
-      hostProps.onRequestInstanceInfo,
-      hostProps.onRequestInstanceTypeChange,
-      hostProps.onUpdateVersion,
-      hostProps.mode === 'cloud-hosting' ? hostProps.getAuthorizationCode : undefined,
+      backendUrl,
+      mode,
+      showNavbar,
+      getAuthorizationCode,
+      onNavigateToSubscription,
+      onRenameProject,
+      onDeleteProject,
+      onRequestInstanceInfo,
+      onRequestInstanceTypeChange,
+      onUpdateVersion,
     ]
   );
   const [queryClient] = useState(

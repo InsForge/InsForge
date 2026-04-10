@@ -1,13 +1,20 @@
 import { createContext, useContext } from 'react';
-import type {
-  CloudHostingDashboardProps,
-  DashboardProjectInfo,
-  SelfHostingDashboardProps,
-} from '../../types';
+import type { DashboardInstanceInfo, DashboardMode, DashboardProjectInfo } from '../../types';
 
-type DashboardHostContextValue =
-  | Omit<SelfHostingDashboardProps, 'project'>
-  | Omit<CloudHostingDashboardProps, 'project'>;
+interface DashboardHostContextValue {
+  backendUrl?: string;
+  showNavbar?: boolean;
+  mode: DashboardMode;
+  getAuthorizationCode?: () => Promise<string>;
+  onNavigateToSubscription?: () => void;
+  onRenameProject?: (name: string) => Promise<void>;
+  onDeleteProject?: () => Promise<void>;
+  onRequestInstanceInfo?: () => Promise<DashboardInstanceInfo>;
+  onRequestInstanceTypeChange?: (
+    instanceType: string
+  ) => Promise<{ success: boolean; instanceType?: string; error?: string }>;
+  onUpdateVersion?: () => Promise<void>;
+}
 
 const DashboardHostContext = createContext<DashboardHostContextValue | null>(null);
 const DashboardProjectContext = createContext<DashboardProjectInfo | undefined>(undefined);
