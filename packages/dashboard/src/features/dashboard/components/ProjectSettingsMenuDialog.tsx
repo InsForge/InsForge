@@ -51,6 +51,8 @@ const INFO_FIELD_CLASS =
 export default function ProjectSettingsMenuDialog() {
   const host = useDashboardHost();
   const isCloudHostingMode = useIsCloudHostingMode();
+  const onRequestInstanceInfo =
+    host.mode === 'cloud-hosting' ? host.onRequestInstanceInfo : undefined;
   const { isSettingsDialogOpen, settingsDefaultTab, closeSettingsDialog } = useModal();
   const [activeTab, setActiveTab] = useState<TabType>('info');
   const [isVersionOutdated, setIsVersionOutdated] = useState(false);
@@ -124,20 +126,18 @@ export default function ProjectSettingsMenuDialog() {
   }, [instanceInfo, selectedInstanceType]);
 
   const requestInstanceInfo = useCallback(async () => {
-    if (host.mode === 'cloud-hosting' && host.onRequestInstanceInfo) {
-      try {
-        const nextInstanceInfo = await host.onRequestInstanceInfo();
-        setInstanceInfo(nextInstanceInfo);
-        setSelectedInstanceType(null);
-      } catch (error) {
-        showToast(
-          error instanceof Error ? error.message : 'Failed to load compute options',
-          'error'
-        );
-      }
+    if (!onRequestInstanceInfo) {
       return;
     }
-  }, [host, showToast]);
+
+    try {
+      const nextInstanceInfo = await onRequestInstanceInfo();
+      setInstanceInfo(nextInstanceInfo);
+      setSelectedInstanceType(null);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to load compute options', 'error');
+    }
+  }, [onRequestInstanceInfo, showToast]);
 
   useEffect(() => {
     if (isSettingsDialogOpen) {
@@ -167,7 +167,6 @@ export default function ProjectSettingsMenuDialog() {
   }, [
     canUseCloudHost,
     isSettingsDialogOpen,
-    projectInfo.name,
     requestInstanceInfo,
     settingsDefaultTab,
   ]);

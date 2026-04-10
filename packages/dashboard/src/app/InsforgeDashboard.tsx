@@ -17,12 +17,25 @@ function normalizeBackendUrl(url?: string) {
 }
 
 export function InsForgeDashboard(props: InsForgeDashboardProps) {
+  const { connectDialogOpen, onConnectDialogOpenChange, ...hostProps } = props;
   const host = useMemo<InsForgeDashboardProps>(
     () => ({
-      ...props,
-      backendUrl: normalizeBackendUrl(props.backendUrl),
+      ...hostProps,
+      backendUrl: normalizeBackendUrl(hostProps.backendUrl),
     }),
-    [props]
+    [
+      hostProps.backendUrl,
+      hostProps.mode,
+      hostProps.showNavbar,
+      hostProps.project,
+      hostProps.onNavigateToSubscription,
+      hostProps.onRenameProject,
+      hostProps.onDeleteProject,
+      hostProps.onRequestInstanceInfo,
+      hostProps.onRequestInstanceTypeChange,
+      hostProps.onUpdateVersion,
+      hostProps.mode === 'cloud-hosting' ? hostProps.getAuthorizationCode : undefined,
+    ]
   );
   const [queryClient] = useState(
     () =>
@@ -49,8 +62,8 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
                 <ToastProvider>
                   <PostHogAnalyticsProvider>
                     <ModalProvider
-                      connectDialogOpen={host.connectDialogOpen}
-                      onConnectDialogOpenChange={host.onConnectDialogOpenChange}
+                      connectDialogOpen={connectDialogOpen}
+                      onConnectDialogOpenChange={onConnectDialogOpenChange}
                     >
                       <SQLEditorProvider>
                         <AppRoutes />

@@ -1,6 +1,7 @@
-import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 
 export type DashboardSettingsTab = 'info' | 'compute' | 'connect';
+const CONNECT_DIALOG_MESSAGE_TYPES = new Set(['SHOW_ONBOARDING_OVERLAY', 'SHOW_CONNECT_OVERLAY']);
 
 interface DashboardModalContextValue {
   isConnectDialogOpen: boolean;
@@ -49,6 +50,33 @@ export function DashboardModalProvider({
     },
     [isConnectDialogControlled, onConnectDialogOpenChange]
   );
+
+  useEffect(() => {
+    const parentWindow = typeof window !== 'undefined' ? window.parent : null;
+    const openerWindow = typeof window !== 'undefined' ? window.opener : null;
+    const canReceiveHostMessages =
+      parentWindow !== null && (parentWindow !== window || openerWindow !== null);
+
+    if (!canReceiveHostMessages) {
+      return;
+    }
+
+    const handleMessage = (event: MessageEvent<{ type?: string }>) => {
+      const isParentMessage = event.source === parentWindow;
+      const isOpenerMessage = openerWindow !== null && event.source === openerWindow;
+      if (!isParentMessage && !isOpenerMessage) {
+        return;
+      }
+
+      const messageType = event.data?.type;
+      if (messageType && CONNECT_DIALOG_MESSAGE_TYPES.has(messageType)) {
+        setConnectDialogOpen(true);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [setConnectDialogOpen]);
 
   const openSettingsDialog = useCallback((tab: DashboardSettingsTab = 'info') => {
     setSettingsDefaultTab(tab);
