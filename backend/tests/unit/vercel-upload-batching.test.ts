@@ -17,7 +17,7 @@ vi.mock('../../src/services/secrets/secret.service.js', () => ({
  * Helper to create a mock Axios error with a given status code and optional headers
  */
 function makeAxiosError(status: number, headers: Record<string, string> = {}): AxiosError {
-  const error = new Error("Request failed with status code " + status) as AxiosError;
+  const error = new Error('Request failed with status code ' + status) as AxiosError;
   error.isAxiosError = true;
   error.response = {
     status,
@@ -54,14 +54,14 @@ describe('VercelProvider.uploadFiles batching', () => {
       // Simulate network delay so concurrent calls overlap
       await new Promise((r) => setTimeout(r, 10));
       concurrentCount--;
-      return "sha-" + content.length;
+      return 'sha-' + content.length;
     });
   });
 
   it('uploads all files and returns correct results', async () => {
     const files = Array.from({ length: 25 }, (_, i) => ({
-      path: "file-" + i + ".txt",
-      content: Buffer.from("content-" + i),
+      path: 'file-' + i + '.txt',
+      content: Buffer.from('content-' + i),
     }));
 
     const results = await provider.uploadFiles(files);
@@ -69,7 +69,7 @@ describe('VercelProvider.uploadFiles batching', () => {
     expect(results).toHaveLength(25);
     expect(uploadFileSpy).toHaveBeenCalledTimes(25);
     results.forEach((r, i) => {
-      expect(r.file).toBe("file-" + i + ".txt");
+      expect(r.file).toBe('file-' + i + '.txt');
       expect(r.sha).toMatch(/^sha-/);
       expect(r.size).toBeGreaterThan(0);
     });
@@ -77,8 +77,8 @@ describe('VercelProvider.uploadFiles batching', () => {
 
   it('limits concurrency to 5 at a time', async () => {
     const files = Array.from({ length: 25 }, (_, i) => ({
-      path: "file-" + i + ".txt",
-      content: Buffer.from("content-" + i),
+      path: 'file-' + i + '.txt',
+      content: Buffer.from('content-' + i),
     }));
 
     await provider.uploadFiles(files);
@@ -89,8 +89,8 @@ describe('VercelProvider.uploadFiles batching', () => {
 
   it('handles fewer files than batch size', async () => {
     const files = Array.from({ length: 3 }, (_, i) => ({
-      path: "file-" + i + ".txt",
-      content: Buffer.from("content-" + i),
+      path: 'file-' + i + '.txt',
+      content: Buffer.from('content-' + i),
     }));
 
     const results = await provider.uploadFiles(files);
@@ -109,8 +109,8 @@ describe('VercelProvider.uploadFiles batching', () => {
 
   it('handles exactly one batch (5 files)', async () => {
     const files = Array.from({ length: 5 }, (_, i) => ({
-      path: "file-" + i + ".txt",
-      content: Buffer.from("content-" + i),
+      path: 'file-' + i + '.txt',
+      content: Buffer.from('content-' + i),
     }));
 
     const results = await provider.uploadFiles(files);
