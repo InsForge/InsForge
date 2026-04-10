@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, Separator, ThemeSelect } from '../components';
 import { cn } from '../lib/utils/utils';
 import { useTheme } from '../lib/contexts/ThemeContext';
 import { useAuth } from '../lib/contexts/AuthContext';
-import { useModal } from '../lib/hooks/useModal';
+import { useOpenConnectDialog } from './ConnectDialogContext';
 
 // Import SVG icons
 import DiscordIcon from '../assets/logos/discord.svg?react';
@@ -22,7 +22,7 @@ import InsForgeLogoDark from '../assets/logos/insforge_dark.svg';
 export default function AppHeader() {
   const { resolvedTheme } = useTheme();
   const { user, logout } = useAuth();
-  const { setConnectDialogOpen } = useModal();
+  const openConnectDialog = useOpenConnectDialog();
   const [githubStars, setGithubStars] = useState<number | null>(null);
 
   // Fetch GitHub stars
@@ -118,7 +118,7 @@ export default function AppHeader() {
             type="button"
             variant="secondary"
             size="sm"
-            onClick={() => setConnectDialogOpen(true)}
+            onClick={openConnectDialog}
             className="gap-1 rounded-[14px] border-[var(--alpha-8)] px-2 [&_svg]:size-4"
           >
             <Plug aria-hidden="true" />

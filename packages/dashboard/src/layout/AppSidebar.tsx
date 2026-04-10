@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   dashboardDeploymentsMenuItem,
   dashboardSettingsMenuItem,
@@ -9,7 +9,7 @@ import { Link, useLocation, matchPath } from 'react-router-dom';
 import { ExternalLink, PanelLeftOpen, PanelRightOpen } from 'lucide-react';
 import { cn, isInsForgeCloudProject } from '../lib/utils/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
-import { useModal } from '../lib/contexts/ModalContext';
+import { ProjectSettingsMenuDialog } from '../features/dashboard/components';
 
 interface AppSidebarProps extends React.HTMLAttributes<HTMLElement> {
   isCollapsed: boolean;
@@ -18,7 +18,7 @@ interface AppSidebarProps extends React.HTMLAttributes<HTMLElement> {
 
 export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebarProps) {
   const { pathname } = useLocation();
-  const { openSettingsDialog } = useModal();
+  const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
 
   const isCloud = isInsForgeCloudProject();
 
@@ -48,9 +48,9 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
   // Build bottom menu items based on deployment environment
   const bottomMenuItems = useMemo(() => {
     const items: DashboardPrimaryMenuItem[] = [];
-    items.push({ ...dashboardSettingsMenuItem, onClick: () => openSettingsDialog() });
+    items.push({ ...dashboardSettingsMenuItem, onClick: () => setIsSettingsDialogOpen(true) });
     return items;
-  }, [openSettingsDialog]);
+  }, []);
 
   // Find which primary menu item matches the current route
   // Items with secondary menus use prefix matching (end: false)
@@ -198,45 +198,51 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
   const useInlineToggle = !isCollapsed && bottomItemsList.length === 1;
 
   return (
-    <TooltipProvider disableHoverableContent delayDuration={300}>
-      <aside
-        className={cn(
-          'bg-semantic-2 border-r border-[var(--alpha-8)] h-full flex flex-col flex-shrink-0 px-2 pt-3 pb-2',
-          'transition-[width] duration-300 ease-in-out overflow-hidden',
-          isCollapsed ? 'w-[52px]' : 'w-[200px]'
-        )}
-      >
-        <nav className="flex min-h-0 w-full flex-col gap-1.5 overflow-y-auto overflow-x-hidden">
-          {mainMenuItems.map((item) => (
-            <div key={item.id}>
-              <MenuItem item={item} />
-              {item.sectionEnd && <div className="my-1.5 h-px w-full bg-alpha-8" />}
-            </div>
-          ))}
-        </nav>
-
-        <div className="flex-1" />
-
-        <div className={cn('w-full', isCollapsed ? 'space-y-2' : 'space-y-1.5')}>
-          {useInlineToggle ? (
-            <div className="flex items-center gap-2">
-              <div className="min-w-0 flex-1">
-                <MenuItem item={bottomItemsList[0]} isBottom />
-              </div>
-              <ToggleButton compact />
-            </div>
-          ) : (
-            <>
-              {bottomItemsList.map((item) => (
-                <MenuItem key={item.id} item={item} isBottom />
-              ))}
-              <div className={cn('flex', isCollapsed ? 'justify-center' : 'justify-start')}>
-                <ToggleButton compact={!isCollapsed} />
-              </div>
-            </>
+    <>
+      <TooltipProvider disableHoverableContent delayDuration={300}>
+        <aside
+          className={cn(
+            'bg-semantic-2 border-r border-[var(--alpha-8)] h-full flex flex-col flex-shrink-0 px-2 pt-3 pb-2',
+            'transition-[width] duration-300 ease-in-out overflow-hidden',
+            isCollapsed ? 'w-[52px]' : 'w-[200px]'
           )}
-        </div>
-      </aside>
-    </TooltipProvider>
+        >
+          <nav className="flex min-h-0 w-full flex-col gap-1.5 overflow-y-auto overflow-x-hidden">
+            {mainMenuItems.map((item) => (
+              <div key={item.id}>
+                <MenuItem item={item} />
+                {item.sectionEnd && <div className="my-1.5 h-px w-full bg-alpha-8" />}
+              </div>
+            ))}
+          </nav>
+
+          <div className="flex-1" />
+
+          <div className={cn('w-full', isCollapsed ? 'space-y-2' : 'space-y-1.5')}>
+            {useInlineToggle ? (
+              <div className="flex items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <MenuItem item={bottomItemsList[0]} isBottom />
+                </div>
+                <ToggleButton compact />
+              </div>
+            ) : (
+              <>
+                {bottomItemsList.map((item) => (
+                  <MenuItem key={item.id} item={item} isBottom />
+                ))}
+                <div className={cn('flex', isCollapsed ? 'justify-center' : 'justify-start')}>
+                  <ToggleButton compact={!isCollapsed} />
+                </div>
+              </>
+            )}
+          </div>
+        </aside>
+      </TooltipProvider>
+      <ProjectSettingsMenuDialog
+        open={isSettingsDialogOpen}
+        onOpenChange={setIsSettingsDialogOpen}
+      />
+    </>
   );
 }

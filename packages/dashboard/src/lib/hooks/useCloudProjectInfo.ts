@@ -1,4 +1,4 @@
-import { useDashboardHost } from '../config/DashboardHostContext';
+import { useDashboardProject, useIsCloudHostingMode } from '../config/DashboardHostContext';
 
 export interface CloudProjectInfo {
   name?: string;
@@ -16,17 +16,18 @@ interface UseCloudProjectInfoOptions {
 export const CLOUD_PROJECT_INFO_QUERY_KEY = ['cloud-project-info'];
 
 export function useCloudProjectInfo(_options?: UseCloudProjectInfoOptions) {
-  const host = useDashboardHost();
+  const project = useDashboardProject();
+  const isCloudHostingMode = useIsCloudHostingMode();
   const emptyProjectInfo: CloudProjectInfo = {};
-  const hostProjectInfo: CloudProjectInfo = host.project
+  const hostProjectInfo: CloudProjectInfo = project
     ? {
-        name: host.project.name,
-        latestVersion: host.project.latestVersion ?? undefined,
-        instanceType: host.project.instanceType,
-        region: host.project.region,
+        name: project.name,
+        latestVersion: project.latestVersion ?? undefined,
+        instanceType: project.instanceType,
+        region: project.region,
       }
     : {};
-  if (host.mode === 'cloud-hosting') {
+  if (isCloudHostingMode) {
     return {
       projectInfo: hostProjectInfo,
       isLoading: false,

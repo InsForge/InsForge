@@ -20,7 +20,6 @@ import { useApiKey } from '../../../../lib/hooks/useMetadata';
 import { useAnonToken } from '../../../auth/hooks/useAnonToken';
 import { useIsCloudHostingMode } from '../../../../lib/config/DashboardHostContext';
 import { cn, getBackendUrl, isInsForgeCloudProject } from '../../../../lib/utils/utils';
-import { useModal } from '../../../../lib/hooks/useModal';
 import DiscordIcon from '../../../../assets/logos/discord.svg?react';
 
 type ConnectTabId = 'cli' | 'mcp' | 'connection-string' | 'api-keys';
@@ -39,8 +38,12 @@ const CONNECT_TABS: ConnectTab[] = [
   { id: 'api-keys', label: 'API Keys' },
 ];
 
-export function ConnectDialog() {
-  const { isConnectDialogOpen, setConnectDialogOpen } = useModal();
+interface ConnectDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+export function ConnectDialog({ open, onOpenChange }: ConnectDialogProps) {
   const isCloudHostingMode = useIsCloudHostingMode();
   const isCloudProject = isInsForgeCloudProject();
   const canShowCli = isCloudProject && isCloudHostingMode;
@@ -71,17 +74,13 @@ export function ConnectDialog() {
   }, [activeTab, visibleTabs]);
 
   useEffect(() => {
-    if (isConnectDialogOpen) {
+    if (open) {
       setActiveTab(canShowCli ? 'cli' : 'mcp');
     }
-  }, [canShowCli, isConnectDialogOpen]);
-
-  const handleModalClose = (nextOpen: boolean) => {
-    setConnectDialogOpen(nextOpen);
-  };
+  }, [canShowCli, open]);
 
   return (
-    <Dialog open={isConnectDialogOpen} onOpenChange={handleModalClose}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <TooltipProvider>
         <DialogContent showCloseButton={false} className="w-[640px] max-w-[640px] gap-0 p-0">
           <div className="border-b border-[var(--alpha-8)] px-4 pt-3">
@@ -172,7 +171,7 @@ export function ConnectDialog() {
               type="button"
               variant="secondary"
               size="default"
-              onClick={() => setConnectDialogOpen(false)}
+              onClick={() => onOpenChange(false)}
               className="shrink-0"
             >
               I&apos;ll connect later

@@ -1,9 +1,26 @@
 import { createContext, useContext } from 'react';
-import type { InsForgeDashboardProps } from '../../types';
+import type { DashboardInstanceInfo, DashboardMode, DashboardProjectInfo } from '../../types';
 
-const DashboardHostContext = createContext<InsForgeDashboardProps | null>(null);
+interface DashboardHostContextValue {
+  backendUrl?: string;
+  showNavbar?: boolean;
+  mode: DashboardMode;
+  getAuthorizationCode?: () => Promise<string>;
+  onNavigateToSubscription?: () => void;
+  onRenameProject?: (name: string) => Promise<void>;
+  onDeleteProject?: () => Promise<void>;
+  onRequestInstanceInfo?: () => Promise<DashboardInstanceInfo>;
+  onRequestInstanceTypeChange?: (
+    instanceType: string
+  ) => Promise<{ success: boolean; instanceType?: string; error?: string }>;
+  onUpdateVersion?: () => Promise<void>;
+}
+
+const DashboardHostContext = createContext<DashboardHostContextValue | null>(null);
+const DashboardProjectContext = createContext<DashboardProjectInfo | undefined>(undefined);
 
 export const DashboardHostProvider = DashboardHostContext.Provider;
+export const DashboardProjectProvider = DashboardProjectContext.Provider;
 
 export function useDashboardHost() {
   const value = useContext(DashboardHostContext);
@@ -11,6 +28,10 @@ export function useDashboardHost() {
     throw new Error('useDashboardHost must be used within an InsForgeDashboard');
   }
   return value;
+}
+
+export function useDashboardProject() {
+  return useContext(DashboardProjectContext);
 }
 
 export function useIsCloudHostingMode() {

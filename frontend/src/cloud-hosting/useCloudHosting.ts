@@ -41,7 +41,6 @@ type PendingRequests = {
 
 const DEFAULT_TIMEOUT_MS = 15000;
 const INSTANCE_CHANGE_TIMEOUT_MS = 5 * 60 * 1000;
-
 function normalizeUrl(url: string) {
   return url.replace(/\/$/, '');
 }

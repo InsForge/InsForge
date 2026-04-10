@@ -21,13 +21,11 @@ import {
 } from '../../../components';
 import { Button, Input } from '@insforge/ui';
 import { useAuth } from '../../../lib/contexts/AuthContext';
-import { useMcpUsage } from '../../logs/hooks/useMcpUsage';
 import { loginFormSchema, LoginForm } from '../../../lib/utils/schemaValidations';
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const { loginWithPassword, isAuthenticated } = useAuth();
-  const { hasCompletedOnboarding, isLoading: isMcpUsageLoading } = useMcpUsage();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -58,11 +56,10 @@ export default function LoginPage() {
   };
 
   useEffect(() => {
-    if (isAuthenticated && !isMcpUsageLoading) {
-      const redirectPath = hasCompletedOnboarding ? '/dashboard' : '/dashboard/onboard';
-      void navigate(redirectPath, { replace: true });
+    if (isAuthenticated) {
+      void navigate('/dashboard', { replace: true });
     }
-  }, [hasCompletedOnboarding, isAuthenticated, isMcpUsageLoading, navigate]);
+  }, [isAuthenticated, navigate]);
 
   return (
     <div className="min-h-screen bg-[rgb(var(--page))] flex items-center justify-center px-4 sm:px-6 lg:px-8">
