@@ -6,19 +6,25 @@ import { AppRoutes } from '../router/AppRoutes';
 import { ToastProvider } from '../lib/hooks/useToast';
 import { SocketProvider } from '../lib/contexts/SocketContext';
 import { PostHogAnalyticsProvider } from '../lib/analytics/posthog';
-import { ModalProvider } from '../lib/contexts/ModalContext';
 import { SQLEditorProvider } from '../features/database/contexts/SQLEditorContext';
-import { DashboardHostProvider } from '../lib/config/DashboardHostContext';
+import { DashboardHostProvider, DashboardProjectProvider } from '../lib/config/DashboardHostContext';
 import { setDashboardBackendUrl } from '../lib/config/runtime';
-import type { InsForgeDashboardProps } from '../types';
+import type {
+  CloudHostingDashboardProps,
+  InsForgeDashboardProps,
+  SelfHostingDashboardProps,
+} from '../types';
 
 function normalizeBackendUrl(url?: string) {
   return url?.replace(/\/$/, '') || undefined;
 }
 
 export function InsForgeDashboard(props: InsForgeDashboardProps) {
-  const { connectDialogOpen, onConnectDialogOpenChange, ...hostProps } = props;
-  const host = useMemo<InsForgeDashboardProps>(
+  const { project, ...hostProps } = props;
+  const host = useMemo<
+    | Omit<SelfHostingDashboardProps, 'project'>
+    | Omit<CloudHostingDashboardProps, 'project'>
+  >(
     () => ({
       ...hostProps,
       backendUrl: normalizeBackendUrl(hostProps.backendUrl),
@@ -27,7 +33,6 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
       hostProps.backendUrl,
       hostProps.mode,
       hostProps.showNavbar,
-      hostProps.project,
       hostProps.onNavigateToSubscription,
       hostProps.onRenameProject,
       hostProps.onDeleteProject,
@@ -57,22 +62,19 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
       <BrowserRouter>
         <QueryClientProvider client={queryClient}>
           <DashboardHostProvider value={host}>
-            <AuthProvider>
-              <SocketProvider>
-                <ToastProvider>
-                  <PostHogAnalyticsProvider>
-                    <ModalProvider
-                      connectDialogOpen={connectDialogOpen}
-                      onConnectDialogOpenChange={onConnectDialogOpenChange}
-                    >
+            <DashboardProjectProvider value={project}>
+              <AuthProvider>
+                <SocketProvider>
+                  <ToastProvider>
+                    <PostHogAnalyticsProvider>
                       <SQLEditorProvider>
                         <AppRoutes />
                       </SQLEditorProvider>
-                    </ModalProvider>
-                  </PostHogAnalyticsProvider>
-                </ToastProvider>
-              </SocketProvider>
-            </AuthProvider>
+                    </PostHogAnalyticsProvider>
+                  </ToastProvider>
+                </SocketProvider>
+              </AuthProvider>
+            </DashboardProjectProvider>
           </DashboardHostProvider>
         </QueryClientProvider>
       </BrowserRouter>

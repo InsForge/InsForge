@@ -33,7 +33,6 @@ import {
 } from '../../../lib/hooks/useCloudProjectInfo';
 import { useConfirm } from '../../../lib/hooks/useConfirm';
 import { useToast } from '../../../lib/hooks/useToast';
-import { useModal } from '../../../lib/contexts/ModalContext';
 import {
   cn,
   compareVersions,
@@ -48,12 +47,21 @@ type TabType = 'info' | 'compute' | 'connect';
 const INFO_FIELD_CLASS =
   'flex h-8 w-full items-center rounded border border-[var(--alpha-12)] bg-[var(--alpha-4)] px-2.5 text-sm leading-5 text-foreground';
 
-export default function ProjectSettingsMenuDialog() {
+interface ProjectSettingsMenuDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  defaultTab?: TabType;
+}
+
+export default function ProjectSettingsMenuDialog({
+  open,
+  onOpenChange,
+  defaultTab = 'info',
+}: ProjectSettingsMenuDialogProps) {
   const host = useDashboardHost();
   const isCloudHostingMode = useIsCloudHostingMode();
   const onRequestInstanceInfo =
     host.mode === 'cloud-hosting' ? host.onRequestInstanceInfo : undefined;
-  const { isSettingsDialogOpen, settingsDefaultTab, closeSettingsDialog } = useModal();
   const [activeTab, setActiveTab] = useState<TabType>('info');
   const [isVersionOutdated, setIsVersionOutdated] = useState(false);
   const [isUpdatingVersion, setIsUpdatingVersion] = useState(false);
@@ -140,12 +148,12 @@ export default function ProjectSettingsMenuDialog() {
   }, [onRequestInstanceInfo, showToast]);
 
   useEffect(() => {
-    if (isSettingsDialogOpen) {
+    if (open) {
       const cloudProjectName = projectInfo.name ?? '';
       const nextTab: TabType =
-        settingsDefaultTab === 'connect'
+        defaultTab === 'connect'
           ? 'connect'
-          : settingsDefaultTab === 'compute' && canUseCloudHost
+          : defaultTab === 'compute' && canUseCloudHost
             ? 'compute'
             : 'info';
 
@@ -166,9 +174,9 @@ export default function ProjectSettingsMenuDialog() {
     setSelectedInstanceType(null);
   }, [
     canUseCloudHost,
-    isSettingsDialogOpen,
+    open,
     requestInstanceInfo,
-    settingsDefaultTab,
+    defaultTab,
   ]);
 
   useEffect(() => {
@@ -179,7 +187,7 @@ export default function ProjectSettingsMenuDialog() {
   }, [version, latestVersion]);
 
   useEffect(() => {
-    if (!isSettingsDialogOpen || !canUseCloudHost || isProjectInfoLoading) {
+    if (!open || !canUseCloudHost || isProjectInfoLoading) {
       return;
     }
 
@@ -191,7 +199,7 @@ export default function ProjectSettingsMenuDialog() {
     setProjectName(cloudProjectName);
     setProjectNameInitialValue(cloudProjectName);
   }, [
-    isSettingsDialogOpen,
+    open,
     canUseCloudHost,
     isProjectInfoLoading,
     isProjectNameDirty,
@@ -356,12 +364,8 @@ export default function ProjectSettingsMenuDialog() {
     <>
       <ConfirmDialog {...confirmDialogProps} />
       <MenuDialog
-        open={isSettingsDialogOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            closeSettingsDialog();
-          }
-        }}
+        open={open}
+        onOpenChange={onOpenChange}
       >
         <MenuDialogContent>
           <MenuDialogSideNav>

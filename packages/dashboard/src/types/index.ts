@@ -36,8 +36,6 @@ export interface DashboardProps {
   backendUrl?: string;
   showNavbar?: boolean;
   project?: DashboardProjectInfo;
-  connectDialogOpen?: boolean;
-  onConnectDialogOpenChange?: (open: boolean) => void;
   onNavigateToSubscription?: () => void;
   onRenameProject?: (name: string) => Promise<void>;
   onDeleteProject?: () => Promise<void>;
