@@ -26,6 +26,7 @@ import SecretsPage from '../features/functions/pages/SecretsPage';
 import SchedulesPage from '../features/functions/pages/SchedulesPage';
 import AILayout from '../features/ai/components/AILayout';
 import AIPage from '../features/ai/pages/AIPage';
+import AIUsagePage from '../features/ai/pages/AIUsagePage';
 import RealtimeLayout from '../features/realtime/components/RealtimeLayout';
 import RealtimeChannelsPage from '../features/realtime/pages/RealtimeChannelsPage';
 import RealtimeMessagesPage from '../features/realtime/pages/RealtimeMessagesPage';
@@ -101,6 +102,7 @@ export function AppRoutes() {
                 </Route>
                 <Route path="/dashboard/ai" element={<AILayout />}>
                   <Route index element={<AIPage />} />
+                  <Route path="usage" element={<AIUsagePage />} />
                 </Route>
                 <Route path="/dashboard/realtime" element={<RealtimeLayout />}>
                   <Route index element={<Navigate to="channels" replace />} />
