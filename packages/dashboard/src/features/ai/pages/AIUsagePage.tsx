@@ -127,7 +127,8 @@ function PerModelTable({ rows }: { rows: PerModelRow[] }) {
 }
 
 function RecordRow({ record }: { record: AIUsageRecordSchema }) {
-  const createdAtStr = String(record.createdAt);
+  const createdAtStr =
+    record.createdAt instanceof Date ? record.createdAt.toISOString() : String(record.createdAt);
   return (
     <div className="grid grid-cols-[minmax(0,2fr)_1fr_1fr_1fr_1fr_1fr_1fr] gap-x-2.5 min-h-10 items-center text-sm leading-5 text-foreground px-4 border-b border-[var(--alpha-8)] last:border-b-0">
       <p className="truncate text-[13px] text-muted-foreground">{formatTime(createdAtStr)}</p>
@@ -166,7 +167,11 @@ export default function AIUsagePage() {
   } = useAIUsageSummary({ startDate, endDate });
 
   // High-limit fetch used to build the per-model breakdown table.
-  const { data: aggregateData, isLoading: aggregateLoading } = useAIUsageRecords({
+  const {
+    data: aggregateData,
+    isLoading: aggregateLoading,
+    error: aggregateError,
+  } = useAIUsageRecords({
     startDate,
     endDate,
     limit: AGGREGATE_LIMIT,
@@ -212,7 +217,7 @@ export default function AIUsagePage() {
   };
 
   const isLoading = summaryLoading || recordsLoading || aggregateLoading;
-  const error = summaryError ?? recordsError;
+  const error = summaryError ?? recordsError ?? aggregateError;
 
   return (
     <div className="h-full flex flex-col bg-[rgb(var(--semantic-0))]">
