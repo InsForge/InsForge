@@ -1,4 +1,4 @@
-import { FeatureSidebar, type FeatureSidebarListItem } from '@/components';
+import { FeatureSidebar, type FeatureSidebarListItem } from '../../../components';
 
 const AI_SIDEBAR_ITEMS: FeatureSidebarListItem[] = [
   {
