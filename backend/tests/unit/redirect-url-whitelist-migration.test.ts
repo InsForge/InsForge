@@ -45,9 +45,7 @@ describe('027_add-redirect-url-whitelist migration', () => {
   });
 
   it('creates the update_config_updated_at trigger', () => {
-    expect(sql).toMatch(
-      /CREATE TRIGGER update_config_updated_at\s+BEFORE UPDATE ON auth\.config/i
-    );
+    expect(sql).toMatch(/CREATE TRIGGER update_config_updated_at\s+BEFORE UPDATE ON auth\.config/i);
   });
 
   // ── allowed_redirect_urls column ─────────────────────────────────────
