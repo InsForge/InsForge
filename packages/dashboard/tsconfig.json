@@ -9,6 +9,7 @@
     "declarationMap": true,
     "sourceMap": true,
     "declaration": true,
+    "rootDir": "src",
     "outDir": "dist",
     "skipLibCheck": true
   },
