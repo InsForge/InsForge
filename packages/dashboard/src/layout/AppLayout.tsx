@@ -5,8 +5,10 @@ import AppHeader from './AppHeader';
 import { ThemeProvider } from '../lib/contexts/ThemeContext';
 import { useDashboardHost } from '../lib/config/DashboardHostContext';
 import { ConnectDialog } from '../features/dashboard/components/connect';
+import { ConnectDialogV2 } from '../features/dashboard/components/connect/ConnectDialogV2';
 import { cn } from '../lib/utils/utils';
 import { ConnectDialogProvider } from './ConnectDialogContext';
+import { getFeatureFlag } from '../lib/analytics/posthog';
 
 const CONNECT_DIALOG_MESSAGE_TYPES = new Set(['SHOW_ONBOARDING_OVERLAY', 'SHOW_CONNECT_OVERLAY']);
 
@@ -95,7 +97,11 @@ export default function AppLayout({ children }: LayoutProps) {
             </main>
           </div>
         </div>
-        <ConnectDialog open={isConnectDialogOpen} onOpenChange={setIsConnectDialogOpen} />
+        {getFeatureFlag('dashboard-v2-experiment') === 'test' ? (
+          <ConnectDialogV2 open={isConnectDialogOpen} onOpenChange={setIsConnectDialogOpen} />
+        ) : (
+          <ConnectDialog open={isConnectDialogOpen} onOpenChange={setIsConnectDialogOpen} />
+        )}
       </ConnectDialogProvider>
     </ThemeProvider>
   );
