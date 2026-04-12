@@ -39,6 +39,7 @@ export enum DataUpdateResourceType {
   USERS = 'users',
   BUCKETS = 'buckets',
   FUNCTIONS = 'functions',
+  DEPLOYMENTS = 'deployments',
   REALTIME = 'realtime',
 }
 
@@ -296,6 +297,9 @@ export function SocketProvider({ children }: SocketProviderProps) {
           break;
         case DataUpdateResourceType.FUNCTIONS:
           void queryClient.invalidateQueries({ queryKey: ['functions'] });
+          break;
+        case DataUpdateResourceType.DEPLOYMENTS:
+          void queryClient.invalidateQueries({ queryKey: ['deployment-metadata'] });
           break;
         case DataUpdateResourceType.REALTIME:
           void queryClient.invalidateQueries({ queryKey: ['realtime'] });

@@ -9,7 +9,7 @@ import { useCloudProjectInfo } from '../../../lib/hooks/useCloudProjectInfo';
 import { useMcpUsage } from '../../logs/hooks/useMcpUsage';
 import { getBackendUrl, isInsForgeCloudProject } from '../../../lib/utils/utils';
 import { useUsers } from '../../auth';
-import { useAIGatewayConfig } from '../../ai/hooks/useAIGatewayConfig';
+import { useAIUsageSummary } from '../../ai/hooks/useAIUsage';
 import { useDeploymentMetadata } from '../../deployments/hooks/useDeploymentMetadata';
 import { NewCLISection } from '../components/connect/NewCLISection';
 import { MCPSection } from '../components/connect';
@@ -27,13 +27,13 @@ const PROMPT_STEPS: PromptStep[] = [
     id: 1,
     title: 'Add sample data',
     prompt:
-      'Check if a "todo" table exists in the database. If it does, add the sample data below directly. If not, create it first with columns: text, createdAt, and isCompleted.\n\nThen add 4 todo items:\n\n1. Add sign in for users\n2. Add file upload\n3. Use AI to turn text into tasks\n4. Deploy your app',
+      'Check if a "todo" table exists in the database. If it does, add the sample data below directly. If not, create it first with columns: text, createdAt, and isCompleted.\n\nThen add 4 todo items:\n1. Add sign in for users\n2. Add file upload\n3. Use AI to turn text into tasks\n4. Deploy your app\n\nAfter adding the data, update the app to fetch and display all todos from the database on the main page.',
   },
   {
     id: 2,
     title: 'Sign up your first user',
     prompt:
-      'Add authentication to this app using InsForge Auth.\n\nUsers should be able to sign up, sign in, and sign out.\n\nAfter implementing, sign up a test user to verify it works.',
+      'Add authentication to this app using InsForge Auth.\n\nRequirements:\n- Email/password sign up and sign in (with email verification)\n- Google and GitHub OAuth sign in\n- Sign out',
   },
   {
     id: 3,
@@ -257,7 +257,7 @@ export default function NewDashboardPage() {
   const { totalUsers } = useUsers();
   const { hasCompletedOnboarding, isLoading: isMcpUsageLoading } = useMcpUsage();
   const { apiKey, isLoading: isApiKeyLoading } = useApiKey({ enabled: !canShowCli });
-  const { gatewayConfig } = useAIGatewayConfig();
+  const { data: aiUsageSummary } = useAIUsageSummary();
   const { currentDeploymentId } = useDeploymentMetadata();
 
   const [isStepperDismissed, setIsStepperDismissed] = useState(() => {
@@ -301,16 +301,16 @@ export default function NewDashboardPage() {
     () => [
       // Step 1: Add sample data — todo table has records
       (tables?.find((t) => t.tableName === 'todo')?.recordCount ?? 0) > 0,
-      // Step 2: Sign up first user — more than just the admin user
-      (totalUsers ?? 0) > 1,
-      // Step 3: Upload a file — any storage bucket exists
-      bucketCount > 0,
-      // Step 4: Add LLM feature — AI gateway has a BYOK key configured
-      !!gatewayConfig?.hasByokKey,
+      // Step 2: Sign up first user — totalUsers already excludes admin & anon
+      (totalUsers ?? 0) >= 1,
+      // Step 3: Upload a file — todo-attachments bucket has files
+      (storage?.buckets?.find((b) => b.name === 'todo-attachments')?.objectCount ?? 0) > 0,
+      // Step 4: Add LLM feature — AI gateway has been used
+      (aiUsageSummary?.totalRequests ?? 0) > 0,
       // Step 5: Deploy your app — a deployment exists
       !!currentDeploymentId,
     ],
-    [tables, totalUsers, bucketCount, gatewayConfig, currentDeploymentId]
+    [tables, totalUsers, storage, aiUsageSummary, currentDeploymentId]
   );
 
   const handleDismissStepper = useCallback(() => {
