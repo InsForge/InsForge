@@ -41,6 +41,7 @@ export enum DataUpdateResourceType {
   FUNCTIONS = 'functions',
   DEPLOYMENTS = 'deployments',
   REALTIME = 'realtime',
+  AI_USAGE = 'ai_usage',
 }
 
 export interface DatabaseResourceUpdate {
@@ -268,6 +269,8 @@ export function SocketProvider({ children }: SocketProviderProps) {
                 if (change.name) {
                   void queryClient.invalidateQueries({ queryKey: ['records', change.name] });
                 }
+                // Record count changed — refresh metadata so dashboard steps update
+                void queryClient.invalidateQueries({ queryKey: ['metadata', 'full'] });
                 break;
               case 'index':
                 void queryClient.invalidateQueries({ queryKey: ['database', 'indexes'] });
@@ -303,6 +306,9 @@ export function SocketProvider({ children }: SocketProviderProps) {
           break;
         case DataUpdateResourceType.REALTIME:
           void queryClient.invalidateQueries({ queryKey: ['realtime'] });
+          break;
+        case DataUpdateResourceType.AI_USAGE:
+          void queryClient.invalidateQueries({ queryKey: ['ai-usage-summary'] });
           break;
       }
     };
