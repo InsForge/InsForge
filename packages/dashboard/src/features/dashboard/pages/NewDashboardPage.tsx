@@ -2,18 +2,10 @@ import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge, Button, CopyButton } from '@insforge/ui';
 import { Skeleton } from '../../../components';
-import {
-  Braces,
-  Check,
-  Database,
-  ExternalLink,
-  HardDrive,
-  User,
-} from 'lucide-react';
-import { useMetadata } from '../../../lib/hooks/useMetadata';
+import { Braces, Check, Database, ExternalLink, HardDrive, User } from 'lucide-react';
+import { useMetadata, useApiKey } from '../../../lib/hooks/useMetadata';
 import { useIsCloudHostingMode } from '../../../lib/config/DashboardHostContext';
 import { useCloudProjectInfo } from '../../../lib/hooks/useCloudProjectInfo';
-import { useApiKey } from '../../../lib/hooks/useMetadata';
 import { useMcpUsage } from '../../logs/hooks/useMcpUsage';
 import { getBackendUrl, isInsForgeCloudProject } from '../../../lib/utils/utils';
 import { useUsers } from '../../auth';
@@ -58,8 +50,7 @@ const PROMPT_STEPS: PromptStep[] = [
   {
     id: 5,
     title: 'Deploy your app',
-    prompt:
-      'Deploy this app on InsForge, after deploying, share the live URL.',
+    prompt: 'Deploy this app on InsForge, after deploying, share the live URL.',
   },
 ];
 
@@ -174,9 +165,7 @@ function PromptStepper({ onDismiss, completedSteps }: PromptStepperProps) {
                 type="button"
                 onClick={() => setActiveStep(index)}
                 className={`flex flex-col gap-2 border-b border-[var(--alpha-8)] p-4 text-left transition-colors last:border-b-0 ${
-                  isActive
-                    ? 'bg-[var(--special-toast,#323232)]'
-                    : 'hover:bg-[var(--alpha-4)]'
+                  isActive ? 'bg-[var(--special-toast,#323232)]' : 'hover:bg-[var(--alpha-4)]'
                 }`}
               >
                 <div className="flex items-center gap-1">
@@ -208,9 +197,7 @@ function PromptStepper({ onDismiss, completedSteps }: PromptStepperProps) {
             </div>
 
             {/* Title */}
-            <p className="text-[20px] font-medium leading-7 text-foreground">
-              {currentStep.title}
-            </p>
+            <p className="text-[20px] font-medium leading-7 text-foreground">{currentStep.title}</p>
 
             {/* Prompt text */}
             <p className="whitespace-pre-line text-sm leading-6 text-foreground">
@@ -284,14 +271,20 @@ export default function NewDashboardPage() {
   const shouldShowLoadingState =
     isMetadataLoading || isMcpUsageLoading || (isCloudProject && isProjectInfoLoading);
 
-  const projectName = isCloudProject ? projectInfo.name : 'My InsForge Project';
+  const projectName = isCloudProject
+    ? projectInfo.name || 'My InsForge Project'
+    : 'My InsForge Project';
   const instanceType = projectInfo.instanceType?.toUpperCase();
   const showInstanceTypeBadge = isCloudProject && !!instanceType;
   const agentConnected = hasCompletedOnboarding;
 
   const projectHealth = useMemo(() => {
-    if (metadataError) return 'Issue';
-    if (isMetadataLoading) return 'Loading...';
+    if (metadataError) {
+      return 'Issue';
+    }
+    if (isMetadataLoading) {
+      return 'Loading...';
+    }
     return 'Healthy';
   }, [isMetadataLoading, metadataError]);
 
@@ -304,18 +297,21 @@ export default function NewDashboardPage() {
   const functionCount = metadata?.functions.length ?? 0;
 
   // --- Step completion detection (real-time via socket → React Query invalidation) ---
-  const completedSteps = useMemo(() => [
-    // Step 1: Add sample data — todo table has records
-    (tables?.find((t) => t.tableName === 'todo')?.recordCount ?? 0) > 0,
-    // Step 2: Sign up first user — more than just the admin user
-    (totalUsers ?? 0) > 1,
-    // Step 3: Upload a file — any storage bucket exists
-    bucketCount > 0,
-    // Step 4: Add LLM feature — AI gateway has a BYOK key configured
-    !!gatewayConfig?.hasByokKey,
-    // Step 5: Deploy your app — a deployment exists
-    !!currentDeploymentId,
-  ], [tables, totalUsers, bucketCount, gatewayConfig, currentDeploymentId]);
+  const completedSteps = useMemo(
+    () => [
+      // Step 1: Add sample data — todo table has records
+      (tables?.find((t) => t.tableName === 'todo')?.recordCount ?? 0) > 0,
+      // Step 2: Sign up first user — more than just the admin user
+      (totalUsers ?? 0) > 1,
+      // Step 3: Upload a file — any storage bucket exists
+      bucketCount > 0,
+      // Step 4: Add LLM feature — AI gateway has a BYOK key configured
+      !!gatewayConfig?.hasByokKey,
+      // Step 5: Deploy your app — a deployment exists
+      !!currentDeploymentId,
+    ],
+    [tables, totalUsers, bucketCount, gatewayConfig, currentDeploymentId]
+  );
 
   const handleDismissStepper = useCallback(() => {
     setIsStepperDismissed(true);
@@ -355,9 +351,7 @@ export default function NewDashboardPage() {
         {/* Project Header */}
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-medium leading-8 text-foreground">
-              {projectName}
-            </h1>
+            <h1 className="text-2xl font-medium leading-8 text-foreground">{projectName}</h1>
             {showInstanceTypeBadge && (
               <Badge
                 variant="default"
