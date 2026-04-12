@@ -556,6 +556,14 @@ router.post(
         req.user?.id
       );
 
+      const socket = SocketManager.getInstance();
+      socket.broadcastToRoom(
+        'role:project_admin',
+        ServerEvents.DATA_UPDATE,
+        { resource: DataUpdateResourceType.BUCKETS, data: { bucketName } },
+        'system'
+      );
+
       successResponse(res, fileInfo, 201);
     } catch (error) {
       if (error instanceof Error && error.message.includes('not found')) {
