@@ -9,6 +9,8 @@ import {
   type VercelWebhookPayload,
   type VercelDeploymentEventType,
 } from '@/types/webhooks.js';
+import { SocketManager } from '@/infra/socket/socket.manager.js';
+import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import logger from '@/utils/logger.js';
 
 const router = Router();
@@ -93,6 +95,15 @@ router.post('/vercel', async (req: Request, res: Response, next: NextFunction) =
       logger.info('Deployment not found for webhook, ignoring', { deploymentId });
       return res.status(200).json({ received: true, handled: false });
     }
+
+    // Broadcast deployment status change to frontend via socket
+    const socketService = SocketManager.getInstance();
+    socketService.broadcastToRoom(
+      'role:project_admin',
+      ServerEvents.DATA_UPDATE,
+      { resource: DataUpdateResourceType.DEPLOYMENTS },
+      'system'
+    );
 
     logger.info('Vercel webhook processed successfully', {
       eventType,
