@@ -39,7 +39,7 @@ const mockTemplate = {
   id: '00000000-0000-0000-0000-000000000001',
   templateType: 'email-verification-code',
   subject: 'Verify your email',
-  bodyHtml: '<p>Your code is: {{ code }}</p><p>Email: {{ email }}</p>',
+  bodyHtml: '<p>Your code is: {{ token }}</p><p>Email: {{ email }}</p>',
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
 };
@@ -83,7 +83,7 @@ describe('SmtpEmailProvider', () => {
       const transport = nodemailer.default.createTransport();
 
       await provider.sendWithTemplate('user@example.com', 'Test App', 'email-verification-code', {
-        code: '123456',
+        token: '123456',
       });
 
       expect(transport.sendMail).toHaveBeenCalledWith(
@@ -104,7 +104,7 @@ describe('SmtpEmailProvider', () => {
         '<script>alert("xss")</script>@evil.com',
         'Test App',
         'email-verification-code',
-        { code: '<img src=x onerror=alert(1)>' }
+        { token: '<img src=x onerror=alert(1)>' }
       );
 
       expect(transport.sendMail).toHaveBeenCalledWith(
@@ -123,7 +123,7 @@ describe('SmtpEmailProvider', () => {
 
       await expect(
         provider.sendWithTemplate('user@example.com', 'App', 'email-verification-code', {
-          code: '123456',
+          token: '123456',
         })
       ).rejects.toThrow(AppError);
     });

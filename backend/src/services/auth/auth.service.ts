@@ -327,7 +327,7 @@ export class AuthService {
     const emailService = EmailService.getInstance();
     const userName = dbUser.profile?.name || 'User';
     await emailService.sendWithTemplate(email, userName, 'email-verification-code', {
-      code,
+      token: code,
     });
   }
 
@@ -516,7 +516,7 @@ export class AuthService {
     const emailService = EmailService.getInstance();
     const userName = dbUser.profile?.name || 'User';
     await emailService.sendWithTemplate(email, userName, 'reset-password-code', {
-      code,
+      token: code,
     });
   }
 
