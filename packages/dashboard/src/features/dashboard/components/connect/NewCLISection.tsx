@@ -142,17 +142,9 @@ export function NewCLISection({ className }: NewCLISectionProps) {
                 number={1}
                 title="Link Your Project"
                 description="Run the following command in your terminal to connect your project"
-              >
-                <CommandBox command={linkCommand} />
-              </Step>
-
-              <Step
-                number={2}
-                title="Start Building"
-                description="Use InsForge CLI or MCP tools to interact with your backend"
                 isLast
               >
-                <CommandBox command="npx @insforge/cli --help" />
+                <CommandBox command={linkCommand} />
               </Step>
             </>
           )}
