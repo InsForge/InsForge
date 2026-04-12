@@ -216,12 +216,12 @@ export function SocketProvider({ children }: SocketProviderProps) {
     };
   }, [disconnect]);
 
-  // Send onboarding success only on first MCP connection
+  // Send onboarding success only after 2+ MCP connections
   const onMcpConnectedSuccess = useCallback(
     (toolName: string) => {
-      if (mcpUsageCount === 0) {
+      if (mcpUsageCount === 1) {
         trackPostHog('onboarding_completed', {
-          experiment_variant: getFeatureFlag('onboarding-method-experiment'),
+          experiment_variant: getFeatureFlag('dashboard-v2-experiment'),
           tool_name: toolName,
         });
       }
