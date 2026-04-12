@@ -173,8 +173,8 @@ function PromptDisplay({ text }: { text: string }) {
 function StepCircle({ completed, active }: { completed: boolean; active: boolean }) {
   if (completed) {
     return (
-      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-muted-foreground/40">
-        <Check className="h-3 w-3 text-muted-foreground/40" />
+      <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${active ? 'border-primary' : 'border-muted-foreground/40'}`}>
+        <Check className={`h-3 w-3 ${active ? 'text-primary' : 'text-muted-foreground/40'}`} />
       </div>
     );
   }
