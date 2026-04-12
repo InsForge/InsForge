@@ -184,9 +184,9 @@ export default function SQLEditorPage() {
         </div>
 
         {/* Tab Nav: h-full, items-center */}
-        <div className="flex items-center h-full shrink-0">
+        <div className="flex items-center h-full flex-1 min-w-0">
           {/* Tab container: h-full, overflow-clip */}
-          <div className="flex items-center h-full overflow-x-auto">
+          <div className="flex items-center h-full overflow-x-auto flex-1 min-w-0">
             {tabs.map((tab) => {
               const isActive = tab.id === activeTabId;
               return (
