@@ -180,9 +180,7 @@ export function ConnectDialogV2({ open, onOpenChange }: ConnectDialogV2Props) {
                   className="gap-6"
                 />
               )}
-              {activeTab === 'connection-string' && (
-                <ConnectionStringSectionV2 className="gap-4" />
-              )}
+              {activeTab === 'connection-string' && <ConnectionStringSectionV2 className="gap-4" />}
               {activeTab === 'api-keys' && (
                 <APIKeysSectionV2
                   apiKey={displayApiKey}
