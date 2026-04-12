@@ -69,7 +69,7 @@ describe('EmailService', () => {
         'user@example.com',
         'John Doe',
         'email-verification-code',
-        { code: '123456' }
+        { token: '123456' }
       );
 
       expect(jwt.sign).toHaveBeenCalledWith({ sub: 'test-project-123' }, 'test-jwt-secret', {
@@ -82,7 +82,7 @@ describe('EmailService', () => {
           email: 'user@example.com',
           name: 'John Doe',
           template: 'email-verification-code',
-          variables: { code: '123456' },
+          variables: { token: '123456' },
         },
         {
           headers: {
@@ -122,14 +122,14 @@ describe('EmailService', () => {
       });
 
       await emailService.sendWithTemplate('user@example.com', 'Jane Smith', 'reset-password-code', {
-        code: 'reset123',
+        token: 'reset123',
       });
 
       expect(axios.post).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
           template: 'reset-password-code',
-          variables: { code: 'reset123' },
+          variables: { token: 'reset123' },
         }),
         expect.any(Object)
       );
