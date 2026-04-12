@@ -46,7 +46,6 @@ import DeploymentEnvVarsPage from '../features/deployments/pages/DeploymentEnvVa
 import DeploymentDomainsPage from '../features/deployments/pages/DeploymentDomainsPage';
 
 export function AppRoutes() {
-  // PostHog feature flag: 'test' → new dashboard, otherwise → old dashboard
   const dashboardVariant = getFeatureFlag('dashboard-v2-experiment');
   const DashboardHomePage = dashboardVariant === 'test' ? NewDashboardPage : DashboardPage;
 
