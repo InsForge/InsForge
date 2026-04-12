@@ -287,7 +287,7 @@ export default function NewDashboardPage() {
   const projectName = isCloudProject ? projectInfo.name : 'My InsForge Project';
   const instanceType = projectInfo.instanceType?.toUpperCase();
   const showInstanceTypeBadge = isCloudProject && !!instanceType;
-  const agentConnected = false; // TODO: 临时调试，原来是 hasCompletedOnboarding
+  const agentConnected = hasCompletedOnboarding;
 
   const projectHealth = useMemo(() => {
     if (metadataError) return 'Issue';
