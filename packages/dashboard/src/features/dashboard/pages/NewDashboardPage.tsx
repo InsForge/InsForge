@@ -251,7 +251,7 @@ function PromptStepper({ onDismiss, completedSteps, showDismiss = false }: Promp
                 <div className="flex items-center gap-1">
                   <StepCircle completed={!!isCompleted} active={isActive} />
                   <span
-                    className={`text-sm leading-5 ${isCompleted || isActive ? 'text-primary' : 'text-muted-foreground'}`}
+                    className={`text-sm leading-5 ${isActive ? 'text-primary' : 'text-muted-foreground'}`}
                   >
                     Step {step.id}
                   </span>

@@ -1,6 +1,7 @@
 import { ExternalLink } from 'lucide-react';
 import { CopyButton } from '@insforge/ui';
 import { useProjectId } from '../../../../lib/hooks/useMetadata';
+import { useCloudProjectInfo } from '../../../../lib/hooks/useCloudProjectInfo';
 import { cn } from '../../../../lib/utils/utils';
 
 interface StepProps {
@@ -60,8 +61,9 @@ interface NewCLISectionProps {
 
 export function NewCLISection({ className }: NewCLISectionProps) {
   const { projectId } = useProjectId();
+  const { projectInfo } = useCloudProjectInfo();
 
-  const projectName = 'my-app';
+  const projectName = projectInfo.name || 'my-app';
   const createCommand = `npx @insforge/cli link --project-id ${projectId || '<project id>'} --template todo`;
   const devCommand = `cd ${projectName} && npm run dev`;
 
