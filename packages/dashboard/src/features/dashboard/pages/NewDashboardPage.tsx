@@ -106,6 +106,7 @@ function MetricCard({
             <button
               type="button"
               onClick={onNavigate}
+              aria-label={`Open ${label}`}
               className="flex shrink-0 items-center justify-center text-muted-foreground hover:text-foreground"
             >
               <ExternalLink className="h-5 w-5" />
@@ -340,8 +341,8 @@ export default function NewDashboardPage() {
   const { totalUsers } = useUsers();
   const { hasCompletedOnboarding, isLoading: isMcpUsageLoading } = useMcpUsage();
   const { apiKey, isLoading: isApiKeyLoading } = useApiKey();
-  const { data: aiUsageSummary } = useAIUsageSummary();
-  const { currentDeploymentId } = useDeploymentMetadata();
+  const { data: aiUsageSummary, isLoading: isAIUsageLoading } = useAIUsageSummary();
+  const { currentDeploymentId, isLoading: isDeploymentLoading } = useDeploymentMetadata();
 
   const [isStepperDismissed, setIsStepperDismissed] = useState(() => {
     try {
@@ -352,7 +353,11 @@ export default function NewDashboardPage() {
   });
 
   const shouldShowLoadingState =
-    isMetadataLoading || isMcpUsageLoading || (isCloudProject && isProjectInfoLoading);
+    isMetadataLoading ||
+    isMcpUsageLoading ||
+    isAIUsageLoading ||
+    isDeploymentLoading ||
+    (isCloudProject && isProjectInfoLoading);
 
   const projectName = isCloudProject
     ? projectInfo.name || 'My InsForge Project'
