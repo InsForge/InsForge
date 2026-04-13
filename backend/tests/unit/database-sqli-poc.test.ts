@@ -1,6 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { DatabaseTableService } from '../../src/services/database/database-table.service';
-import { DatabaseManager } from '../../src/infra/database/database.manager';
 
 // Create a single mock query function to track all database calls
 const sharedMockQuery = vi.fn();
@@ -45,7 +44,7 @@ describe('DatabaseTableService - SQL Injection Verification (Fixed)', () => {
     try {
       // Execute the method
       await service.getTableSchema(maliciousTableName);
-    } catch (e) {
+    } catch (_e) {
       // Ignore logical errors
     }
 

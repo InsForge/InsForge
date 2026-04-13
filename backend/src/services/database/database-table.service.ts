@@ -379,7 +379,9 @@ export class DatabaseTableService {
       const uniqueSet = new Set(uniqueColumns.map((u: { column_name: string }) => u.column_name));
 
       // Get row count
-      const rowCountResult = await client.query(`SELECT COUNT(*) as row_count FROM ${this.quoteIdentifier(table)}`);
+      const rowCountResult = await client.query(
+        `SELECT COUNT(*) as row_count FROM ${this.quoteIdentifier(table)}`
+      );
       const row_count = rowCountResult.rows[0].row_count;
 
       return {
