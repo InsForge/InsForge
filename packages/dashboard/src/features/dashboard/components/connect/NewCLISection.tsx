@@ -1,5 +1,6 @@
+import { useState, useRef, useEffect } from 'react';
 import { ExternalLink } from 'lucide-react';
-import { CopyButton } from '@insforge/ui';
+import { CopyButton, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import { useProjectId } from '../../../../lib/hooks/useMetadata';
 import { useCloudProjectInfo } from '../../../../lib/hooks/useCloudProjectInfo';
 import { cn } from '../../../../lib/utils/utils';
@@ -40,18 +41,62 @@ interface CommandBoxProps {
 }
 
 function CommandBox({ command }: CommandBoxProps) {
+  const [copied, setCopied] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
+
+  const handleBoxClick = async () => {
+    try {
+      await navigator.clipboard.writeText(command);
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+      setCopied(true);
+      timerRef.current = setTimeout(() => {
+        setCopied(false);
+        timerRef.current = null;
+      }, 3000);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   return (
-    <div className="flex w-full items-center rounded border border-[var(--border)] bg-semantic-0 py-1.5 pl-3 pr-1.5">
-      <div className="flex min-w-0 flex-1 items-center gap-3 whitespace-nowrap px-1 font-mono text-sm leading-5">
-        <span className="shrink-0 text-muted-foreground">$</span>
-        <span className="overflow-hidden text-ellipsis text-foreground">{command}</span>
-      </div>
-      <CopyButton
-        text={command}
-        showText
-        className="h-7 shrink-0 gap-1.5 rounded bg-[var(--alpha-8)] px-2 text-sm font-normal text-muted-foreground before:hidden hover:bg-[var(--alpha-12)] hover:text-foreground"
-      />
-    </div>
+    <TooltipProvider>
+      <Tooltip open={copied}>
+        <TooltipTrigger asChild>
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => void handleBoxClick()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                void handleBoxClick();
+              }
+            }}
+            className="flex w-full cursor-pointer items-center rounded border border-[var(--border)] bg-semantic-0 py-1.5 pl-3 pr-1.5 transition-colors hover:border-[var(--alpha-16)] hover:bg-[var(--alpha-4)]"
+          >
+            <div className="flex min-w-0 flex-1 items-center gap-3 whitespace-nowrap px-1 font-mono text-sm leading-5">
+              <span className="shrink-0 text-muted-foreground">$</span>
+              <span className="overflow-hidden text-ellipsis text-foreground">{command}</span>
+            </div>
+            <CopyButton
+              text={command}
+              showText
+              className="h-7 shrink-0 gap-1.5 rounded bg-[var(--alpha-8)] px-2 text-sm font-normal text-muted-foreground before:hidden hover:bg-[var(--alpha-12)] hover:text-foreground"
+            />
+          </div>
+        </TooltipTrigger>
+        <TooltipContent>Copied!</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
