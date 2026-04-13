@@ -8,6 +8,7 @@ interface CLISectionV2Props {
 
 export function CLISectionV2({ className }: CLISectionV2Props) {
   const { projectId } = useProjectId();
+  const hasProjectId = Boolean(projectId);
   const cliLinkCommand = `npx @insforge/cli link --project-id ${projectId || '<project id>'}`;
 
   return (
@@ -25,7 +26,12 @@ export function CLISectionV2({ className }: CLISectionV2Props) {
               terminal command
             </span>
           </div>
-          <CopyButton text={cliLinkCommand} showText={false} className="shrink-0" />
+          <CopyButton
+            text={cliLinkCommand}
+            showText={false}
+            className="shrink-0"
+            disabled={!hasProjectId}
+          />
         </div>
         <p className="font-mono text-sm leading-6 text-foreground break-all">{cliLinkCommand}</p>
       </div>

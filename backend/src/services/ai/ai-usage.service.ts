@@ -39,8 +39,8 @@ export class AIUsageService {
         { resource: DataUpdateResourceType.AI_USAGE },
         'system'
       );
-    } catch {
-      // Socket may not be initialized in all contexts (e.g. tests)
+    } catch (error) {
+      logger.debug('AI usage update broadcast skipped', { error });
     }
   }
 

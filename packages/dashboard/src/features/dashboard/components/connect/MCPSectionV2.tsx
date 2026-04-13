@@ -112,11 +112,11 @@ export function MCPSectionV2({
 
             {selectedAgent.id === 'cursor' ? (
               <div className="w-fit">
-                <CursorDeeplinkGenerator apiKey={apiKey} os="macos-linux" />
+                <CursorDeeplinkGenerator apiKey={isLoading ? '' : apiKey} os="macos-linux" />
               </div>
             ) : selectedAgent.id === 'qoder' ? (
               <div className="w-fit">
-                <QoderDeeplinkGenerator apiKey={apiKey} os="macos-linux" />
+                <QoderDeeplinkGenerator apiKey={isLoading ? '' : apiKey} os="macos-linux" />
               </div>
             ) : selectedAgent.id === 'mcp' ? (
               <div className="flex h-[320px] w-full flex-col overflow-hidden rounded border border-[var(--alpha-8)] bg-semantic-0">
@@ -124,7 +124,12 @@ export function MCPSectionV2({
                   <div className="px-2">
                     <span className="text-xs text-muted-foreground">MCP Configuration</span>
                   </div>
-                  <CopyButton text={mcpJsonConfig} showText={false} className="shrink-0" />
+                  <CopyButton
+                    text={mcpJsonConfig}
+                    showText={false}
+                    className="shrink-0"
+                    disabled={isLoading}
+                  />
                 </div>
                 <div className="flex-1 overflow-auto p-3">
                   <pre className="m-0 whitespace-pre-wrap break-all text-sm leading-6 text-foreground">

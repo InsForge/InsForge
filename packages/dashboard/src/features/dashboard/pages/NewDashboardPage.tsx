@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import StepUserIcon from '../../../assets/icons/step_user.svg?react';
 import StepUploadIcon from '../../../assets/icons/step_upload.svg?react';
-import { useMetadata, useApiKey } from '../../../lib/hooks/useMetadata';
+import { useMetadata, useApiKey, useProjectId } from '../../../lib/hooks/useMetadata';
 import { useIsCloudHostingMode } from '../../../lib/config/DashboardHostContext';
 import { useCloudProjectInfo } from '../../../lib/hooks/useCloudProjectInfo';
 import { useMcpUsage } from '../../logs/hooks/useMcpUsage';
@@ -72,7 +72,8 @@ const PROMPT_STEPS: PromptStep[] = [
   },
 ];
 
-const STEPPER_DISMISS_KEY = 'insforge-prompt-stepper-dismissed';
+const getStepperDismissKey = (projectId?: string) =>
+  `insforge-prompt-stepper-dismissed-${projectId || 'default'}`;
 
 // --- Sub-components ---
 
@@ -343,10 +344,12 @@ export default function NewDashboardPage() {
   const { apiKey, isLoading: isApiKeyLoading } = useApiKey();
   const { data: aiUsageSummary, isLoading: isAIUsageLoading } = useAIUsageSummary();
   const { currentDeploymentId, isLoading: isDeploymentLoading } = useDeploymentMetadata();
+  const { projectId } = useProjectId();
+  const stepperDismissKey = getStepperDismissKey(projectId ?? undefined);
 
   const [isStepperDismissed, setIsStepperDismissed] = useState(() => {
     try {
-      return localStorage.getItem(STEPPER_DISMISS_KEY) === 'true';
+      return localStorage.getItem(stepperDismissKey) === 'true';
     } catch {
       return false;
     }
@@ -404,11 +407,11 @@ export default function NewDashboardPage() {
   const handleDismissStepper = useCallback(() => {
     setIsStepperDismissed(true);
     try {
-      localStorage.setItem(STEPPER_DISMISS_KEY, 'true');
+      localStorage.setItem(stepperDismissKey, 'true');
     } catch {
       // ignore
     }
-  }, []);
+  }, [stepperDismissKey]);
 
   const displayApiKey = isApiKeyLoading ? 'ik_' + '*'.repeat(32) : apiKey || '';
   const appUrl = getBackendUrl();
