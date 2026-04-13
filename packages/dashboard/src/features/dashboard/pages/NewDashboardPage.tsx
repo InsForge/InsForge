@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge, Button, CopyButton } from '@insforge/ui';
 import { Skeleton } from '../../../components';
@@ -347,13 +347,19 @@ export default function NewDashboardPage() {
   const { projectId } = useProjectId();
   const stepperDismissKey = getStepperDismissKey(projectId ?? undefined);
 
-  const [isStepperDismissed, setIsStepperDismissed] = useState(() => {
-    try {
-      return localStorage.getItem(stepperDismissKey) === 'true';
-    } catch {
-      return false;
+  const [isStepperDismissed, setIsStepperDismissed] = useState(false);
+
+  useEffect(() => {
+    if (!projectId) {
+      return;
     }
-  });
+    try {
+      const dismissed = localStorage.getItem(stepperDismissKey) === 'true';
+      setIsStepperDismissed(dismissed);
+    } catch {
+      // ignore
+    }
+  }, [projectId, stepperDismissKey]);
 
   const shouldShowLoadingState =
     isMetadataLoading ||
