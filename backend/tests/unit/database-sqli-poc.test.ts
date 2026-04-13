@@ -44,8 +44,8 @@ describe('DatabaseTableService - SQL Injection Verification (Fixed)', () => {
     try {
       // Execute the method
       await service.getTableSchema(maliciousTableName);
-    } catch (_e) {
-      // Ignore logical errors
+    } catch {
+      // Ignore logical errors, we only care about the captured SQL
     }
 
     // Find the binary query that contains our malicious payload (the COUNT query)
