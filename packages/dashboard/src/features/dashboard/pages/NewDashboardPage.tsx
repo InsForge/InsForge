@@ -47,7 +47,7 @@ const PROMPT_STEPS: PromptStep[] = [
     id: 2,
     title: 'Sign up your first user',
     prompt:
-      'Add sign in for users to this app.\nUsers should be able to:\n1. Sign up\n2. Sign in\n3. Sign out',
+      'Add sign in for users to this app using InsForge Auth with Google OAuth.\nUsers should be able to:\n1. Sign up\n2. Sign in\n3. Sign out',
     icon: <StepUserIcon className="size-6 text-muted-foreground" />,
   },
   {
@@ -61,7 +61,7 @@ const PROMPT_STEPS: PromptStep[] = [
     id: 4,
     title: 'Add LLM feature',
     prompt:
-      'Add an AI feature to this todo app that turns text into tasks.\nUsers should be able to type natural language and have the app create one or more todo items automatically.',
+      'Add an AI feature to this todo app that turns text into tasks using the InsForge AI Gateway.\nUsers should be able to type natural language and have the app create one or more todo items automatically.',
     icon: <Sparkles className="size-6 text-muted-foreground" />,
   },
   {
