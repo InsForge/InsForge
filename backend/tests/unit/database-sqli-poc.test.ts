@@ -27,10 +27,12 @@ describe('DatabaseTableService - SQL Injection Verification (Fixed)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     service = DatabaseTableService.getInstance();
-    
+
     // Setup sequential responses to satisfy code path logic
     sharedMockQuery
-      .mockResolvedValueOnce({ rows: [{ column_name: 'id', data_type: 'uuid', udt_name: 'uuid', is_nullable: 'NO' }] }) // 1. Columns schema
+      .mockResolvedValueOnce({
+        rows: [{ column_name: 'id', data_type: 'uuid', udt_name: 'uuid', is_nullable: 'NO' }],
+      }) // 1. Columns schema
       .mockResolvedValueOnce({ rows: [] }) // 2. Fkey constraints (pooled query)
       .mockResolvedValueOnce({ rows: [{ column_name: 'id' }] }) // 3. Primary keys
       .mockResolvedValueOnce({ rows: [] }) // 4. Unique columns
@@ -49,8 +51,8 @@ describe('DatabaseTableService - SQL Injection Verification (Fixed)', () => {
     }
 
     // Find the binary query that contains our malicious payload (the COUNT query)
-    const injectionQueryCall = sharedMockQuery.mock.calls.find(call => 
-      typeof call[0] === 'string' && call[0].includes('COUNT(*)')
+    const injectionQueryCall = sharedMockQuery.mock.calls.find(
+      (call) => typeof call[0] === 'string' && call[0].includes('COUNT(*)')
     );
 
     expect(injectionQueryCall).toBeDefined();
@@ -62,7 +64,7 @@ describe('DatabaseTableService - SQL Injection Verification (Fixed)', () => {
     // PostgreSQL escape for " inside an identifier is ""
     // Correctly escaped should be: "users""; DROP TABLE secrets; --"
     expect(capturedQuery).toContain(`FROM "users""; DROP TABLE secrets; --"`);
-    
+
     // This proves that the DROP TABLE command is now safely inside the identifier
     // string and will NOT be executed as a separate SQL command.
     expect(capturedQuery).not.toMatch(/FROM "[^"]*"; DROP TABLE/);
