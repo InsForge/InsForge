@@ -169,9 +169,11 @@ describe('VercelProvider.uploadFile retry logic', () => {
     expect(elapsed).toBeGreaterThanOrEqual(1500);
   }, 15000);
 
-  it('respects Retry-After header on 429', async () => {
+  it('respects X-RateLimit-Reset header on 429', async () => {
+    // Vercel sends X-RateLimit-Reset as Unix epoch seconds
+    const resetEpoch = Math.floor(Date.now() / 1000) + 2; // 2 seconds from now
     axiosPostSpy
-      .mockRejectedValueOnce(makeAxiosError(429, { 'retry-after': '2' }))
+      .mockRejectedValueOnce(makeAxiosError(429, { 'x-ratelimit-reset': String(resetEpoch) }))
       .mockResolvedValueOnce({ status: 200, data: {} });
 
     const start = Date.now();
@@ -180,7 +182,7 @@ describe('VercelProvider.uploadFile retry logic', () => {
 
     expect(sha).toBeTruthy();
     expect(axiosPostSpy).toHaveBeenCalledTimes(2);
-    expect(elapsed).toBeGreaterThanOrEqual(1800);
+    expect(elapsed).toBeGreaterThanOrEqual(1500);
     expect(elapsed).toBeLessThan(4000);
   }, 10000);
 

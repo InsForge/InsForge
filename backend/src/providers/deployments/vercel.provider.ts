@@ -854,12 +854,17 @@ export class VercelProvider {
         }
 
         // 429 Rate limit -- retry with exponential backoff + jitter
+        // Vercel uses X-RateLimit-Reset (Unix epoch seconds) instead of Retry-After
         if (axios.isAxiosError(error) && error.response?.status === 429) {
           if (attempt < UPLOAD_MAX_RETRIES) {
-            const retryAfter = error.response.headers['retry-after'];
-            const baseDelay = retryAfter
-              ? parseInt(retryAfter, 10) * 1000
-              : Math.min(2 ** attempt * UPLOAD_BACKOFF_BASE_MS, UPLOAD_BACKOFF_MAX_MS);
+            const rateLimitReset = error.response.headers['x-ratelimit-reset'];
+            let baseDelay: number;
+            if (rateLimitReset) {
+              const resetMs = parseInt(rateLimitReset, 10) * 1000;
+              baseDelay = Math.max(resetMs - Date.now(), UPLOAD_BACKOFF_BASE_MS);
+            } else {
+              baseDelay = Math.min(2 ** attempt * UPLOAD_BACKOFF_BASE_MS, UPLOAD_BACKOFF_MAX_MS);
+            }
             const delay = baseDelay + Math.random() * UPLOAD_JITTER_MAX_MS;
 
             logger.warn('Vercel rate limit hit, retrying file upload', {
