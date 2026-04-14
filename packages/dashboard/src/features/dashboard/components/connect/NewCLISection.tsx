@@ -108,7 +108,7 @@ export function NewCLISection({ className }: NewCLISectionProps) {
   const { projectId } = useProjectId();
   const { projectInfo } = useCloudProjectInfo();
 
-  const projectName = projectInfo.name || 'my-app';
+  const projectName = (projectInfo.name || 'my-app').replace(/\s+/g, '-');
   const createCommand = `npx @insforge/cli link --project-id ${projectId || '<project id>'} --template todo`;
   const devCommand = `cd ${projectName} && npm run dev`;
 

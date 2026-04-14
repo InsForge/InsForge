@@ -79,7 +79,7 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
 
   return (
     <div className="insforge-dashboard flex h-full min-h-0 min-w-0 flex-col">
-      <BrowserRouter>
+      <BrowserRouter basename={window.location.pathname.match(/^\/dashboard\/project\/[^/]+/)?.[0] || '/'}>
         <QueryClientProvider client={queryClient}>
           <DashboardHostProvider value={host}>
             <DashboardProjectProvider value={project}>

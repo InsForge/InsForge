@@ -40,35 +40,35 @@ const PROMPT_STEPS: PromptStep[] = [
     id: 1,
     title: 'Add sample data',
     prompt:
-      'Add 4 todo items to the todo table:\n\n1. Add sign in for users\n2. Add file upload\n3. Use AI to turn text into tasks\n4. Deploy your app',
-    icon: <Database className="size-6 text-muted-foreground" />,
+      'Use InsForge Skills to add 4 todo items to InsForge backend\'s todo table:\n\n1. Add sign in for users\n2. Add file upload\n3. Use AI to turn text into tasks\n4. Deploy your app',
+    icon: <Database className="size-12 text-[rgb(var(--disabled))]" />,
   },
   {
     id: 2,
     title: 'Sign up your first user',
     prompt:
-      'Add sign in for users to this app using InsForge Auth with Google OAuth.\nUsers should be able to:\n1. Sign up\n2. Sign in\n3. Sign out',
-    icon: <StepUserIcon className="size-6 text-muted-foreground" />,
+      'Use InsForge Skills to add user authentication to this app using InsForge Auth.\n\nUsers should be able to:\n1. Sign up / Sign in with Email\n2. Add Google OAuth\n3. Sign out\n\nAlso update the database and access control so each record belongs to a user:\n1. Add a `user_id` column to the relevant table(s)\n2. Set `user_id` automatically when a new record is created\n3. Restrict reads and writes so users can only access their own data\n4. Add the required row level security policies for this\n\nUpdate the app UI and backend logic so authentication is fully wired up and only signed in users can create and view their own records.',
+    icon: <StepUserIcon className="size-12 text-[rgb(var(--disabled))]" />,
   },
   {
     id: 3,
     title: 'Upload a file',
     prompt:
-      'Add file upload to this app.\nUsers should be able to upload a file and attach it to a task.\nShow the uploaded file in the task UI.\nUse InsForge Storage for file uploads.',
-    icon: <StepUploadIcon className="size-6 text-muted-foreground" />,
+      'Use InsForge Skills to add file upload to this app.\nUsers should be able to upload a file and attach it to a task.\nShow the uploaded file in the task UI.\nUse InsForge Storage for file uploads.',
+    icon: <StepUploadIcon className="size-12 text-[rgb(var(--disabled))]" />,
   },
   {
     id: 4,
     title: 'Add LLM feature',
     prompt:
-      'Add an AI feature to this todo app that turns text into tasks using the InsForge AI Gateway.\nUsers should be able to type natural language and have the app create one or more todo items automatically.',
-    icon: <Sparkles className="size-6 text-muted-foreground" />,
+      'Use InsForge Skills to add an AI feature to this todo app that turns text into tasks using the InsForge AI Gateway.\nUsers should be able to type natural language and have the app create one or more todo items automatically.',
+    icon: <Sparkles className="size-12 text-[rgb(var(--disabled))]" />,
   },
   {
     id: 5,
     title: 'Deploy your app',
-    prompt: 'Deploy this app on InsForge, after deploying, share the live URL.',
-    icon: <Rocket className="size-6 text-muted-foreground" />,
+    prompt: 'Use InsForge Skills to deploy this app on InsForge, after deploying, share the live URL.',
+    icon: <Rocket className="size-12 text-[rgb(var(--disabled))]" />,
   },
 ];
 
@@ -95,8 +95,8 @@ function MetricCard({
   onNavigate,
 }: MetricCardProps) {
   return (
-    <div className="flex min-w-0 flex-1 flex-col justify-between overflow-hidden rounded border border-[var(--alpha-8)] bg-card">
-      <div className="flex flex-1 flex-col justify-between p-4">
+    <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded border border-[var(--alpha-8)] bg-card">
+      <div className="flex h-[120px] flex-col p-4">
         {/* Header row */}
         <div className="flex h-[22px] items-center gap-1.5">
           <div className="flex h-5 w-5 shrink-0 items-center justify-center text-muted-foreground">
@@ -115,8 +115,8 @@ function MetricCard({
           )}
         </div>
 
-        {/* Value row */}
-        <div className="flex items-baseline justify-between">
+        {/* Value row — pinned 60px from top (matching Figma y=76 - padding=16) */}
+        <div className="mt-[38px] flex items-baseline justify-between">
           <div className="flex items-baseline gap-1">
             <p className="text-[20px] font-medium leading-7 text-foreground">{value}</p>
             {subValueLeft && (
@@ -139,32 +139,44 @@ function MetricCard({
 // --- Prompt display (renders numbered lines as an ordered list) ---
 
 function PromptDisplay({ text }: { text: string }) {
-  const lines = text.split('\n').filter((l) => l.trim() !== '');
-  const introLines: string[] = [];
-  const listItems: string[] = [];
+  const lines = text.split('\n');
+
+  type Block = { type: 'text'; content: string } | { type: 'list'; items: string[] } | { type: 'spacer' };
+  const result: Block[] = [];
 
   for (const line of lines) {
-    const match = line.match(/^\d+\.\s+(.+)/);
-    if (match) {
-      listItems.push(match[1]);
-    } else if (line.match(/^-\s+(.+)/)) {
-      listItems.push(line.replace(/^-\s+/, ''));
+    const numberedMatch = line.match(/^\d+\.\s+(.+)/);
+    const bulletMatch = line.match(/^-\s+(.+)/);
+
+    if (numberedMatch || bulletMatch) {
+      const item = numberedMatch ? numberedMatch[1] : bulletMatch![1];
+      const last = result[result.length - 1];
+      if (last && last.type === 'list') {
+        last.items.push(item);
+      } else {
+        result.push({ type: 'list', items: [item] });
+      }
+    } else if (line.trim() === '') {
+      result.push({ type: 'spacer' as const });
     } else {
-      introLines.push(line);
+      result.push({ type: 'text', content: line });
     }
   }
 
   return (
     <div className="text-sm leading-6 text-foreground">
-      {introLines.map((line, i) => (
-        <p key={i}>{line}</p>
-      ))}
-      {listItems.length > 0 && (
-        <ol className="list-decimal pl-5">
-          {listItems.map((item, i) => (
-            <li key={i}>{item}</li>
-          ))}
-        </ol>
+      {result.map((block, i) =>
+        block.type === 'spacer' ? (
+          <div key={i} className="h-2" />
+        ) : block.type === 'text' ? (
+          <p key={i}>{block.content}</p>
+        ) : (
+          <ol key={i} className="list-decimal pl-5">
+            {block.items.map((item, j) => (
+              <li key={j}>{item}</li>
+            ))}
+          </ol>
+        )
       )}
     </div>
   );
@@ -175,10 +187,8 @@ function PromptDisplay({ text }: { text: string }) {
 function StepCircle({ completed, active }: { completed: boolean; active: boolean }) {
   if (completed) {
     return (
-      <div
-        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${active ? 'border-primary' : 'border-muted-foreground/40'}`}
-      >
-        <Check className={`h-3 w-3 ${active ? 'text-primary' : 'text-muted-foreground/40'}`} />
+      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-primary">
+        <Check className="h-3 w-3 text-primary" />
       </div>
     );
   }
@@ -260,7 +270,7 @@ function PromptStepper({ onDismiss, completedSteps, showDismiss = false }: Promp
                     Step {step.id}
                   </span>
                 </div>
-                <p className="text-base leading-7 text-foreground">{step.title}</p>
+                <p className={`text-base leading-7 text-foreground ${isCompleted ? 'line-through' : ''}`}>{step.title}</p>
               </button>
             );
           })}
@@ -268,7 +278,7 @@ function PromptStepper({ onDismiss, completedSteps, showDismiss = false }: Promp
 
         {/* Step detail (right) */}
         <div className="relative flex flex-1 flex-col items-start self-stretch overflow-hidden bg-[var(--special-toast,#323232)] p-6">
-          <div className="relative z-10 flex max-w-[480px] flex-col items-start gap-3">
+          <div className="relative z-10 flex max-w-[640px] flex-col items-start gap-3">
             {/* Icon */}
             <div className="h-12 w-12">{currentStep.icon}</div>
 
@@ -284,11 +294,7 @@ function PromptStepper({ onDismiss, completedSteps, showDismiss = false }: Promp
               showText
               copyText="Copy Prompt"
               copiedText="Copied!"
-              className={
-                completedSteps[activeStep]
-                  ? 'h-9 rounded border border-[var(--alpha-8)] bg-transparent px-2 text-sm font-medium text-foreground hover:bg-[var(--alpha-4)]'
-                  : 'h-9 rounded bg-primary px-2 text-sm font-medium text-[rgb(var(--inverse))] hover:bg-primary/90'
-              }
+              className="h-9 rounded bg-primary px-2 text-sm font-medium text-[rgb(var(--inverse))] hover:bg-primary/90"
             />
           </div>
 
@@ -428,10 +434,10 @@ export default function NewDashboardPage() {
 
   return (
     <main className="h-full min-h-0 min-w-0 overflow-y-auto bg-semantic-0">
-      <div className="flex w-full flex-col gap-6 px-10 py-8">
+      <div className="flex w-full flex-col gap-12 px-10 py-8">
         {/* Project Header */}
         <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-medium leading-8 text-foreground">{projectName}</h1>
+          <h1 className="text-2xl font-normal leading-8 text-foreground">{projectName}</h1>
           {showInstanceTypeBadge && (
             <Badge
               variant="default"
@@ -461,7 +467,7 @@ export default function NewDashboardPage() {
         )}
 
         {/* Metric Cards - 120px height, 4 cols, 12px gap */}
-        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-[38px] xl:grid-cols-4">
           <MetricCard
             label="User"
             value={String(totalUsers ?? 0)}
