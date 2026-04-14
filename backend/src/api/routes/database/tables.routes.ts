@@ -1,6 +1,7 @@
 import { Router, Response, NextFunction } from 'express';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { DatabaseTableService } from '@/services/database/database-table.service.js';
+import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
@@ -39,6 +40,8 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
 
     const { tableName, columns, rlsEnabled } = validation.data;
     const result = await tableService.createTable(tableName, columns, rlsEnabled);
+
+    DatabaseManager.clearColumnTypeCache(tableName);
 
     // Log audit for table creation
     await auditService.log({
@@ -95,6 +98,8 @@ router.patch(
       const operations = validation.data;
       const result = await tableService.updateTableSchema(tableName, operations);
 
+      DatabaseManager.clearColumnTypeCache(tableName);
+
       // Log audit for table schema update
       await auditService.log({
         actor: req.user?.email || 'api-key',
@@ -122,6 +127,8 @@ router.delete(
     try {
       const { tableName } = req.params;
       const result = await tableService.deleteTable(tableName);
+
+      DatabaseManager.clearColumnTypeCache(tableName);
 
       // Log audit for table deletion
       await auditService.log({

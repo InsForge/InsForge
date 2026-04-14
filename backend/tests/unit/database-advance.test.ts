@@ -302,6 +302,122 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
     });
   });
 
+  describe('system schema blocking', () => {
+    test('blocks CREATE OR REPLACE FUNCTION on system schema', () => {
+      const query = `CREATE OR REPLACE FUNCTION system.update_updated_at()
+        RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql`;
+      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+      expect(() => service.sanitizeQuery(query)).toThrow(/system/i);
+    });
+
+    test('blocks SET search_path', () => {
+      const query = 'SET search_path TO system, public';
+      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+    });
+
+    test('blocks ALTER FUNCTION on system schema', () => {
+      const query = 'ALTER FUNCTION system.update_updated_at() SECURITY DEFINER';
+      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+    });
+
+    test('blocks CREATE TRIGGER on system schema table', () => {
+      const query =
+        'CREATE TRIGGER t BEFORE UPDATE ON system.secrets FOR EACH ROW EXECUTE FUNCTION public.my_func()';
+      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+    });
+
+    test('blocks CREATE TRIGGER referencing a system schema function', () => {
+      const query =
+        'CREATE TRIGGER t BEFORE UPDATE ON my_table FOR EACH ROW EXECUTE FUNCTION system.update_updated_at()';
+      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+    });
+
+    test('blocks DROP FUNCTION on system schema', () => {
+      const query = 'DROP FUNCTION system.update_updated_at()';
+      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+    });
+
+    test('blocks DROP TABLE on system schema', () => {
+      const query = 'DROP TABLE system.secrets';
+      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+    });
+
+    test('blocks DROP SCHEMA system', () => {
+      const query = 'DROP SCHEMA system CASCADE';
+      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+    });
+
+    test('blocks CREATE TABLE on system schema', () => {
+      const query = 'CREATE TABLE system.foo (id uuid PRIMARY KEY)';
+      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+    });
+
+    test('blocks ALTER TABLE on system schema', () => {
+      const query = 'ALTER TABLE system.secrets ADD COLUMN foo TEXT';
+      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+    });
+
+    test('blocks DROP TYPE on system schema', () => {
+      const query = 'DROP TYPE system.my_type';
+      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+    });
+
+    test('blocks DROP DOMAIN on system schema', () => {
+      const query = 'DROP DOMAIN system.my_domain';
+      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+    });
+
+    test('blocks INSERT on system schema', () => {
+      const query = "INSERT INTO system.secrets (key, value) VALUES ('a', 'b')";
+      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+    });
+
+    test('blocks UPDATE on system schema', () => {
+      const query = "UPDATE system.secrets SET value = 'x' WHERE key = 'a'";
+      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+    });
+
+    test('blocks DELETE on system schema', () => {
+      const query = "DELETE FROM system.secrets WHERE key = 'test'";
+      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+    });
+
+    test('blocks TRUNCATE on system schema', () => {
+      const query = 'TRUNCATE system.audit_logs';
+      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+    });
+
+    test('allows SELECT on system schema (read-only)', () => {
+      const query = 'SELECT * FROM system.secrets';
+      expect(() => service.sanitizeQuery(query)).not.toThrow();
+    });
+
+    test('allows CREATE TABLE in public schema (not blocked)', () => {
+      const query = 'CREATE TABLE public.foo (id uuid PRIMARY KEY)';
+      expect(() => service.sanitizeQuery(query)).not.toThrow();
+    });
+
+    test('allows CREATE FUNCTION in public schema', () => {
+      const query = `CREATE OR REPLACE FUNCTION public.update_updated_date()
+        RETURNS TRIGGER AS $$ BEGIN NEW.updated_date = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql`;
+      expect(() => service.sanitizeQuery(query)).not.toThrow();
+    });
+
+    test('throws AppError with 403 FORBIDDEN for system schema violations', () => {
+      const query = 'DROP TABLE system.secrets';
+      try {
+        service.sanitizeQuery(query);
+        expect.fail('Should have thrown an error');
+      } catch (error) {
+        expect(error).toBeInstanceOf(AppError);
+        if (error instanceof AppError) {
+          expect(error.statusCode).toBe(403);
+          expect(error.code).toBe(ERROR_CODES.FORBIDDEN);
+        }
+      }
+    });
+  });
+
   describe('other blocked operations', () => {
     test('blocks DROP DATABASE', () => {
       const query = 'DROP DATABASE testdb';

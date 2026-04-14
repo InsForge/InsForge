@@ -140,6 +140,38 @@ To verify the connection, send the following prompt to your agent:
 I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to learn about InsForge instructions.
 ```
 
+#### 4. Running Multiple Projects
+
+You can run multiple InsForge projects on the same host by using different ports and project names.
+
+```bash
+# Create a separate env file for each project
+cp .env.example .env.project1
+cp .env.example .env.project2
+```
+
+Edit `.env.project2` with different ports:
+```
+POSTGRES_PORT=5442
+POSTGREST_PORT=5440
+APP_PORT=7230
+AUTH_PORT=7231
+DENO_PORT=7233
+```
+
+Start each project with a unique name:
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.project1 -p project1 up -d
+docker compose -f docker-compose.prod.yml --env-file .env.project2 -p project2 up -d
+```
+
+Each project gets its own isolated database, storage, and configuration. Manage them with:
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.project1 -p project1 ps      # status
+docker compose -f docker-compose.prod.yml --env-file .env.project1 -p project1 logs -f  # logs
+docker compose -f docker-compose.prod.yml --env-file .env.project1 -p project1 down     # stop
+```
+
 ### One-click Deployment
 
 In addition to running InsForge locally, you can also launch InsForge using a pre-configured setup. This allows you to get up and running quickly with InsForge without installing Docker on your local machine.

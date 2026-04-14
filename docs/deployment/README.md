@@ -4,6 +4,14 @@ This directory contains deployment guides for self-hosting InsForge on various p
 
 ## 📚 Available Guides
 
+### General (Any VPS)
+
+- **[Deployment & Security Guide](./deployment-security-guide.md)** - Comprehensive guide for any Linux VPS
+  - Full deployment walkthrough with Docker Compose
+  - Reverse proxy setup (Nginx & Caddy)
+  - Firewall, SSH hardening, and security best practices
+  - Update, rollback, and automated backup procedures
+
 ### Cloud Platforms
 
 - **[Render](./deploy-to-render.md)** - Deploy InsForge on Render with managed services

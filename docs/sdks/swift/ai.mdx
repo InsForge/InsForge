@@ -209,10 +209,10 @@ let response = try await insforge.ai.generateEmbeddings(
     model: "google/gemini-embedding-001",
     input: .single("Hello world"),
     encodingFormat: .float,
-    dimensions: 768
+    dimensions: 3072
 )
 
-print("Embedding dimensions: \(response.data.first?.embedding.count ?? 0)")  // 768
+print("Embedding dimensions: \(response.data.first?.embedding.count ?? 0)")  // 3072
 ```
 
 ---

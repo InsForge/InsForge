@@ -81,6 +81,7 @@ export async function createApp() {
     cors({
       origin: true, // Allow all origins (matches Better Auth's trustedOrigins: ['*'])
       credentials: true, // Allow cookies/credentials
+      exposedHeaders: ['Content-Range', 'Preference-Applied'],
     })
   );
   app.use(cookieParser()); // Parse cookies for refresh token handling
@@ -158,9 +159,15 @@ export async function createApp() {
   // This ensures signature verification uses the original bytes
   app.use('/api/webhooks', express.raw({ type: 'application/json' }), webhooksRouter);
 
-  // Apply JSON middleware for all other routes
-  app.use(express.json({ limit: '100mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+  // Apply JSON and URL-encoded middleware for all other routes.
+  // We use high defaults (100mb/10mb) to ensure a smooth "out-of-the-box" experience
+  // for large metadata/storage requests, as per project standards.
+  // Users can override these via environment variables for hardened security.
+  const jsonLimit = process.env.MAX_JSON_BODY_SIZE || '100mb';
+  const urlencodedLimit = process.env.MAX_URLENCODED_BODY_SIZE || '10mb';
+
+  app.use(express.json({ limit: jsonLimit }));
+  app.use(express.urlencoded({ extended: true, limit: urlencodedLimit }));
 
   // Create API router and mount all API routes under /api
   const apiRouter = express.Router();
