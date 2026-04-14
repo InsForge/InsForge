@@ -6,6 +6,7 @@ export function CloudHostingDashboard() {
   const {
     getAuthorizationCode,
     projectInfo,
+    initialRoute,
     reportRouteChange,
     navigateToSubscription,
     renameProject,
@@ -21,6 +22,7 @@ export function CloudHostingDashboard() {
       showNavbar={!isInIframe()}
       getAuthorizationCode={getAuthorizationCode}
       project={projectInfo}
+      initialRoute={initialRoute}
       onRouteChange={reportRouteChange}
       onNavigateToSubscription={navigateToSubscription}
       onRenameProject={renameProject}

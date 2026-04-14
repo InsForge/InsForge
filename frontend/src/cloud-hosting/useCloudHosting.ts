@@ -122,6 +122,7 @@ function normalizeProjectInfo(
 export function useCloudHosting() {
   const currentOrigin = getCurrentOrigin();
   const [projectInfo, setProjectInfo] = useState<DashboardProjectInfo>();
+  const [initialRoute, setInitialRoute] = useState<string | null>(null);
   const queuedAuthorizationCodeRef = useRef<string | null>(null);
   const parentOriginRef = useRef<string | null>(getParentOrigin());
   const openerOriginRef = useRef<string | null>(null);
@@ -367,6 +368,13 @@ export function useCloudHosting() {
           );
           return;
         }
+        case 'ROUTE_CHANGE': {
+          const path = typeof message.path === 'string' ? message.path : null;
+          if (path) {
+            setInitialRoute(path);
+          }
+          return;
+        }
         default:
           return;
       }
@@ -465,6 +473,7 @@ export function useCloudHosting() {
 
   return {
     projectInfo,
+    initialRoute,
     getAuthorizationCode,
     reportRouteChange,
     requestInstanceInfo,
