@@ -25,6 +25,15 @@ export function CopyButton({
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Reset copied state when text changes
+  useEffect(() => {
+    setCopied(false);
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, [text]);
+
   // Cleanup timer on unmount
   useEffect(() => {
     return () => {
