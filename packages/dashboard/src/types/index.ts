@@ -36,6 +36,7 @@ export interface DashboardProps {
   backendUrl?: string;
   showNavbar?: boolean;
   project?: DashboardProjectInfo;
+  onRouteChange?: (path: string) => void;
   onNavigateToSubscription?: () => void;
   onRenameProject?: (name: string) => Promise<void>;
   onDeleteProject?: () => Promise<void>;

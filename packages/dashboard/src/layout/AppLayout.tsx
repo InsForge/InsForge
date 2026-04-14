@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useLocation } from 'react-router-dom';
 import AppSidebar from './AppSidebar';
 import AppHeader from './AppHeader';
 import { ThemeProvider } from '../lib/contexts/ThemeContext';
@@ -9,17 +10,27 @@ import { ConnectDialogProvider } from './ConnectDialogContext';
 
 const CONNECT_DIALOG_MESSAGE_TYPES = new Set(['SHOW_ONBOARDING_OVERLAY', 'SHOW_CONNECT_OVERLAY']);
 
+function getEmbeddedDashboardRoute(path: string): string | null {
+  if (path.startsWith('/dashboard')) {
+    return path;
+  }
+
+  return null;
+}
+
 interface LayoutProps {
   children: ReactNode;
 }
 
 export default function AppLayout({ children }: LayoutProps) {
   const host = useDashboardHost();
+  const location = useLocation();
   const isContainedHostLayout = host.mode === 'cloud-hosting';
   const showNavbar = host.showNavbar ?? true;
   const forcedTheme = host.mode === 'cloud-hosting' ? 'dark' : undefined;
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isConnectDialogOpen, setIsConnectDialogOpen] = useState(false);
+  const currentRoute = `${location.pathname}${location.search}${location.hash}`;
 
   const toggleSidebar = () => {
     setIsSidebarCollapsed((previous) => !previous);
@@ -37,7 +48,7 @@ export default function AppLayout({ children }: LayoutProps) {
     const parentWindow = typeof window !== 'undefined' ? window.parent : null;
     const openerWindow = typeof window !== 'undefined' ? window.opener : null;
 
-    const handleMessage = (event: MessageEvent<{ type?: string }>) => {
+    const handleMessage = (event: MessageEvent<{ type?: string; path?: unknown }>) => {
       const isParentMessage = event.source === parentWindow;
       const isOpenerMessage = openerWindow !== null && event.source === openerWindow;
       if (!isParentMessage && !isOpenerMessage) {
@@ -53,6 +64,19 @@ export default function AppLayout({ children }: LayoutProps) {
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [host.mode]);
+
+  useEffect(() => {
+    if (host.mode !== 'cloud-hosting') {
+      return;
+    }
+
+    const embeddedRoute = getEmbeddedDashboardRoute(currentRoute);
+    if (!embeddedRoute) {
+      return;
+    }
+
+    host.onRouteChange?.(embeddedRoute);
+  }, [currentRoute, host]);
 
   return (
     <ThemeProvider forcedTheme={forcedTheme}>

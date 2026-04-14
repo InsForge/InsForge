@@ -456,9 +456,17 @@ export function useCloudHosting() {
     void postMessageToParent({ type: 'NAVIGATE_TO_SUBSCRIPTION' });
   }, [postMessageToParent]);
 
+  const reportRouteChange = useCallback(
+    (path: string) => {
+      void postMessageToParent({ type: 'APP_ROUTE_CHANGE', path });
+    },
+    [postMessageToParent]
+  );
+
   return {
     projectInfo,
     getAuthorizationCode,
+    reportRouteChange,
     requestInstanceInfo,
     requestInstanceTypeChange,
     renameProject,
