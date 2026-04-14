@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, useNavigate } from 'react-router-dom';
+import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from '../lib/contexts/AuthContext';
 import { AppRoutes } from '../router/AppRoutes';
 import { ToastProvider } from '../lib/hooks/useToast';
@@ -14,20 +14,6 @@ import {
 import { setDashboardBackendUrl } from '../lib/config/runtime';
 import type { InsForgeDashboardProps } from '../types';
 
-function InitialRouteNavigator({ route }: { route?: string | null }) {
-  const navigate = useNavigate();
-  const hasNavigated = useRef(false);
-
-  useEffect(() => {
-    if (route && !hasNavigated.current) {
-      hasNavigated.current = true;
-      void navigate(route, { replace: true });
-    }
-  }, [route, navigate]);
-
-  return null;
-}
-
 function normalizeBackendUrl(url?: string) {
   return url?.replace(/\/$/, '') || undefined;
 }
@@ -38,7 +24,6 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
     backendUrl,
     mode,
     showNavbar,
-    initialRoute,
     onRouteChange,
     onNavigateToSubscription,
     onRenameProject,
@@ -95,7 +80,6 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
   return (
     <div className="insforge-dashboard flex h-full min-h-0 min-w-0 flex-col">
       <BrowserRouter>
-        <InitialRouteNavigator route={initialRoute} />
         <QueryClientProvider client={queryClient}>
           <DashboardHostProvider value={host}>
             <DashboardProjectProvider value={project}>
