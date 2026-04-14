@@ -40,7 +40,7 @@ const PROMPT_STEPS: PromptStep[] = [
     id: 1,
     title: 'Add sample data',
     prompt:
-      'Use InsForge Skills to add 4 todo items to InsForge backend\'s todo table:\n\n1. Add sign in for users\n2. Add file upload\n3. Use AI to turn text into tasks\n4. Deploy your app',
+      "Use InsForge Skills to add 4 todo items to InsForge backend's todo table:\n\n1. Add sign in for users\n2. Add file upload\n3. Use AI to turn text into tasks\n4. Deploy your app",
     icon: <Database className="size-12 text-[rgb(var(--disabled))]" />,
   },
   {
@@ -67,7 +67,8 @@ const PROMPT_STEPS: PromptStep[] = [
   {
     id: 5,
     title: 'Deploy your app',
-    prompt: 'Use InsForge Skills to deploy this app on InsForge, after deploying, share the live URL.',
+    prompt:
+      'Use InsForge Skills to deploy this app on InsForge, after deploying, share the live URL.',
     icon: <Rocket className="size-12 text-[rgb(var(--disabled))]" />,
   },
 ];
@@ -141,7 +142,10 @@ function MetricCard({
 function PromptDisplay({ text }: { text: string }) {
   const lines = text.split('\n');
 
-  type Block = { type: 'text'; content: string } | { type: 'list'; items: string[] } | { type: 'spacer' };
+  type Block =
+    | { type: 'text'; content: string }
+    | { type: 'list'; items: string[] }
+    | { type: 'spacer' };
   const result: Block[] = [];
 
   for (const line of lines) {
@@ -149,7 +153,7 @@ function PromptDisplay({ text }: { text: string }) {
     const bulletMatch = line.match(/^-\s+(.+)/);
 
     if (numberedMatch || bulletMatch) {
-      const item = numberedMatch ? numberedMatch[1] : bulletMatch![1];
+      const item = numberedMatch?.[1] ?? bulletMatch?.[1] ?? '';
       const last = result[result.length - 1];
       if (last && last.type === 'list') {
         last.items.push(item);
@@ -270,7 +274,11 @@ function PromptStepper({ onDismiss, completedSteps, showDismiss = false }: Promp
                     Step {step.id}
                   </span>
                 </div>
-                <p className={`text-base leading-7 text-foreground ${isCompleted ? 'line-through' : ''}`}>{step.title}</p>
+                <p
+                  className={`text-base leading-7 text-foreground ${isCompleted ? 'line-through' : ''}`}
+                >
+                  {step.title}
+                </p>
               </button>
             );
           })}
