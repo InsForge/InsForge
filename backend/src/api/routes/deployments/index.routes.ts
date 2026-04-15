@@ -153,19 +153,6 @@ router.put(
         }
       );
 
-      await auditService.log({
-        actor: req.user?.email || 'api-key',
-        action: 'UPLOAD_DEPLOYMENT_FILE',
-        module: 'DEPLOYMENTS',
-        details: {
-          id: idValidation.data,
-          fileId: fileIdValidation.data,
-          path: response.path,
-          size: response.size,
-        },
-        ip_address: req.ip,
-      });
-
       successResponse(res, response);
     } catch (error) {
       next(error);
