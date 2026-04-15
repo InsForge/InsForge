@@ -54,7 +54,11 @@ export class AIAccessConfigService {
 
       if (!result.rows.length) {
         logger.warn('No AI access config found, returning default fallback values');
-        return { ...DEFAULT_CONFIG, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+        return {
+          ...DEFAULT_CONFIG,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
       }
 
       const row = result.rows[0];
@@ -65,7 +69,11 @@ export class AIAccessConfigService {
       };
     } catch (error) {
       logger.error('Failed to get AI access config, returning fallback values', { error });
-      return { ...DEFAULT_CONFIG, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+      return {
+        ...DEFAULT_CONFIG,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
     }
   }
 

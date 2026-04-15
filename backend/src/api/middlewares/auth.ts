@@ -250,10 +250,14 @@ export async function verifyCloudBackend(req: AuthRequest, _res: Response, next:
  */
 export async function checkAnonJwtAccess(req: AuthRequest, _res: Response, next: NextFunction) {
   // ik_ is service-role (admin-equivalent) — always allowed on AI endpoints.
-  if (extractApiKey(req)) return next();
+  if (extractApiKey(req)) {
+    return next();
+  }
 
   const token = extractBearerToken(req.headers.authorization);
-  if (!token) return next();
+  if (!token) {
+    return next();
+  }
 
   let isAnon = false;
   try {
@@ -261,7 +265,9 @@ export async function checkAnonJwtAccess(req: AuthRequest, _res: Response, next:
   } catch {
     return next(); // malformed — let verifyUser produce the 401
   }
-  if (!isAnon) return next();
+  if (!isAnon) {
+    return next();
+  }
 
   try {
     const allowed = await AIAccessConfigService.getInstance().isAnonAiAccessAllowed();

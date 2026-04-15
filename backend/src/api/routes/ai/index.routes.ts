@@ -1,6 +1,11 @@
 import { Router, Response, NextFunction } from 'express';
 import { ChatCompletionService } from '@/services/ai/chat-completion.service.js';
-import { AuthRequest, verifyAdmin, verifyUser, checkAnonJwtAccess } from '../../middlewares/auth.js';
+import {
+  AuthRequest,
+  verifyAdmin,
+  verifyUser,
+  checkAnonJwtAccess,
+} from '../../middlewares/auth.js';
 import { ImageGenerationService } from '@/services/ai/image-generation.service.js';
 import { EmbeddingService } from '@/services/ai/embedding.service.js';
 import { AIModelService } from '@/services/ai/ai-model.service.js';
