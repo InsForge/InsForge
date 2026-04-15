@@ -122,7 +122,6 @@ function normalizeProjectInfo(
 export function useCloudHosting() {
   const currentOrigin = getCurrentOrigin();
   const [projectInfo, setProjectInfo] = useState<DashboardProjectInfo>();
-  const queuedAuthorizationCodeRef = useRef<string | null>(null);
   const parentOriginRef = useRef<string | null>(getParentOrigin());
   const openerOriginRef = useRef<string | null>(null);
   const pendingRequestsRef = useRef<PendingRequests>({});
@@ -272,10 +271,8 @@ export function useCloudHosting() {
 
           if (pendingRequestsRef.current.authCode) {
             resolvePendingRequest('authCode', code);
-            return;
           }
 
-          queuedAuthorizationCodeRef.current = code;
           return;
         }
         case 'AUTHORIZATION_CODE_ERROR':
@@ -389,12 +386,6 @@ export function useCloudHosting() {
   }, [postMessageToParent]);
 
   const getAuthorizationCode = useCallback(async (): Promise<string> => {
-    if (queuedAuthorizationCodeRef.current) {
-      const code = queuedAuthorizationCodeRef.current;
-      queuedAuthorizationCodeRef.current = null;
-      return code;
-    }
-
     // Even if the send fails, keep the pending request open so a proactive parent or opener
     // message can still resolve it when the cloud hosting transport finishes initializing.
     postMessageToParent({ type: 'REQUEST_AUTHORIZATION_CODE' });

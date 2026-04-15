@@ -133,17 +133,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Access token refresh handler
   useEffect(() => {
     const handleRefreshAccessToken = async (): Promise<boolean> => {
-      const refreshed = await loginService.refreshAccessToken();
-      if (refreshed) {
-        return true;
+      if (shouldAttemptCloudAuthentication) {
+        const authenticatedUser = await authenticateCloudSession();
+        return authenticatedUser !== null;
       }
 
-      if (!shouldAttemptCloudAuthentication) {
-        return false;
-      }
-
-      const authenticatedUser = await authenticateCloudSession();
-      return authenticatedUser !== null;
+      return loginService.refreshAccessToken();
     };
 
     apiClient.setRefreshAccessTokenHandler(handleRefreshAccessToken);
