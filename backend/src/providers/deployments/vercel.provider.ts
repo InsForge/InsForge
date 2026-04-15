@@ -863,7 +863,7 @@ export class VercelProvider {
               const resetMs = parseInt(rateLimitReset, 10) * 1000;
               baseDelay = Math.min(
                 Math.max(resetMs - Date.now(), UPLOAD_BACKOFF_BASE_MS),
-                UPLOAD_BACKOFF_MAX_MS,
+                UPLOAD_BACKOFF_MAX_MS
               );
             } else {
               baseDelay = Math.min(2 ** attempt * UPLOAD_BACKOFF_BASE_MS, UPLOAD_BACKOFF_MAX_MS);
