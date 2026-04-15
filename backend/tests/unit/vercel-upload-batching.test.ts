@@ -134,7 +134,6 @@ describe('VercelProvider.uploadFile retry logic', () => {
   const setTimeoutCalls: number[] = [];
 
   beforeEach(() => {
-    vi.useFakeTimers();
     // Deterministic jitter: Math.random always returns 0
     vi.spyOn(Math, 'random').mockReturnValue(0);
 
@@ -154,17 +153,22 @@ describe('VercelProvider.uploadFile retry logic', () => {
 
     axiosPostSpy = vi.spyOn(axios, 'post');
 
-    // Track setTimeout durations to verify backoff values
+    // Intercept setTimeout: record retry delays and resolve immediately.
+    // Pass through short timeouts (vitest internals) to the real implementation.
     setTimeoutCalls.length = 0;
-    const origSetTimeout = globalThis.setTimeout;
-    vi.spyOn(globalThis, 'setTimeout').mockImplementation((fn: TimerHandler, ms?: number) => {
-      if (ms && ms >= 1000) setTimeoutCalls.push(ms);
-      return origSetTimeout(fn, 0);
-    });
+    const realSetTimeout = globalThis.setTimeout.bind(globalThis);
+    vi.spyOn(globalThis, 'setTimeout').mockImplementation(((fn: (...args: unknown[]) => void, ms?: number) => {
+      if (ms !== undefined && ms >= 1000) {
+        setTimeoutCalls.push(ms);
+        // Resolve on next microtask to keep async flow correct
+        Promise.resolve().then(() => fn());
+        return 0 as unknown as ReturnType<typeof setTimeout>;
+      }
+      return realSetTimeout(fn, ms);
+    }) as typeof setTimeout);
   });
 
   afterEach(() => {
-    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
