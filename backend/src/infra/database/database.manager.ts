@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { DatabaseMetadataSchema } from '@insforge/shared-schemas';
+import pgFormat from 'pg-format';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -139,9 +140,8 @@ export class DatabaseManager {
 
             // Build a UNION ALL query to get all counts in one query
             const unionQuery = tableNames
-              .map(
-                (tableName) =>
-                  `SELECT '${tableName.replace(/'/g, "''")}' as table_name, COUNT(*) as count FROM "${tableName}"`
+              .map((tableName) =>
+                pgFormat('SELECT %L as table_name, COUNT(*) as count FROM %I', tableName, tableName)
               )
               .join(' UNION ALL ');
 
