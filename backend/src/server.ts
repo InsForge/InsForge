@@ -39,6 +39,16 @@ import { schedulesRouter } from '@/api/routes/schedules/index.routes.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+function shouldSkipGlobalRateLimit(req: Request): boolean {
+  if (req.path === '/api/health') {
+    return true;
+  }
+
+  return (
+    req.method === 'PUT' && /^\/api\/deployments\/[^/]+\/files\/[^/]+\/content$/.test(req.path)
+  );
+}
+
 // Load .env file from the root directory (parent of backend)
 const envPath = path.resolve(__dirname, '../../.env');
 if (fs.existsSync(envPath)) {
@@ -73,7 +83,7 @@ export async function createApp() {
     windowMs: 15 * 60 * 1000,
     max: 3000,
     message: 'Too many requests from this IP',
-    skip: (req) => req.path === '/api/health',
+    skip: shouldSkipGlobalRateLimit,
   });
 
   // Basic middleware

@@ -51,17 +51,9 @@ export const createDeploymentResponseSchema = z.object({
 });
 
 /**
- * Response from creating a direct-upload deployment session.
+ * Request to create a direct-upload deployment with its file manifest.
  */
-export const createDirectDeploymentResponseSchema = z.object({
-  id: z.string().uuid(),
-  status: deploymentSchema.shape.status,
-});
-
-/**
- * Request to declare the files that will be uploaded for a direct deployment.
- */
-export const createDeploymentManifestRequestSchema = z
+export const createDirectDeploymentRequestSchema = z
   .object({
     files: z.array(deploymentManifestFileEntrySchema).min(1),
   })
@@ -85,14 +77,16 @@ export const createDeploymentManifestRequestSchema = z
   });
 
 /**
- * Response from creating a deployment manifest.
+ * Response from creating a direct-upload deployment session.
  */
-export const createDeploymentManifestResponseSchema = z.object({
+export const createDirectDeploymentResponseSchema = z.object({
+  id: z.string().uuid(),
+  status: deploymentSchema.shape.status,
   files: z.array(deploymentManifestFileSchema),
 });
 
 /**
- * Response from uploading a single deployment file through the proxy.
+ * Response from uploading a direct deployment file through the proxy.
  */
 export const uploadDeploymentFileResponseSchema = deploymentManifestFileSchema.extend({
   uploadedAt: z.string().datetime(),
@@ -263,11 +257,8 @@ export type EnvVar = z.infer<typeof envVarSchema>;
 export type DeploymentManifestFileEntry = z.infer<typeof deploymentManifestFileEntrySchema>;
 export type DeploymentManifestFile = z.infer<typeof deploymentManifestFileSchema>;
 export type CreateDeploymentResponse = z.infer<typeof createDeploymentResponseSchema>;
+export type CreateDirectDeploymentRequest = z.infer<typeof createDirectDeploymentRequestSchema>;
 export type CreateDirectDeploymentResponse = z.infer<typeof createDirectDeploymentResponseSchema>;
-export type CreateDeploymentManifestRequest = z.infer<typeof createDeploymentManifestRequestSchema>;
-export type CreateDeploymentManifestResponse = z.infer<
-  typeof createDeploymentManifestResponseSchema
->;
 export type UploadDeploymentFileResponse = z.infer<typeof uploadDeploymentFileResponseSchema>;
 export type StartDeploymentRequest = z.infer<typeof startDeploymentRequestSchema>;
 export type StartDeploymentResponse = z.infer<typeof startDeploymentResponseSchema>;

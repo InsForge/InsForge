@@ -2,9 +2,8 @@ import { apiClient } from '../../../lib/api/client';
 import type {
   DeploymentSchema,
   CreateDeploymentResponse,
+  CreateDirectDeploymentRequest,
   CreateDirectDeploymentResponse,
-  CreateDeploymentManifestRequest,
-  CreateDeploymentManifestResponse,
   UploadDeploymentFileResponse,
   StartDeploymentRequest,
   ListDeploymentsResponse,
@@ -28,9 +27,8 @@ import type {
 export type {
   DeploymentSchema,
   CreateDeploymentResponse,
+  CreateDirectDeploymentRequest,
   CreateDirectDeploymentResponse,
-  CreateDeploymentManifestRequest,
-  CreateDeploymentManifestResponse,
   UploadDeploymentFileResponse,
   ListDeploymentsResponse,
   DeploymentEnvVar,
@@ -83,26 +81,17 @@ export class DeploymentsService {
   }
 
   /** Creates a new deployment session for direct file uploads. */
-  async createDirectDeployment(): Promise<CreateDirectDeploymentResponse> {
+  async createDirectDeployment(
+    data: CreateDirectDeploymentRequest
+  ): Promise<CreateDirectDeploymentResponse> {
     return apiClient.request('/deployments/direct', {
-      method: 'POST',
-      headers: apiClient.withAccessToken(),
-    });
-  }
-
-  /** Creates the direct-upload file manifest for a deployment. */
-  async createDeploymentManifest(
-    id: string,
-    data: CreateDeploymentManifestRequest
-  ): Promise<CreateDeploymentManifestResponse> {
-    return apiClient.request(`/deployments/${id}/manifest`, {
       method: 'POST',
       headers: apiClient.withAccessToken(),
       body: JSON.stringify(data),
     });
   }
 
-  /** Streams one manifest file through the backend to Vercel. */
+  /** Streams one registered deployment file through the backend to Vercel. */
   async uploadDeploymentFileContent(
     id: string,
     fileId: string,

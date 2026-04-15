@@ -855,7 +855,12 @@ export class VercelProvider {
    * Stream a single file to Vercel
    * POST /v2/files
    */
-  async uploadFileStream(input: { content: Readable; sha: string; size: number }): Promise<string> {
+  async uploadFileStream(input: {
+    content: Readable;
+    sha: string;
+    size: number;
+    signal?: AbortSignal;
+  }): Promise<string> {
     const credentials = await this.getCredentials();
 
     try {
@@ -871,6 +876,7 @@ export class VercelProvider {
           },
           maxBodyLength: Infinity,
           maxContentLength: Infinity,
+          signal: input.signal,
         }
       );
 
@@ -908,6 +914,10 @@ export class VercelProvider {
           400,
           ERROR_CODES.INVALID_INPUT
         );
+      }
+
+      if (axios.isAxiosError(error) && error.code === 'ERR_CANCELED') {
+        throw new AppError('Vercel file upload was interrupted.', 499, ERROR_CODES.INVALID_INPUT);
       }
 
       logger.error('Failed to stream file to Vercel', {

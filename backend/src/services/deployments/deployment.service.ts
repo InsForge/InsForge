@@ -1,4 +1,4 @@
-import { Pool } from 'pg';
+import { Pool, type PoolClient } from 'pg';
 import AdmZip from 'adm-zip';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
@@ -20,9 +20,8 @@ import {
 import logger from '@/utils/logger.js';
 import type {
   CreateDeploymentResponse,
+  CreateDirectDeploymentRequest,
   CreateDirectDeploymentResponse,
-  CreateDeploymentManifestRequest,
-  CreateDeploymentManifestResponse,
   DeploymentManifestFile,
   UploadDeploymentFileResponse,
   StartDeploymentRequest,
@@ -236,9 +235,11 @@ export class DeploymentService {
   }
 
   /**
-   * Create a new direct-upload deployment record with WAITING status
+   * Create a new direct-upload deployment record with WAITING status and file manifest
    */
-  async createDirectDeployment(): Promise<CreateDirectDeploymentResponse> {
+  async createDirectDeployment(
+    input: CreateDirectDeploymentRequest
+  ): Promise<CreateDirectDeploymentResponse> {
     if (!isCloudEnvironment()) {
       throw new AppError(
         'Deployments are only available in cloud environment.',
@@ -248,32 +249,60 @@ export class DeploymentService {
     }
 
     try {
-      const result = await this.getPool().query(
-        `INSERT INTO system.deployments (provider, status, metadata)
-         VALUES ($1, $2, $3)
-         RETURNING
-           id,
-           provider_deployment_id as "providerDeploymentId",
-           provider,
-           status,
-           url,
-           metadata,
-           created_at as "createdAt",
-           updated_at as "updatedAt"`,
-        ['vercel', DeploymentStatus.WAITING, JSON.stringify({ uploadMode: 'direct' })]
-      );
+      const files = this.validateDeploymentManifest(input.files);
+      const totalSizeBytes = files.reduce((sum, file) => sum + file.size, 0);
+      const client = await this.getPool().connect();
 
-      const deployment = result.rows[0] as DeploymentRecord;
+      try {
+        await client.query('BEGIN');
 
-      logger.info('Direct deployment record created', {
-        id: deployment.id,
-        status: deployment.status,
-      });
+        const result = await client.query(
+          `INSERT INTO system.deployments (provider, status, metadata)
+           VALUES ($1, $2, $3)
+           RETURNING
+             id,
+             provider_deployment_id as "providerDeploymentId",
+             provider,
+             status,
+             url,
+             metadata,
+             created_at as "createdAt",
+             updated_at as "updatedAt"`,
+          [
+            'vercel',
+            DeploymentStatus.WAITING,
+            JSON.stringify({
+              uploadMode: 'direct',
+              fileCount: files.length,
+              totalSizeBytes,
+              manifestCreatedAt: new Date().toISOString(),
+            }),
+          ]
+        );
 
-      return {
-        id: deployment.id,
-        status: deployment.status,
-      };
+        const deployment = result.rows[0] as DeploymentRecord;
+        const insertedFiles = await this.insertDeploymentFiles(client, deployment.id, files);
+
+        await client.query('COMMIT');
+
+        logger.info('Direct deployment record created', {
+          id: deployment.id,
+          status: deployment.status,
+          fileCount: files.length,
+          totalSizeBytes,
+        });
+
+        return {
+          id: deployment.id,
+          status: deployment.status,
+          files: insertedFiles.map((row) => this.toDeploymentFileResponse(row)),
+        };
+      } catch (error) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw error;
+      } finally {
+        client.release();
+      }
     } catch (error) {
       if (error instanceof AppError) {
         throw error;
@@ -286,137 +315,13 @@ export class DeploymentService {
   }
 
   /**
-   * Create the file manifest for a direct-upload deployment
-   */
-  async createDeploymentManifest(
-    id: string,
-    input: CreateDeploymentManifestRequest
-  ): Promise<CreateDeploymentManifestResponse> {
-    if (!isCloudEnvironment()) {
-      throw new AppError(
-        'Deployments are only available in cloud environment.',
-        503,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
-
-    try {
-      const deployment = await this.getDeploymentById(id);
-
-      if (!deployment) {
-        throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.NOT_FOUND);
-      }
-
-      if (deployment.status !== DeploymentStatus.WAITING) {
-        throw new AppError(
-          `Deployment manifest can only be created while status is WAITING. Current status: ${deployment.status}`,
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
-      }
-
-      if (deployment.metadata?.uploadMode !== 'direct') {
-        throw new AppError(
-          'Deployment manifest can only be created for direct deployments.',
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
-      }
-
-      const files = this.validateDeploymentManifest(input.files);
-      const totalSizeBytes = files.reduce((sum, file) => sum + file.size, 0);
-
-      const uploadedCountResult = await this.getPool().query<{ count: number }>(
-        `SELECT COUNT(*)::int as count
-         FROM system.deployment_files
-         WHERE deployment_id = $1 AND uploaded_at IS NOT NULL`,
-        [id]
-      );
-
-      if ((uploadedCountResult.rows[0]?.count ?? 0) > 0) {
-        throw new AppError(
-          'Deployment manifest cannot be replaced after file uploads have started.',
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
-      }
-
-      const client = await this.getPool().connect();
-
-      try {
-        await client.query('BEGIN');
-        await client.query('DELETE FROM system.deployment_files WHERE deployment_id = $1', [id]);
-
-        const insertResult = await client.query<DeploymentFileRow>(
-          `INSERT INTO system.deployment_files (deployment_id, file_path, sha, size_bytes)
-           SELECT $1::uuid, file_input.file_path, file_input.sha, file_input.size_bytes
-           FROM unnest($2::text[], $3::text[], $4::int[]) AS file_input(file_path, sha, size_bytes)
-           RETURNING
-             id as "fileId",
-             deployment_id as "deploymentId",
-             file_path as "path",
-             sha,
-             size_bytes as "size",
-             uploaded_at as "uploadedAt"`,
-          [
-            id,
-            files.map((file) => file.path),
-            files.map((file) => file.sha),
-            files.map((file) => file.size),
-          ]
-        );
-
-        await client.query(
-          `UPDATE system.deployments
-           SET metadata = COALESCE(metadata, '{}'::jsonb) || $2::jsonb
-           WHERE id = $1`,
-          [
-            id,
-            JSON.stringify({
-              fileCount: files.length,
-              totalSizeBytes,
-              uploadMode: 'direct',
-              manifestCreatedAt: new Date().toISOString(),
-            }),
-          ]
-        );
-
-        await client.query('COMMIT');
-
-        logger.info('Deployment manifest created', {
-          deploymentId: id,
-          fileCount: files.length,
-          totalSizeBytes,
-        });
-
-        return {
-          files: insertResult.rows.map((row) => this.toDeploymentFileResponse(row)),
-        };
-      } catch (error) {
-        await client.query('ROLLBACK').catch(() => {});
-        throw error;
-      } finally {
-        client.release();
-      }
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error('Failed to create deployment manifest', {
-        error: error instanceof Error ? error.message : String(error),
-        id,
-      });
-      throw new AppError('Failed to create deployment manifest', 500, ERROR_CODES.INTERNAL_ERROR);
-    }
-  }
-
-  /**
-   * Stream a single manifest file through the backend to Vercel
+   * Stream one registered deployment file through the backend to Vercel.
    */
   async uploadDeploymentFileContent(
     id: string,
     fileId: string,
-    content: Readable
+    content: Readable,
+    options: { signal?: AbortSignal } = {}
   ): Promise<UploadDeploymentFileResponse> {
     if (!isCloudEnvironment()) {
       throw new AppError(
@@ -450,11 +355,23 @@ export class DeploymentService {
         throw new AppError(`Deployment file not found: ${fileId}`, 404, ERROR_CODES.NOT_FOUND);
       }
 
-      const validatedContent = this.createValidatedFileStream(content, file.sha, file.size);
+      if (this.getUploadMode(deployment, 1) !== 'direct') {
+        throw new AppError(
+          'Deployment files can only be uploaded for direct deployments.',
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      await this.updateDeploymentStatus(id, DeploymentStatus.UPLOADING, {
+        lastFileUploadStartedAt: new Date().toISOString(),
+      });
+
       await this.vercelProvider.uploadFileStream({
-        content: validatedContent,
+        content: this.createValidatedFileStream(content, file.sha, file.size),
         sha: file.sha,
         size: file.size,
+        signal: options.signal,
       });
 
       const updateResult = await this.getPool().query<DeploymentFileRow>(
@@ -471,18 +388,18 @@ export class DeploymentService {
         [id, fileId]
       );
 
-      await this.updateDeploymentStatus(id, DeploymentStatus.UPLOADING, {
-        lastFileUploadedAt: new Date().toISOString(),
-      });
-
-      const uploadedFile = this.toDeploymentFileResponse(updateResult.rows[0]);
-      if (!uploadedFile.uploadedAt) {
+      const uploadedFile = updateResult.rows[0];
+      if (!uploadedFile?.uploadedAt) {
         throw new AppError(
           'Failed to mark deployment file as uploaded',
           500,
           ERROR_CODES.INTERNAL_ERROR
         );
       }
+
+      await this.updateDeploymentStatus(id, DeploymentStatus.UPLOADING, {
+        lastFileUploadedAt: new Date().toISOString(),
+      });
 
       logger.info('Deployment file uploaded', {
         deploymentId: id,
@@ -491,14 +408,16 @@ export class DeploymentService {
         size: uploadedFile.size,
       });
 
+      const response = this.toDeploymentFileResponse(uploadedFile);
       return {
-        ...uploadedFile,
-        uploadedAt: uploadedFile.uploadedAt,
+        ...response,
+        uploadedAt: response.uploadedAt ?? uploadedFile.uploadedAt.toISOString(),
       };
     } catch (error) {
       if (error instanceof AppError) {
         throw error;
       }
+
       logger.error('Failed to upload deployment file', {
         error: error instanceof Error ? error.message : String(error),
         id,
@@ -835,8 +754,8 @@ export class DeploymentService {
   }
 
   private validateDeploymentManifest(
-    files: CreateDeploymentManifestRequest['files']
-  ): CreateDeploymentManifestRequest['files'] {
+    files: CreateDirectDeploymentRequest['files']
+  ): CreateDirectDeploymentRequest['files'] {
     const maxFiles = this.getMaxDeploymentFiles();
     const maxTotalBytes = this.getMaxDeploymentTotalBytes();
     const maxFileBytes = this.getMaxDeploymentFileBytes();
@@ -889,6 +808,33 @@ export class DeploymentService {
     });
   }
 
+  private async insertDeploymentFiles(
+    client: PoolClient,
+    deploymentId: string,
+    files: CreateDirectDeploymentRequest['files']
+  ): Promise<DeploymentFileRow[]> {
+    const insertResult = await client.query<DeploymentFileRow>(
+      `INSERT INTO system.deployment_files (deployment_id, file_path, sha, size_bytes)
+       SELECT $1::uuid, file_input.file_path, file_input.sha, file_input.size_bytes
+       FROM unnest($2::text[], $3::text[], $4::int[]) AS file_input(file_path, sha, size_bytes)
+       RETURNING
+         id as "fileId",
+         deployment_id as "deploymentId",
+         file_path as "path",
+         sha,
+         size_bytes as "size",
+         uploaded_at as "uploadedAt"`,
+      [
+        deploymentId,
+        files.map((file) => file.path),
+        files.map((file) => file.sha),
+        files.map((file) => file.size),
+      ]
+    );
+
+    return insertResult.rows;
+  }
+
   private toDeploymentFileResponse(row: DeploymentFileRow): DeploymentManifestFile {
     return {
       fileId: row.fileId,
@@ -899,61 +845,63 @@ export class DeploymentService {
     };
   }
 
+  private createFileValidationTransform(expectedSha: string, expectedSize: number): Transform {
+    const hash = crypto.createHash('sha1');
+    let receivedBytes = 0;
+
+    return new Transform({
+      transform(chunk: Buffer, _encoding: BufferEncoding, callback: TransformCallback) {
+        receivedBytes += chunk.length;
+
+        if (receivedBytes > expectedSize) {
+          callback(
+            new AppError(
+              'Uploaded file is larger than the registered deployment file size.',
+              400,
+              ERROR_CODES.INVALID_INPUT
+            )
+          );
+          return;
+        }
+
+        hash.update(chunk);
+        callback(null, chunk);
+      },
+      flush(callback: TransformCallback) {
+        if (receivedBytes !== expectedSize) {
+          callback(
+            new AppError(
+              'Uploaded file size does not match the registered deployment file.',
+              400,
+              ERROR_CODES.INVALID_INPUT
+            )
+          );
+          return;
+        }
+
+        const actualSha = hash.digest('hex');
+        if (actualSha !== expectedSha) {
+          callback(
+            new AppError(
+              'Uploaded file content does not match the registered deployment file.',
+              400,
+              ERROR_CODES.INVALID_INPUT
+            )
+          );
+          return;
+        }
+
+        callback();
+      },
+    });
+  }
+
   private createValidatedFileStream(
     content: Readable,
     expectedSha: string,
     expectedSize: number
   ): Readable {
-    const hash = crypto.createHash('sha1');
-    let receivedBytes = 0;
-
-    return content.pipe(
-      new Transform({
-        transform(chunk: Buffer, _encoding: BufferEncoding, callback: TransformCallback) {
-          receivedBytes += chunk.length;
-
-          if (receivedBytes > expectedSize) {
-            callback(
-              new AppError(
-                'Uploaded file is larger than the registered deployment file size.',
-                400,
-                ERROR_CODES.INVALID_INPUT
-              )
-            );
-            return;
-          }
-
-          hash.update(chunk);
-          callback(null, chunk);
-        },
-        flush(callback: TransformCallback) {
-          if (receivedBytes !== expectedSize) {
-            callback(
-              new AppError(
-                'Uploaded file size does not match the registered deployment file.',
-                400,
-                ERROR_CODES.INVALID_INPUT
-              )
-            );
-            return;
-          }
-
-          const actualSha = hash.digest('hex');
-          if (actualSha !== expectedSha) {
-            callback(
-              new AppError(
-                'Uploaded file content does not match the registered deployment file.',
-                400,
-                ERROR_CODES.INVALID_INPUT
-              )
-            );
-            return;
-          }
-
-          callback();
-        },
-      })
-    );
+    return content.pipe(this.createFileValidationTransform(expectedSha, expectedSize));
   }
 
   private async getDeploymentFileById(

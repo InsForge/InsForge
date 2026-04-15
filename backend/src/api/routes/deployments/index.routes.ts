@@ -7,7 +7,7 @@ import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse, paginatedResponse } from '@/utils/response.js';
 import {
-  createDeploymentManifestRequestSchema,
+  createDirectDeploymentRequestSchema,
   startDeploymentRequestSchema,
   updateSlugRequestSchema,
   addCustomDomainRequestSchema,
@@ -70,13 +70,22 @@ router.post('/direct', verifyAdmin, async (req: AuthRequest, res: Response, next
       );
     }
 
-    const response = await deploymentService.createDirectDeployment();
+    const validationResult = createDirectDeploymentRequestSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      throw new AppError(
+        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    const response = await deploymentService.createDirectDeployment(validationResult.data);
 
     await auditService.log({
       actor: req.user?.email || 'api-key',
       action: 'CREATE_DIRECT_DEPLOYMENT',
       module: 'DEPLOYMENTS',
-      details: { id: response.id },
+      details: { id: response.id, fileCount: response.files.length },
       ip_address: req.ip,
     });
 
@@ -87,58 +96,7 @@ router.post('/direct', verifyAdmin, async (req: AuthRequest, res: Response, next
 });
 
 /**
- * Create the direct-upload deployment manifest
- * POST /api/deployments/:id/manifest
- */
-router.post(
-  '/:id/manifest',
-  verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      if (!deploymentService.isConfigured()) {
-        throw new AppError(
-          'Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID environment variables.',
-          503,
-          ERROR_CODES.INTERNAL_ERROR
-        );
-      }
-
-      const idValidation = uuidParamSchema.safeParse(req.params.id);
-      if (!idValidation.success) {
-        throw new AppError('Invalid deployment ID', 400, ERROR_CODES.INVALID_INPUT);
-      }
-
-      const validationResult = createDeploymentManifestRequestSchema.safeParse(req.body);
-      if (!validationResult.success) {
-        throw new AppError(
-          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
-      }
-
-      const response = await deploymentService.createDeploymentManifest(
-        idValidation.data,
-        validationResult.data
-      );
-
-      await auditService.log({
-        actor: req.user?.email || 'api-key',
-        action: 'CREATE_DEPLOYMENT_MANIFEST',
-        module: 'DEPLOYMENTS',
-        details: { id: idValidation.data, fileCount: response.files.length },
-        ip_address: req.ip,
-      });
-
-      successResponse(res, response, 201);
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-/**
- * Upload a deployment file through the backend to Vercel
+ * Stream one direct deployment file through the backend to Vercel
  * PUT /api/deployments/:id/files/:fileId/content
  */
 router.put(
@@ -168,8 +126,9 @@ router.put(
       const contentType = Array.isArray(contentTypeHeader)
         ? contentTypeHeader[0]
         : (contentTypeHeader ?? '');
+      const normalizedContentType = contentType.split(';')[0].trim().toLowerCase();
 
-      if (contentType.split(';')[0].trim().toLowerCase() !== 'application/octet-stream') {
+      if (normalizedContentType !== 'application/octet-stream') {
         throw new AppError(
           'Deployment file content must be uploaded as application/octet-stream.',
           415,
@@ -177,11 +136,35 @@ router.put(
         );
       }
 
+      const abortController = new AbortController();
+      req.on('aborted', () => abortController.abort());
+      res.on('close', () => {
+        if (!res.writableEnded) {
+          abortController.abort();
+        }
+      });
+
       const response = await deploymentService.uploadDeploymentFileContent(
         idValidation.data,
         fileIdValidation.data,
-        req
+        req,
+        {
+          signal: abortController.signal,
+        }
       );
+
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'UPLOAD_DEPLOYMENT_FILE',
+        module: 'DEPLOYMENTS',
+        details: {
+          id: idValidation.data,
+          fileId: fileIdValidation.data,
+          path: response.path,
+          size: response.size,
+        },
+        ip_address: req.ip,
+      });
 
       successResponse(res, response);
     } catch (error) {

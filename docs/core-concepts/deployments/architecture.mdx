@@ -64,18 +64,16 @@ sequenceDiagram
     participant DB as PostgreSQL
     participant Vercel as Vercel
 
-    Agent->>API: Create direct deployment
+    Agent->>API: Create direct deployment with file manifest
+    API->>DB: Store path, SHA, and size for each file
     API-->>Agent: Deployment ID
 
-    Agent->>API: Create deployment manifest
-    API->>DB: Store path, SHA, and size for each file
-    API-->>Agent: File IDs
+    API-->>Agent: Deployment ID + file IDs
 
-    loop Each source file
-        Agent->>API: Upload file bytes
+    loop Files, with bounded client concurrency
+        Agent->>API: Stream one file by file ID
         API->>Vercel: Stream file to /v2/files
         API->>DB: Mark file uploaded
-        API-->>Agent: File uploaded
     end
 
     Agent->>API: Start deployment
@@ -94,9 +92,9 @@ sequenceDiagram
 
 #### Direct Upload Flow
 
-1. **Create Deployment**: Agent calls `POST /api/deployments/direct` and receives a deployment ID
-2. **Create Manifest**: Agent calls `POST /api/deployments/:id/manifest` with each relative file path, SHA-1 digest, and byte size
-3. **Upload Files**: Agent streams each file to `PUT /api/deployments/:id/files/:fileId/content`; InsForge forwards it to Vercel with provider credentials kept server-side
+1. **Create Deployment**: Agent calls `POST /api/deployments/direct` with each relative file path, SHA-1 digest, and byte size; InsForge stores the manifest and returns a deployment ID plus a file ID for each manifest entry
+2. **Upload Files**: Agent streams each file to `PUT /api/deployments/:id/files/:fileId/content` using bounded client-side concurrency; InsForge validates bytes against the manifest and forwards the stream to Vercel without exposing Vercel credentials
+3. **Retry If Needed**: If an upload is interrupted, the agent can retry individual file uploads for the same deployment ID. To inspect progress, query `system.deployment_files` with a raw SQL tool for that `deployment_id`
 4. **Start Build**: Agent calls `POST /api/deployments/:id/start`; InsForge verifies every manifest file was uploaded, then creates the Vercel deployment with uploaded file SHAs
 5. **Build & Deploy**: Vercel builds the application and deploys to its edge network
 6. **Go Live**: Application becomes available at `https://{app-key}.insforge.site`
@@ -115,7 +113,7 @@ The entire process typically completes in about one minute.
 
 | Status | Description |
 |--------|-------------|
-| `WAITING` | Deployment created, awaiting source zip upload or direct manifest/file uploads |
+| `WAITING` | Deployment created, awaiting source zip upload or direct file uploads |
 | `UPLOADING` | Source files are being proxied to Vercel or deployment creation is in progress |
 | `QUEUED` | Build queued on Vercel |
 | `BUILDING` | Application being built |
@@ -150,7 +148,7 @@ Environment variables can be passed during deployment for build-time configurati
 
 Deployment uploads stream through InsForge directly into Vercel's file upload API, enabling:
 
-- **Lower Memory Use**: Source archives are no longer buffered and unzipped by the backend
+- **Lower Memory Use**: Source zips are no longer buffered and unzipped by the backend for direct-capable clients
 - **Credential Safety**: Vercel credentials remain server-side while clients upload individual files
 - **Compatibility**: Existing zip/S3 clients can continue using the legacy deployment entrypoint
 - **Rapid Builds**: Vercel's distributed build infrastructure

@@ -156,7 +156,13 @@ describe('VercelProvider.uploadFileStream', () => {
 
     const content = Readable.from([Buffer.from('hello')]);
     const sha = 'a'.repeat(40);
-    const result = await provider.uploadFileStream({ content, sha, size: 5 });
+    const abortController = new AbortController();
+    const result = await provider.uploadFileStream({
+      content,
+      sha,
+      size: 5,
+      signal: abortController.signal,
+    });
 
     expect(result).toBe(sha);
     expect(axiosPostSpy).toHaveBeenCalledWith(
@@ -171,6 +177,7 @@ describe('VercelProvider.uploadFileStream', () => {
         }),
         maxBodyLength: Infinity,
         maxContentLength: Infinity,
+        signal: abortController.signal,
       })
     );
   });
