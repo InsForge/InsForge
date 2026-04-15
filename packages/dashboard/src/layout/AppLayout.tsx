@@ -97,7 +97,8 @@ export default function AppLayout({ children }: LayoutProps) {
             </main>
           </div>
         </div>
-        {getFeatureFlag('dashboard-v2-experiment') === 'test' ? (
+        {getFeatureFlag('dashboard-v2-experiment') === 'test' ||
+        getFeatureFlag('dashboard-v2-experiment') === 'c_test' ? (
           <ConnectDialogV2 open={isConnectDialogOpen} onOpenChange={setIsConnectDialogOpen} />
         ) : (
           <ConnectDialog open={isConnectDialogOpen} onOpenChange={setIsConnectDialogOpen} />

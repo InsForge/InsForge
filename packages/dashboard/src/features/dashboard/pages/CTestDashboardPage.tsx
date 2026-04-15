@@ -25,6 +25,7 @@ import { useDeploymentMetadata } from '../../deployments/hooks/useDeploymentMeta
 import { NewCLISection } from '../components/connect/NewCLISection';
 import { MCPSection } from '../components/connect';
 import stepBgDecoration from '../../../assets/images/step_bg_decoration.svg';
+import DiscordIcon from '../../../assets/logos/discord.svg?react';
 
 // --- Prompt Stepper Data ---
 
@@ -104,7 +105,6 @@ function MetricCard({
   return (
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded border border-[var(--alpha-8)] bg-card">
       <div className="flex h-[120px] flex-col p-4">
-        {/* Header row */}
         <div className="flex h-[22px] items-center gap-1.5">
           <div className="flex h-5 w-5 shrink-0 items-center justify-center text-muted-foreground">
             {icon}
@@ -121,8 +121,6 @@ function MetricCard({
             </button>
           )}
         </div>
-
-        {/* Value row — pinned 60px from top (matching Figma y=76 - padding=16) */}
         <div className="mt-[38px] flex items-baseline justify-between">
           <div className="flex items-baseline gap-1">
             <p className="text-[20px] font-medium leading-7 text-foreground">{value}</p>
@@ -143,7 +141,7 @@ function MetricCard({
   );
 }
 
-// --- Prompt display (renders numbered lines as an ordered list) ---
+// --- Prompt display ---
 
 function PromptDisplay({ text }: { text: string }) {
   const lines = text.split('\n');
@@ -192,7 +190,7 @@ function PromptDisplay({ text }: { text: string }) {
   );
 }
 
-// --- Step circle (simple outline, green when active/completed, gray otherwise) ---
+// --- Step circle ---
 
 function StepCircle({ completed, active }: { completed: boolean; active: boolean }) {
   if (completed) {
@@ -228,10 +226,11 @@ function PromptStepper({ onDismiss, completedSteps, showDismiss = false }: Promp
 
   return (
     <div className="flex flex-col gap-6 rounded-lg border border-[var(--alpha-8)] bg-card p-6">
-      {/* Header */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
-          <p className="text-[20px] font-medium leading-7 text-foreground">Next Step</p>
+          <p className="text-[20px] font-medium leading-7 text-foreground">
+            Congratulations! Your backend has been successfully set up.
+          </p>
           {allCompleted ? (
             <Button
               type="button"
@@ -253,13 +252,11 @@ function PromptStepper({ onDismiss, completedSteps, showDismiss = false }: Promp
           ) : null}
         </div>
         <p className="text-[13px] leading-[18px] text-muted-foreground">
-          Copy and Paste prompt to your agent to start building
+          Now open your coding agent and start building your project with prompts
         </p>
       </div>
 
-      {/* Stepper content - inner bordered container */}
       <div className="flex overflow-hidden rounded border border-[var(--alpha-8)]">
-        {/* Step list (left) */}
         <div className="flex w-1/2 max-w-[440px] shrink-0 flex-col border-r border-[var(--alpha-8)]">
           {PROMPT_STEPS.map((step, index) => {
             const isActive = index === activeStep;
@@ -291,19 +288,11 @@ function PromptStepper({ onDismiss, completedSteps, showDismiss = false }: Promp
           })}
         </div>
 
-        {/* Step detail (right) */}
         <div className="relative flex flex-1 flex-col items-start self-stretch overflow-hidden bg-[var(--special-toast,#323232)] p-6">
           <div className="relative z-10 flex max-w-[640px] flex-col items-start gap-3">
-            {/* Icon */}
             <div className="h-12 w-12">{currentStep.icon}</div>
-
-            {/* Title */}
             <p className="text-[20px] font-medium leading-7 text-foreground">{currentStep.title}</p>
-
-            {/* Prompt text */}
             <PromptDisplay text={currentStep.prompt} />
-
-            {/* Action buttons */}
             <div className="flex items-center gap-2">
               <CopyButton
                 text={currentStep.prompt}
@@ -324,8 +313,6 @@ function PromptStepper({ onDismiss, completedSteps, showDismiss = false }: Promp
               )}
             </div>
           </div>
-
-          {/* Decorative background graphic */}
           <img
             src={stepBgDecoration}
             alt=""
@@ -337,7 +324,7 @@ function PromptStepper({ onDismiss, completedSteps, showDismiss = false }: Promp
   );
 }
 
-function NewDashboardLoadingState() {
+function CTestLoadingState() {
   return (
     <main className="h-full min-h-0 min-w-0 overflow-y-auto bg-semantic-0">
       <div className="mx-auto flex w-full flex-col gap-6 px-10 py-8">
@@ -346,12 +333,9 @@ function NewDashboardLoadingState() {
           <Skeleton className="h-5 w-16 rounded" />
           <Skeleton className="h-6 w-20 rounded-full" />
         </div>
-        <div className="grid grid-cols-4 gap-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-[120px] rounded" />
-          ))}
+        <div className="flex items-center justify-center py-12">
+          <Skeleton className="h-[400px] w-full max-w-[640px] rounded" />
         </div>
-        <Skeleton className="h-[360px] rounded" />
       </div>
     </main>
   );
@@ -359,7 +343,7 @@ function NewDashboardLoadingState() {
 
 // --- Main Page ---
 
-export default function NewDashboardPage() {
+export default function CTestDashboardPage() {
   const navigate = useNavigate();
   const isCloudHostingMode = useIsCloudHostingMode();
   const isCloudProject = isInsForgeCloudProject();
@@ -426,21 +410,18 @@ export default function NewDashboardPage() {
   const bucketCount = storage?.buckets?.length ?? 0;
   const functionCount = metadata?.functions.length ?? 0;
 
-  // --- Step completion detection (real-time via socket → React Query invalidation) ---
+  // Todo table has data — triggers transition from Get Started to full dashboard
+  const todoHasData = (tables?.find((t) => t.tableName === 'todo')?.recordCount ?? 0) > 0;
+
   const completedSteps = useMemo(
     () => [
-      // Step 1: Add sample data — todo table has records
-      (tables?.find((t) => t.tableName === 'todo')?.recordCount ?? 0) > 0,
-      // Step 2: Sign up first user — totalUsers already excludes admin & anon
+      todoHasData,
       (totalUsers ?? 0) >= 1,
-      // Step 3: Upload a file — todo-attachments bucket has files
       (storage?.buckets?.find((b) => b.name === 'todo-attachments')?.objectCount ?? 0) > 0,
-      // Step 4: Add LLM feature — AI gateway has been used
       (aiUsageSummary?.totalRequests ?? 0) > 0,
-      // Step 5: Deploy your app — a deployment exists
       !!currentDeploymentId,
     ],
-    [tables, totalUsers, storage, aiUsageSummary, currentDeploymentId]
+    [todoHasData, totalUsers, storage, aiUsageSummary, currentDeploymentId]
   );
 
   const handleDismissStepper = useCallback(() => {
@@ -456,9 +437,49 @@ export default function NewDashboardPage() {
   const appUrl = getBackendUrl();
 
   if (shouldShowLoadingState) {
-    return <NewDashboardLoadingState />;
+    return <CTestLoadingState />;
   }
 
+  // Phase 1: Todo has no data — show centered Get Started with 4 steps
+  if (!todoHasData) {
+    return (
+      <main className="flex h-full min-h-0 min-w-0 flex-col bg-semantic-0">
+        <div className="flex flex-1 flex-col items-center overflow-y-auto pt-[120px]">
+          {/* Get Started title — outside the card */}
+          <h2 className="w-full max-w-[640px] text-center text-2xl font-medium leading-8 text-foreground">
+            Get Started
+          </h2>
+
+          {/* Stepper card */}
+          <div className="mt-6 w-full max-w-[640px]">
+            {canShowCli ? (
+              <NewCLISection isCTest />
+            ) : (
+              <MCPSection apiKey={displayApiKey} appUrl={appUrl} isLoading={isApiKeyLoading} />
+            )}
+          </div>
+        </div>
+
+        {/* Bottom help bar */}
+        <div className="flex items-center justify-center px-4 pb-10 pt-6">
+          <p className="flex items-center gap-1 text-sm leading-6 text-muted-foreground">
+            <span>Need help? Join our</span>
+            <a
+              href="https://discord.gg/DvBtaEc9Jz"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-[#818cf8] hover:text-[#99a3ff]"
+            >
+              <DiscordIcon className="size-5" />
+              <span>Discord</span>
+            </a>
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  // Phase 2: Todo has data — show full dashboard with metrics + stepper
   return (
     <main className="h-full min-h-0 min-w-0 overflow-y-auto bg-semantic-0">
       <div className="flex w-full flex-col gap-12 px-10 py-8">
@@ -473,7 +494,6 @@ export default function NewDashboardPage() {
               {instanceType}
             </Badge>
           )}
-          {/* Health badge */}
           <div className="flex items-center rounded-full bg-[var(--special-toast,#323232)] px-2 py-1">
             <div
               className={`mr-1.5 h-2 w-2 rounded-full ${isHealthy ? 'bg-emerald-400' : 'bg-amber-400'}`}
@@ -482,14 +502,16 @@ export default function NewDashboardPage() {
           </div>
         </div>
 
-        {/* Get Started - CLI or MCP onboarding */}
-        {canShowCli ? (
-          <NewCLISection />
-        ) : (
-          <MCPSection apiKey={displayApiKey} appUrl={appUrl} isLoading={isApiKeyLoading} />
+        {/* Prompt Stepper */}
+        {!isStepperDismissed && (
+          <PromptStepper
+            onDismiss={handleDismissStepper}
+            completedSteps={completedSteps}
+            showDismiss={agentConnected}
+          />
         )}
 
-        {/* Metric Cards - 120px height, 4 cols, 12px gap */}
+        {/* Metric Cards */}
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <MetricCard
             label="User"
@@ -521,15 +543,6 @@ export default function NewDashboardPage() {
             onNavigate={() => void navigate('/dashboard/functions/list')}
           />
         </div>
-
-        {/* Next Step - Prompt Stepper */}
-        {!isStepperDismissed && (
-          <PromptStepper
-            onDismiss={handleDismissStepper}
-            completedSteps={completedSteps}
-            showDismiss={agentConnected}
-          />
-        )}
       </div>
     </main>
   );
