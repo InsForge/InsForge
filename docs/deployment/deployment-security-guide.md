@@ -277,8 +277,8 @@ These variables are only needed if you plan to use InsForge's **deployment featu
 
 ```env
 # ── Deployments ──────────────────────────────────────────────
-# S3 bucket for storing deployment artifacts (required for deployments)
-# Without this, creating or starting a deployment will fail with a 503 error.
+# S3 bucket for legacy zip deployment uploads.
+# Direct uploads use the backend proxy, but POST /api/deployments still requires S3.
 AWS_S3_BUCKET=your-deployment-bucket
 AWS_REGION=us-east-2
 AWS_ACCESS_KEY_ID=

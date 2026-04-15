@@ -3,6 +3,8 @@
 ## Overview
 
 Deploy frontend applications to InsForge using the `create-deployment` MCP tool. The tool handles uploading source files, building, and deploying automatically.
+Source files are uploaded individually through InsForge's deployment proxy; do not zip the project or upload deployment artifacts to storage yourself.
+The REST API still supports the legacy zip upload flow for backward compatibility.
 
 ## Deploy with MCP Tool
 
@@ -54,8 +56,8 @@ LIMIT 1;
 
 | Status | Description |
 |--------|-------------|
-| `WAITING` | Waiting for source upload |
-| `UPLOADING` | Uploading to build server |
+| `WAITING` | Waiting for source zip upload or direct file uploads |
+| `UPLOADING` | Uploading files or creating the Vercel deployment |
 | `QUEUED` | Queued for build |
 | `BUILDING` | Building (typically ~1 min) |
 | `READY` | Deployment complete, URL available |

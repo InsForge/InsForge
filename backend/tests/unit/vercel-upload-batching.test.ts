@@ -1,5 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { Readable } from 'stream';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { VercelProvider } from '../../src/providers/deployments/vercel.provider';
+import axios, { AxiosError, AxiosHeaders } from 'axios';
 
 // Mock dependencies so we don't hit real APIs
 vi.mock('../../src/utils/environment.js', () => ({
@@ -11,6 +13,20 @@ vi.mock('../../src/services/secrets/secret.service.js', () => ({
     getInstance: () => ({}),
   },
 }));
+
+function makeAxiosError(status: number): AxiosError {
+  const error = new Error(`Request failed with status code ${status}`) as AxiosError;
+  error.isAxiosError = true;
+  error.response = {
+    status,
+    statusText: status === 429 ? 'Too Many Requests' : 'Request Failed',
+    headers: {},
+    data: {},
+    config: { headers: new AxiosHeaders() },
+  };
+  error.config = { headers: new AxiosHeaders() };
+  return error;
+}
 
 describe('VercelProvider.uploadFiles batching', () => {
   let provider: VercelProvider;
@@ -107,5 +123,101 @@ describe('VercelProvider.uploadFiles batching', () => {
     const files = [{ path: 'fail.txt', content: Buffer.from('fail') }];
 
     await expect(provider.uploadFiles(files)).rejects.toThrow('rate limited');
+  });
+});
+
+describe('VercelProvider.uploadFileStream', () => {
+  let provider: VercelProvider;
+  let axiosPostSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    // Reset singleton for clean tests
+    // @ts-expect-error accessing private static for test reset
+    VercelProvider.instance = undefined;
+    provider = VercelProvider.getInstance();
+
+    vi.spyOn(provider, 'getCredentials').mockResolvedValue({
+      token: 'test-token',
+      teamId: 'test-team',
+      projectId: 'test-project',
+      expiresAt: null,
+      slug: null,
+    });
+
+    axiosPostSpy = vi.spyOn(axios, 'post');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('streams file content with Vercel digest headers', async () => {
+    axiosPostSpy.mockResolvedValueOnce({ status: 200, data: {} });
+
+    const content = Readable.from([Buffer.from('hello')]);
+    const sha = 'a'.repeat(40);
+    const result = await provider.uploadFileStream({ content, sha, size: 5 });
+
+    expect(result).toBe(sha);
+    expect(axiosPostSpy).toHaveBeenCalledWith(
+      'https://api.vercel.com/v2/files?teamId=test-team',
+      content,
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer test-token',
+          'Content-Type': 'application/octet-stream',
+          'Content-Length': '5',
+          'x-vercel-digest': sha,
+        }),
+        maxBodyLength: Infinity,
+        maxContentLength: Infinity,
+      })
+    );
+  });
+
+  it('treats existing streamed files as success', async () => {
+    axiosPostSpy.mockRejectedValueOnce(makeAxiosError(409));
+
+    const sha = 'b'.repeat(40);
+    const result = await provider.uploadFileStream({
+      content: Readable.from([Buffer.from('hello')]),
+      sha,
+      size: 5,
+    });
+
+    expect(result).toBe(sha);
+    expect(axiosPostSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not retry rate-limited streamed uploads', async () => {
+    axiosPostSpy.mockRejectedValueOnce(makeAxiosError(429));
+
+    await expect(
+      provider.uploadFileStream({
+        content: Readable.from([Buffer.from('hello')]),
+        sha: 'c'.repeat(40),
+        size: 5,
+      })
+    ).rejects.toMatchObject({
+      statusCode: 429,
+      code: 'RATE_LIMITED',
+    });
+
+    expect(axiosPostSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('maps Vercel digest rejection to invalid input', async () => {
+    axiosPostSpy.mockRejectedValueOnce(makeAxiosError(400));
+
+    await expect(
+      provider.uploadFileStream({
+        content: Readable.from([Buffer.from('hello')]),
+        sha: 'd'.repeat(40),
+        size: 5,
+      })
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      code: 'INVALID_INPUT',
+    });
   });
 });

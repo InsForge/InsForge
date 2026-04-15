@@ -1,6 +1,7 @@
 import axios from 'axios';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import type { Readable } from 'stream';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
@@ -844,6 +845,72 @@ export class VercelProvider {
         return sha;
       }
       logger.error('Failed to upload file to Vercel', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new AppError('Failed to upload file to Vercel', 500, ERROR_CODES.INTERNAL_ERROR);
+    }
+  }
+
+  /**
+   * Stream a single file to Vercel
+   * POST /v2/files
+   */
+  async uploadFileStream(input: { content: Readable; sha: string; size: number }): Promise<string> {
+    const credentials = await this.getCredentials();
+
+    try {
+      await axios.post(
+        `https://api.vercel.com/v2/files?teamId=${credentials.teamId}`,
+        input.content,
+        {
+          headers: {
+            Authorization: `Bearer ${credentials.token}`,
+            'Content-Type': 'application/octet-stream',
+            'Content-Length': input.size.toString(),
+            'x-vercel-digest': input.sha,
+          },
+          maxBodyLength: Infinity,
+          maxContentLength: Infinity,
+        }
+      );
+
+      logger.info('File streamed to Vercel', { sha: input.sha, size: input.size });
+      return input.sha;
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      // 409 Conflict means file already exists (same SHA), which is fine.
+      if (axios.isAxiosError(error) && error.response?.status === 409) {
+        logger.info('File already exists on Vercel', { sha: input.sha });
+        return input.sha;
+      }
+
+      // Streaming uploads cannot be safely retried because the request body has
+      // already been consumed. The client should retry with a fresh request.
+      if (axios.isAxiosError(error) && error.response?.status === 429) {
+        logger.warn('Vercel rate limit hit for streamed file upload', { sha: input.sha });
+        throw new AppError(
+          'Vercel rate limit exceeded for file upload. Wait a moment and retry the file upload.',
+          429,
+          ERROR_CODES.RATE_LIMITED
+        );
+      }
+
+      if (axios.isAxiosError(error) && error.response?.status === 400) {
+        logger.warn('Vercel rejected streamed file upload', {
+          sha: input.sha,
+          status: error.response.status,
+        });
+        throw new AppError(
+          'Uploaded file content does not match the registered deployment file.',
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      logger.error('Failed to stream file to Vercel', {
         error: error instanceof Error ? error.message : String(error),
       });
       throw new AppError('Failed to upload file to Vercel', 500, ERROR_CODES.INTERNAL_ERROR);

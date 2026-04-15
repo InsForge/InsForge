@@ -15,17 +15,92 @@ export const envVarSchema = z.object({
 });
 
 /**
- * Response from creating a deployment - includes presigned upload info
+ * Relative file path used by direct deployment uploads.
+ */
+export const deploymentFilePathSchema = z
+  .string()
+  .min(1, 'path is required')
+  .max(2048, 'path is too long')
+  .refine((value) => !value.includes('\0'), 'path cannot contain null bytes')
+  .refine((value) => !value.includes('\\'), 'path must use forward slashes')
+  .refine((value) => !value.startsWith('/'), 'path must be relative')
+  .refine(
+    (value) => value.split('/').every((part) => part !== '' && part !== '.' && part !== '..'),
+    'path cannot contain empty, current, or parent directory segments'
+  );
+
+export const deploymentManifestFileEntrySchema = z.object({
+  path: deploymentFilePathSchema,
+  sha: z.string().regex(/^[a-f0-9]{40}$/i, 'sha must be a SHA-1 hex digest'),
+  size: z.number().int().nonnegative(),
+});
+
+export const deploymentManifestFileSchema = deploymentManifestFileEntrySchema.extend({
+  fileId: z.string().uuid(),
+  uploadedAt: z.string().datetime().nullable(),
+});
+
+/**
+ * Response from creating a legacy deployment session.
+ * Includes presigned upload info for source zip upload.
  */
 export const createDeploymentResponseSchema = z.object({
   id: z.string().uuid(),
   uploadUrl: z.string().url(),
-  uploadFields: z.record(z.string()), // Required for S3 presigned POST (policy, signature, key, etc.)
+  uploadFields: z.record(z.string()),
 });
 
 /**
- * Request to start a deployment (step 2)
- * Triggers upload to Vercel and creates the actual deployment
+ * Response from creating a direct-upload deployment session.
+ */
+export const createDirectDeploymentResponseSchema = z.object({
+  id: z.string().uuid(),
+  status: deploymentSchema.shape.status,
+});
+
+/**
+ * Request to declare the files that will be uploaded for a direct deployment.
+ */
+export const createDeploymentManifestRequestSchema = z
+  .object({
+    files: z.array(deploymentManifestFileEntrySchema).min(1),
+  })
+  .superRefine(({ files }, ctx) => {
+    const firstSeenByPath = new Map<string, number>();
+
+    files.forEach((file, index) => {
+      const existingIndex = firstSeenByPath.get(file.path);
+
+      if (existingIndex !== undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'duplicate file path',
+          path: ['files', index, 'path'],
+        });
+        return;
+      }
+
+      firstSeenByPath.set(file.path, index);
+    });
+  });
+
+/**
+ * Response from creating a deployment manifest.
+ */
+export const createDeploymentManifestResponseSchema = z.object({
+  files: z.array(deploymentManifestFileSchema),
+});
+
+/**
+ * Response from uploading a single deployment file through the proxy.
+ */
+export const uploadDeploymentFileResponseSchema = deploymentManifestFileSchema.extend({
+  uploadedAt: z.string().datetime(),
+});
+
+/**
+ * Request to start a deployment after either legacy zip upload or direct file uploads.
+ * Creates the actual Vercel deployment after source files are available.
  */
 export const startDeploymentRequestSchema = z.object({
   projectSettings: projectSettingsSchema.optional(),
@@ -185,7 +260,15 @@ export const deploymentMetadataResponseSchema = z.object({
 
 export type ProjectSettings = z.infer<typeof projectSettingsSchema>;
 export type EnvVar = z.infer<typeof envVarSchema>;
+export type DeploymentManifestFileEntry = z.infer<typeof deploymentManifestFileEntrySchema>;
+export type DeploymentManifestFile = z.infer<typeof deploymentManifestFileSchema>;
 export type CreateDeploymentResponse = z.infer<typeof createDeploymentResponseSchema>;
+export type CreateDirectDeploymentResponse = z.infer<typeof createDirectDeploymentResponseSchema>;
+export type CreateDeploymentManifestRequest = z.infer<typeof createDeploymentManifestRequestSchema>;
+export type CreateDeploymentManifestResponse = z.infer<
+  typeof createDeploymentManifestResponseSchema
+>;
+export type UploadDeploymentFileResponse = z.infer<typeof uploadDeploymentFileResponseSchema>;
 export type StartDeploymentRequest = z.infer<typeof startDeploymentRequestSchema>;
 export type StartDeploymentResponse = z.infer<typeof startDeploymentResponseSchema>;
 export type ListDeploymentsResponse = z.infer<typeof listDeploymentsResponseSchema>;
