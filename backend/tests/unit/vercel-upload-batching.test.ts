@@ -157,7 +157,10 @@ describe('VercelProvider.uploadFile retry logic', () => {
     // Pass through short timeouts (vitest internals) to the real implementation.
     setTimeoutCalls.length = 0;
     const realSetTimeout = globalThis.setTimeout.bind(globalThis);
-    vi.spyOn(globalThis, 'setTimeout').mockImplementation(((fn: (...args: unknown[]) => void, ms?: number) => {
+    vi.spyOn(globalThis, 'setTimeout').mockImplementation(((
+      fn: (...args: unknown[]) => void,
+      ms?: number
+    ) => {
       if (ms !== undefined && ms >= 1000) {
         setTimeoutCalls.push(ms);
         // Resolve on next microtask to keep async flow correct
