@@ -17,7 +17,7 @@ vi.mock('../../src/services/secrets/secret.service.js', () => ({
  * Helper to create a mock Axios error with a given status code and optional headers
  */
 function makeAxiosError(status: number, headers: Record<string, string> = {}): AxiosError {
-  const error = new Error('Request failed with status code ' + status) as AxiosError;
+  const error = new Error(`Request failed with status code ${status}`) as AxiosError;
   error.isAxiosError = true;
   error.response = {
     status,
@@ -54,14 +54,14 @@ describe('VercelProvider.uploadFiles batching', () => {
       // Simulate network delay so concurrent calls overlap
       await new Promise((r) => setTimeout(r, 10));
       concurrentCount--;
-      return 'sha-' + content.length;
+      return `sha-${content.length}`;
     });
   });
 
   it('uploads all files and returns correct results', async () => {
     const files = Array.from({ length: 25 }, (_, i) => ({
-      path: 'file-' + i + '.txt',
-      content: Buffer.from('content-' + i),
+      path: `file-${i}.txt`,
+      content: Buffer.from(`content-${i}`),
     }));
 
     const results = await provider.uploadFiles(files);
@@ -69,7 +69,7 @@ describe('VercelProvider.uploadFiles batching', () => {
     expect(results).toHaveLength(25);
     expect(uploadFileSpy).toHaveBeenCalledTimes(25);
     results.forEach((r, i) => {
-      expect(r.file).toBe('file-' + i + '.txt');
+      expect(r.file).toBe(`file-${i}.txt`);
       expect(r.sha).toMatch(/^sha-/);
       expect(r.size).toBeGreaterThan(0);
     });
@@ -77,8 +77,8 @@ describe('VercelProvider.uploadFiles batching', () => {
 
   it('limits concurrency to 5 at a time', async () => {
     const files = Array.from({ length: 25 }, (_, i) => ({
-      path: 'file-' + i + '.txt',
-      content: Buffer.from('content-' + i),
+      path: `file-${i}.txt`,
+      content: Buffer.from(`content-${i}`),
     }));
 
     await provider.uploadFiles(files);
@@ -89,8 +89,8 @@ describe('VercelProvider.uploadFiles batching', () => {
 
   it('handles fewer files than batch size', async () => {
     const files = Array.from({ length: 3 }, (_, i) => ({
-      path: 'file-' + i + '.txt',
-      content: Buffer.from('content-' + i),
+      path: `file-${i}.txt`,
+      content: Buffer.from(`content-${i}`),
     }));
 
     const results = await provider.uploadFiles(files);
@@ -109,8 +109,8 @@ describe('VercelProvider.uploadFiles batching', () => {
 
   it('handles exactly one batch (5 files)', async () => {
     const files = Array.from({ length: 5 }, (_, i) => ({
-      path: 'file-' + i + '.txt',
-      content: Buffer.from('content-' + i),
+      path: `file-${i}.txt`,
+      content: Buffer.from(`content-${i}`),
     }));
 
     const results = await provider.uploadFiles(files);
@@ -131,8 +131,13 @@ describe('VercelProvider.uploadFiles batching', () => {
 describe('VercelProvider.uploadFile retry logic', () => {
   let provider: VercelProvider;
   let axiosPostSpy: ReturnType<typeof vi.spyOn>;
+  const setTimeoutCalls: number[] = [];
 
   beforeEach(() => {
+    vi.useFakeTimers();
+    // Deterministic jitter: Math.random always returns 0
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
     // @ts-expect-error accessing private static for test reset
     VercelProvider.instance = undefined;
     provider = VercelProvider.getInstance();
@@ -148,9 +153,18 @@ describe('VercelProvider.uploadFile retry logic', () => {
     });
 
     axiosPostSpy = vi.spyOn(axios, 'post');
+
+    // Track setTimeout durations to verify backoff values
+    setTimeoutCalls.length = 0;
+    const origSetTimeout = globalThis.setTimeout;
+    vi.spyOn(globalThis, 'setTimeout').mockImplementation((fn: TimerHandler, ms?: number) => {
+      if (ms && ms >= 1000) setTimeoutCalls.push(ms);
+      return origSetTimeout(fn, 0);
+    });
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -160,31 +174,32 @@ describe('VercelProvider.uploadFile retry logic', () => {
       .mockRejectedValueOnce(makeAxiosError(429))
       .mockResolvedValueOnce({ status: 200, data: {} });
 
-    const start = Date.now();
     const sha = await provider.uploadFile(Buffer.from('test-content'));
-    const elapsed = Date.now() - start;
 
     expect(sha).toBeTruthy();
     expect(axiosPostSpy).toHaveBeenCalledTimes(3);
-    expect(elapsed).toBeGreaterThanOrEqual(1500);
-  }, 15000);
+    // With Math.random()=0, jitter is 0. Backoff: attempt 0 = 1000ms, attempt 1 = 2000ms
+    expect(setTimeoutCalls).toEqual([1000, 2000]);
+  });
 
   it('respects X-RateLimit-Reset header on 429', async () => {
     // Vercel sends X-RateLimit-Reset as Unix epoch seconds
-    const resetEpoch = Math.floor(Date.now() / 1000) + 2; // 2 seconds from now
+    const nowSec = Math.floor(Date.now() / 1000);
+    const resetEpoch = nowSec + 5; // 5 seconds from now
     axiosPostSpy
       .mockRejectedValueOnce(makeAxiosError(429, { 'x-ratelimit-reset': String(resetEpoch) }))
       .mockResolvedValueOnce({ status: 200, data: {} });
 
-    const start = Date.now();
     const sha = await provider.uploadFile(Buffer.from('test-content'));
-    const elapsed = Date.now() - start;
 
     expect(sha).toBeTruthy();
     expect(axiosPostSpy).toHaveBeenCalledTimes(2);
-    expect(elapsed).toBeGreaterThanOrEqual(1500);
-    expect(elapsed).toBeLessThan(4000);
-  }, 10000);
+    // Delay should be based on reset epoch, not exponential backoff
+    // resetMs - Date.now() ≈ 5000ms (with jitter=0)
+    expect(setTimeoutCalls.length).toBe(1);
+    expect(setTimeoutCalls[0]).toBeGreaterThanOrEqual(4000);
+    expect(setTimeoutCalls[0]).toBeLessThanOrEqual(5500);
+  });
 
   it('throws RATE_LIMITED after max retries exhausted', async () => {
     axiosPostSpy.mockRejectedValue(makeAxiosError(429));
@@ -196,7 +211,9 @@ describe('VercelProvider.uploadFile retry logic', () => {
     });
 
     expect(axiosPostSpy).toHaveBeenCalledTimes(4);
-  }, 30000);
+    // 3 retries with backoff: 1000, 2000, 4000
+    expect(setTimeoutCalls).toEqual([1000, 2000, 4000]);
+  });
 
   it('does not retry on non-429 errors', async () => {
     axiosPostSpy.mockRejectedValueOnce(makeAxiosError(500));
@@ -206,6 +223,7 @@ describe('VercelProvider.uploadFile retry logic', () => {
     });
 
     expect(axiosPostSpy).toHaveBeenCalledTimes(1);
+    expect(setTimeoutCalls).toEqual([]);
   });
 
   it('still handles 409 (file exists) without retrying', async () => {
@@ -215,17 +233,16 @@ describe('VercelProvider.uploadFile retry logic', () => {
 
     expect(sha).toBeTruthy();
     expect(axiosPostSpy).toHaveBeenCalledTimes(1);
+    expect(setTimeoutCalls).toEqual([]);
   });
 
   it('succeeds on first attempt without retry delay', async () => {
     axiosPostSpy.mockResolvedValueOnce({ status: 200, data: {} });
 
-    const start = Date.now();
     const sha = await provider.uploadFile(Buffer.from('test-content'));
-    const elapsed = Date.now() - start;
 
     expect(sha).toBeTruthy();
     expect(axiosPostSpy).toHaveBeenCalledTimes(1);
-    expect(elapsed).toBeLessThan(500);
+    expect(setTimeoutCalls).toEqual([]);
   });
 });
