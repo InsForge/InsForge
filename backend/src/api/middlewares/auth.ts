@@ -244,37 +244,27 @@ export async function verifyCloudBackend(req: AuthRequest, _res: Response, next:
 }
 
 /**
- * Checks the per-project `allow_anon_ai_access` flag.
- * When the flag is `false`, requests using an API key (anon token)
- * are rejected with 403. JWT requests pass through unchanged.
- * Apply as router-level middleware before verifyUser on AI routes.
+ * Gates anon-role JWTs against the `allow_anon_ai_access` flag.
+ * The `ik_` service-role key is admin-equivalent and always passes.
+ * Authenticated JWTs pass unchanged. Apply before verifyUser on AI routes.
  */
-export async function checkAnonAccess(req: AuthRequest, _res: Response, next: NextFunction) {
-  // Check if the request is using an API key (anon access via SDK)
-  const apiKey = extractApiKey(req);
+export async function checkAnonJwtAccess(req: AuthRequest, _res: Response, next: NextFunction) {
+  // ik_ is service-role (admin-equivalent) — always allowed on AI endpoints.
+  if (extractApiKey(req)) return next();
 
-  // Also check if the request is using an anon JWT token
-  let isAnonJwt = false;
-  if (!apiKey) {
-    const token = extractBearerToken(req.headers.authorization);
-    if (token) {
-      try {
-        const payload = tokenManager.verifyToken(token);
-        isAnonJwt = payload.role === 'anon';
-      } catch {
-        // Invalid token — let verifyUser handle the error
-      }
-    }
-  }
+  const token = extractBearerToken(req.headers.authorization);
+  if (!token) return next();
 
-  // If neither an API key nor an anon JWT, this is an authenticated user — skip check
-  if (!apiKey && !isAnonJwt) {
-    return next();
+  let isAnon = false;
+  try {
+    isAnon = tokenManager.verifyToken(token).role === 'anon';
+  } catch {
+    return next(); // malformed — let verifyUser produce the 401
   }
+  if (!isAnon) return next();
 
   try {
-    const aiAccessConfigService = AIAccessConfigService.getInstance();
-    const allowed = await aiAccessConfigService.isAnonAiAccessAllowed();
+    const allowed = await AIAccessConfigService.getInstance().isAnonAiAccessAllowed();
     if (!allowed) {
       return next(
         new AppError(

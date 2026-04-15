@@ -5,26 +5,26 @@ import { ERROR_CODES } from '@/types/error-constants.js';
 import logger from '@/utils/logger.js';
 import type { AIAccessConfigSchema, UpdateAIAccessConfigRequest } from '@insforge/shared-schemas';
 
-/**
- * Singleton service responsible for reading and updating the AI access
- * configuration persisted in the `ai.config` database table.
- *
- * The `allow_anon_ai_access` flag controls whether anonymous (API-key) tokens
- * are permitted to call AI endpoints.  It defaults to `true` so that existing
- * projects are not affected by the migration that introduces this table.
- */
+// Cosmetic fallback used only by the admin read path when the table is empty.
+// The access check path (`isAnonAiAccessAllowed`) fails closed instead.
+const DEFAULT_CONFIG: AIAccessConfigSchema = {
+  id: '00000000-0000-0000-0000-000000000000',
+  allowAnonAiAccess: true,
+  createdAt: new Date(0).toISOString(),
+  updatedAt: new Date(0).toISOString(),
+};
+
+function toIso(value: Date | string): string {
+  return value instanceof Date ? value.toISOString() : value;
+}
+
+/** Singleton service for reading/updating `ai.config`. */
 export class AIAccessConfigService {
   private static instance: AIAccessConfigService;
   private pool: Pool | null = null;
 
-  private constructor() {
-    logger.info('AIAccessConfigService initialized');
-  }
+  private constructor() {}
 
-  /**
-   * Returns the singleton AIAccessConfigService instance,
-   * creating it on first access.
-   */
   public static getInstance(): AIAccessConfigService {
     if (!AIAccessConfigService.instance) {
       AIAccessConfigService.instance = new AIAccessConfigService();
@@ -32,9 +32,6 @@ export class AIAccessConfigService {
     return AIAccessConfigService.instance;
   }
 
-  /**
-   * Returns the lazily-initialized database connection pool.
-   */
   private getPool(): Pool {
     if (!this.pool) {
       this.pool = DatabaseManager.getInstance().getPool();
@@ -42,12 +39,7 @@ export class AIAccessConfigService {
     return this.pool;
   }
 
-  /**
-   * Retrieves the AI access configuration from the database.
-   * Returns the singleton row, or a safe fallback (anon access allowed) when
-   * the table is empty or the query fails, so that a missing migration never
-   * breaks existing behaviour.
-   */
+  /** Admin read path — returns a cosmetic fallback on read failure. */
   async getAIAccessConfig(): Promise<AIAccessConfigSchema> {
     try {
       const result = await this.getPool().query(
@@ -62,50 +54,37 @@ export class AIAccessConfigService {
 
       if (!result.rows.length) {
         logger.warn('No AI access config found, returning default fallback values');
-        return {
-          id: '00000000-0000-0000-0000-000000000000',
-          allowAnonAiAccess: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
+        return { ...DEFAULT_CONFIG, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
       }
 
       const row = result.rows[0];
       return {
         ...row,
-        createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
-        updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
+        createdAt: toIso(row.createdAt),
+        updatedAt: toIso(row.updatedAt),
       };
     } catch (error) {
       logger.error('Failed to get AI access config, returning fallback values', { error });
-      return {
-        id: '00000000-0000-0000-0000-000000000000',
-        allowAnonAiAccess: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+      return { ...DEFAULT_CONFIG, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     }
   }
 
   /**
-   * Returns `true` when anonymous (API-key) tokens are allowed to call AI
-   * endpoints, `false` otherwise.
-   * Falls back to `true` on any database error to preserve existing behaviour.
+   * Access-check path: returns whether anon-role JWTs may call AI endpoints.
+   * Fails closed — propagates DB errors so the middleware can deny the request
+   * instead of silently re-enabling access during a DB hiccup.
    */
   async isAnonAiAccessAllowed(): Promise<boolean> {
-    try {
-      const config = await this.getAIAccessConfig();
-      return config.allowAnonAiAccess;
-    } catch {
+    const result = await this.getPool().query(
+      `SELECT allow_anon_ai_access AS "allowAnonAiAccess" FROM ai.config LIMIT 1`
+    );
+    if (!result.rows.length) {
+      // No row — default to allow (matches the column default and migration seed).
       return true;
     }
+    return result.rows[0].allowAnonAiAccess === true;
   }
 
-  /**
-   * Updates the AI access configuration with the provided values.
-   * If the singleton row does not yet exist (e.g. migration was not run),
-   * it will be created automatically via an INSERT instead of failing.
-   */
   async updateAIAccessConfig(input: UpdateAIAccessConfigRequest): Promise<AIAccessConfigSchema> {
     const client = await this.getPool().connect();
     try {
@@ -116,7 +95,6 @@ export class AIAccessConfigService {
       let result;
 
       if (!existingResult.rows.length) {
-        // Singleton row is missing — create it with the requested value
         result = await client.query(
           `INSERT INTO ai.config (allow_anon_ai_access)
            VALUES ($1)
@@ -147,8 +125,8 @@ export class AIAccessConfigService {
       const row = result.rows[0];
       return {
         ...row,
-        createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
-        updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
+        createdAt: toIso(row.createdAt),
+        updatedAt: toIso(row.updatedAt),
       };
     } catch (error) {
       try {

@@ -1,6 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import { ChatCompletionService } from '@/services/ai/chat-completion.service.js';
-import { AuthRequest, verifyAdmin, verifyUser, checkAnonAccess } from '../../middlewares/auth.js';
+import { AuthRequest, verifyAdmin, verifyUser, checkAnonJwtAccess } from '../../middlewares/auth.js';
 import { ImageGenerationService } from '@/services/ai/image-generation.service.js';
 import { EmbeddingService } from '@/services/ai/embedding.service.js';
 import { AIModelService } from '@/services/ai/ai-model.service.js';
@@ -56,7 +56,17 @@ router.get('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
     const config = await aiAccessConfigService.getAIAccessConfig();
     successResponse(res, config);
   } catch (error) {
-    next(error);
+    if (error instanceof AppError) {
+      next(error);
+    } else {
+      next(
+        new AppError(
+          error instanceof Error ? error.message : 'Failed to fetch AI access configuration',
+          500,
+          ERROR_CODES.INTERNAL_ERROR
+        )
+      );
+    }
   }
 });
 
@@ -107,7 +117,7 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
  */
 router.post(
   '/chat/completion',
-  checkAnonAccess,
+  checkAnonJwtAccess,
   verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
@@ -190,7 +200,7 @@ router.post(
  */
 router.post(
   '/image/generation',
-  checkAnonAccess,
+  checkAnonJwtAccess,
   verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
@@ -545,7 +555,7 @@ router.get('/credits', verifyAdmin, async (req: AuthRequest, res: Response, next
  */
 router.post(
   '/embeddings',
-  checkAnonAccess,
+  checkAnonJwtAccess,
   verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {

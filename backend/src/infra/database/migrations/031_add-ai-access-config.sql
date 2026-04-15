@@ -1,4 +1,4 @@
--- Migration 027: Add AI access configuration table
+-- Migration 031: Add AI access configuration table
 --
 -- Creates ai.config (singleton) to persist per-project AI access settings.
 -- The allow_anon_ai_access flag controls whether anonymous (API-key) tokens

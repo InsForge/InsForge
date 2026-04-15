@@ -113,8 +113,17 @@ describe('AIAccessConfigService', () => {
       expect(allowed).toBe(false);
     });
 
-    it('falls back to true on database error (safe default — never breaks existing behaviour)', async () => {
-      mockPool.query.mockRejectedValueOnce(new Error('DB unreachable'));
+    it('propagates DB errors — fails closed, caller decides how to deny', async () => {
+      const dbErr = new Error('DB unreachable');
+      mockPool.query.mockRejectedValueOnce(dbErr);
+
+      const service = AIAccessConfigService.getInstance();
+
+      await expect(service.isAnonAiAccessAllowed()).rejects.toThrow('DB unreachable');
+    });
+
+    it('returns true when the table is empty (matches column default and migration seed)', async () => {
+      mockPool.query.mockResolvedValueOnce({ rows: [] });
 
       const service = AIAccessConfigService.getInstance();
       const allowed = await service.isAnonAiAccessAllowed();
