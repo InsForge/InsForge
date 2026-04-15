@@ -34,12 +34,15 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
   } = props;
   const getAuthorizationCode =
     props.mode === 'cloud-hosting' ? props.getAuthorizationCode : undefined;
+  const useAuthorizationCodeRefresh =
+    props.mode === 'cloud-hosting' ? props.useAuthorizationCodeRefresh : undefined;
   const host = useMemo(
     () => ({
       backendUrl: normalizeBackendUrl(backendUrl),
       mode,
       showNavbar,
       getAuthorizationCode,
+      useAuthorizationCodeRefresh,
       onRouteChange,
       onNavigateToSubscription,
       onRenameProject,
@@ -53,6 +56,7 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
       mode,
       showNavbar,
       getAuthorizationCode,
+      useAuthorizationCodeRefresh,
       onRouteChange,
       onNavigateToSubscription,
       onRenameProject,

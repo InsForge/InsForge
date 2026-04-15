@@ -6,6 +6,7 @@ interface DashboardHostContextValue {
   showNavbar?: boolean;
   mode: DashboardMode;
   getAuthorizationCode?: () => Promise<string>;
+  useAuthorizationCodeRefresh?: boolean;
   onRouteChange?: (path: string) => void;
   onNavigateToSubscription?: () => void;
   onRenameProject?: (name: string) => Promise<void>;

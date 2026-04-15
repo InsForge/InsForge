@@ -43,6 +43,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const cloudAuthenticationRef = useRef<Promise<UserSchema | null> | null>(null);
   const shouldAttemptCloudAuthentication =
     isCloudHosting && !location.pathname.startsWith('/dashboard/login');
+  const shouldUseAuthorizationCodeRefresh =
+    isCloudHosting && host.useAuthorizationCodeRefresh === true;
 
   const handleAuthError = useCallback(() => {
     setUser(null);
@@ -133,19 +135,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Access token refresh handler
   useEffect(() => {
     const handleRefreshAccessToken = async (): Promise<boolean> => {
-      if (shouldAttemptCloudAuthentication) {
+      const refreshed = await loginService.refreshAccessToken();
+      if (refreshed) {
+        return true;
+      }
+
+      if (shouldUseAuthorizationCodeRefresh) {
         const authenticatedUser = await authenticateCloudSession();
         return authenticatedUser !== null;
       }
 
-      return loginService.refreshAccessToken();
+      return false;
     };
 
     apiClient.setRefreshAccessTokenHandler(handleRefreshAccessToken);
     return () => {
       apiClient.setRefreshAccessTokenHandler(undefined);
     };
-  }, [authenticateCloudSession, shouldAttemptCloudAuthentication]);
+  }, [authenticateCloudSession, shouldUseAuthorizationCodeRefresh]);
 
   const checkAuthStatus = useCallback(async () => {
     try {
