@@ -20,6 +20,7 @@ export function CloudHostingDashboard() {
       mode="cloud-hosting"
       showNavbar={!isInIframe()}
       getAuthorizationCode={getAuthorizationCode}
+      useAuthorizationCodeRefresh={isInIframe()}
       project={projectInfo}
       onRouteChange={reportRouteChange}
       onNavigateToSubscription={navigateToSubscription}

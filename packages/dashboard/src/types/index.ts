@@ -54,6 +54,7 @@ export interface SelfHostingDashboardProps extends DashboardProps {
 export interface CloudHostingDashboardProps extends DashboardProps {
   mode: 'cloud-hosting';
   getAuthorizationCode: () => Promise<string>;
+  useAuthorizationCodeRefresh?: boolean;
 }
 
 export type InsForgeDashboardProps = SelfHostingDashboardProps | CloudHostingDashboardProps;
