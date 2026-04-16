@@ -35,6 +35,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const host = useDashboardHost();
   const isCloudHosting = host.mode === 'cloud-hosting';
   const getAuthorizationCode = isCloudHosting ? host.getAuthorizationCode : null;
+  const onRequestUserInfo = isCloudHosting ? host.onRequestUserInfo : undefined;
   const location = useLocation();
   const [user, setUser] = useState<UserSchema | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -69,14 +70,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     ]);
   }, [queryClient]);
 
+  const performPostHogIdentify = useCallback(async (): Promise<void> => {
+    if (!onRequestUserInfo) {
+      return;
+    }
+    try {
+      const cloudUser = await onRequestUserInfo();
+      await identifyUser(cloudUser.userId, {
+        email: cloudUser.email,
+        name: cloudUser.name,
+      });
+    } catch (err) {
+      console.warn('[PostHog] Failed to identify cloud user', err);
+    }
+  }, [onRequestUserInfo]);
+
   const applyAuthenticatedUser = useCallback(
     async (nextUser: UserSchema): Promise<void> => {
-      await identifyUser(nextUser.id, { email: nextUser.email, name: nextUser.profile?.name });
+      await performPostHogIdentify();
       setUser(nextUser);
       setIsAuthenticated(true);
       await invalidateAuthQueries();
     },
-    [invalidateAuthQueries]
+    [invalidateAuthQueries, performPostHogIdentify]
   );
 
   const exchangeAuthorizationCode = useCallback(
@@ -163,10 +179,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       const currentUser = await loginService.getCurrentUser();
       if (currentUser) {
-        await identifyUser(currentUser.id, {
-          email: currentUser.email,
-          name: currentUser.profile?.name,
-        });
+        await performPostHogIdentify();
         setUser(currentUser);
         setIsAuthenticated(true);
         return currentUser;
@@ -190,7 +203,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [authenticateCloudSession, shouldAttemptCloudAuthentication]);
+  }, [authenticateCloudSession, performPostHogIdentify, shouldAttemptCloudAuthentication]);
 
   const logout = useCallback(async () => {
     await loginService.logout();

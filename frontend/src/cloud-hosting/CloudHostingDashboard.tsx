@@ -13,6 +13,7 @@ export function CloudHostingDashboard() {
     requestInstanceInfo,
     requestInstanceTypeChange,
     updateVersion,
+    requestUserInfo,
   } = useCloudHosting();
 
   return (
@@ -29,6 +30,7 @@ export function CloudHostingDashboard() {
       onRequestInstanceInfo={requestInstanceInfo}
       onRequestInstanceTypeChange={requestInstanceTypeChange}
       onUpdateVersion={updateVersion}
+      onRequestUserInfo={requestUserInfo}
     />
   );
 }
