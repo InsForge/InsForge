@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { aiConfigurationSchema, aiUsageRecordSchema, modalitySchema } from './ai.schema.js';
+import {
+  aiAccessConfigSchema,
+  aiConfigurationSchema,
+  aiUsageRecordSchema,
+  modalitySchema,
+} from './ai.schema.js';
 
 // ============= Chat Completion Schemas =============
 
@@ -322,7 +327,20 @@ export const setGatewayBYOKKeyRequestSchema = z.object({
   apiKey: z.string().min(1, 'API key is required'),
 });
 
+// ============= AI Access Config API Schemas =============
+
+/** Response schema for GET /api/ai/config. */
+export const getAIAccessConfigResponseSchema = aiAccessConfigSchema;
+
+/** Request schema for PUT /api/ai/config. */
+export const updateAIAccessConfigRequestSchema = z.object({
+  allowAnonAiAccess: z.boolean(),
+});
+
 // Export types
+export type GetAIAccessConfigResponse = z.infer<typeof getAIAccessConfigResponseSchema>;
+export type UpdateAIAccessConfigRequest = z.infer<typeof updateAIAccessConfigRequestSchema>;
+
 export type ToolFunction = z.infer<typeof toolFunctionSchema>;
 export type Tool = z.infer<typeof toolSchema>;
 export type ToolChoice = z.infer<typeof toolChoiceSchema>;

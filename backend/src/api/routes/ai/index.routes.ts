@@ -1,6 +1,11 @@
 import { Router, Response, NextFunction } from 'express';
 import { ChatCompletionService } from '@/services/ai/chat-completion.service.js';
-import { AuthRequest, verifyAdmin, verifyUser } from '../../middlewares/auth.js';
+import {
+  AuthRequest,
+  verifyAdmin,
+  verifyUser,
+  checkAnonJwtAccess,
+} from '../../middlewares/auth.js';
 import { ImageGenerationService } from '@/services/ai/image-generation.service.js';
 import { EmbeddingService } from '@/services/ai/embedding.service.js';
 import { AIModelService } from '@/services/ai/ai-model.service.js';
@@ -10,6 +15,7 @@ import { successResponse } from '@/utils/response.js';
 import { AIConfigService } from '@/services/ai/ai-config.service.js';
 import { AIUsageService } from '@/services/ai/ai-usage.service.js';
 import { AIGatewayConfigService } from '@/services/ai/ai-gateway-config.service.js';
+import { AIAccessConfigService } from '@/services/ai/ai-access-config.service.js';
 import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import logger from '@/utils/logger.js';
@@ -22,12 +28,14 @@ import {
   imageGenerationRequestSchema,
   embeddingsRequestSchema,
   setGatewayBYOKKeyRequestSchema,
+  updateAIAccessConfigRequestSchema,
 } from '@insforge/shared-schemas';
 
 const router = Router();
 const chatService = ChatCompletionService.getInstance();
 const aiConfigService = AIConfigService.getInstance();
 const aiUsageService = AIUsageService.getInstance();
+const aiAccessConfigService = AIAccessConfigService.getInstance();
 const auditService = AuditService.getInstance();
 const aiGatewayConfigService = AIGatewayConfigService.getInstance();
 
@@ -45,11 +53,76 @@ router.get('/models', verifyAdmin, async (req: AuthRequest, res: Response, next:
 });
 
 /**
+ * GET /api/ai/config
+ * Get the AI access configuration for this project
+ */
+router.get('/config', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const config = await aiAccessConfigService.getAIAccessConfig();
+    successResponse(res, config);
+  } catch (error) {
+    if (error instanceof AppError) {
+      next(error);
+    } else {
+      next(
+        new AppError(
+          error instanceof Error ? error.message : 'Failed to fetch AI access configuration',
+          500,
+          ERROR_CODES.INTERNAL_ERROR
+        )
+      );
+    }
+  }
+});
+
+/**
+ * PUT /api/ai/config
+ * Update the AI access configuration for this project
+ */
+router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const validation = updateAIAccessConfigRequestSchema.safeParse(req.body);
+    if (!validation.success) {
+      throw new AppError(
+        validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    const config = await aiAccessConfigService.updateAIAccessConfig(validation.data);
+
+    await auditService.log({
+      actor: req.user?.email || 'api-key',
+      action: 'UPDATE_AI_ACCESS_CONFIG',
+      module: 'AI',
+      details: { allowAnonAiAccess: validation.data.allowAnonAiAccess },
+      ip_address: req.ip,
+    });
+
+    successResponse(res, config);
+  } catch (error) {
+    if (error instanceof AppError) {
+      next(error);
+    } else {
+      next(
+        new AppError(
+          error instanceof Error ? error.message : 'Failed to update AI access configuration',
+          500,
+          ERROR_CODES.INTERNAL_ERROR
+        )
+      );
+    }
+  }
+});
+
+/**
  * POST /api/ai/chat/completion
  * Send a chat message to any supported model
  */
 router.post(
   '/chat/completion',
+  checkAnonJwtAccess,
   verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
@@ -132,6 +205,7 @@ router.post(
  */
 router.post(
   '/image/generation',
+  checkAnonJwtAccess,
   verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
@@ -486,6 +560,7 @@ router.get('/credits', verifyAdmin, async (req: AuthRequest, res: Response, next
  */
 router.post(
   '/embeddings',
+  checkAnonJwtAccess,
   verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
