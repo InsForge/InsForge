@@ -29,16 +29,43 @@ export const identifyUser = (
   if (!POSTHOG_KEY) {
     return Promise.resolve();
   }
-  posthog.identify(userId, properties);
-  // posthog.identify triggers a new /decide request for the identified user.
-  // Wait for it to complete before returning, so callers can rely on
-  // getFeatureFlag returning the post-identify variant.
+
+  // Detect whether feature flags are already loaded in posthog-js. When we
+  // register a callback via onFeatureFlags, posthog-js fires it synchronously
+  // with cached flags if a prior /decide has already completed (typically the
+  // anonymous-id init request). We use this to decide whether to skip the
+  // "stale" first callback and wait for the next one (triggered by the
+  // identify-initiated /decide).
   //
-  // Do NOT use posthog.onFeatureFlags here: if PostHog already loaded flags
-  // for the anonymous device id (which happens on init), onFeatureFlags fires
-  // synchronously with that stale cache. Await would resolve immediately and
-  // the next getFeatureFlag would return the anonymous variant.
-  return new Promise<void>((resolve) => setTimeout(resolve, 2000));
+  // DEPENDENCY: relies on posthog-js's sync-fire-if-loaded behavior for
+  // onFeatureFlags. Verified in posthog-js 1.364.x. If upgrading posthog-js
+  // major version, re-verify this behavior in the changelog.
+  let preloaded = false;
+  posthog.onFeatureFlags(() => {
+    preloaded = true;
+  });
+  const target = preloaded ? 2 : 1;
+
+  posthog.identify(userId, properties);
+
+  return new Promise<void>((resolve) => {
+    const timeout = setTimeout(() => resolve(), 5000);
+    let fires = 0;
+    posthog.onFeatureFlags(() => {
+      fires++;
+      if (fires >= target) {
+        clearTimeout(timeout);
+        resolve();
+      }
+    });
+  });
+};
+
+export const getCurrentDistinctId = (): string | undefined => {
+  if (!POSTHOG_KEY) {
+    return undefined;
+  }
+  return posthog.get_distinct_id();
 };
 
 export const trackPostHog = (eventName: string, properties?: Record<string, unknown>) => {

@@ -4,7 +4,7 @@ import { useLocation } from 'react-router-dom';
 import { loginService } from '../../features/login/services/login.service';
 import { useDashboardHost } from '../config/DashboardHostContext';
 import { apiClient } from '../api/client';
-import { identifyUser } from '../analytics/posthog';
+import { getCurrentDistinctId, identifyUser } from '../analytics/posthog';
 import type { UserSchema } from '@insforge/shared-schemas';
 
 interface AuthContextType {
@@ -76,6 +76,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
     try {
       const cloudUser = await onRequestUserInfo();
+      // Skip identify + /decide wait if posthog-js is already identified as
+      // this user (common on F5 refresh or same-session re-mount): calling
+      // posthog.identify with the same id is a no-op, so the counter-based
+      // wait would hit its 5s timeout for nothing.
+      if (getCurrentDistinctId() === cloudUser.userId) {
+        return;
+      }
       await identifyUser(cloudUser.userId, {
         email: cloudUser.email,
         name: cloudUser.name,
