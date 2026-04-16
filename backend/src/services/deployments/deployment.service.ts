@@ -155,13 +155,21 @@ export class DeploymentService {
 
   /**
    * Check if deployment service is configured
-   * Only available in cloud environment
+   * Cloud deployments use credentials from the cloud API.
+   * Self-hosted deployments use Vercel credentials from environment variables.
    */
   isConfigured(): boolean {
-    if (!isCloudEnvironment()) {
-      return false;
-    }
     return this.vercelProvider.isConfigured();
+  }
+
+  private assertDeploymentServiceConfigured(): void {
+    if (!this.isConfigured()) {
+      throw new AppError(
+        'Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID environment variables.',
+        503,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    }
   }
 
   /**
@@ -169,13 +177,7 @@ export class DeploymentService {
    * Returns presigned S3 upload info for the legacy zip upload flow
    */
   async createDeployment(): Promise<CreateDeploymentResponse> {
-    if (!isCloudEnvironment()) {
-      throw new AppError(
-        'Deployments are only available in cloud environment.',
-        503,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
+    this.assertDeploymentServiceConfigured();
 
     if (!this.s3Provider) {
       throw new AppError(
@@ -188,7 +190,7 @@ export class DeploymentService {
     try {
       // Create deployment record in database with WAITING status
       const result = await this.getPool().query(
-        `INSERT INTO system.deployments (provider, status, metadata)
+        `INSERT INTO deployments.runs (provider, status, metadata)
          VALUES ($1, $2, $3)
          RETURNING
            id,
@@ -240,13 +242,7 @@ export class DeploymentService {
   async createDirectDeployment(
     input: CreateDirectDeploymentRequest
   ): Promise<CreateDirectDeploymentResponse> {
-    if (!isCloudEnvironment()) {
-      throw new AppError(
-        'Deployments are only available in cloud environment.',
-        503,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
+    this.assertDeploymentServiceConfigured();
 
     try {
       const files = this.validateDeploymentManifest(input.files);
@@ -257,7 +253,7 @@ export class DeploymentService {
         await client.query('BEGIN');
 
         const result = await client.query(
-          `INSERT INTO system.deployments (provider, status, metadata)
+          `INSERT INTO deployments.runs (provider, status, metadata)
            VALUES ($1, $2, $3)
            RETURNING
              id,
@@ -323,13 +319,7 @@ export class DeploymentService {
     content: Readable,
     options: { signal?: AbortSignal } = {}
   ): Promise<UploadDeploymentFileResponse> {
-    if (!isCloudEnvironment()) {
-      throw new AppError(
-        'Deployments are only available in cloud environment.',
-        503,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
+    this.assertDeploymentServiceConfigured();
 
     try {
       const deployment = await this.getDeploymentById(id);
@@ -375,7 +365,7 @@ export class DeploymentService {
       });
 
       const updateResult = await this.getPool().query<DeploymentFileRow>(
-        `UPDATE system.deployment_files
+        `UPDATE deployments.files
          SET uploaded_at = NOW()
          WHERE deployment_id = $1 AND id = $2
          RETURNING
@@ -431,13 +421,7 @@ export class DeploymentService {
    * Start a deployment - create deployment on Vercel from uploaded file SHAs
    */
   async startDeployment(id: string, input: StartDeploymentRequest = {}): Promise<DeploymentRecord> {
-    if (!isCloudEnvironment()) {
-      throw new AppError(
-        'Deployments are only available in cloud environment.',
-        503,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
+    this.assertDeploymentServiceConfigured();
 
     try {
       const deployment = await this.getDeploymentById(id);
@@ -647,7 +631,7 @@ export class DeploymentService {
     const envVarKeys = await this.vercelProvider.getEnvironmentVariableKeys();
 
     const updateResult = await this.getPool().query(
-      `UPDATE system.deployments
+      `UPDATE deployments.runs
        SET provider_deployment_id = $1,
            status = $2,
            url = $3,
@@ -814,7 +798,7 @@ export class DeploymentService {
     files: CreateDirectDeploymentRequest['files']
   ): Promise<DeploymentFileRow[]> {
     const insertResult = await client.query<DeploymentFileRow>(
-      `INSERT INTO system.deployment_files (deployment_id, file_path, sha, size_bytes)
+      `INSERT INTO deployments.files (deployment_id, file_path, sha, size_bytes)
        SELECT $1::uuid, file_input.file_path, file_input.sha, file_input.size_bytes
        FROM unnest($2::text[], $3::text[], $4::int[]) AS file_input(file_path, sha, size_bytes)
        RETURNING
@@ -916,7 +900,7 @@ export class DeploymentService {
          sha,
          size_bytes as "size",
          uploaded_at as "uploadedAt"
-       FROM system.deployment_files
+       FROM deployments.files
        WHERE deployment_id = $1 AND id = $2`,
       [deploymentId, fileId]
     );
@@ -933,7 +917,7 @@ export class DeploymentService {
          sha,
          size_bytes as "size",
          uploaded_at as "uploadedAt"
-       FROM system.deployment_files
+       FROM deployments.files
        WHERE deployment_id = $1
        ORDER BY file_path ASC`,
       [deploymentId]
@@ -958,7 +942,7 @@ export class DeploymentService {
       : [status, id];
 
     await this.getPool().query(
-      `UPDATE system.deployments SET status = $1${metadataUpdate} WHERE id = $2`,
+      `UPDATE deployments.runs SET status = $1${metadataUpdate} WHERE id = $2`,
       params
     );
   }
@@ -978,7 +962,7 @@ export class DeploymentService {
           metadata,
           created_at as "createdAt",
           updated_at as "updatedAt"
-         FROM system.deployments
+         FROM deployments.runs
          WHERE id = $1`,
         [id]
       );
@@ -1012,7 +996,7 @@ export class DeploymentService {
           metadata,
           created_at as "createdAt",
           updated_at as "updatedAt"
-         FROM system.deployments
+         FROM deployments.runs
          WHERE provider_deployment_id = $1`,
         [vercelDeploymentId]
       );
@@ -1064,7 +1048,7 @@ export class DeploymentService {
 
       // Update database with latest status
       const result = await this.getPool().query(
-        `UPDATE system.deployments
+        `UPDATE deployments.runs
          SET status = $1, url = $2, metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb
          WHERE id = $4
          RETURNING
@@ -1121,12 +1105,12 @@ export class DeploymentService {
             metadata,
             created_at as "createdAt",
             updated_at as "updatedAt"
-           FROM system.deployments
+           FROM deployments.runs
            ORDER BY created_at DESC
            LIMIT $1 OFFSET $2`,
           [limit, offset]
         ),
-        this.getPool().query(`SELECT COUNT(*)::int as count FROM system.deployments`),
+        this.getPool().query(`SELECT COUNT(*)::int as count FROM deployments.runs`),
       ]);
 
       return {
@@ -1173,7 +1157,7 @@ export class DeploymentService {
       }
 
       await this.getPool().query(
-        `UPDATE system.deployments
+        `UPDATE deployments.runs
          SET status = $1
          WHERE id = $2`,
         [DeploymentStatus.CANCELED, id]
@@ -1235,7 +1219,7 @@ export class DeploymentService {
       }
 
       const result = await this.getPool().query(
-        `UPDATE system.deployments
+        `UPDATE deployments.runs
          SET status = $1, url = COALESCE($2, url), metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb
          WHERE provider_deployment_id = $4
          RETURNING
@@ -1379,13 +1363,7 @@ export class DeploymentService {
    * Add a user-owned custom domain on Vercel and return DNS instructions
    */
   async addCustomDomain(domain: string): Promise<AddCustomDomainResponse> {
-    if (!isCloudEnvironment()) {
-      throw new AppError(
-        'Custom domains are only available in cloud environment.',
-        503,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
+    this.assertDeploymentServiceConfigured();
 
     const vercelData = await this.vercelProvider.addCustomDomain(domain);
     const config = await this.getCustomDomainConfigOrEmpty(vercelData.name, domain);
@@ -1398,13 +1376,7 @@ export class DeploymentService {
    * List all custom domains
    */
   async listCustomDomains(): Promise<ListCustomDomainsResponse> {
-    if (!isCloudEnvironment()) {
-      throw new AppError(
-        'Custom domains are only available in cloud environment.',
-        503,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
+    this.assertDeploymentServiceConfigured();
 
     try {
       const domains = (await this.vercelProvider.listCustomDomains()).filter(
@@ -1439,13 +1411,7 @@ export class DeploymentService {
    * Remove a custom domain directly from Vercel
    */
   async removeCustomDomain(domain: string): Promise<void> {
-    if (!isCloudEnvironment()) {
-      throw new AppError(
-        'Custom domains are only available in cloud environment.',
-        503,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
+    this.assertDeploymentServiceConfigured();
 
     await this.vercelProvider.removeCustomDomain(domain);
 
@@ -1456,13 +1422,7 @@ export class DeploymentService {
    * Re-verify a custom domain's DNS configuration via Vercel
    */
   async verifyCustomDomain(domain: string): Promise<VerifyCustomDomainResponse> {
-    if (!isCloudEnvironment()) {
-      throw new AppError(
-        'Custom domains are only available in cloud environment.',
-        503,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
+    this.assertDeploymentServiceConfigured();
 
     try {
       const [vercelResult, projectDomain] = await Promise.all([
@@ -1505,7 +1465,7 @@ export class DeploymentService {
         `SELECT
           id,
           url
-         FROM system.deployments
+         FROM deployments.runs
          WHERE status = 'READY'
          ORDER BY created_at DESC
          LIMIT 1`

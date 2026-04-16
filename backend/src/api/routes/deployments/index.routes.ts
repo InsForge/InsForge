@@ -30,15 +30,6 @@ router.use('/env-vars', envVarsRouter);
  */
 router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    // Check if deployment service is configured
-    if (!deploymentService.isConfigured()) {
-      throw new AppError(
-        'Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID environment variables.',
-        503,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
-
     const response = await deploymentService.createDeployment();
 
     // Log audit
@@ -62,14 +53,6 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
  */
 router.post('/direct', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if (!deploymentService.isConfigured()) {
-      throw new AppError(
-        'Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID environment variables.',
-        503,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
-
     const validationResult = createDirectDeploymentRequestSchema.safeParse(req.body);
     if (!validationResult.success) {
       throw new AppError(
@@ -104,14 +87,6 @@ router.put(
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      if (!deploymentService.isConfigured()) {
-        throw new AppError(
-          'Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID environment variables.',
-          503,
-          ERROR_CODES.INTERNAL_ERROR
-        );
-      }
-
       const idValidation = uuidParamSchema.safeParse(req.params.id);
       if (!idValidation.success) {
         throw new AppError('Invalid deployment ID', 400, ERROR_CODES.INVALID_INPUT);
@@ -169,15 +144,6 @@ router.post(
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      // Check if deployment service is configured
-      if (!deploymentService.isConfigured()) {
-        throw new AppError(
-          'Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID environment variables.',
-          503,
-          ERROR_CODES.INTERNAL_ERROR
-        );
-      }
-
       const { id } = req.params;
 
       const validationResult = startDeploymentRequestSchema.safeParse(req.body);

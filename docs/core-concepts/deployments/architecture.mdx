@@ -94,7 +94,7 @@ sequenceDiagram
 
 1. **Create Deployment**: Agent calls `POST /api/deployments/direct` with each relative file path, SHA-1 digest, and byte size; InsForge stores the manifest and returns a deployment ID plus a file ID for each manifest entry
 2. **Upload Files**: Agent streams each file to `PUT /api/deployments/:id/files/:fileId/content` using bounded client-side concurrency; InsForge validates bytes against the manifest and forwards the stream to Vercel without exposing Vercel credentials
-3. **Retry If Needed**: If an upload is interrupted, the agent can retry individual file uploads for the same deployment ID. To inspect progress, query `system.deployment_files` with a raw SQL tool for that `deployment_id`
+3. **Retry If Needed**: If an upload is interrupted, the agent can retry individual file uploads for the same deployment ID. To inspect progress, query `deployments.files` with a raw SQL tool for that `deployment_id`
 4. **Start Build**: Agent calls `POST /api/deployments/:id/start`; InsForge verifies every manifest file was uploaded, then creates the Vercel deployment with uploaded file SHAs
 5. **Build & Deploy**: Vercel builds the application and deploys to its edge network
 6. **Go Live**: Application becomes available at `https://{app-key}.insforge.site`

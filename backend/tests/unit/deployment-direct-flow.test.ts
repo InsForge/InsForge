@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createHash } from 'crypto';
 import { Readable } from 'stream';
 
-const { mockPool, mockClient, mockVercelProvider } = vi.hoisted(() => ({
+const { mockPool, mockClient, mockVercelProvider, mockIsCloudEnvironment } = vi.hoisted(() => ({
   mockPool: {
     connect: vi.fn(),
     query: vi.fn(),
@@ -14,11 +14,14 @@ const { mockPool, mockClient, mockVercelProvider } = vi.hoisted(() => ({
   mockVercelProvider: {
     isConfigured: vi.fn(() => true),
     uploadFileStream: vi.fn(),
+    listCustomDomains: vi.fn(),
+    getCustomDomainConfig: vi.fn(),
   },
+  mockIsCloudEnvironment: vi.fn(() => true),
 }));
 
 vi.mock('../../src/utils/environment.js', () => ({
-  isCloudEnvironment: () => true,
+  isCloudEnvironment: mockIsCloudEnvironment,
 }));
 
 vi.mock('../../src/infra/database/database.manager.js', () => ({
@@ -46,12 +49,76 @@ describe('DeploymentService direct deployment flow', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPool.connect.mockResolvedValue(mockClient);
+    mockVercelProvider.isConfigured.mockReturnValue(true);
+    mockIsCloudEnvironment.mockReturnValue(true);
 
     // @ts-expect-error resetting singleton for isolated unit tests
     DeploymentService.instance = undefined;
   });
 
+  it('is configured outside cloud when Vercel credentials are configured', () => {
+    mockIsCloudEnvironment.mockReturnValue(false);
+    mockVercelProvider.isConfigured.mockReturnValue(true);
+
+    const service = DeploymentService.getInstance();
+
+    expect(service.isConfigured()).toBe(true);
+  });
+
+  it('lists user-owned custom domains outside cloud when Vercel credentials are configured', async () => {
+    mockIsCloudEnvironment.mockReturnValue(false);
+    mockVercelProvider.listCustomDomains.mockResolvedValueOnce([
+      {
+        id: 'domain-id',
+        name: 'app.example.com',
+        apexName: 'example.com',
+        projectId: 'project-id',
+        verified: true,
+        redirect: null,
+        redirectStatusCode: null,
+        gitBranch: null,
+        createdAt: 1,
+        updatedAt: 2,
+        verification: [],
+      },
+      {
+        id: 'default-domain-id',
+        name: 'default.vercel.app',
+        apexName: 'vercel.app',
+        projectId: 'project-id',
+        verified: true,
+        redirect: null,
+        redirectStatusCode: null,
+        gitBranch: null,
+        createdAt: 1,
+        updatedAt: 2,
+        verification: [],
+      },
+    ]);
+    mockVercelProvider.getCustomDomainConfig.mockResolvedValueOnce({
+      recommendedCNAME: [{ rank: 1, value: 'cname.vercel-dns.com' }],
+    });
+
+    const service = DeploymentService.getInstance();
+    const result = await service.listCustomDomains();
+
+    expect(result).toEqual({
+      domains: [
+        {
+          domain: 'app.example.com',
+          apexDomain: 'example.com',
+          verified: true,
+          misconfigured: false,
+          verification: [],
+          cnameTarget: 'cname.vercel-dns.com',
+          aRecordValue: null,
+        },
+      ],
+    });
+  });
+
   it('creates a direct deployment and stores its manifest in one transaction', async () => {
+    mockIsCloudEnvironment.mockReturnValue(false);
     const deploymentId = '11111111-1111-4111-8111-111111111111';
     const fileId = '22222222-2222-4222-8222-222222222222';
 
@@ -108,7 +175,7 @@ describe('DeploymentService direct deployment flow', () => {
     expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
 
     const insertFilesCall = mockClient.query.mock.calls.find((call) =>
-      String(call[0]).includes('INSERT INTO system.deployment_files')
+      String(call[0]).includes('INSERT INTO deployments.files')
     );
     expect(insertFilesCall?.[1]).toEqual([deploymentId, ['src/index.ts'], ['a'.repeat(40)], [12]]);
   });

@@ -47,7 +47,7 @@ After creating a deployment, query the status using `run-raw-sql`:
 
 ```sql
 SELECT id, status, url, created_at
-FROM system.deployments
+FROM deployments.runs
 ORDER BY created_at DESC
 LIMIT 1;
 ```
@@ -69,7 +69,7 @@ LIMIT 1;
 Once status is `READY`, the `url` column contains the live deployment URL.
 
 ```sql
-SELECT url FROM system.deployments WHERE id = '<deployment-id>';
+SELECT url FROM deployments.runs WHERE id = '<deployment-id>';
 ```
 
 ## SPA Routing (React, Vue, etc.)
@@ -92,5 +92,5 @@ Add `vercel.json` to your project root:
 | Task | Tool | Command |
 |------|------|---------|
 | Deploy app | `create-deployment` | Provide `sourceDirectory` and `envVars` |
-| Check status | `run-raw-sql` | `SELECT status FROM system.deployments WHERE id = '...'` |
-| List deployments | `run-raw-sql` | `SELECT * FROM system.deployments ORDER BY created_at DESC` |
+| Check status | `run-raw-sql` | `SELECT status FROM deployments.runs WHERE id = '...'` |
+| List deployments | `run-raw-sql` | `SELECT * FROM deployments.runs ORDER BY created_at DESC` |
