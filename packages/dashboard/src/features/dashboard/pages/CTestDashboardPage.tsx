@@ -410,8 +410,8 @@ export default function CTestDashboardPage() {
   const bucketCount = storage?.buckets?.length ?? 0;
   const functionCount = metadata?.functions.length ?? 0;
 
-  // Todo table has data — triggers transition from Get Started to full dashboard
-  const todoHasData = (tables?.find((t) => t.tableName === 'todo')?.recordCount ?? 0) > 0;
+  // Todo table has at least 4 records — triggers transition from Get Started to full dashboard
+  const todoHasData = (tables?.find((t) => t.tableName === 'todo')?.recordCount ?? 0) >= 4;
 
   const completedSteps = useMemo(
     () => [
