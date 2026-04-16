@@ -17,7 +17,7 @@ router.use('/tables', databaseTablesRouter);
 router.use('/records', databaseRecordsRouter);
 router.use('/rpc', databaseRpcRouter);
 router.use('/advance', databaseAdvanceRouter);
-router.use('/', encryptionRouter);
+router.use('/encryption', encryptionRouter);
 
 /**
  * Get all database functions
