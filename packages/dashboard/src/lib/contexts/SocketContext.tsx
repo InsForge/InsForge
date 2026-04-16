@@ -45,7 +45,16 @@ export enum DataUpdateResourceType {
 }
 
 export interface DatabaseResourceUpdate {
-  type: 'tables' | 'table' | 'records' | 'index' | 'trigger' | 'policy' | 'function' | 'extension';
+  type:
+    | 'tables'
+    | 'table'
+    | 'records'
+    | 'index'
+    | 'trigger'
+    | 'policy'
+    | 'function'
+    | 'extension'
+    | 'migration';
   name?: string;
 }
 
@@ -286,6 +295,9 @@ export function SocketProvider({ children }: SocketProviderProps) {
                 break;
               case 'extension':
                 // Extensions are not supported yet
+                break;
+              case 'migration':
+                void queryClient.invalidateQueries({ queryKey: ['database', 'migrations'] });
                 break;
             }
           }

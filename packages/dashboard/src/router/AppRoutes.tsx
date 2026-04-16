@@ -38,6 +38,7 @@ import DatabaseFunctionsPage from '../features/database/pages/FunctionsPage';
 import TriggersPage from '../features/database/pages/TriggersPage';
 import PoliciesPage from '../features/database/pages/PoliciesPage';
 import TemplatesPage from '../features/database/pages/TemplatesPage';
+import MigrationsPage from '../features/database/pages/MigrationsPage';
 import AuditsPage from '../features/logs/pages/AuditsPage';
 import DeploymentsLayout from '../features/deployments/components/DeploymentsLayout';
 import DeploymentLogsPage from '../features/deployments/pages/DeploymentLogsPage';
@@ -76,6 +77,7 @@ export function AppRoutes() {
                   <Route path="functions" element={<DatabaseFunctionsPage />} />
                   <Route path="triggers" element={<TriggersPage />} />
                   <Route path="policies" element={<PoliciesPage />} />
+                  <Route path="migrations" element={<MigrationsPage />} />
                   <Route
                     path="sql-editor"
                     element={<Navigate to="/dashboard/sql-editor" replace />}
