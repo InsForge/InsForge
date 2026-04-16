@@ -316,7 +316,11 @@ function PromptStepper({ onDismiss, completedSteps, showDismiss = false }: Promp
                 <Button
                   type="button"
                   size="sm"
-                  onClick={() => void navigate(currentStep.navigateTo!.path)}
+                  onClick={() => {
+                    if (currentStep.navigateTo) {
+                      void navigate(currentStep.navigateTo.path);
+                    }
+                  }}
                   className="h-9 rounded border border-[var(--alpha-8)] bg-transparent px-3 text-sm font-medium text-foreground hover:bg-[var(--alpha-4)]"
                 >
                   {currentStep.navigateTo.label}
