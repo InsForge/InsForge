@@ -35,7 +35,7 @@ const TEMPLATE_INFO: Record<string, { title: string; description: string }> = {
 const TEMPLATE_VARIABLES: Record<string, { name: string; description: string; sample: string }[]> =
   {
     'email-verification-code': [
-      { name: '{{ code }}', description: '6-digit verification code', sample: '847295' },
+      { name: '{{ token }}', description: '6-digit verification code', sample: '847295' },
       { name: '{{ email }}', description: "User's email address", sample: 'user@example.com' },
       { name: '{{ name }}', description: "User's display name", sample: 'John' },
     ],
@@ -49,7 +49,7 @@ const TEMPLATE_VARIABLES: Record<string, { name: string; description: string; sa
       { name: '{{ name }}', description: "User's display name", sample: 'John' },
     ],
     'reset-password-code': [
-      { name: '{{ code }}', description: '6-digit reset code', sample: '382916' },
+      { name: '{{ token }}', description: '6-digit reset code', sample: '382916' },
       { name: '{{ email }}', description: "User's email address", sample: 'user@example.com' },
       { name: '{{ name }}', description: "User's display name", sample: 'John' },
     ],

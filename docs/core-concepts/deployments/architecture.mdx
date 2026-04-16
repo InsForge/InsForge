@@ -18,10 +18,13 @@ graph TB
     Agent[Coding Agent] --> MCP[InsForge MCP]
     MCP --> API[InsForge Server]
 
-    API --> S3[AWS S3]
-    S3 --> Vercel[Vercel Edge Network]
+    API --> S3[AWS S3 Legacy Zip Upload]
+    API --> VercelFiles[Vercel File Upload API]
+    S3 --> API
+    VercelFiles --> Vercel[Vercel Build Platform]
 
     API --> DB[(PostgreSQL)]
+    DB --> Manifest[Deployment Manifest]
     DB --> Metadata[Deployment Metadata]
     DB --> Status[Status Tracking]
 
@@ -31,8 +34,10 @@ graph TB
     style MCP fill:#1e40af,stroke:#3b82f6,color:#dbeafe
     style API fill:#166534,stroke:#22c55e,color:#dcfce7
     style S3 fill:#ea580c,stroke:#f97316,color:#fed7aa
+    style VercelFiles fill:#111827,stroke:#9ca3af,color:#f9fafb
     style Vercel fill:#000000,stroke:#ffffff,color:#ffffff
     style DB fill:#0e7490,stroke:#06b6d4,color:#cffafe
+    style Manifest fill:#0e7490,stroke:#22d3ee,color:#cffafe
     style Metadata fill:#0e7490,stroke:#22d3ee,color:#cffafe
     style Status fill:#0e7490,stroke:#22d3ee,color:#cffafe
     style Live fill:#166534,stroke:#22c55e,color:#dcfce7
@@ -42,9 +47,10 @@ graph TB
 
 | Component | Technology | Purpose |
 |-----------|------------|---------|
-| **Edge Storage** | AWS S3 | Temporary source file staging |
+| **Legacy Uploads** | AWS S3 | Backward-compatible source zip staging |
+| **Upload Proxy** | Express streaming endpoint | Upload files to Vercel without exposing provider credentials |
 | **Build Platform** | Vercel | Production builds and hosting |
-| **Status Tracking** | PostgreSQL | Deployment state and metadata |
+| **Status Tracking** | PostgreSQL | Deployment state, direct-upload manifest, and metadata |
 | **Webhook Handler** | HMAC-SHA1 | Real-time build status updates |
 
 ## How It Works
@@ -55,19 +61,24 @@ graph TB
 sequenceDiagram
     participant Agent as Coding Agent
     participant API as InsForge Server
-    participant S3 as AWS S3
+    participant DB as PostgreSQL
     participant Vercel as Vercel
 
-    Agent->>API: Create deployment
-    API-->>Agent: Upload URL + deployment ID
+    Agent->>API: Create direct deployment with file manifest
+    API->>DB: Store path, SHA, and size for each file
+    API-->>Agent: Deployment ID
 
-    Agent->>S3: Upload source.zip
-    S3-->>Agent: Upload complete
+    API-->>Agent: Deployment ID + file IDs
+
+    loop Files, with bounded client concurrency
+        Agent->>API: Stream one file by file ID
+        API->>Vercel: Stream file to /v2/files
+        API->>DB: Mark file uploaded
+    end
 
     Agent->>API: Start deployment
-    API->>S3: Download source
-    API->>Vercel: Upload files
-    API->>Vercel: Create deployment
+    API->>DB: Verify all files uploaded
+    API->>Vercel: Create deployment with uploaded file SHAs
     API-->>Agent: Deployment started
 
     Vercel->>Vercel: Build application
@@ -79,9 +90,20 @@ sequenceDiagram
 
 ### Step-by-Step Process
 
-1. **Create Deployment**: Agent requests a new deployment, receiving a presigned S3 upload URL
-2. **Upload Source**: Source files are zipped and uploaded directly to S3 via edge network
-3. **Start Build**: InsForge downloads the source, extracts files, and uploads to Vercel
+#### Direct Upload Flow
+
+1. **Create Deployment**: Agent calls `POST /api/deployments/direct` with each relative file path, SHA-1 digest, and byte size; InsForge stores the manifest and returns a deployment ID plus a file ID for each manifest entry
+2. **Upload Files**: Agent streams each file to `PUT /api/deployments/:id/files/:fileId/content` using bounded client-side concurrency; InsForge validates bytes against the manifest and forwards the stream to Vercel without exposing Vercel credentials
+3. **Retry If Needed**: If an upload is interrupted, the agent can retry individual file uploads for the same deployment ID. To inspect progress, query `deployments.files` with a raw SQL tool for that `deployment_id`
+4. **Start Build**: Agent calls `POST /api/deployments/:id/start`; InsForge verifies every manifest file was uploaded, then creates the Vercel deployment with uploaded file SHAs
+5. **Build & Deploy**: Vercel builds the application and deploys to its edge network
+6. **Go Live**: Application becomes available at `https://{app-key}.insforge.site`
+
+#### Legacy Zip Flow
+
+1. **Create Deployment**: Agent calls `POST /api/deployments` and receives a presigned S3 upload URL
+2. **Upload Source Zip**: Agent uploads a zip archive to S3
+3. **Start Build**: InsForge downloads the zip, extracts source files, uploads them to Vercel, and creates the deployment
 4. **Build & Deploy**: Vercel builds the application and deploys to its edge network
 5. **Go Live**: Application becomes available at `https://{app-key}.insforge.site`
 
@@ -91,8 +113,8 @@ The entire process typically completes in about one minute.
 
 | Status | Description |
 |--------|-------------|
-| `WAITING` | Deployment created, awaiting source upload |
-| `UPLOADING` | Source files being processed |
+| `WAITING` | Deployment created, awaiting source zip upload or direct file uploads |
+| `UPLOADING` | Source files are being proxied to Vercel or deployment creation is in progress |
 | `QUEUED` | Build queued on Vercel |
 | `BUILDING` | Application being built |
 | `READY` | Live and accessible |
@@ -122,11 +144,13 @@ Environment variables can be passed during deployment for build-time configurati
 
 ## Performance
 
-### Edge Network Optimization
+### Direct Upload Optimization
 
-Both AWS S3 and Vercel utilize global edge networks, enabling:
+Deployment uploads stream through InsForge directly into Vercel's file upload API, enabling:
 
-- **Fast Uploads**: Source files uploaded to nearest S3 edge location
+- **Lower Memory Use**: Source zips are no longer buffered and unzipped by the backend for direct-capable clients
+- **Credential Safety**: Vercel credentials remain server-side while clients upload individual files
+- **Compatibility**: Existing zip/S3 clients can continue using the legacy deployment entrypoint
 - **Rapid Builds**: Vercel's distributed build infrastructure
 - **Global Distribution**: Deployed applications served from edge locations worldwide
 - **Low Latency**: Sub-100ms response times for static assets

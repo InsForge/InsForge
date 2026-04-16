@@ -196,13 +196,17 @@ router.patch(
         ip_address: req.ip,
       });
 
-      const socket = SocketManager.getInstance();
-      socket.broadcastToRoom(
-        'role:project_admin',
-        ServerEvents.DATA_UPDATE,
-        { resource: DataUpdateResourceType.BUCKETS, data: { bucketName } },
-        'system'
-      );
+      try {
+        const socket = SocketManager.getInstance();
+        socket.broadcastToRoom(
+          'role:project_admin',
+          ServerEvents.DATA_UPDATE,
+          { resource: DataUpdateResourceType.BUCKETS, data: { bucketName } },
+          'system'
+        );
+      } catch {
+        // Best-effort notification; do not fail completed storage mutation
+      }
 
       const accessInfo = isPublic
         ? 'Bucket is now PUBLIC - objects can be accessed without authentication.'
@@ -296,6 +300,18 @@ router.put(
         req.user?.id
       );
 
+      try {
+        const socket = SocketManager.getInstance();
+        socket.broadcastToRoom(
+          'role:project_admin',
+          ServerEvents.DATA_UPDATE,
+          { resource: DataUpdateResourceType.BUCKETS, data: { bucketName } },
+          'system'
+        );
+      } catch {
+        // Best-effort notification; do not fail completed storage mutation
+      }
+
       successResponse(res, storedFile, 201);
     } catch (error) {
       if (error instanceof Error && error.message.includes('already exists')) {
@@ -334,6 +350,18 @@ router.post(
         req.file,
         req.user?.id
       );
+
+      try {
+        const socket = SocketManager.getInstance();
+        socket.broadcastToRoom(
+          'role:project_admin',
+          ServerEvents.DATA_UPDATE,
+          { resource: DataUpdateResourceType.BUCKETS, data: { bucketName } },
+          'system'
+        );
+      } catch {
+        // Best-effort notification; do not fail completed storage mutation
+      }
 
       successResponse(res, storedFile, 201);
     } catch (error) {
@@ -539,6 +567,18 @@ router.post(
         },
         req.user?.id
       );
+
+      try {
+        const socket = SocketManager.getInstance();
+        socket.broadcastToRoom(
+          'role:project_admin',
+          ServerEvents.DATA_UPDATE,
+          { resource: DataUpdateResourceType.BUCKETS, data: { bucketName } },
+          'system'
+        );
+      } catch {
+        // Best-effort notification; do not fail completed storage mutation
+      }
 
       successResponse(res, fileInfo, 201);
     } catch (error) {

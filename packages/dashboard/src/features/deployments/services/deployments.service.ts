@@ -2,6 +2,9 @@ import { apiClient } from '../../../lib/api/client';
 import type {
   DeploymentSchema,
   CreateDeploymentResponse,
+  CreateDirectDeploymentRequest,
+  CreateDirectDeploymentResponse,
+  UploadDeploymentFileResponse,
   StartDeploymentRequest,
   ListDeploymentsResponse,
   DeploymentEnvVar,
@@ -24,6 +27,9 @@ import type {
 export type {
   DeploymentSchema,
   CreateDeploymentResponse,
+  CreateDirectDeploymentRequest,
+  CreateDirectDeploymentResponse,
+  UploadDeploymentFileResponse,
   ListDeploymentsResponse,
   DeploymentEnvVar,
   DeploymentEnvVarWithValue,
@@ -66,7 +72,7 @@ export class DeploymentsService {
     });
   }
 
-  /** Creates a new deployment record and returns a pre-signed S3 upload URL. */
+  /** Creates a new legacy deployment session with a pre-signed source zip upload URL. */
   async createDeployment(): Promise<CreateDeploymentResponse> {
     return apiClient.request('/deployments', {
       method: 'POST',
@@ -74,7 +80,34 @@ export class DeploymentsService {
     });
   }
 
-  /** Triggers the Vercel deployment after the file upload to S3 is complete. */
+  /** Creates a new deployment session for direct file uploads. */
+  async createDirectDeployment(
+    data: CreateDirectDeploymentRequest
+  ): Promise<CreateDirectDeploymentResponse> {
+    return apiClient.request('/deployments/direct', {
+      method: 'POST',
+      headers: apiClient.withAccessToken(),
+      body: JSON.stringify(data),
+    });
+  }
+
+  /** Streams one registered deployment file through the backend to Vercel. */
+  async uploadDeploymentFileContent(
+    id: string,
+    fileId: string,
+    content: Blob | ArrayBuffer
+  ): Promise<UploadDeploymentFileResponse> {
+    return apiClient.request(`/deployments/${id}/files/${fileId}/content`, {
+      method: 'PUT',
+      headers: {
+        ...apiClient.withAccessToken(),
+        'Content-Type': 'application/octet-stream',
+      },
+      body: content,
+    });
+  }
+
+  /** Triggers the Vercel deployment after source files are available. */
   async startDeployment(id: string, data?: StartDeploymentRequest): Promise<DeploymentSchema> {
     return apiClient.request(`/deployments/${id}/start`, {
       method: 'POST',

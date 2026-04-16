@@ -33,10 +33,10 @@ import { useApiKey, useMetadata } from '../../../lib/hooks/useMetadata';
 import { useIsCloudHostingMode } from '../../../lib/config/DashboardHostContext';
 import { useCloudProjectInfo } from '../../../lib/hooks/useCloudProjectInfo';
 import { useMcpUsage } from '../../logs/hooks/useMcpUsage';
-import { useModal } from '../../../lib/contexts/ModalContext';
 import { getBackendUrl, isInsForgeCloudProject } from '../../../lib/utils/utils';
 import { useUsers } from '../../auth';
 import { CLISection, MCPSection } from '../components/connect';
+import { useOpenConnectDialog } from '../../../layout/ConnectDialogContext';
 const REGION_COUNTRY_CODE_MAP: Record<string, 'us' | 'de' | 'sg'> = {
   'us-test': 'us',
   'us-east': 'us',
@@ -363,7 +363,7 @@ function DashboardLoadingState() {
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { setConnectDialogOpen } = useModal();
+  const openConnectDialog = useOpenConnectDialog();
   const isCloudHostingMode = useIsCloudHostingMode();
   const isCloudProject = isInsForgeCloudProject();
   const canShowCliGettingStarted = isCloudProject && isCloudHostingMode;
@@ -404,8 +404,8 @@ export default function DashboardPage() {
   }, [isMetadataLoading, metadataError]);
 
   const openConnectFlow = useCallback(() => {
-    setConnectDialogOpen(true);
-  }, [setConnectDialogOpen]);
+    openConnectDialog();
+  }, [openConnectDialog]);
 
   const initialPreviewNodes = useMemo<PreviewNodeData[]>(() => {
     const unconnectedPlugY = showRegionInfo ? 390 : 368;

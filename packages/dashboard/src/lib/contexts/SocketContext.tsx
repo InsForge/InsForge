@@ -39,7 +39,9 @@ export enum DataUpdateResourceType {
   USERS = 'users',
   BUCKETS = 'buckets',
   FUNCTIONS = 'functions',
+  DEPLOYMENTS = 'deployments',
   REALTIME = 'realtime',
+  AI_USAGE = 'ai_usage',
 }
 
 export interface DatabaseResourceUpdate {
@@ -215,12 +217,12 @@ export function SocketProvider({ children }: SocketProviderProps) {
     };
   }, [disconnect]);
 
-  // Send onboarding success only on first MCP connection
+  // Send onboarding success only after 2+ MCP connections
   const onMcpConnectedSuccess = useCallback(
     (toolName: string) => {
-      if (mcpUsageCount === 0) {
+      if (mcpUsageCount === 1) {
         trackPostHog('onboarding_completed', {
-          experiment_variant: getFeatureFlag('onboarding-method-experiment'),
+          experiment_variant: getFeatureFlag('dashboard-v2-experiment'),
           tool_name: toolName,
         });
       }
@@ -267,6 +269,8 @@ export function SocketProvider({ children }: SocketProviderProps) {
                 if (change.name) {
                   void queryClient.invalidateQueries({ queryKey: ['records', change.name] });
                 }
+                // Record count changed — refresh metadata so dashboard steps update
+                void queryClient.invalidateQueries({ queryKey: ['metadata', 'full'] });
                 break;
               case 'index':
                 void queryClient.invalidateQueries({ queryKey: ['database', 'indexes'] });
@@ -297,8 +301,14 @@ export function SocketProvider({ children }: SocketProviderProps) {
         case DataUpdateResourceType.FUNCTIONS:
           void queryClient.invalidateQueries({ queryKey: ['functions'] });
           break;
+        case DataUpdateResourceType.DEPLOYMENTS:
+          void queryClient.invalidateQueries({ queryKey: ['deployment-metadata'] });
+          break;
         case DataUpdateResourceType.REALTIME:
           void queryClient.invalidateQueries({ queryKey: ['realtime'] });
+          break;
+        case DataUpdateResourceType.AI_USAGE:
+          void queryClient.invalidateQueries({ queryKey: ['ai-usage-summary'] });
           break;
       }
     };

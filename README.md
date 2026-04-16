@@ -35,6 +35,10 @@
   </a>
 </div>
 
+<p align="center">
+  ⭐ <em>Help us reach more developers and grow the InsForge community. Star this repo!</em>
+</p>
+
 ## InsForge
 InsForge is a backend development platform built for AI coding agents and AI code editors. It exposes backend primitives like databases, auth, storage, and functions through a semantic layer that agents can understand, reason about, and operate end to end.
 

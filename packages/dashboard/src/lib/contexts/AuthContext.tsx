@@ -32,6 +32,8 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const host = useDashboardHost();
+  const isCloudHosting = host.mode === 'cloud-hosting';
+  const getAuthorizationCode = isCloudHosting ? host.getAuthorizationCode : null;
   const location = useLocation();
   const [user, setUser] = useState<UserSchema | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -40,7 +42,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const queryClient = useQueryClient();
   const cloudAuthenticationRef = useRef<Promise<UserSchema | null> | null>(null);
   const shouldAttemptCloudAuthentication =
-    host.mode === 'cloud-hosting' && !location.pathname.startsWith('/dashboard/login');
+    isCloudHosting && !location.pathname.startsWith('/dashboard/login');
+  const shouldUseAuthorizationCodeRefresh =
+    isCloudHosting && host.useAuthorizationCodeRefresh === true;
 
   const handleAuthError = useCallback(() => {
     setUser(null);
@@ -89,7 +93,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   );
 
   const authenticateCloudSession = useCallback(async (): Promise<UserSchema | null> => {
-    if (!shouldAttemptCloudAuthentication) {
+    if (!shouldAttemptCloudAuthentication || !getAuthorizationCode) {
       return null;
     }
 
@@ -97,7 +101,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       cloudAuthenticationRef.current = (async () => {
         try {
           setError(null);
-          const code = await host.getAuthorizationCode();
+          const code = await getAuthorizationCode();
           return await exchangeAuthorizationCode(code);
         } catch (err) {
           setUser(null);
@@ -111,7 +115,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
 
     return cloudAuthenticationRef.current;
-  }, [exchangeAuthorizationCode, host, shouldAttemptCloudAuthentication]);
+  }, [exchangeAuthorizationCode, getAuthorizationCode, shouldAttemptCloudAuthentication]);
 
   const loginWithPassword = useCallback(
     async (email: string, password: string): Promise<boolean> => {
@@ -136,19 +140,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return true;
       }
 
-      if (!shouldAttemptCloudAuthentication) {
-        return false;
+      if (shouldUseAuthorizationCodeRefresh) {
+        const authenticatedUser = await authenticateCloudSession();
+        return authenticatedUser !== null;
       }
 
-      const authenticatedUser = await authenticateCloudSession();
-      return authenticatedUser !== null;
+      return false;
     };
 
     apiClient.setRefreshAccessTokenHandler(handleRefreshAccessToken);
     return () => {
       apiClient.setRefreshAccessTokenHandler(undefined);
     };
-  }, [authenticateCloudSession, shouldAttemptCloudAuthentication]);
+  }, [authenticateCloudSession, shouldUseAuthorizationCodeRefresh]);
 
   const checkAuthStatus = useCallback(async () => {
     try {

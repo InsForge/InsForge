@@ -5,6 +5,8 @@ import LoginPage from '../features/login/pages/LoginPage';
 import CloudLoginPage from '../features/login/pages/CloudLoginPage';
 import DashboardLayout from '../features/dashboard/components/DashboardLayout';
 import DashboardPage from '../features/dashboard/pages/DashboardPage';
+import NewDashboardPage from '../features/dashboard/pages/NewDashboardPage';
+import { getFeatureFlag } from '../lib/analytics/posthog';
 import DatabaseLayout from '../features/database/components/DatabaseLayout';
 import SQLEditorLayout from '../features/database/components/SQLEditorLayout';
 import TablesPage from '../features/database/pages/TablesPage';
@@ -44,6 +46,9 @@ import DeploymentEnvVarsPage from '../features/deployments/pages/DeploymentEnvVa
 import DeploymentDomainsPage from '../features/deployments/pages/DeploymentDomainsPage';
 
 export function AppRoutes() {
+  const dashboardVariant = getFeatureFlag('dashboard-v2-experiment');
+  const DashboardHomePage = dashboardVariant === 'test' ? NewDashboardPage : DashboardPage;
+
   return (
     <Routes>
       <Route path="/dashboard/login" element={<LoginPage />} />
@@ -56,7 +61,7 @@ export function AppRoutes() {
               <Routes>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<DashboardLayout />}>
-                  <Route index element={<DashboardPage />} />
+                  <Route index element={<DashboardHomePage />} />
                 </Route>
                 <Route path="/dashboard/authentication" element={<AuthenticationLayout />}>
                   <Route index element={<Navigate to="users" replace />} />

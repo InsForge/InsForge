@@ -184,16 +184,16 @@ export default function SQLEditorPage() {
         </div>
 
         {/* Tab Nav: h-full, items-center */}
-        <div className="flex items-center h-full shrink-0">
+        <div className="flex items-center h-full flex-1 min-w-0">
           {/* Tab container: h-full, overflow-clip */}
-          <div className="flex items-center h-full overflow-clip">
+          <div className="flex items-center h-full overflow-x-auto flex-1 min-w-0">
             {tabs.map((tab) => {
               const isActive = tab.id === activeTabId;
               return (
                 <div
                   key={tab.id}
                   className={cn(
-                    'flex flex-col h-full shrink-0 w-[106px] cursor-pointer',
+                    'flex flex-col h-full shrink-0 w-[160px] cursor-pointer',
                     isActive ? 'bg-[rgb(var(--semantic-0))]' : ''
                   )}
                   onClick={() => setActiveTab(tab.id)}
@@ -229,7 +229,7 @@ export default function SQLEditorPage() {
                       <>
                         {/* Context container: px-6, shrink-0 */}
                         <div
-                          className="flex items-center justify-center px-1.5 shrink-0 min-w-0"
+                          className="flex items-center px-1.5 min-w-0 flex-1"
                           onDoubleClick={(e) => {
                             e.stopPropagation();
                             handleTabNameDoubleClick(tab.id, tab.name);
@@ -237,7 +237,7 @@ export default function SQLEditorPage() {
                         >
                           <span
                             className={cn(
-                              'text-[13px] font-medium leading-[18px] whitespace-nowrap truncate',
+                              'flex-1 min-w-0 text-[13px] font-medium leading-[18px] truncate',
                               isActive
                                 ? 'text-black dark:text-white'
                                 : 'text-neutral-500 dark:text-neutral-400'

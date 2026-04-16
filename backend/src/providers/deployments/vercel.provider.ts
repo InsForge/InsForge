@@ -1,11 +1,14 @@
 import axios from 'axios';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import type { Readable } from 'stream';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import logger from '@/utils/logger.js';
+
+const VERCEL_UPLOAD_TIMEOUT_MS = 120_000;
 
 // Rate-limit retry configuration for Vercel file uploads
 const UPLOAD_MAX_RETRIES = 3;
@@ -118,6 +121,37 @@ export class VercelProvider {
       VercelProvider.instance = new VercelProvider();
     }
     return VercelProvider.instance;
+  }
+
+  private createUploadAbortController(signal?: AbortSignal): {
+    controller: AbortController;
+    cleanup: () => void;
+  } {
+    const controller = new AbortController();
+
+    if (!signal) {
+      return { controller, cleanup: () => undefined };
+    }
+
+    if (signal.aborted) {
+      controller.abort(signal.reason);
+      return { controller, cleanup: () => undefined };
+    }
+
+    const handleAbort = () => controller.abort(signal.reason);
+    signal.addEventListener('abort', handleAbort, { once: true });
+
+    return {
+      controller,
+      cleanup: () => signal.removeEventListener('abort', handleAbort),
+    };
+  }
+
+  private isUploadTimeoutError(error: unknown): boolean {
+    return (
+      axios.isAxiosError(error) &&
+      (error.code === 'ECONNABORTED' || error.message.toLowerCase().includes('timeout'))
+    );
   }
 
   /**
@@ -901,6 +935,108 @@ export class VercelProvider {
 
     // Unreachable, but TypeScript needs a return
     throw new AppError('Failed to upload file to Vercel', 500, ERROR_CODES.INTERNAL_ERROR);
+  }
+
+  /**
+   * Stream a single file to Vercel
+   * POST /v2/files
+   */
+  async uploadFileStream(input: {
+    content: Readable;
+    sha: string;
+    size: number;
+    signal?: AbortSignal;
+  }): Promise<string> {
+    const credentials = await this.getCredentials();
+    const { controller: uploadAbortController, cleanup } = this.createUploadAbortController(
+      input.signal
+    );
+
+    try {
+      await axios.post(
+        `https://api.vercel.com/v2/files?teamId=${credentials.teamId}`,
+        input.content,
+        {
+          headers: {
+            Authorization: `Bearer ${credentials.token}`,
+            'Content-Type': 'application/octet-stream',
+            'Content-Length': input.size.toString(),
+            'x-vercel-digest': input.sha,
+          },
+          maxBodyLength: Infinity,
+          maxContentLength: Infinity,
+          timeout: VERCEL_UPLOAD_TIMEOUT_MS,
+          signal: uploadAbortController.signal,
+        }
+      );
+
+      logger.info('File streamed to Vercel', { sha: input.sha, size: input.size });
+      return input.sha;
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      if (this.isUploadTimeoutError(error)) {
+        uploadAbortController.abort(
+          new Error(`Vercel file upload timed out after ${VERCEL_UPLOAD_TIMEOUT_MS}ms.`)
+        );
+        if (!input.content.destroyed) {
+          input.content.destroy();
+        }
+
+        logger.warn('Vercel timed out streamed file upload', {
+          sha: input.sha,
+          size: input.size,
+          timeoutMs: VERCEL_UPLOAD_TIMEOUT_MS,
+        });
+        throw new AppError(
+          `Vercel file upload timed out after ${VERCEL_UPLOAD_TIMEOUT_MS}ms. Retry the file upload.`,
+          504,
+          ERROR_CODES.INTERNAL_ERROR
+        );
+      }
+
+      // 409 Conflict means file already exists (same SHA), which is fine.
+      if (axios.isAxiosError(error) && error.response?.status === 409) {
+        logger.info('File already exists on Vercel', { sha: input.sha });
+        return input.sha;
+      }
+
+      // Streaming uploads cannot be safely retried because the request body has
+      // already been consumed. The client should retry with a fresh request.
+      if (axios.isAxiosError(error) && error.response?.status === 429) {
+        logger.warn('Vercel rate limit hit for streamed file upload', { sha: input.sha });
+        throw new AppError(
+          'Vercel rate limit exceeded for file upload. Wait a moment and retry the file upload.',
+          429,
+          ERROR_CODES.RATE_LIMITED
+        );
+      }
+
+      if (axios.isAxiosError(error) && error.response?.status === 400) {
+        logger.warn('Vercel rejected streamed file upload', {
+          sha: input.sha,
+          status: error.response.status,
+        });
+        throw new AppError(
+          'Uploaded file content does not match the registered deployment file.',
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      if (axios.isAxiosError(error) && error.code === 'ERR_CANCELED') {
+        throw new AppError('Vercel file upload was interrupted.', 499, ERROR_CODES.INVALID_INPUT);
+      }
+
+      logger.error('Failed to stream file to Vercel', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new AppError('Failed to upload file to Vercel', 500, ERROR_CODES.INTERNAL_ERROR);
+    } finally {
+      cleanup();
+    }
   }
 
   /**

@@ -6,9 +6,11 @@ import { AppRoutes } from '../router/AppRoutes';
 import { ToastProvider } from '../lib/hooks/useToast';
 import { SocketProvider } from '../lib/contexts/SocketContext';
 import { PostHogAnalyticsProvider } from '../lib/analytics/posthog';
-import { ModalProvider } from '../lib/contexts/ModalContext';
 import { SQLEditorProvider } from '../features/database/contexts/SQLEditorContext';
-import { DashboardHostProvider } from '../lib/config/DashboardHostContext';
+import {
+  DashboardHostProvider,
+  DashboardProjectProvider,
+} from '../lib/config/DashboardHostContext';
 import { setDashboardBackendUrl } from '../lib/config/runtime';
 import type { InsForgeDashboardProps } from '../types';
 
@@ -17,12 +19,52 @@ function normalizeBackendUrl(url?: string) {
 }
 
 export function InsForgeDashboard(props: InsForgeDashboardProps) {
-  const host = useMemo<InsForgeDashboardProps>(
+  const {
+    project,
+    backendUrl,
+    mode,
+    showNavbar,
+    onRouteChange,
+    onNavigateToSubscription,
+    onRenameProject,
+    onDeleteProject,
+    onRequestInstanceInfo,
+    onRequestInstanceTypeChange,
+    onUpdateVersion,
+  } = props;
+  const getAuthorizationCode =
+    props.mode === 'cloud-hosting' ? props.getAuthorizationCode : undefined;
+  const useAuthorizationCodeRefresh =
+    props.mode === 'cloud-hosting' ? props.useAuthorizationCodeRefresh : undefined;
+  const host = useMemo(
     () => ({
-      ...props,
-      backendUrl: normalizeBackendUrl(props.backendUrl),
+      backendUrl: normalizeBackendUrl(backendUrl),
+      mode,
+      showNavbar,
+      getAuthorizationCode,
+      useAuthorizationCodeRefresh,
+      onRouteChange,
+      onNavigateToSubscription,
+      onRenameProject,
+      onDeleteProject,
+      onRequestInstanceInfo,
+      onRequestInstanceTypeChange,
+      onUpdateVersion,
     }),
-    [props]
+    [
+      backendUrl,
+      mode,
+      showNavbar,
+      getAuthorizationCode,
+      useAuthorizationCodeRefresh,
+      onRouteChange,
+      onNavigateToSubscription,
+      onRenameProject,
+      onDeleteProject,
+      onRequestInstanceInfo,
+      onRequestInstanceTypeChange,
+      onUpdateVersion,
+    ]
   );
   const [queryClient] = useState(
     () =>
@@ -44,22 +86,19 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
       <BrowserRouter>
         <QueryClientProvider client={queryClient}>
           <DashboardHostProvider value={host}>
-            <AuthProvider>
-              <SocketProvider>
-                <ToastProvider>
-                  <PostHogAnalyticsProvider>
-                    <ModalProvider
-                      connectDialogOpen={host.connectDialogOpen}
-                      onConnectDialogOpenChange={host.onConnectDialogOpenChange}
-                    >
+            <DashboardProjectProvider value={project}>
+              <AuthProvider>
+                <SocketProvider>
+                  <ToastProvider>
+                    <PostHogAnalyticsProvider>
                       <SQLEditorProvider>
                         <AppRoutes />
                       </SQLEditorProvider>
-                    </ModalProvider>
-                  </PostHogAnalyticsProvider>
-                </ToastProvider>
-              </SocketProvider>
-            </AuthProvider>
+                    </PostHogAnalyticsProvider>
+                  </ToastProvider>
+                </SocketProvider>
+              </AuthProvider>
+            </DashboardProjectProvider>
           </DashboardHostProvider>
         </QueryClientProvider>
       </BrowserRouter>

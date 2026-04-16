@@ -37,12 +37,25 @@ Use this skill for `backend/` work in the InsForge repository.
    - For schema changes, write a new migration file instead of editing database structure manually.
    - Put schema changes under `backend/src/infra/database/migrations/`.
 
-3. Preserve existing behavior around mutation flows.
+3. Write idempotent migrations. Every SQL migration must be safe to re-run.
+   - Use `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`.
+   - Never use bare `ALTER TABLE ... RENAME TO` — it fails if the target name already exists. Wrap renames in a `DO` block that checks `information_schema.tables` for both source and target.
+   - Always `DROP TRIGGER IF EXISTS` before `CREATE TRIGGER`.
+   - Guard data migrations and `DROP COLUMN` behind `information_schema.columns` checks when the column may already be gone.
+   - Use `ON CONFLICT` or `WHERE NOT EXISTS` for seed `INSERT` statements.
+
+4. Preserve existing behavior around mutation flows.
    - Keep audit logging when surrounding routes already log state changes.
    - Keep error handling flowing through shared middleware.
    - Do not introduce a new response envelope unless the existing feature already uses one.
    - For critical flows with multiple dependent database writes, use an explicit transactional process so the whole operation succeeds or fails together.
    - Be especially careful with transactions around auth, secrets, billing-like usage updates, schema changes, and any flow that would leave the system inconsistent if partially applied.
+
+5. Always write unit tests for new code.
+   - Every new feature, migration, service, or bug fix should have accompanying unit tests.
+   - For migrations, write tests that validate SQL structure and idempotency guards (see `tests/unit/redirect-url-whitelist-migration.test.ts` for the pattern).
+   - For services, test business logic and error cases.
+   - Run the full test suite before submitting work: `cd backend && npm test`.
 
 ## Validation
 
