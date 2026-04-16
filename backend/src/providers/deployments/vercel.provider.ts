@@ -8,6 +8,8 @@ import { ERROR_CODES } from '@/types/error-constants.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import logger from '@/utils/logger.js';
 
+const VERCEL_UPLOAD_TIMEOUT_MS = 120_000;
+
 interface CloudCredentialsResponse {
   team_id: string;
   vercel_project_id: string;
@@ -111,6 +113,37 @@ export class VercelProvider {
       VercelProvider.instance = new VercelProvider();
     }
     return VercelProvider.instance;
+  }
+
+  private createUploadAbortController(signal?: AbortSignal): {
+    controller: AbortController;
+    cleanup: () => void;
+  } {
+    const controller = new AbortController();
+
+    if (!signal) {
+      return { controller, cleanup: () => undefined };
+    }
+
+    if (signal.aborted) {
+      controller.abort(signal.reason);
+      return { controller, cleanup: () => undefined };
+    }
+
+    const handleAbort = () => controller.abort(signal.reason);
+    signal.addEventListener('abort', handleAbort, { once: true });
+
+    return {
+      controller,
+      cleanup: () => signal.removeEventListener('abort', handleAbort),
+    };
+  }
+
+  private isUploadTimeoutError(error: unknown): boolean {
+    return (
+      axios.isAxiosError(error) &&
+      (error.code === 'ECONNABORTED' || error.message.toLowerCase().includes('timeout'))
+    );
   }
 
   /**
@@ -862,6 +895,9 @@ export class VercelProvider {
     signal?: AbortSignal;
   }): Promise<string> {
     const credentials = await this.getCredentials();
+    const { controller: uploadAbortController, cleanup } = this.createUploadAbortController(
+      input.signal
+    );
 
     try {
       await axios.post(
@@ -876,7 +912,8 @@ export class VercelProvider {
           },
           maxBodyLength: Infinity,
           maxContentLength: Infinity,
-          signal: input.signal,
+          timeout: VERCEL_UPLOAD_TIMEOUT_MS,
+          signal: uploadAbortController.signal,
         }
       );
 
@@ -885,6 +922,26 @@ export class VercelProvider {
     } catch (error) {
       if (error instanceof AppError) {
         throw error;
+      }
+
+      if (this.isUploadTimeoutError(error)) {
+        uploadAbortController.abort(
+          new Error(`Vercel file upload timed out after ${VERCEL_UPLOAD_TIMEOUT_MS}ms.`)
+        );
+        if (!input.content.destroyed) {
+          input.content.destroy();
+        }
+
+        logger.warn('Vercel timed out streamed file upload', {
+          sha: input.sha,
+          size: input.size,
+          timeoutMs: VERCEL_UPLOAD_TIMEOUT_MS,
+        });
+        throw new AppError(
+          `Vercel file upload timed out after ${VERCEL_UPLOAD_TIMEOUT_MS}ms. Retry the file upload.`,
+          504,
+          ERROR_CODES.INTERNAL_ERROR
+        );
       }
 
       // 409 Conflict means file already exists (same SHA), which is fine.
@@ -924,6 +981,8 @@ export class VercelProvider {
         error: error instanceof Error ? error.message : String(error),
       });
       throw new AppError('Failed to upload file to Vercel', 500, ERROR_CODES.INTERNAL_ERROR);
+    } finally {
+      cleanup();
     }
   }
 

@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { VercelProvider } from '../../src/providers/deployments/vercel.provider';
 import axios, { AxiosError, AxiosHeaders } from 'axios';
 
+const VERCEL_UPLOAD_TIMEOUT_MS = 120_000;
+
 // Mock dependencies so we don't hit real APIs
 vi.mock('../../src/utils/environment.js', () => ({
   isCloudEnvironment: () => false,
@@ -175,13 +177,42 @@ describe('VercelProvider.uploadFileStream', () => {
           'Content-Length': '5',
           'x-vercel-digest': sha,
         }),
+        timeout: VERCEL_UPLOAD_TIMEOUT_MS,
         maxBodyLength: Infinity,
         maxContentLength: Infinity,
-        signal: abortController.signal,
+        signal: expect.any(AbortSignal),
       })
     );
   });
 
+  it('uses the upload timeout constant and aborts timed out uploads', async () => {
+    const timeoutError = new AxiosError(
+      `timeout of ${VERCEL_UPLOAD_TIMEOUT_MS}ms exceeded`,
+      'ECONNABORTED'
+    );
+    timeoutError.config = { headers: new AxiosHeaders() };
+    axiosPostSpy.mockRejectedValueOnce(timeoutError);
+
+    const content = Readable.from([Buffer.from('hello')]);
+
+    await expect(
+      provider.uploadFileStream({
+        content,
+        sha: 'e'.repeat(40),
+        size: 5,
+      })
+    ).rejects.toMatchObject({
+      statusCode: 504,
+      code: 'INTERNAL_ERROR',
+      message: `Vercel file upload timed out after ${VERCEL_UPLOAD_TIMEOUT_MS}ms. Retry the file upload.`,
+    });
+
+    const requestConfig = axiosPostSpy.mock.calls[0]?.[2] as
+      | { timeout?: number; signal?: AbortSignal }
+      | undefined;
+    expect(requestConfig?.timeout).toBe(VERCEL_UPLOAD_TIMEOUT_MS);
+    expect(requestConfig?.signal?.aborted).toBe(true);
+  });
   it('treats existing streamed files as success', async () => {
     axiosPostSpy.mockRejectedValueOnce(makeAxiosError(409));
 
