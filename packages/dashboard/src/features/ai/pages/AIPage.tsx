@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Loader2, ChevronUp, ChevronDown, ChevronsUpDown, Settings } from 'lucide-react';
 import { useAIConfigs } from '../hooks/useAIConfigs';
 import { useAIRemainingCredits } from '../hooks/useAIUsage';
@@ -164,14 +165,19 @@ export default function AIPage() {
                   </span>
                 )}
               </div>
-              <Button
-                variant="secondary"
-                onClick={() => setAISettingsOpen(true)}
-                className="h-9 rounded px-2 text-foreground"
-              >
-                <Settings className="h-5 w-5 stroke-[1.7]" />
-                <span className="px-1">Gateway credentials</span>
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="secondary" asChild className="h-9 rounded px-3 text-foreground">
+                  <Link to="/dashboard/ai/usage">View usage</Link>
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => setAISettingsOpen(true)}
+                  className="h-9 rounded px-2 text-foreground"
+                >
+                  <Settings className="h-5 w-5 stroke-[1.7]" />
+                  <span className="px-1">Gateway credentials</span>
+                </Button>
+              </div>
             </div>
             <p className="text-sm leading-5 text-muted-foreground">
               Your models are ready — build LLM-powered features or add more integrations.
