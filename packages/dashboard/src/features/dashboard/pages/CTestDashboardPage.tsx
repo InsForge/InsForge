@@ -2,16 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge, Button, CopyButton } from '@insforge/ui';
 import { Skeleton } from '../../../components';
-import {
-  Braces,
-  Check,
-  Database,
-  ExternalLink,
-  HardDrive,
-  User,
-  Sparkles,
-  Rocket,
-} from 'lucide-react';
+import { Braces, Database, ExternalLink, HardDrive, User, Sparkles, Rocket } from 'lucide-react';
 import StepUserIcon from '../../../assets/icons/step_user.svg?react';
 import StepUploadIcon from '../../../assets/icons/step_upload.svg?react';
 import { useMetadata, useApiKey, useProjectId } from '../../../lib/hooks/useMetadata';
@@ -31,6 +22,7 @@ import DiscordIcon from '../../../assets/logos/discord.svg?react';
 
 interface PromptStep {
   id: number;
+  category: string;
   title: string;
   prompt: string;
   icon: React.ReactNode;
@@ -40,6 +32,7 @@ interface PromptStep {
 const PROMPT_STEPS: PromptStep[] = [
   {
     id: 1,
+    category: 'Database',
     title: 'Add sample data',
     prompt:
       "Use InsForge Skills to add 4 todo items to InsForge backend's todo table:\n\n1. Add sign in for users\n2. Add file upload\n3. Use AI to turn text into tasks\n4. Deploy your app",
@@ -48,6 +41,7 @@ const PROMPT_STEPS: PromptStep[] = [
   },
   {
     id: 2,
+    category: 'Authentication',
     title: 'Sign up your first user',
     prompt:
       'Use InsForge Skills to add user authentication to this app using InsForge Auth.\n\nUsers should be able to:\n1. Sign up / Sign in with Email\n2. Add Google OAuth\n3. Sign out\n\nAlso update the database and access control so each record belongs to a user:\n1. Add a `user_id` column to the relevant table(s)\n2. Set `user_id` automatically when a new record is created\n3. Restrict reads and writes so users can only access their own data\n4. Add the required row level security policies for this\n\nUpdate the app UI and backend logic so authentication is fully wired up and only signed in users can create and view their own records.',
@@ -56,6 +50,7 @@ const PROMPT_STEPS: PromptStep[] = [
   },
   {
     id: 3,
+    category: 'Storage',
     title: 'Upload a file',
     prompt:
       'Use InsForge Skills to add file upload to this app.\nUsers should be able to upload a file and attach it to a task.\nShow the uploaded file in the task UI.\nUse InsForge Storage for file uploads.',
@@ -64,6 +59,7 @@ const PROMPT_STEPS: PromptStep[] = [
   },
   {
     id: 4,
+    category: 'Model Gateway',
     title: 'Add LLM feature',
     prompt:
       'Use InsForge Skills to add an AI feature to this todo app that turns text into tasks using the InsForge AI Gateway.\nUsers should be able to type natural language and have the app create one or more todo items automatically.',
@@ -72,7 +68,8 @@ const PROMPT_STEPS: PromptStep[] = [
   },
   {
     id: 5,
-    title: 'Deploy your app',
+    category: 'Deployment',
+    title: 'Deploy your site',
     prompt:
       'Use InsForge Skills to deploy this app on InsForge, after deploying, share the live URL.',
     icon: <Rocket className="size-12 text-[rgb(var(--disabled))]" />,
@@ -190,26 +187,6 @@ function PromptDisplay({ text }: { text: string }) {
   );
 }
 
-// --- Step circle ---
-
-function StepCircle({ completed, active }: { completed: boolean; active: boolean }) {
-  if (completed) {
-    return (
-      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-primary">
-        <Check className="h-3 w-3 text-primary" />
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className={`h-5 w-5 shrink-0 rounded-full border-2 ${
-        active ? 'border-primary' : 'border-muted-foreground/40'
-      }`}
-    />
-  );
-}
-
 // --- Prompt Stepper ---
 
 interface PromptStepperProps {
@@ -229,7 +206,7 @@ function PromptStepper({ onDismiss, completedSteps, showDismiss = false }: Promp
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <p className="text-[20px] font-medium leading-7 text-foreground">
-            Congratulations! Your backend has been successfully set up.
+            Start building with Prompts
           </p>
           {allCompleted ? (
             <Button
@@ -252,7 +229,7 @@ function PromptStepper({ onDismiss, completedSteps, showDismiss = false }: Promp
           ) : null}
         </div>
         <p className="text-[13px] leading-[18px] text-muted-foreground">
-          Now open your coding agent and start building your project with prompts
+          Copy these prompts into your agent to explore what InsForge can do
         </p>
       </div>
 
@@ -270,12 +247,11 @@ function PromptStepper({ onDismiss, completedSteps, showDismiss = false }: Promp
                   isActive ? 'bg-[var(--special-toast,#323232)]' : 'hover:bg-[var(--alpha-4)]'
                 }`}
               >
-                <div className="flex items-center gap-1">
-                  <StepCircle completed={!!isCompleted} active={isActive} />
+                <div className="flex items-center">
                   <span
-                    className={`text-sm leading-5 ${isActive ? 'text-primary' : 'text-muted-foreground'}`}
+                    className={`rounded bg-[var(--alpha-8)] px-1.5 py-0.5 text-xs leading-5 ${isActive ? 'text-primary' : 'text-muted-foreground'}`}
                   >
-                    Step {step.id}
+                    {step.category}
                   </span>
                 </div>
                 <p
