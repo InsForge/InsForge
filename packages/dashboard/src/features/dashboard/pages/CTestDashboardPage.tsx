@@ -414,19 +414,22 @@ export default function CTestDashboardPage() {
   const bucketCount = storage?.buckets?.length ?? 0;
   const functionCount = metadata?.functions.length ?? 0;
 
-  // Todo table has at least 4 records — triggers transition from Get Started to full dashboard
-  const todoHasData = (tables?.find((t) => t.tableName === 'todo')?.recordCount ?? 0) >= 4;
+  const todoRecordCount = tables?.find((t) => t.tableName === 'todo')?.recordCount ?? 0;
+  // Any todo record → transition away from Get Started to full dashboard
+  const todoHasData = todoRecordCount > 0;
+  // Step 1 completion requires at least 4 records
+  const todoStepComplete = todoRecordCount >= 4;
   const shouldShowGetStarted = !metadataError && !todoHasData;
 
   const completedSteps = useMemo(
     () => [
-      todoHasData,
+      todoStepComplete,
       (totalUsers ?? 0) >= 1,
       (storage?.buckets?.find((b) => b.name === 'todo-attachments')?.objectCount ?? 0) > 0,
       (aiUsageSummary?.totalRequests ?? 0) > 0,
       !!currentDeploymentId,
     ],
-    [todoHasData, totalUsers, storage, aiUsageSummary, currentDeploymentId]
+    [todoStepComplete, totalUsers, storage, aiUsageSummary, currentDeploymentId]
   );
 
   const handleDismissStepper = useCallback(() => {
