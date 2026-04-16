@@ -30,13 +30,15 @@ export const identifyUser = (
     return Promise.resolve();
   }
   posthog.identify(userId, properties);
-  return new Promise<void>((resolve) => {
-    const timeout = setTimeout(() => resolve(), 5000);
-    posthog.onFeatureFlags(() => {
-      clearTimeout(timeout);
-      resolve();
-    });
-  });
+  // posthog.identify triggers a new /decide request for the identified user.
+  // Wait for it to complete before returning, so callers can rely on
+  // getFeatureFlag returning the post-identify variant.
+  //
+  // Do NOT use posthog.onFeatureFlags here: if PostHog already loaded flags
+  // for the anonymous device id (which happens on init), onFeatureFlags fires
+  // synchronously with that stale cache. Await would resolve immediately and
+  // the next getFeatureFlag would return the anonymous variant.
+  return new Promise<void>((resolve) => setTimeout(resolve, 2000));
 };
 
 export const trackPostHog = (eventName: string, properties?: Record<string, unknown>) => {
