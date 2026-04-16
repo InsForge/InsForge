@@ -627,5 +627,56 @@ describe('ComputeServicesService', () => {
 
       expect(result.status).toBe('failed');
     });
+
+    it('throws COMPUTE_SERVICE_NOT_FOUND if the service is deleted concurrently', async () => {
+      const serviceId = 'svc-sync-race';
+
+      // getService query returns the row
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          {
+            id: serviceId,
+            project_id: 'proj-123',
+            name: 'my-api',
+            image_url: 'dockerfile',
+            port: 8080,
+            cpu: 'shared-1x',
+            memory: 512,
+            region: 'iad',
+            fly_app_id: 'my-api-proj-123',
+            fly_machine_id: null,
+            status: 'deploying',
+            endpoint_url: 'https://my-api-proj-123.fly.dev',
+            env_vars_encrypted: null,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+      });
+
+      mockListMachines.mockResolvedValue([
+        { id: 'machine-1', state: 'started', region: 'iad' },
+      ]);
+
+      // UPDATE returns zero rows — service was deleted between getService and UPDATE
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
+      await expect(service.syncAfterDeploy(serviceId)).rejects.toThrow('Service not found');
+    });
+
+    it('throws when projectId is too long to fit in a Fly app name', async () => {
+      const longProjectId = 'a'.repeat(60);
+      await expect(
+        service.prepareForDeploy({
+          projectId: longProjectId,
+          name: 'api',
+          imageUrl: 'nginx:latest',
+          port: 8080,
+          cpu: 'shared-1x',
+          memory: 512,
+          region: 'iad',
+        })
+      ).rejects.toThrow(/projectId is too long/);
+    });
   });
 });

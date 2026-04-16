@@ -69,6 +69,14 @@ function mapRowToSchema(row: ServiceRow): ServiceSchema {
 function makeFlyAppName(name: string, projectId: string): string {
   const suffix = `-${projectId}`;
   const maxBase = 60 - suffix.length;
+  // Need at least 8 chars for truncated name: 1 letter + dash + 6-char hash
+  if (maxBase < 8) {
+    throw new AppError(
+      `projectId is too long to produce a valid Fly app name (max ~51 chars, got ${projectId.length})`,
+      400,
+      ERROR_CODES.INVALID_INPUT
+    );
+  }
   if (name.length <= maxBase) {
     return name + suffix;
   }
@@ -350,6 +358,15 @@ export class ComputeServicesService {
       `UPDATE compute.services SET fly_machine_id = $1, status = $2 WHERE id = $3 RETURNING *`,
       [machine.id, status, id]
     );
+
+    if (!result.rows.length) {
+      throw new AppError(
+        'Service not found',
+        404,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
+        NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS
+      );
+    }
 
     logger.info('Compute service synced after deploy', { id, machineId: machine.id, status });
     return mapRowToSchema(result.rows[0]);
