@@ -6,8 +6,8 @@
 -- Status flow:
 --   WAITING -> UPLOADING -> (Vercel statuses: QUEUED/BUILDING/READY/ERROR/CANCELED)
 --   InsForge statuses:
---   - WAITING: Record created, waiting for client to upload zip to S3
---   - UPLOADING: Server is downloading from S3 and uploading to Vercel
+--   - WAITING: Record created, waiting for source zip upload or direct file registration/content
+--   - UPLOADING: File uploads or provider deployment creation are in progress
 --   Vercel statuses (stored directly):
 --   - QUEUED: Deployment queued
 --   - BUILDING: Deployment building
