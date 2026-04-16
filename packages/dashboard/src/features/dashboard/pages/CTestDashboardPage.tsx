@@ -305,7 +305,11 @@ function PromptStepper({ onDismiss, completedSteps, showDismiss = false }: Promp
                 <Button
                   type="button"
                   size="sm"
-                  onClick={() => void navigate(currentStep.navigateTo!.path)}
+                  onClick={() => {
+                    if (currentStep.navigateTo) {
+                      void navigate(currentStep.navigateTo.path);
+                    }
+                  }}
                   className="h-9 rounded border border-[var(--alpha-8)] bg-transparent px-3 text-sm font-medium text-foreground hover:bg-[var(--alpha-4)]"
                 >
                   {currentStep.navigateTo.label}
@@ -412,6 +416,7 @@ export default function CTestDashboardPage() {
 
   // Todo table has at least 4 records — triggers transition from Get Started to full dashboard
   const todoHasData = (tables?.find((t) => t.tableName === 'todo')?.recordCount ?? 0) >= 4;
+  const shouldShowGetStarted = !metadataError && !todoHasData;
 
   const completedSteps = useMemo(
     () => [
@@ -441,7 +446,7 @@ export default function CTestDashboardPage() {
   }
 
   // Phase 1: Todo has no data — show centered Get Started with 4 steps
-  if (!todoHasData) {
+  if (shouldShowGetStarted) {
     return (
       <main className="flex h-full min-h-0 min-w-0 flex-col bg-semantic-0">
         <div className="flex flex-1 flex-col items-center overflow-y-auto pt-[120px]">
