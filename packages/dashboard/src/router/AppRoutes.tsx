@@ -46,7 +46,7 @@ import DeploymentOverviewPage from '../features/deployments/pages/DeploymentOver
 import DeploymentEnvVarsPage from '../features/deployments/pages/DeploymentEnvVarsPage';
 import DeploymentDomainsPage from '../features/deployments/pages/DeploymentDomainsPage';
 
-export function AppRoutes() {
+function AuthenticatedRoutes() {
   const dashboardVariant = getFeatureFlag('dashboard-v2-experiment');
   const DashboardHomePage =
     dashboardVariant === 'c_test'
@@ -56,6 +56,77 @@ export function AppRoutes() {
         : DashboardPage;
 
   return (
+    <AppLayout>
+      <Routes>
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/dashboard" element={<DashboardLayout />}>
+          <Route index element={<DashboardHomePage />} />
+        </Route>
+        <Route path="/dashboard/authentication" element={<AuthenticationLayout />}>
+          <Route index element={<Navigate to="users" replace />} />
+          <Route path="users" element={<UsersPage />} />
+          <Route path="auth-methods" element={<AuthMethodsPage />} />
+          <Route path="email" element={<EmailPage />} />
+        </Route>
+        <Route path="/dashboard/database" element={<DatabaseLayout />}>
+          <Route index element={<Navigate to="tables" replace />} />
+          <Route path="tables" element={<TablesPage />} />
+          <Route path="indexes" element={<IndexesPage />} />
+          <Route path="functions" element={<DatabaseFunctionsPage />} />
+          <Route path="triggers" element={<TriggersPage />} />
+          <Route path="policies" element={<PoliciesPage />} />
+          <Route
+            path="sql-editor"
+            element={<Navigate to="/dashboard/sql-editor" replace />}
+          />
+          <Route path="templates" element={<TemplatesPage />} />
+        </Route>
+        <Route path="/dashboard/sql-editor" element={<SQLEditorLayout />}>
+          <Route index element={<SQLEditorPage />} />
+        </Route>
+        <Route path="/dashboard/storage" element={<StorageLayout />}>
+          <Route index element={<BucketsPage />} />
+        </Route>
+        <Route path="/dashboard/logs" element={<LogsLayout />}>
+          <Route index element={<Navigate to="MCP" replace />} />
+          <Route path="MCP" element={<MCPLogsPage />} />
+          <Route path="audits" element={<AuditsPage />} />
+          <Route path="function.logs" element={<FunctionLogsPage />} />
+          <Route path=":source" element={<LogsPage />} />
+        </Route>
+        <Route path="/dashboard/functions" element={<FunctionsLayout />}>
+          <Route index element={<Navigate to="list" replace />} />
+          <Route path="list" element={<FunctionsPage />} />
+          <Route path="secrets" element={<SecretsPage />} />
+          <Route path="schedules" element={<SchedulesPage />} />
+        </Route>
+        <Route path="/dashboard/visualizer" element={<VisualizerLayout />}>
+          <Route index element={<VisualizerPage />} />
+        </Route>
+        <Route path="/dashboard/ai" element={<AILayout />}>
+          <Route index element={<AIPage />} />
+        </Route>
+        <Route path="/dashboard/realtime" element={<RealtimeLayout />}>
+          <Route index element={<Navigate to="channels" replace />} />
+          <Route path="channels" element={<RealtimeChannelsPage />} />
+          <Route path="messages" element={<RealtimeMessagesPage />} />
+          <Route path="permissions" element={<RealtimePermissionsPage />} />
+        </Route>
+        <Route path="/dashboard/deployments" element={<DeploymentsLayout />}>
+          <Route index element={<Navigate to="overview" replace />} />
+          <Route path="overview" element={<DeploymentOverviewPage />} />
+          <Route path="logs" element={<DeploymentLogsPage />} />
+          <Route path="env-vars" element={<DeploymentEnvVarsPage />} />
+          <Route path="domains" element={<DeploymentDomainsPage />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </AppLayout>
+  );
+}
+
+export function AppRoutes() {
+  return (
     <Routes>
       <Route path="/dashboard/login" element={<LoginPage />} />
       <Route path="/cloud/login" element={<CloudLoginPage />} />
@@ -63,72 +134,7 @@ export function AppRoutes() {
         path="/*"
         element={
           <RequireAuth>
-            <AppLayout>
-              <Routes>
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                <Route path="/dashboard" element={<DashboardLayout />}>
-                  <Route index element={<DashboardHomePage />} />
-                </Route>
-                <Route path="/dashboard/authentication" element={<AuthenticationLayout />}>
-                  <Route index element={<Navigate to="users" replace />} />
-                  <Route path="users" element={<UsersPage />} />
-                  <Route path="auth-methods" element={<AuthMethodsPage />} />
-                  <Route path="email" element={<EmailPage />} />
-                </Route>
-                <Route path="/dashboard/database" element={<DatabaseLayout />}>
-                  <Route index element={<Navigate to="tables" replace />} />
-                  <Route path="tables" element={<TablesPage />} />
-                  <Route path="indexes" element={<IndexesPage />} />
-                  <Route path="functions" element={<DatabaseFunctionsPage />} />
-                  <Route path="triggers" element={<TriggersPage />} />
-                  <Route path="policies" element={<PoliciesPage />} />
-                  <Route
-                    path="sql-editor"
-                    element={<Navigate to="/dashboard/sql-editor" replace />}
-                  />
-                  <Route path="templates" element={<TemplatesPage />} />
-                </Route>
-                <Route path="/dashboard/sql-editor" element={<SQLEditorLayout />}>
-                  <Route index element={<SQLEditorPage />} />
-                </Route>
-                <Route path="/dashboard/storage" element={<StorageLayout />}>
-                  <Route index element={<BucketsPage />} />
-                </Route>
-                <Route path="/dashboard/logs" element={<LogsLayout />}>
-                  <Route index element={<Navigate to="MCP" replace />} />
-                  <Route path="MCP" element={<MCPLogsPage />} />
-                  <Route path="audits" element={<AuditsPage />} />
-                  <Route path="function.logs" element={<FunctionLogsPage />} />
-                  <Route path=":source" element={<LogsPage />} />
-                </Route>
-                <Route path="/dashboard/functions" element={<FunctionsLayout />}>
-                  <Route index element={<Navigate to="list" replace />} />
-                  <Route path="list" element={<FunctionsPage />} />
-                  <Route path="secrets" element={<SecretsPage />} />
-                  <Route path="schedules" element={<SchedulesPage />} />
-                </Route>
-                <Route path="/dashboard/visualizer" element={<VisualizerLayout />}>
-                  <Route index element={<VisualizerPage />} />
-                </Route>
-                <Route path="/dashboard/ai" element={<AILayout />}>
-                  <Route index element={<AIPage />} />
-                </Route>
-                <Route path="/dashboard/realtime" element={<RealtimeLayout />}>
-                  <Route index element={<Navigate to="channels" replace />} />
-                  <Route path="channels" element={<RealtimeChannelsPage />} />
-                  <Route path="messages" element={<RealtimeMessagesPage />} />
-                  <Route path="permissions" element={<RealtimePermissionsPage />} />
-                </Route>
-                <Route path="/dashboard/deployments" element={<DeploymentsLayout />}>
-                  <Route index element={<Navigate to="overview" replace />} />
-                  <Route path="overview" element={<DeploymentOverviewPage />} />
-                  <Route path="logs" element={<DeploymentLogsPage />} />
-                  <Route path="env-vars" element={<DeploymentEnvVarsPage />} />
-                  <Route path="domains" element={<DeploymentDomainsPage />} />
-                </Route>
-                <Route path="*" element={<Navigate to="/dashboard" replace />} />
-              </Routes>
-            </AppLayout>
+            <AuthenticatedRoutes />
           </RequireAuth>
         }
       />

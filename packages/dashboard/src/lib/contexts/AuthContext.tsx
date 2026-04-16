@@ -4,6 +4,7 @@ import { useLocation } from 'react-router-dom';
 import { loginService } from '../../features/login/services/login.service';
 import { useDashboardHost } from '../config/DashboardHostContext';
 import { apiClient } from '../api/client';
+import { identifyUser } from '../analytics/posthog';
 import type { UserSchema } from '@insforge/shared-schemas';
 
 interface AuthContextType {
@@ -70,6 +71,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const applyAuthenticatedUser = useCallback(
     async (nextUser: UserSchema): Promise<void> => {
+      await identifyUser(nextUser.id, { email: nextUser.email, name: nextUser.profile?.name });
       setUser(nextUser);
       setIsAuthenticated(true);
       await invalidateAuthQueries();
@@ -161,6 +163,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       const currentUser = await loginService.getCurrentUser();
       if (currentUser) {
+        await identifyUser(currentUser.id, { email: currentUser.email, name: currentUser.profile?.name });
         setUser(currentUser);
         setIsAuthenticated(true);
         return currentUser;
