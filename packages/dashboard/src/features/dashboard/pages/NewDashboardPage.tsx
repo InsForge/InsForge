@@ -429,8 +429,8 @@ export default function NewDashboardPage() {
   // --- Step completion detection (real-time via socket → React Query invalidation) ---
   const completedSteps = useMemo(
     () => [
-      // Step 1: Add sample data — todo table has records
-      (tables?.find((t) => t.tableName === 'todo')?.recordCount ?? 0) > 0,
+      // Step 1: Add sample data — todo table has at least 4 records
+      (tables?.find((t) => t.tableName === 'todo')?.recordCount ?? 0) >= 4,
       // Step 2: Sign up first user — totalUsers already excludes admin & anon
       (totalUsers ?? 0) >= 1,
       // Step 3: Upload a file — todo-attachments bucket has files
