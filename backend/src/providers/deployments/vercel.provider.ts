@@ -892,9 +892,10 @@ export class VercelProvider {
         if (axios.isAxiosError(error) && error.response?.status === 429) {
           if (attempt < UPLOAD_MAX_RETRIES) {
             const rateLimitReset = error.response.headers['x-ratelimit-reset'];
+            const parsedReset = rateLimitReset ? parseInt(rateLimitReset, 10) : NaN;
             let baseDelay: number;
-            if (rateLimitReset) {
-              const resetMs = parseInt(rateLimitReset, 10) * 1000;
+            if (!isNaN(parsedReset)) {
+              const resetMs = parsedReset * 1000;
               baseDelay = Math.min(
                 Math.max(resetMs - Date.now(), UPLOAD_BACKOFF_BASE_MS),
                 UPLOAD_BACKOFF_MAX_MS
