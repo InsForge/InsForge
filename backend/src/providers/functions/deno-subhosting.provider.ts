@@ -726,7 +726,7 @@ export default _legacyModule.exports as (req: Request) => Promise<Response>;
       // Empty router when no functions
       return `
 // Auto-generated router (no functions)
-Deno.serve(async (req: Request) => {
+const dispatch = async (req: Request): Promise<Response> => {
   const url = new URL(req.url);
   const pathname = url.pathname;
 
@@ -747,7 +747,11 @@ Deno.serve(async (req: Request) => {
     status: 404,
     headers: { "Content-Type": "application/json" }
   });
-});
+};
+
+(globalThis as any).__insforge_dispatch__ = dispatch;
+
+Deno.serve(dispatch);
 `;
     }
 
@@ -759,79 +763,102 @@ Deno.serve(async (req: Request) => {
 
     return `
 // Auto-generated router
+import { AsyncLocalStorage } from "node:async_hooks";
 ${imports}
 
 const routes: Record<string, (req: Request) => Promise<Response>> = {
 ${routes}
 };
 
-Deno.serve(async (req: Request) => {
-  const url = new URL(req.url);
-  const pathname = url.pathname;
+// Per-request call-depth tracking to catch recursive function invocations
+// (in-process dispatch bypasses Deno Subhosting's network-level 508 guard).
+const MAX_DEPTH = 8;
+const depthStore = new AsyncLocalStorage<number>();
 
-  // Health check
-  if (pathname === "/health" || pathname === "/") {
+const dispatch = async (req: Request): Promise<Response> => {
+  const currentDepth = depthStore.getStore() ?? 0;
+  if (currentDepth >= MAX_DEPTH) {
     return new Response(JSON.stringify({
-      status: "ok",
-      type: "insforge-functions",
-      functions: Object.keys(routes),
-      timestamp: new Date().toISOString(),
+      error: "Loop Detected",
+      message: "Function call depth exceeded " + MAX_DEPTH + ". Possible recursive invocation.",
     }), {
+      status: 508,
       headers: { "Content-Type": "application/json" }
     });
   }
 
-  // Extract function slug
-  const pathParts = pathname.split("/").filter(Boolean);
-  const slug = pathParts[0];
+  return await depthStore.run(currentDepth + 1, async () => {
+    const url = new URL(req.url);
+    const pathname = url.pathname;
 
-  if (!slug || !routes[slug]) {
-    return new Response(JSON.stringify({
-      error: "Function not found",
-      available: Object.keys(routes),
-    }), {
-      status: 404,
-      headers: { "Content-Type": "application/json" }
-    });
-  }
-
-  // Execute function
-  try {
-    const handler = routes[slug];
-
-    // If there's a subpath, create modified request
-    const subpath = pathParts.slice(1).join("/");
-    let funcReq = req;
-    if (subpath) {
-      const newUrl = new URL(req.url);
-      newUrl.pathname = "/" + subpath;
-      funcReq = new Request(newUrl.toString(), req);
+    // Health check
+    if (pathname === "/health" || pathname === "/") {
+      return new Response(JSON.stringify({
+        status: "ok",
+        type: "insforge-functions",
+        functions: Object.keys(routes),
+        timestamp: new Date().toISOString(),
+      }), {
+        headers: { "Content-Type": "application/json" }
+      });
     }
 
-    const startTime = Date.now();
-    const response = await handler(funcReq);
-    const duration = Date.now() - startTime;
+    // Extract function slug
+    const pathParts = pathname.split("/").filter(Boolean);
+    const slug = pathParts[0];
 
-    console.log(JSON.stringify({
-      timestamp: new Date().toISOString(),
-      slug,
-      method: req.method,
-      status: response.status,
-      duration: duration + "ms",
-    }));
+    if (!slug || !routes[slug]) {
+      return new Response(JSON.stringify({
+        error: "Function not found",
+        available: Object.keys(routes),
+      }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
 
-    return response;
-  } catch (error) {
-    console.error("Function error:", error);
-    return new Response(JSON.stringify({
-      error: "Function execution failed",
-      message: (error as Error).message,
-    }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
-  }
-});
+    // Execute function
+    try {
+      const handler = routes[slug];
+
+      // If there's a subpath, create modified request
+      const subpath = pathParts.slice(1).join("/");
+      let funcReq = req;
+      if (subpath) {
+        const newUrl = new URL(req.url);
+        newUrl.pathname = "/" + subpath;
+        funcReq = new Request(newUrl.toString(), req);
+      }
+
+      const startTime = Date.now();
+      const response = await handler(funcReq);
+      const duration = Date.now() - startTime;
+
+      console.log(JSON.stringify({
+        timestamp: new Date().toISOString(),
+        slug,
+        method: req.method,
+        status: response.status,
+        duration: duration + "ms",
+      }));
+
+      return response;
+    } catch (error) {
+      console.error("Function error:", error);
+      return new Response(JSON.stringify({
+        error: "Function execution failed",
+        message: (error as Error).message,
+      }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+  });
+};
+
+(globalThis as any).__insforge_dispatch__ = dispatch;
+
+Deno.serve(dispatch);
 `;
   }
 
