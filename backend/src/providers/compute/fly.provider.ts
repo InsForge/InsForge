@@ -24,7 +24,7 @@ export class FlyProvider {
     };
   }
 
-  private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  private async request<T>(path: string, options: RequestInit = {}): Promise<T | undefined> {
     const url = `${FLY_API_BASE}${path}`;
     const response = await fetch(url, {
       ...options,
@@ -39,9 +39,17 @@ export class FlyProvider {
 
     const text = await response.text();
     if (!text) {
-      return undefined as T;
+      return undefined;
     }
     return JSON.parse(text) as T;
+  }
+
+  private async requestJson<T>(path: string, options: RequestInit = {}): Promise<T> {
+    const result = await this.request<T>(path, options);
+    if (result === undefined) {
+      throw new Error(`Fly API returned empty body for ${options.method ?? 'GET'} ${path}`);
+    }
+    return result;
   }
 
   async createApp(params: {
@@ -74,8 +82,7 @@ export class FlyProvider {
     region: string;
   }): Promise<{ machineId: string }> {
     const guest = this.mapCpuTier(params.cpu, params.memory);
-    // Fly Machines launch always returns a JSON body with the machine ID
-    const result = await this.request<{ id: string }>(`/apps/${params.appId}/machines`, {
+    const result = await this.requestJson<{ id: string }>(`/apps/${params.appId}/machines`, {
       method: 'POST',
       body: JSON.stringify({
         config: {
@@ -96,8 +103,7 @@ export class FlyProvider {
         region: params.region,
       }),
     });
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Fly launch always returns JSON
-    return { machineId: result!.id };
+    return { machineId: result.id };
   }
 
   async updateMachine(params: {
@@ -177,10 +183,10 @@ export class FlyProvider {
   }
 
   async getMachineStatus(appId: string, machineId: string): Promise<{ state: string }> {
-    // Fly Machines GET always returns a JSON body with machine state
-    const result = await this.request<{ state: string }>(`/apps/${appId}/machines/${machineId}`);
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Fly GET always returns JSON
-    return { state: result!.state };
+    const result = await this.requestJson<{ state: string }>(
+      `/apps/${appId}/machines/${machineId}`
+    );
+    return { state: result.state };
   }
 
   async getLogs(
