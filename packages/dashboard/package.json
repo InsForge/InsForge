@@ -1,6 +1,6 @@
 {
   "name": "@insforge/dashboard",
-  "version": "0.0.0-dev.10",
+  "version": "0.0.0-dev.11",
   "description": "Shared InsForge dashboard package for self-hosting and cloud-hosting hosts",
   "license": "Apache-2.0",
   "type": "module",
@@ -28,7 +28,8 @@
   "scripts": {
     "build": "vite build && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "lint": "eslint src/"
   },
   "dependencies": {
     "@codemirror/lang-javascript": "^6.2.4",

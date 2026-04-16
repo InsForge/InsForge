@@ -1,9 +1,5 @@
 export type DashboardMode = 'self-hosting' | 'cloud-hosting';
 
-export interface DashboardRoute {
-  path: string;
-}
-
 export interface DashboardProjectInfo {
   id: string;
   name: string;
@@ -13,25 +9,6 @@ export interface DashboardProjectInfo {
   currentVersion?: string | null;
   status?: 'active' | 'paused' | 'restoring' | string;
 }
-
-export interface DashboardCapabilities {
-  canManageProjectSettings?: boolean;
-  canDeleteProject?: boolean;
-  canRenameProject?: boolean;
-  canManageInstance?: boolean;
-  canManageVersion?: boolean;
-  canOpenUsagePage?: boolean;
-  canOpenSubscriptionPage?: boolean;
-}
-
-export type DashboardAuthConfig =
-  | {
-      strategy: 'session';
-    }
-  | {
-      strategy: 'authorization-code';
-      getAuthorizationCode: () => Promise<string>;
-    };
 
 export interface DashboardInstanceInfo {
   currentInstanceType: string;
@@ -55,17 +32,11 @@ export interface DashboardInstanceInfo {
   }>;
 }
 
-export interface DashboardSharedProps {
-  backendUrl: string;
-  initialPath?: string;
+export interface DashboardProps {
+  backendUrl?: string;
   showNavbar?: boolean;
   project?: DashboardProjectInfo;
-  capabilities?: DashboardCapabilities;
-  connectDialogOpen?: boolean;
-  onConnectDialogOpenChange?: (open: boolean) => void;
-  onRouteChange?: (route: DashboardRoute) => void;
-  onOpenSettings?: () => void;
-  onNavigateToUsage?: () => void;
+  onRouteChange?: (path: string) => void;
   onNavigateToSubscription?: () => void;
   onRenameProject?: (name: string) => Promise<void>;
   onDeleteProject?: () => Promise<void>;
@@ -76,15 +47,14 @@ export interface DashboardSharedProps {
   onUpdateVersion?: () => Promise<void>;
 }
 
-export interface SelfHostingDashboardProps extends DashboardSharedProps {
+export interface SelfHostingDashboardProps extends DashboardProps {
   mode: 'self-hosting';
-  auth?: Extract<DashboardAuthConfig, { strategy: 'session' }>;
 }
 
-export interface CloudHostingDashboardProps extends DashboardSharedProps {
+export interface CloudHostingDashboardProps extends DashboardProps {
   mode: 'cloud-hosting';
-  auth: DashboardAuthConfig;
+  getAuthorizationCode: () => Promise<string>;
+  useAuthorizationCodeRefresh?: boolean;
 }
 
-export type DashboardProps = SelfHostingDashboardProps | CloudHostingDashboardProps;
-export type InsForgeDashboardProps = DashboardProps;
+export type InsForgeDashboardProps = SelfHostingDashboardProps | CloudHostingDashboardProps;

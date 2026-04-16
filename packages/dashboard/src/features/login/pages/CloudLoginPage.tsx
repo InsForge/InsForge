@@ -1,87 +1,73 @@
-import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { LockIcon } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+import { Navigate, useNavigate } from 'react-router-dom';
+import { Lock } from 'lucide-react';
+import { Button } from '@insforge/ui';
 import { useDashboardHost } from '../../../lib/config/DashboardHostContext';
 import { useAuth } from '../../../lib/contexts/AuthContext';
-import type { DashboardAuthConfig } from '../../../types';
-import LoginPage from './LoginPage';
 
 export default function CloudLoginPage() {
   const navigate = useNavigate();
   const host = useDashboardHost();
-  const { isAuthenticated, error, loginWithAuthorizationCode } = useAuth();
+  const { isAuthenticated, isLoading, error, refreshAuth } = useAuth();
   const hasRequestedAuthRef = useRef(false);
-  const [requestError, setRequestError] = useState<Error | null>(null);
-  const shouldUseSessionLogin = host.mode === 'cloud-hosting' && host.auth.strategy === 'session';
+  const isCloudHosting = host.mode === 'cloud-hosting';
 
   useEffect(() => {
-    if (shouldUseSessionLogin || hasRequestedAuthRef.current || isAuthenticated || error) {
+    if (!isCloudHosting || hasRequestedAuthRef.current || isAuthenticated || isLoading || error) {
       return;
     }
 
-    if (host.mode === 'cloud-hosting') {
-      if (host.auth.strategy !== 'authorization-code') {
-        return;
-      }
-
-      const authorizationHostAuth = host.auth as Extract<
-        DashboardAuthConfig,
-        { strategy: 'authorization-code' }
-      >;
-      hasRequestedAuthRef.current = true;
-
-      const authenticate = async () => {
-        try {
-          const code = await authorizationHostAuth.getAuthorizationCode();
-          const success = await loginWithAuthorizationCode(code);
-          if (!success) {
-            throw new Error('Authorization code validation failed');
-          }
-        } catch (authError) {
-          setRequestError(
-            authError instanceof Error ? authError : new Error('Failed to authenticate')
-          );
-        }
-      };
-
-      void authenticate();
-      return;
-    }
-  }, [error, host, isAuthenticated, loginWithAuthorizationCode, shouldUseSessionLogin]);
+    hasRequestedAuthRef.current = true;
+    void refreshAuth();
+  }, [error, isAuthenticated, isCloudHosting, isLoading, refreshAuth]);
 
   useEffect(() => {
+    if (!isCloudHosting) {
+      return;
+    }
+
     if (isAuthenticated) {
       void navigate('/dashboard', { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, isCloudHosting, navigate]);
 
-  if (shouldUseSessionLogin) {
-    return <LoginPage />;
+  if (!isCloudHosting) {
+    return <Navigate to="/dashboard/login" replace />;
   }
 
-  // Show error state if authentication failed
-  const displayError = requestError ?? error;
-
-  if (displayError) {
+  if (error) {
     return (
       <div className="min-h-screen bg-neutral-800 flex items-center justify-center px-4">
-        <div className="text-center text-white">
-          <LockIcon className="h-12 w-12 mx-auto mb-4 text-red-400" />
+        <div className="text-center text-white max-w-md">
+          <Lock className="h-12 w-12 mx-auto mb-4 text-red-400" />
           <h2 className="text-xl font-semibold mb-2">Authentication Failed</h2>
-          <p className="text-gray-400 text-sm max-w-md">{displayError.message}</p>
+          <p className="text-gray-400 text-sm">{error.message}</p>
+          <Button
+            className="mt-6"
+            onClick={() => {
+              void refreshAuth();
+            }}
+          >
+            Retry
+          </Button>
         </div>
       </div>
     );
   }
 
-  // Show authenticating state
   return (
     <div className="min-h-screen bg-neutral-800 flex items-center justify-center px-4">
       <div className="text-center">
-        <div className="animate-spin mb-4">
-          <LockIcon className="h-12 w-12 text-white mx-auto" />
-        </div>
-        <h2 className="text-xl font-semibold text-white mb-2">Authenticating...</h2>
+        {isLoading ? (
+          <div className="animate-spin mb-4">
+            <Lock className="h-12 w-12 text-white mx-auto" />
+          </div>
+        ) : (
+          <Lock className="h-12 w-12 text-white mx-auto mb-4" />
+        )}
+        <h2 className="text-xl font-semibold text-white mb-2">
+          {isLoading ? 'Authenticating...' : 'Preparing dashboard...'}
+        </h2>
         <p className="text-sm text-gray-400">Please wait while we verify your identity</p>
       </div>
     </div>

@@ -5,7 +5,7 @@ description: Serverless edge functions via REST API
 
 ## Overview
 
-The Functions API provides endpoints for invoking and managing serverless functions running in a Deno runtime.
+The Functions API provides endpoints for invoking and managing serverless functions. In cloud environments, functions run on Deno Subhosting at the edge. In self-hosted (Docker) environments, functions run in a local Deno runtime.
 
 ## Headers
 
@@ -20,17 +20,17 @@ Authorization: Bearer your-jwt-token-or-anon-key
 
 For admin endpoints:
 ```bash
-Authorization: Bearer admin-jwt-token-Or-API-Key
+Authorization: Bearer admin-jwt-token-or-api-key
 ```
 
 ---
 
 ## Invoke Function
 
-Execute a deployed function.
+Execute a deployed function using any HTTP method (GET, POST, PUT, PATCH, DELETE, etc.). The server preserves and forwards the caller's original method to the function runtime.
 
 ```
-POST /functions/{slug}
+ANY /functions/{slug}
 ```
 
 <Note>
@@ -344,11 +344,11 @@ export default async function(request) {
 
 ### Execution Error (502)
 
-When the Deno runtime fails to execute the function:
+When the function runtime is unreachable (self-hosted: local Deno runtime down; cloud: subhosting proxy failure):
 
 ```json
 {
-  "error": "Failed to connect to Deno runtime"
+  "error": "Failed to proxy function"
 }
 ```
 

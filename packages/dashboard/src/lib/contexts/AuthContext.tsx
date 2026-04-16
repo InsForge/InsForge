@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useLocation } from 'react-router-dom';
 import { loginService } from '../../features/login/services/login.service';
 import { useDashboardHost } from '../config/DashboardHostContext';
 import { apiClient } from '../api/client';
@@ -10,7 +11,6 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   loginWithPassword: (email: string, password: string) => Promise<boolean>;
-  loginWithAuthorizationCode: (code: string) => Promise<boolean>;
   logout: () => Promise<void>;
   refreshAuth: () => Promise<void>;
   error: Error | null;
@@ -32,11 +32,19 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const host = useDashboardHost();
+  const isCloudHosting = host.mode === 'cloud-hosting';
+  const getAuthorizationCode = isCloudHosting ? host.getAuthorizationCode : null;
+  const location = useLocation();
   const [user, setUser] = useState<UserSchema | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
   const queryClient = useQueryClient();
+  const cloudAuthenticationRef = useRef<Promise<UserSchema | null> | null>(null);
+  const shouldAttemptCloudAuthentication =
+    isCloudHosting && !location.pathname.startsWith('/dashboard/login');
+  const shouldUseAuthorizationCodeRefresh =
+    isCloudHosting && host.useAuthorizationCodeRefresh === true;
 
   const handleAuthError = useCallback(() => {
     setUser(null);
@@ -60,41 +68,91 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     ]);
   }, [queryClient]);
 
-  const loginWithAuthorizationCode = useCallback(
-    async (code: string): Promise<boolean> => {
-      try {
-        setError(null);
-        const result = await loginService.loginWithAuthorizationCode(code);
-        setUser(result.user);
-        setIsAuthenticated(true);
-        await invalidateAuthQueries();
-        return true;
-      } catch (err) {
-        setError(err instanceof Error ? err : new Error('Authorization code exchange failed'));
-        return false;
-      }
+  const applyAuthenticatedUser = useCallback(
+    async (nextUser: UserSchema): Promise<void> => {
+      setUser(nextUser);
+      setIsAuthenticated(true);
+      await invalidateAuthQueries();
     },
     [invalidateAuthQueries]
   );
 
+  const exchangeAuthorizationCode = useCallback(
+    async (code: string): Promise<UserSchema> => {
+      try {
+        setError(null);
+        const result = await loginService.loginWithAuthorizationCode(code);
+        await applyAuthenticatedUser(result.user);
+        return result.user;
+      } catch (err) {
+        setError(err instanceof Error ? err : new Error('Authorization code exchange failed'));
+        throw err;
+      }
+    },
+    [applyAuthenticatedUser]
+  );
+
+  const authenticateCloudSession = useCallback(async (): Promise<UserSchema | null> => {
+    if (!shouldAttemptCloudAuthentication || !getAuthorizationCode) {
+      return null;
+    }
+
+    if (!cloudAuthenticationRef.current) {
+      cloudAuthenticationRef.current = (async () => {
+        try {
+          setError(null);
+          const code = await getAuthorizationCode();
+          return await exchangeAuthorizationCode(code);
+        } catch (err) {
+          setUser(null);
+          setIsAuthenticated(false);
+          setError(err instanceof Error ? err : new Error('Authorization code exchange failed'));
+          return null;
+        } finally {
+          cloudAuthenticationRef.current = null;
+        }
+      })();
+    }
+
+    return cloudAuthenticationRef.current;
+  }, [exchangeAuthorizationCode, getAuthorizationCode, shouldAttemptCloudAuthentication]);
+
+  const loginWithPassword = useCallback(
+    async (email: string, password: string): Promise<boolean> => {
+      try {
+        setError(null);
+        const result = await loginService.loginWithPassword(email, password);
+        await applyAuthenticatedUser(result.user);
+        return true;
+      } catch (err) {
+        setError(err instanceof Error ? err : new Error('Login failed'));
+        return false;
+      }
+    },
+    [applyAuthenticatedUser]
+  );
+
   // Access token refresh handler
   useEffect(() => {
-    const handleRefreshAccessToken = (): Promise<boolean> => {
-      if (host.mode === 'cloud-hosting' && host.auth.strategy === 'authorization-code') {
-        return host.auth
-          .getAuthorizationCode()
-          .then((code) => loginWithAuthorizationCode(code))
-          .catch(() => false);
-      } else {
-        return loginService.refreshAccessToken();
+    const handleRefreshAccessToken = async (): Promise<boolean> => {
+      const refreshed = await loginService.refreshAccessToken();
+      if (refreshed) {
+        return true;
       }
+
+      if (shouldUseAuthorizationCodeRefresh) {
+        const authenticatedUser = await authenticateCloudSession();
+        return authenticatedUser !== null;
+      }
+
+      return false;
     };
 
     apiClient.setRefreshAccessTokenHandler(handleRefreshAccessToken);
     return () => {
       apiClient.setRefreshAccessTokenHandler(undefined);
     };
-  }, [host, loginWithAuthorizationCode]);
+  }, [authenticateCloudSession, shouldUseAuthorizationCodeRefresh]);
 
   const checkAuthStatus = useCallback(async () => {
     try {
@@ -102,9 +160,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setError(null);
 
       const currentUser = await loginService.getCurrentUser();
-      setUser(currentUser);
-      setIsAuthenticated(!!currentUser);
-      return currentUser;
+      if (currentUser) {
+        setUser(currentUser);
+        setIsAuthenticated(true);
+        return currentUser;
+      }
+
+      setUser(null);
+      setIsAuthenticated(false);
+
+      if (shouldAttemptCloudAuthentication) {
+        return await authenticateCloudSession();
+      }
+
+      return null;
     } catch (err) {
       setUser(null);
       setIsAuthenticated(false);
@@ -115,24 +184,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
-
-  const loginWithPassword = useCallback(
-    async (email: string, password: string): Promise<boolean> => {
-      try {
-        setError(null);
-        const result = await loginService.loginWithPassword(email, password);
-        setUser(result.user);
-        setIsAuthenticated(true);
-        await invalidateAuthQueries();
-        return true;
-      } catch (err) {
-        setError(err instanceof Error ? err : new Error('Login failed'));
-        return false;
-      }
-    },
-    [invalidateAuthQueries]
-  );
+  }, [authenticateCloudSession, shouldAttemptCloudAuthentication]);
 
   const logout = useCallback(async () => {
     await loginService.logout();
@@ -154,7 +206,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isAuthenticated,
     isLoading,
     loginWithPassword,
-    loginWithAuthorizationCode,
     logout,
     refreshAuth,
     error,

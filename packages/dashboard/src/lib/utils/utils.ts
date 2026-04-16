@@ -160,6 +160,10 @@ export function isEmptyValue(value: unknown): boolean {
   return value === null || value === undefined;
 }
 
+export const isIframe = () => {
+  return window.self !== window.top;
+};
+
 export const isInsForgeCloudProject = () => {
   try {
     return new URL(getDashboardBackendUrl()).hostname.endsWith('.insforge.app');

@@ -22,6 +22,8 @@ export class LoginService {
     apiClient.setAccessToken(response.accessToken);
     if (response.csrfToken) {
       apiClient.setCsrfToken(response.csrfToken);
+    } else {
+      apiClient.clearCsrfToken();
     }
 
     return {
@@ -45,6 +47,8 @@ export class LoginService {
     apiClient.setAccessToken(response.accessToken);
     if (response.csrfToken) {
       apiClient.setCsrfToken(response.csrfToken);
+    } else {
+      apiClient.clearCsrfToken();
     }
 
     return {
@@ -100,6 +104,8 @@ export class LoginService {
         apiClient.setAccessToken(data.accessToken);
         if (data.csrfToken) {
           apiClient.setCsrfToken(data.csrfToken);
+        } else {
+          apiClient.clearCsrfToken();
         }
         return true;
       }

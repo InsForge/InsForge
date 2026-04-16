@@ -370,6 +370,21 @@ export async function seedBackend(): Promise<void> {
       logger.info('✅ INSFORGE_BASE_URL secret initialized');
     }
 
+    // Add JWT_SECRET so CLI/SDK can access it via secrets API
+    const jwtSecret = process.env.JWT_SECRET;
+    if (jwtSecret) {
+      const existingJwtSecret = await secretService.getSecretByKey('JWT_SECRET');
+
+      if (existingJwtSecret === null) {
+        await secretService.createSecret({
+          key: 'JWT_SECRET',
+          isReserved: true,
+          value: jwtSecret,
+        });
+        logger.info('✅ JWT_SECRET secret initialized');
+      }
+    }
+
     logger.info(`API key generated: ${apiKey}`);
     logger.info(`Setup complete:
       - Save this API key for your apps!

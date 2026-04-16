@@ -11,6 +11,8 @@ import {
   authConfigSchema,
   customOAuthConfigSchema,
   customOAuthKeySchema,
+  smtpConfigSchema,
+  emailTemplateSchema,
 } from './auth.schema.js';
 
 // ============================================================================
@@ -362,6 +364,50 @@ export const getPublicAuthConfigResponseSchema = z.object({
 });
 
 // ============================================================================
+// SMTP Configuration schemas
+// ============================================================================
+
+/**
+ * PUT /api/auth/smtp-config - Upsert SMTP configuration
+ */
+export const upsertSmtpConfigRequestSchema = z.object({
+  enabled: z.boolean(),
+  host: z.string().min(1, 'SMTP host is required'),
+  port: z.union([z.literal(25), z.literal(465), z.literal(587), z.literal(2525)], {
+    errorMap: () => ({ message: 'Port must be one of: 25, 465, 587, 2525' }),
+  }),
+  username: z.string().min(1, 'SMTP username is required'),
+  password: z.string().min(1, 'SMTP password is required').optional(),
+  senderEmail: z.string().email('Invalid sender email'),
+  senderName: z.string().min(1, 'Sender name is required'),
+  minIntervalSeconds: z.number().int().min(0).default(60),
+});
+
+/**
+ * Response for GET /api/auth/smtp-config
+ */
+export const getSmtpConfigResponseSchema = smtpConfigSchema;
+
+// ============================================================================
+// Email Template schemas
+// ============================================================================
+
+/**
+ * PUT /api/auth/email-templates/:type - Update email template
+ */
+export const updateEmailTemplateRequestSchema = z.object({
+  subject: z.string().min(1, 'Subject is required'),
+  bodyHtml: z.string().min(1, 'Template body is required'),
+});
+
+/**
+ * Response for GET /api/auth/email-templates
+ */
+export const listEmailTemplatesResponseSchema = z.object({
+  data: z.array(emailTemplateSchema),
+});
+
+// ============================================================================
 // Error response schema
 // ============================================================================
 
@@ -446,3 +492,7 @@ export const listCustomOAuthConfigsResponseSchema = z.object({
 export type CreateCustomOAuthConfigRequest = z.infer<typeof createCustomOAuthConfigRequestSchema>;
 export type UpdateCustomOAuthConfigRequest = z.infer<typeof updateCustomOAuthConfigRequestSchema>;
 export type ListCustomOAuthConfigsResponse = z.infer<typeof listCustomOAuthConfigsResponseSchema>;
+export type UpsertSmtpConfigRequest = z.infer<typeof upsertSmtpConfigRequestSchema>;
+export type GetSmtpConfigResponse = z.infer<typeof getSmtpConfigResponseSchema>;
+export type UpdateEmailTemplateRequest = z.infer<typeof updateEmailTemplateRequestSchema>;
+export type ListEmailTemplatesResponse = z.infer<typeof listEmailTemplatesResponseSchema>;

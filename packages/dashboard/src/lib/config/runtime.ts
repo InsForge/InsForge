@@ -1,10 +1,10 @@
 let dashboardBackendUrl = '';
 
-function normalizeUrl(url: string) {
-  return url.replace(/\/$/, '');
+function normalizeUrl(url?: string) {
+  return url?.replace(/\/$/, '') ?? '';
 }
 
-export function setDashboardBackendUrl(url: string) {
+export function setDashboardBackendUrl(url?: string) {
   dashboardBackendUrl = normalizeUrl(url);
 }
 
@@ -21,5 +21,5 @@ export function getDashboardBackendUrl() {
 }
 
 export function getDashboardApiBaseUrl() {
-  return `${getDashboardBackendUrl()}/api`;
+  return dashboardBackendUrl ? `${dashboardBackendUrl}/api` : '/api';
 }

@@ -5,8 +5,8 @@ import { z } from 'zod';
  * WAITING -> UPLOADING -> (Vercel statuses: QUEUED/BUILDING/READY/ERROR/CANCELED)
  */
 export const deploymentStatusSchema = z.enum([
-  'WAITING', // Record created, waiting for client to upload zip to S3
-  'UPLOADING', // Server is downloading from S3 and uploading to Vercel
+  'WAITING', // Record created, waiting for source zip upload or direct file registration/content
+  'UPLOADING', // File uploads or Vercel deployment creation are in progress
   'QUEUED', // Vercel: deployment queued
   'BUILDING', // Vercel: deployment building
   'READY', // Vercel: deployment ready

@@ -1,5 +1,7 @@
 import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
+import { SocketManager } from '@/infra/socket/socket.manager.js';
+import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import logger from '@/utils/logger.js';
 import type {
   AIUsageDataSchema,
@@ -28,6 +30,20 @@ export class AIUsageService {
     return this.pool;
   }
 
+  private broadcastUsageUpdate(): void {
+    try {
+      const socket = SocketManager.getInstance();
+      socket.broadcastToRoom(
+        'role:project_admin',
+        ServerEvents.DATA_UPDATE,
+        { resource: DataUpdateResourceType.AI_USAGE },
+        'system'
+      );
+    } catch (error) {
+      logger.debug('AI usage update broadcast skipped', { error });
+    }
+  }
+
   async trackUsage(data: AIUsageDataSchema): Promise<{ id: string }> {
     try {
       const result = await this.getPool().query(
@@ -51,6 +67,7 @@ export class AIUsageService {
         imageCount: data.imageCount,
       });
 
+      this.broadcastUsageUpdate();
       return { id: result.rows[0].id };
     } catch (error) {
       logger.error('Failed to track AI usage', { error, data });
@@ -83,6 +100,7 @@ export class AIUsageService {
         modelId,
       });
 
+      this.broadcastUsageUpdate();
       return { id: usageResult.rows[0].id };
     } catch (error) {
       logger.error('Failed to track chat usage', { error, configId });
@@ -123,6 +141,7 @@ export class AIUsageService {
         modelId,
       });
 
+      this.broadcastUsageUpdate();
       return { id: usageResult.rows[0].id };
     } catch (error) {
       logger.error('Failed to track image usage', { error, configId });

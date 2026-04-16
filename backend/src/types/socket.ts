@@ -39,7 +39,9 @@ export enum DataUpdateResourceType {
   USERS = 'users',
   BUCKETS = 'buckets',
   FUNCTIONS = 'functions',
+  DEPLOYMENTS = 'deployments',
   REALTIME = 'realtime',
+  AI_USAGE = 'ai_usage',
 }
 
 /**

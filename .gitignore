@@ -3,6 +3,7 @@ dist/
 data/
 coverage/
 .env
+.worktrees/
 .DS_Store
 *.log
 *.db
@@ -23,3 +24,6 @@ deno.lock
 better-auth/
 .mcp.json
 backend/logs/*
+
+# Turborepo
+.turbo

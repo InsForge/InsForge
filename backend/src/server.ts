@@ -39,6 +39,16 @@ import { schedulesRouter } from '@/api/routes/schedules/index.routes.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+function shouldSkipGlobalRateLimit(req: Request): boolean {
+  if (req.path === '/api/health') {
+    return true;
+  }
+
+  return (
+    req.method === 'PUT' && /^\/api\/deployments\/[^/]+\/files\/[^/]+\/content$/.test(req.path)
+  );
+}
+
 // Load .env file from the root directory (parent of backend)
 const envPath = path.resolve(__dirname, '../../.env');
 if (fs.existsSync(envPath)) {
@@ -73,7 +83,7 @@ export async function createApp() {
     windowMs: 15 * 60 * 1000,
     max: 3000,
     message: 'Too many requests from this IP',
-    skip: (req) => req.path === '/api/health',
+    skip: shouldSkipGlobalRateLimit,
   });
 
   // Basic middleware
@@ -159,9 +169,15 @@ export async function createApp() {
   // This ensures signature verification uses the original bytes
   app.use('/api/webhooks', express.raw({ type: 'application/json' }), webhooksRouter);
 
-  // Apply JSON middleware for all other routes
-  app.use(express.json({ limit: '100mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+  // Apply JSON and URL-encoded middleware for all other routes.
+  // We use high defaults (100mb/10mb) to ensure a smooth "out-of-the-box" experience
+  // for large metadata/storage requests, as per project standards.
+  // Users can override these via environment variables for hardened security.
+  const jsonLimit = process.env.MAX_JSON_BODY_SIZE || '100mb';
+  const urlencodedLimit = process.env.MAX_URLENCODED_BODY_SIZE || '10mb';
+
+  app.use(express.json({ limit: jsonLimit }));
+  app.use(express.urlencoded({ extended: true, limit: urlencodedLimit }));
 
   // Create API router and mount all API routes under /api
   const apiRouter = express.Router();
