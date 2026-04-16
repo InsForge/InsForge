@@ -438,6 +438,113 @@ paths:
                 statusCode: 404
                 nextActions: "Check table name and try again"
 
+  /api/database/migrations:
+    get:
+      summary: List Database Migrations
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      responses:
+        '200':
+          description: List successful custom migrations
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - migrations
+                properties:
+                  migrations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Migration'
+              example:
+                migrations:
+                  - sequenceNumber: 1
+                    name: "create_posts_table"
+                    statements:
+                      - "CREATE TABLE posts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), title TEXT NOT NULL);"
+                    createdAt: "2026-04-16T17:05:00.000Z"
+
+    post:
+      summary: Create and Execute Database Migration
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - sql
+              properties:
+                name:
+                  type: string
+                  description: Unique migration name
+                  minLength: 1
+                sql:
+                  type: string
+                  description: SQL text to parse and execute immediately
+                  minLength: 1
+            example:
+              name: "create_posts_table"
+              sql: "CREATE TABLE posts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), title TEXT NOT NULL);"
+      responses:
+        '201':
+          description: Migration executed and recorded successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Migration'
+                  - type: object
+                    required:
+                      - message
+                    properties:
+                      message:
+                        type: string
+              example:
+                sequenceNumber: 1
+                name: "create_posts_table"
+                statements:
+                  - "CREATE TABLE posts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), title TEXT NOT NULL);"
+                createdAt: "2026-04-16T17:05:00.000Z"
+                message: "Migration executed successfully"
+        '400':
+          description: Invalid or forbidden migration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidPayload:
+                  value:
+                    error: "INVALID_INPUT"
+                    message: "sql: Migration SQL is required"
+                    statusCode: 400
+                forbiddenSchema:
+                  value:
+                    error: "DATABASE_FORBIDDEN"
+                    message: "Custom migrations may only target the public schema."
+                    statusCode: 400
+        '409':
+          description: Migration name already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "ALREADY_EXISTS"
+                message: "duplicate key value violates unique constraint"
+                statusCode: 409
+
 components:
   securitySchemes:
     bearerAuth:
@@ -449,6 +556,27 @@ components:
       name: X-API-Key
   
   schemas:
+    Migration:
+      type: object
+      required:
+        - sequenceNumber
+        - name
+        - statements
+        - createdAt
+      properties:
+        sequenceNumber:
+          type: integer
+          format: int32
+          minimum: 1
+        name:
+          type: string
+        statements:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
     ErrorResponse:
       type: object
       required:

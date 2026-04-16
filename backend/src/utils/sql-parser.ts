@@ -19,7 +19,16 @@ export async function initSqlParser(): Promise<void> {
 }
 
 export interface DatabaseResourceUpdate {
-  type: 'tables' | 'table' | 'records' | 'index' | 'trigger' | 'policy' | 'function' | 'extension';
+  type:
+    | 'tables'
+    | 'table'
+    | 'records'
+    | 'index'
+    | 'trigger'
+    | 'policy'
+    | 'function'
+    | 'extension'
+    | 'migration';
   name?: string;
 }
 
