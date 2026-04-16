@@ -168,6 +168,10 @@ export const isInsForgeCloudProject = () => {
   }
 };
 
+export const isIframe = () => {
+  return typeof window !== 'undefined' && window.self !== window.top;
+};
+
 export const getBackendUrl = () => {
   return getDashboardBackendUrl();
 };
