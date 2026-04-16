@@ -163,7 +163,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       const currentUser = await loginService.getCurrentUser();
       if (currentUser) {
-        await identifyUser(currentUser.id, { email: currentUser.email, name: currentUser.profile?.name });
+        await identifyUser(currentUser.id, {
+          email: currentUser.email,
+          name: currentUser.profile?.name,
+        });
         setUser(currentUser);
         setIsAuthenticated(true);
         return currentUser;

@@ -22,13 +22,20 @@ export const PostHogAnalyticsProvider = ({ children }: { children: React.ReactNo
   return <>{children}</>;
 };
 
-export const identifyUser = (userId: string, properties?: Record<string, unknown>) => {
+export const identifyUser = (
+  userId: string,
+  properties?: Record<string, unknown>
+): Promise<void> => {
   if (!POSTHOG_KEY) {
     return Promise.resolve();
   }
   posthog.identify(userId, properties);
   return new Promise<void>((resolve) => {
-    posthog.onFeatureFlags(() => resolve());
+    const timeout = setTimeout(() => resolve(), 5000);
+    posthog.onFeatureFlags(() => {
+      clearTimeout(timeout);
+      resolve();
+    });
   });
 };
 

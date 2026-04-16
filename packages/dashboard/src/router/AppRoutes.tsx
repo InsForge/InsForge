@@ -75,10 +75,7 @@ function AuthenticatedRoutes() {
           <Route path="functions" element={<DatabaseFunctionsPage />} />
           <Route path="triggers" element={<TriggersPage />} />
           <Route path="policies" element={<PoliciesPage />} />
-          <Route
-            path="sql-editor"
-            element={<Navigate to="/dashboard/sql-editor" replace />}
-          />
+          <Route path="sql-editor" element={<Navigate to="/dashboard/sql-editor" replace />} />
           <Route path="templates" element={<TemplatesPage />} />
         </Route>
         <Route path="/dashboard/sql-editor" element={<SQLEditorLayout />}>
