@@ -12,6 +12,7 @@
     "clean": "rimraf dist",
     "prebuild": "npm run clean",
     "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",

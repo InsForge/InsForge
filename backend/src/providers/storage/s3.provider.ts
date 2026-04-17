@@ -3,6 +3,7 @@ import {
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
+  CopyObjectCommand,
   ListObjectsV2Command,
   DeleteObjectsCommand,
   HeadObjectCommand,
@@ -122,6 +123,38 @@ export class S3StorageProvider implements StorageProvider {
       Key: this.getS3Key(bucket, key),
     });
     await this.s3Client.send(command);
+  }
+
+  async renameObject(bucket: string, oldKey: string, newKey: string): Promise<void> {
+    if (!this.s3Client) {
+      throw new Error('S3 client not initialized');
+    }
+
+    const sourceKey = this.getS3Key(bucket, oldKey);
+    const destinationKey = this.getS3Key(bucket, newKey);
+    const encodedCopySource = `${this.s3Bucket}/${sourceKey
+      .split('/')
+      .map((segment) => encodeURIComponent(segment))
+      .join('/')}`;
+
+    const copyCommand = new CopyObjectCommand({
+      Bucket: this.s3Bucket,
+      CopySource: encodedCopySource,
+      Key: destinationKey,
+    });
+
+    await this.s3Client.send(copyCommand);
+
+    // TODO: S3 rename is not atomic — if the delete below fails after a successful copy,
+    // the object will exist under both the old and new keys (orphaned duplicate).
+    // For v1 this is acceptable, but a future fix should use S3 Object Lock or a
+    // cleanup/reconciliation job to detect and remove orphaned originals.
+    const deleteCommand = new DeleteObjectCommand({
+      Bucket: this.s3Bucket,
+      Key: sourceKey,
+    });
+
+    await this.s3Client.send(deleteCommand);
   }
 
   async createBucket(_bucket: string): Promise<void> {

@@ -1,5 +1,6 @@
 import path from 'path';
 import { Pool } from 'pg';
+import { AppError } from '@/api/middlewares/error.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { StorageRecord } from '@/types/storage.js';
 import {
@@ -14,6 +15,7 @@ import { StorageConfigService } from '@/services/storage/storage-config.service.
 import logger from '@/utils/logger.js';
 import { escapeSqlLikePattern, escapeRegexPattern } from '@/utils/validations.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
+import { ERROR_CODES } from '@/types/error-constants.js';
 
 const DEFAULT_LIST_LIMIT = 100;
 const GIGABYTE_IN_BYTES = 1024 * 1024 * 1024;
@@ -73,6 +75,65 @@ export class StorageService {
     if (key.includes('..') || key.startsWith('/')) {
       throw new Error('Invalid key. Cannot use ".." or start with "/"');
     }
+  }
+
+  private validateRenameName(newName: string): void {
+    const trimmedName = newName.trim();
+
+    if (!trimmedName) {
+      throw new AppError(
+        'Invalid file name. New name cannot be empty.',
+        400,
+        ERROR_CODES.STORAGE_INVALID_PARAMETER
+      );
+    }
+
+    if (trimmedName === '.' || trimmedName === '..') {
+      throw new AppError(
+        'Invalid file name. "." and ".." are not allowed.',
+        400,
+        ERROR_CODES.STORAGE_INVALID_PARAMETER
+      );
+    }
+
+    if (trimmedName.includes('/') || trimmedName.includes('\\')) {
+      throw new AppError(
+        'Invalid file name. Path separators are not allowed.',
+        400,
+        ERROR_CODES.STORAGE_INVALID_PARAMETER
+      );
+    }
+  }
+
+  private buildRenamedKey(oldKey: string, newName: string): string {
+    this.validateKey(oldKey);
+    this.validateRenameName(newName);
+
+    const trimmedName = newName.trim();
+    const keyParts = oldKey.split('/');
+
+    if (!keyParts[keyParts.length - 1]) {
+      throw new AppError(
+        'Invalid object key. Only files can be renamed.',
+        400,
+        ERROR_CODES.STORAGE_INVALID_PARAMETER
+      );
+    }
+
+    keyParts[keyParts.length - 1] = trimmedName;
+
+    const newKey = keyParts.join('/');
+    this.validateKey(newKey);
+
+    if (newKey === oldKey) {
+      throw new AppError(
+        'New file name must be different from the current name.',
+        400,
+        ERROR_CODES.STORAGE_INVALID_PARAMETER
+      );
+    }
+
+    return newKey;
   }
 
   /**
@@ -249,6 +310,96 @@ export class StorageService {
     }
 
     return false;
+  }
+
+  async renameObject(
+    bucket: string,
+    oldKey: string,
+    newName: string,
+    userId: string,
+    isAdmin: boolean
+  ): Promise<StorageFileSchema> {
+    this.validateBucketName(bucket);
+    this.validateKey(oldKey);
+
+    const newKey = this.buildRenamedKey(oldKey, newName);
+    const client = await this.getPool().connect();
+
+    try {
+      await client.query('BEGIN');
+
+      const sourceResult = isAdmin
+        ? await client.query(
+            `SELECT bucket, key, size, mime_type, uploaded_at, uploaded_by
+             FROM storage.objects
+             WHERE bucket = $1 AND key = $2
+             FOR UPDATE`,
+            [bucket, oldKey]
+          )
+        : await client.query(
+            `SELECT bucket, key, size, mime_type, uploaded_at, uploaded_by
+             FROM storage.objects
+             WHERE bucket = $1 AND key = $2 AND uploaded_by = $3
+             FOR UPDATE`,
+            [bucket, oldKey, userId]
+          );
+
+      const sourceRow = sourceResult.rows[0] as StorageRecord | undefined;
+      if (!sourceRow) {
+        throw new AppError('Object not found', 404, ERROR_CODES.NOT_FOUND);
+      }
+
+      const sourceExists = await this.provider.verifyObjectExists(bucket, oldKey);
+      if (!sourceExists.exists) {
+        throw new AppError('Object file not found in storage', 404, ERROR_CODES.NOT_FOUND);
+      }
+
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`${bucket}/${newKey}`]);
+
+      const destinationResult = await client.query(
+        'SELECT 1 FROM storage.objects WHERE bucket = $1 AND key = $2',
+        [bucket, newKey]
+      );
+
+      if (destinationResult.rows.length > 0) {
+        throw new AppError(
+          `Object "${newKey}" already exists in bucket "${bucket}"`,
+          409,
+          ERROR_CODES.ALREADY_EXISTS
+        );
+      }
+
+      await this.provider.renameObject(bucket, oldKey, newKey);
+
+      const updateResult = await client.query(
+        `UPDATE storage.objects
+         SET key = $1
+         WHERE bucket = $2 AND key = $3
+         RETURNING bucket, key, size, mime_type, uploaded_at`,
+        [newKey, bucket, oldKey]
+      );
+
+      await client.query('COMMIT');
+
+      const updatedRow = updateResult.rows[0] as StorageRecord | undefined;
+      if (!updatedRow) {
+        throw new Error('Failed to update renamed object metadata');
+      }
+
+      return {
+        bucket: updatedRow.bucket,
+        key: updatedRow.key,
+        size: updatedRow.size,
+        mimeType: updatedRow.mime_type,
+        uploadedAt: updatedRow.uploaded_at,
+        url: `${getApiBaseUrl()}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(updatedRow.key)}`,
+      };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async listObjects(

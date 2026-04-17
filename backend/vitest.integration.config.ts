@@ -14,16 +14,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
-    setupFiles: ['./tests/setup.ts'],
-    coverage: {
-      provider: 'v8',
-      reporter: ['text', 'json', 'html'],
-      exclude: ['node_modules/', 'dist/', 'frontend/', 'tests/', '**/*.d.ts', '**/*.config.*'],
-    },
-
-    exclude: ['**/node_modules/**', '**/dist/**', '**/tests/integration/**'],
-    testTimeout: 10000,
-    // Run tests sequentially to avoid database conflicts
+    include: ['tests/integration/**/*.test.ts'],
+    testTimeout: 30000,
     pool: 'forks',
     poolOptions: {
       forks: {

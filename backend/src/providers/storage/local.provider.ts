@@ -68,6 +68,14 @@ export class LocalStorageProvider implements StorageProvider {
     }
   }
 
+  async renameObject(bucket: string, oldKey: string, newKey: string): Promise<void> {
+    const oldPath = this.getFilePath(bucket, oldKey);
+    const newPath = this.getFilePath(bucket, newKey);
+
+    await fs.mkdir(path.dirname(newPath), { recursive: true });
+    await fs.rename(oldPath, newPath);
+  }
+
   async createBucket(bucket: string): Promise<void> {
     const bucketPath = this.getValidatedPath(bucket);
     await fs.mkdir(bucketPath, { recursive: true });
