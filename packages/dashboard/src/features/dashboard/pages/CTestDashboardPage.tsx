@@ -91,8 +91,8 @@ const getStepperDismissKey = (projectId?: string) =>
 const getGetStartedPassedKey = (projectId?: string) =>
   `insforge-ctest-get-started-passed-${projectId || 'default'}`;
 
-const getStepCompletedKey = (projectId?: string) =>
-  `insforge-ctest-step-completed-${projectId || 'default'}`;
+const getStepDoneKey = (projectId: string | null | undefined, stepKey: StepKey) =>
+  `insforge-ctest-step-${stepKey}-done-${projectId || 'default'}`;
 
 // --- Sub-components ---
 
@@ -358,7 +358,6 @@ export default function CTestDashboardPage() {
   const { projectId } = useProjectId();
   const stepperDismissKey = getStepperDismissKey(projectId ?? undefined);
   const getStartedPassedKey = getGetStartedPassedKey(projectId ?? undefined);
-  const stepCompletedKey = getStepCompletedKey(projectId ?? undefined);
 
   const [isStepperDismissed, setIsStepperDismissed] = useState(false);
   const [hasPassedGetStarted, setHasPassedGetStarted] = useState(false);
@@ -394,27 +393,18 @@ export default function CTestDashboardPage() {
     if (projectId === undefined) {
       return;
     }
+    const loaded: Partial<Record<StepKey, boolean>> = {};
     try {
-      const raw = localStorage.getItem(stepCompletedKey);
-      if (!raw) {
-        setStickyCompletedSteps({});
-        return;
-      }
-      const parsed: unknown = JSON.parse(raw);
-      if (
-        parsed &&
-        typeof parsed === 'object' &&
-        !Array.isArray(parsed) &&
-        Object.values(parsed).every((v) => typeof v === 'boolean')
-      ) {
-        setStickyCompletedSteps(parsed as Partial<Record<StepKey, boolean>>);
-      } else {
-        setStickyCompletedSteps({});
+      for (const step of PROMPT_STEPS) {
+        if (localStorage.getItem(getStepDoneKey(projectId, step.key)) === 'true') {
+          loaded[step.key] = true;
+        }
       }
     } catch {
-      setStickyCompletedSteps({});
+      // ignore
     }
-  }, [projectId, stepCompletedKey]);
+    setStickyCompletedSteps(loaded);
+  }, [projectId]);
 
   const shouldShowLoadingState =
     isMetadataLoading ||
@@ -492,24 +482,27 @@ export default function CTestDashboardPage() {
     if (projectId === undefined) {
       return;
     }
-    const merged: Partial<Record<StepKey, boolean>> = { ...stickyCompletedSteps };
-    let changed = false;
     for (const step of PROMPT_STEPS) {
-      if (liveCompletedSteps[step.key] && !merged[step.key]) {
-        merged[step.key] = true;
-        changed = true;
+      if (liveCompletedSteps[step.key]) {
+        try {
+          localStorage.setItem(getStepDoneKey(projectId, step.key), 'true');
+        } catch {
+          // ignore
+        }
       }
     }
-    if (!changed) {
-      return;
-    }
-    setStickyCompletedSteps(merged);
-    try {
-      localStorage.setItem(stepCompletedKey, JSON.stringify(merged));
-    } catch {
-      // ignore
-    }
-  }, [projectId, stepCompletedKey, liveCompletedSteps, stickyCompletedSteps]);
+    setStickyCompletedSteps((prev) => {
+      let changed = false;
+      const next: Partial<Record<StepKey, boolean>> = { ...prev };
+      for (const step of PROMPT_STEPS) {
+        if (liveCompletedSteps[step.key] && !next[step.key]) {
+          next[step.key] = true;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [projectId, liveCompletedSteps]);
 
   const handleDismissStepper = useCallback(() => {
     if (projectId === undefined) {
