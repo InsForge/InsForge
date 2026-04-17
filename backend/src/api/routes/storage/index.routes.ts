@@ -8,6 +8,7 @@ import { dynamicUploadSingle, handleUploadError } from '@/api/middlewares/upload
 import { ERROR_CODES } from '@/types/error-constants.js';
 import {
   createBucketRequestSchema,
+  renameObjectRequestSchema,
   updateBucketRequestSchema,
   updateStorageConfigRequestSchema,
 } from '@insforge/shared-schemas';
@@ -375,6 +376,52 @@ router.post(
           )
         );
       } else if (error instanceof Error && error.message.includes('Invalid')) {
+        next(new AppError(error.message, 400, ERROR_CODES.STORAGE_INVALID_PARAMETER));
+      } else {
+        next(error);
+      }
+    }
+  }
+);
+
+// PATCH /api/storage/buckets/:bucketName/objects/:objectKey - Rename object in bucket (requires auth)
+router.patch(
+  '/buckets/:bucketName/objects/*',
+  verifyUser,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { bucketName } = req.params;
+      const objectKey = req.params[0];
+
+      if (!objectKey) {
+        throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
+      }
+
+      const validation = renameObjectRequestSchema.safeParse(req.body);
+      if (!validation.success) {
+        throw new AppError(
+          validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.STORAGE_INVALID_PARAMETER
+        );
+      }
+
+      const storageService = StorageService.getInstance();
+      const renamedFile = await storageService.renameObject(
+        bucketName,
+        objectKey,
+        validation.data.newName,
+        req.user?.id || '',
+        !!req.apiKey || req.user?.role === 'project_admin'
+      );
+
+      successResponse(res, renamedFile, 200);
+    } catch (error) {
+      if (error instanceof AppError) {
+        next(error);
+      } else if (error instanceof Error && error.message.includes('Invalid')) {
+        next(new AppError(error.message, 400, ERROR_CODES.STORAGE_INVALID_PARAMETER));
+      } else if (error instanceof Error && error.message.includes('different')) {
         next(new AppError(error.message, 400, ERROR_CODES.STORAGE_INVALID_PARAMETER));
       } else {
         next(error);

@@ -47,8 +47,8 @@ export class AIUsageService {
   async trackUsage(data: AIUsageDataSchema): Promise<{ id: string }> {
     try {
       const result = await this.getPool().query(
-        `INSERT INTO ai.usage (config_id, input_tokens, output_tokens, image_count, image_resolution)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO ai.usage (config_id, input_tokens, output_tokens, image_count, image_resolution, usage_type)
+         VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING id`,
         [
           data.configId,
@@ -56,6 +56,7 @@ export class AIUsageService {
           data.outputTokens || null,
           data.imageCount || null,
           data.imageResolution || null,
+          data.usageType || 'chat',
         ]
       );
 
@@ -85,8 +86,8 @@ export class AIUsageService {
 
     try {
       const usageResult = await this.getPool().query(
-        `INSERT INTO ai.usage (config_id, input_tokens, output_tokens, model_id)
-         VALUES ($1, $2, $3, $4)
+        `INSERT INTO ai.usage (config_id, input_tokens, output_tokens, model_id, usage_type)
+         VALUES ($1, $2, $3, $4, 'chat')
          RETURNING id`,
         [configId, inputTokens || null, outputTokens || null, modelId || null]
       );
@@ -108,6 +109,33 @@ export class AIUsageService {
     }
   }
 
+  async trackEmbeddingUsage(
+    configId: string,
+    inputTokens?: number,
+    modelId?: string
+  ): Promise<{ id: string }> {
+    try {
+      const usageResult = await this.getPool().query(
+        `INSERT INTO ai.usage (config_id, input_tokens, model_id, usage_type)
+         VALUES ($1, $2, $3, 'embedding')
+         RETURNING id`,
+        [configId, inputTokens || null, modelId || null]
+      );
+
+      logger.debug('Embedding usage tracked', {
+        id: usageResult.rows[0].id,
+        configId,
+        inputTokens,
+        modelId,
+      });
+
+      return { id: usageResult.rows[0].id };
+    } catch (error) {
+      logger.error('Failed to track embedding usage', { error, configId });
+      throw new Error('Failed to track embedding usage');
+    }
+  }
+
   async trackImageGenerationUsage(
     configId: string,
     imageCount: number,
@@ -118,8 +146,8 @@ export class AIUsageService {
   ): Promise<{ id: string }> {
     try {
       const usageResult = await this.getPool().query(
-        `INSERT INTO ai.usage (config_id, image_count, image_resolution, input_tokens, output_tokens, model_id)
-         VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO ai.usage (config_id, image_count, image_resolution, input_tokens, output_tokens, model_id, usage_type)
+         VALUES ($1, $2, $3, $4, $5, $6, 'image_generation')
          RETURNING id`,
         [
           configId,
@@ -198,7 +226,9 @@ export class AIUsageService {
           COALESCE(SUM(output_tokens), 0) as "totalOutputTokens",
           COALESCE(SUM(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)), 0) as "totalTokens",
           COALESCE(SUM(image_count), 0) as "totalImageCount",
-          COUNT(*) as "totalRequests"
+          COUNT(*) as "totalRequests",
+          COUNT(*) FILTER (WHERE usage_type = 'embedding') as "embeddingRequests",
+          COALESCE(SUM(input_tokens) FILTER (WHERE usage_type = 'embedding'), 0) as "embeddingTokens"
         FROM ai.usage
         WHERE 1=1
       `;
@@ -228,6 +258,8 @@ export class AIUsageService {
         totalTokens: parseInt(result.rows[0].totalTokens),
         totalImageCount: parseInt(result.rows[0].totalImageCount),
         totalRequests: parseInt(result.rows[0].totalRequests),
+        embeddingRequests: parseInt(result.rows[0].embeddingRequests),
+        embeddingTokens: parseInt(result.rows[0].embeddingTokens),
       };
     } catch (error) {
       logger.error('Failed to fetch usage summary', { error, configId });
@@ -252,6 +284,7 @@ export class AIUsageService {
           u.image_resolution as "imageResolution",
           u.created_at as "createdAt",
           u.model_id as "modelId",
+          u.usage_type as "usageType",
           COALESCE(u.model_id, c.model_id) as "model",
           c.provider,
           c.input_modality as "inputModality",

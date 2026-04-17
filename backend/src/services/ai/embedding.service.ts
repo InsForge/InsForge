@@ -1,3 +1,4 @@
+import OpenAI from 'openai';
 import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
 import type { EmbeddingsRequest, EmbeddingsResponse } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
@@ -55,22 +56,17 @@ export class EmbeddingService {
 
       // Track usage if config is available
       if (aiConfig?.id && tokenUsage) {
-        const outputTokens = Math.max(
-          0,
-          (tokenUsage.totalTokens || 0) - (tokenUsage.promptTokens || 0)
-        );
-        await this.aiUsageService.trackChatUsage(
+        await this.aiUsageService.trackEmbeddingUsage(
           aiConfig.id,
           tokenUsage.promptTokens,
-          outputTokens,
-          options.model // pass the actual model ID used
+          options.model
         );
       }
 
       // Transform to our response format with metadata
       return {
         object: 'list',
-        data: response.data.map((item) => ({
+        data: response.data.map((item: OpenAI.Embedding) => ({
           object: 'embedding' as const,
           embedding: item.embedding as number[] | string,
           index: item.index,
