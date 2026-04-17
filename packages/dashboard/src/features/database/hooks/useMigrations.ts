@@ -29,9 +29,6 @@ export function useMigrations(enabled = false) {
       ]);
       showToast('Migration executed successfully', 'success');
     },
-    onError: (error: Error) => {
-      showToast(error.message || 'Failed to execute migration', 'error');
-    },
   });
 
   return {

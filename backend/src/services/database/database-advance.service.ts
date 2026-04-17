@@ -9,6 +9,7 @@ import {
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
+import { hasPgErrorCode } from '@/utils/errors.js';
 import {
   parseSQLStatements,
   checkAuthSchemaOperations,
@@ -17,7 +18,7 @@ import {
 import { validateTableName } from '@/utils/validations.js';
 import pgFormat from 'pg-format';
 import { parse } from 'csv-parse/sync';
-import { DatabaseError, type PoolClient } from 'pg';
+import { type PoolClient } from 'pg';
 
 export class DatabaseAdvanceService {
   private static instance: DatabaseAdvanceService;
@@ -150,7 +151,7 @@ export class DatabaseAdvanceService {
       return response;
     } catch (error) {
       // Handle timeout errors specifically for better error messages
-      if (error instanceof DatabaseError && error.code === '57014') {
+      if (hasPgErrorCode(error, '57014')) {
         throw new Error('Query timeout: The query took longer than 30 seconds to execute');
       }
       // Re-throw other errors as-is
