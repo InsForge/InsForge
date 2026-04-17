@@ -440,13 +440,16 @@ export default function CTestDashboardPage() {
   );
 
   const handleDismissStepper = useCallback(() => {
+    if (projectId === undefined) {
+      return;
+    }
     setIsStepperDismissed(true);
     try {
       localStorage.setItem(stepperDismissKey, 'true');
     } catch {
       // ignore
     }
-  }, [stepperDismissKey]);
+  }, [projectId, stepperDismissKey]);
 
   const displayApiKey = isApiKeyLoading ? 'ik_' + '*'.repeat(32) : apiKey || '';
   const appUrl = getBackendUrl();
