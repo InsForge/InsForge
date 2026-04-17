@@ -72,9 +72,15 @@ export function MigrationFormDialog({
   const isSubmitDisabled = isSubmitting || !name.trim() || !sql.trim();
 
   const handleSubmit = async () => {
+    const trimmedName = name.trim();
+    const trimmedSql = sql.trim();
     const nextErrors: MigrationFormErrors = {
-      name: name.trim() ? '' : 'Migration name is required',
-      sql: sql.trim() ? '' : 'Migration SQL is required',
+      name: !trimmedName
+        ? 'Migration name is required'
+        : !/^[a-z0-9-]+$/.test(trimmedName)
+          ? 'Use lowercase letters, numbers, and hyphens only.'
+          : '',
+      sql: trimmedSql ? '' : 'Migration SQL is required',
     };
 
     if (nextErrors.name || nextErrors.sql) {
@@ -85,16 +91,20 @@ export function MigrationFormDialog({
     try {
       setErrors(EMPTY_ERRORS);
       await onSubmit({
-        name: name.trim(),
-        sql: sql.trim(),
+        name: trimmedName,
+        sql: trimmedSql,
       });
     } catch (submitError) {
       const message =
         submitError instanceof Error ? submitError.message : 'Failed to execute migration';
+      const isNameError =
+        message === 'Migration name already exists.' ||
+        message === 'Migration name is required' ||
+        message === 'Use lowercase letters, numbers, and hyphens only.';
 
       setErrors({
-        name: message === 'Migration name already exists.' ? message : '',
-        sql: message === 'Migration name already exists.' ? '' : message,
+        name: isNameError ? message : '',
+        sql: isNameError ? '' : message,
       });
     }
   };
@@ -115,7 +125,10 @@ export function MigrationFormDialog({
         </DialogHeader>
 
         <DialogBody className="gap-5 px-6 py-5">
-          <MigrationFormRow label="Migration Name">
+          <MigrationFormRow
+            label="Migration Name"
+            description="Use lowercase letters, numbers, and hyphens only."
+          >
             <div className="flex w-full flex-col gap-1">
               <Input
                 id="migration-name"
@@ -124,7 +137,7 @@ export function MigrationFormDialog({
                   setName(event.target.value);
                   setErrors((currentErrors) => ({ ...currentErrors, name: '' }));
                 }}
-                placeholder="create_posts_table"
+                placeholder="create-posts-table"
                 autoFocus
               />
               {errors.name ? <p className="text-sm text-destructive">{errors.name}</p> : null}
