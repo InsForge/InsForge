@@ -11,17 +11,27 @@ import {
   type DataGridColumn,
   type DataGridRowType,
 } from '../../../components';
+import { formatTime } from '../../../lib/utils/utils';
 import type { DatabaseMigrationsResponse } from '@insforge/shared-schemas';
 import { DatabaseStudioSidebarPanel } from '../components/DatabaseSidebar';
 import { MigrationFormDialog } from '../components/MigrationFormDialog';
+import { SQLCellButton, SQLModal } from '../components/SQLModal';
 import { useMigrations } from '../hooks/useMigrations';
 
 interface MigrationRow extends DataGridRowType {
   id: string;
   sequenceNumber: number;
   name: string;
-  statementCount: number;
+  statements: string;
   createdAt: string;
+}
+
+function formatMigrationStatements(statements: string[]): string {
+  return statements
+    .map((statement) => statement.trim().replace(/;+\s*$/u, ''))
+    .filter(Boolean)
+    .map((statement) => `${statement};`)
+    .join('\n\n');
 }
 
 function parseMigrationsFromResponse(response: DatabaseMigrationsResponse | undefined): MigrationRow[] {
@@ -33,7 +43,7 @@ function parseMigrationsFromResponse(response: DatabaseMigrationsResponse | unde
     id: String(migration.sequenceNumber),
     sequenceNumber: migration.sequenceNumber,
     name: migration.name,
-    statementCount: migration.statements.length,
+    statements: formatMigrationStatements(migration.statements),
     createdAt: migration.createdAt,
   }));
 }
@@ -43,6 +53,7 @@ export default function MigrationsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [sqlModal, setSqlModal] = useState({ open: false, title: '', value: '' });
   const { data, isLoading, error, refetch, createMigration, isCreating } = useMigrations(true);
 
   const allMigrations = useMemo(() => parseMigrationsFromResponse(data), [data]);
@@ -92,11 +103,22 @@ export default function MigrationsPage() {
         sortable: true,
       },
       {
-        key: 'statementCount',
+        key: 'statements',
         name: 'Statements',
-        width: 'minmax(120px, 1fr)',
+        width: 'minmax(320px, 4fr)',
         resizable: true,
-        sortable: true,
+        renderCell: ({ row }) => (
+          <SQLCellButton
+            value={row.statements}
+            onClick={() =>
+              setSqlModal({
+                open: true,
+                title: `${row.name} Statements`,
+                value: row.statements,
+              })
+            }
+          />
+        ),
       },
       {
         key: 'createdAt',
@@ -104,6 +126,7 @@ export default function MigrationsPage() {
         width: 'minmax(220px, 1.8fr)',
         resizable: true,
         sortable: true,
+        renderCell: ({ row }) => formatTime(row.createdAt),
       },
     ],
     []
@@ -201,6 +224,13 @@ export default function MigrationsPage() {
           onOpenChange={setIsDialogOpen}
           onSubmit={handleCreateMigration}
           isSubmitting={isCreating}
+        />
+
+        <SQLModal
+          open={sqlModal.open}
+          onOpenChange={(open) => setSqlModal((prev) => ({ ...prev, open }))}
+          title={sqlModal.title}
+          value={sqlModal.value}
         />
       </div>
     </div>
