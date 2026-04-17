@@ -80,6 +80,9 @@ const PROMPT_STEPS: PromptStep[] = [
 const getStepperDismissKey = (projectId?: string) =>
   `insforge-prompt-stepper-dismissed-${projectId || 'default'}`;
 
+const getGetStartedPassedKey = (projectId?: string) =>
+  `insforge-ctest-get-started-passed-${projectId || 'default'}`;
+
 // --- Sub-components ---
 
 interface MetricCardProps {
@@ -343,11 +346,13 @@ export default function CTestDashboardPage() {
   const { currentDeploymentId, isLoading: isDeploymentLoading } = useDeploymentMetadata();
   const { projectId } = useProjectId();
   const stepperDismissKey = getStepperDismissKey(projectId ?? undefined);
+  const getStartedPassedKey = getGetStartedPassedKey(projectId ?? undefined);
 
   const [isStepperDismissed, setIsStepperDismissed] = useState(false);
+  const [hasPassedGetStarted, setHasPassedGetStarted] = useState(false);
 
   useEffect(() => {
-    if (!projectId) {
+    if (projectId === undefined) {
       return;
     }
     try {
@@ -357,6 +362,18 @@ export default function CTestDashboardPage() {
       // ignore
     }
   }, [projectId, stepperDismissKey]);
+
+  useEffect(() => {
+    if (projectId === undefined) {
+      return;
+    }
+    try {
+      const passed = localStorage.getItem(getStartedPassedKey) === 'true';
+      setHasPassedGetStarted(passed);
+    } catch {
+      // ignore
+    }
+  }, [projectId, getStartedPassedKey]);
 
   const shouldShowLoadingState =
     isMetadataLoading ||
@@ -395,7 +412,21 @@ export default function CTestDashboardPage() {
   const todoHasData = todoRecordCount > 0;
   // Step 1 completion requires at least 4 records
   const todoStepComplete = todoRecordCount >= 4;
-  const shouldShowGetStarted = !metadataError && !todoHasData;
+  // Once the user has passed Get Started (todo had data at least once),
+  // never show it again — even if the agent later deletes records (e.g. due to RLS).
+  const shouldShowGetStarted = !metadataError && !hasPassedGetStarted && !todoHasData;
+
+  useEffect(() => {
+    if (projectId === undefined || hasPassedGetStarted || !todoHasData) {
+      return;
+    }
+    try {
+      localStorage.setItem(getStartedPassedKey, 'true');
+      setHasPassedGetStarted(true);
+    } catch {
+      // ignore
+    }
+  }, [projectId, getStartedPassedKey, hasPassedGetStarted, todoHasData]);
 
   const completedSteps = useMemo(
     () => [
