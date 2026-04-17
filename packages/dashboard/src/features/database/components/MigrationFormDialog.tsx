@@ -79,10 +79,7 @@ export function MigrationFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        showCloseButton={false}
-        className="w-[960px] max-w-[calc(100vw-2rem)] p-0"
-      >
+      <DialogContent showCloseButton={false} className="w-[960px] max-w-[calc(100vw-2rem)] p-0">
         <DialogHeader className="gap-0 border-b border-[var(--alpha-8)] px-6 py-4">
           <div className="flex w-full items-start gap-3">
             <div className="min-w-0 flex-1 space-y-1">
