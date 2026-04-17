@@ -70,11 +70,15 @@ export function MigrationFormDialog({
       return;
     }
 
-    setError('');
-    await onSubmit({
-      name: name.trim(),
-      sql: sql.trim(),
-    });
+    try {
+      setError('');
+      await onSubmit({
+        name: name.trim(),
+        sql: sql.trim(),
+      });
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : 'Failed to execute migration');
+    }
   };
 
   return (

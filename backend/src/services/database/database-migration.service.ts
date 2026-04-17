@@ -8,6 +8,7 @@ import type {
 import { AppError } from '@/api/middlewares/error.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
+import { isPgErrorLike } from '@/utils/errors.js';
 import {
   analyzeQuery,
   initSqlParser,
@@ -186,6 +187,15 @@ export class DatabaseMigrationService {
       if (transactionStarted) {
         await client.query('ROLLBACK');
       }
+
+      if (
+        isPgErrorLike(error) &&
+        error.code === '23505' &&
+        error.constraint === 'custom_migrations_name_key'
+      ) {
+        throw new AppError('Migration name already exists.', 409, ERROR_CODES.ALREADY_EXISTS);
+      }
+
       throw error;
     } finally {
       client.release();

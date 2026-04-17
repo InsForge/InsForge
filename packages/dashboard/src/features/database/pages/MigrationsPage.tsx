@@ -182,6 +182,7 @@ export default function MigrationsPage() {
                       className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
                       onClick={() => void handleRefresh()}
                       disabled={isRefreshing}
+                      aria-label={isRefreshing ? 'Refreshing migrations' : 'Refresh migrations'}
                     >
                       <RefreshIcon className={isRefreshing ? 'h-5 w-5 animate-spin' : 'h-5 w-5'} />
                     </Button>
