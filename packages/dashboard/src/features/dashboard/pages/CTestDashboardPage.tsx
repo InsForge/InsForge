@@ -20,8 +20,11 @@ import DiscordIcon from '../../../assets/logos/discord.svg?react';
 
 // --- Prompt Stepper Data ---
 
+type StepKey = 'database' | 'auth' | 'storage' | 'ai' | 'deployment';
+
 interface PromptStep {
   id: number;
+  key: StepKey;
   category: string;
   title: string;
   prompt: string;
@@ -32,6 +35,7 @@ interface PromptStep {
 const PROMPT_STEPS: PromptStep[] = [
   {
     id: 1,
+    key: 'database',
     category: 'Database',
     title: 'Add sample data',
     prompt:
@@ -41,6 +45,7 @@ const PROMPT_STEPS: PromptStep[] = [
   },
   {
     id: 2,
+    key: 'auth',
     category: 'Authentication',
     title: 'Sign up your first user',
     prompt:
@@ -50,6 +55,7 @@ const PROMPT_STEPS: PromptStep[] = [
   },
   {
     id: 3,
+    key: 'storage',
     category: 'Storage',
     title: 'Upload a file',
     prompt:
@@ -59,6 +65,7 @@ const PROMPT_STEPS: PromptStep[] = [
   },
   {
     id: 4,
+    key: 'ai',
     category: 'Model Gateway',
     title: 'Add LLM feature',
     prompt:
@@ -68,6 +75,7 @@ const PROMPT_STEPS: PromptStep[] = [
   },
   {
     id: 5,
+    key: 'deployment',
     category: 'Deployment',
     title: 'Deploy your site',
     prompt:
@@ -82,6 +90,9 @@ const getStepperDismissKey = (projectId?: string) =>
 
 const getGetStartedPassedKey = (projectId?: string) =>
   `insforge-ctest-get-started-passed-${projectId || 'default'}`;
+
+const getStepCompletedKey = (projectId?: string) =>
+  `insforge-ctest-step-completed-${projectId || 'default'}`;
 
 // --- Sub-components ---
 
@@ -347,9 +358,13 @@ export default function CTestDashboardPage() {
   const { projectId } = useProjectId();
   const stepperDismissKey = getStepperDismissKey(projectId ?? undefined);
   const getStartedPassedKey = getGetStartedPassedKey(projectId ?? undefined);
+  const stepCompletedKey = getStepCompletedKey(projectId ?? undefined);
 
   const [isStepperDismissed, setIsStepperDismissed] = useState(false);
   const [hasPassedGetStarted, setHasPassedGetStarted] = useState(false);
+  const [stickyCompletedSteps, setStickyCompletedSteps] = useState<
+    Partial<Record<StepKey, boolean>>
+  >({});
 
   useEffect(() => {
     if (projectId === undefined) {
@@ -374,6 +389,32 @@ export default function CTestDashboardPage() {
       // ignore
     }
   }, [projectId, getStartedPassedKey]);
+
+  useEffect(() => {
+    if (projectId === undefined) {
+      return;
+    }
+    try {
+      const raw = localStorage.getItem(stepCompletedKey);
+      if (!raw) {
+        setStickyCompletedSteps({});
+        return;
+      }
+      const parsed: unknown = JSON.parse(raw);
+      if (
+        parsed &&
+        typeof parsed === 'object' &&
+        !Array.isArray(parsed) &&
+        Object.values(parsed).every((v) => typeof v === 'boolean')
+      ) {
+        setStickyCompletedSteps(parsed as Partial<Record<StepKey, boolean>>);
+      } else {
+        setStickyCompletedSteps({});
+      }
+    } catch {
+      setStickyCompletedSteps({});
+    }
+  }, [projectId, stepCompletedKey]);
 
   const shouldShowLoadingState =
     isMetadataLoading ||
@@ -428,16 +469,48 @@ export default function CTestDashboardPage() {
     }
   }, [projectId, getStartedPassedKey, hasPassedGetStarted, todoHasData]);
 
-  const completedSteps = useMemo(
-    () => [
-      todoStepComplete,
-      (totalUsers ?? 0) >= 1,
-      (storage?.buckets?.find((b) => b.name === 'todo-attachments')?.objectCount ?? 0) > 0,
-      (aiUsageSummary?.totalRequests ?? 0) > 0,
-      !!currentDeploymentId,
-    ],
+  const liveCompletedSteps = useMemo<Record<StepKey, boolean>>(
+    () => ({
+      database: todoStepComplete,
+      auth: (totalUsers ?? 0) >= 1,
+      storage:
+        (storage?.buckets?.find((b) => b.name === 'todo-attachments')?.objectCount ?? 0) > 0,
+      ai: (aiUsageSummary?.totalRequests ?? 0) > 0,
+      deployment: !!currentDeploymentId,
+    }),
     [todoStepComplete, totalUsers, storage, aiUsageSummary, currentDeploymentId]
   );
+
+  const completedSteps = useMemo<boolean[]>(
+    () =>
+      PROMPT_STEPS.map(
+        (step) => liveCompletedSteps[step.key] || stickyCompletedSteps[step.key] === true
+      ),
+    [liveCompletedSteps, stickyCompletedSteps]
+  );
+
+  useEffect(() => {
+    if (projectId === undefined) {
+      return;
+    }
+    const merged: Partial<Record<StepKey, boolean>> = { ...stickyCompletedSteps };
+    let changed = false;
+    for (const step of PROMPT_STEPS) {
+      if (liveCompletedSteps[step.key] && !merged[step.key]) {
+        merged[step.key] = true;
+        changed = true;
+      }
+    }
+    if (!changed) {
+      return;
+    }
+    setStickyCompletedSteps(merged);
+    try {
+      localStorage.setItem(stepCompletedKey, JSON.stringify(merged));
+    } catch {
+      // ignore
+    }
+  }, [projectId, stepCompletedKey, liveCompletedSteps, stickyCompletedSteps]);
 
   const handleDismissStepper = useCallback(() => {
     if (projectId === undefined) {
