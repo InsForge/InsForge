@@ -38,10 +38,11 @@ router.post(
     try {
       const validation = createMigrationRequestSchema.safeParse(req.body);
       if (!validation.success) {
+        const issues = validation.error.issues;
         throw new AppError(
-          validation.error.issues
-            .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
-            .join(', '),
+          issues.length === 1
+            ? issues[0]?.message || 'Invalid migration request.'
+            : issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join(', '),
           400,
           ERROR_CODES.INVALID_INPUT
         );

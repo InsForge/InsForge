@@ -244,8 +244,14 @@ export const bulkUpsertResponseSchema = z.object({
 });
 
 export const createMigrationRequestSchema = z.object({
-  name: z.string().min(1, 'Migration name is required'),
-  sql: z.string().min(1, 'Migration SQL is required'),
+  name: z
+    .string()
+    .trim()
+    .min(1, 'Migration name is required')
+    .refine((value) => value.length === 0 || /^[a-z0-9-]+$/.test(value), {
+      message: 'Use lowercase letters, numbers, and hyphens only.',
+    }),
+  sql: z.string().trim().min(1, 'Migration SQL is required'),
 });
 
 export const createMigrationResponseSchema = migrationSchema.extend({
