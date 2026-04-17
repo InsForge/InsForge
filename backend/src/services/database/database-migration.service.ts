@@ -56,17 +56,30 @@ function collectExplicitSchemas(node: unknown, schemas: Set<string>): void {
   }
 
   const record = node as AstNode;
+  const names = record.names;
+  const isTypeNameNode =
+    Array.isArray(names) && (Object.hasOwn(record, 'typemod') || Object.hasOwn(record, 'typmods'));
 
   if (typeof record.schemaname === 'string') {
     schemas.add(record.schemaname.toLowerCase());
   }
 
-  for (const nameKey of ['funcname', 'objname', 'names']) {
+  for (const nameKey of ['funcname', 'objname']) {
     const nameList = record[nameKey];
     if (Array.isArray(nameList) && nameList.length > 1) {
       const schemaName = readStringNode(nameList[0]);
       if (schemaName) {
         schemas.add(schemaName.toLowerCase());
+      }
+    }
+  }
+
+  if (Array.isArray(names) && names.length > 1) {
+    const schemaName = readStringNode(names[0]);
+    if (schemaName) {
+      const normalizedSchemaName = schemaName.toLowerCase();
+      if (!isTypeNameNode || normalizedSchemaName !== 'pg_catalog') {
+        schemas.add(normalizedSchemaName);
       }
     }
   }
