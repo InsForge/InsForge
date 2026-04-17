@@ -52,9 +52,11 @@ import {
   type GetAuthConfigResponse,
   updateAuthConfigRequestSchema,
   upsertSmtpConfigRequestSchema,
+  upsertResendConfigRequestSchema,
   updateEmailTemplateRequestSchema,
 } from '@insforge/shared-schemas';
 import { SmtpConfigService } from '@/services/email/smtp-config.service.js';
+import { ResendConfigService } from '@/services/email/resend-config.service.js';
 import { EmailTemplateService } from '@/services/email/email-template.service.js';
 import { EMAIL_TEMPLATE_TYPES, type EmailTemplate } from '@/types/email.js';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
@@ -67,6 +69,7 @@ const authConfigService = AuthConfigService.getInstance();
 const authOTPService = AuthOTPService.getInstance();
 const auditService = AuditService.getInstance();
 const smtpConfigService = SmtpConfigService.getInstance();
+const resendConfigService = ResendConfigService.getInstance();
 const emailTemplateService = EmailTemplateService.getInstance();
 
 const emailLinkRequestSchema = z.object({
@@ -1070,6 +1073,56 @@ router.post(
       );
 
       successResponse(res, result);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// Resend Configuration Routes
+// GET /api/auth/resend-config - Get Resend configuration (admin only)
+router.get(
+  '/resend-config',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const config = await resendConfigService.getResendConfig();
+      successResponse(res, config);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// PUT /api/auth/resend-config - Update Resend configuration (admin only)
+router.put(
+  '/resend-config',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validationResult = upsertResendConfigRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        throw new AppError(
+          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const input = validationResult.data;
+      const config = await resendConfigService.upsertResendConfig(input);
+
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'UPDATE_RESEND_CONFIG',
+        module: 'EMAIL',
+        details: {
+          enabled: input.enabled,
+        },
+        ip_address: req.ip,
+      });
+
+      successResponse(res, config);
     } catch (error) {
       next(error);
     }
