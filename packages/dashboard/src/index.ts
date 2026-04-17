@@ -12,6 +12,7 @@ export type {
   DashboardMode,
   DashboardProjectInfo,
   DashboardProps,
+  DashboardUserInfo,
   InsForgeDashboardProps,
   SelfHostingDashboardProps,
 } from './types';

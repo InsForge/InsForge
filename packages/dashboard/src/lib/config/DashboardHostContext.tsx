@@ -1,5 +1,10 @@
 import { createContext, useContext } from 'react';
-import type { DashboardInstanceInfo, DashboardMode, DashboardProjectInfo } from '../../types';
+import type {
+  DashboardInstanceInfo,
+  DashboardMode,
+  DashboardProjectInfo,
+  DashboardUserInfo,
+} from '../../types';
 
 interface DashboardHostContextValue {
   backendUrl?: string;
@@ -16,6 +21,7 @@ interface DashboardHostContextValue {
     instanceType: string
   ) => Promise<{ success: boolean; instanceType?: string; error?: string }>;
   onUpdateVersion?: () => Promise<void>;
+  onRequestUserInfo?: () => Promise<DashboardUserInfo>;
 }
 
 const DashboardHostContext = createContext<DashboardHostContextValue | null>(null);

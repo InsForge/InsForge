@@ -10,6 +10,12 @@ export interface DashboardProjectInfo {
   status?: 'active' | 'paused' | 'restoring' | string;
 }
 
+export interface DashboardUserInfo {
+  userId: string;
+  email: string;
+  name?: string;
+}
+
 export interface DashboardInstanceInfo {
   currentInstanceType: string;
   planName: string;
@@ -45,6 +51,7 @@ export interface DashboardProps {
     instanceType: string
   ) => Promise<{ success: boolean; instanceType?: string; error?: string }>;
   onUpdateVersion?: () => Promise<void>;
+  onRequestUserInfo?: () => Promise<DashboardUserInfo>;
 }
 
 export interface SelfHostingDashboardProps extends DashboardProps {
