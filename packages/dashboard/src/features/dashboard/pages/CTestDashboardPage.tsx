@@ -473,8 +473,7 @@ export default function CTestDashboardPage() {
     () => ({
       database: todoStepComplete,
       auth: (totalUsers ?? 0) >= 1,
-      storage:
-        (storage?.buckets?.find((b) => b.name === 'todo-attachments')?.objectCount ?? 0) > 0,
+      storage: (storage?.buckets?.find((b) => b.name === 'todo-attachments')?.objectCount ?? 0) > 0,
       ai: (aiUsageSummary?.totalRequests ?? 0) > 0,
       deployment: !!currentDeploymentId,
     }),
