@@ -115,7 +115,7 @@ export default function MigrationsPage() {
             onClick={() =>
               setSqlModal({
                 open: true,
-                title: `${row.name} Statements`,
+                title: `${row.name}`,
                 value: row.statements,
               })
             }

@@ -23,16 +23,28 @@ interface MigrationFormDialogProps {
 
 interface MigrationFormRowProps {
   label: string;
-  description: string;
+  description?: React.ReactNode;
   children: React.ReactNode;
 }
+
+interface MigrationFormErrors {
+  name: string;
+  sql: string;
+}
+
+const EMPTY_ERRORS: MigrationFormErrors = {
+  name: '',
+  sql: '',
+};
 
 function MigrationFormRow({ label, description, children }: MigrationFormRowProps) {
   return (
     <div className="grid gap-3 md:grid-cols-[220px_minmax(0,1fr)] md:gap-6">
       <div className="space-y-1">
         <p className="text-sm leading-5 text-foreground">{label}</p>
-        <p className="text-[13px] leading-[18px] text-muted-foreground">{description}</p>
+        {description ? (
+          <p className="text-[13px] leading-[18px] text-muted-foreground">{description}</p>
+        ) : null}
       </div>
       <div className="min-w-0 flex-1">{children}</div>
     </div>
@@ -47,37 +59,43 @@ export function MigrationFormDialog({
 }: MigrationFormDialogProps) {
   const [name, setName] = useState('');
   const [sql, setSql] = useState('');
-  const [error, setError] = useState('');
+  const [errors, setErrors] = useState<MigrationFormErrors>(EMPTY_ERRORS);
 
   useEffect(() => {
     if (open) {
       setName('');
       setSql('');
-      setError('');
+      setErrors(EMPTY_ERRORS);
     }
   }, [open]);
 
   const isSubmitDisabled = isSubmitting || !name.trim() || !sql.trim();
 
   const handleSubmit = async () => {
-    if (!name.trim()) {
-      setError('Migration name is required');
-      return;
-    }
+    const nextErrors: MigrationFormErrors = {
+      name: name.trim() ? '' : 'Migration name is required',
+      sql: sql.trim() ? '' : 'Migration SQL is required',
+    };
 
-    if (!sql.trim()) {
-      setError('Migration SQL is required');
+    if (nextErrors.name || nextErrors.sql) {
+      setErrors(nextErrors);
       return;
     }
 
     try {
-      setError('');
+      setErrors(EMPTY_ERRORS);
       await onSubmit({
         name: name.trim(),
         sql: sql.trim(),
       });
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : 'Failed to execute migration');
+      const message =
+        submitError instanceof Error ? submitError.message : 'Failed to execute migration';
+
+      setErrors({
+        name: message === 'Migration name already exists.' ? message : '',
+        sql: message === 'Migration name already exists.' ? '' : message,
+      });
     }
   };
 
@@ -89,7 +107,7 @@ export function MigrationFormDialog({
             <div className="min-w-0 flex-1 space-y-1">
               <DialogTitle>Run Migration</DialogTitle>
               <DialogDescription>
-                Migrations execute immediately and are stored only after they succeed.
+                Use migrations to version and apply database schema changes over time.
               </DialogDescription>
             </div>
             <DialogCloseButton className="relative right-auto top-auto h-8 w-8 rounded p-1 text-muted-foreground hover:bg-[var(--alpha-4)] hover:text-foreground" />
@@ -97,35 +115,30 @@ export function MigrationFormDialog({
         </DialogHeader>
 
         <DialogBody className="gap-5 px-6 py-5">
-          <MigrationFormRow
-            label="Migration Name"
-            description="Use a stable, descriptive name such as create_posts_table."
-          >
+          <MigrationFormRow label="Migration Name">
             <div className="flex w-full flex-col gap-1">
               <Input
                 id="migration-name"
                 value={name}
                 onChange={(event) => {
                   setName(event.target.value);
-                  setError('');
+                  setErrors((currentErrors) => ({ ...currentErrors, name: '' }));
                 }}
                 placeholder="create_posts_table"
                 autoFocus
               />
+              {errors.name ? <p className="text-sm text-destructive">{errors.name}</p> : null}
             </div>
           </MigrationFormRow>
 
-          <MigrationFormRow
-            label="SQL Statements"
-            description="These statements run immediately. Only successful migrations are stored."
-          >
+          <MigrationFormRow label="SQL Statements">
             <div className="flex w-full flex-col gap-1">
               <div className="h-80 rounded-md border border-border bg-[rgb(var(--semantic-0))]">
                 <CodeEditor
                   value={sql}
                   onChange={(value) => {
                     setSql(value);
-                    setError('');
+                    setErrors((currentErrors) => ({ ...currentErrors, sql: '' }));
                   }}
                   editable
                   language="sql"
@@ -133,7 +146,7 @@ export function MigrationFormDialog({
                   className="rounded-md"
                 />
               </div>
-              {error ? <p className="text-sm text-destructive">{error}</p> : null}
+              {errors.sql ? <p className="text-sm text-destructive">{errors.sql}</p> : null}
             </div>
           </MigrationFormRow>
         </DialogBody>
