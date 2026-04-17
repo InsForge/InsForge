@@ -34,16 +34,14 @@ router.get(
 router.post(
   '/',
   verifyAdmin,
-  async (
-    req: AuthRequest,
-    res: Response<CreateMigrationResponse>,
-    next: NextFunction
-  ) => {
+  async (req: AuthRequest, res: Response<CreateMigrationResponse>, next: NextFunction) => {
     try {
       const validation = createMigrationRequestSchema.safeParse(req.body);
       if (!validation.success) {
         throw new AppError(
-          validation.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join(', '),
+          validation.error.issues
+            .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+            .join(', '),
           400,
           ERROR_CODES.INVALID_INPUT
         );
@@ -70,10 +68,7 @@ router.post(
         {
           resource: DataUpdateResourceType.DATABASE,
           data: {
-            changes: [
-              { type: 'migration' },
-              ...result.changes,
-            ] as DatabaseResourceUpdate[],
+            changes: [{ type: 'migration' }, ...result.changes] as DatabaseResourceUpdate[],
           },
         },
         'system'

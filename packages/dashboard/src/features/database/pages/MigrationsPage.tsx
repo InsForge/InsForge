@@ -34,7 +34,9 @@ function formatMigrationStatements(statements: string[]): string {
     .join('\n\n');
 }
 
-function parseMigrationsFromResponse(response: DatabaseMigrationsResponse | undefined): MigrationRow[] {
+function parseMigrationsFromResponse(
+  response: DatabaseMigrationsResponse | undefined
+): MigrationRow[] {
   if (!response?.migrations) {
     return [];
   }
@@ -163,7 +165,11 @@ export default function MigrationsPage() {
           showDividerAfterTitle
           titleButtons={
             <div className="flex items-center gap-2">
-              <Button type="button" className="h-8 gap-1.5 px-2" onClick={() => setIsDialogOpen(true)}>
+              <Button
+                type="button"
+                className="h-8 gap-1.5 px-2"
+                onClick={() => setIsDialogOpen(true)}
+              >
                 <Plus className="h-4 w-4" />
                 Run Migration
               </Button>
