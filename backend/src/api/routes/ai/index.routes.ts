@@ -23,7 +23,8 @@ import {
   embeddingsRequestSchema,
   setGatewayBYOKKeyRequestSchema,
 } from '@insforge/shared-schemas';
-
+import { vectorSearchRouter } from './vector-search.routes.js';
+import { aiQueryRouter } from './query.routes.js';
 const router = Router();
 const chatService = ChatCompletionService.getInstance();
 const aiConfigService = AIConfigService.getInstance();
@@ -619,5 +620,8 @@ router.delete(
     }
   }
 );
+
+router.use('/vector', vectorSearchRouter);
+router.use('', aiQueryRouter);
 
 export { router as aiRouter };
