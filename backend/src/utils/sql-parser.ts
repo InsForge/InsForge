@@ -238,6 +238,26 @@ function getSchemaFromNameList(items: Array<Record<string, unknown>>): string | 
  * Returns an error message if blocked, null if allowed.
  */
 export function checkSystemSchemaOperations(query: string): string | null {
+  return checkSystemSchemaOperationsWithPolicy(query, { allowSystemInsert: false });
+}
+
+/**
+ * Check if a query contains dangerous operations on the system schema in relaxed mode.
+ * Relaxed mode allows INSERT operations on system schema tables but still blocks
+ * destructive/privileged operations (DDL, DROP, UPDATE, DELETE, TRUNCATE, search_path changes).
+ */
+export function checkSystemSchemaOperationsRelaxed(query: string): string | null {
+  return checkSystemSchemaOperationsWithPolicy(query, { allowSystemInsert: true });
+}
+
+interface SystemSchemaPolicy {
+  allowSystemInsert: boolean;
+}
+
+function checkSystemSchemaOperationsWithPolicy(
+  query: string,
+  policy: SystemSchemaPolicy
+): string | null {
   const isSystem = (s: string | null): boolean => s?.toLowerCase() === 'system';
 
   try {
@@ -373,7 +393,7 @@ export function checkSystemSchemaOperations(query: string): string | null {
       // INSERT INTO system.*
       if (stmtType === 'InsertStmt') {
         const relation = data.relation as Record<string, unknown> | undefined;
-        if (isSystem(getSchemaName(relation))) {
+        if (!policy.allowSystemInsert && isSystem(getSchemaName(relation))) {
           return 'INSERT operations on the "system" schema are not allowed.';
         }
       }
