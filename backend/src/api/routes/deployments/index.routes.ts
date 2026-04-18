@@ -1,7 +1,8 @@
 import { Router, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { DeploymentService } from '@/services/deployments/deployment.service.js';
-import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
+import { verifyAdmin, verifyAdminOrTrialAgent, AuthRequest } from '@/api/middlewares/auth.js';
+import { checkTrialDeployQuota } from '@/api/middlewares/trial-quota.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
@@ -27,8 +28,14 @@ router.use('/env-vars', envVarsRouter);
  * Create a new deployment record with WAITING status
  * Returns presigned upload info for the legacy source zip flow
  * POST /api/deployments
+ *
+ * Accepts admin JWT, ik_* API keys, and agent-issued trial/user-agent keys
+ * (ins_agent_trial_sk_* / ins_agent_sk_*). Trial callers get their quota
+ * enforced by checkTrialDeployQuota before the handler runs.
+ *
+ * Spec: docs/superpowers/specs/2026-04-18-deploy-trial-key-auth.md (#1124)
  */
-router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/', verifyAdminOrTrialAgent(), checkTrialDeployQuota, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const response = await deploymentService.createDeployment();
 
@@ -50,8 +57,10 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
 /**
  * Create a new direct-upload deployment record with WAITING status
  * POST /api/deployments/direct
+ *
+ * Same auth surface as POST /api/deployments — admin + agent keys (#1124).
  */
-router.post('/direct', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/direct', verifyAdminOrTrialAgent(), checkTrialDeployQuota, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const validationResult = createDirectDeploymentRequestSchema.safeParse(req.body);
     if (!validationResult.success) {
@@ -81,10 +90,15 @@ router.post('/direct', verifyAdmin, async (req: AuthRequest, res: Response, next
 /**
  * Stream one direct deployment file through the backend to Vercel
  * PUT /api/deployments/:id/files/:fileId/content
+ *
+ * Same auth surface as POST /api/deployments — admin + agent keys (#1124).
+ * Trial-quota middleware reads Content-Length to cap per-file upload size
+ * against `quota.storage_mb` / `quota.compute_deploy_mb`.
  */
 router.put(
   '/:id/files/:fileId/content',
-  verifyAdmin,
+  verifyAdminOrTrialAgent(),
+  checkTrialDeployQuota,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const idValidation = uuidParamSchema.safeParse(req.params.id);
@@ -138,10 +152,13 @@ router.put(
 /**
  * Start a deployment after source files are available
  * POST /api/deployments/:id/start
+ *
+ * Same auth surface as POST /api/deployments — admin + agent keys (#1124).
  */
 router.post(
   '/:id/start',
-  verifyAdmin,
+  verifyAdminOrTrialAgent(),
+  checkTrialDeployQuota,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
