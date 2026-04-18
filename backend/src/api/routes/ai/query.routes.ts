@@ -17,19 +17,11 @@ router.post('/query', verifyUser, async (req: AuthRequest, res: Response, next: 
     const { model, prompt, options = {} } = req.body;
 
     if (!model || !prompt) {
-      throw new AppError(
-        'Missing required fields: model, prompt',
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
+      throw new AppError('Missing required fields: model, prompt', 400, ERROR_CODES.INVALID_INPUT);
     }
 
     if (typeof prompt !== 'string' || prompt.trim().length === 0) {
-      throw new AppError(
-        'prompt must be a non-empty string',
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
+      throw new AppError('prompt must be a non-empty string', 400, ERROR_CODES.INVALID_INPUT);
     }
 
     const messages = [{ role: 'user' as const, content: prompt }];
@@ -37,10 +29,10 @@ router.post('/query', verifyUser, async (req: AuthRequest, res: Response, next: 
     const result = await chatService.chat(messages, { model, ...options });
 
     successResponse(res, {
-        model,
-        content: result.text,
-        usage: result.metadata?.usage,
-      });
+      model,
+      content: result.text,
+      usage: result.metadata?.usage,
+    });
   } catch (error) {
     if (error instanceof AppError) {
       next(error);
