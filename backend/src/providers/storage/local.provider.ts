@@ -68,6 +68,13 @@ export class LocalStorageProvider implements StorageProvider {
     }
   }
 
+  async copyObject(bucket: string, sourceKey: string, destKey: string): Promise<void> {
+    const srcPath = this.getFilePath(bucket, sourceKey);
+    const destPath = this.getFilePath(bucket, destKey);
+    await fs.mkdir(path.dirname(destPath), { recursive: true });
+    await fs.copyFile(srcPath, destPath);
+  }
+
   async createBucket(bucket: string): Promise<void> {
     const bucketPath = this.getValidatedPath(bucket);
     await fs.mkdir(bucketPath, { recursive: true });

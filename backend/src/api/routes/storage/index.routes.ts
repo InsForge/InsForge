@@ -10,6 +10,7 @@ import {
   createBucketRequestSchema,
   updateBucketRequestSchema,
   updateStorageConfigRequestSchema,
+  renameObjectRequestSchema,
 } from '@insforge/shared-schemas';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
@@ -472,6 +473,76 @@ router.delete(
       );
     } catch (error) {
       next(error);
+    }
+  }
+);
+
+// PATCH /api/storage/buckets/:bucketName/objects/* - Rename object in bucket (requires auth)
+router.patch(
+  '/buckets/:bucketName/objects/*',
+  verifyUser,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { bucketName } = req.params;
+      const objectKey = req.params[0]; // Everything after objects
+
+      if (!objectKey) {
+        throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
+      }
+
+      const validation = renameObjectRequestSchema.safeParse(req.body);
+      if (!validation.success) {
+        throw new AppError(
+          validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.STORAGE_INVALID_PARAMETER,
+          'Please check the request body, it must conform with the RenameObjectRequest schema.'
+        );
+      }
+
+      const { newKey } = validation.data;
+
+      const storageService = StorageService.getInstance();
+      const renamedFile = await storageService.renameObject(
+        bucketName,
+        objectKey,
+        newKey,
+        req.user?.id || '',
+        !!req.apiKey || req.user?.role === 'project_admin'
+      );
+
+      // Log audit for object rename
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'RENAME_OBJECT',
+        module: 'STORAGE',
+        details: {
+          bucketName,
+          oldKey: objectKey,
+          newKey,
+        },
+        ip_address: req.ip,
+      });
+
+      const socket = SocketManager.getInstance();
+      socket.broadcastToRoom(
+        'role:project_admin',
+        ServerEvents.DATA_UPDATE,
+        { resource: DataUpdateResourceType.BUCKETS, data: { bucketName } },
+        'system'
+      );
+
+      successResponse(res, renamedFile);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('already exists')) {
+        next(new AppError(error.message, 409, ERROR_CODES.ALREADY_EXISTS));
+      } else if (error instanceof Error && error.message.includes('not found')) {
+        next(new AppError(error.message, 404, ERROR_CODES.NOT_FOUND));
+      } else if (error instanceof Error && error.message.includes('Invalid')) {
+        next(new AppError(error.message, 400, ERROR_CODES.STORAGE_INVALID_PARAMETER));
+      } else {
+        next(error);
+      }
     }
   }
 );
