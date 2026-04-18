@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { Plus } from 'lucide-react';
 import RefreshIcon from '../../../assets/icons/refresh.svg?react';
 import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import { useNavigate } from 'react-router-dom';
@@ -14,7 +13,6 @@ import {
 import { formatTime } from '../../../lib/utils/utils';
 import type { DatabaseMigrationsResponse } from '@insforge/shared-schemas';
 import { DatabaseStudioSidebarPanel } from '../components/DatabaseSidebar';
-import { MigrationFormDialog } from '../components/MigrationFormDialog';
 import { SQLCellButton, SQLModal } from '../components/SQLModal';
 import { useMigrations } from '../hooks/useMigrations';
 
@@ -54,9 +52,8 @@ export default function MigrationsPage() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [sqlModal, setSqlModal] = useState({ open: false, title: '', value: '' });
-  const { data, isLoading, error, refetch, createMigration, isCreating } = useMigrations(true);
+  const { data, isLoading, error, refetch } = useMigrations(true);
 
   const allMigrations = useMemo(() => parseMigrationsFromResponse(data), [data]);
 
@@ -81,11 +78,6 @@ export default function MigrationsPage() {
     } finally {
       setIsRefreshing(false);
     }
-  };
-
-  const handleCreateMigration = async (payload: { name: string; sql: string }) => {
-    await createMigration(payload);
-    setIsDialogOpen(false);
   };
 
   const columns: DataGridColumn<MigrationRow>[] = useMemo(
@@ -165,14 +157,6 @@ export default function MigrationsPage() {
           showDividerAfterTitle
           titleButtons={
             <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                className="h-8 gap-1.5 px-2"
-                onClick={() => setIsDialogOpen(true)}
-              >
-                <Plus className="h-4 w-4" />
-                Run Migration
-              </Button>
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -225,13 +209,6 @@ export default function MigrationsPage() {
             />
           </div>
         )}
-
-        <MigrationFormDialog
-          open={isDialogOpen}
-          onOpenChange={setIsDialogOpen}
-          onSubmit={handleCreateMigration}
-          isSubmitting={isCreating}
-        />
 
         <SQLModal
           open={sqlModal.open}
