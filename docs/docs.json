@@ -120,14 +120,6 @@
               "sdks/typescript/realtime",
               "sdks/typescript/email",
               {
-                "group": "UI Components",
-                "pages": [
-                  "sdks/typescript/ui-components/react",
-                  "sdks/typescript/ui-components/nextjs",
-                  "sdks/typescript/ui-components/customization"
-                ]
-              },
-              {
                 "group": "Framework Guides",
                 "pages": [
                   "examples/framework-guides/nextjs",
@@ -163,6 +155,18 @@
               "sdks/kotlin/functions",
               "sdks/kotlin/ai",
               "sdks/kotlin/realtime"
+            ]
+          },
+          {
+            "group": "Flutter",
+            "icon": "flutter",
+            "pages": [
+              "sdks/flutter/overview",
+              "sdks/flutter/database",
+              "sdks/flutter/auth",
+              "sdks/flutter/storage",
+              "sdks/flutter/realtime",
+              "sdks/flutter/ai"
             ]
           },
           {
