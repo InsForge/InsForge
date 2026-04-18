@@ -4,6 +4,12 @@ import { AppError } from './error.js';
 import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { RoleSchema } from '@insforge/shared-schemas';
+import {
+  getTrialKeyVerifier,
+  isAgentKey,
+  TrialContext,
+  TrialKeyVerifier,
+} from '@/services/auth/trial-key-verifier.js';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -14,6 +20,13 @@ export interface AuthRequest extends Request {
   authenticated?: boolean;
   apiKey?: string;
   projectId?: string;
+  /**
+   * Present when the request authenticated via an `ins_agent_trial_sk_*` or
+   * `ins_agent_sk_*` bearer. Populated by `verifyAdminOrTrialAgent`; downstream
+   * middleware / handlers read it for quota enforcement and claim_url generation.
+   * Spec: docs/superpowers/specs/2026-04-18-deploy-trial-key-auth.md
+   */
+  trial?: TrialContext;
 }
 
 const tokenManager = TokenManager.getInstance();
@@ -240,4 +253,57 @@ export async function verifyCloudBackend(req: AuthRequest, _res: Response, next:
       );
     }
   }
+}
+
+/**
+ * Accepts admin JWT / `ik_*` API key (legacy) OR agent-issued trial keys
+ * (`ins_agent_trial_sk_*`) / post-upgrade user-agent keys (`ins_agent_sk_*`).
+ *
+ * On agent-key bearer:
+ *   - Verified via `TrialKeyVerifier` against cloud-backend's
+ *     `POST /internal/v1/verify-agent-key` endpoint (DB-separated; HMAC-signed).
+ *   - Sets `req.trial` with {tier, projectId, organizationId, quota, expiresAt, …}.
+ *   - Does NOT set `req.user` — deploy handlers that log `req.user?.email` already
+ *     gracefully degrade to `'api-key'`.
+ *
+ * On admin JWT / `ik_` bearer: falls through to the existing `verifyAdmin`
+ * behavior — zero change for non-agent callers.
+ *
+ * Spec: docs/superpowers/specs/2026-04-18-deploy-trial-key-auth.md
+ */
+export function verifyAdminOrTrialAgent(verifierOverride?: TrialKeyVerifier) {
+  return async function handler(req: AuthRequest, res: Response, next: NextFunction) {
+    const token = extractBearerToken(req.headers.authorization);
+    if (token && isAgentKey(token)) {
+      const verifier = verifierOverride ?? getTrialKeyVerifier();
+      try {
+        const context = await verifier.verify(token);
+        if (!context) {
+          return next(
+            new AppError(
+              'Invalid or expired agent key',
+              401,
+              ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+              NEXT_ACTION.CHECK_TOKEN
+            )
+          );
+        }
+        req.trial = context;
+        req.authenticated = true;
+        return next();
+      } catch (error) {
+        return next(
+          error instanceof AppError
+            ? error
+            : new AppError(
+                'Agent key verification failed',
+                401,
+                ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+                NEXT_ACTION.CHECK_TOKEN
+              )
+        );
+      }
+    }
+    return verifyAdmin(req, res, next);
+  };
 }
