@@ -462,7 +462,7 @@ paths:
                       $ref: '#/components/schemas/Migration'
               example:
                 migrations:
-                  - sequenceNumber: 1
+                  - version: "20260416170500"
                     name: "create_posts_table"
                     statements:
                       - "CREATE TABLE posts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), title TEXT NOT NULL);"
@@ -482,18 +482,24 @@ paths:
             schema:
               type: object
               required:
+                - version
                 - name
                 - sql
               properties:
+                version:
+                  type: string
+                  description: Migration version in YYYYMMDDHHmmss format.
+                  pattern: '^\d{14}$'
                 name:
                   type: string
-                  description: Unique migration name
+                  description: Migration name
                   minLength: 1
                 sql:
                   type: string
                   description: SQL text to parse and execute immediately
                   minLength: 1
             example:
+              version: "20260416170500"
               name: "create_posts_table"
               sql: "CREATE TABLE posts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), title TEXT NOT NULL);"
       responses:
@@ -511,14 +517,14 @@ paths:
                       message:
                         type: string
               example:
-                sequenceNumber: 1
+                version: "20260416170500"
                 name: "create_posts_table"
                 statements:
                   - "CREATE TABLE posts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), title TEXT NOT NULL);"
                 createdAt: "2026-04-16T17:05:00.000Z"
                 message: "Migration executed successfully"
         '400':
-          description: Invalid or forbidden migration
+          description: Invalid migration
           content:
             application/json:
               schema:
@@ -529,20 +535,20 @@ paths:
                     error: "INVALID_INPUT"
                     message: "sql: Migration SQL is required"
                     statusCode: 400
-                forbiddenSchema:
+                transactionStatement:
                   value:
                     error: "DATABASE_FORBIDDEN"
-                    message: "Custom migrations may only target the public schema."
+                    message: "Custom migrations cannot manage their own transactions."
                     statusCode: 400
         '409':
-          description: Migration name already exists
+          description: Migration version already exists or is not newer than the latest applied migration
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 error: "ALREADY_EXISTS"
-                message: "duplicate key value violates unique constraint"
+                message: "Migration version already exists."
                 statusCode: 409
 
 components:
@@ -559,15 +565,14 @@ components:
     Migration:
       type: object
       required:
-        - sequenceNumber
+        - version
         - name
         - statements
         - createdAt
       properties:
-        sequenceNumber:
-          type: integer
-          format: int32
-          minimum: 1
+        version:
+          type: string
+          pattern: '^\d{14}$'
         name:
           type: string
         statements:

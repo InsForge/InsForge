@@ -56,7 +56,7 @@ router.post(
         module: 'DATABASE',
         details: {
           name: result.migration.name,
-          sequenceNumber: result.migration.sequenceNumber,
+          version: result.migration.version,
           statementCount: result.migration.statements.length,
         },
         ip_address: req.ip,

@@ -568,7 +568,7 @@ curl "https://your-app.insforge.app/api/database/migrations" \
 {
   "migrations": [
     {
-      "sequenceNumber": 1,
+      "version": "20260416170500",
       "name": "create_posts_table",
       "statements": [
         "CREATE TABLE posts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), title TEXT NOT NULL);"
@@ -583,7 +583,7 @@ curl "https://your-app.insforge.app/api/database/migrations" \
 
 ## Create Database Migration
 
-Create and immediately execute a custom migration against the `public` schema. The migration is recorded only if every statement succeeds. **Requires admin authentication.**
+Create and immediately execute a custom migration against the database. The migration is recorded only if every statement succeeds. **Requires admin authentication.**
 
 ```
 POST /api/database/migrations
@@ -593,7 +593,8 @@ POST /api/database/migrations
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `name` | string | Yes | Unique migration name |
+| `version` | string | Yes | Migration version in `YYYYMMDDHHmmss` format. |
+| `name` | string | Yes | Migration name |
 | `sql` | string | Yes | SQL text to parse and execute |
 
 ### Example
@@ -603,6 +604,7 @@ curl -X POST "https://your-app.insforge.app/api/database/migrations" \
   -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
   -H "Content-Type: application/json" \
   -d '{
+    "version": "20260416170500",
     "name": "create_posts_table",
     "sql": "CREATE TABLE posts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), title TEXT NOT NULL);"
   }'
@@ -612,7 +614,7 @@ curl -X POST "https://your-app.insforge.app/api/database/migrations" \
 
 ```json
 {
-  "sequenceNumber": 1,
+  "version": "20260416170500",
   "name": "create_posts_table",
   "statements": [
     "CREATE TABLE posts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), title TEXT NOT NULL);"
@@ -623,7 +625,7 @@ curl -X POST "https://your-app.insforge.app/api/database/migrations" \
 ```
 
 <Warning>
-Custom migrations may only target the `public` schema. Statements that reference internal schemas such as `auth`, `system`, `storage`, `ai`, `functions`, `realtime`, or `schedules`, or that attempt to manage `search_path` or their own transactions, are rejected.
+Do not include `BEGIN`, `COMMIT`, or `ROLLBACK` inside a custom migration. InsForge executes the migration inside its own transaction.
 </Warning>
 
 ---

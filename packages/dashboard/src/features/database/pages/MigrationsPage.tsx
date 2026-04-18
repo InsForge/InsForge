@@ -18,7 +18,7 @@ import { useMigrations } from '../hooks/useMigrations';
 
 interface MigrationRow extends DataGridRowType {
   id: string;
-  sequenceNumber: number;
+  version: string;
   name: string;
   statements: string;
   createdAt: string;
@@ -40,8 +40,8 @@ function parseMigrationsFromResponse(
   }
 
   return response.migrations.map((migration) => ({
-    id: String(migration.sequenceNumber),
-    sequenceNumber: migration.sequenceNumber,
+    id: migration.version,
+    version: migration.version,
     name: migration.name,
     statements: formatMigrationStatements(migration.statements),
     createdAt: migration.createdAt,
@@ -65,8 +65,7 @@ export default function MigrationsPage() {
     const query = searchQuery.toLowerCase();
     return allMigrations.filter(
       (migration) =>
-        migration.name.toLowerCase().includes(query) ||
-        String(migration.sequenceNumber).includes(query)
+        migration.name.toLowerCase().includes(query) || migration.version.includes(query)
     );
   }, [allMigrations, searchQuery]);
 
@@ -83,9 +82,9 @@ export default function MigrationsPage() {
   const columns: DataGridColumn<MigrationRow>[] = useMemo(
     () => [
       {
-        key: 'sequenceNumber',
-        name: '#',
-        width: 'minmax(96px, 0.8fr)',
+        key: 'version',
+        name: 'Version',
+        width: 'minmax(180px, 1.2fr)',
         resizable: true,
         sortable: true,
       },

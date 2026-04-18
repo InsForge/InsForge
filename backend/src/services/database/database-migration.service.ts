@@ -16,77 +16,28 @@ import {
   type DatabaseResourceUpdate,
 } from '@/utils/sql-parser.js';
 
-const RESERVED_SCHEMAS = new Set([
-  'auth',
-  'system',
-  'storage',
-  'ai',
-  'functions',
-  'realtime',
-  'schedules',
-  'pg_catalog',
-  'information_schema',
-]);
-
 interface CreateMigrationResult {
   migration: CreateMigrationResponse;
   changes: DatabaseResourceUpdate[];
 }
 
-type AstNode = Record<string, unknown>;
+export function assertMigrationDoesNotManageTransactions(statement: string): void {
+  const { stmts } = parseSync(statement);
+  const statementWrappers = stmts as Array<{ stmt: Record<string, unknown> }>;
 
-function readStringNode(node: unknown): string | null {
-  if (!node || typeof node !== 'object') {
-    return null;
-  }
+  for (const statementWrapper of statementWrappers) {
+    const [statementType] = Object.entries(statementWrapper.stmt)[0] as [
+      string,
+      Record<string, unknown>,
+    ];
 
-  const value = (node as { String?: { sval?: unknown } }).String?.sval;
-  return typeof value === 'string' ? value : null;
-}
-
-function collectExplicitSchemas(node: unknown, schemas: Set<string>): void {
-  if (Array.isArray(node)) {
-    for (const item of node) {
-      collectExplicitSchemas(item, schemas);
+    if (statementType === 'TransactionStmt') {
+      throw new AppError(
+        'Custom migrations cannot manage their own transactions.',
+        400,
+        ERROR_CODES.DATABASE_FORBIDDEN
+      );
     }
-    return;
-  }
-
-  if (!node || typeof node !== 'object') {
-    return;
-  }
-
-  const record = node as AstNode;
-  const names = record.names;
-  const isTypeNameNode =
-    Array.isArray(names) && (Object.hasOwn(record, 'typemod') || Object.hasOwn(record, 'typmods'));
-
-  if (typeof record.schemaname === 'string') {
-    schemas.add(record.schemaname.toLowerCase());
-  }
-
-  for (const nameKey of ['funcname', 'objname']) {
-    const nameList = record[nameKey];
-    if (Array.isArray(nameList) && nameList.length > 1) {
-      const schemaName = readStringNode(nameList[0]);
-      if (schemaName) {
-        schemas.add(schemaName.toLowerCase());
-      }
-    }
-  }
-
-  if (Array.isArray(names) && names.length > 1) {
-    const schemaName = readStringNode(names[0]);
-    if (schemaName) {
-      const normalizedSchemaName = schemaName.toLowerCase();
-      if (!isTypeNameNode || normalizedSchemaName !== 'pg_catalog') {
-        schemas.add(normalizedSchemaName);
-      }
-    }
-  }
-
-  for (const value of Object.values(record)) {
-    collectExplicitSchemas(value, schemas);
   }
 }
 
@@ -106,12 +57,12 @@ export class DatabaseMigrationService {
   async listMigrations(): Promise<DatabaseMigrationsResponse> {
     const result = await this.dbManager.getPool().query(`
       SELECT
-        sequence_number AS "sequenceNumber",
+        version,
         name,
         statements,
         created_at AS "createdAt"
       FROM system.custom_migrations
-      ORDER BY sequence_number DESC
+      ORDER BY version DESC
     `);
 
     return {
@@ -132,7 +83,7 @@ export class DatabaseMigrationService {
     await initSqlParser();
 
     for (const statement of statements) {
-      this.assertStatementIsAllowed(statement);
+      assertMigrationDoesNotManageTransactions(statement);
     }
 
     const client = await this.dbManager.getPool().connect();
@@ -144,30 +95,37 @@ export class DatabaseMigrationService {
       await client.query("SELECT pg_advisory_xact_lock(hashtext('system.custom_migrations'))");
       await client.query('SET LOCAL search_path TO public');
 
-      const sequenceResult = await client.query<{
-        nextSequenceNumber: number;
+      const versionResult = await client.query<{
+        latestVersion: string | null;
       }>(`
-        SELECT COALESCE(MAX(sequence_number), 0) + 1 AS "nextSequenceNumber"
+        SELECT MAX(version) AS "latestVersion"
         FROM system.custom_migrations
       `);
 
-      const sequenceNumber = Number(sequenceResult.rows[0]?.nextSequenceNumber ?? 1);
+      const latestVersion = versionResult.rows[0]?.latestVersion ?? null;
+      const version = input.version;
 
-      for (const statement of statements) {
-        await client.query(statement);
+      if (latestVersion && version <= latestVersion) {
+        throw new AppError(
+          'Migration version must be newer than the latest applied migration.',
+          409,
+          ERROR_CODES.ALREADY_EXISTS
+        );
       }
+
+      await client.query(input.sql);
 
       const insertResult = await client.query<Migration>(
         `
-          INSERT INTO system.custom_migrations (sequence_number, name, statements)
+          INSERT INTO system.custom_migrations (version, name, statements)
           VALUES ($1, $2, $3)
           RETURNING
-            sequence_number AS "sequenceNumber",
+            version,
             name,
             statements,
             created_at AS "createdAt"
         `,
-        [sequenceNumber, input.name, statements]
+        [version, input.name, statements]
       );
 
       await client.query(`NOTIFY pgrst, 'reload schema';`);
@@ -191,68 +149,14 @@ export class DatabaseMigrationService {
       if (
         isPgErrorLike(error) &&
         error.code === '23505' &&
-        error.constraint === 'custom_migrations_name_key'
+        error.constraint === 'custom_migrations_pkey'
       ) {
-        throw new AppError('Migration name already exists.', 409, ERROR_CODES.ALREADY_EXISTS);
+        throw new AppError('Migration version already exists.', 409, ERROR_CODES.ALREADY_EXISTS);
       }
 
       throw error;
     } finally {
       client.release();
-    }
-  }
-
-  private assertStatementIsAllowed(statement: string): void {
-    const { stmts } = parseSync(statement);
-    const statementWrappers = stmts as Array<{ stmt: AstNode }>;
-
-    for (const statementWrapper of statementWrappers) {
-      const [statementType] = Object.entries(statementWrapper.stmt)[0] as [string, AstNode];
-
-      if (statementType === 'TransactionStmt') {
-        throw new AppError(
-          'Custom migrations cannot manage their own transactions.',
-          400,
-          ERROR_CODES.DATABASE_FORBIDDEN
-        );
-      }
-
-      if (statementType === 'VariableSetStmt' && /\bsearch_path\b/i.test(statement)) {
-        throw new AppError(
-          'Custom migrations cannot change search_path.',
-          400,
-          ERROR_CODES.DATABASE_FORBIDDEN
-        );
-      }
-
-      if (statementType === 'CreateSchemaStmt') {
-        throw new AppError(
-          'Custom migrations may only target the public schema.',
-          400,
-          ERROR_CODES.DATABASE_FORBIDDEN
-        );
-      }
-    }
-
-    if (/\bset_config\s*\(\s*'search_path'/i.test(statement)) {
-      throw new AppError(
-        'Custom migrations cannot change search_path.',
-        400,
-        ERROR_CODES.DATABASE_FORBIDDEN
-      );
-    }
-
-    const explicitSchemas = new Set<string>();
-    collectExplicitSchemas(statementWrappers, explicitSchemas);
-
-    for (const schemaName of explicitSchemas) {
-      if (schemaName !== 'public' || RESERVED_SCHEMAS.has(schemaName)) {
-        throw new AppError(
-          'Custom migrations may only target the public schema.',
-          400,
-          ERROR_CODES.DATABASE_FORBIDDEN
-        );
-      }
     }
   }
 }

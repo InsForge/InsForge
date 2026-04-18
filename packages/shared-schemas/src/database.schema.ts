@@ -103,7 +103,7 @@ export const databaseTriggerSchema = z.object({
 });
 
 export const migrationSchema = z.object({
-  sequenceNumber: z.number().int().positive(),
+  version: z.string().regex(/^\d{14}$/, 'Migration version must use YYYYMMDDHHmmss format.'),
   name: z.string().min(1),
   statements: z.array(z.string()).min(1),
   createdAt: z.string(),
