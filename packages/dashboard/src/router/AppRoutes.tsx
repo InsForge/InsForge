@@ -46,11 +46,8 @@ import DeploymentEnvVarsPage from '../features/deployments/pages/DeploymentEnvVa
 import DeploymentDomainsPage from '../features/deployments/pages/DeploymentDomainsPage';
 
 function AuthenticatedRoutes() {
-  const dashboardVariant = getFeatureFlag('dashboard-v2-experiment');
-  const DashboardHomePage =
-    dashboardVariant === 'c_test' || dashboardVariant === 'test'
-      ? CTestDashboardPage
-      : DashboardPage;
+  const dashboardVariant = getFeatureFlag('dashboard-v3-experiment');
+  const DashboardHomePage = dashboardVariant === 'c_test' ? CTestDashboardPage : DashboardPage;
 
   return (
     <AppLayout>

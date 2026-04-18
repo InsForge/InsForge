@@ -222,7 +222,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
     (toolName: string) => {
       if (mcpUsageCount === 1) {
         trackPostHog('onboarding_completed', {
-          experiment_variant: getFeatureFlag('dashboard-v2-experiment'),
+          experiment_variant: getFeatureFlag('dashboard-v3-experiment'),
           tool_name: toolName,
         });
       }
