@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { DashboardInstanceInfo, DashboardProjectInfo } from '@insforge/dashboard';
+import type {
+  DashboardInstanceInfo,
+  DashboardProjectInfo,
+  DashboardUserInfo,
+} from '@insforge/dashboard';
 
 type InstanceTypeChangeResult = {
   success: boolean;
@@ -18,7 +22,8 @@ type PendingRequestKey =
   | 'instanceTypeChange'
   | 'renameProject'
   | 'deleteProject'
-  | 'updateVersion';
+  | 'updateVersion'
+  | 'userInfo';
 
 type PendingRequest<T> = {
   resolve: (value: T) => void;
@@ -33,6 +38,7 @@ type PendingRequestValues = {
   renameProject: void;
   deleteProject: void;
   updateVersion: void;
+  userInfo: DashboardUserInfo;
 };
 
 type PendingRequests = {
@@ -151,6 +157,9 @@ export function useCloudHosting() {
           return;
         case 'updateVersion':
           pendingRequestsRef.current.updateVersion = pendingRequest as PendingRequest<void>;
+          return;
+        case 'userInfo':
+          pendingRequestsRef.current.userInfo = pendingRequest as PendingRequest<DashboardUserInfo>;
           return;
       }
     },
@@ -288,6 +297,20 @@ export function useCloudHosting() {
         }
         case 'PROJECT_INFO': {
           setProjectInfo((previous) => normalizeProjectInfo(previous, currentOrigin, message));
+          return;
+        }
+        case 'USER_INFO': {
+          const userId = typeof message.userId === 'string' ? message.userId : '';
+          const email = typeof message.email === 'string' ? message.email : '';
+          if (!userId || !email) {
+            rejectPendingRequest('userInfo', 'Received an invalid user info payload');
+            return;
+          }
+          resolvePendingRequest('userInfo', {
+            userId,
+            email,
+            name: typeof message.name === 'string' ? message.name : undefined,
+          });
           return;
         }
         case 'INSTANCE_INFO': {
@@ -443,6 +466,13 @@ export function useCloudHosting() {
     return createPendingRequest('updateVersion', 'Project version update');
   }, [createPendingRequest, postMessageToParent]);
 
+  const requestUserInfo = useCallback(async (): Promise<DashboardUserInfo> => {
+    if (!postMessageToParent({ type: 'REQUEST_USER_INFO' })) {
+      throw new Error('Unable to request user info from the parent window');
+    }
+    return createPendingRequest('userInfo', 'User info request');
+  }, [createPendingRequest, postMessageToParent]);
+
   const navigateToSubscription = useCallback(() => {
     void postMessageToParent({ type: 'NAVIGATE_TO_SUBSCRIPTION' });
   }, [postMessageToParent]);
@@ -464,5 +494,6 @@ export function useCloudHosting() {
     deleteProject,
     updateVersion,
     navigateToSubscription,
+    requestUserInfo,
   };
 }
