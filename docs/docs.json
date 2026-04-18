@@ -158,18 +158,6 @@
             ]
           },
           {
-            "group": "Flutter",
-            "icon": "flutter",
-            "pages": [
-              "sdks/flutter/overview",
-              "sdks/flutter/database",
-              "sdks/flutter/auth",
-              "sdks/flutter/storage",
-              "sdks/flutter/realtime",
-              "sdks/flutter/ai"
-            ]
-          },
-          {
             "group": "REST API",
             "icon": "code",
             "pages": [
