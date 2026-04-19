@@ -120,14 +120,6 @@
               "sdks/typescript/realtime",
               "sdks/typescript/email",
               {
-                "group": "UI Components",
-                "pages": [
-                  "sdks/typescript/ui-components/react",
-                  "sdks/typescript/ui-components/nextjs",
-                  "sdks/typescript/ui-components/customization"
-                ]
-              },
-              {
                 "group": "Framework Guides",
                 "pages": [
                   "examples/framework-guides/nextjs",
