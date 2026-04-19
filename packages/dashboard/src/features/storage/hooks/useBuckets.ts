@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { storageService } from '../services/storage.service';
 import { useToast } from '../../../lib/hooks/useToast';
 
-export function useStorageBuckets() {
+export function useBuckets() {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
@@ -22,10 +22,8 @@ export function useStorageBuckets() {
     return useQuery({
       queryKey: ['storage', 'bucket-stats', buckets],
       queryFn: async () => {
-        const stats: Record<
-          string,
-          { fileCount: number; totalSize: number; public: boolean; createdAt?: string }
-        > = {};
+        const stats: Record<string, { fileCount: number; public: boolean; createdAt?: string }> =
+          {};
         const currentBuckets = buckets || [];
         const promises = currentBuckets.map(async (bucket) => {
           try {
@@ -34,7 +32,6 @@ export function useStorageBuckets() {
               bucketName: bucket.name,
               stats: {
                 fileCount: result.pagination.total,
-                totalSize: 0,
                 public: bucket.public,
                 createdAt: bucket.createdAt,
               },
@@ -45,7 +42,6 @@ export function useStorageBuckets() {
               bucketName: bucket.name,
               stats: {
                 fileCount: 0,
-                totalSize: 0,
                 public: bucket.public,
                 createdAt: bucket.createdAt,
               },

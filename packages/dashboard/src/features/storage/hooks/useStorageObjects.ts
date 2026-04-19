@@ -17,6 +17,7 @@ export function useStorageObjects() {
       queryKey: ['storage', 'objects', bucketName, params?.limit, params?.offset, searchQuery],
       queryFn: () => storageService.listObjects(bucketName, params, searchQuery),
       enabled: enabled && !!bucketName,
+      placeholderData: (previousData) => previousData,
     });
   };
 

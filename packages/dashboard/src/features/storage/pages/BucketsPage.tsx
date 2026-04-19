@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Upload } from 'lucide-react';
 import PencilIcon from '../../../assets/icons/pencil.svg?react';
 import RefreshIcon from '../../../assets/icons/refresh.svg?react';
-import { useStorageBuckets } from '../hooks/useStorageBuckets';
+import { useBuckets } from '../hooks/useBuckets';
 import { useStorageObjects } from '../hooks/useStorageObjects';
 import { StorageSidebar } from '../components/StorageSidebar';
 import { StorageDataGrid } from '../components/StorageDataGrid';
@@ -66,7 +66,7 @@ export default function BucketsPage() {
     refetchBuckets,
     useBucketStats,
     deleteBucket,
-  } = useStorageBuckets();
+  } = useBuckets();
   const { uploadObject, deleteObjects } = useStorageObjects();
   const selectedBucket = useMemo(() => {
     if (isLoading || !buckets.length) {
