@@ -40,6 +40,11 @@ const DATABASE_STUDIO_SIDEBAR_ITEMS: Array<{
     sectionEnd: true,
   },
   {
+    id: 'migrations',
+    label: 'Migrations',
+    href: '/dashboard/database/migrations',
+  },
+  {
     id: 'templates',
     label: 'Templates',
     href: '/dashboard/database/templates',
