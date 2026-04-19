@@ -166,7 +166,7 @@ export class CloudComputeProvider implements ComputeProvider {
     throw new AppError(
       `Machine ${machineId} did not reach ${targetStates.join('|')} within ${timeoutMs}ms`,
       504,
-      (ERROR_CODES as any).COMPUTE_PROVIDER_ERROR ?? ERROR_CODES.INTERNAL_ERROR,
+      ERROR_CODES.COMPUTE_PROVIDER_ERROR,
     );
   }
 }
