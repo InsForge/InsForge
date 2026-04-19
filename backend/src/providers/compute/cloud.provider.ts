@@ -22,7 +22,7 @@ export class CloudComputeProvider implements ComputeProvider {
 
   isConfigured(): boolean {
     return (
-      (config as any).cloud?.computeEnabled === true &&
+      config.cloud.computeEnabled === true &&
       !!config.cloud?.projectId &&
       config.cloud.projectId !== 'local' &&
       !!config.app?.jwtSecret
@@ -34,7 +34,7 @@ export class CloudComputeProvider implements ComputeProvider {
       throw new AppError(
         'Cloud compute not configured (need PROJECT_ID, JWT_SECRET, CLOUD_COMPUTE_ENABLED)',
         500,
-        (ERROR_CODES as any).COMPUTE_NOT_CONFIGURED ?? ERROR_CODES.INTERNAL_ERROR,
+        ERROR_CODES.COMPUTE_NOT_CONFIGURED,
       );
     }
     return jwt.sign({ sub: config.cloud.projectId }, config.app.jwtSecret, {
@@ -70,7 +70,7 @@ export class CloudComputeProvider implements ComputeProvider {
       throw new AppError(
         `COMPUTE_CLOUD_UNAVAILABLE: ${(err as Error).message}`,
         503,
-        (ERROR_CODES as any).COMPUTE_CLOUD_UNAVAILABLE ?? ERROR_CODES.INTERNAL_ERROR,
+        ERROR_CODES.COMPUTE_CLOUD_UNAVAILABLE,
         'Check CLOUD_API_HOST is reachable and verify cloud backend health.',
       );
     }
@@ -79,7 +79,7 @@ export class CloudComputeProvider implements ComputeProvider {
       throw new AppError(
         text || `Cloud compute error (${response.status})`,
         response.status,
-        (ERROR_CODES as any).COMPUTE_PROVIDER_ERROR ?? ERROR_CODES.INTERNAL_ERROR,
+        ERROR_CODES.COMPUTE_PROVIDER_ERROR,
       );
     }
     return text ? (JSON.parse(text) as T) : undefined;
