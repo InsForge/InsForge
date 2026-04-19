@@ -28,6 +28,14 @@ vi.mock('@/infra/config/app.config.js', () => ({
       org: 'test-org',
       domain: 'fly.dev',
     },
+    cloud: {
+      computeEnabled: false,
+      projectId: '',
+      apiHost: '',
+    },
+    app: {
+      jwtSecret: 'test-secret',
+    },
   },
 }));
 
