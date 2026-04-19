@@ -1,9 +1,10 @@
 import { config } from '@/infra/config/app.config.js';
 import logger from '@/utils/logger.js';
+import type { ComputeProvider } from './compute.provider.js';
 
 const FLY_API_BASE = 'https://api.machines.dev/v1';
 
-export class FlyProvider {
+export class FlyProvider implements ComputeProvider {
   private static instance: FlyProvider;
 
   static getInstance(): FlyProvider {
