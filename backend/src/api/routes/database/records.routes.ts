@@ -11,9 +11,11 @@ import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import { DatabaseResourceUpdate } from '@/utils/sql-parser.js';
 import { PostgrestProxyService } from '@/services/database/postgrest-proxy.service.js';
+import { EncryptedColumnService } from '@/services/database/encrypted-column.service.js';
 
 const router = Router();
 const proxyService = PostgrestProxyService.getInstance();
+const encryptedColumnService = EncryptedColumnService.getInstance();
 
 /**
  * Helper to handle PostgREST proxy errors
@@ -48,6 +50,9 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
     const method = req.method.toUpperCase();
     let body = req.body;
 
+    // Look up encrypted columns for this table (cached, fast path returns empty map)
+    const encryptedColumns = await encryptedColumnService.getEncryptedColumns(tableName);
+
     if (['POST', 'PATCH', 'PUT'].includes(method) && body && typeof body === 'object') {
       const columnTypeMap = await DatabaseManager.getColumnTypeMap(tableName);
       if (Array.isArray(body)) {
@@ -69,6 +74,26 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
           if (columnTypeMap[key] === 'uuid' && body[key] === '') {
             delete body[key];
           }
+        }
+      }
+
+      // Encrypt values for encrypted columns before forwarding to PostgREST
+      if (encryptedColumns.size > 0) {
+        if (Array.isArray(body)) {
+          body = body.map((item) => {
+            if (item && typeof item === 'object') {
+              return encryptedColumnService.encryptRow(
+                item as Record<string, unknown>,
+                encryptedColumns
+              );
+            }
+            return item;
+          });
+        } else {
+          body = encryptedColumnService.encryptRow(
+            body as Record<string, unknown>,
+            encryptedColumns
+          );
         }
       }
     }
@@ -94,6 +119,26 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
       (typeof result.data === 'string' && result.data.trim() === '')
     ) {
       responseData = [];
+    }
+
+    // Decrypt encrypted columns in response data
+    if (encryptedColumns.size > 0 && responseData) {
+      if (Array.isArray(responseData)) {
+        responseData = responseData.map((row) => {
+          if (row && typeof row === 'object') {
+            return encryptedColumnService.decryptRow(
+              row as Record<string, unknown>,
+              encryptedColumns
+            );
+          }
+          return row;
+        });
+      } else if (typeof responseData === 'object') {
+        responseData = encryptedColumnService.decryptRow(
+          responseData as Record<string, unknown>,
+          encryptedColumns
+        );
+      }
     }
 
     // Broadcast socket events for mutations

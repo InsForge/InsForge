@@ -11,6 +11,8 @@ import { z } from 'zod';
 import { AuthConfigService } from '@/services/auth/auth-config.service.js';
 import { fetchS3Config } from '@/utils/s3-config-loader.js';
 import { ADMIN_ID, ANON_ID } from '@/utils/constants.js';
+import { EncryptedColumnService } from '@/services/database/encrypted-column.service.js';
+import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 
 /**
  * Seeds system users (admin and anon) if they don't exist in the database
@@ -286,6 +288,17 @@ export async function seedBackend(): Promise<void> {
 
   try {
     logger.info(`\n🚀 Insforge Backend Starting...`);
+
+    // Validate ENCRYPTION_KEY if encrypted columns exist
+    const encryptedColumnService = EncryptedColumnService.getInstance();
+    const hasEncryptedColumns = await encryptedColumnService.hasAnyEncryptedColumns();
+    if (hasEncryptedColumns && !EncryptionManager.isConfigured()) {
+      logger.error(
+        'FATAL: Encrypted columns exist in the database but ENCRYPTION_KEY (and JWT_SECRET) is not set. ' +
+          'Data cannot be decrypted. Set ENCRYPTION_KEY in your environment before starting.'
+      );
+      process.exit(1);
+    }
 
     // Seed system users (admin and anon) if not exists
     await seedSystemUsers(adminEmail, adminPassword);

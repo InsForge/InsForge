@@ -49,6 +49,34 @@ export const columnSchema = z.object({
   isNullable: z.boolean(),
   isUnique: z.boolean(),
   foreignKey: foreignKeySchema.optional(),
+  encrypted: z.boolean().optional(),
+});
+
+/** Validated column schema that rejects invalid encrypted column combinations */
+export const validatedColumnSchema = columnSchema.superRefine((data, ctx) => {
+  if (data.encrypted) {
+    if (data.isPrimaryKey) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Encrypted columns cannot be primary keys',
+        path: ['isPrimaryKey'],
+      });
+    }
+    if (data.isUnique) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Encrypted columns cannot have a unique constraint',
+        path: ['isUnique'],
+      });
+    }
+    if (data.foreignKey) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Encrypted columns cannot have foreign key references',
+        path: ['foreignKey'],
+      });
+    }
+  }
 });
 
 export const tableSchema = z.object({
@@ -56,7 +84,7 @@ export const tableSchema = z.object({
     .string()
     .min(1, 'Table name cannot be empty')
     .max(64, 'Table name must be less than 64 characters'),
-  columns: z.array(columnSchema).min(1, 'At least one column is required'),
+  columns: z.array(validatedColumnSchema).min(1, 'At least one column is required'),
   recordCount: z.number().optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),

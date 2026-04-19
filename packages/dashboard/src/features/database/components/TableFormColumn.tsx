@@ -106,6 +106,21 @@ export const TableFormColumn = memo(function TableFormColumn({
         />
       </div>
 
+      <div className="flex w-[100px] shrink-0 justify-center px-2.5">
+        <Controller
+          control={control}
+          name={`columns.${index}.encrypted`}
+          render={({ field }) => (
+            <Checkbox
+              checked={field.value || false}
+              onCheckedChange={field.onChange}
+              disabled={isSystemColumn || !isNewColumn}
+              className="border-[var(--alpha-12)] bg-[var(--alpha-4)] data-[state=checked]:border-transparent data-[state=checked]:bg-[rgb(var(--foreground))] data-[state=checked]:text-[rgb(var(--inverse))]"
+            />
+          )}
+        />
+      </div>
+
       <div className="flex w-[52px] shrink-0 items-center justify-end px-2.5">
         {!isSystemColumn && (
           <button

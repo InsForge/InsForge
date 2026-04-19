@@ -1,7 +1,8 @@
 FROM denoland/deno:alpine-2.0.6
 
-# Create non-root user
-RUN addgroup -S deno && adduser -S deno -G deno
+# Create non-root user (skip if already exists in base image)
+RUN getent group deno || addgroup -S deno && \
+    getent passwd deno || adduser -S deno -G deno
 
 WORKDIR /app/functions
 
