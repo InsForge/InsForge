@@ -51,17 +51,22 @@ export class CloudComputeProvider implements ComputeProvider {
     path: string,
     body?: unknown,
   ): Promise<T | undefined> {
+    // signToken throws AppError(COMPUTE_NOT_CONFIGURED) if config missing —
+    // we want that to surface to the caller, not get masked as CLOUD_UNAVAILABLE.
+    const sign = this.signToken();
+
     let response: Response;
     try {
       response = await fetch(this.url(path), {
         method,
         headers: {
-          sign: this.signToken(),
+          sign,
           'Content-Type': 'application/json',
         },
         body: body !== undefined ? JSON.stringify(body) : undefined,
       });
     } catch (err) {
+      // Only network/fetch errors arrive here — re-wrap as COMPUTE_CLOUD_UNAVAILABLE
       throw new AppError(
         `COMPUTE_CLOUD_UNAVAILABLE: ${(err as Error).message}`,
         503,

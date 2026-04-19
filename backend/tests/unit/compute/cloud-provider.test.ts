@@ -84,4 +84,22 @@ describe('CloudComputeProvider', () => {
     expect(call[0]).toContain('appId=myapp');
     expect(call[0]).toContain('limit=50');
   });
+
+  it('surfaces COMPUTE_NOT_CONFIGURED when config is missing (not masked as CLOUD_UNAVAILABLE)', async () => {
+    const { AppError } = await import('@/api/middlewares/error.js');
+    const { ERROR_CODES } = await import('@/types/error-constants.js');
+    const provider = CloudComputeProvider.getInstance();
+
+    // Force signToken to throw COMPUTE_NOT_CONFIGURED, as it would when isConfigured() is false
+    vi.spyOn(provider as any, 'signToken').mockImplementation(() => {
+      throw new AppError(
+        'Cloud compute not configured (need PROJECT_ID, JWT_SECRET, CLOUD_COMPUTE_ENABLED)',
+        500,
+        (ERROR_CODES as any).COMPUTE_NOT_CONFIGURED ?? ERROR_CODES.INTERNAL_ERROR,
+      );
+    });
+
+    await expect(provider.createApp({ name: 't', network: 't', org: 'o' }))
+      .rejects.toThrow(/COMPUTE_NOT_CONFIGURED|not configured/);
+  });
 });
