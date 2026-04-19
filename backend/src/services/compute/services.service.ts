@@ -3,6 +3,8 @@ import { createHash } from 'crypto';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 import { FlyProvider } from '@/providers/compute/fly.provider.js';
+import { CloudComputeProvider } from '@/providers/compute/cloud.provider.js';
+import type { ComputeProvider } from '@/providers/compute/compute.provider.js';
 import { config } from '@/infra/config/app.config.js';
 import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
 import { AppError } from '@/api/middlewares/error.js';
@@ -90,9 +92,26 @@ function makeNetwork(projectId: string): string {
   return `${projectId}-network`;
 }
 
+export function selectComputeProvider(): ComputeProvider {
+  if (config.fly.apiToken) {
+    return FlyProvider.getInstance();
+  }
+  if (config.cloud.computeEnabled) {
+    return CloudComputeProvider.getInstance();
+  }
+  throw new AppError(
+    'Compute services not configured. Set FLY_API_TOKEN for self-host, ' +
+      'or enable CLOUD_COMPUTE_ENABLED to use cloud-managed compute.',
+    503,
+    ERROR_CODES.COMPUTE_NOT_CONFIGURED,
+    'Self-hosted: set FLY_API_TOKEN in .env. Cloud: set CLOUD_COMPUTE_ENABLED=true and verify PROJECT_ID is set.'
+  );
+}
+
 export class ComputeServicesService {
   private static instance: ComputeServicesService;
   private pool: Pool | null = null;
+  private readonly compute: ComputeProvider = selectComputeProvider();
 
   private constructor() {}
 
@@ -110,8 +129,8 @@ export class ComputeServicesService {
     return this.pool;
   }
 
-  private getFly(): FlyProvider {
-    return FlyProvider.getInstance();
+  private getCompute(): ComputeProvider {
+    return this.compute;
   }
 
   async listServices(projectId: string): Promise<ServiceSchema[]> {
@@ -136,7 +155,7 @@ export class ComputeServicesService {
   }
 
   async createService(input: CreateServiceInput): Promise<ServiceSchema> {
-    const fly = this.getFly();
+    const fly = this.getCompute();
 
     if (!fly.isConfigured()) {
       throw new AppError(
@@ -251,7 +270,7 @@ export class ComputeServicesService {
   }
 
   async prepareForDeploy(input: CreateServiceInput): Promise<ServiceSchema> {
-    const fly = this.getFly();
+    const fly = this.getCompute();
 
     if (!fly.isConfigured()) {
       throw new AppError(
@@ -335,7 +354,7 @@ export class ComputeServicesService {
       );
     }
 
-    const fly = this.getFly();
+    const fly = this.getCompute();
     const machines = await fly.listMachines(svc.flyAppId);
 
     if (machines.length === 0) {
@@ -427,7 +446,7 @@ export class ComputeServicesService {
       // be changed in-place via updateMachine — a region change requires redeployment
       // (destroy + recreate). The region field is stored for the next deploy.
       try {
-        await this.getFly().updateMachine({
+        await this.getCompute().updateMachine({
           appId: existing.flyAppId,
           machineId: existing.flyMachineId,
           image: data.imageUrl ?? existing.imageUrl,
@@ -478,7 +497,7 @@ export class ComputeServicesService {
     // Treat 404 as success (resource already destroyed)
     if (svc.flyMachineId && svc.flyAppId) {
       try {
-        await this.getFly().destroyMachine(svc.flyAppId, svc.flyMachineId);
+        await this.getCompute().destroyMachine(svc.flyAppId, svc.flyMachineId);
       } catch (error) {
         const msg = error instanceof Error ? error.message : '';
         if (!msg.includes('404')) {
@@ -499,7 +518,7 @@ export class ComputeServicesService {
 
     if (svc.flyAppId) {
       try {
-        await this.getFly().destroyApp(svc.flyAppId);
+        await this.getCompute().destroyApp(svc.flyAppId);
       } catch (error) {
         const msg = error instanceof Error ? error.message : '';
         if (!msg.includes('404')) {
@@ -535,7 +554,7 @@ export class ComputeServicesService {
     }
 
     try {
-      await this.getFly().stopMachine(svc.flyAppId, svc.flyMachineId);
+      await this.getCompute().stopMachine(svc.flyAppId, svc.flyMachineId);
     } catch (error) {
       logger.error('Failed to stop compute service', { id, error });
       throw new AppError(
@@ -567,7 +586,7 @@ export class ComputeServicesService {
     }
 
     try {
-      await this.getFly().startMachine(svc.flyAppId, svc.flyMachineId);
+      await this.getCompute().startMachine(svc.flyAppId, svc.flyMachineId);
     } catch (error) {
       logger.error('Failed to start compute service', { id, error });
       throw new AppError(
@@ -601,7 +620,7 @@ export class ComputeServicesService {
       );
     }
 
-    return this.getFly().getLogs(svc.flyAppId, svc.flyMachineId, options);
+    return this.getCompute().getLogs(svc.flyAppId, svc.flyMachineId, options);
   }
 
   private decryptEnvVars(encrypted: string | null): Record<string, string> {

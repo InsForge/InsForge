@@ -46,20 +46,22 @@ const mockGetLogs = vi.fn();
 const mockListMachines = vi.fn();
 const mockIsConfigured = vi.fn();
 
+const mockFlyInstance = {
+  createApp: mockCreateApp,
+  destroyApp: mockDestroyApp,
+  launchMachine: mockLaunchMachine,
+  updateMachine: mockUpdateMachine,
+  stopMachine: mockStopMachine,
+  startMachine: mockStartMachine,
+  destroyMachine: mockDestroyMachine,
+  getLogs: mockGetLogs,
+  listMachines: mockListMachines,
+  isConfigured: mockIsConfigured,
+};
+
 vi.mock('@/providers/compute/fly.provider.js', () => ({
   FlyProvider: {
-    getInstance: () => ({
-      createApp: mockCreateApp,
-      destroyApp: mockDestroyApp,
-      launchMachine: mockLaunchMachine,
-      updateMachine: mockUpdateMachine,
-      stopMachine: mockStopMachine,
-      startMachine: mockStartMachine,
-      destroyMachine: mockDestroyMachine,
-      getLogs: mockGetLogs,
-      listMachines: mockListMachines,
-      isConfigured: mockIsConfigured,
-    }),
+    getInstance: () => mockFlyInstance,
   },
 }));
 
@@ -678,5 +680,49 @@ describe('ComputeServicesService', () => {
         })
       ).rejects.toThrow(/projectId is too long/);
     });
+  });
+});
+
+describe('selectComputeProvider factory', () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  it('returns FlyProvider when FLY_API_TOKEN is set', async () => {
+    vi.doMock('@/infra/config/app.config.js', () => ({
+      config: {
+        fly: { apiToken: 'tok', org: 'o', enabled: true, domain: 'd' },
+        cloud: { computeEnabled: false, projectId: 'local', apiHost: '' },
+        app: { jwtSecret: 'x' },
+      },
+    }));
+    const { selectComputeProvider } = await import('@/services/compute/services.service.js');
+    const { FlyProvider } = await import('@/providers/compute/fly.provider.js');
+    expect(selectComputeProvider()).toBe(FlyProvider.getInstance());
+  });
+
+  it('returns CloudComputeProvider when cloud is enabled and no FLY_API_TOKEN', async () => {
+    vi.doMock('@/infra/config/app.config.js', () => ({
+      config: {
+        fly: { apiToken: '', org: '', enabled: false, domain: '' },
+        cloud: { computeEnabled: true, projectId: 'p', apiHost: 'https://x' },
+        app: { jwtSecret: 'x' },
+      },
+    }));
+    const { selectComputeProvider } = await import('@/services/compute/services.service.js');
+    const { CloudComputeProvider } = await import('@/providers/compute/cloud.provider.js');
+    expect(selectComputeProvider()).toBe(CloudComputeProvider.getInstance());
+  });
+
+  it('throws COMPUTE_NOT_CONFIGURED when neither is set', async () => {
+    vi.doMock('@/infra/config/app.config.js', () => ({
+      config: {
+        fly: { apiToken: '', org: '', enabled: false, domain: '' },
+        cloud: { computeEnabled: false, projectId: 'local', apiHost: '' },
+        app: { jwtSecret: 'x' },
+      },
+    }));
+    const { selectComputeProvider } = await import('@/services/compute/services.service.js');
+    expect(() => selectComputeProvider()).toThrow(/COMPUTE_NOT_CONFIGURED|not configured/);
   });
 });
