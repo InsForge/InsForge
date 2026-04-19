@@ -12,6 +12,7 @@ import { DatabaseError, Pool } from 'pg';
 import fetch from 'node-fetch';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
+import { validateFunctionCode } from '@/utils/function-code-validator.js';
 import { DenoSubhostingProvider } from '@/providers/functions/deno-subhosting.provider.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 
@@ -146,8 +147,7 @@ export class FunctionService {
     const { name, code, description, status } = data;
     const slug = data.slug || name.toLowerCase().replace(/\s+/g, '-');
 
-    // Validate code with regex checks
-    this.validateCode(code);
+    validateFunctionCode(code);
 
     // Save to DB (release client before deployment polling)
     let created: FunctionSchema;
@@ -215,9 +215,8 @@ export class FunctionService {
     slug: string,
     updates: UpdateFunctionRequest
   ): Promise<{ function: FunctionSchema; deployment?: DeploymentResult | null } | null> {
-    // Validate code if provided
     if (updates.code !== undefined) {
-      this.validateCode(updates.code);
+      validateFunctionCode(updates.code);
     }
 
     // Save to DB (release client before deployment polling)
@@ -345,38 +344,6 @@ export class FunctionService {
         error: error instanceof Error ? error.message : String(error),
       });
       return [];
-    }
-  }
-
-  /**
-   * Validate function code for dangerous patterns
-   */
-  private validateCode(code: string): void {
-    if (/Deno\.serve\s*\(/.test(code)) {
-      throw new AppError(
-        'Functions should use "export default async function(req: Request)" instead of "Deno.serve()". The router handles serving automatically.',
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
-    }
-
-    const dangerousPatterns = [
-      /Deno\.run/i,
-      /Deno\.spawn/i,
-      /Deno\.Command/i,
-      /child_process/i,
-      /process\.exit/i,
-      /require\(['"]fs['"]\)/i,
-    ];
-
-    for (const pattern of dangerousPatterns) {
-      if (pattern.test(code)) {
-        throw new AppError(
-          `Code contains potentially dangerous pattern: ${pattern.toString()}`,
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
-      }
     }
   }
 
