@@ -29,11 +29,7 @@ function getDefaultBackupName() {
   return `${day} ${month}, ${year} ${hours}:${minutes}:${seconds} (Manual)`;
 }
 
-export function CreateBackupDialog({
-  open,
-  onOpenChange,
-  onCreate,
-}: CreateBackupDialogProps) {
+export function CreateBackupDialog({ open, onOpenChange, onCreate }: CreateBackupDialogProps) {
   const backupNameId = useId();
   const [backupName, setBackupName] = useState(getDefaultBackupName);
 
