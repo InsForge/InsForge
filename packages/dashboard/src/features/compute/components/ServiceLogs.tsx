@@ -7,7 +7,7 @@ interface ServiceLogsProps {
 }
 
 export function ServiceLogs({ serviceId }: ServiceLogsProps) {
-  const { data: logs = [], isLoading, refetch, isFetching } = useServiceLogs(serviceId);
+  const { data: logs = [], isLoading, isError, refetch, isFetching } = useServiceLogs(serviceId);
 
   return (
     <div className="bg-card border border-[var(--alpha-8)] rounded-lg overflow-hidden">
@@ -21,6 +21,8 @@ export function ServiceLogs({ serviceId }: ServiceLogsProps) {
       <div className="max-h-[300px] overflow-y-auto p-4">
         {isLoading ? (
           <p className="text-xs text-muted-foreground">Loading logs...</p>
+        ) : isError ? (
+          <p className="text-xs text-destructive">Failed to load logs. Try refreshing.</p>
         ) : logs.length === 0 ? (
           <p className="text-xs text-muted-foreground">No logs available.</p>
         ) : (
