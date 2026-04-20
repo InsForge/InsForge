@@ -735,7 +735,7 @@ In `src/config/app.config.ts`, add inside the `appConfig` export object (alphabe
 
 Append to `.env.example`:
 
-```
+```dotenv
 # ─── Compute Services ─────────────────────────────────────────────────
 # Cloud-mode compute provider for InsForge projects.
 # Token must be a Fly.io org-scoped token: `fly tokens create org`.
@@ -1634,7 +1634,7 @@ In `backend/src/types/error-constants.ts`, find the `ERROR_CODES` const. Add (al
 
 In `.env.example`, locate the `# ─── Compute Services (Fly.io) ──` section. Append:
 
-```
+```dotenv
 # Cloud-mode compute: route compute service operations through the InsForge
 # cloud backend instead of calling Fly directly. Self-host users with their
 # own FLY_API_TOKEN should leave this unset.
