@@ -32,6 +32,8 @@ export function ConfirmRestoreDialog({
     try {
       await onRestore();
       onOpenChange(false);
+    } catch {
+      // Keep the dialog open when restore fails; the caller is responsible for reporting errors.
     } finally {
       setIsRestoring(false);
     }
