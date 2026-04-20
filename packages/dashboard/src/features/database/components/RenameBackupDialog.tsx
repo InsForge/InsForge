@@ -15,7 +15,7 @@ interface RenameBackupDialogProps {
   open: boolean;
   initialName: string;
   onOpenChange: (open: boolean) => void;
-  onSave: (backupName: string) => Promise<void> | void;
+  onSave: (backupName: string) => Promise<void>;
 }
 
 export function RenameBackupDialog({
