@@ -48,16 +48,20 @@ export function CreateServiceDialog({
   };
 
   const handleSubmit = async () => {
-    await onCreate({
-      name,
-      imageUrl,
-      port: Number(port),
-      cpu: cpu as CreateServiceRequest['cpu'],
-      memory: Number(memory),
-      region,
-    });
-    resetForm();
-    onOpenChange(false);
+    try {
+      await onCreate({
+        name,
+        imageUrl,
+        port: Number(port),
+        cpu: cpu as CreateServiceRequest['cpu'],
+        memory: Number(memory),
+        region,
+      });
+      resetForm();
+      onOpenChange(false);
+    } catch {
+      // Error is surfaced to the caller's onError handler (e.g. useComputeServices toast)
+    }
   };
 
   const isValid = name.length > 0 && imageUrl.length > 0 && Number(port) > 0;

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Loader2, ArrowLeft, Plus, Play, Square, Trash2, AlertTriangle } from 'lucide-react';
+import { Loader2, ArrowLeft, Plus, Play, Square, Trash2, AlertTriangle, XCircle } from 'lucide-react';
 import { Button, ConfirmDialog } from '@insforge/ui';
 import { useComputeServices } from '../hooks/useComputeServices';
 import { ServiceCard } from '../components/ServiceCard';
@@ -9,7 +9,19 @@ import { statusColors, getReachableUrl } from '../constants';
 import type { ServiceSchema } from '@insforge/shared-schemas';
 
 export default function ComputePage() {
-  const { services, isLoading, create, remove, stop, start, isCreating } = useComputeServices();
+  const {
+    services,
+    isLoading,
+    error,
+    create,
+    remove,
+    stop,
+    start,
+    isCreating,
+    isDeleting,
+    isStopping,
+    isStarting,
+  } = useComputeServices();
   const [selectedService, setSelectedService] = useState<ServiceSchema | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -31,6 +43,17 @@ export default function ComputePage() {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="flex items-center gap-2 text-destructive">
+          <XCircle className="w-5 h-5 shrink-0" />
+          <span className="text-sm">Failed to load services. Please refresh the page.</span>
+        </div>
       </div>
     );
   }
@@ -69,29 +92,32 @@ export default function ComputePage() {
                   <Button
                     variant="secondary"
                     size="sm"
+                    disabled={isStopping || isDeleting}
                     onClick={() => void stop(currentService.id)}
                   >
                     <Square className="h-3.5 w-3.5" />
-                    Stop
+                    {isStopping ? 'Stopping...' : 'Stop'}
                   </Button>
                 )}
                 {currentService.status === 'stopped' && (
                   <Button
                     variant="secondary"
                     size="sm"
+                    disabled={isStarting || isDeleting}
                     onClick={() => void start(currentService.id)}
                   >
                     <Play className="h-3.5 w-3.5" />
-                    Start
+                    {isStarting ? 'Starting...' : 'Start'}
                   </Button>
                 )}
                 <Button
                   variant="destructive"
                   size="sm"
+                  disabled={isDeleting || isStopping || isStarting}
                   onClick={() => setDeleteTarget(currentService.id)}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                  Delete
+                  {isDeleting ? 'Deleting...' : 'Delete'}
                 </Button>
               </div>
             </div>
@@ -133,6 +159,18 @@ export default function ComputePage() {
                   <dt className="text-muted-foreground mb-1">Created</dt>
                   <dd className="text-foreground">
                     {new Date(currentService.createdAt).toLocaleDateString(undefined, {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground mb-1">Updated</dt>
+                  <dd className="text-foreground">
+                    {new Date(currentService.updatedAt).toLocaleDateString(undefined, {
                       year: 'numeric',
                       month: 'short',
                       day: 'numeric',

@@ -81,6 +81,8 @@ export function useComputeServices() {
     isLoading,
     isCreating: createMutation.isPending,
     isDeleting: deleteMutation.isPending,
+    isStopping: stopMutation.isPending,
+    isStarting: startMutation.isPending,
 
     // Errors
     error,
