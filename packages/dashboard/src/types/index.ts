@@ -16,6 +16,22 @@ export interface DashboardUserInfo {
   name?: string;
 }
 
+export interface DashboardBackup {
+  id: string;
+  name: string | null;
+  triggerSource: 'manual' | 'scheduled';
+  status: 'running' | 'completed' | string;
+  sizeBytes: number | null;
+  expiresAt?: string | null;
+  createdAt: string;
+  createdBy: string | null;
+}
+
+export interface DashboardBackupInfo {
+  manualBackups: DashboardBackup[];
+  scheduledBackups: DashboardBackup[];
+}
+
 export interface DashboardInstanceInfo {
   currentInstanceType: string;
   planName: string;
@@ -46,6 +62,9 @@ export interface DashboardProps {
   onNavigateToSubscription?: () => void;
   onRenameProject?: (name: string) => Promise<void>;
   onDeleteProject?: () => Promise<void>;
+  onRequestBackupInfo?: () => Promise<DashboardBackupInfo>;
+  onRenameBackup?: (backupId: string, name: string | null) => Promise<void>;
+  onRestoreBackup?: (backupId: string) => Promise<void>;
   onRequestInstanceInfo?: () => Promise<DashboardInstanceInfo>;
   onRequestInstanceTypeChange?: (
     instanceType: string
