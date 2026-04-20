@@ -14,7 +14,7 @@ import {
 interface CreateBackupDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreate: (backupName: string) => void;
+  onCreate: (backupName: string) => Promise<void> | void;
 }
 
 function getDefaultBackupName() {
@@ -32,12 +32,25 @@ function getDefaultBackupName() {
 export function CreateBackupDialog({ open, onOpenChange, onCreate }: CreateBackupDialogProps) {
   const backupNameId = useId();
   const [backupName, setBackupName] = useState(getDefaultBackupName);
+  const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
     if (open) {
       setBackupName(getDefaultBackupName());
+      setIsCreating(false);
     }
   }, [open]);
+
+  const handleCreate = async () => {
+    setIsCreating(true);
+
+    try {
+      await onCreate(backupName.trim());
+      onOpenChange(false);
+    } finally {
+      setIsCreating(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -78,6 +91,7 @@ export function CreateBackupDialog({ open, onOpenChange, onCreate }: CreateBacku
               type="button"
               variant="secondary"
               className="h-8 rounded px-2"
+              disabled={isCreating}
               onClick={() => onOpenChange(false)}
             >
               Close
@@ -85,13 +99,12 @@ export function CreateBackupDialog({ open, onOpenChange, onCreate }: CreateBacku
             <Button
               type="button"
               className="h-8 rounded px-2"
-              disabled={!backupName.trim()}
+              disabled={!backupName.trim() || isCreating}
               onClick={() => {
-                onCreate(backupName.trim());
-                onOpenChange(false);
+                void handleCreate();
               }}
             >
-              Create
+              {isCreating ? 'Creating...' : 'Create'}
             </Button>
           </DialogFooter>
         </div>

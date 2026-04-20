@@ -11,6 +11,8 @@ export function CloudHostingDashboard() {
     renameProject,
     deleteProject,
     requestBackupInfo,
+    createBackup,
+    deleteBackup,
     renameBackup,
     restoreBackup,
     requestInstanceInfo,
@@ -31,6 +33,8 @@ export function CloudHostingDashboard() {
       onRenameProject={renameProject}
       onDeleteProject={deleteProject}
       onRequestBackupInfo={requestBackupInfo}
+      onCreateBackup={createBackup}
+      onDeleteBackup={deleteBackup}
       onRenameBackup={renameBackup}
       onRestoreBackup={restoreBackup}
       onRequestInstanceInfo={requestInstanceInfo}

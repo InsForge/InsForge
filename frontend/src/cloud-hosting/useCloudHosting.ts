@@ -21,6 +21,8 @@ type CloudHostingMessage = {
 type PendingRequestKey =
   | 'authCode'
   | 'backupInfo'
+  | 'createBackup'
+  | 'deleteBackup'
   | 'renameBackup'
   | 'restoreBackup'
   | 'instanceInfo'
@@ -39,6 +41,8 @@ type PendingRequest<T> = {
 type PendingRequestValues = {
   authCode: string;
   backupInfo: DashboardBackupInfo;
+  createBackup: void;
+  deleteBackup: void;
   renameBackup: void;
   restoreBackup: void;
   instanceInfo: DashboardInstanceInfo;
@@ -183,6 +187,12 @@ export function useCloudHosting() {
         case 'backupInfo':
           pendingRequestsRef.current.backupInfo =
             pendingRequest as PendingRequest<DashboardBackupInfo>;
+          return;
+        case 'createBackup':
+          pendingRequestsRef.current.createBackup = pendingRequest as PendingRequest<void>;
+          return;
+        case 'deleteBackup':
+          pendingRequestsRef.current.deleteBackup = pendingRequest as PendingRequest<void>;
           return;
         case 'renameBackup':
           pendingRequestsRef.current.renameBackup = pendingRequest as PendingRequest<void>;
@@ -362,6 +372,30 @@ export function useCloudHosting() {
           );
           return;
         }
+        case 'BACKUP_CREATE_RESULT': {
+          if (message.success === true) {
+            resolvePendingRequest('createBackup', undefined);
+            return;
+          }
+
+          rejectPendingRequest(
+            'createBackup',
+            getErrorMessage(message.error, 'Failed to create backup')
+          );
+          return;
+        }
+        case 'BACKUP_DELETE_RESULT': {
+          if (message.success === true) {
+            resolvePendingRequest('deleteBackup', undefined);
+            return;
+          }
+
+          rejectPendingRequest(
+            'deleteBackup',
+            getErrorMessage(message.error, 'Failed to delete backup')
+          );
+          return;
+        }
         case 'BACKUP_RENAME_RESULT': {
           if (message.success === true) {
             resolvePendingRequest('renameBackup', undefined);
@@ -511,6 +545,28 @@ export function useCloudHosting() {
     return createPendingRequest('backupInfo', 'Backup info request');
   }, [createPendingRequest, postMessageToParent]);
 
+  const createBackup = useCallback(
+    async (name: string): Promise<void> => {
+      if (!postMessageToParent({ type: 'CREATE_BACKUP', name })) {
+        throw new Error('Unable to request a backup creation from the parent window');
+      }
+
+      return createPendingRequest('createBackup', 'Backup creation');
+    },
+    [createPendingRequest, postMessageToParent]
+  );
+
+  const deleteBackup = useCallback(
+    async (backupId: string): Promise<void> => {
+      if (!postMessageToParent({ type: 'DELETE_BACKUP', backupId })) {
+        throw new Error('Unable to request a backup deletion from the parent window');
+      }
+
+      return createPendingRequest('deleteBackup', 'Backup deletion');
+    },
+    [createPendingRequest, postMessageToParent]
+  );
+
   const renameBackup = useCallback(
     async (backupId: string, name: string | null): Promise<void> => {
       if (!postMessageToParent({ type: 'RENAME_BACKUP', backupId, name })) {
@@ -606,6 +662,8 @@ export function useCloudHosting() {
     getAuthorizationCode,
     reportRouteChange,
     requestBackupInfo,
+    createBackup,
+    deleteBackup,
     renameBackup,
     restoreBackup,
     requestInstanceInfo,
