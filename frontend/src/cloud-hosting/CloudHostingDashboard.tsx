@@ -10,6 +10,9 @@ export function CloudHostingDashboard() {
     navigateToSubscription,
     renameProject,
     deleteProject,
+    requestBackupInfo,
+    renameBackup,
+    restoreBackup,
     requestInstanceInfo,
     requestInstanceTypeChange,
     updateVersion,
@@ -27,6 +30,9 @@ export function CloudHostingDashboard() {
       onNavigateToSubscription={navigateToSubscription}
       onRenameProject={renameProject}
       onDeleteProject={deleteProject}
+      onRequestBackupInfo={requestBackupInfo}
+      onRenameBackup={renameBackup}
+      onRestoreBackup={restoreBackup}
       onRequestInstanceInfo={requestInstanceInfo}
       onRequestInstanceTypeChange={requestInstanceTypeChange}
       onUpdateVersion={updateVersion}

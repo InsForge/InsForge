@@ -38,6 +38,7 @@ import DatabaseFunctionsPage from '../features/database/pages/FunctionsPage';
 import TriggersPage from '../features/database/pages/TriggersPage';
 import PoliciesPage from '../features/database/pages/PoliciesPage';
 import TemplatesPage from '../features/database/pages/TemplatesPage';
+import DatabaseBackupPage from '../features/database/pages/DatabaseBackupPage';
 import AuditsPage from '../features/logs/pages/AuditsPage';
 import DeploymentsLayout from '../features/deployments/components/DeploymentsLayout';
 import DeploymentLogsPage from '../features/deployments/pages/DeploymentLogsPage';
@@ -71,6 +72,7 @@ function AuthenticatedRoutes() {
           <Route path="policies" element={<PoliciesPage />} />
           <Route path="sql-editor" element={<Navigate to="/dashboard/sql-editor" replace />} />
           <Route path="templates" element={<TemplatesPage />} />
+          <Route path="backups" element={<DatabaseBackupPage />} />
         </Route>
         <Route path="/dashboard/sql-editor" element={<SQLEditorLayout />}>
           <Route index element={<SQLEditorPage />} />
