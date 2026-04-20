@@ -3,9 +3,10 @@ import { useLocation } from 'react-router-dom';
 import AppSidebar from './AppSidebar';
 import AppHeader from './AppHeader';
 import { ThemeProvider } from '../lib/contexts/ThemeContext';
-import { useDashboardHost } from '../lib/config/DashboardHostContext';
 import { ConnectDialog } from '../features/dashboard/components/connect';
 import { ConnectDialogV2 } from '../features/dashboard/components/connect/ConnectDialogV2';
+import { ProjectRestoringOverlay } from '../features/dashboard/components/ProjectRestoringOverlay';
+import { useDashboardHost, useDashboardProject } from '../lib/config/DashboardHostContext';
 import { cn } from '../lib/utils/utils';
 import { ConnectDialogProvider } from './ConnectDialogContext';
 import { getFeatureFlag } from '../lib/analytics/posthog';
@@ -26,6 +27,7 @@ interface LayoutProps {
 
 export default function AppLayout({ children }: LayoutProps) {
   const host = useDashboardHost();
+  const project = useDashboardProject();
   const location = useLocation();
   const isContainedHostLayout = host.mode === 'cloud-hosting';
   const showNavbar = host.showNavbar ?? true;
@@ -94,6 +96,9 @@ export default function AppLayout({ children }: LayoutProps) {
             <AppSidebar isCollapsed={isSidebarCollapsed} onToggleCollapse={toggleSidebar} />
             <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
               {children}
+              {host.mode === 'cloud-hosting' && project?.status === 'restoring' ? (
+                <ProjectRestoringOverlay />
+              ) : null}
             </main>
           </div>
         </div>
