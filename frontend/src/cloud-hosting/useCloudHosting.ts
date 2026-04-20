@@ -108,11 +108,16 @@ function normalizeBackups(backups: unknown): DashboardBackup[] {
     return [];
   }
 
-  return backups.map((backup) => {
+  return backups.flatMap((backup) => {
     const item = backup as Record<string, unknown>;
+    const id = typeof item.id === 'string' ? item.id.trim() : '';
+
+    if (!id) {
+      return [];
+    }
 
     return {
-      id: typeof item.id === 'string' ? item.id : '',
+      id,
       name:
         typeof item.name === 'string' || item.name === null ? (item.name as string | null) : null,
       triggerSource: item.triggerSource === 'scheduled' ? 'scheduled' : 'manual',

@@ -6,6 +6,7 @@ export function useDatabaseBackupInfo() {
   const host = useDashboardHost();
   const isCloudHostingMode = useIsCloudHostingMode();
   const onRequestBackupInfo = host.mode === 'cloud-hosting' ? host.onRequestBackupInfo : undefined;
+  const isBackupInfoQueryEnabled = isCloudHostingMode && !!onRequestBackupInfo;
 
   const query = useQuery({
     queryKey: ['database-backup', 'backup-info'],
@@ -16,12 +17,12 @@ export function useDatabaseBackupInfo() {
 
       return onRequestBackupInfo();
     },
-    enabled: isCloudHostingMode && !!onRequestBackupInfo,
+    enabled: isBackupInfoQueryEnabled,
     staleTime: 5 * 60 * 1000,
   });
 
   return {
-    backupInfo: query.data ?? null,
+    backupInfo: isBackupInfoQueryEnabled ? (query.data ?? null) : null,
     isLoading: query.isLoading,
     error: query.error,
     refetch: query.refetch,
@@ -33,6 +34,7 @@ export function useDatabaseBackupInstanceInfo() {
   const isCloudHostingMode = useIsCloudHostingMode();
   const onRequestInstanceInfo =
     host.mode === 'cloud-hosting' ? host.onRequestInstanceInfo : undefined;
+  const isInstanceInfoQueryEnabled = isCloudHostingMode && !!onRequestInstanceInfo;
 
   const query = useQuery({
     queryKey: ['database-backup', 'instance-info'],
@@ -43,12 +45,12 @@ export function useDatabaseBackupInstanceInfo() {
 
       return onRequestInstanceInfo();
     },
-    enabled: isCloudHostingMode && !!onRequestInstanceInfo,
+    enabled: isInstanceInfoQueryEnabled,
     staleTime: 5 * 60 * 1000,
   });
 
   return {
-    instanceInfo: query.data ?? null,
+    instanceInfo: isInstanceInfoQueryEnabled ? (query.data ?? null) : null,
     isLoading: query.isLoading,
     error: query.error,
     refetch: query.refetch,
