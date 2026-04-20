@@ -64,6 +64,7 @@ export class CloudComputeProvider implements ComputeProvider {
           'Content-Type': 'application/json',
         },
         body: body !== undefined ? JSON.stringify(body) : undefined,
+        signal: AbortSignal.timeout(15_000),
       });
     } catch (err) {
       // Only network/fetch errors arrive here — re-wrap as COMPUTE_CLOUD_UNAVAILABLE

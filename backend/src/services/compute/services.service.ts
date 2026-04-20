@@ -93,7 +93,7 @@ function makeNetwork(projectId: string): string {
 }
 
 export function selectComputeProvider(): ComputeProvider {
-  if (config.fly.apiToken) {
+  if (config.fly.enabled && config.fly.apiToken) {
     return FlyProvider.getInstance();
   }
   if (config.cloud.computeEnabled) {
@@ -569,6 +569,15 @@ export class ComputeServicesService {
       [id]
     );
 
+    if (!result.rows.length) {
+      throw new AppError(
+        'Service not found',
+        404,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
+        NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS,
+      );
+    }
+
     logger.info('Compute service stopped', { id });
     return mapRowToSchema(result.rows[0]);
   }
@@ -600,6 +609,15 @@ export class ComputeServicesService {
       `UPDATE compute.services SET status = 'running' WHERE id = $1 RETURNING *`,
       [id]
     );
+
+    if (!result.rows.length) {
+      throw new AppError(
+        'Service not found',
+        404,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
+        NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS,
+      );
+    }
 
     logger.info('Compute service started', { id });
     return mapRowToSchema(result.rows[0]);

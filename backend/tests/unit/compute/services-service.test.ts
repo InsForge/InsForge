@@ -689,7 +689,104 @@ describe('ComputeServicesService', () => {
       ).rejects.toThrow(/projectId is too long/);
     });
   });
+
+  describe('stopService', () => {
+    const serviceRow = {
+      id: 'svc-stop-1',
+      project_id: 'proj-123',
+      name: 'my-api',
+      image_url: 'nginx:latest',
+      port: 8080,
+      cpu: 'shared-1x',
+      memory: 256,
+      region: 'iad',
+      fly_app_id: 'my-api-proj-123',
+      fly_machine_id: 'machine-1',
+      status: 'running',
+      endpoint_url: 'https://my-api-proj-123.fly.dev',
+      env_vars_encrypted: null,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    };
+
+    it('stops machine and updates status to stopped', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [serviceRow] }); // getService
+      mockStopMachine.mockResolvedValue(undefined);
+      mockQuery.mockResolvedValueOnce({ rows: [{ ...serviceRow, status: 'stopped' }] }); // UPDATE
+
+      const result = await service.stopService('svc-stop-1');
+
+      expect(mockStopMachine).toHaveBeenCalledWith('my-api-proj-123', 'machine-1');
+      expect(result.status).toBe('stopped');
+    });
+
+    it('throws COMPUTE_SERVICE_NOT_FOUND when UPDATE affects zero rows', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [serviceRow] }); // getService
+      mockStopMachine.mockResolvedValue(undefined);
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // UPDATE returns nothing
+
+      await expect(service.stopService('svc-stop-1')).rejects.toThrow('Service not found');
+    });
+
+    it('throws COMPUTE_SERVICE_STOP_FAILED when stopMachine fails', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [serviceRow] }); // getService
+      mockStopMachine.mockRejectedValue(new Error('Fly error'));
+
+      await expect(service.stopService('svc-stop-1')).rejects.toThrow(/Failed to stop/);
+    });
+  });
+
+  describe('startService', () => {
+    const serviceRow = {
+      id: 'svc-start-1',
+      project_id: 'proj-123',
+      name: 'my-api',
+      image_url: 'nginx:latest',
+      port: 8080,
+      cpu: 'shared-1x',
+      memory: 256,
+      region: 'iad',
+      fly_app_id: 'my-api-proj-123',
+      fly_machine_id: 'machine-1',
+      status: 'stopped',
+      endpoint_url: 'https://my-api-proj-123.fly.dev',
+      env_vars_encrypted: null,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    };
+
+    it('starts machine and updates status to running', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [serviceRow] }); // getService
+      mockStartMachine.mockResolvedValue(undefined);
+      mockQuery.mockResolvedValueOnce({ rows: [{ ...serviceRow, status: 'running' }] }); // UPDATE
+
+      const result = await service.startService('svc-start-1');
+
+      expect(mockStartMachine).toHaveBeenCalledWith('my-api-proj-123', 'machine-1');
+      expect(result.status).toBe('running');
+    });
+
+    it('throws COMPUTE_SERVICE_NOT_FOUND when UPDATE affects zero rows', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [serviceRow] }); // getService
+      mockStartMachine.mockResolvedValue(undefined);
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // UPDATE returns nothing
+
+      await expect(service.startService('svc-start-1')).rejects.toThrow('Service not found');
+    });
+
+    it('throws COMPUTE_SERVICE_START_FAILED when startMachine fails', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [serviceRow] }); // getService
+      mockStartMachine.mockRejectedValue(new Error('Fly error'));
+
+      await expect(service.startService('svc-start-1')).rejects.toThrow(/Failed to start/);
+    });
+  });
 });
+
+// NOTE: Route-level integration tests for compute endpoints are deferred —
+// supertest is not used in this repo. Unit coverage at the service layer is
+// comprehensive; HTTP-layer wiring is validated via type-checked route
+// definitions and manual QA.
 
 describe('selectComputeProvider factory', () => {
   beforeEach(() => {

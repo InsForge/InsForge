@@ -85,6 +85,14 @@ describe('CloudComputeProvider', () => {
     expect(call[0]).toContain('limit=50');
   });
 
+  it('throws COMPUTE_CLOUD_UNAVAILABLE on AbortError (timeout)', async () => {
+    const abortError = new DOMException('The operation was aborted', 'AbortError');
+    (global.fetch as any).mockRejectedValue(abortError);
+    const provider = CloudComputeProvider.getInstance();
+    await expect(provider.createApp({ name: 't', network: 't', org: 'o' }))
+      .rejects.toMatchObject({ code: 'COMPUTE_CLOUD_UNAVAILABLE' });
+  });
+
   it('surfaces COMPUTE_NOT_CONFIGURED when config is missing (not masked as CLOUD_UNAVAILABLE)', async () => {
     const { AppError } = await import('@/api/middlewares/error.js');
     const { ERROR_CODES } = await import('@/types/error-constants.js');

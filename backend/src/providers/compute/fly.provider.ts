@@ -98,7 +98,7 @@ export class FlyProvider implements ComputeProvider {
           `Fly GraphQL allocateIpAddress(${type}) failed (${response.status}): ${body}`
         );
       }
-      const result = await response.json();
+      const result = await response.json() as { errors?: unknown };
       if (result.errors) {
         throw new Error(
           `Fly GraphQL allocateIpAddress(${type}) errors: ${JSON.stringify(result.errors)}`
@@ -228,6 +228,11 @@ export class FlyProvider implements ComputeProvider {
     return { state: result.state };
   }
 
+  /**
+   * Returns Fly machine lifecycle events (state changes, starts, stops) from
+   * /apps/:app/machines/:id/events. This is NOT container stdout/stderr —
+   * Fly exposes a separate log streaming service for that.
+   */
   async getLogs(
     appId: string,
     machineId: string,
