@@ -335,7 +335,7 @@ export default function DatabaseBackupPage() {
 
                     <div className="min-w-0">
                       <p className="text-base font-normal leading-7 text-foreground">
-                        Free Plans does not have Scheduled Backups
+                        Free Plan does not have Scheduled Backups
                       </p>
                       <p className="mt-1 text-sm leading-6 text-muted-foreground">
                         Upgrade to a paid plan to unlock scheduled backups.
