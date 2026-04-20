@@ -41,6 +41,8 @@ export function RenameBackupDialog({
     try {
       await onSave(backupName.trim());
       onOpenChange(false);
+    } catch {
+      // Keep the dialog open when saving fails; the caller is responsible for reporting errors.
     } finally {
       setIsSaving(false);
     }

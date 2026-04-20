@@ -83,13 +83,7 @@ export default function DatabaseBackupPage() {
       return;
     }
 
-    try {
-      await host.onRestoreBackup(backupId);
-      showToast('Backup restore started successfully.', 'success');
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Failed to restore backup.', 'error');
-      throw error;
-    }
+    await host.onRestoreBackup(backupId);
   };
 
   const handleRenameBackupClick = (backupId: string, backupLabel: string) => {
@@ -104,14 +98,8 @@ export default function DatabaseBackupPage() {
       throw new Error('Backup creation is not available in the current dashboard mode.');
     }
 
-    try {
-      await host.onCreateBackup(backupName);
-      await refetch();
-      showToast('Backup started successfully.', 'success');
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Failed to create backup.', 'error');
-      throw error;
-    }
+    await host.onCreateBackup(backupName);
+    await refetch();
   };
 
   const handleDeleteBackupClick = async (backupId: string, backupLabel: string) => {
@@ -135,9 +123,8 @@ export default function DatabaseBackupPage() {
     try {
       await host.onDeleteBackup(backupId);
       await refetch();
-      showToast('Backup deleted successfully.', 'success');
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Failed to delete backup.', 'error');
+    } catch {
+      // The cloud host is responsible for delete failure toasts.
     }
   };
 
@@ -393,19 +380,9 @@ export default function DatabaseBackupPage() {
             );
           }
 
-          return host
-            .onRenameBackup(renameBackupDialogState.id, backupName)
-            .then(async () => {
-              await refetch();
-              showToast('Backup renamed successfully.', 'success');
-            })
-            .catch((error: unknown) => {
-              showToast(
-                error instanceof Error ? error.message : 'Failed to rename backup.',
-                'error'
-              );
-              throw error;
-            });
+          return host.onRenameBackup(renameBackupDialogState.id, backupName).then(async () => {
+            await refetch();
+          });
         }}
       />
       <ConfirmRestoreDialog

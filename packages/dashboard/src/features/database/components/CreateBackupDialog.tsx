@@ -47,6 +47,8 @@ export function CreateBackupDialog({ open, onOpenChange, onCreate }: CreateBacku
     try {
       await onCreate(backupName.trim());
       onOpenChange(false);
+    } catch {
+      // Keep the dialog open when creation fails; the caller is responsible for reporting errors.
     } finally {
       setIsCreating(false);
     }
