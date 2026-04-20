@@ -18,6 +18,12 @@ vi.mock('@/utils/logger.js', () => ({
 import { FlyProvider } from '@/providers/compute/fly.provider.js';
 
 const FLY_API_BASE = 'https://api.machines.dev/v1';
+const FLY_GRAPHQL_ENDPOINT = 'https://api.fly.io/graphql';
+
+const graphqlOkResponse = () => ({
+  ok: true,
+  json: () => Promise.resolve({ data: { allocateIpAddress: { ipAddress: {} } } }),
+});
 
 describe('FlyProvider', () => {
   let provider: FlyProvider;
@@ -32,11 +38,12 @@ describe('FlyProvider', () => {
   });
 
   describe('createApp', () => {
-    it('calls correct URL with correct body', async () => {
-      const mockFetch = vi.fn().mockResolvedValue({
-        ok: true,
-        text: () => Promise.resolve(''),
-      });
+    it('calls correct URL with correct body and allocates IPs (3 fetches total)', async () => {
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce({ ok: true, text: () => Promise.resolve('') })
+        .mockResolvedValueOnce(graphqlOkResponse())
+        .mockResolvedValueOnce(graphqlOkResponse());
       vi.stubGlobal('fetch', mockFetch);
 
       const result = await provider.createApp({
@@ -45,7 +52,11 @@ describe('FlyProvider', () => {
         org: 'test-org',
       });
 
-      expect(mockFetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+
+      // First call: REST app creation
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        1,
         `${FLY_API_BASE}/apps`,
         expect.objectContaining({
           method: 'POST',
@@ -56,10 +67,29 @@ describe('FlyProvider', () => {
           }),
         })
       );
+
+      // Second call: shared_v4 GraphQL mutation
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        2,
+        FLY_GRAPHQL_ENDPOINT,
+        expect.objectContaining({ method: 'POST' })
+      );
+      const body2 = JSON.parse(mockFetch.mock.calls[1][1].body);
+      expect(body2.variables.input).toEqual({ appId: 'my-app', type: 'shared_v4' });
+
+      // Third call: v6 GraphQL mutation
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        3,
+        FLY_GRAPHQL_ENDPOINT,
+        expect.objectContaining({ method: 'POST' })
+      );
+      const body3 = JSON.parse(mockFetch.mock.calls[2][1].body);
+      expect(body3.variables.input).toEqual({ appId: 'my-app', type: 'v6' });
+
       expect(result).toEqual({ appId: 'my-app' });
     });
 
-    it('throws on Fly API error', async () => {
+    it('throws on Fly API REST error', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         ok: false,
         status: 422,
@@ -70,6 +100,38 @@ describe('FlyProvider', () => {
       await expect(
         provider.createApp({ name: 'my-app', network: 'default', org: 'test-org' })
       ).rejects.toThrow('Fly API error (422): app already exists');
+    });
+
+    it('throws when GraphQL allocateIpAddress returns errors', async () => {
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce({ ok: true, text: () => Promise.resolve('') })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({ errors: [{ message: 'organization limit reached' }] }),
+        });
+      vi.stubGlobal('fetch', mockFetch);
+
+      await expect(
+        provider.createApp({ name: 'my-app', network: 'default', org: 'test-org' })
+      ).rejects.toThrow(/Fly GraphQL allocateIpAddress\(shared_v4\) errors/);
+    });
+
+    it('throws when GraphQL allocateIpAddress responds non-2xx', async () => {
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce({ ok: true, text: () => Promise.resolve('') })
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 500,
+          text: () => Promise.resolve('internal server error'),
+        });
+      vi.stubGlobal('fetch', mockFetch);
+
+      await expect(
+        provider.createApp({ name: 'my-app', network: 'default', org: 'test-org' })
+      ).rejects.toThrow(/Fly GraphQL allocateIpAddress\(shared_v4\) failed \(500\)/);
     });
   });
 
