@@ -66,7 +66,45 @@ export class FlyProvider implements ComputeProvider {
         network: params.network,
       }),
     });
+    await this.allocatePublicIps(params.name);
     return { appId: params.name };
+  }
+
+  private async allocatePublicIps(appId: string): Promise<void> {
+    const graphqlEndpoint = 'https://api.fly.io/graphql';
+    const mutation = `
+      mutation AllocateIp($input: AllocateIPAddressInput!) {
+        allocateIpAddress(input: $input) {
+          ipAddress { id address type region }
+        }
+      }
+    `;
+    const types: ('shared_v4' | 'v6')[] = ['shared_v4', 'v6'];
+    for (const type of types) {
+      const response = await fetch(graphqlEndpoint, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${config.fly.apiToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: mutation,
+          variables: { input: { appId, type } },
+        }),
+      });
+      if (!response.ok) {
+        const body = await response.text();
+        throw new Error(
+          `Fly GraphQL allocateIpAddress(${type}) failed (${response.status}): ${body}`
+        );
+      }
+      const result = await response.json();
+      if (result.errors) {
+        throw new Error(
+          `Fly GraphQL allocateIpAddress(${type}) errors: ${JSON.stringify(result.errors)}`
+        );
+      }
+    }
   }
 
   async destroyApp(appId: string): Promise<void> {
