@@ -52,7 +52,6 @@ export default function DatabaseBackupPage() {
     id: string;
     timestampLabel: string;
   } | null>(null);
-  const [renamedBackupNames, setRenamedBackupNames] = useState<Record<string, string>>({});
 
   const isFreePlan = (instanceInfo?.planName?.toLowerCase() ?? 'free') === 'free';
   const manualBackups = backupInfo?.manualBackups ?? [];
@@ -100,7 +99,22 @@ export default function DatabaseBackupPage() {
     });
   };
 
-  const handleDeleteBackupClick = async (backupLabel: string) => {
+  const handleCreateBackup = async (backupName: string) => {
+    if (!host.onCreateBackup) {
+      throw new Error('Backup creation is not available in the current dashboard mode.');
+    }
+
+    try {
+      await host.onCreateBackup(backupName);
+      await refetch();
+      showToast('Backup started successfully.', 'success');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to create backup.', 'error');
+      throw error;
+    }
+  };
+
+  const handleDeleteBackupClick = async (backupId: string, backupLabel: string) => {
     const shouldDelete = await confirm({
       title: 'Delete Backup',
       description: `Are you sure you want to delete "${backupLabel}"? This action cannot be undone.`,
@@ -113,10 +127,18 @@ export default function DatabaseBackupPage() {
       return;
     }
 
-    showToast(
-      'Delete actions will be available once the cloud backup API is wired to this page.',
-      'info'
-    );
+    if (!host.onDeleteBackup) {
+      showToast('Backup deletion is not available in the current dashboard mode.', 'info');
+      return;
+    }
+
+    try {
+      await host.onDeleteBackup(backupId);
+      await refetch();
+      showToast('Backup deleted successfully.', 'success');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to delete backup.', 'error');
+    }
   };
 
   return (
@@ -178,10 +200,7 @@ export default function DatabaseBackupPage() {
                 <div className="flex flex-col">
                   {manualBackups.map((backup) => {
                     const savedOnLabel = formatBackupTimestamp(backup.createdAt);
-                    const backupLabel =
-                      renamedBackupNames[backup.id] ||
-                      backup.name?.trim() ||
-                      `${savedOnLabel} (Manual)`;
+                    const backupLabel = backup.name?.trim() || `${savedOnLabel} (Manual)`;
 
                     return (
                       <div
@@ -238,7 +257,7 @@ export default function DatabaseBackupPage() {
                             <DropdownMenuContent align="end" sideOffset={6} className="w-44 p-1.5">
                               <DropdownMenuItem
                                 onClick={() => {
-                                  void handleDeleteBackupClick(backupLabel);
+                                  void handleDeleteBackupClick(backup.id, backupLabel);
                                 }}
                                 className="cursor-pointer gap-2 text-destructive"
                               >
@@ -353,12 +372,7 @@ export default function DatabaseBackupPage() {
       <CreateBackupDialog
         open={createBackupDialogOpen}
         onOpenChange={setCreateBackupDialogOpen}
-        onCreate={() => {
-          showToast(
-            'Backup actions will be available once the cloud backup API is wired to this page.',
-            'info'
-          );
-        }}
+        onCreate={handleCreateBackup}
       />
       <RenameBackupDialog
         open={renameBackupDialogState !== null}
@@ -373,28 +387,25 @@ export default function DatabaseBackupPage() {
             return Promise.resolve();
           }
 
-          if (host.onRenameBackup) {
-            return host
-              .onRenameBackup(renameBackupDialogState.id, backupName)
-              .then(async () => {
-                await refetch();
-                showToast('Backup renamed successfully.', 'success');
-              })
-              .catch((error: unknown) => {
-                showToast(
-                  error instanceof Error ? error.message : 'Failed to rename backup.',
-                  'error'
-                );
-                throw error;
-              });
+          if (!host.onRenameBackup) {
+            return Promise.reject(
+              new Error('Backup rename is not available in the current dashboard mode.')
+            );
           }
 
-          setRenamedBackupNames((current) => ({
-            ...current,
-            [renameBackupDialogState.id]: backupName,
-          }));
-          showToast('Backup name updated locally for testing.', 'success');
-          return Promise.resolve();
+          return host
+            .onRenameBackup(renameBackupDialogState.id, backupName)
+            .then(async () => {
+              await refetch();
+              showToast('Backup renamed successfully.', 'success');
+            })
+            .catch((error: unknown) => {
+              showToast(
+                error instanceof Error ? error.message : 'Failed to rename backup.',
+                'error'
+              );
+              throw error;
+            });
         }}
       />
       <ConfirmRestoreDialog
