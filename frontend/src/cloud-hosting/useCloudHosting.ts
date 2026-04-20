@@ -109,7 +109,8 @@ function normalizeBackups(backups: unknown): DashboardBackup[] {
 
     return {
       id: typeof item.id === 'string' ? item.id : '',
-      name: typeof item.name === 'string' || item.name === null ? (item.name as string | null) : null,
+      name:
+        typeof item.name === 'string' || item.name === null ? (item.name as string | null) : null,
       triggerSource: item.triggerSource === 'scheduled' ? 'scheduled' : 'manual',
       status: typeof item.status === 'string' ? item.status : '',
       sizeBytes:
@@ -180,7 +181,8 @@ export function useCloudHosting() {
           pendingRequestsRef.current.authCode = pendingRequest as PendingRequest<string>;
           return;
         case 'backupInfo':
-          pendingRequestsRef.current.backupInfo = pendingRequest as PendingRequest<DashboardBackupInfo>;
+          pendingRequestsRef.current.backupInfo =
+            pendingRequest as PendingRequest<DashboardBackupInfo>;
           return;
         case 'renameBackup':
           pendingRequestsRef.current.renameBackup = pendingRequest as PendingRequest<void>;

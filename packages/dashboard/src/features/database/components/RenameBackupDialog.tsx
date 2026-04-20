@@ -54,9 +54,7 @@ export function RenameBackupDialog({
             <div className="flex w-full items-center gap-3">
               <div className="min-w-0 flex-1">
                 <DialogTitle>Rename Backup</DialogTitle>
-                <DialogDescription className="sr-only">
-                  Rename a database backup.
-                </DialogDescription>
+                <DialogDescription className="sr-only">Rename a database backup.</DialogDescription>
               </div>
               <DialogCloseButton className="relative right-auto top-auto h-7 w-7 rounded p-1" />
             </div>

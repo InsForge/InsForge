@@ -5,8 +5,7 @@ import type { DashboardBackupInfo, DashboardInstanceInfo } from '../../../types'
 export function useDatabaseBackupInfo() {
   const host = useDashboardHost();
   const isCloudHostingMode = useIsCloudHostingMode();
-  const onRequestBackupInfo =
-    host.mode === 'cloud-hosting' ? host.onRequestBackupInfo : undefined;
+  const onRequestBackupInfo = host.mode === 'cloud-hosting' ? host.onRequestBackupInfo : undefined;
 
   const query = useQuery({
     queryKey: ['database-backup', 'backup-info'],

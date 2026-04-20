@@ -235,11 +235,7 @@ export default function DatabaseBackupPage() {
                                 <MoreHorizontal className="h-5 w-5" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent
-                              align="end"
-                              sideOffset={6}
-                              className="w-44 p-1.5"
-                            >
+                            <DropdownMenuContent align="end" sideOffset={6} className="w-44 p-1.5">
                               <DropdownMenuItem
                                 onClick={() => {
                                   void handleDeleteBackupClick(backupLabel);
