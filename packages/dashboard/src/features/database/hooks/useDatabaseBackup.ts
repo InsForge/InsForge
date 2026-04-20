@@ -9,9 +9,9 @@ export function useDatabaseBackupInfo() {
 
   const query = useQuery({
     queryKey: ['database-backup', 'backup-info'],
-    queryFn: async (): Promise<DashboardBackupInfo | null> => {
+    queryFn: (): Promise<DashboardBackupInfo | null> => {
       if (!onRequestBackupInfo) {
-        return null;
+        return Promise.resolve(null);
       }
 
       return onRequestBackupInfo();
@@ -36,9 +36,9 @@ export function useDatabaseBackupInstanceInfo() {
 
   const query = useQuery({
     queryKey: ['database-backup', 'instance-info'],
-    queryFn: async (): Promise<DashboardInstanceInfo | null> => {
+    queryFn: (): Promise<DashboardInstanceInfo | null> => {
       if (!onRequestInstanceInfo) {
-        return null;
+        return Promise.resolve(null);
       }
 
       return onRequestInstanceInfo();

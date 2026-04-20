@@ -14,7 +14,7 @@ import {
 interface CreateBackupDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreate: (backupName: string) => Promise<void> | void;
+  onCreate: (backupName: string) => Promise<void>;
 }
 
 function getDefaultBackupName() {

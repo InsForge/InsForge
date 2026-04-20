@@ -15,7 +15,7 @@ interface ConfirmRestoreDialogProps {
   open: boolean;
   backupTimestampLabel: string;
   onOpenChange: (open: boolean) => void;
-  onRestore: () => Promise<void> | void;
+  onRestore: () => Promise<void>;
 }
 
 export function ConfirmRestoreDialog({
