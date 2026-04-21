@@ -5,7 +5,7 @@ import AppHeader from './AppHeader';
 import { ThemeProvider } from '../lib/contexts/ThemeContext';
 import { ConnectDialog } from '../features/dashboard/components/connect';
 import { ConnectDialogV2 } from '../features/dashboard/components/connect/ConnectDialogV2';
-import { ProjectRestoringOverlay } from '../features/dashboard/components/ProjectRestoringOverlay';
+import { ProjectRestoringPage } from '../features/dashboard/components/ProjectRestoringPage';
 import { useDashboardHost, useDashboardProject } from '../lib/config/DashboardHostContext';
 import { cn } from '../lib/utils/utils';
 import { ConnectDialogProvider } from './ConnectDialogContext';
@@ -32,6 +32,7 @@ export default function AppLayout({ children }: LayoutProps) {
   const isContainedHostLayout = host.mode === 'cloud-hosting';
   const showNavbar = host.showNavbar ?? true;
   const forcedTheme = host.mode === 'cloud-hosting' ? 'dark' : undefined;
+  const showProjectRestoringPage = host.mode === 'cloud-hosting' && project?.status === 'restoring';
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isConnectDialogOpen, setIsConnectDialogOpen] = useState(false);
   const currentRoute = `${location.pathname}${location.search}${location.hash}`;
@@ -95,10 +96,7 @@ export default function AppLayout({ children }: LayoutProps) {
           <div className="min-h-0 min-w-0 flex flex-1 overflow-hidden">
             <AppSidebar isCollapsed={isSidebarCollapsed} onToggleCollapse={toggleSidebar} />
             <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
-              {children}
-              {host.mode === 'cloud-hosting' && project?.status === 'restoring' ? (
-                <ProjectRestoringOverlay />
-              ) : null}
+              {showProjectRestoringPage ? <ProjectRestoringPage /> : children}
             </main>
           </div>
         </div>

@@ -16,7 +16,7 @@ import { useDeploymentMetadata } from '../../deployments/hooks/useDeploymentMeta
 import { NewCLISection } from '../components/connect/NewCLISection';
 import { MCPSection } from '../components/connect';
 import stepBgDecoration from '../../../assets/images/step_bg_decoration.svg';
-import DiscordIcon from '../../../assets/logos/discord.svg?react';
+import { JoinDiscordCta } from '../components/JoinDiscordCta';
 
 // --- Prompt Stepper Data ---
 
@@ -545,18 +545,7 @@ export default function CTestDashboardPage() {
 
         {/* Bottom help bar */}
         <div className="flex items-center justify-center px-4 pb-10 pt-6">
-          <p className="flex items-center gap-1 text-sm leading-6 text-muted-foreground">
-            <span>Need help? Join our</span>
-            <a
-              href="https://discord.gg/DvBtaEc9Jz"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-[#818cf8] hover:text-[#99a3ff]"
-            >
-              <DiscordIcon className="size-5" />
-              <span>Discord</span>
-            </a>
-          </p>
+          <JoinDiscordCta />
         </div>
       </main>
     );

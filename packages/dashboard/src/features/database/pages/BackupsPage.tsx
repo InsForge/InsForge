@@ -36,7 +36,7 @@ function formatBackupTimestamp(timestamp: string) {
   return `${day} ${month}, ${year} ${hours}:${minutes}:${seconds}`;
 }
 
-export default function DatabaseBackupPage() {
+export default function BackupsPage() {
   const navigate = useNavigate();
   const host = useDashboardHost();
   const { showToast } = useToast();
