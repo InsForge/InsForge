@@ -83,13 +83,13 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    // Resend verification code
-    suspend fun resendVerificationCode(email: String) {
+    // Resend verification email
+    suspend fun resendVerificationEmail(email: String) {
         try {
             client.auth.resendVerificationEmail(email = email)
             // Show success message
         } catch (e: InsforgeHttpException) {
-            _uiState.value = AuthUiState.Error("Failed to resend code")
+            _uiState.value = AuthUiState.Error("Failed to resend verification email")
         }
     }
 }
@@ -123,7 +123,7 @@ This indicates that verification via option 2 or 3 is required before the user c
 | Method | Description |
 |--------|-------------|
 | `verifyEmail(email, code)` | Verify email with 6-digit code |
-| `resendVerificationEmail(email)` | Resend verification code to email |
+| `resendVerificationEmail(email)` | Resend verification email |
 
 ---
 
@@ -175,115 +175,9 @@ try {
 
 ---
 
-## signInWithDefaultPage()
-
-InsForge provides a hosted authentication page that supports:
-- **OAuth Providers**: Google, GitHub, Discord, LinkedIn, Facebook, Instagram, TikTok, Apple, X (Twitter), Spotify, Microsoft
-- **Email + Password**: Traditional email/password authentication
-
-Start authentication flow with the hosted authentication page.
-
-<Note>
-For direct OAuth provider authentication without the hosted page, use [signInWithOAuthPage()](#signinwithoauthpage) instead.
-</Note>
-
-### Example
-
-1. Configure App Link / Deep Link Callback
-
-Configure your callback Activity in AndroidManifest.xml:
-
-- Option A: Custom URL Scheme (for Development)
-
-```xml
-<activity
-    android:name=".AuthCallbackActivity"
-    android:launchMode="singleTask"
-    android:exported="true">
-    <intent-filter>
-        <action android:name="android.intent.action.VIEW" />
-        <category android:name="android.intent.category.DEFAULT" />
-        <category android:name="android.intent.category.BROWSABLE" />
-        <data android:scheme="yourapp" android:host="auth" android:path="/callback" />
-    </intent-filter>
-</activity>
-```
-
-- Option B: App Links (for Production)
-
-```xml
-<activity
-    android:name=".AuthCallbackActivity"
-    android:launchMode="singleTask"
-    android:exported="true">
-    <intent-filter android:autoVerify="true">
-        <action android:name="android.intent.action.VIEW" />
-        <category android:name="android.intent.category.DEFAULT" />
-        <category android:name="android.intent.category.BROWSABLE" />
-        <data android:scheme="https" android:host="yourdomain.com" android:path="/auth/callback" />
-    </intent-filter>
-</activity>
-```
-
-2. Initiate OAuth Login
-
-```kotlin
-// Call in your login screen
-fun startLogin() {
-    // Use Custom URL Scheme
-    client.auth.signInWithDefaultPage("yourapp://auth/callback")
-
-    // Or use App Links
-    // client.auth.signInWithDefaultPage("https://yourdomain.com/auth/callback")
-}
-```
-
-3. Handle OAuth Callback
-
-```kotlin
-class AuthCallbackActivity : AppCompatActivity() {
-    
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        handleIntent(intent)
-    }
-    
-    override fun onNewIntent(intent: Intent?) {
-        super.onNewIntent(intent)
-        intent?.let { handleIntent(it) }
-    }
-    
-    private fun handleIntent(intent: Intent) {
-        intent.data?.let { uri ->
-            lifecycleScope.launch {
-                try {
-                    // Callback URL handled by SDK
-                    val result = client.auth.handleAuthCallback(uri.toString())
-                    
-                    // Auth success, navigate to main screen
-                    Toast.makeText(this@AuthCallbackActivity, 
-                        "Success: ${result.email}", Toast.LENGTH_SHORT).show()
-                    
-                    startActivity(Intent(this@AuthCallbackActivity, MainActivity::class.java))
-                    finish()
-                    
-                } catch (e: Exception) {
-                    // Handle error
-                    Toast.makeText(this@AuthCallbackActivity,
-                        "Failed: ${e.message}", Toast.LENGTH_LONG).show()
-                    finish()
-                }
-            }
-        }
-    }
-}
-```
-
----
-
 ## signInWithOAuthPage()
 
-Sign in directly with a specific OAuth provider. Unlike `signInWithDefaultPage()` which shows a hosted page with all options, this method opens the OAuth provider's authentication page directly in the system browser.
+Sign in directly with a specific OAuth provider. This method opens the OAuth provider's authentication page directly in the system browser.
 
 ### Supported Providers
 
@@ -343,7 +237,39 @@ val client = createInsforgeClient(baseURL, anonKey) {
 
 2. Configure App Link / Deep Link Callback
 
-Same as `signInWithDefaultPage()`.
+Configure your callback Activity in AndroidManifest.xml:
+
+- Option A: Custom URL Scheme (for Development)
+
+```xml
+<activity
+    android:name=".AuthCallbackActivity"
+    android:launchMode="singleTask"
+    android:exported="true">
+    <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="yourapp" android:host="auth" android:path="/callback" />
+    </intent-filter>
+</activity>
+```
+
+- Option B: App Links (for Production)
+
+```xml
+<activity
+    android:name=".AuthCallbackActivity"
+    android:launchMode="singleTask"
+    android:exported="true">
+    <intent-filter android:autoVerify="true">
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="https" android:host="yourdomain.com" android:path="/auth/callback" />
+    </intent-filter>
+</activity>
+```
 
 3. Initiate OAuth Login with Specific Provider
 
@@ -362,7 +288,50 @@ fun startGoogleLogin() {
 
 4. Handle OAuth Callback
 
-Same as `signInWithDefaultPage()`.
+```kotlin
+class AuthCallbackActivity : AppCompatActivity() {
+    // Example: read the shared InsForge client from your Application class.
+    private val client by lazy { (application as MyApp).insforgeClient }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        handleIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        intent?.let { handleIntent(it) }
+    }
+
+    private fun handleIntent(intent: Intent) {
+        intent.data?.let { uri ->
+            lifecycleScope.launch {
+                try {
+                    val result = client.auth.handleAuthCallback(uri.toString())
+
+                    Toast.makeText(
+                        this@AuthCallbackActivity,
+                        "Success: ${result.email}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+
+                    startActivity(Intent(this@AuthCallbackActivity, MainActivity::class.java))
+                    finish()
+                } catch (e: Exception) {
+                    Toast.makeText(
+                        this@AuthCallbackActivity,
+                        "Failed: ${e.message}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    finish()
+                }
+            }
+        }
+    }
+}
+```
+
+`client` should come from the same shared InsForge client instance you use elsewhere in the app, such as an `Application` singleton or your DI container.
 
 ---
 

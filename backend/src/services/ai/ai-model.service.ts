@@ -11,7 +11,7 @@ export class AIModelService {
    */
   static async getModels(): Promise<AIModelSchema[]> {
     const openRouterProvider = OpenRouterProvider.getInstance();
-    const configured = openRouterProvider.isConfigured();
+    const configured = await openRouterProvider.isConfiguredAsync();
 
     if (!configured) {
       return [];

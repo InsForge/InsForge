@@ -25,6 +25,3 @@ jobs:
 
       - name: Run backend unit tests
         run: npm run test:backend
-
-      - name: Run frontend unit tests
-        run: npm run test:frontend

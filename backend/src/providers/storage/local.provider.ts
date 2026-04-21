@@ -14,9 +14,17 @@ export class LocalStorageProvider implements StorageProvider {
     await fs.mkdir(this.baseDir, { recursive: true });
   }
 
-  private getValidatedPath(...parts: string[]): string {
+  private getValidatedPath(bucket: string, ...parts: string[]): string {
+    if (!bucket || bucket.trim() === '') {
+      throw new Error('Invalid bucket name');
+    }
+
+    if (!/^[a-zA-Z0-9-_]+$/.test(bucket)) {
+      throw new Error('Bucket name contains invalid characters');
+    }
+
     const resolvedBaseDir = path.resolve(this.baseDir);
-    const resolvedPath = path.resolve(this.baseDir, ...parts);
+    const resolvedPath = path.resolve(this.baseDir, bucket, ...parts);
     const relativePath = path.relative(resolvedBaseDir, resolvedPath);
 
     if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {

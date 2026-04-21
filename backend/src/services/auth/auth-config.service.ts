@@ -4,6 +4,7 @@ import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import logger from '@/utils/logger.js';
 import type { AuthConfigSchema, UpdateAuthConfigRequest } from '@insforge/shared-schemas';
+import { URL } from 'url';
 
 export class AuthConfigService {
   private static instance: AuthConfigService;
@@ -43,7 +44,7 @@ export class AuthConfigService {
           require_special_char as "requireSpecialChar",
           verify_email_method as "verifyEmailMethod",
           reset_password_method as "resetPasswordMethod"
-         FROM auth.configs
+         FROM auth.config
          LIMIT 1`
       );
 
@@ -90,10 +91,10 @@ export class AuthConfigService {
           require_special_char as "requireSpecialChar",
           verify_email_method as "verifyEmailMethod",
           reset_password_method as "resetPasswordMethod",
-          sign_in_redirect_to as "signInRedirectTo",
+          allowed_redirect_urls as "allowedRedirectUrls",
           created_at as "createdAt",
           updated_at as "updatedAt"
-         FROM auth.configs
+         FROM auth.config
          LIMIT 1`
       );
 
@@ -111,7 +112,7 @@ export class AuthConfigService {
           requireSpecialChar: false,
           verifyEmailMethod: 'code' as const,
           resetPasswordMethod: 'code' as const,
-          signInRedirectTo: null,
+          allowedRedirectUrls: [],
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
@@ -137,15 +138,18 @@ export class AuthConfigService {
     try {
       await client.query('BEGIN');
 
-      // Ensure config exists and lock row to prevent concurrent modifications
-      const existingResult = await client.query('SELECT id FROM auth.configs LIMIT 1 FOR UPDATE');
+      // Ensure the singleton config row exists before we try to lock and update it.
+      await client.query('INSERT INTO auth.config DEFAULT VALUES ON CONFLICT DO NOTHING');
+
+      // Lock the singleton row to prevent concurrent modifications.
+      const existingResult = await client.query('SELECT id FROM auth.config LIMIT 1 FOR UPDATE');
 
       if (!existingResult.rows.length) {
         // Config doesn't exist, rollback and throw error
         // The migration should have created the default config
         await client.query('ROLLBACK');
         throw new AppError(
-          'Authentication configuration not found. Please run migrations.',
+          'Authentication configuration not found.',
           500,
           ERROR_CODES.INTERNAL_ERROR
         );
@@ -153,7 +157,7 @@ export class AuthConfigService {
 
       // Build update query
       const updates: string[] = [];
-      const values: (string | number | boolean | null)[] = [];
+      const values: (string | number | boolean | null | string[])[] = [];
       let paramCount = 1;
 
       if (input.requireEmailVerification !== undefined) {
@@ -196,9 +200,9 @@ export class AuthConfigService {
         values.push(input.resetPasswordMethod);
       }
 
-      if (input.signInRedirectTo !== undefined) {
-        updates.push(`sign_in_redirect_to = $${paramCount++}`);
-        values.push(input.signInRedirectTo);
+      if (input.allowedRedirectUrls !== undefined) {
+        updates.push(`allowed_redirect_urls = $${paramCount++}::TEXT[]`);
+        values.push(input.allowedRedirectUrls);
       }
 
       if (!updates.length) {
@@ -211,7 +215,7 @@ export class AuthConfigService {
       updates.push('updated_at = NOW()');
 
       const result = await client.query(
-        `UPDATE auth.configs
+        `UPDATE auth.config
          SET ${updates.join(', ')}
          RETURNING
            id,
@@ -223,7 +227,7 @@ export class AuthConfigService {
            require_special_char as "requireSpecialChar",
            verify_email_method as "verifyEmailMethod",
            reset_password_method as "resetPasswordMethod",
-           sign_in_redirect_to as "signInRedirectTo",
+           allowed_redirect_urls as "allowedRedirectUrls",
            created_at as "createdAt",
            updated_at as "updatedAt"`,
         values
@@ -246,5 +250,77 @@ export class AuthConfigService {
     } finally {
       client.release();
     }
+  }
+
+  /**
+   * Normalizes a URL for comparison.
+   * - Converts hostname to lowercase
+   * - Removes default ports (handled by URL class)
+   * - Removes trailing slash
+   * Returns null if the URL is malformed.
+   */
+  private normalizeUrl(urlStr: string): string | null {
+    try {
+      const url = new URL(urlStr);
+      return url.href.replace(/\/$/, '');
+    } catch {
+      // Reject malformed URL instead of returning lowercased string
+      return null;
+    }
+  }
+
+  /**
+   * Validates a redirect URL against the server's configured allowed redirect URLs
+   */
+  async validateRedirectUrl(urlStr: string): Promise<boolean> {
+    const config = await this.getAuthConfig();
+    const allowedRedirectUrls = config.allowedRedirectUrls;
+
+    if (!allowedRedirectUrls || allowedRedirectUrls.length === 0) {
+      return true;
+    }
+
+    const targetUrl = this.normalizeUrl(urlStr);
+    if (!targetUrl) {
+      return false;
+    }
+
+    let targetUrlObj: URL;
+    try {
+      targetUrlObj = new URL(targetUrl);
+    } catch {
+      return false;
+    }
+
+    return allowedRedirectUrls.some((item) => {
+      if (!item.includes('*.')) {
+        return this.normalizeUrl(item) === targetUrl;
+      }
+
+      try {
+        const dummyPrefix = '__wildcard__.';
+        const normalizedItem = this.normalizeUrl(item.replace('*.', dummyPrefix));
+        if (!normalizedItem) {
+          return false;
+        }
+        const parsedItem = new URL(normalizedItem);
+
+        if (parsedItem.protocol !== targetUrlObj.protocol) {
+          return false;
+        }
+        if (parsedItem.port !== targetUrlObj.port) {
+          return false;
+        }
+        if (parsedItem.pathname !== '/' && parsedItem.pathname !== targetUrlObj.pathname) {
+          return false;
+        }
+
+        const baseDomain = parsedItem.hostname.replace(dummyPrefix, '');
+
+        return targetUrlObj.hostname.endsWith('.' + baseDomain);
+      } catch {
+        return false;
+      }
+    });
   }
 }

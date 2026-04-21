@@ -1,0 +1,10 @@
+FROM denoland/deno:alpine-2.0.6
+
+# Create non-root user
+RUN addgroup -S deno && adduser -S deno -G deno
+
+WORKDIR /app/functions
+
+COPY --chown=deno:deno functions /app/functions
+
+USER deno

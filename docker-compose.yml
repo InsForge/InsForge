@@ -3,7 +3,6 @@ version: '3.8'
 services:
   postgres:
     image: ghcr.io/insforge/postgres:v15.13.2
-    container_name: insforge-postgres
     command: postgres -c config_file=/etc/postgresql/postgresql.conf -c app.encryption_key='${ENCRYPTION_KEY:-${JWT_SECRET:-dev-secret-please-change-in-production}}'
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
@@ -15,7 +14,7 @@ services:
       - ./deploy/docker-init/db/jwt.sql:/docker-entrypoint-initdb.d/02-jwt.sql
       - ./deploy/docker-init/db/postgresql.conf:/etc/postgresql/postgresql.conf
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     security_opt:
       - no-new-privileges:true
     networks:
@@ -28,7 +27,6 @@ services:
 
   postgrest:
     image: postgrest/postgrest:v12.2.12
-    container_name: insforge-postgrest
     restart: unless-stopped
     environment:
       # POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -43,7 +41,7 @@ services:
       PGRST_DB_CHANNEL_ENABLED: true
       PGRST_DB_CHANNEL: pgrst
     ports:
-      - "5430:3000"
+      - "${POSTGREST_PORT:-5430}:3000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -58,15 +56,14 @@ services:
       dockerfile: Dockerfile
       target: dev
     image: insforge-dev
-    container_name: insforge
     working_dir: /app
     depends_on:
       postgres:
         condition: service_healthy
     ports:
-      - "7130:7130"
-      - "7131:7131"
-      - "7132:7132"
+      - "${APP_PORT:-7130}:7130"
+      - "${AUTH_PORT:-7131}:7131"
+      - "${UI_PORT:-7132}:7132"
     environment:
       - PORT=7130
       - PROJECT_ROOT=/app
@@ -83,6 +80,8 @@ services:
       - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-}
       # Storage limits
       - MAX_FILE_SIZE=${MAX_FILE_SIZE:-}
+      - MAX_JSON_BODY_SIZE=${MAX_JSON_BODY_SIZE:-}
+      - MAX_URLENCODED_BODY_SIZE=${MAX_URLENCODED_BODY_SIZE:-}
       # PostgreSQL connection
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
@@ -103,6 +102,10 @@ services:
       - AWS_CLOUDFRONT_URL=${AWS_CLOUDFRONT_URL:-}
       - AWS_CLOUDFRONT_KEY_PAIR_ID=${AWS_CLOUDFRONT_KEY_PAIR_ID:-}
       - AWS_CLOUDFRONT_PRIVATE_KEY=${AWS_CLOUDFRONT_PRIVATE_KEY:-}
+      # Deployment Configuration
+      - VERCEL_TOKEN=${VERCEL_TOKEN:-}
+      - VERCEL_TEAM_ID=${VERCEL_TEAM_ID:-}
+      - VERCEL_PROJECT_ID=${VERCEL_PROJECT_ID:-}
       # Multi-tenant Cloud Configuration
       - DEPLOYMENT_ID=${DEPLOYMENT_ID:-}
       - PROJECT_ID=${PROJECT_ID:-}
@@ -130,25 +133,22 @@ services:
       - LOGS_DIR=/insforge-logs
       # Storage directory (for local file storage when S3 is not configured)
       - STORAGE_DIR=/insforge-storage
-      # Auth app URL for development proxy
-      - AUTH_APP_URL=${AUTH_APP_URL:-http://localhost:7132}
     volumes:
       - ./package.json:/app/package.json
+      - ./package-lock.json:/app/package-lock.json
+      - ./turbo.json:/app/turbo.json
       - ./backend:/app/backend
       - ./frontend:/app/frontend
-      - ./auth:/app/auth
-      - ./shared-schemas:/app/shared-schemas
-      - ./ui:/app/ui
+      - ./packages:/app/packages
       - ./docs:/app/docs
       - node_modules:/app/node_modules
       - backend_node_modules:/app/backend/node_modules
       - frontend_node_modules:/app/frontend/node_modules
-      - auth_node_modules:/app/auth/node_modules
-      - shared_schemas_node_modules:/app/shared-schemas/node_modules
-      - ui_node_modules:/app/ui/node_modules
+      - shared_schemas_node_modules:/app/packages/shared-schemas/node_modules
+      - ui_node_modules:/app/packages/ui/node_modules
       - shared-logs:/insforge-logs
       - storage-data:/insforge-storage
-    command: sh -c "npm install && npm run build:shared-schemas && npm run build:ui && cd backend && npm run migrate:up && cd .. && npm run dev"
+    command: sh -c 'npm install && npx turbo run build --filter=@insforge/shared-schemas --filter=@insforge/ui --filter=@insforge/dashboard && cd backend && npm run migrate:up && cd .. && npx concurrently -n backend,frontend -c cyan,magenta "npm run dev:backend" "npm run dev:frontend"'
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
@@ -158,13 +158,12 @@ services:
   # Deno serverless runtime for edge functions
   deno:
     image: denoland/deno:alpine-2.0.6
-    container_name: insforge-deno
     working_dir: /app
     depends_on:
       - postgres
       - postgrest
     ports:
-      - "7133:7133"
+      - "${DENO_PORT:-7133}:7133"
     environment:
       - PORT=7133
       - DENO_ENV=${DENO_ENV:-development}
@@ -199,7 +198,6 @@ services:
 
   # Vector.dev for log collection and shipping
   vector:
-    container_name: insforge-vector
     image: timberio/vector:0.28.1-alpine
     restart: unless-stopped
     depends_on:
@@ -240,8 +238,6 @@ volumes:
   backend_node_modules:
     driver: local
   frontend_node_modules:
-    driver: local
-  auth_node_modules:
     driver: local
   shared_schemas_node_modules:
     driver: local

@@ -3,14 +3,24 @@ import path from 'path';
 import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { DatabaseMetadataSchema } from '@insforge/shared-schemas';
+import pgFormat from 'pg-format';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+interface CacheEntry<T> {
+  data: T;
+  expiry: number;
+}
 
 export class DatabaseManager {
   private static instance: DatabaseManager;
   private pool!: Pool;
   private dataDir: string;
+
+  private static readonly COLUMN_TYPE_CACHE_TTL = 5 * 60 * 1000;
+  private static columnTypeCache = new Map<string, CacheEntry<Record<string, string>>>();
+  private static readonly MAX_CACHE_SIZE = 100;
 
   private constructor() {
     this.dataDir = process.env.DATABASE_DIR || path.join(__dirname, '../../data');
@@ -40,6 +50,11 @@ export class DatabaseManager {
   }
 
   static async getColumnTypeMap(tableName: string): Promise<Record<string, string>> {
+    const cached = DatabaseManager.columnTypeCache.get(tableName);
+    if (cached && cached.expiry > Date.now()) {
+      return cached.data;
+    }
+
     const instance = DatabaseManager.getInstance();
     const client = await instance.pool.connect();
     try {
@@ -51,9 +66,32 @@ export class DatabaseManager {
       for (const row of result.rows) {
         map[row.column_name] = row.data_type;
       }
+
+      DatabaseManager.setColumnTypeCache(tableName, map);
       return map;
     } finally {
       client.release();
+    }
+  }
+
+  private static setColumnTypeCache(tableName: string, data: Record<string, string>): void {
+    if (DatabaseManager.columnTypeCache.size >= DatabaseManager.MAX_CACHE_SIZE) {
+      const firstKey = DatabaseManager.columnTypeCache.keys().next().value;
+      if (firstKey) {
+        DatabaseManager.columnTypeCache.delete(firstKey);
+      }
+    }
+    DatabaseManager.columnTypeCache.set(tableName, {
+      data,
+      expiry: Date.now() + DatabaseManager.COLUMN_TYPE_CACHE_TTL,
+    });
+  }
+
+  static clearColumnTypeCache(tableName?: string): void {
+    if (tableName) {
+      DatabaseManager.columnTypeCache.delete(tableName);
+    } else {
+      DatabaseManager.columnTypeCache.clear();
     }
   }
 
@@ -102,9 +140,8 @@ export class DatabaseManager {
 
             // Build a UNION ALL query to get all counts in one query
             const unionQuery = tableNames
-              .map(
-                (tableName) =>
-                  `SELECT '${tableName.replace(/'/g, "''")}' as table_name, COUNT(*) as count FROM "${tableName}"`
+              .map((tableName) =>
+                pgFormat('SELECT %L as table_name, COUNT(*) as count FROM %I', tableName, tableName)
               )
               .join(' UNION ALL ');
 

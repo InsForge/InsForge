@@ -10,9 +10,9 @@ export default defineConfig({
   plugins: [react(), tailwindcss(), svgr()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
-      '@insforge/shared-schemas': path.resolve(__dirname, '../shared-schemas/src'),
-      '@insforge/ui': path.resolve(__dirname, '../ui/src'),
+      '@insforge/dashboard': path.resolve(__dirname, '../packages/dashboard/src'),
+      '@insforge/shared-schemas': path.resolve(__dirname, '../packages/shared-schemas/src'),
+      '@insforge/ui': path.resolve(__dirname, '../packages/ui/src'),
     },
   },
   server: {

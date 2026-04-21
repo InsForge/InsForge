@@ -89,6 +89,12 @@
             ]
           },
           {
+            "group": "Self-Hosting",
+            "pages": [
+              "deployment/deployment-security-guide"
+            ]
+          },
+          {
             "group": "Community Showcase",
             "pages": ["showcase"]
           },
@@ -113,14 +119,6 @@
               "sdks/typescript/ai",
               "sdks/typescript/realtime",
               "sdks/typescript/email",
-              {
-                "group": "UI Components",
-                "pages": [
-                  "sdks/typescript/ui-components/react",
-                  "sdks/typescript/ui-components/nextjs",
-                  "sdks/typescript/ui-components/customization"
-                ]
-              },
               {
                 "group": "Framework Guides",
                 "pages": [

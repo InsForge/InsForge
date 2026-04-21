@@ -83,7 +83,12 @@ export class PostgrestProxyService {
   static filterHeaders(headers: Record<string, unknown>): Record<string, string> {
     const filtered: Record<string, string> = {};
     for (const [key, value] of Object.entries(headers)) {
-      if (!EXCLUDED_HEADERS.has(key.toLowerCase()) && value !== undefined) {
+      const normalizedKey = key.toLowerCase();
+      if (
+        !EXCLUDED_HEADERS.has(normalizedKey) &&
+        !normalizedKey.startsWith('access-control-') &&
+        value !== undefined
+      ) {
         filtered[key] = value as string;
       }
     }

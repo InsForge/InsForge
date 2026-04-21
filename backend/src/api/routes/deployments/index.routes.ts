@@ -1,4 +1,5 @@
 import { Router, Response, NextFunction } from 'express';
+import { z } from 'zod';
 import { DeploymentService } from '@/services/deployments/deployment.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { AuditService } from '@/services/logs/audit.service.js';
@@ -6,6 +7,7 @@ import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse, paginatedResponse } from '@/utils/response.js';
 import {
+  createDirectDeploymentRequestSchema,
   startDeploymentRequestSchema,
   updateSlugRequestSchema,
   addCustomDomainRequestSchema,
@@ -16,26 +18,18 @@ const router = Router();
 const deploymentService = DeploymentService.getInstance();
 const auditService = AuditService.getInstance();
 const domainParamSchema = addCustomDomainRequestSchema.shape.domain;
+const uuidParamSchema = z.string().uuid();
 
 // Mount sub-routers first to avoid conflicts with parameterized routes
 router.use('/env-vars', envVarsRouter);
 
 /**
  * Create a new deployment record with WAITING status
- * Returns presigned URL for uploading source zip file
+ * Returns presigned upload info for the legacy source zip flow
  * POST /api/deployments
  */
 router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    // Check if deployment service is configured
-    if (!deploymentService.isConfigured()) {
-      throw new AppError(
-        'Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID environment variables.',
-        503,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
-
     const response = await deploymentService.createDeployment();
 
     // Log audit
@@ -54,7 +48,95 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
 });
 
 /**
- * Start a deployment - downloads zip from S3, uploads to Vercel, creates deployment
+ * Create a new direct-upload deployment record with WAITING status
+ * POST /api/deployments/direct
+ */
+router.post('/direct', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const validationResult = createDirectDeploymentRequestSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      throw new AppError(
+        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    const response = await deploymentService.createDirectDeployment(validationResult.data);
+
+    await auditService.log({
+      actor: req.user?.email || 'api-key',
+      action: 'CREATE_DIRECT_DEPLOYMENT',
+      module: 'DEPLOYMENTS',
+      details: { id: response.id, fileCount: response.files.length },
+      ip_address: req.ip,
+    });
+
+    successResponse(res, response, 201);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * Stream one direct deployment file through the backend to Vercel
+ * PUT /api/deployments/:id/files/:fileId/content
+ */
+router.put(
+  '/:id/files/:fileId/content',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const idValidation = uuidParamSchema.safeParse(req.params.id);
+      if (!idValidation.success) {
+        throw new AppError('Invalid deployment ID', 400, ERROR_CODES.INVALID_INPUT);
+      }
+
+      const fileIdValidation = uuidParamSchema.safeParse(req.params.fileId);
+      if (!fileIdValidation.success) {
+        throw new AppError('Invalid deployment file ID', 400, ERROR_CODES.INVALID_INPUT);
+      }
+
+      const contentTypeHeader = req.headers['content-type'];
+      const contentType = Array.isArray(contentTypeHeader)
+        ? contentTypeHeader[0]
+        : (contentTypeHeader ?? '');
+      const normalizedContentType = contentType.split(';')[0].trim().toLowerCase();
+
+      if (normalizedContentType !== 'application/octet-stream') {
+        throw new AppError(
+          'Deployment file content must be uploaded as application/octet-stream.',
+          415,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const abortController = new AbortController();
+      req.on('aborted', () => abortController.abort());
+      res.on('close', () => {
+        if (!res.writableEnded) {
+          abortController.abort();
+        }
+      });
+
+      const response = await deploymentService.uploadDeploymentFileContent(
+        idValidation.data,
+        fileIdValidation.data,
+        req,
+        {
+          signal: abortController.signal,
+        }
+      );
+
+      successResponse(res, response);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * Start a deployment after source files are available
  * POST /api/deployments/:id/start
  */
 router.post(
@@ -62,15 +144,6 @@ router.post(
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      // Check if deployment service is configured
-      if (!deploymentService.isConfigured()) {
-        throw new AppError(
-          'Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID environment variables.',
-          503,
-          ERROR_CODES.INTERNAL_ERROR
-        );
-      }
-
       const { id } = req.params;
 
       const validationResult = startDeploymentRequestSchema.safeParse(req.body);

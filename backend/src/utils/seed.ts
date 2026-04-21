@@ -124,7 +124,7 @@ async function seedDefaultAuthConfig(): Promise<void> {
   const client = await pool.connect();
 
   try {
-    const result = await client.query('SELECT COUNT(*) as count FROM auth.configs');
+    const result = await client.query('SELECT COUNT(*) as count FROM auth.config');
     const hasConfig = result.rows.length > 0 && Number(result.rows[0].count) > 0;
 
     if (hasConfig) {
@@ -139,7 +139,7 @@ async function seedDefaultAuthConfig(): Promise<void> {
 
     // Table is empty - this is first startup, insert default cloud configuration
     await client.query(
-      `INSERT INTO auth.configs (
+      `INSERT INTO auth.config (
         require_email_verification,
         password_min_length,
         require_number,
@@ -241,6 +241,16 @@ async function seedLocalOAuthConfigs(): Promise<void> {
         provider: 'microsoft',
         clientIdEnv: 'MICROSOFT_CLIENT_ID',
         clientSecretEnv: 'MICROSOFT_CLIENT_SECRET',
+      },
+      {
+        provider: 'x',
+        clientIdEnv: 'X_CLIENT_ID',
+        clientSecretEnv: 'X_CLIENT_SECRET',
+      },
+      {
+        provider: 'apple',
+        clientIdEnv: 'APPLE_CLIENT_ID',
+        clientSecretEnv: 'APPLE_CLIENT_SECRET',
       },
     ];
 
@@ -345,6 +355,21 @@ export async function seedBackend(): Promise<void> {
         value: getApiBaseUrl(),
       });
       logger.info('✅ INSFORGE_BASE_URL secret initialized');
+    }
+
+    // Add JWT_SECRET so CLI/SDK can access it via secrets API
+    const jwtSecret = process.env.JWT_SECRET;
+    if (jwtSecret) {
+      const existingJwtSecret = await secretService.getSecretByKey('JWT_SECRET');
+
+      if (existingJwtSecret === null) {
+        await secretService.createSecret({
+          key: 'JWT_SECRET',
+          isReserved: true,
+          value: jwtSecret,
+        });
+        logger.info('✅ JWT_SECRET secret initialized');
+      }
     }
 
     logger.info(`API key generated: ${apiKey}`);
