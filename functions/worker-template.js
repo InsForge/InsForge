@@ -69,14 +69,7 @@ self.onmessage = async (e) => {
     const module = { exports };
 
     // Execute the wrapper, passing mockDeno as the Deno global
-    wrapper(
-      exports,
-      module,
-      createClient,
-      mockDeno,
-      encodeBase64,
-      decodeBase64
-    );
+    wrapper(exports, module, createClient, mockDeno, encodeBase64, decodeBase64);
 
     // Get the exported function
     const functionHandler = module.exports || exports.default || exports;
