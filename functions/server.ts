@@ -165,7 +165,7 @@ async function executeInWorker(code: string, request: Request): Promise<Response
       type: 'module',
       deno: {
         permissions: {
-          env: ['NODE_ENV', 'DEBUG'],
+          env: ['NODE_ENV', 'DEBUG', 'PORT', 'HOSTNAME', 'USER', 'PATH', 'PWD', 'TERM', 'LANG', 'LC_ALL', 'LC_CTYPE', 'TMPDIR', 'TEMP', 'TMP'],
           net: false,
           read: false,
           write: false,
