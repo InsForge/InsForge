@@ -47,7 +47,7 @@ graph TB
 ## How It Works
 
 ### 1. Schema Definition
-When you create a table through the InsForge API or migrations:
+When you create a table through the InsForge API or custom migrations:
 - Table structure is stored in PostgreSQL
 - PostgREST discovers the schema via database introspection
 - REST endpoints are instantly available
@@ -171,11 +171,23 @@ Tables are organized into dedicated schemas for better organization and security
 | `secrets` | Encrypted system secrets |
 | `audit_logs` | Activity and audit logs |
 | `mcp_usage` | MCP tool usage tracking |
-| `migrations` | Database migration history |
+| `migrations` | Internal platform migration history |
+| `custom_migrations` | Successful developer-run migrations against `public` |
 
 <Note>
 Only tables in the `public` schema are exposed via PostgREST auto-generated APIs. System schemas are accessible only through internal InsForge APIs.
 </Note>
+
+### Custom Migrations
+
+InsForge supports developer-facing custom migrations through the admin API:
+
+- `POST /api/database/migrations` parses and immediately executes SQL in one transaction
+- `GET /api/database/migrations` returns the successful migration history
+- Only migrations that fully succeed are stored in `system.custom_migrations`
+- Custom migrations may target only the `public` schema
+
+This is intentionally separate from `system.migrations`, which tracks InsForge's own internal platform migrations.
 
 ## Query Syntax
 
@@ -307,9 +319,5 @@ Choose the database SDK guide for your platform:
 
   <Card title="Kotlin" icon="android" href="/sdks/kotlin/database">
     Android applications with Coroutines and Flow integration
-  </Card>
-
-  <Card title="Flutter" icon="mobile" href="/sdks/flutter/database">
-    Cross-platform mobile apps for iOS and Android with Dart
   </Card>
 </CardGroup>

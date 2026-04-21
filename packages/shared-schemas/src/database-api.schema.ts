@@ -7,6 +7,7 @@ import {
   databaseIndexSchema,
   databasePolicySchema,
   databaseTriggerSchema,
+  migrationSchema,
 } from './database.schema.js';
 
 export const createTableRequestSchema = tableSchema
@@ -242,6 +243,22 @@ export const bulkUpsertResponseSchema = z.object({
   filename: z.string(),
 });
 
+export const createMigrationRequestSchema = z.object({
+  version: z.string().regex(/^\d{14}$/, 'Migration version must use YYYYMMDDHHmmss format.'),
+  name: z
+    .string()
+    .trim()
+    .min(1, 'Migration name is required')
+    .refine((value) => value.length === 0 || /^[a-z0-9-]+$/.test(value), {
+      message: 'Use lowercase letters, numbers, and hyphens only.',
+    }),
+  sql: z.string().trim().min(1, 'Migration SQL is required'),
+});
+
+export const createMigrationResponseSchema = migrationSchema.extend({
+  message: z.string(),
+});
+
 export type CreateTableRequest = z.infer<typeof createTableRequestSchema>;
 export type CreateTableResponse = z.infer<typeof createTableResponseSchema>;
 export type GetTableSchemaResponse = z.infer<typeof getTableSchemaResponseSchema>;
@@ -265,6 +282,8 @@ export type ImportDatabaseResponse = z.infer<typeof importResponseSchema>;
 // Bulk Upsert Types
 export type BulkUpsertRequest = z.infer<typeof bulkUpsertRequestSchema>;
 export type BulkUpsertResponse = z.infer<typeof bulkUpsertResponseSchema>;
+export type CreateMigrationRequest = z.infer<typeof createMigrationRequestSchema>;
+export type CreateMigrationResponse = z.infer<typeof createMigrationResponseSchema>;
 
 // Database Metadata Response Schemas
 export const databaseFunctionsResponseSchema = z.object({
@@ -283,8 +302,13 @@ export const databaseTriggersResponseSchema = z.object({
   triggers: z.array(databaseTriggerSchema),
 });
 
+export const databaseMigrationsResponseSchema = z.object({
+  migrations: z.array(migrationSchema),
+});
+
 // Database Metadata Response Types
 export type DatabaseFunctionsResponse = z.infer<typeof databaseFunctionsResponseSchema>;
 export type DatabaseIndexesResponse = z.infer<typeof databaseIndexesResponseSchema>;
 export type DatabasePoliciesResponse = z.infer<typeof databasePoliciesResponseSchema>;
 export type DatabaseTriggersResponse = z.infer<typeof databaseTriggersResponseSchema>;
+export type DatabaseMigrationsResponse = z.infer<typeof databaseMigrationsResponseSchema>;

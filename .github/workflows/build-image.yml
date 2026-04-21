@@ -141,13 +141,19 @@ jobs:
           tags: |
             type=ref,event=tag
             type=raw,value=${{ github.event.inputs.test_tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=raw,value=latest,enable=${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-') }}
 
       - name: Create and push multi-arch manifest
+        env:
+          GHCR_IMAGE_RAW: ${{ env.GHCR_REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
+          SOURCE_VERSION: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_tag || github.ref_name }}
         run: |
+          GHCR_IMAGE=$(echo "${GHCR_IMAGE_RAW}" | tr '[:upper:]' '[:lower:]')
           for TAG in $(echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n'); do
             docker buildx imagetools create \
               --tag "${TAG}" \
-              "${TAG}-amd64" "${TAG}-arm64"
+              "${GHCR_IMAGE}:${SOURCE_VERSION}-amd64" \
+              "${GHCR_IMAGE}:${SOURCE_VERSION}-arm64"
           done
 
   push-to-ecr:
@@ -185,8 +191,12 @@ jobs:
           VERSION: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_tag || github.ref_name }}
           GHCR_IMAGE_RAW: ${{ env.GHCR_REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
           ECR_IMAGE: ${{ steps.ecr-login.outputs.registry }}/${{ env.IMAGE_NAME }}
+          TAG_LATEST: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-') }}
         run: |
           # Convert GHCR image name to lowercase (Docker requires lowercase)
           GHCR_IMAGE=$(echo "${GHCR_IMAGE_RAW}" | tr '[:upper:]' '[:lower:]')
           # Copy multi-arch image from GHCR to ECR (preserves all platforms)
           crane copy ${GHCR_IMAGE}:${VERSION} ${ECR_IMAGE}:${VERSION}
+          if [[ "${TAG_LATEST}" == "true" ]]; then
+            crane copy ${GHCR_IMAGE}:${VERSION} ${ECR_IMAGE}:latest
+          fi

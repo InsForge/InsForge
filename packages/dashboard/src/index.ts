@@ -7,6 +7,8 @@ export {
   dashboardStaticMenuItems,
 } from './navigation/menuItems';
 export type {
+  DashboardBackup,
+  DashboardBackupInfo,
   CloudHostingDashboardProps,
   DashboardInstanceInfo,
   DashboardMode,
