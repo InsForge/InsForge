@@ -161,6 +161,12 @@ export function isEmptyValue(value: unknown): boolean {
 }
 
 export const isInsForgeCloudProject = () => {
+  if (
+    typeof window !== 'undefined' &&
+    (window as unknown as Record<string, unknown>).__INSFORGE_MOCK_CLOUD__ === true
+  ) {
+    return true;
+  }
   try {
     return new URL(getDashboardBackendUrl()).hostname.endsWith('.insforge.app');
   } catch {
