@@ -362,12 +362,15 @@ export class FunctionService {
     }
 
     const dangerousPatterns = [
-      /Deno\.run/i,
-      /Deno\.spawn/i,
-      /Deno\.Command/i,
-      /child_process/i,
-      /process\.exit/i,
-      /require\(['"]fs['"]\)/i,
+      /globalThis/i,
+      /self/i,
+      /process\b/i,
+      /Deno\b/i,
+      /import\b/i,
+      /require\b/i,
+      /eval\b/i,
+      /constructor\b/i,
+      /\[\s*['"][a-zA-Z]/i, // Block bracket notation property access like obj['Deno']
     ];
 
     for (const pattern of dangerousPatterns) {

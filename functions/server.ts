@@ -161,7 +161,18 @@ async function executeInWorker(code: string, request: Request): Promise<Response
   const workerUrl = URL.createObjectURL(workerBlob);
 
   return new Promise(async (resolve) => {
-    const worker = new Worker(workerUrl, { type: 'module' });
+    const worker = new Worker(workerUrl, { 
+      type: 'module',
+      deno: {
+        permissions: {
+          env: ['NODE_ENV', 'DEBUG'],
+          net: false,
+          read: false,
+          write: false,
+          run: false,
+        }
+      }
+    });
 
     // Set timeout for worker execution
     const timeout = setTimeout(() => {
