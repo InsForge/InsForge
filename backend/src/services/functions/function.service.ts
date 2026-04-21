@@ -365,7 +365,7 @@ export class FunctionService {
       /globalThis/i,
       /self/i,
       /process\b/i,
-      /Deno\b/i,
+      /Deno\.(run|spawn|makeTemp|remove|write|chmod|chown)/i,
       /import\b/i,
       /require\b/i,
       /eval\b/i,
