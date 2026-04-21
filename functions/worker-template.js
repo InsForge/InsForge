@@ -44,8 +44,12 @@ self.onmessage = async (e) => {
         toObject: () => ({ ...secrets }),
       },
       // Ensure dangerous methods are explicitly blocked in the shadow
-      run: () => { throw new Error('Deno.run is natively disabled'); },
-      spawn: () => { throw new Error('Deno.spawn is natively disabled'); },
+      run: () => {
+        throw new Error('Deno.run is natively disabled');
+      },
+      spawn: () => {
+        throw new Error('Deno.spawn is natively disabled');
+      },
     };
 
     /**
