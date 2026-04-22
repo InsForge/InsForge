@@ -1,8 +1,10 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { UploadStrategyResponse, DownloadStrategyResponse } from '@insforge/shared-schemas';
-import { StorageProvider } from './base.provider.js';
+import { StorageProvider, ObjectMetadata, GetObjectResult } from './base.provider.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
+import { AppError } from '@/api/middlewares/error.js';
+import { ERROR_CODES } from '@/types/error-constants.js';
 
 /**
  * Local filesystem storage implementation
@@ -135,5 +137,51 @@ export class LocalStorageProvider implements StorageProvider {
       }
       throw error;
     }
+  }
+
+  // ==========================================================================
+  // S3 Protocol extensions — not supported on the local filesystem backend.
+  // Callers should check StorageService.isS3Provider() before invoking these.
+  // ==========================================================================
+
+  private notImplemented(op: string): never {
+    throw new AppError(
+      `S3 protocol operation '${op}' requires an S3 storage backend. ` +
+        `Set AWS_S3_BUCKET (and optionally S3_ENDPOINT_URL for MinIO).`,
+      501,
+      ERROR_CODES.S3_PROTOCOL_UNAVAILABLE
+    );
+  }
+
+  async putObjectStream(): Promise<{ etag: string; size: number }> {
+    this.notImplemented('PutObject/streaming');
+  }
+  async headObject(): Promise<ObjectMetadata | null> {
+    this.notImplemented('HeadObject');
+  }
+  async copyObject(): Promise<{ etag: string; lastModified: Date }> {
+    this.notImplemented('CopyObject');
+  }
+  async getObjectStream(): Promise<GetObjectResult> {
+    this.notImplemented('GetObject/streaming');
+  }
+  async createMultipartUpload(): Promise<{ uploadId: string }> {
+    this.notImplemented('CreateMultipartUpload');
+  }
+  async uploadPart(): Promise<{ etag: string }> {
+    this.notImplemented('UploadPart');
+  }
+  async completeMultipartUpload(): Promise<{ etag: string; size: number }> {
+    this.notImplemented('CompleteMultipartUpload');
+  }
+  async abortMultipartUpload(): Promise<void> {
+    this.notImplemented('AbortMultipartUpload');
+  }
+  async listParts(): Promise<{
+    parts: Array<{ partNumber: number; etag: string; size: number; lastModified: Date }>;
+    isTruncated: boolean;
+    nextPartNumberMarker?: number;
+  }> {
+    this.notImplemented('ListParts');
   }
 }
