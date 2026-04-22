@@ -48,9 +48,7 @@ export default function AppHeader() {
   const openConnectDialog = useOpenConnectDialog();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  // TODO(dtest): temporary hardcode for local preview — revert before merge
-  const dashboardVariant = 'd_test';
-  void getFeatureFlag;
+  const dashboardVariant = getFeatureFlag('dashboard-v4-experiment');
   const isDTestDashboard = dashboardVariant === 'd_test' && location.pathname === '/dashboard';
 
   const handleConnectClick = () => {
@@ -73,12 +71,10 @@ export default function AppHeader() {
   useEffect(() => {
     setConnectTipDismissed(readConnectTipDismissed(connectTipKey));
   }, [connectTipKey]);
-  // TODO(dtest): temporary preview override — forces the tip regardless of MCP state. Revert before merge.
-  const DTEST_FORCE_TIP_FOR_PREVIEW = true;
   const showConnectTip =
     isDTestDashboard &&
     searchParams.get('view') !== 'install' &&
-    (DTEST_FORCE_TIP_FOR_PREVIEW || hasCompletedOnboarding) &&
+    hasCompletedOnboarding &&
     !connectTipDismissed;
   const handleDismissConnectTip = () => {
     setConnectTipDismissed(true);

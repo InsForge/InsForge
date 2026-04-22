@@ -50,9 +50,7 @@ import DeploymentDomainsPage from '../features/deployments/pages/DeploymentDomai
 import ComputePage from '../features/compute/pages/ComputePage';
 
 function AuthenticatedRoutes() {
-  // TODO(dtest): temporary hardcode for local preview — revert before merge
-  const dashboardVariant: string = 'd_test';
-  void getFeatureFlag;
+  const dashboardVariant = getFeatureFlag('dashboard-v4-experiment');
   const DashboardHomePage =
     dashboardVariant === 'c_test'
       ? CTestDashboardPage
