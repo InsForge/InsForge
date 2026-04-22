@@ -18,6 +18,12 @@ import * as putObject from './commands/put-object.js';
 import * as deleteObject from './commands/delete-object.js';
 import * as deleteObjects from './commands/delete-objects.js';
 import * as copyObject from './commands/copy-object.js';
+import * as createMultipartUpload from './commands/create-multipart-upload.js';
+import * as uploadPart from './commands/upload-part.js';
+import * as completeMultipartUpload from './commands/complete-multipart-upload.js';
+import * as abortMultipartUpload from './commands/abort-multipart-upload.js';
+import * as listParts from './commands/list-parts.js';
+import * as stubs from './commands/stubs.js';
 
 export const s3GatewayRouter: Router = Router();
 
@@ -100,6 +106,27 @@ s3GatewayRouter.use(async (req: Request, res: Response) => {
         return;
       case 'CopyObject':
         await copyObject.handle(authed, res);
+        return;
+      case 'CreateMultipartUpload':
+        await createMultipartUpload.handle(authed, res);
+        return;
+      case 'UploadPart':
+        await uploadPart.handle(authed, res);
+        return;
+      case 'CompleteMultipartUpload':
+        await completeMultipartUpload.handle(authed, res);
+        return;
+      case 'AbortMultipartUpload':
+        await abortMultipartUpload.handle(authed, res);
+        return;
+      case 'ListParts':
+        await listParts.handle(authed, res);
+        return;
+      case 'GetBucketLocation':
+        await stubs.getBucketLocation(authed, res);
+        return;
+      case 'GetBucketVersioning':
+        await stubs.getBucketVersioning(authed, res);
         return;
       default:
         sendS3Error(res, 'NotImplemented', `Operation ${op} not yet implemented`, {
