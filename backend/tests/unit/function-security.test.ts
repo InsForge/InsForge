@@ -42,6 +42,7 @@ describe('FunctionService Security Validation', () => {
   });
 
   const validateCode = (code: string) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (service as any).validateCode(code);
   };
 
