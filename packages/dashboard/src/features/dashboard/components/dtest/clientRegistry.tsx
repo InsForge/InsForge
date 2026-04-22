@@ -6,10 +6,12 @@ import OpenAILogo from '../../../../assets/logos/openai.svg?react';
 import CursorLogo from '../../../../assets/logos/cursor.svg?react';
 import CopilotLogo from '../../../../assets/logos/copilot.svg?react';
 import OpenCodeLogo from '../../../../assets/logos/opencode.svg?react';
+import OpenClawLogo from '../../../../assets/logos/openclaw.svg?react';
 import ClineLogo from '../../../../assets/logos/cline.svg?react';
 import AntigravityLogo from '../../../../assets/logos/antigravity.png';
 
 export type ClientId =
+  | 'openclaw'
   | 'claude-code'
   | 'codex'
   | 'antigravity'
@@ -38,6 +40,14 @@ const iconTile = (node: ReactNode) => (
 );
 
 export const CLIENT_ENTRIES: Record<ClientId, ClientEntry> = {
+  openclaw: {
+    id: 'openclaw',
+    label: 'OpenClaw',
+    icon: iconTile(<OpenClawLogo className="h-8 w-8" />),
+    detailIcon: <OpenClawLogo className="h-8 w-8" />,
+    kind: 'agent',
+    mcpAgentId: 'openclaw',
+  },
   'claude-code': {
     id: 'claude-code',
     label: 'Claude Code',
@@ -133,6 +143,6 @@ export const CODING_AGENT_GRID_IDS: ClientId[] = [
   'other',
 ];
 
-export const FEATURED_CLAUDE_CODE_ID: ClientId = 'claude-code';
+export const FEATURED_OPENCLAW_ID: ClientId = 'openclaw';
 
 export const DIRECT_CONNECT_IDS: ClientId[] = ['connection-string', 'api-keys'];

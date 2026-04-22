@@ -61,7 +61,7 @@ export function ClientDetailPage({ clientId, onBack }: ClientDetailPageProps) {
             </div>
 
             {tab === 'cli' ? (
-              <DTestCLISection apiKey={apiKey || ''} />
+              <DTestCLISection agentName={entry.label} />
             ) : (
               <DTestMCPSection
                 apiKey={displayApiKey}

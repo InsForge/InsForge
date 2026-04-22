@@ -21,6 +21,7 @@ import OpenAILogo from '../../../../../assets/logos/openai.svg?react';
 import KiroLogo from '../../../../../assets/logos/kiro.png';
 import RooCodeLogo from '../../../../../assets/logos/roo_code.svg?react';
 import OpenCodeLogo from '../../../../../assets/logos/opencode.svg?react';
+import OpenClawLogo from '../../../../../assets/logos/openclaw.svg?react';
 import { getBackendUrl } from '../../../../../lib/utils/utils';
 // import CodexLogo from '../../../../../assets/logos/openai.svg?react';
 
@@ -102,6 +103,12 @@ export const MCP_AGENTS: MCPAgent[] = [
     slug: 'opencode',
     displayName: 'OpenCode',
     logo: <OpenCodeLogo className="w-5 h-5 dark:text-white" />,
+  },
+  {
+    id: 'openclaw',
+    slug: 'openclaw',
+    displayName: 'OpenClaw',
+    logo: <OpenClawLogo className="w-5 h-5" />,
   },
   {
     id: 'mcp',
