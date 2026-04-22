@@ -4,7 +4,7 @@ import {
   CLIENT_ENTRIES,
   CODING_AGENT_GRID_IDS,
   DIRECT_CONNECT_IDS,
-  FEATURED_CLAUDE_CODE_ID,
+  FEATURED_OPENCLAW_ID,
   type ClientId,
 } from './clientRegistry';
 
@@ -14,7 +14,7 @@ interface InstallInsForgePageProps {
 }
 
 export function InstallInsForgePage({ onSelectClient, onDismiss }: InstallInsForgePageProps) {
-  const featured = CLIENT_ENTRIES[FEATURED_CLAUDE_CODE_ID];
+  const featured = CLIENT_ENTRIES[FEATURED_OPENCLAW_ID];
   const gridEntries = CODING_AGENT_GRID_IDS.map((id) => CLIENT_ENTRIES[id]);
   const directEntries = DIRECT_CONNECT_IDS.map((id) => CLIENT_ENTRIES[id]);
 
@@ -34,9 +34,9 @@ export function InstallInsForgePage({ onSelectClient, onDismiss }: InstallInsFor
           </button>
         </div>
 
-        {/* Section 1: Setup in Claude Code */}
+        {/* Section 1: Setup in OpenClaw */}
         <section className="flex flex-col gap-3 rounded border border-[var(--alpha-8)] bg-card p-6">
-          <h2 className="text-base font-medium leading-7 text-foreground">Setup In Claude Code</h2>
+          <h2 className="text-base font-medium leading-7 text-foreground">Setup In OpenClaw</h2>
           {/* 2-column grid with one tile → tile renders at half width, matching Figma. */}
           <div className="grid grid-cols-2 gap-3">
             <ClientTile
