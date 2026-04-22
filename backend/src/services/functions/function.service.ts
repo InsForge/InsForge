@@ -368,7 +368,7 @@ export class FunctionService {
       /Deno\.(run|spawn|Command|makeTemp|remove|write|chmod|chown)/i,
       /import\b/i,
       /require\b/i,
-      /eval\b|Function\b/i,
+      /eval\b|Function\s*\(/i,
       /constructor\b/i,
       /Deno\s*\[|process\s*\[|\[\s*['"][a-zA-Z]/i, // Block bracket notation property access like obj['Deno']
     ];
