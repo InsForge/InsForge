@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { Transform, TransformCallback } from 'stream';
 
 export interface CanonicalRequestInput {
   method: string;
@@ -185,4 +186,138 @@ export function verifyHeaderSignature(input: VerifyInput): VerifyResult {
     scope,
     seedSignature: computedSig,
   };
+}
+
+// ============================================================================
+// Streaming SigV4: STREAMING-AWS4-HMAC-SHA256-PAYLOAD chunk parser
+// ============================================================================
+
+export interface ChunkParserOptions {
+  seedSignature: string;
+  signingKey: Buffer;
+  datetime: string;
+  scope: string;
+}
+
+type ParserState = 'HEADER' | 'DATA' | 'AFTER_DATA_CRLF' | 'DONE';
+
+/**
+ * Transform stream that consumes a STREAMING-AWS4-HMAC-SHA256-PAYLOAD body,
+ * verifies each chunk's signature against the previous chunk's signature
+ * (seeded by the header signature), and emits only the verified raw payload
+ * bytes to downstream consumers. Throws SignatureDoesNotMatch on any
+ * mismatch. Memory usage is bounded by the buffered trailing-chunk fragment
+ * plus MAX_HEADER_LEN per header.
+ */
+export class ChunkSignatureV4Parser extends Transform {
+  private state: ParserState = 'HEADER';
+  private prevSig: string;
+  private readonly signingKey: Buffer;
+  private readonly datetime: string;
+  private readonly scope: string;
+  private buffer: Buffer = Buffer.alloc(0);
+  private remainingChunkBytes = 0;
+  private declaredChunkSig = '';
+  private chunkHash = crypto.createHash('sha256');
+  private sawTerminator = false;
+  private static readonly MAX_HEADER_LEN = 256;
+  private static readonly EMPTY_SHA256 = crypto.createHash('sha256').update('').digest('hex');
+
+  constructor(opts: ChunkParserOptions) {
+    super();
+    this.prevSig = opts.seedSignature;
+    this.signingKey = opts.signingKey;
+    this.datetime = opts.datetime;
+    this.scope = opts.scope;
+  }
+
+  _transform(chunk: Buffer, _enc: BufferEncoding, cb: TransformCallback): void {
+    try {
+      this.buffer = this.buffer.length ? Buffer.concat([this.buffer, chunk]) : chunk;
+      this.pump();
+      cb();
+    } catch (err) {
+      cb(err as Error);
+    }
+  }
+
+  _flush(cb: TransformCallback): void {
+    if (this.state !== 'DONE') {
+      cb(new Error('SignatureDoesNotMatch: stream ended before terminator chunk'));
+      return;
+    }
+    cb();
+  }
+
+  private pump(): void {
+    while (true) {
+      if (this.state === 'HEADER') {
+        const nlIdx = this.buffer.indexOf('\r\n');
+        if (nlIdx === -1) {
+          if (this.buffer.length > ChunkSignatureV4Parser.MAX_HEADER_LEN) {
+            throw new Error('SignatureDoesNotMatch: chunk header too long');
+          }
+          return;
+        }
+        const header = this.buffer.slice(0, nlIdx).toString('ascii');
+        this.buffer = this.buffer.slice(nlIdx + 2);
+        const match = /^([0-9a-fA-F]+);chunk-signature=([0-9a-fA-F]{64})$/.exec(header);
+        if (!match) throw new Error('SignatureDoesNotMatch: malformed chunk header');
+        this.remainingChunkBytes = parseInt(match[1], 16);
+        this.declaredChunkSig = match[2];
+        this.chunkHash = crypto.createHash('sha256');
+        if (this.remainingChunkBytes === 0) {
+          this.verifyHash(ChunkSignatureV4Parser.EMPTY_SHA256);
+          this.sawTerminator = true;
+          this.state = 'AFTER_DATA_CRLF';
+        } else {
+          this.state = 'DATA';
+        }
+      } else if (this.state === 'DATA') {
+        if (this.buffer.length === 0) return;
+        const take = Math.min(this.buffer.length, this.remainingChunkBytes);
+        const payload = this.buffer.slice(0, take);
+        this.chunkHash.update(payload);
+        this.push(payload);
+        this.buffer = this.buffer.slice(take);
+        this.remainingChunkBytes -= take;
+        if (this.remainingChunkBytes === 0) {
+          this.verifyHash(this.chunkHash.digest('hex'));
+          this.state = 'AFTER_DATA_CRLF';
+        }
+      } else if (this.state === 'AFTER_DATA_CRLF') {
+        if (this.buffer.length < 2) return;
+        if (this.buffer[0] !== 0x0d || this.buffer[1] !== 0x0a) {
+          throw new Error('SignatureDoesNotMatch: missing CRLF after chunk data');
+        }
+        this.buffer = this.buffer.slice(2);
+        if (this.sawTerminator) {
+          this.state = 'DONE';
+          return;
+        }
+        this.state = 'HEADER';
+      } else {
+        return;
+      }
+    }
+  }
+
+  private verifyHash(payloadHashHex: string): void {
+    const sts = [
+      'AWS4-HMAC-SHA256-PAYLOAD',
+      this.datetime,
+      this.scope,
+      this.prevSig,
+      ChunkSignatureV4Parser.EMPTY_SHA256,
+      payloadHashHex,
+    ].join('\n');
+    const sig = crypto.createHmac('sha256', this.signingKey).update(sts).digest('hex');
+    if (
+      sig.length !== this.declaredChunkSig.length ||
+      !crypto.timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(this.declaredChunkSig, 'hex'))
+    ) {
+      throw new Error('SignatureDoesNotMatch: chunk signature invalid');
+    }
+    this.prevSig = sig;
+  }
 }
