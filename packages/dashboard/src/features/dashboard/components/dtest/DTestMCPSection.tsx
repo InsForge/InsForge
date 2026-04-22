@@ -154,7 +154,11 @@ function InstallDeeplinkButton({ agent, deeplink }: InstallDeeplinkButtonProps) 
   }, [agent.id, deeplink]);
 
   return (
-    <WhiteActionButton onClick={handleClick} agent={agent} label={`Install to ${agent.displayName}`} />
+    <WhiteActionButton
+      onClick={handleClick}
+      agent={agent}
+      label={`Install to ${agent.displayName}`}
+    />
   );
 }
 
