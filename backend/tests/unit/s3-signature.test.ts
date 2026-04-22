@@ -101,9 +101,7 @@ describe('buildCanonicalRequest', () => {
   });
 
   it('sha256Hex matches known empty-string digest', () => {
-    expect(sha256Hex('')).toBe(
-      'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
-    );
+    expect(sha256Hex('')).toBe('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
   });
 });
 
@@ -143,9 +141,22 @@ describe('verifyHeaderSignature', () => {
   const date = '20260101';
   const region = 'us-east-2';
 
-  function sign(method: string, path: string, query: string, headers: Record<string, string>, payloadHash: string) {
+  function sign(
+    method: string,
+    path: string,
+    query: string,
+    headers: Record<string, string>,
+    payloadHash: string
+  ) {
     const signedHeaders = ['host', 'x-amz-date'];
-    const canonical = buildCanonicalRequest({ method, path, query, headers, signedHeaders, payloadHash });
+    const canonical = buildCanonicalRequest({
+      method,
+      path,
+      query,
+      headers,
+      signedHeaders,
+      payloadHash,
+    });
     const scope = `${date}/${region}/s3/aws4_request`;
     const sts = buildStringToSign({ datetime, scope, canonicalRequestHash: sha256Hex(canonical) });
     const key = deriveSigningKey(secret, date, region, 's3');
@@ -205,7 +216,9 @@ describe('verifyHeaderSignature', () => {
     const res = verifyHeaderSignature({
       authorization: 'Bearer abc',
       secret,
-      method: 'GET', path: '/', query: '',
+      method: 'GET',
+      path: '/',
+      query: '',
       headers: { host: 'h', 'x-amz-date': datetime },
       payloadHash: 'UNSIGNED-PAYLOAD',
       expectedRegion: region,

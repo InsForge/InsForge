@@ -1,10 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import crypto from 'crypto';
 import { Readable } from 'stream';
-import {
-  ChunkSignatureV4Parser,
-  deriveSigningKey,
-} from '@/services/storage/s3-signature.js';
+import { ChunkSignatureV4Parser, deriveSigningKey } from '@/services/storage/s3-signature.js';
 
 async function collect(stream: Readable): Promise<Buffer> {
   const chunks: Buffer[] = [];
@@ -32,11 +29,7 @@ describe('ChunkSignatureV4Parser', () => {
   const scope = `${date}/us-east-2/s3/aws4_request`;
   const signingKey = deriveSigningKey(secret, date, 'us-east-2', 's3');
 
-  function makeChunkedBody(
-    payload: Buffer,
-    seedSignature: string,
-    chunkSizes: number[]
-  ): Buffer {
+  function makeChunkedBody(payload: Buffer, seedSignature: string, chunkSizes: number[]): Buffer {
     const parts: Buffer[] = [];
     let prev = seedSignature;
     let offset = 0;

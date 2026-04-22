@@ -20,14 +20,15 @@ describe('dispatchOp', () => {
     expect(dispatchOp(make('GET', '/mybucket?list-type=2'))).toBe('ListObjectsV2'));
   it('ListObjectsV2 default', () =>
     expect(dispatchOp(make('GET', '/mybucket'))).toBe('ListObjectsV2'));
-  it('PutObject', () =>
-    expect(dispatchOp(make('PUT', '/mybucket/key.jpg'))).toBe('PutObject'));
+  it('PutObject', () => expect(dispatchOp(make('PUT', '/mybucket/key.jpg'))).toBe('PutObject'));
   it('CopyObject', () =>
     expect(dispatchOp(make('PUT', '/mybucket/key.jpg', { 'x-amz-copy-source': '/src/k' }))).toBe(
       'CopyObject'
     ));
   it('UploadPart', () =>
-    expect(dispatchOp(make('PUT', '/mybucket/key.jpg?partNumber=3&uploadId=X'))).toBe('UploadPart'));
+    expect(dispatchOp(make('PUT', '/mybucket/key.jpg?partNumber=3&uploadId=X'))).toBe(
+      'UploadPart'
+    ));
   it('CreateMultipartUpload', () =>
     expect(dispatchOp(make('POST', '/mybucket/key.jpg?uploads'))).toBe('CreateMultipartUpload'));
   it('CompleteMultipartUpload', () =>
@@ -36,8 +37,7 @@ describe('dispatchOp', () => {
     ));
   it('DeleteObjects', () =>
     expect(dispatchOp(make('POST', '/mybucket?delete'))).toBe('DeleteObjects'));
-  it('DeleteObject', () =>
-    expect(dispatchOp(make('DELETE', '/mybucket/k'))).toBe('DeleteObject'));
+  it('DeleteObject', () => expect(dispatchOp(make('DELETE', '/mybucket/k'))).toBe('DeleteObject'));
   it('AbortMultipartUpload', () =>
     expect(dispatchOp(make('DELETE', '/mybucket/k?uploadId=X'))).toBe('AbortMultipartUpload'));
   it('GetObject', () => expect(dispatchOp(make('GET', '/mybucket/k'))).toBe('GetObject'));
@@ -48,8 +48,7 @@ describe('dispatchOp', () => {
     expect(dispatchOp(make('GET', '/mybucket?location'))).toBe('GetBucketLocation'));
   it('GetBucketVersioning stub', () =>
     expect(dispatchOp(make('GET', '/mybucket?versioning'))).toBe('GetBucketVersioning'));
-  it('unknown method → null', () =>
-    expect(dispatchOp(make('PATCH', '/mybucket/k'))).toBeNull());
+  it('unknown method → null', () => expect(dispatchOp(make('PATCH', '/mybucket/k'))).toBeNull());
   it('unknown POST without delete/uploads → null', () =>
     expect(dispatchOp(make('POST', '/mybucket/k'))).toBeNull());
 });

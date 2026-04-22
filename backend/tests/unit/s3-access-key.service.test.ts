@@ -48,7 +48,9 @@ describe('S3AccessKeyService', () => {
 
   it('generates 40-char base64url secret', () => {
     const svc = new S3AccessKeyService(mockPool());
-    const sk = (svc as unknown as { generateSecretAccessKey: () => string }).generateSecretAccessKey();
+    const sk = (
+      svc as unknown as { generateSecretAccessKey: () => string }
+    ).generateSecretAccessKey();
     expect(sk).toHaveLength(40);
     expect(sk).toMatch(/^[A-Za-z0-9_-]{40}$/);
   });
