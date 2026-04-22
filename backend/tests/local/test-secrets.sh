@@ -5,14 +5,7 @@
 
 # Get the directory where this script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-CONFIG_PATH="$SCRIPT_DIR/../test-config.sh"
-
-if [ -f "$CONFIG_PATH" ]; then
-    source "$CONFIG_PATH"
-else
-    echo "Error: Could not find test-config.sh at $CONFIG_PATH"
-    exit 1
-fi
+source "$SCRIPT_DIR/../test-config.sh"
 
 # API base URL
 API_BASE="${TEST_API_BASE:-http://localhost:7130/api}"
