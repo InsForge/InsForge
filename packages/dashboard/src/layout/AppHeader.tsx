@@ -64,21 +64,27 @@ export default function AppHeader() {
   // D test connect-tip: show once after MCP call is detected and user lands on dashboard view.
   const { hasCompletedOnboarding } = useMcpUsage();
   const { projectId } = useProjectId();
-  const connectTipKey = getConnectTipKey(projectId);
-  const [connectTipDismissed, setConnectTipDismissed] = useState(() =>
-    readConnectTipDismissed(connectTipKey)
-  );
+  // Initialise to `true` (dismissed) so the tip never flashes while `projectId` is still
+  // resolving — otherwise the lazy init would read the shared `-default` localStorage key
+  // and leak dismissal state across projects.
+  const [connectTipDismissed, setConnectTipDismissed] = useState(true);
   useEffect(() => {
-    setConnectTipDismissed(readConnectTipDismissed(connectTipKey));
-  }, [connectTipKey]);
+    if (!projectId) {
+      return;
+    }
+    setConnectTipDismissed(readConnectTipDismissed(getConnectTipKey(projectId)));
+  }, [projectId]);
   const showConnectTip =
     isDTestDashboard &&
     searchParams.get('view') !== 'install' &&
     hasCompletedOnboarding &&
     !connectTipDismissed;
   const handleDismissConnectTip = () => {
+    if (!projectId) {
+      return;
+    }
     setConnectTipDismissed(true);
-    writeConnectTipDismissed(connectTipKey);
+    writeConnectTipDismissed(getConnectTipKey(projectId));
   };
 
   const [githubStars, setGithubStars] = useState<number | null>(null);
@@ -187,7 +193,7 @@ export default function AppHeader() {
               <div className="absolute right-0 top-full z-50 mt-2 w-[200px] animate-in fade-in slide-in-from-top-1">
                 {/* Arrow pointing up to the Connect button (inverted color) */}
                 <div className="absolute -top-[6px] right-4 h-0 w-0 border-x-[6px] border-b-[8px] border-x-transparent border-b-[rgb(var(--foreground))]" />
-                <div className="relative flex flex-col gap-2 rounded border border-alpha-8 bg-[rgb(var(--foreground))] p-3 shadow-lg">
+                <div className="relative flex flex-col gap-2 rounded border border-[var(--alpha-8)] bg-[rgb(var(--foreground))] p-3 shadow-lg">
                   <div className="flex items-center justify-between gap-2">
                     <span className="rounded bg-[rgb(var(--inverse))]/10 px-2 py-0.5 text-xs font-medium leading-4 text-[rgb(var(--inverse))]">
                       Tip
