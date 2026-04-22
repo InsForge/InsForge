@@ -7,12 +7,13 @@
 
 ## Context
 
-Dashboard currently supports two variants of the home page, switched by the PostHog feature flag `dashboard-v3-experiment`. D Test ships on a **new** flag, `dashboard-v4-experiment`, with three variants (`control` / `c_test` / `d_test`) so that the existing `dashboard-v3-experiment` allocation is not re-balanced. For historical context, the original variants on v3 are:
+Dashboard home is gated by a single PostHog feature flag `dashboard-v4-experiment` with three variants:
 
-- default (`DashboardPage`) — baseline
-- `c_test` (`CTestDashboardPage`) — Get-Started + Prompt Stepper + metrics
+- default / `control` (`DashboardPage`) — baseline
+- `c_test` (`CTestDashboardPage`) — pairs with `ConnectDialogV2` as the top-nav Connect flow
+- `d_test` — new **install-first** onboarding introduced in this spec
 
-We are adding a third variant `d_test` to compare a more **install-first** onboarding against C test. D test ships a reworked "Install InsForge" client picker as the pre-connection view, and a simplified post-connection dashboard (header + 4 metric cards, no stepper).
+D test ships a reworked "Install InsForge" client picker as the pre-connection view, and a simplified post-connection dashboard (header + 4 metric cards, no stepper). On d_test the top-nav Connect button does **not** open any dialog — it switches the page back to the Install view so users can re-visit setup at any time.
 
 Figma references:
 - Install InsForge (client picker): `2194:75236`
@@ -41,26 +42,22 @@ This is the same signal C test uses today. No new backend work.
 
 ## View Model
 
-Two top-level views, both mounted at `/dashboard` (the existing Dashboard home route), switched by an in-page state `view: 'install' | 'dashboard'`.
+Two top-level views, both mounted at `/dashboard` (the existing Dashboard home route), switched by an in-page state `view: 'install' | 'dashboard'`. View is **session-local React state** (not URL-backed, not persisted) — simpler than the earlier design and still covers every user-facing transition.
 
 ### View resolution
 
-`view` is reflected in the URL as `?view=install` (absent = dashboard). That makes refresh preserve state, enables deep-linking, and supports browser back/forward.
-
-When the URL has no `view` param, the initial view is computed once on mount:
+On mount, once `useMcpUsage()` finishes loading, the initial view is:
 
 ```text
-if installDismissed (localStorage, per-project) → dashboard
-else if !hasCompletedOnboarding                 → install
-else                                            → dashboard
+hasCompletedOnboarding ? 'dashboard' : 'install'
 ```
 
-`installDismissed` is persisted in `localStorage` under key `insforge-dtest-install-dismissed-<projectId>`:
+Thereafter, the view only changes on two events:
 
-- Set to `true` when the user clicks `[X]` on the Install page (the explicit dismissal gesture). Prevents the "auto-bounce back to install after dismissal" refresh bug.
-- Also set to `true` the first time `hasCompletedOnboarding` flips to true, so a connected user who later loses MCP usage history does not get bounced to install.
+1. **Onboarding completes** (`hasCompletedOnboarding` flips false → true): auto-switch to `'dashboard'`. This is the "MCP call succeeds → jump to dashboard" UX.
+2. **Top-nav Connect clicked** (d_test + `/dashboard` route): switch to `'install'`. The Connect button is always enabled; clicking it simply re-opens Install.
 
-Clicking the top-nav `Connect` button (d_test + on `/dashboard`) sets `?view=install` via `useSearchParams`. It does **not** clear `installDismissed` — the flag only governs the *default* view when no URL param is present. Top-nav Connect is an explicit override that always works.
+On refresh the session state resets. The initial-view rule re-runs, so a connected user lands back on dashboard and an unconnected user lands on install — both are the correct defaults. The transient "I just clicked Connect to peek at install" intent is not persisted; if the user wants Install again, they click Connect again.
 
 Within the Install view there is a sub-state `selectedClient`:
 
@@ -70,7 +67,7 @@ view = 'install'
    └── selectedClient !== null   →  ClientDetailPage for that client
 ```
 
-`selectedClient` is **not** reflected in the URL. Opening Install always starts at All Clients. (Rationale: the detail view is always one click away; lifting it to URL adds routing complexity for marginal benefit.)
+`selectedClient` is session-local and resets when switching to dashboard.
 
 ## Navigation Map
 
@@ -168,7 +165,7 @@ packages/dashboard/src/features/dashboard/
         ├── ClientDetailPage.tsx             # detail shell: back + title + slot
         ├── ClientTile.tsx                   # reusable tile for agents & direct-connect
         ├── DTestConnectedDashboard.tsx      # header + 4 metric cards
-        ├── useDTestView.ts                  # URL-backed view state + selectedClient
+        ├── DTestViewContext.tsx             # React context: view + selectedClient, shared between AppHeader and DTestDashboardPage
         └── clientRegistry.ts                # tile metadata (id, label, icon, content type)
 ```
 
@@ -188,9 +185,15 @@ packages/dashboard/src/features/dashboard/components/
 - `packages/dashboard/src/features/dashboard/components/connect/MCPSection.tsx`
   - Add optional `initialAgentId?: string` prop.
   - Change `useState` initializer to resolve `MCP_AGENTS.find((a) => a.id === initialAgentId) ?? MCP_AGENTS[0]`.
+- `packages/dashboard/src/layout/AppLayout.tsx`
+  - Update the dialog-variant flag from `dashboard-v3-experiment` to `dashboard-v4-experiment`. `c_test` still renders `ConnectDialogV2`; `d_test` and default both fall through to `ConnectDialog` (d_test never actually opens it — the Connect button re-routes to the Install view — but the component is still mounted so Connect from non-`/dashboard` routes keeps working).
+  - Wrap the layout tree in `DTestViewProvider` so `AppHeader` and `DTestDashboardPage` share view state.
 - `packages/dashboard/src/layout/AppHeader.tsx` (top-nav `Connect` button)
-  - When `dashboardVariant === 'd_test'` and current route is `/dashboard`: `onClick` sets `?view=install` via react-router `useSearchParams`, instead of calling `openConnectDialog`.
+  - When `dashboardVariant === 'd_test'` and current route is `/dashboard`: `onClick` calls `setView('install')` from `DTestViewContext` instead of calling `openConnectDialog`.
+  - `showConnectTip` checks `dTestView !== 'install'` from the same context (previously read `?view` from URL).
   - Other variants: no behavior change.
+- `packages/dashboard/src/lib/contexts/SocketContext.tsx`
+  - Rename the `experiment_variant` tag on `onboarding_completed` analytics from `dashboard-v3-experiment` to `dashboard-v4-experiment` so analytics matches the live flag.
 
 ## Client Registry
 
@@ -226,59 +229,51 @@ The "featured" section ("Setup In OpenClaw") and grid consume the same entries; 
 
 ## State Management
 
-One hook, `useDTestView`, owns view resolution, URL sync, and the dismissal flag:
+A React context (`DTestViewContext`) provided at `AppLayout` level owns `view` + `selectedClient` and exposes a `useDTestView` hook for both `AppHeader` and `DTestDashboardPage`:
 
-```ts
-function useDTestView({ hasCompletedOnboarding, projectId }: UseDTestViewArgs) {
-  const [params, setParams] = useSearchParams();
-  const dismissKey = `insforge-dtest-install-dismissed-${projectId || 'default'}`;
+```tsx
+export function DTestViewProvider({ children }: { children: ReactNode }) {
+  const { hasCompletedOnboarding, isLoading } = useMcpUsage();
   const [selectedClient, setSelectedClient] = useState<ClientId | null>(null);
-  const [isDismissed, setIsDismissed] = useState(() => readDismissed(dismissKey));
+  const [view, setViewState] = useState<DTestView>('install');
 
-  // Resolve view: explicit URL param > dismissal flag > onboarding state.
-  const view: 'install' | 'dashboard' = useMemo(() => {
-    const urlView = params.get('view');
-    if (urlView === 'install') return 'install';
-    if (urlView === 'dashboard') return 'dashboard';
-    if (isDismissed) return 'dashboard';
-    return hasCompletedOnboarding ? 'dashboard' : 'install';
-  }, [params, hasCompletedOnboarding, isDismissed]);
-
-  // Persist dismissal the first time onboarding completes, so a later loss of
-  // MCP usage history does not bounce the user back to the install page.
+  // Initialise from onboarding state once loading finishes; thereafter
+  // auto-flip to dashboard on every false → true transition.
+  const didInit = useRef(false);
+  const prevOnboarding = useRef(hasCompletedOnboarding);
   useEffect(() => {
-    if (projectId && hasCompletedOnboarding && !isDismissed) {
-      writeDismissed(dismissKey, true);
-      setIsDismissed(true);
+    if (isLoading) return;
+    if (!didInit.current) {
+      setViewState(hasCompletedOnboarding ? 'dashboard' : 'install');
+      didInit.current = true;
+    } else if (!prevOnboarding.current && hasCompletedOnboarding) {
+      setViewState('dashboard');
     }
-  }, [hasCompletedOnboarding, projectId, dismissKey, isDismissed]);
+    prevOnboarding.current = hasCompletedOnboarding;
+  }, [hasCompletedOnboarding, isLoading]);
 
-  const setView = useCallback(
-    (v: 'install' | 'dashboard', options?: { dismiss?: boolean }) => {
-      const next = new URLSearchParams(params);
-      next.set('view', v); // always explicit — prevents default-resolution bounce-back
-      setParams(next, { replace: true });
-      if (v === 'dashboard') setSelectedClient(null);
-      if (options?.dismiss) {
-        writeDismissed(dismissKey, true);
-        setIsDismissed(true);
-      }
-    },
-    [params, setParams, dismissKey]
-  );
+  const setView = useCallback((next: DTestView) => {
+    setViewState(next);
+    if (next === 'dashboard') setSelectedClient(null);
+  }, []);
 
-  return { view, setView, selectedClient, setSelectedClient };
+  // ...provider returned here
 }
 ```
 
-- `[X]` on Install calls `setView('dashboard', { dismiss: true })`.
-- Top-nav Connect on d_test calls `setView('install')` (no dismiss mutation; the flag governs defaults, not explicit toggles).
+Key points:
+
+- **No URL param, no localStorage.** View is pure session state. Refresh recomputes from `hasCompletedOnboarding`.
+- **Single source of truth for view.** `AppHeader.showConnectTip` and `DTestDashboardPage` both read `view` from the same context, so the Connect tip correctly hides while the user is on the Install view.
+- **Provider is mounted for every user**, not just d_test. Non-d_test components don't consume it, and `useMcpUsage()` is already React-Query-cached so the extra call is free.
+- **`[X]` on Install** calls `setView('dashboard')` — no dismissal flag, no persistence.
+- **Top-nav Connect on d_test** (only while on `/dashboard`) calls `setView('install')`.
+- **MCP call success** (the `hasCompletedOnboarding` false → true transition) auto-switches to `'dashboard'` so users see their connected state immediately.
 - `selectedClient` is session-local; switching to dashboard clears it.
-- `safeLocalStorage` wraps `localStorage` access in try/catch for SSR / privacy-mode safety, matching the pattern `CTestDashboardPage` already uses.
 
 ## Feature Flag
 
-A **new** PostHog flag `dashboard-v4-experiment` with three variants (`control` / `c_test` / `d_test`) gates D test. We did not reuse `dashboard-v3-experiment` so that the existing `c_test` allocation on v3 stays undisturbed; v3 can be ended or left running separately. PostHog flag configuration is a dashboard-side change, out of scope for the code PR.
+All three dashboard variants are gated by a single PostHog flag, `dashboard-v4-experiment`, with values `control` / `c_test` / `d_test`. Every code reference to the older `dashboard-v3-experiment` name is renamed in this change (`AppRoutes.tsx`, `AppLayout.tsx`, `SocketContext.tsx`) so the flag name is consistent everywhere. PostHog flag configuration is a dashboard-side change, out of scope for the code PR.
 
 `AppRoutes.tsx`:
 
@@ -303,9 +298,11 @@ This is a UI-only change; verification is primarily manual through the dev serve
   - Click Connection String tile → `ConnectionStringSectionV2` renders inside the detail shell.
   - Click API Keys tile → `APIKeysSectionV2` renders inside the detail shell.
   - `← All Clients` from any detail → back to grid with scroll preserved.
-  - `[X]` on Install page → lands on dashboard view; URL has no `view` param; refresh stays on dashboard (dismissal flag persisted).
-  - Connect button in top nav (on `d_test`, on `/dashboard`) → returns to Install page; refresh preserves Install (via `?view=install`).
-  - Refresh on detail page → returns to Install grid (selectedClient is session-local, not URL-backed). Acceptable per design.
+  - `[X]` on Install page → lands on dashboard view.
+  - Connect button in top nav (on `d_test`, on `/dashboard`) → returns to Install page. The Connect-tip under the button hides immediately (it keys on the context `view`, not URL).
+  - MCP tool succeeds while on Install → view auto-flips to dashboard and the Connect-tip appears under the button (respecting its own dismissal flag in localStorage).
+  - Refresh on either view → re-resolves from `hasCompletedOnboarding`. Connected users land on dashboard; unconnected users land on install. Transient "I clicked Connect to peek" state is intentionally not preserved.
+  - Refresh on detail page → returns to Install grid (selectedClient is session-local). Acceptable per design.
 - Cross-variant regression:
   - On `default` / `c_test`, Connect button still opens `ConnectDialog` modal, not Install page.
   - `MCPSection` with no `initialAgentId` still defaults to `MCP_AGENTS[0]` as before.
@@ -315,6 +312,8 @@ This is a UI-only change; verification is primarily manual through the dev serve
 
 - Feature-flagged end-to-end; rollback is a PostHog flag change.
 - Shared-component edits (`MCPSection`, extracted `MetricCard`) must remain backward-compatible. `initialAgentId` is optional and defaults to today's behavior; extracted `MetricCard` keeps the same props surface.
+- `DTestViewProvider` is mounted for all users, not just d_test. It calls `useMcpUsage()` at layout level, but that hook is already invoked by `AppHeader` and is React-Query-cached, so the provider does not add a new request.
+- Flag rename (`dashboard-v3-experiment` → `dashboard-v4-experiment`) is applied in every code location. If PostHog still has the v3 flag defined, analytics and variant resolution will simply return `null` for the old name — no runtime error, just the control fallback — so the switch is safe to deploy before/after PostHog-side changes.
 
 ## Open Items
 
