@@ -37,18 +37,20 @@ self.onmessage = async (e) => {
      * providing safe secrets access even under strict native lock-down.
      */
     const mockDeno = {
-      ...globalThis.Deno,
-      // Mock the Deno.env API - only get() is needed for reading secrets
+      // Mock only the required Deno.env API
       env: {
         get: (key) => secrets[key] || undefined,
-        toObject: () => ({ ...secrets }),
+        // (toObject removed for security to prevent secret enumeration)
       },
-      // Ensure dangerous methods are explicitly blocked in the shadow
+      // Explicitly block all subprocess APIs
       run: () => {
         throw new Error('Deno.run is natively disabled');
       },
       spawn: () => {
         throw new Error('Deno.spawn is natively disabled');
+      },
+      Command: function () {
+        throw new Error('Deno.Command is natively disabled');
       },
     };
 

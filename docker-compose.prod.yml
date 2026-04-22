@@ -168,7 +168,7 @@ services:
         echo 'Downloading Deno dependencies...' &&
         deno cache functions/server.ts &&
         echo 'Starting Deno server on port 7133...' &&
-        deno run --allow-net --allow-env --allow-read=./functions/worker-template.js functions/server.ts
+        deno run --unstable-worker-options --allow-net --allow-env --allow-read=./functions/worker-template.js functions/server.ts
       "
     restart: unless-stopped
     networks:

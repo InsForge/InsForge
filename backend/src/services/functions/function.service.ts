@@ -365,12 +365,12 @@ export class FunctionService {
       /globalThis/i,
       /self/i,
       /process\b/i,
-      /Deno\.(run|spawn|makeTemp|remove|write|chmod|chown)/i,
+      /Deno\.(run|spawn|Command|makeTemp|remove|write|chmod|chown)/i,
       /import\b/i,
       /require\b/i,
-      /eval\b/i,
+      /eval\b|Function\b/i,
       /constructor\b/i,
-      /\[\s*['"][a-zA-Z]/i, // Block bracket notation property access like obj['Deno']
+      /Deno\s*\[|process\s*\[|\[\s*['"][a-zA-Z]/i, // Block bracket notation property access like obj['Deno']
     ];
 
     for (const pattern of dangerousPatterns) {
