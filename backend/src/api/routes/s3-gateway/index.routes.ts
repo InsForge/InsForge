@@ -12,6 +12,12 @@ import * as headBucket from './commands/head-bucket.js';
 import * as createBucket from './commands/create-bucket.js';
 import * as deleteBucket from './commands/delete-bucket.js';
 import * as listObjectsV2 from './commands/list-objects-v2.js';
+import * as headObject from './commands/head-object.js';
+import * as getObject from './commands/get-object.js';
+import * as putObject from './commands/put-object.js';
+import * as deleteObject from './commands/delete-object.js';
+import * as deleteObjects from './commands/delete-objects.js';
+import * as copyObject from './commands/copy-object.js';
 
 export const s3GatewayRouter: Router = Router();
 
@@ -76,6 +82,24 @@ s3GatewayRouter.use(async (req: Request, res: Response) => {
         return;
       case 'ListObjectsV2':
         await listObjectsV2.handle(authed, res);
+        return;
+      case 'HeadObject':
+        await headObject.handle(authed, res);
+        return;
+      case 'GetObject':
+        await getObject.handle(authed, res);
+        return;
+      case 'PutObject':
+        await putObject.handle(authed, res);
+        return;
+      case 'DeleteObject':
+        await deleteObject.handle(authed, res);
+        return;
+      case 'DeleteObjects':
+        await deleteObjects.handle(authed, res);
+        return;
+      case 'CopyObject':
+        await copyObject.handle(authed, res);
         return;
       default:
         sendS3Error(res, 'NotImplemented', `Operation ${op} not yet implemented`, {
