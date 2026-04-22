@@ -6,13 +6,24 @@ import {
   ListObjectsV2Command,
   DeleteObjectsCommand,
   HeadObjectCommand,
+  CopyObjectCommand,
+  CreateMultipartUploadCommand,
+  UploadPartCommand,
+  CompleteMultipartUploadCommand,
+  AbortMultipartUploadCommand,
+  ListPartsCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
 import { getSignedUrl as getCloudFrontSignedUrl } from '@aws-sdk/cloudfront-signer';
+import { Readable } from 'stream';
 import { UploadStrategyResponse, DownloadStrategyResponse } from '@insforge/shared-schemas';
-import { StorageProvider } from './base.provider.js';
+import { StorageProvider, ObjectMetadata, GetObjectResult } from './base.provider.js';
 import logger from '@/utils/logger.js';
+
+function stripEtagQuotes(etag: string | undefined): string {
+  return (etag ?? '').replace(/^"(.*)"$/, '$1');
+}
 
 const ONE_HOUR_IN_SECONDS = 3600;
 const SEVEN_DAYS_IN_SECONDS = 604800;
@@ -330,5 +341,194 @@ export class S3StorageProvider implements StorageProvider {
     } catch {
       return { exists: false };
     }
+  }
+
+  // ==========================================================================
+  // S3 Protocol extensions
+  // ==========================================================================
+
+  async putObjectStream(
+    bucket: string,
+    key: string,
+    body: Readable,
+    opts: { contentType?: string; contentLength?: number }
+  ): Promise<{ etag: string; size: number }> {
+    if (!this.s3Client) throw new Error('S3 client not initialized');
+    const s3Key = this.getS3Key(bucket, key);
+    const resp = await this.s3Client.send(
+      new PutObjectCommand({
+        Bucket: this.s3Bucket,
+        Key: s3Key,
+        Body: body,
+        ContentType: opts.contentType,
+        ContentLength: opts.contentLength,
+      })
+    );
+    return { etag: stripEtagQuotes(resp.ETag), size: opts.contentLength ?? 0 };
+  }
+
+  async getObjectStream(
+    bucket: string,
+    key: string,
+    opts?: { range?: string }
+  ): Promise<GetObjectResult> {
+    if (!this.s3Client) throw new Error('S3 client not initialized');
+    const s3Key = this.getS3Key(bucket, key);
+    const resp = await this.s3Client.send(
+      new GetObjectCommand({ Bucket: this.s3Bucket, Key: s3Key, Range: opts?.range })
+    );
+    if (!resp.Body) throw new Error('GetObject returned empty body');
+    return {
+      body: resp.Body as Readable,
+      size: Number(resp.ContentLength ?? 0),
+      etag: stripEtagQuotes(resp.ETag),
+      contentType: resp.ContentType,
+      lastModified: resp.LastModified ?? new Date(),
+    };
+  }
+
+  async headObject(bucket: string, key: string): Promise<ObjectMetadata | null> {
+    if (!this.s3Client) throw new Error('S3 client not initialized');
+    const s3Key = this.getS3Key(bucket, key);
+    try {
+      const resp = await this.s3Client.send(
+        new HeadObjectCommand({ Bucket: this.s3Bucket, Key: s3Key })
+      );
+      return {
+        size: Number(resp.ContentLength ?? 0),
+        etag: stripEtagQuotes(resp.ETag),
+        contentType: resp.ContentType,
+        lastModified: resp.LastModified ?? new Date(),
+      };
+    } catch (err: unknown) {
+      if ((err as { name?: string }).name === 'NotFound') return null;
+      throw err;
+    }
+  }
+
+  async copyObject(
+    srcBucket: string,
+    srcKey: string,
+    dstBucket: string,
+    dstKey: string
+  ): Promise<{ etag: string; lastModified: Date }> {
+    if (!this.s3Client) throw new Error('S3 client not initialized');
+    const source = `${this.s3Bucket}/${encodeURIComponent(this.getS3Key(srcBucket, srcKey))}`;
+    const resp = await this.s3Client.send(
+      new CopyObjectCommand({
+        Bucket: this.s3Bucket,
+        Key: this.getS3Key(dstBucket, dstKey),
+        CopySource: source,
+      })
+    );
+    return {
+      etag: stripEtagQuotes(resp.CopyObjectResult?.ETag),
+      lastModified: resp.CopyObjectResult?.LastModified ?? new Date(),
+    };
+  }
+
+  async createMultipartUpload(
+    bucket: string,
+    key: string,
+    opts: { contentType?: string }
+  ): Promise<{ uploadId: string }> {
+    if (!this.s3Client) throw new Error('S3 client not initialized');
+    const resp = await this.s3Client.send(
+      new CreateMultipartUploadCommand({
+        Bucket: this.s3Bucket,
+        Key: this.getS3Key(bucket, key),
+        ContentType: opts.contentType,
+      })
+    );
+    if (!resp.UploadId) throw new Error('CreateMultipartUpload returned no UploadId');
+    return { uploadId: resp.UploadId };
+  }
+
+  async uploadPart(
+    bucket: string,
+    key: string,
+    uploadId: string,
+    partNumber: number,
+    body: Readable,
+    contentLength: number
+  ): Promise<{ etag: string }> {
+    if (!this.s3Client) throw new Error('S3 client not initialized');
+    const resp = await this.s3Client.send(
+      new UploadPartCommand({
+        Bucket: this.s3Bucket,
+        Key: this.getS3Key(bucket, key),
+        UploadId: uploadId,
+        PartNumber: partNumber,
+        Body: body,
+        ContentLength: contentLength,
+      })
+    );
+    return { etag: stripEtagQuotes(resp.ETag) };
+  }
+
+  async completeMultipartUpload(
+    bucket: string,
+    key: string,
+    uploadId: string,
+    parts: Array<{ partNumber: number; etag: string }>
+  ): Promise<{ etag: string; size: number }> {
+    if (!this.s3Client) throw new Error('S3 client not initialized');
+    const resp = await this.s3Client.send(
+      new CompleteMultipartUploadCommand({
+        Bucket: this.s3Bucket,
+        Key: this.getS3Key(bucket, key),
+        UploadId: uploadId,
+        MultipartUpload: {
+          Parts: parts.map((p) => ({ ETag: `"${p.etag}"`, PartNumber: p.partNumber })),
+        },
+      })
+    );
+    const head = await this.headObject(bucket, key);
+    return { etag: stripEtagQuotes(resp.ETag), size: head?.size ?? 0 };
+  }
+
+  async abortMultipartUpload(bucket: string, key: string, uploadId: string): Promise<void> {
+    if (!this.s3Client) throw new Error('S3 client not initialized');
+    await this.s3Client.send(
+      new AbortMultipartUploadCommand({
+        Bucket: this.s3Bucket,
+        Key: this.getS3Key(bucket, key),
+        UploadId: uploadId,
+      })
+    );
+  }
+
+  async listParts(
+    bucket: string,
+    key: string,
+    uploadId: string,
+    opts: { maxParts?: number; partNumberMarker?: number }
+  ): Promise<{
+    parts: Array<{ partNumber: number; etag: string; size: number; lastModified: Date }>;
+    isTruncated: boolean;
+    nextPartNumberMarker?: number;
+  }> {
+    if (!this.s3Client) throw new Error('S3 client not initialized');
+    const resp = await this.s3Client.send(
+      new ListPartsCommand({
+        Bucket: this.s3Bucket,
+        Key: this.getS3Key(bucket, key),
+        UploadId: uploadId,
+        MaxParts: opts.maxParts,
+        PartNumberMarker: opts.partNumberMarker != null ? String(opts.partNumberMarker) : undefined,
+      })
+    );
+    return {
+      parts: (resp.Parts ?? []).map((p) => ({
+        partNumber: p.PartNumber ?? 0,
+        etag: stripEtagQuotes(p.ETag),
+        size: Number(p.Size ?? 0),
+        lastModified: p.LastModified ?? new Date(),
+      })),
+      isTruncated: !!resp.IsTruncated,
+      nextPartNumberMarker: resp.NextPartNumberMarker
+        ? Number(resp.NextPartNumberMarker)
+        : undefined,
+    };
   }
 }
