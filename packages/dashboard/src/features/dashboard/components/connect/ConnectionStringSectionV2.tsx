@@ -14,6 +14,8 @@ interface ConnectionParameter {
 
 interface ConnectionStringSectionV2Props {
   className?: string;
+  /** Layout orientation. 'horizontal' (default) places title column beside content. 'vertical' stacks title above content. */
+  variant?: 'horizontal' | 'vertical';
 }
 
 function formatParameterValue(value: string | number | undefined) {
@@ -23,7 +25,10 @@ function formatParameterValue(value: string | number | undefined) {
   return String(value);
 }
 
-export function ConnectionStringSectionV2({ className }: ConnectionStringSectionV2Props) {
+export function ConnectionStringSectionV2({
+  className,
+  variant = 'horizontal',
+}: ConnectionStringSectionV2Props) {
   const [showConnectionPassword, setShowConnectionPassword] = useState(false);
   const [showParamsPassword, setShowParamsPassword] = useState(false);
 
@@ -74,11 +79,29 @@ export function ConnectionStringSectionV2({ className }: ConnectionStringSection
     showParamsPassword,
   ]);
 
+  const isVertical = variant === 'vertical';
+
   return (
-    <div className={cn('flex gap-6', isConnectionLoading && 'animate-pulse', className)}>
-      <div className="flex w-[240px] shrink-0 flex-col gap-2">
-        <p className="text-sm font-medium leading-6 text-foreground">Connection String</p>
-        <p className="text-sm leading-6 text-muted-foreground">
+    <div
+      className={cn(
+        'flex gap-6',
+        isVertical ? 'flex-col' : 'flex-row',
+        isConnectionLoading && 'animate-pulse',
+        className
+      )}
+    >
+      <div
+        className={cn('flex flex-col gap-1', isVertical ? 'w-full' : 'w-[240px] shrink-0 gap-2')}
+      >
+        <p
+          className={cn(
+            'font-medium leading-7 text-foreground',
+            isVertical ? 'text-base' : 'text-sm leading-6'
+          )}
+        >
+          Connection String
+        </p>
+        <p className="text-sm leading-5 text-muted-foreground">
           Copy the connection details for your database.
         </p>
       </div>

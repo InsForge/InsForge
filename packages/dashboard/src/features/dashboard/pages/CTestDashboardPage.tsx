@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge, Button, CopyButton } from '@insforge/ui';
 import { Skeleton } from '../../../components';
-import { Braces, Database, ExternalLink, HardDrive, User, Sparkles, Rocket } from 'lucide-react';
+import { Braces, Database, HardDrive, User, Sparkles, Rocket } from 'lucide-react';
 import StepUserIcon from '../../../assets/icons/step_user.svg?react';
 import StepUploadIcon from '../../../assets/icons/step_upload.svg?react';
 import { useMetadata, useApiKey, useProjectId } from '../../../lib/hooks/useMetadata';
@@ -17,6 +17,7 @@ import { NewCLISection } from '../components/connect/NewCLISection';
 import { MCPSection } from '../components/connect';
 import stepBgDecoration from '../../../assets/images/step_bg_decoration.svg';
 import { JoinDiscordCta } from '../components/JoinDiscordCta';
+import { MetricCard } from '../components/MetricCard';
 
 // --- Prompt Stepper Data ---
 
@@ -93,64 +94,6 @@ const getGetStartedPassedKey = (projectId?: string) =>
 
 const getStepDoneKey = (projectId: string | null | undefined, stepKey: StepKey) =>
   `insforge-ctest-step-${stepKey}-done-${projectId || 'default'}`;
-
-// --- Sub-components ---
-
-interface MetricCardProps {
-  label: string;
-  value: string;
-  subValueLeft?: string;
-  subValueRight?: string;
-  icon: React.ReactNode;
-  onNavigate?: () => void;
-}
-
-function MetricCard({
-  label,
-  value,
-  subValueLeft,
-  subValueRight,
-  icon,
-  onNavigate,
-}: MetricCardProps) {
-  return (
-    <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded border border-[var(--alpha-8)] bg-card">
-      <div className="flex h-[120px] flex-col p-4">
-        <div className="flex h-[22px] items-center gap-1.5">
-          <div className="flex h-5 w-5 shrink-0 items-center justify-center text-muted-foreground">
-            {icon}
-          </div>
-          <p className="flex-1 text-[13px] leading-[22px] text-muted-foreground">{label}</p>
-          {onNavigate && (
-            <button
-              type="button"
-              onClick={onNavigate}
-              aria-label={`Open ${label}`}
-              className="flex shrink-0 items-center justify-center text-muted-foreground hover:text-foreground"
-            >
-              <ExternalLink className="h-5 w-5" />
-            </button>
-          )}
-        </div>
-        <div className="mt-[38px] flex items-baseline justify-between">
-          <div className="flex items-baseline gap-1">
-            <p className="text-[20px] font-medium leading-7 text-foreground">{value}</p>
-            {subValueLeft && (
-              <span className="text-[13px] leading-[22px] text-muted-foreground">
-                {subValueLeft}
-              </span>
-            )}
-          </div>
-          {subValueRight && (
-            <span className="text-[13px] leading-[22px] text-muted-foreground">
-              {subValueRight}
-            </span>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // --- Prompt display ---
 
@@ -258,7 +201,7 @@ function PromptStepper({ onDismiss, completedSteps, showDismiss = false }: Promp
                 type="button"
                 onClick={() => setActiveStep(index)}
                 className={`flex flex-col gap-2 border-b border-[var(--alpha-8)] p-4 text-left transition-colors last:border-b-0 ${
-                  isActive ? 'bg-[var(--special-toast,#323232)]' : 'hover:bg-[var(--alpha-4)]'
+                  isActive ? 'bg-toast' : 'hover:bg-[var(--alpha-4)]'
                 }`}
               >
                 <div className="flex items-center">
@@ -278,7 +221,7 @@ function PromptStepper({ onDismiss, completedSteps, showDismiss = false }: Promp
           })}
         </div>
 
-        <div className="relative flex flex-1 flex-col items-start self-stretch overflow-hidden bg-[var(--special-toast,#323232)] p-6">
+        <div className="relative flex flex-1 flex-col items-start self-stretch overflow-hidden bg-toast p-6">
           <div className="relative z-10 flex max-w-[640px] flex-col items-start gap-3">
             <div className="h-12 w-12">{currentStep.icon}</div>
             <p className="text-[20px] font-medium leading-7 text-foreground">{currentStep.title}</p>
@@ -566,7 +509,7 @@ export default function CTestDashboardPage() {
               {instanceType}
             </Badge>
           )}
-          <div className="flex items-center rounded-full bg-[var(--special-toast,#323232)] px-2 py-1">
+          <div className="flex items-center rounded-full bg-toast px-2 py-1">
             <div
               className={`mr-1.5 h-2 w-2 rounded-full ${isHealthy ? 'bg-emerald-400' : 'bg-amber-400'}`}
             />

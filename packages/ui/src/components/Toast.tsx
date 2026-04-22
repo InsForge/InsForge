@@ -7,7 +7,7 @@ const toastVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-[var(--special-toast,#323232)]',
+        default: 'bg-toast',
       },
     },
     defaultVariants: {

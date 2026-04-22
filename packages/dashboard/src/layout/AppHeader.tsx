@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { LogOut, ChevronDown, Plug } from 'lucide-react';
+import { useLocation, useSearchParams } from 'react-router-dom';
+import { LogOut, ChevronDown, Plug, X } from 'lucide-react';
 import {
   Button,
   DropdownMenu,
@@ -12,6 +13,28 @@ import { cn } from '../lib/utils/utils';
 import { useTheme } from '../lib/contexts/ThemeContext';
 import { useAuth } from '../lib/contexts/AuthContext';
 import { useOpenConnectDialog } from './ConnectDialogContext';
+import { getFeatureFlag } from '../lib/analytics/posthog';
+import { useMcpUsage } from '../features/logs/hooks/useMcpUsage';
+import { useProjectId } from '../lib/hooks/useMetadata';
+
+const getConnectTipKey = (projectId: string | null | undefined) =>
+  `insforge-dtest-connect-tip-dismissed-${projectId || 'default'}`;
+
+function readConnectTipDismissed(key: string): boolean {
+  try {
+    return localStorage.getItem(key) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function writeConnectTipDismissed(key: string): void {
+  try {
+    localStorage.setItem(key, 'true');
+  } catch {
+    // noop
+  }
+}
 
 // Import SVG icons
 import DiscordIcon from '../assets/logos/discord.svg?react';
@@ -23,6 +46,45 @@ export default function AppHeader() {
   const { resolvedTheme } = useTheme();
   const { user, logout } = useAuth();
   const openConnectDialog = useOpenConnectDialog();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  // TODO(dtest): temporary hardcode for local preview — revert before merge
+  const dashboardVariant = 'd_test';
+  void getFeatureFlag;
+  const isDTestDashboard = dashboardVariant === 'd_test' && location.pathname === '/dashboard';
+
+  const handleConnectClick = () => {
+    if (isDTestDashboard) {
+      const next = new URLSearchParams(searchParams);
+      next.set('view', 'install');
+      setSearchParams(next, { replace: true });
+      return;
+    }
+    openConnectDialog();
+  };
+
+  // D test connect-tip: show once after MCP call is detected and user lands on dashboard view.
+  const { hasCompletedOnboarding } = useMcpUsage();
+  const { projectId } = useProjectId();
+  const connectTipKey = getConnectTipKey(projectId);
+  const [connectTipDismissed, setConnectTipDismissed] = useState(() =>
+    readConnectTipDismissed(connectTipKey)
+  );
+  useEffect(() => {
+    setConnectTipDismissed(readConnectTipDismissed(connectTipKey));
+  }, [connectTipKey]);
+  // TODO(dtest): temporary preview override — forces the tip regardless of MCP state. Revert before merge.
+  const DTEST_FORCE_TIP_FOR_PREVIEW = true;
+  const showConnectTip =
+    isDTestDashboard &&
+    searchParams.get('view') !== 'install' &&
+    (DTEST_FORCE_TIP_FOR_PREVIEW || hasCompletedOnboarding) &&
+    !connectTipDismissed;
+  const handleDismissConnectTip = () => {
+    setConnectTipDismissed(true);
+    writeConnectTipDismissed(connectTipKey);
+  };
+
   const [githubStars, setGithubStars] = useState<number | null>(null);
 
   // Fetch GitHub stars
@@ -114,16 +176,42 @@ export default function AppHeader() {
           <ThemeSelect />
           <Separator className="h-5 mx-2" orientation="vertical" />
           {/* MCP Connection Status */}
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={openConnectDialog}
-            className="gap-1 rounded-[14px] border-[var(--alpha-8)] px-2 [&_svg]:size-4"
-          >
-            <Plug aria-hidden="true" />
-            <span>Connect</span>
-          </Button>
+          <div className="relative">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={handleConnectClick}
+              className="gap-1 rounded-[14px] border-[var(--alpha-8)] px-2 [&_svg]:size-4"
+            >
+              <Plug aria-hidden="true" />
+              <span>Connect</span>
+            </Button>
+            {showConnectTip && (
+              <div className="absolute right-0 top-full z-50 mt-2 w-[200px] animate-in fade-in slide-in-from-top-1">
+                {/* Arrow pointing up to the Connect button (inverted color) */}
+                <div className="absolute -top-[6px] right-4 h-0 w-0 border-x-[6px] border-b-[8px] border-x-transparent border-b-[rgb(var(--foreground))]" />
+                <div className="relative flex flex-col gap-2 rounded border border-alpha-8 bg-[rgb(var(--foreground))] p-3 shadow-lg">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="rounded bg-[rgb(var(--inverse))]/10 px-2 py-0.5 text-xs font-medium leading-4 text-[rgb(var(--inverse))]">
+                      Tip
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleDismissConnectTip}
+                      aria-label="Dismiss tip"
+                      className="shrink-0 text-[rgb(var(--inverse))]/60 hover:text-[rgb(var(--inverse))]"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <p className="text-xs leading-4 text-[rgb(var(--inverse))]">
+                    You can always click here to re-connect.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* User Profile*/}
           <Separator className="h-5 mx-2" orientation="vertical" />
