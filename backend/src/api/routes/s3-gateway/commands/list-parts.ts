@@ -24,7 +24,7 @@ export async function handle(req: S3AuthenticatedRequest, res: Response): Promis
       UploadId: uploadId,
       MaxParts: maxParts ?? 1000,
       IsTruncated: result.isTruncated,
-      ...(result.nextPartNumberMarker != null
+      ...(result.nextPartNumberMarker !== undefined && result.nextPartNumberMarker !== null
         ? { NextPartNumberMarker: result.nextPartNumberMarker }
         : {}),
       Part: result.parts.map((p) => ({

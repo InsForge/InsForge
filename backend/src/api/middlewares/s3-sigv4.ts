@@ -46,7 +46,9 @@ export interface S3AuthenticatedRequest extends Request {
 
 function parseAmzDate(s: string): Date | null {
   const m = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/.exec(s);
-  if (!m) return null;
+  if (!m) {
+    return null;
+  }
   return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]));
 }
 
@@ -108,8 +110,11 @@ export async function s3Sigv4Middleware(
 
   const headers: Record<string, string> = {};
   for (const [k, v] of Object.entries(req.headers)) {
-    if (typeof v === 'string') headers[k.toLowerCase()] = v;
-    else if (Array.isArray(v)) headers[k.toLowerCase()] = v.join(',');
+    if (typeof v === 'string') {
+      headers[k.toLowerCase()] = v;
+    } else if (Array.isArray(v)) {
+      headers[k.toLowerCase()] = v.join(',');
+    }
   }
 
   const rawUrl = req.originalUrl || req.url;

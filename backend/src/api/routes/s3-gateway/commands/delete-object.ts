@@ -23,7 +23,9 @@ export async function handle(req: S3AuthenticatedRequest, res: Response): Promis
   try {
     await svc.getProvider().deleteObject(bucket, key);
   } catch (err) {
-    if (!isNotFound(err)) throw err;
+    if (!isNotFound(err)) {
+      throw err;
+    }
   }
   await svc.deleteObjectRow(bucket, key);
   res.status(204).send();

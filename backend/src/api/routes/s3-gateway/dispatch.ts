@@ -27,7 +27,9 @@ interface Req {
 
 function header(h: Req['headers'], name: string): string | undefined {
   const direct = h[name] ?? h[name.toLowerCase()];
-  if (Array.isArray(direct)) return direct[0];
+  if (Array.isArray(direct)) {
+    return direct[0];
+  }
   return direct;
 }
 
@@ -54,36 +56,62 @@ export function dispatchOp(req: Req): S3Op | null {
   // Bucket-level (no object key)
   if (bucketOnly(path)) {
     if (m === 'GET') {
-      if (q.has('location')) return 'GetBucketLocation';
-      if (q.has('versioning')) return 'GetBucketVersioning';
+      if (q.has('location')) {
+        return 'GetBucketLocation';
+      }
+      if (q.has('versioning')) {
+        return 'GetBucketVersioning';
+      }
       return 'ListObjectsV2';
     }
-    if (m === 'HEAD') return 'HeadBucket';
-    if (m === 'PUT') return 'CreateBucket';
-    if (m === 'DELETE') return 'DeleteBucket';
-    if (m === 'POST' && q.has('delete')) return 'DeleteObjects';
+    if (m === 'HEAD') {
+      return 'HeadBucket';
+    }
+    if (m === 'PUT') {
+      return 'CreateBucket';
+    }
+    if (m === 'DELETE') {
+      return 'DeleteBucket';
+    }
+    if (m === 'POST' && q.has('delete')) {
+      return 'DeleteObjects';
+    }
     return null;
   }
 
   // Object-level
   if (hasKey(path)) {
     if (m === 'PUT') {
-      if (q.has('uploadId') && q.has('partNumber')) return 'UploadPart';
-      if (header(req.headers, 'x-amz-copy-source')) return 'CopyObject';
+      if (q.has('uploadId') && q.has('partNumber')) {
+        return 'UploadPart';
+      }
+      if (header(req.headers, 'x-amz-copy-source')) {
+        return 'CopyObject';
+      }
       return 'PutObject';
     }
     if (m === 'POST') {
-      if (q.has('uploads')) return 'CreateMultipartUpload';
-      if (q.has('uploadId')) return 'CompleteMultipartUpload';
+      if (q.has('uploads')) {
+        return 'CreateMultipartUpload';
+      }
+      if (q.has('uploadId')) {
+        return 'CompleteMultipartUpload';
+      }
       return null;
     }
     if (m === 'GET') {
-      if (q.has('uploadId')) return 'ListParts';
+      if (q.has('uploadId')) {
+        return 'ListParts';
+      }
       return 'GetObject';
     }
-    if (m === 'HEAD') return 'HeadObject';
+    if (m === 'HEAD') {
+      return 'HeadObject';
+    }
     if (m === 'DELETE') {
-      if (q.has('uploadId')) return 'AbortMultipartUpload';
+      if (q.has('uploadId')) {
+        return 'AbortMultipartUpload';
+      }
       return 'DeleteObject';
     }
   }
@@ -93,8 +121,12 @@ export function dispatchOp(req: Req): S3Op | null {
 
 export function parseBucketAndKey(path: string): { bucket: string | null; key: string | null } {
   const trimmed = path.replace(/^\/+/, '');
-  if (!trimmed) return { bucket: null, key: null };
+  if (!trimmed) {
+    return { bucket: null, key: null };
+  }
   const slash = trimmed.indexOf('/');
-  if (slash === -1) return { bucket: trimmed.replace(/\/+$/, ''), key: null };
+  if (slash === -1) {
+    return { bucket: trimmed.replace(/\/+$/, ''), key: null };
+  }
   return { bucket: trimmed.slice(0, slash), key: trimmed.slice(slash + 1) };
 }

@@ -17,7 +17,9 @@ function encodeContinuation(key: string): string {
 }
 
 function decodeContinuation(token: string | undefined): string | undefined {
-  if (!token) return undefined;
+  if (!token) {
+    return undefined;
+  }
   return Buffer.from(token, 'base64url').toString('utf8');
 }
 
@@ -94,7 +96,9 @@ export async function handle(req: S3AuthenticatedRequest, res: Response): Promis
       });
       cursor = r.key;
     }
-    if (stoppedEarly) break;
+    if (stoppedEarly) {
+      break;
+    }
     if (rows.length < DB_WINDOW) {
       exhausted = true;
       break;
