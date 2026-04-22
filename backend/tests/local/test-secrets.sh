@@ -4,8 +4,16 @@
 # Tests CRUD operations for secrets and edge function integration
 
 # Get the directory where this script is located
+# Space-safe directory resolution
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-source "$SCRIPT_DIR/../test-config.sh"
+
+# Explicit sourcing check for test-config
+if [ -f "$SCRIPT_DIR/../test-config.sh" ]; then
+    source "$SCRIPT_DIR/../test-config.sh"
+else
+    echo "❌ Error: Could not find test-config.sh at $SCRIPT_DIR/../test-config.sh"
+    exit 1
+fi
 
 # API base URL
 API_BASE="${TEST_API_BASE:-http://localhost:7130/api}"
