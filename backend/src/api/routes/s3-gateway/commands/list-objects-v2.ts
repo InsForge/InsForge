@@ -37,10 +37,31 @@ export async function handle(req: S3AuthenticatedRequest, res: Response): Promis
   const q = req.query as Record<string, string | undefined>;
   const prefix = q['prefix'] ?? '';
   const delimiter = q['delimiter'];
-  const maxKeys = Math.min(
-    Number(q['max-keys'] ?? MAX_KEYS_DEFAULT) || MAX_KEYS_DEFAULT,
-    MAX_KEYS_LIMIT
-  );
+  // Validate max-keys: S3 accepts integers in [0, 1000] and defaults to 1000.
+  // Negative, fractional, or non-numeric values must be rejected before they
+  // produce nonsense like MaxKeys=-5 in the response.
+  const maxKeysRaw = q['max-keys'];
+  let maxKeys: number;
+  if (maxKeysRaw === undefined || maxKeysRaw === '') {
+    maxKeys = MAX_KEYS_DEFAULT;
+  } else {
+    if (!/^\d+$/.test(maxKeysRaw)) {
+      sendS3Error(res, 'InvalidArgument', `max-keys must be a non-negative integer`, {
+        resource: req.path,
+        requestId: req.s3Auth.requestId,
+      });
+      return;
+    }
+    const parsed = Number(maxKeysRaw);
+    if (parsed > MAX_KEYS_LIMIT) {
+      sendS3Error(res, 'InvalidArgument', `max-keys must be <= ${MAX_KEYS_LIMIT}`, {
+        resource: req.path,
+        requestId: req.s3Auth.requestId,
+      });
+      return;
+    }
+    maxKeys = parsed;
+  }
   const startAfterInput = q['start-after'] ?? decodeContinuation(q['continuation-token']);
 
   // Accumulate visible entries (Contents + CommonPrefixes) up to maxKeys.

@@ -25,6 +25,21 @@ function stripEtagQuotes(etag: string | undefined): string {
   return (etag ?? '').replace(/^"(.*)"$/, '$1');
 }
 
+// S3-compatible backends surface "object doesn't exist" in various shapes:
+// native AWS S3 throws `NotFound`, MinIO and some proxies throw `NoSuchKey`,
+// and a few older SDKs only set `$metadata.httpStatusCode`. Treat all three
+// as a miss so headObject() can honour its Promise<... | null> contract
+// without leaking a thrown error to callers.
+function isS3NotFound(err: unknown): boolean {
+  const e = err as { name?: string; Code?: string; $metadata?: { httpStatusCode?: number } };
+  return (
+    e?.name === 'NotFound' ||
+    e?.name === 'NoSuchKey' ||
+    e?.Code === 'NoSuchKey' ||
+    e?.$metadata?.httpStatusCode === 404
+  );
+}
+
 const ONE_HOUR_IN_SECONDS = 3600;
 const SEVEN_DAYS_IN_SECONDS = 604800;
 
@@ -409,7 +424,7 @@ export class S3StorageProvider implements StorageProvider {
         lastModified: resp.LastModified ?? new Date(),
       };
     } catch (err: unknown) {
-      if ((err as { name?: string }).name === 'NotFound') {
+      if (isS3NotFound(err)) {
         return null;
       }
       throw err;
@@ -510,8 +525,17 @@ export class S3StorageProvider implements StorageProvider {
         },
       })
     );
+    // After S3 successfully completes the multipart upload, the object must
+    // be head-able. If it isn't, something is wrong with the backend or we're
+    // looking at consistency lag — either way, returning size:0 would corrupt
+    // storage.objects metadata. Fail fast instead.
     const head = await this.headObject(bucket, key);
-    return { etag: stripEtagQuotes(resp.ETag), size: head?.size ?? 0 };
+    if (!head) {
+      throw new Error(
+        `CompleteMultipartUpload succeeded but HEAD returned null for ${bucket}/${key}`
+      );
+    }
+    return { etag: stripEtagQuotes(resp.ETag), size: head.size };
   }
 
   async abortMultipartUpload(bucket: string, key: string, uploadId: string): Promise<void> {

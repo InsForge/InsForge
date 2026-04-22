@@ -131,7 +131,7 @@ export async function s3Sigv4Middleware(
   });
 
   if (!result.ok) {
-    sendS3Error(res, 'SignatureDoesNotMatch', result.reason, {
+    sendS3Error(res, result.code, result.reason, {
       resource: req.path,
       requestId,
     });
