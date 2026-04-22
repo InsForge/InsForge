@@ -31,7 +31,7 @@ export interface ClientEntry {
   icon: ReactNode;
   detailIcon: ReactNode;
   kind: ClientKind;
-  /** MCP dropdown preselection inside the detail page. Omit for 'other' & direct-connect. */
+  /** MCP detail preselection. Use 'mcp' for "Other Agents"; omit for direct-connect. */
   mcpAgentId?: string;
 }
 

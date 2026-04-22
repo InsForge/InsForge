@@ -25,6 +25,7 @@ function buildCliPrompt(projectId: string | null | undefined) {
 
 export function DTestCLISection({ className, agentName }: DTestCLISectionProps) {
   const { projectId } = useProjectId();
+  const hasProjectId = Boolean(projectId);
   const prompt = useMemo(() => buildCliPrompt(projectId), [projectId]);
 
   return (
@@ -46,7 +47,12 @@ export function DTestCLISection({ className, agentName }: DTestCLISectionProps) 
           <span className="rounded bg-[var(--alpha-8)] px-2 py-0.5 text-xs font-medium leading-4 text-muted-foreground">
             Prompt
           </span>
-          <CopyButton text={prompt} showText={false} className="shrink-0" />
+          <CopyButton
+            text={prompt}
+            showText={false}
+            className="shrink-0"
+            disabled={!hasProjectId}
+          />
         </div>
         <pre className="m-0 whitespace-pre-wrap break-all font-mono text-sm leading-6 text-foreground">
           {prompt}

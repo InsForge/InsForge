@@ -7,7 +7,7 @@
 
 ## Context
 
-Dashboard currently supports two variants of the home page, switched by the PostHog feature flag `dashboard-v3-experiment`:
+Dashboard currently supports two variants of the home page, switched by the PostHog feature flag `dashboard-v3-experiment`. D Test ships on a **new** flag, `dashboard-v4-experiment`, with three variants (`control` / `c_test` / `d_test`) so that the existing `dashboard-v3-experiment` allocation is not re-balanced. For historical context, the original variants on v3 are:
 
 - default (`DashboardPage`) — baseline
 - `c_test` (`CTestDashboardPage`) — Get-Started + Prompt Stepper + metrics
@@ -49,7 +49,7 @@ Two top-level views, both mounted at `/dashboard` (the existing Dashboard home r
 
 When the URL has no `view` param, the initial view is computed once on mount:
 
-```
+```text
 if installDismissed (localStorage, per-project) → dashboard
 else if !hasCompletedOnboarding                 → install
 else                                            → dashboard
@@ -64,7 +64,7 @@ Clicking the top-nav `Connect` button (d_test + on `/dashboard`) sets `?view=ins
 
 Within the Install view there is a sub-state `selectedClient`:
 
-```
+```text
 view = 'install'
    ├── selectedClient === null   →  InstallInsForgePage (All Clients)
    └── selectedClient !== null   →  ClientDetailPage for that client
@@ -74,7 +74,7 @@ view = 'install'
 
 ## Navigation Map
 
-```
+```text
 ┌────────────────────────────┐                     ┌────────────────────────────┐
 │   InstallInsForgePage      │  [X] close          │   DTestConnectedDashboard  │
 │   (All Clients)            │────────────────────▶│   (header + 4 metrics)     │
@@ -99,12 +99,12 @@ view = 'install'
 
 Three stacked sections, max-width 640 px, top-padding 64 px, centered:
 
-1. **"Setup In Claude Code"** — single tile for Claude Code with `Install` button. (Figma says "OpenClaw"; that is a typo, implement as Claude Code.)
+1. **"Setup In OpenClaw"** — single tile for OpenClaw with `Install` button. (OpenClaw is a distinct agent, not a Figma typo for Claude Code; it is registered as its own `MCPAgent` with `id='openclaw'`, uses `@insforge/install --client openclaw`, and is the `FEATURED_OPENCLAW_ID` in `clientRegistry.tsx`.)
 2. **"Install in Coding Agent"** — 2-column × 4-row grid of tiles. Tiles in display order:
    1. Claude Code  &nbsp;|&nbsp; Codex
    2. Antigravity  &nbsp;|&nbsp; Cursor
-   3. Copilot      &nbsp;|&nbsp; Trae
-   4. Other Agents &nbsp;|&nbsp; *(empty cell)*
+   3. OpenCode     &nbsp;|&nbsp; Copilot
+   4. Cline        &nbsp;|&nbsp; Other Agents
 3. **"Direct Connect"** — 2 tab-style tiles side by side: Connection String | API Keys. These are visually similar to agent tiles but open different detail content.
 
 Top-right of the page header row (same row as the title, within the max-w-640 column): `[X]` close button → switches view to `'dashboard'` (clears `?view` param) and sets `installDismissed = true` in localStorage.
@@ -144,7 +144,7 @@ Content changes per client type:
 
 Matches Figma node `2380:89947`. No Prompt Stepper, no backup badge, no floating button.
 
-```
+```text
 <h1> My Project </h1>  [INSTANCE BADGE]  ● Healthy
 
 ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐
@@ -158,7 +158,7 @@ Project title, instance-type badge, and health badge follow the same source-of-t
 
 ### New files
 
-```
+```text
 packages/dashboard/src/features/dashboard/
 ├── pages/
 │   └── DTestDashboardPage.tsx              # entry; reads view state, dispatches
@@ -174,7 +174,7 @@ packages/dashboard/src/features/dashboard/
 
 ### Shared components extracted
 
-```
+```text
 packages/dashboard/src/features/dashboard/components/
 └── MetricCard.tsx     # lifted from CTestDashboardPage.tsx (currently an inner function)
 ```
@@ -218,7 +218,7 @@ type ClientEntry = {
 };
 ```
 
-The "featured" section ("Setup In Claude Code") and grid consume the same entries; only the section they render in differs.
+The "featured" section ("Setup In OpenClaw") and grid consume the same entries; only the section they render in differs.
 
 ## State Management
 
@@ -270,12 +270,12 @@ function useDTestView(hasCompletedOnboarding: boolean, projectId: string | undef
 
 ## Feature Flag
 
-PostHog `dashboard-v3-experiment` flag must gain a new variant key `d_test`. This is a PostHog-dashboard-side change and is out of scope for the code PR; document it in the PR description so Carmen can configure it before rollout.
+A **new** PostHog flag `dashboard-v4-experiment` with three variants (`control` / `c_test` / `d_test`) gates D test. We did not reuse `dashboard-v3-experiment` so that the existing `c_test` allocation on v3 stays undisturbed; v3 can be ended or left running separately. PostHog flag configuration is a dashboard-side change, out of scope for the code PR.
 
 `AppRoutes.tsx`:
 
 ```ts
-const dashboardVariant = getFeatureFlag('dashboard-v3-experiment');
+const dashboardVariant = getFeatureFlag('dashboard-v4-experiment');
 const DashboardHomePage =
   dashboardVariant === 'c_test' ? CTestDashboardPage :
   dashboardVariant === 'd_test' ? DTestDashboardPage :

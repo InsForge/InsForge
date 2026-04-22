@@ -52,18 +52,22 @@ export function DTestMCPSection({
 }: DTestMCPSectionProps) {
   const agent = useMemo(() => MCP_AGENTS.find((a) => a.id === agentId) ?? MCP_AGENTS[0], [agentId]);
 
+  // While credentials load, caller may pass a masked placeholder (ik_***…). Treat it
+  // as empty so we never produce a deeplink or copyable install command with fake values.
+  const effectiveApiKey = isLoading ? '' : apiKey;
+
   const isMcpJson = agent.id === 'mcp';
   const deeplink = useMemo(
-    () => (apiKey ? buildMcpDeeplink(agent.id, apiKey, appUrl) : null),
-    [agent.id, apiKey, appUrl]
+    () => (effectiveApiKey ? buildMcpDeeplink(agent.id, effectiveApiKey, appUrl) : null),
+    [agent.id, effectiveApiKey, appUrl]
   );
 
   const installBody = useMemo(() => {
     if (isMcpJson) {
-      return JSON.stringify(createMCPConfig(apiKey, 'macos-linux', appUrl), null, 2);
+      return JSON.stringify(createMCPConfig(effectiveApiKey, 'macos-linux', appUrl), null, 2);
     }
-    return GenerateInstallCommand(agent, apiKey);
-  }, [isMcpJson, agent, apiKey, appUrl]);
+    return GenerateInstallCommand(agent, effectiveApiKey);
+  }, [isMcpJson, agent, effectiveApiKey, appUrl]);
 
   const quickStartPrompt = useMemo(
     () => buildQuickStartPrompt(agent, installBody),
