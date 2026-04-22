@@ -61,11 +61,7 @@ export interface StorageProvider {
     dstKey: string
   ): Promise<{ etag: string; lastModified: Date }>;
 
-  getObjectStream(
-    bucket: string,
-    key: string,
-    opts?: { range?: string }
-  ): Promise<GetObjectResult>;
+  getObjectStream(bucket: string, key: string, opts?: { range?: string }): Promise<GetObjectResult>;
 
   createMultipartUpload(
     bucket: string,

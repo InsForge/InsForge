@@ -30,7 +30,9 @@ export async function handle(req: S3AuthenticatedRequest, res: Response): Promis
   }
 
   const chunks: Buffer[] = [];
-  for await (const c of req) chunks.push(c as Buffer);
+  for await (const c of req) {
+    chunks.push(c as Buffer);
+  }
 
   let parsed: unknown;
   try {

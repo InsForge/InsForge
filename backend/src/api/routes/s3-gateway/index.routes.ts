@@ -1,8 +1,5 @@
 import { Router, Request, Response } from 'express';
-import {
-  s3Sigv4Middleware,
-  S3AuthenticatedRequest,
-} from '@/api/middlewares/s3-sigv4.js';
+import { s3Sigv4Middleware, S3AuthenticatedRequest } from '@/api/middlewares/s3-sigv4.js';
 import { dispatchOp, parseBucketAndKey, S3Op } from './dispatch.js';
 import { sendS3Error, S3ProtocolError } from './errors.js';
 import { StorageService } from '@/services/storage/storage.service.js';
@@ -50,7 +47,9 @@ s3GatewayRouter.use((req, res, next) => {
 s3GatewayRouter.use(async (req: Request, res: Response) => {
   const query: Record<string, string | string[] | undefined> = {};
   for (const [k, v] of Object.entries(req.query)) {
-    if (typeof v === 'string' || Array.isArray(v) || v === undefined) query[k] = v as string | string[] | undefined;
+    if (typeof v === 'string' || Array.isArray(v) || v === undefined) {
+      query[k] = v as string | string[] | undefined;
+    }
   }
   const op: S3Op | null = dispatchOp({
     method: req.method,

@@ -153,31 +153,34 @@ export class LocalStorageProvider implements StorageProvider {
     );
   }
 
-  async putObjectStream(): Promise<{ etag: string; size: number }> {
+  // These stubs throw synchronously; declaring them as non-async Promise
+  // returns keeps the interface shape without tripping require-await, and the
+  // thrown AppError surfaces to the caller the same way as any async reject.
+  putObjectStream(): Promise<{ etag: string; size: number }> {
     this.notImplemented('PutObject/streaming');
   }
-  async headObject(): Promise<ObjectMetadata | null> {
+  headObject(): Promise<ObjectMetadata | null> {
     this.notImplemented('HeadObject');
   }
-  async copyObject(): Promise<{ etag: string; lastModified: Date }> {
+  copyObject(): Promise<{ etag: string; lastModified: Date }> {
     this.notImplemented('CopyObject');
   }
-  async getObjectStream(): Promise<GetObjectResult> {
+  getObjectStream(): Promise<GetObjectResult> {
     this.notImplemented('GetObject/streaming');
   }
-  async createMultipartUpload(): Promise<{ uploadId: string }> {
+  createMultipartUpload(): Promise<{ uploadId: string }> {
     this.notImplemented('CreateMultipartUpload');
   }
-  async uploadPart(): Promise<{ etag: string }> {
+  uploadPart(): Promise<{ etag: string }> {
     this.notImplemented('UploadPart');
   }
-  async completeMultipartUpload(): Promise<{ etag: string; size: number }> {
+  completeMultipartUpload(): Promise<{ etag: string; size: number }> {
     this.notImplemented('CompleteMultipartUpload');
   }
-  async abortMultipartUpload(): Promise<void> {
+  abortMultipartUpload(): Promise<void> {
     this.notImplemented('AbortMultipartUpload');
   }
-  async listParts(): Promise<{
+  listParts(): Promise<{
     parts: Array<{ partNumber: number; etag: string; size: number; lastModified: Date }>;
     isTruncated: boolean;
     nextPartNumberMarker?: number;

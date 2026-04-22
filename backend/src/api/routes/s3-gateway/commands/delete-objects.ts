@@ -23,7 +23,9 @@ function isNotFound(err: unknown): boolean {
 
 export async function handle(req: S3AuthenticatedRequest, res: Response): Promise<void> {
   const chunks: Buffer[] = [];
-  for await (const c of req) chunks.push(c as Buffer);
+  for await (const c of req) {
+    chunks.push(c as Buffer);
+  }
   const body = Buffer.concat(chunks);
 
   let parsed: ParsedDelete;
@@ -40,8 +42,11 @@ export async function handle(req: S3AuthenticatedRequest, res: Response): Promis
   const delBlock = parsed?.Delete ?? {};
   const quiet = delBlock.Quiet === true || delBlock.Quiet === 'true';
   let items: Array<{ Key?: string }> = [];
-  if (Array.isArray(delBlock.Object)) items = delBlock.Object;
-  else if (delBlock.Object) items = [delBlock.Object];
+  if (Array.isArray(delBlock.Object)) {
+    items = delBlock.Object;
+  } else if (delBlock.Object) {
+    items = [delBlock.Object];
+  }
   const keys = items.map((i) => i.Key).filter((k): k is string => !!k);
 
   const bucket = (req as unknown as { s3Bucket: string }).s3Bucket;

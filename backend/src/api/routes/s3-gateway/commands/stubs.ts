@@ -2,10 +2,10 @@ import { Response } from 'express';
 import { toXml } from '../xml.js';
 import { S3AuthenticatedRequest } from '@/api/middlewares/s3-sigv4.js';
 
-export async function getBucketLocation(
-  _req: S3AuthenticatedRequest,
-  res: Response
-): Promise<void> {
+// These stubs don't need async work but the router awaits every handler
+// uniformly. Declaring them as Promise-returning (rather than async) keeps
+// the call-site shape consistent without tripping require-await.
+export function getBucketLocation(_req: S3AuthenticatedRequest, res: Response): Promise<void> {
   res
     .status(200)
     .type('application/xml')
@@ -17,12 +17,10 @@ export async function getBucketLocation(
         },
       })
     );
+  return Promise.resolve();
 }
 
-export async function getBucketVersioning(
-  _req: S3AuthenticatedRequest,
-  res: Response
-): Promise<void> {
+export function getBucketVersioning(_req: S3AuthenticatedRequest, res: Response): Promise<void> {
   res
     .status(200)
     .type('application/xml')
@@ -34,4 +32,5 @@ export async function getBucketVersioning(
         },
       })
     );
+  return Promise.resolve();
 }

@@ -137,7 +137,9 @@ export class S3AccessKeyService {
     accessKeyId: string
   ): Promise<{ id: string; secret: string } | null> {
     const cached = this.cache.get(accessKeyId);
-    if (cached) return cached;
+    if (cached) {
+      return cached;
+    }
 
     const result = await this.pool.query(
       `SELECT id, secret_access_key_encrypted
@@ -145,17 +147,21 @@ export class S3AccessKeyService {
        WHERE access_key_id = $1`,
       [accessKeyId]
     );
-    if (result.rowCount === 0) return null;
+    if (result.rowCount === 0) {
+      return null;
+    }
     const row = result.rows[0];
-    const value = { id: row.id, secret: EncryptionManager.decrypt(row.secret_access_key_encrypted) };
+    const value = {
+      id: row.id,
+      secret: EncryptionManager.decrypt(row.secret_access_key_encrypted),
+    };
     this.cache.set(accessKeyId, value);
     return value;
   }
 
   async touchLastUsed(id: string): Promise<void> {
-    await this.pool.query(
-      'UPDATE storage.s3_access_keys SET last_used_at = NOW() WHERE id = $1',
-      [id]
-    );
+    await this.pool.query('UPDATE storage.s3_access_keys SET last_used_at = NOW() WHERE id = $1', [
+      id,
+    ]);
   }
 }

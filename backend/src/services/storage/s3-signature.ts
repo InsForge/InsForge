@@ -44,7 +44,9 @@ function canonicalizePath(p: string): string {
 }
 
 function canonicalizeQuery(q: string): string {
-  if (!q) return '';
+  if (!q) {
+    return '';
+  }
   const pairs = q.split('&').map((pair) => {
     const eq = pair.indexOf('=');
     const k = eq >= 0 ? pair.slice(0, eq) : pair;
@@ -140,18 +142,28 @@ export type VerifyResult =
 
 export function verifyHeaderSignature(input: VerifyInput): VerifyResult {
   const m = AUTH_RE.exec(input.authorization);
-  if (!m) return { ok: false, reason: 'AuthorizationHeaderMalformed' };
+  if (!m) {
+    return { ok: false, reason: 'AuthorizationHeaderMalformed' };
+  }
   const [, accessKeyId, date, region, service, signedHeadersStr, clientSig] = m;
-  if (service !== 's3') return { ok: false, reason: 'Wrong service in scope' };
-  if (region !== input.expectedRegion) return { ok: false, reason: `Wrong region: ${region}` };
+  if (service !== 's3') {
+    return { ok: false, reason: 'Wrong service in scope' };
+  }
+  if (region !== input.expectedRegion) {
+    return { ok: false, reason: `Wrong region: ${region}` };
+  }
 
   const datetime =
     input.headers['x-amz-date'] ??
     input.headers['X-Amz-Date'] ??
     Object.entries(input.headers).find(([k]) => k.toLowerCase() === 'x-amz-date')?.[1] ??
     '';
-  if (!datetime) return { ok: false, reason: 'Missing x-amz-date' };
-  if (datetime.slice(0, 8) !== date) return { ok: false, reason: 'Date mismatch' };
+  if (!datetime) {
+    return { ok: false, reason: 'Missing x-amz-date' };
+  }
+  if (datetime.slice(0, 8) !== date) {
+    return { ok: false, reason: 'Date mismatch' };
+  }
 
   const signedHeaders = signedHeadersStr
     .split(';')
@@ -182,7 +194,9 @@ export function verifyHeaderSignature(input: VerifyInput): VerifyResult {
     Buffer.from(computedSig, 'hex'),
     Buffer.from(clientSig, 'hex')
   );
-  if (!equal) return { ok: false, reason: 'SignatureDoesNotMatch' };
+  if (!equal) {
+    return { ok: false, reason: 'SignatureDoesNotMatch' };
+  }
 
   return {
     ok: true,
@@ -268,7 +282,9 @@ export class ChunkSignatureV4Parser extends Transform {
         const header = this.buffer.slice(0, nlIdx).toString('ascii');
         this.buffer = this.buffer.slice(nlIdx + 2);
         const match = /^([0-9a-fA-F]+);chunk-signature=([0-9a-fA-F]{64})$/.exec(header);
-        if (!match) throw new Error('SignatureDoesNotMatch: malformed chunk header');
+        if (!match) {
+          throw new Error('SignatureDoesNotMatch: malformed chunk header');
+        }
         this.remainingChunkBytes = parseInt(match[1], 16);
         this.declaredChunkSig = match[2];
         this.chunkHash = crypto.createHash('sha256');
@@ -280,7 +296,9 @@ export class ChunkSignatureV4Parser extends Transform {
           this.state = 'DATA';
         }
       } else if (this.state === 'DATA') {
-        if (this.buffer.length === 0) return;
+        if (this.buffer.length === 0) {
+          return;
+        }
         const take = Math.min(this.buffer.length, this.remainingChunkBytes);
         const payload = this.buffer.slice(0, take);
         this.chunkHash.update(payload);
@@ -292,7 +310,9 @@ export class ChunkSignatureV4Parser extends Transform {
           this.state = 'AFTER_DATA_CRLF';
         }
       } else if (this.state === 'AFTER_DATA_CRLF') {
-        if (this.buffer.length < 2) return;
+        if (this.buffer.length < 2) {
+          return;
+        }
         if (this.buffer[0] !== 0x0d || this.buffer[1] !== 0x0a) {
           throw new Error('SignatureDoesNotMatch: missing CRLF after chunk data');
         }

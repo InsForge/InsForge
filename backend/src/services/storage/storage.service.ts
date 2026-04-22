@@ -645,7 +645,9 @@ export class StorageService {
        WHERE bucket = $1 AND key = $2`,
       [bucket, key]
     );
-    if (r.rowCount === 0) return null;
+    if (r.rowCount === 0) {
+      return null;
+    }
     const row = r.rows[0];
     return {
       size: Number(row.size),
@@ -656,14 +658,16 @@ export class StorageService {
   }
 
   async deleteObjectRow(bucket: string, key: string): Promise<void> {
-    await this.getPool().query(
-      'DELETE FROM storage.objects WHERE bucket=$1 AND key=$2',
-      [bucket, key]
-    );
+    await this.getPool().query('DELETE FROM storage.objects WHERE bucket=$1 AND key=$2', [
+      bucket,
+      key,
+    ]);
   }
 
   async deleteObjectRowsBatch(bucket: string, keys: string[]): Promise<void> {
-    if (keys.length === 0) return;
+    if (keys.length === 0) {
+      return;
+    }
     await this.getPool().query(
       `DELETE FROM storage.objects WHERE bucket=$1 AND key = ANY($2::text[])`,
       [bucket, keys]
@@ -671,18 +675,16 @@ export class StorageService {
   }
 
   async bucketExists(bucket: string): Promise<boolean> {
-    const r = await this.getPool().query(
-      'SELECT 1 FROM storage.buckets WHERE name=$1 LIMIT 1',
-      [bucket]
-    );
+    const r = await this.getPool().query('SELECT 1 FROM storage.buckets WHERE name=$1 LIMIT 1', [
+      bucket,
+    ]);
     return (r.rowCount ?? 0) === 1;
   }
 
   async bucketIsEmpty(bucket: string): Promise<boolean> {
-    const r = await this.getPool().query(
-      'SELECT 1 FROM storage.objects WHERE bucket=$1 LIMIT 1',
-      [bucket]
-    );
+    const r = await this.getPool().query('SELECT 1 FROM storage.objects WHERE bucket=$1 LIMIT 1', [
+      bucket,
+    ]);
     return (r.rowCount ?? 0) === 0;
   }
 

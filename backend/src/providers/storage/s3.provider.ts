@@ -353,7 +353,9 @@ export class S3StorageProvider implements StorageProvider {
     body: Readable,
     opts: { contentType?: string; contentLength?: number }
   ): Promise<{ etag: string; size: number }> {
-    if (!this.s3Client) throw new Error('S3 client not initialized');
+    if (!this.s3Client) {
+      throw new Error('S3 client not initialized');
+    }
     const s3Key = this.getS3Key(bucket, key);
     const resp = await this.s3Client.send(
       new PutObjectCommand({
@@ -372,12 +374,16 @@ export class S3StorageProvider implements StorageProvider {
     key: string,
     opts?: { range?: string }
   ): Promise<GetObjectResult> {
-    if (!this.s3Client) throw new Error('S3 client not initialized');
+    if (!this.s3Client) {
+      throw new Error('S3 client not initialized');
+    }
     const s3Key = this.getS3Key(bucket, key);
     const resp = await this.s3Client.send(
       new GetObjectCommand({ Bucket: this.s3Bucket, Key: s3Key, Range: opts?.range })
     );
-    if (!resp.Body) throw new Error('GetObject returned empty body');
+    if (!resp.Body) {
+      throw new Error('GetObject returned empty body');
+    }
     return {
       body: resp.Body as Readable,
       size: Number(resp.ContentLength ?? 0),
@@ -388,7 +394,9 @@ export class S3StorageProvider implements StorageProvider {
   }
 
   async headObject(bucket: string, key: string): Promise<ObjectMetadata | null> {
-    if (!this.s3Client) throw new Error('S3 client not initialized');
+    if (!this.s3Client) {
+      throw new Error('S3 client not initialized');
+    }
     const s3Key = this.getS3Key(bucket, key);
     try {
       const resp = await this.s3Client.send(
@@ -401,7 +409,9 @@ export class S3StorageProvider implements StorageProvider {
         lastModified: resp.LastModified ?? new Date(),
       };
     } catch (err: unknown) {
-      if ((err as { name?: string }).name === 'NotFound') return null;
+      if ((err as { name?: string }).name === 'NotFound') {
+        return null;
+      }
       throw err;
     }
   }
@@ -412,7 +422,9 @@ export class S3StorageProvider implements StorageProvider {
     dstBucket: string,
     dstKey: string
   ): Promise<{ etag: string; lastModified: Date }> {
-    if (!this.s3Client) throw new Error('S3 client not initialized');
+    if (!this.s3Client) {
+      throw new Error('S3 client not initialized');
+    }
     // CopySource must be `<bucket>/<key>` with forward slashes preserved.
     // Encoding the whole key with encodeURIComponent turns '/' into '%2F' and
     // S3 then fails to resolve the source. Encode each segment individually.
@@ -439,7 +451,9 @@ export class S3StorageProvider implements StorageProvider {
     key: string,
     opts: { contentType?: string }
   ): Promise<{ uploadId: string }> {
-    if (!this.s3Client) throw new Error('S3 client not initialized');
+    if (!this.s3Client) {
+      throw new Error('S3 client not initialized');
+    }
     const resp = await this.s3Client.send(
       new CreateMultipartUploadCommand({
         Bucket: this.s3Bucket,
@@ -447,7 +461,9 @@ export class S3StorageProvider implements StorageProvider {
         ContentType: opts.contentType,
       })
     );
-    if (!resp.UploadId) throw new Error('CreateMultipartUpload returned no UploadId');
+    if (!resp.UploadId) {
+      throw new Error('CreateMultipartUpload returned no UploadId');
+    }
     return { uploadId: resp.UploadId };
   }
 
@@ -459,7 +475,9 @@ export class S3StorageProvider implements StorageProvider {
     body: Readable,
     contentLength: number
   ): Promise<{ etag: string }> {
-    if (!this.s3Client) throw new Error('S3 client not initialized');
+    if (!this.s3Client) {
+      throw new Error('S3 client not initialized');
+    }
     const resp = await this.s3Client.send(
       new UploadPartCommand({
         Bucket: this.s3Bucket,
@@ -479,7 +497,9 @@ export class S3StorageProvider implements StorageProvider {
     uploadId: string,
     parts: Array<{ partNumber: number; etag: string }>
   ): Promise<{ etag: string; size: number }> {
-    if (!this.s3Client) throw new Error('S3 client not initialized');
+    if (!this.s3Client) {
+      throw new Error('S3 client not initialized');
+    }
     const resp = await this.s3Client.send(
       new CompleteMultipartUploadCommand({
         Bucket: this.s3Bucket,
@@ -495,7 +515,9 @@ export class S3StorageProvider implements StorageProvider {
   }
 
   async abortMultipartUpload(bucket: string, key: string, uploadId: string): Promise<void> {
-    if (!this.s3Client) throw new Error('S3 client not initialized');
+    if (!this.s3Client) {
+      throw new Error('S3 client not initialized');
+    }
     await this.s3Client.send(
       new AbortMultipartUploadCommand({
         Bucket: this.s3Bucket,
@@ -515,14 +537,19 @@ export class S3StorageProvider implements StorageProvider {
     isTruncated: boolean;
     nextPartNumberMarker?: number;
   }> {
-    if (!this.s3Client) throw new Error('S3 client not initialized');
+    if (!this.s3Client) {
+      throw new Error('S3 client not initialized');
+    }
     const resp = await this.s3Client.send(
       new ListPartsCommand({
         Bucket: this.s3Bucket,
         Key: this.getS3Key(bucket, key),
         UploadId: uploadId,
         MaxParts: opts.maxParts,
-        PartNumberMarker: opts.partNumberMarker != null ? String(opts.partNumberMarker) : undefined,
+        PartNumberMarker:
+          opts.partNumberMarker !== undefined && opts.partNumberMarker !== null
+            ? String(opts.partNumberMarker)
+            : undefined,
       })
     );
     return {
