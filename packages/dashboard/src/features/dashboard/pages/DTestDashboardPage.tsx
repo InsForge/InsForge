@@ -1,7 +1,5 @@
 import { Skeleton } from '../../../components';
-import { useMcpUsage } from '../../logs/hooks/useMcpUsage';
-import { useProjectId } from '../../../lib/hooks/useMetadata';
-import { useDTestView } from '../components/dtest/useDTestView';
+import { useDTestView } from '../components/dtest/DTestViewContext';
 import { InstallInsForgePage } from '../components/dtest/InstallInsForgePage';
 import { ClientDetailPage } from '../components/dtest/ClientDetailPage';
 import { DTestConnectedDashboard } from '../components/dtest/DTestConnectedDashboard';
@@ -20,15 +18,9 @@ function DTestLoadingState() {
 }
 
 export default function DTestDashboardPage() {
-  const { hasCompletedOnboarding, isLoading: isMcpUsageLoading } = useMcpUsage();
-  const { projectId } = useProjectId();
+  const { view, setView, selectedClient, setSelectedClient, isLoading } = useDTestView();
 
-  const { view, setView, selectedClient, setSelectedClient } = useDTestView({
-    hasCompletedOnboarding,
-    projectId,
-  });
-
-  if (isMcpUsageLoading) {
+  if (isLoading) {
     return <DTestLoadingState />;
   }
 
@@ -39,7 +31,7 @@ export default function DTestDashboardPage() {
     return (
       <InstallInsForgePage
         onSelectClient={(id) => setSelectedClient(id)}
-        onDismiss={() => setView('dashboard', { dismiss: true })}
+        onDismiss={() => setView('dashboard')}
       />
     );
   }
