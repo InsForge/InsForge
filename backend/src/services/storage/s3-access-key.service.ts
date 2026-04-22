@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { Pool } from 'pg';
+import { LRUCache } from 'lru-cache';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
@@ -18,6 +19,11 @@ const MAX_KEYS_PER_PROJECT = 50;
 
 export class S3AccessKeyService {
   private static instance: S3AccessKeyService | null = null;
+
+  private cache = new LRUCache<string, { id: string; secret: string }>({
+    max: 1024,
+    ttl: 1000 * 60 * 5,
+  });
 
   constructor(private pool: Pool) {}
 
@@ -101,6 +107,7 @@ export class S3AccessKeyService {
     if (result.rowCount === 0) {
       throw new AppError('S3 access key not found', 404, ERROR_CODES.S3_ACCESS_KEY_NOT_FOUND);
     }
+    this.cache.delete(result.rows[0].access_key_id);
     logger.info('S3 access key deleted', { accessKeyId: result.rows[0].access_key_id });
   }
 
@@ -111,6 +118,9 @@ export class S3AccessKeyService {
   async resolveAccessKeyForVerification(
     accessKeyId: string
   ): Promise<{ id: string; secret: string } | null> {
+    const cached = this.cache.get(accessKeyId);
+    if (cached) return cached;
+
     const result = await this.pool.query(
       `SELECT id, secret_access_key_encrypted
        FROM storage.s3_access_keys
@@ -119,7 +129,9 @@ export class S3AccessKeyService {
     );
     if (result.rowCount === 0) return null;
     const row = result.rows[0];
-    return { id: row.id, secret: EncryptionManager.decrypt(row.secret_access_key_encrypted) };
+    const value = { id: row.id, secret: EncryptionManager.decrypt(row.secret_access_key_encrypted) };
+    this.cache.set(accessKeyId, value);
+    return value;
   }
 
   async touchLastUsed(id: string): Promise<void> {
