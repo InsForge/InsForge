@@ -209,7 +209,10 @@ describe('verifyHeaderSignature', () => {
       expectedRegion: region,
     });
     expect(res.ok).toBe(false);
-    if (!res.ok) expect(res.reason).toMatch(/region/i);
+    if (!res.ok) {
+      expect(res.code).toBe('AuthorizationHeaderMalformed');
+      expect(res.reason).toMatch(/region/i);
+    }
   });
 
   it('rejects malformed Authorization header', () => {
@@ -224,6 +227,6 @@ describe('verifyHeaderSignature', () => {
       expectedRegion: region,
     });
     expect(res.ok).toBe(false);
-    if (!res.ok) expect(res.reason).toBe('AuthorizationHeaderMalformed');
+    if (!res.ok) expect(res.code).toBe('AuthorizationHeaderMalformed');
   });
 });

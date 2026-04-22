@@ -42,16 +42,27 @@ export async function handle(req: S3AuthenticatedRequest, res: Response): Promis
   const result = await svc.getProvider().copyObject(srcBucket, srcKey, dstBucket, dstKey);
 
   // Read metadata from the destination after the copy, not from the source —
-  // the source may have been mutated or deleted between copy and head, and a
-  // null source head would let a 0-size row land in storage.objects.
+  // the source may have been mutated or deleted between copy and head. If
+  // the destination head comes back null after a reported-successful copy,
+  // something is wrong with the backend or cross-region consistency and we
+  // should NOT persist a size:0 row.
   const head = await svc.getProvider().headObject(dstBucket, dstKey);
+  if (!head) {
+    sendS3Error(
+      res,
+      'InternalError',
+      `CopyObject succeeded but destination ${dstBucket}/${dstKey} is not visible`,
+      { resource: req.path, requestId: req.s3Auth.requestId }
+    );
+    return;
+  }
 
   await svc.upsertS3Object({
     bucket: dstBucket,
     key: dstKey,
-    size: head?.size ?? 0,
+    size: head.size,
     etag: result.etag,
-    contentType: head?.contentType ?? null,
+    contentType: head.contentType ?? null,
     s3AccessKeyId: req.s3Auth.accessKeyId,
   });
 

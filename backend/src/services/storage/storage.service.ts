@@ -702,15 +702,18 @@ export class StorageService {
     maxKeys: number;
   }): Promise<Array<{ key: string; size: number; etag: string | null; lastModified: Date }>> {
     const prefix = params.prefix ?? '';
+    // S3 prefixes are literal strings. `_` and `%` are SQL LIKE wildcards,
+    // so a prefix like "foo_" would match "fooX" keys without escaping.
+    const likePrefix = escapeSqlLikePattern(prefix) + '%';
     const rows = await this.getPool().query(
       `SELECT key, size, etag, uploaded_at
        FROM storage.objects
        WHERE bucket = $1
-         AND key LIKE $2 || '%'
+         AND key LIKE $2
          AND ($3::text IS NULL OR key > $3)
        ORDER BY key
        LIMIT $4`,
-      [params.bucket, prefix, params.startAfter ?? null, params.maxKeys]
+      [params.bucket, likePrefix, params.startAfter ?? null, params.maxKeys]
     );
     return rows.rows.map((r) => ({
       key: r.key,

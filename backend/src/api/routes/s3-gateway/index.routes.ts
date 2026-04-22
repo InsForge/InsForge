@@ -38,9 +38,11 @@ s3GatewayRouter.use((req: Request, res: Response, next) => {
   next();
 });
 
-// 2) SigV4 authentication.
+// 2) SigV4 authentication. Express 4 doesn't auto-forward rejected promises
+// from async middleware — chain .catch(next) so DB/service errors inside
+// the middleware hit the error handler instead of hanging the request.
 s3GatewayRouter.use((req, res, next) => {
-  void s3Sigv4Middleware(req, res, next);
+  s3Sigv4Middleware(req, res, next).catch(next);
 });
 
 // 3) Dispatch to the operation handler.

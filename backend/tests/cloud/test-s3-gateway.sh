@@ -45,7 +45,11 @@ if [ -z "$API_KEY" ]; then
     exit 0
 fi
 
-BUCKET="${BUCKET:-s3gw-e2e-$$}"
+BUCKET="${BUCKET:-s3gw-e2e-$$-$RANDOM}"
+
+# Per-run temp directory so parallel runs don't collide on /tmp/s3gw-* paths,
+# and the EXIT trap always removes exactly the files this run created.
+WORK_DIR="$(mktemp -d -t s3gw-e2e.XXXXXX)"
 
 log() { printf "\n\033[1;34m--> %s\033[0m\n" "$*"; }
 ok() { printf "   \033[1;32mOK\033[0m %s\n" "$*"; }
@@ -74,8 +78,7 @@ cleanup() {
       "$API_BASE/storage/s3/access-keys/$KID" > /dev/null 2>&1 || \
         warn "access key revocation failed"
   fi
-  rm -f /tmp/s3gw-small.txt /tmp/s3gw-small.out /tmp/s3gw-big.bin /tmp/s3gw-big.out
-  rm -rf /tmp/s3gw-dir /tmp/s3gw-dir-back
+  rm -rf "$WORK_DIR"
   exit "$rc"
 }
 trap cleanup EXIT
@@ -97,6 +100,7 @@ ok "access key $AK"
 export AWS_ACCESS_KEY_ID="$AK"
 export AWS_SECRET_ACCESS_KEY="$SK"
 export AWS_DEFAULT_REGION="us-east-2"
+
 AWSCMD=(aws --endpoint-url "$GATEWAY_URL")
 
 log "Listing buckets"
@@ -107,35 +111,65 @@ log "Creating bucket $BUCKET"
 CREATED_BUCKET=1
 
 log "Uploading a small file"
-echo "hello world" > /tmp/s3gw-small.txt
-"${AWSCMD[@]}" s3 cp /tmp/s3gw-small.txt "s3://$BUCKET/small.txt"
+echo "hello world" > "$WORK_DIR/small.txt"
+"${AWSCMD[@]}" s3 cp "$WORK_DIR/small.txt" "s3://$BUCKET/small.txt"
 ok "upload"
 
 log "Downloading it back"
-"${AWSCMD[@]}" s3 cp "s3://$BUCKET/small.txt" /tmp/s3gw-small.out
-diff /tmp/s3gw-small.txt /tmp/s3gw-small.out
+"${AWSCMD[@]}" s3 cp "s3://$BUCKET/small.txt" "$WORK_DIR/small.out"
+diff "$WORK_DIR/small.txt" "$WORK_DIR/small.out"
 ok "round-trip identity"
 
 log "Listing objects"
 "${AWSCMD[@]}" s3 ls "s3://$BUCKET/"
 
-log "Uploading 20 MB file (triggers multipart at aws-cli default threshold)"
-dd if=/dev/urandom of=/tmp/s3gw-big.bin bs=1M count=20 status=none
-"${AWSCMD[@]}" s3 cp /tmp/s3gw-big.bin "s3://$BUCKET/big.bin"
+# Drive multipart explicitly via aws s3api so coverage doesn't depend on the
+# caller's aws-cli multipart_threshold config. Two 10 MiB parts + complete.
+log "Running multipart upload explicitly (2 parts via s3api)"
+dd if=/dev/urandom of="$WORK_DIR/big.bin" bs=1M count=20 status=none
+split -b $((10 * 1024 * 1024)) "$WORK_DIR/big.bin" "$WORK_DIR/part-"
+PART1="$WORK_DIR/part-aa"
+PART2="$WORK_DIR/part-ab"
+
+UPLOAD_ID=$("${AWSCMD[@]}" s3api create-multipart-upload \
+  --bucket "$BUCKET" --key big.bin | jq -r '.UploadId')
+[ -n "$UPLOAD_ID" ] || { echo "no UploadId returned"; exit 1; }
+ok "uploadId $UPLOAD_ID"
+
+ETAG1=$("${AWSCMD[@]}" s3api upload-part \
+  --bucket "$BUCKET" --key big.bin --part-number 1 --upload-id "$UPLOAD_ID" \
+  --body "$PART1" | jq -r '.ETag')
+ETAG2=$("${AWSCMD[@]}" s3api upload-part \
+  --bucket "$BUCKET" --key big.bin --part-number 2 --upload-id "$UPLOAD_ID" \
+  --body "$PART2" | jq -r '.ETag')
+
+"${AWSCMD[@]}" s3api complete-multipart-upload \
+  --bucket "$BUCKET" --key big.bin --upload-id "$UPLOAD_ID" \
+  --multipart-upload "$(jq -n --arg e1 "$ETAG1" --arg e2 "$ETAG2" \
+    '{Parts: [{PartNumber: 1, ETag: $e1}, {PartNumber: 2, ETag: $e2}]}')" \
+  > /dev/null
+
+# AWS S3 multipart ETags are suffixed with "-<part count>" per the docs, so
+# this assertion verifies we went through the multipart code path regardless
+# of aws-cli config.
+HEAD_ETAG=$("${AWSCMD[@]}" s3api head-object --bucket "$BUCKET" --key big.bin | jq -r '.ETag')
+case "$HEAD_ETAG" in
+  *-2\") ok "multipart upload (ETag=$HEAD_ETAG)" ;;
+  *) printf "ETag %s is not multipart-style; expected *-2\n" "$HEAD_ETAG" >&2; exit 1 ;;
+esac
 
 log "Downloading 20 MB file"
-"${AWSCMD[@]}" s3 cp "s3://$BUCKET/big.bin" /tmp/s3gw-big.out
-diff /tmp/s3gw-big.bin /tmp/s3gw-big.out
+"${AWSCMD[@]}" s3 cp "s3://$BUCKET/big.bin" "$WORK_DIR/big.out"
+diff "$WORK_DIR/big.bin" "$WORK_DIR/big.out"
 ok "multipart round-trip"
 
 log "aws s3 sync roundtrip"
-mkdir -p /tmp/s3gw-dir/a /tmp/s3gw-dir/b
-echo A > /tmp/s3gw-dir/a/x.txt
-echo B > /tmp/s3gw-dir/b/y.txt
-"${AWSCMD[@]}" s3 sync /tmp/s3gw-dir "s3://$BUCKET/dir/"
-rm -rf /tmp/s3gw-dir-back
-"${AWSCMD[@]}" s3 sync "s3://$BUCKET/dir" /tmp/s3gw-dir-back
-diff -r /tmp/s3gw-dir /tmp/s3gw-dir-back
+mkdir -p "$WORK_DIR/dir/a" "$WORK_DIR/dir/b"
+echo A > "$WORK_DIR/dir/a/x.txt"
+echo B > "$WORK_DIR/dir/b/y.txt"
+"${AWSCMD[@]}" s3 sync "$WORK_DIR/dir" "s3://$BUCKET/dir/"
+"${AWSCMD[@]}" s3 sync "s3://$BUCKET/dir" "$WORK_DIR/dir-back"
+diff -r "$WORK_DIR/dir" "$WORK_DIR/dir-back"
 ok "sync"
 
 printf "\n\033[1;32mAll S3 gateway smoke checks passed.\033[0m\n"

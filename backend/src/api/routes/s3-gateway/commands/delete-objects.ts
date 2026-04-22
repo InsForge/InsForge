@@ -21,10 +21,32 @@ function isNotFound(err: unknown): boolean {
   );
 }
 
+// AWS caps DeleteObjects at 1000 keys per request. 1 MiB of request XML is
+// plenty of headroom for that while preventing a client from streaming an
+// unbounded body into memory before we can reject it.
+const MAX_DELETE_BODY_BYTES = 1024 * 1024;
+
 export async function handle(req: S3AuthenticatedRequest, res: Response): Promise<void> {
   const chunks: Buffer[] = [];
+  let received = 0;
   for await (const c of req) {
-    chunks.push(c as Buffer);
+    const b = c as Buffer;
+    received += b.length;
+    if (received > MAX_DELETE_BODY_BYTES) {
+      sendS3Error(
+        res,
+        'EntityTooLarge',
+        `Delete request body exceeds ${MAX_DELETE_BODY_BYTES} bytes`,
+        {
+          resource: req.path,
+          requestId: req.s3Auth.requestId,
+        }
+      );
+      req.unpipe?.();
+      req.destroy?.();
+      return;
+    }
+    chunks.push(b);
   }
   const body = Buffer.concat(chunks);
 

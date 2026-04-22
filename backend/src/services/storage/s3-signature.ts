@@ -55,7 +55,25 @@ function canonicalizeQuery(q: string): string {
     const dv = safeDecode(v);
     return [uriEncode(dk, true), uriEncode(dv, true)] as [string, string];
   });
-  pairs.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  // Sort by encoded name, breaking ties by encoded value. SigV4 canonical
+  // query ordering requires a stable order for repeated parameter names;
+  // sorting on (name, value) ensures the server canonicalization matches
+  // whatever order the client produced from Array.sort-stable inputs.
+  pairs.sort((a, b) => {
+    if (a[0] < b[0]) {
+      return -1;
+    }
+    if (a[0] > b[0]) {
+      return 1;
+    }
+    if (a[1] < b[1]) {
+      return -1;
+    }
+    if (a[1] > b[1]) {
+      return 1;
+    }
+    return 0;
+  });
   return pairs.map(([k, v]) => `${k}=${v}`).join('&');
 }
 
@@ -129,6 +147,8 @@ export interface VerifyInput {
   expectedRegion: string;
 }
 
+export type VerifyFailureCode = 'AuthorizationHeaderMalformed' | 'SignatureDoesNotMatch';
+
 export type VerifyResult =
   | {
       ok: true;
@@ -138,19 +158,31 @@ export type VerifyResult =
       scope: string;
       seedSignature: string;
     }
-  | { ok: false; reason: string };
+  | { ok: false; code: VerifyFailureCode; reason: string };
 
 export function verifyHeaderSignature(input: VerifyInput): VerifyResult {
   const m = AUTH_RE.exec(input.authorization);
   if (!m) {
-    return { ok: false, reason: 'AuthorizationHeaderMalformed' };
+    return {
+      ok: false,
+      code: 'AuthorizationHeaderMalformed',
+      reason: 'Authorization header not parseable',
+    };
   }
   const [, accessKeyId, date, region, service, signedHeadersStr, clientSig] = m;
   if (service !== 's3') {
-    return { ok: false, reason: 'Wrong service in scope' };
+    return {
+      ok: false,
+      code: 'AuthorizationHeaderMalformed',
+      reason: `Wrong service in scope: ${service}`,
+    };
   }
   if (region !== input.expectedRegion) {
-    return { ok: false, reason: `Wrong region: ${region}` };
+    return {
+      ok: false,
+      code: 'AuthorizationHeaderMalformed',
+      reason: `Wrong region in scope: ${region}`,
+    };
   }
 
   const datetime =
@@ -159,10 +191,14 @@ export function verifyHeaderSignature(input: VerifyInput): VerifyResult {
     Object.entries(input.headers).find(([k]) => k.toLowerCase() === 'x-amz-date')?.[1] ??
     '';
   if (!datetime) {
-    return { ok: false, reason: 'Missing x-amz-date' };
+    return { ok: false, code: 'AuthorizationHeaderMalformed', reason: 'Missing x-amz-date' };
   }
   if (datetime.slice(0, 8) !== date) {
-    return { ok: false, reason: 'Date mismatch' };
+    return {
+      ok: false,
+      code: 'AuthorizationHeaderMalformed',
+      reason: 'Date in scope does not match x-amz-date',
+    };
   }
 
   const signedHeaders = signedHeadersStr
@@ -188,14 +224,14 @@ export function verifyHeaderSignature(input: VerifyInput): VerifyResult {
   const computedSig = crypto.createHmac('sha256', signingKey).update(sts).digest('hex');
 
   if (computedSig.length !== clientSig.length) {
-    return { ok: false, reason: 'SignatureDoesNotMatch' };
+    return { ok: false, code: 'SignatureDoesNotMatch', reason: 'SignatureDoesNotMatch' };
   }
   const equal = crypto.timingSafeEqual(
     Buffer.from(computedSig, 'hex'),
     Buffer.from(clientSig, 'hex')
   );
   if (!equal) {
-    return { ok: false, reason: 'SignatureDoesNotMatch' };
+    return { ok: false, code: 'SignatureDoesNotMatch', reason: 'SignatureDoesNotMatch' };
   }
 
   return {
@@ -253,6 +289,13 @@ export class ChunkSignatureV4Parser extends Transform {
 
   _transform(chunk: Buffer, _enc: BufferEncoding, cb: TransformCallback): void {
     try {
+      // Reject any bytes that arrive after the terminator chunk has been
+      // consumed — a well-formed STREAMING-* payload has nothing after the
+      // closing CRLF, so trailing data indicates a malformed or truncated
+      // request that would otherwise be silently accepted.
+      if (this.state === 'DONE') {
+        throw new Error('SignatureDoesNotMatch: trailing bytes after terminator chunk');
+      }
       this.buffer = this.buffer.length ? Buffer.concat([this.buffer, chunk]) : chunk;
       this.pump();
       cb();
