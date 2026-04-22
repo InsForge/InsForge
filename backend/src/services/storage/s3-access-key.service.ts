@@ -24,14 +24,27 @@ export class S3AccessKeyService {
     max: 1024,
     ttl: 1000 * 60 * 5,
   });
+  private poolOverride: Pool | null = null;
 
-  constructor(private pool: Pool) {}
+  // Optional pool for test injection. At runtime, callers use getInstance()
+  // and the pool is fetched lazily — DatabaseManager.getPool() returns
+  // undefined until server.ts awaits DatabaseManager.initialize(), which
+  // happens after this module is loaded.
+  constructor(poolOverride?: Pool) {
+    if (poolOverride) {
+      this.poolOverride = poolOverride;
+    }
+  }
 
   static getInstance(): S3AccessKeyService {
     if (!this.instance) {
-      this.instance = new S3AccessKeyService(DatabaseManager.getInstance().getPool());
+      this.instance = new S3AccessKeyService();
     }
     return this.instance;
+  }
+
+  private get pool(): Pool {
+    return this.poolOverride ?? DatabaseManager.getInstance().getPool();
   }
 
   private generateAccessKeyId(): string {
