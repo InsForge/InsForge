@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
 import { LogOut, ChevronDown, Plug, X } from 'lucide-react';
 import {
   Button,
@@ -47,13 +46,12 @@ export default function AppHeader() {
   const { resolvedTheme } = useTheme();
   const { user, logout } = useAuth();
   const openConnectDialog = useOpenConnectDialog();
-  const location = useLocation();
   const dashboardVariant = getFeatureFlag('dashboard-v4-experiment');
   const { view: dTestView, setView: setDTestView } = useDTestView();
-  const isDTestDashboard = dashboardVariant === 'd_test' && location.pathname === '/dashboard';
+  const isDTest = dashboardVariant === 'd_test';
 
   const handleConnectClick = () => {
-    if (isDTestDashboard) {
+    if (isDTest) {
       setDTestView('install');
       return;
     }
@@ -74,7 +72,7 @@ export default function AppHeader() {
     setConnectTipDismissed(readConnectTipDismissed(getConnectTipKey(projectId)));
   }, [projectId]);
   const showConnectTip =
-    isDTestDashboard && dTestView !== 'install' && hasCompletedOnboarding && !connectTipDismissed;
+    isDTest && dTestView !== 'install' && hasCompletedOnboarding && !connectTipDismissed;
   const handleDismissConnectTip = () => {
     if (!projectId) {
       return;
