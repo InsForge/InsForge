@@ -34,7 +34,13 @@ function uriEncode(str: string, encodeSlash: boolean): string {
 }
 
 function canonicalizePath(p: string): string {
-  return uriEncode(p, false);
+  // Decode once then re-encode per segment. This handles both decoded input
+  // ("/hello world.jpg") and already-encoded input ("/hello%20world.jpg")
+  // without double-encoding the latter ("/hello%2520world.jpg").
+  return p
+    .split('/')
+    .map((segment) => uriEncode(safeDecode(segment), true))
+    .join('/');
 }
 
 function canonicalizeQuery(q: string): string {

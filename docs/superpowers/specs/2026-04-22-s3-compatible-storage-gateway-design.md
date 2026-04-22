@@ -35,12 +35,12 @@ InsForge today exposes only a REST API for storage. Developers who want to migra
 
 - External endpoint: `https://{appkey}.{region}.insforge.app/storage/v1/s3`
 - SDK configuration: `{ endpoint, region: 'us-east-2', forcePathStyle: true, credentials }`
-- Signature region is fixed to `us-east-2` regardless of where the client is or what InsForge region the project lives in. This is a SigV4 dummy value from the client's point of view (decouples client config from infrastructure choices), but it is not arbitrary: `us-east-2` matches the region our `S3StorageProvider` uses by default (see `s3.provider.ts`), so requests forwarded to the underlying S3 don't need a separate region translation step.
+- Signature region defaults to `us-east-2` to match the region our `S3StorageProvider` uses by default (see `s3.provider.ts`), so requests forwarded to the underlying S3 don't need a separate region translation step. The validated region is **configurable** via the `S3_SIGNING_REGION` env var for deployments whose backing bucket lives elsewhere; clients must sign with whichever value the server is configured to accept.
 - Mount path is `/storage/v1/s3` with **no `/api` prefix**. The `/api` prefix would force clients to configure `endpoint=<host>/api`, breaking S3 tooling conventions.
 
 ### Request Lifecycle
 
-```
+```text
 Client (aws CLI / SDK / rclone)
    │  PUT /storage/v1/s3/my-bucket/photo.jpg
    │  Authorization: AWS4-HMAC-SHA256 Credential=AK.../us-east-2/s3/aws4_request ...
@@ -71,7 +71,7 @@ Client (aws CLI / SDK / rclone)
 
 ### Module Layout
 
-```
+```text
 backend/src/
 ├── api/
 │   ├── middlewares/
@@ -162,7 +162,7 @@ The `secret_access_key_encrypted` column stores `EncryptionManager.encrypt()` ou
 
 ### Constraints
 
-- Hard cap of **50 keys per project**. Enforced in `S3AccessKeyService.create` via `SELECT count(*)` before insert; over-limit returns `400 LIMIT_EXCEEDED`.
+- Hard cap of **50 keys per project**. `S3AccessKeyService.create` performs the count check and the insert inside a single SERIALIZABLE transaction, so concurrent creations cannot both pass the check and overshoot the cap. Over-limit returns `400 S3_ACCESS_KEY_LIMIT_EXCEEDED`.
 - Keys are immutable. No update endpoint.
 - Plaintext secret is returned **only once** in the creation response. Subsequent `GET` calls never return the secret.
 - `last_used_at` updated asynchronously on each successful SigV4 verification via `setImmediate` (fire-and-forget, errors swallowed to avoid blocking the request).
@@ -209,8 +209,8 @@ AWS SigV4 (the short form):
 
 1. Parse `Authorization: AWS4-HMAC-SHA256 Credential=<ak>/<date>/<region>/s3/aws4_request, SignedHeaders=<sorted;list>, Signature=<sig>`.
 2. Look up credential (cache, then DB) → plaintext secret.
-3. Build **Canonical Request**:
-   ```
+3. Build **Canonical Request**. The `<URI-encoded path>` MUST be derived from the raw, percent-encoded request path as the client sent it (e.g. `req.originalUrl` in Express), **not** a URL-decoded representation — otherwise object keys containing percent-encoded characters produce signature mismatches.
+   ```text
    <METHOD>\n
    <URI-encoded path>\n
    <canonical query>\n
@@ -228,7 +228,7 @@ AWS SigV4 (the short form):
 
 Triggered by `x-amz-content-sha256: STREAMING-AWS4-HMAC-SHA256-PAYLOAD`. Body structure:
 
-```
+```text
 <chunk1-size-hex>;chunk-signature=<sig1>\r\n
 <chunk1-payload>\r\n
 <chunk2-size-hex>;chunk-signature=<sig2>\r\n

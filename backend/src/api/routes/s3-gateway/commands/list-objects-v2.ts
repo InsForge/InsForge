@@ -6,6 +6,11 @@ import { S3AuthenticatedRequest } from '@/api/middlewares/s3-sigv4.js';
 
 const MAX_KEYS_DEFAULT = 1000;
 const MAX_KEYS_LIMIT = 1000;
+// With delimiter=/, many raw keys may collapse into a single CommonPrefix.
+// We fetch the DB in windows and accumulate visible entries until we hit
+// maxKeys. This cap bounds total DB work per request.
+const DB_WINDOW = 1000;
+const MAX_DB_PAGES = 200;
 
 function encodeContinuation(key: string): string {
   return Buffer.from(key, 'utf8').toString('base64url');
@@ -34,39 +39,72 @@ export async function handle(req: S3AuthenticatedRequest, res: Response): Promis
     Number(q['max-keys'] ?? MAX_KEYS_DEFAULT) || MAX_KEYS_DEFAULT,
     MAX_KEYS_LIMIT
   );
-  const startAfter = q['start-after'] ?? decodeContinuation(q['continuation-token']);
+  const startAfterInput = q['start-after'] ?? decodeContinuation(q['continuation-token']);
 
-  const raw = await svc.listObjectsV2Db({
-    bucket,
-    prefix,
-    startAfter,
-    maxKeys: maxKeys + 1,
-  });
-  const isTruncated = raw.length > maxKeys;
-  const rows = isTruncated ? raw.slice(0, maxKeys) : raw;
-
+  // Accumulate visible entries (Contents + CommonPrefixes) up to maxKeys.
+  // Track the last DB row key we advanced past for continuation.
   const contents: Array<{ Key: string; Size: number; ETag: string; LastModified: string }> = [];
   const commonPrefixesSet = new Set<string>();
-  for (const r of rows) {
-    if (delimiter) {
-      const tail = r.key.slice(prefix.length);
-      const idx = tail.indexOf(delimiter);
-      if (idx >= 0) {
-        commonPrefixesSet.add(prefix + tail.slice(0, idx + delimiter.length));
-        continue;
-      }
-    }
-    contents.push({
-      Key: r.key,
-      Size: r.size,
-      ETag: `"${r.etag ?? ''}"`,
-      LastModified: r.lastModified.toISOString(),
+  let cursor: string | undefined = startAfterInput;
+  let exhausted = false;
+  let truncated = false;
+
+  for (let page = 0; page < MAX_DB_PAGES; page++) {
+    const rows = await svc.listObjectsV2Db({
+      bucket,
+      prefix,
+      startAfter: cursor,
+      maxKeys: DB_WINDOW,
     });
+    if (rows.length === 0) {
+      exhausted = true;
+      break;
+    }
+
+    let stoppedEarly = false;
+    for (const r of rows) {
+      const visible = contents.length + commonPrefixesSet.size;
+      if (visible >= maxKeys) {
+        truncated = true;
+        stoppedEarly = true;
+        break;
+      }
+      if (delimiter) {
+        const tail = r.key.slice(prefix.length);
+        const idx = tail.indexOf(delimiter);
+        if (idx >= 0) {
+          const pfx = prefix + tail.slice(0, idx + delimiter.length);
+          if (!commonPrefixesSet.has(pfx)) {
+            if (visible + 1 > maxKeys) {
+              truncated = true;
+              stoppedEarly = true;
+              break;
+            }
+            commonPrefixesSet.add(pfx);
+          }
+          cursor = r.key;
+          continue;
+        }
+      }
+      contents.push({
+        Key: r.key,
+        Size: r.size,
+        ETag: `"${r.etag ?? ''}"`,
+        LastModified: r.lastModified.toISOString(),
+      });
+      cursor = r.key;
+    }
+    if (stoppedEarly) break;
+    if (rows.length < DB_WINDOW) {
+      exhausted = true;
+      break;
+    }
+  }
+  if (!exhausted && !truncated && contents.length + commonPrefixesSet.size >= maxKeys) {
+    truncated = true;
   }
 
-  const nextContinuation = isTruncated
-    ? encodeContinuation(rows[rows.length - 1].key)
-    : undefined;
+  const nextContinuation = truncated && cursor ? encodeContinuation(cursor) : undefined;
 
   const xml = toXml({
     ListBucketResult: {
@@ -75,7 +113,7 @@ export async function handle(req: S3AuthenticatedRequest, res: Response): Promis
       Prefix: prefix,
       MaxKeys: maxKeys,
       KeyCount: contents.length + commonPrefixesSet.size,
-      IsTruncated: isTruncated,
+      IsTruncated: truncated,
       ...(nextContinuation ? { NextContinuationToken: nextContinuation } : {}),
       ...(delimiter ? { Delimiter: delimiter } : {}),
       ...(contents.length ? { Contents: contents } : {}),

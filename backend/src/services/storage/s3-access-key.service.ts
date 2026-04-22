@@ -48,40 +48,58 @@ export class S3AccessKeyService {
   }
 
   async create(input: CreateS3AccessKeyRequest): Promise<S3AccessKeyWithSecretSchema> {
-    const countResult = await this.pool.query(
-      'SELECT count(*)::int AS count FROM storage.s3_access_keys'
-    );
-    const count = Number(countResult.rows[0].count);
-    if (count >= MAX_KEYS_PER_PROJECT) {
-      throw new AppError(
-        `S3 access key limit reached (${MAX_KEYS_PER_PROJECT}). Delete an existing key first.`,
-        400,
-        ERROR_CODES.S3_ACCESS_KEY_LIMIT_EXCEEDED
-      );
-    }
-
     const accessKeyId = this.generateAccessKeyId();
     const secretAccessKey = this.generateSecretAccessKey();
     const encrypted = EncryptionManager.encrypt(secretAccessKey);
 
-    const result = await this.pool.query(
-      `INSERT INTO storage.s3_access_keys
-         (access_key_id, secret_access_key_encrypted, description)
-       VALUES ($1, $2, $3)
-       RETURNING id, access_key_id, description, created_at, last_used_at`,
-      [accessKeyId, encrypted, input.description ?? null]
-    );
-    const row = result.rows[0];
-    logger.info('S3 access key created', { accessKeyId });
+    // Count + insert in a single SERIALIZABLE transaction so two concurrent
+    // requests cannot both pass the cap check and each insert a row. Without
+    // this guard the 50-key-per-project limit is racy.
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
+      const countResult = await client.query(
+        'SELECT count(*)::int AS count FROM storage.s3_access_keys'
+      );
+      const count = Number(countResult.rows[0].count);
+      if (count >= MAX_KEYS_PER_PROJECT) {
+        await client.query('ROLLBACK');
+        throw new AppError(
+          `S3 access key limit reached (${MAX_KEYS_PER_PROJECT}). Delete an existing key first.`,
+          400,
+          ERROR_CODES.S3_ACCESS_KEY_LIMIT_EXCEEDED
+        );
+      }
 
-    return {
-      id: row.id,
-      accessKeyId: row.access_key_id,
-      description: row.description,
-      createdAt: row.created_at.toISOString(),
-      lastUsedAt: row.last_used_at ? row.last_used_at.toISOString() : null,
-      secretAccessKey,
-    };
+      const result = await client.query(
+        `INSERT INTO storage.s3_access_keys
+           (access_key_id, secret_access_key_encrypted, description)
+         VALUES ($1, $2, $3)
+         RETURNING id, access_key_id, description, created_at, last_used_at`,
+        [accessKeyId, encrypted, input.description ?? null]
+      );
+      await client.query('COMMIT');
+      const row = result.rows[0];
+      logger.info('S3 access key created', { accessKeyId });
+
+      return {
+        id: row.id,
+        accessKeyId: row.access_key_id,
+        description: row.description,
+        createdAt: row.created_at.toISOString(),
+        lastUsedAt: row.last_used_at ? row.last_used_at.toISOString() : null,
+        secretAccessKey,
+      };
+    } catch (err) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        // swallow — outer error takes precedence
+      }
+      throw err;
+    } finally {
+      client.release();
+    }
   }
 
   async list(): Promise<S3AccessKeySchema[]> {

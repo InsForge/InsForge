@@ -16,6 +16,7 @@ import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { S3AccessKeyService } from '@/services/storage/s3-access-key.service.js';
+import { s3AccessKeyManagementRateLimiter } from '@/api/middlewares/rate-limiters.js';
 
 const router = Router();
 const auditService = AuditService.getInstance();
@@ -624,12 +625,15 @@ router.post(
 );
 // ============================================================================
 // S3 Protocol — Access Key Management (admin only)
+// Per-IP rate limiting applied across all three endpoints since they mint /
+// revoke long-lived credentials.
 // ============================================================================
 
 // POST /api/storage/s3/access-keys - Create a new access key. Plaintext secret
 // is returned ONCE in the response and never again.
 router.post(
   '/s3/access-keys',
+  s3AccessKeyManagementRateLimiter,
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
@@ -659,6 +663,7 @@ router.post(
 // GET /api/storage/s3/access-keys - List all access keys (no secrets)
 router.get(
   '/s3/access-keys',
+  s3AccessKeyManagementRateLimiter,
   verifyAdmin,
   async (_req: AuthRequest, res: Response, next: NextFunction) => {
     try {
@@ -673,6 +678,7 @@ router.get(
 // DELETE /api/storage/s3/access-keys/:id - Revoke an access key
 router.delete(
   '/s3/access-keys/:id',
+  s3AccessKeyManagementRateLimiter,
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {

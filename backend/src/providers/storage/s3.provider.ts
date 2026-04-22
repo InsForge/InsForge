@@ -413,7 +413,14 @@ export class S3StorageProvider implements StorageProvider {
     dstKey: string
   ): Promise<{ etag: string; lastModified: Date }> {
     if (!this.s3Client) throw new Error('S3 client not initialized');
-    const source = `${this.s3Bucket}/${encodeURIComponent(this.getS3Key(srcBucket, srcKey))}`;
+    // CopySource must be `<bucket>/<key>` with forward slashes preserved.
+    // Encoding the whole key with encodeURIComponent turns '/' into '%2F' and
+    // S3 then fails to resolve the source. Encode each segment individually.
+    const encodedKey = this.getS3Key(srcBucket, srcKey)
+      .split('/')
+      .map((seg) => encodeURIComponent(seg))
+      .join('/');
+    const source = `${this.s3Bucket}/${encodedKey}`;
     const resp = await this.s3Client.send(
       new CopyObjectCommand({
         Bucket: this.s3Bucket,

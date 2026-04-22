@@ -58,10 +58,33 @@ export async function handle(req: S3AuthenticatedRequest, res: Response): Promis
     body = parser;
   } else if (req.s3Auth.payloadHash !== 'UNSIGNED-PAYLOAD') {
     // Pre-hashed body: buffer and verify SHA-256 matches the declared hash.
+    // Enforce a running byte-count cap so a client can't force an unbounded
+    // buffer by lying about Content-Length. The cap is the same ceiling
+    // applied above, independent of the (possibly-falsified) header value.
     const chunks: Buffer[] = [];
-    for await (const c of req) chunks.push(c as Buffer);
-    const buf = Buffer.concat(chunks);
-    const digest = crypto.createHash('sha256').update(buf).digest('hex');
+    let received = 0;
+    const hasher = crypto.createHash('sha256');
+    let tooLarge = false;
+    for await (const c of req) {
+      const b = c as Buffer;
+      received += b.length;
+      if (received > cap) {
+        tooLarge = true;
+        req.unpipe?.();
+        req.destroy?.();
+        break;
+      }
+      hasher.update(b);
+      chunks.push(b);
+    }
+    if (tooLarge) {
+      sendS3Error(res, 'EntityTooLarge', `Object exceeds size cap (${cap} bytes)`, {
+        resource: req.path,
+        requestId: req.s3Auth.requestId,
+      });
+      return;
+    }
+    const digest = hasher.digest('hex');
     if (digest !== req.s3Auth.payloadHash) {
       sendS3Error(res, 'SignatureDoesNotMatch', 'Body hash mismatch', {
         resource: req.path,
@@ -69,7 +92,7 @@ export async function handle(req: S3AuthenticatedRequest, res: Response): Promis
       });
       return;
     }
-    body = Readable.from(buf);
+    body = Readable.from(Buffer.concat(chunks));
   }
 
   const result = await svc.getProvider().putObjectStream(bucket, key, body, {
