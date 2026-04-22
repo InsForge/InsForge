@@ -165,8 +165,8 @@ export class StorageService {
     // Save metadata to database and return the timestamp in one operation
     const result = await this.getPool().query(
       `
-      INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by, uploaded_via)
+      VALUES ($1, $2, $3, $4, $5, 'rest')
       RETURNING uploaded_at as "uploadedAt"
     `,
       [bucket, finalKey, file.size, file.mimetype || null, userId || null]
@@ -491,8 +491,8 @@ export class StorageService {
     // Save metadata to database and return the timestamp in one operation
     const result = await this.getPool().query(
       `
-      INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by, uploaded_via)
+      VALUES ($1, $2, $3, $4, $5, 'rest')
       RETURNING uploaded_at as "uploadedAt"
     `,
       [bucket, key, fileSize, metadata.contentType || null, userId || null]
