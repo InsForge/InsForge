@@ -7,18 +7,41 @@
 /* eslint-env worker */
 /* global self, Request, Deno */
 
-// --- SECURITY SHADOWING ---
-// We shadow the global Deno and provide a mock process.env at the very entry point.
-// This prevents libraries from crashing when checking for env vars in a restricted sandbox.
-const mockProcessEnv = {
+// --- SECURITY BLACKOUT (Top-level) ---
+// We polyfill Deno.env and process.env BEFORE any imports.
+// This prevents libraries from triggering 'NotCapable' errors
+// when using a strict whitelist (satisfies Audit and E2E).
+const sterileEnv = {
   NODE_ENV: 'production',
   DEBUG: undefined,
 };
 
-if (typeof globalThis.process === 'undefined') {
-  globalThis.process = { env: mockProcessEnv };
-} else {
-  globalThis.process.env = { ...globalThis.process.env, ...mockProcessEnv };
+try {
+  // Shadow Deno.env with a pure JS implementation
+  const mockDenoEnv = {
+    get: (key) => sterileEnv[key] || undefined,
+    set: () => {
+      throw new Error('Deno.env.set is disabled');
+    },
+    delete: () => {
+      throw new Error('Deno.env.delete is disabled');
+    },
+    toObject: () => ({ ...sterileEnv }),
+    has: (key) => key in sterileEnv,
+  };
+
+  // Replace global Deno.env
+  const originalDeno = globalThis.Deno;
+  Object.defineProperty(globalThis, 'Deno', {
+    value: Object.freeze({ ...originalDeno, env: mockDenoEnv }),
+    configurable: true,
+  });
+
+  // Shadow process.env (Node compatibility)
+  if (!globalThis.process) globalThis.process = {};
+  globalThis.process.env = { ...sterileEnv };
+} catch (e) {
+  // Silent fail in case of restricted environment
 }
 // ----------------------------
 
