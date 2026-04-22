@@ -2,7 +2,12 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a `d_test` variant of the dashboard home that replaces C test's Get-Started + Prompt Stepper flow with an install-first "Install InsForge" client picker and a simplified 4-metric connected dashboard, gated behind the existing PostHog `dashboard-v3-experiment` feature flag.
+**Goal:** Add a `d_test` variant of the dashboard home that replaces C test's Get-Started + Prompt Stepper flow with an install-first "Install InsForge" client picker and a simplified 4-metric connected dashboard, gated behind the PostHog `dashboard-v4-experiment` feature flag.
+
+> **Post-implementation notes (updated after shipping):**
+> - **Feature flag moved to `dashboard-v4-experiment`** (new flag with three variants: `control` / `c_test` / `d_test`). We intentionally did not reuse `dashboard-v4-experiment` so that the existing C test allocation is not re-balanced. All references to `dashboard-v4-experiment` below should be read as `dashboard-v4-experiment`.
+> - **Section 1 of Install page is now "Setup In OpenClaw"** (featured tile = `openclaw`, a real agent — *not* a typo for Claude Code as originally assumed). Claude Code was moved into the Section 2 grid, which now leads with `claude-code` in `CODING_AGENT_GRID_IDS`. The constant is named `FEATURED_OPENCLAW_ID`.
+> - **D Test CLI prompt simplified**: no longer embeds the real `ik_…` project API key. `DTestCLISection` emits a static `<placeholder>` for the login line and disables the Copy button until `projectId` resolves. The change anticipates the CLI's upcoming `--user-api-key uak_...` flow; we'll revisit once that lands.
 
 **Architecture:** `DTestDashboardPage` acts as the entry point and picks between three in-page views (`InstallInsForgePage`, `ClientDetailPage`, `DTestConnectedDashboard`) via a URL-backed `view` state plus a session `selectedClient`. Install ↔ Dashboard transitions are two-way: `[X]` on Install persists a per-project dismissal flag and returns to Dashboard; top-nav Connect sets `?view=install` to return to Install. Tile detail pages reuse existing components (`NewCLISection`, `MCPSection` with a new `initialAgentId` prop, `ConnectionStringSectionV2`, `APIKeysSectionV2`) rather than reimplementing them.
 
@@ -332,12 +337,13 @@ export const CODING_AGENT_GRID_IDS: ClientId[] = [
   'codex',
   'antigravity',
   'cursor',
+  'opencode',
   'copilot',
-  'trae',
+  'cline',
   'other',
 ];
 
-export const FEATURED_CLAUDE_CODE_ID: ClientId = 'claude-code';
+export const FEATURED_OPENCLAW_ID: ClientId = 'openclaw';
 
 export const DIRECT_CONNECT_IDS: ClientId[] = ['connection-string', 'api-keys'];
 ```
@@ -534,7 +540,7 @@ import {
   CLIENT_ENTRIES,
   CODING_AGENT_GRID_IDS,
   DIRECT_CONNECT_IDS,
-  FEATURED_CLAUDE_CODE_ID,
+  FEATURED_OPENCLAW_ID,
   type ClientId,
 } from './clientRegistry';
 
@@ -544,7 +550,7 @@ interface InstallInsForgePageProps {
 }
 
 export function InstallInsForgePage({ onSelectClient, onDismiss }: InstallInsForgePageProps) {
-  const featured = CLIENT_ENTRIES[FEATURED_CLAUDE_CODE_ID];
+  const featured = CLIENT_ENTRIES[FEATURED_OPENCLAW_ID];
   const gridEntries = CODING_AGENT_GRID_IDS.map((id) => CLIENT_ENTRIES[id]);
   const directEntries = DIRECT_CONNECT_IDS.map((id) => CLIENT_ENTRIES[id]);
 
@@ -566,9 +572,9 @@ export function InstallInsForgePage({ onSelectClient, onDismiss }: InstallInsFor
           </Button>
         </div>
 
-        {/* Section 1: Setup in Claude Code */}
+        {/* Section 1: Setup in OpenClaw */}
         <section className="flex flex-col gap-3 rounded border border-[var(--alpha-8)] bg-card p-6">
-          <h2 className="text-base font-medium leading-7 text-foreground">Setup In Claude Code</h2>
+          <h2 className="text-base font-medium leading-7 text-foreground">Setup In OpenClaw</h2>
           <div className="flex gap-3">
             <ClientTile
               icon={featured.icon}
@@ -977,7 +983,7 @@ Expected: clean. Leave changes in the working tree.
 
 ## Task 10: Register `d_test` in the router
 
-**Why:** Wires the new page to the `dashboard-v3-experiment` flag.
+**Why:** Wires the new page to the `dashboard-v4-experiment` flag.
 
 **Files:**
 - Modify: `packages/dashboard/src/router/AppRoutes.tsx`
@@ -993,7 +999,7 @@ import DTestDashboardPage from '../features/dashboard/pages/DTestDashboardPage';
 Replace the `DashboardHomePage` assignment at `AppRoutes.tsx:51-52`:
 
 ```tsx
-const dashboardVariant = getFeatureFlag('dashboard-v3-experiment');
+const dashboardVariant = getFeatureFlag('dashboard-v4-experiment');
 const DashboardHomePage =
   dashboardVariant === 'c_test'
     ? CTestDashboardPage
@@ -1034,7 +1040,7 @@ Inside `AppHeader`, below existing hooks (`useOpenConnectDialog`), add:
 ```tsx
 const location = useLocation();
 const [searchParams, setSearchParams] = useSearchParams();
-const dashboardVariant = getFeatureFlag('dashboard-v3-experiment');
+const dashboardVariant = getFeatureFlag('dashboard-v4-experiment');
 const isDTestDashboard =
   dashboardVariant === 'd_test' && location.pathname === '/dashboard';
 
@@ -1072,14 +1078,14 @@ Expected: clean. Leave changes in the working tree.
 npm run dev
 ```
 
-Log in with a dev account. Use the PostHog feature-flag override (add `?__posthog-ff-dashboard-v3-experiment=d_test` to the URL, or use the in-app PostHog debug panel) to force `d_test`.
+Log in with a dev account. Use the PostHog feature-flag override (add `?__posthog-ff-dashboard-v4-experiment=d_test` to the URL, or use the in-app PostHog debug panel) to force `d_test`.
 
 - [ ] **Step 2: Walk the unconnected flow**
 
 - Account must have zero successful MCP usage records.
 - Visit `/dashboard`. Expect the Install InsForge page.
-- "Setup In Claude Code" section shows Claude Code tile.
-- "Install in Coding Agent" grid shows 7 tiles: Claude Code / Codex / Antigravity / Cursor / Copilot / Trae / Other Agents.
+- "Setup In OpenClaw" section shows OpenClaw tile.
+- "Install in Coding Agent" grid shows 8 tiles: Claude Code / Codex / Antigravity / Cursor / OpenCode / Copilot / Cline / Other Agents.
 - "Direct Connect" section shows Connection String and API Keys tiles.
 - Click each agent tile → detail page with the correct icon and label; CLI tab shows NewCLISection; MCP tab dropdown is preselected to the matching agent (or Cursor for Other Agents).
 - Click Connection String tile → detail page shows `ConnectionStringSectionV2` content.
@@ -1118,7 +1124,7 @@ When the user asks to commit / open a PR, use:
 - Title: `feat(dtest): add D test onboarding variant`
 - Body must include:
   - Link to the design spec: `docs/superpowers/specs/2026-04-21-dtest-onboarding-design.md`
-  - Note: **Before rollout**, add a `d_test` variant to the `dashboard-v3-experiment` flag in PostHog. Until the variant exists, no user traffic is affected.
+  - Note: **Before rollout**, add a `d_test` variant to the `dashboard-v4-experiment` flag in PostHog. Until the variant exists, no user traffic is affected.
   - Summary of the verification walkthrough above.
   - Screenshots / screen recordings of: unconnected Install page, a detail page (CLI + MCP tabs), connected dashboard.
 
