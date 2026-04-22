@@ -34,8 +34,8 @@ InsForge today exposes only a REST API for storage. Developers who want to migra
 ### Endpoint & Routing
 
 - External endpoint: `https://{appkey}.{region}.insforge.app/storage/v1/s3`
-- SDK configuration: `{ endpoint, region: 'us-east-1', forcePathStyle: true, credentials }`
-- Signature region is fixed to `us-east-1` regardless of actual deployment region. This is a SigV4 dummy value; it decouples client configuration from infrastructure region choices, matching Supabase's convention.
+- SDK configuration: `{ endpoint, region: 'us-east-2', forcePathStyle: true, credentials }`
+- Signature region is fixed to `us-east-2` regardless of where the client is or what InsForge region the project lives in. This is a SigV4 dummy value from the client's point of view (decouples client config from infrastructure choices), but it is not arbitrary: `us-east-2` matches the region our `S3StorageProvider` uses by default (see `s3.provider.ts`), so requests forwarded to the underlying S3 don't need a separate region translation step.
 - Mount path is `/storage/v1/s3` with **no `/api` prefix**. The `/api` prefix would force clients to configure `endpoint=<host>/api`, breaking S3 tooling conventions.
 
 ### Request Lifecycle
@@ -43,7 +43,7 @@ InsForge today exposes only a REST API for storage. Developers who want to migra
 ```
 Client (aws CLI / SDK / rclone)
    │  PUT /storage/v1/s3/my-bucket/photo.jpg
-   │  Authorization: AWS4-HMAC-SHA256 Credential=AK.../us-east-1/s3/aws4_request ...
+   │  Authorization: AWS4-HMAC-SHA256 Credential=AK.../us-east-2/s3/aws4_request ...
    │  x-amz-content-sha256: STREAMING-AWS4-HMAC-SHA256-PAYLOAD
    ▼
 [1] Express app — `/storage/v1/s3/*` mounted BEFORE express.json() body parser.
@@ -425,7 +425,7 @@ ALTER TABLE storage.objects
 
 **Object-level (11):** `PutObject`, `GetObject`, `HeadObject`, `DeleteObject`, `DeleteObjects` (batch), `CopyObject`, `CreateMultipartUpload`, `UploadPart`, `CompleteMultipartUpload`, `AbortMultipartUpload`, `ListParts`.
 
-**Stubs (2):** `GetBucketLocation` returns `<LocationConstraint>us-east-1</LocationConstraint>`; `GetBucketVersioning` returns `<VersioningConfiguration><Status>Disabled</Status></VersioningConfiguration>`. Both are commonly probed by SDKs on client init.
+**Stubs (2):** `GetBucketLocation` returns `<LocationConstraint>us-east-2</LocationConstraint>`; `GetBucketVersioning` returns `<VersioningConfiguration><Status>Disabled</Status></VersioningConfiguration>`. Both are commonly probed by SDKs on client init.
 
 ### Explicitly Rejected (return `NotImplemented` 501)
 
@@ -508,7 +508,7 @@ Tests live under `backend/tests/s3-gateway/`.
 | Mount order regression swallows raw body via `express.json()` | Medium | Integration test that streams a 10 MB body through to verify chunks arrive; code-review checklist. |
 | Hot access key causes DB contention | Medium | LRU cache + single-flight mutex on cache miss. |
 | `crypto.timingSafeEqual` throws on length mismatch | Low | Length check before call; mismatched length returns `SignatureDoesNotMatch`. |
-| Client with wrong region signature slips through | Low | Validate `Credential` scope's region field equals `us-east-1`. |
+| Client with wrong region signature slips through | Low | Validate `Credential` scope's region field equals `us-east-2`. |
 | Noise from unsupported presigned-URL failures | Low | Docs explicitly redirect users to REST `upload-strategy`. |
 | Credential enumeration / DoS | Low | 50-key hard cap; per-access-key rate limit. |
 
