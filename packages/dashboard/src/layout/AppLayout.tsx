@@ -10,6 +10,7 @@ import { useDashboardHost, useDashboardProject } from '../lib/config/DashboardHo
 import { cn } from '../lib/utils/utils';
 import { ConnectDialogProvider } from './ConnectDialogContext';
 import { getFeatureFlag } from '../lib/analytics/posthog';
+import { DTestViewProvider } from '../features/dashboard/components/dtest/DTestViewContext';
 
 const CONNECT_DIALOG_MESSAGE_TYPES = new Set(['SHOW_ONBOARDING_OVERLAY', 'SHOW_CONNECT_OVERLAY']);
 
@@ -86,25 +87,27 @@ export default function AppLayout({ children }: LayoutProps) {
   return (
     <ThemeProvider forcedTheme={forcedTheme}>
       <ConnectDialogProvider value={openConnectDialog}>
-        <div
-          className={cn(
-            'min-h-0 min-w-0 bg-semantic-0 flex flex-col',
-            isContainedHostLayout ? 'h-full' : 'h-screen'
-          )}
-        >
-          {showNavbar ? <AppHeader /> : null}
-          <div className="min-h-0 min-w-0 flex flex-1 overflow-hidden">
-            <AppSidebar isCollapsed={isSidebarCollapsed} onToggleCollapse={toggleSidebar} />
-            <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
-              {showProjectRestoringPage ? <ProjectRestoringPage /> : children}
-            </main>
+        <DTestViewProvider>
+          <div
+            className={cn(
+              'min-h-0 min-w-0 bg-semantic-0 flex flex-col',
+              isContainedHostLayout ? 'h-full' : 'h-screen'
+            )}
+          >
+            {showNavbar ? <AppHeader /> : null}
+            <div className="min-h-0 min-w-0 flex flex-1 overflow-hidden">
+              <AppSidebar isCollapsed={isSidebarCollapsed} onToggleCollapse={toggleSidebar} />
+              <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
+                {showProjectRestoringPage ? <ProjectRestoringPage /> : children}
+              </main>
+            </div>
           </div>
-        </div>
-        {getFeatureFlag('dashboard-v3-experiment') === 'c_test' ? (
-          <ConnectDialogV2 open={isConnectDialogOpen} onOpenChange={setIsConnectDialogOpen} />
-        ) : (
-          <ConnectDialog open={isConnectDialogOpen} onOpenChange={setIsConnectDialogOpen} />
-        )}
+          {getFeatureFlag('dashboard-v4-experiment') === 'c_test' ? (
+            <ConnectDialogV2 open={isConnectDialogOpen} onOpenChange={setIsConnectDialogOpen} />
+          ) : (
+            <ConnectDialog open={isConnectDialogOpen} onOpenChange={setIsConnectDialogOpen} />
+          )}
+        </DTestViewProvider>
       </ConnectDialogProvider>
     </ThemeProvider>
   );

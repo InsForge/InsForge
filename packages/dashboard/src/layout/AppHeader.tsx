@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useLocation, useSearchParams } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { LogOut, ChevronDown, Plug, X } from 'lucide-react';
 import {
   Button,
@@ -16,6 +16,7 @@ import { useOpenConnectDialog } from './ConnectDialogContext';
 import { getFeatureFlag } from '../lib/analytics/posthog';
 import { useMcpUsage } from '../features/logs/hooks/useMcpUsage';
 import { useProjectId } from '../lib/hooks/useMetadata';
+import { useDTestView } from '../features/dashboard/components/dtest/DTestViewContext';
 
 const getConnectTipKey = (projectId: string | null | undefined) =>
   `insforge-dtest-connect-tip-dismissed-${projectId || 'default'}`;
@@ -47,15 +48,13 @@ export default function AppHeader() {
   const { user, logout } = useAuth();
   const openConnectDialog = useOpenConnectDialog();
   const location = useLocation();
-  const [searchParams, setSearchParams] = useSearchParams();
   const dashboardVariant = getFeatureFlag('dashboard-v4-experiment');
+  const { view: dTestView, setView: setDTestView } = useDTestView();
   const isDTestDashboard = dashboardVariant === 'd_test' && location.pathname === '/dashboard';
 
   const handleConnectClick = () => {
     if (isDTestDashboard) {
-      const next = new URLSearchParams(searchParams);
-      next.set('view', 'install');
-      setSearchParams(next, { replace: true });
+      setDTestView('install');
       return;
     }
     openConnectDialog();
@@ -75,10 +74,7 @@ export default function AppHeader() {
     setConnectTipDismissed(readConnectTipDismissed(getConnectTipKey(projectId)));
   }, [projectId]);
   const showConnectTip =
-    isDTestDashboard &&
-    searchParams.get('view') !== 'install' &&
-    hasCompletedOnboarding &&
-    !connectTipDismissed;
+    isDTestDashboard && dTestView !== 'install' && hasCompletedOnboarding && !connectTipDismissed;
   const handleDismissConnectTip = () => {
     if (!projectId) {
       return;
