@@ -5,8 +5,29 @@ import { verifyHeaderSignature } from '@/services/storage/s3-signature.js';
 import { sendS3Error } from '@/api/routes/s3-gateway/errors.js';
 import logger from '@/utils/logger.js';
 
-const SIGNING_REGION = 'us-east-2';
+/**
+ * Region used to validate the `Credential=<ak>/<date>/<region>/s3/aws4_request`
+ * scope in incoming Authorization headers. Default matches S3StorageProvider's
+ * default AWS_REGION so forwarded S3 calls don't need a separate region
+ * translation. Override via S3_SIGNING_REGION if this backend runs against a
+ * bucket in a different region.
+ */
+const SIGNING_REGION = process.env.S3_SIGNING_REGION || 'us-east-2';
 const MAX_CLOCK_SKEW_MS = 15 * 60 * 1000;
+
+/**
+ * Return the raw, percent-encoded path as the client sent it, *including* the
+ * gateway mount prefix. Express's `req.path` is URL-decoded (so `hello%20x`
+ * becomes `hello x`) which breaks SigV4 canonicalization for object keys with
+ * percent-encoded chars. SigV4 also requires the canonical URI to match what
+ * the client signed, which is the absolute HTTP path — i.e. the prefix is
+ * part of the signed bytes and must not be stripped before verification.
+ */
+function rawRequestPath(req: Request): string {
+  const full = req.originalUrl || req.url;
+  const qIdx = full.indexOf('?');
+  return qIdx === -1 ? full : full.slice(0, qIdx);
+}
 
 export interface S3AuthContext {
   accessKeyId: string;
@@ -91,12 +112,13 @@ export async function s3Sigv4Middleware(
     else if (Array.isArray(v)) headers[k.toLowerCase()] = v.join(',');
   }
 
-  const query = req.url.includes('?') ? req.url.slice(req.url.indexOf('?') + 1) : '';
+  const rawUrl = req.originalUrl || req.url;
+  const query = rawUrl.includes('?') ? rawUrl.slice(rawUrl.indexOf('?') + 1) : '';
   const result = verifyHeaderSignature({
     authorization: authHeader,
     secret: resolved.secret,
     method: req.method,
-    path: req.path,
+    path: rawRequestPath(req),
     query,
     headers,
     payloadHash,

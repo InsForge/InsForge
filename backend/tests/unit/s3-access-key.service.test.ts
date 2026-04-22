@@ -3,27 +3,34 @@ import { S3AccessKeyService } from '@/services/storage/s3-access-key.service.js'
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 
 function mockPool(rows: unknown[] = [], count = 0) {
+  const query = vi.fn(async (sql: string) => {
+    if (/^\s*(BEGIN|COMMIT|ROLLBACK)/i.test(sql)) {
+      return { rows: [], rowCount: 0 };
+    }
+    if (sql.toLowerCase().includes('count(*)')) {
+      return { rows: [{ count }], rowCount: 1 };
+    }
+    if (sql.trim().startsWith('INSERT')) {
+      return {
+        rows: [
+          {
+            id: '11111111-1111-1111-1111-111111111111',
+            access_key_id: 'INSFAAAAAAAAAAAAAAAA',
+            description: null,
+            created_at: new Date('2026-04-22T00:00:00Z'),
+            last_used_at: null,
+          },
+        ],
+        rowCount: 1,
+      };
+    }
+    return { rows, rowCount: rows.length };
+  });
+
+  const client = { query, release: vi.fn() };
   return {
-    query: vi.fn(async (sql: string) => {
-      if (sql.toLowerCase().includes('count(*)')) {
-        return { rows: [{ count }], rowCount: 1 };
-      }
-      if (sql.trim().startsWith('INSERT')) {
-        return {
-          rows: [
-            {
-              id: '11111111-1111-1111-1111-111111111111',
-              access_key_id: 'INSFAAAAAAAAAAAAAAAA',
-              description: null,
-              created_at: new Date('2026-04-22T00:00:00Z'),
-              last_used_at: null,
-            },
-          ],
-          rowCount: 1,
-        };
-      }
-      return { rows, rowCount: rows.length };
-    }),
+    query,
+    connect: vi.fn(async () => client),
   } as unknown as import('pg').Pool;
 }
 

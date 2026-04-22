@@ -47,6 +47,21 @@ describe('buildCanonicalRequest', () => {
     expect(canonical.split('\n')[1]).toBe('/my-bucket/photos/sun%20set.jpg');
   });
 
+  it('does not double-encode an already-encoded path', () => {
+    // Callers may pass either a decoded path ("sun set.jpg") or the raw
+    // encoded form from the wire ("sun%20set.jpg"). Both must canonicalize
+    // to the same string, never "sun%2520set.jpg".
+    const canonical = buildCanonicalRequest({
+      method: 'PUT',
+      path: '/my-bucket/photos/sun%20set.jpg',
+      query: '',
+      headers: { host: 'h', 'x-amz-date': '20260101T000000Z' },
+      signedHeaders: ['host', 'x-amz-date'],
+      payloadHash: 'UNSIGNED-PAYLOAD',
+    });
+    expect(canonical.split('\n')[1]).toBe('/my-bucket/photos/sun%20set.jpg');
+  });
+
   it('sorts query parameters and encodes + as literal per SigV4 spec', () => {
     const canonical = buildCanonicalRequest({
       method: 'GET',

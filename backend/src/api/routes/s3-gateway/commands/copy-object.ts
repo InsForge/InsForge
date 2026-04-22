@@ -16,7 +16,17 @@ export async function handle(req: S3AuthenticatedRequest, res: Response): Promis
     });
     return;
   }
-  const decoded = decodeURIComponent(source.replace(/^\//, ''));
+
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(source.replace(/^\//, ''));
+  } catch {
+    sendS3Error(res, 'InvalidRequest', 'Malformed x-amz-copy-source', {
+      resource: req.path,
+      requestId: req.s3Auth.requestId,
+    });
+    return;
+  }
   const slash = decoded.indexOf('/');
   if (slash === -1) {
     sendS3Error(res, 'InvalidRequest', 'Malformed x-amz-copy-source', {
@@ -30,7 +40,11 @@ export async function handle(req: S3AuthenticatedRequest, res: Response): Promis
 
   const svc = StorageService.getInstance();
   const result = await svc.getProvider().copyObject(srcBucket, srcKey, dstBucket, dstKey);
-  const head = await svc.getProvider().headObject(srcBucket, srcKey);
+
+  // Read metadata from the destination after the copy, not from the source —
+  // the source may have been mutated or deleted between copy and head, and a
+  // null source head would let a 0-size row land in storage.objects.
+  const head = await svc.getProvider().headObject(dstBucket, dstKey);
 
   await svc.upsertS3Object({
     bucket: dstBucket,

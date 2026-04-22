@@ -4,7 +4,7 @@ import {
   S3AuthenticatedRequest,
 } from '@/api/middlewares/s3-sigv4.js';
 import { dispatchOp, parseBucketAndKey, S3Op } from './dispatch.js';
-import { sendS3Error } from './errors.js';
+import { sendS3Error, S3ProtocolError } from './errors.js';
 import { StorageService } from '@/services/storage/storage.service.js';
 import logger from '@/utils/logger.js';
 import * as listBuckets from './commands/list-buckets.js';
@@ -136,13 +136,34 @@ s3GatewayRouter.use(async (req: Request, res: Response) => {
         return;
     }
   } catch (err) {
+    if (res.headersSent) {
+      logger.error('S3 gateway handler error after headers sent', { op, err });
+      return;
+    }
+    // Typed protocol error — use its S3 code/status directly.
+    if (err instanceof S3ProtocolError) {
+      sendS3Error(res, err.code, err.message, {
+        resource: req.path,
+        requestId: authed.s3Auth?.requestId,
+      });
+      return;
+    }
+    // Chunk signature failures bubble out of the streaming parser as plain
+    // Error with 'SignatureDoesNotMatch' in the message — translate to the
+    // S3 auth error rather than a generic 500.
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes('SignatureDoesNotMatch')) {
+      logger.warn('S3 gateway chunk signature failure', { op, err });
+      sendS3Error(res, 'SignatureDoesNotMatch', msg, {
+        resource: req.path,
+        requestId: authed.s3Auth?.requestId,
+      });
+      return;
+    }
     logger.error('S3 gateway handler error', { op, err });
-    if (res.headersSent) return;
-    sendS3Error(
-      res,
-      'InternalError',
-      err instanceof Error ? err.message : 'Internal error',
-      { resource: req.path, requestId: authed.s3Auth?.requestId }
-    );
+    sendS3Error(res, 'InternalError', msg, {
+      resource: req.path,
+      requestId: authed.s3Auth?.requestId,
+    });
   }
 });

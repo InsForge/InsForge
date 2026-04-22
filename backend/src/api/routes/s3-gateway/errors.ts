@@ -16,6 +16,9 @@ export type S3ErrorCode =
   | 'NotImplemented'
   | 'InternalError'
   | 'InvalidRequest'
+  | 'InvalidArgument'
+  | 'InvalidPart'
+  | 'MalformedXML'
   | 'MethodNotAllowed';
 
 const statusMap: Record<S3ErrorCode, number> = {
@@ -33,6 +36,9 @@ const statusMap: Record<S3ErrorCode, number> = {
   NotImplemented: 501,
   InternalError: 500,
   InvalidRequest: 400,
+  InvalidArgument: 400,
+  InvalidPart: 400,
+  MalformedXML: 400,
   MethodNotAllowed: 405,
 };
 
