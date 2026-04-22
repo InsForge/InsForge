@@ -5,7 +5,7 @@
 **Goal:** Add a `d_test` variant of the dashboard home that replaces C test's Get-Started + Prompt Stepper flow with an install-first "Install InsForge" client picker and a simplified 4-metric connected dashboard, gated behind the PostHog `dashboard-v4-experiment` feature flag.
 
 > **Post-implementation notes (updated after shipping):**
-> - **Feature flag moved to `dashboard-v4-experiment`** (new flag with three variants: `control` / `c_test` / `d_test`). We intentionally did not reuse `dashboard-v4-experiment` so that the existing C test allocation is not re-balanced. All references to `dashboard-v4-experiment` below should be read as `dashboard-v4-experiment`.
+> - **Feature flag is `dashboard-v4-experiment`** (new flag with three variants: `control` / `c_test` / `d_test`). We intentionally did **not** reuse the existing `dashboard-v3-experiment` so that the C test allocation is not re-balanced. Earlier drafts of this plan referred to the v3 flag; those references have been rewritten to v4 in place.
 > - **Section 1 of Install page is now "Setup In OpenClaw"** (featured tile = `openclaw`, a real agent — *not* a typo for Claude Code as originally assumed). Claude Code was moved into the Section 2 grid, which now leads with `claude-code` in `CODING_AGENT_GRID_IDS`. The constant is named `FEATURED_OPENCLAW_ID`.
 > - **D Test CLI prompt simplified**: no longer embeds the real `ik_…` project API key. `DTestCLISection` emits a static `<placeholder>` for the login line and disables the Copy button until `projectId` resolves. The change anticipates the CLI's upcoming `--user-api-key uak_...` flow; we'll revisit once that lands.
 
@@ -222,22 +222,26 @@ Expected: clean. Leave changes in the working tree.
 ```tsx
 // packages/dashboard/src/features/dashboard/components/dtest/clientRegistry.tsx
 import { type ReactNode } from 'react';
-import { Database, MoreHorizontal } from 'lucide-react';
+import { Database, Sparkles } from 'lucide-react';
 import KeyHorizontalIcon from '../../../../assets/icons/key_horizontal.svg?react';
 import ClaudeLogo from '../../../../assets/logos/claude_code.svg?react';
 import OpenAILogo from '../../../../assets/logos/openai.svg?react';
 import CursorLogo from '../../../../assets/logos/cursor.svg?react';
 import CopilotLogo from '../../../../assets/logos/copilot.svg?react';
-import TraeLogo from '../../../../assets/logos/trae.svg?react';
+import OpenCodeLogo from '../../../../assets/logos/opencode.svg?react';
+import OpenClawLogo from '../../../../assets/logos/openclaw.svg?react';
+import ClineLogo from '../../../../assets/logos/cline.svg?react';
 import AntigravityLogo from '../../../../assets/logos/antigravity.png';
 
 export type ClientId =
+  | 'openclaw'
   | 'claude-code'
   | 'codex'
   | 'antigravity'
   | 'cursor'
+  | 'opencode'
   | 'copilot'
-  | 'trae'
+  | 'cline'
   | 'other'
   | 'connection-string'
   | 'api-keys';
@@ -250,13 +254,21 @@ export interface ClientEntry {
   icon: ReactNode;
   detailIcon: ReactNode;
   kind: ClientKind;
-  /** MCP dropdown preselection inside the detail page. Omit for 'other' & direct-connect. */
+  /** MCP detail preselection. Use 'mcp' for "Other Agents"; omit for direct-connect. */
   mcpAgentId?: string;
 }
 
 const iconTile = (node: ReactNode) => <span className="flex h-8 w-8 items-center justify-center">{node}</span>;
 
 export const CLIENT_ENTRIES: Record<ClientId, ClientEntry> = {
+  openclaw: {
+    id: 'openclaw',
+    label: 'OpenClaw',
+    icon: iconTile(<OpenClawLogo className="h-8 w-8" />),
+    detailIcon: <OpenClawLogo className="h-8 w-8" />,
+    kind: 'agent',
+    mcpAgentId: 'openclaw',
+  },
   'claude-code': {
     id: 'claude-code',
     label: 'Claude Code',
@@ -291,6 +303,14 @@ export const CLIENT_ENTRIES: Record<ClientId, ClientEntry> = {
     kind: 'agent',
     mcpAgentId: 'cursor',
   },
+  opencode: {
+    id: 'opencode',
+    label: 'OpenCode',
+    icon: iconTile(<OpenCodeLogo className="h-8 w-8 dark:text-white" />),
+    detailIcon: <OpenCodeLogo className="h-8 w-8 dark:text-white" />,
+    kind: 'agent',
+    mcpAgentId: 'opencode',
+  },
   copilot: {
     id: 'copilot',
     label: 'Copilot',
@@ -299,21 +319,22 @@ export const CLIENT_ENTRIES: Record<ClientId, ClientEntry> = {
     kind: 'agent',
     mcpAgentId: 'copilot',
   },
-  trae: {
-    id: 'trae',
-    label: 'Trae',
-    icon: iconTile(<TraeLogo className="h-8 w-8" />),
-    detailIcon: <TraeLogo className="h-8 w-8" />,
+  cline: {
+    id: 'cline',
+    label: 'Cline',
+    icon: iconTile(<ClineLogo className="h-8 w-8 dark:text-white" />),
+    detailIcon: <ClineLogo className="h-8 w-8 dark:text-white" />,
     kind: 'agent',
-    mcpAgentId: 'trae',
+    mcpAgentId: 'cline',
   },
   other: {
     id: 'other',
     label: 'Other Agents',
-    icon: iconTile(<MoreHorizontal className="h-6 w-6 text-muted-foreground" />),
-    detailIcon: <MoreHorizontal className="h-8 w-8 text-muted-foreground" />,
+    icon: iconTile(<Sparkles className="h-6 w-6 text-foreground" />),
+    detailIcon: <Sparkles className="h-8 w-8 text-foreground" />,
     kind: 'agent',
-    // intentionally no mcpAgentId → MCPSection falls back to MCP_AGENTS[0]
+    // Jumps directly to the MCP JSON config (no agent dropdown needed).
+    mcpAgentId: 'mcp',
   },
   'connection-string': {
     id: 'connection-string',

@@ -173,14 +173,20 @@ interface PastePromptButtonProps {
 
 function PastePromptButton({ agent, prompt }: PastePromptButtonProps) {
   const handleClick = useCallback(() => {
-    trackPostHog('onboarding_action_taken', {
-      action_type: 'verify mcp',
-      experiment_variant: getFeatureFlag('onboarding-method-experiment'),
-      method: 'clipboard',
-      agent_id: agent.id,
-      install_type: 'deeplink',
-    });
-    void navigator.clipboard?.writeText(prompt);
+    void (async () => {
+      try {
+        await navigator.clipboard.writeText(prompt);
+        trackPostHog('onboarding_action_taken', {
+          action_type: 'verify mcp',
+          experiment_variant: getFeatureFlag('onboarding-method-experiment'),
+          method: 'clipboard',
+          agent_id: agent.id,
+          install_type: 'deeplink',
+        });
+      } catch (error) {
+        console.error('Failed to copy MCP verification prompt to clipboard', error);
+      }
+    })();
   }, [agent.id, prompt]);
 
   return (

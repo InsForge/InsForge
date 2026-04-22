@@ -22,7 +22,7 @@ Figma references:
 
 ## Goals
 
-1. Let users connect any coding agent (Claude Code, Codex, Antigravity, Cursor, Copilot, Trae, "Other") or connect directly via DB connection string / API keys, from a single discoverable page.
+1. Let users connect any coding agent (OpenClaw, Claude Code, Codex, Antigravity, Cursor, OpenCode, Copilot, Cline, "Other") or connect directly via DB connection string / API keys, from a single discoverable page.
 2. Keep the connected-state dashboard minimal: project header + User / Database / Storage / Edge Functions cards.
 3. Share underlying install components (`NewCLISection`, `MCPSection`, `ConnectionStringSectionV2`, `APIKeysSectionV2`) with other dashboard variants so the winning variant leaves behind clean, working infrastructure.
 4. Allow users to toggle between Install view and Dashboard view freely after first connection.
@@ -119,14 +119,14 @@ Below: 32 px client icon + client display name (h2, 28 px medium).
 
 Content changes per client type:
 
-### Coding agents (Claude Code, Codex, Antigravity, Cursor, Copilot, Trae, Other Agents)
+### Coding agents (OpenClaw, Claude Code, Codex, Antigravity, Cursor, OpenCode, Copilot, Cline, Other Agents)
 
 - CLI / MCP toggle (`toggle nav` pattern from Figma).
-- **CLI tab** → `<NewCLISection isCTest={false} />` (identical 3-step layout for every agent).
-- **MCP tab** → `<MCPSection initialAgentId={id} apiKey={...} appUrl={...} />`.
-  - For specific agents, `initialAgentId` matches the tile id (`claude-code`, `codex`, `cursor`, `antigravity`, `copilot`, `trae`).
-  - For "Other Agents", `initialAgentId` is omitted; `MCPSection` falls back to its default (`MCP_AGENTS[0]`), keeping the full dropdown usable.
-  - User can still change the dropdown in all cases.
+- **CLI tab** → `<DTestCLISection agentName={...} />` (identical layout for every agent; prompt uses a static `<placeholder>` for the API key line — see "D Test CLI prompt" below).
+- **MCP tab** → `<DTestMCPSection agentId={id} apiKey={...} appUrl={...} />`.
+  - For specific agents, `agentId` matches the tile id (`openclaw`, `claude-code`, `codex`, `cursor`, `antigravity`, `opencode`, `copilot`, `cline`).
+  - For "Other Agents", the entry sets `mcpAgentId: 'mcp'` which jumps directly to the MCP JSON config (no agent dropdown needed).
+  - For Cursor and Qoder (deeplink-capable), Step 1 shows an "Install to &lt;agent&gt;" white button that opens the MCP-install deeplink and Step 2 shows a "Paste Prompt to &lt;agent&gt;" button that copies `MCP_VERIFY_CONNECTION_PROMPT` to the clipboard. Other agents show the terminal command + prompt code blocks.
 
 ### Connection String tile
 
@@ -198,12 +198,14 @@ packages/dashboard/src/features/dashboard/components/
 
 ```ts
 type ClientId =
+  | 'openclaw'
   | 'claude-code'
   | 'codex'
   | 'antigravity'
   | 'cursor'
+  | 'opencode'
   | 'copilot'
-  | 'trae'
+  | 'cline'
   | 'other'
   | 'connection-string'
   | 'api-keys';
@@ -213,10 +215,12 @@ type ClientEntry = {
   label: string;
   icon: ReactNode;
   kind: 'agent' | 'direct-connect';
-  /** MCP dropdown preselection; undefined for 'other' and direct-connect */
+  /** MCP detail preselection. Use 'mcp' for "Other Agents"; omit for direct-connect. */
   mcpAgentId?: string;
 };
 ```
+
+`FEATURED_OPENCLAW_ID = 'openclaw'` is the featured tile in Section 1; `CODING_AGENT_GRID_IDS` renders the Section 2 grid starting with `'claude-code'`. The `other` entry sets `mcpAgentId: 'mcp'` so clicking "Other Agents" drops the user straight into the MCP JSON config view.
 
 The "featured" section ("Setup In OpenClaw") and grid consume the same entries; only the section they render in differs.
 
@@ -225,39 +229,43 @@ The "featured" section ("Setup In OpenClaw") and grid consume the same entries; 
 One hook, `useDTestView`, owns view resolution, URL sync, and the dismissal flag:
 
 ```ts
-function useDTestView(hasCompletedOnboarding: boolean, projectId: string | undefined) {
+function useDTestView({ hasCompletedOnboarding, projectId }: UseDTestViewArgs) {
   const [params, setParams] = useSearchParams();
   const dismissKey = `insforge-dtest-install-dismissed-${projectId || 'default'}`;
   const [selectedClient, setSelectedClient] = useState<ClientId | null>(null);
+  const [isDismissed, setIsDismissed] = useState(() => readDismissed(dismissKey));
 
-  // resolve view: explicit URL > dismissal > onboarding state
+  // Resolve view: explicit URL param > dismissal flag > onboarding state.
   const view: 'install' | 'dashboard' = useMemo(() => {
     const urlView = params.get('view');
     if (urlView === 'install') return 'install';
-    if (urlView === 'dashboard' || urlView === null) {
-      if (urlView === 'dashboard') return 'dashboard';
-      const dismissed = safeLocalStorage.getItem(dismissKey) === 'true';
-      if (dismissed) return 'dashboard';
-      return hasCompletedOnboarding ? 'dashboard' : 'install';
-    }
-    return 'dashboard';
-  }, [params, hasCompletedOnboarding, dismissKey]);
+    if (urlView === 'dashboard') return 'dashboard';
+    if (isDismissed) return 'dashboard';
+    return hasCompletedOnboarding ? 'dashboard' : 'install';
+  }, [params, hasCompletedOnboarding, isDismissed]);
 
-  // persist dismissal the first time onboarding completes
+  // Persist dismissal the first time onboarding completes, so a later loss of
+  // MCP usage history does not bounce the user back to the install page.
   useEffect(() => {
-    if (hasCompletedOnboarding && projectId) {
-      safeLocalStorage.setItem(dismissKey, 'true');
+    if (projectId && hasCompletedOnboarding && !isDismissed) {
+      writeDismissed(dismissKey, true);
+      setIsDismissed(true);
     }
-  }, [hasCompletedOnboarding, projectId, dismissKey]);
+  }, [hasCompletedOnboarding, projectId, dismissKey, isDismissed]);
 
-  const setView = (v: 'install' | 'dashboard', options?: { dismiss?: boolean }) => {
-    const next = new URLSearchParams(params);
-    if (v === 'install') next.set('view', 'install');
-    else next.delete('view');
-    setParams(next, { replace: true });
-    if (v === 'dashboard') setSelectedClient(null);
-    if (options?.dismiss && projectId) safeLocalStorage.setItem(dismissKey, 'true');
-  };
+  const setView = useCallback(
+    (v: 'install' | 'dashboard', options?: { dismiss?: boolean }) => {
+      const next = new URLSearchParams(params);
+      next.set('view', v); // always explicit — prevents default-resolution bounce-back
+      setParams(next, { replace: true });
+      if (v === 'dashboard') setSelectedClient(null);
+      if (options?.dismiss) {
+        writeDismissed(dismissKey, true);
+        setIsDismissed(true);
+      }
+    },
+    [params, setParams, dismissKey]
+  );
 
   return { view, setView, selectedClient, setSelectedClient };
 }
