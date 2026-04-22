@@ -73,11 +73,7 @@ export function useDTestView({ hasCompletedOnboarding, projectId }: UseDTestView
   const setView = useCallback(
     (v: DTestView, options?: { dismiss?: boolean }) => {
       const next = new URLSearchParams(params);
-      if (v === 'install') {
-        next.set('view', 'install');
-      } else {
-        next.delete('view');
-      }
+      next.set('view', v);
       setParams(next, { replace: true });
       if (v === 'dashboard') {
         setSelectedClient(null);
