@@ -50,7 +50,7 @@
     "./tailwind-preset": "./tailwind-preset.js"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && node -e \"fs.copyFileSync('src/styles.css', 'dist/styles.css')\"",
+    "build": "tsc -p tsconfig.build.json && cp src/styles.css dist/styles.css",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build",
     "lint": "eslint src/"
