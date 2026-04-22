@@ -71,3 +71,44 @@ describe('S3AccessKeyService', () => {
     expect(result.secretAccessKey).toHaveLength(40);
   });
 });
+
+describe('S3AccessKeyService cache', () => {
+  beforeEach(() => {
+    process.env.ENCRYPTION_KEY = 'a'.repeat(64);
+  });
+
+  it('caches resolveAccessKeyForVerification after first call', async () => {
+    const encrypted = EncryptionManager.encrypt('s'.repeat(40));
+    const pool = {
+      query: vi.fn(async () => ({
+        rows: [{ id: 'abc', secret_access_key_encrypted: encrypted }],
+        rowCount: 1,
+      })),
+    } as unknown as import('pg').Pool;
+    const svc = new S3AccessKeyService(pool);
+    await svc.resolveAccessKeyForVerification('INSFAAAAAAAAAAAAAAAA');
+    await svc.resolveAccessKeyForVerification('INSFAAAAAAAAAAAAAAAA');
+    expect(pool.query).toHaveBeenCalledOnce();
+  });
+
+  it('invalidates cache on delete', async () => {
+    const encrypted = EncryptionManager.encrypt('s'.repeat(40));
+    const pool = {
+      query: vi.fn(async (sql: string) => {
+        if (sql.trim().startsWith('DELETE')) {
+          return { rows: [{ access_key_id: 'INSFAAAAAAAAAAAAAAAA' }], rowCount: 1 };
+        }
+        return { rows: [{ id: 'abc', secret_access_key_encrypted: encrypted }], rowCount: 1 };
+      }),
+    } as unknown as import('pg').Pool;
+    const svc = new S3AccessKeyService(pool);
+    await svc.resolveAccessKeyForVerification('INSFAAAAAAAAAAAAAAAA');
+    await svc.delete('abc');
+    await svc.resolveAccessKeyForVerification('INSFAAAAAAAAAAAAAAAA');
+    const calls = (pool.query as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    const selects = calls.filter(
+      (c) => typeof c[0] === 'string' && (c[0] as string).trim().startsWith('SELECT id, secret')
+    );
+    expect(selects.length).toBe(2);
+  });
+});
