@@ -244,7 +244,7 @@ export const bulkUpsertResponseSchema = z.object({
 });
 
 export const createMigrationRequestSchema = z.object({
-  version: z.string().regex(/^\d{14}$/, 'Migration version must use YYYYMMDDHHmmss format.'),
+  version: z.string().regex(/^\d+$/, 'Migration version must be numeric (e.g. 0001 or 20260418091500).'),
   name: z
     .string()
     .trim()
