@@ -22,9 +22,9 @@ export class CloudComputeProvider implements ComputeProvider {
 
   isConfigured(): boolean {
     return (
-      config.cloud.computeEnabled === true &&
       !!config.cloud?.projectId &&
       config.cloud.projectId !== 'local' &&
+      !!config.cloud?.apiHost &&
       !!config.app?.jwtSecret
     );
   }
@@ -32,7 +32,7 @@ export class CloudComputeProvider implements ComputeProvider {
   private signToken(): string {
     if (!this.isConfigured()) {
       throw new AppError(
-        'Cloud compute not configured (need PROJECT_ID, JWT_SECRET, CLOUD_COMPUTE_ENABLED)',
+        'Cloud compute not configured (need PROJECT_ID, CLOUD_API_HOST, JWT_SECRET)',
         500,
         ERROR_CODES.COMPUTE_NOT_CONFIGURED,
       );
@@ -64,7 +64,11 @@ export class CloudComputeProvider implements ComputeProvider {
           'Content-Type': 'application/json',
         },
         body: body !== undefined ? JSON.stringify(body) : undefined,
-        signal: AbortSignal.timeout(15_000),
+        // 60s: launchMachine can legitimately take 15-25s (Fly app create +
+        // IP allocation retry loop + machine provisioning). 15s was too tight
+        // and produced false-positive COMPUTE_CLOUD_UNAVAILABLE errors that
+        // caused orphaned Fly resources.
+        signal: AbortSignal.timeout(60_000),
       });
     } catch (err) {
       // Only network/fetch errors arrive here — re-wrap as COMPUTE_CLOUD_UNAVAILABLE

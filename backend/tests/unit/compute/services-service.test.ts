@@ -29,7 +29,6 @@ vi.mock('@/infra/config/app.config.js', () => ({
       domain: 'fly.dev',
     },
     cloud: {
-      computeEnabled: false,
       projectId: '',
       apiHost: '',
     },
@@ -52,7 +51,7 @@ const mockStartMachine = vi.fn();
 const mockDestroyMachine = vi.fn();
 const mockGetLogs = vi.fn();
 const mockListMachines = vi.fn();
-const mockIsConfigured = vi.fn();
+const mockIsConfigured = vi.fn(() => true);
 
 const mockFlyInstance = {
   createApp: mockCreateApp,
@@ -791,13 +790,17 @@ describe('ComputeServicesService', () => {
 describe('selectComputeProvider factory', () => {
   beforeEach(() => {
     vi.resetModules();
+    // Unmock the provider modules so the factory calls REAL isConfigured()
+    // methods driven by the `config` mock for each test.
+    vi.doUnmock('@/providers/compute/fly.provider.js');
+    vi.doUnmock('@/providers/compute/cloud.provider.js');
   });
 
   it('returns FlyProvider when FLY_API_TOKEN is set', async () => {
     vi.doMock('@/infra/config/app.config.js', () => ({
       config: {
         fly: { apiToken: 'tok', org: 'o', enabled: true, domain: 'd' },
-        cloud: { computeEnabled: false, projectId: 'local', apiHost: '' },
+        cloud: { projectId: 'local', apiHost: '' },
         app: { jwtSecret: 'x' },
       },
     }));
@@ -806,11 +809,11 @@ describe('selectComputeProvider factory', () => {
     expect(selectComputeProvider()).toBe(FlyProvider.getInstance());
   });
 
-  it('returns CloudComputeProvider when cloud is enabled and no FLY_API_TOKEN', async () => {
+  it('returns CloudComputeProvider when PROJECT_ID is provisioned and no FLY_API_TOKEN', async () => {
     vi.doMock('@/infra/config/app.config.js', () => ({
       config: {
         fly: { apiToken: '', org: '', enabled: false, domain: '' },
-        cloud: { computeEnabled: true, projectId: 'p', apiHost: 'https://x' },
+        cloud: { projectId: 'p', apiHost: 'https://x' },
         app: { jwtSecret: 'x' },
       },
     }));
@@ -823,7 +826,7 @@ describe('selectComputeProvider factory', () => {
     vi.doMock('@/infra/config/app.config.js', () => ({
       config: {
         fly: { apiToken: '', org: '', enabled: false, domain: '' },
-        cloud: { computeEnabled: false, projectId: 'local', apiHost: '' },
+        cloud: { projectId: 'local', apiHost: '' },
         app: { jwtSecret: 'x' },
       },
     }));

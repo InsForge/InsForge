@@ -13,7 +13,6 @@ export interface AppConfig {
     cloudFrontUrl: string;
     cloudFrontKeyPairId: string;
     cloudFrontPrivateKey: string;
-    computeEnabled: boolean;
     projectId: string;
   };
   denoSubhosting: {
@@ -45,7 +44,6 @@ export const config: AppConfig = {
     cloudFrontUrl: process.env.AWS_CLOUDFRONT_URL || '',
     cloudFrontKeyPairId: process.env.AWS_CLOUDFRONT_KEY_PAIR_ID || '',
     cloudFrontPrivateKey: process.env.AWS_CLOUDFRONT_PRIVATE_KEY || '',
-    computeEnabled: process.env.CLOUD_COMPUTE_ENABLED === 'true',
   },
   denoSubhosting: {
     token: process.env.DENO_SUBHOSTING_TOKEN || '',
