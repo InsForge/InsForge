@@ -36,7 +36,7 @@ S3 Configuration**, or fetched via `GET /api/storage/s3/config`.
 | Field | Value |
 | --- | --- |
 | Endpoint | `https://{project-ref}.{region}.insforge.app/storage/v1/s3` |
-| Region | `us-east-2` (or the value set via `S3_SIGNING_REGION`) |
+| Region | `us-east-2` (or the value set via `AWS_REGION`) |
 
 Clients **must** use path-style URLs (`forcePathStyle: true`). Virtual-hosted
 style (`{bucket}.endpoint/...`) is not supported.
