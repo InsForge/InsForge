@@ -489,7 +489,8 @@ paths:
                 version:
                   type: string
                   description: Numeric migration version. Accepts Drizzle-style sequential prefixes (e.g. `0001`) or a `YYYYMMDDHHmmss` timestamp. Versions are compared numerically.
-                  pattern: '^\d+$'
+                  pattern: '^\d{1,64}$'
+                  maxLength: 64
                 name:
                   type: string
                   description: Migration name
@@ -572,7 +573,7 @@ components:
       properties:
         version:
           type: string
-          pattern: '^\d+$'
+          pattern: '^\d{1,64}$'
         name:
           type: string
         statements:

@@ -593,7 +593,7 @@ POST /api/database/migrations
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `version` | string | Yes | Numeric migration version. Accepts Drizzle-style sequential prefixes (e.g. `0001`) or a `YYYYMMDDHHmmss` timestamp. Versions are compared numerically. |
+| `version` | string | Yes | Numeric migration version (up to 64 digits). Accepts Drizzle-style sequential prefixes (e.g. `0001`) or a `YYYYMMDDHHmmss` timestamp. Versions are compared numerically. |
 | `name` | string | Yes | Migration name |
 | `sql` | string | Yes | SQL text to parse and execute |
 
