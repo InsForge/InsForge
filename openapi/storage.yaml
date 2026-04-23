@@ -731,6 +731,42 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/storage/s3/config:
+    get:
+      summary: Get S3 Gateway Config
+      description: |
+        Return the externally-reachable endpoint URL and the SigV4 signing
+        region for the S3 protocol gateway. The endpoint is assembled from
+        the server's `VITE_API_BASE_URL` env var plus `/storage/v1/s3`, and
+        the region is `S3_SIGNING_REGION` (default `us-east-2`).
+
+        Intended for Dashboard display so the UI doesn't make any
+        backend-topology assumptions client-side.
+      tags:
+        - S3 Access Keys
+      security:
+        - apiKey: []
+      responses:
+        '200':
+          description: Gateway config
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/S3GatewayConfig'
+              example:
+                data:
+                  endpoint: https://proj.insforge.app/storage/v1/s3
+                  region: us-east-2
+        '401':
+          description: Missing or invalid API key / admin token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/storage/s3/access-keys:
     get:
       summary: List S3 Access Keys
@@ -1135,6 +1171,22 @@ components:
           type: string
           description: Suggested action to resolve the error
           example: "Check your request parameters"
+
+    S3GatewayConfig:
+      type: object
+      description: Read-only config of the S3 protocol gateway.
+      required:
+        - endpoint
+        - region
+      properties:
+        endpoint:
+          type: string
+          description: Full URL clients should configure as their S3 endpoint.
+          example: https://proj.insforge.app/storage/v1/s3
+        region:
+          type: string
+          description: SigV4 signing region the gateway validates incoming requests against.
+          example: us-east-2
 
     S3AccessKey:
       type: object

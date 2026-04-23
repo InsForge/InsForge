@@ -137,7 +137,7 @@ export function StorageSettingsMenuDialog({ open, onOpenChange }: StorageSetting
                 active={activeTab === 's3'}
                 onClick={() => setActiveTab('s3')}
               >
-                S3 Compatible API
+                S3 Configuration
               </MenuDialogNavItem>
             </MenuDialogNavList>
           </MenuDialogNav>

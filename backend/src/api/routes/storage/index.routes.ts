@@ -624,10 +624,26 @@ router.post(
   }
 );
 // ============================================================================
-// S3 Protocol — Access Key Management (admin only)
-// Per-IP rate limiting applied across all three endpoints since they mint /
-// revoke long-lived credentials.
+// S3 Protocol — Gateway Config + Access Key Management (admin only)
+// Per-IP rate limiting applied across all three access-key endpoints since
+// they mint / revoke long-lived credentials.
 // ============================================================================
+
+// GET /api/storage/s3/config - Return the gateway endpoint + signing region.
+// Endpoint is assembled from VITE_API_BASE_URL (the externally-reachable base
+// URL clients use for this backend) plus the fixed /storage/v1/s3 path. The
+// signing region is the value the SigV4 middleware validates against; clients
+// must sign with exactly this value.
+router.get('/s3/config', verifyAdmin, (_req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const base = (process.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
+    const endpoint = base ? `${base}/storage/v1/s3` : '/storage/v1/s3';
+    const region = process.env.AWS_REGION || 'us-east-2';
+    successResponse(res, { endpoint, region });
+  } catch (error) {
+    next(error);
+  }
+});
 
 // POST /api/storage/s3/access-keys - Create a new access key. Plaintext secret
 // is returned ONCE in the response and never again.

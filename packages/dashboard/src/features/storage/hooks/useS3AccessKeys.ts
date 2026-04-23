@@ -3,9 +3,20 @@ import type {
   S3AccessKeySchema,
   S3AccessKeyWithSecretSchema,
   CreateS3AccessKeyRequest,
+  S3GatewayConfigSchema,
 } from '@insforge/shared-schemas';
 import { s3AccessKeyService } from '../services/s3-access-key.service';
 import { useToast } from '../../../lib/hooks/useToast';
+
+/** React Query hook for the read-only S3 gateway config (endpoint + region). */
+export function useS3GatewayConfig() {
+  return useQuery<S3GatewayConfigSchema>({
+    queryKey: ['storage', 's3-gateway-config'],
+    queryFn: () => s3AccessKeyService.getGatewayConfig(),
+    // Endpoint/region come from server env; they don't change at runtime.
+    staleTime: Infinity,
+  });
+}
 
 /**
  * React Query hook for managing S3 access keys. Returns the list query plus
