@@ -211,7 +211,11 @@ export class FlyProvider implements ComputeProvider {
   }
 
   async destroyMachine(appId: string, machineId: string): Promise<void> {
-    await this.request(`/apps/${appId}/machines/${machineId}`, { method: 'DELETE' });
+    // force=true so running machines can be destroyed in one call. Without it
+    // Fly returns 412 `failed_precondition: unable to destroy machine, not
+    // currently stopped, suspended, failed, or pending` and the caller's
+    // delete path 502s, leaving the Fly app + DB row orphaned.
+    await this.request(`/apps/${appId}/machines/${machineId}?force=true`, { method: 'DELETE' });
   }
 
   async listMachines(appId: string): Promise<{ id: string; state: string; region: string }[]> {

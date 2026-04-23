@@ -191,7 +191,7 @@ describe('FlyProvider', () => {
   });
 
   describe('destroyMachine', () => {
-    it('calls DELETE to machine endpoint', async () => {
+    it('calls DELETE to machine endpoint with force=true', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
         text: () => Promise.resolve(''),
@@ -201,7 +201,7 @@ describe('FlyProvider', () => {
       await provider.destroyMachine('my-app', 'machine-123');
 
       expect(mockFetch).toHaveBeenCalledWith(
-        `${FLY_API_BASE}/apps/my-app/machines/machine-123`,
+        `${FLY_API_BASE}/apps/my-app/machines/machine-123?force=true`,
         expect.objectContaining({ method: 'DELETE' })
       );
     });
