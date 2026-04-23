@@ -77,7 +77,8 @@
               {
                 "group": "Email (Experimental)",
                 "pages": [
-                  "core-concepts/email/architecture"
+                  "core-concepts/email/architecture",
+                  "core-concepts/email/custom-smtp"
                 ]
               },
               {
