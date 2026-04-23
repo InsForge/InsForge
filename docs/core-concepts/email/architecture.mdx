@@ -1,6 +1,6 @@
 ---
 title: Email Architecture
-description: Transactional email delivery powered by AWS SES
+description: Transactional email delivery via InsForge Cloud or your own SMTP server
 ---
 
 <Warning>
@@ -9,7 +9,7 @@ description: Transactional email delivery powered by AWS SES
 
 ## Overview
 
-InsForge provides a managed email service for sending transactional emails. Built on AWS SES, it offers high deliverability and scalability without requiring you to configure email infrastructure.
+InsForge provides a managed email service for sending transactional emails. By default, mail is delivered through InsForge Cloud (built on AWS SES) for high deliverability without infrastructure setup. You can also configure a [custom SMTP server](/core-concepts/email/custom-smtp) to send through your own provider — the same API powers both paths.
 
 ## Technology Stack
 
@@ -17,15 +17,22 @@ InsForge provides a managed email service for sending transactional emails. Buil
 graph TB
     Client[Client Application] --> SDK[InsForge SDK]
     SDK --> API[Email API]
-    API --> Cloud[InsForge Cloud]
+    API --> Service[EmailService]
+    Service --> Decision{SMTP enabled?}
+    Decision -->|No| Cloud[InsForge Cloud]
     Cloud --> SES[AWS SES]
+    Decision -->|Yes| SMTP[Your SMTP server]
     SES --> Inbox[Recipient Inbox]
+    SMTP --> Inbox
 
     style Client fill:#1e293b,stroke:#475569,color:#e2e8f0
     style SDK fill:#1e40af,stroke:#3b82f6,color:#dbeafe
     style API fill:#166534,stroke:#22c55e,color:#dcfce7
+    style Service fill:#166534,stroke:#22c55e,color:#dcfce7
+    style Decision fill:#7c3aed,stroke:#a78bfa,color:#ede9fe
     style Cloud fill:#7c3aed,stroke:#a78bfa,color:#ede9fe
     style SES fill:#ea580c,stroke:#f97316,color:#fed7aa
+    style SMTP fill:#0e7490,stroke:#06b6d4,color:#cffafe
     style Inbox fill:#0e7490,stroke:#06b6d4,color:#cffafe
 ```
 
@@ -33,20 +40,20 @@ graph TB
 
 1. **SDK Call** - Your application calls `emails.send()` with recipients and HTML content
 2. **API Processing** - Request is validated and authenticated
-3. **Cloud Delivery** - InsForge Cloud queues and sends via AWS SES
-4. **Delivery** - Email is delivered to recipient inboxes
+3. **Provider Resolution** - `EmailService` checks per-call whether custom SMTP is enabled
+4. **Delivery** - The email is queued through AWS SES (cloud) or your SMTP server, then delivered to the recipient
 
 ```mermaid
 sequenceDiagram
     participant App as Your App
     participant SDK as InsForge SDK
     participant API as Email API
-    participant SES as AWS SES
+    participant Provider as Cloud (SES) or your SMTP
 
     App->>SDK: emails.send({to, subject, html})
     SDK->>API: POST /api/email/send-raw
-    API->>SES: Queue for delivery
-    SES-->>API: Accepted
+    API->>Provider: Route based on SMTP config
+    Provider-->>API: Accepted
     API-->>SDK: Success
     SDK-->>App: {data, error}
 ```
@@ -58,12 +65,20 @@ sequenceDiagram
     AWS SES infrastructure with optimized sending reputation
   </Card>
 
+  <Card title="Custom SMTP" icon="server" href="/core-concepts/email/custom-smtp">
+    Bring your own SMTP server and route every email — including auth flows — through your provider
+  </Card>
+
   <Card title="Multiple Recipients" icon="users">
     Send to up to 50 recipients per request with CC/BCC support
   </Card>
 
   <Card title="Custom Sender" icon="signature">
     Customize the sender display name for your brand
+  </Card>
+
+  <Card title="Editable Templates" icon="envelope-open-text" href="/core-concepts/email/custom-smtp#email-templates">
+    With custom SMTP enabled, customize the subject and HTML of every authentication email
   </Card>
 
   <Card title="HTML Content" icon="code">
