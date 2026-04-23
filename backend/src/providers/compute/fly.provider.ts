@@ -71,6 +71,18 @@ export class FlyProvider implements ComputeProvider {
   }
 
   private async allocatePublicIps(appId: string): Promise<void> {
+    // Race: when called immediately after createApp, Fly's GraphQL returns
+    // `{ipAddress: null}` without an `errors` field — no allocation happened,
+    // but the response looks successful. Retry with short backoff until we
+    // get back an actual ipAddress. Without this the app has IPv6 only, DNS
+    // resolves AAAA only, and IPv4-only clients NXDOMAIN on the .fly.dev URL.
+    const types: ('shared_v4' | 'v6')[] = ['shared_v4', 'v6'];
+    for (const type of types) {
+      await this.allocateOneIp(appId, type);
+    }
+  }
+
+  private async allocateOneIp(appId: string, type: 'shared_v4' | 'v6'): Promise<void> {
     const graphqlEndpoint = 'https://api.fly.io/graphql';
     const mutation = `
       mutation AllocateIp($input: AllocateIPAddressInput!) {
@@ -79,18 +91,15 @@ export class FlyProvider implements ComputeProvider {
         }
       }
     `;
-    const types: ('shared_v4' | 'v6')[] = ['shared_v4', 'v6'];
-    for (const type of types) {
+    const maxAttempts = 5;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       const response = await fetch(graphqlEndpoint, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${config.fly.apiToken}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          query: mutation,
-          variables: { input: { appId, type } },
-        }),
+        body: JSON.stringify({ query: mutation, variables: { input: { appId, type } } }),
       });
       if (!response.ok) {
         const body = await response.text();
@@ -98,13 +107,51 @@ export class FlyProvider implements ComputeProvider {
           `Fly GraphQL allocateIpAddress(${type}) failed (${response.status}): ${body}`
         );
       }
-      const result = await response.json() as { errors?: unknown };
+      const result = (await response.json()) as {
+        data?: { allocateIpAddress?: { ipAddress?: { address?: string } | null } | null };
+        errors?: unknown;
+      };
       if (result.errors) {
         throw new Error(
           `Fly GraphQL allocateIpAddress(${type}) errors: ${JSON.stringify(result.errors)}`
         );
       }
+      const ip = result.data?.allocateIpAddress?.ipAddress;
+      if (ip && ip.address) {
+        return;
+      }
+      // shared_v4 is an edge case: Fly does not return a per-app address for
+      // shared IPs — it flips the app to use the org's shared v4 and returns
+      // null. Verify via a follow-up query that `sharedIpAddress` is populated.
+      if (type === 'shared_v4' && (await this.hasSharedV4(appId))) {
+        return;
+      }
+      if (attempt < maxAttempts) {
+        await new Promise((r) => setTimeout(r, 1000 * attempt));
+      }
     }
+    throw new Error(
+      `Fly GraphQL allocateIpAddress(${type}) returned no address after ${maxAttempts} attempts`
+    );
+  }
+
+  private async hasSharedV4(appId: string): Promise<boolean> {
+    const response = await fetch('https://api.fly.io/graphql', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${config.fly.apiToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query: `query($name: String!) { app(name: $name) { sharedIpAddress } }`,
+        variables: { name: appId },
+      }),
+    });
+    if (!response.ok) {
+      return false;
+    }
+    const result = (await response.json()) as { data?: { app?: { sharedIpAddress?: string | null } } };
+    return !!result.data?.app?.sharedIpAddress;
   }
 
   async destroyApp(appId: string): Promise<void> {
