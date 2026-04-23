@@ -16,6 +16,12 @@ export const createS3AccessKeyRequestSchema = z.object({
   description: z.string().max(200).optional(),
 });
 
+export const s3GatewayConfigSchema = z.object({
+  endpoint: z.string(),
+  region: z.string(),
+});
+
 export type S3AccessKeySchema = z.infer<typeof s3AccessKeySchema>;
 export type S3AccessKeyWithSecretSchema = z.infer<typeof s3AccessKeyWithSecretSchema>;
 export type CreateS3AccessKeyRequest = z.infer<typeof createS3AccessKeyRequestSchema>;
+export type S3GatewayConfigSchema = z.infer<typeof s3GatewayConfigSchema>;

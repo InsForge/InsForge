@@ -3,10 +3,21 @@ import type {
   S3AccessKeySchema,
   S3AccessKeyWithSecretSchema,
   CreateS3AccessKeyRequest,
+  S3GatewayConfigSchema,
 } from '@insforge/shared-schemas';
 
 /** Client-side service for managing project-scoped S3 access keys. */
 export class S3AccessKeyService {
+  /**
+   * Fetch the S3 gateway's externally-reachable endpoint and signing region.
+   * Both are server-side config (VITE_API_BASE_URL + /storage/v1/s3 and
+   * S3_SIGNING_REGION respectively) — the UI displays whatever the backend
+   * returns, no client-side assembly.
+   */
+  async getGatewayConfig(): Promise<S3GatewayConfigSchema> {
+    return apiClient.request('/storage/s3/config');
+  }
+
   /** List every access key for this project (no plaintext secrets). */
   async list(): Promise<S3AccessKeySchema[]> {
     return apiClient.request('/storage/s3/access-keys');

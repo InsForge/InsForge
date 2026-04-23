@@ -1,13 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { KeyRound, Trash2 } from 'lucide-react';
 import { Button, ConfirmDialog, CopyButton, Input } from '@insforge/ui';
 import type { S3AccessKeySchema } from '@insforge/shared-schemas';
-import { useS3AccessKeys } from '../hooks/useS3AccessKeys';
-import { getDashboardBackendUrl } from '../../../lib/config/runtime';
+import { useS3AccessKeys, useS3GatewayConfig } from '../hooks/useS3AccessKeys';
 import { S3AccessKeyCreateDialog } from './S3AccessKeyCreateDialog';
-
-/** S3-protocol signing region. Matches the server default (S3_SIGNING_REGION env var). */
-const S3_SIGNING_REGION = 'us-east-2';
 
 /** Formats an ISO timestamp as "N minutes/hours/days ago", or "—" when null. */
 function formatRelative(iso: string | null): string {
@@ -69,13 +65,12 @@ function Section({ title, description, children }: SectionProps) {
 export function S3SettingsPanel() {
   const { keys, isLoading, error, createAccessKey, isCreating, deleteAccessKey, isDeleting } =
     useS3AccessKeys();
+  const gatewayConfigQuery = useS3GatewayConfig();
+  const endpoint = gatewayConfigQuery.data?.endpoint ?? '';
+  const region = gatewayConfigQuery.data?.region ?? '';
+
   const [createOpen, setCreateOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<S3AccessKeySchema | null>(null);
-
-  const endpoint = useMemo(() => {
-    const base = getDashboardBackendUrl();
-    return `${base}/storage/v1/s3`;
-  }, []);
 
   return (
     <div className="flex flex-col gap-8 p-6">
@@ -85,7 +80,7 @@ export function S3SettingsPanel() {
       >
         <div className="flex items-center gap-2">
           <Input readOnly value={endpoint} className="font-mono text-sm" />
-          <CopyButton text={endpoint} showText={false} />
+          <CopyButton text={endpoint} showText={false} disabled={!endpoint} />
         </div>
       </Section>
 
@@ -94,8 +89,8 @@ export function S3SettingsPanel() {
         description="SigV4 signing region expected by the gateway. Clients must sign with this exact value (configurable server-side via S3_SIGNING_REGION)."
       >
         <div className="flex items-center gap-2">
-          <Input readOnly value={S3_SIGNING_REGION} className="w-48 font-mono text-sm" />
-          <CopyButton text={S3_SIGNING_REGION} showText={false} />
+          <Input readOnly value={region} className="w-48 font-mono text-sm" />
+          <CopyButton text={region} showText={false} disabled={!region} />
         </div>
       </Section>
 
