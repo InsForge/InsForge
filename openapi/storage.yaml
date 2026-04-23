@@ -738,7 +738,7 @@ paths:
         Return the externally-reachable endpoint URL and the SigV4 signing
         region for the S3 protocol gateway. The endpoint is assembled from
         the server's `VITE_API_BASE_URL` env var plus `/storage/v1/s3`, and
-        the region is `S3_SIGNING_REGION` (default `us-east-2`).
+        the region is `AWS_REGION` (default `us-east-2`).
 
         Intended for Dashboard display so the UI doesn't make any
         backend-topology assumptions client-side.
@@ -916,7 +916,7 @@ paths:
       from any SigV4 client (AWS SDKs, `aws` CLI, `rclone`, Terraform, etc.)
       against this endpoint. Only path-style URLs are supported; SDKs must
       be configured with `forcePathStyle: true` and the signing region
-      `us-east-2` (or the value of `S3_SIGNING_REGION` on this backend).
+      `us-east-2` (or the value of `AWS_REGION` on this backend).
 
       Supported operations: ListBuckets, CreateBucket, DeleteBucket,
       HeadBucket, ListObjectsV2, PutObject (streaming + UNSIGNED +
@@ -1022,7 +1022,7 @@ components:
       description: |
         AWS SigV4 authentication using S3 access keys minted by
         `POST /api/storage/s3/access-keys`. Region must match the server's
-        `S3_SIGNING_REGION` (default `us-east-2`); service scope must be `s3`.
+        `AWS_REGION` (default `us-east-2`); service scope must be `s3`.
 
   schemas:
     StoredFile:

@@ -36,7 +36,7 @@ InsForge today exposes only a REST API for storage. Developers who want to migra
 
 - External endpoint: `https://{appkey}.{region}.insforge.app/storage/v1/s3`
 - SDK configuration: `{ endpoint, region: 'us-east-2', forcePathStyle: true, credentials }`
-- Signature region defaults to `us-east-2` to match the region our `S3StorageProvider` uses by default (see `s3.provider.ts`), so requests forwarded to the underlying S3 don't need a separate region translation step. The validated region is **configurable** via the `S3_SIGNING_REGION` env var for deployments whose backing bucket lives elsewhere; clients must sign with whichever value the server is configured to accept.
+- Signature region defaults to `us-east-2` to match the region our `S3StorageProvider` uses by default (see `s3.provider.ts`), so requests forwarded to the underlying S3 don't need a separate region translation step. The validated region comes from `AWS_REGION` — the same env var the S3 provider already reads — so clients sign with the same region the backing bucket lives in, and the Dashboard's S3 Config page (`GET /api/storage/s3/config`) surfaces exactly what the middleware will accept.
 - Mount path is `/storage/v1/s3` with **no `/api` prefix**. The `/api` prefix would force clients to configure `endpoint=<host>/api`, breaking S3 tooling conventions.
 
 ### Request Lifecycle

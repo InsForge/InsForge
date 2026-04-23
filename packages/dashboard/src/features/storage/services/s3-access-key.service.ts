@@ -11,7 +11,7 @@ export class S3AccessKeyService {
   /**
    * Fetch the S3 gateway's externally-reachable endpoint and signing region.
    * Both are server-side config (VITE_API_BASE_URL + /storage/v1/s3 and
-   * S3_SIGNING_REGION respectively) — the UI displays whatever the backend
+   * AWS_REGION respectively) — the UI displays whatever the backend
    * returns, no client-side assembly.
    */
   async getGatewayConfig(): Promise<S3GatewayConfigSchema> {
