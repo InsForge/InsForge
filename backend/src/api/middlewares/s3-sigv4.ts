@@ -7,12 +7,12 @@ import logger from '@/utils/logger.js';
 
 /**
  * Region used to validate the `Credential=<ak>/<date>/<region>/s3/aws4_request`
- * scope in incoming Authorization headers. Default matches S3StorageProvider's
- * default AWS_REGION so forwarded S3 calls don't need a separate region
- * translation. Override via S3_SIGNING_REGION if this backend runs against a
- * bucket in a different region.
+ * scope in incoming Authorization headers. Shares `AWS_REGION` with
+ * S3StorageProvider so clients sign with the same region the backing bucket
+ * lives in (and so `GET /api/storage/s3/config` surfaces exactly what the
+ * middleware will accept). Defaults to `us-east-2`.
  */
-const SIGNING_REGION = process.env.S3_SIGNING_REGION || 'us-east-2';
+const SIGNING_REGION = process.env.AWS_REGION || 'us-east-2';
 const MAX_CLOCK_SKEW_MS = 15 * 60 * 1000;
 
 /**

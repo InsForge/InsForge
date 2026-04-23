@@ -247,7 +247,7 @@ Common codes you may see: `SignatureDoesNotMatch`, `InvalidAccessKeyId`,
 <AccordionGroup>
   <Accordion title="SignatureDoesNotMatch">
     Most commonly caused by one of:
-    - Wrong region in the client — it must match the server's `S3_SIGNING_REGION` (shown in the Dashboard).
+    - Wrong region in the client — it must match the server's `AWS_REGION` (shown in the Dashboard).
     - Clock skew on the client. SigV4 signatures expire after 15 minutes; check `date -u` matches wall clock.
     - Using virtual-hosted-style URLs. Set `forcePathStyle: true` (SDK) or `s3.addressing_style = path` (aws-cli / boto3).
     - A proxy that rewrites or strips headers in the `SignedHeaders` list.

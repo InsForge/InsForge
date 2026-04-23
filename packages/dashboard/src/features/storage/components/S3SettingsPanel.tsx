@@ -86,7 +86,7 @@ export function S3SettingsPanel() {
 
       <Section
         title="Region"
-        description="SigV4 signing region expected by the gateway. Clients must sign with this exact value (configurable server-side via S3_SIGNING_REGION)."
+        description="SigV4 signing region expected by the gateway. Clients must sign with this exact value (configurable server-side via AWS_REGION)."
       >
         <div className="flex items-center gap-2">
           <Input readOnly value={region} className="w-48 font-mono text-sm" />
