@@ -112,6 +112,17 @@ export const authConfigSchema = z.object({
   updatedAt: z.string(), // PostgreSQL timestamp
 });
 
+// Resend configuration schema
+export const resendConfigSchema = z.object({
+  id: z.string().uuid(),
+  enabled: z.boolean(),
+  hasApiKey: z.boolean(),
+  senderEmail: z.string(),
+  senderName: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
 // SMTP configuration schema
 export const smtpConfigSchema = z.object({
   id: z.string().uuid(),
@@ -189,5 +200,6 @@ export const customOAuthConfigSchema = z.object({
 
 export type CustomOAuthKeySchema = z.infer<typeof customOAuthKeySchema>;
 export type CustomOAuthConfigSchema = z.infer<typeof customOAuthConfigSchema>;
+export type ResendConfigSchema = z.infer<typeof resendConfigSchema>;
 export type SmtpConfigSchema = z.infer<typeof smtpConfigSchema>;
 export type EmailTemplateSchema = z.infer<typeof emailTemplateSchema>;
