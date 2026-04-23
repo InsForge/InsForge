@@ -14,6 +14,7 @@ import {
   DTestViewProvider,
   useDTestView,
 } from '../features/dashboard/components/dtest/DTestViewContext';
+import { DTestConnectTip } from '../features/dashboard/components/dtest/DTestConnectTip';
 
 const CONNECT_DIALOG_MESSAGE_TYPES = new Set(['SHOW_ONBOARDING_OVERLAY', 'SHOW_CONNECT_OVERLAY']);
 
@@ -109,6 +110,7 @@ export default function AppLayout({ children }: LayoutProps) {
       <ConnectDialogProvider value={openConnectDialog}>
         <DTestViewProvider>
           <ConnectOverlayBridge hostMode={host.mode} onOpenDialog={openConnectDialog} />
+          <DTestConnectTip />
           <div
             className={cn(
               'min-h-0 min-w-0 bg-semantic-0 flex flex-col',
