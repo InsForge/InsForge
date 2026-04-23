@@ -93,18 +93,21 @@ function makeNetwork(projectId: string): string {
 }
 
 export function selectComputeProvider(): ComputeProvider {
-  if (config.fly.enabled && config.fly.apiToken) {
-    return FlyProvider.getInstance();
-  }
-  if (config.cloud.computeEnabled) {
-    return CloudComputeProvider.getInstance();
-  }
+  // Self-host takes precedence: if FLY_API_TOKEN is set, the user has their own
+  // Fly account and wants direct control. Otherwise fall through to cloud-proxy
+  // (PROJECT_ID + CLOUD_API_HOST + JWT_SECRET all present).
+  const fly = FlyProvider.getInstance();
+  if (fly.isConfigured()) return fly;
+
+  const cloud = CloudComputeProvider.getInstance();
+  if (cloud.isConfigured()) return cloud;
+
   throw new AppError(
-    'Compute services not configured. Set FLY_API_TOKEN for self-host, ' +
-      'or enable CLOUD_COMPUTE_ENABLED to use cloud-managed compute.',
+    'Compute services not configured.',
     503,
     ERROR_CODES.COMPUTE_NOT_CONFIGURED,
-    'Self-hosted: set FLY_API_TOKEN in .env. Cloud: set CLOUD_COMPUTE_ENABLED=true and verify PROJECT_ID is set.'
+    'Self-hosted: set COMPUTE_SERVICES_ENABLED=true and FLY_API_TOKEN in .env. ' +
+      'Cloud: ensure PROJECT_ID, CLOUD_API_HOST, and JWT_SECRET are set (provisioned by insforge-cloud).'
   );
 }
 
