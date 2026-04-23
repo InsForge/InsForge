@@ -3,6 +3,7 @@ import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from './error.js';
 import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
+import { AIAccessConfigService } from '@/services/ai/ai-access-config.service.js';
 import { RoleSchema } from '@insforge/shared-schemas';
 
 export interface AuthRequest extends Request {
@@ -240,4 +241,48 @@ export async function verifyCloudBackend(req: AuthRequest, _res: Response, next:
       );
     }
   }
+}
+
+/**
+ * Gates anon-role JWTs against the `allow_anon_ai_access` flag.
+ * The `ik_` service-role key is admin-equivalent and always passes.
+ * Authenticated JWTs pass unchanged. Apply before verifyUser on AI routes.
+ */
+export async function checkAnonJwtAccess(req: AuthRequest, _res: Response, next: NextFunction) {
+  // ik_ is service-role (admin-equivalent) — always allowed on AI endpoints.
+  if (extractApiKey(req)) {
+    return next();
+  }
+
+  const token = extractBearerToken(req.headers.authorization);
+  if (!token) {
+    return next();
+  }
+
+  let isAnon = false;
+  try {
+    isAnon = tokenManager.verifyToken(token).role === 'anon';
+  } catch {
+    return next(); // malformed — let verifyUser produce the 401
+  }
+  if (!isAnon) {
+    return next();
+  }
+
+  try {
+    const allowed = await AIAccessConfigService.getInstance().isAnonAiAccessAllowed();
+    if (!allowed) {
+      return next(
+        new AppError(
+          'Anonymous access to AI endpoints is disabled for this project',
+          403,
+          ERROR_CODES.AUTH_UNAUTHORIZED,
+          NEXT_ACTION.CHECK_TOKEN
+        )
+      );
+    }
+  } catch (error) {
+    return next(error);
+  }
+  next();
 }
