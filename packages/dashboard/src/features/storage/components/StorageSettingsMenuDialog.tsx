@@ -1,7 +1,7 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Settings } from 'lucide-react';
+import { Cloud, Settings } from 'lucide-react';
 import {
   Button,
   Input,
@@ -26,6 +26,9 @@ import {
   type UpdateStorageConfigRequest,
 } from '@insforge/shared-schemas';
 import { useStorageConfig } from '../hooks/useStorageConfig';
+import { S3SettingsPanel } from './S3SettingsPanel';
+
+type StorageSettingsTab = 'general' | 's3';
 
 /** Props for the StorageSettingsMenuDialog component. */
 interface StorageSettingsMenuDialogProps {
@@ -71,9 +74,10 @@ function SettingRow({ label, description, children }: SettingRowProps) {
   );
 }
 
-/** Admin dialog for viewing and editing the storage configuration (max upload size). */
+/** Admin dialog for viewing and editing the storage configuration. */
 export function StorageSettingsMenuDialog({ open, onOpenChange }: StorageSettingsMenuDialogProps) {
   const { config, isLoading, error, isUpdating, updateConfig } = useStorageConfig();
+  const [activeTab, setActiveTab] = useState<StorageSettingsTab>('general');
 
   const form = useForm<UpdateStorageConfigRequest>({
     resolver: zodResolver(updateStorageConfigRequestSchema),
@@ -87,6 +91,7 @@ export function StorageSettingsMenuDialog({ open, onOpenChange }: StorageSetting
   useEffect(() => {
     if (open) {
       resetForm();
+      setActiveTab('general');
     }
   }, [open, resetForm]);
 
@@ -109,6 +114,8 @@ export function StorageSettingsMenuDialog({ open, onOpenChange }: StorageSetting
 
   const saveDisabled = !form.formState.isDirty || isUpdating;
 
+  const title = activeTab === 's3' ? 'S3 Compatible API' : 'General';
+
   return (
     <MenuDialog open={open} onOpenChange={handleOpenChange}>
       <MenuDialogContent>
@@ -120,10 +127,17 @@ export function StorageSettingsMenuDialog({ open, onOpenChange }: StorageSetting
             <MenuDialogNavList>
               <MenuDialogNavItem
                 icon={<Settings className="h-5 w-5" />}
-                active={true}
-                onClick={() => {}}
+                active={activeTab === 'general'}
+                onClick={() => setActiveTab('general')}
               >
                 General
+              </MenuDialogNavItem>
+              <MenuDialogNavItem
+                icon={<Cloud className="h-5 w-5" />}
+                active={activeTab === 's3'}
+                onClick={() => setActiveTab('s3')}
+              >
+                S3 Compatible API
               </MenuDialogNavItem>
             </MenuDialogNavList>
           </MenuDialogNav>
@@ -131,11 +145,15 @@ export function StorageSettingsMenuDialog({ open, onOpenChange }: StorageSetting
 
         <MenuDialogMain>
           <MenuDialogHeader>
-            <MenuDialogTitle>General</MenuDialogTitle>
+            <MenuDialogTitle>{title}</MenuDialogTitle>
             <MenuDialogCloseButton className="ml-auto" />
           </MenuDialogHeader>
 
-          {isLoading ? (
+          {activeTab === 's3' ? (
+            <MenuDialogBody>
+              <S3SettingsPanel />
+            </MenuDialogBody>
+          ) : isLoading ? (
             <MenuDialogBody>
               <div className="flex h-full min-h-[120px] items-center justify-center text-sm text-muted-foreground">
                 Loading configuration...
