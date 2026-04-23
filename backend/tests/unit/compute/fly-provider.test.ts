@@ -22,7 +22,10 @@ const FLY_GRAPHQL_ENDPOINT = 'https://api.fly.io/graphql';
 
 const graphqlOkResponse = () => ({
   ok: true,
-  json: () => Promise.resolve({ data: { allocateIpAddress: { ipAddress: {} } } }),
+  json: () =>
+    Promise.resolve({
+      data: { allocateIpAddress: { ipAddress: { address: '66.241.125.89', type: 'v4' } } },
+    }),
 });
 
 describe('FlyProvider', () => {
@@ -191,7 +194,7 @@ describe('FlyProvider', () => {
   });
 
   describe('destroyMachine', () => {
-    it('calls DELETE to machine endpoint with force=true', async () => {
+    it('calls DELETE to machine endpoint', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
         text: () => Promise.resolve(''),
