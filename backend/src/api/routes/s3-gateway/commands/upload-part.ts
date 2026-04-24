@@ -26,6 +26,39 @@ class ByteLimitStream extends Transform {
   }
 }
 
+/**
+ * Coalesce small writes from our aws-chunked parser into ≥64 KiB buffers so
+ * the AWS SDK forwards valid SigV4 streaming chunks to the backing bucket
+ * (S3 rejects non-final chunks <8 KiB).
+ */
+class MinChunkSizeStream extends Transform {
+  private pending: Buffer[] = [];
+  private pendingLen = 0;
+  constructor(private readonly minBytes: number) {
+    super();
+  }
+  _transform(chunk: Buffer, _enc: BufferEncoding, cb: TransformCallback): void {
+    this.pending.push(chunk);
+    this.pendingLen += chunk.length;
+    if (this.pendingLen >= this.minBytes) {
+      this.push(Buffer.concat(this.pending, this.pendingLen));
+      this.pending = [];
+      this.pendingLen = 0;
+    }
+    cb();
+  }
+  _flush(cb: TransformCallback): void {
+    if (this.pendingLen > 0) {
+      this.push(Buffer.concat(this.pending, this.pendingLen));
+      this.pending = [];
+      this.pendingLen = 0;
+    }
+    cb();
+  }
+}
+
+const MIN_UPSTREAM_CHUNK_BYTES = 64 * 1024;
+
 function parseDecodedLength(raw: unknown): number | null {
   if (typeof raw !== 'string') {
     return null;
@@ -102,13 +135,15 @@ export async function handle(req: S3AuthenticatedRequest, res: Response): Promis
       acceptTrailer: isSignedStreamTrailer,
     });
     const limiter = new ByteLimitStream(MAX_PART_BYTES);
-    req.pipe(parser).pipe(limiter);
-    body = limiter;
+    const coalesce = new MinChunkSizeStream(MIN_UPSTREAM_CHUNK_BYTES);
+    req.pipe(parser).pipe(limiter).pipe(coalesce);
+    body = coalesce;
   } else if (isUnsignedStreamTrailer) {
     const parser = new AwsChunkedPayloadParser();
     const limiter = new ByteLimitStream(MAX_PART_BYTES);
-    req.pipe(parser).pipe(limiter);
-    body = limiter;
+    const coalesce = new MinChunkSizeStream(MIN_UPSTREAM_CHUNK_BYTES);
+    req.pipe(parser).pipe(limiter).pipe(coalesce);
+    body = coalesce;
   }
 
   const { etag } = await StorageService.getInstance()

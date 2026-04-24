@@ -172,5 +172,63 @@ echo B > "$WORK_DIR/dir/b/y.txt"
 diff -r "$WORK_DIR/dir" "$WORK_DIR/dir-back"
 ok "sync"
 
+# Modern aws-cli (≥2.30) turns on default integrity protections, which sends
+# PutObject / UploadPart bodies in aws-chunked framing with
+# x-amz-content-sha256: STREAMING-UNSIGNED-PAYLOAD-TRAILER. The 20 MiB `aws
+# s3 cp` upload below auto-splits into multipart parts, each one going
+# through the UploadPart path in that same format. If this test regresses
+# with "Body hash mismatch" or "Only the last chunk is allowed…", the
+# gateway has stopped handling that payload-hash variant.
+log "aws s3 cp multipart round-trip (exercises UNSIGNED-PAYLOAD-TRAILER UploadPart)"
+dd if=/dev/urandom of="$WORK_DIR/multi.bin" bs=1M count=20 status=none
+"${AWSCMD[@]}" s3 cp "$WORK_DIR/multi.bin" "s3://$BUCKET/multi.bin"
+"${AWSCMD[@]}" s3 cp "s3://$BUCKET/multi.bin" "$WORK_DIR/multi.out"
+diff "$WORK_DIR/multi.bin" "$WORK_DIR/multi.out"
+MULTI_ETAG=$("${AWSCMD[@]}" s3api head-object --bucket "$BUCKET" --key multi.bin | jq -r '.ETag')
+case "$MULTI_ETAG" in
+  *-*\") ok "aws-cli multipart round-trip (ETag=$MULTI_ETAG)" ;;
+  *) printf "ETag %s is not multipart-style; aws-cli didn't exercise UploadPart\n" "$MULTI_ETAG" >&2; exit 1 ;;
+esac
+
+# Force STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER via the JS SDK. The
+# aws-cli path above covers UNSIGNED-PAYLOAD-TRAILER; the signed-trailer
+# variant is what clients pick when they enable default integrity *and*
+# keep per-chunk signing (the AWS SDK for JavaScript does this when you
+# set requestChecksumCalculation=WHEN_SUPPORTED and don't opt into
+# unsigned streaming).
+if command -v node >/dev/null 2>&1; then
+  log "JS SDK v3 upload with signed-trailer (STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER)"
+  NODE_SCRIPT="$WORK_DIR/signed-trailer.mjs"
+  cat > "$NODE_SCRIPT" <<'JS'
+import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+const [endpoint, bucket, ak, sk] = process.argv.slice(2);
+const client = new S3Client({
+  endpoint,
+  region: 'us-east-2',
+  forcePathStyle: true,
+  credentials: { accessKeyId: ak, secretAccessKey: sk },
+  // WHEN_SUPPORTED triggers trailing checksums; request signing is on by
+  // default, so the body flows as STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER.
+  requestChecksumCalculation: 'WHEN_SUPPORTED',
+});
+const payload = Buffer.alloc(500_000, 0x41); // 500 KiB > 64 KiB → multi-chunk
+await client.send(new PutObjectCommand({
+  Bucket: bucket, Key: 'signed-trailer.bin',
+  Body: payload, ContentType: 'application/octet-stream',
+}));
+const got = await client.send(new GetObjectCommand({ Bucket: bucket, Key: 'signed-trailer.bin' }));
+const chunks = [];
+for await (const c of got.Body) chunks.push(c);
+const back = Buffer.concat(chunks);
+if (!back.equals(payload)) { console.error('round-trip mismatch'); process.exit(1); }
+console.log('OK ' + back.length + ' bytes round-tripped');
+JS
+  (cd "$WORK_DIR" && npm init -y >/dev/null 2>&1 && npm install --silent --no-audit --no-fund @aws-sdk/client-s3 >/dev/null 2>&1)
+  node "$NODE_SCRIPT" "$GATEWAY_URL" "$BUCKET" "$AK" "$SK"
+  ok "JS SDK signed-trailer round-trip"
+else
+  warn "node not installed — skipping signed-trailer test"
+fi
+
 printf "\n\033[1;32mAll S3 gateway smoke checks passed.\033[0m\n"
 # cleanup() via trap handles access-key revocation and bucket teardown.

@@ -42,6 +42,43 @@ class ByteLimitStream extends Transform {
 }
 
 /**
+ * Transform that accumulates small writes into larger ones before emitting.
+ * Needed between our aws-chunked parsers and the AWS SDK client we forward
+ * to: the SDK turns every `data` event from the input stream into a single
+ * SigV4 streaming chunk, and real S3 / MinIO reject non-final chunks
+ * smaller than 8 KiB. Our parsers emit whatever slice of a chunk happens
+ * to have arrived on the wire, which after TCP fragmentation is often
+ * <8 KiB. Buffering to 64 KiB guarantees well-sized upstream chunks.
+ */
+class MinChunkSizeStream extends Transform {
+  private pending: Buffer[] = [];
+  private pendingLen = 0;
+  constructor(private readonly minBytes: number) {
+    super();
+  }
+  _transform(chunk: Buffer, _enc: BufferEncoding, cb: TransformCallback): void {
+    this.pending.push(chunk);
+    this.pendingLen += chunk.length;
+    if (this.pendingLen >= this.minBytes) {
+      this.push(Buffer.concat(this.pending, this.pendingLen));
+      this.pending = [];
+      this.pendingLen = 0;
+    }
+    cb();
+  }
+  _flush(cb: TransformCallback): void {
+    if (this.pendingLen > 0) {
+      this.push(Buffer.concat(this.pending, this.pendingLen));
+      this.pending = [];
+      this.pendingLen = 0;
+    }
+    cb();
+  }
+}
+
+const MIN_UPSTREAM_CHUNK_BYTES = 64 * 1024;
+
+/**
  * Parse the decoded payload length from a STREAMING-* request.
  * `x-amz-decoded-content-length` is the authoritative payload size (bytes
  * after chunk-framing is stripped). An explicit "0" is a valid length, not
@@ -108,10 +145,13 @@ export async function handle(req: S3AuthenticatedRequest, res: Response): Promis
       acceptTrailer: isSignedStreamTrailer,
     });
     // Pipe chunk-verified output through a byte-limit transform so a client
-    // lying about x-amz-decoded-content-length can't stream past the cap.
+    // lying about x-amz-decoded-content-length can't stream past the cap;
+    // coalesce into ≥64 KiB writes so the downstream SDK can sign them as
+    // valid SigV4 streaming chunks for the backing bucket.
     const limiter = new ByteLimitStream(cap);
-    req.pipe(parser).pipe(limiter);
-    body = limiter;
+    const coalesce = new MinChunkSizeStream(MIN_UPSTREAM_CHUNK_BYTES);
+    req.pipe(parser).pipe(limiter).pipe(coalesce);
+    body = coalesce;
   } else if (isUnsignedStreamTrailer) {
     // Unsigned aws-chunked with trailing integrity checksum — the default
     // AWS CLI / SDK format once "default integrity protections" rolled out
@@ -119,8 +159,9 @@ export async function handle(req: S3AuthenticatedRequest, res: Response): Promis
     // the SigV4 header signature for request authentication.
     const parser = new AwsChunkedPayloadParser();
     const limiter = new ByteLimitStream(cap);
-    req.pipe(parser).pipe(limiter);
-    body = limiter;
+    const coalesce = new MinChunkSizeStream(MIN_UPSTREAM_CHUNK_BYTES);
+    req.pipe(parser).pipe(limiter).pipe(coalesce);
+    body = coalesce;
   } else if (payloadHash !== 'UNSIGNED-PAYLOAD') {
     // Pre-hashed body: buffer and verify SHA-256 matches the declared hash.
     // Enforce a running byte-count cap so a client can't force an unbounded
