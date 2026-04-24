@@ -253,9 +253,18 @@ export interface ChunkParserOptions {
   signingKey: Buffer;
   datetime: string;
   scope: string;
+  /**
+   * For STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER the terminator chunk is
+   * followed by trailer headers (the integrity checksum and
+   * x-amz-trailer-signature) terminated by an empty line. Set this flag to
+   * consume them. We do NOT verify the trailer signature in v1: the chunk
+   * signatures already authenticate every byte of the payload, and the
+   * trailer checksum is a transit-corruption guard.
+   */
+  acceptTrailer?: boolean;
 }
 
-type ParserState = 'HEADER' | 'DATA' | 'AFTER_DATA_CRLF' | 'DONE';
+type ParserState = 'HEADER' | 'DATA' | 'AFTER_DATA_CRLF' | 'TRAILERS' | 'DONE';
 
 /**
  * Transform stream that consumes a STREAMING-AWS4-HMAC-SHA256-PAYLOAD body,
@@ -271,12 +280,14 @@ export class ChunkSignatureV4Parser extends Transform {
   private readonly signingKey: Buffer;
   private readonly datetime: string;
   private readonly scope: string;
+  private readonly acceptTrailer: boolean;
   private buffer: Buffer = Buffer.alloc(0);
   private remainingChunkBytes = 0;
   private declaredChunkSig = '';
   private chunkHash = crypto.createHash('sha256');
   private sawTerminator = false;
   private static readonly MAX_HEADER_LEN = 256;
+  private static readonly MAX_TRAILER_LEN = 8192;
   private static readonly EMPTY_SHA256 = crypto.createHash('sha256').update('').digest('hex');
 
   constructor(opts: ChunkParserOptions) {
@@ -285,6 +296,7 @@ export class ChunkSignatureV4Parser extends Transform {
     this.signingKey = opts.signingKey;
     this.datetime = opts.datetime;
     this.scope = opts.scope;
+    this.acceptTrailer = opts.acceptTrailer === true;
   }
 
   _transform(chunk: Buffer, _enc: BufferEncoding, cb: TransformCallback): void {
@@ -334,7 +346,7 @@ export class ChunkSignatureV4Parser extends Transform {
         if (this.remainingChunkBytes === 0) {
           this.verifyHash(ChunkSignatureV4Parser.EMPTY_SHA256);
           this.sawTerminator = true;
-          this.state = 'AFTER_DATA_CRLF';
+          this.state = this.acceptTrailer ? 'TRAILERS' : 'AFTER_DATA_CRLF';
         } else {
           this.state = 'DATA';
         }
@@ -365,6 +377,22 @@ export class ChunkSignatureV4Parser extends Transform {
           return;
         }
         this.state = 'HEADER';
+      } else if (this.state === 'TRAILERS') {
+        const nlIdx = this.buffer.indexOf('\r\n');
+        if (nlIdx === -1) {
+          if (this.buffer.length > ChunkSignatureV4Parser.MAX_TRAILER_LEN) {
+            throw new Error('SignatureDoesNotMatch: trailer header too long');
+          }
+          return;
+        }
+        const line = this.buffer.slice(0, nlIdx);
+        this.buffer = this.buffer.slice(nlIdx + 2);
+        if (line.length === 0) {
+          this.state = 'DONE';
+          return;
+        }
+        // Trailer headers (integrity checksum, trailer signature) are
+        // consumed but not verified — see acceptTrailer on the options doc.
       } else {
         return;
       }
@@ -388,5 +416,117 @@ export class ChunkSignatureV4Parser extends Transform {
       throw new Error('SignatureDoesNotMatch: chunk signature invalid');
     }
     this.prevSig = sig;
+  }
+}
+
+// ============================================================================
+// Unsigned aws-chunked: STREAMING-UNSIGNED-PAYLOAD-TRAILER
+// ============================================================================
+
+type AwsChunkedState = 'HEADER' | 'DATA' | 'AFTER_DATA_CRLF' | 'TRAILERS' | 'DONE';
+
+/**
+ * Transform stream that consumes an aws-chunked body with no per-chunk
+ * signature — the format used when `x-amz-content-sha256` is
+ * `STREAMING-UNSIGNED-PAYLOAD-TRAILER`. Emits only the unwrapped payload
+ * bytes.
+ *
+ * Chunk format: `<hex-size>[;ext=...]\r\n<data>\r\n`, terminated by a
+ * `0\r\n` chunk followed by zero-or-more trailer header lines and a closing
+ * empty line. Trailers (integrity checksum such as x-amz-checksum-crc32 /
+ * -crc32c / -crc64nvme / -sha1 / -sha256) are consumed but not verified —
+ * the SigV4 header signature already authenticates request metadata, and
+ * CRC verification is a transit-corruption check we defer to v2.
+ */
+export class AwsChunkedPayloadParser extends Transform {
+  private state: AwsChunkedState = 'HEADER';
+  private buffer: Buffer = Buffer.alloc(0);
+  private remainingChunkBytes = 0;
+  private static readonly MAX_HEADER_LEN = 256;
+  private static readonly MAX_TRAILER_LEN = 8192;
+
+  _transform(chunk: Buffer, _enc: BufferEncoding, cb: TransformCallback): void {
+    try {
+      if (this.state === 'DONE') {
+        throw new Error('InvalidChunk: trailing bytes after terminator chunk');
+      }
+      this.buffer = this.buffer.length ? Buffer.concat([this.buffer, chunk]) : chunk;
+      this.pump();
+      cb();
+    } catch (err) {
+      cb(err as Error);
+    }
+  }
+
+  _flush(cb: TransformCallback): void {
+    if (this.state !== 'DONE') {
+      cb(new Error('InvalidChunk: stream ended before terminator chunk'));
+      return;
+    }
+    cb();
+  }
+
+  private pump(): void {
+    while (true) {
+      if (this.state === 'HEADER') {
+        const nlIdx = this.buffer.indexOf('\r\n');
+        if (nlIdx === -1) {
+          if (this.buffer.length > AwsChunkedPayloadParser.MAX_HEADER_LEN) {
+            throw new Error('InvalidChunk: chunk header too long');
+          }
+          return;
+        }
+        const header = this.buffer.slice(0, nlIdx).toString('ascii');
+        this.buffer = this.buffer.slice(nlIdx + 2);
+        const sizePart = header.split(';', 1)[0];
+        if (!/^[0-9a-fA-F]+$/.test(sizePart)) {
+          throw new Error('InvalidChunk: malformed chunk header');
+        }
+        const size = parseInt(sizePart, 16);
+        if (size === 0) {
+          this.state = 'TRAILERS';
+        } else {
+          this.remainingChunkBytes = size;
+          this.state = 'DATA';
+        }
+      } else if (this.state === 'DATA') {
+        if (this.buffer.length === 0) {
+          return;
+        }
+        const take = Math.min(this.buffer.length, this.remainingChunkBytes);
+        this.push(this.buffer.slice(0, take));
+        this.buffer = this.buffer.slice(take);
+        this.remainingChunkBytes -= take;
+        if (this.remainingChunkBytes === 0) {
+          this.state = 'AFTER_DATA_CRLF';
+        }
+      } else if (this.state === 'AFTER_DATA_CRLF') {
+        if (this.buffer.length < 2) {
+          return;
+        }
+        if (this.buffer[0] !== 0x0d || this.buffer[1] !== 0x0a) {
+          throw new Error('InvalidChunk: missing CRLF after chunk data');
+        }
+        this.buffer = this.buffer.slice(2);
+        this.state = 'HEADER';
+      } else if (this.state === 'TRAILERS') {
+        const nlIdx = this.buffer.indexOf('\r\n');
+        if (nlIdx === -1) {
+          if (this.buffer.length > AwsChunkedPayloadParser.MAX_TRAILER_LEN) {
+            throw new Error('InvalidChunk: trailer header too long');
+          }
+          return;
+        }
+        const line = this.buffer.slice(0, nlIdx);
+        this.buffer = this.buffer.slice(nlIdx + 2);
+        if (line.length === 0) {
+          this.state = 'DONE';
+          return;
+        }
+        // Discard trailer header line (e.g. x-amz-checksum-crc64nvme).
+      } else {
+        return;
+      }
+    }
   }
 }

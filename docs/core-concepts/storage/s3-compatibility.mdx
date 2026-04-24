@@ -184,9 +184,14 @@ The gateway implements the operations needed by common workloads:
 | Multipart | `CreateMultipartUpload`, `UploadPart`, `CompleteMultipartUpload`, `AbortMultipartUpload`, `ListParts` |
 | Probe stubs | `GetBucketLocation`, `GetBucketVersioning` (for SDK startup checks) |
 
-Streaming uploads (`STREAMING-AWS4-HMAC-SHA256-PAYLOAD`) are fully
-supported, so `aws s3 cp` with large files and `aws s3 sync` work without
-any client-side configuration changes.
+Streaming uploads are fully supported: both the classic
+`STREAMING-AWS4-HMAC-SHA256-PAYLOAD` format and the newer
+`STREAMING-UNSIGNED-PAYLOAD-TRAILER` /
+`STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER` formats produced by AWS SDKs
+with "default integrity protections" enabled. So `aws s3 cp` with large
+files and `aws s3 sync` work without any client-side configuration
+changes. Trailing CRC32 / CRC32C / CRC64NVME / SHA1 / SHA256 checksums
+sent by the client are accepted but not re-verified by the gateway.
 
 ### Not supported
 
