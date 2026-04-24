@@ -144,9 +144,7 @@ describe('ChunkSignatureV4Parser', () => {
     const withoutFinalCrlf = body.slice(0, body.length - 2);
     const trailered = Buffer.concat([
       withoutFinalCrlf,
-      Buffer.from(
-        'x-amz-checksum-crc64nvme:abc123==\r\nx-amz-trailer-signature:deadbeef\r\n\r\n'
-      ),
+      Buffer.from('x-amz-checksum-crc64nvme:abc123==\r\nx-amz-trailer-signature:deadbeef\r\n\r\n'),
     ]);
 
     const parser = new ChunkSignatureV4Parser({
@@ -181,9 +179,11 @@ describe('AwsChunkedPayloadParser', () => {
 
   it('emits unwrapped payload bytes in order', async () => {
     const payload = Buffer.from('hello chunked '.repeat(800));
-    const body = makeUnsignedChunked(payload, [1000, 1000, payload.length - 2000], [
-      'x-amz-checksum-crc64nvme:qUYH90IMgHs=',
-    ]);
+    const body = makeUnsignedChunked(
+      payload,
+      [1000, 1000, payload.length - 2000],
+      ['x-amz-checksum-crc64nvme:qUYH90IMgHs=']
+    );
 
     const parser = new AwsChunkedPayloadParser();
     Readable.from([body]).pipe(parser);
@@ -192,9 +192,7 @@ describe('AwsChunkedPayloadParser', () => {
   });
 
   it('handles a zero-length payload with only the terminator chunk', async () => {
-    const body = makeUnsignedChunked(Buffer.alloc(0), [], [
-      'x-amz-checksum-crc64nvme:abc==',
-    ]);
+    const body = makeUnsignedChunked(Buffer.alloc(0), [], ['x-amz-checksum-crc64nvme:abc==']);
 
     const parser = new AwsChunkedPayloadParser();
     Readable.from([body]).pipe(parser);
@@ -214,9 +212,7 @@ describe('AwsChunkedPayloadParser', () => {
 
   it('handles single-byte-at-a-time feeding', async () => {
     const payload = Buffer.from('byte-by-byte');
-    const body = makeUnsignedChunked(payload, [payload.length], [
-      'x-amz-checksum-crc32:abcd',
-    ]);
+    const body = makeUnsignedChunked(payload, [payload.length], ['x-amz-checksum-crc32:abcd']);
     const byByte = Array.from({ length: body.length }, (_, i) => body.slice(i, i + 1));
 
     const parser = new AwsChunkedPayloadParser();
