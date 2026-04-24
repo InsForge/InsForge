@@ -3,9 +3,10 @@ import { useLocation } from 'react-router-dom';
 import AppSidebar from './AppSidebar';
 import AppHeader from './AppHeader';
 import { ThemeProvider } from '../lib/contexts/ThemeContext';
-import { useDashboardHost } from '../lib/config/DashboardHostContext';
 import { ConnectDialog } from '../features/dashboard/components/connect';
 import { ConnectDialogV2 } from '../features/dashboard/components/connect/ConnectDialogV2';
+import { ProjectRestoringPage } from '../features/dashboard/components/ProjectRestoringPage';
+import { useDashboardHost, useDashboardProject } from '../lib/config/DashboardHostContext';
 import { cn } from '../lib/utils/utils';
 import { ConnectDialogProvider } from './ConnectDialogContext';
 import { getFeatureFlag } from '../lib/analytics/posthog';
@@ -26,10 +27,12 @@ interface LayoutProps {
 
 export default function AppLayout({ children }: LayoutProps) {
   const host = useDashboardHost();
+  const project = useDashboardProject();
   const location = useLocation();
   const isContainedHostLayout = host.mode === 'cloud-hosting';
   const showNavbar = host.showNavbar ?? true;
   const forcedTheme = host.mode === 'cloud-hosting' ? 'dark' : undefined;
+  const showProjectRestoringPage = host.mode === 'cloud-hosting' && project?.status === 'restoring';
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isConnectDialogOpen, setIsConnectDialogOpen] = useState(false);
   const currentRoute = `${location.pathname}${location.search}${location.hash}`;
@@ -93,11 +96,11 @@ export default function AppLayout({ children }: LayoutProps) {
           <div className="min-h-0 min-w-0 flex flex-1 overflow-hidden">
             <AppSidebar isCollapsed={isSidebarCollapsed} onToggleCollapse={toggleSidebar} />
             <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
-              {children}
+              {showProjectRestoringPage ? <ProjectRestoringPage /> : children}
             </main>
           </div>
         </div>
-        {getFeatureFlag('dashboard-v2-experiment') === 'test' ? (
+        {getFeatureFlag('dashboard-v3-experiment') === 'c_test' ? (
           <ConnectDialogV2 open={isConnectDialogOpen} onOpenChange={setIsConnectDialogOpen} />
         ) : (
           <ConnectDialog open={isConnectDialogOpen} onOpenChange={setIsConnectDialogOpen} />

@@ -8,10 +8,11 @@ import {
   DeploymentResult,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
-import { DatabaseError, Pool } from 'pg';
+import { Pool } from 'pg';
 import fetch from 'node-fetch';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
+import { hasPgErrorCode } from '@/utils/errors.js';
 import { DenoSubhostingProvider } from '@/providers/functions/deno-subhosting.provider.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 
@@ -185,7 +186,7 @@ export class FunctionService {
         operation: 'createFunction',
       });
 
-      if (error instanceof DatabaseError && error.code === '23505') {
+      if (hasPgErrorCode(error, '23505')) {
         throw new AppError(
           'Function with this slug already exists',
           409,

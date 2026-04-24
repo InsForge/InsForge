@@ -45,7 +45,16 @@ export enum DataUpdateResourceType {
 }
 
 export interface DatabaseResourceUpdate {
-  type: 'tables' | 'table' | 'records' | 'index' | 'trigger' | 'policy' | 'function' | 'extension';
+  type:
+    | 'tables'
+    | 'table'
+    | 'records'
+    | 'index'
+    | 'trigger'
+    | 'policy'
+    | 'function'
+    | 'extension'
+    | 'migration';
   name?: string;
 }
 
@@ -222,7 +231,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
     (toolName: string) => {
       if (mcpUsageCount === 1) {
         trackPostHog('onboarding_completed', {
-          experiment_variant: getFeatureFlag('dashboard-v2-experiment'),
+          experiment_variant: getFeatureFlag('dashboard-v3-experiment'),
           tool_name: toolName,
         });
       }
@@ -286,6 +295,9 @@ export function SocketProvider({ children }: SocketProviderProps) {
                 break;
               case 'extension':
                 // Extensions are not supported yet
+                break;
+              case 'migration':
+                void queryClient.invalidateQueries({ queryKey: ['database', 'migrations'] });
                 break;
             }
           }

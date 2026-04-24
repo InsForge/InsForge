@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { StorageFileSchema } from '@insforge/shared-schemas';
 import { cn, formatTime } from '../../../lib/utils/utils';
-import { useStorage } from '../hooks/useStorage';
+import { useStorageObjects } from '../hooks/useStorageObjects';
 import { FilePreviewDialog } from './FilePreviewDialog';
 import { useConfirm } from '../../../lib/hooks/useConfirm';
 import { useToast } from '../../../lib/hooks/useToast';
@@ -313,7 +313,7 @@ export function StorageDataGrid({
     setCurrentPage(1);
   }, [searchQuery, bucketName]);
 
-  const { useListObjects, deleteObjects, downloadObject } = useStorage();
+  const { useListObjects, deleteObjects, downloadObject } = useStorageObjects();
   const {
     data: objectsData,
     isLoading: objectsLoading,

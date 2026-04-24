@@ -102,46 +102,46 @@ const LEGACY_DOCS_MAP: Record<DocTypeSchema, string> = {
   'functions-sdk': 'sdks/typescript/functions.mdx',
   'ai-integration-sdk': 'sdks/typescript/ai.mdx',
   'real-time': 'agent-docs/real-time.md',
-  'deployment': 'agent-docs/deployment.md',
+  deployment: 'agent-docs/deployment.md',
 };
 
 // SDK documentation map for GET /api/docs/:docFeature/:docLanguage endpoint
 // Supports feature × language combinations with type safety
 const SDK_DOCS_MAP: Record<SdkFeatureSchema, Partial<Record<SdkLanguageSchema, string>>> = {
-  'db': {
-    'typescript': 'sdks/typescript/database.mdx',
-    'swift': 'sdks/swift/database.mdx',
-    'kotlin': 'sdks/kotlin/database.mdx',
+  db: {
+    typescript: 'sdks/typescript/database.mdx',
+    swift: 'sdks/swift/database.mdx',
+    kotlin: 'sdks/kotlin/database.mdx',
     'rest-api': 'sdks/rest/database.mdx',
   },
-  'storage': {
-    'typescript': 'sdks/typescript/storage.mdx',
-    'swift': 'sdks/swift/storage.mdx',
-    'kotlin': 'sdks/kotlin/storage.mdx',
+  storage: {
+    typescript: 'sdks/typescript/storage.mdx',
+    swift: 'sdks/swift/storage.mdx',
+    kotlin: 'sdks/kotlin/storage.mdx',
     'rest-api': 'sdks/rest/storage.mdx',
   },
-  'functions': {
-    'typescript': 'sdks/typescript/functions.mdx',
-    'swift': 'sdks/swift/functions.mdx',
-    'kotlin': 'sdks/kotlin/functions.mdx',
+  functions: {
+    typescript: 'sdks/typescript/functions.mdx',
+    swift: 'sdks/swift/functions.mdx',
+    kotlin: 'sdks/kotlin/functions.mdx',
     'rest-api': 'sdks/rest/functions.mdx',
   },
-  'auth': {
-    'typescript': 'sdks/typescript/auth.mdx',
-    'swift': 'sdks/swift/auth.mdx',
-    'kotlin': 'sdks/kotlin/auth.mdx',
+  auth: {
+    typescript: 'sdks/typescript/auth.mdx',
+    swift: 'sdks/swift/auth.mdx',
+    kotlin: 'sdks/kotlin/auth.mdx',
     'rest-api': 'sdks/rest/auth.mdx',
   },
-  'ai': {
-    'typescript': 'sdks/typescript/ai.mdx',
-    'swift': 'sdks/swift/ai.mdx',
-    'kotlin': 'sdks/kotlin/ai.mdx',
+  ai: {
+    typescript: 'sdks/typescript/ai.mdx',
+    swift: 'sdks/swift/ai.mdx',
+    kotlin: 'sdks/kotlin/ai.mdx',
     'rest-api': 'sdks/rest/ai.mdx',
   },
-  'realtime': {
-    'typescript': 'sdks/typescript/realtime.mdx',
-    'swift': 'sdks/swift/realtime.mdx',
-    'kotlin': 'sdks/kotlin/realtime.mdx',
+  realtime: {
+    typescript: 'sdks/typescript/realtime.mdx',
+    swift: 'sdks/swift/realtime.mdx',
+    kotlin: 'sdks/kotlin/realtime.mdx',
     'rest-api': 'sdks/rest/realtime.mdx',
   },
 };
@@ -241,7 +241,8 @@ router.get('/', (_req: Request, res: Response, next: NextFunction) => {
     for (const [feature, languages] of Object.entries(SDK_DOCS_MAP)) {
       for (const [language, filename] of Object.entries(languages)) {
         if (filename) {
-          const type = language === 'rest-api' ? `${feature}-${language}` : `${feature}-sdk-${language}`;
+          const type =
+            language === 'rest-api' ? `${feature}-${language}` : `${feature}-sdk-${language}`;
           sdkDocs.push({
             type,
             filename,

@@ -10,6 +10,28 @@ export interface DashboardProjectInfo {
   status?: 'active' | 'paused' | 'restoring' | string;
 }
 
+export interface DashboardUserInfo {
+  userId: string;
+  email: string;
+  name?: string;
+}
+
+export interface DashboardBackup {
+  id: string;
+  name: string | null;
+  triggerSource: 'manual' | 'scheduled';
+  status: 'running' | 'completed' | string;
+  sizeBytes: number | null;
+  expiresAt?: string | null;
+  createdAt: string;
+  createdBy: string | null;
+}
+
+export interface DashboardBackupInfo {
+  manualBackups: DashboardBackup[];
+  scheduledBackups: DashboardBackup[];
+}
+
 export interface DashboardInstanceInfo {
   currentInstanceType: string;
   planName: string;
@@ -40,11 +62,17 @@ export interface DashboardProps {
   onNavigateToSubscription?: () => void;
   onRenameProject?: (name: string) => Promise<void>;
   onDeleteProject?: () => Promise<void>;
+  onRequestBackupInfo?: () => Promise<DashboardBackupInfo>;
+  onCreateBackup?: (name: string) => Promise<void>;
+  onDeleteBackup?: (backupId: string) => Promise<void>;
+  onRenameBackup?: (backupId: string, name: string | null) => Promise<void>;
+  onRestoreBackup?: (backupId: string) => Promise<void>;
   onRequestInstanceInfo?: () => Promise<DashboardInstanceInfo>;
   onRequestInstanceTypeChange?: (
     instanceType: string
   ) => Promise<{ success: boolean; instanceType?: string; error?: string }>;
   onUpdateVersion?: () => Promise<void>;
+  onRequestUserInfo?: () => Promise<DashboardUserInfo>;
 }
 
 export interface SelfHostingDashboardProps extends DashboardProps {

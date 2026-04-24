@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { DashboardInstanceInfo, DashboardProjectInfo } from '@insforge/dashboard';
+import type {
+  DashboardBackup,
+  DashboardBackupInfo,
+  DashboardInstanceInfo,
+  DashboardProjectInfo,
+  DashboardUserInfo,
+} from '@insforge/dashboard';
 
 type InstanceTypeChangeResult = {
   success: boolean;
@@ -14,11 +20,17 @@ type CloudHostingMessage = {
 
 type PendingRequestKey =
   | 'authCode'
+  | 'backupInfo'
+  | 'createBackup'
+  | 'deleteBackup'
+  | 'renameBackup'
+  | 'restoreBackup'
   | 'instanceInfo'
   | 'instanceTypeChange'
   | 'renameProject'
   | 'deleteProject'
-  | 'updateVersion';
+  | 'updateVersion'
+  | 'userInfo';
 
 type PendingRequest<T> = {
   resolve: (value: T) => void;
@@ -28,11 +40,17 @@ type PendingRequest<T> = {
 
 type PendingRequestValues = {
   authCode: string;
+  backupInfo: DashboardBackupInfo;
+  createBackup: void;
+  deleteBackup: void;
+  renameBackup: void;
+  restoreBackup: void;
   instanceInfo: DashboardInstanceInfo;
   instanceTypeChange: InstanceTypeChangeResult;
   renameProject: void;
   deleteProject: void;
   updateVersion: void;
+  userInfo: DashboardUserInfo;
 };
 
 type PendingRequests = {
@@ -85,6 +103,42 @@ function getErrorMessage(message: unknown, fallback: string): string {
   return typeof message === 'string' && message.trim() ? message : fallback;
 }
 
+function normalizeBackups(backups: unknown): DashboardBackup[] {
+  if (!Array.isArray(backups)) {
+    return [];
+  }
+
+  return backups.flatMap((backup) => {
+    const item = backup as Record<string, unknown>;
+    const id = typeof item.id === 'string' ? item.id.trim() : '';
+
+    if (!id) {
+      return [];
+    }
+
+    return {
+      id,
+      name:
+        typeof item.name === 'string' || item.name === null ? (item.name as string | null) : null,
+      triggerSource: item.triggerSource === 'scheduled' ? 'scheduled' : 'manual',
+      status: typeof item.status === 'string' ? item.status : '',
+      sizeBytes:
+        typeof item.sizeBytes === 'number' || item.sizeBytes === null
+          ? (item.sizeBytes as number | null)
+          : null,
+      expiresAt:
+        typeof item.expiresAt === 'string' || item.expiresAt === null
+          ? (item.expiresAt as string | null)
+          : null,
+      createdAt: typeof item.createdAt === 'string' ? item.createdAt : '',
+      createdBy:
+        typeof item.createdBy === 'string' || item.createdBy === null
+          ? (item.createdBy as string | null)
+          : null,
+    };
+  });
+}
+
 function normalizeProjectInfo(
   previous: DashboardProjectInfo | undefined,
   origin: string,
@@ -135,6 +189,22 @@ export function useCloudHosting() {
         case 'authCode':
           pendingRequestsRef.current.authCode = pendingRequest as PendingRequest<string>;
           return;
+        case 'backupInfo':
+          pendingRequestsRef.current.backupInfo =
+            pendingRequest as PendingRequest<DashboardBackupInfo>;
+          return;
+        case 'createBackup':
+          pendingRequestsRef.current.createBackup = pendingRequest as PendingRequest<void>;
+          return;
+        case 'deleteBackup':
+          pendingRequestsRef.current.deleteBackup = pendingRequest as PendingRequest<void>;
+          return;
+        case 'renameBackup':
+          pendingRequestsRef.current.renameBackup = pendingRequest as PendingRequest<void>;
+          return;
+        case 'restoreBackup':
+          pendingRequestsRef.current.restoreBackup = pendingRequest as PendingRequest<void>;
+          return;
         case 'instanceInfo':
           pendingRequestsRef.current.instanceInfo =
             pendingRequest as PendingRequest<DashboardInstanceInfo>;
@@ -151,6 +221,9 @@ export function useCloudHosting() {
           return;
         case 'updateVersion':
           pendingRequestsRef.current.updateVersion = pendingRequest as PendingRequest<void>;
+          return;
+        case 'userInfo':
+          pendingRequestsRef.current.userInfo = pendingRequest as PendingRequest<DashboardUserInfo>;
           return;
       }
     },
@@ -290,6 +363,82 @@ export function useCloudHosting() {
           setProjectInfo((previous) => normalizeProjectInfo(previous, currentOrigin, message));
           return;
         }
+        case 'BACKUP_INFO': {
+          resolvePendingRequest('backupInfo', {
+            manualBackups: normalizeBackups(message.manualBackups),
+            scheduledBackups: normalizeBackups(message.scheduledBackups),
+          });
+          return;
+        }
+        case 'BACKUP_INFO_ERROR': {
+          rejectPendingRequest(
+            'backupInfo',
+            getErrorMessage(message.error, 'Failed to load backup information')
+          );
+          return;
+        }
+        case 'BACKUP_CREATE_RESULT': {
+          if (message.success === true) {
+            resolvePendingRequest('createBackup', undefined);
+            return;
+          }
+
+          rejectPendingRequest(
+            'createBackup',
+            getErrorMessage(message.error, 'Failed to create backup')
+          );
+          return;
+        }
+        case 'BACKUP_DELETE_RESULT': {
+          if (message.success === true) {
+            resolvePendingRequest('deleteBackup', undefined);
+            return;
+          }
+
+          rejectPendingRequest(
+            'deleteBackup',
+            getErrorMessage(message.error, 'Failed to delete backup')
+          );
+          return;
+        }
+        case 'BACKUP_RENAME_RESULT': {
+          if (message.success === true) {
+            resolvePendingRequest('renameBackup', undefined);
+            return;
+          }
+
+          rejectPendingRequest(
+            'renameBackup',
+            getErrorMessage(message.error, 'Failed to rename backup')
+          );
+          return;
+        }
+        case 'BACKUP_RESTORE_RESULT': {
+          if (message.success === true) {
+            resolvePendingRequest('restoreBackup', undefined);
+            return;
+          }
+
+          rejectPendingRequest(
+            'restoreBackup',
+            getErrorMessage(message.error, 'Failed to restore backup')
+          );
+          return;
+        }
+        case 'USER_INFO': {
+          const userId = typeof message.userId === 'string' ? message.userId : '';
+          const email = typeof message.email === 'string' ? message.email : '';
+          if (!userId || !email) {
+            rejectPendingRequest('userInfo', 'Received an invalid user info payload');
+            return;
+          }
+          resolvePendingRequest('userInfo', {
+            userId,
+            email,
+            name: typeof message.name === 'string' ? message.name : undefined,
+          });
+          return;
+        }
         case 'INSTANCE_INFO': {
           resolvePendingRequest('instanceInfo', {
             currentInstanceType:
@@ -393,6 +542,58 @@ export function useCloudHosting() {
     return createPendingRequest('authCode', 'Authorization code request');
   }, [createPendingRequest, postMessageToParent]);
 
+  const requestBackupInfo = useCallback(async (): Promise<DashboardBackupInfo> => {
+    if (!postMessageToParent({ type: 'REQUEST_BACKUP_INFO' })) {
+      throw new Error('Unable to request backup information from the parent window');
+    }
+
+    return createPendingRequest('backupInfo', 'Backup info request');
+  }, [createPendingRequest, postMessageToParent]);
+
+  const createBackup = useCallback(
+    async (name: string): Promise<void> => {
+      if (!postMessageToParent({ type: 'CREATE_BACKUP', name })) {
+        throw new Error('Unable to request a backup creation from the parent window');
+      }
+
+      return createPendingRequest('createBackup', 'Backup creation');
+    },
+    [createPendingRequest, postMessageToParent]
+  );
+
+  const deleteBackup = useCallback(
+    async (backupId: string): Promise<void> => {
+      if (!postMessageToParent({ type: 'DELETE_BACKUP', backupId })) {
+        throw new Error('Unable to request a backup deletion from the parent window');
+      }
+
+      return createPendingRequest('deleteBackup', 'Backup deletion');
+    },
+    [createPendingRequest, postMessageToParent]
+  );
+
+  const renameBackup = useCallback(
+    async (backupId: string, name: string | null): Promise<void> => {
+      if (!postMessageToParent({ type: 'RENAME_BACKUP', backupId, name })) {
+        throw new Error('Unable to request a backup rename from the parent window');
+      }
+
+      return createPendingRequest('renameBackup', 'Backup rename');
+    },
+    [createPendingRequest, postMessageToParent]
+  );
+
+  const restoreBackup = useCallback(
+    async (backupId: string): Promise<void> => {
+      if (!postMessageToParent({ type: 'RESTORE_BACKUP', backupId })) {
+        throw new Error('Unable to request a backup restore from the parent window');
+      }
+
+      return createPendingRequest('restoreBackup', 'Backup restore');
+    },
+    [createPendingRequest, postMessageToParent]
+  );
+
   const requestInstanceInfo = useCallback(async (): Promise<DashboardInstanceInfo> => {
     if (!postMessageToParent({ type: 'REQUEST_INSTANCE_INFO' })) {
       throw new Error('Unable to request instance information from the parent window');
@@ -443,6 +644,13 @@ export function useCloudHosting() {
     return createPendingRequest('updateVersion', 'Project version update');
   }, [createPendingRequest, postMessageToParent]);
 
+  const requestUserInfo = useCallback(async (): Promise<DashboardUserInfo> => {
+    if (!postMessageToParent({ type: 'REQUEST_USER_INFO' })) {
+      throw new Error('Unable to request user info from the parent window');
+    }
+    return createPendingRequest('userInfo', 'User info request');
+  }, [createPendingRequest, postMessageToParent]);
+
   const navigateToSubscription = useCallback(() => {
     void postMessageToParent({ type: 'NAVIGATE_TO_SUBSCRIPTION' });
   }, [postMessageToParent]);
@@ -458,11 +666,17 @@ export function useCloudHosting() {
     projectInfo,
     getAuthorizationCode,
     reportRouteChange,
+    requestBackupInfo,
+    createBackup,
+    deleteBackup,
+    renameBackup,
+    restoreBackup,
     requestInstanceInfo,
     requestInstanceTypeChange,
     renameProject,
     deleteProject,
     updateVersion,
     navigateToSubscription,
+    requestUserInfo,
   };
 }

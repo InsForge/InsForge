@@ -9,10 +9,11 @@ import {
   type FeatureSidebarListItem,
 } from '../../../components';
 import { ScrollArea } from '../../../components/radix/ScrollArea';
+import { useIsCloudHostingMode } from '../../../lib/config/DashboardHostContext';
 import { cn } from '../../../lib/utils/utils';
 import { Button } from '@insforge/ui';
 
-const DATABASE_STUDIO_SIDEBAR_ITEMS: Array<{
+const DATABASE_STUDIO_SIDEBAR_BASE_ITEMS: Array<{
   id: string;
   label: string;
   href: string;
@@ -38,6 +39,11 @@ const DATABASE_STUDIO_SIDEBAR_ITEMS: Array<{
     label: 'Policies',
     href: '/dashboard/database/policies',
     sectionEnd: true,
+  },
+  {
+    id: 'migrations',
+    label: 'Migrations',
+    href: '/dashboard/database/migrations',
   },
   {
     id: 'templates',
@@ -95,6 +101,8 @@ function DatabaseStudioSidebarItem({ label, href, sectionEnd }: DatabaseStudioSi
 const STUDIO_MENU_TRANSITION_MS = 260;
 
 export function DatabaseStudioSidebarPanel({ onBack }: DatabaseStudioSidebarPanelProps) {
+  const isCloudHostingMode = useIsCloudHostingMode();
+
   return (
     <aside className="h-full w-60 flex flex-col border-r border-border bg-semantic-1 flex-shrink-0">
       <div className="p-3">
@@ -110,7 +118,17 @@ export function DatabaseStudioSidebarPanel({ onBack }: DatabaseStudioSidebarPane
 
       <ScrollArea className="flex-1 px-3 pb-2">
         <div className="flex flex-col gap-1.5">
-          {DATABASE_STUDIO_SIDEBAR_ITEMS.map((item) => (
+          {(isCloudHostingMode
+            ? [
+                ...DATABASE_STUDIO_SIDEBAR_BASE_ITEMS,
+                {
+                  id: 'backups',
+                  label: 'Backup & Restore',
+                  href: '/dashboard/database/backups',
+                },
+              ]
+            : DATABASE_STUDIO_SIDEBAR_BASE_ITEMS
+          ).map((item) => (
             <DatabaseStudioSidebarItem
               key={item.id}
               label={item.label}

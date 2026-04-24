@@ -4,6 +4,7 @@ import { useLocation } from 'react-router-dom';
 import { loginService } from '../../features/login/services/login.service';
 import { useDashboardHost } from '../config/DashboardHostContext';
 import { apiClient } from '../api/client';
+import { getCurrentDistinctId, identifyUser } from '../analytics/posthog';
 import type { UserSchema } from '@insforge/shared-schemas';
 
 interface AuthContextType {
@@ -34,6 +35,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const host = useDashboardHost();
   const isCloudHosting = host.mode === 'cloud-hosting';
   const getAuthorizationCode = isCloudHosting ? host.getAuthorizationCode : null;
+  const onRequestUserInfo = isCloudHosting ? host.onRequestUserInfo : undefined;
   const location = useLocation();
   const [user, setUser] = useState<UserSchema | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -68,13 +70,36 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     ]);
   }, [queryClient]);
 
+  const performPostHogIdentify = useCallback(async (): Promise<void> => {
+    if (!onRequestUserInfo) {
+      return;
+    }
+    try {
+      const cloudUser = await onRequestUserInfo();
+      // Skip identify + /decide wait if posthog-js is already identified as
+      // this user (common on F5 refresh or same-session re-mount): calling
+      // posthog.identify with the same id is a no-op, so the counter-based
+      // wait would hit its 5s timeout for nothing.
+      if (getCurrentDistinctId() === cloudUser.userId) {
+        return;
+      }
+      await identifyUser(cloudUser.userId, {
+        email: cloudUser.email,
+        name: cloudUser.name,
+      });
+    } catch (err) {
+      console.warn('[PostHog] Failed to identify cloud user', err);
+    }
+  }, [onRequestUserInfo]);
+
   const applyAuthenticatedUser = useCallback(
     async (nextUser: UserSchema): Promise<void> => {
+      await performPostHogIdentify();
       setUser(nextUser);
       setIsAuthenticated(true);
       await invalidateAuthQueries();
     },
-    [invalidateAuthQueries]
+    [invalidateAuthQueries, performPostHogIdentify]
   );
 
   const exchangeAuthorizationCode = useCallback(
@@ -161,6 +186,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       const currentUser = await loginService.getCurrentUser();
       if (currentUser) {
+        await performPostHogIdentify();
         setUser(currentUser);
         setIsAuthenticated(true);
         return currentUser;
@@ -184,7 +210,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [authenticateCloudSession, shouldAttemptCloudAuthentication]);
+  }, [authenticateCloudSession, performPostHogIdentify, shouldAttemptCloudAuthentication]);
 
   const logout = useCallback(async () => {
     await loginService.logout();

@@ -16,13 +16,16 @@ vi.mock('../../src/services/secrets/secret.service.js', () => ({
   },
 }));
 
-function makeAxiosError(status: number): AxiosError {
+/**
+ * Helper to create a mock Axios error with a given status code and optional headers
+ */
+function makeAxiosError(status: number, headers: Record<string, string> = {}): AxiosError {
   const error = new Error(`Request failed with status code ${status}`) as AxiosError;
   error.isAxiosError = true;
   error.response = {
     status,
     statusText: status === 429 ? 'Too Many Requests' : 'Request Failed',
-    headers: {},
+    headers,
     data: {},
     config: { headers: new AxiosHeaders() },
   };
@@ -75,7 +78,7 @@ describe('VercelProvider.uploadFiles batching', () => {
     });
   });
 
-  it('limits concurrency to 10 at a time', async () => {
+  it('limits concurrency to 5 at a time', async () => {
     const files = Array.from({ length: 25 }, (_, i) => ({
       path: `file-${i}.txt`,
       content: Buffer.from(`content-${i}`),
@@ -83,8 +86,8 @@ describe('VercelProvider.uploadFiles batching', () => {
 
     await provider.uploadFiles(files);
 
-    expect(peakConcurrent).toBeLessThanOrEqual(10);
-    expect(peakConcurrent).toBeGreaterThan(1); // still parallel within a batch
+    expect(peakConcurrent).toBeLessThanOrEqual(5);
+    expect(peakConcurrent).toBeGreaterThan(1);
   });
 
   it('handles fewer files than batch size', async () => {
@@ -107,16 +110,16 @@ describe('VercelProvider.uploadFiles batching', () => {
     expect(uploadFileSpy).not.toHaveBeenCalled();
   });
 
-  it('handles exactly one batch (10 files)', async () => {
-    const files = Array.from({ length: 10 }, (_, i) => ({
+  it('handles exactly one batch (5 files)', async () => {
+    const files = Array.from({ length: 5 }, (_, i) => ({
       path: `file-${i}.txt`,
       content: Buffer.from(`content-${i}`),
     }));
 
     const results = await provider.uploadFiles(files);
 
-    expect(results).toHaveLength(10);
-    expect(peakConcurrent).toBeLessThanOrEqual(10);
+    expect(results).toHaveLength(5);
+    expect(peakConcurrent).toBeLessThanOrEqual(5);
   });
 
   it('propagates upload errors without swallowing them', async () => {
@@ -257,5 +260,131 @@ describe('VercelProvider.uploadFileStream', () => {
       statusCode: 400,
       code: 'INVALID_INPUT',
     });
+  });
+});
+
+describe('VercelProvider.uploadFile retry logic', () => {
+  let provider: VercelProvider;
+  let axiosPostSpy: ReturnType<typeof vi.spyOn>;
+  const setTimeoutCalls: number[] = [];
+
+  beforeEach(() => {
+    // Deterministic jitter: Math.random always returns 0
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    // @ts-expect-error accessing private static for test reset
+    VercelProvider.instance = undefined;
+    provider = VercelProvider.getInstance();
+
+    // Mock getCredentials to avoid real API calls
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.spyOn(provider as any, 'getCredentials').mockResolvedValue({
+      token: 'test-token',
+      teamId: 'test-team',
+      projectId: 'test-project',
+      expiresAt: null,
+      slug: null,
+    });
+
+    axiosPostSpy = vi.spyOn(axios, 'post');
+
+    // Intercept setTimeout: record retry delays and resolve immediately.
+    // Pass through short timeouts (vitest internals) to the real implementation.
+    setTimeoutCalls.length = 0;
+    const realSetTimeout = globalThis.setTimeout.bind(globalThis);
+    vi.spyOn(globalThis, 'setTimeout').mockImplementation(((
+      fn: (...args: unknown[]) => void,
+      ms?: number
+    ) => {
+      if (ms !== undefined && ms >= 1000) {
+        setTimeoutCalls.push(ms);
+        // Resolve on next microtask to keep async flow correct
+        Promise.resolve().then(() => fn());
+        return 0 as unknown as ReturnType<typeof setTimeout>;
+      }
+      return realSetTimeout(fn, ms);
+    }) as typeof setTimeout);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('retries on 429 with exponential backoff', async () => {
+    axiosPostSpy
+      .mockRejectedValueOnce(makeAxiosError(429))
+      .mockRejectedValueOnce(makeAxiosError(429))
+      .mockResolvedValueOnce({ status: 200, data: {} });
+
+    const sha = await provider.uploadFile(Buffer.from('test-content'));
+
+    expect(sha).toBeTruthy();
+    expect(axiosPostSpy).toHaveBeenCalledTimes(3);
+    // With Math.random()=0, jitter is 0. Backoff: attempt 0 = 1000ms, attempt 1 = 2000ms
+    expect(setTimeoutCalls).toEqual([1000, 2000]);
+  });
+
+  it('respects X-RateLimit-Reset header on 429', async () => {
+    // Vercel sends X-RateLimit-Reset as Unix epoch seconds
+    const nowSec = Math.floor(Date.now() / 1000);
+    const resetEpoch = nowSec + 5; // 5 seconds from now
+    axiosPostSpy
+      .mockRejectedValueOnce(makeAxiosError(429, { 'x-ratelimit-reset': String(resetEpoch) }))
+      .mockResolvedValueOnce({ status: 200, data: {} });
+
+    const sha = await provider.uploadFile(Buffer.from('test-content'));
+
+    expect(sha).toBeTruthy();
+    expect(axiosPostSpy).toHaveBeenCalledTimes(2);
+    // Delay should be based on reset epoch, not exponential backoff
+    // resetMs - Date.now() ≈ 5000ms (with jitter=0)
+    expect(setTimeoutCalls.length).toBe(1);
+    expect(setTimeoutCalls[0]).toBeGreaterThanOrEqual(4000);
+    expect(setTimeoutCalls[0]).toBeLessThanOrEqual(5500);
+  });
+
+  it('throws RATE_LIMITED after max retries exhausted', async () => {
+    axiosPostSpy.mockRejectedValue(makeAxiosError(429));
+
+    await expect(provider.uploadFile(Buffer.from('test-content'))).rejects.toMatchObject({
+      message: expect.stringContaining('rate limit'),
+      statusCode: 429,
+      code: 'RATE_LIMITED',
+    });
+
+    expect(axiosPostSpy).toHaveBeenCalledTimes(4);
+    // 3 retries with backoff: 1000, 2000, 4000
+    expect(setTimeoutCalls).toEqual([1000, 2000, 4000]);
+  });
+
+  it('does not retry on non-429 errors', async () => {
+    axiosPostSpy.mockRejectedValueOnce(makeAxiosError(500));
+
+    await expect(provider.uploadFile(Buffer.from('test-content'))).rejects.toMatchObject({
+      statusCode: 500,
+    });
+
+    expect(axiosPostSpy).toHaveBeenCalledTimes(1);
+    expect(setTimeoutCalls).toEqual([]);
+  });
+
+  it('still handles 409 (file exists) without retrying', async () => {
+    axiosPostSpy.mockRejectedValueOnce(makeAxiosError(409));
+
+    const sha = await provider.uploadFile(Buffer.from('test-content'));
+
+    expect(sha).toBeTruthy();
+    expect(axiosPostSpy).toHaveBeenCalledTimes(1);
+    expect(setTimeoutCalls).toEqual([]);
+  });
+
+  it('succeeds on first attempt without retry delay', async () => {
+    axiosPostSpy.mockResolvedValueOnce({ status: 200, data: {} });
+
+    const sha = await provider.uploadFile(Buffer.from('test-content'));
+
+    expect(sha).toBeTruthy();
+    expect(axiosPostSpy).toHaveBeenCalledTimes(1);
+    expect(setTimeoutCalls).toEqual([]);
   });
 });

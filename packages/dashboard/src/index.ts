@@ -7,11 +7,14 @@ export {
   dashboardStaticMenuItems,
 } from './navigation/menuItems';
 export type {
+  DashboardBackup,
+  DashboardBackupInfo,
   CloudHostingDashboardProps,
   DashboardInstanceInfo,
   DashboardMode,
   DashboardProjectInfo,
   DashboardProps,
+  DashboardUserInfo,
   InsForgeDashboardProps,
   SelfHostingDashboardProps,
 } from './types';

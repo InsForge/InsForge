@@ -20,7 +20,7 @@ import { useApiKey } from '../../../../lib/hooks/useMetadata';
 import { useAnonToken } from '../../../auth/hooks/useAnonToken';
 import { useIsCloudHostingMode } from '../../../../lib/config/DashboardHostContext';
 import { cn, getBackendUrl, isInsForgeCloudProject } from '../../../../lib/utils/utils';
-import DiscordIcon from '../../../../assets/logos/discord.svg?react';
+import { JoinDiscordCta } from '../JoinDiscordCta';
 
 type ConnectTabId = 'cli' | 'mcp' | 'connection-string' | 'api-keys';
 
@@ -155,18 +155,7 @@ export function ConnectDialog({ open, onOpenChange }: ConnectDialogProps) {
           </DialogBody>
 
           <DialogFooter className="justify-between">
-            <p className="flex min-w-0 items-center gap-1 text-sm leading-6 text-muted-foreground">
-              <span>Need help? Join our</span>
-              <a
-                href="https://discord.gg/DvBtaEc9Jz"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-[#818cf8] hover:text-[#99a3ff]"
-              >
-                <DiscordIcon className="size-5" />
-                <span>Discord</span>
-              </a>
-            </p>
+            <JoinDiscordCta />
             <Button
               type="button"
               variant="secondary"

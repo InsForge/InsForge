@@ -102,7 +102,15 @@ export const databaseTriggerSchema = z.object({
   actionStatement: z.string(),
 });
 
+export const migrationSchema = z.object({
+  version: z.string().regex(/^\d{14}$/, 'Migration version must use YYYYMMDDHHmmss format.'),
+  name: z.string().min(1),
+  statements: z.array(z.string()).min(1),
+  createdAt: z.string(),
+});
+
 export type DatabaseFunction = z.infer<typeof databaseFunctionSchema>;
 export type DatabaseIndex = z.infer<typeof databaseIndexSchema>;
 export type DatabasePolicy = z.infer<typeof databasePolicySchema>;
 export type DatabaseTrigger = z.infer<typeof databaseTriggerSchema>;
+export type Migration = z.infer<typeof migrationSchema>;

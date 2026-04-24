@@ -1,5 +1,11 @@
 import { createContext, useContext } from 'react';
-import type { DashboardInstanceInfo, DashboardMode, DashboardProjectInfo } from '../../types';
+import type {
+  DashboardBackupInfo,
+  DashboardInstanceInfo,
+  DashboardMode,
+  DashboardProjectInfo,
+  DashboardUserInfo,
+} from '../../types';
 
 interface DashboardHostContextValue {
   backendUrl?: string;
@@ -11,11 +17,17 @@ interface DashboardHostContextValue {
   onNavigateToSubscription?: () => void;
   onRenameProject?: (name: string) => Promise<void>;
   onDeleteProject?: () => Promise<void>;
+  onRequestBackupInfo?: () => Promise<DashboardBackupInfo>;
+  onCreateBackup?: (name: string) => Promise<void>;
+  onDeleteBackup?: (backupId: string) => Promise<void>;
+  onRenameBackup?: (backupId: string, name: string | null) => Promise<void>;
+  onRestoreBackup?: (backupId: string) => Promise<void>;
   onRequestInstanceInfo?: () => Promise<DashboardInstanceInfo>;
   onRequestInstanceTypeChange?: (
     instanceType: string
   ) => Promise<{ success: boolean; instanceType?: string; error?: string }>;
   onUpdateVersion?: () => Promise<void>;
+  onRequestUserInfo?: () => Promise<DashboardUserInfo>;
 }
 
 const DashboardHostContext = createContext<DashboardHostContextValue | null>(null);

@@ -102,9 +102,10 @@ function CommandBox({ command }: CommandBoxProps) {
 
 interface NewCLISectionProps {
   className?: string;
+  isCTest?: boolean;
 }
 
-export function NewCLISection({ className }: NewCLISectionProps) {
+export function NewCLISection({ className, isCTest = false }: NewCLISectionProps) {
   const { projectId } = useProjectId();
   const { projectInfo } = useCloudProjectInfo();
 
@@ -119,13 +120,15 @@ export function NewCLISection({ className }: NewCLISectionProps) {
         className
       )}
     >
-      {/* Header */}
-      <div className="flex max-w-[640px] flex-col gap-3">
-        <h3 className="text-2xl font-medium leading-8 text-foreground">Get Started</h3>
-        <p className="text-sm leading-6 text-muted-foreground">
-          Run these commands to create a new web app with your credentials.
-        </p>
-      </div>
+      {/* Header — hidden when isCTest (title is external in c test) */}
+      {!isCTest && (
+        <div className="flex max-w-[640px] flex-col gap-3">
+          <h3 className="text-2xl font-medium leading-8 text-foreground">Get Started</h3>
+          <p className="text-sm leading-6 text-muted-foreground">
+            Run these commands to create a new web app with your credentials.
+          </p>
+        </div>
+      )}
 
       {/* Steps */}
       <div className="flex flex-col">
@@ -149,7 +152,7 @@ export function NewCLISection({ className }: NewCLISectionProps) {
           number={3}
           title="View Your App"
           description="Open your browser to see the app running locally"
-          isLast
+          isLast={!isCTest}
         >
           <div className="flex items-center gap-1 pl-1">
             <a
@@ -163,6 +166,12 @@ export function NewCLISection({ className }: NewCLISectionProps) {
             <ExternalLink className="size-4 text-primary" />
           </div>
         </Step>
+
+        {isCTest && (
+          <Step number={4} title="Add a To Do to your app" description="" isLast>
+            <></>
+          </Step>
+        )}
       </div>
     </div>
   );

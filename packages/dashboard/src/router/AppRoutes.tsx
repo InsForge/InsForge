@@ -5,7 +5,7 @@ import LoginPage from '../features/login/pages/LoginPage';
 import CloudLoginPage from '../features/login/pages/CloudLoginPage';
 import DashboardLayout from '../features/dashboard/components/DashboardLayout';
 import DashboardPage from '../features/dashboard/pages/DashboardPage';
-import NewDashboardPage from '../features/dashboard/pages/NewDashboardPage';
+import CTestDashboardPage from '../features/dashboard/pages/CTestDashboardPage';
 import { getFeatureFlag } from '../lib/analytics/posthog';
 import DatabaseLayout from '../features/database/components/DatabaseLayout';
 import SQLEditorLayout from '../features/database/components/SQLEditorLayout';
@@ -38,6 +38,8 @@ import DatabaseFunctionsPage from '../features/database/pages/FunctionsPage';
 import TriggersPage from '../features/database/pages/TriggersPage';
 import PoliciesPage from '../features/database/pages/PoliciesPage';
 import TemplatesPage from '../features/database/pages/TemplatesPage';
+import MigrationsPage from '../features/database/pages/MigrationsPage';
+import BackupsPage from '../features/database/pages/BackupsPage';
 import AuditsPage from '../features/logs/pages/AuditsPage';
 import DeploymentsLayout from '../features/deployments/components/DeploymentsLayout';
 import DeploymentLogsPage from '../features/deployments/pages/DeploymentLogsPage';
@@ -46,10 +48,81 @@ import DeploymentEnvVarsPage from '../features/deployments/pages/DeploymentEnvVa
 import DeploymentDomainsPage from '../features/deployments/pages/DeploymentDomainsPage';
 import ComputePage from '../features/compute/pages/ComputePage';
 
-export function AppRoutes() {
-  const dashboardVariant = getFeatureFlag('dashboard-v2-experiment');
-  const DashboardHomePage = dashboardVariant === 'test' ? NewDashboardPage : DashboardPage;
+function AuthenticatedRoutes() {
+  const dashboardVariant = getFeatureFlag('dashboard-v3-experiment');
+  const DashboardHomePage = dashboardVariant === 'c_test' ? CTestDashboardPage : DashboardPage;
 
+  return (
+    <AppLayout>
+      <Routes>
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/dashboard" element={<DashboardLayout />}>
+          <Route index element={<DashboardHomePage />} />
+        </Route>
+        <Route path="/dashboard/authentication" element={<AuthenticationLayout />}>
+          <Route index element={<Navigate to="users" replace />} />
+          <Route path="users" element={<UsersPage />} />
+          <Route path="auth-methods" element={<AuthMethodsPage />} />
+          <Route path="email" element={<EmailPage />} />
+        </Route>
+        <Route path="/dashboard/database" element={<DatabaseLayout />}>
+          <Route index element={<Navigate to="tables" replace />} />
+          <Route path="tables" element={<TablesPage />} />
+          <Route path="indexes" element={<IndexesPage />} />
+          <Route path="functions" element={<DatabaseFunctionsPage />} />
+          <Route path="triggers" element={<TriggersPage />} />
+          <Route path="policies" element={<PoliciesPage />} />
+          <Route path="sql-editor" element={<Navigate to="/dashboard/sql-editor" replace />} />
+          <Route path="templates" element={<TemplatesPage />} />
+          <Route path="migrations" element={<MigrationsPage />} />
+          <Route path="backups" element={<BackupsPage />} />
+        </Route>
+        <Route path="/dashboard/sql-editor" element={<SQLEditorLayout />}>
+          <Route index element={<SQLEditorPage />} />
+        </Route>
+        <Route path="/dashboard/storage" element={<StorageLayout />}>
+          <Route index element={<BucketsPage />} />
+        </Route>
+        <Route path="/dashboard/logs" element={<LogsLayout />}>
+          <Route index element={<Navigate to="MCP" replace />} />
+          <Route path="MCP" element={<MCPLogsPage />} />
+          <Route path="audits" element={<AuditsPage />} />
+          <Route path="function.logs" element={<FunctionLogsPage />} />
+          <Route path=":source" element={<LogsPage />} />
+        </Route>
+        <Route path="/dashboard/functions" element={<FunctionsLayout />}>
+          <Route index element={<Navigate to="list" replace />} />
+          <Route path="list" element={<FunctionsPage />} />
+          <Route path="secrets" element={<SecretsPage />} />
+          <Route path="schedules" element={<SchedulesPage />} />
+        </Route>
+        <Route path="/dashboard/visualizer" element={<VisualizerLayout />}>
+          <Route index element={<VisualizerPage />} />
+        </Route>
+        <Route path="/dashboard/ai" element={<AILayout />}>
+          <Route index element={<AIPage />} />
+        </Route>
+        <Route path="/dashboard/realtime" element={<RealtimeLayout />}>
+          <Route index element={<Navigate to="channels" replace />} />
+          <Route path="channels" element={<RealtimeChannelsPage />} />
+          <Route path="messages" element={<RealtimeMessagesPage />} />
+          <Route path="permissions" element={<RealtimePermissionsPage />} />
+        </Route>
+        <Route path="/dashboard/deployments" element={<DeploymentsLayout />}>
+          <Route index element={<Navigate to="overview" replace />} />
+          <Route path="overview" element={<DeploymentOverviewPage />} />
+          <Route path="logs" element={<DeploymentLogsPage />} />
+          <Route path="env-vars" element={<DeploymentEnvVarsPage />} />
+          <Route path="domains" element={<DeploymentDomainsPage />} />
+        </Route>
+        <Route path="/dashboard/compute" element={<ComputePage />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </AppLayout>
+  );
+}
+
+export function AppRoutes() {
   return (
     <Routes>
       <Route path="/dashboard/login" element={<LoginPage />} />
@@ -58,73 +131,7 @@ export function AppRoutes() {
         path="/*"
         element={
           <RequireAuth>
-            <AppLayout>
-              <Routes>
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                <Route path="/dashboard" element={<DashboardLayout />}>
-                  <Route index element={<DashboardHomePage />} />
-                </Route>
-                <Route path="/dashboard/authentication" element={<AuthenticationLayout />}>
-                  <Route index element={<Navigate to="users" replace />} />
-                  <Route path="users" element={<UsersPage />} />
-                  <Route path="auth-methods" element={<AuthMethodsPage />} />
-                  <Route path="email" element={<EmailPage />} />
-                </Route>
-                <Route path="/dashboard/database" element={<DatabaseLayout />}>
-                  <Route index element={<Navigate to="tables" replace />} />
-                  <Route path="tables" element={<TablesPage />} />
-                  <Route path="indexes" element={<IndexesPage />} />
-                  <Route path="functions" element={<DatabaseFunctionsPage />} />
-                  <Route path="triggers" element={<TriggersPage />} />
-                  <Route path="policies" element={<PoliciesPage />} />
-                  <Route
-                    path="sql-editor"
-                    element={<Navigate to="/dashboard/sql-editor" replace />}
-                  />
-                  <Route path="templates" element={<TemplatesPage />} />
-                </Route>
-                <Route path="/dashboard/sql-editor" element={<SQLEditorLayout />}>
-                  <Route index element={<SQLEditorPage />} />
-                </Route>
-                <Route path="/dashboard/storage" element={<StorageLayout />}>
-                  <Route index element={<BucketsPage />} />
-                </Route>
-                <Route path="/dashboard/logs" element={<LogsLayout />}>
-                  <Route index element={<Navigate to="MCP" replace />} />
-                  <Route path="MCP" element={<MCPLogsPage />} />
-                  <Route path="audits" element={<AuditsPage />} />
-                  <Route path="function.logs" element={<FunctionLogsPage />} />
-                  <Route path=":source" element={<LogsPage />} />
-                </Route>
-                <Route path="/dashboard/functions" element={<FunctionsLayout />}>
-                  <Route index element={<Navigate to="list" replace />} />
-                  <Route path="list" element={<FunctionsPage />} />
-                  <Route path="secrets" element={<SecretsPage />} />
-                  <Route path="schedules" element={<SchedulesPage />} />
-                </Route>
-                <Route path="/dashboard/visualizer" element={<VisualizerLayout />}>
-                  <Route index element={<VisualizerPage />} />
-                </Route>
-                <Route path="/dashboard/ai" element={<AILayout />}>
-                  <Route index element={<AIPage />} />
-                </Route>
-                <Route path="/dashboard/realtime" element={<RealtimeLayout />}>
-                  <Route index element={<Navigate to="channels" replace />} />
-                  <Route path="channels" element={<RealtimeChannelsPage />} />
-                  <Route path="messages" element={<RealtimeMessagesPage />} />
-                  <Route path="permissions" element={<RealtimePermissionsPage />} />
-                </Route>
-                <Route path="/dashboard/deployments" element={<DeploymentsLayout />}>
-                  <Route index element={<Navigate to="overview" replace />} />
-                  <Route path="overview" element={<DeploymentOverviewPage />} />
-                  <Route path="logs" element={<DeploymentLogsPage />} />
-                  <Route path="env-vars" element={<DeploymentEnvVarsPage />} />
-                  <Route path="domains" element={<DeploymentDomainsPage />} />
-                </Route>
-                <Route path="/dashboard/compute" element={<ComputePage />} />
-                <Route path="*" element={<Navigate to="/dashboard" replace />} />
-              </Routes>
-            </AppLayout>
+            <AuthenticatedRoutes />
           </RequireAuth>
         }
       />

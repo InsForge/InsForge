@@ -28,9 +28,15 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
     onNavigateToSubscription,
     onRenameProject,
     onDeleteProject,
+    onRequestBackupInfo,
+    onCreateBackup,
+    onDeleteBackup,
+    onRenameBackup,
+    onRestoreBackup,
     onRequestInstanceInfo,
     onRequestInstanceTypeChange,
     onUpdateVersion,
+    onRequestUserInfo,
   } = props;
   const getAuthorizationCode =
     props.mode === 'cloud-hosting' ? props.getAuthorizationCode : undefined;
@@ -47,9 +53,15 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
       onNavigateToSubscription,
       onRenameProject,
       onDeleteProject,
+      onRequestBackupInfo,
+      onCreateBackup,
+      onDeleteBackup,
+      onRenameBackup,
+      onRestoreBackup,
       onRequestInstanceInfo,
       onRequestInstanceTypeChange,
       onUpdateVersion,
+      onRequestUserInfo,
     }),
     [
       backendUrl,
@@ -61,9 +73,15 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
       onNavigateToSubscription,
       onRenameProject,
       onDeleteProject,
+      onRequestBackupInfo,
+      onCreateBackup,
+      onDeleteBackup,
+      onRenameBackup,
+      onRestoreBackup,
       onRequestInstanceInfo,
       onRequestInstanceTypeChange,
       onUpdateVersion,
+      onRequestUserInfo,
     ]
   );
   const [queryClient] = useState(

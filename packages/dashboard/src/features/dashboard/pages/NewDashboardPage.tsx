@@ -33,6 +33,7 @@ interface PromptStep {
   title: string;
   prompt: string;
   icon: React.ReactNode;
+  navigateTo?: { label: string; path: string };
 }
 
 const PROMPT_STEPS: PromptStep[] = [
@@ -42,6 +43,7 @@ const PROMPT_STEPS: PromptStep[] = [
     prompt:
       "Use InsForge Skills to add 4 todo items to InsForge backend's todo table:\n\n1. Add sign in for users\n2. Add file upload\n3. Use AI to turn text into tasks\n4. Deploy your app",
     icon: <Database className="size-12 text-[rgb(var(--disabled))]" />,
+    navigateTo: { label: 'Go to Database', path: '/dashboard/database/tables' },
   },
   {
     id: 2,
@@ -49,6 +51,7 @@ const PROMPT_STEPS: PromptStep[] = [
     prompt:
       'Use InsForge Skills to add user authentication to this app using InsForge Auth.\n\nUsers should be able to:\n1. Sign up / Sign in with Email\n2. Add Google OAuth\n3. Sign out\n\nAlso update the database and access control so each record belongs to a user:\n1. Add a `user_id` column to the relevant table(s)\n2. Set `user_id` automatically when a new record is created\n3. Restrict reads and writes so users can only access their own data\n4. Add the required row level security policies for this\n\nUpdate the app UI and backend logic so authentication is fully wired up and only signed in users can create and view their own records.',
     icon: <StepUserIcon className="size-12 text-[rgb(var(--disabled))]" />,
+    navigateTo: { label: 'Go to User', path: '/dashboard/authentication/users' },
   },
   {
     id: 3,
@@ -56,6 +59,7 @@ const PROMPT_STEPS: PromptStep[] = [
     prompt:
       'Use InsForge Skills to add file upload to this app.\nUsers should be able to upload a file and attach it to a task.\nShow the uploaded file in the task UI.\nUse InsForge Storage for file uploads.',
     icon: <StepUploadIcon className="size-12 text-[rgb(var(--disabled))]" />,
+    navigateTo: { label: 'Go to Storage', path: '/dashboard/storage' },
   },
   {
     id: 4,
@@ -63,6 +67,7 @@ const PROMPT_STEPS: PromptStep[] = [
     prompt:
       'Use InsForge Skills to add an AI feature to this todo app that turns text into tasks using the InsForge AI Gateway.\nUsers should be able to type natural language and have the app create one or more todo items automatically.',
     icon: <Sparkles className="size-12 text-[rgb(var(--disabled))]" />,
+    navigateTo: { label: 'Go to Model Gateway', path: '/dashboard/ai' },
   },
   {
     id: 5,
@@ -70,6 +75,7 @@ const PROMPT_STEPS: PromptStep[] = [
     prompt:
       'Use InsForge Skills to deploy this app on InsForge, after deploying, share the live URL.',
     icon: <Rocket className="size-12 text-[rgb(var(--disabled))]" />,
+    navigateTo: { label: 'Go to Deployment', path: '/dashboard/deployments' },
   },
 ];
 
@@ -215,6 +221,7 @@ interface PromptStepperProps {
 }
 
 function PromptStepper({ onDismiss, completedSteps, showDismiss = false }: PromptStepperProps) {
+  const navigate = useNavigate();
   const [activeStep, setActiveStep] = useState(0);
   const currentStep = PROMPT_STEPS[activeStep];
   const allCompleted = completedSteps.every(Boolean);
@@ -296,14 +303,30 @@ function PromptStepper({ onDismiss, completedSteps, showDismiss = false }: Promp
             {/* Prompt text */}
             <PromptDisplay text={currentStep.prompt} />
 
-            {/* Copy Prompt button */}
-            <CopyButton
-              text={currentStep.prompt}
-              showText
-              copyText="Copy Prompt"
-              copiedText="Copied!"
-              className="h-9 rounded bg-primary px-2 text-sm font-medium text-[rgb(var(--inverse))] hover:bg-primary/90"
-            />
+            {/* Action buttons */}
+            <div className="flex items-center gap-2">
+              <CopyButton
+                text={currentStep.prompt}
+                showText
+                copyText="Copy Prompt"
+                copiedText="Copied!"
+                className="h-9 rounded bg-primary px-2 text-sm font-medium text-[rgb(var(--inverse))] hover:bg-primary/90"
+              />
+              {currentStep.navigateTo && (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => {
+                    if (currentStep.navigateTo) {
+                      void navigate(currentStep.navigateTo.path);
+                    }
+                  }}
+                  className="h-9 rounded border border-[var(--alpha-8)] bg-transparent px-3 text-sm font-medium text-foreground hover:bg-[var(--alpha-4)]"
+                >
+                  {currentStep.navigateTo.label}
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Decorative background graphic */}
@@ -410,8 +433,8 @@ export default function NewDashboardPage() {
   // --- Step completion detection (real-time via socket → React Query invalidation) ---
   const completedSteps = useMemo(
     () => [
-      // Step 1: Add sample data — todo table has records
-      (tables?.find((t) => t.tableName === 'todo')?.recordCount ?? 0) > 0,
+      // Step 1: Add sample data — todo table has at least 4 records
+      (tables?.find((t) => t.tableName === 'todo')?.recordCount ?? 0) >= 4,
       // Step 2: Sign up first user — totalUsers already excludes admin & anon
       (totalUsers ?? 0) >= 1,
       // Step 3: Upload a file — todo-attachments bucket has files
@@ -455,15 +478,11 @@ export default function NewDashboardPage() {
             </Badge>
           )}
           {/* Health badge */}
-          <div className="flex items-center overflow-hidden rounded-full bg-[var(--special-toast,#323232)]">
-            <div className="flex items-center gap-1 px-2 py-1">
-              <div className="flex h-5 w-5 items-center justify-center">
-                <div
-                  className={`h-2 w-2 rounded-full ${isHealthy ? 'bg-emerald-400' : 'bg-amber-400'}`}
-                />
-              </div>
-              <span className="text-xs font-medium text-foreground">{projectHealth}</span>
-            </div>
+          <div className="flex items-center rounded-full bg-[var(--special-toast,#323232)] px-2 py-1">
+            <div
+              className={`mr-1.5 h-2 w-2 rounded-full ${isHealthy ? 'bg-emerald-400' : 'bg-amber-400'}`}
+            />
+            <span className="text-xs font-medium text-foreground">{projectHealth}</span>
           </div>
         </div>
 
@@ -475,7 +494,7 @@ export default function NewDashboardPage() {
         )}
 
         {/* Metric Cards - 120px height, 4 cols, 12px gap */}
-        <div className="grid grid-cols-2 gap-[38px] xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <MetricCard
             label="User"
             value={String(totalUsers ?? 0)}

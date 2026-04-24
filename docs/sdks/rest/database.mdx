@@ -547,6 +547,89 @@ curl "https://your-app.insforge.app/api/database/triggers" \
 
 ---
 
+## List Database Migrations
+
+Get the history of successful custom migrations. InsForge stores these in `system.custom_migrations`, but the endpoint returns only the migration metadata and executed statements. **Requires admin authentication.**
+
+```
+GET /api/database/migrations
+```
+
+### Example
+
+```bash
+curl "https://your-app.insforge.app/api/database/migrations" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
+```
+
+### Response
+
+```json
+{
+  "migrations": [
+    {
+      "version": "20260416170500",
+      "name": "create_posts_table",
+      "statements": [
+        "CREATE TABLE posts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), title TEXT NOT NULL);"
+      ],
+      "createdAt": "2026-04-16T17:05:00.000Z"
+    }
+  ]
+}
+```
+
+---
+
+## Create Database Migration
+
+Create and immediately execute a custom migration against the database. The migration is recorded only if every statement succeeds. **Requires admin authentication.**
+
+```
+POST /api/database/migrations
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `version` | string | Yes | Migration version in `YYYYMMDDHHmmss` format. |
+| `name` | string | Yes | Migration name |
+| `sql` | string | Yes | SQL text to parse and execute |
+
+### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/database/migrations" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "version": "20260416170500",
+    "name": "create_posts_table",
+    "sql": "CREATE TABLE posts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), title TEXT NOT NULL);"
+  }'
+```
+
+### Response
+
+```json
+{
+  "version": "20260416170500",
+  "name": "create_posts_table",
+  "statements": [
+    "CREATE TABLE posts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), title TEXT NOT NULL);"
+  ],
+  "createdAt": "2026-04-16T17:05:00.000Z",
+  "message": "Migration executed successfully"
+}
+```
+
+<Warning>
+Do not include `BEGIN`, `COMMIT`, or `ROLLBACK` inside a custom migration. InsForge executes the migration inside its own transaction.
+</Warning>
+
+---
+
 ## Execute Raw SQL (Strict Mode)
 
 Execute raw SQL query with strict sanitization. Blocks access to system tables and auth.users. **Requires admin authentication.**

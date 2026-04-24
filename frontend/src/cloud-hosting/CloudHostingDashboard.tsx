@@ -10,9 +10,15 @@ export function CloudHostingDashboard() {
     navigateToSubscription,
     renameProject,
     deleteProject,
+    requestBackupInfo,
+    createBackup,
+    deleteBackup,
+    renameBackup,
+    restoreBackup,
     requestInstanceInfo,
     requestInstanceTypeChange,
     updateVersion,
+    requestUserInfo,
   } = useCloudHosting();
 
   return (
@@ -26,9 +32,15 @@ export function CloudHostingDashboard() {
       onNavigateToSubscription={navigateToSubscription}
       onRenameProject={renameProject}
       onDeleteProject={deleteProject}
+      onRequestBackupInfo={requestBackupInfo}
+      onCreateBackup={createBackup}
+      onDeleteBackup={deleteBackup}
+      onRenameBackup={renameBackup}
+      onRestoreBackup={restoreBackup}
       onRequestInstanceInfo={requestInstanceInfo}
       onRequestInstanceTypeChange={requestInstanceTypeChange}
       onUpdateVersion={updateVersion}
+      onRequestUserInfo={requestUserInfo}
     />
   );
 }
