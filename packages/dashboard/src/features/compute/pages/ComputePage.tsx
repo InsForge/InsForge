@@ -244,14 +244,34 @@ export default function ComputePage() {
             </div>
 
             {services.length === 0 ? (
-              <div className="bg-card border border-[var(--alpha-8)] rounded-lg p-8 text-center">
-                <p className="text-sm text-muted-foreground mb-2">No services deployed yet.</p>
-                <p className="text-xs text-muted-foreground mb-4">
-                  Create a service using the button above or the CLI:{' '}
-                  <code className="px-1.5 py-0.5 bg-muted rounded text-xs">
-                    insforge compute create --name my-api --image nginx:alpine
-                  </code>
+              <div className="bg-card border border-[var(--alpha-8)] rounded-lg p-8">
+                <p className="text-sm text-muted-foreground mb-4 text-center">
+                  No services deployed yet.
                 </p>
+                <div className="flex flex-col gap-3 max-w-xl mx-auto">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1.5">
+                      Use the button above, the CLI:
+                    </p>
+                    <code className="block px-3 py-2 bg-muted text-foreground rounded text-xs font-mono break-all">
+                      npx @insforge/cli compute create --name my-api --image nginx:alpine
+                    </code>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1.5">Or ask your AI agent:</p>
+                    <ul className="flex flex-col gap-1 text-xs text-foreground">
+                      <li className="px-3 py-2 bg-muted rounded">
+                        &ldquo;Deploy nginx:alpine on port 80 as a compute service&rdquo;
+                      </li>
+                      <li className="px-3 py-2 bg-muted rounded">
+                        &ldquo;Deploy this FastAPI app in the current directory&rdquo;
+                      </li>
+                      <li className="px-3 py-2 bg-muted rounded">
+                        &ldquo;Create a Redis container for caching&rdquo;
+                      </li>
+                    </ul>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
