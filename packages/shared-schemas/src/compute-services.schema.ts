@@ -9,13 +9,15 @@ export const serviceStatusEnum = z.enum([
   'destroying',
 ]);
 
-export const cpuTierEnum = z.enum([
-  'shared-1x',
-  'shared-2x',
-  'performance-1x',
-  'performance-2x',
-  'performance-4x',
-]);
+// CPU tier accepts Fly.io's standard `<kind>-<N>x` format (e.g. shared-1x,
+// performance-8x). We deliberately do NOT maintain a hardcoded allow-list —
+// Fly.io is the source of truth for which sizes exist at any given moment.
+// Unsupported combinations return a Fly validation error at machine-create
+// time.
+export const cpuTierRegex = /^(shared|performance)-\d+x$/;
+export const cpuTierEnum = z
+  .string()
+  .regex(cpuTierRegex, 'cpu must match `<shared|performance>-<N>x`, e.g. shared-2x or performance-8x');
 
 export const serviceSchema = z.object({
   id: z.string().uuid(),

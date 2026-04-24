@@ -255,14 +255,15 @@ export class FlyProvider implements ComputeProvider {
     cpu: string,
     memory: number
   ): { cpu_kind: string; cpus: number; memory_mb: number } {
-    const tiers: Record<string, { cpu_kind: string; cpus: number }> = {
-      'shared-1x': { cpu_kind: 'shared', cpus: 1 },
-      'shared-2x': { cpu_kind: 'shared', cpus: 2 },
-      'performance-1x': { cpu_kind: 'performance', cpus: 1 },
-      'performance-2x': { cpu_kind: 'performance', cpus: 2 },
-      'performance-4x': { cpu_kind: 'performance', cpus: 4 },
-    };
-    const tier = tiers[cpu] ?? tiers['shared-1x'];
-    return { ...tier, memory_mb: memory };
+    // Parse Fly.io's `<kind>-<N>x` format. Fly is the source of truth for
+    // which combos exist; we only enforce the wire format here. If Fly later
+    // adds a `performance-32x`, it works without a code change.
+    const m = /^(shared|performance)-(\d+)x$/.exec(cpu);
+    if (!m) {
+      // Default to the smallest shared size if the input is malformed,
+      // matching the historical behaviour for self-hosted callers.
+      return { cpu_kind: 'shared', cpus: 1, memory_mb: memory };
+    }
+    return { cpu_kind: m[1], cpus: parseInt(m[2], 10), memory_mb: memory };
   }
 }
