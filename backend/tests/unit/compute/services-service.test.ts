@@ -231,6 +231,54 @@ describe('ComputeServicesService', () => {
       expect(failedUpdateCall[0]).toContain('UPDATE compute.services');
       expect(failedUpdateCall[1]).toContain('failed');
     });
+
+    it('passes through structured cloud errors (quota, invalid input, etc.) instead of swallowing as generic 502', async () => {
+      // Reproduces the bug found by stress-testing against staging:
+      // when the cloud backend returns 403 COMPUTE_QUOTA_EXCEEDED with a clear
+      // message ("Project X has reached 5 active services"), the OSS was
+      // catching it and re-throwing as generic
+      // "Compute service operation failed" 502 — losing the actual reason.
+      const { AppError } = await import('@/api/middlewares/error.js');
+      const { ERROR_CODES } = await import('@/types/error-constants.js');
+
+      const serviceId = 'svc-quota-test';
+      mockQuery.mockResolvedValueOnce({
+        rows: [{
+          id: serviceId, project_id: input.projectId, name: input.name,
+          image_url: input.imageUrl, port: input.port, cpu: input.cpu,
+          memory: input.memory, region: input.region,
+          fly_app_id: null, fly_machine_id: null, status: 'creating',
+          endpoint_url: null, env_vars_encrypted: null,
+          created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+        }],
+      });
+
+      // CloudComputeProvider re-wraps the cloud's response body verbatim into
+      // an AppError; replicate that shape — JSON string in `message`, status
+      // code = HTTP status from cloud.
+      const cloudQuotaError = new AppError(
+        '{"code":"COMPUTE_QUOTA_EXCEEDED","error":"Project e8a6b768 has reached 5 active services"}',
+        403,
+        (ERROR_CODES as { COMPUTE_PROVIDER_ERROR: string }).COMPUTE_PROVIDER_ERROR
+      );
+      mockCreateApp.mockRejectedValue(cloudQuotaError);
+
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+
+      let thrown: AppError | undefined;
+      try {
+        await service.createService(input);
+      } catch (e) {
+        thrown = e as AppError;
+      }
+
+      expect(thrown).toBeDefined();
+      // Real bug: this used to be 502/COMPUTE_SERVICE_DEPLOY_FAILED. Should be
+      // the cloud's actual code + message + status.
+      expect(thrown!.statusCode).toBe(403);
+      expect(thrown!.code).toBe('COMPUTE_QUOTA_EXCEEDED');
+      expect(thrown!.message).toMatch(/has reached 5 active services/);
+    });
   });
 
   describe('listServices', () => {

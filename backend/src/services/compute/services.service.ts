@@ -273,8 +273,31 @@ export class ComputeServicesService {
         serviceId,
       ]);
 
+      // Pass through structured errors from the cloud / Fly provider instead
+      // of swallowing them as a generic 502. The provider call wraps the
+      // cloud's response verbatim into an AppError whose .message is the raw
+      // body — typically `{"code":"COMPUTE_QUOTA_EXCEEDED","error":"…","nextActions":[…]}`.
+      // Parse it back out and re-throw with the cloud's actual code, message,
+      // status, and nextActions so the user sees WHY (quota? Fly down? bad
+      // image?) instead of "Compute service operation failed".
+      if (error instanceof AppError) {
+        let parsed: { code?: string; error?: string; nextActions?: string[] } | undefined;
+        try {
+          parsed = JSON.parse(error.message);
+        } catch {
+          parsed = undefined;
+        }
+        throw new AppError(
+          parsed?.error ?? error.message,
+          error.statusCode,
+          (parsed?.code as keyof typeof ERROR_CODES & string) ??
+            error.code ??
+            ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED,
+          parsed?.nextActions?.join('; ')
+        );
+      }
       throw new AppError(
-        'Compute service operation failed',
+        error instanceof Error ? error.message : 'Compute service operation failed',
         502,
         ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED
       );
