@@ -29,10 +29,11 @@ export const REGIONS = [
   { value: 'syd', label: 'Sydney (syd)' },
 ] as const;
 
-/** Return the actual reachable .fly.dev URL instead of a custom domain that may not resolve */
+/**
+ * Return the service endpoint. Backend now constructs `endpointUrl` from
+ * COMPUTE_DOMAIN (when set) or falls back to `.fly.dev`, so this just returns
+ * what the API provided.
+ */
 export function getReachableUrl(service: ServiceSchema): string | null {
-  if (service.flyAppId) {
-    return `https://${service.flyAppId}.fly.dev`;
-  }
   return service.endpointUrl;
 }
