@@ -19,6 +19,7 @@ export function CloudHostingDashboard() {
     requestInstanceTypeChange,
     updateVersion,
     requestUserInfo,
+    requestUserApiKey,
   } = useCloudHosting();
 
   return (
@@ -41,6 +42,7 @@ export function CloudHostingDashboard() {
       onRequestInstanceTypeChange={requestInstanceTypeChange}
       onUpdateVersion={updateVersion}
       onRequestUserInfo={requestUserInfo}
+      onRequestUserApiKey={requestUserApiKey}
     />
   );
 }

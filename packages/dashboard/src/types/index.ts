@@ -73,6 +73,7 @@ export interface DashboardProps {
   ) => Promise<{ success: boolean; instanceType?: string; error?: string }>;
   onUpdateVersion?: () => Promise<void>;
   onRequestUserInfo?: () => Promise<DashboardUserInfo>;
+  onRequestUserApiKey?: () => Promise<string>;
 }
 
 export interface SelfHostingDashboardProps extends DashboardProps {
