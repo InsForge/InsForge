@@ -11,7 +11,6 @@ import {
 import { MCP_VERIFY_CONNECTION_PROMPT } from '../connect/constants';
 import { QuickStartPromptCard } from './QuickStartPromptCard';
 import { cn } from '../../../../lib/utils/utils';
-import { trackPostHog, getFeatureFlag } from '../../../../lib/analytics/posthog';
 
 function buildMcpDeeplink(agentId: string, apiKey: string, appUrl: string): string | null {
   const config = createMCPServerConfig(apiKey, 'macos-linux' as PlatformType, appUrl);
@@ -23,6 +22,24 @@ function buildMcpDeeplink(agentId: string, apiKey: string, appUrl: string): stri
   if (agentId === 'qoder') {
     const base64Config = btoa(encodeURIComponent(configString));
     return `qoder://aicoding.aicoding-deeplink/mcp/add?name=insforge&config=${encodeURIComponent(base64Config)}`;
+  }
+  return null;
+}
+
+// Open-chat-with-prompt deeplinks. Official docs:
+//   Cursor — https://cursor.com/docs/integrations/deeplinks
+//   Qoder  — https://docs.qoder.com/user-guide/deeplink
+// Cursor caps the total URL at 8000 chars after encoding; we fall back to
+// clipboard if the encoded prompt would blow past that.
+const CURSOR_DEEPLINK_MAX_LEN = 8000;
+function buildPromptDeeplink(agentId: string, prompt: string): string | null {
+  const encoded = encodeURIComponent(prompt);
+  if (agentId === 'cursor') {
+    const url = `cursor://anysphere.cursor-deeplink/prompt?text=${encoded}`;
+    return url.length > CURSOR_DEEPLINK_MAX_LEN ? null : url;
+  }
+  if (agentId === 'qoder') {
+    return `qoder://aicoding.aicoding-deeplink/chat?text=${encoded}&mode=agent`;
   }
   return null;
 }
@@ -147,15 +164,8 @@ interface InstallDeeplinkButtonProps {
 
 function InstallDeeplinkButton({ agent, deeplink }: InstallDeeplinkButtonProps) {
   const handleClick = useCallback(() => {
-    trackPostHog('onboarding_action_taken', {
-      action_type: 'install mcp',
-      experiment_variant: getFeatureFlag('onboarding-method-experiment'),
-      method: 'terminal',
-      agent_id: agent.id,
-      install_type: 'deeplink',
-    });
     window.open(deeplink, '_blank');
-  }, [agent.id, deeplink]);
+  }, [deeplink]);
 
   return (
     <WhiteActionButton
@@ -172,22 +182,23 @@ interface PastePromptButtonProps {
 }
 
 function PastePromptButton({ agent, prompt }: PastePromptButtonProps) {
+  const deeplink = useMemo(() => buildPromptDeeplink(agent.id, prompt), [agent.id, prompt]);
+
   const handleClick = useCallback(() => {
+    if (deeplink) {
+      window.open(deeplink, '_blank');
+      return;
+    }
+
+    // Fallback: no deeplink (agent unsupported or URL too long) — copy instead.
     void (async () => {
       try {
         await navigator.clipboard.writeText(prompt);
-        trackPostHog('onboarding_action_taken', {
-          action_type: 'verify mcp',
-          experiment_variant: getFeatureFlag('onboarding-method-experiment'),
-          method: 'clipboard',
-          agent_id: agent.id,
-          install_type: 'deeplink',
-        });
       } catch (error) {
         console.error('Failed to copy MCP verification prompt to clipboard', error);
       }
     })();
-  }, [agent.id, prompt]);
+  }, [deeplink, prompt]);
 
   return (
     <WhiteActionButton
