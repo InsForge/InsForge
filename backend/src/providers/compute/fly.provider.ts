@@ -14,8 +14,12 @@ export class FlyProvider implements ComputeProvider {
     return FlyProvider.instance;
   }
 
+  // Configured purely by the presence of FLY_API_TOKEN. No separate
+  // COMPUTE_SERVICES_ENABLED flag — if you've put a token in the env
+  // you've opted in. Cloud-managed mode (CloudComputeProvider) likewise
+  // detects itself implicitly from PROJECT_ID + JWT_SECRET + CLOUD_API_HOST.
   isConfigured(): boolean {
-    return config.fly.enabled && !!config.fly.apiToken;
+    return !!config.fly.apiToken;
   }
 
   private headers(): Record<string, string> {
@@ -302,18 +306,20 @@ export class FlyProvider implements ComputeProvider {
     return mapped.slice(0, limit);
   }
 
+  // Parse Fly.io's `<kind>-<N>x` format (e.g. shared-2x, performance-8x).
+  // We don't maintain a hardcoded allow-list — Fly is the source of truth
+  // for which sizes exist. Unsupported combinations (if any) return a clean
+  // Fly 4xx at machine-create time instead of being pre-rejected here.
+  // Falls back to shared-1x for malformed input so a typo never crashes a
+  // deploy; Fly will validate the final spec regardless.
   private mapCpuTier(
     cpu: string,
     memory: number
   ): { cpu_kind: string; cpus: number; memory_mb: number } {
-    const tiers: Record<string, { cpu_kind: string; cpus: number }> = {
-      'shared-1x': { cpu_kind: 'shared', cpus: 1 },
-      'shared-2x': { cpu_kind: 'shared', cpus: 2 },
-      'performance-1x': { cpu_kind: 'performance', cpus: 1 },
-      'performance-2x': { cpu_kind: 'performance', cpus: 2 },
-      'performance-4x': { cpu_kind: 'performance', cpus: 4 },
-    };
-    const tier = tiers[cpu] ?? tiers['shared-1x'];
-    return { ...tier, memory_mb: memory };
+    const m = /^(shared|performance)-([1-9]\d*)x$/.exec(cpu);
+    if (!m) {
+      return { cpu_kind: 'shared', cpus: 1, memory_mb: memory };
+    }
+    return { cpu_kind: m[1], cpus: parseInt(m[2], 10), memory_mb: memory };
   }
 }

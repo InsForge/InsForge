@@ -21,7 +21,6 @@ export interface AppConfig {
     domain: string;
   };
   fly: {
-    enabled: boolean;
     apiToken: string;
     org: string;
     domain: string;
@@ -51,7 +50,6 @@ export const config: AppConfig = {
     domain: 'functions.insforge.app',
   },
   fly: {
-    enabled: process.env.COMPUTE_SERVICES_ENABLED === 'true',
     apiToken: process.env.FLY_API_TOKEN || '',
     org: process.env.FLY_ORG || 'insforge',
     domain: process.env.COMPUTE_DOMAIN || '',
