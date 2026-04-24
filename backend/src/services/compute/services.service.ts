@@ -96,15 +96,19 @@ export function selectComputeProvider(): ComputeProvider {
   if (config.fly.enabled && config.fly.apiToken) {
     return FlyProvider.getInstance();
   }
-  if (config.cloud.computeEnabled) {
-    return CloudComputeProvider.getInstance();
+  // Cloud mode is detected implicitly from the PROJECT_ID + JWT_SECRET that
+  // the cloud backend's EC2 provisioning injects. No separate enable flag.
+  const cloudProvider = CloudComputeProvider.getInstance();
+  if (cloudProvider.isConfigured()) {
+    return cloudProvider;
   }
   throw new AppError(
-    'Compute services not configured. Set FLY_API_TOKEN for self-host, ' +
-      'or enable CLOUD_COMPUTE_ENABLED to use cloud-managed compute.',
+    'Compute services not configured. Self-hosted: set FLY_API_TOKEN in .env. ' +
+      'Cloud-managed: PROJECT_ID and JWT_SECRET must be set (normally injected ' +
+      "by the InsForge cloud backend at provisioning time).",
     503,
     ERROR_CODES.COMPUTE_NOT_CONFIGURED,
-    'Self-hosted: set FLY_API_TOKEN in .env. Cloud: set CLOUD_COMPUTE_ENABLED=true and verify PROJECT_ID is set.'
+    'Self-hosted: set FLY_API_TOKEN in .env. Cloud-managed: verify PROJECT_ID and JWT_SECRET are set.'
   );
 }
 

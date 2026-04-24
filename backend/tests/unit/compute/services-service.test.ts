@@ -29,7 +29,6 @@ vi.mock('@/infra/config/app.config.js', () => ({
       domain: 'fly.dev',
     },
     cloud: {
-      computeEnabled: false,
       projectId: '',
       apiHost: '',
     },
@@ -793,11 +792,11 @@ describe('selectComputeProvider factory', () => {
     vi.resetModules();
   });
 
-  it('returns FlyProvider when FLY_API_TOKEN is set', async () => {
+  it('returns FlyProvider when FLY_API_TOKEN is set (direct-Fly mode wins over cloud)', async () => {
     vi.doMock('@/infra/config/app.config.js', () => ({
       config: {
         fly: { apiToken: 'tok', org: 'o', enabled: true, domain: 'd' },
-        cloud: { computeEnabled: false, projectId: 'local', apiHost: '' },
+        cloud: { projectId: 'p', apiHost: 'https://x' },
         app: { jwtSecret: 'x' },
       },
     }));
@@ -806,11 +805,11 @@ describe('selectComputeProvider factory', () => {
     expect(selectComputeProvider()).toBe(FlyProvider.getInstance());
   });
 
-  it('returns CloudComputeProvider when cloud is enabled and no FLY_API_TOKEN', async () => {
+  it('returns CloudComputeProvider when PROJECT_ID + JWT_SECRET are real (no FLY_API_TOKEN)', async () => {
     vi.doMock('@/infra/config/app.config.js', () => ({
       config: {
         fly: { apiToken: '', org: '', enabled: false, domain: '' },
-        cloud: { computeEnabled: true, projectId: 'p', apiHost: 'https://x' },
+        cloud: { projectId: 'p', apiHost: 'https://x' },
         app: { jwtSecret: 'x' },
       },
     }));
@@ -819,12 +818,24 @@ describe('selectComputeProvider factory', () => {
     expect(selectComputeProvider()).toBe(CloudComputeProvider.getInstance());
   });
 
-  it('throws COMPUTE_NOT_CONFIGURED when neither is set', async () => {
+  it('throws COMPUTE_NOT_CONFIGURED when projectId is the "local" default', async () => {
     vi.doMock('@/infra/config/app.config.js', () => ({
       config: {
         fly: { apiToken: '', org: '', enabled: false, domain: '' },
-        cloud: { computeEnabled: false, projectId: 'local', apiHost: '' },
+        cloud: { projectId: 'local', apiHost: '' },
         app: { jwtSecret: 'x' },
+      },
+    }));
+    const { selectComputeProvider } = await import('@/services/compute/services.service.js');
+    expect(() => selectComputeProvider()).toThrow(/COMPUTE_NOT_CONFIGURED|not configured/);
+  });
+
+  it('throws COMPUTE_NOT_CONFIGURED when JWT_SECRET is missing', async () => {
+    vi.doMock('@/infra/config/app.config.js', () => ({
+      config: {
+        fly: { apiToken: '', org: '', enabled: false, domain: '' },
+        cloud: { projectId: 'p', apiHost: 'https://x' },
+        app: { jwtSecret: '' },
       },
     }));
     const { selectComputeProvider } = await import('@/services/compute/services.service.js');

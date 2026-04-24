@@ -20,9 +20,12 @@ export class CloudComputeProvider implements ComputeProvider {
     return CloudComputeProvider.instance;
   }
 
+  // Cloud mode is detected implicitly: a real PROJECT_ID (not the 'local'
+  // default) plus a JWT_SECRET means this OSS instance was provisioned by
+  // the InsForge cloud backend (which injects both at EC2 cloud-init time).
+  // No separate CLOUD_COMPUTE_ENABLED flag — it was redundant signal.
   isConfigured(): boolean {
     return (
-      config.cloud.computeEnabled === true &&
       !!config.cloud?.projectId &&
       config.cloud.projectId !== 'local' &&
       !!config.app?.jwtSecret
@@ -32,7 +35,8 @@ export class CloudComputeProvider implements ComputeProvider {
   private signToken(): string {
     if (!this.isConfigured()) {
       throw new AppError(
-        'Cloud compute not configured (need PROJECT_ID, JWT_SECRET, CLOUD_COMPUTE_ENABLED)',
+        'Cloud compute not configured (need PROJECT_ID and JWT_SECRET set ' +
+          "by the cloud backend's EC2 provisioning)",
         500,
         ERROR_CODES.COMPUTE_NOT_CONFIGURED,
       );

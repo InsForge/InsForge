@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 
 vi.mock('@/infra/config/app.config.js', () => ({
   config: {
-    cloud: { apiHost: 'https://cloud.test', projectId: 'proj-1', computeEnabled: true },
+    cloud: { apiHost: 'https://cloud.test', projectId: 'proj-1' },
     app: { jwtSecret: 'secret-1' },
   },
 }));
@@ -101,7 +101,7 @@ describe('CloudComputeProvider', () => {
     // Force signToken to throw COMPUTE_NOT_CONFIGURED, as it would when isConfigured() is false
     vi.spyOn(provider as any, 'signToken').mockImplementation(() => {
       throw new AppError(
-        'Cloud compute not configured (need PROJECT_ID, JWT_SECRET, CLOUD_COMPUTE_ENABLED)',
+        'Cloud compute not configured (need PROJECT_ID and JWT_SECRET)',
         500,
         (ERROR_CODES as any).COMPUTE_NOT_CONFIGURED ?? ERROR_CODES.INTERNAL_ERROR,
       );
