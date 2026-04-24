@@ -1,8 +1,8 @@
 import { type ReactNode } from 'react';
 import { Database, Sparkles } from 'lucide-react';
 import KeyHorizontalIcon from '../../../../assets/icons/key_horizontal.svg?react';
-import ClaudeLogo from '../../../../assets/logos/claude_code.svg?react';
-import OpenAILogo from '../../../../assets/logos/openai.svg?react';
+import ClaudeLogo from '../../../../assets/logos/claude_code.png';
+import CodexLogo from '../../../../assets/logos/codex.svg?react';
 import CursorLogo from '../../../../assets/logos/cursor.svg?react';
 import CopilotLogo from '../../../../assets/logos/copilot.svg?react';
 import OpenCodeLogo from '../../../../assets/logos/opencode.svg?react';
@@ -25,6 +25,8 @@ export type ClientId =
 
 export type ClientKind = 'agent' | 'direct-connect';
 
+export type AgentTab = 'cli' | 'mcp';
+
 export interface ClientEntry {
   id: ClientId;
   label: string;
@@ -33,6 +35,12 @@ export interface ClientEntry {
   kind: ClientKind;
   /** MCP detail preselection. Use 'mcp' for "Other Agents"; omit for direct-connect. */
   mcpAgentId?: string;
+  /**
+   * Tabs available on the detail page for `kind: 'agent'`. Omit = both CLI and
+   * MCP. Use `['cli']` for OpenClaw (install flow only) and `['mcp']` for
+   * "Other Agents" (drops straight into the MCP JSON config).
+   */
+  tabs?: ReadonlyArray<AgentTab>;
 }
 
 const iconTile = (node: ReactNode) => (
@@ -47,20 +55,21 @@ export const CLIENT_ENTRIES: Record<ClientId, ClientEntry> = {
     detailIcon: <OpenClawLogo className="h-8 w-8" />,
     kind: 'agent',
     mcpAgentId: 'openclaw',
+    tabs: ['cli'],
   },
   'claude-code': {
     id: 'claude-code',
     label: 'Claude Code',
-    icon: iconTile(<ClaudeLogo className="h-8 w-8" />),
-    detailIcon: <ClaudeLogo className="h-8 w-8" />,
+    icon: iconTile(<img src={ClaudeLogo} alt="Claude Code" className="h-8 w-8 object-contain" />),
+    detailIcon: <img src={ClaudeLogo} alt="Claude Code" className="h-8 w-8 object-contain" />,
     kind: 'agent',
     mcpAgentId: 'claude-code',
   },
   codex: {
     id: 'codex',
     label: 'Codex',
-    icon: iconTile(<OpenAILogo className="h-8 w-8 dark:text-white" />),
-    detailIcon: <OpenAILogo className="h-8 w-8 dark:text-white" />,
+    icon: iconTile(<CodexLogo className="h-8 w-8" />),
+    detailIcon: <CodexLogo className="h-8 w-8" />,
     kind: 'agent',
     mcpAgentId: 'codex',
   },
@@ -114,6 +123,7 @@ export const CLIENT_ENTRIES: Record<ClientId, ClientEntry> = {
     kind: 'agent',
     // Jumps directly to the MCP JSON config (no agent dropdown needed).
     mcpAgentId: 'mcp',
+    tabs: ['mcp'],
   },
   'connection-string': {
     id: 'connection-string',
