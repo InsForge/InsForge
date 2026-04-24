@@ -11,10 +11,9 @@ custom scripts — at that endpoint with a project access key and you can
 read/write the same buckets you use through the REST API and the Dashboard.
 
 <Info>
-**Cloud only.** The S3 gateway is available on InsForge Cloud projects.
-Self-hosted deployments can achieve the same capability by running the
-platform against a MinIO or AWS S3 bucket and exposing `/storage/v1/s3`
-behind their own ingress.
+  **Cloud only.** The S3 gateway is available on InsForge Cloud projects. Self-hosted deployments
+  can achieve the same capability by running the platform against a MinIO or AWS S3 bucket and
+  exposing `/storage/v1/s3` behind their own ingress.
 </Info>
 
 ## When to use it
@@ -33,10 +32,10 @@ app code and doesn't require you to hand out long-lived S3 credentials.
 Both values are shown in the Dashboard under **Storage → Settings →
 S3 Configuration**, or fetched via `GET /api/storage/s3/config`.
 
-| Field | Value |
-| --- | --- |
+| Field    | Value                                                       |
+| -------- | ----------------------------------------------------------- |
 | Endpoint | `https://{project-ref}.{region}.insforge.app/storage/v1/s3` |
-| Region | `us-east-2` (or the value set via `AWS_REGION`) |
+| Region   | `us-east-2` (or the value set via `AWS_REGION`)             |
 
 Clients **must** use path-style URLs (`forcePathStyle: true`). Virtual-hosted
 style (`{bucket}.endpoint/...`) is not supported.
@@ -69,9 +68,8 @@ Response:
 ```
 
 <Warning>
-The `secretAccessKey` is returned **exactly once**. It is encrypted at rest
-and we can't recover it for you later — capture it immediately on create,
-and revoke + recreate if you lose it.
+  The `secretAccessKey` is returned **exactly once**. It is encrypted at rest and we can't recover
+  it for you later — capture it immediately on create, and revoke + recreate if you lose it.
 </Warning>
 
 Keys grant **project-admin-level** access: they can read and write every
@@ -177,12 +175,12 @@ rclone sync insforge:my-bucket/backups ./local-backups
 
 The gateway implements the operations needed by common workloads:
 
-| Category | Operations |
-| --- | --- |
-| Bucket | `ListBuckets`, `CreateBucket`, `DeleteBucket`, `HeadBucket`, `ListObjectsV2` |
-| Object | `PutObject`, `GetObject` (incl. `Range`), `HeadObject`, `DeleteObject`, `DeleteObjects`, `CopyObject` |
-| Multipart | `CreateMultipartUpload`, `UploadPart`, `CompleteMultipartUpload`, `AbortMultipartUpload`, `ListParts` |
-| Probe stubs | `GetBucketLocation`, `GetBucketVersioning` (for SDK startup checks) |
+| Category    | Operations                                                                                            |
+| ----------- | ----------------------------------------------------------------------------------------------------- |
+| Bucket      | `ListBuckets`, `CreateBucket`, `DeleteBucket`, `HeadBucket`, `ListObjectsV2`                          |
+| Object      | `PutObject`, `GetObject` (incl. `Range`), `HeadObject`, `DeleteObject`, `DeleteObjects`, `CopyObject` |
+| Multipart   | `CreateMultipartUpload`, `UploadPart`, `CompleteMultipartUpload`, `AbortMultipartUpload`, `ListParts` |
+| Probe stubs | `GetBucketLocation`, `GetBucketVersioning` (for SDK startup checks)                                   |
 
 Streaming uploads are fully supported: both the classic
 `STREAMING-AWS4-HMAC-SHA256-PAYLOAD` format and the newer
@@ -222,14 +220,14 @@ curl -H "x-api-key: $ACCESS_API_KEY" \
 
 ## Limits & Errors
 
-| Limit | Value |
-| --- | --- |
-| Single `PutObject` body | 5 GB (AWS S3 cap; deployment may lower via `S3_PROTOCOL_MAX_OBJECT_SIZE_GB`) |
-| Multipart part | 5 MB min (except last), 5 GB max, parts 1–10 000 |
-| Multipart object total | 5 TB |
-| Access keys per project | 50 |
-| Clock skew tolerance | 15 minutes |
-| Access-key admin API rate limit | 20 requests / 15 min / IP |
+| Limit                           | Value                                                                        |
+| ------------------------------- | ---------------------------------------------------------------------------- |
+| Single `PutObject` body         | 5 GB (AWS S3 cap; deployment may lower via `S3_PROTOCOL_MAX_OBJECT_SIZE_GB`) |
+| Multipart part                  | 5 MB min (except last), 5 GB max, parts 1–10 000                             |
+| Multipart object total          | 5 TB                                                                         |
+| Access keys per project         | 50                                                                           |
+| Clock skew tolerance            | 15 minutes                                                                   |
+| Access-key admin API rate limit | 20 requests / 15 min / IP                                                    |
 
 All errors use AWS's XML shape:
 
@@ -258,17 +256,16 @@ Common codes you may see: `SignatureDoesNotMatch`, `InvalidAccessKeyId`,
     - A proxy that rewrites or strips headers in the `SignedHeaders` list.
   </Accordion>
 
-  <Accordion title="InvalidAccessKeyId">
-    The key was revoked, never existed, or was mistyped. Check the
-    Dashboard's access-keys list and regenerate if needed.
-  </Accordion>
+<Accordion title="InvalidAccessKeyId">
+  The key was revoked, never existed, or was mistyped. Check the Dashboard's access-keys list and
+  regenerate if needed.
+</Accordion>
 
-  <Accordion title="NotImplemented on client startup">
-    Some SDKs probe `GetBucketVersioning` / `GetBucketLocation` on first
-    use; the gateway stubs these. If you see `NotImplemented` it's more
-    likely because the backend isn't configured with `AWS_S3_BUCKET`
-    (self-hosted without an S3-compatible backend).
-  </Accordion>
+<Accordion title="NotImplemented on client startup">
+  Some SDKs probe `GetBucketVersioning` / `GetBucketLocation` on first use; the gateway stubs these.
+  If you see `NotImplemented` it's more likely because the backend isn't configured with
+  `AWS_S3_BUCKET` (self-hosted without an S3-compatible backend).
+</Accordion>
 
   <Accordion title="Large uploads hang or fail">
     Make sure your client uses the default streaming signing
