@@ -92,6 +92,15 @@ function makeNetwork(projectId: string): string {
   return `${projectId}-network`;
 }
 
+// Default to Fly's own .fly.dev hostname (which Fly routes automatically for
+// every app). Operators owning a custom domain can set COMPUTE_DOMAIN; otherwise
+// we return a URL that actually resolves instead of a vanity domain the operator
+// doesn't control.
+function makeEndpointUrl(flyAppName: string): string {
+  const domain = config.fly.domain || 'fly.dev';
+  return `https://${flyAppName}.${domain}`;
+}
+
 export function selectComputeProvider(): ComputeProvider {
   // Self-host takes precedence: if FLY_API_TOKEN is set, the user has their own
   // Fly account and wants direct control. Otherwise fall through to cloud-proxy
@@ -206,7 +215,7 @@ export class ComputeServicesService {
     const serviceId = row.id;
     const flyAppName = makeFlyAppName(input.name, input.projectId);
     const network = makeNetwork(input.projectId);
-    const endpointUrl = `https://${flyAppName}.${config.fly.domain}`;
+    const endpointUrl = makeEndpointUrl(flyAppName);
 
     let flyMachineId: string | undefined;
     try {
@@ -290,7 +299,7 @@ export class ComputeServicesService {
 
     const flyAppName = makeFlyAppName(input.name, input.projectId);
     const network = makeNetwork(input.projectId);
-    const endpointUrl = `https://${flyAppName}.${config.fly.domain}`;
+    const endpointUrl = makeEndpointUrl(flyAppName);
 
     // Insert row — check for duplicate name before calling Fly APIs
     let insertResult;
