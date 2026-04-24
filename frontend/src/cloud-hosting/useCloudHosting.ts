@@ -30,7 +30,8 @@ type PendingRequestKey =
   | 'renameProject'
   | 'deleteProject'
   | 'updateVersion'
-  | 'userInfo';
+  | 'userInfo'
+  | 'userApiKey';
 
 type PendingRequest<T> = {
   resolve: (value: T) => void;
@@ -51,6 +52,7 @@ type PendingRequestValues = {
   deleteProject: void;
   updateVersion: void;
   userInfo: DashboardUserInfo;
+  userApiKey: string;
 };
 
 type PendingRequests = {
@@ -224,6 +226,9 @@ export function useCloudHosting() {
           return;
         case 'userInfo':
           pendingRequestsRef.current.userInfo = pendingRequest as PendingRequest<DashboardUserInfo>;
+          return;
+        case 'userApiKey':
+          pendingRequestsRef.current.userApiKey = pendingRequest as PendingRequest<string>;
           return;
       }
     },
@@ -439,6 +444,23 @@ export function useCloudHosting() {
           });
           return;
         }
+        case 'USER_API_KEY': {
+          const apiKey =
+            typeof message.apiKey === 'string' && message.apiKey.trim() ? message.apiKey : '';
+          if (!apiKey) {
+            rejectPendingRequest('userApiKey', 'Received an invalid user API key payload');
+            return;
+          }
+          resolvePendingRequest('userApiKey', apiKey);
+          return;
+        }
+        case 'USER_API_KEY_ERROR': {
+          rejectPendingRequest(
+            'userApiKey',
+            getErrorMessage(message.error, 'Failed to create user API key')
+          );
+          return;
+        }
         case 'INSTANCE_INFO': {
           resolvePendingRequest('instanceInfo', {
             currentInstanceType:
@@ -651,6 +673,13 @@ export function useCloudHosting() {
     return createPendingRequest('userInfo', 'User info request');
   }, [createPendingRequest, postMessageToParent]);
 
+  const requestUserApiKey = useCallback(async (): Promise<string> => {
+    if (!postMessageToParent({ type: 'REQUEST_USER_API_KEY' })) {
+      throw new Error('Unable to request a user API key from the parent window');
+    }
+    return createPendingRequest('userApiKey', 'User API key request');
+  }, [createPendingRequest, postMessageToParent]);
+
   const navigateToSubscription = useCallback(() => {
     void postMessageToParent({ type: 'NAVIGATE_TO_SUBSCRIPTION' });
   }, [postMessageToParent]);
@@ -678,5 +707,6 @@ export function useCloudHosting() {
     updateVersion,
     navigateToSubscription,
     requestUserInfo,
+    requestUserApiKey,
   };
 }
