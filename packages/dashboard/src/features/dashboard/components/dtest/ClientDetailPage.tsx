@@ -6,7 +6,7 @@ import { APIKeysSectionV2 } from '../connect/APIKeysSectionV2';
 import { DTestMCPSection } from './DTestMCPSection';
 import { DTestCLISection } from './DTestCLISection';
 import { QuickStartPromptCard } from './QuickStartPromptCard';
-import { CLIENT_ENTRIES, type ClientId } from './clientRegistry';
+import { CLIENT_ENTRIES, type AgentTab, type ClientId } from './clientRegistry';
 import { useApiKey, useDatabaseConnectionString } from '../../../../lib/hooks/useMetadata';
 import { useAnonToken } from '../../../auth/hooks/useAnonToken';
 import { cn, getBackendUrl } from '../../../../lib/utils/utils';
@@ -16,14 +16,15 @@ interface ClientDetailPageProps {
   onBack: () => void;
 }
 
-type DetailTab = 'cli' | 'mcp';
+const DEFAULT_AGENT_TABS: ReadonlyArray<AgentTab> = ['cli', 'mcp'];
 
 export function ClientDetailPage({ clientId, onBack }: ClientDetailPageProps) {
   const entry = CLIENT_ENTRIES[clientId];
+  const availableTabs = entry.tabs ?? DEFAULT_AGENT_TABS;
   const { apiKey, isLoading: isApiKeyLoading } = useApiKey();
   const { accessToken: anonKey, isLoading: isAnonKeyLoading } = useAnonToken();
   const { connectionData } = useDatabaseConnectionString();
-  const [tab, setTab] = useState<DetailTab>('cli');
+  const [tab, setTab] = useState<AgentTab>(availableTabs[0] ?? 'cli');
 
   const appUrl = getBackendUrl();
   const displayApiKey = isApiKeyLoading ? 'ik_' + '*'.repeat(32) : apiKey || '';
@@ -54,11 +55,19 @@ export function ClientDetailPage({ clientId, onBack }: ClientDetailPageProps) {
         {/* Body per kind */}
         {entry.kind === 'agent' ? (
           <>
-            {/* CLI/MCP toggle */}
-            <div className="flex w-full overflow-hidden rounded border border-[var(--alpha-8)] bg-[var(--alpha-4)]">
-              <TabButton active={tab === 'cli'} onClick={() => setTab('cli')} label="CLI" />
-              <TabButton active={tab === 'mcp'} onClick={() => setTab('mcp')} label="MCP" />
-            </div>
+            {/* CLI/MCP toggle — only shown when the entry supports more than one tab */}
+            {availableTabs.length > 1 && (
+              <div className="flex w-full overflow-hidden rounded border border-[var(--alpha-8)] bg-[var(--alpha-4)]">
+                {availableTabs.map((t) => (
+                  <TabButton
+                    key={t}
+                    active={tab === t}
+                    onClick={() => setTab(t)}
+                    label={t === 'cli' ? 'CLI' : 'MCP'}
+                  />
+                ))}
+              </div>
+            )}
 
             {tab === 'cli' ? (
               <DTestCLISection agentName={entry.label} />
