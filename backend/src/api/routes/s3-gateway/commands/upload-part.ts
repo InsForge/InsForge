@@ -1,7 +1,10 @@
 import { Response } from 'express';
 import { Readable, Transform, TransformCallback } from 'stream';
 import { StorageService } from '@/services/storage/storage.service.js';
-import { ChunkSignatureV4Parser } from '@/services/storage/s3-signature.js';
+import {
+  AwsChunkedPayloadParser,
+  ChunkSignatureV4Parser,
+} from '@/services/storage/s3-signature.js';
 import { sendS3Error, S3ProtocolError } from '../errors.js';
 import { S3AuthenticatedRequest } from '@/api/middlewares/s3-sigv4.js';
 
@@ -59,7 +62,11 @@ export async function handle(req: S3AuthenticatedRequest, res: Response): Promis
     return;
   }
 
-  const isStreaming = req.s3Auth.payloadHash === 'STREAMING-AWS4-HMAC-SHA256-PAYLOAD';
+  const payloadHash = req.s3Auth.payloadHash;
+  const isSignedStream = payloadHash === 'STREAMING-AWS4-HMAC-SHA256-PAYLOAD';
+  const isSignedStreamTrailer = payloadHash === 'STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER';
+  const isUnsignedStreamTrailer = payloadHash === 'STREAMING-UNSIGNED-PAYLOAD-TRAILER';
+  const isStreaming = isSignedStream || isSignedStreamTrailer || isUnsignedStreamTrailer;
   const decodedLen = parseDecodedLength(req.headers['x-amz-decoded-content-length']);
   const plainLen = Number(req.headers['content-length'] ?? 0);
   // Streaming parts: x-amz-decoded-content-length is authoritative (0 is valid).
@@ -86,13 +93,19 @@ export async function handle(req: S3AuthenticatedRequest, res: Response): Promis
   }
 
   let body: Readable = req;
-  if (isStreaming) {
+  if (isSignedStream || isSignedStreamTrailer) {
     const parser = new ChunkSignatureV4Parser({
       seedSignature: req.s3Auth.seedSignature,
       signingKey: req.s3Auth.signingKey,
       datetime: req.s3Auth.datetime,
       scope: req.s3Auth.scope,
+      acceptTrailer: isSignedStreamTrailer,
     });
+    const limiter = new ByteLimitStream(MAX_PART_BYTES);
+    req.pipe(parser).pipe(limiter);
+    body = limiter;
+  } else if (isUnsignedStreamTrailer) {
+    const parser = new AwsChunkedPayloadParser();
     const limiter = new ByteLimitStream(MAX_PART_BYTES);
     req.pipe(parser).pipe(limiter);
     body = limiter;
