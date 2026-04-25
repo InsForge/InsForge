@@ -4,7 +4,6 @@ import AppSidebar from './AppSidebar';
 import AppHeader from './AppHeader';
 import { ThemeProvider } from '../lib/contexts/ThemeContext';
 import { ConnectDialog } from '../features/dashboard/components/connect';
-import { ConnectDialogV2 } from '../features/dashboard/components/connect/ConnectDialogV2';
 import { ProjectRestoringPage } from '../features/dashboard/components/ProjectRestoringPage';
 import { useDashboardHost, useDashboardProject } from '../lib/config/DashboardHostContext';
 import { cn } from '../lib/utils/utils';
@@ -125,11 +124,7 @@ export default function AppLayout({ children }: LayoutProps) {
               </main>
             </div>
           </div>
-          {getFeatureFlag('dashboard-v4-experiment') === 'c_test' ? (
-            <ConnectDialogV2 open={isConnectDialogOpen} onOpenChange={setIsConnectDialogOpen} />
-          ) : (
-            <ConnectDialog open={isConnectDialogOpen} onOpenChange={setIsConnectDialogOpen} />
-          )}
+          <ConnectDialog open={isConnectDialogOpen} onOpenChange={setIsConnectDialogOpen} />
         </DTestViewProvider>
       </ConnectDialogProvider>
     </ThemeProvider>
