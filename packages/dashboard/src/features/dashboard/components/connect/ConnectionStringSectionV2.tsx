@@ -79,6 +79,21 @@ export function ConnectionStringSectionV2({
     showParamsPassword,
   ]);
 
+  // Clipboard always uses the real password regardless of reveal state, matching
+  // the connection-string clipboard above. Without this, copying parameters
+  // while the password is hidden would paste literal "*******" into the user's
+  // agent / config file.
+  const parametersClipboard = useMemo(() => {
+    return parameters
+      .map(({ label, value }) => {
+        if (label === 'PASSWORD' && dbPassword) {
+          return `${label}: ${dbPassword}`;
+        }
+        return `${label}: ${formatParameterValue(value)}`;
+      })
+      .join('\n');
+  }, [parameters, dbPassword]);
+
   const isVertical = variant === 'vertical';
 
   return (
@@ -138,12 +153,7 @@ export function ConnectionStringSectionV2({
                 show={showParamsPassword}
                 onToggle={() => setShowParamsPassword(!showParamsPassword)}
               />
-              <CopyButton
-                text={parameters
-                  .map(({ label, value }) => `${label}: ${formatParameterValue(value)}`)
-                  .join('\n')}
-                showText={false}
-              />
+              <CopyButton text={parametersClipboard} showText={false} />
             </div>
           </div>
           <div className="flex flex-col gap-1 font-mono text-sm leading-5">
