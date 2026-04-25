@@ -52,7 +52,8 @@
               {
                 "group": "Storage",
                 "pages": [
-                  "core-concepts/storage/architecture"
+                  "core-concepts/storage/architecture",
+                  "core-concepts/storage/s3-compatibility"
                 ]
               },
               {

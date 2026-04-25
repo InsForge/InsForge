@@ -1,0 +1,287 @@
+---
+title: S3-Compatible Gateway
+description: Read and write InsForge Storage with any S3 SDK or CLI via the AWS SigV4 protocol
+---
+
+## Overview
+
+InsForge Storage speaks the **AWS S3 protocol** at `/storage/v1/s3`. Point
+any SigV4-signing client — the `aws` CLI, AWS SDKs, `rclone`, Terraform,
+custom scripts — at that endpoint with a project access key and you can
+read/write the same buckets you use through the REST API and the Dashboard.
+
+<Info>
+  **Cloud only.** The S3 gateway is available on InsForge Cloud projects. Self-hosted deployments
+  can achieve the same capability by running the platform against a MinIO or AWS S3 bucket and
+  exposing `/storage/v1/s3` behind their own ingress.
+</Info>
+
+## When to use it
+
+- Push build artifacts from CI with `aws s3 cp` or `rclone sync`.
+- Migrate existing S3-based tooling without rewriting it — Terraform's
+  `aws_s3_object`, backup scripts, log shippers, etc. all work unchanged.
+- Upload from servers or workers where pulling in our SDK is overkill.
+
+For browser direct uploads, public download URLs, bucket visibility
+management, and typed helpers, prefer the [InsForge SDK](/sdks/typescript/storage) — it's built for
+app code and doesn't require you to hand out long-lived S3 credentials.
+
+## Endpoint & Region
+
+Both values are shown in the Dashboard under **Storage → Settings →
+S3 Configuration**, or fetched via `GET /api/storage/s3/config`.
+
+| Field    | Value                                                       |
+| -------- | ----------------------------------------------------------- |
+| Endpoint | `https://{project-ref}.{region}.insforge.app/storage/v1/s3` |
+| Region   | `us-east-2` (or the value set via `AWS_REGION`)             |
+
+Clients **must** use path-style URLs (`forcePathStyle: true`). Virtual-hosted
+style (`{bucket}.endpoint/...`) is not supported.
+
+## Access Keys
+
+Generate credentials from **Storage → Settings → S3 Configuration →
+New access key** in the Dashboard, or via the admin API:
+
+```bash
+curl -X POST "$API_BASE/api/storage/s3/access-keys" \
+  -H "x-api-key: $ACCESS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"description":"backup-script"}'
+```
+
+Response:
+
+```json
+{
+  "data": {
+    "id": "11111111-1111-1111-1111-111111111111",
+    "accessKeyId": "INSFABC123DEF456GH78",
+    "secretAccessKey": "x7K2-a_pL9qRs4N8vYzWcE1fH5gJ3mUtBoD6ViXk",
+    "description": "backup-script",
+    "createdAt": "2026-04-22T00:00:00Z",
+    "lastUsedAt": null
+  }
+}
+```
+
+<Warning>
+  The `secretAccessKey` is returned **exactly once**. It is encrypted at rest and we can't recover
+  it for you later — capture it immediately on create, and revoke + recreate if you lose it.
+</Warning>
+
+Keys grant **project-admin-level** access: they can read and write every
+bucket regardless of the `public`/`private` flag. There's a hard cap of
+**50 keys per project**. Revoke a key with:
+
+```bash
+curl -X DELETE -H "x-api-key: $ACCESS_API_KEY" \
+  "$API_BASE/api/storage/s3/access-keys/$KEY_ID"
+```
+
+Revocation invalidates the server-side LRU cache immediately, so clients
+still holding the credentials start seeing `InvalidAccessKeyId` at once.
+
+## Client Examples
+
+### AWS SDK for JavaScript v3
+
+```ts
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+
+const client = new S3Client({
+  forcePathStyle: true,
+  region: 'us-east-2',
+  endpoint: 'https://project_ref.region.insforge.app/storage/v1/s3',
+  credentials: {
+    accessKeyId: 'your_access_key_id',
+    secretAccessKey: 'your_secret_access_key',
+  },
+});
+
+await client.send(
+  new PutObjectCommand({
+    Bucket: 'my-bucket',
+    Key: 'hello.txt',
+    Body: 'hello from node',
+    ContentType: 'text/plain',
+  })
+);
+```
+
+### AWS CLI & shared credentials file
+
+```ini
+# ~/.aws/credentials
+[insforge]
+aws_access_key_id = your_access_key_id
+aws_secret_access_key = your_secret_access_key
+
+# ~/.aws/config
+[profile insforge]
+region = us-east-2
+endpoint_url = https://project_ref.region.insforge.app/storage/v1/s3
+s3 =
+  addressing_style = path
+```
+
+Then:
+
+```bash
+aws --profile insforge s3 ls
+aws --profile insforge s3 cp ./photo.jpg s3://my-bucket/photo.jpg
+aws --profile insforge s3 sync ./dist s3://my-bucket/dist
+```
+
+### boto3 (Python)
+
+```python
+import boto3
+
+s3 = boto3.client(
+    's3',
+    region_name='us-east-2',
+    endpoint_url='https://project_ref.region.insforge.app/storage/v1/s3',
+    aws_access_key_id='your_access_key_id',
+    aws_secret_access_key='your_secret_access_key',
+    config=boto3.session.Config(s3={'addressing_style': 'path'}),
+)
+
+s3.upload_file('photo.jpg', 'my-bucket', 'photo.jpg')
+```
+
+### rclone
+
+```ini
+# ~/.config/rclone/rclone.conf
+[insforge]
+type = s3
+provider = Other
+access_key_id = your_access_key_id
+secret_access_key = your_secret_access_key
+endpoint = https://project_ref.region.insforge.app/storage/v1/s3
+region = us-east-2
+force_path_style = true
+```
+
+```bash
+rclone copy ./dist insforge:my-bucket/dist
+rclone sync insforge:my-bucket/backups ./local-backups
+```
+
+## Supported Operations
+
+The gateway implements the operations needed by common workloads:
+
+| Category    | Operations                                                                                            |
+| ----------- | ----------------------------------------------------------------------------------------------------- |
+| Bucket      | `ListBuckets`, `CreateBucket`, `DeleteBucket`, `HeadBucket`, `ListObjectsV2`                          |
+| Object      | `PutObject`, `GetObject` (incl. `Range`), `HeadObject`, `DeleteObject`, `DeleteObjects`, `CopyObject` |
+| Multipart   | `CreateMultipartUpload`, `UploadPart`, `CompleteMultipartUpload`, `AbortMultipartUpload`, `ListParts` |
+| Probe stubs | `GetBucketLocation`, `GetBucketVersioning` (for SDK startup checks)                                   |
+
+Streaming uploads are fully supported: both the classic
+`STREAMING-AWS4-HMAC-SHA256-PAYLOAD` format and the newer
+`STREAMING-UNSIGNED-PAYLOAD-TRAILER` /
+`STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER` formats produced by AWS SDKs
+with "default integrity protections" enabled. So `aws s3 cp` with large
+files and `aws s3 sync` work without any client-side configuration
+changes. Trailing CRC32 / CRC32C / CRC64NVME / SHA1 / SHA256 checksums
+sent by the client are accepted but not re-verified by the gateway.
+
+### Not supported
+
+- **Presigned URLs** (query-string SigV4). For browser direct uploads,
+  use the REST helper `POST /api/storage/buckets/:bucket/upload-strategy`.
+- **Session tokens** (`X-Amz-Security-Token` / user-JWT-scoped access).
+  The gateway only accepts the long-lived access keys described above.
+- S3 governance features: versioning, SSE-C / SSE-KMS, bucket policies,
+  ACLs, object lock, tagging, lifecycle, replication, CORS config. These
+  return `NotImplemented` (501).
+- Virtual-hosted-style URLs. Path-style only.
+
+## Shared Namespace with REST
+
+An object uploaded via the S3 gateway appears immediately in the REST API
+and the Dashboard — and vice versa. There's no separate S3 bucket
+namespace to reconcile.
+
+```bash
+# Upload via S3 protocol
+aws --profile insforge s3 cp photo.jpg s3://my-bucket/photo.jpg
+
+# Same object is visible to the REST API
+curl -H "x-api-key: $ACCESS_API_KEY" \
+  "$API_BASE/api/storage/buckets/my-bucket/objects"
+# { "data": [{ "key": "photo.jpg", ... }] }
+```
+
+## Limits & Errors
+
+| Limit                           | Value                                                                        |
+| ------------------------------- | ---------------------------------------------------------------------------- |
+| Single `PutObject` body         | 5 GB (AWS S3 cap; deployment may lower via `S3_PROTOCOL_MAX_OBJECT_SIZE_GB`) |
+| Multipart part                  | 5 MB min (except last), 5 GB max, parts 1–10 000                             |
+| Multipart object total          | 5 TB                                                                         |
+| Access keys per project         | 50                                                                           |
+| Clock skew tolerance            | 15 minutes                                                                   |
+| Access-key admin API rate limit | 20 requests / 15 min / IP                                                    |
+
+All errors use AWS's XML shape:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<Error>
+  <Code>SignatureDoesNotMatch</Code>
+  <Message>...</Message>
+  <Resource>/my-bucket/photo.jpg</Resource>
+  <RequestId>...</RequestId>
+</Error>
+```
+
+Common codes you may see: `SignatureDoesNotMatch`, `InvalidAccessKeyId`,
+`RequestTimeTooSkewed`, `AuthorizationHeaderMalformed`, `NoSuchBucket`,
+`NoSuchKey`, `EntityTooLarge`, `BucketAlreadyOwnedByYou`, `BucketNotEmpty`.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="SignatureDoesNotMatch">
+    Most commonly caused by one of:
+    - Wrong region in the client — it must match the server's `AWS_REGION` (shown in the Dashboard).
+    - Clock skew on the client. SigV4 signatures expire after 15 minutes; check `date -u` matches wall clock.
+    - Using virtual-hosted-style URLs. Set `forcePathStyle: true` (SDK) or `s3.addressing_style = path` (aws-cli / boto3).
+    - A proxy that rewrites or strips headers in the `SignedHeaders` list.
+  </Accordion>
+
+<Accordion title="InvalidAccessKeyId">
+  The key was revoked, never existed, or was mistyped. Check the Dashboard's access-keys list and
+  regenerate if needed.
+</Accordion>
+
+<Accordion title="NotImplemented on client startup">
+  Some SDKs probe `GetBucketVersioning` / `GetBucketLocation` on first use; the gateway stubs these.
+  If you see `NotImplemented` it's more likely because the backend isn't configured with
+  `AWS_S3_BUCKET` (self-hosted without an S3-compatible backend).
+</Accordion>
+
+  <Accordion title="Large uploads hang or fail">
+    Make sure your client uses the default streaming signing
+    (`STREAMING-AWS4-HMAC-SHA256-PAYLOAD`). A custom config forcing
+    `UNSIGNED-PAYLOAD` will buffer the entire body in memory on the
+    server and can hit the single-object cap.
+  </Accordion>
+</AccordionGroup>
+
+## See Also
+
+<CardGroup cols={2}>
+  <Card title="Storage Architecture" icon="database" href="/core-concepts/storage/architecture">
+    How Storage is built on top of S3-compatible backends.
+  </Card>
+  <Card title="TypeScript SDK" icon="js" href="/sdks/typescript/storage">
+    Higher-level client for app code — presigned uploads, public URLs, bucket visibility.
+  </Card>
+</CardGroup>
