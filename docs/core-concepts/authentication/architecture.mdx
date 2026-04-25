@@ -83,6 +83,10 @@ InsForge supports both `code` and `link` methods for email verification and pass
 - `redirectTo` must be included in `allowedRedirectUrls` before link-based flows can use it.
 - If `allowedRedirectUrls` is empty, InsForge allows all redirects for smoother development UX. Do not rely on that behavior in production.
 
+<Note>
+Verification and password-reset emails are sent through InsForge Cloud by default. To send them from your own server with custom subject lines and HTML, configure [Custom SMTP](/core-concepts/email/custom-smtp) under **Authentication → Email** in the dashboard — the four `email-verification-*` and `reset-password-*` templates are fully editable.
+</Note>
+
 For link-based email verification:
 
 - The email link opens `GET /api/auth/email/verify-link?token=...`

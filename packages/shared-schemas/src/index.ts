@@ -4,6 +4,7 @@ export * from './secrets.schema.js';
 export * from './secrets-api.schema.js';
 export * from './storage.schema.js';
 export * from './storage-api.schema.js';
+export * from './s3-access-key.schema.js';
 export * from './auth.schema.js';
 export * from './auth-api.schema.js';
 export * from './metadata.schema.js';

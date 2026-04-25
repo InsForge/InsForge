@@ -2,8 +2,8 @@
 -- and persist per-request redirect targets for email OTP flows.
 DO $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'auth' AND table_name = 'configs')
-     AND NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'auth' AND table_name = 'config')
+  IF to_regclass('auth.configs') IS NOT NULL
+     AND to_regclass('auth.config') IS NULL
   THEN
     ALTER TABLE auth.configs RENAME TO config;
   END IF;

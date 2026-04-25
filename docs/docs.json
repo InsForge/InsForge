@@ -52,7 +52,8 @@
               {
                 "group": "Storage",
                 "pages": [
-                  "core-concepts/storage/architecture"
+                  "core-concepts/storage/architecture",
+                  "core-concepts/storage/s3-compatibility"
                 ]
               },
               {
@@ -77,7 +78,8 @@
               {
                 "group": "Email (Experimental)",
                 "pages": [
-                  "core-concepts/email/architecture"
+                  "core-concepts/email/architecture",
+                  "core-concepts/email/custom-smtp"
                 ]
               },
               {
