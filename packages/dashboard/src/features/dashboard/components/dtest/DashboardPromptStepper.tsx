@@ -1,23 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Badge, Button, CopyButton } from '@insforge/ui';
-import { Skeleton } from '../../../components';
-import { Braces, Database, HardDrive, User, Sparkles, Rocket } from 'lucide-react';
-import StepUserIcon from '../../../assets/icons/step_user.svg?react';
-import StepUploadIcon from '../../../assets/icons/step_upload.svg?react';
-import { useMetadata, useApiKey, useProjectId } from '../../../lib/hooks/useMetadata';
-import { useIsCloudHostingMode } from '../../../lib/config/DashboardHostContext';
-import { useCloudProjectInfo } from '../../../lib/hooks/useCloudProjectInfo';
-import { useMcpUsage } from '../../logs/hooks/useMcpUsage';
-import { getBackendUrl, isInsForgeCloudProject } from '../../../lib/utils/utils';
-import { useUsers } from '../../auth';
-import { useAIUsageSummary } from '../../ai/hooks/useAIUsage';
-import { useDeploymentMetadata } from '../../deployments/hooks/useDeploymentMetadata';
-import { NewCLISection } from '../components/connect/NewCLISection';
-import { MCPSection } from '../components/connect';
-import stepBgDecoration from '../../../assets/images/step_bg_decoration.svg';
-import { JoinDiscordCta } from '../components/JoinDiscordCta';
-import { MetricCard } from '../components/MetricCard';
+import { Button, CopyButton } from '@insforge/ui';
+import { Database, Sparkles, Rocket } from 'lucide-react';
+import StepUserIcon from '../../../../assets/icons/step_user.svg?react';
+import StepUploadIcon from '../../../../assets/icons/step_upload.svg?react';
+import stepBgDecoration from '../../../../assets/images/step_bg_decoration.svg';
+import { useMetadata, useProjectId } from '../../../../lib/hooks/useMetadata';
+import { useUsers } from '../../../auth';
+import { useAIUsageSummary } from '../../../ai/hooks/useAIUsage';
+import { useDeploymentMetadata } from '../../../deployments/hooks/useDeploymentMetadata';
 
 // --- Prompt Stepper Data ---
 
@@ -89,9 +80,6 @@ const PROMPT_STEPS: PromptStep[] = [
 const getStepperDismissKey = (projectId?: string) =>
   `insforge-prompt-stepper-dismissed-${projectId || 'default'}`;
 
-const getGetStartedPassedKey = (projectId?: string) =>
-  `insforge-ctest-get-started-passed-${projectId || 'default'}`;
-
 const getStepDoneKey = (projectId: string | null | undefined, stepKey: StepKey) =>
   `insforge-ctest-step-${stepKey}-done-${projectId || 'default'}`;
 
@@ -144,15 +132,15 @@ function PromptDisplay({ text }: { text: string }) {
   );
 }
 
-// --- Prompt Stepper ---
+// --- Stepper card (presentation) ---
 
-interface PromptStepperProps {
+interface StepperCardProps {
   onDismiss: () => void;
   completedSteps: boolean[];
   showDismiss?: boolean;
 }
 
-function PromptStepper({ onDismiss, completedSteps, showDismiss = false }: PromptStepperProps) {
+function StepperCard({ onDismiss, completedSteps, showDismiss = false }: StepperCardProps) {
   const navigate = useNavigate();
   const [activeStep, setActiveStep] = useState(0);
   const currentStep = PROMPT_STEPS[activeStep];
@@ -163,7 +151,7 @@ function PromptStepper({ onDismiss, completedSteps, showDismiss = false }: Promp
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <p className="text-[20px] font-medium leading-7 text-foreground">
-            Start building with Prompts
+            Your Agent can now do the work for you
           </p>
           {allCompleted ? (
             <Button
@@ -186,7 +174,7 @@ function PromptStepper({ onDismiss, completedSteps, showDismiss = false }: Promp
           ) : null}
         </div>
         <p className="text-[13px] leading-[18px] text-muted-foreground">
-          Copy these prompts into your agent to explore what InsForge can do
+          Open your coding agent and start building your project with prompts
         </p>
       </div>
 
@@ -261,49 +249,27 @@ function PromptStepper({ onDismiss, completedSteps, showDismiss = false }: Promp
   );
 }
 
-function CTestLoadingState() {
-  return (
-    <main className="h-full min-h-0 min-w-0 overflow-y-auto bg-semantic-0">
-      <div className="mx-auto flex w-full flex-col gap-6 px-10 py-8">
-        <div className="flex items-center gap-2">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-5 w-16 rounded" />
-          <Skeleton className="h-6 w-20 rounded-full" />
-        </div>
-        <div className="flex items-center justify-center py-12">
-          <Skeleton className="h-[400px] w-full max-w-[640px] rounded" />
-        </div>
-      </div>
-    </main>
-  );
-}
+// --- Self-contained wrapper ---
 
-// --- Main Page ---
-
-export default function CTestDashboardPage() {
-  const navigate = useNavigate();
-  const isCloudHostingMode = useIsCloudHostingMode();
-  const isCloudProject = isInsForgeCloudProject();
-  const canShowCli = isCloudProject && isCloudHostingMode;
-  const {
-    metadata,
-    tables,
-    storage,
-    isLoading: isMetadataLoading,
-    error: metadataError,
-  } = useMetadata();
-  const { projectInfo, isLoading: isProjectInfoLoading } = useCloudProjectInfo();
+/**
+ * Self-contained "Start building with Prompts" stepper for the connected
+ * dashboard. Manages its own dismiss persistence and step-completion tracking
+ * (live signals from useMetadata / useUsers / useAIUsageSummary /
+ * useDeploymentMetadata, plus a sticky localStorage flag so completion stays
+ * checked even if the agent later deletes the source data).
+ *
+ * Returns null silently when the user has dismissed it or projectId hasn't
+ * resolved yet (avoids flashing the card while we read localStorage).
+ */
+export function DashboardPromptStepper() {
+  const { tables, storage } = useMetadata();
   const { totalUsers } = useUsers();
-  const { hasCompletedOnboarding, isLoading: isMcpUsageLoading } = useMcpUsage();
-  const { apiKey, isLoading: isApiKeyLoading } = useApiKey();
-  const { data: aiUsageSummary, isLoading: isAIUsageLoading } = useAIUsageSummary();
-  const { currentDeploymentId, isLoading: isDeploymentLoading } = useDeploymentMetadata();
+  const { data: aiUsageSummary } = useAIUsageSummary();
+  const { currentDeploymentId } = useDeploymentMetadata();
   const { projectId } = useProjectId();
-  const stepperDismissKey = getStepperDismissKey(projectId ?? undefined);
-  const getStartedPassedKey = getGetStartedPassedKey(projectId ?? undefined);
 
-  const [isStepperDismissed, setIsStepperDismissed] = useState(false);
-  const [hasPassedGetStarted, setHasPassedGetStarted] = useState(false);
+  const stepperDismissKey = getStepperDismissKey(projectId ?? undefined);
+  const [isDismissed, setIsDismissed] = useState(false);
   const [stickyCompletedSteps, setStickyCompletedSteps] = useState<
     Partial<Record<StepKey, boolean>>
   >({});
@@ -313,24 +279,11 @@ export default function CTestDashboardPage() {
       return;
     }
     try {
-      const dismissed = localStorage.getItem(stepperDismissKey) === 'true';
-      setIsStepperDismissed(dismissed);
+      setIsDismissed(localStorage.getItem(stepperDismissKey) === 'true');
     } catch {
       // ignore
     }
   }, [projectId, stepperDismissKey]);
-
-  useEffect(() => {
-    if (projectId === undefined) {
-      return;
-    }
-    try {
-      const passed = localStorage.getItem(getStartedPassedKey) === 'true';
-      setHasPassedGetStarted(passed);
-    } catch {
-      // ignore
-    }
-  }, [projectId, getStartedPassedKey]);
 
   useEffect(() => {
     if (projectId === undefined) {
@@ -349,58 +302,8 @@ export default function CTestDashboardPage() {
     setStickyCompletedSteps(loaded);
   }, [projectId]);
 
-  const shouldShowLoadingState =
-    isMetadataLoading ||
-    isMcpUsageLoading ||
-    isAIUsageLoading ||
-    isDeploymentLoading ||
-    (isCloudProject && isProjectInfoLoading);
-
-  const projectName = isCloudProject
-    ? projectInfo.name || 'My InsForge Project'
-    : 'My InsForge Project';
-  const instanceType = projectInfo.instanceType?.toUpperCase();
-  const showInstanceTypeBadge = isCloudProject && !!instanceType;
-  const agentConnected = hasCompletedOnboarding;
-
-  const projectHealth = useMemo(() => {
-    if (metadataError) {
-      return 'Issue';
-    }
-    if (isMetadataLoading) {
-      return 'Loading...';
-    }
-    return 'Healthy';
-  }, [isMetadataLoading, metadataError]);
-
-  const isHealthy = projectHealth === 'Healthy';
-
-  const tableCount = tables?.length ?? 0;
-  const databaseSize = (metadata?.database.totalSizeInGB ?? 0).toFixed(2);
-  const storageSize = (storage?.totalSizeInGB ?? 0).toFixed(2);
-  const bucketCount = storage?.buckets?.length ?? 0;
-  const functionCount = metadata?.functions.length ?? 0;
-
   const todoRecordCount = tables?.find((t) => t.tableName === 'todo')?.recordCount ?? 0;
-  // Any todo record → transition away from Get Started to full dashboard
-  const todoHasData = todoRecordCount > 0;
-  // Step 1 completion requires at least 4 records
   const todoStepComplete = todoRecordCount >= 4;
-  // Once the user has passed Get Started (todo had data at least once),
-  // never show it again — even if the agent later deletes records (e.g. due to RLS).
-  const shouldShowGetStarted = !metadataError && !hasPassedGetStarted && !todoHasData;
-
-  useEffect(() => {
-    if (projectId === undefined || hasPassedGetStarted || !todoHasData) {
-      return;
-    }
-    try {
-      localStorage.setItem(getStartedPassedKey, 'true');
-      setHasPassedGetStarted(true);
-    } catch {
-      // ignore
-    }
-  }, [projectId, getStartedPassedKey, hasPassedGetStarted, todoHasData]);
 
   const liveCompletedSteps = useMemo<Record<StepKey, boolean>>(
     () => ({
@@ -413,14 +316,8 @@ export default function CTestDashboardPage() {
     [todoStepComplete, totalUsers, storage, aiUsageSummary, currentDeploymentId]
   );
 
-  const completedSteps = useMemo<boolean[]>(
-    () =>
-      PROMPT_STEPS.map(
-        (step) => liveCompletedSteps[step.key] || stickyCompletedSteps[step.key] === true
-      ),
-    [liveCompletedSteps, stickyCompletedSteps]
-  );
-
+  // Persist live completions so they stick even if the agent later removes
+  // the source rows (e.g. via RLS policies the user added).
   useEffect(() => {
     if (projectId === undefined) {
       return;
@@ -447,11 +344,19 @@ export default function CTestDashboardPage() {
     });
   }, [projectId, liveCompletedSteps]);
 
-  const handleDismissStepper = useCallback(() => {
+  const completedSteps = useMemo<boolean[]>(
+    () =>
+      PROMPT_STEPS.map(
+        (step) => liveCompletedSteps[step.key] || stickyCompletedSteps[step.key] === true
+      ),
+    [liveCompletedSteps, stickyCompletedSteps]
+  );
+
+  const handleDismiss = useCallback(() => {
     if (projectId === undefined) {
       return;
     }
-    setIsStepperDismissed(true);
+    setIsDismissed(true);
     try {
       localStorage.setItem(stepperDismissKey, 'true');
     } catch {
@@ -459,106 +364,11 @@ export default function CTestDashboardPage() {
     }
   }, [projectId, stepperDismissKey]);
 
-  const displayApiKey = isApiKeyLoading ? 'ik_' + '*'.repeat(32) : apiKey || '';
-  const appUrl = getBackendUrl();
-
-  if (shouldShowLoadingState) {
-    return <CTestLoadingState />;
+  if (isDismissed) {
+    return null;
   }
 
-  // Phase 1: Todo has no data — show centered Get Started with 4 steps
-  if (shouldShowGetStarted) {
-    return (
-      <main className="flex h-full min-h-0 min-w-0 flex-col bg-semantic-0">
-        <div className="flex flex-1 flex-col items-center overflow-y-auto pt-[120px]">
-          {/* Get Started title — outside the card */}
-          <h2 className="w-full max-w-[640px] text-center text-2xl font-medium leading-8 text-foreground">
-            Get Started
-          </h2>
-
-          {/* Stepper card */}
-          <div className="mt-6 w-full max-w-[640px]">
-            {canShowCli ? (
-              <NewCLISection isCTest />
-            ) : (
-              <MCPSection apiKey={displayApiKey} appUrl={appUrl} isLoading={isApiKeyLoading} />
-            )}
-          </div>
-        </div>
-
-        {/* Bottom help bar */}
-        <div className="flex items-center justify-center px-4 pb-10 pt-6">
-          <JoinDiscordCta />
-        </div>
-      </main>
-    );
-  }
-
-  // Phase 2: Todo has data — show full dashboard with metrics + stepper
-  return (
-    <main className="h-full min-h-0 min-w-0 overflow-y-auto bg-semantic-0">
-      <div className="flex w-full flex-col gap-12 px-10 py-8">
-        {/* Project Header */}
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-normal leading-8 text-foreground">{projectName}</h1>
-          {showInstanceTypeBadge && (
-            <Badge
-              variant="default"
-              className="rounded bg-[var(--alpha-8)] px-1 py-0.5 text-xs font-medium uppercase text-muted-foreground"
-            >
-              {instanceType}
-            </Badge>
-          )}
-          <div className="flex items-center rounded-full bg-toast px-2 py-1">
-            <div
-              className={`mr-1.5 h-2 w-2 rounded-full ${isHealthy ? 'bg-emerald-400' : 'bg-amber-400'}`}
-            />
-            <span className="text-xs font-medium text-foreground">{projectHealth}</span>
-          </div>
-        </div>
-
-        {/* Prompt Stepper */}
-        {!isStepperDismissed && (
-          <PromptStepper
-            onDismiss={handleDismissStepper}
-            completedSteps={completedSteps}
-            showDismiss={agentConnected}
-          />
-        )}
-
-        {/* Metric Cards */}
-        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-          <MetricCard
-            label="User"
-            value={String(totalUsers ?? 0)}
-            icon={<User className="h-5 w-5" />}
-            onNavigate={() => void navigate('/dashboard/authentication/users')}
-          />
-          <MetricCard
-            label="Database"
-            value={`${tableCount}`}
-            subValueLeft={tableCount === 1 ? 'Table' : 'Tables'}
-            subValueRight={`${databaseSize} GB`}
-            icon={<Database className="h-5 w-5" />}
-            onNavigate={() => void navigate('/dashboard/database/tables')}
-          />
-          <MetricCard
-            label="Storage"
-            value={`${bucketCount}`}
-            subValueLeft={bucketCount === 1 ? 'Bucket' : 'Buckets'}
-            subValueRight={`${storageSize} GB`}
-            icon={<HardDrive className="h-5 w-5" />}
-            onNavigate={() => void navigate('/dashboard/storage')}
-          />
-          <MetricCard
-            label="Edge Functions"
-            value={String(functionCount)}
-            subValueLeft={functionCount === 1 ? 'Function' : 'Functions'}
-            icon={<Braces className="h-5 w-5" />}
-            onNavigate={() => void navigate('/dashboard/functions/list')}
-          />
-        </div>
-      </div>
-    </main>
-  );
+  // The user is on the connected dashboard view, which means they've already
+  // finished onboarding — always allow dismiss.
+  return <StepperCard onDismiss={handleDismiss} completedSteps={completedSteps} showDismiss />;
 }
