@@ -10,6 +10,8 @@ import { ExternalLink, PanelLeftOpen, PanelRightOpen } from 'lucide-react';
 import { cn, isInsForgeCloudProject } from '../lib/utils/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import { ProjectSettingsMenuDialog } from '../features/dashboard/components';
+import { getFeatureFlag } from '../lib/analytics/posthog';
+import { useDTestView } from '../features/dashboard/components/dtest/DTestViewContext';
 
 interface AppSidebarProps extends React.HTMLAttributes<HTMLElement> {
   isCollapsed: boolean;
@@ -52,10 +54,21 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
     return items;
   }, []);
 
+  // In d_test, the Install InsForge view lives at /dashboard and replaces the
+  // connected Dashboard content. While on the Install view the Dashboard nav
+  // item shouldn't look "selected" — the user is in onboarding, not viewing
+  // the home dashboard.
+  const { view: dTestView } = useDTestView();
+  const isDTestInstall =
+    getFeatureFlag('dashboard-v4-experiment') === 'd_test' && dTestView === 'install';
+
   // Find which primary menu item matches the current route
   // Items with secondary menus use prefix matching (end: false)
   // Items without secondary menus use exact matching (end: true)
   const activeMenu = useMemo(() => {
+    if (isDTestInstall) {
+      return undefined;
+    }
     const allItems = [...mainMenuItems, ...bottomMenuItems];
     return allItems.find((item) => {
       if (item.external || item.onClick) {
@@ -65,7 +78,7 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
       const shouldMatchExactly = item.href === '/dashboard';
       return !!matchPath({ path: item.href, end: shouldMatchExactly }, pathname);
     });
-  }, [mainMenuItems, bottomMenuItems, pathname]);
+  }, [mainMenuItems, bottomMenuItems, pathname, isDTestInstall]);
 
   const handleToggleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();

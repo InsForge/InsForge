@@ -270,7 +270,7 @@ function PromptStepper({ onDismiss, completedSteps, showDismiss = false }: Promp
                 type="button"
                 onClick={() => setActiveStep(index)}
                 className={`flex flex-col gap-2 border-b border-[var(--alpha-8)] p-4 text-left transition-colors last:border-b-0 ${
-                  isActive ? 'bg-[var(--special-toast,#323232)]' : 'hover:bg-[var(--alpha-4)]'
+                  isActive ? 'bg-toast' : 'hover:bg-[var(--alpha-4)]'
                 }`}
               >
                 <div className="flex items-center gap-1">
@@ -292,7 +292,7 @@ function PromptStepper({ onDismiss, completedSteps, showDismiss = false }: Promp
         </div>
 
         {/* Step detail (right) */}
-        <div className="relative flex flex-1 flex-col items-start self-stretch overflow-hidden bg-[var(--special-toast,#323232)] p-6">
+        <div className="relative flex flex-1 flex-col items-start self-stretch overflow-hidden bg-toast p-6">
           <div className="relative z-10 flex max-w-[640px] flex-col items-start gap-3">
             {/* Icon */}
             <div className="h-12 w-12">{currentStep.icon}</div>
@@ -478,7 +478,7 @@ export default function NewDashboardPage() {
             </Badge>
           )}
           {/* Health badge */}
-          <div className="flex items-center rounded-full bg-[var(--special-toast,#323232)] px-2 py-1">
+          <div className="flex items-center rounded-full bg-toast px-2 py-1">
             <div
               className={`mr-1.5 h-2 w-2 rounded-full ${isHealthy ? 'bg-emerald-400' : 'bg-amber-400'}`}
             />
