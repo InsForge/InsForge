@@ -19,7 +19,7 @@ function buildCliPrompt(projectId: string | null | undefined, apiKey: string | n
     '',
     'Then install the InsForge CLI and skills for this project, and link it with:',
     '',
-    `npx @insforge/cli link --project-id ${id}`,
+    `npx @insforge/cli link --project-id ${id} --template todo`,
     '',
     'Use the InsForge CLI and skills for backend tasks.',
   ].join('\n');
