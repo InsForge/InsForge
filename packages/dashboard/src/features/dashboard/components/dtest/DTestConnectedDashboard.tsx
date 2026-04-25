@@ -7,6 +7,7 @@ import { useMetadata } from '../../../../lib/hooks/useMetadata';
 import { useCloudProjectInfo } from '../../../../lib/hooks/useCloudProjectInfo';
 import { useUsers } from '../../../auth';
 import { isInsForgeCloudProject } from '../../../../lib/utils/utils';
+import { DashboardPromptStepper } from './DashboardPromptStepper';
 
 export function DTestConnectedDashboard() {
   const navigate = useNavigate();
@@ -65,6 +66,8 @@ export function DTestConnectedDashboard() {
             <span className="text-xs font-medium text-foreground">{projectHealth}</span>
           </div>
         </div>
+
+        <DashboardPromptStepper />
 
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <MetricCard
