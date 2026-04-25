@@ -7,7 +7,11 @@ import { DTestMCPSection } from './DTestMCPSection';
 import { DTestCLISection } from './DTestCLISection';
 import { QuickStartPromptCard } from './QuickStartPromptCard';
 import { CLIENT_ENTRIES, type AgentTab, type ClientId } from './clientRegistry';
-import { useApiKey, useDatabaseConnectionString } from '../../../../lib/hooks/useMetadata';
+import {
+  useApiKey,
+  useDatabaseConnectionString,
+  useDatabasePassword,
+} from '../../../../lib/hooks/useMetadata';
 import { useAnonToken } from '../../../auth/hooks/useAnonToken';
 import { cn, getBackendUrl } from '../../../../lib/utils/utils';
 
@@ -24,12 +28,21 @@ export function ClientDetailPage({ clientId, onBack }: ClientDetailPageProps) {
   const { apiKey, isLoading: isApiKeyLoading } = useApiKey();
   const { accessToken: anonKey, isLoading: isAnonKeyLoading } = useAnonToken();
   const { connectionData } = useDatabaseConnectionString();
+  const { passwordData } = useDatabasePassword();
   const [tab, setTab] = useState<AgentTab>(availableTabs[0] ?? 'cli');
 
   const appUrl = getBackendUrl();
   const displayApiKey = isApiKeyLoading ? 'ik_' + '*'.repeat(32) : apiKey || '';
+  // Backend returns the connection URL with its password masked as `********`.
+  // Substitute the real password so the prompt the user pastes into their agent
+  // actually works. If the password isn't available yet, fall back to the
+  // placeholder so we don't paste a broken-looking string either.
+  const dbPassword = passwordData?.databasePassword || '';
   const connectionUrl = connectionData?.connectionURL || '';
-  const connectionStringPrompt = `I'm using InsForge as my backend. Here's my database connection string:\n\n${connectionUrl || '<connection string>'}\n\nPlease connect to my database.`;
+  const connectionUrlWithPassword = dbPassword
+    ? connectionUrl.replace('********', dbPassword)
+    : connectionUrl;
+  const connectionStringPrompt = `I'm using InsForge as my backend. Here's my database connection string:\n\n${connectionUrlWithPassword || '<connection string>'}\n\nPlease connect to my database.`;
 
   return (
     <main className="h-full min-h-0 min-w-0 overflow-y-auto bg-semantic-1">
