@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { getFeatureFlag } from '../../../../lib/analytics/posthog';
-import { useMcpUsage } from '../../../logs/hooks/useMcpUsage';
 import { useProjectId } from '../../../../lib/hooks/useMetadata';
 import { useDashboardHost, useDashboardProject } from '../../../../lib/config/DashboardHostContext';
 import { useDTestView } from './DTestViewContext';
@@ -31,7 +30,6 @@ function writeConnectTipDismissed(key: string): void {
 export function DTestConnectTip() {
   const dashboardVariant = getFeatureFlag('dashboard-v4-experiment');
   const { view } = useDTestView();
-  const { hasCompletedOnboarding } = useMcpUsage();
   // Prefer the host-injected project id (synchronous) so the dismissal state
   // still resolves when /metadata/project-id 401s during auth bootstrap.
   const dashboardProject = useDashboardProject();
@@ -61,7 +59,6 @@ export function DTestConnectTip() {
     host.mode !== 'cloud-hosting' ||
     dashboardVariant !== 'd_test' ||
     view === 'install' ||
-    !hasCompletedOnboarding ||
     dismissed
   ) {
     return null;
