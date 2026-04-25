@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react';
-import { Database, Sparkles } from 'lucide-react';
+import { Database } from 'lucide-react';
 import KeyHorizontalIcon from '../../../../assets/icons/key_horizontal.svg?react';
 import ClaudeLogo from '../../../../assets/logos/claude_code.png';
 import CodexLogo from '../../../../assets/logos/codex.svg?react';
@@ -9,6 +9,7 @@ import OpenCodeLogo from '../../../../assets/logos/opencode.svg?react';
 import OpenClawLogo from '../../../../assets/logos/openclaw.svg?react';
 import ClineLogo from '../../../../assets/logos/cline.svg?react';
 import AntigravityLogo from '../../../../assets/logos/antigravity.png';
+import OtherAgentsLogo from '../../../../assets/logos/other_agents.svg?react';
 
 export type ClientId =
   | 'openclaw'
@@ -118,8 +119,8 @@ export const CLIENT_ENTRIES: Record<ClientId, ClientEntry> = {
   other: {
     id: 'other',
     label: 'Other Agents',
-    icon: iconTile(<Sparkles className="h-6 w-6 text-foreground" />),
-    detailIcon: <Sparkles className="h-8 w-8 text-foreground" />,
+    icon: iconTile(<OtherAgentsLogo className="h-8 w-8 text-foreground" />),
+    detailIcon: <OtherAgentsLogo className="h-8 w-8 text-foreground" />,
     kind: 'agent',
     // Jumps directly to the MCP JSON config (no agent dropdown needed).
     mcpAgentId: 'mcp',
