@@ -67,8 +67,6 @@ export function DTestConnectedDashboard() {
           </div>
         </div>
 
-        <DashboardPromptStepper />
-
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <MetricCard
             label="User"
@@ -100,6 +98,8 @@ export function DTestConnectedDashboard() {
             onNavigate={() => void navigate('/dashboard/functions/list')}
           />
         </div>
+
+        <DashboardPromptStepper />
       </div>
     </main>
   );
