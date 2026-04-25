@@ -125,7 +125,14 @@ export class CloudComputeProvider implements ComputeProvider {
 
   async launchMachine(params: LaunchMachineParams): Promise<{ machineId: string }> {
     const result = await this.call<{ machineId: string }>('POST', '/machines', params);
-    return { machineId: result!.machineId };
+    if (!result?.machineId) {
+      throw new AppError(
+        `Cloud compute returned empty machine payload for app ${params.appId}`,
+        502,
+        ERROR_CODES.COMPUTE_PROVIDER_ERROR,
+      );
+    }
+    return { machineId: result.machineId };
   }
 
   async updateMachine(params: UpdateMachineParams): Promise<void> {
@@ -154,10 +161,18 @@ export class CloudComputeProvider implements ComputeProvider {
   }
 
   async getMachineStatus(appId: string, machineId: string): Promise<{ state: string }> {
-    return (await this.call<{ state: string }>(
+    const result = await this.call<{ state: string }>(
       'GET',
       `/machines/${encodeURIComponent(machineId)}?appId=${encodeURIComponent(appId)}`,
-    ))!;
+    );
+    if (!result?.state) {
+      throw new AppError(
+        `Cloud compute returned empty status payload for ${appId}/${machineId}`,
+        502,
+        ERROR_CODES.COMPUTE_PROVIDER_ERROR,
+      );
+    }
+    return result;
   }
 
   async getLogs(

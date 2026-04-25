@@ -475,6 +475,17 @@ export class ComputeServicesService {
       values.push(data.memory);
     }
     if (data.region !== undefined) {
+      // Region change on a deployed machine is meaningless: Fly machines
+      // can't be moved between regions in-place. Persisting it would let
+      // the API/UI report a region the machine isn't actually running in.
+      // Force the user to delete + redeploy.
+      if (data.region !== existing.region && existing.flyAppId && existing.flyMachineId) {
+        throw new AppError(
+          `Cannot change region for a deployed service. Delete and redeploy in region "${data.region}" instead.`,
+          400,
+          ERROR_CODES.COMPUTE_REGION_CHANGE_NOT_SUPPORTED,
+        );
+      }
       updates.push(`region = $${paramIdx++}`);
       values.push(data.region);
     }
