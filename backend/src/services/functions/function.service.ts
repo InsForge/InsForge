@@ -363,7 +363,7 @@ export class FunctionService {
 
     const dangerousPatterns = [
       /globalThis/i,
-      /self/i,
+      /\bself\b/i,
       /process\b/i,
       /Deno\.(run|spawn|Command|makeTemp|remove|write|chmod|chown)/i,
       /import\b/i,
@@ -372,7 +372,7 @@ export class FunctionService {
       /\bFunction\s*\(/, // Case-sensitive: Block constructor but allow 'function' keyword
 
       /constructor\b/i,
-      /Deno\s*\[|process\s*\[|\[\s*['"][a-zA-Z]/i, // Block bracket notation property access like obj['Deno']
+      /\bDeno\s*\[|\bprocess\s*\[|\bglobalThis\s*\[/i, // Block bracket notation property access like obj['Deno']
     ];
 
     for (const pattern of dangerousPatterns) {

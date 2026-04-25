@@ -8,9 +8,9 @@
 /* global self, Request, Deno */
 
 // --- SECURITY BLACKOUT (Top-level) ---
-// We polyfill Deno.env and process.env BEFORE any imports.
-// This prevents libraries from triggering 'NotCapable' errors
-// when using a strict whitelist (satisfies Audit and E2E).
+// We polyfill Deno.env and process.env BEFORE any imports using Top-Level Await.
+// This prevents libraries (like 'debug') from triggering 'NotCapable' errors
+// when using a strict native whitelist (env: false).
 const sterileEnv = {
   NODE_ENV: 'production',
   DEBUG: undefined,
@@ -34,21 +34,33 @@ try {
   const originalDeno = globalThis.Deno;
   Object.defineProperty(globalThis, 'Deno', {
     value: Object.freeze({ ...originalDeno, env: mockDenoEnv }),
-    configurable: true,
+    configurable: false, // Lock down permanently (Audit Finding)
+    writable: false,
   });
 
   // Shadow process.env (Node compatibility)
   if (!globalThis.process) globalThis.process = {};
   globalThis.process.env = { ...sterileEnv };
 } catch (e) {
-  // Silent fail in case of restricted environment
+  // FATAL: Security setup failed. Terminate immediately to prevent leakage.
+  console.error('Security shadow application failed:', e);
+  self.postMessage({
+    success: false,
+    error: 'Security Initialization Error',
+    status: 500,
+  });
+  self.close();
 }
 // ----------------------------
 
-// Import SDK at worker level - this will be available to all functions
-import { createClient } from 'npm:@insforge/sdk';
-// Import base64 utilities for encoding/decoding
-import { encodeBase64, decodeBase64 } from 'https://deno.land/std@0.224.0/encoding/base64.ts';
+// ----------------------------
+// LATE IMPORTS (Pre-emptive Mocking)
+// ----------------------------
+// We use dynamic imports AFTER the environment is shadowed.
+const { createClient } = await import('npm:@insforge/sdk');
+const { encodeBase64, decodeBase64 } = await import(
+  'https://deno.land/std@0.224.0/encoding/base64.ts'
+);
 
 // Handle the single message with code, request data, and secrets
 self.onmessage = async (e) => {
@@ -57,15 +69,18 @@ self.onmessage = async (e) => {
   try {
     /**
      * MOCK DENO OBJECT:
-     * providing safe secrets access even under strict native lock-down.
+     * Providing safe secrets access even under strict native lock-down (env: false).
+     * This fake 'Deno' object is injected into the user function's scope, ensuring
+     * they only see the secrets we explicitly allow, while the native Deno runtime
+     * remains blindfolded at the C++ layer.
      */
     const mockDeno = {
-      // Mock only the required Deno.env API
+      // Mock only the required Deno.env API for secret retrieval
       env: {
         get: (key) => secrets[key] || undefined,
         // (toObject removed for security to prevent secret enumeration)
       },
-      // Explicitly block all subprocess APIs
+      // Explicitly block all subprocess APIs as a secondary defense tier
       run: () => {
         throw new Error('Deno.run is natively disabled');
       },
@@ -80,6 +95,7 @@ self.onmessage = async (e) => {
     /**
      * FUNCTION WRAPPING:
      * Injecting mocks into the user function execution scope.
+     * We pass mockDeno instead of the real Deno global.
      */
     const wrapper = new Function(
       'exports',

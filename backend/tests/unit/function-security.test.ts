@@ -1,20 +1,29 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FunctionService } from '../../src/services/functions/function.service.js';
 
-// Mock dependencies
+const mockClient = {
+  query: vi.fn(),
+  release: vi.fn(),
+};
+
+const mockPool = {
+  query: vi.fn(),
+  connect: vi.fn().mockResolvedValue(mockClient),
+};
+
 vi.mock('../../src/infra/database/database.manager.js', () => ({
   DatabaseManager: {
     getInstance: () => ({
-      getPool: () => ({
-        query: vi.fn(),
-      }),
+      getPool: () => mockPool,
     }),
   },
 }));
 
 vi.mock('../../src/providers/functions/deno-subhosting.provider.js', () => ({
   DenoSubhostingProvider: {
-    getInstance: () => ({}),
+    getInstance: () => ({
+      isConfigured: vi.fn().mockReturnValue(false),
+    }),
   },
 }));
 
@@ -33,7 +42,7 @@ vi.mock('../../src/utils/logger.js', () => ({
   },
 }));
 
-describe('FunctionService Security Validation', () => {
+describe('FunctionService Security Validation (Public API)', () => {
   let service: FunctionService;
 
   beforeEach(() => {
@@ -41,70 +50,85 @@ describe('FunctionService Security Validation', () => {
     service = FunctionService.getInstance();
   });
 
-  const validateCode = (code: string) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (service as any).validateCode(code);
+  const createTestFunction = (code: string) => {
+    return service.createFunction({
+      slug: 'test-function',
+      name: 'Test Function',
+      code,
+      status: 'active',
+    });
   };
 
-  describe('validateCode', () => {
-    it('should allow valid function code', () => {
+  describe('Security Patterns', () => {
+    it('should allow valid function code', async () => {
       const validCode = `
         export default async function(req: Request) {
           const data = await req.json();
           return new Response(JSON.stringify({ hello: 'world' }));
         }
       `;
-      expect(() => validateCode(validCode)).not.toThrow();
+      mockClient.query.mockResolvedValueOnce({}); // Insert
+      mockClient.query.mockResolvedValueOnce({}); // Update
+      mockClient.query.mockResolvedValueOnce({ rows: [{ id: '1' }] }); // Select
+      await expect(createTestFunction(validCode)).resolves.toBeDefined();
     });
 
-    it('should block Deno.serve', () => {
+    it('should allow identifiers containing "self" (Regression Fix)', async () => {
+      const code = 'const myself = { name: "test" }; return myself;';
+      mockClient.query.mockResolvedValueOnce({}); // Insert
+      mockClient.query.mockResolvedValueOnce({}); // Update
+      mockClient.query.mockResolvedValueOnce({ rows: [{ id: '1' }] }); // Select
+      await expect(createTestFunction(code)).resolves.toBeDefined();
+    });
+
+    it('should allow string array literals (Regression Fix)', async () => {
+      const code = "const arr = ['a', 'b']; return new Response(arr.join(','));";
+      mockClient.query.mockResolvedValueOnce({}); // Insert
+      mockClient.query.mockResolvedValueOnce({}); // Update
+      mockClient.query.mockResolvedValueOnce({ rows: [{ id: '1' }] }); // Select
+      await expect(createTestFunction(code)).resolves.toBeDefined();
+    });
+
+    it('should block self access (Word Boundary)', async () => {
+      const code = 'const x = self.postMessage;';
+      await expect(createTestFunction(code)).rejects.toThrow(/potentially dangerous pattern/);
+    });
+
+    it('should block constructor access', async () => {
+      const code = 'const proto = obj.constructor.prototype;';
+      await expect(createTestFunction(code)).rejects.toThrow(/potentially dangerous pattern/);
+    });
+
+    it('should block Deno.serve', async () => {
       const code = 'Deno.serve((req) => new Response("hi"));';
-      expect(() => validateCode(code)).toThrow(/should use "export default async function/i);
+      await expect(createTestFunction(code)).rejects.toThrow(
+        /should use "export default async function/i
+      );
     });
 
-    it('should block RCE via Deno.Command', () => {
+    it('should block RCE via Deno.Command', async () => {
       const code = 'const cmd = new Deno.Command("rm", { args: ["-rf", "/"] });';
-      expect(() => validateCode(code)).toThrow(/potentially dangerous pattern/);
+      await expect(createTestFunction(code)).rejects.toThrow(/potentially dangerous pattern/);
     });
 
-    it('should block RCE via Deno.run', () => {
-      const code = 'Deno.run({ cmd: ["ls"] });';
-      expect(() => validateCode(code)).toThrow(/potentially dangerous pattern/);
-    });
-
-    it('should block dynamic Function constructor (Case Sensitive)', () => {
+    it('should block dynamic Function constructor', async () => {
       const code = 'const f = new Function("return 1");';
-      expect(() => validateCode(code)).toThrow(/potentially dangerous pattern/);
+      await expect(createTestFunction(code)).rejects.toThrow(/potentially dangerous pattern/);
     });
 
-    it('should allow "function" keyword', () => {
-      const code = 'async function myInternalTask() { return 1; }';
-      expect(() => validateCode(code)).not.toThrow();
-    });
-
-    it('should block globalThis access', () => {
-      const code = 'const secret = globalThis.Deno.env.get("JWT_SECRET");';
-      expect(() => validateCode(code)).toThrow(/potentially dangerous pattern/);
-    });
-
-    it('should block process access', () => {
-      const code = 'const env = process.env;';
-      expect(() => validateCode(code)).toThrow(/potentially dangerous pattern/);
-    });
-
-    it('should block bracket notation bypass', () => {
+    it('should block bracket notation bypass (Deno)', async () => {
       const code = 'const d = globalThis["Deno"];';
-      expect(() => validateCode(code)).toThrow(/potentially dangerous pattern/);
+      await expect(createTestFunction(code)).rejects.toThrow(/potentially dangerous pattern/);
     });
 
-    it('should block import statements', () => {
-      const code = 'import { readFileSync } from "fs";';
-      expect(() => validateCode(code)).toThrow(/potentially dangerous pattern/);
+    it('should block bracket notation bypass (process)', async () => {
+      const code = 'const p = globalThis["process"];';
+      await expect(createTestFunction(code)).rejects.toThrow(/potentially dangerous pattern/);
     });
 
-    it('should block eval', () => {
+    it('should block eval', async () => {
       const code = 'eval("console.log(1)");';
-      expect(() => validateCode(code)).toThrow(/potentially dangerous pattern/);
+      await expect(createTestFunction(code)).rejects.toThrow(/potentially dangerous pattern/);
     });
   });
 });

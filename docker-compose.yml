@@ -188,7 +188,7 @@ services:
         echo 'Downloading Deno dependencies...' &&
         deno cache functions/server.ts &&
         echo 'Starting Deno server on port 7133...' &&
-        deno run --allow-all --unstable-worker-options --watch functions/server.ts
+        deno run --allow-net --allow-env --allow-read --unstable-worker-options --watch functions/server.ts
       "
     restart: unless-stopped
     security_opt:
