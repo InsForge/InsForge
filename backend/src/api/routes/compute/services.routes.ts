@@ -129,6 +129,29 @@ router.post('/deploy', verifyAdmin, async (req: AuthRequest, res: Response, next
   }
 });
 
+// Issue a Fly deploy token for the CLI (cloud-managed mode only).
+// Used so `compute deploy` can run flyctl without the user holding
+// their own FLY_API_TOKEN.
+router.post(
+  '/:id/deploy-token',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const svc = ComputeServicesService.getInstance();
+      const existing = await svc.getService(req.params.id);
+
+      if (existing.projectId !== getProjectId(req)) {
+        throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
+      }
+
+      const tokenResult = await svc.issueDeployTokenForService(req.params.id);
+      successResponse(res, tokenResult);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // Sync after flyctl deploy (update machine info from Fly)
 router.patch(
   '/:id/sync',
