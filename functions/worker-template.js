@@ -58,9 +58,8 @@ try {
 // ----------------------------
 // We use dynamic imports AFTER the environment is shadowed.
 const { createClient } = await import('npm:@insforge/sdk');
-const { encodeBase64, decodeBase64 } = await import(
-  'https://deno.land/std@0.224.0/encoding/base64.ts'
-);
+const { encodeBase64, decodeBase64 } =
+  await import('https://deno.land/std@0.224.0/encoding/base64.ts');
 
 // Handle the single message with code, request data, and secrets
 self.onmessage = async (e) => {
