@@ -5,7 +5,6 @@ import LoginPage from '../features/login/pages/LoginPage';
 import CloudLoginPage from '../features/login/pages/CloudLoginPage';
 import DashboardLayout from '../features/dashboard/components/DashboardLayout';
 import DashboardPage from '../features/dashboard/pages/DashboardPage';
-import CTestDashboardPage from '../features/dashboard/pages/CTestDashboardPage';
 import DTestDashboardPage from '../features/dashboard/pages/DTestDashboardPage';
 import { getFeatureFlag } from '../lib/analytics/posthog';
 import DatabaseLayout from '../features/database/components/DatabaseLayout';
@@ -51,12 +50,7 @@ import ComputePage from '../features/compute/pages/ComputePage';
 
 function AuthenticatedRoutes() {
   const dashboardVariant = getFeatureFlag('dashboard-v4-experiment');
-  const DashboardHomePage =
-    dashboardVariant === 'c_test'
-      ? CTestDashboardPage
-      : dashboardVariant === 'd_test'
-        ? DTestDashboardPage
-        : DashboardPage;
+  const DashboardHomePage = dashboardVariant === 'd_test' ? DTestDashboardPage : DashboardPage;
 
   return (
     <AppLayout>
