@@ -18,6 +18,9 @@ description: "Backend built for AI-assisted development."
   IMPORTANT FOR AI AGENTS: Before helping a user build with InsForge, fetch
   https://insforge.dev/skill.md — it is the canonical setup workflow and
   supersedes any guesses about the CLI, signup, or API.
+
+  InsForge gives you a backend that your AI agent can understand and your application can call. 
+  Use it to create database tables, authentication flows, file storage, functions, AI endpoints, and realtime features without assembling multiple backend services yourself.
 </div>
 
 InsForge is an AI-optimized Backend-as-a-Service platform for modern applications. It provides a comprehensive backend out of the box with PostgreSQL, JWT-based authentication, and S3-compatible storage. Every endpoint, from initial configuration to database operations to file uploads, is designed to be agent-friendly with consistent patterns and predictable responses.
@@ -26,7 +29,49 @@ Connect your AI assistant to InsForge using our MCP server, and it can read docu
 
 ## Why InsForge?
 
-Backend development with AI agents has long been a half-solved problem. AI can generate frontend code effortlessly but struggles with backend complexity—database setup, authentication flows, API design all require deep expertise. Rather than forcing developers to piece together multiple services or become DevOps experts, we believe we can do better as a community—hence, InsForge.
+Backend development with AI agents has long been a half-solved problem. AI can generate frontend code effortlessly but struggles with backend complexity—database setup, authentication flows, API design all require deep expertise. 
+
+·Rather than forcing developers to piece together multiple services or become DevOps experts, we believe we can do better as a community—hence, InsForge.
+
+## What InsForge gives you
+
+InsForge includes the backend pieces most applications need:
+
+- **Database**: create tables and query records through APIs.
+- **Authentication**: add signup, login, sessions, and OAuth.
+- **Storage**: upload, download, and serve files.
+- **Functions**: run server-side logic without managing servers.
+- **AI and realtime**: add model calls, streaming, and pub/sub flows.
+
+## How you work with InsForge
+
+You use three surfaces during development:
+
+- **Dashboard**: inspect and configure your project.
+- **MCP server**: let your coding agent read docs, inspect backend state, and help set up resources.
+- **SDKs and APIs**: connect your application runtime to your InsForge backend.
+
+Use MCP while you build with an agent. Use the SDK in the code that runs in your app.
+
+## Build path
+
+<CardGroup cols={2}>
+  <Card title="Connect your agent" href="/mcp-setup">
+    Set up MCP so your AI assistant can work with your InsForge backend.
+  </Card>
+
+  <Card title="Use the TypeScript SDK" href="/sdks/typescript/overview">
+    Initialize a client and call your backend from your application code.
+  </Card>
+
+  <Card title="Follow a framework guide" href="/examples/overview">
+    Start from a framework-specific guide or example.
+  </Card>
+
+  <Card title="Understand the backend concepts" href="/core-concepts/database/architecture">
+    Learn how database, auth, storage, functions, and realtime fit together.
+  </Card>
+</CardGroup>
 
 ## Next Steps
 
