@@ -166,6 +166,31 @@ export class ComputeServicesService {
     return mapRowToSchema(result.rows[0]);
   }
 
+  // Fetch a Fly deploy token for an existing service. Used by the CLI so
+  // `compute deploy` can run flyctl without the user holding their own
+  // FLY_API_TOKEN. Cloud mode only — self-hosted users with their own Fly
+  // account already have a token and don't need this path.
+  async issueDeployTokenForService(serviceId: string): Promise<{ token: string; expirySeconds: number }> {
+    const fly = this.getCompute();
+    if (!(fly instanceof CloudComputeProvider)) {
+      throw new AppError(
+        'Deploy-token issuance is only supported in cloud-managed mode. ' +
+          'Self-hosters with FLY_API_TOKEN set already have a token and do not need this endpoint.',
+        400,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED,
+      );
+    }
+    const service = await this.getService(serviceId);
+    if (!service.flyAppId) {
+      throw new AppError(
+        `Service ${serviceId} has no Fly app yet — call /api/compute/services/deploy first to create the app.`,
+        400,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED,
+      );
+    }
+    return fly.issueDeployToken(service.flyAppId);
+  }
+
   async createService(input: CreateServiceInput): Promise<ServiceSchema> {
     const fly = this.getCompute();
 

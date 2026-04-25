@@ -103,6 +103,26 @@ export class CloudComputeProvider implements ComputeProvider {
     await this.call('DELETE', `/apps/${encodeURIComponent(appId)}`);
   }
 
+  // Fetch a Fly deploy token for one app from the cloud. The cloud mints
+  // the token using its own org-scoped FLY_API_TOKEN, so the OSS instance
+  // (and ultimately the CLI) never needs its own Fly credentials. Token is
+  // 20-min lifetime, scoped to one app — see cloud's
+  // POST /projects/v1/{projectId}/compute/apps/{appId}/deploy-token.
+  async issueDeployToken(appId: string): Promise<{ token: string; expirySeconds: number }> {
+    const result = await this.call<{ token: string; expirySeconds: number }>(
+      'POST',
+      `/apps/${encodeURIComponent(appId)}/deploy-token`,
+    );
+    if (!result) {
+      throw new AppError(
+        'Cloud returned empty deploy-token response',
+        500,
+        ERROR_CODES.COMPUTE_PROVIDER_ERROR,
+      );
+    }
+    return result;
+  }
+
   async launchMachine(params: LaunchMachineParams): Promise<{ machineId: string }> {
     const result = await this.call<{ machineId: string }>('POST', '/machines', params);
     return { machineId: result!.machineId };
