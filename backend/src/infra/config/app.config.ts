@@ -9,15 +9,20 @@ export interface AppConfig {
     storageBucket: string;
     instanceProfile: string;
     apiHost: string;
-    projectId: string;
     appKey: string;
     cloudFrontUrl: string;
     cloudFrontKeyPairId: string;
     cloudFrontPrivateKey: string;
+    projectId: string;
   };
   denoSubhosting: {
     token: string;
     organizationId: string;
+    domain: string;
+  };
+  fly: {
+    apiToken: string;
+    org: string;
     domain: string;
   };
 }
@@ -43,5 +48,10 @@ export const config: AppConfig = {
     token: process.env.DENO_SUBHOSTING_TOKEN || '',
     organizationId: process.env.DENO_SUBHOSTING_ORG_ID || '',
     domain: 'functions.insforge.app',
+  },
+  fly: {
+    apiToken: process.env.FLY_API_TOKEN || '',
+    org: process.env.FLY_ORG || 'insforge',
+    domain: process.env.COMPUTE_DOMAIN || '',
   },
 };

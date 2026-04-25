@@ -23,3 +23,5 @@ export * from './deployments.schema.js';
 export * from './deployments-api.schema.js';
 export * from './schedules.schema.js';
 export * from './schedules-api.schema.js';
+export * from './compute-services.schema.js';
+export * from './compute-services-api.schema.js';
