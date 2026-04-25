@@ -8,6 +8,14 @@ BEGIN
     SELECT 1
     FROM information_schema.tables
     WHERE table_schema = 'system' AND table_name = 'deployments'
+  ) AND NOT EXISTS (
+    SELECT 1
+    FROM information_schema.tables
+    WHERE table_schema = 'deployments' AND table_name = 'deployments'
+  ) AND NOT EXISTS (
+    SELECT 1
+    FROM information_schema.tables
+    WHERE table_schema = 'deployments' AND table_name = 'runs'
   ) THEN
     ALTER TABLE system.deployments SET SCHEMA deployments;
   END IF;
