@@ -26,8 +26,9 @@ export default function AppHeader() {
   const { user, logout } = useAuth();
   const openConnectDialog = useOpenConnectDialog();
   const dashboardVariant = getFeatureFlag('dashboard-v4-experiment');
-  const { setView: setDTestView } = useDTestView();
+  const { view: dTestView, setView: setDTestView } = useDTestView();
   const isDTest = dashboardVariant === 'd_test';
+  const isConnectDisabled = isDTest && dTestView === 'install';
 
   const handleConnectClick = () => {
     if (isDTest) {
@@ -133,6 +134,7 @@ export default function AppHeader() {
             variant="secondary"
             size="sm"
             onClick={handleConnectClick}
+            disabled={isConnectDisabled}
             className="gap-1 rounded-[14px] border-[var(--alpha-8)] px-2 [&_svg]:size-4"
           >
             <Plug aria-hidden="true" />

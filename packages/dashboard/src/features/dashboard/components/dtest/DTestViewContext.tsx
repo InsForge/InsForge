@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useMcpUsage } from '../../../logs/hooks/useMcpUsage';
+import { getFeatureFlag } from '../../../../lib/analytics/posthog';
 import type { ClientId } from './clientRegistry';
 
 export type DTestView = 'install' | 'dashboard';
@@ -51,6 +52,16 @@ export function DTestViewProvider({ children }: { children: ReactNode }) {
       setSelectedClient(null);
     }
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || window.parent === window) {
+      return;
+    }
+    if (getFeatureFlag('dashboard-v4-experiment') !== 'd_test') {
+      return;
+    }
+    window.parent.postMessage({ type: 'D_TEST_VIEW_CHANGED', view }, '*');
+  }, [view]);
 
   return (
     <DTestViewContext.Provider
