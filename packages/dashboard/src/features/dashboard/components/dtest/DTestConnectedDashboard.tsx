@@ -1,13 +1,15 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '@insforge/ui';
-import { Braces, Database, HardDrive, User } from 'lucide-react';
+import { Braces, Database, Download, HardDrive, User } from 'lucide-react';
 import { MetricCard } from '../MetricCard';
 import { useMetadata } from '../../../../lib/hooks/useMetadata';
 import { useCloudProjectInfo } from '../../../../lib/hooks/useCloudProjectInfo';
 import { useUsers } from '../../../auth';
 import { isInsForgeCloudProject } from '../../../../lib/utils/utils';
+import { useMcpUsage } from '../../../logs/hooks/useMcpUsage';
 import { DashboardPromptStepper } from './DashboardPromptStepper';
+import { useDTestView } from './DTestViewContext';
 
 export function DTestConnectedDashboard() {
   const navigate = useNavigate();
@@ -21,6 +23,8 @@ export function DTestConnectedDashboard() {
   } = useMetadata();
   const { projectInfo } = useCloudProjectInfo();
   const { totalUsers } = useUsers();
+  const { hasCompletedOnboarding } = useMcpUsage();
+  const { setView } = useDTestView();
 
   const projectName = isCloudProject
     ? projectInfo.name || 'My InsForge Project'
@@ -66,6 +70,22 @@ export function DTestConnectedDashboard() {
             <span className="text-xs font-medium text-foreground">{projectHealth}</span>
           </div>
         </div>
+
+        {!hasCompletedOnboarding && (
+          <section className="flex w-full flex-col items-center gap-6 rounded-lg border border-[var(--alpha-8)] bg-card px-6 pb-12 pt-10">
+            <p className="text-xl font-medium leading-7 text-foreground">
+              Let your agent build your backend for you
+            </p>
+            <button
+              type="button"
+              onClick={() => setView('install')}
+              className="flex items-center gap-1 rounded bg-emerald-300 p-2 text-sm font-medium leading-5 text-black transition-colors hover:bg-emerald-400"
+            >
+              <Download className="h-5 w-5" aria-hidden="true" />
+              <span className="px-1">Install InsForge</span>
+            </button>
+          </section>
+        )}
 
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <MetricCard

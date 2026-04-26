@@ -51,6 +51,8 @@ interface DTestMCPSectionProps {
   className?: string;
   /** Pick the agent whose install command (or MCP JSON for id='mcp') is shown. Falls back to MCP_AGENTS[0]. */
   agentId?: string;
+  /** Hide the top "Paste this prompt to setup MCP" card. Used by Other Agents, where users only want raw config. */
+  hideQuickStartPrompt?: boolean;
 }
 
 function buildQuickStartPrompt(agent: MCPAgent, installBody: string) {
@@ -66,6 +68,7 @@ export function DTestMCPSection({
   isLoading = false,
   className,
   agentId,
+  hideQuickStartPrompt = false,
 }: DTestMCPSectionProps) {
   const agent = useMemo(() => MCP_AGENTS.find((a) => a.id === agentId) ?? MCP_AGENTS[0], [agentId]);
 
@@ -113,10 +116,12 @@ export function DTestMCPSection({
 
   return (
     <div className={cn('flex flex-col gap-3', className)}>
-      <QuickStartPromptCard
-        subtitle={`Paste this into ${agent.displayName} to setup InsForge MCP`}
-        prompt={quickStartPrompt}
-      />
+      {!hideQuickStartPrompt && (
+        <QuickStartPromptCard
+          subtitle={`Paste this into ${agent.displayName} to setup InsForge MCP`}
+          prompt={quickStartPrompt}
+        />
+      )}
 
       {/* Step by Step card */}
       <section className="flex flex-col gap-6 rounded border border-[var(--alpha-8)] bg-card p-6">
