@@ -1,5 +1,14 @@
 import { useState } from 'react';
-import { Loader2, ArrowLeft, Plus, Play, Square, Trash2, AlertTriangle, XCircle } from 'lucide-react';
+import {
+  Loader2,
+  ArrowLeft,
+  Plus,
+  Play,
+  Square,
+  Trash2,
+  AlertTriangle,
+  XCircle,
+} from 'lucide-react';
 import { Button, ConfirmDialog } from '@insforge/ui';
 import { useComputeServices } from '../hooks/useComputeServices';
 import { ServiceCard } from '../components/ServiceCard';
