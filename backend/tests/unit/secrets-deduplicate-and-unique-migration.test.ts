@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -10,7 +10,16 @@ const migrationPath = path.resolve(
 );
 
 describe('035_fix-secrets-deduplicate-and-unique migration', () => {
-  const sql = fs.readFileSync(migrationPath, 'utf8');
+  let sql = '';
+
+  beforeAll(() => {
+    // Defer the read so the "file exists" test below can fail cleanly
+    // with a clear assertion message instead of an ENOENT thrown during
+    // describe-block evaluation.
+    if (fs.existsSync(migrationPath)) {
+      sql = fs.readFileSync(migrationPath, 'utf8');
+    }
+  });
 
   it('migration file exists', () => {
     expect(fs.existsSync(migrationPath)).toBe(true);
@@ -50,10 +59,12 @@ describe('035_fix-secrets-deduplicate-and-unique migration', () => {
     expect(sql).toMatch(/key\s+NOT LIKE\s+'API_KEY_OLD_%'/i);
   });
 
-  it('keeps the most recently created row as the tiebreaker', () => {
-    // The exclusion subquery includes created_at DESC as a tiebreaker after
-    // the active/unexpired prioritization (see test below).
-    expect(sql).toMatch(/created_at\s+DESC[\s\S]*?LIMIT\s+1/i);
+  it('uses created_at DESC then id DESC as deterministic tiebreakers', () => {
+    // The exclusion subquery includes created_at DESC as the primary
+    // tiebreaker (after active/unexpired prioritization), then id DESC as
+    // a final tiebreaker so the survivor is fully deterministic even when
+    // multiple rows share a created_at value.
+    expect(sql).toMatch(/created_at\s+DESC\s*,\s*id\s+DESC[\s\S]*?LIMIT\s+1/i);
   });
 
   it('prioritizes is_active=true AND non-expired rows when picking the survivor', () => {

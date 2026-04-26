@@ -68,7 +68,10 @@ BEGIN
       AND t.relname = 'secrets'
       AND c.contype = 'u'
       AND (
-        SELECT array_agg(a.attname)
+        -- Cast attname (type: name) to text so the comparison against
+        -- ARRAY['key'] (type: text[]) doesn't fail with
+        -- "operator does not exist: name[] = text[]".
+        SELECT array_agg(a.attname::text)
         FROM unnest(c.conkey) ck
         JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ck
       ) = ARRAY['key']
