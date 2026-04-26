@@ -111,8 +111,7 @@ describe('FlyProvider', () => {
         .mockResolvedValueOnce({ ok: true, text: () => Promise.resolve('') })
         .mockResolvedValueOnce({
           ok: true,
-          json: () =>
-            Promise.resolve({ errors: [{ message: 'organization limit reached' }] }),
+          json: () => Promise.resolve({ errors: [{ message: 'organization limit reached' }] }),
         });
       vi.stubGlobal('fetch', mockFetch);
 
