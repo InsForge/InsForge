@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, X } from 'lucide-react';
 import {
   Button,
@@ -20,7 +19,6 @@ import { RecordFormField } from './RecordFormField';
 import { cn } from '../../../lib/utils/utils';
 import { ColumnSchema } from '@insforge/shared-schemas';
 import { SYSTEM_FIELDS } from '../helpers';
-import { databaseTableQueryKeys } from '../queryKeys';
 
 interface RecordFormDialogProps {
   open: boolean;
@@ -38,7 +36,6 @@ export function RecordFormDialog({
   onSuccess,
 }: RecordFormDialogProps) {
   const [error, setError] = useState<string | null>(null);
-  const queryClient = useQueryClient();
   const { createRecord, isCreating } = useRecords(tableName);
 
   const displayFields = useMemo(() => {
@@ -76,8 +73,6 @@ export function RecordFormDialog({
     async (data) => {
       try {
         await createRecord(data);
-        void queryClient.invalidateQueries({ queryKey: ['records', tableName] });
-        void queryClient.invalidateQueries({ queryKey: databaseTableQueryKeys.schema(tableName) });
         onOpenChange(false);
         form.reset();
         setError(null);
