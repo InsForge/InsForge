@@ -7,6 +7,7 @@ import type { TokenPayloadSchema } from '@insforge/shared-schemas';
 
 const JWT_SECRET = process.env.JWT_SECRET ?? '';
 const ACCESS_TOKEN_EXPIRES_IN = '15m';
+const ADMIN_ACCESS_TOKEN_EXPIRES_IN = '30s';
 const REFRESH_TOKEN_EXPIRES_IN = '7d';
 
 /**
@@ -55,7 +56,10 @@ export class TokenManager {
   generateAccessToken(payload: TokenPayloadSchema): string {
     return jwt.sign(payload, JWT_SECRET, {
       algorithm: 'HS256',
-      expiresIn: ACCESS_TOKEN_EXPIRES_IN,
+      expiresIn:
+        payload.role === 'project_admin'
+          ? ADMIN_ACCESS_TOKEN_EXPIRES_IN
+          : ACCESS_TOKEN_EXPIRES_IN,
     });
   }
 
