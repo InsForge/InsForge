@@ -13,6 +13,14 @@
 -- constraint so neither the boot path, a manual psql session, nor a future
 -- partial migration can re-create the state. It is idempotent.
 
+-- 0. Block concurrent writers for the duration of this migration so a
+--    concurrent INSERT can't slip new duplicates between the dedupe
+--    step and the ADD CONSTRAINT step (which would make the latter fail).
+--    SHARE ROW EXCLUSIVE blocks INSERT/UPDATE/DELETE but lets SELECTs
+--    through; the lock releases automatically when the migration's
+--    surrounding transaction commits.
+LOCK TABLE system.secrets IN SHARE ROW EXCLUSIVE MODE;
+
 -- 1. Collapse duplicates: keep the most recently created row per key,
 --    rename the rest with a unique _DUP_<id> suffix and mark them inactive
 --    + immediately expired so read paths ignore them but audit history is

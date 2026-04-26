@@ -44,6 +44,14 @@ describe('035_fix-secrets-deduplicate-and-unique migration', () => {
     expect(sql).not.toMatch(/public\.secrets|auth\.secrets/);
   });
 
+  it('locks the table to close the dedupe→constraint race window', () => {
+    // Without this lock, a concurrent writer can re-introduce duplicates
+    // between step 1 (dedupe) and step 2 (ADD CONSTRAINT), making the
+    // constraint add fail. SHARE ROW EXCLUSIVE blocks writers but lets
+    // SELECTs through.
+    expect(sql).toMatch(/LOCK\s+TABLE\s+system\.secrets\s+IN\s+SHARE\s+ROW\s+EXCLUSIVE\s+MODE/i);
+  });
+
   // ── Step 1: Dedupe ────────────────────────────────────────────────────
   it('wraps the dedupe step in a DO block for idempotency', () => {
     expect(sql).toMatch(
