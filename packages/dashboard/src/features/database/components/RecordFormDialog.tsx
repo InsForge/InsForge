@@ -20,6 +20,7 @@ import { RecordFormField } from './RecordFormField';
 import { cn } from '../../../lib/utils/utils';
 import { ColumnSchema } from '@insforge/shared-schemas';
 import { SYSTEM_FIELDS } from '../helpers';
+import { databaseTableQueryKeys } from '../queryKeys';
 
 interface RecordFormDialogProps {
   open: boolean;
@@ -76,7 +77,7 @@ export function RecordFormDialog({
       try {
         await createRecord(data);
         void queryClient.invalidateQueries({ queryKey: ['records', tableName] });
-        void queryClient.invalidateQueries({ queryKey: ['table', tableName] });
+        void queryClient.invalidateQueries({ queryKey: databaseTableQueryKeys.schema(tableName) });
         onOpenChange(false);
         form.reset();
         setError(null);
