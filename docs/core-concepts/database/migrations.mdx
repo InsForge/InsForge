@@ -1,0 +1,256 @@
+---
+title: Database Migrations
+description: Track schema changes in git and apply them with the InsForge CLI
+---
+
+## Overview
+
+InsForge database migrations are versioned SQL files stored in your repository and applied with `@insforge/cli`.
+
+For most teams, the workflow is:
+
+1. Create a migration file locally.
+2. Write the SQL that changes your schema.
+3. Commit that file to git.
+4. Apply it to the linked InsForge backend.
+
+InsForge stores successful app-level migrations in `system.custom_migrations`. This is separate from `system.migrations`, which InsForge uses for its own internal platform upgrades.
+
+<Info>
+InsForge does not require a separate local database stack for migrations. `db migrations up` applies directly to the linked backend.
+</Info>
+
+## How InsForge migrations work
+
+The core workflow is simple:
+
+1. Create a file in `migrations/` with `npx @insforge/cli db migrations new ...`.
+2. Write the SQL for the schema change you want.
+3. Commit that file to git.
+4. Apply it with `npx @insforge/cli db migrations up ...`.
+
+InsForge migrations are forward-only today. You usually write the SQL yourself, apply changes in version order, and test destructive changes in a non-production project first.
+
+## Before you start
+
+Install and link the CLI to the backend you want to manage:
+
+```bash
+npx @insforge/cli login
+npx @insforge/cli link
+```
+
+If you want to see the current remote history first:
+
+```bash
+npx @insforge/cli db migrations list
+```
+
+<Tip>
+If you are linking a repository to an existing InsForge project for the first time, run `npx @insforge/cli db migrations fetch` before creating new files. That gives you a local `migrations/` folder that matches the backend's applied history.
+</Tip>
+
+## Create and apply your first migration
+
+This walkthrough uses a simple `employees` table to show the InsForge CLI workflow.
+
+### 1. Create a migration file
+
+```bash
+npx @insforge/cli db migrations new create-employees-table
+```
+
+This creates a file named like:
+
+```text
+migrations/<timestamp>_create-employees-table.sql
+```
+
+The CLI uses a 14-digit UTC timestamp for `<timestamp>` in `YYYYMMDDHHmmss` format.
+
+### 2. Add the SQL
+
+Add the SQL for your table:
+
+```sql
+create table if not exists public.employees (
+  id bigint primary key generated always as identity,
+  name text not null,
+  email text,
+  created_at timestamptz default now()
+);
+```
+
+### 3. Apply the migration
+
+Apply every pending local migration in order:
+
+```bash
+npx @insforge/cli db migrations up --all
+```
+
+Because there is only one pending file in this example, `--all` applies just that file.
+
+### 4. Confirm the remote history
+
+```bash
+npx @insforge/cli db migrations list
+```
+
+That command reads the backend's applied migration history, not just your local folder.
+
+## Modify the schema with another migration
+
+Create a second migration file:
+
+```bash
+npx @insforge/cli db migrations new add-employee-department
+```
+
+Then add the SQL:
+
+```sql
+alter table if exists public.employees
+add column department text default 'Hooli';
+```
+
+Apply it:
+
+```bash
+npx @insforge/cli db migrations up --all
+```
+
+This is the normal InsForge rhythm: one change, one SQL file, one forward-only apply.
+
+## Applying one migration vs. applying many
+
+InsForge gives you three apply modes:
+
+| Command | What it does |
+| --- | --- |
+| `npx @insforge/cli db migrations up <version-or-filename>` | Apply exactly one migration file |
+| `npx @insforge/cli db migrations up --to <version-or-filename>` | Apply pending files up to and including a target |
+| `npx @insforge/cli db migrations up --all` | Apply every pending local migration |
+
+Examples:
+
+```bash
+npx @insforge/cli db migrations up 20260426153000
+npx @insforge/cli db migrations up 20260426153000_create-employees-table.sql
+npx @insforge/cli db migrations up --to 20260426154000_add-employee-department.sql
+npx @insforge/cli db migrations up --all
+```
+
+<Note>
+`up <target>` is the most forgiving mode. It validates the target migration and still enforces ordering, but it does not require every unrelated file in `migrations/` to be valid. `up --to` and `up --all` validate the whole directory first.
+</Note>
+
+## Sync remote history into local files
+
+If the backend already has applied migrations, you can materialize them into your repository:
+
+```bash
+npx @insforge/cli db migrations fetch
+```
+
+This command:
+
+- ensures `migrations/` exists
+- reads `GET /api/database/migrations`
+- writes one local `.sql` file per applied remote migration
+- skips existing exact filenames instead of overwriting them
+
+Use `fetch` when:
+
+- you are onboarding to an existing InsForge project
+- your local `migrations/` folder is missing files
+- you want a disk copy of the backend's applied history
+
+## Team workflow
+
+Once you adopt migrations, treat them as code:
+
+1. Create migration files on your feature branch.
+2. Commit `migrations/*.sql` to git.
+3. Review migration SQL just like application code.
+4. Apply migrations to staging or production from those committed files.
+5. If a migration has already been applied remotely, do not edit it in place. Create a new forward migration instead.
+
+<Info>
+Git tracks the migration files in your repository. InsForge tracks what has been applied in `system.custom_migrations`. Keep both in sync by committing every migration file and applying schema changes from migration files instead of making ad hoc remote edits.
+</Info>
+
+Because `db migrations up` executes immediately against the linked backend, shared environments need coordination. In practice, that usually means one person or one CI job applies migrations to production-like environments.
+
+## Rules and guardrails
+
+The CLI intentionally keeps migration naming and ordering strict:
+
+- Files live in `migrations/`.
+- Filenames must match `<14-digit-version>_<migration-name>.sql`.
+- Migration names may use lowercase letters, numbers, and hyphens only.
+- `db migrations new` refuses to continue if your local filenames are invalid or two files share the same version.
+- Empty migration files are rejected.
+- Migrations are forward-only today. There is no `down` or rollback command in the CLI.
+
+The backend API is a little broader than the CLI:
+
+- The API accepts numeric version strings up to 64 digits.
+- The CLI standardizes on 14-digit UTC timestamps for local filenames.
+
+That distinction matters if you call the API directly, but most teams should stick to the CLI's timestamp-based convention.
+
+## Under the hood
+
+When you run `db migrations up`, the CLI talks to the backend migration API:
+
+- `GET /api/database/migrations` returns the applied history
+- `POST /api/database/migrations` executes a new migration
+
+On the backend, each migration run:
+
+1. Splits your SQL into statements for history tracking.
+2. Rejects migration files that try to manage their own transactions with `BEGIN`, `COMMIT`, or `ROLLBACK`.
+3. Starts a transaction and acquires an advisory lock on `system.custom_migrations`.
+4. Sets `search_path` to `public` for the transaction.
+5. Executes the SQL.
+6. Inserts a row into `system.custom_migrations` only if the SQL succeeds.
+7. Notifies PostgREST to reload schema metadata.
+
+<Note>
+Because the backend sets `search_path` to `public`, unqualified objects such as `create table posts (...)` resolve to `public.posts` by default. Using `public.` explicitly in migration SQL is still a good habit when you want the target schema to be obvious in code review.
+</Note>
+
+## Troubleshooting
+
+### "Migration version must be newer than the latest applied migration"
+
+Your local file is older than the remote head, or you reused a version. Run:
+
+```bash
+npx @insforge/cli db migrations list
+```
+
+Then create a fresh file with `db migrations new ...` and move your SQL into the new versioned file.
+
+### "Migration is already applied remotely"
+
+Do not try to re-run it. Either:
+
+- keep the local file because it matches committed history, or
+- delete the stale duplicate if it should not exist locally
+
+### "Migration ... is not the next pending local migration"
+
+An earlier local migration must be applied first. Either:
+
+- apply the earlier file, or
+- fix/delete the stale file if it should no longer exist
+
+### Need a clean-room test environment
+
+The CLI does not currently include a built-in database reset command. Use a disposable InsForge project or a staging backend when you need to rehearse destructive changes safely.
+
+### Need automatic schema diff generation
+
+The CLI does not currently include automatic schema diff generation. Write the SQL by hand, or copy generated SQL from your editor or dashboard workflow into a new migration file created with `db migrations new`.
