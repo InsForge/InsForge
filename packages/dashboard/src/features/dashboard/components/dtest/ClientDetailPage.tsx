@@ -90,6 +90,7 @@ export function ClientDetailPage({ clientId, onBack }: ClientDetailPageProps) {
                 appUrl={appUrl}
                 isLoading={isApiKeyLoading}
                 agentId={entry.mcpAgentId}
+                hideQuickStartPrompt={clientId === 'other'}
               />
             )}
           </>
