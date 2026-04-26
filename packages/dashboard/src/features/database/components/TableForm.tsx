@@ -363,9 +363,11 @@ export function TableForm({
           queryKey: databaseTableQueryKeys.schema(editTable.tableName),
         });
       }
-      void queryClient.invalidateQueries({
-        queryKey: databaseTableQueryKeys.schema(data.tableName),
-      });
+      if (data.tableName !== editTable?.tableName) {
+        void queryClient.invalidateQueries({
+          queryKey: databaseTableQueryKeys.schema(data.tableName),
+        });
+      }
 
       // Invalidate all table data queries for this table (with all parameter combinations)
       void queryClient.invalidateQueries({ queryKey: ['records', editTable?.tableName] });
