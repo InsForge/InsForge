@@ -1,11 +1,31 @@
 export interface LaunchMachineParams {
   appId: string;
-  image: string;
+  /**
+   * Pre-built image URL. Either `image` or (`sourceKey` + `imageTag`) must
+   * be provided. If both are set, the cloud rejects with 400.
+   */
+  image?: string;
+  /**
+   * S3 key (within the configured source-staging bucket) where source.tgz
+   * was uploaded via a presigned URL from /build-creds. When set, cloud
+   * triggers a CodeBuild run before launching the machine and replaces
+   * `image` with the resulting digest-pinned ECR tag.
+   */
+  sourceKey?: string;
+  /** ECR image tag CodeBuild will produce, paired with `sourceKey`. */
+  imageTag?: string;
   port: number;
   cpu: string;
   memory: number;
   envVars: Record<string, string>;
   region: string;
+}
+
+export interface SourceUploadCreds {
+  sourceKey: string;
+  uploadUrl: string;
+  imageTag: string;
+  expiresAt: string;
 }
 
 export interface UpdateMachineParams {
@@ -33,6 +53,11 @@ export interface ComputeProvider {
   isConfigured(): boolean;
   createApp(params: { name: string; network: string; org: string }): Promise<{ appId: string }>;
   destroyApp(appId: string): Promise<void>;
+  /**
+   * Mints credentials for the CLI to upload source directly to staging.
+   * Optional — providers without source-deploy support throw or omit.
+   */
+  issueBuildCreds?(appId: string): Promise<SourceUploadCreds>;
   launchMachine(params: LaunchMachineParams): Promise<{ machineId: string }>;
   updateMachine(params: UpdateMachineParams): Promise<void>;
   stopMachine(appId: string, machineId: string): Promise<void>;
