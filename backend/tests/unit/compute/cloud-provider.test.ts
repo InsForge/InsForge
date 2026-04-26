@@ -28,7 +28,9 @@ describe('CloudComputeProvider', () => {
 
     const provider = CloudComputeProvider.getInstance();
     const result = await provider.createApp({
-      name: 'test', network: 'test', org: 'unused-in-cloud-mode',
+      name: 'test',
+      network: 'test',
+      org: 'unused-in-cloud-mode',
     });
 
     const call = fetchMock.mock.calls[0];
@@ -42,18 +44,21 @@ describe('CloudComputeProvider', () => {
   it('throws COMPUTE_CLOUD_UNAVAILABLE on network error', async () => {
     fetchMock.mockRejectedValue(new Error('ECONNREFUSED'));
     const provider = CloudComputeProvider.getInstance();
-    await expect(provider.createApp({ name: 't', network: 't', org: 'o' }))
-      .rejects.toThrow(/COMPUTE_CLOUD_UNAVAILABLE/);
+    await expect(provider.createApp({ name: 't', network: 't', org: 'o' })).rejects.toThrow(
+      /COMPUTE_CLOUD_UNAVAILABLE/
+    );
   });
 
   it('throws AppError when cloud returns non-2xx with body', async () => {
     fetchMock.mockResolvedValue({
-      ok: false, status: 403,
+      ok: false,
+      status: 403,
       text: async () => '{"code":"COMPUTE_QUOTA_EXCEEDED","error":"limit reached"}',
     } as Response);
     const provider = CloudComputeProvider.getInstance();
-    await expect(provider.createApp({ name: 't', network: 't', org: 'o' }))
-      .rejects.toThrow(/limit reached|COMPUTE_QUOTA_EXCEEDED/);
+    await expect(provider.createApp({ name: 't', network: 't', org: 'o' })).rejects.toThrow(
+      /limit reached|COMPUTE_QUOTA_EXCEEDED/
+    );
   });
 
   it('startMachine POSTs to /machines/:id/start with appId in body', async () => {
@@ -94,8 +99,9 @@ describe('CloudComputeProvider', () => {
     const abortError = new DOMException('The operation was aborted', 'AbortError');
     fetchMock.mockRejectedValue(abortError);
     const provider = CloudComputeProvider.getInstance();
-    await expect(provider.createApp({ name: 't', network: 't', org: 'o' }))
-      .rejects.toMatchObject({ code: 'COMPUTE_CLOUD_UNAVAILABLE' });
+    await expect(provider.createApp({ name: 't', network: 't', org: 'o' })).rejects.toMatchObject({
+      code: 'COMPUTE_CLOUD_UNAVAILABLE',
+    });
   });
 
   it('surfaces COMPUTE_NOT_CONFIGURED when config is missing (not masked as CLOUD_UNAVAILABLE)', async () => {
@@ -105,15 +111,18 @@ describe('CloudComputeProvider', () => {
 
     // Force signToken to throw COMPUTE_NOT_CONFIGURED, as it would when isConfigured() is false
     const errorCodes = ERROR_CODES as unknown as Record<string, string>;
-    vi.spyOn(provider as unknown as { signToken: () => string }, 'signToken').mockImplementation(() => {
-      throw new AppError(
-        'Cloud compute not configured (need PROJECT_ID, CLOUD_API_HOST, JWT_SECRET)',
-        500,
-        errorCodes.COMPUTE_NOT_CONFIGURED ?? ERROR_CODES.INTERNAL_ERROR,
-      );
-    });
+    vi.spyOn(provider as unknown as { signToken: () => string }, 'signToken').mockImplementation(
+      () => {
+        throw new AppError(
+          'Cloud compute not configured (need PROJECT_ID, CLOUD_API_HOST, JWT_SECRET)',
+          500,
+          errorCodes.COMPUTE_NOT_CONFIGURED ?? ERROR_CODES.INTERNAL_ERROR
+        );
+      }
+    );
 
-    await expect(provider.createApp({ name: 't', network: 't', org: 'o' }))
-      .rejects.toThrow(/COMPUTE_NOT_CONFIGURED|not configured/);
+    await expect(provider.createApp({ name: 't', network: 't', org: 'o' })).rejects.toThrow(
+      /COMPUTE_NOT_CONFIGURED|not configured/
+    );
   });
 });

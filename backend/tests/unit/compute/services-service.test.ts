@@ -190,7 +190,9 @@ describe('ComputeServicesService', () => {
     it('throws COMPUTE_SERVICE_NOT_CONFIGURED when provider is not configured', async () => {
       mockIsConfigured.mockReturnValue(false);
 
-      await expect(service.createService(input)).rejects.toThrow('Compute services are not enabled on this project.');
+      await expect(service.createService(input)).rejects.toThrow(
+        'Compute services are not enabled on this project.'
+      );
     });
 
     it('sets status to failed when Fly deploy fails', async () => {
@@ -243,14 +245,25 @@ describe('ComputeServicesService', () => {
 
       const serviceId = 'svc-quota-test';
       mockQuery.mockResolvedValueOnce({
-        rows: [{
-          id: serviceId, project_id: input.projectId, name: input.name,
-          image_url: input.imageUrl, port: input.port, cpu: input.cpu,
-          memory: input.memory, region: input.region,
-          fly_app_id: null, fly_machine_id: null, status: 'creating',
-          endpoint_url: null, env_vars_encrypted: null,
-          created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
-        }],
+        rows: [
+          {
+            id: serviceId,
+            project_id: input.projectId,
+            name: input.name,
+            image_url: input.imageUrl,
+            port: input.port,
+            cpu: input.cpu,
+            memory: input.memory,
+            region: input.region,
+            fly_app_id: null,
+            fly_machine_id: null,
+            status: 'creating',
+            endpoint_url: null,
+            env_vars_encrypted: null,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
       });
 
       // CloudComputeProvider re-wraps the cloud's response body verbatim into
@@ -711,9 +724,7 @@ describe('ComputeServicesService', () => {
         ],
       });
 
-      mockListMachines.mockResolvedValue([
-        { id: 'machine-1', state: 'started', region: 'iad' },
-      ]);
+      mockListMachines.mockResolvedValue([{ id: 'machine-1', state: 'started', region: 'iad' }]);
 
       // UPDATE returns zero rows — service was deleted between getService and UPDATE
       mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
