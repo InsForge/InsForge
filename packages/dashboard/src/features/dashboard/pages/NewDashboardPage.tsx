@@ -40,8 +40,7 @@ const PROMPT_STEPS: PromptStep[] = [
   {
     id: 1,
     title: 'Add sample data',
-    prompt:
-      "Use InsForge Skills to add 4 todo items to InsForge backend's todo table:\n\n1. Add sign in for users\n2. Add file upload\n3. Use AI to turn text into tasks\n4. Deploy your app",
+    prompt: 'Use InsForge Skills to create a table in InsForge backend and add some sample data.',
     icon: <Database className="size-12 text-[rgb(var(--disabled))]" />,
     navigateTo: { label: 'Go to Database', path: '/dashboard/database/tables' },
   },
@@ -57,7 +56,7 @@ const PROMPT_STEPS: PromptStep[] = [
     id: 3,
     title: 'Upload a file',
     prompt:
-      'Use InsForge Skills to add file upload to this app.\nUsers should be able to upload a file and attach it to a task.\nShow the uploaded file in the task UI.\nUse InsForge Storage for file uploads.',
+      'Use InsForge Skills to add file upload to this app.\nUsers should be able to upload a file and attach it to a record.\nShow the uploaded file in the UI.\nUse InsForge Storage for file uploads.',
     icon: <StepUploadIcon className="size-12 text-[rgb(var(--disabled))]" />,
     navigateTo: { label: 'Go to Storage', path: '/dashboard/storage' },
   },
@@ -65,7 +64,7 @@ const PROMPT_STEPS: PromptStep[] = [
     id: 4,
     title: 'Add LLM feature',
     prompt:
-      'Use InsForge Skills to add an AI feature to this todo app that turns text into tasks using the InsForge AI Gateway.\nUsers should be able to type natural language and have the app create one or more todo items automatically.',
+      'Use InsForge Skills to add an AI feature to this app using the InsForge AI Gateway.\nUsers should be able to type natural language and have the AI generate a useful response automatically.',
     icon: <Sparkles className="size-12 text-[rgb(var(--disabled))]" />,
     navigateTo: { label: 'Go to Model Gateway', path: '/dashboard/ai' },
   },
@@ -270,7 +269,7 @@ function PromptStepper({ onDismiss, completedSteps, showDismiss = false }: Promp
                 type="button"
                 onClick={() => setActiveStep(index)}
                 className={`flex flex-col gap-2 border-b border-[var(--alpha-8)] p-4 text-left transition-colors last:border-b-0 ${
-                  isActive ? 'bg-[var(--special-toast,#323232)]' : 'hover:bg-[var(--alpha-4)]'
+                  isActive ? 'bg-toast' : 'hover:bg-[var(--alpha-4)]'
                 }`}
               >
                 <div className="flex items-center gap-1">
@@ -292,7 +291,7 @@ function PromptStepper({ onDismiss, completedSteps, showDismiss = false }: Promp
         </div>
 
         {/* Step detail (right) */}
-        <div className="relative flex flex-1 flex-col items-start self-stretch overflow-hidden bg-[var(--special-toast,#323232)] p-6">
+        <div className="relative flex flex-1 flex-col items-start self-stretch overflow-hidden bg-toast p-6">
           <div className="relative z-10 flex max-w-[640px] flex-col items-start gap-3">
             {/* Icon */}
             <div className="h-12 w-12">{currentStep.icon}</div>
@@ -433,12 +432,12 @@ export default function NewDashboardPage() {
   // --- Step completion detection (real-time via socket → React Query invalidation) ---
   const completedSteps = useMemo(
     () => [
-      // Step 1: Add sample data — todo table has at least 4 records
-      (tables?.find((t) => t.tableName === 'todo')?.recordCount ?? 0) >= 4,
+      // Step 1: Add sample data — at least one user table has rows
+      (tables ?? []).some((t) => t.recordCount > 0),
       // Step 2: Sign up first user — totalUsers already excludes admin & anon
       (totalUsers ?? 0) >= 1,
-      // Step 3: Upload a file — todo-attachments bucket has files
-      (storage?.buckets?.find((b) => b.name === 'todo-attachments')?.objectCount ?? 0) > 0,
+      // Step 3: Upload a file — at least one storage bucket exists
+      (storage?.buckets?.length ?? 0) > 0,
       // Step 4: Add LLM feature — AI gateway has been used
       (aiUsageSummary?.totalRequests ?? 0) > 0,
       // Step 5: Deploy your app — a deployment exists
@@ -478,7 +477,7 @@ export default function NewDashboardPage() {
             </Badge>
           )}
           {/* Health badge */}
-          <div className="flex items-center rounded-full bg-[var(--special-toast,#323232)] px-2 py-1">
+          <div className="flex items-center rounded-full bg-toast px-2 py-1">
             <div
               className={`mr-1.5 h-2 w-2 rounded-full ${isHealthy ? 'bg-emerald-400' : 'bg-amber-400'}`}
             />

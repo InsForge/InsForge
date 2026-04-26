@@ -10,8 +10,9 @@ import {
   ChartLine,
   Settings,
   Rocket,
-  GitFork,
   SquarePen,
+  Download,
+  BookOpen,
 } from 'lucide-react';
 
 export interface DashboardSecondaryMenuItem {
@@ -105,12 +106,6 @@ export const dashboardStaticMenuItems: DashboardPrimaryMenuItem[] = [
     href: '/dashboard/logs',
     icon: ChartLine,
   },
-  {
-    id: 'visualizer',
-    label: 'Visualizer',
-    href: '/dashboard/visualizer',
-    icon: GitFork,
-  },
 ];
 
 export const dashboardSettingsMenuItem: DashboardPrimaryMenuItem = {
@@ -125,4 +120,22 @@ export const dashboardDeploymentsMenuItem: DashboardPrimaryMenuItem = {
   label: 'Deployments',
   href: '/dashboard/deployments',
   icon: Rocket,
+};
+
+// d_test + cloud-hosting only: opens the Install InsForge view (sets view + navigates to /dashboard).
+// onClick is wired up in AppSidebar where DTestViewContext + react-router are available.
+export const dashboardDTestInstallMenuItem: DashboardPrimaryMenuItem = {
+  id: 'dtest-install',
+  label: 'Install',
+  href: '/dashboard',
+  icon: Download,
+};
+
+// d_test + cloud-hosting only: opens the docs site in a new tab.
+export const dashboardDTestDocMenuItem: DashboardPrimaryMenuItem = {
+  id: 'dtest-doc',
+  label: 'Doc',
+  href: 'https://docs.insforge.dev/introduction',
+  icon: BookOpen,
+  external: true,
 };

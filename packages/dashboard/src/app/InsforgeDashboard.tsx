@@ -37,6 +37,7 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
     onRequestInstanceTypeChange,
     onUpdateVersion,
     onRequestUserInfo,
+    onRequestUserApiKey,
   } = props;
   const getAuthorizationCode =
     props.mode === 'cloud-hosting' ? props.getAuthorizationCode : undefined;
@@ -62,6 +63,7 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
       onRequestInstanceTypeChange,
       onUpdateVersion,
       onRequestUserInfo,
+      onRequestUserApiKey,
     }),
     [
       backendUrl,
@@ -82,6 +84,7 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
       onRequestInstanceTypeChange,
       onUpdateVersion,
       onRequestUserInfo,
+      onRequestUserApiKey,
     ]
   );
   const [queryClient] = useState(
