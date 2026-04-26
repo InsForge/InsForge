@@ -121,7 +121,7 @@ Content changes per client type:
 ### Coding agents (OpenClaw, Claude Code, Codex, Antigravity, Cursor, OpenCode, Copilot, Cline, Other Agents)
 
 - CLI / MCP toggle (`toggle nav` pattern from Figma) — only rendered when the entry's `tabs` field exposes more than one tab. **OpenClaw** has `tabs: ['cli']` (CLI only, no toggle); **Other Agents** has `tabs: ['mcp']` (MCP only, jumps directly into the MCP JSON config); the rest default to both.
-- **CLI tab** → `<DTestCLISection agentName={...} />`. The prompt embeds a real `uak_…` user API key minted by the cloud control plane (`onRequestUserApiKey` callback) on every section mount, with a 3-month TTL — falls back to `<placeholder>` when the host doesn't provide the callback (self-hosted preview). The `npx @insforge/cli link` line includes `--template todo` to scaffold the demo project.
+- **CLI tab** → `<DTestCLISection agentName={...} />`. The prompt embeds a real `uak_…` user API key minted by the cloud control plane (`onRequestUserApiKey` callback) on every section mount, with a 3-month TTL — falls back to `<placeholder>` when the host doesn't provide the callback (self-hosted preview).
 - **MCP tab** → `<DTestMCPSection agentId={id} apiKey={...} appUrl={...} />`.
   - For specific agents, `agentId` matches the tile id (`openclaw`, `claude-code`, `codex`, `cursor`, `antigravity`, `opencode`, `copilot`, `cline`).
   - For "Other Agents", the entry sets `mcpAgentId: 'mcp'` which jumps directly to the MCP JSON config (no agent dropdown needed).
@@ -173,15 +173,14 @@ Project title, instance-type badge, and health badge use `useCloudProjectInfo` +
 A 5-step "Start building" stepper rendered below the metric cards. Self-contained: each instance manages its own dismiss flag and step-completion derivation.
 
 - **5 steps** (database → auth → storage → model gateway → deployment), each with a copy-pastable prompt and a "Go to &lt;area&gt;" button.
-- **Live completion detection** from existing hooks:
-  - `database` → `tables.find(t => t.tableName === 'todo')?.recordCount >= 4`
+- **Live completion detection** from existing hooks (intentionally schema-agnostic so prompts work for any project, not just a fixed demo):
+  - `database` → `tables.some(t => t.recordCount > 0)` (any user table has rows)
   - `auth` → `totalUsers >= 1`
-  - `storage` → bucket `todo-attachments` has objectCount > 0
+  - `storage` → `storage.buckets.length > 0` (any bucket exists)
   - `ai` → `aiUsageSummary.totalRequests > 0`
   - `deployment` → `currentDeploymentId` exists
 - **Sticky completion**: once a step is detected complete, it stays complete in localStorage (`insforge-ctest-step-<key>-done-<projectId>`) even if the agent later removes the source data (e.g. via newly added RLS policies). Key prefix is `insforge-ctest-` for backwards compatibility with users who progressed through c_test.
 - **Dismiss**: persists `insforge-prompt-stepper-dismissed-<projectId>` in localStorage. Once dismissed for a project, the stepper never shows for that project again.
-- The 5-step prompts assume the user ran `npx @insforge/cli link --template todo`, which scaffolds a demo with the `todo` table and `todo-attachments` bucket — without that, the live completion detection won't fire.
 
 ## File Plan
 

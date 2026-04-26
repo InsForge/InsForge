@@ -119,12 +119,11 @@ export const CLIENT_ENTRIES: Record<ClientId, ClientEntry> = {
   other: {
     id: 'other',
     label: 'Other Agents',
-    icon: iconTile(<OtherAgentsLogo className="h-8 w-8 text-foreground" />),
-    detailIcon: <OtherAgentsLogo className="h-8 w-8 text-foreground" />,
+    icon: iconTile(<OtherAgentsLogo className="h-8 w-8" />),
+    detailIcon: <OtherAgentsLogo className="h-8 w-8" />,
     kind: 'agent',
-    // Jumps directly to the MCP JSON config (no agent dropdown needed).
+    // MCP tab renders the raw MCP JSON config (no agent dropdown needed).
     mcpAgentId: 'mcp',
-    tabs: ['mcp'],
   },
   'connection-string': {
     id: 'connection-string',

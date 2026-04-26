@@ -9,6 +9,7 @@ import { useMetadata, useProjectId } from '../../../../lib/hooks/useMetadata';
 import { useUsers } from '../../../auth';
 import { useAIUsageSummary } from '../../../ai/hooks/useAIUsage';
 import { useDeploymentMetadata } from '../../../deployments/hooks/useDeploymentMetadata';
+import { useMcpUsage } from '../../../logs/hooks/useMcpUsage';
 
 // --- Prompt Stepper Data ---
 
@@ -30,8 +31,7 @@ const PROMPT_STEPS: PromptStep[] = [
     key: 'database',
     category: 'Database',
     title: 'Add sample data',
-    prompt:
-      "Use InsForge Skills to add 4 todo items to InsForge backend's todo table:\n\n1. Add sign in for users\n2. Add file upload\n3. Use AI to turn text into tasks\n4. Deploy your app",
+    prompt: 'Use InsForge Skills to create a table in InsForge backend and add some sample data.',
     icon: <Database className="size-12 text-[rgb(var(--disabled))]" />,
     navigateTo: { label: 'Go to Database', path: '/dashboard/database/tables' },
   },
@@ -51,7 +51,7 @@ const PROMPT_STEPS: PromptStep[] = [
     category: 'Storage',
     title: 'Upload a file',
     prompt:
-      'Use InsForge Skills to add file upload to this app.\nUsers should be able to upload a file and attach it to a task.\nShow the uploaded file in the task UI.\nUse InsForge Storage for file uploads.',
+      'Use InsForge Skills to add file upload to this app.\nUsers should be able to upload a file and attach it to a record.\nShow the uploaded file in the UI.\nUse InsForge Storage for file uploads.',
     icon: <StepUploadIcon className="size-12 text-[rgb(var(--disabled))]" />,
     navigateTo: { label: 'Go to Storage', path: '/dashboard/storage' },
   },
@@ -61,7 +61,7 @@ const PROMPT_STEPS: PromptStep[] = [
     category: 'Model Gateway',
     title: 'Add LLM feature',
     prompt:
-      'Use InsForge Skills to add an AI feature to this todo app that turns text into tasks using the InsForge AI Gateway.\nUsers should be able to type natural language and have the app create one or more todo items automatically.',
+      'Use InsForge Skills to add an AI feature to this app using the InsForge AI Gateway.\nUsers should be able to type natural language and have the AI generate a useful response automatically.',
     icon: <Sparkles className="size-12 text-[rgb(var(--disabled))]" />,
     navigateTo: { label: 'Go to Model Gateway', path: '/dashboard/ai' },
   },
@@ -267,6 +267,10 @@ export function DashboardPromptStepper() {
   const { data: aiUsageSummary } = useAIUsageSummary();
   const { currentDeploymentId } = useDeploymentMetadata();
   const { projectId } = useProjectId();
+  // Only surface the stepper after the agent has made at least one MCP call.
+  // A user who lands on the connected dashboard without ever invoking MCP
+  // (e.g. dismissed the Install view manually) shouldn't be nagged with steps.
+  const { hasCompletedOnboarding } = useMcpUsage();
 
   const stepperDismissKey = getStepperDismissKey(projectId ?? undefined);
   const [isDismissed, setIsDismissed] = useState(false);
@@ -302,18 +306,18 @@ export function DashboardPromptStepper() {
     setStickyCompletedSteps(loaded);
   }, [projectId]);
 
-  const todoRecordCount = tables?.find((t) => t.tableName === 'todo')?.recordCount ?? 0;
-  const todoStepComplete = todoRecordCount >= 4;
+  const databaseStepComplete = (tables ?? []).some((t) => t.recordCount > 0);
+  const storageStepComplete = (storage?.buckets?.length ?? 0) > 0;
 
   const liveCompletedSteps = useMemo<Record<StepKey, boolean>>(
     () => ({
-      database: todoStepComplete,
+      database: databaseStepComplete,
       auth: (totalUsers ?? 0) >= 1,
-      storage: (storage?.buckets?.find((b) => b.name === 'todo-attachments')?.objectCount ?? 0) > 0,
+      storage: storageStepComplete,
       ai: (aiUsageSummary?.totalRequests ?? 0) > 0,
       deployment: !!currentDeploymentId,
     }),
-    [todoStepComplete, totalUsers, storage, aiUsageSummary, currentDeploymentId]
+    [databaseStepComplete, totalUsers, storageStepComplete, aiUsageSummary, currentDeploymentId]
   );
 
   // Persist live completions so they stick even if the agent later removes
@@ -364,7 +368,7 @@ export function DashboardPromptStepper() {
     }
   }, [projectId, stepperDismissKey]);
 
-  if (isDismissed) {
+  if (isDismissed || !hasCompletedOnboarding) {
     return null;
   }
 
