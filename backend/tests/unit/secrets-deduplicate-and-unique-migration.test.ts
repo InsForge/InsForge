@@ -48,9 +48,20 @@ describe('035_fix-secrets-deduplicate-and-unique migration', () => {
     expect(sql).toMatch(/key\s+NOT LIKE\s+'API_KEY_OLD_%'/i);
   });
 
-  it('keeps the most recently created row as the survivor', () => {
-    // The exclusion subquery picks newest-by-created_at as the row to keep.
-    expect(sql).toMatch(/ORDER BY\s+created_at\s+DESC\s+LIMIT\s+1/i);
+  it('keeps the most recently created row as the tiebreaker', () => {
+    // The exclusion subquery includes created_at DESC as a tiebreaker after
+    // the active/unexpired prioritization (see test below).
+    expect(sql).toMatch(/created_at\s+DESC[\s\S]*?LIMIT\s+1/i);
+  });
+
+  it('prioritizes is_active=true AND non-expired rows when picking the survivor', () => {
+    // If duplicates include both an active-non-expired row and an
+    // inactive/expired one, the migration must keep the active one even if
+    // the inactive row has a newer created_at — otherwise we'd deactivate
+    // the only row that the read paths actually accept.
+    expect(sql).toMatch(
+      /CASE[\s\S]*?is_active\s*=\s*true[\s\S]*?expires_at\s+IS\s+NULL\s+OR\s+expires_at\s*>\s*NOW\(\)[\s\S]*?END/i
+    );
   });
 
   it('renames duplicates with a _DUP_<id> suffix to keep them globally unique', () => {
@@ -89,10 +100,21 @@ describe('035_fix-secrets-deduplicate-and-unique migration', () => {
     expect(sql).toMatch(/'key'/);
   });
 
-  it('skips constraint add if a unique index on (key) already exists', () => {
-    // Some installs may have a unique index without a named constraint
-    // (e.g., from Postgres auto-generation on UNIQUE column declarations).
-    expect(sql).toMatch(/pg_index[\s\S]*?indisunique/i);
+  it('skips constraint add only for a valid, complete, single-column unique index on (key)', () => {
+    // pg_index.indisunique alone is not enough — partial, expression, and
+    // not-yet-validated unique indexes can exist and don't enforce
+    // unconditional uniqueness. The migration must require:
+    //   indisunique + indisvalid + indisready
+    //   indpred IS NULL  (not partial)
+    //   indexprs IS NULL (not expression)
+    //   indnkeyatts = 1  (single-column)
+    expect(sql).toMatch(/pg_index/i);
+    expect(sql).toMatch(/indisunique/);
+    expect(sql).toMatch(/indisvalid/);
+    expect(sql).toMatch(/indisready/);
+    expect(sql).toMatch(/indpred\s+IS\s+NULL/i);
+    expect(sql).toMatch(/indexprs\s+IS\s+NULL/i);
+    expect(sql).toMatch(/indnkeyatts\s*=\s*1/i);
   });
 
   it('adds the constraint with a descriptive name', () => {

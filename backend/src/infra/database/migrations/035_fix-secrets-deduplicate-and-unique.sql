@@ -35,10 +35,20 @@ BEGIN
         expires_at = NOW()
     WHERE key = dup_key
       AND id <> (
+        -- Prefer a row that the read paths would actually accept
+        -- (is_active=true AND not-expired). If none qualifies, fall back
+        -- to newest by created_at so we still pick deterministically.
         SELECT id
         FROM system.secrets
         WHERE key = dup_key
-        ORDER BY created_at DESC
+        ORDER BY
+          CASE
+            WHEN is_active = true
+             AND (expires_at IS NULL OR expires_at > NOW()) THEN 0
+            ELSE 1
+          END,
+          created_at DESC,
+          id DESC
         LIMIT 1
       );
     RAISE NOTICE 'Collapsed duplicates for key=%', dup_key;
@@ -71,8 +81,12 @@ BEGIN
     WHERE n.nspname = 'system'
       AND t.relname = 'secrets'
       AND i.indisunique
+      AND i.indisvalid       -- skip indexes still being built / never validated
+      AND i.indisready       -- skip indexes not yet ready for inserts
+      AND i.indpred IS NULL  -- not a partial index (would skip rows)
+      AND i.indexprs IS NULL -- not an expression index (different semantics)
+      AND i.indnkeyatts = 1  -- single-column index
       AND a.attname = 'key'
-      AND array_length(i.indkey::int[], 1) = 1
   ) THEN
     ALTER TABLE system.secrets ADD CONSTRAINT secrets_key_unique UNIQUE (key);
     RAISE NOTICE 'Added UNIQUE constraint secrets_key_unique on system.secrets(key)';
