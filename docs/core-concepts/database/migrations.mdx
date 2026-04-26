@@ -16,10 +16,6 @@ For most teams, the workflow is:
 
 InsForge stores successful app-level migrations in `system.custom_migrations`. This is separate from `system.migrations`, which InsForge uses for its own internal platform upgrades.
 
-<Info>
-InsForge does not require a separate local database stack for migrations. `db migrations up` applies directly to the linked backend.
-</Info>
-
 ## How InsForge migrations work
 
 The core workflow is simple:
@@ -29,7 +25,7 @@ The core workflow is simple:
 3. Commit that file to git.
 4. Apply it with `npx @insforge/cli db migrations up ...`.
 
-InsForge migrations are forward-only today. You usually write the SQL yourself, apply changes in version order, and test destructive changes in a non-production project first.
+Today the workflow is up-only. Support for down SQL statements is planned for a future iteration.
 
 ## Before you start
 
@@ -49,6 +45,24 @@ npx @insforge/cli db migrations list
 <Tip>
 If you are linking a repository to an existing InsForge project for the first time, run `npx @insforge/cli db migrations fetch` before creating new files. That gives you a local `migrations/` folder that matches the backend's applied history.
 </Tip>
+
+## Avoid schema drift
+
+If you choose to manage your database with migrations, all schema changes should go through migration files.
+
+Avoid changing schema through:
+
+- the dashboard schema tools
+- ad hoc raw SQL commands
+
+Instead:
+
+1. Create a migration file.
+2. Put the schema change in that file.
+3. Commit it to git.
+4. Apply it with the CLI.
+
+This keeps your repository, your team, and the backend's applied migration history in sync.
 
 ## Create and apply your first migration
 
@@ -191,7 +205,7 @@ The CLI intentionally keeps migration naming and ordering strict:
 - Migration names may use lowercase letters, numbers, and hyphens only.
 - `db migrations new` refuses to continue if your local filenames are invalid or two files share the same version.
 - Empty migration files are rejected.
-- Migrations are forward-only today. There is no `down` or rollback command in the CLI.
+- Today there is no `down` or rollback command in the CLI. Support for down SQL statements is planned for a future iteration.
 
 The backend API is a little broader than the CLI:
 
@@ -246,11 +260,3 @@ An earlier local migration must be applied first. Either:
 
 - apply the earlier file, or
 - fix/delete the stale file if it should no longer exist
-
-### Need a clean-room test environment
-
-The CLI does not currently include a built-in database reset command. Use a disposable InsForge project or a staging backend when you need to rehearse destructive changes safely.
-
-### Need automatic schema diff generation
-
-The CLI does not currently include automatic schema diff generation. Write the SQL by hand, or copy generated SQL from your editor or dashboard workflow into a new migration file created with `db migrations new`.
