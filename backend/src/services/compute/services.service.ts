@@ -117,10 +117,14 @@ export function selectComputeProvider(): ComputeProvider {
   // Fly account and wants direct control. Otherwise fall through to cloud-proxy
   // (PROJECT_ID + CLOUD_API_HOST + JWT_SECRET all present).
   const fly = FlyProvider.getInstance();
-  if (fly.isConfigured()) return fly;
+  if (fly.isConfigured()) {
+    return fly;
+  }
 
   const cloud = CloudComputeProvider.getInstance();
-  if (cloud.isConfigured()) return cloud;
+  if (cloud.isConfigured()) {
+    return cloud;
+  }
 
   throw new AppError(
     'Compute services not configured.',
@@ -181,14 +185,16 @@ export class ComputeServicesService {
   // `compute deploy` can run flyctl without the user holding their own
   // FLY_API_TOKEN. Cloud mode only — self-hosted users with their own Fly
   // account already have a token and don't need this path.
-  async issueDeployTokenForService(serviceId: string): Promise<{ token: string; expirySeconds: number }> {
+  async issueDeployTokenForService(
+    serviceId: string
+  ): Promise<{ token: string; expirySeconds: number }> {
     const fly = this.getCompute();
     if (!(fly instanceof CloudComputeProvider)) {
       throw new AppError(
         'Deploy-token issuance is only supported in cloud-managed mode. ' +
           'Self-hosters with FLY_API_TOKEN set already have a token and do not need this endpoint.',
         400,
-        ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED
       );
     }
     const service = await this.getService(serviceId);
@@ -196,7 +202,7 @@ export class ComputeServicesService {
       throw new AppError(
         `Service ${serviceId} has no Fly app yet — call /api/compute/services/deploy first to create the app.`,
         400,
-        ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED
       );
     }
     return fly.issueDeployToken(service.flyAppId);
@@ -230,14 +236,14 @@ export class ComputeServicesService {
       throw new AppError(
         'Source-deploy is only supported in cloud-managed mode.',
         400,
-        ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED
       );
     }
     if (!fly.issueBuildCreds) {
       throw new AppError(
         'Source-deploy is not implemented by the configured compute provider.',
         503,
-        ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED
       );
     }
     return fly.issueBuildCreds(name);
@@ -260,21 +266,22 @@ export class ComputeServicesService {
       throw new AppError(
         'Must provide either imageUrl (image-mode) or sourceKey+imageTag (source-mode).',
         400,
-        ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED
       );
     }
     if (input.imageUrl && input.sourceKey) {
       throw new AppError(
         'Cannot provide both imageUrl and sourceKey — pick one mode.',
         400,
-        ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED
       );
     }
 
     // For source-mode, the row records the ECR tag the build will produce.
     // After build completes, the cloud-resolved digest-pinned tag is what
     // actually runs, but the bare tag is what we display in /list etc.
-    const recordedImageUrl = input.imageUrl ?? input.imageTag!;
+    // Earlier validation guarantees one of imageUrl/imageTag is set.
+    const recordedImageUrl = input.imageUrl ?? input.imageTag ?? '';
 
     const envVarsEncrypted = input.envVars
       ? EncryptionManager.encrypt(JSON.stringify(input.envVars))
@@ -558,7 +565,7 @@ export class ComputeServicesService {
         throw new AppError(
           `Cannot change region for a deployed service. Delete and redeploy in region "${data.region}" instead.`,
           400,
-          ERROR_CODES.COMPUTE_REGION_CHANGE_NOT_SUPPORTED,
+          ERROR_CODES.COMPUTE_REGION_CHANGE_NOT_SUPPORTED
         );
       }
       updates.push(`region = $${paramIdx++}`);
@@ -575,7 +582,15 @@ export class ComputeServicesService {
 
     // If deployment-affecting fields changed and a machine exists, update Fly FIRST.
     // Only commit to DB after Fly accepts the new config to avoid stale DB state.
-    const deployFields = ['imageUrl', 'sourceKey', 'imageTag', 'port', 'cpu', 'memory', 'envVars'] as const;
+    const deployFields = [
+      'imageUrl',
+      'sourceKey',
+      'imageTag',
+      'port',
+      'cpu',
+      'memory',
+      'envVars',
+    ] as const;
     const hasDeployChange = deployFields.some((f) => data[f] !== undefined);
 
     if (hasDeployChange && existing.flyAppId && existing.flyMachineId) {
@@ -725,7 +740,7 @@ export class ComputeServicesService {
         'Service not found',
         404,
         ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
-        NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS,
+        NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS
       );
     }
 
@@ -766,7 +781,7 @@ export class ComputeServicesService {
         'Service not found',
         404,
         ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
-        NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS,
+        NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS
       );
     }
 

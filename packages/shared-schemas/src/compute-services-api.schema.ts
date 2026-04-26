@@ -42,10 +42,9 @@ export const createServiceSchema = z
       .optional(),
     region: z.string().default('iad'),
   })
-  .refine(
-    (v) => Boolean(v.imageUrl) !== Boolean(v.sourceKey && v.imageTag),
-    { message: 'Provide either imageUrl OR (sourceKey + imageTag), not both/neither' }
-  );
+  .refine((v) => Boolean(v.imageUrl) !== Boolean(v.sourceKey && v.imageTag), {
+    message: 'Provide either imageUrl OR (sourceKey + imageTag), not both/neither',
+  });
 
 export const updateServiceSchema = z
   .object({
@@ -71,14 +70,12 @@ export const updateServiceSchema = z
       .optional(),
     region: z.string().optional(),
   })
-  .refine(
-    (v) => !(v.imageUrl && v.sourceKey),
-    { message: 'Cannot provide both imageUrl and sourceKey' }
-  )
-  .refine(
-    (v) => Boolean(v.sourceKey) === Boolean(v.imageTag),
-    { message: 'sourceKey and imageTag must be provided together' }
-  );
+  .refine((v) => !(v.imageUrl && v.sourceKey), {
+    message: 'Cannot provide both imageUrl and sourceKey',
+  })
+  .refine((v) => Boolean(v.sourceKey) === Boolean(v.imageTag), {
+    message: 'sourceKey and imageTag must be provided together',
+  });
 
 export const listServicesResponseSchema = z.object({
   services: z.array(serviceSchema),

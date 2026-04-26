@@ -154,7 +154,9 @@ export class FlyProvider implements ComputeProvider {
     if (!response.ok) {
       return false;
     }
-    const result = (await response.json()) as { data?: { app?: { sharedIpAddress?: string | null } } };
+    const result = (await response.json()) as {
+      data?: { app?: { sharedIpAddress?: string | null } };
+    };
     return !!result.data?.app?.sharedIpAddress;
   }
 
