@@ -37,7 +37,9 @@ describe('035_fix-secrets-deduplicate-and-unique migration', () => {
 
   // ── Step 1: Dedupe ────────────────────────────────────────────────────
   it('wraps the dedupe step in a DO block for idempotency', () => {
-    expect(sql).toMatch(/DO\s*\$\$[\s\S]*?FOR\s+\w+\s+IN[\s\S]*?LOOP[\s\S]*?END\s+LOOP[\s\S]*?\$\$/i);
+    expect(sql).toMatch(
+      /DO\s*\$\$[\s\S]*?FOR\s+\w+\s+IN[\s\S]*?LOOP[\s\S]*?END\s+LOOP[\s\S]*?\$\$/i
+    );
   });
 
   it('only collapses keys that have more than one row', () => {
