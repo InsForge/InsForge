@@ -31,7 +31,16 @@ export interface SourceUploadCreds {
 export interface UpdateMachineParams {
   appId: string;
   machineId: string;
-  image: string;
+  /**
+   * Pre-built image URL. Either `image` or (`sourceKey` + `imageTag`) must
+   * be provided for a redeploy. (For non-image updates like port-only,
+   * pass the existing image URL.)
+   */
+  image?: string;
+  /** S3 key from /build-creds. Triggers cloud-side build before update. */
+  sourceKey?: string;
+  /** ECR tag the source-mode build will produce, paired with sourceKey. */
+  imageTag?: string;
   port: number;
   cpu: string;
   memory: number;

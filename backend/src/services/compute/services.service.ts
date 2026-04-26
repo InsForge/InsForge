@@ -29,7 +29,12 @@ export interface CreateServiceInput {
 }
 
 export interface UpdateServiceInput {
+  /** Pre-built image URL. Mutually exclusive with sourceKey/imageTag. */
   imageUrl?: string;
+  /** S3 key from /build-creds. Triggers cloud-side build before update. */
+  sourceKey?: string;
+  /** ECR tag the source-mode build will produce, paired with sourceKey. */
+  imageTag?: string;
   port?: number;
   cpu?: string;
   memory?: number;
@@ -570,7 +575,7 @@ export class ComputeServicesService {
 
     // If deployment-affecting fields changed and a machine exists, update Fly FIRST.
     // Only commit to DB after Fly accepts the new config to avoid stale DB state.
-    const deployFields = ['imageUrl', 'port', 'cpu', 'memory', 'envVars'] as const;
+    const deployFields = ['imageUrl', 'sourceKey', 'imageTag', 'port', 'cpu', 'memory', 'envVars'] as const;
     const hasDeployChange = deployFields.some((f) => data[f] !== undefined);
 
     if (hasDeployChange && existing.flyAppId && existing.flyMachineId) {
@@ -587,10 +592,15 @@ export class ComputeServicesService {
       // be changed in-place via updateMachine — a region change requires redeployment
       // (destroy + recreate). The region field is stored for the next deploy.
       try {
+        // Source-mode redeploy: forward sourceKey + imageTag to cloud, which
+        // builds first then updates with the resolved image. Image-mode
+        // redeploy: forward imageUrl as before.
         await this.getCompute().updateMachine({
           appId: existing.flyAppId,
           machineId: existing.flyMachineId,
-          image: data.imageUrl ?? existing.imageUrl,
+          image: data.sourceKey ? undefined : (data.imageUrl ?? existing.imageUrl),
+          sourceKey: data.sourceKey,
+          imageTag: data.imageTag,
           port: data.port ?? existing.port,
           cpu: data.cpu ?? existing.cpu,
           memory: data.memory ?? existing.memory,
