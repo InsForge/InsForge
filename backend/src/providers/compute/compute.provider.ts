@@ -79,6 +79,6 @@ export interface ComputeProvider {
     appId: string,
     machineId: string,
     targetStates: string[],
-    timeoutMs?: number,
+    timeoutMs?: number
   ): Promise<string>;
 }

@@ -34,7 +34,7 @@ export class CloudComputeProvider implements ComputeProvider {
       throw new AppError(
         'Cloud compute not configured (need PROJECT_ID, CLOUD_API_HOST, JWT_SECRET)',
         500,
-        ERROR_CODES.COMPUTE_NOT_CONFIGURED,
+        ERROR_CODES.COMPUTE_NOT_CONFIGURED
       );
     }
     return jwt.sign({ sub: config.cloud.projectId }, config.app.jwtSecret, {
@@ -46,11 +46,7 @@ export class CloudComputeProvider implements ComputeProvider {
     return `${config.cloud.apiHost}/projects/v1/${config.cloud.projectId}/compute${path}`;
   }
 
-  private async call<T>(
-    method: string,
-    path: string,
-    body?: unknown,
-  ): Promise<T | undefined> {
+  private async call<T>(method: string, path: string, body?: unknown): Promise<T | undefined> {
     // signToken throws AppError(COMPUTE_NOT_CONFIGURED) if config missing —
     // we want that to surface to the caller, not get masked as CLOUD_UNAVAILABLE.
     const sign = this.signToken();
@@ -76,7 +72,7 @@ export class CloudComputeProvider implements ComputeProvider {
         `COMPUTE_CLOUD_UNAVAILABLE: ${(err as Error).message}`,
         503,
         ERROR_CODES.COMPUTE_CLOUD_UNAVAILABLE,
-        'Check CLOUD_API_HOST is reachable and verify cloud backend health.',
+        'Check CLOUD_API_HOST is reachable and verify cloud backend health.'
       );
     }
     const text = await response.text();
@@ -84,18 +80,17 @@ export class CloudComputeProvider implements ComputeProvider {
       throw new AppError(
         text || `Cloud compute error (${response.status})`,
         response.status,
-        ERROR_CODES.COMPUTE_PROVIDER_ERROR,
+        ERROR_CODES.COMPUTE_PROVIDER_ERROR
       );
     }
     return text ? (JSON.parse(text) as T) : undefined;
   }
 
   async createApp(params: { name: string; network: string; org: string }) {
-    const result = await this.call<{ appId: string; serviceId?: string }>(
-      'POST',
-      '/apps',
-      { name: params.name, network: params.network },
-    );
+    const result = await this.call<{ appId: string; serviceId?: string }>('POST', '/apps', {
+      name: params.name,
+      network: params.network,
+    });
     return { appId: result?.appId ?? params.name };
   }
 
@@ -111,13 +106,13 @@ export class CloudComputeProvider implements ComputeProvider {
   async issueDeployToken(appId: string): Promise<{ token: string; expirySeconds: number }> {
     const result = await this.call<{ token: string; expirySeconds: number }>(
       'POST',
-      `/apps/${encodeURIComponent(appId)}/deploy-token`,
+      `/apps/${encodeURIComponent(appId)}/deploy-token`
     );
     if (!result) {
       throw new AppError(
         'Cloud returned empty deploy-token response',
         500,
-        ERROR_CODES.COMPUTE_PROVIDER_ERROR,
+        ERROR_CODES.COMPUTE_PROVIDER_ERROR
       );
     }
     return result;
@@ -129,7 +124,7 @@ export class CloudComputeProvider implements ComputeProvider {
       throw new AppError(
         `Cloud compute returned empty machine payload for app ${params.appId}`,
         502,
-        ERROR_CODES.COMPUTE_PROVIDER_ERROR,
+        ERROR_CODES.COMPUTE_PROVIDER_ERROR
       );
     }
     return { machineId: result.machineId };
@@ -154,7 +149,7 @@ export class CloudComputeProvider implements ComputeProvider {
       throw new AppError(
         `Cloud compute returned empty build-creds for ${appId}`,
         502,
-        ERROR_CODES.COMPUTE_PROVIDER_ERROR,
+        ERROR_CODES.COMPUTE_PROVIDER_ERROR
       );
     }
     return result;
@@ -178,23 +173,21 @@ export class CloudComputeProvider implements ComputeProvider {
 
   async listMachines(appId: string): Promise<MachineSummary[]> {
     return (
-      (await this.call<MachineSummary[]>(
-        'GET',
-        `/machines?appId=${encodeURIComponent(appId)}`,
-      )) ?? []
+      (await this.call<MachineSummary[]>('GET', `/machines?appId=${encodeURIComponent(appId)}`)) ??
+      []
     );
   }
 
   async getMachineStatus(appId: string, machineId: string): Promise<{ state: string }> {
     const result = await this.call<{ state: string }>(
       'GET',
-      `/machines/${encodeURIComponent(machineId)}?appId=${encodeURIComponent(appId)}`,
+      `/machines/${encodeURIComponent(machineId)}?appId=${encodeURIComponent(appId)}`
     );
     if (!result?.state) {
       throw new AppError(
         `Cloud compute returned empty status payload for ${appId}/${machineId}`,
         502,
-        ERROR_CODES.COMPUTE_PROVIDER_ERROR,
+        ERROR_CODES.COMPUTE_PROVIDER_ERROR
       );
     }
     return result;
@@ -203,15 +196,14 @@ export class CloudComputeProvider implements ComputeProvider {
   async getLogs(
     appId: string,
     machineId: string,
-    options?: { limit?: number },
+    options?: { limit?: number }
   ): Promise<ComputeEvent[]> {
     const qs =
-      `?appId=${encodeURIComponent(appId)}` +
-      (options?.limit ? `&limit=${options.limit}` : '');
+      `?appId=${encodeURIComponent(appId)}` + (options?.limit ? `&limit=${options.limit}` : '');
     return (
       (await this.call<ComputeEvent[]>(
         'GET',
-        `/machines/${encodeURIComponent(machineId)}/events${qs}`,
+        `/machines/${encodeURIComponent(machineId)}/events${qs}`
       )) ?? []
     );
   }
@@ -220,18 +212,20 @@ export class CloudComputeProvider implements ComputeProvider {
     appId: string,
     machineId: string,
     targetStates: string[],
-    timeoutMs = 60_000,
+    timeoutMs = 60_000
   ): Promise<string> {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
       const { state } = await this.getMachineStatus(appId, machineId);
-      if (targetStates.includes(state)) return state;
+      if (targetStates.includes(state)) {
+        return state;
+      }
       await new Promise((r) => setTimeout(r, 1500));
     }
     throw new AppError(
       `Machine ${machineId} did not reach ${targetStates.join('|')} within ${timeoutMs}ms`,
       504,
-      ERROR_CODES.COMPUTE_PROVIDER_ERROR,
+      ERROR_CODES.COMPUTE_PROVIDER_ERROR
     );
   }
 }
