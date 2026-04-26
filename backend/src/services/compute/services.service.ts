@@ -14,7 +14,13 @@ import type { ServiceSchema } from '@insforge/shared-schemas';
 export interface CreateServiceInput {
   projectId: string;
   name: string;
-  imageUrl: string;
+  /**
+   * Either `imageUrl` (deploy a pre-built image) or (`sourceKey` + `imageTag`)
+   * (build from source via cloud's CodeBuild, then deploy) is required.
+   */
+  imageUrl?: string;
+  sourceKey?: string;
+  imageTag?: string;
   port: number;
   cpu: string;
   memory: number;
@@ -191,6 +197,47 @@ export class ComputeServicesService {
     return fly.issueDeployToken(service.flyAppId);
   }
 
+  // Mint a presigned S3 PUT URL for the CLI to upload source.tgz directly
+  // to the cloud's source-staging bucket. Cloud-mode only (CodeBuild lives
+  // in InsForge's AWS account). Cloud handles per-project throttling.
+  async issueBuildCredsForService(serviceId: string): Promise<{
+    sourceKey: string;
+    uploadUrl: string;
+    imageTag: string;
+    expiresAt: string;
+  }> {
+    const service = await this.getService(serviceId);
+    return this.issueBuildCredsByName(service.name);
+  }
+
+  // Same as issueBuildCredsForService but takes a name directly. Used on
+  // the first deploy when the service doesn't exist in the DB yet — CLI
+  // calls this, uploads source, then POSTs to /services with the resulting
+  // sourceKey + imageTag to create + deploy in one go.
+  async issueBuildCredsByName(name: string): Promise<{
+    sourceKey: string;
+    uploadUrl: string;
+    imageTag: string;
+    expiresAt: string;
+  }> {
+    const fly = this.getCompute();
+    if (!(fly instanceof CloudComputeProvider)) {
+      throw new AppError(
+        'Source-deploy is only supported in cloud-managed mode.',
+        400,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED,
+      );
+    }
+    if (!fly.issueBuildCreds) {
+      throw new AppError(
+        'Source-deploy is not implemented by the configured compute provider.',
+        503,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED,
+      );
+    }
+    return fly.issueBuildCreds(name);
+  }
+
   async createService(input: CreateServiceInput): Promise<ServiceSchema> {
     const fly = this.getCompute();
 
@@ -202,6 +249,27 @@ export class ComputeServicesService {
         NEXT_ACTION.ENABLE_COMPUTE
       );
     }
+
+    // Validate: must provide either imageUrl OR (sourceKey + imageTag)
+    if (!input.imageUrl && !(input.sourceKey && input.imageTag)) {
+      throw new AppError(
+        'Must provide either imageUrl (image-mode) or sourceKey+imageTag (source-mode).',
+        400,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED,
+      );
+    }
+    if (input.imageUrl && input.sourceKey) {
+      throw new AppError(
+        'Cannot provide both imageUrl and sourceKey — pick one mode.',
+        400,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED,
+      );
+    }
+
+    // For source-mode, the row records the ECR tag the build will produce.
+    // After build completes, the cloud-resolved digest-pinned tag is what
+    // actually runs, but the bare tag is what we display in /list etc.
+    const recordedImageUrl = input.imageUrl ?? input.imageTag!;
 
     const envVarsEncrypted = input.envVars
       ? EncryptionManager.encrypt(JSON.stringify(input.envVars))
@@ -217,7 +285,7 @@ export class ComputeServicesService {
         [
           input.projectId,
           input.name,
-          input.imageUrl,
+          recordedImageUrl,
           input.port,
           input.cpu,
           input.memory,
@@ -253,6 +321,8 @@ export class ComputeServicesService {
       const { machineId } = await fly.launchMachine({
         appId: flyAppName,
         image: input.imageUrl,
+        sourceKey: input.sourceKey,
+        imageTag: input.imageTag,
         port: input.port,
         cpu: input.cpu,
         memory: input.memory,
