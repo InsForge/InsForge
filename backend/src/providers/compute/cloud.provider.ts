@@ -216,9 +216,14 @@ export class CloudComputeProvider implements ComputeProvider {
   ): Promise<string> {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
-      const { state } = await this.getMachineStatus(appId, machineId);
-      if (targetStates.includes(state)) {
-        return state;
+      try {
+        const { state } = await this.getMachineStatus(appId, machineId);
+        if (targetStates.includes(state)) {
+          return state;
+        }
+      } catch {
+        // Transient network/cloud blip — keep polling until the deadline
+        // rather than aborting the wait. Mirrors FlyProvider.waitForState.
       }
       await new Promise((r) => setTimeout(r, 1500));
     }

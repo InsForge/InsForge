@@ -21,6 +21,7 @@ export interface AppConfig {
     domain: string;
   };
   fly: {
+    enabled: boolean;
     apiToken: string;
     org: string;
     domain: string;
@@ -50,8 +51,15 @@ export const config: AppConfig = {
     domain: 'functions.insforge.app',
   },
   fly: {
+    // Self-hosters opt in to compute by setting COMPUTE_SERVICES_ENABLED=true
+    // AND providing FLY_API_TOKEN. Both are required — neither alone is enough.
+    enabled: process.env.COMPUTE_SERVICES_ENABLED === 'true',
     apiToken: process.env.FLY_API_TOKEN || '',
-    org: process.env.FLY_ORG || 'insforge',
+    // FLY_ORG must be set explicitly; defaulting to "insforge" caused
+    // self-hosters to attempt to create apps inside our internal org and get
+    // an opaque auth error from Fly. Empty string makes the misconfig
+    // detectable so we can warn at startup.
+    org: process.env.FLY_ORG || '',
     domain: process.env.COMPUTE_DOMAIN || '',
   },
 };
