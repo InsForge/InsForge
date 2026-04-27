@@ -4,10 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
-const servicePath = path.resolve(
-  currentDir,
-  '../../src/services/schedules/schedule.service.ts'
-);
+const servicePath = path.resolve(currentDir, '../../src/services/schedules/schedule.service.ts');
 const sharedSchemaPath = path.resolve(
   currentDir,
   '../../../packages/shared-schemas/src/schedules-api.schema.ts'
@@ -40,9 +37,7 @@ describe('Sub-minute cadence support: validator', () => {
   });
 
   it('service computeNextRunForSchedule has an interval branch using INTERVAL_RE', () => {
-    expect(serviceSrc).toMatch(
-      /computeNextRunForSchedule\b[\s\S]+?INTERVAL_RE[\s\S]+?getTime\(\)/
-    );
+    expect(serviceSrc).toMatch(/computeNextRunForSchedule\b[\s\S]+?INTERVAL_RE[\s\S]+?getTime\(\)/);
   });
 
   it('service interval next-run handles seconds, minutes, and hours multipliers', () => {
@@ -102,4 +97,3 @@ describe('Sub-minute cadence regex behaviour', () => {
     expect(input.match(INTERVAL_RE)).toBeNull();
   });
 });
-

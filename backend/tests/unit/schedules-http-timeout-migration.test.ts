@@ -36,15 +36,11 @@ describe('036_schedules-http-timeout migration', () => {
 
   // ── HTTP timeouts are configured ─────────────────────────────────────
   it('sets CURLOPT_TIMEOUT_MS to 300000 (5min end-to-end timeout)', () => {
-    expect(sql).toMatch(
-      /http_set_curlopt\(\s*'CURLOPT_TIMEOUT_MS'\s*,\s*'300000'\s*\)/i
-    );
+    expect(sql).toMatch(/http_set_curlopt\(\s*'CURLOPT_TIMEOUT_MS'\s*,\s*'300000'\s*\)/i);
   });
 
   it('sets CURLOPT_CONNECTTIMEOUT_MS to 5000 (5s connect timeout)', () => {
-    expect(sql).toMatch(
-      /http_set_curlopt\(\s*'CURLOPT_CONNECTTIMEOUT_MS'\s*,\s*'5000'\s*\)/i
-    );
+    expect(sql).toMatch(/http_set_curlopt\(\s*'CURLOPT_CONNECTTIMEOUT_MS'\s*,\s*'5000'\s*\)/i);
   });
 
   it('timeouts are set BEFORE the http() call inside execute_job', () => {
