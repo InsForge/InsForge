@@ -632,7 +632,8 @@ export class ComputeServicesService {
       }
     } else if (data.imageUrl && existing.flyAppId && !existing.flyMachineId) {
       // Path A: prepareForDeploy created the app + DB row but no machine.
-      // CLI has now docker-pushed the image and is telling us to launch.
+      // CLI has now built+pushed the image (via flyctl remote builder, or
+      // pre-built --image URL) and is telling us to launch the machine.
       const existingRow = await this.getPool().query(
         `SELECT env_vars_encrypted FROM compute.services WHERE id = $1`,
         [id]
