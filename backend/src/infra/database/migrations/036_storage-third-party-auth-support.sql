@@ -31,7 +31,7 @@ CREATE OR REPLACE FUNCTION storage.foldername(name TEXT)
 RETURNS TEXT[]
 LANGUAGE sql IMMUTABLE PARALLEL SAFE
 AS $$
-  SELECT regexp_split_to_array(name, '/')[
+  SELECT (regexp_split_to_array(name, '/'))[
     1 : array_upper(regexp_split_to_array(name, '/'), 1) - 1
   ]
 $$;
@@ -40,7 +40,7 @@ CREATE OR REPLACE FUNCTION storage.filename(name TEXT)
 RETURNS TEXT
 LANGUAGE sql IMMUTABLE PARALLEL SAFE
 AS $$
-  SELECT regexp_split_to_array(name, '/')[
+  SELECT (regexp_split_to_array(name, '/'))[
     array_upper(regexp_split_to_array(name, '/'), 1)
   ]
 $$;
