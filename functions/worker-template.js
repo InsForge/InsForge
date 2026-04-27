@@ -33,7 +33,7 @@ try {
   // Replace global Deno.env
   const originalDeno = globalThis.Deno;
   Object.defineProperty(globalThis, 'Deno', {
-    value: Object.freeze({ ...originalDeno, env: mockDenoEnv }),
+    value: Object.freeze({ env: mockDenoEnv }),
     configurable: false, // Lock down permanently (Audit Finding)
     writable: false,
   });

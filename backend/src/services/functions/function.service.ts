@@ -364,7 +364,7 @@ export class FunctionService {
     const dangerousPatterns = [
       /globalThis/i,
       /\bself\b/i,
-      /process\b/i,
+      /\bprocess\b/i,
       /Deno\.(run|spawn|Command|makeTemp|remove|write|chmod|chown)/i,
       /import\b/i,
       /require\b/i,
@@ -377,8 +377,12 @@ export class FunctionService {
 
     for (const pattern of dangerousPatterns) {
       if (pattern.test(code)) {
+        logger.warn('Dangerous code pattern blocked', {
+          pattern: pattern.toString(),
+          codeLength: code.length,
+        });
         throw new AppError(
-          `Code contains potentially dangerous pattern: ${pattern.toString()}`,
+          'Code contains a potentially dangerous pattern.',
           400,
           ERROR_CODES.INVALID_INPUT
         );
