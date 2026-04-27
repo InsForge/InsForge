@@ -458,7 +458,7 @@ To prevent unbounded storage growth and maintain query performance, InsForge imp
 ## Limitations
 
 - **No Message Replay**: Clients don't receive messages missed during disconnection
-- **No Presence**: No built-in tracking of who's online in a channel
+- **Single-Instance Presence**: Presence is tracked in-memory on one backend instance and is not shared across multiple servers
 - **Single Region**: Messages delivered from single backend instance
 - **Webhook Retries**: Limited to 2 retries with short timeout
 

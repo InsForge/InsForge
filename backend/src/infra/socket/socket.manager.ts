@@ -2,8 +2,14 @@ import { Server as HttpServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import logger from '@/utils/logger.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
-import { ServerEvents, ClientEvents, SocketMetadata, NotificationPayload } from '@/types/socket.js';
+import {
+  ServerEvents,
+  ClientEvents,
+  SocketMetadata,
+  NotificationPayload,
+} from '@/types/socket.js';
 import type {
+  PresenceIdentityType,
   SubscribeChannelPayload,
   PublishEventPayload,
   SocketMessage,
@@ -16,10 +22,12 @@ import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
 import { RealtimeAuthService } from '@/services/realtime/realtime-auth.service.js';
 import { RealtimeMessageService } from '@/services/realtime/realtime-message.service.js';
+import { RealtimePresenceService } from '@/services/realtime/realtime-presence.service.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 
 const tokenManager = TokenManager.getInstance();
 const secretService = SecretService.getInstance();
+const presenceService = RealtimePresenceService.getInstance();
 
 /**
  * SocketManager - Industrial-grade Socket.IO implementation
@@ -29,9 +37,6 @@ export class SocketManager {
   private static instance: SocketManager;
   private io: SocketIOServer | null = null;
   private socketMetadata: Map<string, SocketMetadata> = new Map();
-  // Ephemeral presence state: roomName → socketId → PresenceMember
-  // NOTE: In-memory only. Multi-instance deployments would need a shared store (e.g., Redis adapter).
-  private channelPresence: Map<string, Map<string, PresenceMember>> = new Map();
 
   private constructor() {}
 
@@ -85,6 +90,7 @@ export class SocketManager {
               email: 'api-key@client',
               role: 'project_admin',
             };
+            socket.data.presenceType = 'anonymous';
             logger.debug('Socket authenticated via API key');
             return next();
           }
@@ -121,6 +127,7 @@ export class SocketManager {
           email: payload.email,
           role: payload.role,
         };
+        socket.data.presenceType = 'user';
 
         next();
       } catch (error) {
@@ -211,14 +218,16 @@ export class SocketManager {
       connectionDuration: metadata ? Date.now() - metadata.connectedAt.getTime() : 0,
     });
 
-    // Presence: broadcast leave for every channel this socket was in.
-    // On disconnect, Socket.IO has already removed the socket from its rooms,
-    // so we use this.io.to(roomName) to reach remaining members.
-    if (metadata) {
-      for (const roomName of metadata.subscriptions) {
-        const channel = roomName.replace(/^realtime:/, '');
-        this.removePresenceAndNotify(socket.id, roomName, channel, this.io);
-      }
+    // Presence: if this was the final socket for any logical member, notify remaining subscribers.
+    for (const result of presenceService.removeSocketFromAllRooms(socket.id)) {
+      const channel = result.roomName.replace(/^realtime:/, '');
+      this.emitPresenceMemberEvent(
+        ServerEvents.PRESENCE_LEAVE,
+        this.io,
+        result.roomName,
+        channel,
+        result.member
+      );
     }
 
     // Cleanup
@@ -304,36 +313,43 @@ export class SocketManager {
         metadata.subscriptions.add(roomName);
       }
 
-      // Presence: track member and broadcast join (skip if already present)
-      if (!this.channelPresence.has(roomName)) {
-        this.channelPresence.set(roomName, new Map());
+      const presenceType =
+        (socket.data.presenceType as PresenceIdentityType | undefined) ??
+        (userId ? 'user' : 'anonymous');
+
+      const presence =
+        presenceType === 'user' && userId
+          ? presenceService.trackMember(roomName, socket.id, {
+              type: 'user',
+              presenceId: userId,
+              joinedAt: new Date().toISOString(),
+            })
+          : presenceService.trackMember(roomName, socket.id, {
+              type: 'anonymous',
+              presenceId: socket.id,
+              joinedAt: new Date().toISOString(),
+            });
+
+      ack?.({
+        ok: true,
+        channel,
+        presence: presence.presence,
+      });
+
+      if (presence.joinedMember) {
+        this.emitPresenceMemberEvent(
+          ServerEvents.PRESENCE_JOIN,
+          socket,
+          roomName,
+          channel,
+          presence.joinedMember
+        );
       }
-      const presenceMap = this.channelPresence.get(roomName);
-      const alreadyPresent = presenceMap?.has(socket.id) ?? false;
-
-      if (!alreadyPresent) {
-        const member: PresenceMember = {
-          presenceId: crypto.randomUUID(),
-          userId: socket.data.user?.id,
-          role: socket.data.user?.role,
-          joinedAt: new Date().toISOString(),
-        };
-        presenceMap?.set(socket.id, member);
-
-        // Notify existing subscribers about the new member
-        socket.to(roomName).emit(ServerEvents.PRESENCE_JOIN, { channel, member });
-      }
-
-      // Always send full member list to the subscriber
-      const members = presenceMap ? Array.from(presenceMap.values()) : [];
-      socket.emit(ServerEvents.PRESENCE_SYNC, { channel, members });
-
-      ack?.({ ok: true, channel });
 
       logger.debug('Socket subscribed to realtime channel', {
         socketId: socket.id,
         channel,
-        presenceCount: members.length,
+        presenceCount: presence.presence.members.length,
       });
     } catch (error) {
       logger.error('Error handling realtime subscribe', { error, channel });
@@ -352,8 +368,16 @@ export class SocketManager {
     const { channel } = payload;
     const roomName = `realtime:${channel}`;
 
-    // Presence: broadcast leave before leaving the room (so socket.to still works)
-    this.removePresenceAndNotify(socket.id, roomName, channel, socket);
+    const leavingMember = presenceService.removeSocketFromRoom(roomName, socket.id);
+    if (leavingMember) {
+      this.emitPresenceMemberEvent(
+        ServerEvents.PRESENCE_LEAVE,
+        socket,
+        roomName,
+        channel,
+        leavingMember
+      );
+    }
 
     void socket.leave(roomName);
 
@@ -578,28 +602,27 @@ export class SocketManager {
   }
 
   /**
-   * Remove a socket from a channel's presence map and broadcast PRESENCE_LEAVE.
-   * @param emitter - the broadcast target: a Socket (for unsubscribe, peers only) or the IO server (for disconnect, all remaining)
+   * Emit a presence event to everyone else subscribed to the room.
    */
-  private removePresenceAndNotify(
-    socketId: string,
+  private emitPresenceMemberEvent(
+    event: ServerEvents.PRESENCE_JOIN | ServerEvents.PRESENCE_LEAVE,
+    emitter: Socket | SocketIOServer | null,
     roomName: string,
     channel: string,
-    emitter: Socket | SocketIOServer | null
+    member: PresenceMember
   ): void {
-    const presenceMap = this.channelPresence.get(roomName);
-    if (!presenceMap) {
+    if (!emitter) {
       return;
     }
 
-    const leavingMember = presenceMap.get(socketId);
-    presenceMap.delete(socketId);
-    if (presenceMap.size === 0) {
-      this.channelPresence.delete(roomName);
-    }
-    if (leavingMember) {
-      emitter?.to(roomName).emit(ServerEvents.PRESENCE_LEAVE, { channel, member: leavingMember });
-    }
+    const message = this.buildSocketMessage(
+      { member },
+      {
+        channel,
+        senderType: 'system',
+      }
+    );
+    emitter.to(roomName).emit(event, message);
   }
 
   /**
@@ -621,7 +644,7 @@ export class SocketManager {
 
     // Clear metadata
     this.socketMetadata.clear();
-    this.channelPresence.clear();
+    presenceService.clear();
   }
 }
 

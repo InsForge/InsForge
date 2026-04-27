@@ -13,7 +13,6 @@ export enum ServerEvents {
   // Realtime events
   REALTIME_ERROR = 'realtime:error',
   // Presence events
-  PRESENCE_SYNC = 'presence:sync',
   PRESENCE_JOIN = 'presence:join',
   PRESENCE_LEAVE = 'presence:leave',
 }
