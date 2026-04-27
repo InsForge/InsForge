@@ -107,7 +107,6 @@ describe('FunctionService Security Validation (Public API)', () => {
       await expect(createTestFunction(code)).resolves.toBeDefined();
     });
 
-
     it('should block constructor access', async () => {
       const code = 'const proto = obj.constructor.prototype;';
       await expect(createTestFunction(code)).rejects.toThrow(GENERIC_ERROR);
@@ -155,5 +154,4 @@ describe('FunctionService Security Validation (Public API)', () => {
       await expect(updateTestFunction(dangerousCode)).rejects.toThrow(GENERIC_ERROR);
     });
   });
-
 });
