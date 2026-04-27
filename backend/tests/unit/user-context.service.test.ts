@@ -89,9 +89,7 @@ describe('withUserContext', () => {
 
     await withUserContext(pool, { role: 'anon' }, async () => {});
 
-    const setSub = calls.find((c) =>
-      c.sql.includes("set_config('request.jwt.claim.sub'")
-    );
+    const setSub = calls.find((c) => c.sql.includes("set_config('request.jwt.claim.sub'"));
     expect(setSub?.params).toEqual(['']);
     const setLocalRole = calls.find((c) => c.sql.startsWith('SET LOCAL ROLE'));
     expect(setLocalRole?.sql).toBe('SET LOCAL ROLE anon');
@@ -102,13 +100,9 @@ describe('withUserContext', () => {
     const pool = makeMockPool(client);
 
     await expect(
-      withUserContext(
-        pool,
-        { userId: 'u1', role: 'authenticated' },
-        async () => {
-          throw new Error('boom');
-        }
-      )
+      withUserContext(pool, { userId: 'u1', role: 'authenticated' }, async () => {
+        throw new Error('boom');
+      })
     ).rejects.toThrow('boom');
 
     const sequence = calls.map((c) => c.sql);
