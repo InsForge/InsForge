@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronUp, Copy } from 'lucide-react';
 import type { DashboardAdvisorIssue } from '../../../../types';
+import { useToast } from '../../../../lib/hooks/useToast';
 import CriticalIcon from '../../../../assets/icons/severity_critical.svg?react';
 import InfoIcon from '../../../../assets/icons/severity_info.svg?react';
 import WarningIcon from '../../../../assets/icons/severity_warning.svg?react';
@@ -23,13 +24,19 @@ const SEVERITY_TONE = {
 
 export function AdvisoryItem({ issue }: AdvisoryItemProps) {
   const [expanded, setExpanded] = useState(false);
+  const { showToast } = useToast();
   const Icon = SEVERITY_ICON[issue.severity];
 
-  const handleCopyRemediation = () => {
+  const handleCopyRemediation = async () => {
     if (!issue.recommendation) {
       return;
     }
-    void navigator.clipboard.writeText(issue.recommendation);
+    try {
+      await navigator.clipboard.writeText(issue.recommendation);
+      showToast('Remediation copied', 'success');
+    } catch {
+      showToast('Failed to copy remediation', 'error');
+    }
   };
 
   const copyButtonVisibility = expanded
@@ -51,7 +58,7 @@ export function AdvisoryItem({ issue }: AdvisoryItemProps) {
                 {issue.recommendation && (
                   <button
                     type="button"
-                    onClick={handleCopyRemediation}
+                    onClick={() => void handleCopyRemediation()}
                     className={`flex items-center gap-1 rounded border border-[var(--alpha-8)] bg-card px-1 py-1 text-sm leading-5 text-foreground transition-opacity hover:bg-[var(--alpha-4)] ${copyButtonVisibility}`}
                   >
                     <Copy className="h-5 w-5" />

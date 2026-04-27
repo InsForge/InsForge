@@ -5,12 +5,24 @@ import type {
   DashboardInstanceInfo,
   DashboardProjectInfo,
   DashboardUserInfo,
+  DashboardMetricName,
   DashboardMetricsRange,
   DashboardMetricsResponse,
   DashboardAdvisorSummary,
   DashboardAdvisorIssuesQuery,
   DashboardAdvisorIssuesResponse,
 } from '@insforge/dashboard';
+
+const VALID_METRICS_RANGES: readonly DashboardMetricsRange[] = ['1h', '6h', '24h', '3d'] as const;
+const VALID_METRIC_NAMES: readonly DashboardMetricName[] = [
+  'cpu_usage',
+  'memory_usage',
+  'disk_usage',
+  'network_in',
+  'network_out',
+] as const;
+const VALID_ADVISOR_SEVERITIES = ['critical', 'warning', 'info'] as const;
+const VALID_ADVISOR_CATEGORIES = ['security', 'performance', 'health'] as const;
 
 type InstanceTypeChangeResult = {
   success: boolean;
@@ -564,19 +576,26 @@ export function useCloudHosting() {
           return;
         }
         case 'PROJECT_METRICS': {
-          const range = (
-            typeof message.range === 'string' ? message.range : '1h'
-          ) as DashboardMetricsRange;
+          const range: DashboardMetricsRange = VALID_METRICS_RANGES.includes(
+            message.range as DashboardMetricsRange
+          )
+            ? (message.range as DashboardMetricsRange)
+            : '1h';
           const metrics = Array.isArray(message.metrics)
-            ? message.metrics.map((entry: unknown) => {
+            ? message.metrics.flatMap((entry: unknown) => {
                 const m = entry as Record<string, unknown>;
-                return {
-                  metric: m.metric as DashboardMetricsResponse['metrics'][number]['metric'],
-                  instanceId: typeof m.instanceId === 'string' ? m.instanceId : undefined,
-                  data: Array.isArray(m.data)
-                    ? (m.data as Array<{ timestamp: number; value: number }>)
-                    : [],
-                };
+                if (!VALID_METRIC_NAMES.includes(m.metric as DashboardMetricName)) {
+                  return [];
+                }
+                return [
+                  {
+                    metric: m.metric as DashboardMetricName,
+                    instanceId: typeof m.instanceId === 'string' ? m.instanceId : undefined,
+                    data: Array.isArray(m.data)
+                      ? (m.data as Array<{ timestamp: number; value: number }>)
+                      : [],
+                  },
+                ];
               })
             : [];
           resolvePendingRequest('projectMetrics', { range, metrics });
@@ -629,30 +648,31 @@ export function useCloudHosting() {
           return;
         }
         case 'ADVISOR_ISSUES': {
+          type AdvisorIssue = DashboardAdvisorIssuesResponse['issues'][number];
           const issues = Array.isArray(message.issues)
-            ? message.issues.map((entry: unknown) => {
+            ? message.issues.flatMap((entry: unknown): AdvisorIssue[] => {
                 const i = entry as Record<string, unknown>;
-                return {
-                  id: typeof i.id === 'string' ? i.id : '',
-                  ruleId: typeof i.ruleId === 'string' ? i.ruleId : '',
-                  severity: (i.severity === 'critical' ||
-                  i.severity === 'warning' ||
-                  i.severity === 'info'
-                    ? i.severity
-                    : 'info') as DashboardAdvisorIssuesResponse['issues'][number]['severity'],
-                  category: (i.category === 'security' ||
-                  i.category === 'performance' ||
-                  i.category === 'health'
-                    ? i.category
-                    : 'security') as DashboardAdvisorIssuesResponse['issues'][number]['category'],
-                  title: typeof i.title === 'string' ? i.title : '',
-                  description: typeof i.description === 'string' ? i.description : '',
-                  affectedObject:
-                    typeof i.affectedObject === 'string' ? i.affectedObject : undefined,
-                  recommendation:
-                    typeof i.recommendation === 'string' ? i.recommendation : undefined,
-                  isResolved: !!i.isResolved,
-                };
+                if (!VALID_ADVISOR_SEVERITIES.includes(i.severity as AdvisorIssue['severity'])) {
+                  return [];
+                }
+                if (!VALID_ADVISOR_CATEGORIES.includes(i.category as AdvisorIssue['category'])) {
+                  return [];
+                }
+                return [
+                  {
+                    id: typeof i.id === 'string' ? i.id : '',
+                    ruleId: typeof i.ruleId === 'string' ? i.ruleId : '',
+                    severity: i.severity as AdvisorIssue['severity'],
+                    category: i.category as AdvisorIssue['category'],
+                    title: typeof i.title === 'string' ? i.title : '',
+                    description: typeof i.description === 'string' ? i.description : '',
+                    affectedObject:
+                      typeof i.affectedObject === 'string' ? i.affectedObject : undefined,
+                    recommendation:
+                      typeof i.recommendation === 'string' ? i.recommendation : undefined,
+                    isResolved: !!i.isResolved,
+                  },
+                ];
               })
             : [];
           resolvePendingRequest('advisorIssues', {

@@ -14,17 +14,19 @@ const SPARKLINE_WIDTH = 434;
 const SPARKLINE_HEIGHT = 100;
 
 function buildSparklinePaths(data: DashboardMetricDataPoint[]) {
-  if (data.length < 2) {
+  const finite = data
+    .filter((p) => Number.isFinite(p.value))
+    .sort((a, b) => a.timestamp - b.timestamp);
+  if (finite.length < 2) {
     return { line: '', area: '' };
   }
-  const sorted = [...data].sort((a, b) => a.timestamp - b.timestamp);
-  const values = sorted.map((p) => p.value);
+  const values = finite.map((p) => p.value);
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = max - min || 1;
 
-  const points = sorted.map((p, i) => {
-    const x = (i / (sorted.length - 1)) * SPARKLINE_WIDTH;
+  const points = finite.map((p, i) => {
+    const x = (i / (finite.length - 1)) * SPARKLINE_WIDTH;
     const y = SPARKLINE_HEIGHT - ((p.value - min) / range) * SPARKLINE_HEIGHT;
     return [x, y] as const;
   });

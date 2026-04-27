@@ -62,20 +62,23 @@ export function BackendAdvisorSection() {
   const summary = latest.data?.summary;
   const lastScanLabel = formatRelative(latest.data?.scannedAt);
 
-  const handleCopyAll = () => {
-    if (!issues.data?.issues.length) {
-      return;
-    }
-    const blocks = issues.data.issues
+  const handleCopyAll = async () => {
+    const blocks = (issues.data?.issues ?? [])
       .filter((issue) => issue.recommendation)
       .map(
         (issue) =>
           `-- ${issue.ruleId}\n-- ${issue.title}${issue.affectedObject ? ` (${issue.affectedObject})` : ''}\n${issue.recommendation}`
       );
     if (blocks.length === 0) {
+      showToast('Nothing to copy', 'info');
       return;
     }
-    void navigator.clipboard.writeText(blocks.join('\n\n'));
+    try {
+      await navigator.clipboard.writeText(blocks.join('\n\n'));
+      showToast(`Copied ${blocks.length} remediation${blocks.length === 1 ? '' : 's'}`, 'success');
+    } catch {
+      showToast('Failed to copy remediations', 'error');
+    }
   };
 
   return (
@@ -97,7 +100,11 @@ export function BackendAdvisorSection() {
             )}
             <span className="px-1">Re-run Scan</span>
           </button>
-          <button type="button" onClick={handleCopyAll} className={ADVISOR_BUTTON_CLASS}>
+          <button
+            type="button"
+            onClick={() => void handleCopyAll()}
+            className={ADVISOR_BUTTON_CLASS}
+          >
             <Copy className="h-5 w-5" />
             <span className="px-1">Copy All Remediations</span>
           </button>

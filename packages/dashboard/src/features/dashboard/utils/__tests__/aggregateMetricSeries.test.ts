@@ -29,8 +29,10 @@ describe('aggregateMetricSeries', () => {
   it('ignores NaN/non-finite values', () => {
     const result = aggregateMetricSeries([
       { timestamp: 1, value: Number.NaN },
-      { timestamp: 2, value: 10 },
-      { timestamp: 3, value: 20 },
+      { timestamp: 2, value: Number.POSITIVE_INFINITY },
+      { timestamp: 3, value: Number.NEGATIVE_INFINITY },
+      { timestamp: 4, value: 10 },
+      { timestamp: 5, value: 20 },
     ]);
     expect(result.avg).toBeCloseTo(15);
     expect(result.max).toBe(20);

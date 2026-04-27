@@ -19,7 +19,11 @@ export function useLastBackup() {
       if (all.length === 0) {
         return null;
       }
-      return all.sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+      const toEpoch = (iso: string) => {
+        const t = new Date(iso).getTime();
+        return Number.isNaN(t) ? -Infinity : t;
+      };
+      return all.sort((a, b) => toEpoch(b.createdAt) - toEpoch(a.createdAt))[0];
     },
     enabled: !!fetcher,
     retry: false,

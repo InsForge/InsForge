@@ -62,7 +62,7 @@ export function ObservabilitySection() {
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-medium leading-7 text-foreground">Observability</h2>
         <div
-          role="tablist"
+          role="group"
           aria-label="Time range"
           className="flex items-center overflow-hidden rounded border border-[var(--alpha-8)] bg-[var(--alpha-4)]"
         >
@@ -70,8 +70,7 @@ export function ObservabilitySection() {
             <button
               key={value}
               type="button"
-              role="tab"
-              aria-selected={range === value}
+              aria-pressed={range === value}
               onClick={() => setRange(value)}
               className={`flex items-center px-3 py-1.5 text-sm leading-5 transition-colors ${
                 range === value
