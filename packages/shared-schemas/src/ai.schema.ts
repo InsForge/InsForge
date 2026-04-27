@@ -53,8 +53,19 @@ export const aiUsageSummarySchema = z.object({
   totalRequests: z.number(),
 });
 
+// ============= AI Access Configuration Schema =============
+
+/** Singleton configuration that controls project-level AI access settings. */
+export const aiAccessConfigSchema = z.object({
+  id: z.string().uuid(),
+  allowAnonAiAccess: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
 // Export types
 export type ModalitySchema = z.infer<typeof modalitySchema>;
+export type AIAccessConfigSchema = z.infer<typeof aiAccessConfigSchema>;
 export type AIConfigurationInputSchema = z.infer<typeof aiConfigurationInputSchema>;
 export type AIConfigurationSchema = z.infer<typeof aiConfigurationSchema>;
 export type AIConfigurationWithUsageSchema = z.infer<typeof aiConfigurationWithUsageSchema>;
