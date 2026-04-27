@@ -839,6 +839,169 @@ describe('ComputeServicesService', () => {
       await expect(service.startService('svc-start-1')).rejects.toThrow(/Failed to start/);
     });
   });
+
+  describe('updateService — Path A first-launch branch', () => {
+    // Service that prepareForDeploy has already created: app exists, but no
+    // machine yet. The CLI now PATCHes with an imageUrl (it just built+pushed)
+    // and we must launch the machine.
+    const baseRow = {
+      id: 'svc-pa-1',
+      project_id: 'proj-123',
+      name: 'my-api',
+      image_url: 'dockerfile',
+      port: 8080,
+      cpu: 'shared-1x',
+      memory: 512,
+      region: 'iad',
+      fly_app_id: 'my-api-proj-123',
+      fly_machine_id: null,
+      status: 'deploying',
+      endpoint_url: 'https://my-api-proj-123.fly.dev',
+      env_vars_encrypted: null,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    };
+
+    it('happy path: launches machine, persists machineId/status/endpoint', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [baseRow] }); // getService
+      mockQuery.mockResolvedValueOnce({ rows: [{ env_vars_encrypted: null }] }); // hoisted SELECT
+      mockLaunchMachine.mockResolvedValue({ machineId: 'mach-pa-1' });
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          {
+            ...baseRow,
+            fly_machine_id: 'mach-pa-1',
+            status: 'running',
+            endpoint_url: 'https://my-api-proj-123.fly.dev',
+            image_url: 'registry.fly.io/my-api-proj-123:deployment-abc',
+          },
+        ],
+      }); // final UPDATE (with optimistic lock)
+
+      const result = await service.updateService('svc-pa-1', {
+        imageUrl: 'registry.fly.io/my-api-proj-123:deployment-abc',
+      });
+
+      // launchMachine called with the existing app id + the new image
+      expect(mockLaunchMachine).toHaveBeenCalledWith(
+        expect.objectContaining({
+          appId: 'my-api-proj-123',
+          image: 'registry.fly.io/my-api-proj-123:deployment-abc',
+          port: 8080,
+          cpu: 'shared-1x',
+          memory: 512,
+          region: 'iad',
+        })
+      );
+      // updateMachine MUST NOT be called on the first-launch path
+      expect(mockUpdateMachine).not.toHaveBeenCalled();
+
+      // The final UPDATE carries the optimistic lock.
+      const updateCall = mockQuery.mock.calls[2];
+      expect(updateCall[0]).toContain('UPDATE compute.services');
+      expect(updateCall[0]).toContain('fly_machine_id IS NULL');
+      expect(updateCall[1]).toContain('mach-pa-1');
+      expect(updateCall[1]).toContain('running');
+
+      expect(result.flyMachineId).toBe('mach-pa-1');
+      expect(result.status).toBe('running');
+      expect(result.endpointUrl).toBe('https://my-api-proj-123.fly.dev');
+    });
+
+    it('rewraps structured cloud errors (quota / nextActions surfaces through)', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [baseRow] }); // getService
+      mockQuery.mockResolvedValueOnce({ rows: [{ env_vars_encrypted: null }] }); // hoisted SELECT
+
+      // CloudComputeProvider wraps the cloud's JSON body verbatim into an
+      // AppError whose .message is the raw body. The catch block must parse
+      // it back out and surface code/message/nextActions.
+      const { AppError } = await import('@/api/middlewares/error.js');
+      const cloudBody = JSON.stringify({
+        code: 'COMPUTE_QUOTA_EXCEEDED',
+        error: 'Project compute quota exceeded',
+        nextActions: ['upgrade plan', 'delete unused services'],
+      });
+      mockLaunchMachine.mockRejectedValue(new AppError(cloudBody, 403, 'COMPUTE_QUOTA_EXCEEDED'));
+
+      await expect(
+        service.updateService('svc-pa-1', { imageUrl: 'registry.fly.io/x:y' })
+      ).rejects.toMatchObject({
+        statusCode: 403,
+        code: 'COMPUTE_QUOTA_EXCEEDED',
+        message: 'Project compute quota exceeded',
+      });
+
+      // Final UPDATE must NOT have run — Fly call failed.
+      expect(mockQuery.mock.calls.some((c) => String(c[0]).startsWith('UPDATE'))).toBe(false);
+    });
+
+    it('regression: existing machine + imageUrl takes the redeploy path (updateMachine, no launch, no optimistic lock)', async () => {
+      const deployedRow = { ...baseRow, fly_machine_id: 'mach-existing', status: 'running' };
+      mockQuery.mockResolvedValueOnce({ rows: [deployedRow] }); // getService
+      mockQuery.mockResolvedValueOnce({ rows: [{ env_vars_encrypted: null }] }); // hoisted SELECT
+      mockUpdateMachine.mockResolvedValue(undefined);
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ ...deployedRow, image_url: 'registry.fly.io/my-api:v2' }],
+      }); // final UPDATE (no optimistic lock)
+
+      await service.updateService('svc-pa-1', { imageUrl: 'registry.fly.io/my-api:v2' });
+
+      expect(mockUpdateMachine).toHaveBeenCalledWith(
+        expect.objectContaining({
+          appId: 'my-api-proj-123',
+          machineId: 'mach-existing',
+          image: 'registry.fly.io/my-api:v2',
+        })
+      );
+      expect(mockLaunchMachine).not.toHaveBeenCalled();
+
+      const updateCall = mockQuery.mock.calls[2];
+      expect(updateCall[0]).toContain('UPDATE compute.services');
+      // No optimistic lock on the redeploy path — only first-launch needs it.
+      expect(updateCall[0]).not.toContain('fly_machine_id IS NULL');
+    });
+
+    it('race condition: concurrent launch loses DB write, destroys orphan, returns winning state', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [baseRow] }); // getService
+      mockQuery.mockResolvedValueOnce({ rows: [{ env_vars_encrypted: null }] }); // hoisted SELECT
+      mockLaunchMachine.mockResolvedValue({ machineId: 'mach-loser' });
+      // Final UPDATE returns 0 rows — the other concurrent request already
+      // wrote fly_machine_id, and `AND fly_machine_id IS NULL` filtered us out.
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+      mockDestroyMachine.mockResolvedValue(undefined);
+      // Cleanup path: getService returns the winning state.
+      const winningRow = { ...baseRow, fly_machine_id: 'mach-winner', status: 'running' };
+      mockQuery.mockResolvedValueOnce({ rows: [winningRow] }); // final getService
+
+      const result = await service.updateService('svc-pa-1', {
+        imageUrl: 'registry.fly.io/my-api-proj-123:deployment-abc',
+      });
+
+      // We MUST destroy the machine we just created so it doesn't keep billing.
+      expect(mockDestroyMachine).toHaveBeenCalledWith('my-api-proj-123', 'mach-loser');
+      // Caller sees the WINNING state, not an error — both requests "succeed"
+      // from the user's POV (idempotent retry).
+      expect(result.flyMachineId).toBe('mach-winner');
+      expect(result.status).toBe('running');
+    });
+
+    it('race condition: even if cleanup destroyMachine fails, still returns winning state (best-effort)', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [baseRow] }); // getService
+      mockQuery.mockResolvedValueOnce({ rows: [{ env_vars_encrypted: null }] }); // hoisted SELECT
+      mockLaunchMachine.mockResolvedValue({ machineId: 'mach-loser' });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // optimistic lock filters us out
+      mockDestroyMachine.mockRejectedValue(new Error('Fly transient 503'));
+      const winningRow = { ...baseRow, fly_machine_id: 'mach-winner', status: 'running' };
+      mockQuery.mockResolvedValueOnce({ rows: [winningRow] }); // final getService
+
+      const result = await service.updateService('svc-pa-1', {
+        imageUrl: 'registry.fly.io/x:y',
+      });
+
+      expect(mockDestroyMachine).toHaveBeenCalled();
+      expect(result.flyMachineId).toBe('mach-winner');
+    });
+  });
 });
 
 // NOTE: Route-level integration tests for compute endpoints are deferred —

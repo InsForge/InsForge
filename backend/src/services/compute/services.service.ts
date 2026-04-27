@@ -112,6 +112,37 @@ function makeEndpointUrl(flyAppName: string): string {
   return `https://${flyAppName}.${domain}`;
 }
 
+// Cloud-mode providers wrap the cloud's structured error body verbatim into
+// AppError.message (a JSON string like
+// `{"code":"COMPUTE_QUOTA_EXCEEDED","error":"…","nextActions":[…]}`).
+// Rewrap so callers see the cloud's actual code/message/nextActions instead
+// of a generic "Compute service operation failed" 502. Falls back to a 502
+// with the provided default message if the input isn't a recognizable
+// AppError.
+function rewrapCloudError(error: unknown, defaultMessage: string): AppError {
+  if (error instanceof AppError) {
+    let parsed: { code?: string; error?: string; nextActions?: string[] } | undefined;
+    try {
+      parsed = JSON.parse(error.message);
+    } catch {
+      parsed = undefined;
+    }
+    return new AppError(
+      parsed?.error ?? error.message,
+      error.statusCode,
+      (parsed?.code as keyof typeof ERROR_CODES & string) ??
+        error.code ??
+        ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED,
+      parsed?.nextActions?.join('; ')
+    );
+  }
+  return new AppError(
+    error instanceof Error ? error.message : defaultMessage,
+    502,
+    ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED
+  );
+}
+
 export function selectComputeProvider(): ComputeProvider {
   // Self-host takes precedence: if FLY_API_TOKEN is set, the user has their own
   // Fly account and wants direct control. Otherwise fall through to cloud-proxy
@@ -380,34 +411,7 @@ export class ComputeServicesService {
         serviceId,
       ]);
 
-      // Pass through structured errors from the cloud / Fly provider instead
-      // of swallowing them as a generic 502. The provider call wraps the
-      // cloud's response verbatim into an AppError whose .message is the raw
-      // body — typically `{"code":"COMPUTE_QUOTA_EXCEEDED","error":"…","nextActions":[…]}`.
-      // Parse it back out and re-throw with the cloud's actual code, message,
-      // status, and nextActions so the user sees WHY (quota? Fly down? bad
-      // image?) instead of "Compute service operation failed".
-      if (error instanceof AppError) {
-        let parsed: { code?: string; error?: string; nextActions?: string[] } | undefined;
-        try {
-          parsed = JSON.parse(error.message);
-        } catch {
-          parsed = undefined;
-        }
-        throw new AppError(
-          parsed?.error ?? error.message,
-          error.statusCode,
-          (parsed?.code as keyof typeof ERROR_CODES & string) ??
-            error.code ??
-            ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED,
-          parsed?.nextActions?.join('; ')
-        );
-      }
-      throw new AppError(
-        error instanceof Error ? error.message : 'Compute service operation failed',
-        502,
-        ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED
-      );
+      throw rewrapCloudError(error, 'Compute service operation failed');
     }
   }
 
@@ -593,16 +597,26 @@ export class ComputeServicesService {
     ] as const;
     const hasDeployChange = deployFields.some((f) => data[f] !== undefined);
 
-    if (hasDeployChange && existing.flyAppId && existing.flyMachineId) {
-      // Fetch existing encrypted env vars to merge with update
+    // env_vars merge is needed by both Fly-touching branches (updateMachine
+    // for redeploy, launchMachine for first-deploy). Hoist the SELECT so we
+    // only hit the DB once.
+    let mergedEnvVars: Record<string, string> | undefined;
+    if (hasDeployChange && existing.flyAppId) {
       const existingRow = await this.getPool().query(
         `SELECT env_vars_encrypted FROM compute.services WHERE id = $1`,
         [id]
       );
       const existingEnvVarsEncrypted: string | null =
         existingRow.rows[0]?.env_vars_encrypted ?? null;
-      const envVars = data.envVars ?? this.decryptEnvVars(existingEnvVarsEncrypted);
+      mergedEnvVars = data.envVars ?? this.decryptEnvVars(existingEnvVarsEncrypted);
+    }
 
+    // Path A first-launch sets this so the final UPDATE can apply an
+    // optimistic lock (`AND fly_machine_id IS NULL`) and self-heal if a
+    // concurrent request also launched a machine.
+    let justLaunchedMachineId: string | undefined;
+
+    if (hasDeployChange && existing.flyAppId && existing.flyMachineId) {
       // NOTE: Region changes are persisted in the DB but Fly machine region cannot
       // be changed in-place via updateMachine — a region change requires redeployment
       // (destroy + recreate). The region field is stored for the next deploy.
@@ -619,28 +633,17 @@ export class ComputeServicesService {
           port: data.port ?? existing.port,
           cpu: data.cpu ?? existing.cpu,
           memory: data.memory ?? existing.memory,
-          envVars,
+          envVars: mergedEnvVars ?? {},
         });
         logger.info('Compute service machine updated', { id });
       } catch (error) {
         logger.error('Failed to update machine on Fly', { id, error });
-        throw new AppError(
-          'Compute service operation failed',
-          502,
-          ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED
-        );
+        throw rewrapCloudError(error, 'Compute service operation failed');
       }
     } else if (data.imageUrl && existing.flyAppId && !existing.flyMachineId) {
       // Path A: prepareForDeploy created the app + DB row but no machine.
       // CLI has now built+pushed the image (via flyctl remote builder, or
       // pre-built --image URL) and is telling us to launch the machine.
-      const existingRow = await this.getPool().query(
-        `SELECT env_vars_encrypted FROM compute.services WHERE id = $1`,
-        [id]
-      );
-      const existingEnvVarsEncrypted: string | null =
-        existingRow.rows[0]?.env_vars_encrypted ?? null;
-      const envVars = data.envVars ?? this.decryptEnvVars(existingEnvVarsEncrypted);
       try {
         const { machineId } = await this.getCompute().launchMachine({
           appId: existing.flyAppId,
@@ -648,9 +651,10 @@ export class ComputeServicesService {
           port: data.port ?? existing.port,
           cpu: data.cpu ?? existing.cpu,
           memory: data.memory ?? existing.memory,
-          envVars,
+          envVars: mergedEnvVars ?? {},
           region: data.region ?? existing.region,
         });
+        justLaunchedMachineId = machineId;
         // Persist machine id + flip status alongside the field updates below.
         updates.push(`fly_machine_id = $${paramIdx++}`);
         values.push(machineId);
@@ -661,38 +665,45 @@ export class ComputeServicesService {
         logger.info('Compute service machine launched (Path A)', { id, machineId });
       } catch (error) {
         logger.error('Failed to launch machine on Fly (Path A)', { id, error });
-        if (error instanceof AppError) {
-          let parsed: { code?: string; error?: string; nextActions?: string[] } | undefined;
-          try {
-            parsed = JSON.parse(error.message);
-          } catch {
-            parsed = undefined;
-          }
-          throw new AppError(
-            parsed?.error ?? error.message,
-            error.statusCode,
-            (parsed?.code as keyof typeof ERROR_CODES & string) ??
-              error.code ??
-              ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED,
-            parsed?.nextActions?.join('; ')
-          );
-        }
-        throw new AppError(
-          error instanceof Error ? error.message : 'Compute service operation failed',
-          502,
-          ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED
-        );
+        throw rewrapCloudError(error, 'Compute service operation failed');
       }
     }
 
-    // Fly accepted the update (or no Fly update was needed) — now commit to DB
+    // Fly accepted the update (or no Fly update was needed) — now commit to DB.
+    // For a first-launch, append `AND fly_machine_id IS NULL` so a concurrent
+    // PATCH (CLI retry, double-click) that also raced to launchMachine loses
+    // the DB write. The loser then destroys the orphan machine it just made.
     values.push(id);
+    const whereClause =
+      justLaunchedMachineId !== undefined
+        ? `WHERE id = $${paramIdx} AND fly_machine_id IS NULL`
+        : `WHERE id = $${paramIdx}`;
     const result = await this.getPool().query(
-      `UPDATE compute.services SET ${updates.join(', ')} WHERE id = $${paramIdx} RETURNING *`,
+      `UPDATE compute.services SET ${updates.join(', ')} ${whereClause} RETURNING *`,
       values
     );
 
     if (!result.rows.length) {
+      if (justLaunchedMachineId !== undefined && existing.flyAppId) {
+        // Lost a launch race: another request already wrote fly_machine_id.
+        // Destroy the machine we just created so it doesn't keep billing.
+        // Best-effort — even if the destroy itself fails, returning the
+        // current row is still correct (the winning machine is healthy).
+        try {
+          await this.getCompute().destroyMachine(existing.flyAppId, justLaunchedMachineId);
+          logger.info('Cleaned up orphan machine from launch race', {
+            id,
+            orphanMachineId: justLaunchedMachineId,
+          });
+        } catch (cleanupErr) {
+          logger.error('Failed to destroy orphan machine after launch race', {
+            id,
+            orphanMachineId: justLaunchedMachineId,
+            error: cleanupErr,
+          });
+        }
+        return this.getService(id);
+      }
       throw new AppError(
         'Service not found',
         404,
