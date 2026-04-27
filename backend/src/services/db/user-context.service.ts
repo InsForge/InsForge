@@ -59,8 +59,12 @@ export async function withUserContext<T>(
   }
 
   const claims: Record<string, string> = { role: ctx.role };
-  if (ctx.userId) claims.sub = ctx.userId;
-  if (ctx.email) claims.email = ctx.email;
+  if (ctx.userId) {
+    claims.sub = ctx.userId;
+  }
+  if (ctx.email) {
+    claims.email = ctx.email;
+  }
 
   const client = await pool.connect();
   try {
