@@ -48,6 +48,28 @@ json_int_field() {
     echo "$body" | grep -o "\"$key\":[0-9]*" | head -1 | cut -d':' -f2
 }
 
+# Escape a string so it can safely be embedded in a JSON value. Quotes,
+# backslashes, and control chars become their \uXXXX / \" / \\ forms. Mirrors
+# what `jq -Rn @json` does, but works without jq (CI image is slim).
+json_escape() {
+    local s=$1
+    s=${s//\\/\\\\}
+    s=${s//\"/\\\"}
+    s=${s//$'\n'/\\n}
+    s=${s//$'\r'/\\r}
+    s=${s//$'\t'/\\t}
+    printf '%s' "$s"
+}
+
+# Build a schedule POST body with the given name and cronSchedule, escaping
+# both fields and the global ECHO_URL safely. Returns JSON on stdout.
+build_schedule_body() {
+    local name=$1
+    local cron=$2
+    printf '{"name":"%s","cronSchedule":"%s","functionUrl":"%s","httpMethod":"POST"}' \
+        "$(json_escape "$name")" "$(json_escape "$cron")" "$(json_escape "$ECHO_URL")"
+}
+
 echo "Testing schedules router (sub-minute cadence)..."
 check_requirements
 
@@ -62,7 +84,7 @@ print_success "Admin token acquired"
 print_info "1) POST /schedules with cronSchedule=\"30 seconds\""
 resp=$(curl -s -w "\n%{http_code}" -X POST "$API_BASE/schedules" \
     -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" \
-    -d "{\"name\":\"e2e-30s-$$\",\"cronSchedule\":\"30 seconds\",\"functionUrl\":\"$ECHO_URL\",\"httpMethod\":\"POST\"}")
+    -d "$(build_schedule_body "e2e-30s-$$" "30 seconds")")
 status=$(echo "$resp" | tail -n1); body=$(echo "$resp" | sed '$d')
 if [ "$status" = "200" ] || [ "$status" = "201" ]; then
     print_success "  Accepted (status $status)"
@@ -76,7 +98,7 @@ fi
 print_info "2) POST /schedules with cronSchedule=\"*/5 * * * *\""
 resp=$(curl -s -w "\n%{http_code}" -X POST "$API_BASE/schedules" \
     -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" \
-    -d "{\"name\":\"e2e-5min-$$\",\"cronSchedule\":\"*/5 * * * *\",\"functionUrl\":\"$ECHO_URL\",\"httpMethod\":\"POST\"}")
+    -d "$(build_schedule_body "e2e-5min-$$" "*/5 * * * *")")
 status=$(echo "$resp" | tail -n1); body=$(echo "$resp" | sed '$d')
 if [ "$status" = "200" ] || [ "$status" = "201" ]; then
     print_success "  Accepted (status $status)"
@@ -90,7 +112,7 @@ fi
 print_info "3) POST /schedules with cronSchedule=\"2 days\" (should reject)"
 resp=$(curl -s -w "\n%{http_code}" -X POST "$API_BASE/schedules" \
     -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" \
-    -d "{\"name\":\"e2e-bad1-$$\",\"cronSchedule\":\"2 days\",\"functionUrl\":\"$ECHO_URL\",\"httpMethod\":\"POST\"}")
+    -d "$(build_schedule_body "e2e-bad1-$$" "2 days")")
 status=$(echo "$resp" | tail -n1); body=$(echo "$resp" | sed '$d')
 if [ "$status" = "400" ]; then
     if echo "$body" | grep -q "interval form\|seconds"; then
@@ -106,7 +128,7 @@ fi
 print_info "4) POST /schedules with cronSchedule=\"2.5 seconds\" (should reject)"
 resp=$(curl -s -w "\n%{http_code}" -X POST "$API_BASE/schedules" \
     -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" \
-    -d "{\"name\":\"e2e-bad2-$$\",\"cronSchedule\":\"2.5 seconds\",\"functionUrl\":\"$ECHO_URL\",\"httpMethod\":\"POST\"}")
+    -d "$(build_schedule_body "e2e-bad2-$$" "2.5 seconds")")
 status=$(echo "$resp" | tail -n1)
 if [ "$status" = "400" ]; then
     print_success "  Rejected (status 400)"

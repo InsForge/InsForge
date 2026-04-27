@@ -4,15 +4,19 @@ import { scheduleSchema, scheduleLogSchema } from './schedules.schema.js';
 // Accept either:
 //   - 5-field cron expression (e.g. "*/5 * * * *", "0 9 * * 1-5")
 //   - pg_cron interval form for sub-minute cadence (e.g. "2 seconds", "30 seconds", "5 minutes")
-const intervalRegex = /^\s*\d+\s+(seconds?|minutes?|hours?)\s*$/i;
+// Interval requires a positive integer ([1-9]\d*) so "0 seconds" is rejected at
+// the schema layer, matching ScheduleService.validateCronExpression.
+const intervalRegex = /^\s*[1-9]\d*\s+(seconds?|minutes?|hours?)\s*$/i;
 
 const cronScheduleSchema = z.string().refine(
   (value) => {
     if (intervalRegex.test(value)) {
       return true;
     }
+    // Service only accepts 5-field cron; 6-field (with seconds prefix) is
+    // explicitly rejected, so don't let it past the schema.
     const parts = value.trim().split(/\s+/);
-    return parts.length === 5 || parts.length === 6;
+    return parts.length === 5;
   },
   {
     message:
