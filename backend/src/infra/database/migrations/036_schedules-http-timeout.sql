@@ -1,15 +1,17 @@
 -- Migration 036: Bound execute_job's HTTP timeout
 --
--- Sets a per-call timeout (30s end-to-end, 5s connect) on the synchronous
+-- Sets a per-call timeout (5min end-to-end, 5s connect) on the synchronous
 -- http() invocation inside schedules.execute_job() so a hung downstream
 -- target cannot pin a pg_cron worker indefinitely.
 --
--- This is the only safety guardrail needed once sub-minute cadence
--- ("N seconds" interval syntax) is exposed: the existing pgsql-http stack
--- handles 2-second cadence cleanly (POC verified) so long as a slow
--- target can't accumulate workers. The 30s cap ensures even a wedged
--- target frees its worker before the next cron tick at minute cadence,
--- and limits pool pressure at sub-minute cadence to a small constant.
+-- The 5-minute end-to-end ceiling gives long-running scheduled jobs (daily
+-- reports, ETL, etc.) the headroom they need while still bounding the
+-- worst case for the pg_cron worker pool. Sub-minute schedules pointed at
+-- slow targets remain at risk of pool saturation; that's a target-design
+-- problem, not a timeout problem.
+--
+-- The 5-second connect ceiling is unchanged from typical curl defaults and
+-- catches DNS/SYN failures fast.
 --
 -- Idempotent: CREATE OR REPLACE FUNCTION.
 
@@ -32,7 +34,7 @@ BEGIN
   -- Bound the per-call HTTP timeout. http_set_curlopt is per-session;
   -- pg_cron may reuse a session across ticks but the values are stable so
   -- repeated calls are harmless.
-  PERFORM http_set_curlopt('CURLOPT_TIMEOUT_MS', '30000');
+  PERFORM http_set_curlopt('CURLOPT_TIMEOUT_MS', '300000');
   PERFORM http_set_curlopt('CURLOPT_CONNECTTIMEOUT_MS', '5000');
 
   SELECT
