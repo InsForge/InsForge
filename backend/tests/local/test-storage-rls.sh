@@ -81,7 +81,7 @@ assert_count() {
 list_count() {
   local jwt="$1" bucket="$2"
   curl -sS "$API/storage/buckets/$bucket/objects" -H "Authorization: Bearer $jwt" \
-    | python3 -c 'import sys,json; print(json.load(sys.stdin)["pagination"]["total"])'
+    | grep -o '"total":[0-9]*' | head -1 | cut -d: -f2
 }
 
 upload() {
@@ -111,22 +111,24 @@ curl -sS -X POST "$API/auth/users" -H "Content-Type: application/json" \
 register_test_user "$ALICE_EMAIL"
 register_test_user "$BOB_EMAIL"
 
-ALICE_JWT=$(curl -sS -X POST "$API/auth/sessions" -H "Content-Type: application/json" \
-  -d "{\"email\":\"$ALICE_EMAIL\",\"password\":\"$PASS\"}" \
-  | python3 -c 'import sys,json; print(json.load(sys.stdin)["accessToken"])')
-BOB_JWT=$(curl -sS -X POST "$API/auth/sessions" -H "Content-Type: application/json" \
-  -d "{\"email\":\"$BOB_EMAIL\",\"password\":\"$PASS\"}" \
-  | python3 -c 'import sys,json; print(json.load(sys.stdin)["accessToken"])')
+login_token() {
+  curl -sS -X POST "$API/auth/sessions" -H "Content-Type: application/json" \
+    -d "{\"email\":\"$1\",\"password\":\"$PASS\"}" \
+    | grep -o '"accessToken":"[^"]*' | cut -d'"' -f4
+}
+ALICE_JWT=$(login_token "$ALICE_EMAIL")
+BOB_JWT=$(login_token "$BOB_EMAIL")
 
 # Pull the user IDs from the JWT (sub claim) for the path-based test.
-# JWT uses base64url (no padding) — decode in python3 with urlsafe_b64decode.
+# JWT uses base64url (no padding) — decode in node since python3 isn't
+# guaranteed to be installed in the backend container.
 jwt_sub() {
-  python3 -c "
-import sys, json, base64
-seg = sys.argv[1].split('.')[1]
-seg += '=' * (-len(seg) % 4)
-print(json.loads(base64.urlsafe_b64decode(seg))['sub'])
-" "$1"
+  node -e '
+    const seg = process.argv[1].split(".")[1];
+    const padded = seg + "=".repeat((4 - seg.length % 4) % 4);
+    const json = Buffer.from(padded.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
+    process.stdout.write(JSON.parse(json).sub);
+  ' "$1"
 }
 ALICE_ID=$(jwt_sub "$ALICE_JWT")
 BOB_ID=$(jwt_sub "$BOB_JWT")
