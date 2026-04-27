@@ -179,6 +179,27 @@ assert_count "Bob DELETE alice's file (RLS blocks → 404)" "404" "$bob_del_alic
 
 assert_count "Alice's file survived" "1" "$(list_count "$ALICE_JWT" "$BUCKET")"
 
+# Anon GET on this private bucket should be blocked at conditionalAuth (401),
+# proving the default policy doesn't leak.
+anon_private=$(curl -sS -o /dev/null -w "%{http_code}" \
+  "$API/storage/buckets/$BUCKET/objects/a.txt")
+assert_count "Anon GET private bucket → 401" "401" "$anon_private"
+
+# === 1b. public-bucket reads flow through RLS, not a route bypass ======
+PUBLIC_BUCKET="rls-public-$TS"
+register_test_bucket "$PUBLIC_BUCKET"
+curl -sS -X POST "$API/storage/buckets" \
+  -H "Authorization: Bearer $API_KEY" -H "Content-Type: application/json" \
+  -d "{\"bucketName\":\"$PUBLIC_BUCKET\",\"isPublic\":true}" > /dev/null
+echo "hello-public" > "/tmp/_rls_pub_$TS.txt"
+curl -sS -o /dev/null -X PUT "$API/storage/buckets/$PUBLIC_BUCKET/objects/hello.txt" \
+  -H "Authorization: Bearer $API_KEY" -F "file=@/tmp/_rls_pub_$TS.txt"
+rm -f "/tmp/_rls_pub_$TS.txt"
+
+anon_public=$(curl -sS -o /dev/null -w "%{http_code}" \
+  "$API/storage/buckets/$PUBLIC_BUCKET/objects/hello.txt")
+assert_count "Anon GET public bucket (storage_objects_public_read policy)" "200" "$anon_public"
+
 # === 2. override SELECT policy → public-read bucket ====================
 
 if [ "$HAVE_PSQL" = "1" ]; then

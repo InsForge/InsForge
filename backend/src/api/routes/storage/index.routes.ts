@@ -25,13 +25,15 @@ import { UserContext } from '@/services/db/user-context.service.js';
  * `sub` claim plumbed through to RLS.
  */
 function authedContext(req: AuthRequest): UserContext {
-  const isAdmin = !!req.apiKey || req.user?.role === 'project_admin';
-  return {
-    isAdmin,
-    userId: req.user?.id,
-    email: req.user?.email,
-    role: 'authenticated',
-  };
+  if (req.apiKey || req.user?.role === 'project_admin') {
+    return { isAdmin: true, role: 'authenticated' };
+  }
+  if (req.user) {
+    return { userId: req.user.id, email: req.user.email, role: 'authenticated' };
+  }
+  // Unauthenticated caller (only reachable via routes that allow anon, e.g.
+  // public-bucket downloads). RLS evaluates against role=anon.
+  return { role: 'anon' };
 }
 
 const router = Router();
@@ -427,15 +429,13 @@ router.get(
         return res.redirect(strategy.url);
       }
 
-      // conditionalAuth either confirmed a public bucket (no req.user) or
-      // required auth. For the public-bucket case we run as admin to bypass
-      // RLS, preserving the prior behavior; otherwise RLS evaluates.
-      const authReq = req as AuthRequest;
-      const ctx: UserContext =
-        !authReq.user && !authReq.apiKey
-          ? { isAdmin: true, role: 'authenticated' }
-          : authedContext(authReq);
-      const result = await storageService.getObject(ctx, bucketName, objectKey);
+      // conditionalAuth lets anon through for public buckets; the
+      // storage_objects_public_read RLS policy handles the actual gate.
+      const result = await storageService.getObject(
+        authedContext(req as AuthRequest),
+        bucketName,
+        objectKey
+      );
       if (!result) {
         throw new AppError('Object not found', 404, ERROR_CODES.NOT_FOUND);
       }
