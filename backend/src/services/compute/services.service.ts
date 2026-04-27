@@ -149,6 +149,15 @@ export function selectComputeProvider(): ComputeProvider {
   // (PROJECT_ID + CLOUD_API_HOST + JWT_SECRET all present).
   const fly = FlyProvider.getInstance();
   if (fly.isConfigured()) {
+    if (!config.fly.org) {
+      // FLY_ORG used to default to "insforge" — our internal org. Operators
+      // who copied .env.example verbatim got opaque "unauthorized" errors
+      // from Fly. Warn loudly at provider selection time instead.
+      logger.warn(
+        'Compute self-host: FLY_ORG is empty. Set FLY_ORG to your Fly org slug ' +
+          '(`fly orgs list`); compute requests will otherwise fail with auth errors from Fly.'
+      );
+    }
     return fly;
   }
 
