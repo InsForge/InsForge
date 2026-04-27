@@ -51,11 +51,20 @@ Subscribe to a channel to receive events.
 ### Returns
 
 ```typescript
-Promise<{
-  ok: boolean,
-  channel: string,
-  error?: { code: string, message: string }
-}>
+Promise<
+  | {
+      ok: true,
+      channel: string,
+      presence: {
+        members: PresenceMember[]
+      }
+    }
+  | {
+      ok: false,
+      channel: string,
+      error: { code: string, message: string }
+    }
+>
 ```
 
 <Note>
@@ -74,11 +83,10 @@ const response = await insforge.realtime.subscribe('orders:123')
 
 if (response.ok) {
   console.log('Subscribed to:', response.channel)
+  console.log('Members already present:', response.presence.members)
 } else {
-  console.error('Failed:', response.error?.message)
+  console.error('Failed:', response.error.message)
 }
-
-const response = await insforge.realtime.subscribe('orders:456')
 ```
 
 ### Output (Success)
@@ -86,9 +94,20 @@ const response = await insforge.realtime.subscribe('orders:456')
 ```json
 {
   "ok": true,
-  "channel": "orders:123"
+  "channel": "orders:123",
+  "presence": {
+    "members": [
+      {
+        "type": "user",
+        "presenceId": "user-123",
+        "joinedAt": "2026-04-25T17:00:00.000Z"
+      }
+    ]
+  }
 }
 ```
+
+`presenceId` is the stable identity for the member: a user ID when `type` is `'user'`, or a socket ID when `type` is `'anonymous'`.
 
 ### Output (Error - Connection Failed)
 
@@ -176,6 +195,8 @@ Listen for events.
 | `connect_error` | `Error` | Fired when connection fails (including reconnection attempts) |
 | `disconnect` | `string` (reason) | Fired when disconnected from the server |
 | `error` | `RealtimeErrorPayload` | Fired when a realtime error occurs |
+| `presence:join` | `PresenceJoinMessage` | Fired when a logical member becomes present in the channel |
+| `presence:leave` | `PresenceLeaveMessage` | Fired when a logical member is no longer present in the channel |
 
 ### Example
 
@@ -201,6 +222,15 @@ insforge.realtime.on('disconnect', (reason) => {
 // Realtime error handling
 insforge.realtime.on('error', (error) => {
   console.error('Realtime error:', error.code, error.message)
+})
+
+// Presence deltas
+insforge.realtime.on('presence:join', (message) => {
+  console.log('Member joined:', message.member)
+})
+
+insforge.realtime.on('presence:leave', (message) => {
+  console.log('Member left:', message.member)
 })
 ```
 
