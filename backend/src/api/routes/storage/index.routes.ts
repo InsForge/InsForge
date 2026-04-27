@@ -429,13 +429,15 @@ router.get(
         return res.redirect(strategy.url);
       }
 
-      // conditionalAuth lets anon through for public buckets; the
-      // storage_objects_public_read RLS policy handles the actual gate.
-      const result = await storageService.getObject(
-        authedContext(req as AuthRequest),
-        bucketName,
-        objectKey
-      );
+      // Public-bucket reads bypass RLS: conditionalAuth has already confirmed
+      // public=true before letting an unauthed request through, so the bypass
+      // only triggers in that case. Authed callers always go through RLS.
+      const authReq = req as AuthRequest;
+      const ctx: UserContext =
+        !authReq.user && !authReq.apiKey
+          ? { isAdmin: true, role: 'authenticated' }
+          : authedContext(authReq);
+      const result = await storageService.getObject(ctx, bucketName, objectKey);
       if (!result) {
         throw new AppError('Object not found', 404, ERROR_CODES.NOT_FOUND);
       }

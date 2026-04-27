@@ -109,20 +109,6 @@ CREATE POLICY storage_objects_owner_delete ON storage.objects
   FOR DELETE TO authenticated
   USING (uploaded_by = (SELECT auth.jwt() ->> 'sub'));
 
--- Public-bucket reads flow through RLS too. Without this, public-bucket
--- access would have to bypass RLS in app code — splitting the access
--- model and breaking user-defined policies on public buckets. With this,
--- anon and authenticated callers can SELECT any object whose bucket is
--- flagged public; users override by dropping/replacing this policy.
-CREATE POLICY storage_objects_public_read ON storage.objects
-  FOR SELECT TO anon, authenticated
-  USING (EXISTS (
-    SELECT 1 FROM storage.buckets b
-    WHERE b.name = storage.objects.bucket AND b.public = true
-  ));
-
 GRANT SELECT, INSERT, UPDATE, DELETE ON storage.objects TO authenticated;
-GRANT SELECT ON storage.objects TO anon;
-GRANT SELECT ON storage.buckets TO authenticated, anon;
-GRANT USAGE ON SCHEMA storage TO authenticated, anon;
+GRANT USAGE ON SCHEMA storage TO authenticated;
 GRANT EXECUTE ON FUNCTION auth.jwt() TO authenticated, anon;
