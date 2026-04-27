@@ -17,6 +17,22 @@ import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { S3AccessKeyService } from '@/services/storage/s3-access-key.service.js';
 import { s3AccessKeyManagementRateLimiter } from '@/api/middlewares/rate-limiters.js';
+import { UserContext } from '@/services/db/user-context.service.js';
+
+/**
+ * Build a UserContext from the authenticated request. Admin = API key or
+ * the project_admin role; everyone else runs as `authenticated` with their
+ * `sub` claim plumbed through to RLS.
+ */
+function authedContext(req: AuthRequest): UserContext {
+  const isAdmin = !!req.apiKey || req.user?.role === 'project_admin';
+  return {
+    isAdmin,
+    userId: req.user?.id,
+    email: req.user?.email,
+    role: 'authenticated',
+  };
+}
 
 const router = Router();
 const auditService = AuditService.getInstance();
@@ -236,9 +252,10 @@ router.patch(
   }
 );
 
-// GET /api/storage/buckets/:bucketName/objects - List objects in bucket
-// Admin / API-key callers see every object in the bucket. Authenticated users
-// see only the rows they uploaded themselves (matches deleteObject's filter).
+// GET /api/storage/buckets/:bucketName/objects - List objects in bucket.
+// Visibility is decided by RLS on storage.objects: admin (apiKey /
+// project_admin) bypasses, authenticated callers see only rows their
+// policies allow.
 router.get(
   '/buckets/:bucketName/objects',
   verifyUser,
@@ -250,16 +267,13 @@ router.get(
       const limit = Math.min(Math.max(1, parseInt(req.query.limit as string) || 100), 1000);
       const offset = Math.max(0, parseInt(req.query.offset as string) || 0);
 
-      const storageService = StorageService.getInstance();
-      const isAdmin = !!req.apiKey || req.user?.role === 'project_admin';
-      const result = await storageService.listObjects(
+      const result = await StorageService.getInstance().listObjects(
+        authedContext(req),
         bucketName,
         prefix,
         limit,
         offset,
-        searchQuery,
-        req.user?.id,
-        isAdmin
+        searchQuery
       );
 
       successResponse(
@@ -301,12 +315,11 @@ router.put(
         throw new AppError('File is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
 
-      const storageService = StorageService.getInstance();
-      const storedFile = await storageService.putObject(
+      const storedFile = await StorageService.getInstance().putObject(
+        authedContext(req),
         bucketName,
         objectKey,
-        req.file,
-        req.user?.id
+        req.file
       );
 
       try {
@@ -354,10 +367,10 @@ router.post(
       const objectKey = storageService.generateObjectKey(req.file.originalname);
 
       const storedFile = await storageService.putObject(
+        authedContext(req),
         bucketName,
         objectKey,
-        req.file,
-        req.user?.id
+        req.file
       );
 
       try {
@@ -414,7 +427,15 @@ router.get(
         return res.redirect(strategy.url);
       }
 
-      const result = await storageService.getObject(bucketName, objectKey);
+      // conditionalAuth either confirmed a public bucket (no req.user) or
+      // required auth. For the public-bucket case we run as admin to bypass
+      // RLS, preserving the prior behavior; otherwise RLS evaluates.
+      const authReq = req as AuthRequest;
+      const ctx: UserContext =
+        !authReq.user && !authReq.apiKey
+          ? { isAdmin: true, role: 'authenticated' }
+          : authedContext(authReq);
+      const result = await storageService.getObject(ctx, bucketName, objectKey);
       if (!result) {
         throw new AppError('Object not found', 404, ERROR_CODES.NOT_FOUND);
       }
@@ -498,12 +519,10 @@ router.delete(
         throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
 
-      const storageService = StorageService.getInstance();
-      const deleted = await storageService.deleteObject(
+      const deleted = await StorageService.getInstance().deleteObject(
+        authedContext(req),
         bucketName,
-        objectKey,
-        req.user?.id || '',
-        !!req.apiKey || req.user?.role === 'project_admin'
+        objectKey
       );
 
       if (!deleted) {
@@ -534,12 +553,11 @@ router.post(
         throw new AppError('Filename is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
 
-      const storageService = StorageService.getInstance();
-      const strategy = await storageService.getUploadStrategy(bucketName, {
-        filename,
-        contentType,
-        size,
-      });
+      const strategy = await StorageService.getInstance().getUploadStrategy(
+        authedContext(req),
+        bucketName,
+        { filename, contentType, size }
+      );
 
       successResponse(res, strategy);
     } catch (error) {

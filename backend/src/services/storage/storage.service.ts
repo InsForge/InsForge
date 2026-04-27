@@ -1,6 +1,7 @@
 import path from 'path';
-import { Pool } from 'pg';
+import { Pool, PoolClient } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
+import { withUserContext, UserContext } from '@/services/db/user-context.service.js';
 import { StorageRecord } from '@/types/storage.js';
 import {
   StorageBucketSchema,
@@ -97,15 +98,21 @@ export class StorageService {
    * @param originalKey - The original filename
    * @returns The next available key
    */
-  private async generateNextAvailableKey(bucket: string, originalKey: string): Promise<string> {
+  private async generateNextAvailableKey(
+    bucket: string,
+    originalKey: string,
+    db: PoolClient | Pool
+  ): Promise<string> {
     // Parse filename and extension for potential auto-renaming
     const lastDotIndex = originalKey.lastIndexOf('.');
     const baseName = lastDotIndex > 0 ? originalKey.substring(0, lastDotIndex) : originalKey;
     const extension = lastDotIndex > 0 ? originalKey.substring(lastDotIndex) : '';
 
-    // Use efficient SQL query to find the highest existing counter
-    // This query finds all files matching the pattern and extracts the counter number
-    const result = await this.getPool().query(
+    // Use efficient SQL query to find the highest existing counter.
+    // Runs through the caller's user-context client, so RLS scopes the
+    // dedup check to keys the caller can actually see — different users
+    // can independently upload `note.txt` without conflict.
+    const result = await db.query(
       `
         SELECT key FROM storage.objects
         WHERE bucket = $1
@@ -148,57 +155,63 @@ export class StorageService {
   }
 
   async putObject(
+    ctx: UserContext,
     bucket: string,
     originalKey: string,
-    file: Express.Multer.File,
-    userId?: string
+    file: Express.Multer.File
   ): Promise<StorageFileSchema> {
     this.validateBucketName(bucket);
     this.validateKey(originalKey);
 
-    // Generate next available key using (1), (2), (3) pattern if duplicates exist
-    const finalKey = await this.generateNextAvailableKey(bucket, originalKey);
+    return withUserContext(this.getPool(), ctx, async (db) => {
+      // Generate next available key using (1), (2), (3) pattern if duplicates exist.
+      // RLS scopes the dedup check to keys the caller can actually see, so two
+      // users can independently upload `note.txt` without conflict.
+      const finalKey = await this.generateNextAvailableKey(bucket, originalKey, db);
 
-    // Save file using backend
-    await this.provider.putObject(bucket, finalKey, file);
+      await this.provider.putObject(bucket, finalKey, file);
 
-    // Save metadata to database and return the timestamp in one operation
-    const result = await this.getPool().query(
-      `
-      INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by, uploaded_via)
-      VALUES ($1, $2, $3, $4, $5, 'rest')
-      RETURNING uploaded_at as "uploadedAt"
-    `,
-      [bucket, finalKey, file.size, file.mimetype || null, userId || null]
-    );
+      // INSERT is checked against the storage_objects_owner_insert RLS policy.
+      const result = await db.query(
+        `
+        INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by, uploaded_via)
+        VALUES ($1, $2, $3, $4, $5, 'rest')
+        RETURNING uploaded_at as "uploadedAt"
+      `,
+        [bucket, finalKey, file.size, file.mimetype || null, ctx.userId || null]
+      );
 
-    if (!result.rows[0]) {
-      throw new Error(`Failed to retrieve upload timestamp for ${bucket}/${finalKey}`);
-    }
+      if (!result.rows[0]) {
+        throw new Error(`Failed to retrieve upload timestamp for ${bucket}/${finalKey}`);
+      }
 
-    return {
-      bucket,
-      key: finalKey,
-      size: file.size,
-      mimeType: file.mimetype,
-      uploadedAt: result.rows[0].uploadedAt,
-      url: `${getApiBaseUrl()}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(finalKey)}`,
-    };
+      return {
+        bucket,
+        key: finalKey,
+        size: file.size,
+        mimeType: file.mimetype,
+        uploadedAt: result.rows[0].uploadedAt,
+        url: `${getApiBaseUrl()}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(finalKey)}`,
+      };
+    });
   }
 
   async getObject(
+    ctx: UserContext,
     bucket: string,
     key: string
   ): Promise<{ file: Buffer; metadata: StorageFileSchema } | null> {
     this.validateBucketName(bucket);
     this.validateKey(key);
 
-    const result = await this.getPool().query(
-      'SELECT * FROM storage.objects WHERE bucket = $1 AND key = $2',
-      [bucket, key]
-    );
-
-    const metadata = result.rows[0] as StorageRecord | undefined;
+    // RLS filters this SELECT — non-owners get an empty result and a 404.
+    const metadata = await withUserContext(this.getPool(), ctx, async (db) => {
+      const result = await db.query(
+        'SELECT * FROM storage.objects WHERE bucket = $1 AND key = $2',
+        [bucket, key]
+      );
+      return result.rows[0] as StorageRecord | undefined;
+    });
 
     if (!metadata) {
       return null;
@@ -222,84 +235,65 @@ export class StorageService {
     };
   }
 
-  async deleteObject(
-    bucket: string,
-    key: string,
-    userId: string,
-    isAdmin: boolean
-  ): Promise<boolean> {
+  async deleteObject(ctx: UserContext, bucket: string, key: string): Promise<boolean> {
     this.validateBucketName(bucket);
     this.validateKey(key);
 
-    // Admin can delete any object, non-admin can only delete their own uploads
-    const result = isAdmin
-      ? await this.getPool().query('DELETE FROM storage.objects WHERE bucket = $1 AND key = $2', [
-          bucket,
-          key,
-        ])
-      : await this.getPool().query(
-          'DELETE FROM storage.objects WHERE bucket = $1 AND key = $2 AND uploaded_by = $3',
-          [bucket, key, userId]
-        );
+    // RLS handles ownership: non-owners delete zero rows. Admin connections
+    // (postgres role) bypass RLS and can delete any row.
+    const deleted = await withUserContext(this.getPool(), ctx, async (db) => {
+      const result = await db.query('DELETE FROM storage.objects WHERE bucket = $1 AND key = $2', [
+        bucket,
+        key,
+      ]);
+      return result.rowCount !== null && result.rowCount > 0;
+    });
 
-    // If delete succeeded in DB, also delete from storage provider
-    if (result.rowCount !== null && result.rowCount > 0) {
+    if (deleted) {
       await this.provider.deleteObject(bucket, key);
-      return true;
     }
-
-    return false;
+    return deleted;
   }
 
   async listObjects(
+    ctx: UserContext,
     bucket: string,
-    prefix?: string,
+    prefix: string | undefined,
     limit: number = DEFAULT_LIST_LIMIT,
     offset: number = 0,
-    searchQuery?: string,
-    userId?: string,
-    isAdmin: boolean = false
+    searchQuery: string | undefined
   ): Promise<{ objects: StorageFileSchema[]; total: number }> {
     this.validateBucketName(bucket);
 
-    const client = await this.getPool().connect();
-    try {
-      let query = 'SELECT * FROM storage.objects WHERE bucket = $1';
-      let countQuery = 'SELECT COUNT(*) as count FROM storage.objects WHERE bucket = $1';
-      const params: (string | number)[] = [bucket];
-      let paramIndex = 2;
+    let query = 'SELECT * FROM storage.objects WHERE bucket = $1';
+    let countQuery = 'SELECT COUNT(*) as count FROM storage.objects WHERE bucket = $1';
+    const params: (string | number)[] = [bucket];
+    let paramIndex = 2;
 
-      // Non-admin callers only see rows they uploaded themselves. Mirrors the
-      // ownership filter deleteObject already applies — keeps the storage
-      // permission model consistent across operations.
-      if (!isAdmin) {
-        query += ` AND uploaded_by = $${paramIndex}`;
-        countQuery += ` AND uploaded_by = $${paramIndex}`;
-        params.push(userId ?? '');
-        paramIndex++;
-      }
+    if (prefix) {
+      query += ` AND key LIKE $${paramIndex}`;
+      countQuery += ` AND key LIKE $${paramIndex}`;
+      params.push(`${escapeSqlLikePattern(prefix)}%`);
+      paramIndex++;
+    }
 
-      if (prefix) {
-        query += ` AND key LIKE $${paramIndex}`;
-        countQuery += ` AND key LIKE $${paramIndex}`;
-        params.push(`${escapeSqlLikePattern(prefix)}%`);
-        paramIndex++;
-      }
+    // Add search functionality for file names (key field)
+    if (searchQuery && searchQuery.trim()) {
+      query += ` AND key LIKE $${paramIndex}`;
+      countQuery += ` AND key LIKE $${paramIndex}`;
+      const searchPattern = `%${escapeSqlLikePattern(searchQuery.trim())}%`;
+      params.push(searchPattern);
+      paramIndex++;
+    }
 
-      // Add search functionality for file names (key field)
-      if (searchQuery && searchQuery.trim()) {
-        query += ` AND key LIKE $${paramIndex}`;
-        countQuery += ` AND key LIKE $${paramIndex}`;
-        const searchPattern = `%${escapeSqlLikePattern(searchQuery.trim())}%`;
-        params.push(searchPattern);
-        paramIndex++;
-      }
+    query += ` ORDER BY key LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    const queryParams = [...params, limit, offset];
 
-      query += ` ORDER BY key LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-      const queryParams = [...params, limit, offset];
-
-      const objectsResult = await client.query(query, queryParams);
-      const totalResult = await client.query(countQuery, params);
+    // RLS scopes both queries — admin sees everything, authenticated callers
+    // see only rows their policies allow. No app-side filter.
+    return withUserContext(this.getPool(), ctx, async (db) => {
+      const objectsResult = await db.query(query, queryParams);
+      const totalResult = await db.query(countQuery, params);
 
       return {
         objects: objectsResult.rows.map((obj) => ({
@@ -310,9 +304,7 @@ export class StorageService {
         })),
         total: parseInt(totalResult.rows[0].count, 10),
       };
-    } finally {
-      client.release();
-    }
+    });
   }
 
   async isBucketPublic(bucket: string): Promise<boolean> {
@@ -421,6 +413,7 @@ export class StorageService {
 
   // New methods for universal upload/download strategies
   async getUploadStrategy(
+    ctx: UserContext,
     bucket: string,
     metadata: {
       filename: string;
@@ -430,8 +423,7 @@ export class StorageService {
   ) {
     this.validateBucketName(bucket);
 
-    const client = await this.getPool().connect();
-    try {
+    return withUserContext(this.getPool(), ctx, async (client) => {
       // Check if bucket exists
       const bucketResult = await client.query('SELECT name FROM storage.buckets WHERE name = $1', [
         bucket,
@@ -441,13 +433,12 @@ export class StorageService {
         throw new Error(`Bucket "${bucket}" does not exist`);
       }
 
-      // Generate next available key using (1), (2), (3) pattern if duplicates exist
-      const key = await this.generateNextAvailableKey(bucket, metadata.filename);
+      // Generate next available key using (1), (2), (3) pattern. RLS scopes
+      // the dedup query so users don't conflict on filenames they can't see.
+      const key = await this.generateNextAvailableKey(bucket, metadata.filename, client);
       const maxFileSizeBytes = await StorageConfigService.getInstance().getMaxFileSizeBytes();
       return this.provider.getUploadStrategy(bucket, key, metadata, maxFileSizeBytes);
-    } finally {
-      client.release();
-    }
+    });
   }
 
   async getDownloadStrategy(bucket: string, key: string) {
