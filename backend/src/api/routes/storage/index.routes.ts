@@ -236,10 +236,12 @@ router.patch(
   }
 );
 
-// GET /api/storage/buckets/:bucketName/objects - List objects in bucket (requires auth)
+// GET /api/storage/buckets/:bucketName/objects - List objects in bucket
+// Admin / API-key callers see every object in the bucket. Authenticated users
+// see only the rows they uploaded themselves (matches deleteObject's filter).
 router.get(
   '/buckets/:bucketName/objects',
-  verifyAdmin,
+  verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { bucketName } = req.params;
@@ -249,12 +251,15 @@ router.get(
       const offset = Math.max(0, parseInt(req.query.offset as string) || 0);
 
       const storageService = StorageService.getInstance();
+      const isAdmin = !!req.apiKey || req.user?.role === 'project_admin';
       const result = await storageService.listObjects(
         bucketName,
         prefix,
         limit,
         offset,
-        searchQuery
+        searchQuery,
+        req.user?.id,
+        isAdmin
       );
 
       successResponse(

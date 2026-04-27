@@ -256,7 +256,9 @@ export class StorageService {
     prefix?: string,
     limit: number = DEFAULT_LIST_LIMIT,
     offset: number = 0,
-    searchQuery?: string
+    searchQuery?: string,
+    userId?: string,
+    isAdmin: boolean = false
   ): Promise<{ objects: StorageFileSchema[]; total: number }> {
     this.validateBucketName(bucket);
 
@@ -266,6 +268,16 @@ export class StorageService {
       let countQuery = 'SELECT COUNT(*) as count FROM storage.objects WHERE bucket = $1';
       const params: (string | number)[] = [bucket];
       let paramIndex = 2;
+
+      // Non-admin callers only see rows they uploaded themselves. Mirrors the
+      // ownership filter deleteObject already applies — keeps the storage
+      // permission model consistent across operations.
+      if (!isAdmin) {
+        query += ` AND uploaded_by = $${paramIndex}`;
+        countQuery += ` AND uploaded_by = $${paramIndex}`;
+        params.push(userId ?? '');
+        paramIndex++;
+      }
 
       if (prefix) {
         query += ` AND key LIKE $${paramIndex}`;
