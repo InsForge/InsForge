@@ -31,21 +31,43 @@ export class ScheduleService {
   }
 
   /**
-   * Validate that the cron expression is exactly 5 fields (minute, hour, day, month, day-of-week).
-   * pg_cron does not support 6-field expressions with seconds.
+   * Match pg_cron's sub-minute interval syntax: "<n> seconds|minutes|hours" (pg_cron >= 1.5).
+   * Captures: [1] = numeric value, [2] = unit (seconds|second|minutes|minute|hours|hour).
+   */
+  private static readonly INTERVAL_RE = /^\s*(\d+)\s+(seconds?|minutes?|hours?)\s*$/i;
+
+  /**
+   * Validate that the cron expression is either a 5-field cron expression or a pg_cron
+   * interval expression (e.g. "2 seconds", "30 seconds", "5 minutes").
+   * 6-field cron-with-seconds (Quartz/Spring style) is NOT supported by pg_cron.
    */
   private validateCronExpression(cronSchedule: string): void {
-    const fields = cronSchedule.trim().split(/\s+/);
+    const trimmed = cronSchedule.trim();
+
+    const interval = trimmed.match(ScheduleService.INTERVAL_RE);
+    if (interval) {
+      const n = Number(interval[1]);
+      if (!Number.isFinite(n) || n < 1) {
+        throw new AppError(
+          'Interval value must be a positive integer (e.g., "2 seconds", "30 seconds").',
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+      return;
+    }
+
+    const fields = trimmed.split(/\s+/);
     if (fields.length !== 5) {
       throw new AppError(
-        `Cron expression must be exactly 5 fields (minute, hour, day, month, day-of-week). Got ${fields.length} fields. Example: "*/5 * * * *" for every 5 minutes.`,
+        `Cron expression must be exactly 5 fields (minute, hour, day, month, day-of-week) or an interval like "2 seconds". Got ${fields.length} fields. Examples: "*/5 * * * *" for every 5 minutes, "30 seconds" for every 30 seconds.`,
         400,
         ERROR_CODES.INVALID_INPUT
       );
     }
 
     try {
-      CronExpressionParser.parse(cronSchedule, { strict: false });
+      CronExpressionParser.parse(trimmed, { strict: false });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       throw new AppError(`Invalid cron expression: ${msg}`, 400, ERROR_CODES.INVALID_INPUT);
@@ -73,6 +95,19 @@ export class ScheduleService {
 
       if (updatedAt && updatedAt > after) {
         after = updatedAt;
+      }
+
+      // Interval syntax (pg_cron >= 1.5) — cron-parser cannot parse this.
+      const interval = schedule.cronSchedule.trim().match(ScheduleService.INTERVAL_RE);
+      if (interval) {
+        const n = Number(interval[1]);
+        const unit = interval[2].toLowerCase();
+        const multMs = unit.startsWith('hour')
+          ? 3_600_000
+          : unit.startsWith('minute')
+            ? 60_000
+            : 1_000;
+        return new Date(after.getTime() + n * multMs).toISOString();
       }
 
       const cronExpression = CronExpressionParser.parse(schedule.cronSchedule, {

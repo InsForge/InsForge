@@ -1,12 +1,23 @@
 import { z } from 'zod';
 import { scheduleSchema, scheduleLogSchema } from './schedules.schema.js';
 
+// Accept either:
+//   - 5-field cron expression (e.g. "*/5 * * * *", "0 9 * * 1-5")
+//   - pg_cron interval form for sub-minute cadence (e.g. "2 seconds", "30 seconds", "5 minutes")
+const intervalRegex = /^\s*\d+\s+(seconds?|minutes?|hours?)\s*$/i;
+
 const cronScheduleSchema = z.string().refine(
   (value) => {
-    const parts = value.split(' ');
+    if (intervalRegex.test(value)) {
+      return true;
+    }
+    const parts = value.trim().split(/\s+/);
     return parts.length === 5 || parts.length === 6;
   },
-  { message: 'Invalid cron schedule format. Use 5 or 6 parts (e.g., "* * * * *").' }
+  {
+    message:
+      'Invalid cron schedule. Use 5-field cron (e.g., "* * * * *") or interval form (e.g., "2 seconds", "30 seconds", "5 minutes").',
+  }
 );
 
 /**
