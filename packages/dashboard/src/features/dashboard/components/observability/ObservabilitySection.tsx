@@ -55,7 +55,7 @@ const METRICS: MetricConfig[] = [
 
 export function ObservabilitySection() {
   const [range, setRange] = useState<DashboardMetricsRange>('1h');
-  const { data, isLoading, isUnavailable } = useProjectMetrics(range);
+  const { data, isLoading, isUnavailable, error } = useProjectMetrics(range);
 
   return (
     <section className="flex flex-col gap-6">
@@ -87,6 +87,10 @@ export function ObservabilitySection() {
       {isUnavailable ? (
         <div className="flex h-32 items-center justify-center rounded border border-dashed border-[var(--alpha-8)] bg-card text-sm text-muted-foreground">
           Metrics unavailable for this instance
+        </div>
+      ) : error ? (
+        <div className="flex h-32 items-center justify-center rounded border border-dashed border-[var(--alpha-8)] bg-card text-sm text-destructive">
+          Failed to load metrics. Please try again.
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">

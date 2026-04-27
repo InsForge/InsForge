@@ -119,6 +119,10 @@ export function BackendAdvisorSection() {
           <div className="flex h-24 items-center justify-center text-sm text-muted-foreground">
             Loading…
           </div>
+        ) : issues.isError ? (
+          <div className="flex h-24 items-center justify-center text-sm text-destructive">
+            Failed to load advisor issues
+          </div>
         ) : issues.data && issues.data.issues.length > 0 ? (
           <div className="flex flex-col">
             {issues.data.issues.map((issue) => (

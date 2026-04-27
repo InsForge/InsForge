@@ -1,15 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
-import { useDashboardHost } from '../../../lib/config/DashboardHostContext';
+import { useDashboardHost, useDashboardProject } from '../../../lib/config/DashboardHostContext';
 import type { DashboardBackup } from '../../../types';
 
 export const LAST_BACKUP_QUERY_KEY = ['dashboard-last-backup'] as const;
 
 export function useLastBackup() {
   const host = useDashboardHost();
+  const project = useDashboardProject();
   const fetcher = host.onRequestBackupInfo;
 
   return useQuery<DashboardBackup | null, Error>({
-    queryKey: LAST_BACKUP_QUERY_KEY,
+    queryKey: [...LAST_BACKUP_QUERY_KEY, project?.id],
     queryFn: async () => {
       if (!fetcher) {
         return null;

@@ -592,7 +592,18 @@ export function useCloudHosting() {
                     metric: m.metric as DashboardMetricName,
                     instanceId: typeof m.instanceId === 'string' ? m.instanceId : undefined,
                     data: Array.isArray(m.data)
-                      ? (m.data as Array<{ timestamp: number; value: number }>)
+                      ? m.data.flatMap((sample: unknown) => {
+                          const s = sample as Record<string, unknown>;
+                          if (
+                            typeof s.timestamp !== 'number' ||
+                            !Number.isFinite(s.timestamp) ||
+                            typeof s.value !== 'number' ||
+                            !Number.isFinite(s.value)
+                          ) {
+                            return [];
+                          }
+                          return [{ timestamp: s.timestamp, value: s.value }];
+                        })
                       : [],
                   },
                 ];
@@ -611,6 +622,11 @@ export function useCloudHosting() {
           return;
         }
         case 'ADVISOR_LATEST': {
+          const summaryRaw = message.summary as Record<string, unknown> | undefined;
+          const finiteCount = (key: string): number => {
+            const v = summaryRaw?.[key];
+            return typeof v === 'number' && Number.isFinite(v) ? v : 0;
+          };
           resolvePendingRequest('advisorLatest', {
             scanId: typeof message.scanId === 'string' ? message.scanId : '',
             status:
@@ -620,22 +636,10 @@ export function useCloudHosting() {
             scanType: message.scanType === 'manual' ? 'manual' : 'scheduled',
             scannedAt: typeof message.scannedAt === 'string' ? message.scannedAt : '',
             summary: {
-              total:
-                typeof (message.summary as Record<string, unknown>)?.total === 'number'
-                  ? ((message.summary as Record<string, unknown>).total as number)
-                  : 0,
-              critical:
-                typeof (message.summary as Record<string, unknown>)?.critical === 'number'
-                  ? ((message.summary as Record<string, unknown>).critical as number)
-                  : 0,
-              warning:
-                typeof (message.summary as Record<string, unknown>)?.warning === 'number'
-                  ? ((message.summary as Record<string, unknown>).warning as number)
-                  : 0,
-              info:
-                typeof (message.summary as Record<string, unknown>)?.info === 'number'
-                  ? ((message.summary as Record<string, unknown>).info as number)
-                  : 0,
+              total: finiteCount('total'),
+              critical: finiteCount('critical'),
+              warning: finiteCount('warning'),
+              info: finiteCount('info'),
             },
           });
           return;
@@ -677,7 +681,10 @@ export function useCloudHosting() {
             : [];
           resolvePendingRequest('advisorIssues', {
             issues,
-            total: typeof message.total === 'number' ? message.total : issues.length,
+            total:
+              typeof message.total === 'number' && Number.isFinite(message.total)
+                ? message.total
+                : issues.length,
           });
           return;
         }

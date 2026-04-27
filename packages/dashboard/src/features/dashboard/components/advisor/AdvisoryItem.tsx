@@ -69,6 +69,7 @@ export function AdvisoryItem({ issue }: AdvisoryItemProps) {
                   type="button"
                   onClick={() => setExpanded((v) => !v)}
                   aria-label={expanded ? 'Collapse' : 'Expand'}
+                  aria-expanded={expanded}
                   className="flex h-5 w-5 items-center justify-center text-muted-foreground hover:text-foreground"
                 >
                   {expanded ? (
