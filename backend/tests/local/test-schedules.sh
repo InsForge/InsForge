@@ -21,15 +21,31 @@ API_BASE="$TEST_API_BASE"
 ECHO_URL="${ECHO_URL:-http://example.com}"
 
 declare -a SCHEDULES_CREATED=()
+ADMIN_TOKEN=""
 
 cleanup_schedules() {
-    local token=$1
-    if [ ${#SCHEDULES_CREATED[@]} -gt 0 ] && [ -n "$token" ]; then
+    if [ ${#SCHEDULES_CREATED[@]} -gt 0 ] && [ -n "$ADMIN_TOKEN" ]; then
         for sid in "${SCHEDULES_CREATED[@]}"; do
             curl -s -X DELETE "$API_BASE/schedules/$sid" \
-                -H "Authorization: Bearer $token" >/dev/null 2>&1
+                -H "Authorization: Bearer $ADMIN_TOKEN" >/dev/null 2>&1
         done
     fi
+}
+trap cleanup_schedules EXIT INT TERM
+
+# Extract a top-level JSON string field from a flat response body. Avoids
+# python/jq so this runs on slim CI containers (mirrors the grep+cut pattern
+# used elsewhere in tests/test-config.sh).
+json_field() {
+    local key=$1
+    local body=$2
+    echo "$body" | grep -o "\"$key\":\"[^\"]*\"" | head -1 | cut -d'"' -f4
+}
+
+json_int_field() {
+    local key=$1
+    local body=$2
+    echo "$body" | grep -o "\"$key\":[0-9]*" | head -1 | cut -d':' -f2
 }
 
 echo "Testing schedules router (sub-minute cadence)..."
@@ -50,7 +66,7 @@ resp=$(curl -s -w "\n%{http_code}" -X POST "$API_BASE/schedules" \
 status=$(echo "$resp" | tail -n1); body=$(echo "$resp" | sed '$d')
 if [ "$status" = "200" ] || [ "$status" = "201" ]; then
     print_success "  Accepted (status $status)"
-    sid=$(echo "$body" | python3 -c "import json,sys;print(json.load(sys.stdin).get('id',''))")
+    sid=$(json_field id "$body")
     [ -n "$sid" ] && SCHEDULES_CREATED+=("$sid")
 else
     print_fail "  Expected 200/201, got $status: $body"
@@ -64,7 +80,7 @@ resp=$(curl -s -w "\n%{http_code}" -X POST "$API_BASE/schedules" \
 status=$(echo "$resp" | tail -n1); body=$(echo "$resp" | sed '$d')
 if [ "$status" = "200" ] || [ "$status" = "201" ]; then
     print_success "  Accepted (status $status)"
-    sid=$(echo "$body" | python3 -c "import json,sys;print(json.load(sys.stdin).get('id',''))")
+    sid=$(json_field id "$body")
     [ -n "$sid" ] && SCHEDULES_CREATED+=("$sid")
 else
     print_fail "  Expected 200/201, got $status: $body"
@@ -105,9 +121,10 @@ if [ "$SCHEDULES_WAIT_FOR_FIRE" = "1" ] && [ ${#SCHEDULES_CREATED[@]} -gt 0 ]; t
     fired=0
     for i in 1 2 3 4 5; do
         sleep 15
-        count=$(curl -s "$API_BASE/schedules/$sid/logs?limit=10" \
-            -H "Authorization: Bearer $ADMIN_TOKEN" \
-            | python3 -c "import json,sys;d=json.load(sys.stdin);print(d.get('totalCount',0))" 2>/dev/null || echo 0)
+        body=$(curl -s "$API_BASE/schedules/$sid/logs?limit=10" \
+            -H "Authorization: Bearer $ADMIN_TOKEN")
+        count=$(json_int_field totalCount "$body")
+        count=${count:-0}
         if [ "$count" -ge 1 ]; then
             print_success "  Schedule fired ($count log row(s) after $((i*15))s)"
             fired=1
@@ -119,9 +136,7 @@ else
     print_info "5) Skipping fire-poll (set SCHEDULES_WAIT_FOR_FIRE=1 to enable)"
 fi
 
-cleanup_schedules "$ADMIN_TOKEN"
-
-if [ $TEST_FAILED -eq 1 ]; then
+if [ "${TEST_FAILED:-0}" -eq 1 ]; then
     print_fail "Schedules tests FAILED"
     exit 1
 else
