@@ -185,7 +185,7 @@ SQL
 DROP POLICY IF EXISTS storage_objects_public_read_test ON storage.objects;
 CREATE POLICY storage_objects_owner_select ON storage.objects
   FOR SELECT TO authenticated
-  USING (uploaded_by = current_setting('request.jwt.claim.sub', true));
+  USING (uploaded_by = (SELECT auth.jwt() ->> 'sub'));
 SQL
   print_success "Default SELECT policy restored"
 else
@@ -216,7 +216,7 @@ if [ "$HAVE_PSQL" = "1" ]; then
 DROP POLICY IF EXISTS storage_objects_owner_select ON storage.objects;
 CREATE POLICY storage_objects_path_select ON storage.objects
   FOR SELECT TO authenticated
-  USING ((storage.foldername(key))[1] = current_setting('request.jwt.claim.sub', true));
+  USING ((storage.foldername(key))[1] = (SELECT auth.jwt() ->> 'sub'));
 SQL
 
   assert_count "Alice list (path policy)" "1" "$(list_count "$ALICE_JWT" "$PATH_BUCKET")"
@@ -227,7 +227,7 @@ SQL
 DROP POLICY IF EXISTS storage_objects_path_select ON storage.objects;
 CREATE POLICY storage_objects_owner_select ON storage.objects
   FOR SELECT TO authenticated
-  USING (uploaded_by = current_setting('request.jwt.claim.sub', true));
+  USING (uploaded_by = (SELECT auth.jwt() ->> 'sub'));
 SQL
   print_success "Default policy restored after path-based test"
 else

@@ -69,6 +69,7 @@ describe('withUserContext', () => {
     expect(sequence).toEqual([
       'BEGIN',
       'SET LOCAL ROLE authenticated',
+      "SELECT set_config('request.jwt.claims', $1, true)",
       "SELECT set_config('request.jwt.claim.sub', $1, true)",
       "SELECT set_config('request.jwt.claim.role', $1, true)",
       "SELECT set_config('request.jwt.claim.email', $1, true)",
@@ -77,9 +78,14 @@ describe('withUserContext', () => {
       'RESET ROLE',
     ]);
 
-    expect(calls[2].params).toEqual(['ZVP5j6raUC9cuBIWzDGjdNdelMFjWNc5']);
-    expect(calls[3].params).toEqual(['authenticated']);
-    expect(calls[4].params).toEqual(['alice@example.com']);
+    expect(JSON.parse(calls[2].params![0] as string)).toEqual({
+      role: 'authenticated',
+      sub: 'ZVP5j6raUC9cuBIWzDGjdNdelMFjWNc5',
+      email: 'alice@example.com',
+    });
+    expect(calls[3].params).toEqual(['ZVP5j6raUC9cuBIWzDGjdNdelMFjWNc5']);
+    expect(calls[4].params).toEqual(['authenticated']);
+    expect(calls[5].params).toEqual(['alice@example.com']);
     expect(client.release).toHaveBeenCalledOnce();
   });
 
