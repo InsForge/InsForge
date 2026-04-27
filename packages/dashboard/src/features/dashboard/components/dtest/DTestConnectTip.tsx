@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { getFeatureFlag } from '../../../../lib/analytics/posthog';
 import { useProjectId } from '../../../../lib/hooks/useMetadata';
 import { useDashboardHost, useDashboardProject } from '../../../../lib/config/DashboardHostContext';
-import { useDTestView } from './DTestViewContext';
 
 const getConnectTipKey = (projectId: string | null | undefined) =>
   `insforge-dtest-connect-tip-dismissed-${projectId || 'default'}`;
@@ -29,7 +29,8 @@ function writeConnectTipDismissed(key: string): void {
 // AppHeader) because cloud-hosting hides our AppHeader via showNavbar=false.
 export function DTestConnectTip() {
   const dashboardVariant = getFeatureFlag('dashboard-v4-experiment');
-  const { view } = useDTestView();
+  const { pathname } = useLocation();
+  const isOnInstallPage = pathname === '/dashboard/install';
   // Prefer the host-injected project id (synchronous) so the dismissal state
   // still resolves when /metadata/project-id 401s during auth bootstrap.
   const dashboardProject = useDashboardProject();
@@ -58,7 +59,7 @@ export function DTestConnectTip() {
   if (
     host.mode !== 'cloud-hosting' ||
     dashboardVariant !== 'd_test' ||
-    view === 'install' ||
+    isOnInstallPage ||
     dismissed
   ) {
     return null;

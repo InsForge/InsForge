@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   dashboardDeploymentsMenuItem,
   dashboardDTestDocMenuItem,
@@ -7,13 +7,12 @@ import {
   dashboardStaticMenuItems,
   type DashboardPrimaryMenuItem,
 } from '../navigation/menuItems';
-import { Link, useLocation, matchPath, useNavigate } from 'react-router-dom';
+import { Link, useLocation, matchPath } from 'react-router-dom';
 import { ExternalLink, PanelLeftOpen, PanelRightOpen } from 'lucide-react';
 import { cn, isInsForgeCloudProject } from '../lib/utils/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import { ProjectSettingsMenuDialog } from '../features/dashboard/components';
 import { getFeatureFlag } from '../lib/analytics/posthog';
-import { useDTestView } from '../features/dashboard/components/dtest/DTestViewContext';
 import { useDashboardHost } from '../lib/config/DashboardHostContext';
 
 interface AppSidebarProps extends React.HTMLAttributes<HTMLElement> {
@@ -23,15 +22,12 @@ interface AppSidebarProps extends React.HTMLAttributes<HTMLElement> {
 
 export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebarProps) {
   const { pathname } = useLocation();
-  const navigate = useNavigate();
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
 
   const isCloud = isInsForgeCloudProject();
   const host = useDashboardHost();
-  const { view: dTestView, setView: setDTestView } = useDTestView();
   const isDTest = getFeatureFlag('dashboard-v4-experiment') === 'd_test';
   const isDTestCloud = isDTest && host.mode === 'cloud-hosting';
-  const isDTestInstall = isDTest && dTestView === 'install';
 
   // Insert deployments at the end of section 2 for cloud projects.
   const mainMenuItems = useMemo(() => {
@@ -56,29 +52,24 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
     return items;
   }, [isCloud]);
 
-  const handleDTestInstallClick = useCallback(() => {
-    setDTestView('install');
-    void navigate('/dashboard');
-  }, [setDTestView, navigate]);
-
   // d_test + cloud-hosting prepends Install + Doc above Settings in the
   // bottom nav. Other shells just show Settings.
   const bottomMenuItems = useMemo(() => {
     const items: DashboardPrimaryMenuItem[] = [];
     if (isDTestCloud) {
-      items.push({ ...dashboardDTestInstallMenuItem, onClick: handleDTestInstallClick });
+      items.push({ ...dashboardDTestInstallMenuItem });
       items.push({ ...dashboardDTestDocMenuItem });
     }
     items.push({ ...dashboardSettingsMenuItem, onClick: () => setIsSettingsDialogOpen(true) });
     return items;
-  }, [isDTestCloud, handleDTestInstallClick]);
+  }, [isDTestCloud]);
 
   // Find which primary menu item matches the current route
   // Items with secondary menus use prefix matching (end: false)
   // Items without secondary menus use exact matching (end: true)
   const activeMenu = useMemo(() => {
     const allItems = [...mainMenuItems, ...bottomMenuItems];
-    const routeActive = allItems.find((item) => {
+    return allItems.find((item) => {
       if (item.external || item.onClick) {
         return false;
       }
@@ -86,13 +77,7 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
       const shouldMatchExactly = item.href === '/dashboard';
       return !!matchPath({ path: item.href, end: shouldMatchExactly }, pathname);
     });
-
-    if (isDTestInstall && routeActive?.id === 'dashboard') {
-      return { id: dashboardDTestInstallMenuItem.id };
-    }
-
-    return routeActive;
-  }, [mainMenuItems, bottomMenuItems, pathname, isDTestInstall]);
+  }, [mainMenuItems, bottomMenuItems, pathname]);
 
   const handleToggleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();

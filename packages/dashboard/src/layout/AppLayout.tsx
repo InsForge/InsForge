@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import AppSidebar from './AppSidebar';
 import AppHeader from './AppHeader';
 import { ThemeProvider } from '../lib/contexts/ThemeContext';
@@ -9,10 +9,6 @@ import { useDashboardHost, useDashboardProject } from '../lib/config/DashboardHo
 import { cn } from '../lib/utils/utils';
 import { ConnectDialogProvider } from './ConnectDialogContext';
 import { getFeatureFlag } from '../lib/analytics/posthog';
-import {
-  DTestViewProvider,
-  useDTestView,
-} from '../features/dashboard/components/dtest/DTestViewContext';
 import { DTestConnectTip } from '../features/dashboard/components/dtest/DTestConnectTip';
 
 const CONNECT_DIALOG_MESSAGE_TYPES = new Set(['SHOW_ONBOARDING_OVERLAY', 'SHOW_CONNECT_OVERLAY']);
@@ -23,7 +19,7 @@ interface ConnectOverlayBridgeProps {
 }
 
 function ConnectOverlayBridge({ hostMode, onOpenDialog }: ConnectOverlayBridgeProps) {
-  const { setView } = useDTestView();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (hostMode !== 'cloud-hosting') {
@@ -46,7 +42,7 @@ function ConnectOverlayBridge({ hostMode, onOpenDialog }: ConnectOverlayBridgePr
       }
 
       if (getFeatureFlag('dashboard-v4-experiment') === 'd_test') {
-        setView('install');
+        void navigate('/dashboard/install');
       } else {
         onOpenDialog();
       }
@@ -54,7 +50,24 @@ function ConnectOverlayBridge({ hostMode, onOpenDialog }: ConnectOverlayBridgePr
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [hostMode, setView, onOpenDialog]);
+  }, [hostMode, navigate, onOpenDialog]);
+
+  return null;
+}
+
+function DTestViewBroadcaster() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || window.parent === window) {
+      return;
+    }
+    if (getFeatureFlag('dashboard-v4-experiment') !== 'd_test') {
+      return;
+    }
+    const view = pathname === '/dashboard/install' ? 'install' : 'dashboard';
+    window.parent.postMessage({ type: 'D_TEST_VIEW_CHANGED', view }, '*');
+  }, [pathname]);
 
   return null;
 }
@@ -107,25 +120,24 @@ export default function AppLayout({ children }: LayoutProps) {
   return (
     <ThemeProvider forcedTheme={forcedTheme}>
       <ConnectDialogProvider value={openConnectDialog}>
-        <DTestViewProvider>
-          <ConnectOverlayBridge hostMode={host.mode} onOpenDialog={openConnectDialog} />
-          <DTestConnectTip />
-          <div
-            className={cn(
-              'min-h-0 min-w-0 bg-semantic-0 flex flex-col',
-              isContainedHostLayout ? 'h-full' : 'h-screen'
-            )}
-          >
-            {showNavbar ? <AppHeader /> : null}
-            <div className="min-h-0 min-w-0 flex flex-1 overflow-hidden">
-              <AppSidebar isCollapsed={isSidebarCollapsed} onToggleCollapse={toggleSidebar} />
-              <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
-                {showProjectRestoringPage ? <ProjectRestoringPage /> : children}
-              </main>
-            </div>
+        <ConnectOverlayBridge hostMode={host.mode} onOpenDialog={openConnectDialog} />
+        <DTestViewBroadcaster />
+        <DTestConnectTip />
+        <div
+          className={cn(
+            'min-h-0 min-w-0 bg-semantic-0 flex flex-col',
+            isContainedHostLayout ? 'h-full' : 'h-screen'
+          )}
+        >
+          {showNavbar ? <AppHeader /> : null}
+          <div className="min-h-0 min-w-0 flex flex-1 overflow-hidden">
+            <AppSidebar isCollapsed={isSidebarCollapsed} onToggleCollapse={toggleSidebar} />
+            <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
+              {showProjectRestoringPage ? <ProjectRestoringPage /> : children}
+            </main>
           </div>
-          <ConnectDialog open={isConnectDialogOpen} onOpenChange={setIsConnectDialogOpen} />
-        </DTestViewProvider>
+        </div>
+        <ConnectDialog open={isConnectDialogOpen} onOpenChange={setIsConnectDialogOpen} />
       </ConnectDialogProvider>
     </ThemeProvider>
   );
