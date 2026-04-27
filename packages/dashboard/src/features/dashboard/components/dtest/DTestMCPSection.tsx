@@ -1,0 +1,306 @@
+import { useCallback, useMemo } from 'react';
+import { CopyButton } from '@insforge/ui';
+import {
+  MCP_AGENTS,
+  GenerateInstallCommand,
+  createMCPConfig,
+  createMCPServerConfig,
+  type MCPAgent,
+  type PlatformType,
+} from '../connect/mcp/helpers';
+import { MCP_VERIFY_CONNECTION_PROMPT } from '../connect/constants';
+import { QuickStartPromptCard } from './QuickStartPromptCard';
+import { cn } from '../../../../lib/utils/utils';
+
+function buildMcpDeeplink(agentId: string, apiKey: string, appUrl: string): string | null {
+  const config = createMCPServerConfig(apiKey, 'macos-linux' as PlatformType, appUrl);
+  const configString = JSON.stringify(config);
+  if (agentId === 'cursor') {
+    const base64Config = btoa(configString);
+    return `cursor://anysphere.cursor-deeplink/mcp/install?name=insforge&config=${encodeURIComponent(base64Config)}`;
+  }
+  if (agentId === 'qoder') {
+    const base64Config = btoa(encodeURIComponent(configString));
+    return `qoder://aicoding.aicoding-deeplink/mcp/add?name=insforge&config=${encodeURIComponent(base64Config)}`;
+  }
+  return null;
+}
+
+// Open-chat-with-prompt deeplinks. Official docs:
+//   Cursor — https://cursor.com/docs/integrations/deeplinks
+//   Qoder  — https://docs.qoder.com/user-guide/deeplink
+// Cursor caps the total URL at 8000 chars after encoding; we fall back to
+// clipboard if the encoded prompt would blow past that.
+const CURSOR_DEEPLINK_MAX_LEN = 8000;
+function buildPromptDeeplink(agentId: string, prompt: string): string | null {
+  const encoded = encodeURIComponent(prompt);
+  if (agentId === 'cursor') {
+    const url = `cursor://anysphere.cursor-deeplink/prompt?text=${encoded}`;
+    return url.length > CURSOR_DEEPLINK_MAX_LEN ? null : url;
+  }
+  if (agentId === 'qoder') {
+    return `qoder://aicoding.aicoding-deeplink/chat?text=${encoded}&mode=agent`;
+  }
+  return null;
+}
+
+interface DTestMCPSectionProps {
+  apiKey: string;
+  appUrl: string;
+  isLoading?: boolean;
+  className?: string;
+  /** Pick the agent whose install command (or MCP JSON for id='mcp') is shown. Falls back to MCP_AGENTS[0]. */
+  agentId?: string;
+  /** Hide the top "Paste this prompt to setup MCP" card. Used by Other Agents, where users only want raw config. */
+  hideQuickStartPrompt?: boolean;
+}
+
+function buildQuickStartPrompt(agent: MCPAgent, installBody: string) {
+  if (agent.id === 'mcp') {
+    return `I'm using InsForge as my backend platform. Please add the following MCP configuration to enable the InsForge MCP server:\n\n${installBody}\n\nThen ${MCP_VERIFY_CONNECTION_PROMPT.replace(/^I'm using InsForge as my backend platform, /i, '')}`;
+  }
+  return `I'm using InsForge as my backend platform. Please run this command to install the InsForge MCP server:\n\n${installBody}\n\nThen ${MCP_VERIFY_CONNECTION_PROMPT.replace(/^I'm using InsForge as my backend platform, /i, '')}`;
+}
+
+export function DTestMCPSection({
+  apiKey,
+  appUrl,
+  isLoading = false,
+  className,
+  agentId,
+  hideQuickStartPrompt = false,
+}: DTestMCPSectionProps) {
+  const agent = useMemo(() => MCP_AGENTS.find((a) => a.id === agentId) ?? MCP_AGENTS[0], [agentId]);
+
+  // While credentials load, caller may pass a masked placeholder (ik_***…). Treat it
+  // as empty so we never produce a deeplink or copyable install command with fake values.
+  const effectiveApiKey = isLoading ? '' : apiKey;
+
+  const isMcpJson = agent.id === 'mcp';
+  const deeplink = useMemo(
+    () => (effectiveApiKey ? buildMcpDeeplink(agent.id, effectiveApiKey, appUrl) : null),
+    [agent.id, effectiveApiKey, appUrl]
+  );
+
+  const installBody = useMemo(() => {
+    if (isMcpJson) {
+      return JSON.stringify(createMCPConfig(effectiveApiKey, 'macos-linux', appUrl), null, 2);
+    }
+    return GenerateInstallCommand(agent, effectiveApiKey);
+  }, [isMcpJson, agent, effectiveApiKey, appUrl]);
+
+  const quickStartPrompt = useMemo(
+    () => buildQuickStartPrompt(agent, installBody),
+    [agent, installBody]
+  );
+
+  if (deeplink) {
+    return (
+      <div className={cn('flex flex-col gap-3', className)}>
+        <section className="flex flex-col rounded border border-[var(--alpha-8)] bg-card p-6">
+          <Step number={1} title="Install InsForge MCP" description="Install in one click">
+            <InstallDeeplinkButton agent={agent} deeplink={deeplink} />
+          </Step>
+          <Step
+            number={2}
+            title="Verify Connection"
+            description="Send the prompt below to your AI coding agent to verify the connection."
+            isLast
+          >
+            <PastePromptButton agent={agent} prompt={MCP_VERIFY_CONNECTION_PROMPT} />
+          </Step>
+        </section>
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn('flex flex-col gap-3', className)}>
+      {!hideQuickStartPrompt && (
+        <QuickStartPromptCard
+          subtitle={`Paste this into ${agent.displayName} to setup InsForge MCP`}
+          prompt={quickStartPrompt}
+        />
+      )}
+
+      {/* Step by Step card */}
+      <section className="flex flex-col gap-6 rounded border border-[var(--alpha-8)] bg-card p-6">
+        <span className="w-fit rounded bg-[var(--alpha-8)] px-1.5 py-0.5 text-xs font-medium leading-4 text-[rgb(var(--warning))]">
+          Step by Step
+        </span>
+
+        <div className="flex flex-col">
+          <Step
+            number={1}
+            title={isMcpJson ? 'Add MCP Configuration' : 'Install InsForge MCP'}
+            description={
+              isMcpJson
+                ? 'Add this configuration to your MCP settings.'
+                : 'Run the following command in terminal to install InsForge MCP Server'
+            }
+          >
+            <CodeBlock
+              badge={isMcpJson ? 'MCP JSON' : 'terminal command'}
+              code={installBody}
+              isLoading={isLoading}
+              mono
+              scroll={isMcpJson}
+            />
+          </Step>
+
+          <Step
+            number={2}
+            title="Verify Connection"
+            description="Send the prompt below to your AI coding agent to verify the connection."
+            isLast
+          >
+            <CodeBlock badge="prompt" code={MCP_VERIFY_CONNECTION_PROMPT} mono />
+          </Step>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+interface InstallDeeplinkButtonProps {
+  agent: MCPAgent;
+  deeplink: string;
+}
+
+function InstallDeeplinkButton({ agent, deeplink }: InstallDeeplinkButtonProps) {
+  const handleClick = useCallback(() => {
+    window.open(deeplink, '_blank');
+  }, [deeplink]);
+
+  return (
+    <WhiteActionButton
+      onClick={handleClick}
+      agent={agent}
+      label={`Install to ${agent.displayName}`}
+    />
+  );
+}
+
+interface PastePromptButtonProps {
+  agent: MCPAgent;
+  prompt: string;
+}
+
+function PastePromptButton({ agent, prompt }: PastePromptButtonProps) {
+  const deeplink = useMemo(() => buildPromptDeeplink(agent.id, prompt), [agent.id, prompt]);
+
+  const handleClick = useCallback(() => {
+    if (deeplink) {
+      window.open(deeplink, '_blank');
+      return;
+    }
+
+    // Fallback: no deeplink (agent unsupported or URL too long) — copy instead.
+    void (async () => {
+      try {
+        await navigator.clipboard.writeText(prompt);
+      } catch (error) {
+        console.error('Failed to copy MCP verification prompt to clipboard', error);
+      }
+    })();
+  }, [deeplink, prompt]);
+
+  return (
+    <WhiteActionButton
+      onClick={handleClick}
+      agent={agent}
+      label={`Paste Prompt to ${agent.displayName}`}
+    />
+  );
+}
+
+interface WhiteActionButtonProps {
+  onClick: () => void;
+  agent: MCPAgent;
+  label: string;
+}
+
+function WhiteActionButton({ onClick, agent, label }: WhiteActionButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex h-8 w-fit items-center gap-1 rounded bg-white px-1.5 text-sm font-medium text-black transition-opacity hover:opacity-90"
+    >
+      {agent.logo && <div className="flex h-5 w-5 items-center justify-center">{agent.logo}</div>}
+      <span className="px-1">{label}</span>
+    </button>
+  );
+}
+
+interface StepProps {
+  number: number;
+  title: string;
+  description: string;
+  isLast?: boolean;
+  children: React.ReactNode;
+}
+
+function Step({ number, title, description, isLast = false, children }: StepProps) {
+  return (
+    <div className="flex w-full gap-3">
+      {/* Indicator column */}
+      <div className="flex shrink-0 flex-col items-center pt-0.5">
+        <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--alpha-8)] text-xs font-medium leading-4 text-foreground">
+          {number}
+        </div>
+        {!isLast && <div className="mt-1 w-px flex-1 bg-[var(--alpha-8)]" />}
+      </div>
+
+      {/* Content */}
+      <div className={cn('flex min-w-0 flex-1 flex-col gap-3', !isLast && 'pb-6')}>
+        <div className="flex flex-col gap-2">
+          <p className="text-sm font-medium leading-6 text-foreground">{title}</p>
+          <p className="text-sm leading-5 text-muted-foreground">{description}</p>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+interface CodeBlockProps {
+  badge: string;
+  code: string;
+  isLoading?: boolean;
+  mono?: boolean;
+  scroll?: boolean;
+}
+
+function CodeBlock({
+  badge,
+  code,
+  isLoading = false,
+  mono = true,
+  scroll = false,
+}: CodeBlockProps) {
+  return (
+    <div
+      className={cn(
+        'flex flex-col gap-2 rounded border border-[var(--alpha-8)] bg-semantic-1 p-3',
+        isLoading && 'animate-pulse'
+      )}
+    >
+      <div className="flex items-center justify-between">
+        <span className="rounded bg-[var(--alpha-8)] px-2 py-0.5 text-xs font-medium leading-4 text-muted-foreground">
+          {badge}
+        </span>
+        <CopyButton text={code} showText={false} className="shrink-0" />
+      </div>
+      <pre
+        className={cn(
+          'm-0 whitespace-pre-wrap break-all text-sm leading-6 text-foreground',
+          mono && 'font-mono',
+          scroll && 'max-h-[320px] overflow-auto'
+        )}
+      >
+        {code}
+      </pre>
+    </div>
+  );
+}

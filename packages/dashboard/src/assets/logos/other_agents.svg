@@ -1,0 +1,9 @@
+<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M8 13C9.65685 13 11 14.3431 11 16C11 17.6569 9.65685 19 8 19C6.34315 19 5 17.6569 5 16C5 14.3431 6.34315 13 8 13ZM16 13C17.6569 13 19 14.3431 19 16C19 17.6569 17.6569 19 16 19C14.3431 19 13 17.6569 13 16C13 14.3431 14.3431 13 16 13ZM24 13C25.6569 13 27 14.3431 27 16C27 17.6569 25.6569 19 24 19C22.3431 19 21 17.6569 21 16C21 14.3431 22.3431 13 24 13Z" fill="url(#other_agents_gradient)"/>
+  <defs>
+    <linearGradient id="other_agents_gradient" x1="5" y1="13" x2="27" y2="19" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A3A3A3"/>
+      <stop offset="1" stop-color="#6D6D6D"/>
+    </linearGradient>
+  </defs>
+</svg>

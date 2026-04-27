@@ -14,6 +14,7 @@ import { apiClient } from '../api/client';
 import { useAuth } from './AuthContext';
 import { getDashboardBackendUrl } from '../config/runtime';
 import type { SocketMessage } from '@insforge/shared-schemas';
+import { databaseTableQueryKeys } from '../../features/database/queryKeys';
 import { useMcpUsage } from '../../features/logs/hooks/useMcpUsage';
 import { trackPostHog, getFeatureFlag } from '../analytics/posthog';
 
@@ -231,7 +232,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
     (toolName: string) => {
       if (mcpUsageCount === 1) {
         trackPostHog('onboarding_completed', {
-          experiment_variant: getFeatureFlag('dashboard-v3-experiment'),
+          experiment_variant: getFeatureFlag('dashboard-v4-experiment'),
           tool_name: toolName,
         });
       }
@@ -263,14 +264,16 @@ export function SocketProvider({ children }: SocketProviderProps) {
             switch (change.type) {
               case 'tables':
                 // CREATE TABLE / DROP TABLE - affects table list
-                void queryClient.invalidateQueries({ queryKey: ['tables'] });
+                void queryClient.invalidateQueries({ queryKey: databaseTableQueryKeys.list });
                 void queryClient.invalidateQueries({ queryKey: ['metadata', 'full'] });
                 break;
               case 'table':
                 // ALTER TABLE / RENAME - affects specific table and list
-                void queryClient.invalidateQueries({ queryKey: ['tables'] });
+                void queryClient.invalidateQueries({ queryKey: databaseTableQueryKeys.list });
                 if (change.name) {
-                  void queryClient.invalidateQueries({ queryKey: ['table', change.name] });
+                  void queryClient.invalidateQueries({
+                    queryKey: databaseTableQueryKeys.schema(change.name),
+                  });
                 }
                 break;
               case 'records':

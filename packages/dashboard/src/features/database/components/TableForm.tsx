@@ -17,6 +17,7 @@ import { TableFormColumn } from './TableFormColumn';
 import { ForeignKeyPopover } from './ForeignKeyPopover';
 import { ColumnType, TableSchema, UpdateTableSchemaRequest } from '@insforge/shared-schemas';
 import { SYSTEM_FIELDS } from '../helpers';
+import { databaseTableQueryKeys } from '../queryKeys';
 
 const newColumn: TableFormColumnSchema = {
   columnName: '',
@@ -224,7 +225,7 @@ export function TableForm({
     },
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: ['database-metadata'] });
-      void queryClient.invalidateQueries({ queryKey: ['tables'] });
+      void queryClient.invalidateQueries({ queryKey: databaseTableQueryKeys.list });
       void queryClient.invalidateQueries({ queryKey: ['metadata'] });
 
       showToast('Table created successfully!', 'success');
@@ -355,13 +356,20 @@ export function TableForm({
     },
     onSuccess: (_, data) => {
       void queryClient.invalidateQueries({ queryKey: ['database-metadata'] });
-      void queryClient.invalidateQueries({ queryKey: ['tables'] });
+      void queryClient.invalidateQueries({ queryKey: databaseTableQueryKeys.list });
       void queryClient.invalidateQueries({ queryKey: ['metadata'] });
-      void queryClient.invalidateQueries({ queryKey: ['tables', editTable?.tableName, 'schema'] });
-      void queryClient.invalidateQueries({ queryKey: ['tables', data.tableName, 'schema'] });
+      if (editTable?.tableName) {
+        void queryClient.invalidateQueries({
+          queryKey: databaseTableQueryKeys.schema(editTable.tableName),
+        });
+      }
+      if (data.tableName !== editTable?.tableName) {
+        void queryClient.invalidateQueries({
+          queryKey: databaseTableQueryKeys.schema(data.tableName),
+        });
+      }
 
       // Invalidate all table data queries for this table (with all parameter combinations)
-      void queryClient.invalidateQueries({ queryKey: ['table', editTable?.tableName] });
       void queryClient.invalidateQueries({ queryKey: ['records', editTable?.tableName] });
       void queryClient.invalidateQueries({ queryKey: ['records', data.tableName] });
 
@@ -374,9 +382,6 @@ export function TableForm({
       onSuccess?.(data.tableName);
     },
     onError: (err) => {
-      // Invalidate queries to ensure we have fresh data after failed request
-      void queryClient.invalidateQueries({ queryKey: ['table', editTable?.tableName] });
-
       const errorMessage = err.message || 'Failed to update table';
       setError(errorMessage);
       showToast(errorMessage, 'error');

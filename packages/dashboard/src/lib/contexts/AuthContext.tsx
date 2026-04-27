@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import { loginService } from '../../features/login/services/login.service';
+import { databaseTableQueryKeys } from '../../features/database/queryKeys';
 import { useDashboardHost } from '../config/DashboardHostContext';
 import { apiClient } from '../api/client';
 import { getCurrentDistinctId, identifyUser } from '../analytics/posthog';
@@ -65,7 +66,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       queryClient.invalidateQueries({ queryKey: ['apiKey'] }),
       queryClient.invalidateQueries({ queryKey: ['metadata'] }),
       queryClient.invalidateQueries({ queryKey: ['users'] }),
-      queryClient.invalidateQueries({ queryKey: ['tables'] }),
+      queryClient.invalidateQueries({ queryKey: databaseTableQueryKeys.list }),
       queryClient.invalidateQueries({ queryKey: ['mcp-usage'] }),
     ]);
   }, [queryClient]);
