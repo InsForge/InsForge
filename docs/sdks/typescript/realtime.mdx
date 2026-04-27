@@ -51,14 +51,20 @@ Subscribe to a channel to receive events.
 ### Returns
 
 ```typescript
-Promise<{
-  ok: boolean,
-  channel: string,
-  presence?: {
-    members: PresenceMember[]
-  },
-  error?: { code: string, message: string }
-}>
+Promise<
+  | {
+      ok: true,
+      channel: string,
+      presence: {
+        members: PresenceMember[]
+      }
+    }
+  | {
+      ok: false,
+      channel: string,
+      error: { code: string, message: string }
+    }
+>
 ```
 
 <Note>
