@@ -54,6 +54,65 @@ export interface DashboardInstanceInfo {
   }>;
 }
 
+export type DashboardMetricsRange = '1h' | '6h' | '24h' | '3d';
+export type DashboardMetricName =
+  | 'cpu_usage'
+  | 'memory_usage'
+  | 'disk_usage'
+  | 'network_in'
+  | 'network_out';
+
+export interface DashboardMetricDataPoint {
+  timestamp: number; // unix seconds
+  value: number;
+}
+
+export interface DashboardMetricSeries {
+  metric: DashboardMetricName;
+  instanceId?: string;
+  data: DashboardMetricDataPoint[];
+}
+
+export interface DashboardMetricsResponse {
+  range: DashboardMetricsRange;
+  metrics: DashboardMetricSeries[];
+}
+
+export type DashboardMetricsError = { kind: 'unavailable' } | { kind: 'error'; message: string };
+
+export type DashboardAdvisorSeverity = 'critical' | 'warning' | 'info';
+
+export interface DashboardAdvisorSummary {
+  scanId: string;
+  status: 'running' | 'completed' | 'failed';
+  scanType: 'scheduled' | 'manual';
+  scannedAt: string; // ISO
+  summary: { total: number; critical: number; warning: number; info: number };
+}
+
+export interface DashboardAdvisorIssue {
+  id: string;
+  ruleId: string;
+  severity: DashboardAdvisorSeverity;
+  category: 'security' | 'performance' | 'health';
+  title: string;
+  description: string;
+  affectedObject?: string;
+  recommendation?: string;
+  isResolved: boolean;
+}
+
+export interface DashboardAdvisorIssuesResponse {
+  issues: DashboardAdvisorIssue[];
+  total: number;
+}
+
+export interface DashboardAdvisorIssuesQuery {
+  severity?: DashboardAdvisorSeverity;
+  limit?: number;
+  offset?: number;
+}
+
 export interface DashboardProps {
   backendUrl?: string;
   showNavbar?: boolean;
@@ -74,6 +133,12 @@ export interface DashboardProps {
   onUpdateVersion?: () => Promise<void>;
   onRequestUserInfo?: () => Promise<DashboardUserInfo>;
   onRequestUserApiKey?: () => Promise<string>;
+  onRequestProjectMetrics?: (range: DashboardMetricsRange) => Promise<DashboardMetricsResponse>;
+  onRequestAdvisorLatest?: () => Promise<DashboardAdvisorSummary | null>;
+  onRequestAdvisorIssues?: (
+    query: DashboardAdvisorIssuesQuery
+  ) => Promise<DashboardAdvisorIssuesResponse>;
+  onTriggerAdvisorScan?: () => Promise<void>;
 }
 
 export interface SelfHostingDashboardProps extends DashboardProps {

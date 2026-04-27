@@ -5,6 +5,11 @@ import type {
   DashboardInstanceInfo,
   DashboardProjectInfo,
   DashboardUserInfo,
+  DashboardMetricsRange,
+  DashboardMetricsResponse,
+  DashboardAdvisorSummary,
+  DashboardAdvisorIssuesQuery,
+  DashboardAdvisorIssuesResponse,
 } from '@insforge/dashboard';
 
 type InstanceTypeChangeResult = {
@@ -31,7 +36,11 @@ type PendingRequestKey =
   | 'deleteProject'
   | 'updateVersion'
   | 'userInfo'
-  | 'userApiKey';
+  | 'userApiKey'
+  | 'projectMetrics'
+  | 'advisorLatest'
+  | 'advisorIssues'
+  | 'advisorScan';
 
 type PendingRequest<T> = {
   resolve: (value: T) => void;
@@ -53,6 +62,10 @@ type PendingRequestValues = {
   updateVersion: void;
   userInfo: DashboardUserInfo;
   userApiKey: string;
+  projectMetrics: DashboardMetricsResponse;
+  advisorLatest: DashboardAdvisorSummary;
+  advisorIssues: DashboardAdvisorIssuesResponse;
+  advisorScan: void;
 };
 
 type PendingRequests = {
@@ -229,6 +242,21 @@ export function useCloudHosting() {
           return;
         case 'userApiKey':
           pendingRequestsRef.current.userApiKey = pendingRequest as PendingRequest<string>;
+          return;
+        case 'projectMetrics':
+          pendingRequestsRef.current.projectMetrics =
+            pendingRequest as PendingRequest<DashboardMetricsResponse>;
+          return;
+        case 'advisorLatest':
+          pendingRequestsRef.current.advisorLatest =
+            pendingRequest as PendingRequest<DashboardAdvisorSummary>;
+          return;
+        case 'advisorIssues':
+          pendingRequestsRef.current.advisorIssues =
+            pendingRequest as PendingRequest<DashboardAdvisorIssuesResponse>;
+          return;
+        case 'advisorScan':
+          pendingRequestsRef.current.advisorScan = pendingRequest as PendingRequest<void>;
           return;
       }
     },
@@ -535,6 +563,122 @@ export function useCloudHosting() {
           );
           return;
         }
+        case 'PROJECT_METRICS': {
+          const range = (
+            typeof message.range === 'string' ? message.range : '1h'
+          ) as DashboardMetricsRange;
+          const metrics = Array.isArray(message.metrics)
+            ? message.metrics.map((entry: unknown) => {
+                const m = entry as Record<string, unknown>;
+                return {
+                  metric: m.metric as DashboardMetricsResponse['metrics'][number]['metric'],
+                  instanceId: typeof m.instanceId === 'string' ? m.instanceId : undefined,
+                  data: Array.isArray(m.data)
+                    ? (m.data as Array<{ timestamp: number; value: number }>)
+                    : [],
+                };
+              })
+            : [];
+          resolvePendingRequest('projectMetrics', { range, metrics });
+          return;
+        }
+        case 'PROJECT_METRICS_ERROR': {
+          rejectPendingRequest(
+            'projectMetrics',
+            message.code === 'unavailable'
+              ? 'METRICS_UNAVAILABLE'
+              : getErrorMessage(message.error, 'Failed to load metrics')
+          );
+          return;
+        }
+        case 'ADVISOR_LATEST': {
+          resolvePendingRequest('advisorLatest', {
+            scanId: typeof message.scanId === 'string' ? message.scanId : '',
+            status:
+              message.status === 'running' || message.status === 'failed'
+                ? message.status
+                : 'completed',
+            scanType: message.scanType === 'manual' ? 'manual' : 'scheduled',
+            scannedAt: typeof message.scannedAt === 'string' ? message.scannedAt : '',
+            summary: {
+              total:
+                typeof (message.summary as Record<string, unknown>)?.total === 'number'
+                  ? ((message.summary as Record<string, unknown>).total as number)
+                  : 0,
+              critical:
+                typeof (message.summary as Record<string, unknown>)?.critical === 'number'
+                  ? ((message.summary as Record<string, unknown>).critical as number)
+                  : 0,
+              warning:
+                typeof (message.summary as Record<string, unknown>)?.warning === 'number'
+                  ? ((message.summary as Record<string, unknown>).warning as number)
+                  : 0,
+              info:
+                typeof (message.summary as Record<string, unknown>)?.info === 'number'
+                  ? ((message.summary as Record<string, unknown>).info as number)
+                  : 0,
+            },
+          });
+          return;
+        }
+        case 'ADVISOR_LATEST_ERROR': {
+          rejectPendingRequest(
+            'advisorLatest',
+            getErrorMessage(message.error, 'Failed to load advisor summary')
+          );
+          return;
+        }
+        case 'ADVISOR_ISSUES': {
+          const issues = Array.isArray(message.issues)
+            ? message.issues.map((entry: unknown) => {
+                const i = entry as Record<string, unknown>;
+                return {
+                  id: typeof i.id === 'string' ? i.id : '',
+                  ruleId: typeof i.ruleId === 'string' ? i.ruleId : '',
+                  severity: (i.severity === 'critical' ||
+                  i.severity === 'warning' ||
+                  i.severity === 'info'
+                    ? i.severity
+                    : 'info') as DashboardAdvisorIssuesResponse['issues'][number]['severity'],
+                  category: (i.category === 'security' ||
+                  i.category === 'performance' ||
+                  i.category === 'health'
+                    ? i.category
+                    : 'security') as DashboardAdvisorIssuesResponse['issues'][number]['category'],
+                  title: typeof i.title === 'string' ? i.title : '',
+                  description: typeof i.description === 'string' ? i.description : '',
+                  affectedObject:
+                    typeof i.affectedObject === 'string' ? i.affectedObject : undefined,
+                  recommendation:
+                    typeof i.recommendation === 'string' ? i.recommendation : undefined,
+                  isResolved: !!i.isResolved,
+                };
+              })
+            : [];
+          resolvePendingRequest('advisorIssues', {
+            issues,
+            total: typeof message.total === 'number' ? message.total : issues.length,
+          });
+          return;
+        }
+        case 'ADVISOR_ISSUES_ERROR': {
+          rejectPendingRequest(
+            'advisorIssues',
+            getErrorMessage(message.error, 'Failed to load advisor issues')
+          );
+          return;
+        }
+        case 'ADVISOR_SCAN_RESULT': {
+          if (message.success === true) {
+            resolvePendingRequest('advisorScan', undefined);
+            return;
+          }
+          rejectPendingRequest(
+            'advisorScan',
+            getErrorMessage(message.error, 'Failed to trigger advisor scan')
+          );
+          return;
+        }
         default:
           return;
       }
@@ -680,6 +824,47 @@ export function useCloudHosting() {
     return createPendingRequest('userApiKey', 'User API key request');
   }, [createPendingRequest, postMessageToParent]);
 
+  const requestProjectMetrics = useCallback(
+    async (range: DashboardMetricsRange): Promise<DashboardMetricsResponse> => {
+      if (!postMessageToParent({ type: 'REQUEST_PROJECT_METRICS', range })) {
+        throw new Error('Unable to request project metrics from the parent window');
+      }
+      return createPendingRequest('projectMetrics', 'Project metrics request');
+    },
+    [createPendingRequest, postMessageToParent]
+  );
+
+  const requestAdvisorLatest = useCallback(async (): Promise<DashboardAdvisorSummary> => {
+    if (!postMessageToParent({ type: 'REQUEST_ADVISOR_LATEST' })) {
+      throw new Error('Unable to request advisor summary from the parent window');
+    }
+    return createPendingRequest('advisorLatest', 'Advisor latest request');
+  }, [createPendingRequest, postMessageToParent]);
+
+  const requestAdvisorIssues = useCallback(
+    async (query: DashboardAdvisorIssuesQuery): Promise<DashboardAdvisorIssuesResponse> => {
+      if (
+        !postMessageToParent({
+          type: 'REQUEST_ADVISOR_ISSUES',
+          severity: query.severity,
+          limit: query.limit,
+          offset: query.offset,
+        })
+      ) {
+        throw new Error('Unable to request advisor issues from the parent window');
+      }
+      return createPendingRequest('advisorIssues', 'Advisor issues request');
+    },
+    [createPendingRequest, postMessageToParent]
+  );
+
+  const triggerAdvisorScan = useCallback(async (): Promise<void> => {
+    if (!postMessageToParent({ type: 'TRIGGER_ADVISOR_SCAN' })) {
+      throw new Error('Unable to trigger advisor scan from the parent window');
+    }
+    return createPendingRequest('advisorScan', 'Advisor scan trigger');
+  }, [createPendingRequest, postMessageToParent]);
+
   const navigateToSubscription = useCallback(() => {
     void postMessageToParent({ type: 'NAVIGATE_TO_SUBSCRIPTION' });
   }, [postMessageToParent]);
@@ -708,5 +893,9 @@ export function useCloudHosting() {
     navigateToSubscription,
     requestUserInfo,
     requestUserApiKey,
+    requestProjectMetrics,
+    requestAdvisorLatest,
+    requestAdvisorIssues,
+    triggerAdvisorScan,
   };
 }
