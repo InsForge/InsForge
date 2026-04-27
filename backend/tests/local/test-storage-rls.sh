@@ -40,16 +40,26 @@ BOB_EMAIL="bob-rls-$TS@example.com"
 #   3. Local-dev fallback: scrape ik_… from a known container's logs
 API_KEY="${TEST_API_KEY:-${ACCESS_API_KEY:-}}"
 if [ -z "$API_KEY" ]; then
-  ADMIN_TOKEN=$(get_admin_token 2>/dev/null || true)
+  # Use the same admin login + /metadata/api-key fallback that
+  # test-public-bucket.sh uses (proven to work in CI). grep+cut over
+  # python3 to avoid an extra runtime dependency on the parser.
+  ADMIN_TOKEN=$(get_admin_token)
   if [ -n "$ADMIN_TOKEN" ]; then
-    API_KEY=$(curl -sS "$API/metadata/api-key" -H "Authorization: Bearer $ADMIN_TOKEN" \
-      | python3 -c 'import sys,json; print(json.load(sys.stdin).get("apiKey",""))' 2>/dev/null || true)
+    API_KEY_RESPONSE=$(curl -sS "$API/metadata/api-key" -H "Authorization: Bearer $ADMIN_TOKEN")
+    API_KEY=$(echo "$API_KEY_RESPONSE" | grep -o '"apiKey":"[^"]*' | cut -d'"' -f4)
   fi
 fi
 if [ -z "$API_KEY" ] && command -v docker >/dev/null 2>&1; then
   API_KEY=$(docker logs ba-sdk-test-insforge-1 2>&1 | grep -oE 'ik_[a-f0-9]+' | tail -1 || true)
 fi
-[ -z "$API_KEY" ] && { print_fail "Could not get API key (set TEST_API_KEY or ACCESS_API_KEY)"; exit 1; }
+if [ -z "$API_KEY" ]; then
+  print_fail "Could not get API key (set TEST_API_KEY or ACCESS_API_KEY)"
+  print_info "  TEST_API_BASE=$TEST_API_BASE"
+  print_info "  TEST_ADMIN_EMAIL=$TEST_ADMIN_EMAIL"
+  print_info "  ADMIN_TOKEN length=${#ADMIN_TOKEN}"
+  print_info "  /metadata/api-key response (first 200 chars): ${API_KEY_RESPONSE:0:200}"
+  exit 1
+fi
 # Export so the test-config.sh cleanup trap can delete buckets.
 export ACCESS_API_KEY="$API_KEY"
 
