@@ -1,11 +1,16 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Copy, Loader2, RotateCw } from 'lucide-react';
 import { useAdvisorIssues, useAdvisorLatest, useTriggerAdvisorScan } from '../../hooks/useAdvisor';
-import type { DashboardAdvisorSeverity } from '../../../../types';
+import type { DashboardAdvisorIssue, DashboardAdvisorSeverity } from '../../../../types';
+import { useDashboardHost } from '../../../../lib/config/DashboardHostContext';
 import { useToast } from '../../../../lib/hooks/useToast';
+import { usePageSize } from '../../../../lib/hooks/usePageSize';
+import { PaginationControls } from '../../../../components';
 import { AdvisoryItem } from './AdvisoryItem';
 import { AdvisoryTabs, type AdvisoryTabValue } from './AdvisoryTabs';
 import { SeveritySummary } from './SeveritySummary';
+
+const ADVISOR_FETCH_PAGE_SIZE = 100;
 
 function formatRelative(iso: string | undefined): string {
   if (!iso) {
@@ -35,17 +40,26 @@ const ADVISOR_BUTTON_CLASS =
 
 export function BackendAdvisorSection() {
   const [tab, setTab] = useState<AdvisoryTabValue>('all');
-  const latest = useAdvisorLatest();
+  const { pageSize, pageSizeOptions, onPageSizeChange } = usePageSize('advisor-issues');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Reset to first page when severity filter or page size changes.
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [tab, pageSize]);
+
   const issuesQuery = useMemo(
     () => ({
       severity: tab === 'all' ? undefined : (tab as DashboardAdvisorSeverity),
-      limit: 50,
-      offset: 0,
+      limit: pageSize,
+      offset: (currentPage - 1) * pageSize,
     }),
-    [tab]
+    [tab, pageSize, currentPage]
   );
+  const latest = useAdvisorLatest();
   const issues = useAdvisorIssues(issuesQuery);
   const trigger = useTriggerAdvisorScan();
+  const host = useDashboardHost();
   const { showToast } = useToast();
 
   const handleRunScan = () => {
@@ -61,19 +75,41 @@ export function BackendAdvisorSection() {
 
   const summary = latest.data?.summary;
   const lastScanLabel = formatRelative(latest.data?.scannedAt);
+  const totalRecords = issues.data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
 
   const handleCopyAll = async () => {
-    const blocks = (issues.data?.issues ?? [])
-      .filter((issue) => issue.recommendation)
-      .map(
-        (issue) =>
-          `-- ${issue.ruleId}\n-- ${issue.title}${issue.affectedObject ? ` (${issue.affectedObject})` : ''}\n${issue.recommendation}`
-      );
-    if (blocks.length === 0) {
+    const fetcher = host.onRequestAdvisorIssues;
+    if (!fetcher || totalRecords === 0) {
       showToast('Nothing to copy', 'info');
       return;
     }
     try {
+      // Backend zod caps `limit` at 100, so paginate across the full result set
+      // instead of relying on the displayed page.
+      const severity = tab === 'all' ? undefined : (tab as DashboardAdvisorSeverity);
+      const all: DashboardAdvisorIssue[] = [];
+      for (let offset = 0; offset < totalRecords; offset += ADVISOR_FETCH_PAGE_SIZE) {
+        const page = await fetcher({
+          severity,
+          limit: ADVISOR_FETCH_PAGE_SIZE,
+          offset,
+        });
+        all.push(...page.issues);
+        if (page.issues.length < ADVISOR_FETCH_PAGE_SIZE) {
+          break;
+        }
+      }
+      const blocks = all
+        .filter((issue) => issue.recommendation)
+        .map(
+          (issue) =>
+            `-- ${issue.ruleId}\n-- ${issue.title}${issue.affectedObject ? ` (${issue.affectedObject})` : ''}\n${issue.recommendation}`
+        );
+      if (blocks.length === 0) {
+        showToast('No remediations available', 'info');
+        return;
+      }
       await navigator.clipboard.writeText(blocks.join('\n\n'));
       showToast(`Copied ${blocks.length} remediation${blocks.length === 1 ? '' : 's'}`, 'success');
     } catch {
@@ -135,6 +171,21 @@ export function BackendAdvisorSection() {
           </div>
         )}
       </div>
+
+      {totalRecords > 0 && (
+        <PaginationControls
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          totalRecords={totalRecords}
+          pageSize={pageSize}
+          pageSizeOptions={pageSizeOptions}
+          onPageSizeChange={(size) => {
+            onPageSizeChange(size);
+          }}
+          recordLabel="issues"
+        />
+      )}
     </section>
   );
 }

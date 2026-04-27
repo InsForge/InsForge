@@ -322,11 +322,20 @@ export function useCloudHosting() {
   }, []);
 
   const createPendingRequest = useCallback(
-    <K extends PendingRequestKey>(key: K, actionLabel: string, timeoutMs = DEFAULT_TIMEOUT_MS) =>
+    <K extends PendingRequestKey>(
+      key: K,
+      actionLabel: string,
+      options?: { timeoutMs?: number; supersede?: boolean }
+    ) =>
       new Promise<PendingRequestValues[K]>((resolve, reject) => {
+        const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
         if (pendingRequestsRef.current[key]) {
-          reject(new Error(`${actionLabel} is already in progress`));
-          return;
+          if (options?.supersede) {
+            rejectPendingRequest(key, `${actionLabel} superseded by newer request`);
+          } else {
+            reject(new Error(`${actionLabel} is already in progress`));
+            return;
+          }
         }
 
         const timeoutId = window.setTimeout(() => {
@@ -801,11 +810,9 @@ export function useCloudHosting() {
         throw new Error('Unable to request an instance type change from the parent window');
       }
 
-      return createPendingRequest(
-        'instanceTypeChange',
-        'Instance type change',
-        INSTANCE_CHANGE_TIMEOUT_MS
-      );
+      return createPendingRequest('instanceTypeChange', 'Instance type change', {
+        timeoutMs: INSTANCE_CHANGE_TIMEOUT_MS,
+      });
     },
     [createPendingRequest, postMessageToParent]
   );
@@ -856,7 +863,9 @@ export function useCloudHosting() {
       if (!postMessageToParent({ type: 'REQUEST_PROJECT_METRICS', range })) {
         throw new Error('Unable to request project metrics from the parent window');
       }
-      return createPendingRequest('projectMetrics', 'Project metrics request');
+      return createPendingRequest('projectMetrics', 'Project metrics request', {
+        supersede: true,
+      });
     },
     [createPendingRequest, postMessageToParent]
   );
@@ -880,7 +889,9 @@ export function useCloudHosting() {
       ) {
         throw new Error('Unable to request advisor issues from the parent window');
       }
-      return createPendingRequest('advisorIssues', 'Advisor issues request');
+      return createPendingRequest('advisorIssues', 'Advisor issues request', {
+        supersede: true,
+      });
     },
     [createPendingRequest, postMessageToParent]
   );
