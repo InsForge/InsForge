@@ -1,20 +1,29 @@
 import { EmailProvider } from '@/providers/email/base.provider.js';
 import { CloudEmailProvider } from '@/providers/email/cloud.provider.js';
 import { SmtpEmailProvider } from '@/providers/email/smtp.provider.js';
+import { ResendEmailProvider } from '@/providers/email/resend.provider.js';
 import { SmtpConfigService, RawSmtpConfig } from '@/services/email/smtp-config.service.js';
+import { ResendConfigService } from '@/services/email/resend-config.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { EmailTemplate } from '@/types/email.js';
 import { SendRawEmailRequest } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 
+interface ResolvedProvider {
+  provider: EmailProvider;
+  smtpConfig: RawSmtpConfig | null;
+}
+
 /**
- * Email service — resolves provider per-call so SMTP config changes take effect without restart
+ * Email service — resolves provider per-call so config changes take effect without restart.
+ * Priority: Resend (if enabled) > SMTP (if enabled) > Cloud (default)
  */
 export class EmailService {
   private static instance: EmailService;
   private cloudProvider = new CloudEmailProvider();
   private smtpProvider = new SmtpEmailProvider();
+  private resendProvider = new ResendEmailProvider();
   private lastEmailSentAt = new Map<string, number>();
 
   private constructor() {
@@ -28,18 +37,20 @@ export class EmailService {
     return EmailService.instance;
   }
 
-  private async resolveProvider(): Promise<[EmailProvider, RawSmtpConfig | null]> {
-    try {
-      const smtpConfig = await SmtpConfigService.getInstance().getRawSmtpConfig();
-      if (smtpConfig) {
-        return [this.smtpProvider, smtpConfig];
-      }
-    } catch (error) {
-      logger.warn('Error checking SMTP config, falling back to cloud provider', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
+  private async resolveProvider(): Promise<ResolvedProvider> {
+    // Resend takes priority — simplest setup (just API key)
+    const resendConfig = await ResendConfigService.getInstance().getRawResendConfig();
+    if (resendConfig) {
+      return { provider: this.resendProvider, smtpConfig: null };
     }
-    return [this.cloudProvider, null];
+
+    // SMTP fallback
+    const smtpConfig = await SmtpConfigService.getInstance().getRawSmtpConfig();
+    if (smtpConfig) {
+      return { provider: this.smtpProvider, smtpConfig };
+    }
+
+    return { provider: this.cloudProvider, smtpConfig: null };
   }
 
   // -------------------------------------------------------------------------
@@ -88,7 +99,7 @@ export class EmailService {
     template: EmailTemplate,
     variables?: Record<string, string>
   ): Promise<void> {
-    const [provider, smtpConfig] = await this.resolveProvider();
+    const { provider, smtpConfig } = await this.resolveProvider();
 
     if (smtpConfig) {
       this.checkMinInterval(email, smtpConfig.minIntervalSeconds);
@@ -102,7 +113,7 @@ export class EmailService {
   }
 
   public async sendRaw(options: SendRawEmailRequest): Promise<void> {
-    const [provider, smtpConfig] = await this.resolveProvider();
+    const { provider, smtpConfig } = await this.resolveProvider();
 
     const recipients = Array.isArray(options.to) ? options.to : [options.to];
 
