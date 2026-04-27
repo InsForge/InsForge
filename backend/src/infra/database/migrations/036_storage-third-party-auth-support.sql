@@ -76,8 +76,6 @@ AS $$
   )::jsonb
 $$;
 
-COMMENT ON FUNCTION auth.uid() IS 'Deprecated for third-party auth. Use auth.jwt() ->> ''sub'' instead — auth.uid() coerces to uuid which fails on non-UUID subs (Better Auth, Clerk, Auth0, etc.).';
-
 -- 5. Enable RLS and ship safe defaults.
 --
 -- Default policies are owner-only on every CRUD operation, matching the
