@@ -1,18 +1,24 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronUp, Copy } from 'lucide-react';
 import type { DashboardAdvisorIssue } from '../../../../types';
-import { SEVERITY_ICONS } from './severityIcons';
+import CriticalIcon from '../../../../assets/icons/severity_critical.svg?react';
+import InfoIcon from '../../../../assets/icons/severity_info.svg?react';
+import WarningIcon from '../../../../assets/icons/severity_warning.svg?react';
 
 interface AdvisoryItemProps {
   issue: DashboardAdvisorIssue;
 }
 
-const SEVERITY_ICON = SEVERITY_ICONS;
+const SEVERITY_ICON = {
+  critical: CriticalIcon,
+  warning: WarningIcon,
+  info: InfoIcon,
+} as const;
 
 const SEVERITY_TONE = {
-  critical: 'text-red-500',
-  warning: 'text-amber-500',
-  info: 'text-sky-500',
+  critical: 'text-destructive',
+  warning: 'text-warning',
+  info: 'text-info',
 } as const;
 
 export function AdvisoryItem({ issue }: AdvisoryItemProps) {

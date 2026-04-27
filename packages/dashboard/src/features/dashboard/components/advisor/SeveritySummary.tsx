@@ -1,5 +1,7 @@
 import type { DashboardAdvisorSummary } from '../../../../types';
-import { CriticalIcon, InfoIcon, WarningIcon } from './severityIcons';
+import CriticalIcon from '../../../../assets/icons/severity_critical.svg?react';
+import InfoIcon from '../../../../assets/icons/severity_info.svg?react';
+import WarningIcon from '../../../../assets/icons/severity_warning.svg?react';
 
 interface SeveritySummaryProps {
   summary?: DashboardAdvisorSummary['summary'];
@@ -10,22 +12,22 @@ const TILES = [
     key: 'critical' as const,
     label: 'Critical',
     Icon: CriticalIcon,
-    iconColor: 'text-red-500',
-    iconBg: 'bg-red-500/20',
+    iconColor: 'text-destructive',
+    iconBg: 'bg-destructive/20',
   },
   {
     key: 'warning' as const,
     label: 'Warnings',
     Icon: WarningIcon,
-    iconColor: 'text-amber-500',
-    iconBg: 'bg-amber-500/20',
+    iconColor: 'text-warning',
+    iconBg: 'bg-warning/20',
   },
   {
     key: 'info' as const,
     label: 'Info',
     Icon: InfoIcon,
-    iconColor: 'text-sky-500',
-    iconBg: 'bg-sky-500/20',
+    iconColor: 'text-info',
+    iconBg: 'bg-info/20',
   },
 ];
 
