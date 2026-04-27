@@ -85,10 +85,8 @@ if (response.ok) {
   console.log('Subscribed to:', response.channel)
   console.log('Members already present:', response.presence.members)
 } else {
-  console.error('Failed:', response.error?.message)
+  console.error('Failed:', response.error.message)
 }
-
-const response = await insforge.realtime.subscribe('orders:456')
 ```
 
 ### Output (Success)
