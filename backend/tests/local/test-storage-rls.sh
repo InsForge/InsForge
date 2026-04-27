@@ -69,6 +69,23 @@ if command -v psql >/dev/null 2>&1 && [ -n "$DATABASE_URL" ]; then
   HAVE_PSQL=1
 fi
 
+PATH_BUCKET="rls-path-$TS"
+
+# Restore the default policy on any exit — leaves a shared DB clean even
+# on early failure.
+restore_default_storage_policies() {
+  [ "$HAVE_PSQL" = "1" ] || return 0
+  psql "$DATABASE_URL" >/dev/null 2>&1 <<SQL || true
+DROP POLICY IF EXISTS storage_objects_public_read_test ON storage.objects;
+DROP POLICY IF EXISTS storage_objects_path_select ON storage.objects;
+DROP POLICY IF EXISTS storage_objects_owner_select ON storage.objects;
+CREATE POLICY storage_objects_owner_select ON storage.objects
+  FOR SELECT TO authenticated
+  USING (uploaded_by = (SELECT auth.jwt() ->> 'sub'));
+SQL
+}
+trap restore_default_storage_policies EXIT
+
 assert_count() {
   local label="$1" expected="$2" actual="$3"
   if [ "$expected" = "$actual" ]; then
@@ -86,11 +103,15 @@ list_count() {
 
 upload() {
   local jwt="$1" bucket="$2" key="$3" content="$4"
-  echo "$content" > /tmp/_rls_$TS.txt
-  local code=$(curl -sS -o /dev/null -w "%{http_code}" -X PUT \
+  echo "$content" > "/tmp/_rls_$TS.txt"
+  # Split decl from assignment so curl's exit status isn't masked by `local`.
+  local code rc
+  code=$(curl -sS -o /dev/null -w "%{http_code}" -X PUT \
     "$API/storage/buckets/$bucket/objects/$key" \
     -H "Authorization: Bearer $jwt" -F "file=@/tmp/_rls_$TS.txt")
-  rm -f /tmp/_rls_$TS.txt
+  rc=$?
+  rm -f "/tmp/_rls_$TS.txt"
+  [ $rc -ne 0 ] && return $rc
   echo "$code"
 }
 
@@ -198,7 +219,6 @@ if [ "$HAVE_PSQL" = "1" ]; then
   print_blue "
 3. Path-based RLS (storage.foldername)"
 
-  PATH_BUCKET="rls-path-$TS"
   register_test_bucket "$PATH_BUCKET"
   curl -sS -X POST "$API/storage/buckets" \
     -H "Authorization: Bearer $API_KEY" -H "Content-Type: application/json" \
@@ -211,12 +231,15 @@ if [ "$HAVE_PSQL" = "1" ]; then
   assert_count "Bob upload bob/note"     "201" \
     "$(upload "$BOB_JWT"   "$PATH_BUCKET" "${BOB_ID}/note.txt" bob)"
 
-  # Now layer a path-based policy and verify the helper works in production
+  # Scoped to $PATH_BUCKET so concurrent runs on other buckets aren't affected.
   psql "$DATABASE_URL" >/dev/null <<SQL
 DROP POLICY IF EXISTS storage_objects_owner_select ON storage.objects;
 CREATE POLICY storage_objects_path_select ON storage.objects
   FOR SELECT TO authenticated
-  USING ((storage.foldername(key))[1] = (SELECT auth.jwt() ->> 'sub'));
+  USING (
+    bucket = '$PATH_BUCKET'
+    AND (storage.foldername(key))[1] = (SELECT auth.jwt() ->> 'sub')
+  );
 SQL
 
   assert_count "Alice list (path policy)" "1" "$(list_count "$ALICE_JWT" "$PATH_BUCKET")"

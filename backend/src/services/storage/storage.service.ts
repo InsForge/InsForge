@@ -239,20 +239,27 @@ export class StorageService {
     this.validateBucketName(bucket);
     this.validateKey(key);
 
-    // RLS handles ownership: non-owners delete zero rows. Admin connections
-    // (postgres role) bypass RLS and can delete any row.
-    const deleted = await withUserContext(this.getPool(), ctx, async (db) => {
+    // RLS-gated SELECT first; if the caller can't see the row we abort
+    // before touching the provider. Provider delete then DB delete in
+    // that order — a provider failure leaves both sides intact and a
+    // retry resolves cleanly, whereas DB-first would orphan the blob.
+    return withUserContext(this.getPool(), ctx, async (db) => {
+      const found = await db.query('SELECT 1 FROM storage.objects WHERE bucket = $1 AND key = $2', [
+        bucket,
+        key,
+      ]);
+      if ((found.rowCount ?? 0) === 0) {
+        return false;
+      }
+
+      await this.provider.deleteObject(bucket, key);
+
       const result = await db.query('DELETE FROM storage.objects WHERE bucket = $1 AND key = $2', [
         bucket,
         key,
       ]);
-      return result.rowCount !== null && result.rowCount > 0;
+      return (result.rowCount ?? 0) > 0;
     });
-
-    if (deleted) {
-      await this.provider.deleteObject(bucket, key);
-    }
-    return deleted;
   }
 
   async listObjects(

@@ -111,12 +111,17 @@ describe('withUserContext', () => {
       })
     ).rejects.toThrow('boom');
 
-    const sequence = calls.map((c) => c.sql);
-    expect(sequence).toContain('BEGIN');
-    expect(sequence).toContain('ROLLBACK');
-    expect(sequence).toContain('RESET ROLE');
-    // No COMMIT happened
-    expect(sequence).not.toContain('COMMIT');
+    // Pin the exact sequence — flipping order or skipping RESET ROLE
+    // silently leaks role state across the pool.
+    expect(calls.map((c) => c.sql)).toEqual([
+      'BEGIN',
+      'SET LOCAL ROLE authenticated',
+      "SELECT set_config('request.jwt.claims', $1, true)",
+      "SELECT set_config('request.jwt.claim.sub', $1, true)",
+      "SELECT set_config('request.jwt.claim.role', $1, true)",
+      'ROLLBACK',
+      'RESET ROLE',
+    ]);
     expect(client.release).toHaveBeenCalledOnce();
   });
 
@@ -137,6 +142,7 @@ describe('withUserContext', () => {
 
     await withUserContext(pool, { userId: 'u1', role: 'authenticated' }, async () => {});
 
+    expect(calls.map((c) => c.sql)).toContain('RESET ROLE');
     expect(client.release).toHaveBeenCalledOnce();
   });
 });
