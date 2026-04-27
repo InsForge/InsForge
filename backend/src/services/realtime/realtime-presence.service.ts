@@ -91,7 +91,7 @@ export class RealtimePresenceService {
 
     const removedMembers: Array<{ roomName: string; member: PresenceMember }> = [];
 
-    for (const roomName of rooms.keys()) {
+    for (const roomName of [...rooms.keys()]) {
       const member = this.removeSocketFromRoom(roomName, socketId);
       if (member) {
         removedMembers.push({ roomName, member });

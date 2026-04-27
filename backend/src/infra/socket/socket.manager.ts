@@ -4,7 +4,6 @@ import logger from '@/utils/logger.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { ServerEvents, ClientEvents, SocketMetadata, NotificationPayload } from '@/types/socket.js';
 import type {
-  PresenceIdentityType,
   SubscribeChannelPayload,
   PublishEventPayload,
   SocketMessage,
@@ -308,12 +307,8 @@ export class SocketManager {
         metadata.subscriptions.add(roomName);
       }
 
-      const presenceType =
-        (socket.data.presenceType as PresenceIdentityType | undefined) ??
-        (userId ? 'user' : 'anonymous');
-
       const presence =
-        presenceType === 'user' && userId
+        socket.data.presenceType === 'user' && userId
           ? presenceService.trackMember(roomName, socket.id, {
               type: 'user',
               presenceId: userId,
