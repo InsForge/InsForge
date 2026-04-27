@@ -2,12 +2,7 @@ import { Server as HttpServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import logger from '@/utils/logger.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
-import {
-  ServerEvents,
-  ClientEvents,
-  SocketMetadata,
-  NotificationPayload,
-} from '@/types/socket.js';
+import { ServerEvents, ClientEvents, SocketMetadata, NotificationPayload } from '@/types/socket.js';
 import type {
   PresenceIdentityType,
   SubscribeChannelPayload,
