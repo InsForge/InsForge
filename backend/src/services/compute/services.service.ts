@@ -630,6 +630,58 @@ export class ComputeServicesService {
           ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED
         );
       }
+    } else if (data.imageUrl && existing.flyAppId && !existing.flyMachineId) {
+      // Path A: prepareForDeploy created the app + DB row but no machine.
+      // CLI has now docker-pushed the image and is telling us to launch.
+      const existingRow = await this.getPool().query(
+        `SELECT env_vars_encrypted FROM compute.services WHERE id = $1`,
+        [id]
+      );
+      const existingEnvVarsEncrypted: string | null =
+        existingRow.rows[0]?.env_vars_encrypted ?? null;
+      const envVars = data.envVars ?? this.decryptEnvVars(existingEnvVarsEncrypted);
+      try {
+        const { machineId } = await this.getCompute().launchMachine({
+          appId: existing.flyAppId,
+          image: data.imageUrl,
+          port: data.port ?? existing.port,
+          cpu: data.cpu ?? existing.cpu,
+          memory: data.memory ?? existing.memory,
+          envVars,
+          region: data.region ?? existing.region,
+        });
+        // Persist machine id + flip status alongside the field updates below.
+        updates.push(`fly_machine_id = $${paramIdx++}`);
+        values.push(machineId);
+        updates.push(`status = $${paramIdx++}`);
+        values.push('running');
+        updates.push(`endpoint_url = $${paramIdx++}`);
+        values.push(makeEndpointUrl(existing.flyAppId));
+        logger.info('Compute service machine launched (Path A)', { id, machineId });
+      } catch (error) {
+        logger.error('Failed to launch machine on Fly (Path A)', { id, error });
+        if (error instanceof AppError) {
+          let parsed: { code?: string; error?: string; nextActions?: string[] } | undefined;
+          try {
+            parsed = JSON.parse(error.message);
+          } catch {
+            parsed = undefined;
+          }
+          throw new AppError(
+            parsed?.error ?? error.message,
+            error.statusCode,
+            (parsed?.code as keyof typeof ERROR_CODES & string) ??
+              error.code ??
+              ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED,
+            parsed?.nextActions?.join('; ')
+          );
+        }
+        throw new AppError(
+          error instanceof Error ? error.message : 'Compute service operation failed',
+          502,
+          ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED
+        );
+      }
     }
 
     // Fly accepted the update (or no Fly update was needed) — now commit to DB
