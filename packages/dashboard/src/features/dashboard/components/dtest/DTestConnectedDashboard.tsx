@@ -9,7 +9,6 @@ import { useUsers } from '../../../auth';
 import { isInsForgeCloudProject } from '../../../../lib/utils/utils';
 import { useMcpUsage } from '../../../logs/hooks/useMcpUsage';
 import { DashboardPromptStepper } from './DashboardPromptStepper';
-import { useDTestView } from './DTestViewContext';
 
 export function DTestConnectedDashboard() {
   const navigate = useNavigate();
@@ -24,7 +23,6 @@ export function DTestConnectedDashboard() {
   const { projectInfo } = useCloudProjectInfo();
   const { totalUsers } = useUsers();
   const { hasCompletedOnboarding } = useMcpUsage();
-  const { setView } = useDTestView();
 
   const projectName = isCloudProject
     ? projectInfo.name || 'My InsForge Project'
@@ -78,7 +76,7 @@ export function DTestConnectedDashboard() {
             </p>
             <button
               type="button"
-              onClick={() => setView('install')}
+              onClick={() => void navigate('/dashboard/install')}
               className="flex items-center gap-1 rounded bg-emerald-300 p-2 text-sm font-medium leading-5 text-black transition-colors hover:bg-emerald-400"
             >
               <Download className="h-5 w-5" aria-hidden="true" />

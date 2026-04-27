@@ -1,7 +1,6 @@
+import { Navigate } from 'react-router-dom';
 import { Skeleton } from '../../../components';
-import { useDTestView } from '../components/dtest/DTestViewContext';
-import { InstallInsForgePage } from '../components/dtest/InstallInsForgePage';
-import { ClientDetailPage } from '../components/dtest/ClientDetailPage';
+import { useMcpUsage } from '../../logs/hooks/useMcpUsage';
 import { DTestConnectedDashboard } from '../components/dtest/DTestConnectedDashboard';
 
 function DTestLoadingState() {
@@ -18,22 +17,14 @@ function DTestLoadingState() {
 }
 
 export default function DTestDashboardPage() {
-  const { view, setView, selectedClient, setSelectedClient, isLoading } = useDTestView();
+  const { hasCompletedOnboarding, isLoading } = useMcpUsage();
 
   if (isLoading) {
     return <DTestLoadingState />;
   }
 
-  if (view === 'install') {
-    if (selectedClient !== null) {
-      return <ClientDetailPage clientId={selectedClient} onBack={() => setSelectedClient(null)} />;
-    }
-    return (
-      <InstallInsForgePage
-        onSelectClient={(id) => setSelectedClient(id)}
-        onDismiss={() => setView('dashboard')}
-      />
-    );
+  if (!hasCompletedOnboarding) {
+    return <Navigate to="/dashboard/install" replace />;
   }
 
   return <DTestConnectedDashboard />;

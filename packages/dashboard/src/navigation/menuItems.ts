@@ -129,12 +129,11 @@ export const dashboardDeploymentsMenuItem: DashboardPrimaryMenuItem = {
   icon: Rocket,
 };
 
-// d_test + cloud-hosting only: opens the Install InsForge view (sets view + navigates to /dashboard).
-// onClick is wired up in AppSidebar where DTestViewContext + react-router are available.
+// d_test + cloud-hosting only: navigates to the Install InsForge route.
 export const dashboardDTestInstallMenuItem: DashboardPrimaryMenuItem = {
   id: 'dtest-install',
   label: 'Install',
-  href: '/dashboard',
+  href: '/dashboard/install',
   icon: Download,
 };
 

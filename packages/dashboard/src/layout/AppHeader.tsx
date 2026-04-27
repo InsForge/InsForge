@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { LogOut, ChevronDown, Plug } from 'lucide-react';
 import {
   Button,
@@ -13,7 +14,6 @@ import { useTheme } from '../lib/contexts/ThemeContext';
 import { useAuth } from '../lib/contexts/AuthContext';
 import { useOpenConnectDialog } from './ConnectDialogContext';
 import { getFeatureFlag } from '../lib/analytics/posthog';
-import { useDTestView } from '../features/dashboard/components/dtest/DTestViewContext';
 
 // Import SVG icons
 import DiscordIcon from '../assets/logos/discord.svg?react';
@@ -26,13 +26,14 @@ export default function AppHeader() {
   const { user, logout } = useAuth();
   const openConnectDialog = useOpenConnectDialog();
   const dashboardVariant = getFeatureFlag('dashboard-v4-experiment');
-  const { view: dTestView, setView: setDTestView } = useDTestView();
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
   const isDTest = dashboardVariant === 'd_test';
-  const isConnectDisabled = isDTest && dTestView === 'install';
+  const isConnectDisabled = isDTest && pathname === '/dashboard/install';
 
   const handleConnectClick = () => {
     if (isDTest) {
-      setDTestView('install');
+      void navigate('/dashboard/install');
       return;
     }
     openConnectDialog();
