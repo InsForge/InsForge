@@ -227,9 +227,25 @@ export function ScheduleFormDialog({
                   <input
                     {...form.register('cronSchedule')}
                     className="w-full px-3 py-2 rounded border bg-white dark:bg-neutral-800 border-zinc-200 dark:border-neutral-700 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500"
-                    placeholder="E.g., */5 * * * *"
+                    placeholder='E.g. "*/5 * * * *" or "30 seconds"'
                   />
+                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                    5-field cron (e.g. <code>*/5 * * * *</code>) or interval form for sub-minute
+                    cadence (1–59 seconds, e.g. <code>30 seconds</code>). For ≥ 1 minute, use cron.
+                  </p>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      className="px-3 py-2 rounded-lg bg-zinc-100 text-zinc-900 hover:bg-zinc-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 dark:bg-neutral-800 dark:text-zinc-100 dark:hover:bg-neutral-700 text-sm transition-colors text-left"
+                      onClick={() => {
+                        form.setValue('cronSchedule', '30 seconds', {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        });
+                      }}
+                    >
+                      Every 30 seconds
+                    </button>
                     <button
                       type="button"
                       className="px-3 py-2 rounded-lg bg-zinc-100 text-zinc-900 hover:bg-zinc-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 dark:bg-neutral-800 dark:text-zinc-100 dark:hover:bg-neutral-700 text-sm transition-colors text-left"
