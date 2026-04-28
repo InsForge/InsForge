@@ -26,6 +26,49 @@ export interface StripeSyncSnapshot {
   prices: StripePrice[];
 }
 
+export interface StripeProductCreateInput {
+  name: string;
+  description?: string | null;
+  active?: boolean;
+  metadata?: Record<string, string>;
+}
+
+export interface StripeProductUpdateInput {
+  name?: string;
+  description?: string | null;
+  active?: boolean;
+  metadata?: Record<string, string>;
+}
+
+export interface StripeProductDeleteResult {
+  id: string;
+  deleted: boolean;
+}
+
+export type StripePriceRecurringInterval = 'day' | 'week' | 'month' | 'year';
+export type StripePriceTaxBehavior = 'exclusive' | 'inclusive' | 'unspecified';
+
+export interface StripePriceCreateInput {
+  stripeProductId: string;
+  currency: string;
+  unitAmount: number;
+  lookupKey?: string | null;
+  active?: boolean;
+  recurring?: {
+    interval: StripePriceRecurringInterval;
+    intervalCount?: number;
+  };
+  taxBehavior?: StripePriceTaxBehavior;
+  metadata?: Record<string, string>;
+}
+
+export interface StripePriceUpdateInput {
+  active?: boolean;
+  lookupKey?: string | null;
+  taxBehavior?: StripePriceTaxBehavior;
+  metadata?: Record<string, string>;
+}
+
 export interface StripeConnectionRow {
   environment: StripeEnvironment;
   status: StripeConnectionStatus;
@@ -48,7 +91,6 @@ export interface StripeProductRow {
   defaultPriceId: string | null;
   metadata: Record<string, string>;
   syncedAt: Date | string;
-  isDeleted: boolean;
 }
 
 export interface StripePriceRow {
@@ -67,5 +109,4 @@ export interface StripePriceRow {
   recurringIntervalCount: number | null;
   metadata: Record<string, string>;
   syncedAt: Date | string;
-  isDeleted: boolean;
 }

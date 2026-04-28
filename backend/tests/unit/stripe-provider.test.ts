@@ -73,4 +73,89 @@ describe('StripeProvider', () => {
       'price_inactive',
     ]);
   });
+
+  it('creates, updates, and deletes products through Stripe products API', async () => {
+    const client = {
+      accounts: { retrieveCurrent: vi.fn() },
+      products: {
+        list: vi.fn(),
+        create: vi.fn().mockResolvedValue({ id: 'prod_new', object: 'product' }),
+        update: vi.fn().mockResolvedValue({ id: 'prod_new', object: 'product' }),
+        del: vi.fn().mockResolvedValue({ id: 'prod_new', deleted: true }),
+      },
+      prices: { list: vi.fn() },
+    } as unknown as StripeClient;
+    const provider = new StripeProvider('sk_test_1234567890', 'test', client);
+
+    await provider.createProduct({
+      name: 'Pro',
+      description: null,
+      active: true,
+      metadata: { tier: 'pro' },
+    });
+    await provider.updateProduct('prod_new', {
+      description: null,
+      active: false,
+    });
+    await expect(provider.deleteProduct('prod_new')).resolves.toEqual({
+      id: 'prod_new',
+      deleted: true,
+    });
+
+    expect(client.products.create).toHaveBeenCalledWith({
+      name: 'Pro',
+      active: true,
+      metadata: { tier: 'pro' },
+    });
+    expect(client.products.update).toHaveBeenCalledWith('prod_new', {
+      description: '',
+      active: false,
+    });
+    expect(client.products.del).toHaveBeenCalledWith('prod_new');
+  });
+
+  it('creates and updates prices through Stripe prices API', async () => {
+    const client = {
+      accounts: { retrieveCurrent: vi.fn() },
+      products: { list: vi.fn() },
+      prices: {
+        list: vi.fn(),
+        create: vi.fn().mockResolvedValue({ id: 'price_new', object: 'price' }),
+        update: vi.fn().mockResolvedValue({ id: 'price_new', object: 'price' }),
+      },
+    } as unknown as StripeClient;
+    const provider = new StripeProvider('sk_test_1234567890', 'test', client);
+
+    await provider.createPrice({
+      stripeProductId: 'prod_123',
+      currency: 'usd',
+      unitAmount: 2000,
+      lookupKey: 'pro_monthly',
+      active: true,
+      recurring: { interval: 'month', intervalCount: 1 },
+      taxBehavior: 'exclusive',
+      metadata: { tier: 'pro' },
+    });
+    await provider.updatePrice('price_new', {
+      active: false,
+      lookupKey: null,
+      metadata: { archived: 'true' },
+    });
+
+    expect(client.prices.create).toHaveBeenCalledWith({
+      product: 'prod_123',
+      currency: 'usd',
+      unit_amount: 2000,
+      lookup_key: 'pro_monthly',
+      active: true,
+      recurring: { interval: 'month', interval_count: 1 },
+      tax_behavior: 'exclusive',
+      metadata: { tier: 'pro' },
+    });
+    expect(client.prices.update).toHaveBeenCalledWith('price_new', {
+      active: false,
+      lookup_key: '',
+      metadata: { archived: 'true' },
+    });
+  });
 });

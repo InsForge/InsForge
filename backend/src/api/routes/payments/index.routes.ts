@@ -5,6 +5,8 @@ import { ERROR_CODES } from '@/types/error-constants.js';
 import { PaymentService } from '@/services/payments/payment.service.js';
 import { StripeKeyValidationError } from '@/providers/payments/stripe.provider.js';
 import { successResponse } from '@/utils/response.js';
+import { pricesRouter } from './prices.routes.js';
+import { productsRouter } from './products.routes.js';
 import {
   stripeEnvironmentSchema,
   upsertPaymentsConfigRequestSchema,
@@ -86,6 +88,9 @@ router.delete(
     }
   }
 );
+
+router.use('/products', productsRouter);
+router.use('/prices', pricesRouter);
 
 router.get('/catalog', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {

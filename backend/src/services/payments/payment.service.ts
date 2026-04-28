@@ -2,12 +2,14 @@ import type { Pool, PoolClient } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
+import { AppError } from '@/api/middlewares/error.js';
 import {
   maskStripeKey,
   StripeProvider,
   validateStripeSecretKey,
 } from '@/providers/payments/stripe.provider.js';
 import logger from '@/utils/logger.js';
+import { ERROR_CODES } from '@/types/error-constants.js';
 import { STRIPE_ENVIRONMENTS } from '@/types/payments.js';
 import type {
   StripeConnectionRow,
@@ -19,12 +21,25 @@ import type {
   StripeSyncSnapshot,
 } from '@/types/payments.js';
 import type {
+  ArchivePaymentPriceResponse,
+  CreatePaymentPriceRequest,
   GetPaymentsStatusResponse,
+  GetPaymentPriceResponse,
   ListPaymentCatalogResponse,
+  ListPaymentPricesRequest,
+  ListPaymentPricesResponse,
   StripeConnection,
   StripePriceMirror,
   StripeProductMirror,
   GetPaymentsConfigResponse,
+  CreatePaymentProductRequest,
+  DeletePaymentProductResponse,
+  GetPaymentProductResponse,
+  ListPaymentProductsResponse,
+  MutatePaymentPriceResponse,
+  MutatePaymentProductResponse,
+  UpdatePaymentPriceRequest,
+  UpdatePaymentProductRequest,
 } from '@insforge/shared-schemas';
 
 const SECRET_KEY_BY_ENVIRONMENT: Record<StripeEnvironment, string> = {
@@ -129,6 +144,20 @@ export class PaymentService {
     return secretKey;
   }
 
+  private async createStripeProvider(environment: StripeEnvironment): Promise<StripeProvider> {
+    const secretKey = await this.getStripeSecretKey(environment);
+
+    if (!secretKey) {
+      throw new AppError(
+        `STRIPE_${environment.toUpperCase()}_SECRET_KEY is not configured`,
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    return new StripeProvider(secretKey, environment);
+  }
+
   private async getStripeKeyConfig(environment: StripeEnvironment) {
     const secretKey = await this.getStripeSecretKey(environment);
 
@@ -186,8 +215,7 @@ export class PaymentService {
            active,
            default_price_id AS "defaultPriceId",
            metadata,
-           synced_at AS "syncedAt",
-           is_deleted AS "isDeleted"
+           synced_at AS "syncedAt"
          FROM payments.products
          ${environmentFilter}
          ORDER BY environment, name, stripe_product_id`,
@@ -209,8 +237,7 @@ export class PaymentService {
            recurring_interval AS "recurringInterval",
            recurring_interval_count AS "recurringIntervalCount",
            metadata,
-           synced_at AS "syncedAt",
-           is_deleted AS "isDeleted"
+           synced_at AS "syncedAt"
          FROM payments.prices
          ${environmentFilter}
          ORDER BY environment, stripe_product_id, stripe_price_id`,
@@ -223,6 +250,129 @@ export class PaymentService {
         this.normalizeProductRow(row)
       ),
       prices: (pricesResult.rows as StripePriceRow[]).map((row) => this.normalizePriceRow(row)),
+    };
+  }
+
+  async listTestProducts(): Promise<ListPaymentProductsResponse> {
+    const catalog = await this.listCatalog('test');
+    return { products: catalog.products };
+  }
+
+  async getTestProduct(stripeProductId: string): Promise<GetPaymentProductResponse> {
+    const catalog = await this.listCatalog('test');
+    const product = catalog.products.find((item) => item.stripeProductId === stripeProductId);
+
+    if (!product) {
+      throw new AppError(
+        `Stripe test product not found: ${stripeProductId}`,
+        404,
+        ERROR_CODES.NOT_FOUND
+      );
+    }
+
+    return {
+      product,
+      prices: catalog.prices.filter((price) => price.stripeProductId === stripeProductId),
+    };
+  }
+
+  async listTestPrices(filters: ListPaymentPricesRequest = {}): Promise<ListPaymentPricesResponse> {
+    const catalog = await this.listCatalog('test');
+    const prices = filters.stripeProductId
+      ? catalog.prices.filter((price) => price.stripeProductId === filters.stripeProductId)
+      : catalog.prices;
+
+    return { prices };
+  }
+
+  async getTestPrice(stripePriceId: string): Promise<GetPaymentPriceResponse> {
+    const catalog = await this.listCatalog('test');
+    const price = catalog.prices.find((item) => item.stripePriceId === stripePriceId);
+
+    if (!price) {
+      throw new AppError(
+        `Stripe test price not found: ${stripePriceId}`,
+        404,
+        ERROR_CODES.NOT_FOUND
+      );
+    }
+
+    return { price };
+  }
+
+  async createTestProduct(
+    input: CreatePaymentProductRequest
+  ): Promise<MutatePaymentProductResponse> {
+    const provider = await this.createStripeProvider('test');
+    const product = await provider.createProduct(input);
+
+    await this.syncEnvironment('test');
+
+    return {
+      product: this.normalizeStripeProduct(product, 'test'),
+    };
+  }
+
+  async updateTestProduct(
+    stripeProductId: string,
+    input: UpdatePaymentProductRequest
+  ): Promise<MutatePaymentProductResponse> {
+    const provider = await this.createStripeProvider('test');
+    const product = await provider.updateProduct(stripeProductId, input);
+
+    await this.syncEnvironment('test');
+
+    return {
+      product: this.normalizeStripeProduct(product, 'test'),
+    };
+  }
+
+  async deleteTestProduct(stripeProductId: string): Promise<DeletePaymentProductResponse> {
+    const provider = await this.createStripeProvider('test');
+    const deletedProduct = await provider.deleteProduct(stripeProductId);
+
+    await this.syncEnvironment('test');
+
+    return {
+      stripeProductId: deletedProduct.id,
+      deleted: deletedProduct.deleted,
+    };
+  }
+
+  async createTestPrice(input: CreatePaymentPriceRequest): Promise<MutatePaymentPriceResponse> {
+    const provider = await this.createStripeProvider('test');
+    const price = await provider.createPrice(input);
+
+    await this.syncEnvironment('test');
+
+    return {
+      price: this.normalizeStripePrice(price, 'test'),
+    };
+  }
+
+  async updateTestPrice(
+    stripePriceId: string,
+    input: UpdatePaymentPriceRequest
+  ): Promise<MutatePaymentPriceResponse> {
+    const provider = await this.createStripeProvider('test');
+    const price = await provider.updatePrice(stripePriceId, input);
+
+    await this.syncEnvironment('test');
+
+    return {
+      price: this.normalizeStripePrice(price, 'test'),
+    };
+  }
+
+  async archiveTestPrice(stripePriceId: string): Promise<ArchivePaymentPriceResponse> {
+    const provider = await this.createStripeProvider('test');
+    const price = await provider.updatePrice(stripePriceId, { active: false });
+
+    await this.syncEnvironment('test');
+
+    return {
+      price: this.normalizeStripePrice(price, 'test'),
+      archived: !price.active,
     };
   }
 
@@ -339,7 +489,7 @@ export class PaymentService {
       await this.upsertConnection(client, environment, snapshot);
       await this.upsertProducts(client, environment, snapshot.products, syncStartedAt);
       await this.upsertPrices(client, environment, snapshot.prices, syncStartedAt);
-      await this.markMissingRowsDeleted(client, environment, syncStartedAt);
+      await this.deleteMissingRows(client, environment, syncStartedAt);
 
       await client.query('COMMIT');
     } catch (error) {
@@ -411,10 +561,9 @@ export class PaymentService {
            default_price_id,
            metadata,
            raw,
-           synced_at,
-           is_deleted
+           synced_at
          )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, FALSE)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          ON CONFLICT (environment, stripe_product_id) DO UPDATE SET
            name = EXCLUDED.name,
            description = EXCLUDED.description,
@@ -423,7 +572,6 @@ export class PaymentService {
            metadata = EXCLUDED.metadata,
            raw = EXCLUDED.raw,
            synced_at = EXCLUDED.synced_at,
-           is_deleted = FALSE,
            updated_at = NOW()`,
         [
           environment,
@@ -464,10 +612,9 @@ export class PaymentService {
            recurring_interval_count,
            metadata,
            raw,
-           synced_at,
-           is_deleted
+           synced_at
          )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, FALSE)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
          ON CONFLICT (environment, stripe_price_id) DO UPDATE SET
            stripe_product_id = EXCLUDED.stripe_product_id,
            active = EXCLUDED.active,
@@ -483,7 +630,6 @@ export class PaymentService {
            metadata = EXCLUDED.metadata,
            raw = EXCLUDED.raw,
            synced_at = EXCLUDED.synced_at,
-           is_deleted = FALSE,
            updated_at = NOW()`,
         [
           environment,
@@ -492,7 +638,7 @@ export class PaymentService {
           price.active,
           price.currency,
           price.unit_amount ?? null,
-          price.unit_amount_decimal ?? null,
+          this.normalizeStripeDecimal(price.unit_amount_decimal),
           price.type,
           price.lookup_key ?? null,
           price.billing_scheme ?? null,
@@ -507,27 +653,21 @@ export class PaymentService {
     }
   }
 
-  private async markMissingRowsDeleted(
+  private async deleteMissingRows(
     client: PoolClient,
     environment: StripeEnvironment,
     syncStartedAt: Date
   ): Promise<void> {
     await client.query(
-      `UPDATE payments.products
-       SET is_deleted = TRUE,
-           updated_at = NOW()
+      `DELETE FROM payments.prices
        WHERE environment = $1
-         AND is_deleted = FALSE
          AND synced_at < $2`,
       [environment, syncStartedAt]
     );
 
     await client.query(
-      `UPDATE payments.prices
-       SET is_deleted = TRUE,
-           updated_at = NOW()
+      `DELETE FROM payments.products
        WHERE environment = $1
-         AND is_deleted = FALSE
          AND synced_at < $2`,
       [environment, syncStartedAt]
     );
@@ -574,12 +714,71 @@ export class PaymentService {
     };
   }
 
+  private normalizeStripeProduct(
+    product: StripeProduct,
+    environment: StripeEnvironment
+  ): StripeProductMirror {
+    return {
+      environment,
+      stripeProductId: product.id,
+      name: product.name,
+      description: product.description ?? null,
+      active: product.active,
+      defaultPriceId: this.getStripeObjectId(product.default_price),
+      metadata: product.metadata ?? {},
+      syncedAt: new Date().toISOString(),
+    };
+  }
+
   private normalizePriceRow(row: StripePriceRow): StripePriceMirror {
     return {
       ...row,
       unitAmount: row.unitAmount === null ? null : Number(row.unitAmount),
+      unitAmountDecimal: this.normalizeStripeDecimal(row.unitAmountDecimal),
       syncedAt: this.toISOString(row.syncedAt),
     };
+  }
+
+  private normalizeStripePrice(
+    price: StripePrice,
+    environment: StripeEnvironment
+  ): StripePriceMirror {
+    return {
+      environment,
+      stripePriceId: price.id,
+      stripeProductId: this.getStripeObjectId(price.product),
+      active: price.active,
+      currency: price.currency,
+      unitAmount: price.unit_amount ?? null,
+      unitAmountDecimal: this.normalizeStripeDecimal(price.unit_amount_decimal),
+      type: price.type,
+      lookupKey: price.lookup_key ?? null,
+      billingScheme: price.billing_scheme ?? null,
+      taxBehavior: price.tax_behavior ?? null,
+      recurringInterval: price.recurring?.interval ?? null,
+      recurringIntervalCount: price.recurring?.interval_count ?? null,
+      metadata: price.metadata ?? {},
+      syncedAt: new Date().toISOString(),
+    };
+  }
+
+  private normalizeStripeDecimal(value: unknown): string | null {
+    if (value === null || value === undefined) {
+      return null;
+    }
+
+    const stringValue = String(value);
+
+    try {
+      const parsed = JSON.parse(stringValue) as unknown;
+      if (typeof parsed === 'string') {
+        return parsed;
+      }
+    } catch {
+      // Decimal values are usually plain strings; only legacy mirrored rows need JSON unwrapping.
+    }
+
+    return stringValue;
   }
 
   private createEmptyConnection(environment: StripeEnvironment): StripeConnectionRow {

@@ -34,15 +34,13 @@ CREATE TABLE IF NOT EXISTS payments.products (
   metadata JSONB NOT NULL DEFAULT '{}'::JSONB,
   raw JSONB NOT NULL DEFAULT '{}'::JSONB,
   synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (environment, stripe_product_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_payments_products_environment_active
-  ON payments.products(environment, active)
-  WHERE is_deleted = FALSE;
+  ON payments.products(environment, active);
 
 CREATE TABLE IF NOT EXISTS payments.prices (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -62,19 +60,17 @@ CREATE TABLE IF NOT EXISTS payments.prices (
   metadata JSONB NOT NULL DEFAULT '{}'::JSONB,
   raw JSONB NOT NULL DEFAULT '{}'::JSONB,
   synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (environment, stripe_price_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_payments_prices_environment_product
-  ON payments.prices(environment, stripe_product_id)
-  WHERE is_deleted = FALSE;
+  ON payments.prices(environment, stripe_product_id);
 
 CREATE INDEX IF NOT EXISTS idx_payments_prices_environment_lookup_key
   ON payments.prices(environment, lookup_key)
-  WHERE lookup_key IS NOT NULL AND is_deleted = FALSE;
+  WHERE lookup_key IS NOT NULL;
 
 DROP TRIGGER IF EXISTS trg_payments_stripe_connections_updated_at ON payments.stripe_connections;
 CREATE TRIGGER trg_payments_stripe_connections_updated_at

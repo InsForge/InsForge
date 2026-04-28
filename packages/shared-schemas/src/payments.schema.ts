@@ -32,7 +32,6 @@ export const stripeProductMirrorSchema = z.object({
   defaultPriceId: z.string().nullable(),
   metadata: z.record(z.string()),
   syncedAt: z.string(),
-  isDeleted: z.boolean(),
 });
 export type StripeProductMirror = z.infer<typeof stripeProductMirrorSchema>;
 
@@ -52,6 +51,5 @@ export const stripePriceMirrorSchema = z.object({
   recurringIntervalCount: z.number().nullable(),
   metadata: z.record(z.string()),
   syncedAt: z.string(),
-  isDeleted: z.boolean(),
 });
 export type StripePriceMirror = z.infer<typeof stripePriceMirrorSchema>;

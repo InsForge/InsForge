@@ -38,8 +38,8 @@ describe('036_create-payments-schema migration', () => {
     expect(sql).toMatch(/raw JSONB NOT NULL DEFAULT '\{\}'::JSONB/i);
   });
 
-  it('keeps deleted Stripe catalog objects as soft-deleted mirror rows', () => {
-    expect(sql).toMatch(/is_deleted BOOLEAN NOT NULL DEFAULT FALSE/i);
+  it('does not keep soft-delete tombstones in Stripe catalog mirror rows', () => {
+    expect(sql).not.toMatch(/is_deleted/i);
   });
 
   it('creates unique indexes for environment and Stripe object id pairs', () => {
