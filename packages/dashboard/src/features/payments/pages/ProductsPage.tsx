@@ -95,10 +95,6 @@ function ConfigureStripeKeyCallout({ environment }: { environment: StripeEnviron
 }
 
 function ProductStatus({ product }: { product: StripeProductMirror }) {
-  if (product.isDeleted) {
-    return <StatusBadge active={false} label="Deleted" />;
-  }
-
   return <StatusBadge active={product.active} label={product.active ? 'Active' : 'Inactive'} />;
 }
 
@@ -191,8 +187,6 @@ function PricesForProductTable({
       </div>
       {prices.map((price) => {
         const isDefault = price.stripePriceId === product.defaultPriceId;
-        const isActive = price.active && !price.isDeleted;
-
         return (
           <div
             key={`${price.environment}:${price.stripePriceId}`}
@@ -208,7 +202,7 @@ function PricesForProductTable({
             <div className="font-medium text-foreground">{formatAmount(price)}</div>
             <div className="text-muted-foreground">{formatBilling(price)}</div>
             <div>
-              <StatusBadge active={isActive} label={isActive ? 'Active' : 'Inactive'} />
+              <StatusBadge active={price.active} label={price.active ? 'Active' : 'Inactive'} />
             </div>
           </div>
         );
