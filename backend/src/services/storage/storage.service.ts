@@ -244,26 +244,18 @@ export class StorageService {
     this.validateBucketName(bucket);
     this.validateKey(key);
 
-    // RLS-gated SELECT first; if the caller can't see the row we abort
-    // before touching the provider. Provider delete then DB delete in
-    // that order — a provider failure leaves both sides intact and a
-    // retry resolves cleanly, whereas DB-first would orphan the blob.
-    //
-    // This relies on `provider.deleteObject` being idempotent on missing
-    // keys. S3 DELETE is (returns 204 either way); LocalStorageProvider's
-    // unlink swallows ENOENT. A future provider that throws on missing
-    // keys would break retry safety here — keep that contract.
+    // RLS-gated visibility check, then provider delete OUTSIDE any
+    // transaction (don't hold a pool connection across S3 IO), then
+    // RLS-gated DELETE. Provider must be idempotent on missing keys —
+    // S3 DELETE is, LocalStorageProvider swallows ENOENT.
+    const visible = await this.objectIsVisible(ctx, bucket, key);
+    if (!visible) {
+      return false;
+    }
+
+    await this.provider.deleteObject(bucket, key);
+
     return withUserContext(this.getPool(), ctx, async (db) => {
-      const found = await db.query('SELECT 1 FROM storage.objects WHERE bucket = $1 AND key = $2', [
-        bucket,
-        key,
-      ]);
-      if ((found.rowCount ?? 0) === 0) {
-        return false;
-      }
-
-      await this.provider.deleteObject(bucket, key);
-
       const result = await db.query('DELETE FROM storage.objects WHERE bucket = $1 AND key = $2', [
         bucket,
         key,
@@ -665,6 +657,8 @@ export class StorageService {
     contentType?: string | null;
     s3AccessKeyId: string;
   }): Promise<void> {
+    // ON CONFLICT preserves uploaded_by — clobbering to NULL would silently
+    // strip ownership when S3 overwrites a REST-uploaded key.
     await this.getPool().query(
       `INSERT INTO storage.objects
          (bucket, key, size, mime_type, etag, uploaded_at, uploaded_by, uploaded_via, s3_access_key_id)
@@ -675,8 +669,7 @@ export class StorageService {
          etag             = EXCLUDED.etag,
          uploaded_at      = EXCLUDED.uploaded_at,
          uploaded_via     = EXCLUDED.uploaded_via,
-         s3_access_key_id = EXCLUDED.s3_access_key_id,
-         uploaded_by      = NULL`,
+         s3_access_key_id = EXCLUDED.s3_access_key_id`,
       [
         params.bucket,
         params.key,

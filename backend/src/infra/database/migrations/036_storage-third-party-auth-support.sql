@@ -24,14 +24,10 @@
 ALTER TABLE storage.objects
   DROP CONSTRAINT IF EXISTS objects_uploaded_by_fkey;
 
--- 2. Widen the column. UUIDs are valid text, so existing native-auth rows
--- convert losslessly and the btree index is preserved across the change.
---
--- Guarded for replay: once the owner-only policies below are installed, they
--- depend on uploaded_by, and Postgres rejects ALTER TYPE on a policy-referenced
--- column with "cannot alter type of a column used in a policy definition".
--- Skip the ALTER if the column is already TEXT so migrate:redo / manual replay
--- both succeed.
+-- 2. Widen the column. UUIDs are valid text so existing rows convert
+-- losslessly and the btree index survives. Guarded by a column-type
+-- check: once the owner-only policies below reference uploaded_by,
+-- Postgres rejects ALTER TYPE — skip it on replay if already TEXT.
 DO $widen$
 BEGIN
   IF (
@@ -79,18 +75,14 @@ $$;
 -- callers but errors on non-UUID subs from third-party providers. Ship
 -- a jsonb helper alongside so policies can extract any claim as text:
 -- `auth.jwt() ->> 'sub'` for ownership, `->> 'role'` for role checks,
--- `->> 'org_id'` or any custom claim. Reads both the legacy per-claim
--- GUC and the modern claims-jsonb GUC so the helper works whether the
--- caller is the app server (set_config of the dotted form) or PostgREST
--- (sets the jsonb form).
+-- `->> 'org_id'` or any custom claim. Reads `request.jwt.claims`
+-- (jsonb) which is set by withUserContext on the app server and by
+-- PostgREST on its connections.
 CREATE OR REPLACE FUNCTION auth.jwt()
 RETURNS jsonb
 LANGUAGE sql STABLE
 AS $$
-  SELECT coalesce(
-    nullif(current_setting('request.jwt.claim', true), ''),
-    nullif(current_setting('request.jwt.claims', true), '')
-  )::jsonb
+  SELECT nullif(current_setting('request.jwt.claims', true), '')::jsonb
 $$;
 
 -- 5. Enable RLS. Install owner-only defaults only on existing projects.
