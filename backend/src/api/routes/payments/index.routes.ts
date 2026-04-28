@@ -10,7 +10,10 @@ import { productsRouter } from './products.routes.js';
 import {
   stripeEnvironmentSchema,
   upsertPaymentsConfigRequestSchema,
+  createCheckoutSessionRequestSchema,
   listPaymentCatalogRequestSchema,
+  listPaymentHistoryRequestSchema,
+  listSubscriptionsRequestSchema,
   syncPaymentsRequestSchema,
 } from '@insforge/shared-schemas';
 
@@ -91,6 +94,66 @@ router.delete(
 
 router.use('/products', productsRouter);
 router.use('/prices', pricesRouter);
+
+router.get('/payment-history', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const validation = listPaymentHistoryRequestSchema.safeParse(req.query);
+    if (!validation.success) {
+      throw new AppError(
+        validation.error.issues
+          .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+          .join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    const paymentHistory = await paymentService.listPaymentHistory(validation.data);
+    successResponse(res, paymentHistory);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/subscriptions', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const validation = listSubscriptionsRequestSchema.safeParse(req.query);
+    if (!validation.success) {
+      throw new AppError(
+        validation.error.issues
+          .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+          .join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    const subscriptions = await paymentService.listSubscriptions(validation.data);
+    successResponse(res, subscriptions);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/checkout-sessions', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const validation = createCheckoutSessionRequestSchema.safeParse(req.body);
+    if (!validation.success) {
+      throw new AppError(
+        validation.error.issues
+          .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+          .join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    const checkoutSession = await paymentService.createCheckoutSession(validation.data);
+    successResponse(res, checkoutSession, 201);
+  } catch (error) {
+    next(normalizeStripeConfigError(error));
+  }
+});
 
 router.get('/catalog', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {

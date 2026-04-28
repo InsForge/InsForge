@@ -158,4 +158,135 @@ describe('StripeProvider', () => {
       metadata: { archived: 'true' },
     });
   });
+
+  it('creates customers through Stripe customers API', async () => {
+    const client = {
+      accounts: { retrieveCurrent: vi.fn() },
+      products: { list: vi.fn() },
+      prices: { list: vi.fn() },
+      customers: {
+        create: vi.fn().mockResolvedValue({ id: 'cus_123', object: 'customer' }),
+      },
+      checkout: { sessions: { create: vi.fn() } },
+      webhooks: { constructEvent: vi.fn() },
+    } as unknown as StripeClient;
+    const provider = new StripeProvider('sk_test_1234567890', 'test', client);
+
+    await provider.createCustomer({
+      email: 'buyer@example.com',
+      metadata: { insforge_subject_type: 'team', insforge_subject_id: 'team_123' },
+    });
+
+    expect(client.customers.create).toHaveBeenCalledWith({
+      email: 'buyer@example.com',
+      metadata: { insforge_subject_type: 'team', insforge_subject_id: 'team_123' },
+    });
+  });
+
+  it('creates checkout sessions and copies metadata onto durable Stripe objects', async () => {
+    const client = {
+      accounts: { retrieveCurrent: vi.fn() },
+      products: { list: vi.fn() },
+      prices: { list: vi.fn() },
+      customers: { create: vi.fn() },
+      checkout: {
+        sessions: {
+          create: vi.fn().mockResolvedValue({
+            id: 'cs_test_123',
+            object: 'checkout.session',
+            url: 'https://checkout.stripe.com/c/pay/cs_test_123',
+          }),
+        },
+      },
+      webhooks: { constructEvent: vi.fn() },
+    } as unknown as StripeClient;
+    const provider = new StripeProvider('sk_test_1234567890', 'test', client);
+
+    await provider.createCheckoutSession({
+      mode: 'subscription',
+      lineItems: [{ stripePriceId: 'price_123', quantity: 1 }],
+      successUrl: 'https://example.com/success',
+      cancelUrl: 'https://example.com/cancel',
+      customerId: 'cus_123',
+      metadata: { insforge_subject_type: 'team', insforge_subject_id: 'team_123' },
+    });
+
+    expect(client.checkout.sessions.create).toHaveBeenCalledWith({
+      mode: 'subscription',
+      line_items: [{ price: 'price_123', quantity: 1 }],
+      success_url: 'https://example.com/success',
+      cancel_url: 'https://example.com/cancel',
+      metadata: { insforge_subject_type: 'team', insforge_subject_id: 'team_123' },
+      customer: 'cus_123',
+      subscription_data: {
+        metadata: { insforge_subject_type: 'team', insforge_subject_id: 'team_123' },
+      },
+    });
+  });
+
+  it('constructs webhook events with the original raw body and Stripe signature', () => {
+    const rawBody = Buffer.from('{"id":"evt_123"}');
+    const client = {
+      accounts: { retrieveCurrent: vi.fn() },
+      products: { list: vi.fn() },
+      prices: { list: vi.fn() },
+      customers: { create: vi.fn() },
+      checkout: { sessions: { create: vi.fn() } },
+      webhooks: {
+        constructEvent: vi
+          .fn()
+          .mockReturnValue({ id: 'evt_123', type: 'checkout.session.completed' }),
+      },
+    } as unknown as StripeClient;
+    const provider = new StripeProvider('sk_test_1234567890', 'test', client);
+
+    expect(provider.constructWebhookEvent(rawBody, 'sig_123', 'whsec_123')).toEqual({
+      id: 'evt_123',
+      type: 'checkout.session.completed',
+    });
+    expect(client.webhooks.constructEvent).toHaveBeenCalledWith(rawBody, 'sig_123', 'whsec_123');
+  });
+
+  it('lists, creates, and deletes webhook endpoints through Stripe webhook endpoint APIs', async () => {
+    const client = {
+      accounts: { retrieveCurrent: vi.fn() },
+      products: { list: vi.fn() },
+      prices: { list: vi.fn() },
+      customers: { create: vi.fn() },
+      checkout: { sessions: { create: vi.fn() } },
+      webhooks: { constructEvent: vi.fn() },
+      webhookEndpoints: {
+        list: vi
+          .fn()
+          .mockReturnValue(createAsyncList([{ id: 'we_123', object: 'webhook_endpoint' }])),
+        create: vi.fn().mockResolvedValue({
+          id: 'we_new',
+          object: 'webhook_endpoint',
+          secret: 'whsec_new',
+        }),
+        del: vi.fn().mockResolvedValue({ id: 'we_123', deleted: true }),
+      },
+    } as unknown as StripeClient;
+    const provider = new StripeProvider('sk_test_1234567890', 'test', client);
+
+    await expect(provider.listWebhookEndpoints()).resolves.toEqual([
+      { id: 'we_123', object: 'webhook_endpoint' },
+    ]);
+    await expect(
+      provider.createWebhookEndpoint({
+        url: 'https://example.com/api/webhooks/stripe/test',
+        enabledEvents: ['checkout.session.completed'],
+        metadata: { managed_by: 'insforge' },
+      })
+    ).resolves.toMatchObject({ id: 'we_new', secret: 'whsec_new' });
+    await provider.deleteWebhookEndpoint('we_123');
+
+    expect(client.webhookEndpoints.list).toHaveBeenCalledWith({ limit: 100 });
+    expect(client.webhookEndpoints.create).toHaveBeenCalledWith({
+      url: 'https://example.com/api/webhooks/stripe/test',
+      enabled_events: ['checkout.session.completed'],
+      metadata: { managed_by: 'insforge' },
+    });
+    expect(client.webhookEndpoints.del).toHaveBeenCalledWith('we_123');
+  });
 });

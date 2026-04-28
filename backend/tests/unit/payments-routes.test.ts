@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  createCheckoutSessionRequestSchema,
   createPaymentPriceRequestSchema,
   createPaymentProductRequestSchema,
   listPaymentCatalogRequestSchema,
+  listPaymentHistoryRequestSchema,
   listPaymentPricesRequestSchema,
   listPaymentProductsRequestSchema,
+  listSubscriptionsRequestSchema,
   syncPaymentsRequestSchema,
   updatePaymentPriceRequestSchema,
   updatePaymentProductRequestSchema,
@@ -128,5 +131,80 @@ describe('payments route schemas', () => {
       active: false,
       environment: 'live',
     });
+  });
+
+  it('allows anonymous one-time checkout sessions', () => {
+    expect(
+      createCheckoutSessionRequestSchema.parse({
+        environment: 'test',
+        mode: 'payment',
+        lineItems: [{ stripePriceId: 'price_123', quantity: 2 }],
+        successUrl: 'https://example.com/success',
+        cancelUrl: 'https://example.com/cancel',
+        customerEmail: 'buyer@example.com',
+      })
+    ).toEqual({
+      environment: 'test',
+      mode: 'payment',
+      lineItems: [{ stripePriceId: 'price_123', quantity: 2 }],
+      successUrl: 'https://example.com/success',
+      cancelUrl: 'https://example.com/cancel',
+      customerEmail: 'buyer@example.com',
+    });
+  });
+
+  it('requires subscription checkout sessions to specify a billing subject', () => {
+    expect(() =>
+      createCheckoutSessionRequestSchema.parse({
+        environment: 'test',
+        mode: 'subscription',
+        lineItems: [{ stripePriceId: 'price_123' }],
+        successUrl: 'https://example.com/success',
+        cancelUrl: 'https://example.com/cancel',
+      })
+    ).toThrow(/billing subject/i);
+
+    expect(
+      createCheckoutSessionRequestSchema.parse({
+        environment: 'test',
+        mode: 'subscription',
+        lineItems: [{ stripePriceId: 'price_123' }],
+        successUrl: 'https://example.com/success',
+        cancelUrl: 'https://example.com/cancel',
+        subject: { type: 'team', id: 'team_123' },
+      })
+    ).toEqual({
+      environment: 'test',
+      mode: 'subscription',
+      lineItems: [{ stripePriceId: 'price_123', quantity: 1 }],
+      successUrl: 'https://example.com/success',
+      cancelUrl: 'https://example.com/cancel',
+      subject: { type: 'team', id: 'team_123' },
+    });
+  });
+
+  it('requires runtime list filters to specify explicit environment and complete subject filters', () => {
+    expect(listPaymentHistoryRequestSchema.parse({ environment: 'live' })).toEqual({
+      environment: 'live',
+      limit: 50,
+    });
+    expect(
+      listSubscriptionsRequestSchema.parse({
+        environment: 'test',
+        subjectType: 'organization',
+        subjectId: 'org_123',
+        limit: '25',
+      })
+    ).toEqual({
+      environment: 'test',
+      subjectType: 'organization',
+      subjectId: 'org_123',
+      limit: 25,
+    });
+
+    expect(() => listPaymentHistoryRequestSchema.parse({})).toThrow();
+    expect(() =>
+      listSubscriptionsRequestSchema.parse({ environment: 'test', subjectType: 'team' })
+    ).toThrow(/provided together/i);
   });
 });
