@@ -554,16 +554,64 @@ describe('ComputeServicesService', () => {
       });
 
       mockCreateApp.mockRejectedValue(new Error('Fly API error (500): internal error'));
+      mockDestroyApp.mockResolvedValue(undefined);
 
       // DELETE cleanup
       mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
 
       await expect(service.prepareForDeploy(input)).rejects.toThrow('Fly API error (500)');
 
+      // Verify Fly-side cleanup so the partially-created app doesn't leak
+      // (regression: previously only the DB row was deleted, leaving the
+      // Fly app orphaned in our org).
+      expect(mockDestroyApp).toHaveBeenCalledWith('my-api-proj-123');
+
       // Verify cleanup DELETE
       const deleteCall = mockQuery.mock.calls[1];
       expect(deleteCall[0]).toContain('DELETE FROM compute.services');
       expect(deleteCall[1]).toEqual([serviceId]);
+    });
+
+    it('still rethrows the original Fly error if destroyApp cleanup itself fails', async () => {
+      const serviceId = 'svc-deploy-4';
+
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          {
+            id: serviceId,
+            project_id: input.projectId,
+            name: input.name,
+            image_url: input.imageUrl,
+            port: input.port,
+            cpu: input.cpu,
+            memory: input.memory,
+            region: input.region,
+            fly_app_id: 'my-api-proj-123',
+            fly_machine_id: null,
+            status: 'deploying',
+            endpoint_url: 'https://my-api-proj-123.fly.dev',
+            env_vars_encrypted: null,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+      });
+
+      mockCreateApp.mockRejectedValue(new Error('Fly API error (500): IP allocation failed'));
+      mockDestroyApp.mockRejectedValue(new Error('Fly API error (502): bad gateway'));
+
+      // DELETE cleanup still runs despite destroyApp failure.
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+
+      await expect(service.prepareForDeploy(input)).rejects.toThrow(
+        /IP allocation failed/
+      );
+
+      // destroyApp was attempted (best effort).
+      expect(mockDestroyApp).toHaveBeenCalledWith('my-api-proj-123');
+      // DB row still cleaned up.
+      const deleteCall = mockQuery.mock.calls[1];
+      expect(deleteCall[0]).toContain('DELETE FROM compute.services');
     });
   });
 
