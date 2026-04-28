@@ -15,12 +15,14 @@ export interface CreateServiceInput {
   projectId: string;
   name: string;
   /**
-   * Either `imageUrl` (deploy a pre-built image) or (`sourceKey` + `imageTag`)
-   * (build from source via cloud's CodeBuild, then deploy) is required.
+   * Image URL — image-mode (any registry) or source-mode (digest-pinned
+   * registry.fly.io ref produced by the CLI's flyctl remote build + push).
+   *
+   * Required for createService (immediate launch path). Omit for
+   * prepareForDeploy (which creates the Fly app without launching a machine
+   * — the CLI then runs flyctl, then PATCH triggers launch with the new image).
    */
   imageUrl?: string;
-  sourceKey?: string;
-  imageTag?: string;
   port: number;
   cpu: string;
   memory: number;
@@ -29,12 +31,11 @@ export interface CreateServiceInput {
 }
 
 export interface UpdateServiceInput {
-  /** Pre-built image URL. Mutually exclusive with sourceKey/imageTag. */
+  /**
+   * New image URL — image-mode (any registry) or source-mode digest-pinned
+   * registry.fly.io ref. For non-image updates (port-only, env-only) omit.
+   */
   imageUrl?: string;
-  /** S3 key from /build-creds. Triggers cloud-side build before update. */
-  sourceKey?: string;
-  /** ECR tag the source-mode build will produce, paired with sourceKey. */
-  imageTag?: string;
   port?: number;
   cpu?: string;
   memory?: number;
@@ -248,47 +249,6 @@ export class ComputeServicesService {
     return fly.issueDeployToken(service.flyAppId);
   }
 
-  // Mint a presigned S3 PUT URL for the CLI to upload source.tgz directly
-  // to the cloud's source-staging bucket. Cloud-mode only (CodeBuild lives
-  // in InsForge's AWS account). Cloud handles per-project throttling.
-  async issueBuildCredsForService(serviceId: string): Promise<{
-    sourceKey: string;
-    uploadUrl: string;
-    imageTag: string;
-    expiresAt: string;
-  }> {
-    const service = await this.getService(serviceId);
-    return this.issueBuildCredsByName(service.name);
-  }
-
-  // Same as issueBuildCredsForService but takes a name directly. Used on
-  // the first deploy when the service doesn't exist in the DB yet — CLI
-  // calls this, uploads source, then POSTs to /services with the resulting
-  // sourceKey + imageTag to create + deploy in one go.
-  async issueBuildCredsByName(name: string): Promise<{
-    sourceKey: string;
-    uploadUrl: string;
-    imageTag: string;
-    expiresAt: string;
-  }> {
-    const fly = this.getCompute();
-    if (!(fly instanceof CloudComputeProvider)) {
-      throw new AppError(
-        'Source-deploy is only supported in cloud-managed mode.',
-        400,
-        ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED
-      );
-    }
-    if (!fly.issueBuildCreds) {
-      throw new AppError(
-        'Source-deploy is not implemented by the configured compute provider.',
-        503,
-        ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED
-      );
-    }
-    return fly.issueBuildCreds(name);
-  }
-
   async createService(input: CreateServiceInput): Promise<ServiceSchema> {
     const fly = this.getCompute();
 
@@ -301,27 +261,16 @@ export class ComputeServicesService {
       );
     }
 
-    // Validate: must provide either imageUrl OR (sourceKey + imageTag)
-    if (!input.imageUrl && !(input.sourceKey && input.imageTag)) {
+    // createService is the image-mode immediate-launch path; imageUrl is required.
+    // (Source mode goes through prepareForDeploy → CLI flyctl → PATCH-launches-machine.)
+    if (!input.imageUrl) {
       throw new AppError(
-        'Must provide either imageUrl (image-mode) or sourceKey+imageTag (source-mode).',
+        'imageUrl is required for createService.',
         400,
-        ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED
+        ERROR_CODES.INVALID_INPUT
       );
     }
-    if (input.imageUrl && input.sourceKey) {
-      throw new AppError(
-        'Cannot provide both imageUrl and sourceKey — pick one mode.',
-        400,
-        ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED
-      );
-    }
-
-    // For source-mode, the row records the ECR tag the build will produce.
-    // After build completes, the cloud-resolved digest-pinned tag is what
-    // actually runs, but the bare tag is what we display in /list etc.
-    // Earlier validation guarantees one of imageUrl/imageTag is set.
-    const recordedImageUrl = input.imageUrl ?? input.imageTag ?? '';
+    const recordedImageUrl = input.imageUrl;
 
     const envVarsEncrypted = input.envVars
       ? EncryptionManager.encrypt(JSON.stringify(input.envVars))
@@ -373,8 +322,6 @@ export class ComputeServicesService {
       const { machineId } = await fly.launchMachine({
         appId: flyAppName,
         image: input.imageUrl,
-        sourceKey: input.sourceKey,
-        imageTag: input.imageTag,
         port: input.port,
         cpu: input.cpu,
         memory: input.memory,
@@ -511,55 +458,6 @@ export class ComputeServicesService {
     return mapRowToSchema(insertResult.rows[0]);
   }
 
-  async syncAfterDeploy(id: string): Promise<ServiceSchema> {
-    const svc = await this.getService(id);
-
-    if (!svc.flyAppId) {
-      throw new AppError(
-        'Service not found',
-        404,
-        ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
-        NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS
-      );
-    }
-
-    const fly = this.getCompute();
-    const machines = await fly.listMachines(svc.flyAppId);
-
-    if (machines.length === 0) {
-      // Deploy may have failed — mark as failed
-      await this.getPool().query(`UPDATE compute.services SET status = 'failed' WHERE id = $1`, [
-        id,
-      ]);
-      return this.getService(id);
-    }
-
-    const machine = machines[0];
-    const status =
-      machine.state === 'started' || machine.state === 'running'
-        ? 'running'
-        : machine.state === 'stopped'
-          ? 'stopped'
-          : 'deploying';
-
-    const result = await this.getPool().query(
-      `UPDATE compute.services SET fly_machine_id = $1, status = $2 WHERE id = $3 RETURNING *`,
-      [machine.id, status, id]
-    );
-
-    if (!result.rows.length) {
-      throw new AppError(
-        'Service not found',
-        404,
-        ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
-        NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS
-      );
-    }
-
-    logger.info('Compute service synced after deploy', { id, machineId: machine.id, status });
-    return mapRowToSchema(result.rows[0]);
-  }
-
   async updateService(id: string, data: UpdateServiceInput): Promise<ServiceSchema> {
     const existing = await this.getService(id);
 
@@ -609,15 +507,7 @@ export class ComputeServicesService {
 
     // If deployment-affecting fields changed and a machine exists, update Fly FIRST.
     // Only commit to DB after Fly accepts the new config to avoid stale DB state.
-    const deployFields = [
-      'imageUrl',
-      'sourceKey',
-      'imageTag',
-      'port',
-      'cpu',
-      'memory',
-      'envVars',
-    ] as const;
+    const deployFields = ['imageUrl', 'port', 'cpu', 'memory', 'envVars'] as const;
     const hasDeployChange = deployFields.some((f) => data[f] !== undefined);
 
     // env_vars merge is needed by both Fly-touching branches (updateMachine
@@ -644,15 +534,10 @@ export class ComputeServicesService {
       // be changed in-place via updateMachine — a region change requires redeployment
       // (destroy + recreate). The region field is stored for the next deploy.
       try {
-        // Source-mode redeploy: forward sourceKey + imageTag to cloud, which
-        // builds first then updates with the resolved image. Image-mode
-        // redeploy: forward imageUrl as before.
         await this.getCompute().updateMachine({
           appId: existing.flyAppId,
           machineId: existing.flyMachineId,
-          image: data.sourceKey ? undefined : (data.imageUrl ?? existing.imageUrl),
-          sourceKey: data.sourceKey,
-          imageTag: data.imageTag,
+          image: data.imageUrl ?? existing.imageUrl,
           port: data.port ?? existing.port,
           cpu: data.cpu ?? existing.cpu,
           memory: data.memory ?? existing.memory,

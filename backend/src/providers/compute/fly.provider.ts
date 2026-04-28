@@ -168,26 +168,13 @@ export class FlyProvider implements ComputeProvider {
 
   async launchMachine(params: {
     appId: string;
-    image?: string;
-    sourceKey?: string;
-    imageTag?: string;
+    image: string;
     port: number;
     cpu: string;
     memory: number;
     envVars: Record<string, string>;
     region: string;
   }): Promise<{ machineId: string }> {
-    // Source-mode (sourceKey + imageTag) requires CodeBuild and lives only
-    // on CloudComputeProvider. FlyProvider's interface mirrors the abstract
-    // ComputeProvider's `image?: string` and TS bivariance lets undefined
-    // through. Fail loudly here instead of sending `image: null` to Fly's
-    // machines API and surfacing a cryptic 422 to the user.
-    if (!params.image) {
-      throw new Error(
-        'FlyProvider does not support source-mode builds (sourceKey/imageTag). ' +
-          'Provide a pre-built imageUrl, or use CloudComputeProvider for source builds.'
-      );
-    }
     const guest = this.mapCpuTier(params.cpu, params.memory);
     const result = await this.requestJson<{ id: string }>(`/apps/${params.appId}/machines`, {
       method: 'POST',
