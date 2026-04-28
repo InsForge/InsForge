@@ -13,6 +13,7 @@ import {
   SquarePen,
   Download,
   BookOpen,
+  CreditCard,
 } from 'lucide-react';
 
 export interface DashboardSecondaryMenuItem {
@@ -98,6 +99,12 @@ export const dashboardStaticMenuItems: DashboardPrimaryMenuItem[] = [
     label: 'Model Gateway',
     href: '/dashboard/ai',
     icon: Sparkles,
+  },
+  {
+    id: 'payments',
+    label: 'Payments',
+    href: '/dashboard/payments',
+    icon: CreditCard,
     sectionEnd: true,
   },
   {
