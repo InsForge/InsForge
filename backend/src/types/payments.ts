@@ -23,7 +23,9 @@ export type StripeWebhookEndpoint = AsyncIterableItem<
 export type StripeWebhookEndpointCreateResult = Awaited<
   ReturnType<StripeInstance['webhookEndpoints']['create']>
 >;
-export type StripeSubscription = Awaited<ReturnType<StripeInstance['subscriptions']['retrieve']>>;
+export type StripeSubscription = AsyncIterableItem<
+  ReturnType<StripeInstance['subscriptions']['list']>
+>;
 export type StripeSubscriptionItem = StripeSubscription['items']['data'][number];
 export type StripePaymentIntent = Awaited<ReturnType<StripeInstance['paymentIntents']['retrieve']>>;
 export type StripeCharge = Awaited<ReturnType<StripeInstance['charges']['retrieve']>>;
@@ -31,7 +33,14 @@ export type StripeInvoice = Awaited<ReturnType<StripeInstance['invoices']['retri
 export type StripeRefund = Awaited<ReturnType<StripeInstance['refunds']['retrieve']>>;
 export type StripeClient = Pick<
   StripeInstance,
-  'accounts' | 'products' | 'prices' | 'customers' | 'checkout' | 'webhooks' | 'webhookEndpoints'
+  | 'accounts'
+  | 'products'
+  | 'prices'
+  | 'customers'
+  | 'checkout'
+  | 'webhooks'
+  | 'webhookEndpoints'
+  | 'subscriptions'
 >;
 
 export interface StripeKeyConfig {
@@ -203,8 +212,8 @@ export interface StripeSubscriptionRow {
   environment: StripeEnvironment;
   stripeSubscriptionId: string;
   stripeCustomerId: string;
-  subjectType: string;
-  subjectId: string;
+  subjectType: string | null;
+  subjectId: string | null;
   status:
     | 'incomplete'
     | 'incomplete_expired'

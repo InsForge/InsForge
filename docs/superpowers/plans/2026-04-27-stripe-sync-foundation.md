@@ -56,7 +56,7 @@ Rows missing from a successful sync for the same environment are marked `is_dele
 - `POST /api/payments/config`: stores a test/live Stripe secret key in the secret store.
 - `DELETE /api/payments/config/:environment`: removes a test/live Stripe secret key from the secret store.
 - `GET /api/payments/catalog?environment=test|live`: returns mirrored products and prices.
-- `POST /api/payments/sync`: syncs `test`, `live`, or `all`.
+- `POST /api/payments/catalog/sync`: syncs `test`, `live`, or `all`.
 
 All routes require admin auth.
 

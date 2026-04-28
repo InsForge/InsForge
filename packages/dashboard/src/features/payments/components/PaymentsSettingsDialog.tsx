@@ -154,20 +154,22 @@ function EnvironmentKeySection({
         {error && <p className="text-xs text-destructive">{error}</p>}
 
         {config?.hasKey && (
-          <div className="flex items-center justify-between gap-3 rounded border border-[var(--alpha-8)] bg-muted/40 p-3">
-            <p className="text-xs leading-5 text-muted-foreground">
-              Remove this Stripe key from InsForge&apos;s secret store.
-            </p>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={onRemove}
-              disabled={isBusy}
-              className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
-            >
-              Remove
-            </Button>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between gap-3 rounded border border-[var(--alpha-8)] bg-muted/40 p-3">
+              <p className="text-xs leading-5 text-muted-foreground">
+                Remove this Stripe key from InsForge&apos;s secret store.
+              </p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={onRemove}
+                disabled={isBusy}
+                className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              >
+                Remove
+              </Button>
+            </div>
           </div>
         )}
       </div>
@@ -275,9 +277,9 @@ export function PaymentsSettingsDialog({ open, onOpenChange }: PaymentsSettingsD
             <div className="flex flex-col gap-6">
               <div>
                 <p className="text-sm leading-6 text-muted-foreground">
-                  Configure the Stripe secret keys InsForge uses to sync products and prices. The
-                  test key is for implementation and validation; the live key is used only when you
-                  intentionally sync production catalog data.
+                  Configure the Stripe secret keys InsForge uses for catalog sync, checkout, and
+                  webhooks. The test key is for implementation and validation; the live key is used
+                  only when you intentionally work with production Stripe data.
                 </p>
               </div>
 

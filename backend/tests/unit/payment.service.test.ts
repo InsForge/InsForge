@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { StripeAccount, StripePrice, StripeProduct } from '../../src/types/payments';
+import type {
+  StripeAccount,
+  StripePrice,
+  StripeProduct,
+  StripeSubscription,
+} from '../../src/types/payments';
 
 const { mockPool, mockProvider, mockGetSecretByKey, mockEncrypt } = vi.hoisted(() => ({
   mockPool: {
@@ -20,6 +25,7 @@ const { mockPool, mockProvider, mockGetSecretByKey, mockEncrypt } = vi.hoisted((
     listWebhookEndpoints: vi.fn(),
     createWebhookEndpoint: vi.fn(),
     deleteWebhookEndpoint: vi.fn(),
+    listSubscriptions: vi.fn(),
   },
   mockGetSecretByKey: vi.fn(),
   mockEncrypt: vi.fn(),
@@ -159,6 +165,7 @@ describe('PaymentService', () => {
       url: 'http://localhost:7130/api/webhooks/stripe/test',
       secret: 'whsec_new',
     });
+    mockProvider.listSubscriptions.mockResolvedValue([]);
     mockProvider.syncCatalog.mockResolvedValue({
       account: {
         id: 'acct_123',
@@ -258,6 +265,52 @@ describe('PaymentService', () => {
       'STRIPE_TEST_WEBHOOK_SECRET',
       'encrypted-secret',
     ]);
+    expect(mockProvider.syncCatalog).toHaveBeenCalledTimes(1);
+  });
+
+  it('saves Stripe keys even when managed webhook setup fails', async () => {
+    const mockClient = {
+      query: vi.fn().mockResolvedValue({ rows: [] }),
+      release: vi.fn(),
+    };
+    mockPool.connect.mockResolvedValue(mockClient);
+    mockPool.query.mockResolvedValueOnce({
+      rows: [{ stripeAccountId: 'acct_123', hasPaymentRows: false }],
+    });
+    mockProvider.createWebhookEndpoint.mockRejectedValueOnce(
+      new Error(
+        'Invalid URL: URL must be publicly accessible. Consider using a tool like the Stripe CLI to test webhooks locally.'
+      )
+    );
+
+    await expect(
+      PaymentService.getInstance().setStripeSecretKey('test', 'sk_test_newsecret1234')
+    ).resolves.toBeUndefined();
+
+    expect(mockProvider.retrieveAccount).toHaveBeenCalledTimes(1);
+    expect(mockProvider.createWebhookEndpoint).toHaveBeenCalledTimes(1);
+    expect(mockClient.query).toHaveBeenCalledWith(expect.stringMatching(/system\.secrets/i), [
+      'STRIPE_TEST_SECRET_KEY',
+      'encrypted-secret',
+    ]);
+    expect(mockClient.query).toHaveBeenCalledWith(
+      expect.stringMatching(/UPDATE system\.secrets/i),
+      ['STRIPE_TEST_WEBHOOK_SECRET']
+    );
+    expect(mockClient.query).toHaveBeenCalledWith(
+      expect.stringMatching(/INSERT INTO payments\.stripe_connections/i),
+      [
+        'test',
+        'acct_123',
+        'owner@example.com',
+        false,
+        null,
+        null,
+        expect.objectContaining({ id: 'acct_123' }),
+        false,
+      ]
+    );
+    expect(mockEncrypt).not.toHaveBeenCalledWith('whsec_new');
     expect(mockProvider.syncCatalog).toHaveBeenCalledTimes(1);
   });
 
@@ -1206,6 +1259,79 @@ describe('PaymentService', () => {
       expect.arrayContaining(['test', 'si_123', 'sub_123', 'prod_123', 'price_123', 1])
     );
     expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
+  });
+
+  it('syncs existing Stripe subscriptions as unmapped when no billing subject exists', async () => {
+    const mockClient = {
+      query: vi.fn().mockResolvedValue({ rowCount: 0, rows: [] }),
+      release: vi.fn(),
+    };
+    mockPool.connect.mockResolvedValue(mockClient);
+    mockProvider.listSubscriptions.mockResolvedValueOnce([
+      {
+        id: 'sub_existing',
+        object: 'subscription',
+        customer: 'cus_existing',
+        status: 'active',
+        current_period_start: null,
+        current_period_end: null,
+        cancel_at_period_end: false,
+        cancel_at: null,
+        canceled_at: null,
+        trial_start: null,
+        trial_end: null,
+        latest_invoice: 'in_existing',
+        metadata: {},
+        items: {
+          data: [
+            {
+              id: 'si_existing',
+              object: 'subscription_item',
+              current_period_start: 1777334400,
+              current_period_end: 1779926400,
+              quantity: 1,
+              metadata: {},
+              price: {
+                id: 'price_existing',
+                product: 'prod_existing',
+              },
+            },
+          ],
+        },
+      } as unknown as StripeSubscription,
+    ]);
+
+    await expect(
+      PaymentService.getInstance().syncSubscriptions({ environment: 'test' })
+    ).resolves.toEqual({
+      environment: 'test',
+      synced: 1,
+      unmapped: 1,
+      deleted: 0,
+    });
+
+    expect(mockProvider.listSubscriptions).toHaveBeenCalledTimes(1);
+    expect(mockClient.query).toHaveBeenCalledWith(
+      expect.stringMatching(/INSERT INTO payments\.subscriptions/i),
+      expect.arrayContaining(['test', 'sub_existing', 'cus_existing', null, null, 'active'])
+    );
+    expect(mockClient.query).toHaveBeenCalledWith(
+      expect.stringMatching(/INSERT INTO payments\.subscription_items/i),
+      expect.arrayContaining([
+        'test',
+        'si_existing',
+        'sub_existing',
+        'prod_existing',
+        'price_existing',
+        1,
+      ])
+    );
+    expect(mockClient.query).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /DELETE FROM payments\.subscriptions[\s\S]*NOT \(stripe_subscription_id = ANY/i
+      ),
+      ['test', ['sub_existing']]
+    );
   });
 
   it('lists payment history for an environment and billing subject', async () => {

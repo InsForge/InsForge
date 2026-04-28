@@ -26,6 +26,7 @@ export function usePaymentsConfig() {
         queryClient.invalidateQueries({ queryKey: PAYMENTS_CONFIG_QUERY_KEY }),
         queryClient.invalidateQueries({ queryKey: ['payments', 'status'] }),
         queryClient.invalidateQueries({ queryKey: ['payments', 'catalog'] }),
+        queryClient.invalidateQueries({ queryKey: ['payments', 'subscriptions'] }),
       ]);
       showToast('Stripe key saved successfully', 'success');
     },
@@ -41,6 +42,7 @@ export function usePaymentsConfig() {
         queryClient.invalidateQueries({ queryKey: PAYMENTS_CONFIG_QUERY_KEY }),
         queryClient.invalidateQueries({ queryKey: ['payments', 'status'] }),
         queryClient.invalidateQueries({ queryKey: ['payments', 'catalog'] }),
+        queryClient.invalidateQueries({ queryKey: ['payments', 'subscriptions'] }),
       ]);
       showToast('Stripe key removed', 'success');
     },

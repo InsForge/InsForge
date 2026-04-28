@@ -131,7 +131,7 @@ function ProductTable({
       <div className="mx-auto flex w-4/5 max-w-[1024px] flex-col items-center justify-center rounded border border-dashed border-[var(--alpha-8)] bg-card p-8 text-center">
         <p className="text-sm font-medium text-foreground">No products found</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Sync Stripe after creating products in your Stripe dashboard.
+          Sync Catalog after creating products in your Stripe dashboard.
         </p>
       </div>
     );
@@ -412,7 +412,7 @@ export default function ProductsPage() {
                 ) : (
                   <RefreshCw className="h-4 w-4" />
                 )}
-                Sync Stripe
+                Sync Catalog
               </Button>
             </>
           ) : null

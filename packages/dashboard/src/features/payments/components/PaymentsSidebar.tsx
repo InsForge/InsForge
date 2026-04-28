@@ -11,6 +11,11 @@ const PAYMENTS_SIDEBAR_ITEMS: FeatureSidebarListItem[] = [
     label: 'Products',
     href: '/dashboard/payments/products',
   },
+  {
+    id: 'subscriptions',
+    label: 'Subscriptions',
+    href: '/dashboard/payments/subscriptions',
+  },
 ];
 
 interface PaymentsSidebarProps {

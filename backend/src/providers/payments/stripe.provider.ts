@@ -15,6 +15,7 @@ import type {
   StripeProductCreateInput,
   StripeProductDeleteResult,
   StripeProductUpdateInput,
+  StripeSubscription,
   StripeSyncSnapshot,
   StripeWebhookEndpoint,
   StripeWebhookEndpointCreateResult,
@@ -33,6 +34,7 @@ type StripeCustomerCreateParams = Parameters<StripeClient['customers']['create']
 type StripeCheckoutSessionCreateParams = Parameters<
   StripeClient['checkout']['sessions']['create']
 >[0];
+type StripeSubscriptionListParams = Parameters<StripeClient['subscriptions']['list']>[0];
 type StripeWebhookEndpointCreateParams = Parameters<StripeClient['webhookEndpoints']['create']>[0];
 type StripeWebhookEndpointEnabledEvent =
   StripeWebhookEndpointCreateParams['enabled_events'][number];
@@ -180,6 +182,20 @@ export class StripeProvider {
 
   async deleteWebhookEndpoint(webhookEndpointId: string): Promise<void> {
     await this.client.webhookEndpoints.del(webhookEndpointId);
+  }
+
+  async listSubscriptions(): Promise<StripeSubscription[]> {
+    const subscriptions: StripeSubscription[] = [];
+    const params: StripeSubscriptionListParams = {
+      limit: 100,
+      status: 'all',
+    };
+
+    for await (const subscription of this.client.subscriptions.list(params)) {
+      subscriptions.push(subscription);
+    }
+
+    return subscriptions;
   }
 
   async listProducts(): Promise<StripeProduct[]> {

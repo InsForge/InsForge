@@ -14,7 +14,8 @@ import {
   listPaymentCatalogRequestSchema,
   listPaymentHistoryRequestSchema,
   listSubscriptionsRequestSchema,
-  syncPaymentsRequestSchema,
+  syncPaymentCatalogRequestSchema,
+  syncPaymentSubscriptionsRequestSchema,
 } from '@insforge/shared-schemas';
 
 const router = Router();
@@ -135,6 +136,26 @@ router.get('/subscriptions', async (req: AuthRequest, res: Response, next: NextF
   }
 });
 
+router.post('/subscriptions/sync', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const validation = syncPaymentSubscriptionsRequestSchema.safeParse(req.body);
+    if (!validation.success) {
+      throw new AppError(
+        validation.error.issues
+          .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+          .join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    const result = await paymentService.syncSubscriptions(validation.data);
+    successResponse(res, result);
+  } catch (error) {
+    next(normalizeStripeConfigError(error));
+  }
+});
+
 router.post('/checkout-sessions', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const validation = createCheckoutSessionRequestSchema.safeParse(req.body);
@@ -175,9 +196,9 @@ router.get('/catalog', async (req: AuthRequest, res: Response, next: NextFunctio
   }
 });
 
-router.post('/sync', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/catalog/sync', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const validation = syncPaymentsRequestSchema.safeParse(req.body);
+    const validation = syncPaymentCatalogRequestSchema.safeParse(req.body);
     if (!validation.success) {
       throw new AppError(
         validation.error.issues

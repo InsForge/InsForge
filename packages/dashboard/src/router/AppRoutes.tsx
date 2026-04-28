@@ -31,6 +31,7 @@ import AILayout from '../features/ai/components/AILayout';
 import AIPage from '../features/ai/pages/AIPage';
 import PaymentsLayout from '../features/payments/components/PaymentsLayout';
 import ProductsPage from '../features/payments/pages/ProductsPage';
+import SubscriptionsPage from '../features/payments/pages/SubscriptionsPage';
 import RealtimeLayout from '../features/realtime/components/RealtimeLayout';
 import RealtimeChannelsPage from '../features/realtime/pages/RealtimeChannelsPage';
 import RealtimeMessagesPage from '../features/realtime/pages/RealtimeMessagesPage';
@@ -112,6 +113,7 @@ function AuthenticatedRoutes() {
         <Route path="/dashboard/payments" element={<PaymentsLayout />}>
           <Route index element={<Navigate to="products" replace />} />
           <Route path="products" element={<ProductsPage />} />
+          <Route path="subscriptions" element={<SubscriptionsPage />} />
         </Route>
         <Route path="/dashboard/realtime" element={<RealtimeLayout />}>
           <Route index element={<Navigate to="channels" replace />} />

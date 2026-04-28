@@ -10,7 +10,7 @@ import {
   stripeWebhookEventSchema,
 } from './payments.schema.js';
 
-export const syncPaymentsRequestSchema = z.object({
+export const syncPaymentCatalogRequestSchema = z.object({
   environment: z.union([stripeEnvironmentSchema, z.literal('all')]).default('all'),
 });
 
@@ -108,7 +108,7 @@ export const updatePaymentPriceRequestSchema = z
     message: 'At least one price field is required',
   });
 
-export const syncPaymentsResponseSchema = z.object({
+export const syncPaymentCatalogResponseSchema = z.object({
   connections: z.array(stripeConnectionSchema),
 });
 
@@ -237,6 +237,15 @@ export const listSubscriptionsResponseSchema = z.object({
   subscriptions: z.array(stripeSubscriptionSchema),
 });
 
+export const syncPaymentSubscriptionsRequestSchema = paymentEnvironmentRequestSchema;
+
+export const syncPaymentSubscriptionsResponseSchema = z.object({
+  environment: stripeEnvironmentSchema,
+  synced: z.number().int().nonnegative(),
+  unmapped: z.number().int().nonnegative(),
+  deleted: z.number().int().nonnegative(),
+});
+
 export const stripeWebhookResponseSchema = z.object({
   received: z.boolean(),
   handled: z.boolean(),
@@ -258,7 +267,7 @@ export const upsertPaymentsConfigRequestSchema = z.object({
   secretKey: z.string().min(1, 'Stripe secret key is required'),
 });
 
-export type SyncPaymentsRequest = z.infer<typeof syncPaymentsRequestSchema>;
+export type SyncPaymentCatalogRequest = z.infer<typeof syncPaymentCatalogRequestSchema>;
 export type ListPaymentCatalogRequest = z.infer<typeof listPaymentCatalogRequestSchema>;
 export type PaymentEnvironmentRequest = z.infer<typeof paymentEnvironmentRequestSchema>;
 export type ListPaymentProductsRequest = z.infer<typeof listPaymentProductsRequestSchema>;
@@ -280,8 +289,12 @@ export type ListPaymentHistoryRequest = z.infer<typeof listPaymentHistoryRequest
 export type ListSubscriptionsRequest = z.infer<typeof listSubscriptionsRequestSchema>;
 export type ListPaymentHistoryResponse = z.infer<typeof listPaymentHistoryResponseSchema>;
 export type ListSubscriptionsResponse = z.infer<typeof listSubscriptionsResponseSchema>;
+export type SyncPaymentSubscriptionsRequest = z.infer<typeof syncPaymentSubscriptionsRequestSchema>;
+export type SyncPaymentSubscriptionsResponse = z.infer<
+  typeof syncPaymentSubscriptionsResponseSchema
+>;
 export type StripeWebhookResponse = z.infer<typeof stripeWebhookResponseSchema>;
-export type SyncPaymentsResponse = z.infer<typeof syncPaymentsResponseSchema>;
+export type SyncPaymentCatalogResponse = z.infer<typeof syncPaymentCatalogResponseSchema>;
 export type GetPaymentsStatusResponse = z.infer<typeof getPaymentsStatusResponseSchema>;
 export type ListPaymentCatalogResponse = z.infer<typeof listPaymentCatalogResponseSchema>;
 export type ListPaymentProductsResponse = z.infer<typeof listPaymentProductsResponseSchema>;
