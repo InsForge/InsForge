@@ -1,4 +1,4 @@
-import { type MouseEventHandler, type ReactNode, useMemo, useRef, useState } from 'react';
+import { type MouseEventHandler, type ReactNode, useId, useMemo, useRef, useState } from 'react';
 import type { DashboardMetricDataPoint } from '../../../../types';
 import { aggregateMetricSeries } from '../../utils/aggregateMetricSeries';
 
@@ -9,10 +9,14 @@ export interface MetricChartCardProps {
   rangeSeconds: number;
   formatValue: (value: number) => string;
   isLoading?: boolean;
+  threshold?: number;
 }
 
 const SPARKLINE_WIDTH = 434;
 const SPARKLINE_HEIGHT = 100;
+// Figma reserves 29px on the left for the y-axis labels (e.g. "85%"), so the
+// threshold dashed line and reference grid start after them.
+const Y_AXIS_LABEL_WIDTH = 29;
 
 interface SparklinePoint {
   x: number;
@@ -25,21 +29,33 @@ interface SparklineGeometry {
   line: string;
   area: string;
   points: SparklinePoint[];
+  min: number | null;
+  max: number | null;
 }
 
-function buildSparkline(data: DashboardMetricDataPoint[], rangeSeconds: number): SparklineGeometry {
+function buildSparkline(
+  data: DashboardMetricDataPoint[],
+  rangeSeconds: number,
+  fixedDomain?: [number, number]
+): SparklineGeometry {
   const finite = data
     .filter((p) => Number.isFinite(p.value))
     .sort((a, b) => a.timestamp - b.timestamp);
   if (finite.length < 2) {
-    return { line: '', area: '', points: [] };
+    return { line: '', area: '', points: [], min: null, max: null };
   }
   const values = finite.map((p) => p.value);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+  const dataMin = Math.min(...values);
+  const dataMax = Math.max(...values);
+  const min = fixedDomain ? fixedDomain[0] : dataMin;
+  const max = fixedDomain ? fixedDomain[1] : dataMax;
   const valueRange = max - min || 1;
 
-  const windowEnd = Math.floor(Date.now() / 1000);
+  // Anchor the right edge of the chart to the last data point's timestamp
+  // (rather than "now"), so the line always reaches the right edge regardless
+  // of how stale the data is.
+  const lastTimestamp = finite[finite.length - 1].timestamp;
+  const windowEnd = lastTimestamp;
   const windowStart = windowEnd - rangeSeconds;
   const tRange = Math.max(1, windowEnd - windowStart);
 
@@ -57,7 +73,7 @@ function buildSparkline(data: DashboardMetricDataPoint[], rangeSeconds: number):
   const lastX = points[points.length - 1].x.toFixed(2);
   const area = `${line} L${lastX},${SPARKLINE_HEIGHT} L${firstX},${SPARKLINE_HEIGHT} Z`;
 
-  return { line, area, points };
+  return { line, area, points, min, max };
 }
 
 function formatHoverTime(ts: number, rangeSeconds: number): string {
@@ -70,6 +86,8 @@ function formatHoverTime(ts: number, rangeSeconds: number): string {
   return `${date} ${time}`;
 }
 
+const FIXED_PERCENT_DOMAIN: [number, number] = [0, 100];
+
 export function MetricChartCard({
   title,
   icon,
@@ -77,11 +95,23 @@ export function MetricChartCard({
   rangeSeconds,
   formatValue,
   isLoading,
+  threshold,
 }: MetricChartCardProps) {
   const aggregates = useMemo(() => aggregateMetricSeries(data), [data]);
-  const sparkline = useMemo(() => buildSparkline(data, rangeSeconds), [data, rangeSeconds]);
+  const sparkline = useMemo(
+    () =>
+      buildSparkline(
+        data,
+        rangeSeconds,
+        threshold !== undefined ? FIXED_PERCENT_DOMAIN : undefined
+      ),
+    [data, rangeSeconds, threshold]
+  );
+  const gradientId = useId();
   const xAxisTicks = useMemo(() => {
-    const end = Math.floor(Date.now() / 1000);
+    const finite = data.filter((p) => Number.isFinite(p.value));
+    const end =
+      finite.length > 0 ? finite[finite.length - 1].timestamp : Math.floor(Date.now() / 1000);
     const start = end - rangeSeconds;
     const mid = start + Math.floor(rangeSeconds / 2);
     return [start, mid, end].map((ts) => formatHoverTime(ts, rangeSeconds));
@@ -120,6 +150,8 @@ export function MetricChartCard({
   const hoverTopPct = hover ? (hover.y / SPARKLINE_HEIGHT) * 100 : 0;
   const tooltipTranslateX = hoverLeftPct < 15 ? '0%' : hoverLeftPct > 85 ? '-100%' : '-50%';
 
+  const thresholdOffsetPct = threshold !== undefined ? 100 - threshold : 0;
+
   return (
     <div className="flex flex-col overflow-hidden rounded border border-[var(--alpha-8)] bg-card">
       <div className="flex flex-col gap-3 p-4">
@@ -131,7 +163,7 @@ export function MetricChartCard({
           {isLoading ? '—' : renderValue(aggregates.latest)}
         </p>
         <div className="flex flex-col gap-1">
-          <div className="relative h-[100px] w-full">
+          <div className="relative h-[100px]">
             {sparkline.line ? (
               <>
                 <svg
@@ -143,15 +175,78 @@ export function MetricChartCard({
                   onMouseLeave={handleLeave}
                   aria-hidden="true"
                 >
-                  <path d={sparkline.area} fill="currentColor" className="text-emerald-300/15" />
+                  {threshold !== undefined && (
+                    <defs>
+                      <linearGradient
+                        id={`${gradientId}-line`}
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2={SPARKLINE_HEIGHT}
+                        gradientUnits="userSpaceOnUse"
+                      >
+                        <stop offset="0%" stopColor="rgb(var(--destructive))" />
+                        <stop
+                          offset={`${thresholdOffsetPct}%`}
+                          stopColor="rgb(var(--destructive))"
+                        />
+                        <stop
+                          offset={`${Math.min(100, thresholdOffsetPct + 10)}%`}
+                          stopColor="rgb(var(--primary))"
+                        />
+                        <stop offset="100%" stopColor="rgb(var(--primary))" />
+                      </linearGradient>
+                      <linearGradient
+                        id={`${gradientId}-area`}
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2={SPARKLINE_HEIGHT}
+                        gradientUnits="userSpaceOnUse"
+                      >
+                        <stop offset="0%" stopColor="rgb(var(--destructive))" stopOpacity={0.15} />
+                        <stop offset="100%" stopColor="rgb(var(--primary))" stopOpacity={0.15} />
+                      </linearGradient>
+                    </defs>
+                  )}
+                  <path
+                    d={sparkline.area}
+                    fill={threshold !== undefined ? `url(#${gradientId}-area)` : 'currentColor'}
+                    className={threshold !== undefined ? '' : 'text-emerald-300/15'}
+                  />
+                  {threshold !== undefined && (
+                    <line
+                      x1={Y_AXIS_LABEL_WIDTH}
+                      x2={SPARKLINE_WIDTH}
+                      y1={(SPARKLINE_HEIGHT * thresholdOffsetPct) / 100}
+                      y2={(SPARKLINE_HEIGHT * thresholdOffsetPct) / 100}
+                      stroke="var(--alpha-16)"
+                      strokeWidth={1}
+                      strokeDasharray="2 2"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  )}
                   <path
                     d={sparkline.line}
                     fill="none"
-                    stroke="currentColor"
+                    stroke={threshold !== undefined ? `url(#${gradientId}-line)` : 'currentColor'}
                     strokeWidth={2}
-                    className="text-emerald-300"
+                    className={threshold !== undefined ? '' : 'text-emerald-300'}
                   />
                 </svg>
+                {threshold !== undefined && (
+                  <>
+                    <span
+                      className="pointer-events-none absolute left-0 -translate-y-1/2 text-xs leading-4 text-muted-foreground"
+                      style={{ top: `${thresholdOffsetPct}%` }}
+                    >
+                      {threshold}%
+                    </span>
+                    <span className="pointer-events-none absolute bottom-0 left-0 text-xs leading-4 text-muted-foreground">
+                      0%
+                    </span>
+                  </>
+                )}
                 {hover && (
                   <>
                     <div
@@ -159,7 +254,7 @@ export function MetricChartCard({
                       style={{ left: `${hoverLeftPct}%` }}
                     />
                     <div
-                      className="pointer-events-none absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-300 ring-2 ring-card"
+                      className="pointer-events-none absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground ring-2 ring-card"
                       style={{ left: `${hoverLeftPct}%`, top: `${hoverTopPct}%` }}
                     />
                     <div
@@ -184,8 +279,8 @@ export function MetricChartCard({
             )}
           </div>
           {sparkline.line && (
-            <div className="relative h-4 w-full text-[11px] leading-4 text-muted-foreground">
-              <span className="absolute left-0">{xAxisTicks[0]}</span>
+            <div className="relative h-4 text-xs leading-4 text-muted-foreground">
+              {threshold === undefined && <span className="absolute left-0">{xAxisTicks[0]}</span>}
               <span className="absolute left-1/2 -translate-x-1/2">{xAxisTicks[1]}</span>
               <span className="absolute right-0">{xAxisTicks[2]}</span>
             </div>

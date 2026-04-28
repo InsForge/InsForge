@@ -18,6 +18,7 @@ interface MetricConfig {
   title: string;
   icon: React.ReactNode;
   format: (value: number) => string;
+  threshold?: number;
 }
 
 const PERCENT = (value: number) => `${value.toFixed(1)}%`;
@@ -33,18 +34,26 @@ const BYTES_PER_SEC = (value: number) => {
 };
 
 const METRICS: MetricConfig[] = [
-  { metric: 'cpu_usage', title: 'CPU Usage', icon: <Cpu className="h-5 w-5" />, format: PERCENT },
+  {
+    metric: 'cpu_usage',
+    title: 'CPU Usage',
+    icon: <Cpu className="h-5 w-5" />,
+    format: PERCENT,
+    threshold: 60,
+  },
   {
     metric: 'memory_usage',
     title: 'Memory Usage',
     icon: <MemoryStick className="h-5 w-5" />,
     format: PERCENT,
+    threshold: 85,
   },
   {
     metric: 'disk_usage',
     title: 'Disk Usage',
     icon: <HardDrive className="h-5 w-5" />,
     format: PERCENT,
+    threshold: 90,
   },
   {
     metric: 'network_in',
@@ -112,6 +121,7 @@ export function ObservabilitySection() {
                 rangeSeconds={RANGE_SECONDS[range]}
                 formatValue={config.format}
                 isLoading={isLoading}
+                threshold={config.threshold}
               />
             );
           })}
