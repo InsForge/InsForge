@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/insforge-insforge-badge.png)](https://mseep.ai/app/insforge-insforge)
+
 <div align="center">
   <a href="https://insforge.dev">
     <picture>
