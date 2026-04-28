@@ -130,31 +130,6 @@ export class CloudComputeProvider implements ComputeProvider {
     return { machineId: result.machineId };
   }
 
-  // Mint a presigned S3 PUT URL the CLI uses to upload source.tgz, plus
-  // the ECR image tag the resulting CodeBuild will produce. The CLI
-  // uploads source directly to S3 — bytes never proxy through OSS or cloud.
-  async issueBuildCreds(appId: string): Promise<{
-    sourceKey: string;
-    uploadUrl: string;
-    imageTag: string;
-    expiresAt: string;
-  }> {
-    const result = await this.call<{
-      sourceKey: string;
-      uploadUrl: string;
-      imageTag: string;
-      expiresAt: string;
-    }>('POST', `/apps/${encodeURIComponent(appId)}/build-creds`);
-    if (!result?.uploadUrl) {
-      throw new AppError(
-        `Cloud compute returned empty build-creds for ${appId}`,
-        502,
-        ERROR_CODES.COMPUTE_PROVIDER_ERROR
-      );
-    }
-    return result;
-  }
-
   async updateMachine(params: UpdateMachineParams): Promise<void> {
     await this.call('PATCH', `/machines/${encodeURIComponent(params.machineId)}`, params);
   }
