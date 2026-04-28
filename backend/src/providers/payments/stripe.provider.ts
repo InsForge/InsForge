@@ -2,7 +2,12 @@ import Stripe from 'stripe';
 import type {
   StripeAccount,
   StripeClient,
+  StripeCheckoutSession,
+  StripeCheckoutSessionCreateInput,
+  StripeCustomer,
+  StripeCustomerCreateInput,
   StripeEnvironment,
+  StripeEvent,
   StripePrice,
   StripePriceCreateInput,
   StripePriceUpdateInput,
@@ -11,6 +16,8 @@ import type {
   StripeProductDeleteResult,
   StripeProductUpdateInput,
   StripeSyncSnapshot,
+  StripeWebhookEndpoint,
+  StripeWebhookEndpointCreateResult,
 } from '@/types/payments.js';
 
 const KEY_PREFIX_BY_ENVIRONMENT: Record<StripeEnvironment, string> = {
@@ -22,6 +29,19 @@ type StripeProductCreateParams = Parameters<StripeClient['products']['create']>[
 type StripeProductUpdateParams = NonNullable<Parameters<StripeClient['products']['update']>[1]>;
 type StripePriceCreateParams = Parameters<StripeClient['prices']['create']>[0];
 type StripePriceUpdateParams = NonNullable<Parameters<StripeClient['prices']['update']>[1]>;
+type StripeCustomerCreateParams = Parameters<StripeClient['customers']['create']>[0];
+type StripeCheckoutSessionCreateParams = Parameters<
+  StripeClient['checkout']['sessions']['create']
+>[0];
+type StripeWebhookEndpointCreateParams = Parameters<StripeClient['webhookEndpoints']['create']>[0];
+type StripeWebhookEndpointEnabledEvent =
+  StripeWebhookEndpointCreateParams['enabled_events'][number];
+
+export interface StripeWebhookEndpointCreateInput {
+  url: string;
+  enabledEvents: StripeWebhookEndpointEnabledEvent[];
+  metadata?: Record<string, string>;
+}
 
 export class StripeKeyValidationError extends Error {
   constructor(message: string) {
@@ -79,6 +99,87 @@ export class StripeProvider {
     ]);
 
     return { account, products, prices };
+  }
+
+  async createCustomer(input: StripeCustomerCreateInput): Promise<StripeCustomer> {
+    const params: StripeCustomerCreateParams = {};
+
+    if (input.email !== undefined && input.email !== null) {
+      params.email = input.email;
+    }
+
+    if (input.metadata !== undefined) {
+      params.metadata = input.metadata;
+    }
+
+    return this.client.customers.create(params);
+  }
+
+  async createCheckoutSession(
+    input: StripeCheckoutSessionCreateInput
+  ): Promise<StripeCheckoutSession> {
+    const params: StripeCheckoutSessionCreateParams = {
+      mode: input.mode,
+      line_items: input.lineItems.map((lineItem) => ({
+        price: lineItem.stripePriceId,
+        quantity: lineItem.quantity,
+      })),
+      success_url: input.successUrl,
+      cancel_url: input.cancelUrl,
+    };
+
+    if (input.metadata !== undefined) {
+      params.metadata = input.metadata;
+    }
+
+    if (input.customerId !== undefined && input.customerId !== null) {
+      params.customer = input.customerId;
+    } else if (input.customerEmail !== undefined && input.customerEmail !== null) {
+      params.customer_email = input.customerEmail;
+    }
+
+    if (input.metadata !== undefined) {
+      if (input.mode === 'subscription') {
+        params.subscription_data = { metadata: input.metadata };
+      } else {
+        params.payment_intent_data = { metadata: input.metadata };
+      }
+    }
+
+    return this.client.checkout.sessions.create(params);
+  }
+
+  constructWebhookEvent(rawBody: Buffer, signature: string, webhookSecret: string): StripeEvent {
+    return this.client.webhooks.constructEvent(rawBody, signature, webhookSecret);
+  }
+
+  async listWebhookEndpoints(): Promise<StripeWebhookEndpoint[]> {
+    const endpoints: StripeWebhookEndpoint[] = [];
+
+    for await (const endpoint of this.client.webhookEndpoints.list({ limit: 100 })) {
+      endpoints.push(endpoint);
+    }
+
+    return endpoints;
+  }
+
+  async createWebhookEndpoint(
+    input: StripeWebhookEndpointCreateInput
+  ): Promise<StripeWebhookEndpointCreateResult> {
+    const params: StripeWebhookEndpointCreateParams = {
+      url: input.url,
+      enabled_events: input.enabledEvents,
+    };
+
+    if (input.metadata !== undefined) {
+      params.metadata = input.metadata;
+    }
+
+    return this.client.webhookEndpoints.create(params);
+  }
+
+  async deleteWebhookEndpoint(webhookEndpointId: string): Promise<void> {
+    await this.client.webhookEndpoints.del(webhookEndpointId);
   }
 
   async listProducts(): Promise<StripeProduct[]> {

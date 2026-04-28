@@ -12,15 +12,27 @@ import logger from '@/utils/logger.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import {
   STRIPE_ENVIRONMENTS,
+  type PaymentHistoryRow,
+  type StripeCheckoutSession,
   type StripeConnectionRow,
+  type StripeCustomer,
   type StripeEnvironment,
+  type StripeEvent,
+  type StripePaymentIntent,
   type StripeAccount,
   type StripePrice,
   type StripePriceRow,
   type StripeProduct,
   type StripeProductRow,
+  type StripeSubscription,
+  type StripeSubscriptionItem,
+  type StripeSubscriptionItemRow,
+  type StripeSubscriptionRow,
   type StripeSyncSnapshot,
+  type StripeWebhookEventRow,
+  type StripeWebhookEndpoint,
 } from '@/types/payments.js';
+import { getApiBaseUrl } from '@/utils/environment.js';
 import type {
   ArchivePaymentPriceResponse,
   CreatePaymentPriceRequest,
@@ -42,12 +54,45 @@ import type {
   MutatePaymentProductResponse,
   UpdatePaymentPriceRequest,
   UpdatePaymentProductRequest,
+  CreateCheckoutSessionRequest,
+  CreateCheckoutSessionResponse,
+  BillingSubject,
+  StripeWebhookResponse,
+  StripeWebhookEvent,
+  ListPaymentHistoryRequest,
+  ListPaymentHistoryResponse,
+  ListSubscriptionsRequest,
+  ListSubscriptionsResponse,
 } from '@insforge/shared-schemas';
 
 const SECRET_KEY_BY_ENVIRONMENT: Record<StripeEnvironment, string> = {
   test: 'STRIPE_TEST_SECRET_KEY',
   live: 'STRIPE_LIVE_SECRET_KEY',
 };
+
+const WEBHOOK_SECRET_BY_ENVIRONMENT: Record<StripeEnvironment, string> = {
+  test: 'STRIPE_TEST_WEBHOOK_SECRET',
+  live: 'STRIPE_LIVE_WEBHOOK_SECRET',
+};
+
+const SUBJECT_METADATA_KEYS = {
+  type: 'insforge_subject_type',
+  id: 'insforge_subject_id',
+} as const;
+
+const MANAGED_WEBHOOK_EVENTS = [
+  'checkout.session.completed',
+  'payment_intent.succeeded',
+  'payment_intent.payment_failed',
+  'customer.subscription.created',
+  'customer.subscription.updated',
+  'customer.subscription.deleted',
+] as const;
+
+const MANAGED_WEBHOOK_METADATA = {
+  managed_by: 'insforge',
+  insforge_webhook: 'stripe_payments',
+} as const;
 
 export class PaymentService {
   private static instance: PaymentService;
@@ -85,9 +130,19 @@ export class PaymentService {
       const provider = new StripeProvider(trimmedSecretKey, environment);
       const account = await provider.retrieveAccount();
       const encryptedValue = EncryptionManager.encrypt(trimmedSecretKey);
-      const shouldClearMirror = await this.shouldClearCatalogForNewAccount(environment, account.id);
+      const shouldClearMirror = await this.shouldClearPaymentMirrorForNewAccount(
+        environment,
+        account.id
+      );
+      const webhookSetup = await this.recreateManagedStripeWebhook(provider, environment);
 
-      await this.persistStripeSecretKey(environment, encryptedValue, account, shouldClearMirror);
+      await this.persistStripeSecretKey(
+        environment,
+        encryptedValue,
+        account,
+        shouldClearMirror,
+        webhookSetup
+      );
 
       try {
         const snapshot = await provider.syncCatalog();
@@ -107,6 +162,8 @@ export class PaymentService {
   }
 
   private async removeStripeSecretKeyUnlocked(environment: StripeEnvironment): Promise<boolean> {
+    await this.deleteManagedStripeWebhookForStoredKey(environment);
+
     const client = await this.getPool().connect();
 
     try {
@@ -123,11 +180,21 @@ export class PaymentService {
 
       const removed = (result.rowCount ?? 0) > 0;
       if (removed) {
-        await client.query('DELETE FROM payments.prices WHERE environment = $1', [environment]);
-        await client.query('DELETE FROM payments.products WHERE environment = $1', [environment]);
+        await client.query(
+          `UPDATE system.secrets
+           SET is_active = false,
+               updated_at = NOW()
+           WHERE key = $1
+             AND is_active = true`,
+          [WEBHOOK_SECRET_BY_ENVIRONMENT[environment]]
+        );
+        await this.clearPaymentMirror(client, environment);
         await client.query(
           `UPDATE payments.stripe_connections
            SET status = 'unconfigured',
+               webhook_endpoint_id = NULL,
+               webhook_endpoint_url = NULL,
+               webhook_configured_at = NULL,
                last_synced_at = NULL,
                last_sync_status = 'failed',
                last_sync_error = $2,
@@ -146,6 +213,29 @@ export class PaymentService {
       throw error;
     } finally {
       client.release();
+    }
+  }
+
+  private async deleteManagedStripeWebhookForStoredKey(
+    environment: StripeEnvironment
+  ): Promise<void> {
+    const secretKey = await SecretService.getInstance().getSecretByKey(
+      SECRET_KEY_BY_ENVIRONMENT[environment]
+    );
+
+    if (!secretKey) {
+      return;
+    }
+
+    try {
+      validateStripeSecretKey(environment, secretKey);
+      const provider = new StripeProvider(secretKey, environment);
+      await this.deleteManagedStripeWebhookEndpoints(provider, environment);
+    } catch (error) {
+      logger.warn('Failed to delete managed Stripe webhook before key removal', {
+        environment,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
@@ -206,6 +296,103 @@ export class PaymentService {
     return secretKey;
   }
 
+  private async getStripeWebhookSecret(environment: StripeEnvironment): Promise<string | null> {
+    return SecretService.getInstance().getSecretByKey(WEBHOOK_SECRET_BY_ENVIRONMENT[environment]);
+  }
+
+  private async clearPaymentMirror(
+    client: PoolClient,
+    environment: StripeEnvironment
+  ): Promise<void> {
+    await client.query('DELETE FROM payments.subscription_items WHERE environment = $1', [
+      environment,
+    ]);
+    await client.query('DELETE FROM payments.subscriptions WHERE environment = $1', [environment]);
+    await client.query('DELETE FROM payments.payment_history WHERE environment = $1', [
+      environment,
+    ]);
+    await client.query('DELETE FROM payments.stripe_customer_mappings WHERE environment = $1', [
+      environment,
+    ]);
+    await client.query('DELETE FROM payments.webhook_events WHERE environment = $1', [environment]);
+    await client.query('DELETE FROM payments.prices WHERE environment = $1', [environment]);
+    await client.query('DELETE FROM payments.products WHERE environment = $1', [environment]);
+  }
+
+  private getManagedStripeWebhookUrl(environment: StripeEnvironment): string {
+    const baseUrl = getApiBaseUrl().replace(/\/+$/, '');
+    return `${baseUrl}/api/webhooks/stripe/${environment}`;
+  }
+
+  private async recreateManagedStripeWebhook(
+    provider: StripeProvider,
+    environment: StripeEnvironment
+  ): Promise<{ endpointId: string; endpointUrl: string; secret: string }> {
+    const endpointUrl = this.getManagedStripeWebhookUrl(environment);
+    await this.deleteManagedStripeWebhookEndpoints(provider, environment);
+
+    const createdEndpoint = await provider.createWebhookEndpoint({
+      url: endpointUrl,
+      enabledEvents: [...MANAGED_WEBHOOK_EVENTS],
+      metadata: {
+        ...MANAGED_WEBHOOK_METADATA,
+        insforge_environment: environment,
+        insforge_endpoint_path: `/api/webhooks/stripe/${environment}`,
+        insforge_endpoint_url: endpointUrl,
+      },
+    });
+
+    if (!createdEndpoint.secret) {
+      throw new AppError(
+        'Stripe did not return a webhook signing secret for the managed endpoint',
+        500,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    }
+
+    return {
+      endpointId: createdEndpoint.id,
+      endpointUrl,
+      secret: createdEndpoint.secret,
+    };
+  }
+
+  private async deleteManagedStripeWebhookEndpoints(
+    provider: StripeProvider,
+    environment: StripeEnvironment
+  ): Promise<void> {
+    const endpoints = await provider.listWebhookEndpoints();
+    const managedEndpoints = endpoints.filter((endpoint) =>
+      this.isManagedStripeWebhookEndpoint(endpoint, environment)
+    );
+
+    for (const endpoint of managedEndpoints) {
+      try {
+        await provider.deleteWebhookEndpoint(endpoint.id);
+      } catch (error) {
+        logger.warn('Failed to delete existing InsForge-managed Stripe webhook endpoint', {
+          environment,
+          webhookEndpointId: endpoint.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  private isManagedStripeWebhookEndpoint(
+    endpoint: StripeWebhookEndpoint,
+    environment: StripeEnvironment
+  ): boolean {
+    const endpointUrl = this.getManagedStripeWebhookUrl(environment);
+
+    return (
+      endpoint.metadata?.managed_by === MANAGED_WEBHOOK_METADATA.managed_by &&
+      endpoint.metadata?.insforge_webhook === MANAGED_WEBHOOK_METADATA.insforge_webhook &&
+      endpoint.metadata?.insforge_environment === environment &&
+      endpoint.url === endpointUrl
+    );
+  }
+
   private async createStripeProvider(environment: StripeEnvironment): Promise<StripeProvider> {
     const secretKey = await this.getStripeSecretKey(environment);
 
@@ -230,7 +417,7 @@ export class PaymentService {
     };
   }
 
-  private async shouldClearCatalogForNewAccount(
+  private async shouldClearPaymentMirrorForNewAccount(
     environment: StripeEnvironment,
     stripeAccountId: string
   ): Promise<boolean> {
@@ -240,7 +427,12 @@ export class PaymentService {
          (
            EXISTS (SELECT 1 FROM payments.products WHERE environment = $1)
            OR EXISTS (SELECT 1 FROM payments.prices WHERE environment = $1)
-         ) AS "hasCatalogRows"
+           OR EXISTS (SELECT 1 FROM payments.stripe_customer_mappings WHERE environment = $1)
+           OR EXISTS (SELECT 1 FROM payments.payment_history WHERE environment = $1)
+           OR EXISTS (SELECT 1 FROM payments.subscriptions WHERE environment = $1)
+           OR EXISTS (SELECT 1 FROM payments.subscription_items WHERE environment = $1)
+           OR EXISTS (SELECT 1 FROM payments.webhook_events WHERE environment = $1)
+         ) AS "hasPaymentRows"
        FROM (SELECT $1::TEXT AS environment) selected_environment
        LEFT JOIN payments.stripe_connections connection
          ON connection.environment = selected_environment.environment`,
@@ -248,7 +440,7 @@ export class PaymentService {
     );
 
     const row = result.rows[0] as
-      | { stripeAccountId: string | null; hasCatalogRows: boolean }
+      | { stripeAccountId: string | null; hasPaymentRows: boolean }
       | undefined;
     if (!row) {
       return false;
@@ -258,14 +450,19 @@ export class PaymentService {
       return row.stripeAccountId !== stripeAccountId;
     }
 
-    return row.hasCatalogRows;
+    return row.hasPaymentRows;
   }
 
   private async persistStripeSecretKey(
     environment: StripeEnvironment,
     encryptedValue: string,
     account: StripeAccount,
-    clearMirror: boolean
+    clearMirror: boolean,
+    webhookSetup: {
+      endpointId: string;
+      endpointUrl: string;
+      secret: string;
+    }
   ): Promise<void> {
     const client = await this.getPool().connect();
 
@@ -273,9 +470,8 @@ export class PaymentService {
       await client.query('BEGIN');
 
       if (clearMirror) {
-        await client.query('DELETE FROM payments.prices WHERE environment = $1', [environment]);
-        await client.query('DELETE FROM payments.products WHERE environment = $1', [environment]);
-        logger.info('Cleared Stripe catalog mirror after account key change', { environment });
+        await this.clearPaymentMirror(client, environment);
+        logger.info('Cleared Stripe payment mirror after account key change', { environment });
       }
 
       await client.query(
@@ -290,35 +486,52 @@ export class PaymentService {
       );
 
       await client.query(
+        `INSERT INTO system.secrets (key, value_ciphertext, is_active, is_reserved)
+         VALUES ($1, $2, true, true)
+         ON CONFLICT (key) DO UPDATE SET
+           value_ciphertext = EXCLUDED.value_ciphertext,
+           is_active = true,
+           is_reserved = true,
+           updated_at = NOW()`,
+        [WEBHOOK_SECRET_BY_ENVIRONMENT[environment], EncryptionManager.encrypt(webhookSetup.secret)]
+      );
+
+      await client.query(
         `INSERT INTO payments.stripe_connections (
            environment,
            stripe_account_id,
            stripe_account_email,
            account_livemode,
            status,
+           webhook_endpoint_id,
+           webhook_endpoint_url,
+           webhook_configured_at,
            last_synced_at,
            last_sync_status,
            last_sync_error,
            last_sync_counts,
            raw
          )
-         VALUES ($1, $2, $3, $4, 'connected', NULL, NULL, NULL, '{}'::JSONB, $5)
+         VALUES ($1, $2, $3, $4, 'connected', $5, $6, NOW(), NULL, NULL, NULL, '{}'::JSONB, $7)
          ON CONFLICT (environment) DO UPDATE SET
            stripe_account_id = EXCLUDED.stripe_account_id,
            stripe_account_email = EXCLUDED.stripe_account_email,
            account_livemode = EXCLUDED.account_livemode,
            status = 'connected',
+           webhook_endpoint_id = EXCLUDED.webhook_endpoint_id,
+           webhook_endpoint_url = EXCLUDED.webhook_endpoint_url,
+           webhook_configured_at = EXCLUDED.webhook_configured_at,
            last_synced_at = CASE
-             WHEN $6 THEN NULL
+             WHEN $8 THEN NULL
              ELSE payments.stripe_connections.last_synced_at
            END,
            last_sync_status = CASE
-             WHEN $6 THEN NULL
+             WHEN $8 THEN NULL
              ELSE payments.stripe_connections.last_sync_status
            END,
            last_sync_error = NULL,
            last_sync_counts = CASE
-             WHEN $6 THEN '{}'::JSONB
+             WHEN $8 THEN '{}'::JSONB
              ELSE payments.stripe_connections.last_sync_counts
            END,
            raw = EXCLUDED.raw,
@@ -328,6 +541,8 @@ export class PaymentService {
           account.id,
           account.email ?? null,
           environment === 'live',
+          webhookSetup.endpointId,
+          webhookSetup.endpointUrl,
           account,
           clearMirror,
         ]
@@ -350,6 +565,9 @@ export class PaymentService {
          stripe_account_id AS "stripeAccountId",
          stripe_account_email AS "stripeAccountEmail",
          account_livemode AS "accountLivemode",
+         webhook_endpoint_id AS "webhookEndpointId",
+         webhook_endpoint_url AS "webhookEndpointUrl",
+         webhook_configured_at AS "webhookConfiguredAt",
          last_synced_at AS "lastSyncedAt",
          last_sync_status AS "lastSyncStatus",
          last_sync_error AS "lastSyncError",
@@ -480,6 +698,137 @@ export class PaymentService {
     return { price };
   }
 
+  async listPaymentHistory(input: ListPaymentHistoryRequest): Promise<ListPaymentHistoryResponse> {
+    const params: Array<string | number> = [input.environment];
+    const filters = ['environment = $1'];
+
+    if (input.subjectType && input.subjectId) {
+      params.push(input.subjectType, input.subjectId);
+      filters.push(`subject_type = $${params.length - 1}`, `subject_id = $${params.length}`);
+    }
+
+    params.push(input.limit);
+
+    const result = await this.getPool().query(
+      `SELECT
+         environment,
+         type,
+         status,
+         subject_type AS "subjectType",
+         subject_id AS "subjectId",
+         stripe_customer_id AS "stripeCustomerId",
+         customer_email_snapshot AS "customerEmailSnapshot",
+         stripe_checkout_session_id AS "stripeCheckoutSessionId",
+         stripe_payment_intent_id AS "stripePaymentIntentId",
+         stripe_invoice_id AS "stripeInvoiceId",
+         stripe_charge_id AS "stripeChargeId",
+         stripe_refund_id AS "stripeRefundId",
+         stripe_subscription_id AS "stripeSubscriptionId",
+         stripe_product_id AS "stripeProductId",
+         stripe_price_id AS "stripePriceId",
+         amount,
+         amount_refunded AS "amountRefunded",
+         currency,
+         description,
+         paid_at AS "paidAt",
+         failed_at AS "failedAt",
+         refunded_at AS "refundedAt",
+         stripe_created_at AS "stripeCreatedAt",
+         created_at AS "createdAt",
+         updated_at AS "updatedAt"
+       FROM payments.payment_history
+       WHERE ${filters.join(' AND ')}
+       ORDER BY COALESCE(stripe_created_at, created_at) DESC
+       LIMIT $${params.length}`,
+      params
+    );
+
+    return {
+      paymentHistory: (result.rows as PaymentHistoryRow[]).map((row) =>
+        this.normalizePaymentHistoryRow(row)
+      ),
+    };
+  }
+
+  async listSubscriptions(input: ListSubscriptionsRequest): Promise<ListSubscriptionsResponse> {
+    const params: Array<string | number> = [input.environment];
+    const filters = ['environment = $1'];
+
+    if (input.subjectType && input.subjectId) {
+      params.push(input.subjectType, input.subjectId);
+      filters.push(`subject_type = $${params.length - 1}`, `subject_id = $${params.length}`);
+    }
+
+    params.push(input.limit);
+
+    const subscriptionsResult = await this.getPool().query(
+      `SELECT
+         environment,
+         stripe_subscription_id AS "stripeSubscriptionId",
+         stripe_customer_id AS "stripeCustomerId",
+         subject_type AS "subjectType",
+         subject_id AS "subjectId",
+         status,
+         current_period_start AS "currentPeriodStart",
+         current_period_end AS "currentPeriodEnd",
+         cancel_at_period_end AS "cancelAtPeriodEnd",
+         cancel_at AS "cancelAt",
+         canceled_at AS "canceledAt",
+         trial_start AS "trialStart",
+         trial_end AS "trialEnd",
+         latest_invoice_id AS "latestInvoiceId",
+         metadata,
+         synced_at AS "syncedAt",
+         created_at AS "createdAt",
+         updated_at AS "updatedAt"
+       FROM payments.subscriptions
+       WHERE ${filters.join(' AND ')}
+       ORDER BY updated_at DESC
+       LIMIT $${params.length}`,
+      params
+    );
+
+    const subscriptionRows = subscriptionsResult.rows as StripeSubscriptionRow[];
+    if (subscriptionRows.length === 0) {
+      return { subscriptions: [] };
+    }
+
+    const subscriptionIds = subscriptionRows.map((row) => row.stripeSubscriptionId);
+    const itemsResult = await this.getPool().query(
+      `SELECT
+         environment,
+         stripe_subscription_item_id AS "stripeSubscriptionItemId",
+         stripe_subscription_id AS "stripeSubscriptionId",
+         stripe_product_id AS "stripeProductId",
+         stripe_price_id AS "stripePriceId",
+         quantity,
+         metadata,
+         created_at AS "createdAt",
+         updated_at AS "updatedAt"
+       FROM payments.subscription_items
+       WHERE environment = $1
+         AND stripe_subscription_id = ANY($2::TEXT[])
+       ORDER BY stripe_subscription_id, stripe_subscription_item_id`,
+      [input.environment, subscriptionIds]
+    );
+
+    const itemsBySubscriptionId = new Map<string, StripeSubscriptionItemRow[]>();
+    for (const item of itemsResult.rows as StripeSubscriptionItemRow[]) {
+      const items = itemsBySubscriptionId.get(item.stripeSubscriptionId) ?? [];
+      items.push(item);
+      itemsBySubscriptionId.set(item.stripeSubscriptionId, items);
+    }
+
+    return {
+      subscriptions: subscriptionRows.map((row) => ({
+        ...this.normalizeSubscriptionRow(row),
+        items: (itemsBySubscriptionId.get(row.stripeSubscriptionId) ?? []).map((item) =>
+          this.normalizeSubscriptionItemRow(item)
+        ),
+      })),
+    };
+  }
+
   async createProduct(input: CreatePaymentProductRequest): Promise<MutatePaymentProductResponse> {
     const { environment, ...productInput } = input;
 
@@ -580,6 +929,84 @@ export class PaymentService {
     });
   }
 
+  async createCheckoutSession(
+    input: CreateCheckoutSessionRequest
+  ): Promise<CreateCheckoutSessionResponse> {
+    if (input.mode === 'subscription' && !input.subject) {
+      throw new AppError(
+        'Subscription checkout requires a billing subject',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    return this.withEnvironmentLock(input.environment, async () => {
+      const provider = await this.createStripeProvider(input.environment);
+      const metadata = this.buildStripeMetadata(input.metadata, input.subject);
+      const customerId = await this.resolveCheckoutCustomer(input, provider, metadata);
+      const checkoutSession = await provider.createCheckoutSession({
+        mode: input.mode,
+        lineItems: input.lineItems,
+        successUrl: input.successUrl,
+        cancelUrl: input.cancelUrl,
+        customerId,
+        customerEmail: customerId ? null : input.customerEmail,
+        metadata,
+      });
+
+      return {
+        checkoutSession: this.normalizeCheckoutSession(checkoutSession, input.environment),
+      };
+    });
+  }
+
+  async handleStripeWebhook(
+    environment: StripeEnvironment,
+    rawBody: Buffer,
+    signature: string
+  ): Promise<StripeWebhookResponse> {
+    const webhookSecret = await this.getStripeWebhookSecret(environment);
+    if (!webhookSecret) {
+      throw new AppError(
+        `${WEBHOOK_SECRET_BY_ENVIRONMENT[environment]} is not configured`,
+        500,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    }
+
+    const provider = await this.createStripeProvider(environment);
+    const event = provider.constructWebhookEvent(rawBody, signature, webhookSecret);
+    const eventStart = await this.recordWebhookEventStart(environment, event);
+
+    if (!eventStart.shouldProcess) {
+      return {
+        received: true,
+        handled: false,
+        event: this.normalizeWebhookEventRow(eventStart.row),
+      };
+    }
+
+    try {
+      const handled = await this.applyStripeWebhookEvent(environment, event);
+      const row = await this.markWebhookEvent(
+        environment,
+        event.id,
+        handled ? 'processed' : 'ignored',
+        null
+      );
+
+      return {
+        received: true,
+        handled,
+        event: this.normalizeWebhookEventRow(row),
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await this.markWebhookEvent(environment, event.id, 'failed', message);
+      throw error;
+    }
+  }
+
   async syncAll(): Promise<StripeConnection[]> {
     return Promise.all(STRIPE_ENVIRONMENTS.map((environment) => this.syncEnvironment(environment)));
   }
@@ -630,6 +1057,9 @@ export class PaymentService {
          stripe_account_id AS "stripeAccountId",
          stripe_account_email AS "stripeAccountEmail",
          account_livemode AS "accountLivemode",
+         webhook_endpoint_id AS "webhookEndpointId",
+         webhook_endpoint_url AS "webhookEndpointUrl",
+         webhook_configured_at AS "webhookConfiguredAt",
          last_synced_at AS "lastSyncedAt",
          last_sync_status AS "lastSyncStatus",
          last_sync_error AS "lastSyncError",
@@ -665,6 +1095,18 @@ export class PaymentService {
          status = EXCLUDED.status,
          last_sync_status = 'failed',
          last_sync_error = EXCLUDED.last_sync_error,
+         webhook_endpoint_id = CASE
+           WHEN $2 = 'unconfigured' THEN NULL
+           ELSE payments.stripe_connections.webhook_endpoint_id
+         END,
+         webhook_endpoint_url = CASE
+           WHEN $2 = 'unconfigured' THEN NULL
+           ELSE payments.stripe_connections.webhook_endpoint_url
+         END,
+         webhook_configured_at = CASE
+           WHEN $2 = 'unconfigured' THEN NULL
+           ELSE payments.stripe_connections.webhook_configured_at
+         END,
          updated_at = NOW()
        RETURNING
          environment,
@@ -672,6 +1114,9 @@ export class PaymentService {
          stripe_account_id AS "stripeAccountId",
          stripe_account_email AS "stripeAccountEmail",
          account_livemode AS "accountLivemode",
+         webhook_endpoint_id AS "webhookEndpointId",
+         webhook_endpoint_url AS "webhookEndpointUrl",
+         webhook_configured_at AS "webhookConfiguredAt",
          last_synced_at AS "lastSyncedAt",
          last_sync_status AS "lastSyncStatus",
          last_sync_error AS "lastSyncError",
@@ -889,6 +1334,636 @@ export class PaymentService {
     );
   }
 
+  private async resolveCheckoutCustomer(
+    input: CreateCheckoutSessionRequest,
+    provider: StripeProvider,
+    metadata: Record<string, string>
+  ): Promise<string | null> {
+    if (!input.subject) {
+      return null;
+    }
+
+    const existing = await this.findStripeCustomerMapping(input.environment, input.subject);
+    if (existing) {
+      return existing.stripeCustomerId;
+    }
+
+    const customer = await provider.createCustomer({
+      email: input.customerEmail ?? null,
+      metadata,
+    });
+
+    await this.upsertStripeCustomerMapping(
+      input.environment,
+      input.subject,
+      customer,
+      input.customerEmail ?? null,
+      metadata
+    );
+
+    return customer.id;
+  }
+
+  private async findStripeCustomerMapping(
+    environment: StripeEnvironment,
+    subject: BillingSubject
+  ): Promise<{ stripeCustomerId: string } | null> {
+    const result = await this.getPool().query(
+      `SELECT stripe_customer_id AS "stripeCustomerId"
+       FROM payments.stripe_customer_mappings
+       WHERE environment = $1
+         AND subject_type = $2
+         AND subject_id = $3`,
+      [environment, subject.type, subject.id]
+    );
+
+    return (result.rows[0] as { stripeCustomerId: string } | undefined) ?? null;
+  }
+
+  private async upsertStripeCustomerMapping(
+    environment: StripeEnvironment,
+    subject: BillingSubject,
+    customer: StripeCustomer,
+    customerEmailSnapshot: string | null,
+    metadata: Record<string, string>
+  ): Promise<void> {
+    await this.getPool().query(
+      `INSERT INTO payments.stripe_customer_mappings (
+         environment,
+         subject_type,
+         subject_id,
+         stripe_customer_id,
+         customer_email_snapshot,
+         metadata,
+         raw
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (environment, subject_type, subject_id) DO UPDATE SET
+         stripe_customer_id = EXCLUDED.stripe_customer_id,
+         customer_email_snapshot = EXCLUDED.customer_email_snapshot,
+         metadata = EXCLUDED.metadata,
+         raw = EXCLUDED.raw,
+         updated_at = NOW()`,
+      [
+        environment,
+        subject.type,
+        subject.id,
+        customer.id,
+        customerEmailSnapshot,
+        metadata,
+        customer,
+      ]
+    );
+  }
+
+  private async findStripeCustomerMappingByCustomerId(
+    environment: StripeEnvironment,
+    stripeCustomerId: string
+  ): Promise<{ subjectType: string; subjectId: string } | null> {
+    const result = await this.getPool().query(
+      `SELECT
+         subject_type AS "subjectType",
+         subject_id AS "subjectId"
+       FROM payments.stripe_customer_mappings
+       WHERE environment = $1
+         AND stripe_customer_id = $2`,
+      [environment, stripeCustomerId]
+    );
+
+    return (result.rows[0] as { subjectType: string; subjectId: string } | undefined) ?? null;
+  }
+
+  private buildStripeMetadata(
+    metadata: Record<string, string> | undefined,
+    subject: BillingSubject | undefined
+  ): Record<string, string> {
+    const stripeMetadata = { ...(metadata ?? {}) };
+
+    if (subject) {
+      stripeMetadata[SUBJECT_METADATA_KEYS.type] = subject.type;
+      stripeMetadata[SUBJECT_METADATA_KEYS.id] = subject.id;
+    }
+
+    return stripeMetadata;
+  }
+
+  private async recordWebhookEventStart(
+    environment: StripeEnvironment,
+    event: StripeEvent
+  ): Promise<{ row: StripeWebhookEventRow; shouldProcess: boolean }> {
+    const object = event.data.object as unknown;
+    const objectType = this.getStripeObjectType(object);
+    const objectId = this.getStripeObjectId(object);
+    const stripeAccountId = typeof event.account === 'string' ? event.account : null;
+
+    const insertResult = await this.getPool().query(
+      `INSERT INTO payments.webhook_events (
+         environment,
+         stripe_event_id,
+         event_type,
+         livemode,
+         stripe_account_id,
+         object_type,
+         object_id,
+         processing_status,
+         attempt_count,
+         payload
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', 1, $8)
+       ON CONFLICT (environment, stripe_event_id) DO NOTHING
+       RETURNING
+         environment,
+         stripe_event_id AS "stripeEventId",
+         event_type AS "eventType",
+         livemode,
+         stripe_account_id AS "stripeAccountId",
+         object_type AS "objectType",
+         object_id AS "objectId",
+         processing_status AS "processingStatus",
+         attempt_count AS "attemptCount",
+         last_error AS "lastError",
+         received_at AS "receivedAt",
+         processed_at AS "processedAt",
+         created_at AS "createdAt",
+         updated_at AS "updatedAt"`,
+      [
+        environment,
+        event.id,
+        event.type,
+        event.livemode,
+        stripeAccountId,
+        objectType,
+        objectId,
+        event,
+      ]
+    );
+
+    const inserted = insertResult.rows[0] as StripeWebhookEventRow | undefined;
+    if (inserted) {
+      return { row: inserted, shouldProcess: true };
+    }
+
+    const existingResult = await this.getPool().query(
+      `SELECT
+         environment,
+         stripe_event_id AS "stripeEventId",
+         event_type AS "eventType",
+         livemode,
+         stripe_account_id AS "stripeAccountId",
+         object_type AS "objectType",
+         object_id AS "objectId",
+         processing_status AS "processingStatus",
+         attempt_count AS "attemptCount",
+         last_error AS "lastError",
+         received_at AS "receivedAt",
+         processed_at AS "processedAt",
+         created_at AS "createdAt",
+         updated_at AS "updatedAt"
+       FROM payments.webhook_events
+       WHERE environment = $1
+         AND stripe_event_id = $2`,
+      [environment, event.id]
+    );
+
+    const existing = existingResult.rows[0] as StripeWebhookEventRow;
+    if (existing.processingStatus === 'processed' || existing.processingStatus === 'ignored') {
+      return { row: existing, shouldProcess: false };
+    }
+
+    const retryResult = await this.getPool().query(
+      `UPDATE payments.webhook_events
+       SET processing_status = 'pending',
+           attempt_count = attempt_count + 1,
+           last_error = NULL,
+           payload = $3,
+           updated_at = NOW()
+       WHERE environment = $1
+         AND stripe_event_id = $2
+       RETURNING
+         environment,
+         stripe_event_id AS "stripeEventId",
+         event_type AS "eventType",
+         livemode,
+         stripe_account_id AS "stripeAccountId",
+         object_type AS "objectType",
+         object_id AS "objectId",
+         processing_status AS "processingStatus",
+         attempt_count AS "attemptCount",
+         last_error AS "lastError",
+         received_at AS "receivedAt",
+         processed_at AS "processedAt",
+         created_at AS "createdAt",
+         updated_at AS "updatedAt"`,
+      [environment, event.id, event]
+    );
+
+    return { row: retryResult.rows[0] as StripeWebhookEventRow, shouldProcess: true };
+  }
+
+  private async markWebhookEvent(
+    environment: StripeEnvironment,
+    stripeEventId: string,
+    processingStatus: 'processed' | 'failed' | 'ignored',
+    error: string | null
+  ): Promise<StripeWebhookEventRow> {
+    const result = await this.getPool().query(
+      `UPDATE payments.webhook_events
+       SET processing_status = $3,
+           last_error = $4,
+           processed_at = CASE WHEN $3 IN ('processed', 'ignored') THEN NOW() ELSE processed_at END,
+           updated_at = NOW()
+       WHERE environment = $1
+         AND stripe_event_id = $2
+       RETURNING
+         environment,
+         stripe_event_id AS "stripeEventId",
+         event_type AS "eventType",
+         livemode,
+         stripe_account_id AS "stripeAccountId",
+         object_type AS "objectType",
+         object_id AS "objectId",
+         processing_status AS "processingStatus",
+         attempt_count AS "attemptCount",
+         last_error AS "lastError",
+         received_at AS "receivedAt",
+         processed_at AS "processedAt",
+         created_at AS "createdAt",
+         updated_at AS "updatedAt"`,
+      [environment, stripeEventId, processingStatus, error]
+    );
+
+    return result.rows[0] as StripeWebhookEventRow;
+  }
+
+  private async applyStripeWebhookEvent(
+    environment: StripeEnvironment,
+    event: StripeEvent
+  ): Promise<boolean> {
+    switch (event.type) {
+      case 'checkout.session.completed':
+        return this.processCheckoutSessionCompleted(
+          environment,
+          event.data.object as StripeCheckoutSession
+        );
+      case 'payment_intent.succeeded':
+        await this.upsertPaymentIntentHistory(
+          environment,
+          event.data.object as StripePaymentIntent,
+          'succeeded'
+        );
+        return true;
+      case 'payment_intent.payment_failed':
+        await this.upsertPaymentIntentHistory(
+          environment,
+          event.data.object as StripePaymentIntent,
+          'failed'
+        );
+        return true;
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated':
+      case 'customer.subscription.deleted':
+        return this.upsertSubscriptionProjection(
+          environment,
+          event.data.object as StripeSubscription
+        );
+      default:
+        return false;
+    }
+  }
+
+  private async processCheckoutSessionCompleted(
+    environment: StripeEnvironment,
+    checkoutSession: StripeCheckoutSession
+  ): Promise<boolean> {
+    if (checkoutSession.mode !== 'payment') {
+      return false;
+    }
+
+    await this.upsertCheckoutPaymentHistory(environment, checkoutSession);
+    return true;
+  }
+
+  private async upsertCheckoutPaymentHistory(
+    environment: StripeEnvironment,
+    checkoutSession: StripeCheckoutSession
+  ): Promise<void> {
+    const subject = this.getBillingSubjectFromMetadata(checkoutSession.metadata);
+    const stripePaymentIntentId = this.getStripeObjectId(checkoutSession.payment_intent);
+
+    await this.getPool().query(
+      `INSERT INTO payments.payment_history (
+         environment,
+         type,
+         status,
+         subject_type,
+         subject_id,
+         stripe_customer_id,
+         customer_email_snapshot,
+         stripe_checkout_session_id,
+         stripe_payment_intent_id,
+         stripe_subscription_id,
+         amount,
+         currency,
+         description,
+         paid_at,
+         stripe_created_at,
+         raw
+       )
+       VALUES ($1, 'one_time_payment', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+       ON CONFLICT (environment, stripe_payment_intent_id)
+         WHERE stripe_payment_intent_id IS NOT NULL
+       DO UPDATE SET
+         status = EXCLUDED.status,
+         subject_type = EXCLUDED.subject_type,
+         subject_id = EXCLUDED.subject_id,
+         stripe_customer_id = EXCLUDED.stripe_customer_id,
+         customer_email_snapshot = EXCLUDED.customer_email_snapshot,
+         stripe_checkout_session_id = EXCLUDED.stripe_checkout_session_id,
+         stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+         amount = EXCLUDED.amount,
+         currency = EXCLUDED.currency,
+         description = EXCLUDED.description,
+         paid_at = EXCLUDED.paid_at,
+         stripe_created_at = EXCLUDED.stripe_created_at,
+         raw = EXCLUDED.raw,
+         updated_at = NOW()`,
+      [
+        environment,
+        checkoutSession.payment_status === 'paid' ? 'succeeded' : 'pending',
+        subject?.type ?? null,
+        subject?.id ?? null,
+        this.getStripeObjectId(checkoutSession.customer),
+        checkoutSession.customer_details?.email ?? null,
+        checkoutSession.id,
+        stripePaymentIntentId,
+        this.getStripeObjectId(checkoutSession.subscription),
+        checkoutSession.amount_total ?? null,
+        checkoutSession.currency ?? null,
+        null,
+        checkoutSession.payment_status === 'paid' ? new Date() : null,
+        this.fromStripeTimestamp(checkoutSession.created),
+        checkoutSession,
+      ]
+    );
+  }
+
+  private async upsertPaymentIntentHistory(
+    environment: StripeEnvironment,
+    paymentIntent: StripePaymentIntent,
+    status: 'succeeded' | 'failed'
+  ): Promise<void> {
+    const subject = this.getBillingSubjectFromMetadata(paymentIntent.metadata);
+
+    await this.getPool().query(
+      `INSERT INTO payments.payment_history (
+         environment,
+         type,
+         status,
+         subject_type,
+         subject_id,
+         stripe_customer_id,
+         customer_email_snapshot,
+         stripe_payment_intent_id,
+         stripe_charge_id,
+         amount,
+         currency,
+         description,
+         paid_at,
+         failed_at,
+         stripe_created_at,
+         raw
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+       ON CONFLICT (environment, stripe_payment_intent_id)
+         WHERE stripe_payment_intent_id IS NOT NULL
+       DO UPDATE SET
+         type = EXCLUDED.type,
+         status = EXCLUDED.status,
+         subject_type = EXCLUDED.subject_type,
+         subject_id = EXCLUDED.subject_id,
+         stripe_customer_id = EXCLUDED.stripe_customer_id,
+         customer_email_snapshot = EXCLUDED.customer_email_snapshot,
+         stripe_charge_id = EXCLUDED.stripe_charge_id,
+         amount = EXCLUDED.amount,
+         currency = EXCLUDED.currency,
+         description = EXCLUDED.description,
+         paid_at = EXCLUDED.paid_at,
+         failed_at = EXCLUDED.failed_at,
+         stripe_created_at = EXCLUDED.stripe_created_at,
+         raw = EXCLUDED.raw,
+         updated_at = NOW()`,
+      [
+        environment,
+        status === 'succeeded' ? 'one_time_payment' : 'failed_payment',
+        status,
+        subject?.type ?? null,
+        subject?.id ?? null,
+        this.getStripeObjectId(paymentIntent.customer),
+        paymentIntent.receipt_email ?? null,
+        paymentIntent.id,
+        this.getStripeObjectId(paymentIntent.latest_charge),
+        status === 'succeeded' ? paymentIntent.amount_received : paymentIntent.amount,
+        paymentIntent.currency,
+        paymentIntent.description ?? null,
+        status === 'succeeded' ? this.fromStripeTimestamp(paymentIntent.created) : null,
+        status === 'failed' ? this.fromStripeTimestamp(paymentIntent.created) : null,
+        this.fromStripeTimestamp(paymentIntent.created),
+        paymentIntent,
+      ]
+    );
+  }
+
+  private async upsertSubscriptionProjection(
+    environment: StripeEnvironment,
+    subscription: StripeSubscription
+  ): Promise<boolean> {
+    const stripeCustomerId = this.getStripeObjectId(subscription.customer);
+    if (!stripeCustomerId) {
+      return false;
+    }
+
+    const subject =
+      this.getBillingSubjectFromMetadata(subscription.metadata) ??
+      (await this.findSubjectForStripeCustomer(environment, stripeCustomerId));
+
+    if (!subject) {
+      logger.warn('Stripe subscription webhook missing InsForge billing subject', {
+        environment,
+        stripeSubscriptionId: subscription.id,
+        stripeCustomerId,
+      });
+      return false;
+    }
+
+    const client = await this.getPool().connect();
+    const subscriptionItems = subscription.items?.data ?? [];
+
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `INSERT INTO payments.subscriptions (
+           environment,
+           stripe_subscription_id,
+           stripe_customer_id,
+           subject_type,
+           subject_id,
+           status,
+           current_period_start,
+           current_period_end,
+           cancel_at_period_end,
+           cancel_at,
+           canceled_at,
+           trial_start,
+           trial_end,
+           latest_invoice_id,
+           metadata,
+           raw,
+           synced_at
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW())
+         ON CONFLICT (environment, stripe_subscription_id) DO UPDATE SET
+           stripe_customer_id = EXCLUDED.stripe_customer_id,
+           subject_type = EXCLUDED.subject_type,
+           subject_id = EXCLUDED.subject_id,
+           status = EXCLUDED.status,
+           current_period_start = EXCLUDED.current_period_start,
+           current_period_end = EXCLUDED.current_period_end,
+           cancel_at_period_end = EXCLUDED.cancel_at_period_end,
+           cancel_at = EXCLUDED.cancel_at,
+           canceled_at = EXCLUDED.canceled_at,
+           trial_start = EXCLUDED.trial_start,
+           trial_end = EXCLUDED.trial_end,
+           latest_invoice_id = EXCLUDED.latest_invoice_id,
+           metadata = EXCLUDED.metadata,
+           raw = EXCLUDED.raw,
+           synced_at = NOW(),
+           updated_at = NOW()`,
+        [
+          environment,
+          subscription.id,
+          stripeCustomerId,
+          subject.type,
+          subject.id,
+          subscription.status,
+          this.fromStripeTimestamp(this.getSubscriptionCurrentPeriodStart(subscription)),
+          this.fromStripeTimestamp(this.getSubscriptionCurrentPeriodEnd(subscription)),
+          subscription.cancel_at_period_end,
+          this.fromStripeTimestamp(subscription.cancel_at),
+          this.fromStripeTimestamp(subscription.canceled_at),
+          this.fromStripeTimestamp(subscription.trial_start),
+          this.fromStripeTimestamp(subscription.trial_end),
+          this.getStripeObjectId(subscription.latest_invoice),
+          subscription.metadata ?? {},
+          subscription,
+        ]
+      );
+
+      for (const item of subscriptionItems) {
+        await this.upsertSubscriptionItem(client, environment, subscription.id, item);
+      }
+
+      await client.query(
+        `DELETE FROM payments.subscription_items
+         WHERE environment = $1
+           AND stripe_subscription_id = $2
+           AND NOT (stripe_subscription_item_id = ANY($3::TEXT[]))`,
+        [
+          environment,
+          subscription.id,
+          subscriptionItems.map((item: StripeSubscriptionItem) => item.id),
+        ]
+      );
+
+      await client.query('COMMIT');
+      return true;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  private async upsertSubscriptionItem(
+    client: PoolClient,
+    environment: StripeEnvironment,
+    stripeSubscriptionId: string,
+    item: StripeSubscriptionItem
+  ): Promise<void> {
+    await client.query(
+      `INSERT INTO payments.subscription_items (
+         environment,
+         stripe_subscription_item_id,
+         stripe_subscription_id,
+         stripe_product_id,
+         stripe_price_id,
+         quantity,
+         metadata,
+         raw
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       ON CONFLICT (environment, stripe_subscription_item_id) DO UPDATE SET
+         stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+         stripe_product_id = EXCLUDED.stripe_product_id,
+         stripe_price_id = EXCLUDED.stripe_price_id,
+         quantity = EXCLUDED.quantity,
+         metadata = EXCLUDED.metadata,
+         raw = EXCLUDED.raw,
+         updated_at = NOW()`,
+      [
+        environment,
+        item.id,
+        stripeSubscriptionId,
+        this.getStripeObjectId(item.price?.product),
+        item.price?.id ?? null,
+        item.quantity ?? null,
+        item.metadata ?? {},
+        item,
+      ]
+    );
+  }
+
+  private async findSubjectForStripeCustomer(
+    environment: StripeEnvironment,
+    stripeCustomerId: string
+  ): Promise<BillingSubject | null> {
+    const mapping = await this.findStripeCustomerMappingByCustomerId(environment, stripeCustomerId);
+    if (!mapping) {
+      return null;
+    }
+
+    return { type: mapping.subjectType, id: mapping.subjectId };
+  }
+
+  private getBillingSubjectFromMetadata(
+    metadata: Record<string, string> | null | undefined
+  ): BillingSubject | null {
+    const subjectType = metadata?.[SUBJECT_METADATA_KEYS.type];
+    const subjectId = metadata?.[SUBJECT_METADATA_KEYS.id];
+
+    if (!subjectType || !subjectId) {
+      return null;
+    }
+
+    return { type: subjectType, id: subjectId };
+  }
+
+  private getSubscriptionCurrentPeriodStart(subscription: StripeSubscription): number | null {
+    const starts = subscription.items.data
+      .map((item) => item.current_period_start)
+      .filter((value): value is number => typeof value === 'number');
+
+    return starts.length > 0 ? Math.min(...starts) : null;
+  }
+
+  private getSubscriptionCurrentPeriodEnd(subscription: StripeSubscription): number | null {
+    const ends = subscription.items.data
+      .map((item) => item.current_period_end)
+      .filter((value): value is number => typeof value === 'number');
+
+    return ends.length > 0 ? Math.max(...ends) : null;
+  }
+
   private getStripeObjectId(value: unknown): string | null {
     if (!value) {
       return null;
@@ -905,6 +1980,19 @@ export class PaymentService {
     return null;
   }
 
+  private getStripeObjectType(value: unknown): string | null {
+    if (
+      value &&
+      typeof value === 'object' &&
+      'object' in value &&
+      typeof value.object === 'string'
+    ) {
+      return value.object;
+    }
+
+    return null;
+  }
+
   private normalizeConnectionRow(
     row: StripeConnectionRow,
     maskedKey: string | null
@@ -915,6 +2003,9 @@ export class PaymentService {
       stripeAccountId: row.stripeAccountId ?? null,
       stripeAccountEmail: row.stripeAccountEmail ?? null,
       accountLivemode: row.accountLivemode ?? null,
+      webhookEndpointId: row.webhookEndpointId ?? null,
+      webhookEndpointUrl: row.webhookEndpointUrl ?? null,
+      webhookConfiguredAt: this.toISOStringOrNull(row.webhookConfiguredAt),
       maskedKey,
       lastSyncedAt: this.toISOStringOrNull(row.lastSyncedAt),
       lastSyncStatus: row.lastSyncStatus ?? null,
@@ -978,6 +2069,115 @@ export class PaymentService {
     };
   }
 
+  private normalizeCheckoutSession(
+    checkoutSession: StripeCheckoutSession,
+    environment: StripeEnvironment
+  ): CreateCheckoutSessionResponse['checkoutSession'] {
+    return {
+      environment,
+      stripeCheckoutSessionId: checkoutSession.id,
+      mode: checkoutSession.mode === 'subscription' ? 'subscription' : 'payment',
+      url: checkoutSession.url ?? null,
+      status: checkoutSession.status ?? null,
+      paymentStatus: checkoutSession.payment_status ?? null,
+      stripeCustomerId: this.getStripeObjectId(checkoutSession.customer),
+      stripePaymentIntentId: this.getStripeObjectId(checkoutSession.payment_intent),
+      stripeSubscriptionId: this.getStripeObjectId(checkoutSession.subscription),
+    };
+  }
+
+  private normalizePaymentHistoryRow(
+    row: PaymentHistoryRow
+  ): ListPaymentHistoryResponse['paymentHistory'][number] {
+    return {
+      environment: row.environment,
+      type: row.type,
+      status: row.status,
+      subjectType: row.subjectType ?? null,
+      subjectId: row.subjectId ?? null,
+      stripeCustomerId: row.stripeCustomerId ?? null,
+      customerEmailSnapshot: row.customerEmailSnapshot ?? null,
+      stripeCheckoutSessionId: row.stripeCheckoutSessionId ?? null,
+      stripePaymentIntentId: row.stripePaymentIntentId ?? null,
+      stripeInvoiceId: row.stripeInvoiceId ?? null,
+      stripeChargeId: row.stripeChargeId ?? null,
+      stripeRefundId: row.stripeRefundId ?? null,
+      stripeSubscriptionId: row.stripeSubscriptionId ?? null,
+      stripeProductId: row.stripeProductId ?? null,
+      stripePriceId: row.stripePriceId ?? null,
+      amount: row.amount === null ? null : Number(row.amount),
+      amountRefunded: row.amountRefunded === null ? null : Number(row.amountRefunded),
+      currency: row.currency ?? null,
+      description: row.description ?? null,
+      paidAt: this.toISOStringOrNull(row.paidAt),
+      failedAt: this.toISOStringOrNull(row.failedAt),
+      refundedAt: this.toISOStringOrNull(row.refundedAt),
+      stripeCreatedAt: this.toISOStringOrNull(row.stripeCreatedAt),
+      createdAt: this.toISOString(row.createdAt),
+      updatedAt: this.toISOString(row.updatedAt),
+    };
+  }
+
+  private normalizeSubscriptionRow(
+    row: StripeSubscriptionRow
+  ): Omit<ListSubscriptionsResponse['subscriptions'][number], 'items'> {
+    return {
+      environment: row.environment,
+      stripeSubscriptionId: row.stripeSubscriptionId,
+      stripeCustomerId: row.stripeCustomerId,
+      subjectType: row.subjectType,
+      subjectId: row.subjectId,
+      status: row.status,
+      currentPeriodStart: this.toISOStringOrNull(row.currentPeriodStart),
+      currentPeriodEnd: this.toISOStringOrNull(row.currentPeriodEnd),
+      cancelAtPeriodEnd: row.cancelAtPeriodEnd,
+      cancelAt: this.toISOStringOrNull(row.cancelAt),
+      canceledAt: this.toISOStringOrNull(row.canceledAt),
+      trialStart: this.toISOStringOrNull(row.trialStart),
+      trialEnd: this.toISOStringOrNull(row.trialEnd),
+      latestInvoiceId: row.latestInvoiceId ?? null,
+      metadata: row.metadata ?? {},
+      syncedAt: this.toISOString(row.syncedAt),
+      createdAt: this.toISOString(row.createdAt),
+      updatedAt: this.toISOString(row.updatedAt),
+    };
+  }
+
+  private normalizeSubscriptionItemRow(
+    row: StripeSubscriptionItemRow
+  ): NonNullable<ListSubscriptionsResponse['subscriptions'][number]['items']>[number] {
+    return {
+      environment: row.environment,
+      stripeSubscriptionItemId: row.stripeSubscriptionItemId,
+      stripeSubscriptionId: row.stripeSubscriptionId,
+      stripeProductId: row.stripeProductId ?? null,
+      stripePriceId: row.stripePriceId ?? null,
+      quantity: row.quantity === null ? null : Number(row.quantity),
+      metadata: row.metadata ?? {},
+      createdAt: this.toISOString(row.createdAt),
+      updatedAt: this.toISOString(row.updatedAt),
+    };
+  }
+
+  private normalizeWebhookEventRow(row: StripeWebhookEventRow): StripeWebhookEvent {
+    return {
+      environment: row.environment,
+      stripeEventId: row.stripeEventId,
+      eventType: row.eventType,
+      livemode: row.livemode,
+      stripeAccountId: row.stripeAccountId ?? null,
+      objectType: row.objectType ?? null,
+      objectId: row.objectId ?? null,
+      processingStatus: row.processingStatus,
+      attemptCount: Number(row.attemptCount),
+      lastError: row.lastError ?? null,
+      receivedAt: this.toISOString(row.receivedAt),
+      processedAt: this.toISOStringOrNull(row.processedAt),
+      createdAt: this.toISOString(row.createdAt),
+      updatedAt: this.toISOString(row.updatedAt),
+    };
+  }
+
   private normalizeStripeDecimal(value: unknown): string | null {
     if (value === null || value === undefined) {
       return null;
@@ -1004,6 +2204,9 @@ export class PaymentService {
       stripeAccountId: null,
       stripeAccountEmail: null,
       accountLivemode: null,
+      webhookEndpointId: null,
+      webhookEndpointUrl: null,
+      webhookConfiguredAt: null,
       lastSyncedAt: null,
       lastSyncStatus: null,
       lastSyncError: null,
@@ -1021,5 +2224,9 @@ export class PaymentService {
 
   private toISOString(value: Date | string): string {
     return value instanceof Date ? value.toISOString() : value;
+  }
+
+  private fromStripeTimestamp(value: number | null | undefined): Date | null {
+    return value ? new Date(value * 1000) : null;
   }
 }

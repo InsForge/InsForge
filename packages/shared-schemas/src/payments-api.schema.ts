@@ -1,9 +1,13 @@
 import { z } from 'zod';
 import {
+  billingSubjectSchema,
+  paymentHistorySchema,
   stripeConnectionSchema,
   stripeEnvironmentSchema,
   stripePriceMirrorSchema,
   stripeProductMirrorSchema,
+  stripeSubscriptionSchema,
+  stripeWebhookEventSchema,
 } from './payments.schema.js';
 
 export const syncPaymentsRequestSchema = z.object({
@@ -35,6 +39,10 @@ export const paymentProductParamsSchema = z.object({
 
 export const paymentPriceParamsSchema = z.object({
   priceId: z.string().trim().min(1, 'Stripe price id is required'),
+});
+
+export const stripeWebhookParamsSchema = z.object({
+  environment: stripeEnvironmentSchema,
 });
 
 export const stripePriceRecurringIntervalSchema = z.enum(['day', 'week', 'month', 'year']);
@@ -148,6 +156,93 @@ export const deletePaymentProductResponseSchema = z.object({
   deleted: z.boolean(),
 });
 
+export const checkoutModeSchema = z.enum(['payment', 'subscription']);
+
+export const createCheckoutSessionLineItemSchema = z
+  .object({
+    stripePriceId: z.string().trim().min(1, 'Stripe price id is required'),
+    quantity: z.number().int().positive().max(999).default(1),
+  })
+  .strict();
+
+export const createCheckoutSessionRequestSchema = z
+  .object({
+    environment: stripeEnvironmentSchema,
+    mode: checkoutModeSchema,
+    lineItems: z.array(createCheckoutSessionLineItemSchema).min(1).max(100),
+    successUrl: z.string().trim().url('Success URL must be a valid URL'),
+    cancelUrl: z.string().trim().url('Cancel URL must be a valid URL'),
+    subject: billingSubjectSchema.optional(),
+    customerEmail: z.string().trim().email().nullable().optional(),
+    metadata: z.record(z.string()).optional(),
+  })
+  .strict()
+  .refine((value) => value.mode !== 'subscription' || value.subject !== undefined, {
+    path: ['subject'],
+    message: 'Subscription checkout requires a billing subject',
+  });
+
+export const checkoutSessionSchema = z.object({
+  environment: stripeEnvironmentSchema,
+  stripeCheckoutSessionId: z.string(),
+  mode: checkoutModeSchema,
+  url: z.string().nullable(),
+  status: z.string().nullable(),
+  paymentStatus: z.string().nullable(),
+  stripeCustomerId: z.string().nullable(),
+  stripePaymentIntentId: z.string().nullable(),
+  stripeSubscriptionId: z.string().nullable(),
+});
+
+export const createCheckoutSessionResponseSchema = z.object({
+  checkoutSession: checkoutSessionSchema,
+});
+
+const subjectFilterFields = {
+  subjectType: z.string().trim().min(1).max(100).optional(),
+  subjectId: z.string().trim().min(1).max(255).optional(),
+};
+
+function hasCompleteSubjectFilter(value: { subjectType?: string; subjectId?: string }) {
+  return (value.subjectType === undefined) === (value.subjectId === undefined);
+}
+
+export const listPaymentHistoryRequestSchema = z
+  .object({
+    ...subjectFilterFields,
+    environment: stripeEnvironmentSchema,
+    limit: z.coerce.number().int().min(1).max(100).default(50),
+  })
+  .strict()
+  .refine(hasCompleteSubjectFilter, {
+    message: 'subjectType and subjectId must be provided together',
+  });
+
+export const listSubscriptionsRequestSchema = z
+  .object({
+    ...subjectFilterFields,
+    environment: stripeEnvironmentSchema,
+    limit: z.coerce.number().int().min(1).max(100).default(50),
+  })
+  .strict()
+  .refine(hasCompleteSubjectFilter, {
+    message: 'subjectType and subjectId must be provided together',
+  });
+
+export const listPaymentHistoryResponseSchema = z.object({
+  paymentHistory: z.array(paymentHistorySchema),
+});
+
+export const listSubscriptionsResponseSchema = z.object({
+  subscriptions: z.array(stripeSubscriptionSchema),
+});
+
+export const stripeWebhookResponseSchema = z.object({
+  received: z.boolean(),
+  handled: z.boolean(),
+  event: stripeWebhookEventSchema.optional(),
+});
+
 export const stripeKeyConfigSchema = z.object({
   environment: stripeEnvironmentSchema,
   hasKey: z.boolean(),
@@ -170,12 +265,22 @@ export type ListPaymentProductsRequest = z.infer<typeof listPaymentProductsReque
 export type ListPaymentPricesRequest = z.infer<typeof listPaymentPricesRequestSchema>;
 export type PaymentProductParams = z.infer<typeof paymentProductParamsSchema>;
 export type PaymentPriceParams = z.infer<typeof paymentPriceParamsSchema>;
+export type StripeWebhookParams = z.infer<typeof stripeWebhookParamsSchema>;
 export type StripePriceRecurringInterval = z.infer<typeof stripePriceRecurringIntervalSchema>;
 export type StripePriceTaxBehavior = z.infer<typeof stripePriceTaxBehaviorSchema>;
 export type CreatePaymentProductRequest = z.infer<typeof createPaymentProductRequestSchema>;
 export type UpdatePaymentProductRequest = z.infer<typeof updatePaymentProductRequestSchema>;
 export type CreatePaymentPriceRequest = z.infer<typeof createPaymentPriceRequestSchema>;
 export type UpdatePaymentPriceRequest = z.infer<typeof updatePaymentPriceRequestSchema>;
+export type CreateCheckoutSessionLineItem = z.infer<typeof createCheckoutSessionLineItemSchema>;
+export type CreateCheckoutSessionRequest = z.infer<typeof createCheckoutSessionRequestSchema>;
+export type CheckoutSession = z.infer<typeof checkoutSessionSchema>;
+export type CreateCheckoutSessionResponse = z.infer<typeof createCheckoutSessionResponseSchema>;
+export type ListPaymentHistoryRequest = z.infer<typeof listPaymentHistoryRequestSchema>;
+export type ListSubscriptionsRequest = z.infer<typeof listSubscriptionsRequestSchema>;
+export type ListPaymentHistoryResponse = z.infer<typeof listPaymentHistoryResponseSchema>;
+export type ListSubscriptionsResponse = z.infer<typeof listSubscriptionsResponseSchema>;
+export type StripeWebhookResponse = z.infer<typeof stripeWebhookResponseSchema>;
 export type SyncPaymentsResponse = z.infer<typeof syncPaymentsResponseSchema>;
 export type GetPaymentsStatusResponse = z.infer<typeof getPaymentsStatusResponseSchema>;
 export type ListPaymentCatalogResponse = z.infer<typeof listPaymentCatalogResponseSchema>;
