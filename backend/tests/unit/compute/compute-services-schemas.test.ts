@@ -63,12 +63,12 @@ describe('createServiceSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rejects missing imageUrl', () => {
+  it('accepts missing imageUrl (source-mode prepareForDeploy sends no imageUrl; createService route guards image-mode)', () => {
     const result = createServiceSchema.safeParse({
       name: 'my-api',
       port: 8080,
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 
   it('rejects invalid port', () => {

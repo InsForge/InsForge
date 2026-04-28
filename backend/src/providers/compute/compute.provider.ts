@@ -1,19 +1,10 @@
 export interface LaunchMachineParams {
   appId: string;
   /**
-   * Pre-built image URL. Either `image` or (`sourceKey` + `imageTag`) must
-   * be provided. If both are set, the cloud rejects with 400.
+   * Image URL — image-mode (any registry) or source-mode (digest-pinned
+   * registry.fly.io ref produced by the CLI's `flyctl deploy --build-only --push`).
    */
-  image?: string;
-  /**
-   * S3 key (within the configured source-staging bucket) where source.tgz
-   * was uploaded via a presigned URL from /build-creds. When set, cloud
-   * triggers a CodeBuild run before launching the machine and replaces
-   * `image` with the resulting digest-pinned ECR tag.
-   */
-  sourceKey?: string;
-  /** ECR image tag CodeBuild will produce, paired with `sourceKey`. */
-  imageTag?: string;
+  image: string;
   port: number;
   cpu: string;
   memory: number;
@@ -21,26 +12,14 @@ export interface LaunchMachineParams {
   region: string;
 }
 
-export interface SourceUploadCreds {
-  sourceKey: string;
-  uploadUrl: string;
-  imageTag: string;
-  expiresAt: string;
-}
-
 export interface UpdateMachineParams {
   appId: string;
   machineId: string;
   /**
-   * Pre-built image URL. Either `image` or (`sourceKey` + `imageTag`) must
-   * be provided for a redeploy. (For non-image updates like port-only,
-   * pass the existing image URL.)
+   * Image URL — same shape as LaunchMachineParams.image. For non-image
+   * updates (port-only, env-only) pass the existing image URL.
    */
-  image?: string;
-  /** S3 key from /build-creds. Triggers cloud-side build before update. */
-  sourceKey?: string;
-  /** ECR tag the source-mode build will produce, paired with sourceKey. */
-  imageTag?: string;
+  image: string;
   port: number;
   cpu: string;
   memory: number;
@@ -62,11 +41,6 @@ export interface ComputeProvider {
   isConfigured(): boolean;
   createApp(params: { name: string; network: string; org: string }): Promise<{ appId: string }>;
   destroyApp(appId: string): Promise<void>;
-  /**
-   * Mints credentials for the CLI to upload source directly to staging.
-   * Optional — providers without source-deploy support throw or omit.
-   */
-  issueBuildCreds?(appId: string): Promise<SourceUploadCreds>;
   launchMachine(params: LaunchMachineParams): Promise<{ machineId: string }>;
   updateMachine(params: UpdateMachineParams): Promise<void>;
   stopMachine(appId: string, machineId: string): Promise<void>;
