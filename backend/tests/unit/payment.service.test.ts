@@ -7,6 +7,7 @@ const { mockPool, mockProvider, mockGetSecretByKey, mockEncrypt } = vi.hoisted((
     connect: vi.fn(),
   },
   mockProvider: {
+    retrieveAccount: vi.fn(),
     syncCatalog: vi.fn(),
     createProduct: vi.fn(),
     updateProduct: vi.fn(),
@@ -65,6 +66,17 @@ describe('PaymentService', () => {
     mockGetSecretByKey.mockResolvedValue('sk_test_1234567890');
     mockEncrypt.mockReturnValue('encrypted-secret');
     mockPool.query.mockResolvedValue({ rowCount: 1, rows: [] });
+    mockPool.connect.mockResolvedValue({
+      query: vi.fn().mockResolvedValue({ rows: [] }),
+      release: vi.fn(),
+    });
+    mockProvider.retrieveAccount.mockResolvedValue({
+      id: 'acct_123',
+      object: 'account',
+      email: 'owner@example.com',
+      charges_enabled: true,
+      details_submitted: true,
+    } as unknown as StripeAccount);
     mockProvider.createProduct.mockResolvedValue({
       id: 'prod_new',
       object: 'product',
@@ -174,22 +186,102 @@ describe('PaymentService', () => {
     expect(mockGetSecretByKey).toHaveBeenCalledWith('STRIPE_LIVE_SECRET_KEY');
   });
 
-  it('upserts encrypted Stripe keys into the canonical secret names', async () => {
+  it('upserts encrypted Stripe keys into the canonical secret names and syncs immediately', async () => {
+    const mockClient = {
+      query: vi.fn().mockResolvedValue({ rows: [] }),
+      release: vi.fn(),
+    };
+    mockPool.connect.mockResolvedValue(mockClient);
+    mockPool.query.mockResolvedValueOnce({
+      rows: [{ stripeAccountId: 'acct_123', hasCatalogRows: true }],
+    });
+
     await PaymentService.getInstance().setStripeSecretKey('test', ' sk_test_newsecret1234 ');
 
+    expect(mockProvider.retrieveAccount).toHaveBeenCalledTimes(1);
     expect(mockEncrypt).toHaveBeenCalledWith('sk_test_newsecret1234');
-    expect(mockPool.query).toHaveBeenCalledWith(expect.stringMatching(/system\.secrets/i), [
+    expect(mockClient.query).toHaveBeenCalledWith(expect.stringMatching(/system\.secrets/i), [
       'STRIPE_TEST_SECRET_KEY',
       'encrypted-secret',
     ]);
+    expect(mockProvider.syncCatalog).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears the environment catalog mirror when a new key points to another Stripe account', async () => {
+    const mockClient = {
+      query: vi.fn().mockResolvedValue({ rows: [] }),
+      release: vi.fn(),
+    };
+    mockPool.connect.mockResolvedValue(mockClient);
+    mockProvider.retrieveAccount.mockResolvedValueOnce({
+      id: 'acct_new',
+      object: 'account',
+      email: 'new-owner@example.com',
+    } as unknown as StripeAccount);
+    mockProvider.syncCatalog.mockRejectedValueOnce(new Error('sync failed'));
+    mockPool.query
+      .mockResolvedValueOnce({
+        rows: [{ stripeAccountId: 'acct_old', hasCatalogRows: true }],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            environment: 'test',
+            status: 'error',
+            stripeAccountId: 'acct_new',
+            stripeAccountEmail: 'new-owner@example.com',
+            accountLivemode: false,
+            lastSyncedAt: null,
+            lastSyncStatus: 'failed',
+            lastSyncError: 'sync failed',
+            lastSyncCounts: {},
+          },
+        ],
+      });
+
+    await expect(
+      PaymentService.getInstance().setStripeSecretKey('test', 'sk_test_newsecret1234')
+    ).resolves.toBeUndefined();
+
+    expect(mockClient.query).toHaveBeenCalledWith(
+      'DELETE FROM payments.prices WHERE environment = $1',
+      ['test']
+    );
+    expect(mockClient.query).toHaveBeenCalledWith(
+      'DELETE FROM payments.products WHERE environment = $1',
+      ['test']
+    );
+    expect(mockPool.query).toHaveBeenCalledWith(
+      expect.stringMatching(/INSERT INTO payments\.stripe_connections/i),
+      ['test', 'error', 'sync failed']
+    );
   });
 
   it('soft-removes Stripe keys from the secret store', async () => {
+    const mockClient = {
+      query: vi.fn().mockResolvedValue({ rowCount: 1, rows: [] }),
+      release: vi.fn(),
+    };
+    mockPool.connect.mockResolvedValue(mockClient);
+
     await expect(PaymentService.getInstance().removeStripeSecretKey('live')).resolves.toBe(true);
 
-    expect(mockPool.query).toHaveBeenCalledWith(expect.stringMatching(/UPDATE system\.secrets/i), [
-      'STRIPE_LIVE_SECRET_KEY',
-    ]);
+    expect(mockClient.query).toHaveBeenCalledWith(
+      expect.stringMatching(/UPDATE system\.secrets/i),
+      ['STRIPE_LIVE_SECRET_KEY']
+    );
+    expect(mockClient.query).toHaveBeenCalledWith(
+      'DELETE FROM payments.prices WHERE environment = $1',
+      ['live']
+    );
+    expect(mockClient.query).toHaveBeenCalledWith(
+      'DELETE FROM payments.products WHERE environment = $1',
+      ['live']
+    );
+    expect(mockClient.query).toHaveBeenCalledWith(
+      expect.stringMatching(/UPDATE payments\.stripe_connections/i),
+      ['live', 'STRIPE_LIVE_SECRET_KEY is not configured']
+    );
   });
 
   it('seeds Stripe keys from environment variables', async () => {
@@ -251,11 +343,15 @@ describe('PaymentService', () => {
   });
 
   it('fetches Stripe products and prices and commits a successful sync', async () => {
-    const mockClient = {
+    const mockLockClient = {
       query: vi.fn().mockResolvedValue({ rows: [] }),
       release: vi.fn(),
     };
-    mockPool.connect.mockResolvedValueOnce(mockClient);
+    const mockSyncClient = {
+      query: vi.fn().mockResolvedValue({ rows: [] }),
+      release: vi.fn(),
+    };
+    mockPool.connect.mockResolvedValueOnce(mockLockClient).mockResolvedValueOnce(mockSyncClient);
     mockPool.query.mockResolvedValueOnce({
       rows: [
         {
@@ -276,19 +372,25 @@ describe('PaymentService', () => {
 
     expect(result.status).toBe('connected');
     expect(mockProvider.syncCatalog).toHaveBeenCalledTimes(1);
-    expect(mockClient.query).toHaveBeenCalledWith('BEGIN');
-    expect(mockClient.query).toHaveBeenCalledWith(
+    expect(mockLockClient.query).toHaveBeenCalledWith('SELECT pg_advisory_lock(hashtext($1))', [
+      'payments_environment_test',
+    ]);
+    expect(mockLockClient.query).toHaveBeenCalledWith('SELECT pg_advisory_unlock(hashtext($1))', [
+      'payments_environment_test',
+    ]);
+    expect(mockSyncClient.query).toHaveBeenCalledWith('BEGIN');
+    expect(mockSyncClient.query).toHaveBeenCalledWith(
       expect.stringMatching(/DELETE FROM payments\.prices/i),
-      ['test', expect.any(Date)]
+      ['test', ['price_123']]
     );
-    expect(mockClient.query).toHaveBeenCalledWith(
+    expect(mockSyncClient.query).toHaveBeenCalledWith(
       expect.stringMatching(/DELETE FROM payments\.products/i),
-      ['test', expect.any(Date)]
+      ['test', ['prod_123']]
     );
-    expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
+    expect(mockSyncClient.query).toHaveBeenCalledWith('COMMIT');
   });
 
-  it('lists test products from the local Stripe mirror', async () => {
+  it('lists products from the requested local Stripe mirror environment', async () => {
     mockPool.query
       .mockResolvedValueOnce({
         rows: [
@@ -306,7 +408,9 @@ describe('PaymentService', () => {
       })
       .mockResolvedValueOnce({ rows: [] });
 
-    await expect(PaymentService.getInstance().listTestProducts()).resolves.toEqual({
+    await expect(
+      PaymentService.getInstance().listProducts({ environment: 'test' })
+    ).resolves.toEqual({
       products: [
         {
           environment: 'test',
@@ -326,7 +430,8 @@ describe('PaymentService', () => {
     ]);
   });
 
-  it('creates products only with the Stripe test key and refreshes the test mirror', async () => {
+  it('creates products with the requested Stripe key and refreshes that environment mirror', async () => {
+    mockGetSecretByKey.mockResolvedValue('sk_live_1234567890');
     const mockClient = {
       query: vi.fn().mockResolvedValue({ rows: [] }),
       release: vi.fn(),
@@ -335,11 +440,11 @@ describe('PaymentService', () => {
     mockPool.query.mockResolvedValueOnce({
       rows: [
         {
-          environment: 'test',
+          environment: 'live',
           status: 'connected',
           stripeAccountId: 'acct_123',
           stripeAccountEmail: 'owner@example.com',
-          accountLivemode: false,
+          accountLivemode: true,
           lastSyncedAt: new Date('2026-04-27T00:00:00.000Z'),
           lastSyncStatus: 'succeeded',
           lastSyncError: null,
@@ -348,7 +453,8 @@ describe('PaymentService', () => {
       ],
     });
 
-    const result = await PaymentService.getInstance().createTestProduct({
+    const result = await PaymentService.getInstance().createProduct({
+      environment: 'live',
       name: 'New Product',
       active: true,
       metadata: { tier: 'new' },
@@ -359,18 +465,17 @@ describe('PaymentService', () => {
       active: true,
       metadata: { tier: 'new' },
     });
-    expect(mockGetSecretByKey).toHaveBeenCalledWith('STRIPE_TEST_SECRET_KEY');
-    expect(mockGetSecretByKey).not.toHaveBeenCalledWith('STRIPE_LIVE_SECRET_KEY');
+    expect(mockGetSecretByKey).toHaveBeenCalledWith('STRIPE_LIVE_SECRET_KEY');
     expect(mockProvider.syncCatalog).toHaveBeenCalledTimes(1);
     expect(result.product).toMatchObject({
-      environment: 'test',
+      environment: 'live',
       stripeProductId: 'prod_new',
       name: 'New Product',
       active: true,
     });
   });
 
-  it('updates and deletes products through the Stripe test provider', async () => {
+  it('updates and deletes products through the requested Stripe provider', async () => {
     const mockClient = {
       query: vi.fn().mockResolvedValue({ rows: [] }),
       release: vi.fn(),
@@ -393,7 +498,8 @@ describe('PaymentService', () => {
     });
 
     await expect(
-      PaymentService.getInstance().updateTestProduct('prod_123', {
+      PaymentService.getInstance().updateProduct('prod_123', {
+        environment: 'test',
         name: 'Updated Product',
         active: false,
       })
@@ -405,7 +511,7 @@ describe('PaymentService', () => {
       },
     });
 
-    await expect(PaymentService.getInstance().deleteTestProduct('prod_123')).resolves.toEqual({
+    await expect(PaymentService.getInstance().deleteProduct('test', 'prod_123')).resolves.toEqual({
       stripeProductId: 'prod_123',
       deleted: true,
     });
@@ -418,7 +524,7 @@ describe('PaymentService', () => {
     expect(mockProvider.syncCatalog).toHaveBeenCalledTimes(2);
   });
 
-  it('lists test prices from the local Stripe mirror with an optional product filter', async () => {
+  it('lists prices from the requested local Stripe mirror with an optional product filter', async () => {
     mockPool.query.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({
       rows: [
         {
@@ -459,7 +565,7 @@ describe('PaymentService', () => {
     });
 
     await expect(
-      PaymentService.getInstance().listTestPrices({ stripeProductId: 'prod_123' })
+      PaymentService.getInstance().listPrices({ environment: 'test', stripeProductId: 'prod_123' })
     ).resolves.toEqual({
       prices: [
         {
@@ -483,7 +589,7 @@ describe('PaymentService', () => {
     });
   });
 
-  it('creates, updates, and archives prices through the Stripe test provider', async () => {
+  it('creates, updates, and archives prices through the requested Stripe provider', async () => {
     const mockClient = {
       query: vi.fn().mockResolvedValue({ rows: [] }),
       release: vi.fn(),
@@ -506,7 +612,8 @@ describe('PaymentService', () => {
     });
 
     await expect(
-      PaymentService.getInstance().createTestPrice({
+      PaymentService.getInstance().createPrice({
+        environment: 'test',
         stripeProductId: 'prod_123',
         currency: 'usd',
         unitAmount: 2000,
@@ -522,7 +629,8 @@ describe('PaymentService', () => {
     });
 
     await expect(
-      PaymentService.getInstance().updateTestPrice('price_123', {
+      PaymentService.getInstance().updatePrice('price_123', {
+        environment: 'test',
         active: false,
         metadata: { archived: 'true' },
       })
@@ -534,16 +642,16 @@ describe('PaymentService', () => {
       },
     });
 
-    await expect(PaymentService.getInstance().archiveTestPrice('price_123')).resolves.toMatchObject(
-      {
-        price: {
-          environment: 'test',
-          stripePriceId: 'price_123',
-          active: false,
-        },
-        archived: true,
-      }
-    );
+    await expect(
+      PaymentService.getInstance().archivePrice('test', 'price_123')
+    ).resolves.toMatchObject({
+      price: {
+        environment: 'test',
+        stripePriceId: 'price_123',
+        active: false,
+      },
+      archived: true,
+    });
 
     expect(mockProvider.createPrice).toHaveBeenCalledWith({
       stripeProductId: 'prod_123',

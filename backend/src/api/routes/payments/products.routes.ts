@@ -7,6 +7,7 @@ import { StripeKeyValidationError } from '@/providers/payments/stripe.provider.j
 import { successResponse } from '@/utils/response.js';
 import {
   listPaymentProductsRequestSchema,
+  paymentEnvironmentRequestSchema,
   paymentProductParamsSchema,
   createPaymentProductRequestSchema,
   updatePaymentProductRequestSchema,
@@ -36,7 +37,7 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
       throw new AppError(formatValidationIssues(validation.error), 400, ERROR_CODES.INVALID_INPUT);
     }
 
-    const products = await paymentService.listTestProducts();
+    const products = await paymentService.listProducts(validation.data);
     successResponse(res, products);
   } catch (error) {
     next(error);
@@ -50,7 +51,19 @@ router.get('/:productId', async (req: AuthRequest, res: Response, next: NextFunc
       throw new AppError(formatValidationIssues(validation.error), 400, ERROR_CODES.INVALID_INPUT);
     }
 
-    const product = await paymentService.getTestProduct(validation.data.productId);
+    const queryValidation = paymentEnvironmentRequestSchema.safeParse(req.query);
+    if (!queryValidation.success) {
+      throw new AppError(
+        formatValidationIssues(queryValidation.error),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    const product = await paymentService.getProduct(
+      queryValidation.data.environment,
+      validation.data.productId
+    );
     successResponse(res, product);
   } catch (error) {
     next(error);
@@ -64,7 +77,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
       throw new AppError(formatValidationIssues(validation.error), 400, ERROR_CODES.INVALID_INPUT);
     }
 
-    const product = await paymentService.createTestProduct(validation.data);
+    const product = await paymentService.createProduct(validation.data);
     successResponse(res, product, 201);
   } catch (error) {
     next(normalizeStripeConfigError(error));
@@ -91,7 +104,7 @@ router.patch('/:productId', async (req: AuthRequest, res: Response, next: NextFu
       );
     }
 
-    const product = await paymentService.updateTestProduct(
+    const product = await paymentService.updateProduct(
       paramsValidation.data.productId,
       bodyValidation.data
     );
@@ -108,7 +121,19 @@ router.delete('/:productId', async (req: AuthRequest, res: Response, next: NextF
       throw new AppError(formatValidationIssues(validation.error), 400, ERROR_CODES.INVALID_INPUT);
     }
 
-    const product = await paymentService.deleteTestProduct(validation.data.productId);
+    const queryValidation = paymentEnvironmentRequestSchema.safeParse(req.query);
+    if (!queryValidation.success) {
+      throw new AppError(
+        formatValidationIssues(queryValidation.error),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    const product = await paymentService.deleteProduct(
+      queryValidation.data.environment,
+      validation.data.productId
+    );
     successResponse(res, product);
   } catch (error) {
     next(normalizeStripeConfigError(error));

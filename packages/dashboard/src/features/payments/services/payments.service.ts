@@ -3,7 +3,6 @@ import type {
   GetPaymentsConfigResponse,
   GetPaymentsStatusResponse,
   ListPaymentCatalogResponse,
-  SyncPaymentsRequest,
   SyncPaymentsResponse,
   StripeEnvironment,
   UpsertPaymentsConfigRequest,
@@ -28,13 +27,11 @@ export class PaymentsService {
     });
   }
 
-  async syncCatalog(
-    environment: SyncPaymentsRequest['environment']
-  ): Promise<SyncPaymentsResponse> {
+  async syncCatalog(): Promise<SyncPaymentsResponse> {
     return apiClient.request('/payments/sync', {
       method: 'POST',
       headers: apiClient.withAccessToken(),
-      body: JSON.stringify({ environment }),
+      body: JSON.stringify({ environment: 'all' }),
     });
   }
 

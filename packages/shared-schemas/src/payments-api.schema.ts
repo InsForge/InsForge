@@ -14,10 +14,17 @@ export const listPaymentCatalogRequestSchema = z.object({
   environment: stripeEnvironmentSchema.optional(),
 });
 
-export const listPaymentProductsRequestSchema = z.object({}).strict();
+export const paymentEnvironmentRequestSchema = z
+  .object({
+    environment: stripeEnvironmentSchema,
+  })
+  .strict();
+
+export const listPaymentProductsRequestSchema = paymentEnvironmentRequestSchema;
 
 export const listPaymentPricesRequestSchema = z
   .object({
+    environment: stripeEnvironmentSchema,
     stripeProductId: z.string().trim().min(1, 'Stripe product id is required').optional(),
   })
   .strict();
@@ -35,6 +42,7 @@ export const stripePriceTaxBehaviorSchema = z.enum(['exclusive', 'inclusive', 'u
 
 export const createPaymentProductRequestSchema = z
   .object({
+    environment: stripeEnvironmentSchema,
     name: z.string().trim().min(1, 'Product name is required'),
     description: z.string().trim().max(5000).nullable().optional(),
     active: z.boolean().optional(),
@@ -44,18 +52,20 @@ export const createPaymentProductRequestSchema = z
 
 export const updatePaymentProductRequestSchema = z
   .object({
+    environment: stripeEnvironmentSchema,
     name: z.string().trim().min(1, 'Product name is required').optional(),
     description: z.string().trim().max(5000).nullable().optional(),
     active: z.boolean().optional(),
     metadata: z.record(z.string()).optional(),
   })
   .strict()
-  .refine((value) => Object.keys(value).length > 0, {
+  .refine(({ environment: _environment, ...value }) => Object.keys(value).length > 0, {
     message: 'At least one product field is required',
   });
 
 export const createPaymentPriceRequestSchema = z
   .object({
+    environment: stripeEnvironmentSchema,
     stripeProductId: z.string().trim().min(1, 'Stripe product id is required'),
     currency: z
       .string()
@@ -79,13 +89,14 @@ export const createPaymentPriceRequestSchema = z
 
 export const updatePaymentPriceRequestSchema = z
   .object({
+    environment: stripeEnvironmentSchema,
     active: z.boolean().optional(),
     lookupKey: z.string().trim().min(1).max(200).nullable().optional(),
     taxBehavior: stripePriceTaxBehaviorSchema.optional(),
     metadata: z.record(z.string()).optional(),
   })
   .strict()
-  .refine((value) => Object.keys(value).length > 0, {
+  .refine(({ environment: _environment, ...value }) => Object.keys(value).length > 0, {
     message: 'At least one price field is required',
   });
 
@@ -154,6 +165,7 @@ export const upsertPaymentsConfigRequestSchema = z.object({
 
 export type SyncPaymentsRequest = z.infer<typeof syncPaymentsRequestSchema>;
 export type ListPaymentCatalogRequest = z.infer<typeof listPaymentCatalogRequestSchema>;
+export type PaymentEnvironmentRequest = z.infer<typeof paymentEnvironmentRequestSchema>;
 export type ListPaymentProductsRequest = z.infer<typeof listPaymentProductsRequestSchema>;
 export type ListPaymentPricesRequest = z.infer<typeof listPaymentPricesRequestSchema>;
 export type PaymentProductParams = z.infer<typeof paymentProductParamsSchema>;

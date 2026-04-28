@@ -303,8 +303,17 @@ export default function ProductsPage() {
   const [environment, setEnvironment] = useState<StripeEnvironment>('test');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<StripeProductMirror | null>(null);
-  const { activeConnection, products, prices, isLoading, isSyncing, error, syncCatalog, refetch } =
-    usePayments(environment);
+  const {
+    connections,
+    activeConnection,
+    products,
+    prices,
+    isLoading,
+    isSyncing,
+    error,
+    syncCatalog,
+    refetch,
+  } = usePayments(environment);
 
   useEffect(() => {
     setSelectedProduct(null);
@@ -342,6 +351,7 @@ export default function ProductsPage() {
     ? (pricesByProductId.get(selectedProduct.stripeProductId) ?? [])
     : [];
   const hasActiveKey = !!activeConnection?.maskedKey;
+  const hasAnyKey = connections.some((connection) => !!connection.maskedKey);
 
   if (selectedProduct) {
     return (
@@ -382,7 +392,7 @@ export default function ProductsPage() {
             <Button
               variant="secondary"
               onClick={() => void syncCatalog()}
-              disabled={!hasActiveKey || isSyncing}
+              disabled={!hasAnyKey || isSyncing}
               className="h-9 rounded px-3"
             >
               {isSyncing ? (
