@@ -10,6 +10,7 @@ import { EmptyState, PaginationControls } from '../../../../components';
 import { AdvisoryItem } from './AdvisoryItem';
 import { AdvisoryTabs, type AdvisoryTabValue } from './AdvisoryTabs';
 import { SeveritySummary } from './SeveritySummary';
+import { formatRemediationPromptBatch } from './remediationPrompt';
 
 const ADVISOR_FETCH_PAGE_SIZE = 100;
 const SCAN_POLL_INTERVAL_MS = 3_000;
@@ -158,18 +159,16 @@ export function BackendAdvisorSection() {
           break;
         }
       }
-      const blocks = all
-        .filter((issue) => issue.recommendation)
-        .map(
-          (issue) =>
-            `-- ${issue.ruleId}\n-- ${issue.title}${issue.affectedObject ? ` (${issue.affectedObject})` : ''}\n${issue.recommendation}`
-        );
-      if (blocks.length === 0) {
+      const actionable = all.filter((issue) => issue.recommendation);
+      if (actionable.length === 0) {
         showToast('No remediations available', 'info');
         return;
       }
-      await navigator.clipboard.writeText(blocks.join('\n\n'));
-      showToast(`Copied ${blocks.length} remediation${blocks.length === 1 ? '' : 's'}`, 'success');
+      await navigator.clipboard.writeText(formatRemediationPromptBatch(actionable));
+      showToast(
+        `Copied ${actionable.length} remediation${actionable.length === 1 ? '' : 's'}`,
+        'success'
+      );
     } catch {
       showToast('Failed to copy remediations', 'error');
     }

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChevronDown, ChevronUp, Copy } from 'lucide-react';
 import type { DashboardAdvisorIssue } from '../../../../types';
 import { useToast } from '../../../../lib/hooks/useToast';
+import { formatRemediationPrompt } from './remediationPrompt';
 import CriticalIcon from '../../../../assets/icons/severity_critical.svg?react';
 import InfoIcon from '../../../../assets/icons/severity_info.svg?react';
 import WarningIcon from '../../../../assets/icons/severity_warning.svg?react';
@@ -32,7 +33,7 @@ export function AdvisoryItem({ issue }: AdvisoryItemProps) {
       return;
     }
     try {
-      await navigator.clipboard.writeText(issue.recommendation);
+      await navigator.clipboard.writeText(formatRemediationPrompt(issue));
       showToast('Remediation copied', 'success');
     } catch {
       showToast('Failed to copy remediation', 'error');
