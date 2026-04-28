@@ -6,7 +6,7 @@ import type { DashboardAdvisorIssue, DashboardAdvisorSeverity } from '../../../.
 import { useDashboardHost } from '../../../../lib/config/DashboardHostContext';
 import { useToast } from '../../../../lib/hooks/useToast';
 import { usePageSize } from '../../../../lib/hooks/usePageSize';
-import { PaginationControls } from '../../../../components';
+import { EmptyState, PaginationControls } from '../../../../components';
 import { AdvisoryItem } from './AdvisoryItem';
 import { AdvisoryTabs, type AdvisoryTabValue } from './AdvisoryTabs';
 import { SeveritySummary } from './SeveritySummary';
@@ -132,6 +132,7 @@ export function BackendAdvisorSection() {
 
   const summary = latest.data?.summary;
   const lastScanLabel = formatRelative(latest.data?.scannedAt);
+  const hasScan = !!latest.data?.scanId;
   const totalRecords = issues.data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
 
@@ -208,7 +209,13 @@ export function BackendAdvisorSection() {
 
       <div className="flex flex-col rounded border border-[var(--alpha-8)] bg-card">
         <AdvisoryTabs value={tab} onChange={setTab} summary={summary} />
-        {issues.isLoading ? (
+        {!hasScan && !latest.isLoading ? (
+          <EmptyState
+            className="h-32 gap-1"
+            title="No scan yet"
+            description="Click Re-run Scan above to start your first scan"
+          />
+        ) : issues.isLoading ? (
           <div className="flex h-24 items-center justify-center text-sm text-muted-foreground">
             Loading…
           </div>
@@ -229,7 +236,7 @@ export function BackendAdvisorSection() {
         )}
       </div>
 
-      {totalRecords > 0 && (
+      {hasScan && totalRecords > 0 && (
         <PaginationControls
           currentPage={currentPage}
           totalPages={totalPages}
