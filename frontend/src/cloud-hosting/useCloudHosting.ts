@@ -697,13 +697,12 @@ export function useCloudHosting() {
                 ];
               })
             : [];
-          resolvePendingRequest('advisorIssues', {
-            issues,
-            total:
-              typeof message.total === 'number' && Number.isFinite(message.total)
-                ? message.total
-                : issues.length,
-          });
+          const totalRaw = message.total;
+          const total =
+            typeof totalRaw === 'number' && Number.isFinite(totalRaw) && totalRaw >= 0
+              ? Math.floor(totalRaw)
+              : issues.length;
+          resolvePendingRequest('advisorIssues', { issues, total });
           return;
         }
         case 'ADVISOR_ISSUES_ERROR': {

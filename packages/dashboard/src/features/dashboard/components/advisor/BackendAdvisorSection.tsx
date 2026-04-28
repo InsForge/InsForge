@@ -68,18 +68,23 @@ export function BackendAdvisorSection() {
 
   const [isScanning, setIsScanning] = useState(false);
   const baselineScanIdRef = useRef<string | undefined>(undefined);
+  const pollStartRef = useRef<number | null>(null);
+  const refetchLatest = latest.refetch;
 
   useEffect(() => {
     if (!isScanning) {
+      pollStartRef.current = null;
       return;
     }
+    if (pollStartRef.current === null) {
+      pollStartRef.current = Date.now();
+    }
     let cancelled = false;
-    const pollStart = Date.now();
     const interval = window.setInterval(() => {
       if (cancelled) {
         return;
       }
-      void latest.refetch().then((result) => {
+      void refetchLatest().then((result) => {
         if (cancelled) {
           return;
         }
@@ -97,6 +102,7 @@ export function BackendAdvisorSection() {
           }
           return;
         }
+        const pollStart = pollStartRef.current ?? Date.now();
         if (Date.now() - pollStart >= SCAN_POLL_MAX_DURATION_MS) {
           cancelled = true;
           window.clearInterval(interval);
@@ -110,7 +116,7 @@ export function BackendAdvisorSection() {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [isScanning, latest, queryClient, showToast]);
+  }, [isScanning, refetchLatest, queryClient, showToast]);
 
   const handleRunScan = () => {
     baselineScanIdRef.current = latest.data?.scanId;
