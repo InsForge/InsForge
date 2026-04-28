@@ -40,6 +40,7 @@
                 "group": "Database",
                 "pages": [
                   "core-concepts/database/architecture",
+                  "core-concepts/database/migrations",
                   "core-concepts/database/pgvector"
                 ]
               },
@@ -52,7 +53,8 @@
               {
                 "group": "Storage",
                 "pages": [
-                  "core-concepts/storage/architecture"
+                  "core-concepts/storage/architecture",
+                  "core-concepts/storage/s3-compatibility"
                 ]
               },
               {

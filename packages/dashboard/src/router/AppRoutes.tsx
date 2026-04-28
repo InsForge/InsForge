@@ -5,7 +5,8 @@ import LoginPage from '../features/login/pages/LoginPage';
 import CloudLoginPage from '../features/login/pages/CloudLoginPage';
 import DashboardLayout from '../features/dashboard/components/DashboardLayout';
 import DashboardPage from '../features/dashboard/pages/DashboardPage';
-import CTestDashboardPage from '../features/dashboard/pages/CTestDashboardPage';
+import DTestDashboardPage from '../features/dashboard/pages/DTestDashboardPage';
+import DTestInstallPage from '../features/dashboard/pages/DTestInstallPage';
 import { getFeatureFlag } from '../lib/analytics/posthog';
 import DatabaseLayout from '../features/database/components/DatabaseLayout';
 import SQLEditorLayout from '../features/database/components/SQLEditorLayout';
@@ -49,8 +50,9 @@ import DeploymentDomainsPage from '../features/deployments/pages/DeploymentDomai
 import ComputePage from '../features/compute/pages/ComputePage';
 
 function AuthenticatedRoutes() {
-  const dashboardVariant = getFeatureFlag('dashboard-v3-experiment');
-  const DashboardHomePage = dashboardVariant === 'c_test' ? CTestDashboardPage : DashboardPage;
+  const dashboardVariant = getFeatureFlag('dashboard-v4-experiment');
+  const isDTest = dashboardVariant === 'd_test';
+  const DashboardHomePage = isDTest ? DTestDashboardPage : DashboardPage;
 
   return (
     <AppLayout>
@@ -58,6 +60,10 @@ function AuthenticatedRoutes() {
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<DashboardLayout />}>
           <Route index element={<DashboardHomePage />} />
+          <Route
+            path="install"
+            element={isDTest ? <DTestInstallPage /> : <Navigate to="/dashboard" replace />}
+          />
         </Route>
         <Route path="/dashboard/authentication" element={<AuthenticationLayout />}>
           <Route index element={<Navigate to="users" replace />} />

@@ -72,6 +72,7 @@ Subscribe to a channel to receive events.
 SubscribeResponse(
     ok: Boolean,
     channel: String,
+    presence: PresenceSnapshot?,  // present when ok is true
     error: SubscribeError?  // null if ok is true
 )
 ```
@@ -85,6 +86,7 @@ val response = client.realtime.subscribe("todos")
 
 if (response.ok) {
     println("Subscribed to channel: ${response.channel}")
+    println("Members already present: ${response.presence?.members}")
 } else {
     println("Subscribe failed: ${response.error?.message}")
 }

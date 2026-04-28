@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { recordService } from '../services/record.service';
+import { databaseTableQueryKeys } from '../queryKeys';
 import { useToast } from '../../../lib/hooks/useToast';
 import { ConvertedValue } from '../../../components/datagrid/datagridTypes';
 
@@ -50,7 +51,7 @@ export function useRecords(tableName: string) {
       recordService.createRecord(tableName, data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['records', tableName] });
-      void queryClient.invalidateQueries({ queryKey: ['tables', tableName, 'schema'] });
+      void queryClient.invalidateQueries({ queryKey: databaseTableQueryKeys.schema(tableName) });
       showToast('Record created successfully', 'success');
     },
     onError: (error: Error) => {
@@ -65,7 +66,7 @@ export function useRecords(tableName: string) {
       recordService.createRecords(tableName, records),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['records', tableName] });
-      void queryClient.invalidateQueries({ queryKey: ['tables', tableName, 'schema'] });
+      void queryClient.invalidateQueries({ queryKey: databaseTableQueryKeys.schema(tableName) });
       showToast('Records created successfully', 'success');
     },
     onError: (error: Error) => {
@@ -87,7 +88,7 @@ export function useRecords(tableName: string) {
     }) => recordService.updateRecord(tableName, pkColumn, pkValue, data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['records', tableName] });
-      void queryClient.invalidateQueries({ queryKey: ['tables', tableName, 'schema'] });
+      void queryClient.invalidateQueries({ queryKey: databaseTableQueryKeys.schema(tableName) });
       showToast('Record updated successfully', 'success');
     },
     onError: (error: Error) => {
@@ -102,7 +103,7 @@ export function useRecords(tableName: string) {
       recordService.deleteRecords(tableName, variables.pkColumn, variables.pkValues),
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['records', tableName] });
-      void queryClient.invalidateQueries({ queryKey: ['tables', tableName, 'schema'] });
+      void queryClient.invalidateQueries({ queryKey: databaseTableQueryKeys.schema(tableName) });
       const count = variables.pkValues.length;
       if (count === 1) {
         showToast('Record deleted successfully', 'success');

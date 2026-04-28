@@ -20,6 +20,7 @@ import { realtimeRouter } from '@/api/routes/realtime/index.routes.js';
 import { emailRouter } from '@/api/routes/email/index.routes.js';
 import { deploymentsRouter } from '@/api/routes/deployments/index.routes.js';
 import { webhooksRouter } from '@/api/routes/webhooks/index.routes.js';
+import { s3GatewayRouter } from '@/api/routes/s3-gateway/index.routes.js';
 import { errorMiddleware } from '@/api/middlewares/error.js';
 import { destroyEmailCooldownInterval } from '@/api/middlewares/rate-limiters.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
@@ -169,6 +170,11 @@ export async function createApp() {
   // Mount webhooks with raw body parser BEFORE JSON middleware
   // This ensures signature verification uses the original bytes
   app.use('/api/webhooks', express.raw({ type: 'application/json' }), webhooksRouter);
+
+  // Mount the S3 protocol gateway BEFORE JSON middleware so request bodies
+  // stream through untouched. The gateway handles raw streams itself
+  // (including STREAMING-AWS4-HMAC-SHA256-PAYLOAD chunked signatures).
+  app.use('/storage/v1/s3', s3GatewayRouter);
 
   // Apply JSON and URL-encoded middleware for all other routes.
   // We use high defaults (100mb/10mb) to ensure a smooth "out-of-the-box" experience

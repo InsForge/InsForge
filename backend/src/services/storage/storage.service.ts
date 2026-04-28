@@ -165,8 +165,8 @@ export class StorageService {
     // Save metadata to database and return the timestamp in one operation
     const result = await this.getPool().query(
       `
-      INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by, uploaded_via)
+      VALUES ($1, $2, $3, $4, $5, 'rest')
       RETURNING uploaded_at as "uploadedAt"
     `,
       [bucket, finalKey, file.size, file.mimetype || null, userId || null]
@@ -491,8 +491,8 @@ export class StorageService {
     // Save metadata to database and return the timestamp in one operation
     const result = await this.getPool().query(
       `
-      INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by, uploaded_via)
+      VALUES ($1, $2, $3, $4, $5, 'rest')
       RETURNING uploaded_at as "uploadedAt"
     `,
       [bucket, key, fileSize, metadata.contentType || null, userId || null]
@@ -581,5 +581,145 @@ export class StorageService {
       });
       return 0;
     }
+  }
+
+  // ==========================================================================
+  // S3 Protocol helpers — used by /storage/v1/s3 handlers.
+  // ==========================================================================
+
+  getProvider(): StorageProvider {
+    return this.provider;
+  }
+
+  isS3Provider(): boolean {
+    return this.provider instanceof S3StorageProvider;
+  }
+
+  /**
+   * Upsert object metadata after an S3-protocol PutObject or CompleteMultipartUpload.
+   * uploaded_by stays NULL; uploaded_via='s3' + s3_access_key_id distinguish S3 uploads.
+   */
+  async upsertS3Object(params: {
+    bucket: string;
+    key: string;
+    size: number;
+    etag: string;
+    contentType?: string | null;
+    s3AccessKeyId: string;
+  }): Promise<void> {
+    await this.getPool().query(
+      `INSERT INTO storage.objects
+         (bucket, key, size, mime_type, etag, uploaded_at, uploaded_by, uploaded_via, s3_access_key_id)
+       VALUES ($1, $2, $3, $4, $5, NOW(), NULL, 's3', $6)
+       ON CONFLICT (bucket, key) DO UPDATE SET
+         size             = EXCLUDED.size,
+         mime_type        = EXCLUDED.mime_type,
+         etag             = EXCLUDED.etag,
+         uploaded_at      = EXCLUDED.uploaded_at,
+         uploaded_via     = EXCLUDED.uploaded_via,
+         s3_access_key_id = EXCLUDED.s3_access_key_id,
+         uploaded_by      = NULL`,
+      [
+        params.bucket,
+        params.key,
+        params.size,
+        params.contentType ?? null,
+        params.etag,
+        params.s3AccessKeyId,
+      ]
+    );
+  }
+
+  async getObjectMetadataRow(
+    bucket: string,
+    key: string
+  ): Promise<null | {
+    size: number;
+    etag: string | null;
+    mimeType: string | null;
+    uploadedAt: Date;
+  }> {
+    const r = await this.getPool().query(
+      `SELECT size, etag, mime_type, uploaded_at
+       FROM storage.objects
+       WHERE bucket = $1 AND key = $2`,
+      [bucket, key]
+    );
+    if (r.rowCount === 0) {
+      return null;
+    }
+    const row = r.rows[0];
+    return {
+      size: Number(row.size),
+      etag: row.etag,
+      mimeType: row.mime_type,
+      uploadedAt: row.uploaded_at,
+    };
+  }
+
+  async deleteObjectRow(bucket: string, key: string): Promise<void> {
+    await this.getPool().query('DELETE FROM storage.objects WHERE bucket=$1 AND key=$2', [
+      bucket,
+      key,
+    ]);
+  }
+
+  async deleteObjectRowsBatch(bucket: string, keys: string[]): Promise<void> {
+    if (keys.length === 0) {
+      return;
+    }
+    await this.getPool().query(
+      `DELETE FROM storage.objects WHERE bucket=$1 AND key = ANY($2::text[])`,
+      [bucket, keys]
+    );
+  }
+
+  async bucketExists(bucket: string): Promise<boolean> {
+    const r = await this.getPool().query('SELECT 1 FROM storage.buckets WHERE name=$1 LIMIT 1', [
+      bucket,
+    ]);
+    return (r.rowCount ?? 0) === 1;
+  }
+
+  async bucketIsEmpty(bucket: string): Promise<boolean> {
+    const r = await this.getPool().query('SELECT 1 FROM storage.objects WHERE bucket=$1 LIMIT 1', [
+      bucket,
+    ]);
+    return (r.rowCount ?? 0) === 0;
+  }
+
+  async listAllBucketsSimple(): Promise<Array<{ name: string; createdAt: Date }>> {
+    const r = await this.getPool().query(
+      'SELECT name, created_at FROM storage.buckets ORDER BY name'
+    );
+    return r.rows.map((row) => ({ name: row.name, createdAt: row.created_at }));
+  }
+
+  async listObjectsV2Db(params: {
+    bucket: string;
+    prefix?: string;
+    startAfter?: string;
+    maxKeys: number;
+  }): Promise<Array<{ key: string; size: number; etag: string | null; lastModified: Date }>> {
+    const prefix = params.prefix ?? '';
+    // S3 prefixes are literal strings. `_` and `%` are SQL LIKE wildcards,
+    // so a prefix like "foo_" would match "fooX" keys without escaping.
+    const likePrefix = escapeSqlLikePattern(prefix) + '%';
+    const rows = await this.getPool().query(
+      `SELECT key, size, etag, uploaded_at
+       FROM storage.objects
+       WHERE bucket = $1
+         AND key LIKE $2
+         AND ($3::text IS NULL OR key > $3)
+       ORDER BY key
+       LIMIT $4`,
+      [params.bucket, likePrefix, params.startAfter ?? null, params.maxKeys]
+    );
+    return rows.rows.map((r) => ({
+      key: r.key,
+      size: Number(r.size),
+      etag: r.etag,
+      lastModified: r.uploaded_at,
+    }));
   }
 }

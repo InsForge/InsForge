@@ -37,6 +37,7 @@
     "@aws-sdk/client-cloudwatch-logs": "^3.713.0",
     "@aws-sdk/client-s3": "^3.713.0",
     "@aws-sdk/cloudfront-signer": "^3.901.0",
+    "@aws-sdk/lib-storage": "^3.1035.0",
     "@aws-sdk/s3-presigned-post": "^3.879.0",
     "@aws-sdk/s3-request-presigner": "^3.879.0",
     "@databases/split-sql-query": "^1.0.4",
@@ -57,6 +58,7 @@
     "jose": "^6.1.0",
     "jsonwebtoken": "^9.0.2",
     "libpg-query": "^17.6.0",
+    "lru-cache": "^11.3.5",
     "multer": "^2.0.2",
     "node-fetch": "^3.3.2",
     "node-pg-migrate": "^8.0.3",
@@ -66,6 +68,7 @@
     "pg-format": "^1.0.4",
     "socket.io": "^4.8.1",
     "winston": "^3.17.0",
+    "xml2js": "^0.6.2",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -77,6 +80,7 @@
     "@types/node": "^20.11.24",
     "@types/nodemailer": "^7.0.11",
     "@types/pg-format": "^1.0.5",
+    "@types/xml2js": "^0.4.14",
     "dotenv-cli": "^10.0.0",
     "tsup": "^8.5.0",
     "tsx": "^4.7.1",

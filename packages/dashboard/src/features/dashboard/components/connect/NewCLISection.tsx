@@ -103,14 +103,20 @@ function CommandBox({ command }: CommandBoxProps) {
 interface NewCLISectionProps {
   className?: string;
   isCTest?: boolean;
+  /** Hide the internal "Get Started" header. Parent should already render a title. */
+  hideHeader?: boolean;
 }
 
-export function NewCLISection({ className, isCTest = false }: NewCLISectionProps) {
+export function NewCLISection({
+  className,
+  isCTest = false,
+  hideHeader = false,
+}: NewCLISectionProps) {
   const { projectId } = useProjectId();
   const { projectInfo } = useCloudProjectInfo();
 
   const projectName = (projectInfo.name || 'my-app').replace(/\s+/g, '-');
-  const createCommand = `npx @insforge/cli link --project-id ${projectId || '<project id>'} --template todo`;
+  const createCommand = `npx @insforge/cli link --project-id ${projectId || '<project id>'}`;
   const devCommand = `cd ${projectName} && npm run dev`;
 
   return (
@@ -120,8 +126,8 @@ export function NewCLISection({ className, isCTest = false }: NewCLISectionProps
         className
       )}
     >
-      {/* Header — hidden when isCTest (title is external in c test) */}
-      {!isCTest && (
+      {/* Header — hidden when isCTest or hideHeader (title is external in those variants) */}
+      {!isCTest && !hideHeader && (
         <div className="flex max-w-[640px] flex-col gap-3">
           <h3 className="text-2xl font-medium leading-8 text-foreground">Get Started</h3>
           <p className="text-sm leading-6 text-muted-foreground">
