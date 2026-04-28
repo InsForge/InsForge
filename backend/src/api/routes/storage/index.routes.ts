@@ -597,14 +597,14 @@ router.post(
 
       const storageService = StorageService.getInstance();
       const fileInfo = await storageService.confirmUpload(
+        authedContext(req),
         bucketName,
         objectKey,
         {
           size,
           contentType,
           etag,
-        },
-        req.user?.id
+        }
       );
 
       try {

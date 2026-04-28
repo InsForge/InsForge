@@ -493,14 +493,14 @@ export class StorageService {
   }
 
   async confirmUpload(
+    ctx: UserContext,
     bucket: string,
     key: string,
     metadata: {
       size: number;
       contentType?: string;
       etag?: string;
-    },
-    userId?: string
+    }
   ): Promise<StorageFileSchema> {
     this.validateBucketName(bucket);
     this.validateKey(key);
@@ -519,7 +519,12 @@ export class StorageService {
       throw new Error(`File size exceeds the configured maximum upload size of ${limitMb} MB`);
     }
 
-    // Check if already confirmed
+    // Already-confirmed check runs on the admin pool deliberately — the
+    // friendly "already confirmed" error must fire even when the existing
+    // row was uploaded by a different user (RLS would hide it). Falling
+    // through to the INSERT in that case would either raise a unique
+    // constraint violation (worse UX) or silently shadow the original
+    // row depending on the schema.
     const existingResult = await this.getPool().query(
       'SELECT key FROM storage.objects WHERE bucket = $1 AND key = $2',
       [bucket, key]
@@ -529,14 +534,18 @@ export class StorageService {
       throw new Error(`File "${key}" already confirmed in bucket "${bucket}"`);
     }
 
-    // Save metadata to database and return the timestamp in one operation
-    const result = await this.getPool().query(
-      `
-      INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by, uploaded_via)
-      VALUES ($1, $2, $3, $4, $5, 'rest')
-      RETURNING uploaded_at as "uploadedAt"
-    `,
-      [bucket, key, fileSize, metadata.contentType || null, userId || null]
+    // INSERT runs through withUserContext, matching the rest of the
+    // user-facing write surface (putObject, deleteObject, etc.). For
+    // end-user contexts the RLS WITH CHECK on storage_objects_owner_insert
+    // verifies uploaded_by = jwt.sub. Admin contexts bypass RLS via the
+    // postgres role.
+    const result = await withUserContext(this.getPool(), ctx, (db) =>
+      db.query(
+        `INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by, uploaded_via)
+         VALUES ($1, $2, $3, $4, $5, 'rest')
+         RETURNING uploaded_at as "uploadedAt"`,
+        [bucket, key, fileSize, metadata.contentType || null, ctx.userId || null]
+      )
     );
 
     if (!result.rows[0]) {

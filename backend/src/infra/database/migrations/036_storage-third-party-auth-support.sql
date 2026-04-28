@@ -26,8 +26,25 @@ ALTER TABLE storage.objects
 
 -- 2. Widen the column. UUIDs are valid text, so existing native-auth rows
 -- convert losslessly and the btree index is preserved across the change.
-ALTER TABLE storage.objects
-  ALTER COLUMN uploaded_by TYPE TEXT;
+--
+-- Guarded for replay: once the owner-only policies below are installed, they
+-- depend on uploaded_by, and Postgres rejects ALTER TYPE on a policy-referenced
+-- column with "cannot alter type of a column used in a policy definition".
+-- Skip the ALTER if the column is already TEXT so migrate:redo / manual replay
+-- both succeed.
+DO $widen$
+BEGIN
+  IF (
+    SELECT data_type
+    FROM information_schema.columns
+    WHERE table_schema = 'storage'
+      AND table_name = 'objects'
+      AND column_name = 'uploaded_by'
+  ) <> 'text' THEN
+    ALTER TABLE storage.objects ALTER COLUMN uploaded_by TYPE TEXT;
+  END IF;
+END
+$widen$;
 
 -- 3. Path helpers. Let projects layer per-folder RLS on top of
 -- column-based ownership: storage.foldername('a/b/c.txt') = {a, b}.
@@ -106,30 +123,58 @@ $$;
 -- uploaded_by = auth.jwt() ->> 'sub'`).
 ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 
+-- Postgres has no `CREATE POLICY IF NOT EXISTS` (any version through 17),
+-- so each CREATE is guarded by a pg_policy lookup. Same pattern as the
+-- e2e test setup in tests/local/test-storage-rls.sh — keeps the migration
+-- safe to re-run (migrate:redo, manual replay, recovery scenarios).
 DO $migration$
 BEGIN
   IF EXISTS (SELECT 1 FROM storage.buckets LIMIT 1) THEN
-    EXECUTE $sql$
-      CREATE POLICY storage_objects_owner_select ON storage.objects
-        FOR SELECT TO authenticated
-        USING (uploaded_by = (SELECT auth.jwt() ->> 'sub'))
-    $sql$;
-    EXECUTE $sql$
-      CREATE POLICY storage_objects_owner_insert ON storage.objects
-        FOR INSERT TO authenticated
-        WITH CHECK (uploaded_by = (SELECT auth.jwt() ->> 'sub'))
-    $sql$;
-    EXECUTE $sql$
-      CREATE POLICY storage_objects_owner_update ON storage.objects
-        FOR UPDATE TO authenticated
-        USING (uploaded_by = (SELECT auth.jwt() ->> 'sub'))
-        WITH CHECK (uploaded_by = (SELECT auth.jwt() ->> 'sub'))
-    $sql$;
-    EXECUTE $sql$
-      CREATE POLICY storage_objects_owner_delete ON storage.objects
-        FOR DELETE TO authenticated
-        USING (uploaded_by = (SELECT auth.jwt() ->> 'sub'))
-    $sql$;
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_policy
+      WHERE polname = 'storage_objects_owner_select'
+        AND polrelid = 'storage.objects'::regclass
+    ) THEN
+      EXECUTE $sql$
+        CREATE POLICY storage_objects_owner_select ON storage.objects
+          FOR SELECT TO authenticated
+          USING (uploaded_by = (SELECT auth.jwt() ->> 'sub'))
+      $sql$;
+    END IF;
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_policy
+      WHERE polname = 'storage_objects_owner_insert'
+        AND polrelid = 'storage.objects'::regclass
+    ) THEN
+      EXECUTE $sql$
+        CREATE POLICY storage_objects_owner_insert ON storage.objects
+          FOR INSERT TO authenticated
+          WITH CHECK (uploaded_by = (SELECT auth.jwt() ->> 'sub'))
+      $sql$;
+    END IF;
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_policy
+      WHERE polname = 'storage_objects_owner_update'
+        AND polrelid = 'storage.objects'::regclass
+    ) THEN
+      EXECUTE $sql$
+        CREATE POLICY storage_objects_owner_update ON storage.objects
+          FOR UPDATE TO authenticated
+          USING (uploaded_by = (SELECT auth.jwt() ->> 'sub'))
+          WITH CHECK (uploaded_by = (SELECT auth.jwt() ->> 'sub'))
+      $sql$;
+    END IF;
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_policy
+      WHERE polname = 'storage_objects_owner_delete'
+        AND polrelid = 'storage.objects'::regclass
+    ) THEN
+      EXECUTE $sql$
+        CREATE POLICY storage_objects_owner_delete ON storage.objects
+          FOR DELETE TO authenticated
+          USING (uploaded_by = (SELECT auth.jwt() ->> 'sub'))
+      $sql$;
+    END IF;
   END IF;
 END
 $migration$;
