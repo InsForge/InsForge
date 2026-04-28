@@ -1,11 +1,9 @@
-import { useState } from 'react';
 import { Settings } from 'lucide-react';
 import {
   FeatureSidebar,
   type FeatureSidebarHeaderButton,
   type FeatureSidebarListItem,
 } from '../../../components';
-import { PaymentsSettingsDialog } from './PaymentsSettingsDialog';
 
 const PAYMENTS_SIDEBAR_ITEMS: FeatureSidebarListItem[] = [
   {
@@ -15,26 +13,21 @@ const PAYMENTS_SIDEBAR_ITEMS: FeatureSidebarListItem[] = [
   },
 ];
 
-export function PaymentsSidebar() {
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+interface PaymentsSidebarProps {
+  onOpenSettings: () => void;
+}
 
+export function PaymentsSidebar({ onOpenSettings }: PaymentsSidebarProps) {
   const headerButtons: FeatureSidebarHeaderButton[] = [
     {
       id: 'payments-settings',
       label: 'Payments Settings',
       icon: Settings,
-      onClick: () => setIsSettingsOpen(true),
+      onClick: onOpenSettings,
     },
   ];
 
   return (
-    <>
-      <FeatureSidebar
-        title="Payments"
-        items={PAYMENTS_SIDEBAR_ITEMS}
-        headerButtons={headerButtons}
-      />
-      <PaymentsSettingsDialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
-    </>
+    <FeatureSidebar title="Payments" items={PAYMENTS_SIDEBAR_ITEMS} headerButtons={headerButtons} />
   );
 }
