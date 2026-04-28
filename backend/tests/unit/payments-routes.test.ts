@@ -8,31 +8,32 @@ import {
   listPaymentPricesRequestSchema,
   listPaymentProductsRequestSchema,
   listSubscriptionsRequestSchema,
-  syncPaymentsRequestSchema,
+  syncPaymentCatalogRequestSchema,
+  syncPaymentSubscriptionsRequestSchema,
   updatePaymentPriceRequestSchema,
   updatePaymentProductRequestSchema,
   upsertPaymentsConfigRequestSchema,
 } from '@insforge/shared-schemas';
 
 describe('payments route schemas', () => {
-  it('accepts test, live, and all sync targets', () => {
-    expect(syncPaymentsRequestSchema.parse({ environment: 'test' })).toEqual({
+  it('accepts test, live, and all catalog sync targets', () => {
+    expect(syncPaymentCatalogRequestSchema.parse({ environment: 'test' })).toEqual({
       environment: 'test',
     });
-    expect(syncPaymentsRequestSchema.parse({ environment: 'live' })).toEqual({
+    expect(syncPaymentCatalogRequestSchema.parse({ environment: 'live' })).toEqual({
       environment: 'live',
     });
-    expect(syncPaymentsRequestSchema.parse({ environment: 'all' })).toEqual({
+    expect(syncPaymentCatalogRequestSchema.parse({ environment: 'all' })).toEqual({
       environment: 'all',
     });
   });
 
-  it('defaults sync to all environments', () => {
-    expect(syncPaymentsRequestSchema.parse({})).toEqual({ environment: 'all' });
+  it('defaults catalog sync to all environments', () => {
+    expect(syncPaymentCatalogRequestSchema.parse({})).toEqual({ environment: 'all' });
   });
 
-  it('rejects unknown sync environments', () => {
-    expect(() => syncPaymentsRequestSchema.parse({ environment: 'prod' })).toThrow();
+  it('rejects unknown catalog sync environments', () => {
+    expect(() => syncPaymentCatalogRequestSchema.parse({ environment: 'prod' })).toThrow();
   });
 
   it('accepts optional catalog environment filters', () => {
@@ -206,5 +207,12 @@ describe('payments route schemas', () => {
     expect(() =>
       listSubscriptionsRequestSchema.parse({ environment: 'test', subjectType: 'team' })
     ).toThrow(/provided together/i);
+  });
+
+  it('requires subscription sync callers to specify the target Stripe environment', () => {
+    expect(syncPaymentSubscriptionsRequestSchema.parse({ environment: 'test' })).toEqual({
+      environment: 'test',
+    });
+    expect(() => syncPaymentSubscriptionsRequestSchema.parse({})).toThrow();
   });
 });

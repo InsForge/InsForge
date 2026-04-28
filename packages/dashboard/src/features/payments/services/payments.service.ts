@@ -3,7 +3,11 @@ import type {
   GetPaymentsConfigResponse,
   GetPaymentsStatusResponse,
   ListPaymentCatalogResponse,
-  SyncPaymentsResponse,
+  ListSubscriptionsRequest,
+  ListSubscriptionsResponse,
+  SyncPaymentCatalogResponse,
+  SyncPaymentSubscriptionsRequest,
+  SyncPaymentSubscriptionsResponse,
   StripeEnvironment,
   UpsertPaymentsConfigRequest,
 } from '@insforge/shared-schemas';
@@ -27,8 +31,8 @@ export class PaymentsService {
     });
   }
 
-  async syncCatalog(): Promise<SyncPaymentsResponse> {
-    return apiClient.request('/payments/sync', {
+  async syncCatalog(): Promise<SyncPaymentCatalogResponse> {
+    return apiClient.request('/payments/catalog/sync', {
       method: 'POST',
       headers: apiClient.withAccessToken(),
       body: JSON.stringify({ environment: 'all' }),
@@ -53,6 +57,32 @@ export class PaymentsService {
     return apiClient.request(`/payments/config/${environment}`, {
       method: 'DELETE',
       headers: apiClient.withAccessToken(),
+    });
+  }
+
+  async listSubscriptions(input: ListSubscriptionsRequest): Promise<ListSubscriptionsResponse> {
+    const searchParams = new URLSearchParams({
+      environment: input.environment,
+      limit: String(input.limit),
+    });
+
+    if (input.subjectType && input.subjectId) {
+      searchParams.set('subjectType', input.subjectType);
+      searchParams.set('subjectId', input.subjectId);
+    }
+
+    return apiClient.request(`/payments/subscriptions?${searchParams.toString()}`, {
+      headers: apiClient.withAccessToken(),
+    });
+  }
+
+  async syncSubscriptions(
+    input: SyncPaymentSubscriptionsRequest
+  ): Promise<SyncPaymentSubscriptionsResponse> {
+    return apiClient.request('/payments/subscriptions/sync', {
+      method: 'POST',
+      headers: apiClient.withAccessToken(),
+      body: JSON.stringify(input),
     });
   }
 }

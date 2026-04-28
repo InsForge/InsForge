@@ -63,6 +63,8 @@ import type {
   ListPaymentHistoryResponse,
   ListSubscriptionsRequest,
   ListSubscriptionsResponse,
+  SyncPaymentSubscriptionsRequest,
+  SyncPaymentSubscriptionsResponse,
 } from '@insforge/shared-schemas';
 
 const SECRET_KEY_BY_ENVIRONMENT: Record<StripeEnvironment, string> = {
@@ -93,6 +95,17 @@ const MANAGED_WEBHOOK_METADATA = {
   managed_by: 'insforge',
   insforge_webhook: 'stripe_payments',
 } as const;
+
+interface ManagedStripeWebhookSetup {
+  endpointId: string;
+  endpointUrl: string;
+  secret: string;
+}
+
+interface SubscriptionProjectionResult {
+  synced: boolean;
+  unmapped: boolean;
+}
 
 export class PaymentService {
   private static instance: PaymentService;
@@ -134,7 +147,7 @@ export class PaymentService {
         environment,
         account.id
       );
-      const webhookSetup = await this.recreateManagedStripeWebhook(provider, environment);
+      const webhookSetup = await this.tryRecreateManagedStripeWebhook(provider, environment);
 
       await this.persistStripeSecretKey(
         environment,
@@ -327,7 +340,7 @@ export class PaymentService {
   private async recreateManagedStripeWebhook(
     provider: StripeProvider,
     environment: StripeEnvironment
-  ): Promise<{ endpointId: string; endpointUrl: string; secret: string }> {
+  ): Promise<ManagedStripeWebhookSetup> {
     const endpointUrl = this.getManagedStripeWebhookUrl(environment);
     await this.deleteManagedStripeWebhookEndpoints(provider, environment);
 
@@ -355,6 +368,22 @@ export class PaymentService {
       endpointUrl,
       secret: createdEndpoint.secret,
     };
+  }
+
+  private async tryRecreateManagedStripeWebhook(
+    provider: StripeProvider,
+    environment: StripeEnvironment
+  ): Promise<ManagedStripeWebhookSetup | null> {
+    try {
+      return await this.recreateManagedStripeWebhook(provider, environment);
+    } catch (error) {
+      logger.warn('Stripe managed webhook setup skipped during key configuration', {
+        environment,
+        endpointUrl: this.getManagedStripeWebhookUrl(environment),
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
   }
 
   private async deleteManagedStripeWebhookEndpoints(
@@ -458,11 +487,7 @@ export class PaymentService {
     encryptedValue: string,
     account: StripeAccount,
     clearMirror: boolean,
-    webhookSetup: {
-      endpointId: string;
-      endpointUrl: string;
-      secret: string;
-    }
+    webhookSetup: ManagedStripeWebhookSetup | null
   ): Promise<void> {
     const client = await this.getPool().connect();
 
@@ -485,16 +510,30 @@ export class PaymentService {
         [SECRET_KEY_BY_ENVIRONMENT[environment], encryptedValue]
       );
 
-      await client.query(
-        `INSERT INTO system.secrets (key, value_ciphertext, is_active, is_reserved)
-         VALUES ($1, $2, true, true)
-         ON CONFLICT (key) DO UPDATE SET
-           value_ciphertext = EXCLUDED.value_ciphertext,
-           is_active = true,
-           is_reserved = true,
-           updated_at = NOW()`,
-        [WEBHOOK_SECRET_BY_ENVIRONMENT[environment], EncryptionManager.encrypt(webhookSetup.secret)]
-      );
+      if (webhookSetup) {
+        await client.query(
+          `INSERT INTO system.secrets (key, value_ciphertext, is_active, is_reserved)
+           VALUES ($1, $2, true, true)
+           ON CONFLICT (key) DO UPDATE SET
+             value_ciphertext = EXCLUDED.value_ciphertext,
+             is_active = true,
+             is_reserved = true,
+             updated_at = NOW()`,
+          [
+            WEBHOOK_SECRET_BY_ENVIRONMENT[environment],
+            EncryptionManager.encrypt(webhookSetup.secret),
+          ]
+        );
+      } else {
+        await client.query(
+          `UPDATE system.secrets
+           SET is_active = false,
+               updated_at = NOW()
+           WHERE key = $1
+             AND is_active = true`,
+          [WEBHOOK_SECRET_BY_ENVIRONMENT[environment]]
+        );
+      }
 
       await client.query(
         `INSERT INTO payments.stripe_connections (
@@ -512,7 +551,21 @@ export class PaymentService {
            last_sync_counts,
            raw
          )
-         VALUES ($1, $2, $3, $4, 'connected', $5, $6, NOW(), NULL, NULL, NULL, '{}'::JSONB, $7)
+         VALUES (
+           $1,
+           $2,
+           $3,
+           $4,
+           'connected',
+           $5,
+           $6,
+           CASE WHEN $5::TEXT IS NULL THEN NULL ELSE NOW() END,
+           NULL,
+           NULL,
+           NULL,
+           '{}'::JSONB,
+           $7
+         )
          ON CONFLICT (environment) DO UPDATE SET
            stripe_account_id = EXCLUDED.stripe_account_id,
            stripe_account_email = EXCLUDED.stripe_account_email,
@@ -541,8 +594,8 @@ export class PaymentService {
           account.id,
           account.email ?? null,
           environment === 'live',
-          webhookSetup.endpointId,
-          webhookSetup.endpointUrl,
+          webhookSetup?.endpointId ?? null,
+          webhookSetup?.endpointUrl ?? null,
           account,
           clearMirror,
         ]
@@ -827,6 +880,39 @@ export class PaymentService {
         ),
       })),
     };
+  }
+
+  async syncSubscriptions(
+    input: SyncPaymentSubscriptionsRequest
+  ): Promise<SyncPaymentSubscriptionsResponse> {
+    return this.withEnvironmentLock(input.environment, async () => {
+      const provider = await this.createStripeProvider(input.environment);
+      const subscriptions = await provider.listSubscriptions();
+      let synced = 0;
+      let unmapped = 0;
+
+      for (const subscription of subscriptions) {
+        const result = await this.upsertSubscriptionProjection(input.environment, subscription);
+        if (result.synced) {
+          synced += 1;
+        }
+        if (result.unmapped) {
+          unmapped += 1;
+        }
+      }
+
+      const deleted = await this.deleteMissingSyncedSubscriptions(
+        input.environment,
+        subscriptions.map((subscription) => subscription.id)
+      );
+
+      return {
+        environment: input.environment,
+        synced,
+        unmapped,
+        deleted,
+      };
+    });
   }
 
   async createProduct(input: CreatePaymentProductRequest): Promise<MutatePaymentProductResponse> {
@@ -1622,10 +1708,12 @@ export class PaymentService {
       case 'customer.subscription.created':
       case 'customer.subscription.updated':
       case 'customer.subscription.deleted':
-        return this.upsertSubscriptionProjection(
-          environment,
-          event.data.object as StripeSubscription
-        );
+        return (
+          await this.upsertSubscriptionProjection(
+            environment,
+            event.data.object as StripeSubscription
+          )
+        ).synced;
       default:
         return false;
     }
@@ -1776,23 +1864,24 @@ export class PaymentService {
   private async upsertSubscriptionProjection(
     environment: StripeEnvironment,
     subscription: StripeSubscription
-  ): Promise<boolean> {
+  ): Promise<SubscriptionProjectionResult> {
     const stripeCustomerId = this.getStripeObjectId(subscription.customer);
     if (!stripeCustomerId) {
-      return false;
+      return { synced: false, unmapped: false };
     }
 
-    const subject =
-      this.getBillingSubjectFromMetadata(subscription.metadata) ??
-      (await this.findSubjectForStripeCustomer(environment, stripeCustomerId));
+    const subject = await this.resolveSubscriptionSubject(
+      environment,
+      subscription,
+      stripeCustomerId
+    );
 
     if (!subject) {
-      logger.warn('Stripe subscription webhook missing InsForge billing subject', {
+      logger.warn('Stripe subscription projection is missing InsForge billing subject', {
         environment,
         stripeSubscriptionId: subscription.id,
         stripeCustomerId,
       });
-      return false;
     }
 
     const client = await this.getPool().connect();
@@ -1842,8 +1931,8 @@ export class PaymentService {
           environment,
           subscription.id,
           stripeCustomerId,
-          subject.type,
-          subject.id,
+          subject?.type ?? null,
+          subject?.id ?? null,
           subscription.status,
           this.fromStripeTimestamp(this.getSubscriptionCurrentPeriodStart(subscription)),
           this.fromStripeTimestamp(this.getSubscriptionCurrentPeriodEnd(subscription)),
@@ -1875,7 +1964,38 @@ export class PaymentService {
       );
 
       await client.query('COMMIT');
-      return true;
+      return { synced: true, unmapped: !subject };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  private async deleteMissingSyncedSubscriptions(
+    environment: StripeEnvironment,
+    stripeSubscriptionIds: string[]
+  ): Promise<number> {
+    const client = await this.getPool().connect();
+
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `DELETE FROM payments.subscription_items
+         WHERE environment = $1
+           AND NOT (stripe_subscription_id = ANY($2::TEXT[]))`,
+        [environment, stripeSubscriptionIds]
+      );
+      const result = await client.query(
+        `DELETE FROM payments.subscriptions
+         WHERE environment = $1
+           AND NOT (stripe_subscription_id = ANY($2::TEXT[]))`,
+        [environment, stripeSubscriptionIds]
+      );
+      await client.query('COMMIT');
+
+      return result.rowCount ?? 0;
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
@@ -1933,6 +2053,17 @@ export class PaymentService {
     }
 
     return { type: mapping.subjectType, id: mapping.subjectId };
+  }
+
+  private async resolveSubscriptionSubject(
+    environment: StripeEnvironment,
+    subscription: StripeSubscription,
+    stripeCustomerId: string
+  ): Promise<BillingSubject | null> {
+    return (
+      this.getBillingSubjectFromMetadata(subscription.metadata) ??
+      (await this.findSubjectForStripeCustomer(environment, stripeCustomerId))
+    );
   }
 
   private getBillingSubjectFromMetadata(
@@ -2125,8 +2256,8 @@ export class PaymentService {
       environment: row.environment,
       stripeSubscriptionId: row.stripeSubscriptionId,
       stripeCustomerId: row.stripeCustomerId,
-      subjectType: row.subjectType,
-      subjectId: row.subjectId,
+      subjectType: row.subjectType ?? null,
+      subjectId: row.subjectId ?? null,
       status: row.status,
       currentPeriodStart: this.toISOStringOrNull(row.currentPeriodStart),
       currentPeriodEnd: this.toISOStringOrNull(row.currentPeriodEnd),

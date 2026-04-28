@@ -74,6 +74,27 @@ describe('StripeProvider', () => {
     ]);
   });
 
+  it('lists all Stripe subscriptions for bootstrap and repair imports', async () => {
+    const client = {
+      accounts: { retrieveCurrent: vi.fn() },
+      products: { list: vi.fn() },
+      prices: { list: vi.fn() },
+      subscriptions: {
+        list: vi.fn().mockReturnValue(createAsyncList([{ id: 'sub_123', object: 'subscription' }])),
+      },
+    } as unknown as StripeClient;
+    const provider = new StripeProvider('sk_test_1234567890', 'test', client);
+
+    await expect(provider.listSubscriptions()).resolves.toEqual([
+      { id: 'sub_123', object: 'subscription' },
+    ]);
+
+    expect(client.subscriptions.list).toHaveBeenCalledWith({
+      limit: 100,
+      status: 'all',
+    });
+  });
+
   it('creates, updates, and deletes products through Stripe products API', async () => {
     const client = {
       accounts: { retrieveCurrent: vi.fn() },

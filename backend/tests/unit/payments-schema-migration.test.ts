@@ -105,12 +105,18 @@ describe('036_create-payments-schema migration', () => {
     expect(sql).toMatch(/customer_email_snapshot TEXT/i);
   });
 
-  it('requires identified subscription rows', () => {
+  it('allows unmapped subscription rows for existing Stripe syncs', () => {
     expect(sql).toMatch(
-      /CREATE TABLE IF NOT EXISTS payments\.subscriptions[\s\S]*subject_type TEXT NOT NULL/i
+      /CREATE TABLE IF NOT EXISTS payments\.subscriptions[\s\S]*subject_type TEXT,/i
     );
     expect(sql).toMatch(
-      /CREATE TABLE IF NOT EXISTS payments\.subscriptions[\s\S]*subject_id TEXT NOT NULL/i
+      /CREATE TABLE IF NOT EXISTS payments\.subscriptions[\s\S]*subject_id TEXT,/i
+    );
+    expect(sql).not.toMatch(
+      /ALTER TABLE payments\.subscriptions\s+ALTER COLUMN subject_type DROP NOT NULL/i
+    );
+    expect(sql).not.toMatch(
+      /ALTER TABLE payments\.subscriptions\s+ALTER COLUMN subject_id DROP NOT NULL/i
     );
   });
 
