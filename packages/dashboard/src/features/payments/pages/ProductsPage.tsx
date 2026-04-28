@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AlertCircle, ChevronRight, Loader2, RefreshCw } from 'lucide-react';
+import { AlertCircle, ChevronRight, Loader2, RefreshCw, Settings } from 'lucide-react';
+import { useOutletContext } from 'react-router-dom';
 import { Button, Tab, Tabs } from '@insforge/ui';
 import { Alert, AlertDescription, AlertTitle } from '../../../components/radix';
 import { ErrorState, LoadingState, TableHeader } from '../../../components';
 import { usePayments } from '../hooks/usePayments';
+import type { PaymentsOutletContext } from '../components/PaymentsLayout';
 import type {
   StripeEnvironment,
   StripePriceMirror,
@@ -79,17 +81,35 @@ function StatusBadge({
   );
 }
 
-function ConfigureStripeKeyCallout({ environment }: { environment: StripeEnvironment }) {
+function ConfigureStripeKeyEmptyState({
+  environment,
+  onConfigure,
+}: {
+  environment: StripeEnvironment;
+  onConfigure: () => void;
+}) {
+  const keyName = environment === 'test' ? 'STRIPE_TEST_SECRET_KEY' : 'STRIPE_LIVE_SECRET_KEY';
+
   return (
-    <Alert className="mx-auto w-4/5 max-w-[1024px] border-amber-200 bg-amber-50 text-amber-950">
-      <AlertCircle className="h-4 w-4" />
-      <AlertTitle>Configure a Stripe {environment} key</AlertTitle>
-      <AlertDescription className="mt-2">
-        Open the Payments settings from the sidebar gear button and add a{' '}
-        <span className="font-mono">{environment === 'test' ? 'sk_test_' : 'sk_live_'}</span>
-        secret key before syncing products.
-      </AlertDescription>
-    </Alert>
+    <div className="flex h-full min-h-[320px] items-center justify-center px-6 text-center">
+      <div className="flex max-w-md flex-col items-center gap-3">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--alpha-3)] text-muted-foreground">
+          <Settings className="h-5 w-5" />
+        </div>
+        <div className="flex flex-col gap-1">
+          <h2 className="text-sm font-medium text-foreground">
+            Configure your Stripe {environment} key
+          </h2>
+          <p className="text-sm leading-6 text-muted-foreground">
+            Add {keyName} before syncing or managing {environment} products and prices.
+          </p>
+        </div>
+        <Button variant="secondary" onClick={onConfigure} className="mt-1 h-9 rounded px-3">
+          <Settings className="h-4 w-4" />
+          Configure Stripe API keys
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -300,20 +320,12 @@ function ProductDetail({
 }
 
 export default function ProductsPage() {
+  const { openPaymentsSettings } = useOutletContext<PaymentsOutletContext>();
   const [environment, setEnvironment] = useState<StripeEnvironment>('test');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<StripeProductMirror | null>(null);
-  const {
-    connections,
-    activeConnection,
-    products,
-    prices,
-    isLoading,
-    isSyncing,
-    error,
-    syncCatalog,
-    refetch,
-  } = usePayments(environment);
+  const { activeConnection, products, prices, isLoading, isSyncing, error, syncCatalog, refetch } =
+    usePayments(environment);
 
   useEffect(() => {
     setSelectedProduct(null);
@@ -351,7 +363,6 @@ export default function ProductsPage() {
     ? (pricesByProductId.get(selectedProduct.stripeProductId) ?? [])
     : [];
   const hasActiveKey = !!activeConnection?.maskedKey;
-  const hasAnyKey = connections.some((connection) => !!connection.maskedKey);
 
   if (selectedProduct) {
     return (
@@ -385,25 +396,28 @@ export default function ProductsPage() {
           </Tabs>
         }
         rightActions={
-          <>
-            <span className="text-xs text-muted-foreground">
-              Last synced: {formatLastSynced(activeConnection?.lastSyncedAt ?? null)}
-            </span>
-            <Button
-              variant="secondary"
-              onClick={() => void syncCatalog()}
-              disabled={!hasAnyKey || isSyncing}
-              className="h-9 rounded px-3"
-            >
-              {isSyncing ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-              Sync Stripe
-            </Button>
-          </>
+          hasActiveKey ? (
+            <>
+              <span className="text-xs text-muted-foreground">
+                Last synced: {formatLastSynced(activeConnection?.lastSyncedAt ?? null)}
+              </span>
+              <Button
+                variant="secondary"
+                onClick={() => void syncCatalog()}
+                disabled={isSyncing}
+                className="h-9 rounded px-3"
+              >
+                {isSyncing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                Sync Stripe
+              </Button>
+            </>
+          ) : null
         }
+        showSearch={hasActiveKey}
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}
         searchDebounceTime={300}
@@ -411,43 +425,50 @@ export default function ProductsPage() {
       />
 
       <div className="relative min-h-0 flex-1 overflow-y-auto">
-        <div className="h-10" />
+        {error ? (
+          <ErrorState error={error as Error} onRetry={() => void refetch()} />
+        ) : isLoading ? (
+          <LoadingState message="Loading Stripe products..." />
+        ) : !hasActiveKey ? (
+          <ConfigureStripeKeyEmptyState
+            environment={environment}
+            onConfigure={openPaymentsSettings}
+          />
+        ) : (
+          <>
+            <div className="h-10" />
 
-        <div className="sticky top-0 z-10 bg-[rgb(var(--semantic-1))] px-3">
-          <div className="mx-auto w-4/5 max-w-[1024px]">
-            <div className="flex h-8 items-center text-sm text-muted-foreground">
-              <div className="w-[30px] shrink-0" />
-              <div className="flex-[1.5] px-2.5 py-1.5">Product</div>
-              <div className="w-[120px] shrink-0 px-2.5 py-1.5">Status</div>
-              <div className="w-[100px] shrink-0 px-2.5 py-1.5">Prices</div>
-              <div className="flex-1 px-2.5 py-1.5">Default Price</div>
+            <div className="sticky top-0 z-10 bg-[rgb(var(--semantic-1))] px-3">
+              <div className="mx-auto w-4/5 max-w-[1024px]">
+                <div className="flex h-8 items-center text-sm text-muted-foreground">
+                  <div className="w-[30px] shrink-0" />
+                  <div className="flex-[1.5] px-2.5 py-1.5">Product</div>
+                  <div className="w-[120px] shrink-0 px-2.5 py-1.5">Status</div>
+                  <div className="w-[100px] shrink-0 px-2.5 py-1.5">Prices</div>
+                  <div className="flex-1 px-2.5 py-1.5">Default Price</div>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
 
-        <div className="flex flex-col gap-4 px-3 pb-4 pt-1">
-          {!hasActiveKey && <ConfigureStripeKeyCallout environment={environment} />}
+            <div className="flex flex-col gap-4 px-3 pb-4 pt-1">
+              {activeConnection?.lastSyncError && (
+                <Alert variant="destructive" className="mx-auto w-4/5 max-w-[1024px]">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Latest sync failed</AlertTitle>
+                  <AlertDescription className="mt-2">
+                    {activeConnection.lastSyncError}
+                  </AlertDescription>
+                </Alert>
+              )}
 
-          {activeConnection?.lastSyncError && (
-            <Alert variant="destructive" className="mx-auto w-4/5 max-w-[1024px]">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Latest sync failed</AlertTitle>
-              <AlertDescription className="mt-2">{activeConnection.lastSyncError}</AlertDescription>
-            </Alert>
-          )}
-
-          {error ? (
-            <ErrorState error={error as Error} onRetry={() => void refetch()} />
-          ) : isLoading ? (
-            <LoadingState message="Loading Stripe products..." />
-          ) : (
-            <ProductTable
-              products={filteredProducts}
-              pricesByProductId={pricesByProductId}
-              onSelectProduct={setSelectedProduct}
-            />
-          )}
-        </div>
+              <ProductTable
+                products={filteredProducts}
+                pricesByProductId={pricesByProductId}
+                onSelectProduct={setSelectedProduct}
+              />
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
