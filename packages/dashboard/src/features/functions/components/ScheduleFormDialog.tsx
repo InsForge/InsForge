@@ -231,7 +231,7 @@ export function ScheduleFormDialog({
                   />
                   <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                     5-field cron (e.g. <code>*/5 * * * *</code>) or interval form for sub-minute
-                    cadence (e.g. <code>30 seconds</code>, <code>5 minutes</code>).
+                    cadence (1–59 seconds, e.g. <code>30 seconds</code>). For ≥ 1 minute, use cron.
                   </p>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
                     <button
