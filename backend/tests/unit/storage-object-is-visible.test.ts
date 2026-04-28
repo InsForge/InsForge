@@ -127,11 +127,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     const svc = StorageService.getInstance();
 
     await expect(
-      svc.objectIsVisible(
-        { userId: 'alice', role: 'authenticated' },
-        'no spaces allowed',
-        'k'
-      )
+      svc.objectIsVisible({ userId: 'alice', role: 'authenticated' }, 'no spaces allowed', 'k')
     ).rejects.toThrow(/Invalid bucket name/);
     expect(calls).toHaveLength(0);
   });
