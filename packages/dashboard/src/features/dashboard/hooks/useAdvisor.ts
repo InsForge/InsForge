@@ -1,6 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDashboardHost } from '../../../lib/config/DashboardHostContext';
 import type {
+  DashboardAdvisorCategory,
   DashboardAdvisorIssuesQuery,
   DashboardAdvisorIssuesResponse,
   DashboardAdvisorSummary,
@@ -9,7 +10,15 @@ import type {
 export const ADVISOR_QUERY_KEYS = {
   latest: ['advisor', 'latest'] as const,
   issues: (q: DashboardAdvisorIssuesQuery) =>
-    ['advisor', 'issues', q.severity ?? 'all', q.limit ?? 50, q.offset ?? 0] as const,
+    [
+      'advisor',
+      'issues',
+      q.severity ?? 'all',
+      q.category ?? 'all',
+      q.limit ?? 50,
+      q.offset ?? 0,
+    ] as const,
+  categoryCounts: ['advisor', 'category-counts'] as const,
 };
 
 export function useAdvisorLatest() {
@@ -34,6 +43,32 @@ export function useAdvisorIssues(query: DashboardAdvisorIssuesQuery) {
     retry: false,
     staleTime: 60 * 1000,
     placeholderData: keepPreviousData,
+  });
+}
+
+export function useAdvisorCategoryCounts() {
+  const host = useDashboardHost();
+  const fetcher = host.onRequestAdvisorIssues;
+  return useQuery<Record<DashboardAdvisorCategory, number>, Error>({
+    queryKey: ADVISOR_QUERY_KEYS.categoryCounts,
+    queryFn: async () => {
+      if (!fetcher) {
+        return { security: 0, performance: 0, health: 0 };
+      }
+      const [security, performance, health] = await Promise.all([
+        fetcher({ category: 'security', limit: 1 }),
+        fetcher({ category: 'performance', limit: 1 }),
+        fetcher({ category: 'health', limit: 1 }),
+      ]);
+      return {
+        security: security.total,
+        performance: performance.total,
+        health: health.total,
+      };
+    },
+    enabled: !!fetcher,
+    retry: false,
+    staleTime: 60 * 1000,
   });
 }
 

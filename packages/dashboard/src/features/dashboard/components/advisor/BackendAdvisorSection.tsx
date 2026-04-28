@@ -1,20 +1,31 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Copy, Loader2, RotateCw } from 'lucide-react';
-import { useAdvisorIssues, useAdvisorLatest, useTriggerAdvisorScan } from '../../hooks/useAdvisor';
-import type { DashboardAdvisorIssue, DashboardAdvisorSeverity } from '../../../../types';
+import {
+  useAdvisorCategoryCounts,
+  useAdvisorIssues,
+  useAdvisorLatest,
+  useTriggerAdvisorScan,
+} from '../../hooks/useAdvisor';
+import type {
+  DashboardAdvisorCategory,
+  DashboardAdvisorIssue,
+  DashboardAdvisorSeverity,
+} from '../../../../types';
 import { useDashboardHost } from '../../../../lib/config/DashboardHostContext';
 import { useToast } from '../../../../lib/hooks/useToast';
 import { usePageSize } from '../../../../lib/hooks/usePageSize';
 import { EmptyState, PaginationControls } from '../../../../components';
 import { AdvisoryItem } from './AdvisoryItem';
 import { AdvisoryTabs, type AdvisoryTabValue } from './AdvisoryTabs';
-import { SeveritySummary } from './SeveritySummary';
+import { SeverityFilterDropdown } from './SeverityFilterDropdown';
 import { formatRemediationPromptBatch } from './remediationPrompt';
 
 const ADVISOR_FETCH_PAGE_SIZE = 100;
 const SCAN_POLL_INTERVAL_MS = 3_000;
 const SCAN_POLL_MAX_DURATION_MS = 30_000;
+
+const ALL_SEVERITIES: readonly DashboardAdvisorSeverity[] = ['critical', 'warning', 'info'];
 
 function formatRelative(iso: string | undefined): string {
   if (!iso) {
@@ -40,28 +51,45 @@ function formatRelative(iso: string | undefined): string {
 }
 
 const ADVISOR_BUTTON_CLASS =
-  'flex items-center gap-1 rounded border border-[var(--alpha-8)] bg-card px-1 py-1 text-sm leading-5 text-foreground transition-colors hover:bg-[var(--alpha-4)] disabled:opacity-50';
+  'flex h-8 items-center gap-1 rounded border border-[var(--alpha-8)] bg-card px-2 text-sm leading-5 text-foreground transition-colors hover:bg-[var(--alpha-4)] disabled:opacity-50';
 
 export function BackendAdvisorSection() {
   const [tab, setTab] = useState<AdvisoryTabValue>('all');
+  const [selectedSeverities, setSelectedSeverities] = useState<Set<DashboardAdvisorSeverity>>(
+    () => new Set(ALL_SEVERITIES)
+  );
   const { pageSize, pageSizeOptions, onPageSizeChange } = usePageSize('advisor-issues');
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Reset to first page when severity filter or page size changes.
+  const allSeveritiesSelected = selectedSeverities.size === ALL_SEVERITIES.length;
+  const noSeveritiesSelected = selectedSeverities.size === 0;
+  // Server-side severity filter only when exactly one is selected; otherwise we filter client-side.
+  const serverSeverity =
+    selectedSeverities.size === 1 ? ([...selectedSeverities][0] ?? undefined) : undefined;
+  const clientSideSeverityFilter = !allSeveritiesSelected && selectedSeverities.size !== 1;
+
+  const categoryFilter: DashboardAdvisorCategory | undefined =
+    tab === 'all' ? undefined : (tab as DashboardAdvisorCategory);
+
+  // Reset to first page when filters change.
   useEffect(() => {
     setCurrentPage(1);
-  }, [tab, pageSize]);
+  }, [tab, pageSize, selectedSeverities]);
 
   const issuesQuery = useMemo(
     () => ({
-      severity: tab === 'all' ? undefined : (tab as DashboardAdvisorSeverity),
-      limit: pageSize,
-      offset: (currentPage - 1) * pageSize,
+      severity: serverSeverity,
+      category: categoryFilter,
+      // When client-side filtering severity, fetch the largest page so all items
+      // for the active category are available locally for filter+paginate.
+      limit: clientSideSeverityFilter ? ADVISOR_FETCH_PAGE_SIZE : pageSize,
+      offset: clientSideSeverityFilter ? 0 : (currentPage - 1) * pageSize,
     }),
-    [tab, pageSize, currentPage]
+    [serverSeverity, categoryFilter, clientSideSeverityFilter, pageSize, currentPage]
   );
   const latest = useAdvisorLatest();
   const issues = useAdvisorIssues(issuesQuery);
+  const categoryCounts = useAdvisorCategoryCounts();
   const trigger = useTriggerAdvisorScan();
   const host = useDashboardHost();
   const { showToast } = useToast();
@@ -96,6 +124,7 @@ export function BackendAdvisorSection() {
           window.clearInterval(interval);
           setIsScanning(false);
           void queryClient.invalidateQueries({ queryKey: ['advisor', 'issues'] });
+          void queryClient.invalidateQueries({ queryKey: ['advisor', 'category-counts'] });
           if (data.status === 'failed') {
             showToast('Scan failed. Check backend logs.', 'error');
           } else {
@@ -131,10 +160,28 @@ export function BackendAdvisorSection() {
     });
   };
 
-  const summary = latest.data?.summary;
   const lastScanLabel = formatRelative(latest.data?.scannedAt);
   const hasScan = !!latest.data?.scanId;
-  const totalRecords = issues.data?.total ?? 0;
+  const summaryTotal = latest.data?.summary.total;
+  const reservedItemsHeight =
+    hasScan && summaryTotal && summaryTotal > 0 ? summaryTotal * 68 + 64 : 0;
+
+  // Apply client-side severity filter when needed, then derive pagination.
+  const fetchedIssues = issues.data?.issues ?? [];
+  const fetchedTotal = issues.data?.total ?? 0;
+  const filteredIssues = clientSideSeverityFilter
+    ? fetchedIssues.filter((i) => selectedSeverities.has(i.severity))
+    : fetchedIssues;
+  const visibleIssues = noSeveritiesSelected
+    ? []
+    : clientSideSeverityFilter
+      ? filteredIssues.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+      : filteredIssues;
+  const totalRecords = noSeveritiesSelected
+    ? 0
+    : clientSideSeverityFilter
+      ? filteredIssues.length
+      : fetchedTotal;
   const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
 
   const handleCopyAll = async () => {
@@ -144,19 +191,23 @@ export function BackendAdvisorSection() {
       return;
     }
     try {
-      // Backend zod caps `limit` at 100, so paginate across the full result set
-      // instead of relying on the displayed page.
-      const severity = tab === 'all' ? undefined : (tab as DashboardAdvisorSeverity);
       const all: DashboardAdvisorIssue[] = [];
-      for (let offset = 0; offset < totalRecords; offset += ADVISOR_FETCH_PAGE_SIZE) {
-        const page = await fetcher({
-          severity,
-          limit: ADVISOR_FETCH_PAGE_SIZE,
-          offset,
-        });
-        all.push(...page.issues);
-        if (page.issues.length < ADVISOR_FETCH_PAGE_SIZE) {
-          break;
+      // Backend caps `limit` at 100 — paginate when severity filter is server-side.
+      // When client-side, we already have everything in `filteredIssues`.
+      if (clientSideSeverityFilter) {
+        all.push(...filteredIssues);
+      } else {
+        for (let offset = 0; offset < fetchedTotal; offset += ADVISOR_FETCH_PAGE_SIZE) {
+          const page = await fetcher({
+            severity: serverSeverity,
+            category: categoryFilter,
+            limit: ADVISOR_FETCH_PAGE_SIZE,
+            offset,
+          });
+          all.push(...page.issues);
+          if (page.issues.length < ADVISOR_FETCH_PAGE_SIZE) {
+            break;
+          }
         }
       }
       const actionable = all.filter((issue) => issue.recommendation);
@@ -175,11 +226,20 @@ export function BackendAdvisorSection() {
   };
 
   return (
-    <section className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <section className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center gap-3">
         <h2 className="text-xl font-medium leading-7 text-foreground">Backend Advisor</h2>
-        <div className="flex items-center gap-3">
-          <span className="text-xs leading-4 text-muted-foreground">Last scan {lastScanLabel}</span>
+        <span className="text-xs leading-4 text-muted-foreground">Last scan {lastScanLabel}</span>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <AdvisoryTabs
+          value={tab}
+          onChange={setTab}
+          totalCount={summaryTotal}
+          categoryCounts={categoryCounts.data}
+        />
+        <div className="flex items-center gap-2">
           <button
             type="button"
             disabled={isScanning}
@@ -187,68 +247,71 @@ export function BackendAdvisorSection() {
             className={ADVISOR_BUTTON_CLASS}
           >
             {isScanning ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <RotateCw className="h-5 w-5" />
+              <RotateCw className="h-4 w-4" />
             )}
-            <span className="px-1">{isScanning ? 'Scanning…' : 'Re-run Scan'}</span>
+            <span>{isScanning ? 'Scanning…' : 'Re-scan'}</span>
           </button>
+          <SeverityFilterDropdown selected={selectedSeverities} onChange={setSelectedSeverities} />
           <button
             type="button"
             onClick={() => void handleCopyAll()}
             className={ADVISOR_BUTTON_CLASS}
           >
-            <Copy className="h-5 w-5" />
-            <span className="px-1">Copy All Remediations</span>
+            <Copy className="h-4 w-4" />
+            <span>Copy All</span>
           </button>
         </div>
       </div>
 
-      <SeveritySummary summary={summary} />
+      <div
+        style={{ minHeight: reservedItemsHeight ? `${reservedItemsHeight}px` : undefined }}
+        className="flex flex-col gap-4"
+      >
+        <div className="flex flex-col rounded border border-[var(--alpha-8)] bg-[var(--alpha-4)]">
+          {!hasScan && !latest.isLoading ? (
+            <EmptyState
+              className="h-32 gap-1"
+              title="No scan yet"
+              description="Click Re-scan above to start your first scan"
+            />
+          ) : issues.isLoading ? (
+            <div className="flex h-24 items-center justify-center text-sm text-muted-foreground">
+              Loading…
+            </div>
+          ) : issues.isError ? (
+            <div className="flex h-24 items-center justify-center text-sm text-destructive">
+              Failed to load advisor issues
+            </div>
+          ) : visibleIssues.length > 0 ? (
+            <div className="flex flex-col">
+              {visibleIssues.map((issue) => (
+                <AdvisoryItem key={issue.id} issue={issue} />
+              ))}
+            </div>
+          ) : (
+            <div className="flex h-24 items-center justify-center text-sm text-muted-foreground">
+              No issues found
+            </div>
+          )}
+        </div>
 
-      <div className="flex flex-col rounded border border-[var(--alpha-8)] bg-card">
-        <AdvisoryTabs value={tab} onChange={setTab} summary={summary} />
-        {!hasScan && !latest.isLoading ? (
-          <EmptyState
-            className="h-32 gap-1"
-            title="No scan yet"
-            description="Click Re-run Scan above to start your first scan"
+        {hasScan && totalRecords > 0 && (
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            totalRecords={totalRecords}
+            pageSize={pageSize}
+            pageSizeOptions={pageSizeOptions}
+            onPageSizeChange={(size) => {
+              onPageSizeChange(size);
+            }}
+            recordLabel="issues"
           />
-        ) : issues.isLoading ? (
-          <div className="flex h-24 items-center justify-center text-sm text-muted-foreground">
-            Loading…
-          </div>
-        ) : issues.isError ? (
-          <div className="flex h-24 items-center justify-center text-sm text-destructive">
-            Failed to load advisor issues
-          </div>
-        ) : issues.data && issues.data.issues.length > 0 ? (
-          <div className="flex flex-col">
-            {issues.data.issues.map((issue) => (
-              <AdvisoryItem key={issue.id} issue={issue} />
-            ))}
-          </div>
-        ) : (
-          <div className="flex h-24 items-center justify-center text-sm text-muted-foreground">
-            No issues found
-          </div>
         )}
       </div>
-
-      {hasScan && totalRecords > 0 && (
-        <PaginationControls
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={setCurrentPage}
-          totalRecords={totalRecords}
-          pageSize={pageSize}
-          pageSizeOptions={pageSizeOptions}
-          onPageSizeChange={(size) => {
-            onPageSizeChange(size);
-          }}
-          recordLabel="issues"
-        />
-      )}
     </section>
   );
 }

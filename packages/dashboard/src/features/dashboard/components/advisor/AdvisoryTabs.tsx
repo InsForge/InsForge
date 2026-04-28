@@ -1,30 +1,28 @@
 import { Badge } from '@insforge/ui';
-import type { DashboardAdvisorSeverity, DashboardAdvisorSummary } from '../../../../types';
+import type { DashboardAdvisorCategory } from '../../../../types';
 
-export type AdvisoryTabValue = 'all' | DashboardAdvisorSeverity;
+export type AdvisoryTabValue = 'all' | DashboardAdvisorCategory;
 
 interface AdvisoryTabsProps {
   value: AdvisoryTabValue;
   onChange: (value: AdvisoryTabValue) => void;
-  summary?: DashboardAdvisorSummary['summary'];
+  totalCount?: number;
+  categoryCounts?: Record<DashboardAdvisorCategory, number>;
 }
 
-const TABS: Array<{
-  value: AdvisoryTabValue;
-  label: string;
-  key?: keyof NonNullable<AdvisoryTabsProps['summary']>;
-}> = [
-  { value: 'all', label: 'All', key: 'total' },
-  { value: 'critical', label: 'Critical', key: 'critical' },
-  { value: 'warning', label: 'Warnings', key: 'warning' },
-  { value: 'info', label: 'Info', key: 'info' },
+const TABS: Array<{ value: AdvisoryTabValue; label: string }> = [
+  { value: 'all', label: 'All' },
+  { value: 'security', label: 'Security' },
+  { value: 'performance', label: 'Performance' },
+  { value: 'health', label: 'Health' },
 ];
 
-export function AdvisoryTabs({ value, onChange, summary }: AdvisoryTabsProps) {
+export function AdvisoryTabs({ value, onChange, totalCount, categoryCounts }: AdvisoryTabsProps) {
   return (
-    <div role="tablist" className="flex border-b border-[var(--alpha-8)]">
+    <div role="tablist" className="flex items-center gap-1">
       {TABS.map((tab) => {
-        const count = summary && tab.key ? summary[tab.key] : undefined;
+        const count =
+          tab.value === 'all' ? totalCount : categoryCounts ? categoryCounts[tab.value] : undefined;
         const isActive = value === tab.value;
         return (
           <button
@@ -33,9 +31,9 @@ export function AdvisoryTabs({ value, onChange, summary }: AdvisoryTabsProps) {
             role="tab"
             aria-selected={isActive}
             onClick={() => onChange(tab.value)}
-            className={`flex h-9 items-center gap-2 px-3 text-sm transition-colors ${
+            className={`flex h-8 items-center gap-1.5 rounded px-2 text-sm leading-5 transition-colors ${
               isActive
-                ? 'border-b-2 border-primary text-foreground'
+                ? 'bg-toast text-foreground'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >

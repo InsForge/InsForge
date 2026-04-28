@@ -81,6 +81,7 @@ export interface DashboardMetricsResponse {
 export type DashboardMetricsError = { kind: 'unavailable' } | { kind: 'error'; message: string };
 
 export type DashboardAdvisorSeverity = 'critical' | 'warning' | 'info';
+export type DashboardAdvisorCategory = 'security' | 'performance' | 'health';
 
 export interface DashboardAdvisorSummary {
   scanId: string;
@@ -94,7 +95,7 @@ export interface DashboardAdvisorIssue {
   id: string;
   ruleId: string;
   severity: DashboardAdvisorSeverity;
-  category: 'security' | 'performance' | 'health';
+  category: DashboardAdvisorCategory;
   title: string;
   description: string;
   affectedObject?: string;
@@ -109,6 +110,7 @@ export interface DashboardAdvisorIssuesResponse {
 
 export interface DashboardAdvisorIssuesQuery {
   severity?: DashboardAdvisorSeverity;
+  category?: DashboardAdvisorCategory;
   limit?: number;
   offset?: number;
 }

@@ -24,6 +24,7 @@ export type {
   DashboardMetricsResponse,
   DashboardMetricsError,
   DashboardAdvisorSeverity,
+  DashboardAdvisorCategory,
   DashboardAdvisorSummary,
   DashboardAdvisorIssue,
   DashboardAdvisorIssuesQuery,

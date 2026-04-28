@@ -891,6 +891,7 @@ export function useCloudHosting() {
         !postMessageToParent({
           type: 'REQUEST_ADVISOR_ISSUES',
           severity: query.severity,
+          category: query.category,
           limit: query.limit,
           offset: query.offset,
         })
