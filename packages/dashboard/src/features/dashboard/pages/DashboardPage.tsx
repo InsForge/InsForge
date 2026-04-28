@@ -663,7 +663,7 @@ export default function DashboardPage() {
           </div>
         </section>
       </div>
-      <div className="mx-auto flex w-full max-w-[1024px] flex-col gap-12 px-10 py-10">
+      <div className="flex flex-col gap-12 px-10 py-10">
         <ObservabilitySection />
         <BackendAdvisorSection />
       </div>

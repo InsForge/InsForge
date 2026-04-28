@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDashboardHost } from '../../../lib/config/DashboardHostContext';
 import type {
   DashboardAdvisorIssuesQuery,
@@ -33,6 +33,7 @@ export function useAdvisorIssues(query: DashboardAdvisorIssuesQuery) {
     enabled: !!fetcher,
     retry: false,
     staleTime: 60 * 1000,
+    placeholderData: keepPreviousData,
   });
 }
 
