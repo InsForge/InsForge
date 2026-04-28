@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { CheckCircle2, Eye, EyeOff, Loader2, Settings } from 'lucide-react';
 import {
   Button,
@@ -157,7 +156,7 @@ function EnvironmentKeySection({
         {config?.hasKey && (
           <div className="flex items-center justify-between gap-3 rounded border border-[var(--alpha-8)] bg-muted/40 p-3">
             <p className="text-xs leading-5 text-muted-foreground">
-              Remove this Stripe key from InsForge's secret store.
+              Remove this Stripe key from InsForge&apos;s secret store.
             </p>
             <Button
               type="button"

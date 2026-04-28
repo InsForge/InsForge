@@ -10,15 +10,15 @@ import {
 } from '@/providers/payments/stripe.provider.js';
 import logger from '@/utils/logger.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
-import { STRIPE_ENVIRONMENTS } from '@/types/payments.js';
-import type {
-  StripeConnectionRow,
-  StripeEnvironment,
-  StripePrice,
-  StripePriceRow,
-  StripeProduct,
-  StripeProductRow,
-  StripeSyncSnapshot,
+import {
+  STRIPE_ENVIRONMENTS,
+  type StripeConnectionRow,
+  type StripeEnvironment,
+  type StripePrice,
+  type StripePriceRow,
+  type StripeProduct,
+  type StripeProductRow,
+  type StripeSyncSnapshot,
 } from '@/types/payments.js';
 import type {
   ArchivePaymentPriceResponse,
