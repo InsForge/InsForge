@@ -3,7 +3,7 @@ import { FAKE_PROJECT } from './fixtures';
 
 export function FakeCloudNavbar() {
   const notifyMock = () => {
-    console.info('[MOCK] navbar action disabled in mock cloud mode');
+    console.warn('[MOCK] navbar action disabled in mock cloud mode');
   };
 
   return (

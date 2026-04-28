@@ -21,15 +21,55 @@ export const FAKE_PROJECT: DashboardProjectInfo = {
 };
 
 const FAKE_INSTANCE_TYPES: DashboardInstanceInfo['instanceTypes'] = [
-  { id: 'standard', name: 'Standard', cpu: '1 vCPU', ram: '2 GB', pricePerHour: 0.014, pricePerMonth: 10 },
-  { id: 'standard-1', name: 'Standard 1', cpu: '2 vCPU', ram: '4 GB', pricePerHour: 0.028, pricePerMonth: 20 },
-  { id: 'standard-2', name: 'Standard 2', cpu: '4 vCPU', ram: '8 GB', pricePerHour: 0.055, pricePerMonth: 40 },
-  { id: 'standard-3', name: 'Standard 3', cpu: '8 vCPU', ram: '16 GB', pricePerHour: 0.11, pricePerMonth: 80 },
+  {
+    id: 'standard',
+    name: 'Standard',
+    cpu: '1 vCPU',
+    ram: '2 GB',
+    pricePerHour: 0.014,
+    pricePerMonth: 10,
+  },
+  {
+    id: 'standard-1',
+    name: 'Standard 1',
+    cpu: '2 vCPU',
+    ram: '4 GB',
+    pricePerHour: 0.028,
+    pricePerMonth: 20,
+  },
+  {
+    id: 'standard-2',
+    name: 'Standard 2',
+    cpu: '4 vCPU',
+    ram: '8 GB',
+    pricePerHour: 0.055,
+    pricePerMonth: 40,
+  },
+  {
+    id: 'standard-3',
+    name: 'Standard 3',
+    cpu: '8 vCPU',
+    ram: '16 GB',
+    pricePerHour: 0.11,
+    pricePerMonth: 80,
+  },
 ];
 
 const FAKE_INSTANCE_PROJECTS: DashboardInstanceInfo['projects'] = [
-  { name: 'Mock Cloud Project', instanceType: 'standard', monthlyCost: 10, isCurrent: true, status: 'active' },
-  { name: 'Side Project', instanceType: 'standard-1', monthlyCost: 20, isCurrent: false, status: 'active' },
+  {
+    name: 'Mock Cloud Project',
+    instanceType: 'standard',
+    monthlyCost: 10,
+    isCurrent: true,
+    status: 'active',
+  },
+  {
+    name: 'Side Project',
+    instanceType: 'standard-1',
+    monthlyCost: 20,
+    isCurrent: false,
+    status: 'active',
+  },
 ];
 
 const FAKE_MANUAL_BACKUPS: DashboardBackup[] = [
@@ -104,34 +144,37 @@ export const STUB_CALLBACKS: Omit<CloudProps, 'mode' | 'project'> = {
   backendUrl: undefined,
   showNavbar: false, // FakeCloudNavbar renders its own top bar instead
   useAuthorizationCodeRefresh: false,
-  getAuthorizationCode: async () => 'mock-auth-code',
+  getAuthorizationCode: () => Promise.resolve('mock-auth-code'),
   onRouteChange: () => {},
   onNavigateToSubscription: () => {
-    console.info('[MOCK] onNavigateToSubscription called');
+    console.warn('[MOCK] onNavigateToSubscription called');
   },
-  onRenameProject: async () => {},
-  onDeleteProject: async () => {},
-  onRequestBackupInfo: async () => ({
-    manualBackups: FAKE_MANUAL_BACKUPS,
-    scheduledBackups: FAKE_SCHEDULED_BACKUPS,
-  }),
-  onCreateBackup: async () => {},
-  onDeleteBackup: async () => {},
-  onRenameBackup: async () => {},
-  onRestoreBackup: async () => {},
-  onRequestInstanceInfo: async () => ({
-    currentInstanceType: 'standard',
-    planName: 'Pro (Mock)',
-    computeCredits: 50,
-    currentOrgComputeCost: 12.34,
-    instanceTypes: FAKE_INSTANCE_TYPES,
-    projects: FAKE_INSTANCE_PROJECTS,
-  }),
-  onRequestInstanceTypeChange: async () => ({ success: true, instanceType: 'standard' }),
-  onUpdateVersion: async () => {},
-  onRequestUserInfo: async () => ({
-    userId: 'mock-user-id',
-    email: 'mock@insforge.dev',
-    name: 'Mock User',
-  }),
+  onRenameProject: () => Promise.resolve(),
+  onDeleteProject: () => Promise.resolve(),
+  onRequestBackupInfo: () =>
+    Promise.resolve({
+      manualBackups: FAKE_MANUAL_BACKUPS,
+      scheduledBackups: FAKE_SCHEDULED_BACKUPS,
+    }),
+  onCreateBackup: () => Promise.resolve(),
+  onDeleteBackup: () => Promise.resolve(),
+  onRenameBackup: () => Promise.resolve(),
+  onRestoreBackup: () => Promise.resolve(),
+  onRequestInstanceInfo: () =>
+    Promise.resolve({
+      currentInstanceType: 'standard',
+      planName: 'Pro (Mock)',
+      computeCredits: 50,
+      currentOrgComputeCost: 12.34,
+      instanceTypes: FAKE_INSTANCE_TYPES,
+      projects: FAKE_INSTANCE_PROJECTS,
+    }),
+  onRequestInstanceTypeChange: () => Promise.resolve({ success: true, instanceType: 'standard' }),
+  onUpdateVersion: () => Promise.resolve(),
+  onRequestUserInfo: () =>
+    Promise.resolve({
+      userId: 'mock-user-id',
+      email: 'mock@insforge.dev',
+      name: 'Mock User',
+    }),
 };

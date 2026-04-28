@@ -22,11 +22,7 @@ export function FakeCloudDashboard() {
     <div className="flex h-screen flex-col">
       <FakeCloudNavbar />
       <div className="min-h-0 flex-1">
-        <InsForgeDashboard
-          mode="cloud-hosting"
-          project={FAKE_PROJECT}
-          {...STUB_CALLBACKS}
-        />
+        <InsForgeDashboard mode="cloud-hosting" project={FAKE_PROJECT} {...STUB_CALLBACKS} />
       </div>
     </div>
   );
