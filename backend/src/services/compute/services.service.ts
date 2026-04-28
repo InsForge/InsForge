@@ -485,7 +485,21 @@ export class ComputeServicesService {
       const isAlreadyExists =
         (status === 422 || msg.includes('422')) && msg.toLowerCase().includes('already exists');
       if (!isAlreadyExists) {
-        // Clean up DB record and rethrow
+        // Clean up DB record AND any partially-created Fly app to avoid an
+        // orphaned Fly app under our org that we can't see in the dashboard.
+        // (e.g. allocatePublicIps fails after createApp succeeds — the catch
+        // here used to only delete the row, leaving the Fly app behind to
+        // accrue cost and consume the org's app slot.) Mirrors createService
+        // and deployService cleanup. Best-effort: log and swallow on Fly
+        // errors so the original error still propagates.
+        try {
+          await fly.destroyApp(flyAppName);
+        } catch (destroyError) {
+          logger.error('Failed to clean up orphaned Fly app after prepareForDeploy failure', {
+            flyAppName,
+            error: destroyError,
+          });
+        }
         await this.getPool().query(`DELETE FROM compute.services WHERE id = $1`, [
           insertResult.rows[0].id,
         ]);
