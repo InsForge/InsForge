@@ -67,6 +67,7 @@ services:
       - PORT=7130
       - PROJECT_ROOT=/app
       - API_BASE_URL=${API_BASE_URL:-}
+      - GLOBAL_RATE_LIMIT_MAX=${GLOBAL_RATE_LIMIT_MAX:-3000}
       - JWT_SECRET=${JWT_SECRET:-dev-secret-please-change-in-production}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}

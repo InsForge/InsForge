@@ -48,6 +48,16 @@ if (fs.existsSync(envPath)) {
   dotenv.config();
 }
 
+function parsePositiveIntegerEnv(name: string, fallback: number): number {
+  const rawValue = process.env[name];
+  if (!rawValue) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(rawValue, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 export async function createApp() {
   // Initialize database first
   const dbManager = DatabaseManager.getInstance();
@@ -71,7 +81,7 @@ export async function createApp() {
 
   const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 3000,
+    max: parsePositiveIntegerEnv('GLOBAL_RATE_LIMIT_MAX', 3000),
     message: 'Too many requests from this IP',
     skip: (req) => req.path === '/api/health',
   });
