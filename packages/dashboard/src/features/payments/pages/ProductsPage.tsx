@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AlertCircle, ChevronRight, Loader2, RefreshCw } from 'lucide-react';
 import { Button, Tab, Tabs } from '@insforge/ui';
 import { Alert, AlertDescription, AlertTitle } from '../../../components/radix';
@@ -128,20 +127,40 @@ function ProductTable({
             key={`${product.environment}:${product.stripeProductId}`}
             type="button"
             onClick={() => onSelectProduct(product)}
-            className="grid h-14 grid-cols-[minmax(220px,1.5fr)_120px_120px_minmax(160px,1fr)] items-center rounded px-2 text-left text-sm transition-colors hover:bg-alpha-4"
+            className="rounded border border-[var(--alpha-8)] bg-card text-left"
           >
-            <div className="min-w-0 px-2">
-              <p className="truncate font-medium text-foreground">{product.name}</p>
-              <p className="truncate font-mono text-xs text-muted-foreground">
-                {product.stripeProductId}
-              </p>
-            </div>
-            <div className="px-2">
-              <ProductStatus product={product} />
-            </div>
-            <div className="px-2 text-sm text-muted-foreground">{productPrices.length}</div>
-            <div className="truncate px-2 font-mono text-xs text-muted-foreground">
-              {product.defaultPriceId ?? '-'}
+            <div className="flex cursor-pointer items-center rounded transition-colors hover:bg-[var(--alpha-8)]">
+              <div className="flex w-[30px] shrink-0 items-center justify-center">
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </div>
+
+              <div className="flex h-12 min-w-0 flex-[1.5] flex-col justify-center px-2.5">
+                <p className="truncate text-sm font-medium leading-[18px] text-foreground">
+                  {product.name}
+                </p>
+                <p className="truncate font-mono text-xs leading-4 text-muted-foreground">
+                  {product.stripeProductId}
+                </p>
+              </div>
+
+              <div className="flex h-12 w-[120px] shrink-0 items-center px-2.5">
+                <ProductStatus product={product} />
+              </div>
+
+              <div className="flex h-12 w-[100px] shrink-0 items-center px-2.5">
+                <span className="text-sm leading-[18px] text-foreground">
+                  {productPrices.length}
+                </span>
+              </div>
+
+              <div className="flex h-12 min-w-0 flex-1 items-center px-2.5">
+                <span
+                  className="block truncate font-mono text-xs leading-[18px] text-muted-foreground"
+                  title={product.defaultPriceId ?? ''}
+                >
+                  {product.defaultPriceId ?? '-'}
+                </span>
+              </div>
             </div>
           </button>
         );
@@ -197,7 +216,9 @@ function PricesForProductTable({
                 <p className="truncate font-mono text-xs text-foreground">{price.stripePriceId}</p>
                 {isDefault && <StatusBadge active label="Default" tone="primary" />}
               </div>
-              <p className="truncate text-xs text-muted-foreground">{price.lookupKey ?? '-'}</p>
+              {price.lookupKey && (
+                <p className="truncate text-xs text-muted-foreground">{price.lookupKey}</p>
+              )}
             </div>
             <div className="font-medium text-foreground">{formatAmount(price)}</div>
             <div className="text-muted-foreground">{formatBilling(price)}</div>
@@ -384,11 +405,12 @@ export default function ProductsPage() {
 
         <div className="sticky top-0 z-10 bg-[rgb(var(--semantic-1))] px-3">
           <div className="mx-auto w-4/5 max-w-[1024px]">
-            <div className="grid h-8 grid-cols-[minmax(220px,1.5fr)_120px_120px_minmax(160px,1fr)] items-center text-sm text-muted-foreground">
-              <div className="px-2">Product</div>
-              <div className="px-2">Status</div>
-              <div className="px-2">Prices</div>
-              <div className="px-2">Default Price</div>
+            <div className="flex h-8 items-center text-sm text-muted-foreground">
+              <div className="w-[30px] shrink-0" />
+              <div className="flex-[1.5] px-2.5 py-1.5">Product</div>
+              <div className="w-[120px] shrink-0 px-2.5 py-1.5">Status</div>
+              <div className="w-[100px] shrink-0 px-2.5 py-1.5">Prices</div>
+              <div className="flex-1 px-2.5 py-1.5">Default Price</div>
             </div>
           </div>
         </div>
