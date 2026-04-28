@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Copy, Loader2, RotateCw } from 'lucide-react';
 import { useAdvisorIssues, useAdvisorLatest, useTriggerAdvisorScan } from '../../hooks/useAdvisor';
 import type { DashboardAdvisorIssue, DashboardAdvisorSeverity } from '../../../../types';
@@ -11,6 +12,8 @@ import { AdvisoryTabs, type AdvisoryTabValue } from './AdvisoryTabs';
 import { SeveritySummary } from './SeveritySummary';
 
 const ADVISOR_FETCH_PAGE_SIZE = 100;
+const SCAN_POLL_INTERVAL_MS = 3_000;
+const SCAN_POLL_MAX_DURATION_MS = 30_000;
 
 function formatRelative(iso: string | undefined): string {
   if (!iso) {
@@ -61,13 +64,61 @@ export function BackendAdvisorSection() {
   const trigger = useTriggerAdvisorScan();
   const host = useDashboardHost();
   const { showToast } = useToast();
+  const queryClient = useQueryClient();
+
+  const [isScanning, setIsScanning] = useState(false);
+  const baselineScanIdRef = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!isScanning) {
+      return;
+    }
+    let cancelled = false;
+    const pollStart = Date.now();
+    const interval = window.setInterval(() => {
+      if (cancelled) {
+        return;
+      }
+      void latest.refetch().then((result) => {
+        if (cancelled) {
+          return;
+        }
+        const data = result.data;
+        const scanIdChanged = !!data && data.scanId !== baselineScanIdRef.current;
+        if (scanIdChanged && data.status !== 'running') {
+          cancelled = true;
+          window.clearInterval(interval);
+          setIsScanning(false);
+          void queryClient.invalidateQueries({ queryKey: ['advisor', 'issues'] });
+          if (data.status === 'failed') {
+            showToast('Scan failed. Check backend logs.', 'error');
+          } else {
+            showToast('Scan complete', 'success');
+          }
+          return;
+        }
+        if (Date.now() - pollStart >= SCAN_POLL_MAX_DURATION_MS) {
+          cancelled = true;
+          window.clearInterval(interval);
+          setIsScanning(false);
+          showToast('Scan still running. Refresh later to see results.', 'info');
+        }
+      });
+    }, SCAN_POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [isScanning, latest, queryClient, showToast]);
 
   const handleRunScan = () => {
+    baselineScanIdRef.current = latest.data?.scanId;
+    setIsScanning(true);
+    showToast('Scanning… typically takes 5–10s', 'info');
     trigger.mutate(undefined, {
-      onSuccess: () => {
-        showToast('Scan started. Results will refresh shortly.', 'success');
-      },
       onError: (error) => {
+        setIsScanning(false);
         showToast(`Failed to start scan: ${error.message}`, 'error');
       },
     });
@@ -125,16 +176,16 @@ export function BackendAdvisorSection() {
           <span className="text-xs leading-4 text-muted-foreground">Last scan {lastScanLabel}</span>
           <button
             type="button"
-            disabled={trigger.isPending}
+            disabled={isScanning}
             onClick={handleRunScan}
             className={ADVISOR_BUTTON_CLASS}
           >
-            {trigger.isPending ? (
+            {isScanning ? (
               <Loader2 className="h-5 w-5 animate-spin" />
             ) : (
               <RotateCw className="h-5 w-5" />
             )}
-            <span className="px-1">Re-run Scan</span>
+            <span className="px-1">{isScanning ? 'Scanning…' : 'Re-run Scan'}</span>
           </button>
           <button
             type="button"

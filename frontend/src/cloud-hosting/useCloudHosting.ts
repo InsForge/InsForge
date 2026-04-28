@@ -592,6 +592,9 @@ export function useCloudHosting() {
             : '1h';
           const metrics = Array.isArray(message.metrics)
             ? message.metrics.flatMap((entry: unknown) => {
+                if (!entry || typeof entry !== 'object') {
+                  return [];
+                }
                 const m = entry as Record<string, unknown>;
                 if (!VALID_METRIC_NAMES.includes(m.metric as DashboardMetricName)) {
                   return [];
@@ -602,6 +605,9 @@ export function useCloudHosting() {
                     instanceId: typeof m.instanceId === 'string' ? m.instanceId : undefined,
                     data: Array.isArray(m.data)
                       ? m.data.flatMap((sample: unknown) => {
+                          if (!sample || typeof sample !== 'object') {
+                            return [];
+                          }
                           const s = sample as Record<string, unknown>;
                           if (
                             typeof s.timestamp !== 'number' ||
@@ -664,6 +670,9 @@ export function useCloudHosting() {
           type AdvisorIssue = DashboardAdvisorIssuesResponse['issues'][number];
           const issues = Array.isArray(message.issues)
             ? message.issues.flatMap((entry: unknown): AdvisorIssue[] => {
+                if (!entry || typeof entry !== 'object') {
+                  return [];
+                }
                 const i = entry as Record<string, unknown>;
                 if (!VALID_ADVISOR_SEVERITIES.includes(i.severity as AdvisorIssue['severity'])) {
                   return [];
