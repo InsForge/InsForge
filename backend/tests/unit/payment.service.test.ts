@@ -265,6 +265,18 @@ describe('PaymentService', () => {
       'STRIPE_TEST_WEBHOOK_SECRET',
       'encrypted-secret',
     ]);
+    expect(mockClient.query).not.toHaveBeenCalledWith(
+      'DELETE FROM payments.subscription_items WHERE environment = $1',
+      ['test']
+    );
+    expect(mockClient.query).not.toHaveBeenCalledWith(
+      'DELETE FROM payments.subscriptions WHERE environment = $1',
+      ['test']
+    );
+    expect(mockClient.query).not.toHaveBeenCalledWith(
+      'DELETE FROM payments.products WHERE environment = $1',
+      ['test']
+    );
     expect(mockProvider.syncCatalog).toHaveBeenCalledTimes(1);
   });
 
@@ -385,6 +397,14 @@ describe('PaymentService', () => {
     ).resolves.toBeUndefined();
 
     expect(mockClient.query).toHaveBeenCalledWith(
+      'DELETE FROM payments.subscription_items WHERE environment = $1',
+      ['test']
+    );
+    expect(mockClient.query).toHaveBeenCalledWith(
+      'DELETE FROM payments.subscriptions WHERE environment = $1',
+      ['test']
+    );
+    expect(mockClient.query).toHaveBeenCalledWith(
       'DELETE FROM payments.prices WHERE environment = $1',
       ['test']
     );
@@ -398,7 +418,7 @@ describe('PaymentService', () => {
     );
   });
 
-  it('soft-removes Stripe keys from the secret store', async () => {
+  it('soft-removes Stripe keys without clearing the mirrored payment data', async () => {
     const mockClient = {
       query: vi.fn().mockResolvedValue({ rowCount: 1, rows: [] }),
       release: vi.fn(),
@@ -411,11 +431,19 @@ describe('PaymentService', () => {
       expect.stringMatching(/UPDATE system\.secrets/i),
       ['STRIPE_LIVE_SECRET_KEY']
     );
-    expect(mockClient.query).toHaveBeenCalledWith(
+    expect(mockClient.query).not.toHaveBeenCalledWith(
+      'DELETE FROM payments.subscription_items WHERE environment = $1',
+      ['live']
+    );
+    expect(mockClient.query).not.toHaveBeenCalledWith(
+      'DELETE FROM payments.subscriptions WHERE environment = $1',
+      ['live']
+    );
+    expect(mockClient.query).not.toHaveBeenCalledWith(
       'DELETE FROM payments.prices WHERE environment = $1',
       ['live']
     );
-    expect(mockClient.query).toHaveBeenCalledWith(
+    expect(mockClient.query).not.toHaveBeenCalledWith(
       'DELETE FROM payments.products WHERE environment = $1',
       ['live']
     );
@@ -597,13 +625,17 @@ describe('PaymentService', () => {
     ]);
   });
 
-  it('creates products with the requested Stripe key and refreshes that environment mirror', async () => {
+  it('creates products with the requested Stripe key and updates only the returned product mirror', async () => {
     mockGetSecretByKey.mockResolvedValue('sk_live_1234567890');
-    const mockClient = {
+    const mockLockClient = {
       query: vi.fn().mockResolvedValue({ rows: [] }),
       release: vi.fn(),
     };
-    mockPool.connect.mockResolvedValueOnce(mockClient);
+    const mockMirrorClient = {
+      query: vi.fn().mockResolvedValue({ rows: [] }),
+      release: vi.fn(),
+    };
+    mockPool.connect.mockResolvedValueOnce(mockLockClient).mockResolvedValueOnce(mockMirrorClient);
     mockPool.query.mockResolvedValueOnce({
       rows: [
         {
@@ -633,7 +665,11 @@ describe('PaymentService', () => {
       metadata: { tier: 'new' },
     });
     expect(mockGetSecretByKey).toHaveBeenCalledWith('STRIPE_LIVE_SECRET_KEY');
-    expect(mockProvider.syncCatalog).toHaveBeenCalledTimes(1);
+    expect(mockMirrorClient.query).toHaveBeenCalledWith(
+      expect.stringMatching(/INSERT INTO payments\.products/i),
+      expect.arrayContaining(['live', 'prod_new', 'New Product'])
+    );
+    expect(mockProvider.syncCatalog).not.toHaveBeenCalled();
     expect(result.product).toMatchObject({
       environment: 'live',
       stripeProductId: 'prod_new',
@@ -688,7 +724,19 @@ describe('PaymentService', () => {
       active: false,
     });
     expect(mockProvider.deleteProduct).toHaveBeenCalledWith('prod_123');
-    expect(mockProvider.syncCatalog).toHaveBeenCalledTimes(2);
+    expect(mockClient.query).toHaveBeenCalledWith(
+      expect.stringMatching(/INSERT INTO payments\.products/i),
+      expect.arrayContaining(['test', 'prod_123', 'Updated Product'])
+    );
+    expect(mockClient.query).toHaveBeenCalledWith(
+      expect.stringMatching(/DELETE FROM payments\.prices[\s\S]*stripe_product_id = \$2/i),
+      ['test', 'prod_123']
+    );
+    expect(mockClient.query).toHaveBeenCalledWith(
+      expect.stringMatching(/DELETE FROM payments\.products[\s\S]*stripe_product_id = \$2/i),
+      ['test', 'prod_123']
+    );
+    expect(mockProvider.syncCatalog).not.toHaveBeenCalled();
   });
 
   it('lists prices from the requested local Stripe mirror with an optional product filter', async () => {
@@ -831,7 +879,15 @@ describe('PaymentService', () => {
       metadata: { archived: 'true' },
     });
     expect(mockProvider.updatePrice).toHaveBeenCalledWith('price_123', { active: false });
-    expect(mockProvider.syncCatalog).toHaveBeenCalledTimes(3);
+    expect(mockClient.query).toHaveBeenCalledWith(
+      expect.stringMatching(/INSERT INTO payments\.prices/i),
+      expect.arrayContaining(['test', 'price_new', 'prod_123', true, 'usd'])
+    );
+    expect(mockClient.query).toHaveBeenCalledWith(
+      expect.stringMatching(/INSERT INTO payments\.prices/i),
+      expect.arrayContaining(['test', 'price_123', 'prod_123', false, 'usd'])
+    );
+    expect(mockProvider.syncCatalog).not.toHaveBeenCalled();
   });
 
   it('rejects subscription checkout without a billing subject', async () => {
