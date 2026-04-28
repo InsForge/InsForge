@@ -201,7 +201,6 @@ export class PaymentService {
              AND is_active = true`,
           [WEBHOOK_SECRET_BY_ENVIRONMENT[environment]]
         );
-        await this.clearPaymentMirror(client, environment);
         await client.query(
           `UPDATE payments.stripe_connections
            SET status = 'unconfigured',
@@ -922,7 +921,7 @@ export class PaymentService {
       const provider = await this.createStripeProvider(environment);
       const product = await provider.createProduct(productInput);
 
-      await this.syncEnvironmentUnlocked(environment);
+      await this.upsertProductMirror(environment, product);
 
       return {
         product: this.normalizeStripeProduct(product, environment),
@@ -940,7 +939,7 @@ export class PaymentService {
       const provider = await this.createStripeProvider(environment);
       const product = await provider.updateProduct(stripeProductId, productInput);
 
-      await this.syncEnvironmentUnlocked(environment);
+      await this.upsertProductMirror(environment, product);
 
       return {
         product: this.normalizeStripeProduct(product, environment),
@@ -956,7 +955,9 @@ export class PaymentService {
       const provider = await this.createStripeProvider(environment);
       const deletedProduct = await provider.deleteProduct(stripeProductId);
 
-      await this.syncEnvironmentUnlocked(environment);
+      if (deletedProduct.deleted) {
+        await this.deleteProductMirror(environment, deletedProduct.id);
+      }
 
       return {
         stripeProductId: deletedProduct.id,
@@ -972,7 +973,7 @@ export class PaymentService {
       const provider = await this.createStripeProvider(environment);
       const price = await provider.createPrice(priceInput);
 
-      await this.syncEnvironmentUnlocked(environment);
+      await this.upsertPriceMirror(environment, price);
 
       return {
         price: this.normalizeStripePrice(price, environment),
@@ -990,7 +991,7 @@ export class PaymentService {
       const provider = await this.createStripeProvider(environment);
       const price = await provider.updatePrice(stripePriceId, priceInput);
 
-      await this.syncEnvironmentUnlocked(environment);
+      await this.upsertPriceMirror(environment, price);
 
       return {
         price: this.normalizeStripePrice(price, environment),
@@ -1006,7 +1007,7 @@ export class PaymentService {
       const provider = await this.createStripeProvider(environment);
       const price = await provider.updatePrice(stripePriceId, { active: false });
 
-      await this.syncEnvironmentUnlocked(environment);
+      await this.upsertPriceMirror(environment, price);
 
       return {
         price: this.normalizeStripePrice(price, environment),
@@ -1418,6 +1419,71 @@ export class PaymentService {
          AND NOT (stripe_product_id = ANY($2::TEXT[]))`,
       [environment, stripeProductIds]
     );
+  }
+
+  private async upsertProductMirror(
+    environment: StripeEnvironment,
+    product: StripeProduct
+  ): Promise<void> {
+    const client = await this.getPool().connect();
+
+    try {
+      await client.query('BEGIN');
+      await this.upsertProducts(client, environment, [product], new Date());
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  private async upsertPriceMirror(
+    environment: StripeEnvironment,
+    price: StripePrice
+  ): Promise<void> {
+    const client = await this.getPool().connect();
+
+    try {
+      await client.query('BEGIN');
+      await this.upsertPrices(client, environment, [price], new Date());
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  private async deleteProductMirror(
+    environment: StripeEnvironment,
+    stripeProductId: string
+  ): Promise<void> {
+    const client = await this.getPool().connect();
+
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `DELETE FROM payments.prices
+         WHERE environment = $1
+           AND stripe_product_id = $2`,
+        [environment, stripeProductId]
+      );
+      await client.query(
+        `DELETE FROM payments.products
+         WHERE environment = $1
+           AND stripe_product_id = $2`,
+        [environment, stripeProductId]
+      );
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   private async resolveCheckoutCustomer(
