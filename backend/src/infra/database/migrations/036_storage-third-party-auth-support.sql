@@ -76,25 +76,53 @@ AS $$
   )::jsonb
 $$;
 
--- 5. Enable RLS, deny by default.
+-- 5. Enable RLS. Install owner-only defaults only on existing projects.
 --
--- No policies are created — the table is RLS-enabled with zero policies,
--- so every authenticated read/write is denied until a project defines its
--- own policies. Admin connections (postgres / API key) bypass RLS because
--- they connect with elevated privileges, so the dashboard and server-side
+-- Fresh installs ship deny-by-default (zero policies) — same shape
+-- Supabase ships, projects opt in to end-user access by writing
+-- policies suited to the bucket: owner-only, path-scoped, public-read,
+-- team-shared, etc.
+--
+-- Existing projects (any rows in storage.buckets at migration time) get
+-- the owner-only set installed automatically so the upgrade does not
+-- silently break end-user uploads/reads. Projects can drop those
+-- policies later when they want different semantics.
+--
+-- Admin connections (postgres / API key) bypass RLS regardless because
+-- they connect with elevated privileges — dashboard and server-side
 -- code keep working out of the box.
---
--- Projects opt in to end-user access by writing policies suited to the
--- bucket: owner-only, path-scoped, public-read, team-shared, etc. A
--- starter owner-only set looks like:
---
---   CREATE POLICY <name> ON storage.objects
---     FOR SELECT TO authenticated
---     USING (uploaded_by = (SELECT auth.jwt() ->> 'sub'));
 --
 -- The `(SELECT auth.jwt() ->> 'sub')` form hoists the call out of the
 -- per-row evaluation so postgres caches it once per query.
 ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+
+DO $migration$
+BEGIN
+  IF EXISTS (SELECT 1 FROM storage.buckets LIMIT 1) THEN
+    EXECUTE $sql$
+      CREATE POLICY storage_objects_owner_select ON storage.objects
+        FOR SELECT TO authenticated
+        USING (uploaded_by = (SELECT auth.jwt() ->> 'sub'))
+    $sql$;
+    EXECUTE $sql$
+      CREATE POLICY storage_objects_owner_insert ON storage.objects
+        FOR INSERT TO authenticated
+        WITH CHECK (uploaded_by = (SELECT auth.jwt() ->> 'sub'))
+    $sql$;
+    EXECUTE $sql$
+      CREATE POLICY storage_objects_owner_update ON storage.objects
+        FOR UPDATE TO authenticated
+        USING (uploaded_by = (SELECT auth.jwt() ->> 'sub'))
+        WITH CHECK (uploaded_by = (SELECT auth.jwt() ->> 'sub'))
+    $sql$;
+    EXECUTE $sql$
+      CREATE POLICY storage_objects_owner_delete ON storage.objects
+        FOR DELETE TO authenticated
+        USING (uploaded_by = (SELECT auth.jwt() ->> 'sub'))
+    $sql$;
+  END IF;
+END
+$migration$;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON storage.objects TO authenticated;
 GRANT USAGE ON SCHEMA storage TO authenticated;

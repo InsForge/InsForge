@@ -163,10 +163,14 @@ print_success "Two users logged in (alice=$ALICE_ID, bob=$BOB_ID)"
 print_blue "
 1. Owner-only RLS (starter policy set)"
 
-# Migration 036 enables RLS with no policies, so install the owner-only
-# starter set. Same SQL projects would paste from the docs to re-enable
-# pre-RLS behavior.
+# Install the owner-only starter set. Idempotent so the test runs the
+# same way against a fresh CI DB (migration shipped no defaults) or an
+# existing-project DB (migration installed the same set already).
 psql "$DATABASE_URL" >/dev/null <<'SQL'
+DROP POLICY IF EXISTS storage_objects_owner_select ON storage.objects;
+DROP POLICY IF EXISTS storage_objects_owner_insert ON storage.objects;
+DROP POLICY IF EXISTS storage_objects_owner_update ON storage.objects;
+DROP POLICY IF EXISTS storage_objects_owner_delete ON storage.objects;
 CREATE POLICY storage_objects_owner_select ON storage.objects
   FOR SELECT TO authenticated
   USING (uploaded_by = (SELECT auth.jwt() ->> 'sub'));
