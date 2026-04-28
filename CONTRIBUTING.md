@@ -60,6 +60,18 @@ Before you start development, ensure you have the following:
    docker compose up
    ```
 
+### Previewing cloud-only UI locally
+
+The dashboard's cloud-hosting variant lives in this repo but is normally gated to `insforge.dev` hostnames. To preview it during frontend development:
+
+```bash
+cp frontend/.env.example frontend/.env.local
+# set VITE_MOCK_CLOUD=true in frontend/.env.local
+cd frontend && npm run dev
+```
+
+This renders `FakeCloudDashboard` with hardcoded fixtures (see `frontend/src/mock-cloud/`). Cloud-only pages (Deployments, Compute & Disk, Backups) show populated mock data; endpoints that hit live cloud APIs will 404 against the local backend by design.
+
 ## Development Workflow
 
 1. Create a new branch for your changes:

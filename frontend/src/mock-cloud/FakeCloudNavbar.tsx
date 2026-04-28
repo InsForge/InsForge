@@ -20,11 +20,11 @@ export function FakeCloudNavbar() {
           MOCK
         </span>
         <Button variant="ghost" size="sm" onClick={notifyMock}>
-          Mock Organization ▾
+          Mock Organization
         </Button>
         <span className="text-xs text-semantic-muted">/</span>
         <Button variant="ghost" size="sm" onClick={notifyMock}>
-          {FAKE_PROJECT.name} ▾
+          {FAKE_PROJECT.name}
         </Button>
       </div>
       <div className="flex items-center gap-2">
@@ -35,7 +35,7 @@ export function FakeCloudNavbar() {
           Contact
         </Button>
         <Button variant="ghost" size="sm" onClick={notifyMock}>
-          Mock User ▾
+          Mock User
         </Button>
       </div>
     </header>
