@@ -2,25 +2,26 @@
 
 # E2E: Storage access is enforced by Postgres RLS, not by app-side filtering.
 #
+# Migration 036 ships RLS enabled with zero default policies (matching
+# Supabase). This script installs an owner-only starter set via psql so
+# section 1 has something to verify against — it's also the recipe a
+# project would use to re-enable the pre-RLS owner-only behavior.
+#
 # Sections:
-#   1. Default owner-only RLS — Alice/Bob can't see each other's files
-#      via list, get, or delete. Admin sees everything. (Always runs.)
-#   2. RLS override — drop default SELECT policy, install a permissive
-#      one ("public read inside this bucket"), verify both users now see
+#   1. Owner-only RLS — Alice/Bob can't see each other's files via list,
+#      get, or delete. Admin sees everything.
+#   2. RLS override — drop owner SELECT policy, install a permissive one
+#      ("public read inside this bucket"), verify both users now see
 #      everything WITHOUT the storage service changing.
-#      (Skipped if psql is unavailable or DATABASE_URL is unset.)
 #   3. Path-based RLS — use storage.foldername(key)[1] = sub, verify
 #      only files inside `<user_id>/...` are visible.
-#      (Skipped if psql is unavailable.)
 #   4. Third-party-auth-shaped JWT (text sub) flows the same path as
 #      native UUID JWTs. This is what makes Better Auth / Clerk / Auth0 /
 #      WorkOS / Stytch / Kinde work.
 #      (Skipped if JWT_SECRET is not retrievable.)
 #
-# Section 1 covers the core acceptance criterion (RLS-driven isolation).
-# The other sections add stronger evidence when psql + JWT_SECRET are
-# available locally, but their absence does not fail the suite — CI runs
-# inside a backend container that lacks the psql client.
+# psql is required to install/teardown policies. CI installs
+# postgresql-client into the backend container before running.
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "$SCRIPT_DIR/../test-config.sh"
@@ -63,28 +64,28 @@ fi
 # Export so the test-config.sh cleanup trap can delete buckets.
 export ACCESS_API_KEY="$API_KEY"
 
-# psql + DATABASE_URL gate sections 2 and 3.
-HAVE_PSQL=0
-if command -v psql >/dev/null 2>&1 && [ -n "$DATABASE_URL" ]; then
-  HAVE_PSQL=1
+# psql is required: migration 036 ships RLS enabled with zero default
+# policies, so the test installs its own owner-only set up front.
+if ! command -v psql >/dev/null 2>&1 || [ -z "$DATABASE_URL" ]; then
+  print_fail "psql + DATABASE_URL required (migration 036 has no default policies)"
+  exit 1
 fi
 
 PATH_BUCKET="rls-path-$TS"
 
-# Restore the default policy on any exit — leaves a shared DB clean even
-# on early failure.
-restore_default_storage_policies() {
-  [ "$HAVE_PSQL" = "1" ] || return 0
-  psql "$DATABASE_URL" >/dev/null 2>&1 <<SQL || true
+# Tear down all test-installed policies on exit so a shared DB ends in
+# the same state the migration left it: RLS enabled, zero policies.
+cleanup_storage_policies() {
+  psql "$DATABASE_URL" >/dev/null 2>&1 <<'SQL' || true
 DROP POLICY IF EXISTS storage_objects_public_read_test ON storage.objects;
 DROP POLICY IF EXISTS storage_objects_path_select ON storage.objects;
 DROP POLICY IF EXISTS storage_objects_owner_select ON storage.objects;
-CREATE POLICY storage_objects_owner_select ON storage.objects
-  FOR SELECT TO authenticated
-  USING (uploaded_by = (SELECT auth.jwt() ->> 'sub'));
+DROP POLICY IF EXISTS storage_objects_owner_insert ON storage.objects;
+DROP POLICY IF EXISTS storage_objects_owner_update ON storage.objects;
+DROP POLICY IF EXISTS storage_objects_owner_delete ON storage.objects;
 SQL
 }
-trap restore_default_storage_policies EXIT
+trap cleanup_storage_policies EXIT
 
 assert_count() {
   local label="$1" expected="$2" actual="$3"
@@ -157,10 +158,29 @@ BOB_ID=$(jwt_sub "$BOB_JWT")
 [ -z "$ALICE_JWT" ] || [ -z "$BOB_JWT" ] && { print_fail "Login failed"; exit 1; }
 print_success "Two users logged in (alice=$ALICE_ID, bob=$BOB_ID)"
 
-# === 1. default owner-only RLS =========================================
+# === 1. owner-only RLS =================================================
 
 print_blue "
-1. Default owner-only RLS"
+1. Owner-only RLS (starter policy set)"
+
+# Migration 036 enables RLS with no policies, so install the owner-only
+# starter set. Same SQL projects would paste from the docs to re-enable
+# pre-RLS behavior.
+psql "$DATABASE_URL" >/dev/null <<'SQL'
+CREATE POLICY storage_objects_owner_select ON storage.objects
+  FOR SELECT TO authenticated
+  USING (uploaded_by = (SELECT auth.jwt() ->> 'sub'));
+CREATE POLICY storage_objects_owner_insert ON storage.objects
+  FOR INSERT TO authenticated
+  WITH CHECK (uploaded_by = (SELECT auth.jwt() ->> 'sub'));
+CREATE POLICY storage_objects_owner_update ON storage.objects
+  FOR UPDATE TO authenticated
+  USING (uploaded_by = (SELECT auth.jwt() ->> 'sub'))
+  WITH CHECK (uploaded_by = (SELECT auth.jwt() ->> 'sub'));
+CREATE POLICY storage_objects_owner_delete ON storage.objects
+  FOR DELETE TO authenticated
+  USING (uploaded_by = (SELECT auth.jwt() ->> 'sub'));
+SQL
 
 assert_count "Alice upload"  "201" "$(upload "$ALICE_JWT" "$BUCKET" "a.txt" alice)"
 assert_count "Bob upload"    "201" "$(upload "$BOB_JWT"   "$BUCKET" "b.txt" bob)"
@@ -186,58 +206,53 @@ assert_count "Anon GET private bucket → 401" "401" "$anon_private"
 
 # === 2. override SELECT policy → public-read bucket ====================
 
-if [ "$HAVE_PSQL" = "1" ]; then
-  print_blue "
-2. Override default SELECT policy → public-read"
+print_blue "
+2. Override owner SELECT policy → public-read"
 
-  psql "$DATABASE_URL" >/dev/null <<SQL
+psql "$DATABASE_URL" >/dev/null <<SQL
 DROP POLICY IF EXISTS storage_objects_owner_select ON storage.objects;
 CREATE POLICY storage_objects_public_read_test ON storage.objects
   FOR SELECT TO authenticated
   USING (bucket = '$BUCKET');
 SQL
 
-  # Without the storage service changing, Alice and Bob should now see both files.
-  assert_count "Alice list (after override)" "2" "$(list_count "$ALICE_JWT" "$BUCKET")"
-  assert_count "Bob list (after override)"   "2" "$(list_count "$BOB_JWT"   "$BUCKET")"
+# Without the storage service changing, Alice and Bob should now see both files.
+assert_count "Alice list (after override)" "2" "$(list_count "$ALICE_JWT" "$BUCKET")"
+assert_count "Bob list (after override)"   "2" "$(list_count "$BOB_JWT"   "$BUCKET")"
 
-  # But INSERT/DELETE policies are unchanged — Bob still can't delete Alice's file
-  bob_del_alice2=$(curl -sS -o /dev/null -w "%{http_code}" -X DELETE \
-    "$API/storage/buckets/$BUCKET/objects/a.txt" -H "Authorization: Bearer $BOB_JWT")
-  assert_count "Bob DELETE alice's file (DELETE policy unchanged)" "404" "$bob_del_alice2"
+# But INSERT/DELETE policies are unchanged — Bob still can't delete Alice's file
+bob_del_alice2=$(curl -sS -o /dev/null -w "%{http_code}" -X DELETE \
+  "$API/storage/buckets/$BUCKET/objects/a.txt" -H "Authorization: Bearer $BOB_JWT")
+assert_count "Bob DELETE alice's file (DELETE policy unchanged)" "404" "$bob_del_alice2"
 
-  # Restore the default policy
-  psql "$DATABASE_URL" >/dev/null <<SQL
+# Restore the owner SELECT policy for clean teardown
+psql "$DATABASE_URL" >/dev/null <<'SQL'
 DROP POLICY IF EXISTS storage_objects_public_read_test ON storage.objects;
 CREATE POLICY storage_objects_owner_select ON storage.objects
   FOR SELECT TO authenticated
   USING (uploaded_by = (SELECT auth.jwt() ->> 'sub'));
 SQL
-  print_success "Default SELECT policy restored"
-else
-  print_info "2. Override SELECT policy: SKIPPED (psql or DATABASE_URL not available)"
-fi
+print_success "Owner SELECT policy restored"
 
 # === 3. path-based RLS using storage.foldername =========================
 
-if [ "$HAVE_PSQL" = "1" ]; then
-  print_blue "
+print_blue "
 3. Path-based RLS (storage.foldername)"
 
-  register_test_bucket "$PATH_BUCKET"
-  curl -sS -X POST "$API/storage/buckets" \
-    -H "Authorization: Bearer $API_KEY" -H "Content-Type: application/json" \
-    -d "{\"bucketName\":\"$PATH_BUCKET\",\"isPublic\":false}" > /dev/null
+register_test_bucket "$PATH_BUCKET"
+curl -sS -X POST "$API/storage/buckets" \
+  -H "Authorization: Bearer $API_KEY" -H "Content-Type: application/json" \
+  -d "{\"bucketName\":\"$PATH_BUCKET\",\"isPublic\":false}" > /dev/null
 
-  # Each user uploads at <user_id>/note.txt — column-based RLS still applies, so
-  # this works.
-  assert_count "Alice upload alice/note" "201" \
-    "$(upload "$ALICE_JWT" "$PATH_BUCKET" "${ALICE_ID}/note.txt" alice)"
-  assert_count "Bob upload bob/note"     "201" \
-    "$(upload "$BOB_JWT"   "$PATH_BUCKET" "${BOB_ID}/note.txt" bob)"
+# Each user uploads at <user_id>/note.txt — column-based RLS still applies, so
+# this works.
+assert_count "Alice upload alice/note" "201" \
+  "$(upload "$ALICE_JWT" "$PATH_BUCKET" "${ALICE_ID}/note.txt" alice)"
+assert_count "Bob upload bob/note"     "201" \
+  "$(upload "$BOB_JWT"   "$PATH_BUCKET" "${BOB_ID}/note.txt" bob)"
 
-  # Scoped to $PATH_BUCKET so concurrent runs on other buckets aren't affected.
-  psql "$DATABASE_URL" >/dev/null <<SQL
+# Scoped to $PATH_BUCKET so concurrent runs on other buckets aren't affected.
+psql "$DATABASE_URL" >/dev/null <<SQL
 DROP POLICY IF EXISTS storage_objects_owner_select ON storage.objects;
 CREATE POLICY storage_objects_path_select ON storage.objects
   FOR SELECT TO authenticated
@@ -247,20 +262,16 @@ CREATE POLICY storage_objects_path_select ON storage.objects
   );
 SQL
 
-  assert_count "Alice list (path policy)" "1" "$(list_count "$ALICE_JWT" "$PATH_BUCKET")"
-  assert_count "Bob list (path policy)"   "1" "$(list_count "$BOB_JWT"   "$PATH_BUCKET")"
+assert_count "Alice list (path policy)" "1" "$(list_count "$ALICE_JWT" "$PATH_BUCKET")"
+assert_count "Bob list (path policy)"   "1" "$(list_count "$BOB_JWT"   "$PATH_BUCKET")"
 
-  # Restore default
-  psql "$DATABASE_URL" >/dev/null <<SQL
+# Restore owner SELECT so INSERT…RETURNING against $BUCKET in section 4 sees rows.
+psql "$DATABASE_URL" >/dev/null <<'SQL'
 DROP POLICY IF EXISTS storage_objects_path_select ON storage.objects;
 CREATE POLICY storage_objects_owner_select ON storage.objects
   FOR SELECT TO authenticated
   USING (uploaded_by = (SELECT auth.jwt() ->> 'sub'));
 SQL
-  print_success "Default policy restored after path-based test"
-else
-  print_info "3. Path-based RLS: SKIPPED (psql or DATABASE_URL not available)"
-fi
 
 # === 4. third-party-auth-shaped JWT (text sub) =========================
 
@@ -269,9 +280,9 @@ print_blue "
 
 # Forge a BA-shaped JWT signed with the project's JWT_SECRET so we don't
 # need a running BA app to prove the storage path accepts text subs.
-# Order: env var (CI), then psql lookup if available (locally encrypted secret).
+# Order: env var (CI), then psql lookup (locally encrypted secret).
 JWT_SECRET_FOR_TEST="${JWT_SECRET:-${INSFORGE_JWT_SECRET:-}}"
-if [ -z "$JWT_SECRET_FOR_TEST" ] && [ "$HAVE_PSQL" = "1" ]; then
+if [ -z "$JWT_SECRET_FOR_TEST" ]; then
   JWT_SECRET_FOR_TEST=$(psql "$DATABASE_URL" -t -A -c \
     "SELECT system.decrypt_secret(value_ciphertext) FROM system.secrets WHERE key='JWT_SECRET' LIMIT 1;" 2>/dev/null || true)
 fi
@@ -312,14 +323,14 @@ fi
 
 print_blue "
 Cleanup"
-if [ "$HAVE_PSQL" = "1" ]; then
-  psql "$DATABASE_URL" >/dev/null <<SQL
+psql "$DATABASE_URL" >/dev/null <<'SQL'
 DELETE FROM storage.objects WHERE bucket LIKE 'rls-%';
 DELETE FROM storage.buckets WHERE name LIKE 'rls-%';
 SQL
-  print_success "Buckets removed (psql)"
-fi
+print_success "Buckets removed (psql)"
 # The trap from test-config.sh handles bucket/user cleanup via the API too.
+# The cleanup_storage_policies trap drops every test-installed policy,
+# leaving the table in the same RLS-enabled-no-policies state as the migration.
 
 echo
 echo "Storage RLS e2e: complete"

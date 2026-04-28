@@ -76,36 +76,25 @@ AS $$
   )::jsonb
 $$;
 
--- 5. Enable RLS and ship safe defaults.
+-- 5. Enable RLS, deny by default.
 --
--- Default policies are owner-only on every CRUD operation, matching the
--- behavior the application layer used to enforce. Projects override these
--- with `DROP POLICY` + `CREATE POLICY` to express anything else
--- (public read, team-shared, path-based, etc.) without touching the
--- storage service. Admin connections (postgres / API key) bypass RLS
--- because they connect with elevated privileges.
+-- No policies are created — the table is RLS-enabled with zero policies,
+-- so every authenticated read/write is denied until a project defines its
+-- own policies. Admin connections (postgres / API key) bypass RLS because
+-- they connect with elevated privileges, so the dashboard and server-side
+-- code keep working out of the box.
+--
+-- Projects opt in to end-user access by writing policies suited to the
+-- bucket: owner-only, path-scoped, public-read, team-shared, etc. A
+-- starter owner-only set looks like:
+--
+--   CREATE POLICY <name> ON storage.objects
+--     FOR SELECT TO authenticated
+--     USING (uploaded_by = (SELECT auth.jwt() ->> 'sub'));
 --
 -- The `(SELECT auth.jwt() ->> 'sub')` form hoists the call out of the
--- per-row evaluation so postgres caches it once per query instead of
--- re-running on every row.
+-- per-row evaluation so postgres caches it once per query.
 ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY storage_objects_owner_select ON storage.objects
-  FOR SELECT TO authenticated
-  USING (uploaded_by = (SELECT auth.jwt() ->> 'sub'));
-
-CREATE POLICY storage_objects_owner_insert ON storage.objects
-  FOR INSERT TO authenticated
-  WITH CHECK (uploaded_by = (SELECT auth.jwt() ->> 'sub'));
-
-CREATE POLICY storage_objects_owner_update ON storage.objects
-  FOR UPDATE TO authenticated
-  USING (uploaded_by = (SELECT auth.jwt() ->> 'sub'))
-  WITH CHECK (uploaded_by = (SELECT auth.jwt() ->> 'sub'));
-
-CREATE POLICY storage_objects_owner_delete ON storage.objects
-  FOR DELETE TO authenticated
-  USING (uploaded_by = (SELECT auth.jwt() ->> 'sub'));
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON storage.objects TO authenticated;
 GRANT USAGE ON SCHEMA storage TO authenticated;
