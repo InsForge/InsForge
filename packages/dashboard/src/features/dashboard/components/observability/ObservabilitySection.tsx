@@ -6,6 +6,13 @@ import { MetricChartCard } from './MetricChartCard';
 
 const RANGES: DashboardMetricsRange[] = ['1h', '6h', '24h', '3d'];
 
+const RANGE_SECONDS: Record<DashboardMetricsRange, number> = {
+  '1h': 3600,
+  '6h': 21600,
+  '24h': 86400,
+  '3d': 259200,
+};
+
 interface MetricConfig {
   metric: DashboardMetricName;
   title: string;
@@ -102,6 +109,7 @@ export function ObservabilitySection() {
                 title={config.title}
                 icon={config.icon}
                 data={series?.data ?? []}
+                rangeSeconds={RANGE_SECONDS[range]}
                 formatValue={config.format}
                 isLoading={isLoading}
               />

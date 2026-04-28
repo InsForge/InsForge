@@ -6,6 +6,7 @@ export interface MetricChartCardProps {
   title: string;
   icon: ReactNode;
   data: DashboardMetricDataPoint[];
+  rangeSeconds: number;
   formatValue: (value: number) => string;
   isLoading?: boolean;
 }
@@ -13,7 +14,7 @@ export interface MetricChartCardProps {
 const SPARKLINE_WIDTH = 434;
 const SPARKLINE_HEIGHT = 100;
 
-function buildSparklinePaths(data: DashboardMetricDataPoint[]) {
+function buildSparklinePaths(data: DashboardMetricDataPoint[], rangeSeconds: number) {
   const finite = data
     .filter((p) => Number.isFinite(p.value))
     .sort((a, b) => a.timestamp - b.timestamp);
@@ -23,18 +24,25 @@ function buildSparklinePaths(data: DashboardMetricDataPoint[]) {
   const values = finite.map((p) => p.value);
   const min = Math.min(...values);
   const max = Math.max(...values);
-  const range = max - min || 1;
+  const valueRange = max - min || 1;
 
-  const points = finite.map((p, i) => {
-    const x = (i / (finite.length - 1)) * SPARKLINE_WIDTH;
-    const y = SPARKLINE_HEIGHT - ((p.value - min) / range) * SPARKLINE_HEIGHT;
+  const windowEnd = Math.floor(Date.now() / 1000);
+  const windowStart = windowEnd - rangeSeconds;
+  const tRange = Math.max(1, windowEnd - windowStart);
+
+  const points = finite.map((p) => {
+    const rawX = ((p.timestamp - windowStart) / tRange) * SPARKLINE_WIDTH;
+    const x = Math.max(0, Math.min(SPARKLINE_WIDTH, rawX));
+    const y = SPARKLINE_HEIGHT - ((p.value - min) / valueRange) * SPARKLINE_HEIGHT;
     return [x, y] as const;
   });
 
   const line = points
     .map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`)
     .join(' ');
-  const area = `${line} L${SPARKLINE_WIDTH},${SPARKLINE_HEIGHT} L0,${SPARKLINE_HEIGHT} Z`;
+  const firstX = points[0][0].toFixed(2);
+  const lastX = points[points.length - 1][0].toFixed(2);
+  const area = `${line} L${lastX},${SPARKLINE_HEIGHT} L${firstX},${SPARKLINE_HEIGHT} Z`;
 
   return { line, area };
 }
@@ -43,11 +51,12 @@ export function MetricChartCard({
   title,
   icon,
   data,
+  rangeSeconds,
   formatValue,
   isLoading,
 }: MetricChartCardProps) {
   const aggregates = useMemo(() => aggregateMetricSeries(data), [data]);
-  const paths = useMemo(() => buildSparklinePaths(data), [data]);
+  const paths = useMemo(() => buildSparklinePaths(data, rangeSeconds), [data, rangeSeconds]);
 
   const renderValue = (value: number | null) => (value === null ? '—' : formatValue(value));
 
