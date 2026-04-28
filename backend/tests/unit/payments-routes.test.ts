@@ -57,47 +57,58 @@ describe('payments route schemas', () => {
     ).toThrow();
   });
 
-  it('keeps products CRUD scoped to the test environment by rejecting environment input', () => {
-    expect(listPaymentProductsRequestSchema.parse({})).toEqual({});
-    expect(() => listPaymentProductsRequestSchema.parse({ environment: 'live' })).toThrow();
+  it('requires products CRUD callers to specify the target Stripe environment', () => {
+    expect(listPaymentProductsRequestSchema.parse({ environment: 'live' })).toEqual({
+      environment: 'live',
+    });
+    expect(() => listPaymentProductsRequestSchema.parse({})).toThrow();
 
     expect(
       createPaymentProductRequestSchema.parse({
+        environment: 'test',
         name: 'Pro',
         description: null,
         active: true,
         metadata: { tier: 'pro' },
       })
     ).toEqual({
+      environment: 'test',
       name: 'Pro',
       description: null,
       active: true,
       metadata: { tier: 'pro' },
     });
 
-    expect(() =>
-      createPaymentProductRequestSchema.parse({ name: 'Pro', environment: 'live' })
-    ).toThrow();
+    expect(() => createPaymentProductRequestSchema.parse({ name: 'Pro' })).toThrow();
     expect(() => updatePaymentProductRequestSchema.parse({})).toThrow();
-    expect(() =>
-      updatePaymentProductRequestSchema.parse({ active: false, environment: 'live' })
-    ).toThrow();
+    expect(() => updatePaymentProductRequestSchema.parse({ environment: 'live' })).toThrow();
+    expect(updatePaymentProductRequestSchema.parse({ active: false, environment: 'live' })).toEqual(
+      {
+        active: false,
+        environment: 'live',
+      }
+    );
   });
 
-  it('keeps prices CRUD scoped to the test environment by rejecting environment input', () => {
-    expect(listPaymentPricesRequestSchema.parse({ stripeProductId: 'prod_123' })).toEqual({
+  it('requires prices CRUD callers to specify the target Stripe environment', () => {
+    expect(
+      listPaymentPricesRequestSchema.parse({ environment: 'test', stripeProductId: 'prod_123' })
+    ).toEqual({
+      environment: 'test',
       stripeProductId: 'prod_123',
     });
-    expect(() => listPaymentPricesRequestSchema.parse({ environment: 'live' })).toThrow();
+    expect(() => listPaymentPricesRequestSchema.parse({ stripeProductId: 'prod_123' })).toThrow();
 
     expect(
       createPaymentPriceRequestSchema.parse({
+        environment: 'test',
         stripeProductId: 'prod_123',
         currency: 'USD',
         unitAmount: 2000,
         recurring: { interval: 'month', intervalCount: 1 },
       })
     ).toEqual({
+      environment: 'test',
       stripeProductId: 'prod_123',
       currency: 'usd',
       unitAmount: 2000,
@@ -109,12 +120,13 @@ describe('payments route schemas', () => {
         stripeProductId: 'prod_123',
         currency: 'usd',
         unitAmount: 2000,
-        environment: 'live',
       })
     ).toThrow();
     expect(() => updatePaymentPriceRequestSchema.parse({})).toThrow();
-    expect(() =>
-      updatePaymentPriceRequestSchema.parse({ active: false, environment: 'live' })
-    ).toThrow();
+    expect(() => updatePaymentPriceRequestSchema.parse({ environment: 'live' })).toThrow();
+    expect(updatePaymentPriceRequestSchema.parse({ active: false, environment: 'live' })).toEqual({
+      active: false,
+      environment: 'live',
+    });
   });
 });

@@ -14,6 +14,7 @@ import {
   STRIPE_ENVIRONMENTS,
   type StripeConnectionRow,
   type StripeEnvironment,
+  type StripeAccount,
   type StripePrice,
   type StripePriceRow,
   type StripeProduct,
@@ -28,6 +29,7 @@ import type {
   ListPaymentCatalogResponse,
   ListPaymentPricesRequest,
   ListPaymentPricesResponse,
+  ListPaymentProductsRequest,
   StripeConnection,
   StripePriceMirror,
   StripeProductMirror,
@@ -76,34 +78,94 @@ export class PaymentService {
   }
 
   async setStripeSecretKey(environment: StripeEnvironment, secretKey: string): Promise<void> {
-    const trimmedSecretKey = secretKey.trim();
-    validateStripeSecretKey(environment, trimmedSecretKey);
+    await this.withEnvironmentLock(environment, async () => {
+      const trimmedSecretKey = secretKey.trim();
+      validateStripeSecretKey(environment, trimmedSecretKey);
 
-    const encryptedValue = EncryptionManager.encrypt(trimmedSecretKey);
+      const provider = new StripeProvider(trimmedSecretKey, environment);
+      const account = await provider.retrieveAccount();
+      const encryptedValue = EncryptionManager.encrypt(trimmedSecretKey);
+      const shouldClearMirror = await this.shouldClearCatalogForNewAccount(environment, account.id);
 
-    await this.getPool().query(
-      `INSERT INTO system.secrets (key, value_ciphertext, is_active, is_reserved)
-       VALUES ($1, $2, true, true)
-       ON CONFLICT (key) DO UPDATE SET
-         value_ciphertext = EXCLUDED.value_ciphertext,
-         is_active = true,
-         is_reserved = true,
-         updated_at = NOW()`,
-      [SECRET_KEY_BY_ENVIRONMENT[environment], encryptedValue]
-    );
+      await this.persistStripeSecretKey(environment, encryptedValue, account, shouldClearMirror);
+
+      try {
+        const snapshot = await provider.syncCatalog();
+        await this.writeSnapshot(environment, snapshot, new Date());
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        logger.error('Stripe sync failed after key update', { environment, error: message });
+        await this.recordConnectionStatus(environment, 'error', message);
+      }
+    });
   }
 
   async removeStripeSecretKey(environment: StripeEnvironment): Promise<boolean> {
-    const result = await this.getPool().query(
-      `UPDATE system.secrets
-       SET is_active = false,
-           updated_at = NOW()
-       WHERE key = $1
-         AND is_active = true`,
-      [SECRET_KEY_BY_ENVIRONMENT[environment]]
+    return this.withEnvironmentLock(environment, async () =>
+      this.removeStripeSecretKeyUnlocked(environment)
     );
+  }
 
-    return (result.rowCount ?? 0) > 0;
+  private async removeStripeSecretKeyUnlocked(environment: StripeEnvironment): Promise<boolean> {
+    const client = await this.getPool().connect();
+
+    try {
+      await client.query('BEGIN');
+
+      const result = await client.query(
+        `UPDATE system.secrets
+         SET is_active = false,
+             updated_at = NOW()
+         WHERE key = $1
+           AND is_active = true`,
+        [SECRET_KEY_BY_ENVIRONMENT[environment]]
+      );
+
+      const removed = (result.rowCount ?? 0) > 0;
+      if (removed) {
+        await client.query('DELETE FROM payments.prices WHERE environment = $1', [environment]);
+        await client.query('DELETE FROM payments.products WHERE environment = $1', [environment]);
+        await client.query(
+          `UPDATE payments.stripe_connections
+           SET status = 'unconfigured',
+               last_synced_at = NULL,
+               last_sync_status = 'failed',
+               last_sync_error = $2,
+               last_sync_counts = '{}'::JSONB,
+               updated_at = NOW()
+           WHERE environment = $1`,
+          [environment, `STRIPE_${environment.toUpperCase()}_SECRET_KEY is not configured`]
+        );
+      }
+
+      await client.query('COMMIT');
+
+      return removed;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  private async withEnvironmentLock<T>(
+    environment: StripeEnvironment,
+    task: () => Promise<T>
+  ): Promise<T> {
+    const client = await this.getPool().connect();
+    const lockName = `payments_environment_${environment}`;
+
+    try {
+      await client.query('SELECT pg_advisory_lock(hashtext($1))', [lockName]);
+      return await task();
+    } finally {
+      try {
+        await client.query('SELECT pg_advisory_unlock(hashtext($1))', [lockName]);
+      } finally {
+        client.release();
+      }
+    }
   }
 
   async seedStripeKeysFromEnv(): Promise<void> {
@@ -166,6 +228,118 @@ export class PaymentService {
       hasKey: !!secretKey,
       maskedKey: secretKey ? maskStripeKey(secretKey) : null,
     };
+  }
+
+  private async shouldClearCatalogForNewAccount(
+    environment: StripeEnvironment,
+    stripeAccountId: string
+  ): Promise<boolean> {
+    const result = await this.getPool().query(
+      `SELECT
+         connection.stripe_account_id AS "stripeAccountId",
+         (
+           EXISTS (SELECT 1 FROM payments.products WHERE environment = $1)
+           OR EXISTS (SELECT 1 FROM payments.prices WHERE environment = $1)
+         ) AS "hasCatalogRows"
+       FROM (SELECT $1::TEXT AS environment) selected_environment
+       LEFT JOIN payments.stripe_connections connection
+         ON connection.environment = selected_environment.environment`,
+      [environment]
+    );
+
+    const row = result.rows[0] as
+      | { stripeAccountId: string | null; hasCatalogRows: boolean }
+      | undefined;
+    if (!row) {
+      return false;
+    }
+
+    if (row.stripeAccountId) {
+      return row.stripeAccountId !== stripeAccountId;
+    }
+
+    return row.hasCatalogRows;
+  }
+
+  private async persistStripeSecretKey(
+    environment: StripeEnvironment,
+    encryptedValue: string,
+    account: StripeAccount,
+    clearMirror: boolean
+  ): Promise<void> {
+    const client = await this.getPool().connect();
+
+    try {
+      await client.query('BEGIN');
+
+      if (clearMirror) {
+        await client.query('DELETE FROM payments.prices WHERE environment = $1', [environment]);
+        await client.query('DELETE FROM payments.products WHERE environment = $1', [environment]);
+        logger.info('Cleared Stripe catalog mirror after account key change', { environment });
+      }
+
+      await client.query(
+        `INSERT INTO system.secrets (key, value_ciphertext, is_active, is_reserved)
+         VALUES ($1, $2, true, true)
+         ON CONFLICT (key) DO UPDATE SET
+           value_ciphertext = EXCLUDED.value_ciphertext,
+           is_active = true,
+           is_reserved = true,
+           updated_at = NOW()`,
+        [SECRET_KEY_BY_ENVIRONMENT[environment], encryptedValue]
+      );
+
+      await client.query(
+        `INSERT INTO payments.stripe_connections (
+           environment,
+           stripe_account_id,
+           stripe_account_email,
+           account_livemode,
+           status,
+           last_synced_at,
+           last_sync_status,
+           last_sync_error,
+           last_sync_counts,
+           raw
+         )
+         VALUES ($1, $2, $3, $4, 'connected', NULL, NULL, NULL, '{}'::JSONB, $5)
+         ON CONFLICT (environment) DO UPDATE SET
+           stripe_account_id = EXCLUDED.stripe_account_id,
+           stripe_account_email = EXCLUDED.stripe_account_email,
+           account_livemode = EXCLUDED.account_livemode,
+           status = 'connected',
+           last_synced_at = CASE
+             WHEN $6 THEN NULL
+             ELSE payments.stripe_connections.last_synced_at
+           END,
+           last_sync_status = CASE
+             WHEN $6 THEN NULL
+             ELSE payments.stripe_connections.last_sync_status
+           END,
+           last_sync_error = NULL,
+           last_sync_counts = CASE
+             WHEN $6 THEN '{}'::JSONB
+             ELSE payments.stripe_connections.last_sync_counts
+           END,
+           raw = EXCLUDED.raw,
+           updated_at = NOW()`,
+        [
+          environment,
+          account.id,
+          account.email ?? null,
+          environment === 'live',
+          account,
+          clearMirror,
+        ]
+      );
+
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async getStatus(): Promise<GetPaymentsStatusResponse> {
@@ -253,18 +427,21 @@ export class PaymentService {
     };
   }
 
-  async listTestProducts(): Promise<ListPaymentProductsResponse> {
-    const catalog = await this.listCatalog('test');
+  async listProducts(input: ListPaymentProductsRequest): Promise<ListPaymentProductsResponse> {
+    const catalog = await this.listCatalog(input.environment);
     return { products: catalog.products };
   }
 
-  async getTestProduct(stripeProductId: string): Promise<GetPaymentProductResponse> {
-    const catalog = await this.listCatalog('test');
+  async getProduct(
+    environment: StripeEnvironment,
+    stripeProductId: string
+  ): Promise<GetPaymentProductResponse> {
+    const catalog = await this.listCatalog(environment);
     const product = catalog.products.find((item) => item.stripeProductId === stripeProductId);
 
     if (!product) {
       throw new AppError(
-        `Stripe test product not found: ${stripeProductId}`,
+        `Stripe ${environment} product not found: ${stripeProductId}`,
         404,
         ERROR_CODES.NOT_FOUND
       );
@@ -276,8 +453,8 @@ export class PaymentService {
     };
   }
 
-  async listTestPrices(filters: ListPaymentPricesRequest = {}): Promise<ListPaymentPricesResponse> {
-    const catalog = await this.listCatalog('test');
+  async listPrices(filters: ListPaymentPricesRequest): Promise<ListPaymentPricesResponse> {
+    const catalog = await this.listCatalog(filters.environment);
     const prices = filters.stripeProductId
       ? catalog.prices.filter((price) => price.stripeProductId === filters.stripeProductId)
       : catalog.prices;
@@ -285,13 +462,16 @@ export class PaymentService {
     return { prices };
   }
 
-  async getTestPrice(stripePriceId: string): Promise<GetPaymentPriceResponse> {
-    const catalog = await this.listCatalog('test');
+  async getPrice(
+    environment: StripeEnvironment,
+    stripePriceId: string
+  ): Promise<GetPaymentPriceResponse> {
+    const catalog = await this.listCatalog(environment);
     const price = catalog.prices.find((item) => item.stripePriceId === stripePriceId);
 
     if (!price) {
       throw new AppError(
-        `Stripe test price not found: ${stripePriceId}`,
+        `Stripe ${environment} price not found: ${stripePriceId}`,
         404,
         ERROR_CODES.NOT_FOUND
       );
@@ -300,80 +480,104 @@ export class PaymentService {
     return { price };
   }
 
-  async createTestProduct(
-    input: CreatePaymentProductRequest
-  ): Promise<MutatePaymentProductResponse> {
-    const provider = await this.createStripeProvider('test');
-    const product = await provider.createProduct(input);
+  async createProduct(input: CreatePaymentProductRequest): Promise<MutatePaymentProductResponse> {
+    const { environment, ...productInput } = input;
 
-    await this.syncEnvironment('test');
+    return this.withEnvironmentLock(environment, async () => {
+      const provider = await this.createStripeProvider(environment);
+      const product = await provider.createProduct(productInput);
 
-    return {
-      product: this.normalizeStripeProduct(product, 'test'),
-    };
+      await this.syncEnvironmentUnlocked(environment);
+
+      return {
+        product: this.normalizeStripeProduct(product, environment),
+      };
+    });
   }
 
-  async updateTestProduct(
+  async updateProduct(
     stripeProductId: string,
     input: UpdatePaymentProductRequest
   ): Promise<MutatePaymentProductResponse> {
-    const provider = await this.createStripeProvider('test');
-    const product = await provider.updateProduct(stripeProductId, input);
+    const { environment, ...productInput } = input;
 
-    await this.syncEnvironment('test');
+    return this.withEnvironmentLock(environment, async () => {
+      const provider = await this.createStripeProvider(environment);
+      const product = await provider.updateProduct(stripeProductId, productInput);
 
-    return {
-      product: this.normalizeStripeProduct(product, 'test'),
-    };
+      await this.syncEnvironmentUnlocked(environment);
+
+      return {
+        product: this.normalizeStripeProduct(product, environment),
+      };
+    });
   }
 
-  async deleteTestProduct(stripeProductId: string): Promise<DeletePaymentProductResponse> {
-    const provider = await this.createStripeProvider('test');
-    const deletedProduct = await provider.deleteProduct(stripeProductId);
+  async deleteProduct(
+    environment: StripeEnvironment,
+    stripeProductId: string
+  ): Promise<DeletePaymentProductResponse> {
+    return this.withEnvironmentLock(environment, async () => {
+      const provider = await this.createStripeProvider(environment);
+      const deletedProduct = await provider.deleteProduct(stripeProductId);
 
-    await this.syncEnvironment('test');
+      await this.syncEnvironmentUnlocked(environment);
 
-    return {
-      stripeProductId: deletedProduct.id,
-      deleted: deletedProduct.deleted,
-    };
+      return {
+        stripeProductId: deletedProduct.id,
+        deleted: deletedProduct.deleted,
+      };
+    });
   }
 
-  async createTestPrice(input: CreatePaymentPriceRequest): Promise<MutatePaymentPriceResponse> {
-    const provider = await this.createStripeProvider('test');
-    const price = await provider.createPrice(input);
+  async createPrice(input: CreatePaymentPriceRequest): Promise<MutatePaymentPriceResponse> {
+    const { environment, ...priceInput } = input;
 
-    await this.syncEnvironment('test');
+    return this.withEnvironmentLock(environment, async () => {
+      const provider = await this.createStripeProvider(environment);
+      const price = await provider.createPrice(priceInput);
 
-    return {
-      price: this.normalizeStripePrice(price, 'test'),
-    };
+      await this.syncEnvironmentUnlocked(environment);
+
+      return {
+        price: this.normalizeStripePrice(price, environment),
+      };
+    });
   }
 
-  async updateTestPrice(
+  async updatePrice(
     stripePriceId: string,
     input: UpdatePaymentPriceRequest
   ): Promise<MutatePaymentPriceResponse> {
-    const provider = await this.createStripeProvider('test');
-    const price = await provider.updatePrice(stripePriceId, input);
+    const { environment, ...priceInput } = input;
 
-    await this.syncEnvironment('test');
+    return this.withEnvironmentLock(environment, async () => {
+      const provider = await this.createStripeProvider(environment);
+      const price = await provider.updatePrice(stripePriceId, priceInput);
 
-    return {
-      price: this.normalizeStripePrice(price, 'test'),
-    };
+      await this.syncEnvironmentUnlocked(environment);
+
+      return {
+        price: this.normalizeStripePrice(price, environment),
+      };
+    });
   }
 
-  async archiveTestPrice(stripePriceId: string): Promise<ArchivePaymentPriceResponse> {
-    const provider = await this.createStripeProvider('test');
-    const price = await provider.updatePrice(stripePriceId, { active: false });
+  async archivePrice(
+    environment: StripeEnvironment,
+    stripePriceId: string
+  ): Promise<ArchivePaymentPriceResponse> {
+    return this.withEnvironmentLock(environment, async () => {
+      const provider = await this.createStripeProvider(environment);
+      const price = await provider.updatePrice(stripePriceId, { active: false });
 
-    await this.syncEnvironment('test');
+      await this.syncEnvironmentUnlocked(environment);
 
-    return {
-      price: this.normalizeStripePrice(price, 'test'),
-      archived: !price.active,
-    };
+      return {
+        price: this.normalizeStripePrice(price, environment),
+        archived: !price.active,
+      };
+    });
   }
 
   async syncAll(): Promise<StripeConnection[]> {
@@ -381,6 +585,12 @@ export class PaymentService {
   }
 
   async syncEnvironment(environment: StripeEnvironment): Promise<StripeConnection> {
+    return this.withEnvironmentLock(environment, async () =>
+      this.syncEnvironmentUnlocked(environment)
+    );
+  }
+
+  private async syncEnvironmentUnlocked(environment: StripeEnvironment): Promise<StripeConnection> {
     let secretKey: string | null;
 
     try {
@@ -489,7 +699,12 @@ export class PaymentService {
       await this.upsertConnection(client, environment, snapshot);
       await this.upsertProducts(client, environment, snapshot.products, syncStartedAt);
       await this.upsertPrices(client, environment, snapshot.prices, syncStartedAt);
-      await this.deleteMissingRows(client, environment, syncStartedAt);
+      await this.deleteMissingRows(
+        client,
+        environment,
+        snapshot.products.map((product) => product.id),
+        snapshot.prices.map((price) => price.id)
+      );
 
       await client.query('COMMIT');
     } catch (error) {
@@ -656,20 +871,21 @@ export class PaymentService {
   private async deleteMissingRows(
     client: PoolClient,
     environment: StripeEnvironment,
-    syncStartedAt: Date
+    stripeProductIds: string[],
+    stripePriceIds: string[]
   ): Promise<void> {
     await client.query(
       `DELETE FROM payments.prices
        WHERE environment = $1
-         AND synced_at < $2`,
-      [environment, syncStartedAt]
+         AND NOT (stripe_price_id = ANY($2::TEXT[]))`,
+      [environment, stripePriceIds]
     );
 
     await client.query(
       `DELETE FROM payments.products
        WHERE environment = $1
-         AND synced_at < $2`,
-      [environment, syncStartedAt]
+         AND NOT (stripe_product_id = ANY($2::TEXT[]))`,
+      [environment, stripeProductIds]
     );
   }
 

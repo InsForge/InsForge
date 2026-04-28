@@ -7,6 +7,7 @@ import { StripeKeyValidationError } from '@/providers/payments/stripe.provider.j
 import { successResponse } from '@/utils/response.js';
 import {
   listPaymentPricesRequestSchema,
+  paymentEnvironmentRequestSchema,
   paymentPriceParamsSchema,
   createPaymentPriceRequestSchema,
   updatePaymentPriceRequestSchema,
@@ -36,7 +37,7 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
       throw new AppError(formatValidationIssues(validation.error), 400, ERROR_CODES.INVALID_INPUT);
     }
 
-    const prices = await paymentService.listTestPrices(validation.data);
+    const prices = await paymentService.listPrices(validation.data);
     successResponse(res, prices);
   } catch (error) {
     next(error);
@@ -50,7 +51,19 @@ router.get('/:priceId', async (req: AuthRequest, res: Response, next: NextFuncti
       throw new AppError(formatValidationIssues(validation.error), 400, ERROR_CODES.INVALID_INPUT);
     }
 
-    const price = await paymentService.getTestPrice(validation.data.priceId);
+    const queryValidation = paymentEnvironmentRequestSchema.safeParse(req.query);
+    if (!queryValidation.success) {
+      throw new AppError(
+        formatValidationIssues(queryValidation.error),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    const price = await paymentService.getPrice(
+      queryValidation.data.environment,
+      validation.data.priceId
+    );
     successResponse(res, price);
   } catch (error) {
     next(error);
@@ -64,7 +77,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
       throw new AppError(formatValidationIssues(validation.error), 400, ERROR_CODES.INVALID_INPUT);
     }
 
-    const price = await paymentService.createTestPrice(validation.data);
+    const price = await paymentService.createPrice(validation.data);
     successResponse(res, price, 201);
   } catch (error) {
     next(normalizeStripeConfigError(error));
@@ -91,7 +104,7 @@ router.patch('/:priceId', async (req: AuthRequest, res: Response, next: NextFunc
       );
     }
 
-    const price = await paymentService.updateTestPrice(
+    const price = await paymentService.updatePrice(
       paramsValidation.data.priceId,
       bodyValidation.data
     );
@@ -108,7 +121,19 @@ router.delete('/:priceId', async (req: AuthRequest, res: Response, next: NextFun
       throw new AppError(formatValidationIssues(validation.error), 400, ERROR_CODES.INVALID_INPUT);
     }
 
-    const price = await paymentService.archiveTestPrice(validation.data.priceId);
+    const queryValidation = paymentEnvironmentRequestSchema.safeParse(req.query);
+    if (!queryValidation.success) {
+      throw new AppError(
+        formatValidationIssues(queryValidation.error),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    const price = await paymentService.archivePrice(
+      queryValidation.data.environment,
+      validation.data.priceId
+    );
     successResponse(res, price);
   } catch (error) {
     next(normalizeStripeConfigError(error));

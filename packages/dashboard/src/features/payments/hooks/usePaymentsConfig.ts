@@ -25,6 +25,7 @@ export function usePaymentsConfig() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: PAYMENTS_CONFIG_QUERY_KEY }),
         queryClient.invalidateQueries({ queryKey: ['payments', 'status'] }),
+        queryClient.invalidateQueries({ queryKey: ['payments', 'catalog'] }),
       ]);
       showToast('Stripe key saved successfully', 'success');
     },
@@ -39,6 +40,7 @@ export function usePaymentsConfig() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: PAYMENTS_CONFIG_QUERY_KEY }),
         queryClient.invalidateQueries({ queryKey: ['payments', 'status'] }),
+        queryClient.invalidateQueries({ queryKey: ['payments', 'catalog'] }),
       ]);
       showToast('Stripe key removed', 'success');
     },

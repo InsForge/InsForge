@@ -31,13 +31,13 @@ export function usePayments(environment: StripeEnvironment) {
   });
 
   const syncMutation = useMutation({
-    mutationFn: () => paymentsService.syncCatalog(environment),
+    mutationFn: () => paymentsService.syncCatalog(),
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['payments', 'status'] }),
         queryClient.invalidateQueries({ queryKey: ['payments', 'catalog'] }),
       ]);
-      showToast('Stripe catalog synced successfully', 'success');
+      showToast('Stripe catalogs synced successfully', 'success');
     },
     onError: (error: Error) => {
       showToast(error.message || 'Failed to sync Stripe catalog', 'error');
