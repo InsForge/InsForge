@@ -69,7 +69,17 @@ export async function withUserContext<T>(
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    await client.query(`SET LOCAL ROLE ${ctx.role}`);
+    // Postgres parameters can't bind identifiers in SET ROLE, so the role
+    // string must be interpolated. Allowlist instead — a future caller that
+    // builds UserContext from a JSON payload or DB row is one mistake away
+    // from arbitrary SQL landing in `SET LOCAL ROLE` if we trust the type.
+    if (ctx.role === 'authenticated') {
+      await client.query('SET LOCAL ROLE authenticated');
+    } else if (ctx.role === 'anon') {
+      await client.query('SET LOCAL ROLE anon');
+    } else {
+      throw new Error(`withUserContext: unsupported role ${JSON.stringify(ctx.role)}`);
+    }
     await client.query("SELECT set_config('request.jwt.claims', $1, true)", [
       JSON.stringify(claims),
     ]);

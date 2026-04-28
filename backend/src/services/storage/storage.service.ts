@@ -169,6 +169,11 @@ export class StorageService {
       // users can independently upload `note.txt` without conflict.
       const finalKey = await this.generateNextAvailableKey(bucket, originalKey, db);
 
+      // Provider write happens before INSERT. The INSERT's RLS WITH CHECK is
+      // unreachable in practice because uploaded_by is always ctx.userId, which
+      // is the same value the policy reads via auth.jwt() ->> 'sub'. Any
+      // non-RLS INSERT failure (unique conflict, transient DB error) leaves
+      // the blob orphaned on the provider; the rollback only undoes the DB.
       await this.provider.putObject(bucket, finalKey, file);
 
       // INSERT is checked against the storage_objects_owner_insert RLS policy.
@@ -243,6 +248,11 @@ export class StorageService {
     // before touching the provider. Provider delete then DB delete in
     // that order — a provider failure leaves both sides intact and a
     // retry resolves cleanly, whereas DB-first would orphan the blob.
+    //
+    // This relies on `provider.deleteObject` being idempotent on missing
+    // keys. S3 DELETE is (returns 204 either way); LocalStorageProvider's
+    // unlink swallows ENOENT. A future provider that throws on missing
+    // keys would break retry safety here — keep that contract.
     return withUserContext(this.getPool(), ctx, async (db) => {
       const found = await db.query('SELECT 1 FROM storage.objects WHERE bucket = $1 AND key = $2', [
         bucket,
@@ -461,6 +471,27 @@ export class StorageService {
     return this.provider.getDownloadStrategy(bucket, key, expiresIn, isPublic);
   }
 
+  /**
+   * RLS-gated existence check. Returns true iff the caller is allowed by
+   * `storage.objects` RLS policies to see this row. Used by routes that
+   * issue presigned URLs (S3 backend) before redirecting — the presigned
+   * URL itself bypasses RLS, so the route must do the ownership check
+   * before handing the URL out. Admin contexts always return true (admin
+   * bypasses RLS at the DB level).
+   */
+  async objectIsVisible(ctx: UserContext, bucket: string, key: string): Promise<boolean> {
+    this.validateBucketName(bucket);
+    this.validateKey(key);
+
+    return withUserContext(this.getPool(), ctx, async (db) => {
+      const result = await db.query(
+        'SELECT 1 FROM storage.objects WHERE bucket = $1 AND key = $2',
+        [bucket, key]
+      );
+      return (result.rowCount ?? 0) > 0;
+    });
+  }
+
   async confirmUpload(
     bucket: string,
     key: string,
@@ -608,6 +639,14 @@ export class StorageService {
   /**
    * Upsert object metadata after an S3-protocol PutObject or CompleteMultipartUpload.
    * uploaded_by stays NULL; uploaded_via='s3' + s3_access_key_id distinguish S3 uploads.
+   *
+   * Note on RLS: under the migration's default `storage_objects_owner_select`
+   * policy (`uploaded_by = auth.jwt() ->> 'sub'`), `NULL = '<sub>'` is never
+   * true — so S3-uploaded rows are invisible to authenticated end-users via
+   * the user API. Admin (API key / project_admin) bypasses RLS and sees them.
+   * Projects that mix the S3 protocol and the user API on the same bucket
+   * should write a custom SELECT policy that handles `uploaded_by IS NULL`
+   * explicitly (e.g., `uploaded_by IS NULL OR uploaded_by = auth.jwt()...`).
    */
   async upsertS3Object(params: {
     bucket: string;

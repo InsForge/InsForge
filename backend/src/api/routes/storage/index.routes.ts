@@ -422,13 +422,6 @@ router.get(
 
       const storageService = StorageService.getInstance();
 
-      // Get download strategy (service auto-calculates expiry based on bucket visibility)
-      const strategy = await storageService.getDownloadStrategy(bucketName, objectKey);
-
-      if (strategy.method === 'presigned') {
-        return res.redirect(strategy.url);
-      }
-
       // Public-bucket reads bypass RLS: conditionalAuth has already confirmed
       // public=true before letting an unauthed request through, so the bypass
       // only triggers in that case. Authed callers always go through RLS.
@@ -437,6 +430,23 @@ router.get(
         !authReq.user && !authReq.apiKey
           ? { isAdmin: true, role: 'authenticated' }
           : authedContext(authReq);
+
+      // Get download strategy (service auto-calculates expiry based on bucket visibility)
+      const strategy = await storageService.getDownloadStrategy(bucketName, objectKey);
+
+      if (strategy.method === 'presigned') {
+        // Presigned URLs bypass the backend, so RLS doesn't fire when the
+        // client redeems them. Gate the redirect on an RLS-scoped existence
+        // check — without this, an authenticated non-owner could redeem any
+        // known key in a private bucket. Admin/anon-public-bucket contexts
+        // bypass RLS at the DB level and always return true.
+        const visible = await storageService.objectIsVisible(ctx, bucketName, objectKey);
+        if (!visible) {
+          throw new AppError('Object not found', 404, ERROR_CODES.NOT_FOUND);
+        }
+        return res.redirect(strategy.url);
+      }
+
       const result = await storageService.getObject(ctx, bucketName, objectKey);
       if (!result) {
         throw new AppError('Object not found', 404, ERROR_CODES.NOT_FOUND);
@@ -636,6 +646,21 @@ router.post(
       const { bucketName, objectKey } = req.params;
 
       const storageService = StorageService.getInstance();
+
+      // RLS-gate the strategy hand-off, same as GET /objects/*. A presigned
+      // URL bypasses RLS at redeem time, so we must verify ownership before
+      // issuing one. Public-bucket unauthed callers bypass via isAdmin: true
+      // because conditionalAuth has already confirmed public=true.
+      const authReq = req as AuthRequest;
+      const ctx: UserContext =
+        !authReq.user && !authReq.apiKey
+          ? { isAdmin: true, role: 'authenticated' }
+          : authedContext(authReq);
+      const visible = await storageService.objectIsVisible(ctx, bucketName, objectKey);
+      if (!visible) {
+        throw new AppError('Object not found', 404, ERROR_CODES.NOT_FOUND);
+      }
+
       const strategy = await storageService.getDownloadStrategy(bucketName, objectKey);
 
       successResponse(res, strategy);

@@ -94,6 +94,16 @@ $$;
 --
 -- The `(SELECT auth.jwt() ->> 'sub')` form hoists the call out of the
 -- per-row evaluation so postgres caches it once per query.
+--
+-- Caveat for projects mixing the user API and the S3 protocol: rows
+-- written by the S3 gateway have `uploaded_by = NULL` (the S3 caller
+-- isn't a JWT user). Under the owner-only policies below, `NULL = '<sub>'`
+-- is never true, so authenticated end-users will not see S3-uploaded
+-- rows via the user API. Admin (API key / project_admin) bypasses RLS
+-- and sees them. Projects that need both surfaces visible to end-users
+-- should drop these defaults and write a custom SELECT policy that
+-- handles `uploaded_by IS NULL` (e.g. `uploaded_by IS NULL OR
+-- uploaded_by = auth.jwt() ->> 'sub'`).
 ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 
 DO $migration$
