@@ -150,6 +150,10 @@ export class StripeProvider {
       params.customer_email = input.customerEmail;
     }
 
+    if (input.clientReferenceId !== undefined && input.clientReferenceId !== null) {
+      params.client_reference_id = input.clientReferenceId;
+    }
+
     if (input.metadata !== undefined) {
       if (input.mode === 'subscription') {
         params.subscription_data = { metadata: input.metadata };

@@ -36,7 +36,15 @@ router.post(
         );
       }
 
-      const checkoutSession = await paymentService.createCheckoutSession(validation.data);
+      if (!req.user) {
+        throw new AppError(
+          'Checkout session creation requires a user token',
+          401,
+          ERROR_CODES.AUTH_INVALID_CREDENTIALS
+        );
+      }
+
+      const checkoutSession = await paymentService.createCheckoutSession(validation.data, req.user);
       successResponse(res, checkoutSession, 201);
     } catch (error) {
       next(normalizeStripeConfigError(error));

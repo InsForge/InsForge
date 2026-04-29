@@ -16,11 +16,13 @@ export const SUBJECT_METADATA_KEYS = {
 } as const;
 
 export const CHECKOUT_MODE_METADATA_KEY = 'insforge_checkout_mode';
+export const CHECKOUT_SESSION_METADATA_KEY = 'insforge_checkout_session_id';
 
 export const MANAGED_WEBHOOK_EVENTS = [
   'checkout.session.completed',
   'checkout.session.async_payment_succeeded',
   'checkout.session.async_payment_failed',
+  'checkout.session.expired',
   'invoice.paid',
   'invoice.payment_failed',
   'refund.created',

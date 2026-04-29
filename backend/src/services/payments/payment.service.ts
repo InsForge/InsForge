@@ -3,18 +3,24 @@ import { AppError } from '@/api/middlewares/error.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { StripeProvider } from '@/providers/payments/stripe.provider.js';
 import { PaymentConfigService } from '@/services/payments/payment-config.service.js';
+import {
+  PaymentCheckoutService,
+  type CheckoutUserContext,
+} from '@/services/payments/payment-checkout.service.js';
 import { PaymentHistoryService } from '@/services/payments/payment-history.service.js';
 import { PaymentProductService } from '@/services/payments/payment-product.service.js';
 import { PaymentPriceService } from '@/services/payments/payment-price.service.js';
 import { PaymentSubscriptionService } from '@/services/payments/payment-subscription.service.js';
 import { PaymentWebhookService } from '@/services/payments/payment-webhook.service.js';
 import {
+  CHECKOUT_SESSION_METADATA_KEY,
   CHECKOUT_MODE_METADATA_KEY,
   SUBJECT_METADATA_KEYS,
   WEBHOOK_SECRET_BY_ENVIRONMENT,
 } from '@/services/payments/constants.js';
 import {
   buildStripeIdempotencyKey,
+  getBillingSubjectFromMetadata,
   getStripeObjectId,
   normalizePriceRow,
   normalizeProductRow,
@@ -24,7 +30,6 @@ import { ERROR_CODES } from '@/types/error-constants.js';
 import {
   STRIPE_ENVIRONMENTS,
   type StripeCheckoutSession,
-  type StripeCustomer,
   type StripeEnvironment,
   type StripeEvent,
   type StripeCharge,
@@ -73,6 +78,7 @@ export class PaymentService {
   private static instance: PaymentService;
   private pool: Pool | null = null;
   private readonly configService = PaymentConfigService.getInstance();
+  private readonly checkoutService = PaymentCheckoutService.getInstance();
   private readonly historyService = PaymentHistoryService.getInstance();
   private readonly productService = PaymentProductService.getInstance();
   private readonly priceService = PaymentPriceService.getInstance();
@@ -271,7 +277,8 @@ export class PaymentService {
   }
 
   async createCheckoutSession(
-    input: CreateCheckoutSessionRequest
+    input: CreateCheckoutSessionRequest,
+    user: CheckoutUserContext
   ): Promise<CreateCheckoutSessionResponse> {
     if (input.mode === 'subscription' && !input.subject) {
       throw new AppError(
@@ -282,31 +289,59 @@ export class PaymentService {
     }
 
     return this.withEnvironmentLock(input.environment, async () => {
-      const provider = await this.configService.createStripeProvider(input.environment);
-      const metadata = this.buildStripeMetadata(input.metadata, input.subject, input.mode);
-      const customerId = await this.resolveCheckoutCustomer(input, provider, metadata);
-      const checkoutSession = await provider.createCheckoutSession({
-        mode: input.mode,
-        lineItems: input.lineItems,
-        successUrl: input.successUrl,
-        cancelUrl: input.cancelUrl,
-        customerId,
-        customerEmail: customerId ? null : input.customerEmail,
-        metadata,
-        ...(input.idempotencyKey
-          ? {
-              idempotencyKey: buildStripeIdempotencyKey(
-                input.environment,
-                'checkout_session',
-                input.idempotencyKey
-              ),
-            }
-          : {}),
-      });
+      const baseMetadata = this.buildStripeMetadata(input.metadata, input.subject, input.mode);
+      const initialized = await this.checkoutService.insertInitializedCheckoutSession(
+        input,
+        baseMetadata,
+        user
+      );
+      if (initialized.existingCheckoutSession) {
+        return { checkoutSession: initialized.existingCheckoutSession };
+      }
 
-      return {
-        checkoutSession: this.normalizeCheckoutSession(checkoutSession, input.environment),
+      const metadata = {
+        ...baseMetadata,
+        [CHECKOUT_SESSION_METADATA_KEY]: initialized.id,
       };
+
+      try {
+        const provider = await this.configService.createStripeProvider(input.environment);
+        const customerId = await this.resolveCheckoutCustomer(input);
+        const checkoutSession = await provider.createCheckoutSession({
+          mode: input.mode,
+          lineItems: input.lineItems,
+          successUrl: input.successUrl,
+          cancelUrl: input.cancelUrl,
+          customerId,
+          customerEmail: customerId ? null : input.customerEmail,
+          clientReferenceId: initialized.id,
+          metadata,
+          idempotencyKey: buildStripeIdempotencyKey(
+            input.environment,
+            'checkout_session',
+            input.idempotencyKey ?? initialized.id
+          ),
+        });
+
+        return {
+          checkoutSession: await this.checkoutService.markCheckoutSessionOpen(
+            initialized.id,
+            checkoutSession,
+            metadata
+          ),
+        };
+      } catch (error) {
+        await this.checkoutService
+          .markCheckoutSessionFailed(initialized.id, error)
+          .catch((markError) => {
+            logger.warn('Failed to mark Stripe checkout session as failed', {
+              environment: input.environment,
+              checkoutSessionId: initialized.id,
+              error: markError instanceof Error ? markError.message : String(markError),
+            });
+          });
+        throw error;
+      }
     });
   }
 
@@ -457,9 +492,7 @@ export class PaymentService {
   }
 
   private async resolveCheckoutCustomer(
-    input: CreateCheckoutSessionRequest,
-    provider: StripeProvider,
-    metadata: Record<string, string>
+    input: CreateCheckoutSessionRequest
   ): Promise<string | null> {
     if (!input.subject) {
       return null;
@@ -470,29 +503,7 @@ export class PaymentService {
       return existing.stripeCustomerId;
     }
 
-    const customer = await provider.createCustomer({
-      email: input.customerEmail ?? null,
-      metadata,
-      ...(input.idempotencyKey
-        ? {
-            idempotencyKey: buildStripeIdempotencyKey(
-              input.environment,
-              'customer',
-              input.idempotencyKey
-            ),
-          }
-        : {}),
-    });
-
-    await this.upsertStripeCustomerMapping(
-      input.environment,
-      input.subject,
-      customer,
-      input.customerEmail ?? null,
-      metadata
-    );
-
-    return customer.id;
+    return null;
   }
 
   private async findStripeCustomerMapping(
@@ -511,13 +522,16 @@ export class PaymentService {
     return (result.rows[0] as { stripeCustomerId: string } | undefined) ?? null;
   }
 
-  private async upsertStripeCustomerMapping(
+  private async upsertStripeCustomerMappingFromCheckout(
     environment: StripeEnvironment,
-    subject: BillingSubject,
-    customer: StripeCustomer,
-    customerEmailSnapshot: string | null,
-    metadata: Record<string, string>
-  ): Promise<void> {
+    checkoutSession: StripeCheckoutSession
+  ): Promise<boolean> {
+    const subject = getBillingSubjectFromMetadata(checkoutSession.metadata);
+    const stripeCustomerId = getStripeObjectId(checkoutSession.customer);
+    if (!subject || !stripeCustomerId) {
+      return false;
+    }
+
     await this.getPool().query(
       `INSERT INTO payments.stripe_customer_mappings (
          environment,
@@ -539,12 +553,14 @@ export class PaymentService {
         environment,
         subject.type,
         subject.id,
-        customer.id,
-        customerEmailSnapshot,
-        metadata,
-        customer,
+        stripeCustomerId,
+        checkoutSession.customer_details?.email ?? null,
+        checkoutSession.metadata ?? {},
+        checkoutSession,
       ]
     );
+
+    return true;
   }
 
   private buildStripeMetadata(
@@ -571,22 +587,60 @@ export class PaymentService {
     provider: StripeProvider
   ): Promise<boolean> {
     switch (event.type) {
-      case 'checkout.session.completed':
-        return this.historyService.processCheckoutSessionCompleted(
+      case 'checkout.session.completed': {
+        const checkoutSession = event.data.object as StripeCheckoutSession;
+        const [checkoutRow, mapped, historyHandled] = await Promise.all([
+          this.checkoutService.updateCheckoutSessionFromStripe(
+            environment,
+            checkoutSession,
+            'completed'
+          ),
+          this.upsertStripeCustomerMappingFromCheckout(environment, checkoutSession),
+          this.historyService.processCheckoutSessionCompleted(environment, checkoutSession),
+        ]);
+
+        return Boolean(checkoutRow) || mapped || historyHandled;
+      }
+      case 'checkout.session.async_payment_succeeded': {
+        const checkoutSession = event.data.object as StripeCheckoutSession;
+        const [checkoutRow, mapped, historyHandled] = await Promise.all([
+          this.checkoutService.updateCheckoutSessionFromStripe(
+            environment,
+            checkoutSession,
+            'completed'
+          ),
+          this.upsertStripeCustomerMappingFromCheckout(environment, checkoutSession),
+          this.historyService.processCheckoutSessionCompleted(
+            environment,
+            checkoutSession,
+            'succeeded'
+          ),
+        ]);
+
+        return Boolean(checkoutRow) || mapped || historyHandled;
+      }
+      case 'checkout.session.async_payment_failed': {
+        const checkoutSession = event.data.object as StripeCheckoutSession;
+        const checkoutRow = await this.checkoutService.updateCheckoutSessionFromStripe(
           environment,
-          event.data.object as StripeCheckoutSession
+          checkoutSession,
+          'completed'
         );
-      case 'checkout.session.async_payment_succeeded':
-        return this.historyService.processCheckoutSessionCompleted(
+        const historyHandled = await this.historyService.processCheckoutSessionCompleted(
           environment,
-          event.data.object as StripeCheckoutSession,
-          'succeeded'
-        );
-      case 'checkout.session.async_payment_failed':
-        return this.historyService.processCheckoutSessionCompleted(
-          environment,
-          event.data.object as StripeCheckoutSession,
+          checkoutSession,
           'failed'
+        );
+
+        return Boolean(checkoutRow) || historyHandled;
+      }
+      case 'checkout.session.expired':
+        return Boolean(
+          await this.checkoutService.updateCheckoutSessionFromStripe(
+            environment,
+            event.data.object as StripeCheckoutSession,
+            'expired'
+          )
         );
       case 'invoice.paid':
       case 'invoice.payment_succeeded':
@@ -670,22 +724,5 @@ export class PaymentService {
       : null;
 
     return { paymentIntent, charge, invoice };
-  }
-
-  private normalizeCheckoutSession(
-    checkoutSession: StripeCheckoutSession,
-    environment: StripeEnvironment
-  ): CreateCheckoutSessionResponse['checkoutSession'] {
-    return {
-      environment,
-      stripeCheckoutSessionId: checkoutSession.id,
-      mode: checkoutSession.mode === 'subscription' ? 'subscription' : 'payment',
-      url: checkoutSession.url ?? null,
-      status: checkoutSession.status ?? null,
-      paymentStatus: checkoutSession.payment_status ?? null,
-      stripeCustomerId: getStripeObjectId(checkoutSession.customer),
-      stripePaymentIntentId: getStripeObjectId(checkoutSession.payment_intent),
-      stripeSubscriptionId: getStripeObjectId(checkoutSession.subscription),
-    };
   }
 }

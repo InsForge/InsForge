@@ -30,6 +30,7 @@ describe('payments route schemas', () => {
     expect(paymentsRouteSource.indexOf("'/checkout-sessions'")).toBeLessThan(
       paymentsRouteSource.indexOf('router.use(verifyAdmin)')
     );
+    expect(paymentsRouteSource).toContain('Checkout session creation requires a user token');
   });
 
   it('accepts test, live, and all unified sync targets', () => {

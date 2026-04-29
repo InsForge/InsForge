@@ -103,6 +103,59 @@ CREATE TABLE IF NOT EXISTS payments.stripe_customer_mappings (
 CREATE INDEX IF NOT EXISTS idx_payments_stripe_customer_mappings_environment_subject
   ON payments.stripe_customer_mappings(environment, subject_type, subject_id);
 
+CREATE TABLE IF NOT EXISTS payments.checkout_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  environment TEXT NOT NULL CHECK (environment IN ('test', 'live')),
+  mode TEXT NOT NULL CHECK (mode IN ('payment', 'subscription')),
+  status TEXT NOT NULL DEFAULT 'initialized'
+    CHECK (status IN ('initialized', 'open', 'completed', 'expired', 'failed')),
+  payment_status TEXT
+    CHECK (payment_status IS NULL OR payment_status IN ('paid', 'unpaid', 'no_payment_required')),
+  subject_type TEXT,
+  subject_id TEXT,
+  customer_email_snapshot TEXT,
+  line_items JSONB NOT NULL DEFAULT '[]'::JSONB CHECK (jsonb_typeof(line_items) = 'array'),
+  success_url TEXT NOT NULL,
+  cancel_url TEXT NOT NULL,
+  idempotency_key TEXT,
+  metadata JSONB NOT NULL DEFAULT '{}'::JSONB,
+  stripe_checkout_session_id TEXT,
+  stripe_customer_id TEXT,
+  stripe_payment_intent_id TEXT,
+  stripe_subscription_id TEXT,
+  url TEXT,
+  last_error TEXT,
+  raw JSONB NOT NULL DEFAULT '{}'::JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (environment, stripe_checkout_session_id)
+);
+
+ALTER TABLE payments.checkout_sessions ENABLE ROW LEVEL SECURITY;
+
+GRANT USAGE ON SCHEMA payments TO anon, authenticated, project_admin;
+GRANT INSERT, SELECT ON payments.checkout_sessions TO anon, authenticated, project_admin;
+
+CREATE INDEX IF NOT EXISTS idx_payments_checkout_sessions_environment_status
+  ON payments.checkout_sessions(environment, status);
+
+CREATE INDEX IF NOT EXISTS idx_payments_checkout_sessions_environment_subject
+  ON payments.checkout_sessions(environment, subject_type, subject_id)
+  WHERE subject_type IS NOT NULL
+    AND subject_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_payments_checkout_sessions_environment_customer
+  ON payments.checkout_sessions(environment, stripe_customer_id)
+  WHERE stripe_customer_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_payments_checkout_sessions_environment_stripe_session
+  ON payments.checkout_sessions(environment, stripe_checkout_session_id)
+  WHERE stripe_checkout_session_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_checkout_sessions_environment_idempotency
+  ON payments.checkout_sessions(environment, idempotency_key)
+  WHERE idempotency_key IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS payments.payment_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   environment TEXT NOT NULL CHECK (environment IN ('test', 'live')),
@@ -257,6 +310,11 @@ FOR EACH ROW EXECUTE FUNCTION system.update_updated_at();
 DROP TRIGGER IF EXISTS trg_payments_stripe_customer_mappings_updated_at ON payments.stripe_customer_mappings;
 CREATE TRIGGER trg_payments_stripe_customer_mappings_updated_at
 BEFORE UPDATE ON payments.stripe_customer_mappings
+FOR EACH ROW EXECUTE FUNCTION system.update_updated_at();
+
+DROP TRIGGER IF EXISTS trg_payments_checkout_sessions_updated_at ON payments.checkout_sessions;
+CREATE TRIGGER trg_payments_checkout_sessions_updated_at
+BEFORE UPDATE ON payments.checkout_sessions
 FOR EACH ROW EXECUTE FUNCTION system.update_updated_at();
 
 DROP TRIGGER IF EXISTS trg_payments_payment_history_updated_at ON payments.payment_history;

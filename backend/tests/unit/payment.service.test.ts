@@ -90,6 +90,34 @@ describe('PaymentService', () => {
     lastSyncError: null,
     lastSyncCounts: { products: 1, prices: 1 },
   };
+  const checkoutUser = {
+    id: '00000000-0000-4000-8000-000000000001',
+    email: 'buyer@example.com',
+    role: 'authenticated' as const,
+  };
+  const anonCheckoutUser = {
+    id: '12345678-1234-5678-90ab-cdef12345678',
+    email: 'anon@insforge.com',
+    role: 'anon' as const,
+  };
+  const checkoutSessionRow = {
+    id: '2a22bd54-2e90-4d33-94bd-e1fb59dfb111',
+    environment: 'test',
+    mode: 'subscription',
+    status: 'open',
+    paymentStatus: 'unpaid',
+    subjectType: 'team',
+    subjectId: 'team_123',
+    customerEmailSnapshot: 'buyer@example.com',
+    stripeCheckoutSessionId: 'cs_test_123',
+    stripeCustomerId: 'cus_123',
+    stripePaymentIntentId: null,
+    stripeSubscriptionId: null,
+    url: 'https://checkout.stripe.com/c/pay/cs_test_123',
+    lastError: null,
+    createdAt: new Date('2026-04-28T00:00:00.000Z'),
+    updatedAt: new Date('2026-04-28T00:00:00.000Z'),
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -295,6 +323,7 @@ describe('PaymentService', () => {
         'checkout.session.completed',
         'checkout.session.async_payment_succeeded',
         'checkout.session.async_payment_failed',
+        'checkout.session.expired',
         'invoice.paid',
         'invoice.payment_failed',
         'refund.created',
@@ -390,7 +419,7 @@ describe('PaymentService', () => {
     expect(mockProvider.listSubscriptions).toHaveBeenCalledTimes(1);
   });
 
-  it('recreates existing InsForge-managed Stripe webhooks when saving an environment key', async () => {
+  it('recreates existing InsForge-managed Stripe webhooks even when the stored endpoint URL is stale', async () => {
     const mockClient = {
       query: vi.fn().mockResolvedValue({ rows: [] }),
       release: vi.fn(),
@@ -404,11 +433,21 @@ describe('PaymentService', () => {
       {
         id: 'we_old',
         object: 'webhook_endpoint',
-        url: 'http://localhost:7130/api/webhooks/stripe/test',
+        url: 'https://old.example.com/api/webhooks/stripe/test',
         metadata: {
           managed_by: 'insforge',
           insforge_webhook: 'stripe_payments',
           insforge_environment: 'test',
+        },
+      },
+      {
+        id: 'we_live',
+        object: 'webhook_endpoint',
+        url: 'https://old.example.com/api/webhooks/stripe/live',
+        metadata: {
+          managed_by: 'insforge',
+          insforge_webhook: 'stripe_payments',
+          insforge_environment: 'live',
         },
       },
       {
@@ -421,6 +460,7 @@ describe('PaymentService', () => {
     await PaymentService.getInstance().setStripeSecretKey('test', 'sk_test_newsecret1234');
 
     expect(mockProvider.deleteWebhookEndpoint).toHaveBeenCalledWith('we_old');
+    expect(mockProvider.deleteWebhookEndpoint).not.toHaveBeenCalledWith('we_live');
     expect(mockProvider.deleteWebhookEndpoint).not.toHaveBeenCalledWith('we_developer');
     expect(mockProvider.createWebhookEndpoint).toHaveBeenCalledTimes(1);
   });
@@ -529,6 +569,10 @@ describe('PaymentService', () => {
     );
     expect(mockClient.query).toHaveBeenCalledWith(
       'DELETE FROM payments.payment_history WHERE environment = $1',
+      ['test']
+    );
+    expect(mockClient.query).toHaveBeenCalledWith(
+      'DELETE FROM payments.checkout_sessions WHERE environment = $1',
       ['test']
     );
     expect(mockClient.query).toHaveBeenCalledWith(
@@ -1014,6 +1058,10 @@ describe('PaymentService', () => {
       ['test']
     );
     expect(mockSyncClient.query).toHaveBeenCalledWith(
+      'DELETE FROM payments.checkout_sessions WHERE environment = $1',
+      ['test']
+    );
+    expect(mockSyncClient.query).toHaveBeenCalledWith(
       'DELETE FROM payments.stripe_customer_mappings WHERE environment = $1',
       ['test']
     );
@@ -1342,19 +1390,22 @@ describe('PaymentService', () => {
 
   it('rejects subscription checkout without a billing subject', async () => {
     await expect(
-      PaymentService.getInstance().createCheckoutSession({
-        environment: 'test',
-        mode: 'subscription',
-        lineItems: [{ stripePriceId: 'price_123', quantity: 1 }],
-        successUrl: 'https://example.com/success',
-        cancelUrl: 'https://example.com/cancel',
-      })
+      PaymentService.getInstance().createCheckoutSession(
+        {
+          environment: 'test',
+          mode: 'subscription',
+          lineItems: [{ stripePriceId: 'price_123', quantity: 1 }],
+          successUrl: 'https://example.com/success',
+          cancelUrl: 'https://example.com/cancel',
+        },
+        checkoutUser
+      )
     ).rejects.toThrow(/billing subject/i);
 
     expect(mockProvider.createCheckoutSession).not.toHaveBeenCalled();
   });
 
-  it('creates a Stripe customer mapping before identified checkout', async () => {
+  it('creates an authorized checkout row before identified Stripe checkout', async () => {
     const mockClient = {
       query: vi.fn().mockResolvedValue({ rows: [] }),
       release: vi.fn(),
@@ -1362,7 +1413,7 @@ describe('PaymentService', () => {
     mockPool.connect.mockResolvedValue(mockClient);
     mockPool.query
       .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rowCount: 1, rows: [] });
+      .mockResolvedValueOnce({ rows: [checkoutSessionRow] });
     mockProvider.createCheckoutSession.mockResolvedValueOnce({
       id: 'cs_test_123',
       object: 'checkout.session',
@@ -1376,19 +1427,23 @@ describe('PaymentService', () => {
     });
 
     await expect(
-      PaymentService.getInstance().createCheckoutSession({
-        environment: 'test',
-        mode: 'subscription',
-        lineItems: [{ stripePriceId: 'price_123', quantity: 1 }],
-        successUrl: 'https://example.com/success',
-        cancelUrl: 'https://example.com/cancel',
-        customerEmail: 'buyer@example.com',
-        subject: { type: 'team', id: 'team_123' },
-        metadata: { plan: 'pro' },
-        idempotencyKey: 'checkout-123',
-      })
+      PaymentService.getInstance().createCheckoutSession(
+        {
+          environment: 'test',
+          mode: 'subscription',
+          lineItems: [{ stripePriceId: 'price_123', quantity: 1 }],
+          successUrl: 'https://example.com/success',
+          cancelUrl: 'https://example.com/cancel',
+          customerEmail: 'buyer@example.com',
+          subject: { type: 'team', id: 'team_123' },
+          metadata: { plan: 'pro' },
+          idempotencyKey: 'checkout-123',
+        },
+        checkoutUser
+      )
     ).resolves.toMatchObject({
       checkoutSession: {
+        id: checkoutSessionRow.id,
         environment: 'test',
         stripeCheckoutSessionId: 'cs_test_123',
         mode: 'subscription',
@@ -1396,48 +1451,98 @@ describe('PaymentService', () => {
       },
     });
 
-    expect(mockProvider.createCustomer).toHaveBeenCalledWith({
-      email: 'buyer@example.com',
-      metadata: {
-        plan: 'pro',
-        insforge_checkout_mode: 'subscription',
-        insforge_subject_type: 'team',
-        insforge_subject_id: 'team_123',
-      },
-      idempotencyKey: 'insforge:test:customer:checkout-123',
-    });
-    expect(mockPool.query).toHaveBeenCalledWith(
-      expect.stringMatching(/INSERT INTO payments\.stripe_customer_mappings/i),
-      [
+    expect(mockProvider.createCustomer).not.toHaveBeenCalled();
+    expect(mockClient.query).toHaveBeenCalledWith(
+      expect.stringMatching(/SET LOCAL ROLE authenticated/i)
+    );
+    expect(mockClient.query).toHaveBeenCalledWith(
+      expect.stringMatching(/INSERT INTO payments\.checkout_sessions/i),
+      expect.arrayContaining([
         'test',
+        'subscription',
         'team',
         'team_123',
-        'cus_123',
         'buyer@example.com',
-        {
-          plan: 'pro',
-          insforge_checkout_mode: 'subscription',
-          insforge_subject_type: 'team',
-          insforge_subject_id: 'team_123',
-        },
-        expect.objectContaining({ id: 'cus_123' }),
-      ]
+        JSON.stringify([{ stripePriceId: 'price_123', quantity: 1 }]),
+        'https://example.com/success',
+        'https://example.com/cancel',
+      ])
     );
     expect(mockProvider.createCheckoutSession).toHaveBeenCalledWith({
       mode: 'subscription',
       lineItems: [{ stripePriceId: 'price_123', quantity: 1 }],
       successUrl: 'https://example.com/success',
       cancelUrl: 'https://example.com/cancel',
-      customerId: 'cus_123',
-      customerEmail: null,
+      customerId: null,
+      customerEmail: 'buyer@example.com',
+      clientReferenceId: expect.any(String),
       metadata: {
         plan: 'pro',
         insforge_checkout_mode: 'subscription',
         insforge_subject_type: 'team',
         insforge_subject_id: 'team_123',
+        insforge_checkout_session_id: expect.any(String),
       },
       idempotencyKey: 'insforge:test:checkout_session:checkout-123',
     });
+  });
+
+  it('returns an existing checkout session for matching caller idempotency retries', async () => {
+    const existingCheckoutSessionRow = {
+      ...checkoutSessionRow,
+      id: 'f3478541-f24c-4833-a060-b81691a761ef',
+      stripeCheckoutSessionId: 'cs_existing_123',
+      url: 'https://checkout.stripe.com/c/pay/cs_existing_123',
+    };
+    const mockClient = {
+      query: vi.fn().mockImplementation((sql: string) => {
+        if (/INSERT INTO payments\.checkout_sessions/i.test(sql)) {
+          return Promise.resolve({ rowCount: 0, rows: [] });
+        }
+
+        return Promise.resolve({ rowCount: 1, rows: [] });
+      }),
+      release: vi.fn(),
+    };
+    mockPool.connect.mockResolvedValue(mockClient);
+    mockPool.query.mockResolvedValueOnce({ rows: [existingCheckoutSessionRow] });
+
+    await expect(
+      PaymentService.getInstance().createCheckoutSession(
+        {
+          environment: 'test',
+          mode: 'subscription',
+          lineItems: [{ stripePriceId: 'price_123', quantity: 1 }],
+          successUrl: 'https://example.com/success',
+          cancelUrl: 'https://example.com/cancel',
+          customerEmail: 'buyer@example.com',
+          subject: { type: 'team', id: 'team_123' },
+          idempotencyKey: 'checkout-123',
+        },
+        checkoutUser
+      )
+    ).resolves.toMatchObject({
+      checkoutSession: {
+        id: existingCheckoutSessionRow.id,
+        stripeCheckoutSessionId: 'cs_existing_123',
+      },
+    });
+
+    expect(mockProvider.createCheckoutSession).not.toHaveBeenCalled();
+    expect(mockPool.query).toHaveBeenCalledWith(
+      expect.stringMatching(/FROM payments\.checkout_sessions[\s\S]*idempotency_key = \$2/i),
+      [
+        'test',
+        'checkout-123',
+        'subscription',
+        'team',
+        'team_123',
+        'buyer@example.com',
+        JSON.stringify([{ stripePriceId: 'price_123', quantity: 1 }]),
+        'https://example.com/success',
+        'https://example.com/cancel',
+      ]
+    );
   });
 
   it('reuses an existing Stripe customer mapping for identified checkout', async () => {
@@ -1446,18 +1551,34 @@ describe('PaymentService', () => {
       release: vi.fn(),
     };
     mockPool.connect.mockResolvedValue(mockClient);
-    mockPool.query.mockResolvedValueOnce({
-      rows: [{ stripeCustomerId: 'cus_existing' }],
-    });
+    mockPool.query
+      .mockResolvedValueOnce({
+        rows: [{ stripeCustomerId: 'cus_existing' }],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            ...checkoutSessionRow,
+            id: '0dd01831-1742-4f1f-9622-f2274ca7f6c5',
+            mode: 'payment',
+            subjectType: 'organization',
+            subjectId: 'org_123',
+            stripeCustomerId: 'cus_existing',
+          },
+        ],
+      });
 
-    await PaymentService.getInstance().createCheckoutSession({
-      environment: 'test',
-      mode: 'payment',
-      lineItems: [{ stripePriceId: 'price_123', quantity: 1 }],
-      successUrl: 'https://example.com/success',
-      cancelUrl: 'https://example.com/cancel',
-      subject: { type: 'organization', id: 'org_123' },
-    });
+    await PaymentService.getInstance().createCheckoutSession(
+      {
+        environment: 'test',
+        mode: 'payment',
+        lineItems: [{ stripePriceId: 'price_123', quantity: 1 }],
+        successUrl: 'https://example.com/success',
+        cancelUrl: 'https://example.com/cancel',
+        subject: { type: 'organization', id: 'org_123' },
+      },
+      checkoutUser
+    );
 
     expect(mockProvider.createCustomer).not.toHaveBeenCalled();
     expect(mockProvider.createCheckoutSession).toHaveBeenCalledWith(
@@ -1468,7 +1589,10 @@ describe('PaymentService', () => {
           insforge_checkout_mode: 'payment',
           insforge_subject_type: 'organization',
           insforge_subject_id: 'org_123',
+          insforge_checkout_session_id: expect.any(String),
         },
+        clientReferenceId: expect.any(String),
+        idempotencyKey: expect.stringMatching(/^insforge:test:checkout_session:/),
       })
     );
   });
@@ -1479,15 +1603,30 @@ describe('PaymentService', () => {
       release: vi.fn(),
     };
     mockPool.connect.mockResolvedValue(mockClient);
-
-    await PaymentService.getInstance().createCheckoutSession({
-      environment: 'test',
-      mode: 'payment',
-      lineItems: [{ stripePriceId: 'price_123', quantity: 2 }],
-      successUrl: 'https://example.com/success',
-      cancelUrl: 'https://example.com/cancel',
-      customerEmail: 'anon@example.com',
+    mockPool.query.mockResolvedValueOnce({
+      rows: [
+        {
+          ...checkoutSessionRow,
+          id: '7b98f4d1-880f-4e2a-b9f2-414398e376a1',
+          mode: 'payment',
+          subjectType: null,
+          subjectId: null,
+          customerEmailSnapshot: 'anon@example.com',
+        },
+      ],
     });
+
+    await PaymentService.getInstance().createCheckoutSession(
+      {
+        environment: 'test',
+        mode: 'payment',
+        lineItems: [{ stripePriceId: 'price_123', quantity: 2 }],
+        successUrl: 'https://example.com/success',
+        cancelUrl: 'https://example.com/cancel',
+        customerEmail: 'anon@example.com',
+      },
+      anonCheckoutUser
+    );
 
     expect(mockProvider.createCustomer).not.toHaveBeenCalled();
     expect(mockProvider.createCheckoutSession).toHaveBeenCalledWith({
@@ -1497,12 +1636,48 @@ describe('PaymentService', () => {
       cancelUrl: 'https://example.com/cancel',
       customerId: null,
       customerEmail: 'anon@example.com',
-      metadata: { insforge_checkout_mode: 'payment' },
+      clientReferenceId: expect.any(String),
+      metadata: {
+        insforge_checkout_mode: 'payment',
+        insforge_checkout_session_id: expect.any(String),
+      },
+      idempotencyKey: expect.stringMatching(/^insforge:test:checkout_session:/),
     });
     expect(mockPool.query).not.toHaveBeenCalledWith(
       expect.stringMatching(/payments\.stripe_customer_mappings/i),
       expect.any(Array)
     );
+  });
+
+  it('does not call Stripe when checkout_sessions RLS denies the insert', async () => {
+    const mockClient = {
+      query: vi.fn().mockImplementation((sql: string) => {
+        if (/INSERT INTO payments\.checkout_sessions/i.test(sql)) {
+          return Promise.reject({ code: '42501', message: 'new row violates row-level security' });
+        }
+
+        return Promise.resolve({ rows: [] });
+      }),
+      release: vi.fn(),
+    };
+    mockPool.connect.mockResolvedValue(mockClient);
+
+    await expect(
+      PaymentService.getInstance().createCheckoutSession(
+        {
+          environment: 'test',
+          mode: 'payment',
+          lineItems: [{ stripePriceId: 'price_123', quantity: 1 }],
+          successUrl: 'https://example.com/success',
+          cancelUrl: 'https://example.com/cancel',
+          subject: { type: 'team', id: 'team_123' },
+        },
+        checkoutUser
+      )
+    ).rejects.toThrow(/RLS policies/i);
+
+    expect(mockProvider.createCheckoutSession).not.toHaveBeenCalled();
+    expect(mockProvider.createCustomer).not.toHaveBeenCalled();
   });
 
   it('stores duplicate processed Stripe webhook events without reprocessing', async () => {
@@ -1606,6 +1781,8 @@ describe('PaymentService', () => {
           },
         ],
       })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
@@ -1721,6 +1898,7 @@ describe('PaymentService', () => {
           },
         ],
       })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
         rows: [

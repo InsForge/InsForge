@@ -65,6 +65,41 @@ export const billingSubjectSchema = z
   .strict();
 export type BillingSubject = z.infer<typeof billingSubjectSchema>;
 
+export const checkoutModeSchema = z.enum(['payment', 'subscription']);
+export type CheckoutMode = z.infer<typeof checkoutModeSchema>;
+
+export const checkoutSessionStatusSchema = z.enum([
+  'initialized',
+  'open',
+  'completed',
+  'expired',
+  'failed',
+]);
+export type CheckoutSessionStatus = z.infer<typeof checkoutSessionStatusSchema>;
+
+export const checkoutSessionPaymentStatusSchema = z.enum(['paid', 'unpaid', 'no_payment_required']);
+export type CheckoutSessionPaymentStatus = z.infer<typeof checkoutSessionPaymentStatusSchema>;
+
+export const checkoutSessionSchema = z.object({
+  id: z.string(),
+  environment: stripeEnvironmentSchema,
+  mode: checkoutModeSchema,
+  status: checkoutSessionStatusSchema,
+  paymentStatus: checkoutSessionPaymentStatusSchema.nullable(),
+  subjectType: z.string().nullable(),
+  subjectId: z.string().nullable(),
+  customerEmailSnapshot: z.string().nullable(),
+  stripeCheckoutSessionId: z.string().nullable(),
+  stripeCustomerId: z.string().nullable(),
+  stripePaymentIntentId: z.string().nullable(),
+  stripeSubscriptionId: z.string().nullable(),
+  url: z.string().nullable(),
+  lastError: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type CheckoutSession = z.infer<typeof checkoutSessionSchema>;
+
 export const stripeCustomerMappingSchema = z.object({
   environment: stripeEnvironmentSchema,
   subjectType: z.string(),

@@ -618,6 +618,9 @@ export class PaymentConfigService {
     await client.query('DELETE FROM payments.payment_history WHERE environment = $1', [
       environment,
     ]);
+    await client.query('DELETE FROM payments.checkout_sessions WHERE environment = $1', [
+      environment,
+    ]);
     await client.query('DELETE FROM payments.stripe_customer_mappings WHERE environment = $1', [
       environment,
     ]);
@@ -690,13 +693,10 @@ export class PaymentConfigService {
     endpoint: StripeWebhookEndpoint,
     environment: StripeEnvironment
   ): boolean {
-    const endpointUrl = this.getManagedStripeWebhookUrl(environment);
-
     return (
       endpoint.metadata?.managed_by === MANAGED_WEBHOOK_METADATA.managed_by &&
       endpoint.metadata?.insforge_webhook === MANAGED_WEBHOOK_METADATA.insforge_webhook &&
-      endpoint.metadata?.insforge_environment === environment &&
-      endpoint.url === endpointUrl
+      endpoint.metadata?.insforge_environment === environment
     );
   }
 

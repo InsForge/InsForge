@@ -133,6 +133,7 @@ export interface StripeCheckoutSessionCreateInput {
   cancelUrl: string;
   customerId?: string | null;
   customerEmail?: string | null;
+  clientReferenceId?: string | null;
   metadata?: Record<string, string>;
   idempotencyKey?: string;
 }
@@ -180,6 +181,29 @@ export interface StripePriceRow {
   recurringIntervalCount: number | null;
   metadata: Record<string, string>;
   syncedAt: Date | string;
+}
+
+export type CheckoutSessionStatus = 'initialized' | 'open' | 'completed' | 'expired' | 'failed';
+
+export type CheckoutSessionPaymentStatus = 'paid' | 'unpaid' | 'no_payment_required';
+
+export interface CheckoutSessionRow {
+  id: string;
+  environment: StripeEnvironment;
+  mode: StripeCheckoutMode;
+  status: CheckoutSessionStatus;
+  paymentStatus: CheckoutSessionPaymentStatus | null;
+  subjectType: string | null;
+  subjectId: string | null;
+  customerEmailSnapshot: string | null;
+  stripeCheckoutSessionId: string | null;
+  stripeCustomerId: string | null;
+  stripePaymentIntentId: string | null;
+  stripeSubscriptionId: string | null;
+  url: string | null;
+  lastError: string | null;
+  createdAt: Date | string;
+  updatedAt: Date | string;
 }
 
 export interface StripeWebhookEventRow {

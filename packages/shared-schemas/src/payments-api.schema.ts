@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import {
   billingSubjectSchema,
+  checkoutModeSchema,
+  checkoutSessionSchema,
   paymentHistorySchema,
   stripeConnectionSchema,
   stripeEnvironmentSchema,
@@ -159,8 +161,6 @@ export const deletePaymentProductResponseSchema = z.object({
   deleted: z.boolean(),
 });
 
-export const checkoutModeSchema = z.enum(['payment', 'subscription']);
-
 export const createCheckoutSessionLineItemSchema = z
   .object({
     stripePriceId: z.string().trim().min(1, 'Stripe price id is required'),
@@ -185,18 +185,6 @@ export const createCheckoutSessionRequestSchema = z
     path: ['subject'],
     message: 'Subscription checkout requires a billing subject',
   });
-
-export const checkoutSessionSchema = z.object({
-  environment: stripeEnvironmentSchema,
-  stripeCheckoutSessionId: z.string(),
-  mode: checkoutModeSchema,
-  url: z.string().nullable(),
-  status: z.string().nullable(),
-  paymentStatus: z.string().nullable(),
-  stripeCustomerId: z.string().nullable(),
-  stripePaymentIntentId: z.string().nullable(),
-  stripeSubscriptionId: z.string().nullable(),
-});
 
 export const createCheckoutSessionResponseSchema = z.object({
   checkoutSession: checkoutSessionSchema,
@@ -299,7 +287,6 @@ export type CreatePaymentPriceRequest = z.infer<typeof createPaymentPriceRequest
 export type UpdatePaymentPriceRequest = z.infer<typeof updatePaymentPriceRequestSchema>;
 export type CreateCheckoutSessionLineItem = z.infer<typeof createCheckoutSessionLineItemSchema>;
 export type CreateCheckoutSessionRequest = z.infer<typeof createCheckoutSessionRequestSchema>;
-export type CheckoutSession = z.infer<typeof checkoutSessionSchema>;
 export type CreateCheckoutSessionResponse = z.infer<typeof createCheckoutSessionResponseSchema>;
 export type ListPaymentHistoryRequest = z.infer<typeof listPaymentHistoryRequestSchema>;
 export type ListSubscriptionsRequest = z.infer<typeof listSubscriptionsRequestSchema>;

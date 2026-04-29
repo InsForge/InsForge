@@ -25,6 +25,7 @@ describe('038_create-payments-schema migration', () => {
     expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS payments\.products/i);
     expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS payments\.prices/i);
     expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS payments\.stripe_customer_mappings/i);
+    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS payments\.checkout_sessions/i);
     expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS payments\.payment_history/i);
     expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS payments\.subscriptions/i);
     expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS payments\.subscription_items/i);
@@ -68,6 +69,7 @@ describe('038_create-payments-schema migration', () => {
     expect(sql).toMatch(/UNIQUE \(environment, stripe_price_id\)/i);
     expect(sql).toMatch(/UNIQUE \(environment, subject_type, subject_id\)/i);
     expect(sql).toMatch(/UNIQUE \(environment, stripe_customer_id\)/i);
+    expect(sql).toMatch(/UNIQUE \(environment, stripe_checkout_session_id\)/i);
     expect(sql).toMatch(/UNIQUE \(environment, stripe_subscription_id\)/i);
     expect(sql).toMatch(/UNIQUE \(environment, stripe_subscription_item_id\)/i);
     expect(sql).toMatch(/UNIQUE \(environment, stripe_event_id\)/i);
@@ -110,6 +112,23 @@ describe('038_create-payments-schema migration', () => {
     expect(sql).toMatch(/customer_email_snapshot TEXT/i);
   });
 
+  it('creates checkout sessions as an RLS gate before Stripe checkout', () => {
+    expect(sql).toMatch(
+      /CREATE TABLE IF NOT EXISTS payments\.checkout_sessions[\s\S]*status TEXT NOT NULL DEFAULT 'initialized'\s+CHECK \(status IN \('initialized', 'open', 'completed', 'expired', 'failed'\)\)/i
+    );
+    expect(sql).toMatch(
+      /CREATE TABLE IF NOT EXISTS payments\.checkout_sessions[\s\S]*payment_status TEXT\s+CHECK \(payment_status IS NULL OR payment_status IN \('paid', 'unpaid', 'no_payment_required'\)\)/i
+    );
+    expect(sql).toMatch(
+      /CREATE TABLE IF NOT EXISTS payments\.checkout_sessions[\s\S]*line_items JSONB NOT NULL DEFAULT '\[\]'::JSONB CHECK \(jsonb_typeof\(line_items\) = 'array'\)/i
+    );
+    expect(sql).toMatch(/idempotency_key TEXT/i);
+    expect(sql).toMatch(/ALTER TABLE payments\.checkout_sessions ENABLE ROW LEVEL SECURITY/i);
+    expect(sql).toMatch(
+      /GRANT INSERT, SELECT ON payments\.checkout_sessions TO anon, authenticated, project_admin/i
+    );
+  });
+
   it('allows unmapped subscription rows for existing Stripe syncs', () => {
     expect(sql).toMatch(
       /CREATE TABLE IF NOT EXISTS payments\.subscriptions[\s\S]*subject_type TEXT,/i
@@ -135,6 +154,9 @@ describe('038_create-payments-schema migration', () => {
 
   it('adds useful runtime indexes', () => {
     expect(sql).toMatch(/idx_payments_payment_history_environment_subject/i);
+    expect(sql).toMatch(/idx_payments_checkout_sessions_environment_status/i);
+    expect(sql).toMatch(/idx_payments_checkout_sessions_environment_subject/i);
+    expect(sql).toMatch(/idx_payments_checkout_sessions_environment_idempotency/i);
     expect(sql).toMatch(/idx_payments_payment_history_environment_payment_intent/i);
     expect(sql).toMatch(/idx_payments_payment_history_environment_invoice/i);
     expect(sql).toMatch(/idx_payments_payment_history_environment_refund/i);
@@ -159,12 +181,13 @@ describe('038_create-payments-schema migration', () => {
     expect(sql).toMatch(/CREATE TRIGGER trg_payments_products_updated_at/i);
     expect(sql).toMatch(/CREATE TRIGGER trg_payments_prices_updated_at/i);
     expect(sql).toMatch(/CREATE TRIGGER trg_payments_stripe_customer_mappings_updated_at/i);
+    expect(sql).toMatch(/CREATE TRIGGER trg_payments_checkout_sessions_updated_at/i);
     expect(sql).toMatch(/CREATE TRIGGER trg_payments_payment_history_updated_at/i);
     expect(sql).toMatch(/CREATE TRIGGER trg_payments_subscriptions_updated_at/i);
     expect(sql).toMatch(/CREATE TRIGGER trg_payments_subscription_items_updated_at/i);
     expect(sql).toMatch(/CREATE TRIGGER trg_payments_webhook_events_updated_at/i);
     expect(
       sql.match(/EXECUTE FUNCTION system\.update_updated_at\(\)/gi)?.length
-    ).toBeGreaterThanOrEqual(8);
+    ).toBeGreaterThanOrEqual(9);
   });
 });
