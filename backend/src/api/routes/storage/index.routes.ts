@@ -10,14 +10,18 @@ import {
   createBucketRequestSchema,
   updateBucketRequestSchema,
   updateStorageConfigRequestSchema,
+  createS3AccessKeyRequestSchema,
 } from '@insforge/shared-schemas';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import { AuditService } from '@/services/logs/audit.service.js';
+import { S3AccessKeyService } from '@/services/storage/s3-access-key.service.js';
+import { s3AccessKeyManagementRateLimiter } from '@/api/middlewares/rate-limiters.js';
 
 const router = Router();
 const auditService = AuditService.getInstance();
 const storageConfigService = StorageConfigService.getInstance();
+const s3AccessKeyService = S3AccessKeyService.getInstance();
 
 // Middleware to conditionally apply authentication based on bucket visibility
 const conditionalAuth = async (req: Request, res: Response, next: NextFunction) => {
@@ -619,4 +623,94 @@ router.post(
     }
   }
 );
+// ============================================================================
+// S3 Protocol — Gateway Config + Access Key Management (admin only)
+// Per-IP rate limiting applied across all three access-key endpoints since
+// they mint / revoke long-lived credentials.
+// ============================================================================
+
+// GET /api/storage/s3/config - Return the gateway endpoint + signing region.
+// Endpoint is assembled from VITE_API_BASE_URL (the externally-reachable base
+// URL clients use for this backend) plus the fixed /storage/v1/s3 path. The
+// signing region is the value the SigV4 middleware validates against; clients
+// must sign with exactly this value.
+router.get('/s3/config', verifyAdmin, (_req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const base = (process.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
+    const endpoint = base ? `${base}/storage/v1/s3` : '/storage/v1/s3';
+    const region = process.env.AWS_REGION || 'us-east-2';
+    successResponse(res, { endpoint, region });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/storage/s3/access-keys - Create a new access key. Plaintext secret
+// is returned ONCE in the response and never again.
+router.post(
+  '/s3/access-keys',
+  s3AccessKeyManagementRateLimiter,
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validation = createS3AccessKeyRequestSchema.safeParse(req.body ?? {});
+      if (!validation.success) {
+        throw new AppError(
+          validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.STORAGE_INVALID_PARAMETER
+        );
+      }
+      const result = await s3AccessKeyService.create(validation.data);
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'CREATE_S3_ACCESS_KEY',
+        module: 'STORAGE',
+        details: { accessKeyId: result.accessKeyId },
+        ip_address: req.ip,
+      });
+      successResponse(res, result, 201);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// GET /api/storage/s3/access-keys - List all access keys (no secrets)
+router.get(
+  '/s3/access-keys',
+  s3AccessKeyManagementRateLimiter,
+  verifyAdmin,
+  async (_req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const keys = await s3AccessKeyService.list();
+      successResponse(res, keys);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// DELETE /api/storage/s3/access-keys/:id - Revoke an access key
+router.delete(
+  '/s3/access-keys/:id',
+  s3AccessKeyManagementRateLimiter,
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      await s3AccessKeyService.delete(req.params.id);
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'DELETE_S3_ACCESS_KEY',
+        module: 'STORAGE',
+        details: { id: req.params.id },
+        ip_address: req.ip,
+      });
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 export { router as storageRouter };

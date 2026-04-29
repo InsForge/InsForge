@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import {
   dashboardDeploymentsMenuItem,
+  dashboardDTestDocMenuItem,
+  dashboardDTestInstallMenuItem,
   dashboardSettingsMenuItem,
   dashboardStaticMenuItems,
   type DashboardPrimaryMenuItem,
@@ -10,6 +12,8 @@ import { ExternalLink, PanelLeftOpen, PanelRightOpen } from 'lucide-react';
 import { cn, isInsForgeCloudProject } from '../lib/utils/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import { ProjectSettingsMenuDialog } from '../features/dashboard/components';
+import { getFeatureFlag } from '../lib/analytics/posthog';
+import { useDashboardHost } from '../lib/config/DashboardHostContext';
 
 interface AppSidebarProps extends React.HTMLAttributes<HTMLElement> {
   isCollapsed: boolean;
@@ -21,8 +25,11 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
 
   const isCloud = isInsForgeCloudProject();
+  const host = useDashboardHost();
+  const isDTest = getFeatureFlag('dashboard-v4-experiment') === 'd_test';
+  const isDTestCloud = isDTest && host.mode === 'cloud-hosting';
 
-  // Build main menu items - insert deployments at the end of section 2 for cloud projects
+  // Insert deployments at the end of section 2 for cloud projects.
   const mainMenuItems = useMemo(() => {
     const items = dashboardStaticMenuItems.map((item) => ({ ...item }));
 
@@ -45,12 +52,17 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
     return items;
   }, [isCloud]);
 
-  // Build bottom menu items based on deployment environment
+  // d_test + cloud-hosting prepends Install + Doc above Settings in the
+  // bottom nav. Other shells just show Settings.
   const bottomMenuItems = useMemo(() => {
     const items: DashboardPrimaryMenuItem[] = [];
+    if (isDTestCloud) {
+      items.push({ ...dashboardDTestInstallMenuItem });
+      items.push({ ...dashboardDTestDocMenuItem });
+    }
     items.push({ ...dashboardSettingsMenuItem, onClick: () => setIsSettingsDialogOpen(true) });
     return items;
-  }, []);
+  }, [isDTestCloud]);
 
   // Find which primary menu item matches the current route
   // Items with secondary menus use prefix matching (end: false)
@@ -195,7 +207,11 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
   );
 
   const bottomItemsList = bottomMenuItems ?? [];
-  const useInlineToggle = !isCollapsed && bottomItemsList.length === 1;
+  // When expanded, the toggle button sits inline with the last bottom item
+  // (Settings) so the layout matches Figma regardless of how many items are
+  // above it. When collapsed, the toggle gets its own centered row.
+  const inlineToggleHost =
+    !isCollapsed && bottomItemsList.length > 0 ? bottomItemsList.length - 1 : -1;
 
   return (
     <>
@@ -219,22 +235,22 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
           <div className="flex-1" />
 
           <div className={cn('w-full', isCollapsed ? 'space-y-2' : 'space-y-1.5')}>
-            {useInlineToggle ? (
-              <div className="flex items-center gap-2">
-                <div className="min-w-0 flex-1">
-                  <MenuItem item={bottomItemsList[0]} isBottom />
+            {bottomItemsList.map((item, index) =>
+              index === inlineToggleHost ? (
+                <div key={item.id} className="flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <MenuItem item={item} isBottom />
+                  </div>
+                  <ToggleButton compact />
                 </div>
-                <ToggleButton compact />
+              ) : (
+                <MenuItem key={item.id} item={item} isBottom />
+              )
+            )}
+            {isCollapsed && (
+              <div className="flex justify-center">
+                <ToggleButton />
               </div>
-            ) : (
-              <>
-                {bottomItemsList.map((item) => (
-                  <MenuItem key={item.id} item={item} isBottom />
-                ))}
-                <div className={cn('flex', isCollapsed ? 'justify-center' : 'justify-start')}>
-                  <ToggleButton compact={!isCollapsed} />
-                </div>
-              </>
             )}
           </div>
         </aside>

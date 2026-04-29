@@ -14,12 +14,14 @@ export class FlyProvider implements ComputeProvider {
     return FlyProvider.instance;
   }
 
-  // Configured purely by the presence of FLY_API_TOKEN. No separate
-  // COMPUTE_SERVICES_ENABLED flag — if you've put a token in the env
-  // you've opted in. Cloud-managed mode (CloudComputeProvider) likewise
-  // detects itself implicitly from PROJECT_ID + JWT_SECRET + CLOUD_API_HOST.
+  // Self-hosters must opt in via COMPUTE_SERVICES_ENABLED=true AND set
+  // FLY_API_TOKEN. The flag exists so an operator can preflight a deploy
+  // (FLY_API_TOKEN populated for testing/secrets management) without the
+  // backend actually accepting compute traffic.
+  // Cloud-managed mode (CloudComputeProvider) detects itself implicitly
+  // from PROJECT_ID + JWT_SECRET + CLOUD_API_HOST and bypasses this check.
   isConfigured(): boolean {
-    return !!config.fly.apiToken;
+    return config.fly.enabled && !!config.fly.apiToken;
   }
 
   private headers(): Record<string, string> {

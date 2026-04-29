@@ -41,6 +41,47 @@ describe('CloudComputeProvider', () => {
     expect(result.appId).toBe('ifc-proj-test');
   });
 
+  // Regression: live e2e on prod (project 2163e1eb-...) showed Fly 422
+  // "Validation failed: Name not a valid network name" because the caller
+  // (services.service.ts) used to pass `${projectId}-network` (~44 chars)
+  // which exceeded Fly's network-name validator on stricter orgs. The
+  // service now uses APP_KEY (~8 chars) — these tests pin the wire format.
+  it('createApp forwards network when caller passes a (short) value', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify({ appId: 'ifc-proj-test' }),
+    } as Response);
+
+    const provider = CloudComputeProvider.getInstance();
+    await provider.createApp({
+      name: 'test',
+      network: 'd9byq46t',
+      org: 'unused-in-cloud-mode',
+    });
+
+    const call = fetchMock.mock.calls[0];
+    const sentBody = JSON.parse((call[1] as RequestInit).body as string);
+    expect(sentBody).toEqual({ name: 'test', network: 'd9byq46t' });
+  });
+
+  it('createApp omits network field when caller does not pass one', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify({ appId: 'ifc-proj-test' }),
+    } as Response);
+
+    const provider = CloudComputeProvider.getInstance();
+    await provider.createApp({
+      name: 'test',
+      org: 'unused-in-cloud-mode',
+    });
+
+    const call = fetchMock.mock.calls[0];
+    const sentBody = JSON.parse((call[1] as RequestInit).body as string);
+    expect(sentBody).toEqual({ name: 'test' });
+    expect('network' in sentBody).toBe(false);
+  });
+
   it('throws COMPUTE_CLOUD_UNAVAILABLE on network error', async () => {
     fetchMock.mockRejectedValue(new Error('ECONNREFUSED'));
     const provider = CloudComputeProvider.getInstance();

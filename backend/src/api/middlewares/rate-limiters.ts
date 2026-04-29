@@ -69,6 +69,31 @@ export const sendEmailOTPRateLimiter = rateLimit({
 });
 
 /**
+ * Per-IP rate limiter for S3 access key management endpoints.
+ * These endpoints mint / revoke long-lived credentials, so tight limits
+ * prevent credential spraying or key-churn abuse from a single IP.
+ *
+ * Limits: 20 requests per 15 minutes per IP (shared across POST/GET/DELETE).
+ */
+export const s3AccessKeyManagementRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req: Request, _res: Response, next: NextFunction) => {
+    next(
+      new AppError(
+        'Too many S3 access key management requests from this IP. Please try again in 15 minutes.',
+        429,
+        ERROR_CODES.TOO_MANY_REQUESTS
+      )
+    );
+  },
+  skipSuccessfulRequests: false,
+  skipFailedRequests: false,
+});
+
+/**
  * Per-IP rate limiter for email OTP verification attempts
  * Prevents brute-force code guessing
  *

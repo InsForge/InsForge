@@ -62,7 +62,7 @@ export class DatabaseMigrationService {
         statements,
         created_at AS "createdAt"
       FROM system.custom_migrations
-      ORDER BY version DESC
+      ORDER BY version::numeric DESC
     `);
 
     return {
@@ -98,14 +98,16 @@ export class DatabaseMigrationService {
       const versionResult = await client.query<{
         latestVersion: string | null;
       }>(`
-        SELECT MAX(version) AS "latestVersion"
+        SELECT version AS "latestVersion"
         FROM system.custom_migrations
+        ORDER BY version::numeric DESC
+        LIMIT 1
       `);
 
       const latestVersion = versionResult.rows[0]?.latestVersion ?? null;
       const version = input.version;
 
-      if (latestVersion && version <= latestVersion) {
+      if (latestVersion && BigInt(version) <= BigInt(latestVersion)) {
         throw new AppError(
           'Migration version must be newer than the latest applied migration.',
           409,

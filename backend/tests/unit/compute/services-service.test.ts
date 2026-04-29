@@ -79,6 +79,7 @@ describe('ComputeServicesService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.APP_KEY = 'testkey1';
     service = ComputeServicesService.getInstance();
     mockIsConfigured.mockReturnValue(true);
   });
@@ -159,7 +160,7 @@ describe('ComputeServicesService', () => {
       // Verify Fly calls
       expect(mockCreateApp).toHaveBeenCalledWith({
         name: 'my-api-proj-123',
-        network: 'proj-123-network',
+        network: 'testkey1',
         org: 'test-org',
       });
       expect(mockLaunchMachine).toHaveBeenCalledWith(
@@ -473,7 +474,7 @@ describe('ComputeServicesService', () => {
       // Verify Fly app created
       expect(mockCreateApp).toHaveBeenCalledWith({
         name: 'my-api-proj-123',
-        network: 'proj-123-network',
+        network: 'testkey1',
         org: 'test-org',
       });
 
@@ -554,35 +555,38 @@ describe('ComputeServicesService', () => {
       });
 
       mockCreateApp.mockRejectedValue(new Error('Fly API error (500): internal error'));
+      mockDestroyApp.mockResolvedValue(undefined);
 
       // DELETE cleanup
       mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
 
       await expect(service.prepareForDeploy(input)).rejects.toThrow('Fly API error (500)');
 
+      // Verify Fly-side cleanup so the partially-created app doesn't leak
+      // (regression: previously only the DB row was deleted, leaving the
+      // Fly app orphaned in our org).
+      expect(mockDestroyApp).toHaveBeenCalledWith('my-api-proj-123');
+
       // Verify cleanup DELETE
       const deleteCall = mockQuery.mock.calls[1];
       expect(deleteCall[0]).toContain('DELETE FROM compute.services');
       expect(deleteCall[1]).toEqual([serviceId]);
     });
-  });
 
-  describe('syncAfterDeploy', () => {
-    it('queries Fly for machines and updates DB with machineId and running status', async () => {
-      const serviceId = 'svc-sync-1';
+    it('still rethrows the original Fly error if destroyApp cleanup itself fails', async () => {
+      const serviceId = 'svc-deploy-4';
 
-      // getService query
       mockQuery.mockResolvedValueOnce({
         rows: [
           {
             id: serviceId,
-            project_id: 'proj-123',
-            name: 'my-api',
-            image_url: 'dockerfile',
-            port: 8080,
-            cpu: 'shared-1x',
-            memory: 512,
-            region: 'iad',
+            project_id: input.projectId,
+            name: input.name,
+            image_url: input.imageUrl,
+            port: input.port,
+            cpu: input.cpu,
+            memory: input.memory,
+            region: input.region,
             fly_app_id: 'my-api-proj-123',
             fly_machine_id: null,
             status: 'deploying',
@@ -594,144 +598,25 @@ describe('ComputeServicesService', () => {
         ],
       });
 
-      mockListMachines.mockResolvedValue([
-        { id: 'machine-new-1', state: 'started', region: 'iad' },
-      ]);
+      mockCreateApp.mockRejectedValue(new Error('Fly API error (500): IP allocation failed'));
+      mockDestroyApp.mockRejectedValue(new Error('Fly API error (502): bad gateway'));
 
-      // UPDATE query
-      mockQuery.mockResolvedValueOnce({
-        rows: [
-          {
-            id: serviceId,
-            project_id: 'proj-123',
-            name: 'my-api',
-            image_url: 'dockerfile',
-            port: 8080,
-            cpu: 'shared-1x',
-            memory: 512,
-            region: 'iad',
-            fly_app_id: 'my-api-proj-123',
-            fly_machine_id: 'machine-new-1',
-            status: 'running',
-            endpoint_url: 'https://my-api-proj-123.fly.dev',
-            env_vars_encrypted: null,
-            created_at: '2026-01-01T00:00:00Z',
-            updated_at: '2026-01-01T00:00:00Z',
-          },
-        ],
-      });
-
-      const result = await service.syncAfterDeploy(serviceId);
-
-      expect(mockListMachines).toHaveBeenCalledWith('my-api-proj-123');
-
-      const updateCall = mockQuery.mock.calls[1];
-      expect(updateCall[0]).toContain('UPDATE compute.services');
-      expect(updateCall[1]).toContain('machine-new-1');
-      expect(updateCall[1]).toContain('running');
-
-      expect(result.flyMachineId).toBe('machine-new-1');
-      expect(result.status).toBe('running');
-    });
-
-    it('marks as failed when no machines found', async () => {
-      const serviceId = 'svc-sync-2';
-
-      // getService query
-      mockQuery.mockResolvedValueOnce({
-        rows: [
-          {
-            id: serviceId,
-            project_id: 'proj-123',
-            name: 'my-api',
-            image_url: 'dockerfile',
-            port: 8080,
-            cpu: 'shared-1x',
-            memory: 512,
-            region: 'iad',
-            fly_app_id: 'my-api-proj-123',
-            fly_machine_id: null,
-            status: 'deploying',
-            endpoint_url: 'https://my-api-proj-123.fly.dev',
-            env_vars_encrypted: null,
-            created_at: '2026-01-01T00:00:00Z',
-            updated_at: '2026-01-01T00:00:00Z',
-          },
-        ],
-      });
-
-      mockListMachines.mockResolvedValue([]);
-
-      // UPDATE to failed
+      // DELETE cleanup still runs despite destroyApp failure.
       mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
 
-      // getService for return (after failed update)
-      mockQuery.mockResolvedValueOnce({
-        rows: [
-          {
-            id: serviceId,
-            project_id: 'proj-123',
-            name: 'my-api',
-            image_url: 'dockerfile',
-            port: 8080,
-            cpu: 'shared-1x',
-            memory: 512,
-            region: 'iad',
-            fly_app_id: 'my-api-proj-123',
-            fly_machine_id: null,
-            status: 'failed',
-            endpoint_url: 'https://my-api-proj-123.fly.dev',
-            env_vars_encrypted: null,
-            created_at: '2026-01-01T00:00:00Z',
-            updated_at: '2026-01-01T00:00:00Z',
-          },
-        ],
-      });
+      await expect(service.prepareForDeploy(input)).rejects.toThrow(
+        /IP allocation failed/
+      );
 
-      const result = await service.syncAfterDeploy(serviceId);
-
-      // Verify status set to failed (status is inline in SQL, not a param)
-      const failedCall = mockQuery.mock.calls[1];
-      expect(failedCall[0]).toContain('UPDATE compute.services');
-      expect(failedCall[0]).toContain("'failed'");
-
-      expect(result.status).toBe('failed');
+      // destroyApp was attempted (best effort).
+      expect(mockDestroyApp).toHaveBeenCalledWith('my-api-proj-123');
+      // DB row still cleaned up.
+      const deleteCall = mockQuery.mock.calls[1];
+      expect(deleteCall[0]).toContain('DELETE FROM compute.services');
     });
+  });
 
-    it('throws COMPUTE_SERVICE_NOT_FOUND if the service is deleted concurrently', async () => {
-      const serviceId = 'svc-sync-race';
-
-      // getService query returns the row
-      mockQuery.mockResolvedValueOnce({
-        rows: [
-          {
-            id: serviceId,
-            project_id: 'proj-123',
-            name: 'my-api',
-            image_url: 'dockerfile',
-            port: 8080,
-            cpu: 'shared-1x',
-            memory: 512,
-            region: 'iad',
-            fly_app_id: 'my-api-proj-123',
-            fly_machine_id: null,
-            status: 'deploying',
-            endpoint_url: 'https://my-api-proj-123.fly.dev',
-            env_vars_encrypted: null,
-            created_at: '2026-01-01T00:00:00Z',
-            updated_at: '2026-01-01T00:00:00Z',
-          },
-        ],
-      });
-
-      mockListMachines.mockResolvedValue([{ id: 'machine-1', state: 'started', region: 'iad' }]);
-
-      // UPDATE returns zero rows — service was deleted between getService and UPDATE
-      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
-
-      await expect(service.syncAfterDeploy(serviceId)).rejects.toThrow('Service not found');
-    });
-
+  describe('Fly app name length guard', () => {
     it('throws when projectId is too long to fit in a Fly app name', async () => {
       const longProjectId = 'a'.repeat(60);
       await expect(

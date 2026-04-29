@@ -86,11 +86,17 @@ export class CloudComputeProvider implements ComputeProvider {
     return text ? (JSON.parse(text) as T) : undefined;
   }
 
-  async createApp(params: { name: string; network: string; org: string }) {
-    const result = await this.call<{ appId: string; serviceId?: string }>('POST', '/apps', {
-      name: params.name,
-      network: params.network,
-    });
+  async createApp(params: { name: string; network?: string; org: string }) {
+    // Forward `network` only if the caller passed one. We keep it short
+    // (services.service.ts uses APP_KEY, ~8 chars) so Fly's network-name
+    // validator accepts it. Live e2e on prod (project 2163e1eb-…) showed
+    // the previous long `${projectId}-network` (~44 chars) 422'd as
+    // "Name not a valid network name".
+    const body: Record<string, unknown> = { name: params.name };
+    if (params.network !== undefined) {
+      body.network = params.network;
+    }
+    const result = await this.call<{ appId: string; serviceId?: string }>('POST', '/apps', body);
     return { appId: result?.appId ?? params.name };
   }
 
@@ -128,31 +134,6 @@ export class CloudComputeProvider implements ComputeProvider {
       );
     }
     return { machineId: result.machineId };
-  }
-
-  // Mint a presigned S3 PUT URL the CLI uses to upload source.tgz, plus
-  // the ECR image tag the resulting CodeBuild will produce. The CLI
-  // uploads source directly to S3 — bytes never proxy through OSS or cloud.
-  async issueBuildCreds(appId: string): Promise<{
-    sourceKey: string;
-    uploadUrl: string;
-    imageTag: string;
-    expiresAt: string;
-  }> {
-    const result = await this.call<{
-      sourceKey: string;
-      uploadUrl: string;
-      imageTag: string;
-      expiresAt: string;
-    }>('POST', `/apps/${encodeURIComponent(appId)}/build-creds`);
-    if (!result?.uploadUrl) {
-      throw new AppError(
-        `Cloud compute returned empty build-creds for ${appId}`,
-        502,
-        ERROR_CODES.COMPUTE_PROVIDER_ERROR
-      );
-    }
-    return result;
   }
 
   async updateMachine(params: UpdateMachineParams): Promise<void> {
@@ -216,9 +197,14 @@ export class CloudComputeProvider implements ComputeProvider {
   ): Promise<string> {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
-      const { state } = await this.getMachineStatus(appId, machineId);
-      if (targetStates.includes(state)) {
-        return state;
+      try {
+        const { state } = await this.getMachineStatus(appId, machineId);
+        if (targetStates.includes(state)) {
+          return state;
+        }
+      } catch {
+        // Transient network/cloud blip — keep polling until the deadline
+        // rather than aborting the wait. Mirrors FlyProvider.waitForState.
       }
       await new Promise((r) => setTimeout(r, 1500));
     }

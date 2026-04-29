@@ -28,6 +28,7 @@ interface DashboardHostContextValue {
   ) => Promise<{ success: boolean; instanceType?: string; error?: string }>;
   onUpdateVersion?: () => Promise<void>;
   onRequestUserInfo?: () => Promise<DashboardUserInfo>;
+  onRequestUserApiKey?: () => Promise<string>;
 }
 
 const DashboardHostContext = createContext<DashboardHostContextValue | null>(null);
