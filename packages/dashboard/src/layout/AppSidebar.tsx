@@ -30,8 +30,11 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
   const isDTestCloud = isDTest && host.mode === 'cloud-hosting';
 
   // Insert deployments at the end of section 2 for cloud projects.
+  // Analytics is cloud-only; hide it in self-hosted mode.
   const mainMenuItems = useMemo(() => {
-    const items = dashboardStaticMenuItems.map((item) => ({ ...item }));
+    const items = dashboardStaticMenuItems
+      .filter((item) => isCloud || item.id !== 'analytics')
+      .map((item) => ({ ...item }));
 
     if (isCloud) {
       const aiItemIndex = items.findIndex((item) => item.id === 'ai');
