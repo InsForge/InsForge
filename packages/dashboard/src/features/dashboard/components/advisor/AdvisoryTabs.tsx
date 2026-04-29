@@ -32,9 +32,7 @@ export function AdvisoryTabs({ value, onChange, totalCount, categoryCounts }: Ad
             aria-selected={isActive}
             onClick={() => onChange(tab.value)}
             className={`flex h-8 items-center gap-1.5 rounded px-2 text-sm leading-5 transition-colors ${
-              isActive
-                ? 'bg-toast text-foreground'
-                : 'text-muted-foreground hover:text-foreground'
+              isActive ? 'bg-toast text-foreground' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             {tab.label}
