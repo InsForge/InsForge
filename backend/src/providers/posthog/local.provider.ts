@@ -21,6 +21,16 @@ export class LocalPosthogProvider implements PosthogProvider {
     return this.throwUnsupported();
   }
 
+  async getSummary() {
+    await Promise.resolve();
+    return this.throwUnsupported();
+  }
+
+  async getRecentEvents() {
+    await Promise.resolve();
+    return this.throwUnsupported();
+  }
+
   async disconnect() {
     await Promise.resolve();
     return this.throwUnsupported();

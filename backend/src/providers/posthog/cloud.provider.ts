@@ -6,8 +6,12 @@ import { ERROR_CODES } from '@/types/error-constants.js';
 import {
   posthogConnectionSchema,
   posthogDashboardsResponseSchema,
+  posthogSummarySchema,
+  posthogEventsResponseSchema,
   type PosthogConnection,
   type PosthogDashboardsResponse,
+  type PosthogSummary,
+  type PosthogEventsResponse,
 } from '@insforge/shared-schemas';
 import type { PosthogProvider } from './base.provider.js';
 
@@ -83,6 +87,47 @@ export class CloudPosthogProvider implements PosthogProvider {
       const msg = err instanceof Error ? err.message : 'unknown';
       throw new AppError(
         `Failed to fetch PostHog dashboards: ${msg}`,
+        502,
+        ERROR_CODES.UPSTREAM_FAILURE
+      );
+    }
+  }
+
+  async getSummary(): Promise<PosthogSummary> {
+    try {
+      const { data } = await axios.get(this.url('/posthog/summary'), {
+        headers: this.headers(),
+        timeout: 10000,
+      });
+      return posthogSummarySchema.parse(data);
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err) && err.response?.status === 404) {
+        throw new AppError('PostHog not connected', 404, ERROR_CODES.NOT_FOUND);
+      }
+      const msg = err instanceof Error ? err.message : 'unknown';
+      throw new AppError(
+        `Failed to fetch PostHog summary: ${msg}`,
+        502,
+        ERROR_CODES.UPSTREAM_FAILURE
+      );
+    }
+  }
+
+  async getRecentEvents(limit = 10): Promise<PosthogEventsResponse> {
+    try {
+      const { data } = await axios.get(this.url('/posthog/events'), {
+        headers: this.headers(),
+        timeout: 10000,
+        params: { limit },
+      });
+      return posthogEventsResponseSchema.parse(data);
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err) && err.response?.status === 404) {
+        throw new AppError('PostHog not connected', 404, ERROR_CODES.NOT_FOUND);
+      }
+      const msg = err instanceof Error ? err.message : 'unknown';
+      throw new AppError(
+        `Failed to fetch PostHog events: ${msg}`,
         502,
         ERROR_CODES.UPSTREAM_FAILURE
       );

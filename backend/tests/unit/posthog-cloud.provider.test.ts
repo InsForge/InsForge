@@ -138,6 +138,71 @@ describe('CloudPosthogProvider', () => {
     });
   });
 
+  describe('getSummary', () => {
+    it('parses summary response', async () => {
+      axiosGetMock.mockResolvedValueOnce({
+        data: {
+          todayEvents: 1234,
+          dau24h: 56,
+          totalEvents7d: 8000,
+          topEvents: [{ event: 'pageview', count: 500 }],
+        },
+      });
+      const out = await CloudPosthogProvider.getInstance().getSummary();
+      expect(out.todayEvents).toEqual(1234);
+      expect(out.topEvents[0].event).toEqual('pageview');
+    });
+
+    it('throws AppError with NOT_FOUND on 404', async () => {
+      axiosGetMock.mockRejectedValueOnce(makeAxiosError(404));
+      await expect(CloudPosthogProvider.getInstance().getSummary()).rejects.toMatchObject({
+        statusCode: 404,
+        code: ERROR_CODES.NOT_FOUND,
+      });
+    });
+
+    it('throws AppError with UPSTREAM_FAILURE on network error', async () => {
+      axiosGetMock.mockRejectedValueOnce(new Error('Network Error'));
+      await expect(CloudPosthogProvider.getInstance().getSummary()).rejects.toMatchObject({
+        statusCode: 502,
+        code: ERROR_CODES.UPSTREAM_FAILURE,
+      });
+    });
+  });
+
+  describe('getRecentEvents', () => {
+    it('parses events response with custom limit', async () => {
+      axiosGetMock.mockResolvedValueOnce({
+        data: {
+          next: null,
+          events: [
+            { id: 'e1', event: 'pageview', distinctId: 'u1', timestamp: '2026-04-29T10:00:00Z' },
+          ],
+        },
+      });
+      const out = await CloudPosthogProvider.getInstance().getRecentEvents(5);
+      expect(out.events).toHaveLength(1);
+      expect(out.events[0].event).toEqual('pageview');
+      const call = axiosGetMock.mock.calls[0];
+      expect(call[1].params.limit).toEqual(5);
+    });
+
+    it('default limit is 10', async () => {
+      axiosGetMock.mockResolvedValueOnce({ data: { next: null, events: [] } });
+      await CloudPosthogProvider.getInstance().getRecentEvents();
+      const call = axiosGetMock.mock.calls[0];
+      expect(call[1].params.limit).toEqual(10);
+    });
+
+    it('throws AppError with NOT_FOUND on 404', async () => {
+      axiosGetMock.mockRejectedValueOnce(makeAxiosError(404));
+      await expect(CloudPosthogProvider.getInstance().getRecentEvents()).rejects.toMatchObject({
+        statusCode: 404,
+        code: ERROR_CODES.NOT_FOUND,
+      });
+    });
+  });
+
   describe('disconnect', () => {
     it('issues DELETE to the correct URL', async () => {
       axiosDeleteMock.mockResolvedValueOnce({ status: 204 });

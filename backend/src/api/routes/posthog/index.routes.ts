@@ -37,6 +37,35 @@ posthogRouter.get(
   }
 );
 
+// GET /api/integrations/posthog/summary
+posthogRouter.get(
+  '/summary',
+  verifyUser,
+  async (_req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const data = await service.getSummary();
+      res.json(data);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /api/integrations/posthog/events
+posthogRouter.get(
+  '/events',
+  verifyUser,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const limit = parseInt(String(req.query.limit ?? '10'), 10) || 10;
+      const data = await service.getRecentEvents(limit);
+      res.json(data);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 // DELETE /api/integrations/posthog/connection
 posthogRouter.delete(
   '/connection',
