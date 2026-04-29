@@ -62,6 +62,7 @@ import type {
   UpdatePaymentProductRequest,
   CreateCheckoutSessionRequest,
   CreateCheckoutSessionResponse,
+  CheckoutSession,
   BillingSubject,
   StripeWebhookResponse,
   ListPaymentHistoryRequest,
@@ -290,23 +291,28 @@ export class PaymentService {
 
     return this.withEnvironmentLock(input.environment, async () => {
       const baseMetadata = this.buildStripeMetadata(input.metadata, input.subject, input.mode);
-      const initialized = await this.checkoutService.insertInitializedCheckoutSession(
+      const checkoutRecord = await this.checkoutService.insertInitializedCheckoutSession(
         input,
         baseMetadata,
         user
       );
-      if (initialized.existingCheckoutSession) {
-        return { checkoutSession: initialized.existingCheckoutSession };
+      if (
+        checkoutRecord.existingCheckoutSession &&
+        this.isUsableCheckoutSession(checkoutRecord.existingCheckoutSession)
+      ) {
+        return { checkoutSession: checkoutRecord.existingCheckoutSession };
       }
 
       const metadata = {
         ...baseMetadata,
-        [CHECKOUT_SESSION_METADATA_KEY]: initialized.id,
+        [CHECKOUT_SESSION_METADATA_KEY]: checkoutRecord.id,
       };
 
       try {
         const provider = await this.configService.createStripeProvider(input.environment);
         const customerId = await this.resolveCheckoutCustomer(input);
+        const customerCreation =
+          input.mode === 'payment' && input.subject && !customerId ? 'always' : undefined;
         const checkoutSession = await provider.createCheckoutSession({
           mode: input.mode,
           lineItems: input.lineItems,
@@ -314,35 +320,40 @@ export class PaymentService {
           cancelUrl: input.cancelUrl,
           customerId,
           customerEmail: customerId ? null : input.customerEmail,
-          clientReferenceId: initialized.id,
+          ...(customerCreation ? { customerCreation } : {}),
+          clientReferenceId: checkoutRecord.id,
           metadata,
           idempotencyKey: buildStripeIdempotencyKey(
             input.environment,
             'checkout_session',
-            input.idempotencyKey ?? initialized.id
+            input.idempotencyKey ?? checkoutRecord.id
           ),
         });
 
         return {
           checkoutSession: await this.checkoutService.markCheckoutSessionOpen(
-            initialized.id,
+            checkoutRecord.id,
             checkoutSession,
             metadata
           ),
         };
       } catch (error) {
         await this.checkoutService
-          .markCheckoutSessionFailed(initialized.id, error)
+          .markCheckoutSessionFailed(checkoutRecord.id, error)
           .catch((markError) => {
             logger.warn('Failed to mark Stripe checkout session as failed', {
               environment: input.environment,
-              checkoutSessionId: initialized.id,
+              checkoutSessionId: checkoutRecord.id,
               error: markError instanceof Error ? markError.message : String(markError),
             });
           });
         throw error;
       }
     });
+  }
+
+  private isUsableCheckoutSession(checkoutSession: CheckoutSession): boolean {
+    return Boolean(checkoutSession.stripeCheckoutSessionId && checkoutSession.url);
   }
 
   async handleStripeWebhook(
@@ -537,27 +548,13 @@ export class PaymentService {
          environment,
          subject_type,
          subject_id,
-         stripe_customer_id,
-         customer_email_snapshot,
-         metadata,
-         raw
+         stripe_customer_id
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       VALUES ($1, $2, $3, $4)
        ON CONFLICT (environment, subject_type, subject_id) DO UPDATE SET
          stripe_customer_id = EXCLUDED.stripe_customer_id,
-         customer_email_snapshot = EXCLUDED.customer_email_snapshot,
-         metadata = EXCLUDED.metadata,
-         raw = EXCLUDED.raw,
          updated_at = NOW()`,
-      [
-        environment,
-        subject.type,
-        subject.id,
-        stripeCustomerId,
-        checkoutSession.customer_details?.email ?? null,
-        checkoutSession.metadata ?? {},
-        checkoutSession,
-      ]
+      [environment, subject.type, subject.id, stripeCustomerId]
     );
 
     return true;
@@ -568,6 +565,15 @@ export class PaymentService {
     subject: BillingSubject | undefined,
     checkoutMode?: 'payment' | 'subscription'
   ): Record<string, string> {
+    const reservedKey = Object.keys(metadata ?? {}).find((key) => key.startsWith('insforge_'));
+    if (reservedKey) {
+      throw new AppError(
+        `Metadata key ${reservedKey} is reserved for InsForge`,
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
     const stripeMetadata = { ...(metadata ?? {}) };
     if (checkoutMode) {
       stripeMetadata[CHECKOUT_MODE_METADATA_KEY] = checkoutMode;
@@ -692,7 +698,8 @@ export class PaymentService {
         return (
           await this.subscriptionService.upsertSubscriptionProjection(
             environment,
-            event.data.object as StripeSubscription
+            event.data.object as StripeSubscription,
+            provider
           )
         ).synced;
       default:

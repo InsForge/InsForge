@@ -91,9 +91,6 @@ CREATE TABLE IF NOT EXISTS payments.stripe_customer_mappings (
   subject_type TEXT NOT NULL,
   subject_id TEXT NOT NULL,
   stripe_customer_id TEXT NOT NULL,
-  customer_email_snapshot TEXT,
-  metadata JSONB NOT NULL DEFAULT '{}'::JSONB,
-  raw JSONB NOT NULL DEFAULT '{}'::JSONB,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (environment, subject_type, subject_id),
@@ -113,7 +110,7 @@ CREATE TABLE IF NOT EXISTS payments.checkout_sessions (
     CHECK (payment_status IS NULL OR payment_status IN ('paid', 'unpaid', 'no_payment_required')),
   subject_type TEXT,
   subject_id TEXT,
-  customer_email_snapshot TEXT,
+  customer_email TEXT,
   line_items JSONB NOT NULL DEFAULT '[]'::JSONB CHECK (jsonb_typeof(line_items) = 'array'),
   success_url TEXT NOT NULL,
   cancel_url TEXT NOT NULL,
@@ -199,6 +196,11 @@ CREATE INDEX IF NOT EXISTS idx_payments_payment_history_environment_created
 CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_payment_history_environment_payment_intent
   ON payments.payment_history(environment, stripe_payment_intent_id)
   WHERE stripe_payment_intent_id IS NOT NULL
+    AND type <> 'refund';
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_payment_history_environment_checkout_session
+  ON payments.payment_history(environment, stripe_checkout_session_id)
+  WHERE stripe_checkout_session_id IS NOT NULL
     AND type <> 'refund';
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_payment_history_environment_invoice

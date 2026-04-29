@@ -55,6 +55,10 @@ export const stripeIdempotencyKeySchema = z
   .min(1, 'Idempotency key is required')
   .max(200, 'Idempotency key must be 200 characters or fewer');
 
+function hasNoReservedInsForgeMetadata(metadata: Record<string, string> | undefined) {
+  return !Object.keys(metadata ?? {}).some((key) => key.startsWith('insforge_'));
+}
+
 export const createPaymentProductRequestSchema = z
   .object({
     environment: stripeEnvironmentSchema,
@@ -184,6 +188,10 @@ export const createCheckoutSessionRequestSchema = z
   .refine((value) => value.mode !== 'subscription' || value.subject !== undefined, {
     path: ['subject'],
     message: 'Subscription checkout requires a billing subject',
+  })
+  .refine((value) => hasNoReservedInsForgeMetadata(value.metadata), {
+    path: ['metadata'],
+    message: 'Metadata keys starting with insforge_ are reserved',
   });
 
 export const createCheckoutSessionResponseSchema = z.object({

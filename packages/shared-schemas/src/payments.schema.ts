@@ -88,7 +88,7 @@ export const checkoutSessionSchema = z.object({
   paymentStatus: checkoutSessionPaymentStatusSchema.nullable(),
   subjectType: z.string().nullable(),
   subjectId: z.string().nullable(),
-  customerEmailSnapshot: z.string().nullable(),
+  customerEmail: z.string().nullable(),
   stripeCheckoutSessionId: z.string().nullable(),
   stripeCustomerId: z.string().nullable(),
   stripePaymentIntentId: z.string().nullable(),
@@ -105,8 +105,6 @@ export const stripeCustomerMappingSchema = z.object({
   subjectType: z.string(),
   subjectId: z.string(),
   stripeCustomerId: z.string(),
-  customerEmailSnapshot: z.string().nullable(),
-  metadata: z.record(z.string()),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

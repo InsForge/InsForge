@@ -375,9 +375,41 @@ export class PaymentHistoryService {
     const stripePaymentIntentId = getStripeObjectId(checkoutSession.payment_intent);
     const status =
       statusOverride ?? (checkoutSession.payment_status === 'paid' ? 'succeeded' : 'pending');
+    const conflictTarget = stripePaymentIntentId
+      ? `(environment, stripe_payment_intent_id)
+         WHERE stripe_payment_intent_id IS NOT NULL
+           AND type <> 'refund'`
+      : `(environment, stripe_checkout_session_id)
+         WHERE stripe_checkout_session_id IS NOT NULL
+           AND type <> 'refund'`;
 
     await this.getPool().query(
-      `INSERT INTO payments.payment_history (
+      `WITH updated AS (
+         UPDATE payments.payment_history
+         SET status = $2,
+             subject_type = $3,
+             subject_id = $4,
+             stripe_customer_id = $5,
+             customer_email_snapshot = $6,
+             stripe_checkout_session_id = $7,
+             stripe_payment_intent_id = COALESCE($8, stripe_payment_intent_id),
+             stripe_subscription_id = $9,
+             amount = $10,
+             currency = $11,
+             description = $12,
+             paid_at = $13,
+             stripe_created_at = $14,
+             raw = $15,
+             updated_at = NOW()
+         WHERE environment = $1
+           AND type <> 'refund'
+           AND (
+             stripe_checkout_session_id = $7
+             OR ($8::TEXT IS NOT NULL AND stripe_payment_intent_id = $8)
+           )
+         RETURNING id
+       )
+       INSERT INTO payments.payment_history (
          environment,
          type,
          status,
@@ -395,10 +427,9 @@ export class PaymentHistoryService {
          stripe_created_at,
          raw
        )
-       VALUES ($1, 'one_time_payment', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-       ON CONFLICT (environment, stripe_payment_intent_id)
-         WHERE stripe_payment_intent_id IS NOT NULL
-           AND type <> 'refund'
+       SELECT $1, 'one_time_payment', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
+       WHERE NOT EXISTS (SELECT 1 FROM updated)
+       ON CONFLICT ${conflictTarget}
        DO UPDATE SET
          status = EXCLUDED.status,
          subject_type = EXCLUDED.subject_type,

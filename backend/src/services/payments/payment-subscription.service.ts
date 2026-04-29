@@ -135,7 +135,7 @@ export class PaymentSubscriptionService {
     let unmapped = 0;
 
     for (const subscription of subscriptions) {
-      const result = await this.upsertSubscriptionProjection(environment, subscription);
+      const result = await this.upsertSubscriptionProjection(environment, subscription, provider);
       if (result.synced) {
         synced += 1;
       }
@@ -159,7 +159,8 @@ export class PaymentSubscriptionService {
 
   async upsertSubscriptionProjection(
     environment: StripeEnvironment,
-    subscription: StripeSubscription
+    subscription: StripeSubscription,
+    provider?: StripeProvider
   ): Promise<SubscriptionProjectionResult> {
     const stripeCustomerId = getStripeObjectId(subscription.customer);
     if (!stripeCustomerId) {
@@ -172,8 +173,8 @@ export class PaymentSubscriptionService {
       stripeCustomerId
     );
 
+    const subscriptionItems = await this.resolveSubscriptionItems(subscription, provider);
     const client = await this.getPool().connect();
-    const subscriptionItems = subscription.items?.data ?? [];
 
     try {
       await client.query('BEGIN');
@@ -222,8 +223,8 @@ export class PaymentSubscriptionService {
           subject?.type ?? null,
           subject?.id ?? null,
           subscription.status,
-          fromStripeTimestamp(this.getSubscriptionCurrentPeriodStart(subscription)),
-          fromStripeTimestamp(this.getSubscriptionCurrentPeriodEnd(subscription)),
+          fromStripeTimestamp(this.getSubscriptionCurrentPeriodStart(subscriptionItems)),
+          fromStripeTimestamp(this.getSubscriptionCurrentPeriodEnd(subscriptionItems)),
           subscription.cancel_at_period_end,
           fromStripeTimestamp(subscription.cancel_at),
           fromStripeTimestamp(subscription.canceled_at),
@@ -332,6 +333,18 @@ export class PaymentSubscriptionService {
     );
   }
 
+  private async resolveSubscriptionItems(
+    subscription: StripeSubscription,
+    provider?: StripeProvider
+  ): Promise<StripeSubscriptionItem[]> {
+    const embeddedItems = subscription.items?.data ?? [];
+    if (!provider || subscription.items?.has_more !== true) {
+      return embeddedItems;
+    }
+
+    return provider.listSubscriptionItems(subscription.id);
+  }
+
   private async resolveSubscriptionSubject(
     environment: StripeEnvironment,
     subscription: StripeSubscription,
@@ -417,16 +430,16 @@ export class PaymentSubscriptionService {
     };
   }
 
-  private getSubscriptionCurrentPeriodStart(subscription: StripeSubscription): number | null {
-    const starts = subscription.items.data
+  private getSubscriptionCurrentPeriodStart(items: StripeSubscriptionItem[]): number | null {
+    const starts = items
       .map((item) => item.current_period_start)
       .filter((value): value is number => typeof value === 'number');
 
     return starts.length > 0 ? Math.min(...starts) : null;
   }
 
-  private getSubscriptionCurrentPeriodEnd(subscription: StripeSubscription): number | null {
-    const ends = subscription.items.data
+  private getSubscriptionCurrentPeriodEnd(items: StripeSubscriptionItem[]): number | null {
+    const ends = items
       .map((item) => item.current_period_end)
       .filter((value): value is number => typeof value === 'number');
 

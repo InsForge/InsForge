@@ -96,6 +96,34 @@ describe('StripeProvider', () => {
     });
   });
 
+  it('lists all Stripe subscription items for a subscription', async () => {
+    const client = {
+      accounts: { retrieveCurrent: vi.fn() },
+      products: { list: vi.fn() },
+      prices: { list: vi.fn() },
+      subscriptions: { list: vi.fn() },
+      subscriptionItems: {
+        list: vi.fn().mockReturnValue(
+          createAsyncList([
+            { id: 'si_123', object: 'subscription_item', subscription: 'sub_123' },
+            { id: 'si_456', object: 'subscription_item', subscription: 'sub_123' },
+          ])
+        ),
+      },
+    } as unknown as StripeClient;
+    const provider = new StripeProvider('sk_test_1234567890', 'test', client);
+
+    await expect(provider.listSubscriptionItems('sub_123')).resolves.toEqual([
+      { id: 'si_123', object: 'subscription_item', subscription: 'sub_123' },
+      { id: 'si_456', object: 'subscription_item', subscription: 'sub_123' },
+    ]);
+
+    expect(client.subscriptionItems.list).toHaveBeenCalledWith({
+      limit: 100,
+      subscription: 'sub_123',
+    });
+  });
+
   it('retrieves Stripe objects needed to recover refund context', async () => {
     const invoicePayment = {
       id: 'inpay_123',
@@ -297,6 +325,44 @@ describe('StripeProvider', () => {
       subscription_data: {
         metadata: { insforge_subject_type: 'team', insforge_subject_id: 'team_123' },
       },
+    });
+  });
+
+  it('requests Customer creation for identified one-time Checkout Sessions', async () => {
+    const client = {
+      accounts: { retrieveCurrent: vi.fn() },
+      products: { list: vi.fn() },
+      prices: { list: vi.fn() },
+      customers: { create: vi.fn() },
+      checkout: {
+        sessions: {
+          create: vi.fn().mockResolvedValue({
+            id: 'cs_test_123',
+            object: 'checkout.session',
+            url: 'https://checkout.stripe.com/c/pay/cs_test_123',
+          }),
+        },
+      },
+      webhooks: { constructEvent: vi.fn() },
+    } as unknown as StripeClient;
+    const provider = new StripeProvider('sk_test_1234567890', 'test', client);
+
+    await provider.createCheckoutSession({
+      mode: 'payment',
+      lineItems: [{ stripePriceId: 'price_123', quantity: 1 }],
+      successUrl: 'https://example.com/success',
+      cancelUrl: 'https://example.com/cancel',
+      customerEmail: 'buyer@example.com',
+      customerCreation: 'always',
+    });
+
+    expect(client.checkout.sessions.create).toHaveBeenCalledWith({
+      mode: 'payment',
+      line_items: [{ price: 'price_123', quantity: 1 }],
+      success_url: 'https://example.com/success',
+      cancel_url: 'https://example.com/cancel',
+      customer_email: 'buyer@example.com',
+      customer_creation: 'always',
     });
   });
 

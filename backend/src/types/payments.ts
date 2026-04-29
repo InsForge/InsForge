@@ -27,7 +27,9 @@ export type StripeWebhookEndpointCreateResult = Awaited<
 export type StripeSubscription = AsyncIterableItem<
   ReturnType<StripeInstance['subscriptions']['list']>
 >;
-export type StripeSubscriptionItem = StripeSubscription['items']['data'][number];
+export type StripeSubscriptionItem = AsyncIterableItem<
+  ReturnType<StripeInstance['subscriptionItems']['list']>
+>;
 export type StripePaymentIntent = StripeResourceData<
   Awaited<ReturnType<StripeInstance['paymentIntents']['retrieve']>>
 >;
@@ -53,6 +55,7 @@ export type StripeClient = Pick<
   | 'webhooks'
   | 'webhookEndpoints'
   | 'subscriptions'
+  | 'subscriptionItems'
   | 'paymentIntents'
   | 'charges'
   | 'invoicePayments'
@@ -122,6 +125,7 @@ export interface StripePriceUpdateInput {
 }
 
 export type StripeCheckoutMode = 'payment' | 'subscription';
+export type StripeCheckoutCustomerCreation = 'always' | 'if_required';
 
 export interface StripeCheckoutSessionCreateInput {
   mode: StripeCheckoutMode;
@@ -133,6 +137,7 @@ export interface StripeCheckoutSessionCreateInput {
   cancelUrl: string;
   customerId?: string | null;
   customerEmail?: string | null;
+  customerCreation?: StripeCheckoutCustomerCreation;
   clientReferenceId?: string | null;
   metadata?: Record<string, string>;
   idempotencyKey?: string;
@@ -195,7 +200,7 @@ export interface CheckoutSessionRow {
   paymentStatus: CheckoutSessionPaymentStatus | null;
   subjectType: string | null;
   subjectId: string | null;
-  customerEmailSnapshot: string | null;
+  customerEmail: string | null;
   stripeCheckoutSessionId: string | null;
   stripeCustomerId: string | null;
   stripePaymentIntentId: string | null;

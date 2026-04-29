@@ -102,6 +102,18 @@ describe('038_create-payments-schema migration', () => {
   it('keeps customer mappings generic without foreign keys to app tables', () => {
     expect(sql).toMatch(/subject_type TEXT NOT NULL/i);
     expect(sql).toMatch(/subject_id TEXT NOT NULL/i);
+    expect(sql).toMatch(
+      /CREATE TABLE IF NOT EXISTS payments\.stripe_customer_mappings[\s\S]*stripe_customer_id TEXT NOT NULL[\s\S]*created_at TIMESTAMPTZ NOT NULL DEFAULT NOW\(\)/i
+    );
+    expect(sql).not.toMatch(
+      /CREATE TABLE IF NOT EXISTS payments\.stripe_customer_mappings\s*\([^;]*customer_email_snapshot/i
+    );
+    expect(sql).not.toMatch(
+      /CREATE TABLE IF NOT EXISTS payments\.stripe_customer_mappings\s*\([^;]*metadata JSONB/i
+    );
+    expect(sql).not.toMatch(
+      /CREATE TABLE IF NOT EXISTS payments\.stripe_customer_mappings\s*\([^;]*raw JSONB/i
+    );
     expect(sql).not.toMatch(/REFERENCES public\./i);
     expect(sql).not.toMatch(/REFERENCES auth\./i);
   });
@@ -121,6 +133,12 @@ describe('038_create-payments-schema migration', () => {
     );
     expect(sql).toMatch(
       /CREATE TABLE IF NOT EXISTS payments\.checkout_sessions[\s\S]*line_items JSONB NOT NULL DEFAULT '\[\]'::JSONB CHECK \(jsonb_typeof\(line_items\) = 'array'\)/i
+    );
+    expect(sql).toMatch(
+      /CREATE TABLE IF NOT EXISTS payments\.checkout_sessions[\s\S]*customer_email TEXT/i
+    );
+    expect(sql).not.toMatch(
+      /CREATE TABLE IF NOT EXISTS payments\.checkout_sessions\s*\([^;]*customer_email_snapshot/i
     );
     expect(sql).toMatch(/idempotency_key TEXT/i);
     expect(sql).toMatch(/ALTER TABLE payments\.checkout_sessions ENABLE ROW LEVEL SECURITY/i);
@@ -158,6 +176,7 @@ describe('038_create-payments-schema migration', () => {
     expect(sql).toMatch(/idx_payments_checkout_sessions_environment_subject/i);
     expect(sql).toMatch(/idx_payments_checkout_sessions_environment_idempotency/i);
     expect(sql).toMatch(/idx_payments_payment_history_environment_payment_intent/i);
+    expect(sql).toMatch(/idx_payments_payment_history_environment_checkout_session/i);
     expect(sql).toMatch(/idx_payments_payment_history_environment_invoice/i);
     expect(sql).toMatch(/idx_payments_payment_history_environment_refund/i);
     expect(sql).toMatch(/idx_payments_subscriptions_environment_subject/i);
@@ -167,6 +186,9 @@ describe('038_create-payments-schema migration', () => {
   it('keeps refund rows from conflicting with original payment and invoice rows', () => {
     expect(sql).toMatch(
       /CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_payment_history_environment_payment_intent[\s\S]*WHERE stripe_payment_intent_id IS NOT NULL\s+AND type <> 'refund'/i
+    );
+    expect(sql).toMatch(
+      /CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_payment_history_environment_checkout_session[\s\S]*WHERE stripe_checkout_session_id IS NOT NULL\s+AND type <> 'refund'/i
     );
     expect(sql).toMatch(
       /CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_payment_history_environment_invoice[\s\S]*WHERE stripe_invoice_id IS NOT NULL\s+AND type <> 'refund'/i

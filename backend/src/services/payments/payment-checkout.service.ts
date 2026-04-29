@@ -25,7 +25,7 @@ const CHECKOUT_SESSION_COLUMNS = `
   payment_status AS "paymentStatus",
   subject_type AS "subjectType",
   subject_id AS "subjectId",
-  customer_email_snapshot AS "customerEmailSnapshot",
+  customer_email AS "customerEmail",
   stripe_checkout_session_id AS "stripeCheckoutSessionId",
   stripe_customer_id AS "stripeCustomerId",
   stripe_payment_intent_id AS "stripePaymentIntentId",
@@ -72,6 +72,7 @@ export class PaymentCheckoutService {
     const id = randomUUID();
     const client = await this.getPool().connect();
     let inserted = false;
+    let existingCheckoutSession: CheckoutSession | null = null;
 
     try {
       await client.query('BEGIN');
@@ -85,7 +86,7 @@ export class PaymentCheckoutService {
            status,
            subject_type,
            subject_id,
-           customer_email_snapshot,
+           customer_email,
            line_items,
            success_url,
            cancel_url,
@@ -111,6 +112,9 @@ export class PaymentCheckoutService {
         ]
       );
       inserted = result.rowCount !== 0;
+      if (!inserted) {
+        existingCheckoutSession = await this.findMatchingIdempotentCheckoutSession(client, input);
+      }
       await client.query('COMMIT');
     } catch (error) {
       await client.query('ROLLBACK').catch(() => {});
@@ -121,7 +125,9 @@ export class PaymentCheckoutService {
     }
 
     if (!inserted) {
-      const existingCheckoutSession = await this.findMatchingIdempotentCheckoutSession(input);
+      if (!existingCheckoutSession) {
+        throw new AppError('Checkout session was not created', 500, ERROR_CODES.INTERNAL_ERROR);
+      }
       return { id: existingCheckoutSession.id, existingCheckoutSession };
     }
 
@@ -226,7 +232,7 @@ export class PaymentCheckoutService {
       paymentStatus: row.paymentStatus,
       subjectType: row.subjectType,
       subjectId: row.subjectId,
-      customerEmailSnapshot: row.customerEmailSnapshot,
+      customerEmail: row.customerEmail,
       stripeCheckoutSessionId: row.stripeCheckoutSessionId,
       stripeCustomerId: row.stripeCustomerId,
       stripePaymentIntentId: row.stripePaymentIntentId,
@@ -239,13 +245,14 @@ export class PaymentCheckoutService {
   }
 
   private async findMatchingIdempotentCheckoutSession(
+    client: PoolClient,
     input: CreateCheckoutSessionRequest
   ): Promise<CheckoutSession> {
     if (!input.idempotencyKey) {
       throw new AppError('Checkout session was not created', 500, ERROR_CODES.INTERNAL_ERROR);
     }
 
-    const result = await this.getPool().query(
+    const result = await client.query(
       `SELECT ${CHECKOUT_SESSION_COLUMNS}
        FROM payments.checkout_sessions
        WHERE environment = $1
@@ -253,7 +260,7 @@ export class PaymentCheckoutService {
          AND mode = $3
          AND subject_type IS NOT DISTINCT FROM $4
          AND subject_id IS NOT DISTINCT FROM $5
-         AND customer_email_snapshot IS NOT DISTINCT FROM $6
+         AND customer_email IS NOT DISTINCT FROM $6
          AND line_items = $7::JSONB
          AND success_url = $8
          AND cancel_url = $9

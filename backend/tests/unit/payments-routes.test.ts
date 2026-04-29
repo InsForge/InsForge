@@ -204,6 +204,22 @@ describe('payments route schemas', () => {
     });
   });
 
+  it('rejects caller-provided InsForge-reserved checkout metadata', () => {
+    expect(() =>
+      createCheckoutSessionRequestSchema.parse({
+        environment: 'test',
+        mode: 'payment',
+        lineItems: [{ stripePriceId: 'price_123' }],
+        successUrl: 'https://example.com/success',
+        cancelUrl: 'https://example.com/cancel',
+        metadata: {
+          insforge_subject_type: 'team',
+          insforge_subject_id: 'team_victim',
+        },
+      })
+    ).toThrow(/reserved/i);
+  });
+
   it('requires subscription checkout sessions to specify a billing subject', () => {
     expect(() =>
       createCheckoutSessionRequestSchema.parse({

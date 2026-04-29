@@ -20,6 +20,7 @@ import type {
   StripeProductDeleteResult,
   StripeProductUpdateInput,
   StripeSubscription,
+  StripeSubscriptionItem,
   StripeSyncSnapshot,
   StripeWebhookEndpoint,
   StripeWebhookEndpointCreateResult,
@@ -39,6 +40,7 @@ type StripeCheckoutSessionCreateParams = Parameters<
   StripeClient['checkout']['sessions']['create']
 >[0];
 type StripeSubscriptionListParams = Parameters<StripeClient['subscriptions']['list']>[0];
+type StripeSubscriptionItemListParams = Parameters<StripeClient['subscriptionItems']['list']>[0];
 type StripeWebhookEndpointCreateParams = Parameters<StripeClient['webhookEndpoints']['create']>[0];
 type StripeInvoicePaymentListParams = Parameters<StripeClient['invoicePayments']['list']>[0];
 type StripeWebhookEndpointEnabledEvent =
@@ -150,6 +152,10 @@ export class StripeProvider {
       params.customer_email = input.customerEmail;
     }
 
+    if (input.customerCreation !== undefined) {
+      params.customer_creation = input.customerCreation;
+    }
+
     if (input.clientReferenceId !== undefined && input.clientReferenceId !== null) {
       params.client_reference_id = input.clientReferenceId;
     }
@@ -240,6 +246,20 @@ export class StripeProvider {
     }
 
     return subscriptions;
+  }
+
+  async listSubscriptionItems(subscriptionId: string): Promise<StripeSubscriptionItem[]> {
+    const items: StripeSubscriptionItem[] = [];
+    const params: StripeSubscriptionItemListParams = {
+      limit: 100,
+      subscription: subscriptionId,
+    };
+
+    for await (const item of this.client.subscriptionItems.list(params)) {
+      items.push(item);
+    }
+
+    return items;
   }
 
   async listProducts(): Promise<StripeProduct[]> {
