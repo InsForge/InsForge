@@ -80,6 +80,7 @@ export enum ERROR_CODES {
   FORBIDDEN = 'FORBIDDEN',
   RATE_LIMITED = 'RATE_LIMITED',
   NOT_IMPLEMENTED = 'NOT_IMPLEMENTED',
+  UPSTREAM_FAILURE = 'UPSTREAM_FAILURE',
 }
 
 // Next actions - what the user should do
