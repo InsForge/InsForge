@@ -23,3 +23,5 @@ export * from './deployments.schema.js';
 export * from './deployments-api.schema.js';
 export * from './schedules.schema.js';
 export * from './schedules-api.schema.js';
+export * from './posthog.schema.js';
+export * from './posthog-api.schema.js';
