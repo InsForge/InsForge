@@ -115,6 +115,19 @@ export const instanceTypeChangeResultEventSchema = z.object({
   error: z.string().optional(),
 });
 
+export const posthogConnectionStatusEventSchema = z.object({
+  type: z.literal('POSTHOG_CONNECTION_STATUS'),
+  status: z.enum(['connected', 'error', 'cancelled']),
+  reason: z.string().optional(),
+  timestamp: z.number(),
+});
+
+export const posthogConnectRequestEventSchema = z.object({
+  type: z.literal('POSTHOG_CONNECT_REQUEST'),
+  projectId: z.string(),
+  timestamp: z.number(),
+});
+
 export const cloudEventSchema = z.discriminatedUnion('type', [
   appRouteChangeEventSchema,
   authSuccessEventSchema,
@@ -135,6 +148,8 @@ export const cloudEventSchema = z.discriminatedUnion('type', [
   instanceInfoEventSchema,
   requestInstanceTypeChangeEventSchema,
   instanceTypeChangeResultEventSchema,
+  posthogConnectionStatusEventSchema,
+  posthogConnectRequestEventSchema,
 ]);
 
 export type AppRouteChangeEvent = z.infer<typeof appRouteChangeEventSchema>;
@@ -155,3 +170,5 @@ export type RequestInstanceInfoEvent = z.infer<typeof requestInstanceInfoEventSc
 export type InstanceInfoEvent = z.infer<typeof instanceInfoEventSchema>;
 export type RequestInstanceTypeChangeEvent = z.infer<typeof requestInstanceTypeChangeEventSchema>;
 export type InstanceTypeChangeResultEvent = z.infer<typeof instanceTypeChangeResultEventSchema>;
+export type PosthogConnectionStatusEvent = z.infer<typeof posthogConnectionStatusEventSchema>;
+export type PosthogConnectRequestEvent = z.infer<typeof posthogConnectRequestEventSchema>;
