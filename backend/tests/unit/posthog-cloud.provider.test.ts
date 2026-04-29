@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import jwt from 'jsonwebtoken';
-import { AppError } from '../../src/api/middlewares/error';
 import { ERROR_CODES } from '../../src/types/error-constants';
 
 const apiHost = 'https://cloud.test.insforge.dev';
@@ -14,11 +13,16 @@ vi.mock('../../src/infra/config/app.config', () => ({
   },
 }));
 
+interface MockAxiosError extends Error {
+  __isAxiosError: true;
+  response: { status: number; data: { error: string } };
+}
+
 // Axios mock factory — must be hoisted
 const axiosGetMock = vi.fn();
 const axiosDeleteMock = vi.fn();
 const axiosIsAxiosError = vi.fn((err: unknown) => {
-  return (err as any)?.__isAxiosError === true;
+  return (err as { __isAxiosError?: boolean })?.__isAxiosError === true;
 });
 
 vi.mock('axios', () => {
@@ -31,8 +35,8 @@ vi.mock('axios', () => {
   };
 });
 
-function makeAxiosError(status: number) {
-  const err: any = new Error(`Request failed with status code ${status}`);
+function makeAxiosError(status: number): MockAxiosError {
+  const err = new Error(`Request failed with status code ${status}`) as MockAxiosError;
   err.__isAxiosError = true;
   err.response = { status, data: { error: 'test' } };
   return err;
