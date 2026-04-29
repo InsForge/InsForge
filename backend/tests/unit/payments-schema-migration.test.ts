@@ -15,6 +15,11 @@ describe('038_create-payments-schema migration', () => {
     expect(fs.existsSync(migrationPath)).toBe(true);
   });
 
+  it('labels the migration with the matching version number', () => {
+    expect(sql).toMatch(/^-- Migration 038:/);
+    expect(sql).not.toMatch(/^-- Migration 036:/);
+  });
+
   it('creates the payments catalog and runtime tables', () => {
     expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS payments\.stripe_connections/i);
     expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS payments\.products/i);
@@ -135,6 +140,18 @@ describe('038_create-payments-schema migration', () => {
     expect(sql).toMatch(/idx_payments_payment_history_environment_refund/i);
     expect(sql).toMatch(/idx_payments_subscriptions_environment_subject/i);
     expect(sql).toMatch(/idx_payments_webhook_events_environment_status/i);
+  });
+
+  it('keeps refund rows from conflicting with original payment and invoice rows', () => {
+    expect(sql).toMatch(
+      /CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_payment_history_environment_payment_intent[\s\S]*WHERE stripe_payment_intent_id IS NOT NULL\s+AND type <> 'refund'/i
+    );
+    expect(sql).toMatch(
+      /CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_payment_history_environment_invoice[\s\S]*WHERE stripe_invoice_id IS NOT NULL\s+AND type <> 'refund'/i
+    );
+    expect(sql).toMatch(
+      /CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_payment_history_environment_refund[\s\S]*WHERE stripe_refund_id IS NOT NULL/i
+    );
   });
 
   it('adds updated_at triggers for all payments tables', () => {

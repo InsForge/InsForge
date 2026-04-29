@@ -244,9 +244,10 @@ describe('PaymentService', () => {
       release: vi.fn(),
     };
     mockPool.connect.mockResolvedValue(mockClient);
+    mockGetSecretByKey.mockResolvedValue(null);
     mockPool.query
       .mockResolvedValueOnce({
-        rows: [{ stripeAccountId: 'acct_123', hasPaymentRows: true }],
+        rows: [{ stripeAccountId: 'acct_123' }],
       })
       .mockResolvedValueOnce({ rows: [connectedTestConnectionRow] })
       .mockResolvedValueOnce({ rows: [connectedTestConnectionRow] });
@@ -312,9 +313,10 @@ describe('PaymentService', () => {
       release: vi.fn(),
     };
     mockPool.connect.mockResolvedValue(mockClient);
+    mockGetSecretByKey.mockResolvedValue(null);
     mockPool.query
       .mockResolvedValueOnce({
-        rows: [{ stripeAccountId: 'acct_123', hasPaymentRows: false }],
+        rows: [{ stripeAccountId: 'acct_123' }],
       })
       .mockResolvedValueOnce({ rows: [connectedTestConnectionRow] })
       .mockResolvedValueOnce({ rows: [connectedTestConnectionRow] });
@@ -362,8 +364,9 @@ describe('PaymentService', () => {
       release: vi.fn(),
     };
     mockPool.connect.mockResolvedValue(mockClient);
+    mockGetSecretByKey.mockResolvedValue(null);
     mockPool.query.mockResolvedValueOnce({
-      rows: [{ stripeAccountId: 'acct_123', hasPaymentRows: true }],
+      rows: [{ stripeAccountId: 'acct_123' }],
     });
     mockProvider.listWebhookEndpoints.mockResolvedValueOnce([
       {
@@ -390,6 +393,94 @@ describe('PaymentService', () => {
     expect(mockProvider.createWebhookEndpoint).toHaveBeenCalledTimes(1);
   });
 
+  it('skips webhook recreation and sync when saving the same Stripe key', async () => {
+    mockPool.query.mockResolvedValueOnce({
+      rows: [{ stripeAccountId: 'acct_123' }],
+    });
+
+    await PaymentService.getInstance().setStripeSecretKey('test', ' sk_test_1234567890 ');
+
+    expect(mockProvider.retrieveAccount).not.toHaveBeenCalled();
+    expect(mockEncrypt).not.toHaveBeenCalled();
+    expect(mockProvider.listWebhookEndpoints).not.toHaveBeenCalled();
+    expect(mockProvider.createWebhookEndpoint).not.toHaveBeenCalled();
+    expect(mockProvider.syncCatalog).not.toHaveBeenCalled();
+    expect(mockProvider.listSubscriptions).not.toHaveBeenCalled();
+  });
+
+  it('treats a missing stored Stripe account id as unknown and re-syncs', async () => {
+    const mockClient = {
+      query: vi.fn().mockResolvedValue({ rows: [] }),
+      release: vi.fn(),
+    };
+    mockPool.connect.mockResolvedValue(mockClient);
+    mockPool.query
+      .mockResolvedValueOnce({
+        rows: [{ stripeAccountId: null }],
+      })
+      .mockResolvedValueOnce({ rows: [connectedTestConnectionRow] })
+      .mockResolvedValueOnce({ rows: [connectedTestConnectionRow] });
+
+    await PaymentService.getInstance().setStripeSecretKey('test', 'sk_test_1234567890');
+
+    expect(mockProvider.retrieveAccount).toHaveBeenCalledTimes(1);
+    expect(mockProvider.createWebhookEndpoint).toHaveBeenCalledTimes(1);
+    expect(mockClient.query).toHaveBeenCalledWith(
+      'DELETE FROM payments.subscription_items WHERE environment = $1',
+      ['test']
+    );
+    expect(mockClient.query).toHaveBeenCalledWith(
+      'DELETE FROM payments.subscriptions WHERE environment = $1',
+      ['test']
+    );
+    expect(mockClient.query).toHaveBeenCalledWith(
+      'DELETE FROM payments.prices WHERE environment = $1',
+      ['test']
+    );
+    expect(mockClient.query).toHaveBeenCalledWith(
+      'DELETE FROM payments.products WHERE environment = $1',
+      ['test']
+    );
+    expect(mockProvider.syncCatalog).toHaveBeenCalledTimes(1);
+    expect(mockProvider.listSubscriptions).toHaveBeenCalledTimes(1);
+  });
+
+  it('persists rotated keys without recreating webhooks or syncing when the Stripe account is unchanged', async () => {
+    const mockClient = {
+      query: vi.fn().mockResolvedValue({ rows: [] }),
+      release: vi.fn(),
+    };
+    mockPool.connect.mockResolvedValue(mockClient);
+    mockGetSecretByKey.mockResolvedValue('sk_test_oldsecret1234');
+    mockPool.query.mockResolvedValueOnce({
+      rows: [{ stripeAccountId: 'acct_123' }],
+    });
+
+    await PaymentService.getInstance().setStripeSecretKey('test', 'sk_test_rotated1234');
+
+    expect(mockProvider.retrieveAccount).toHaveBeenCalledTimes(1);
+    expect(mockEncrypt).toHaveBeenCalledWith('sk_test_rotated1234');
+    expect(mockProvider.listWebhookEndpoints).not.toHaveBeenCalled();
+    expect(mockProvider.createWebhookEndpoint).not.toHaveBeenCalled();
+    expect(mockProvider.syncCatalog).not.toHaveBeenCalled();
+    expect(mockProvider.listSubscriptions).not.toHaveBeenCalled();
+    expect(mockClient.query).toHaveBeenCalledWith(expect.stringMatching(/system\.secrets/i), [
+      'STRIPE_TEST_SECRET_KEY',
+      'encrypted-secret',
+    ]);
+    expect(mockClient.query).not.toHaveBeenCalledWith(expect.any(String), [
+      'STRIPE_TEST_WEBHOOK_SECRET',
+    ]);
+    expect(mockClient.query).not.toHaveBeenCalledWith(expect.any(String), [
+      'STRIPE_TEST_WEBHOOK_SECRET',
+      'encrypted-secret',
+    ]);
+    expect(mockClient.query).toHaveBeenCalledWith(
+      expect.stringMatching(/UPDATE payments\.stripe_connections/i),
+      ['test', 'acct_123', 'owner@example.com', false, expect.objectContaining({ id: 'acct_123' })]
+    );
+  });
+
   it('clears the environment catalog mirror when a new key points to another Stripe account', async () => {
     const mockClient = {
       query: vi.fn().mockResolvedValue({ rows: [] }),
@@ -404,7 +495,7 @@ describe('PaymentService', () => {
     mockProvider.syncCatalog.mockRejectedValueOnce(new Error('sync failed'));
     mockPool.query
       .mockResolvedValueOnce({
-        rows: [{ stripeAccountId: 'acct_old', hasPaymentRows: true }],
+        rows: [{ stripeAccountId: 'acct_old' }],
       })
       .mockResolvedValueOnce({
         rows: [
@@ -586,7 +677,7 @@ describe('PaymentService', () => {
       .mockResolvedValueOnce(mockSubscriptionsClient);
     mockPool.query
       .mockResolvedValueOnce({
-        rows: [{ stripeAccountId: 'acct_123', hasPaymentRows: true }],
+        rows: [{ stripeAccountId: 'acct_123' }],
       })
       .mockResolvedValueOnce({
         rows: [
@@ -675,7 +766,7 @@ describe('PaymentService', () => {
       .mockResolvedValueOnce(mockSubscriptionsClient);
     mockPool.query
       .mockResolvedValueOnce({
-        rows: [{ stripeAccountId: 'acct_123', hasPaymentRows: false }],
+        rows: [{ stripeAccountId: 'acct_123' }],
       })
       .mockResolvedValueOnce({ rows: [connectedRow] })
       .mockResolvedValueOnce({ rows: [connectedRow] });
@@ -729,7 +820,7 @@ describe('PaymentService', () => {
     });
     mockPool.query
       .mockResolvedValueOnce({
-        rows: [{ stripeAccountId: 'acct_old', hasPaymentRows: true }],
+        rows: [{ stripeAccountId: 'acct_old' }],
       })
       .mockResolvedValueOnce({
         rows: [
@@ -1400,7 +1491,9 @@ describe('PaymentService', () => {
     });
 
     expect(mockPool.query).toHaveBeenCalledWith(
-      expect.stringMatching(/INSERT INTO payments\.payment_history/i),
+      expect.stringMatching(
+        /INSERT INTO payments\.payment_history[\s\S]*ON CONFLICT \(environment, stripe_payment_intent_id\)[\s\S]*AND type <> 'refund'/i
+      ),
       [
         'test',
         'succeeded',
@@ -1501,7 +1594,9 @@ describe('PaymentService', () => {
     ).resolves.toMatchObject({ received: true, handled: true });
 
     expect(mockPool.query).toHaveBeenCalledWith(
-      expect.stringMatching(/INSERT INTO payments\.payment_history/i),
+      expect.stringMatching(
+        /INSERT INTO payments\.payment_history[\s\S]*ON CONFLICT \(environment, stripe_payment_intent_id\)[\s\S]*AND type <> 'refund'/i
+      ),
       [
         'test',
         'failed',
@@ -1632,7 +1727,9 @@ describe('PaymentService', () => {
     ).resolves.toMatchObject({ received: true, handled: true });
 
     expect(mockPool.query).toHaveBeenCalledWith(
-      expect.stringMatching(/INSERT INTO payments\.payment_history/i),
+      expect.stringMatching(
+        /INSERT INTO payments\.payment_history[\s\S]*ON CONFLICT \(environment, stripe_invoice_id\)[\s\S]*AND type <> 'refund'/i
+      ),
       [
         'test',
         'subscription_invoice',
@@ -1741,6 +1838,110 @@ describe('PaymentService', () => {
     );
   });
 
+  it('records InsForge one-time PaymentIntent webhooks with non-refund uniqueness', async () => {
+    mockGetSecretByKey
+      .mockResolvedValueOnce('whsec_test_123')
+      .mockResolvedValueOnce('sk_test_1234567890');
+    mockProvider.constructWebhookEvent.mockReturnValueOnce({
+      id: 'evt_pi_checkout_123',
+      type: 'payment_intent.succeeded',
+      livemode: false,
+      data: {
+        object: {
+          id: 'pi_checkout_123',
+          object: 'payment_intent',
+          amount: 4500,
+          amount_received: 4500,
+          currency: 'usd',
+          created: 1777334400,
+          customer: 'cus_123',
+          latest_charge: 'ch_123',
+          metadata: {
+            insforge_checkout_mode: 'payment',
+            insforge_subject_type: 'team',
+            insforge_subject_id: 'team_123',
+          },
+          receipt_email: 'buyer@example.com',
+          description: 'One-time checkout',
+        },
+      },
+    });
+    mockPool.query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            environment: 'test',
+            stripeEventId: 'evt_pi_checkout_123',
+            eventType: 'payment_intent.succeeded',
+            livemode: false,
+            stripeAccountId: null,
+            objectType: 'payment_intent',
+            objectId: 'pi_checkout_123',
+            processingStatus: 'pending',
+            attemptCount: 1,
+            lastError: null,
+            receivedAt: new Date('2026-04-28T00:00:00.000Z'),
+            processedAt: null,
+            createdAt: new Date('2026-04-28T00:00:00.000Z'),
+            updatedAt: new Date('2026-04-28T00:00:00.000Z'),
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            environment: 'test',
+            stripeEventId: 'evt_pi_checkout_123',
+            eventType: 'payment_intent.succeeded',
+            livemode: false,
+            stripeAccountId: null,
+            objectType: 'payment_intent',
+            objectId: 'pi_checkout_123',
+            processingStatus: 'processed',
+            attemptCount: 1,
+            lastError: null,
+            receivedAt: new Date('2026-04-28T00:00:00.000Z'),
+            processedAt: new Date('2026-04-28T00:00:01.000Z'),
+            createdAt: new Date('2026-04-28T00:00:00.000Z'),
+            updatedAt: new Date('2026-04-28T00:00:01.000Z'),
+          },
+        ],
+      });
+
+    await expect(
+      PaymentService.getInstance().handleStripeWebhook(
+        'test',
+        Buffer.from('{"id":"evt_pi_checkout_123"}'),
+        'sig_123'
+      )
+    ).resolves.toMatchObject({ received: true, handled: true });
+
+    expect(mockPool.query).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /INSERT INTO payments\.payment_history[\s\S]*ON CONFLICT \(environment, stripe_payment_intent_id\)[\s\S]*AND type <> 'refund'/i
+      ),
+      [
+        'test',
+        'one_time_payment',
+        'succeeded',
+        'team',
+        'team_123',
+        'cus_123',
+        'buyer@example.com',
+        'pi_checkout_123',
+        'ch_123',
+        4500,
+        'usd',
+        'One-time checkout',
+        new Date('2026-04-28T00:00:00.000Z'),
+        null,
+        new Date('2026-04-28T00:00:00.000Z'),
+        expect.objectContaining({ id: 'pi_checkout_123' }),
+      ]
+    );
+  });
+
   it('records refund history and copies context from the original payment', async () => {
     mockGetSecretByKey
       .mockResolvedValueOnce('whsec_test_123')
@@ -1832,7 +2033,9 @@ describe('PaymentService', () => {
     ).resolves.toMatchObject({ received: true, handled: true });
 
     expect(mockPool.query).toHaveBeenCalledWith(
-      expect.stringMatching(/INSERT INTO payments\.payment_history/i),
+      expect.stringMatching(
+        /INSERT INTO payments\.payment_history[\s\S]*ON CONFLICT \(environment, stripe_refund_id\)/i
+      ),
       [
         'test',
         'refunded',
@@ -1974,7 +2177,7 @@ describe('PaymentService', () => {
     mockPool.connect.mockResolvedValue(mockClient);
     mockPool.query
       .mockResolvedValueOnce({
-        rows: [{ stripeAccountId: 'acct_123', hasPaymentRows: false }],
+        rows: [{ stripeAccountId: 'acct_123' }],
       })
       .mockResolvedValueOnce({ rows: [connectedTestConnectionRow] })
       .mockResolvedValueOnce({ rows: [] })

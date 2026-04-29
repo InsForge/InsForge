@@ -168,13 +168,24 @@ export class PaymentService {
       const trimmedSecretKey = secretKey.trim();
       validateStripeSecretKey(environment, trimmedSecretKey);
 
+      const existingSecretKey = await this.getStripeSecretKey(environment);
+      const currentStripeAccountId = await this.getCurrentStripeAccountId(environment);
+      if (existingSecretKey === trimmedSecretKey && currentStripeAccountId) {
+        return;
+      }
+
       const provider = new StripeProvider(trimmedSecretKey, environment);
       const account = await provider.retrieveAccount();
       const encryptedValue = EncryptionManager.encrypt(trimmedSecretKey);
-      const shouldClearMirror = await this.shouldClearPaymentMirrorForNewAccount(
-        environment,
-        account.id
-      );
+      const sameConfiguredStripeAccount =
+        !!existingSecretKey && currentStripeAccountId === account.id;
+
+      if (sameConfiguredStripeAccount) {
+        await this.persistSameAccountStripeSecretKey(environment, encryptedValue, account);
+        return;
+      }
+
+      const shouldClearMirror = currentStripeAccountId !== account.id;
       const webhookSetup = await this.tryRecreateManagedStripeWebhook(provider, environment);
 
       await this.persistStripeSecretKey(
@@ -466,40 +477,58 @@ export class PaymentService {
     };
   }
 
-  private async shouldClearPaymentMirrorForNewAccount(
-    environment: StripeEnvironment,
-    stripeAccountId: string
-  ): Promise<boolean> {
+  private async getCurrentStripeAccountId(environment: StripeEnvironment): Promise<string | null> {
     const result = await this.getPool().query(
-      `SELECT
-         connection.stripe_account_id AS "stripeAccountId",
-         (
-           EXISTS (SELECT 1 FROM payments.products WHERE environment = $1)
-           OR EXISTS (SELECT 1 FROM payments.prices WHERE environment = $1)
-           OR EXISTS (SELECT 1 FROM payments.stripe_customer_mappings WHERE environment = $1)
-           OR EXISTS (SELECT 1 FROM payments.payment_history WHERE environment = $1)
-           OR EXISTS (SELECT 1 FROM payments.subscriptions WHERE environment = $1)
-           OR EXISTS (SELECT 1 FROM payments.subscription_items WHERE environment = $1)
-           OR EXISTS (SELECT 1 FROM payments.webhook_events WHERE environment = $1)
-         ) AS "hasPaymentRows"
-       FROM (SELECT $1::TEXT AS environment) selected_environment
-       LEFT JOIN payments.stripe_connections connection
-         ON connection.environment = selected_environment.environment`,
+      `SELECT stripe_account_id AS "stripeAccountId"
+       FROM payments.stripe_connections
+       WHERE environment = $1`,
       [environment]
     );
 
-    const row = result.rows[0] as
-      | { stripeAccountId: string | null; hasPaymentRows: boolean }
-      | undefined;
-    if (!row) {
-      return false;
-    }
+    const row = result.rows[0] as { stripeAccountId: string | null } | undefined;
+    return row?.stripeAccountId ?? null;
+  }
 
-    if (row.stripeAccountId) {
-      return row.stripeAccountId !== stripeAccountId;
-    }
+  private async persistSameAccountStripeSecretKey(
+    environment: StripeEnvironment,
+    encryptedValue: string,
+    account: StripeAccount
+  ): Promise<void> {
+    const client = await this.getPool().connect();
 
-    return row.hasPaymentRows;
+    try {
+      await client.query('BEGIN');
+
+      await client.query(
+        `INSERT INTO system.secrets (key, value_ciphertext, is_active, is_reserved)
+         VALUES ($1, $2, true, true)
+         ON CONFLICT (key) DO UPDATE SET
+           value_ciphertext = EXCLUDED.value_ciphertext,
+           is_active = true,
+           is_reserved = true,
+           updated_at = NOW()`,
+        [SECRET_KEY_BY_ENVIRONMENT[environment], encryptedValue]
+      );
+
+      await client.query(
+        `UPDATE payments.stripe_connections
+         SET stripe_account_id = $2,
+             stripe_account_email = $3,
+             account_livemode = $4,
+             status = 'connected',
+             raw = $5,
+             updated_at = NOW()
+         WHERE environment = $1`,
+        [environment, account.id, account.email ?? null, environment === 'live', account]
+      );
+
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   private async persistStripeSecretKey(
@@ -554,6 +583,9 @@ export class PaymentService {
           [WEBHOOK_SECRET_BY_ENVIRONMENT[environment]]
         );
       }
+
+      const webhookEndpointId = webhookSetup?.endpointId ?? null;
+      const webhookEndpointUrl = webhookSetup?.endpointUrl ?? null;
 
       await client.query(
         `INSERT INTO payments.stripe_connections (
@@ -614,8 +646,8 @@ export class PaymentService {
           account.id,
           account.email ?? null,
           environment === 'live',
-          webhookSetup?.endpointId ?? null,
-          webhookSetup?.endpointUrl ?? null,
+          webhookEndpointId,
+          webhookEndpointUrl,
           account,
           clearMirror,
         ]
@@ -1186,7 +1218,7 @@ export class PaymentService {
   ): Promise<StripeConnection> {
     const snapshot = await provider.syncCatalog();
     const shouldClearMirror = checkAccountChange
-      ? await this.shouldClearPaymentMirrorForNewAccount(environment, snapshot.account.id)
+      ? (await this.getCurrentStripeAccountId(environment)) !== snapshot.account.id
       : false;
 
     await this.writeSnapshot(environment, snapshot, new Date(), shouldClearMirror);
@@ -1938,6 +1970,7 @@ export class PaymentService {
        VALUES ($1, 'one_time_payment', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        ON CONFLICT (environment, stripe_payment_intent_id)
          WHERE stripe_payment_intent_id IS NOT NULL
+           AND type <> 'refund'
        DO UPDATE SET
          status = EXCLUDED.status,
          subject_type = EXCLUDED.subject_type,
@@ -2017,6 +2050,7 @@ export class PaymentService {
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
        ON CONFLICT (environment, stripe_invoice_id)
          WHERE stripe_invoice_id IS NOT NULL
+           AND type <> 'refund'
        DO UPDATE SET
          type = EXCLUDED.type,
          status = EXCLUDED.status,
@@ -2102,6 +2136,7 @@ export class PaymentService {
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
        ON CONFLICT (environment, stripe_payment_intent_id)
          WHERE stripe_payment_intent_id IS NOT NULL
+           AND type <> 'refund'
        DO UPDATE SET
          type = EXCLUDED.type,
          status = EXCLUDED.status,

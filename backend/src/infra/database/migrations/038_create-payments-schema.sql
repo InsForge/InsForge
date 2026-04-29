@@ -1,4 +1,4 @@
--- Migration 036: Create payments schema for Stripe catalog and runtime state.
+-- Migration 038: Create payments schema for Stripe catalog and runtime state.
 --
 -- Stripe remains the source of truth. These tables store the minimal mirror and
 -- runtime projections needed for agents and the dashboard to reason about
@@ -145,11 +145,13 @@ CREATE INDEX IF NOT EXISTS idx_payments_payment_history_environment_created
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_payment_history_environment_payment_intent
   ON payments.payment_history(environment, stripe_payment_intent_id)
-  WHERE stripe_payment_intent_id IS NOT NULL;
+  WHERE stripe_payment_intent_id IS NOT NULL
+    AND type <> 'refund';
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_payment_history_environment_invoice
   ON payments.payment_history(environment, stripe_invoice_id)
-  WHERE stripe_invoice_id IS NOT NULL;
+  WHERE stripe_invoice_id IS NOT NULL
+    AND type <> 'refund';
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_payment_history_environment_refund
   ON payments.payment_history(environment, stripe_refund_id)
