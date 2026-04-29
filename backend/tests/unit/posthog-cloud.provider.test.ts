@@ -146,9 +146,7 @@ describe('CloudPosthogProvider', () => {
 
       expect(axiosDeleteMock).toHaveBeenCalledOnce();
       const callArgs = axiosDeleteMock.mock.calls[0];
-      expect(callArgs[0]).toEqual(
-        `${apiHost}/projects/v1/${projectId}/posthog/connection`
-      );
+      expect(callArgs[0]).toEqual(`${apiHost}/projects/v1/${projectId}/posthog/connection`);
     });
 
     it('throws AppError with UPSTREAM_FAILURE on error', async () => {
