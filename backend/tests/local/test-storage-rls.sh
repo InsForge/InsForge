@@ -229,6 +229,14 @@ bob_del_alice2=$(curl -sS -o /dev/null -w "%{http_code}" -X DELETE \
   "$API/storage/buckets/$BUCKET/objects/a.txt" -H "Authorization: Bearer $BOB_JWT")
 assert_count "Bob DELETE alice's file (DELETE policy unchanged)" "404" "$bob_del_alice2"
 
+# Cross-policy attack regression check. Bob already failed the DELETE above
+# while having visibility — the critical follow-up is that Alice's blob is
+# still on disk. If deleteObject ever regresses to "check visibility, then
+# delete blob, then DB-DELETE", this read would 404 / return empty.
+alice_dl=$(curl -sS -o /dev/null -w "%{http_code}" \
+  "$API/storage/buckets/$BUCKET/objects/a.txt" -H "Authorization: Bearer $ALICE_JWT")
+assert_count "Alice can still download her file (blob untouched)" "200" "$alice_dl"
+
 # Restore the owner SELECT policy for clean teardown
 psql "$DATABASE_URL" >/dev/null <<'SQL'
 DROP POLICY IF EXISTS storage_objects_public_read_test ON storage.objects;

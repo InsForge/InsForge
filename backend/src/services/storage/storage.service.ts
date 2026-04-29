@@ -108,10 +108,11 @@ export class StorageService {
     const baseName = lastDotIndex > 0 ? originalKey.substring(0, lastDotIndex) : originalKey;
     const extension = lastDotIndex > 0 ? originalKey.substring(lastDotIndex) : '';
 
-    // Use efficient SQL query to find the highest existing counter.
-    // Runs through the caller's user-context client, so RLS scopes the
-    // dedup check to keys the caller can actually see — different users
-    // can independently upload `note.txt` without conflict.
+    // Dedup runs on the admin pool so it sees ALL rows, not just those
+    // RLS lets the caller view. Otherwise an RLS-hidden collision would
+    // pass the check and silently overwrite another user's blob — the
+    // (bucket, key) keyspace is globally unique. Two users uploading
+    // `note.txt` get `note.txt` and `note (1).txt` respectively.
     const result = await db.query(
       `
         SELECT key FROM storage.objects
@@ -163,20 +164,14 @@ export class StorageService {
     this.validateBucketName(bucket);
     this.validateKey(originalKey);
 
+    // Admin-pool dedup (sees all rows; avoids silent cross-user blob overwrite).
+    const finalKey = await this.generateNextAvailableKey(bucket, originalKey, this.getPool());
+
     return withUserContext(this.getPool(), ctx, async (db) => {
-      // Generate next available key using (1), (2), (3) pattern if duplicates exist.
-      // RLS scopes the dedup check to keys the caller can actually see, so two
-      // users can independently upload `note.txt` without conflict.
-      const finalKey = await this.generateNextAvailableKey(bucket, originalKey, db);
-
-      // Provider write happens before INSERT. The INSERT's RLS WITH CHECK is
-      // unreachable in practice because uploaded_by is always ctx.userId, which
-      // is the same value the policy reads via auth.jwt() ->> 'sub'. Any
-      // non-RLS INSERT failure (unique conflict, transient DB error) leaves
-      // the blob orphaned on the provider; the rollback only undoes the DB.
-      await this.provider.putObject(bucket, finalKey, file);
-
-      // INSERT is checked against the storage_objects_owner_insert RLS policy.
+      // INSERT before provider write so UNIQUE (bucket, key) catches any
+      // race-window collision before any blob is touched. Provider write
+      // stays inside the transaction — a provider failure throws, the tx
+      // rolls back, and no orphan row remains.
       const result = await db.query(
         `
         INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by, uploaded_via)
@@ -189,6 +184,8 @@ export class StorageService {
       if (!result.rows[0]) {
         throw new Error(`Failed to retrieve upload timestamp for ${bucket}/${finalKey}`);
       }
+
+      await this.provider.putObject(bucket, finalKey, file);
 
       return {
         bucket,
@@ -244,24 +241,26 @@ export class StorageService {
     this.validateBucketName(bucket);
     this.validateKey(key);
 
-    // RLS-gated visibility check, then provider delete OUTSIDE any
-    // transaction (don't hold a pool connection across S3 IO), then
-    // RLS-gated DELETE. Provider must be idempotent on missing keys —
-    // S3 DELETE is, LocalStorageProvider swallows ENOENT.
-    const visible = await this.objectIsVisible(ctx, bucket, key);
-    if (!visible) {
-      return false;
-    }
-
-    await this.provider.deleteObject(bucket, key);
-
-    return withUserContext(this.getPool(), ctx, async (db) => {
+    // DB DELETE first (RLS DELETE policy gates authorization) so a permissive
+    // SELECT + restrictive DELETE policy combo can't be exploited to destroy
+    // other users' blobs. If rowCount=0 the caller had no DELETE permission
+    // (or the row was already gone) — return false without touching storage.
+    // Provider delete then runs outside the tx; failure here leaves an orphan
+    // blob that an external GC sweep can reclaim, but never an orphan row.
+    const deleted = await withUserContext(this.getPool(), ctx, async (db) => {
       const result = await db.query('DELETE FROM storage.objects WHERE bucket = $1 AND key = $2', [
         bucket,
         key,
       ]);
       return (result.rowCount ?? 0) > 0;
     });
+
+    if (!deleted) {
+      return false;
+    }
+
+    await this.provider.deleteObject(bucket, key);
+    return true;
   }
 
   async listObjects(

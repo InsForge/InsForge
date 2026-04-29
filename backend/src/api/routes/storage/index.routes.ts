@@ -1,5 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { verifyAdmin, AuthRequest, verifyUser } from '@/api/middlewares/auth.js';
+import {
+  verifyAdmin,
+  AuthRequest,
+  verifyUser,
+  getUserContextFromReq,
+} from '@/api/middlewares/auth.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { StorageService } from '@/services/storage/storage.service.js';
 import { StorageConfigService } from '@/services/storage/storage-config.service.js';
@@ -18,23 +23,6 @@ import { AuditService } from '@/services/logs/audit.service.js';
 import { S3AccessKeyService } from '@/services/storage/s3-access-key.service.js';
 import { s3AccessKeyManagementRateLimiter } from '@/api/middlewares/rate-limiters.js';
 import { UserContext } from '@/services/db/user-context.service.js';
-
-/**
- * Build a UserContext from the authenticated request. Admin = API key or
- * the project_admin role; everyone else runs as `authenticated` with their
- * `sub` claim plumbed through to RLS.
- */
-function authedContext(req: AuthRequest): UserContext {
-  if (req.apiKey || req.user?.role === 'project_admin') {
-    return { isAdmin: true, role: 'authenticated' };
-  }
-  if (req.user) {
-    return { userId: req.user.id, email: req.user.email, role: 'authenticated' };
-  }
-  // Unauthenticated caller (only reachable via routes that allow anon, e.g.
-  // public-bucket downloads). RLS evaluates against role=anon.
-  return { role: 'anon' };
-}
 
 const router = Router();
 const auditService = AuditService.getInstance();
@@ -270,7 +258,7 @@ router.get(
       const offset = Math.max(0, parseInt(req.query.offset as string) || 0);
 
       const result = await StorageService.getInstance().listObjects(
-        authedContext(req),
+        getUserContextFromReq(req),
         bucketName,
         prefix,
         limit,
@@ -318,7 +306,7 @@ router.put(
       }
 
       const storedFile = await StorageService.getInstance().putObject(
-        authedContext(req),
+        getUserContextFromReq(req),
         bucketName,
         objectKey,
         req.file
@@ -369,7 +357,7 @@ router.post(
       const objectKey = storageService.generateObjectKey(req.file.originalname);
 
       const storedFile = await storageService.putObject(
-        authedContext(req),
+        getUserContextFromReq(req),
         bucketName,
         objectKey,
         req.file
@@ -429,7 +417,7 @@ router.get(
       const ctx: UserContext =
         !authReq.user && !authReq.apiKey
           ? { isAdmin: true, role: 'authenticated' }
-          : authedContext(authReq);
+          : getUserContextFromReq(authReq);
 
       // Get download strategy (service auto-calculates expiry based on bucket visibility)
       const strategy = await storageService.getDownloadStrategy(bucketName, objectKey);
@@ -532,7 +520,7 @@ router.delete(
       }
 
       const deleted = await StorageService.getInstance().deleteObject(
-        authedContext(req),
+        getUserContextFromReq(req),
         bucketName,
         objectKey
       );
@@ -566,7 +554,7 @@ router.post(
       }
 
       const strategy = await StorageService.getInstance().getUploadStrategy(
-        authedContext(req),
+        getUserContextFromReq(req),
         bucketName,
         { filename, contentType, size }
       );
@@ -597,7 +585,7 @@ router.post(
 
       const storageService = StorageService.getInstance();
       const fileInfo = await storageService.confirmUpload(
-        authedContext(req),
+        getUserContextFromReq(req),
         bucketName,
         objectKey,
         {
@@ -655,7 +643,7 @@ router.post(
       const ctx: UserContext =
         !authReq.user && !authReq.apiKey
           ? { isAdmin: true, role: 'authenticated' }
-          : authedContext(authReq);
+          : getUserContextFromReq(authReq);
       const visible = await storageService.objectIsVisible(ctx, bucketName, objectKey);
       if (!visible) {
         throw new AppError('Object not found', 404, ERROR_CODES.NOT_FOUND);
