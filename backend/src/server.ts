@@ -37,6 +37,7 @@ import { initSqlParser } from '@/utils/sql-parser.js';
 import { FunctionService } from '@/services/functions/function.service.js';
 import packageJson from '../../package.json';
 import { schedulesRouter } from '@/api/routes/schedules/index.routes.js';
+import { posthogRouter } from '@/api/routes/posthog/index.routes.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -213,6 +214,7 @@ export async function createApp() {
   apiRouter.use('/email', emailRouter);
   apiRouter.use('/deployments', deploymentsRouter);
   apiRouter.use('/schedules', schedulesRouter);
+  apiRouter.use('/integrations/posthog', posthogRouter);
 
   // Mount all API routes under /api prefix
   app.use('/api', apiRouter);
