@@ -166,6 +166,22 @@ export function BackendAdvisorSection() {
   const reservedItemsHeight =
     hasScan && summaryTotal && summaryTotal > 0 ? summaryTotal * 68 + 64 : 0;
 
+  const summary = latest.data?.summary;
+  const filteredAllCount =
+    summary === undefined
+      ? undefined
+      : allSeveritiesSelected
+        ? summary.total
+        : [...selectedSeverities].reduce((sum, sev) => sum + summary[sev], 0);
+  const matrix = categoryCounts.data;
+  const filteredCategoryCounts: Record<DashboardAdvisorCategory, number> | undefined = matrix
+    ? {
+        security: [...selectedSeverities].reduce((s, sev) => s + matrix.security[sev], 0),
+        performance: [...selectedSeverities].reduce((s, sev) => s + matrix.performance[sev], 0),
+        health: [...selectedSeverities].reduce((s, sev) => s + matrix.health[sev], 0),
+      }
+    : undefined;
+
   // Apply client-side severity filter when needed, then derive pagination.
   const fetchedIssues = issues.data?.issues ?? [];
   const fetchedTotal = issues.data?.total ?? 0;
@@ -236,8 +252,8 @@ export function BackendAdvisorSection() {
         <AdvisoryTabs
           value={tab}
           onChange={setTab}
-          totalCount={summaryTotal}
-          categoryCounts={categoryCounts.data}
+          totalCount={filteredAllCount}
+          categoryCounts={filteredCategoryCounts}
         />
         <div className="flex items-center gap-2">
           <button

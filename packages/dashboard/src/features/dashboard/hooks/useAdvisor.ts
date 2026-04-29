@@ -4,8 +4,14 @@ import type {
   DashboardAdvisorCategory,
   DashboardAdvisorIssuesQuery,
   DashboardAdvisorIssuesResponse,
+  DashboardAdvisorSeverity,
   DashboardAdvisorSummary,
 } from '../../../types';
+
+export type AdvisorCategorySeverityMatrix = Record<
+  DashboardAdvisorCategory,
+  Record<DashboardAdvisorSeverity, number>
+>;
 
 export const ADVISOR_QUERY_KEYS = {
   latest: ['advisor', 'latest'] as const,
@@ -46,25 +52,39 @@ export function useAdvisorIssues(query: DashboardAdvisorIssuesQuery) {
   });
 }
 
+function emptyMatrix(): AdvisorCategorySeverityMatrix {
+  const empty = (): Record<DashboardAdvisorSeverity, number> => ({
+    critical: 0,
+    warning: 0,
+    info: 0,
+  });
+  return { security: empty(), performance: empty(), health: empty() };
+}
+
+const ADVISOR_COUNT_PAGE_SIZE = 100;
+
 export function useAdvisorCategoryCounts() {
   const host = useDashboardHost();
   const fetcher = host.onRequestAdvisorIssues;
-  return useQuery<Record<DashboardAdvisorCategory, number>, Error>({
+  return useQuery<AdvisorCategorySeverityMatrix, Error>({
     queryKey: ADVISOR_QUERY_KEYS.categoryCounts,
     queryFn: async () => {
       if (!fetcher) {
-        return { security: 0, performance: 0, health: 0 };
+        return emptyMatrix();
       }
-      const [security, performance, health] = await Promise.all([
-        fetcher({ category: 'security', limit: 1 }),
-        fetcher({ category: 'performance', limit: 1 }),
-        fetcher({ category: 'health', limit: 1 }),
-      ]);
-      return {
-        security: security.total,
-        performance: performance.total,
-        health: health.total,
-      };
+      const matrix = emptyMatrix();
+      let offset = 0;
+      while (true) {
+        const page = await fetcher({ limit: ADVISOR_COUNT_PAGE_SIZE, offset });
+        for (const issue of page.issues) {
+          matrix[issue.category][issue.severity] += 1;
+        }
+        offset += page.issues.length;
+        if (page.issues.length < ADVISOR_COUNT_PAGE_SIZE || offset >= page.total) {
+          break;
+        }
+      }
+      return matrix;
     },
     enabled: !!fetcher,
     retry: false,
