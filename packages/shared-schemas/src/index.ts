@@ -25,3 +25,5 @@ export * from './schedules.schema.js';
 export * from './schedules-api.schema.js';
 export * from './compute-services.schema.js';
 export * from './compute-services-api.schema.js';
+export * from './posthog.schema.js';
+export * from './posthog-api.schema.js';
