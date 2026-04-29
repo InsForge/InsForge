@@ -1,6 +1,8 @@
 import type {
   GetPosthogConnectionResponse,
   GetPosthogDashboardsResponse,
+  PosthogSummary,
+  PosthogEventsResponse,
 } from '@insforge/shared-schemas';
 import { apiClient } from '../../../lib/api/client';
 
@@ -31,5 +33,18 @@ export const posthogApi = {
       method: 'DELETE',
       headers: apiClient.withAccessToken({}),
     });
+  },
+
+  async getSummary(): Promise<PosthogSummary> {
+    return apiClient.request('/integrations/posthog/summary', {
+      headers: apiClient.withAccessToken({}),
+    }) as Promise<PosthogSummary>;
+  },
+
+  async getRecentEvents(limit = 10): Promise<PosthogEventsResponse> {
+    const params = new URLSearchParams({ limit: String(limit) });
+    return apiClient.request(`/integrations/posthog/events?${params.toString()}`, {
+      headers: apiClient.withAccessToken({}),
+    }) as Promise<PosthogEventsResponse>;
   },
 };
