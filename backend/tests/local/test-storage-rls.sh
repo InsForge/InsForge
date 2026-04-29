@@ -208,6 +208,18 @@ anon_private=$(curl -sS -o /dev/null -w "%{http_code}" \
   "$API/storage/buckets/$BUCKET/objects/a.txt")
 assert_count "Anon GET private bucket → 401" "401" "$anon_private"
 
+# Hidden-key collision regression. Both users upload "shared.txt"; the
+# second upload must auto-rename via dedup (admin-pool scan) instead of
+# silently overwriting Alice's blob in the provider before failing UNIQUE.
+upload "$ALICE_JWT" "$BUCKET" "shared.txt" "ALICE-shared-content" >/dev/null
+bob_shared_resp=$(curl -sS -X PUT "$API/storage/buckets/$BUCKET/objects/shared.txt" \
+  -H "Authorization: Bearer $BOB_JWT" -F "file=@/dev/stdin;filename=shared.txt" <<< "BOB-shared-content")
+bob_shared_key=$(echo "$bob_shared_resp" | grep -oE '"key":"[^"]*' | head -1 | cut -d'"' -f4)
+assert_count "Bob's shared.txt auto-renamed (no silent overwrite)" "shared (1).txt" "$bob_shared_key"
+alice_shared_dl=$(curl -sSL "$API/storage/buckets/$BUCKET/objects/shared.txt" \
+  -H "Authorization: Bearer $ALICE_JWT")
+assert_count "Alice's shared.txt blob untouched" "ALICE-shared-content" "$alice_shared_dl"
+
 # === 2. override SELECT policy → public-read bucket ====================
 
 print_blue "
@@ -220,9 +232,9 @@ CREATE POLICY storage_objects_public_read_test ON storage.objects
   USING (bucket = '$BUCKET');
 SQL
 
-# Without the storage service changing, Alice and Bob should now see both files.
-assert_count "Alice list (after override)" "2" "$(list_count "$ALICE_JWT" "$BUCKET")"
-assert_count "Bob list (after override)"   "2" "$(list_count "$BOB_JWT"   "$BUCKET")"
+# Both users see all four files now (a.txt, b.txt, shared.txt, shared (1).txt).
+assert_count "Alice list (after override)" "4" "$(list_count "$ALICE_JWT" "$BUCKET")"
+assert_count "Bob list (after override)"   "4" "$(list_count "$BOB_JWT"   "$BUCKET")"
 
 # But INSERT/DELETE policies are unchanged — Bob still can't delete Alice's file
 bob_del_alice2=$(curl -sS -o /dev/null -w "%{http_code}" -X DELETE \
@@ -232,8 +244,9 @@ assert_count "Bob DELETE alice's file (DELETE policy unchanged)" "404" "$bob_del
 # Cross-policy attack regression check. Bob already failed the DELETE above
 # while having visibility — the critical follow-up is that Alice's blob is
 # still on disk. If deleteObject ever regresses to "check visibility, then
-# delete blob, then DB-DELETE", this read would 404 / return empty.
-alice_dl=$(curl -sS -o /dev/null -w "%{http_code}" \
+# delete blob, then DB-DELETE", this read would 404. Follow redirects so
+# we get the actual blob fetch status (200 local, S3-presigned-then-200).
+alice_dl=$(curl -sSL -o /dev/null -w "%{http_code}" \
   "$API/storage/buckets/$BUCKET/objects/a.txt" -H "Authorization: Bearer $ALICE_JWT")
 assert_count "Alice can still download her file (blob untouched)" "200" "$alice_dl"
 
