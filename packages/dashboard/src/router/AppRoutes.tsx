@@ -48,6 +48,7 @@ import DeploymentOverviewPage from '../features/deployments/pages/DeploymentOver
 import DeploymentEnvVarsPage from '../features/deployments/pages/DeploymentEnvVarsPage';
 import DeploymentDomainsPage from '../features/deployments/pages/DeploymentDomainsPage';
 import ComputePage from '../features/compute/pages/ComputePage';
+import { AnalyticsPage } from '../features/analytics';
 
 function AuthenticatedRoutes() {
   const dashboardVariant = getFeatureFlag('dashboard-v4-experiment');
@@ -122,6 +123,7 @@ function AuthenticatedRoutes() {
           <Route path="domains" element={<DeploymentDomainsPage />} />
         </Route>
         <Route path="/dashboard/compute" element={<ComputePage />} />
+        <Route path="/dashboard/analytics" element={<AnalyticsPage />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </AppLayout>

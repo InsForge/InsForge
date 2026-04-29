@@ -9,6 +9,7 @@ import {
   Server,
   Sparkles,
   ChartLine,
+  BarChart3,
   Settings,
   Rocket,
   SquarePen,
@@ -112,6 +113,12 @@ export const dashboardStaticMenuItems: DashboardPrimaryMenuItem[] = [
     label: 'Logs',
     href: '/dashboard/logs',
     icon: ChartLine,
+  },
+  {
+    id: 'analytics',
+    label: 'Analytics',
+    href: '/dashboard/analytics',
+    icon: BarChart3,
   },
 ];
 
