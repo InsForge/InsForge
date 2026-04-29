@@ -34,7 +34,7 @@ export function AnalyticsPage() {
     return (
       <div className="p-6">
         <h1 className="mb-4 text-2xl font-bold text-foreground">Analytics</h1>
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
           Failed to load PostHog connection. Please refresh, or contact support if it persists.
         </div>
       </div>
