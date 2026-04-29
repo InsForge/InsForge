@@ -59,6 +59,15 @@ describe('payments route schemas', () => {
     expect(paymentsRouteSource).not.toContain("'/subscriptions/sync'");
   });
 
+  it('keeps managed webhook configuration behind the admin-only route guard', () => {
+    expect(paymentsRouteSource.indexOf("'/webhooks/:environment/configure'")).toBeGreaterThan(
+      paymentsRouteSource.indexOf('router.use(verifyAdmin)')
+    );
+    expect(paymentsRouteSource).toMatch(
+      /router\.post\(\s*'\/webhooks\/:environment\/configure'[\s\S]*stripeEnvironmentSchema[\s\S]*configureWebhook/
+    );
+  });
+
   it('rejects unknown unified sync environments', () => {
     expect(() => syncPaymentsRequestSchema.parse({ environment: 'prod' })).toThrow();
   });
@@ -101,6 +110,7 @@ describe('payments route schemas', () => {
         description: null,
         active: true,
         metadata: { tier: 'pro' },
+        idempotencyKey: 'agent-product-123',
       })
     ).toEqual({
       environment: 'test',
@@ -108,9 +118,17 @@ describe('payments route schemas', () => {
       description: null,
       active: true,
       metadata: { tier: 'pro' },
+      idempotencyKey: 'agent-product-123',
     });
 
     expect(() => createPaymentProductRequestSchema.parse({ name: 'Pro' })).toThrow();
+    expect(() =>
+      createPaymentProductRequestSchema.parse({
+        environment: 'test',
+        name: 'Pro',
+        idempotencyKey: 'x'.repeat(201),
+      })
+    ).toThrow(/200 characters/i);
     expect(() => updatePaymentProductRequestSchema.parse({})).toThrow();
     expect(() => updatePaymentProductRequestSchema.parse({ environment: 'live' })).toThrow();
     expect(updatePaymentProductRequestSchema.parse({ active: false, environment: 'live' })).toEqual(
@@ -137,6 +155,7 @@ describe('payments route schemas', () => {
         currency: 'USD',
         unitAmount: 2000,
         recurring: { interval: 'month', intervalCount: 1 },
+        idempotencyKey: 'agent-price-123',
       })
     ).toEqual({
       environment: 'test',
@@ -144,6 +163,7 @@ describe('payments route schemas', () => {
       currency: 'usd',
       unitAmount: 2000,
       recurring: { interval: 'month', intervalCount: 1 },
+      idempotencyKey: 'agent-price-123',
     });
 
     expect(() =>
@@ -170,6 +190,7 @@ describe('payments route schemas', () => {
         successUrl: 'https://example.com/success',
         cancelUrl: 'https://example.com/cancel',
         customerEmail: 'buyer@example.com',
+        idempotencyKey: 'checkout-123',
       })
     ).toEqual({
       environment: 'test',
@@ -178,6 +199,7 @@ describe('payments route schemas', () => {
       successUrl: 'https://example.com/success',
       cancelUrl: 'https://example.com/cancel',
       customerEmail: 'buyer@example.com',
+      idempotencyKey: 'checkout-123',
     });
   });
 

@@ -139,6 +139,23 @@ router.post('/sync', async (req: AuthRequest, res: Response, next: NextFunction)
   }
 });
 
+router.post(
+  '/webhooks/:environment/configure',
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validation = stripeEnvironmentSchema.safeParse(req.params.environment);
+      if (!validation.success) {
+        throw new AppError('Invalid Stripe environment', 400, ERROR_CODES.INVALID_INPUT);
+      }
+
+      const result = await paymentService.configureWebhook(validation.data);
+      successResponse(res, result);
+    } catch (error) {
+      next(normalizeStripeConfigError(error));
+    }
+  }
+);
+
 router.get('/payment-history', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const validation = listPaymentHistoryRequestSchema.safeParse(req.query);

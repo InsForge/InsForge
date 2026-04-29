@@ -96,6 +96,60 @@ describe('StripeProvider', () => {
     });
   });
 
+  it('retrieves Stripe objects needed to recover refund context', async () => {
+    const invoicePayment = {
+      id: 'inpay_123',
+      object: 'invoice_payment',
+      invoice: {
+        id: 'in_123',
+        object: 'invoice',
+      },
+      payment: {
+        type: 'payment_intent',
+        payment_intent: 'pi_123',
+      },
+    };
+    const client = {
+      accounts: { retrieveCurrent: vi.fn() },
+      products: { list: vi.fn() },
+      prices: { list: vi.fn() },
+      paymentIntents: {
+        retrieve: vi.fn().mockResolvedValue({ id: 'pi_123', object: 'payment_intent' }),
+      },
+      charges: {
+        retrieve: vi.fn().mockResolvedValue({ id: 'ch_123', object: 'charge' }),
+      },
+      invoicePayments: {
+        list: vi.fn().mockReturnValue(createAsyncList([invoicePayment])),
+      },
+    } as unknown as StripeClient;
+    const provider = new StripeProvider('sk_test_1234567890', 'test', client);
+
+    await expect(provider.retrievePaymentIntent('pi_123')).resolves.toMatchObject({
+      id: 'pi_123',
+    });
+    await expect(provider.retrieveCharge('ch_123')).resolves.toMatchObject({
+      id: 'ch_123',
+    });
+    await expect(provider.retrieveInvoiceByPaymentIntent('pi_123')).resolves.toMatchObject({
+      id: 'in_123',
+      payments: {
+        data: [expect.objectContaining({ id: 'inpay_123' })],
+      },
+    });
+
+    expect(client.paymentIntents.retrieve).toHaveBeenCalledWith('pi_123');
+    expect(client.charges.retrieve).toHaveBeenCalledWith('ch_123');
+    expect(client.invoicePayments.list).toHaveBeenCalledWith({
+      limit: 1,
+      payment: {
+        type: 'payment_intent',
+        payment_intent: 'pi_123',
+      },
+      expand: ['data.invoice'],
+    });
+  });
+
   it('creates, updates, and deletes products through Stripe products API', async () => {
     const client = {
       accounts: { retrieveCurrent: vi.fn() },
@@ -244,6 +298,78 @@ describe('StripeProvider', () => {
         metadata: { insforge_subject_type: 'team', insforge_subject_id: 'team_123' },
       },
     });
+  });
+
+  it('passes idempotency keys to Stripe create requests', async () => {
+    const client = {
+      accounts: { retrieveCurrent: vi.fn() },
+      products: {
+        list: vi.fn(),
+        create: vi.fn().mockResolvedValue({ id: 'prod_new', object: 'product' }),
+      },
+      prices: {
+        list: vi.fn(),
+        create: vi.fn().mockResolvedValue({ id: 'price_new', object: 'price' }),
+      },
+      customers: {
+        create: vi.fn().mockResolvedValue({ id: 'cus_123', object: 'customer' }),
+      },
+      checkout: {
+        sessions: {
+          create: vi.fn().mockResolvedValue({ id: 'cs_test_123', object: 'checkout.session' }),
+        },
+      },
+      webhooks: { constructEvent: vi.fn() },
+    } as unknown as StripeClient;
+    const provider = new StripeProvider('sk_test_1234567890', 'test', client);
+
+    await provider.createCustomer({
+      email: 'buyer@example.com',
+      idempotencyKey: 'insforge:test:customer:checkout-123',
+    });
+    await provider.createCheckoutSession({
+      mode: 'payment',
+      lineItems: [{ stripePriceId: 'price_123', quantity: 1 }],
+      successUrl: 'https://example.com/success',
+      cancelUrl: 'https://example.com/cancel',
+      idempotencyKey: 'insforge:test:checkout_session:checkout-123',
+    });
+    await provider.createProduct({
+      name: 'Pro',
+      idempotencyKey: 'insforge:test:product:agent-123',
+    });
+    await provider.createPrice({
+      stripeProductId: 'prod_123',
+      currency: 'usd',
+      unitAmount: 2000,
+      idempotencyKey: 'insforge:test:price:agent-123',
+    });
+
+    expect(client.customers.create).toHaveBeenCalledWith(
+      { email: 'buyer@example.com' },
+      { idempotencyKey: 'insforge:test:customer:checkout-123' }
+    );
+    expect(client.checkout.sessions.create).toHaveBeenCalledWith(
+      {
+        mode: 'payment',
+        line_items: [{ price: 'price_123', quantity: 1 }],
+        success_url: 'https://example.com/success',
+        cancel_url: 'https://example.com/cancel',
+      },
+      { idempotencyKey: 'insforge:test:checkout_session:checkout-123' }
+    );
+    expect(client.products.create).toHaveBeenCalledWith(
+      { name: 'Pro' },
+      { idempotencyKey: 'insforge:test:product:agent-123' }
+    );
+    expect(client.prices.create).toHaveBeenCalledWith(
+      {
+        product: 'prod_123',
+        currency: 'usd',
+        unit_amount: 2000,
+      },
+      { idempotencyKey: 'insforge:test:price:agent-123' }
+    );
   });
 
   it('constructs webhook events with the original raw body and Stripe signature', () => {

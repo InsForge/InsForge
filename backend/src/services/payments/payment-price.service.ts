@@ -4,6 +4,7 @@ import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import type { StripeEnvironment, StripePrice, StripePriceRow } from '@/types/payments.js';
 import {
+  buildStripeIdempotencyKey,
   getStripeObjectId,
   normalizePriceRow,
   normalizeStripeDecimal,
@@ -207,11 +208,18 @@ export class PaymentPriceService {
   }
 
   async createPrice(input: CreatePaymentPriceRequest): Promise<MutatePaymentPriceResponse> {
-    const { environment, ...priceInput } = input;
+    const { environment, idempotencyKey, ...priceInput } = input;
 
     return this.withEnvironmentLock(environment, async () => {
       const provider = await this.configService.createStripeProvider(environment);
-      const price = await provider.createPrice(priceInput);
+      const price = await provider.createPrice({
+        ...priceInput,
+        ...(idempotencyKey
+          ? {
+              idempotencyKey: buildStripeIdempotencyKey(environment, 'price', idempotencyKey),
+            }
+          : {}),
+      });
 
       await this.upsertPriceMirror(environment, price);
 

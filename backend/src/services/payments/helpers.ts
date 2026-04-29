@@ -12,6 +12,8 @@ import type {
   StripeProductMirror,
 } from '@insforge/shared-schemas';
 
+export type StripeIdempotencyOperation = 'checkout_session' | 'customer' | 'product' | 'price';
+
 export function getStripeObjectId(value: unknown): string | null {
   if (!value) {
     return null;
@@ -74,6 +76,18 @@ export function toISOString(value: Date | string): string {
 
 export function fromStripeTimestamp(value: number | null | undefined): Date | null {
   return value ? new Date(value * 1000) : null;
+}
+
+export function buildStripeIdempotencyKey(
+  environment: StripeEnvironment,
+  operation: StripeIdempotencyOperation,
+  callerKey: string | undefined
+): string | undefined {
+  if (!callerKey) {
+    return undefined;
+  }
+
+  return `insforge:${environment}:${operation}:${callerKey}`;
 }
 
 export function normalizeProductRow(row: StripeProductRow): StripeProductMirror {

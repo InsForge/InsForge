@@ -37,6 +37,14 @@ interface PaymentHistoryContext {
   description: string | null;
 }
 
+interface RefundStripeContext {
+  paymentIntent: StripePaymentIntent | null;
+  charge: StripeCharge | null;
+  invoice: StripeInvoice | null;
+}
+
+type RefundStripeContextLoader = () => Promise<RefundStripeContext>;
+
 export class PaymentHistoryService {
   private static instance: PaymentHistoryService;
   private pool: Pool | null = null;
@@ -142,7 +150,7 @@ export class PaymentHistoryService {
     const failedAt = status === 'failed' ? fromStripeTimestamp(invoice.created) : null;
 
     await this.getPool().query(
-      `INSERT INTO payments.payment_history (
+      `INSERT INTO payments.payment_history AS payment_history (
          environment,
          type,
          status,
@@ -170,14 +178,14 @@ export class PaymentHistoryService {
        DO UPDATE SET
          type = EXCLUDED.type,
          status = EXCLUDED.status,
-         subject_type = EXCLUDED.subject_type,
-         subject_id = EXCLUDED.subject_id,
-         stripe_customer_id = EXCLUDED.stripe_customer_id,
-         customer_email_snapshot = EXCLUDED.customer_email_snapshot,
-         stripe_payment_intent_id = EXCLUDED.stripe_payment_intent_id,
-         stripe_subscription_id = EXCLUDED.stripe_subscription_id,
-         stripe_product_id = EXCLUDED.stripe_product_id,
-         stripe_price_id = EXCLUDED.stripe_price_id,
+         subject_type = COALESCE(EXCLUDED.subject_type, payment_history.subject_type),
+         subject_id = COALESCE(EXCLUDED.subject_id, payment_history.subject_id),
+         stripe_customer_id = COALESCE(EXCLUDED.stripe_customer_id, payment_history.stripe_customer_id),
+         customer_email_snapshot = COALESCE(EXCLUDED.customer_email_snapshot, payment_history.customer_email_snapshot),
+         stripe_payment_intent_id = COALESCE(EXCLUDED.stripe_payment_intent_id, payment_history.stripe_payment_intent_id),
+         stripe_subscription_id = COALESCE(EXCLUDED.stripe_subscription_id, payment_history.stripe_subscription_id),
+         stripe_product_id = COALESCE(EXCLUDED.stripe_product_id, payment_history.stripe_product_id),
+         stripe_price_id = COALESCE(EXCLUDED.stripe_price_id, payment_history.stripe_price_id),
          amount = EXCLUDED.amount,
          currency = EXCLUDED.currency,
          description = EXCLUDED.description,
@@ -229,19 +237,32 @@ export class PaymentHistoryService {
 
   async upsertRefundPaymentHistory(
     environment: StripeEnvironment,
-    refund: StripeRefund
+    refund: StripeRefund,
+    loadStripeContext?: RefundStripeContextLoader
   ): Promise<void> {
     const stripePaymentIntentId = getStripeObjectId(refund.payment_intent);
     const stripeChargeId = getStripeObjectId(refund.charge);
-    const context = await this.findPaymentHistoryContextForRefund(
+    let context = await this.findPaymentHistoryContextForRefund(
       environment,
       stripePaymentIntentId,
       stripeChargeId
     );
+
+    if (!context && loadStripeContext) {
+      const stripeContext = await loadStripeContext();
+      await this.upsertOriginalPaymentHistoryForRefund(environment, stripeContext);
+      context =
+        (await this.findPaymentHistoryContextForRefund(
+          environment,
+          stripePaymentIntentId,
+          stripeChargeId
+        )) ?? (await this.buildRefundContextFromStripeContext(environment, stripeContext));
+    }
+
     const mappedStatus = this.mapRefundStatus(refund.status);
 
     await this.getPool().query(
-      `INSERT INTO payments.payment_history (
+      `INSERT INTO payments.payment_history AS payment_history (
          environment,
          type,
          status,
@@ -268,16 +289,16 @@ export class PaymentHistoryService {
          WHERE stripe_refund_id IS NOT NULL
        DO UPDATE SET
          status = EXCLUDED.status,
-         subject_type = EXCLUDED.subject_type,
-         subject_id = EXCLUDED.subject_id,
-         stripe_customer_id = EXCLUDED.stripe_customer_id,
-         customer_email_snapshot = EXCLUDED.customer_email_snapshot,
-         stripe_payment_intent_id = EXCLUDED.stripe_payment_intent_id,
-         stripe_invoice_id = EXCLUDED.stripe_invoice_id,
-         stripe_charge_id = EXCLUDED.stripe_charge_id,
-         stripe_subscription_id = EXCLUDED.stripe_subscription_id,
-         stripe_product_id = EXCLUDED.stripe_product_id,
-         stripe_price_id = EXCLUDED.stripe_price_id,
+         subject_type = COALESCE(EXCLUDED.subject_type, payment_history.subject_type),
+         subject_id = COALESCE(EXCLUDED.subject_id, payment_history.subject_id),
+         stripe_customer_id = COALESCE(EXCLUDED.stripe_customer_id, payment_history.stripe_customer_id),
+         customer_email_snapshot = COALESCE(EXCLUDED.customer_email_snapshot, payment_history.customer_email_snapshot),
+         stripe_payment_intent_id = COALESCE(EXCLUDED.stripe_payment_intent_id, payment_history.stripe_payment_intent_id),
+         stripe_invoice_id = COALESCE(EXCLUDED.stripe_invoice_id, payment_history.stripe_invoice_id),
+         stripe_charge_id = COALESCE(EXCLUDED.stripe_charge_id, payment_history.stripe_charge_id),
+         stripe_subscription_id = COALESCE(EXCLUDED.stripe_subscription_id, payment_history.stripe_subscription_id),
+         stripe_product_id = COALESCE(EXCLUDED.stripe_product_id, payment_history.stripe_product_id),
+         stripe_price_id = COALESCE(EXCLUDED.stripe_price_id, payment_history.stripe_price_id),
          amount = EXCLUDED.amount,
          currency = EXCLUDED.currency,
          description = EXCLUDED.description,
@@ -513,34 +534,139 @@ export class PaymentHistoryService {
              ($2::TEXT IS NOT NULL AND stripe_payment_intent_id = $2)
              OR ($3::TEXT IS NOT NULL AND stripe_charge_id = $3)
            )
+       ),
+       original_context AS (
+         SELECT
+           subject_type,
+           subject_id,
+           stripe_customer_id,
+           customer_email_snapshot,
+           stripe_invoice_id,
+           stripe_subscription_id,
+           stripe_product_id,
+           stripe_price_id
+         FROM payments.payment_history
+         WHERE environment = $1
+           AND type <> 'refund'
+           AND (
+             ($2::TEXT IS NOT NULL AND stripe_payment_intent_id = $2)
+             OR ($3::TEXT IS NOT NULL AND stripe_charge_id = $3)
+           )
+         ORDER BY created_at DESC
+         LIMIT 1
+       ),
+       updated_original AS (
+         UPDATE payments.payment_history original
+         SET amount_refunded = refund_totals.amount_refunded,
+             status = CASE
+               WHEN refund_totals.amount_refunded > 0
+                 AND original.amount IS NOT NULL
+                 AND refund_totals.amount_refunded >= original.amount
+                 THEN 'refunded'
+               WHEN refund_totals.amount_refunded > 0
+                 THEN 'partially_refunded'
+               WHEN original.status IN ('refunded', 'partially_refunded')
+                 THEN CASE WHEN original.failed_at IS NOT NULL THEN 'failed' ELSE 'succeeded' END
+               ELSE original.status
+             END,
+             refunded_at = CASE
+               WHEN refund_totals.amount_refunded > 0 THEN refund_totals.refunded_at
+               ELSE NULL
+             END,
+             updated_at = NOW()
+         FROM refund_totals
+         WHERE original.environment = $1
+           AND original.type <> 'refund'
+           AND (
+             ($2::TEXT IS NOT NULL AND original.stripe_payment_intent_id = $2)
+             OR ($3::TEXT IS NOT NULL AND original.stripe_charge_id = $3)
+           )
+         RETURNING original.id
        )
-       UPDATE payments.payment_history original
-       SET amount_refunded = refund_totals.amount_refunded,
-           status = CASE
-             WHEN refund_totals.amount_refunded > 0
-               AND original.amount IS NOT NULL
-               AND refund_totals.amount_refunded >= original.amount
-               THEN 'refunded'
-             WHEN refund_totals.amount_refunded > 0
-               THEN 'partially_refunded'
-             WHEN original.status IN ('refunded', 'partially_refunded')
-               THEN CASE WHEN original.failed_at IS NOT NULL THEN 'failed' ELSE 'succeeded' END
-             ELSE original.status
-           END,
-           refunded_at = CASE
-             WHEN refund_totals.amount_refunded > 0 THEN refund_totals.refunded_at
-             ELSE NULL
-           END,
+       UPDATE payments.payment_history refund
+       SET subject_type = COALESCE(refund.subject_type, original_context.subject_type),
+           subject_id = COALESCE(refund.subject_id, original_context.subject_id),
+           stripe_customer_id = COALESCE(refund.stripe_customer_id, original_context.stripe_customer_id),
+           customer_email_snapshot = COALESCE(refund.customer_email_snapshot, original_context.customer_email_snapshot),
+           stripe_invoice_id = COALESCE(refund.stripe_invoice_id, original_context.stripe_invoice_id),
+           stripe_subscription_id = COALESCE(refund.stripe_subscription_id, original_context.stripe_subscription_id),
+           stripe_product_id = COALESCE(refund.stripe_product_id, original_context.stripe_product_id),
+           stripe_price_id = COALESCE(refund.stripe_price_id, original_context.stripe_price_id),
            updated_at = NOW()
-       FROM refund_totals
-       WHERE original.environment = $1
-         AND original.type <> 'refund'
+       FROM original_context
+       WHERE refund.environment = $1
+         AND refund.type = 'refund'
          AND (
-           ($2::TEXT IS NOT NULL AND original.stripe_payment_intent_id = $2)
-           OR ($3::TEXT IS NOT NULL AND original.stripe_charge_id = $3)
+           ($2::TEXT IS NOT NULL AND refund.stripe_payment_intent_id = $2)
+           OR ($3::TEXT IS NOT NULL AND refund.stripe_charge_id = $3)
+         )
+         AND (
+           (refund.subject_type IS NULL AND original_context.subject_type IS NOT NULL)
+           OR (refund.subject_id IS NULL AND original_context.subject_id IS NOT NULL)
+           OR (refund.stripe_customer_id IS NULL AND original_context.stripe_customer_id IS NOT NULL)
+           OR (refund.customer_email_snapshot IS NULL AND original_context.customer_email_snapshot IS NOT NULL)
+           OR (refund.stripe_invoice_id IS NULL AND original_context.stripe_invoice_id IS NOT NULL)
+           OR (refund.stripe_subscription_id IS NULL AND original_context.stripe_subscription_id IS NOT NULL)
+           OR (refund.stripe_product_id IS NULL AND original_context.stripe_product_id IS NOT NULL)
+           OR (refund.stripe_price_id IS NULL AND original_context.stripe_price_id IS NOT NULL)
          )`,
       [environment, stripePaymentIntentId, stripeChargeId]
     );
+  }
+
+  private async upsertOriginalPaymentHistoryForRefund(
+    environment: StripeEnvironment,
+    stripeContext: RefundStripeContext
+  ): Promise<void> {
+    if (stripeContext.invoice) {
+      await this.upsertInvoicePaymentHistory(environment, stripeContext.invoice, 'succeeded');
+      return;
+    }
+
+    if (stripeContext.paymentIntent?.status === 'succeeded') {
+      await this.processPaymentIntentHistory(environment, stripeContext.paymentIntent, 'succeeded');
+    }
+  }
+
+  private async buildRefundContextFromStripeContext(
+    environment: StripeEnvironment,
+    stripeContext: RefundStripeContext
+  ): Promise<PaymentHistoryContext | null> {
+    const { paymentIntent, charge, invoice } = stripeContext;
+    const stripeCustomerId =
+      getStripeObjectId(invoice?.customer) ??
+      getStripeObjectId(paymentIntent?.customer) ??
+      getStripeObjectId(charge?.customer);
+    const subject =
+      getBillingSubjectFromMetadata(paymentIntent?.metadata) ??
+      getBillingSubjectFromMetadata(charge?.metadata) ??
+      (invoice ? await this.resolveInvoiceSubject(environment, invoice, stripeCustomerId) : null) ??
+      (stripeCustomerId
+        ? await this.findSubjectForStripeCustomer(environment, stripeCustomerId)
+        : null);
+    const firstLine = invoice?.lines?.data?.[0] ?? null;
+    const context: PaymentHistoryContext = {
+      subjectType: subject?.type ?? null,
+      subjectId: subject?.id ?? null,
+      stripeCustomerId,
+      customerEmailSnapshot:
+        invoice?.customer_email ??
+        paymentIntent?.receipt_email ??
+        charge?.billing_details?.email ??
+        null,
+      stripeInvoiceId: invoice?.id ?? null,
+      stripeSubscriptionId: invoice ? this.getInvoiceSubscriptionId(invoice) : null,
+      stripeProductId: invoice ? this.getInvoiceLineItemProductId(firstLine) : null,
+      stripePriceId: invoice ? this.getInvoiceLineItemPriceId(firstLine) : null,
+      description:
+        invoice?.description ?? paymentIntent?.description ?? charge?.description ?? null,
+    };
+
+    if (Object.values(context).some((value) => value !== null)) {
+      return context;
+    }
+
+    return null;
   }
 
   private async findPaymentHistoryContextForRefund(

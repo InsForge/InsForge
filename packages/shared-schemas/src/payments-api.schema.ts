@@ -47,6 +47,11 @@ export const stripeWebhookParamsSchema = z.object({
 
 export const stripePriceRecurringIntervalSchema = z.enum(['day', 'week', 'month', 'year']);
 export const stripePriceTaxBehaviorSchema = z.enum(['exclusive', 'inclusive', 'unspecified']);
+export const stripeIdempotencyKeySchema = z
+  .string()
+  .trim()
+  .min(1, 'Idempotency key is required')
+  .max(200, 'Idempotency key must be 200 characters or fewer');
 
 export const createPaymentProductRequestSchema = z
   .object({
@@ -55,6 +60,7 @@ export const createPaymentProductRequestSchema = z
     description: z.string().trim().max(5000).nullable().optional(),
     active: z.boolean().optional(),
     metadata: z.record(z.string()).optional(),
+    idempotencyKey: stripeIdempotencyKeySchema.optional(),
   })
   .strict();
 
@@ -92,6 +98,7 @@ export const createPaymentPriceRequestSchema = z
       .optional(),
     taxBehavior: stripePriceTaxBehaviorSchema.optional(),
     metadata: z.record(z.string()).optional(),
+    idempotencyKey: stripeIdempotencyKeySchema.optional(),
   })
   .strict();
 
@@ -171,6 +178,7 @@ export const createCheckoutSessionRequestSchema = z
     subject: billingSubjectSchema.optional(),
     customerEmail: z.string().trim().email().nullable().optional(),
     metadata: z.record(z.string()).optional(),
+    idempotencyKey: stripeIdempotencyKeySchema.optional(),
   })
   .strict()
   .refine((value) => value.mode !== 'subscription' || value.subject !== undefined, {
@@ -250,6 +258,10 @@ export const syncPaymentsResponseSchema = z.object({
   results: z.array(syncPaymentsEnvironmentResultSchema),
 });
 
+export const configurePaymentWebhookResponseSchema = z.object({
+  connection: stripeConnectionSchema,
+});
+
 export const stripeWebhookResponseSchema = z.object({
   received: z.boolean(),
   handled: z.boolean(),
@@ -298,6 +310,7 @@ export type SyncPaymentsSubscriptionsSummary = z.infer<
 >;
 export type SyncPaymentsEnvironmentResult = z.infer<typeof syncPaymentsEnvironmentResultSchema>;
 export type SyncPaymentsResponse = z.infer<typeof syncPaymentsResponseSchema>;
+export type ConfigurePaymentWebhookResponse = z.infer<typeof configurePaymentWebhookResponseSchema>;
 export type StripeWebhookResponse = z.infer<typeof stripeWebhookResponseSchema>;
 export type GetPaymentsStatusResponse = z.infer<typeof getPaymentsStatusResponseSchema>;
 export type ListPaymentCatalogResponse = z.infer<typeof listPaymentCatalogResponseSchema>;

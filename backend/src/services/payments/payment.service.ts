@@ -14,6 +14,7 @@ import {
   WEBHOOK_SECRET_BY_ENVIRONMENT,
 } from '@/services/payments/constants.js';
 import {
+  buildStripeIdempotencyKey,
   getStripeObjectId,
   normalizePriceRow,
   normalizeProductRow,
@@ -36,6 +37,7 @@ import {
 } from '@/types/payments.js';
 import type {
   ArchivePaymentPriceResponse,
+  ConfigurePaymentWebhookResponse,
   CreatePaymentPriceRequest,
   GetPaymentsStatusResponse,
   GetPaymentPriceResponse,
@@ -138,6 +140,11 @@ export class PaymentService {
 
   async getStatus(): Promise<GetPaymentsStatusResponse> {
     return this.configService.getStatus();
+  }
+
+  async configureWebhook(environment: StripeEnvironment): Promise<ConfigurePaymentWebhookResponse> {
+    const connection = await this.configService.configureManagedStripeWebhook(environment);
+    return { connection };
   }
 
   async listCatalog(environment?: StripeEnvironment): Promise<ListPaymentCatalogResponse> {
@@ -286,6 +293,15 @@ export class PaymentService {
         customerId,
         customerEmail: customerId ? null : input.customerEmail,
         metadata,
+        ...(input.idempotencyKey
+          ? {
+              idempotencyKey: buildStripeIdempotencyKey(
+                input.environment,
+                'checkout_session',
+                input.idempotencyKey
+              ),
+            }
+          : {}),
       });
 
       return {
@@ -321,7 +337,7 @@ export class PaymentService {
     }
 
     try {
-      const handled = await this.applyStripeWebhookEvent(environment, event);
+      const handled = await this.applyStripeWebhookEvent(environment, event, provider);
       const row = await this.webhookService.markWebhookEvent(
         environment,
         event.id,
@@ -457,6 +473,15 @@ export class PaymentService {
     const customer = await provider.createCustomer({
       email: input.customerEmail ?? null,
       metadata,
+      ...(input.idempotencyKey
+        ? {
+            idempotencyKey: buildStripeIdempotencyKey(
+              input.environment,
+              'customer',
+              input.idempotencyKey
+            ),
+          }
+        : {}),
     });
 
     await this.upsertStripeCustomerMapping(
@@ -542,7 +567,8 @@ export class PaymentService {
 
   private async applyStripeWebhookEvent(
     environment: StripeEnvironment,
-    event: StripeEvent
+    event: StripeEvent,
+    provider: StripeProvider
   ): Promise<boolean> {
     switch (event.type) {
       case 'checkout.session.completed':
@@ -600,7 +626,8 @@ export class PaymentService {
       case 'refund.failed':
         await this.historyService.upsertRefundPaymentHistory(
           environment,
-          event.data.object as StripeRefund
+          event.data.object as StripeRefund,
+          () => this.loadRefundStripeContext(provider, event.data.object as StripeRefund)
         );
         return true;
       case 'customer.subscription.created':
@@ -617,6 +644,32 @@ export class PaymentService {
       default:
         return false;
     }
+  }
+
+  private async loadRefundStripeContext(
+    provider: StripeProvider,
+    refund: StripeRefund
+  ): Promise<{
+    paymentIntent: StripePaymentIntent | null;
+    charge: StripeCharge | null;
+    invoice: StripeInvoice | null;
+  }> {
+    const refundPaymentIntentId = getStripeObjectId(refund.payment_intent);
+    const refundChargeId = getStripeObjectId(refund.charge);
+    const [refundPaymentIntent, charge] = await Promise.all([
+      refundPaymentIntentId ? provider.retrievePaymentIntent(refundPaymentIntentId) : null,
+      refundChargeId ? provider.retrieveCharge(refundChargeId) : null,
+    ]);
+    const paymentIntentId =
+      refundPaymentIntentId ?? getStripeObjectId(charge?.payment_intent) ?? null;
+    const paymentIntent =
+      refundPaymentIntent ??
+      (paymentIntentId ? await provider.retrievePaymentIntent(paymentIntentId) : null);
+    const invoice = paymentIntentId
+      ? await provider.retrieveInvoiceByPaymentIntent(paymentIntentId)
+      : null;
+
+    return { paymentIntent, charge, invoice };
   }
 
   private normalizeCheckoutSession(

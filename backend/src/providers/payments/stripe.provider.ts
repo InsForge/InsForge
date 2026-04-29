@@ -8,6 +8,10 @@ import type {
   StripeCustomerCreateInput,
   StripeEnvironment,
   StripeEvent,
+  StripeCharge,
+  StripeInvoice,
+  StripeInvoicePayment,
+  StripePaymentIntent,
   StripePrice,
   StripePriceCreateInput,
   StripePriceUpdateInput,
@@ -36,8 +40,10 @@ type StripeCheckoutSessionCreateParams = Parameters<
 >[0];
 type StripeSubscriptionListParams = Parameters<StripeClient['subscriptions']['list']>[0];
 type StripeWebhookEndpointCreateParams = Parameters<StripeClient['webhookEndpoints']['create']>[0];
+type StripeInvoicePaymentListParams = Parameters<StripeClient['invoicePayments']['list']>[0];
 type StripeWebhookEndpointEnabledEvent =
   StripeWebhookEndpointCreateParams['enabled_events'][number];
+type StripeRequestOptions = NonNullable<Parameters<StripeClient['customers']['create']>[1]>;
 
 export interface StripeWebhookEndpointCreateInput {
   url: string;
@@ -114,7 +120,11 @@ export class StripeProvider {
       params.metadata = input.metadata;
     }
 
-    return this.client.customers.create(params);
+    return this.createWithOptionalIdempotency(
+      () => this.client.customers.create(params),
+      (options) => this.client.customers.create(params, options),
+      input.idempotencyKey
+    );
   }
 
   async createCheckoutSession(
@@ -148,11 +158,40 @@ export class StripeProvider {
       }
     }
 
-    return this.client.checkout.sessions.create(params);
+    return this.createWithOptionalIdempotency(
+      () => this.client.checkout.sessions.create(params),
+      (options) => this.client.checkout.sessions.create(params, options),
+      input.idempotencyKey
+    );
   }
 
   constructWebhookEvent(rawBody: Buffer, signature: string, webhookSecret: string): StripeEvent {
     return this.client.webhooks.constructEvent(rawBody, signature, webhookSecret);
+  }
+
+  async retrievePaymentIntent(paymentIntentId: string): Promise<StripePaymentIntent> {
+    return this.client.paymentIntents.retrieve(paymentIntentId);
+  }
+
+  async retrieveCharge(chargeId: string): Promise<StripeCharge> {
+    return this.client.charges.retrieve(chargeId);
+  }
+
+  async retrieveInvoiceByPaymentIntent(paymentIntentId: string): Promise<StripeInvoice | null> {
+    const params: StripeInvoicePaymentListParams = {
+      limit: 1,
+      payment: {
+        type: 'payment_intent',
+        payment_intent: paymentIntentId,
+      },
+      expand: ['data.invoice'],
+    };
+
+    for await (const invoicePayment of this.client.invoicePayments.list(params)) {
+      return this.getInvoiceFromInvoicePayment(invoicePayment);
+    }
+
+    return null;
   }
 
   async listWebhookEndpoints(): Promise<StripeWebhookEndpoint[]> {
@@ -226,7 +265,11 @@ export class StripeProvider {
       params.metadata = input.metadata;
     }
 
-    return this.client.products.create(params);
+    return this.createWithOptionalIdempotency(
+      () => this.client.products.create(params),
+      (options) => this.client.products.create(params, options),
+      input.idempotencyKey
+    );
   }
 
   async updateProduct(productId: string, input: StripeProductUpdateInput): Promise<StripeProduct> {
@@ -302,7 +345,11 @@ export class StripeProvider {
       params.metadata = input.metadata;
     }
 
-    return this.client.prices.create(params);
+    return this.createWithOptionalIdempotency(
+      () => this.client.prices.create(params),
+      (options) => this.client.prices.create(params, options),
+      input.idempotencyKey
+    );
   }
 
   async updatePrice(priceId: string, input: StripePriceUpdateInput): Promise<StripePrice> {
@@ -325,5 +372,43 @@ export class StripeProvider {
     }
 
     return this.client.prices.update(priceId, params);
+  }
+
+  private async createWithOptionalIdempotency<T>(
+    create: () => Promise<T>,
+    createWithOptions: (options: StripeRequestOptions) => Promise<T>,
+    idempotencyKey?: string
+  ): Promise<T> {
+    if (!idempotencyKey) {
+      return create();
+    }
+
+    return createWithOptions({ idempotencyKey });
+  }
+
+  private getInvoiceFromInvoicePayment(invoicePayment: StripeInvoicePayment): StripeInvoice | null {
+    const invoice = invoicePayment.invoice;
+
+    if (typeof invoice === 'string' || ('deleted' in invoice && invoice.deleted)) {
+      return null;
+    }
+
+    const existingPayments = invoice.payments;
+    const hasPayment =
+      existingPayments?.data.some((payment) => payment.id === invoicePayment.id) ?? false;
+
+    if (hasPayment) {
+      return invoice;
+    }
+
+    return {
+      ...invoice,
+      payments: {
+        object: 'list',
+        data: [invoicePayment, ...(existingPayments?.data ?? [])],
+        has_more: existingPayments?.has_more ?? false,
+        url: existingPayments?.url ?? '/v1/invoice_payments',
+      },
+    };
   }
 }

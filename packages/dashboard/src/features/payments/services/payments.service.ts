@@ -1,5 +1,6 @@
 import { apiClient } from '../../../lib/api/client';
 import type {
+  ConfigurePaymentWebhookResponse,
   GetPaymentsConfigResponse,
   GetPaymentsStatusResponse,
   ListPaymentCatalogResponse,
@@ -55,6 +56,13 @@ export class PaymentsService {
   async removeConfig(environment: StripeEnvironment): Promise<GetPaymentsConfigResponse> {
     return apiClient.request(`/payments/config/${environment}`, {
       method: 'DELETE',
+      headers: apiClient.withAccessToken(),
+    });
+  }
+
+  async configureWebhook(environment: StripeEnvironment): Promise<ConfigurePaymentWebhookResponse> {
+    return apiClient.request(`/payments/webhooks/${environment}/configure`, {
+      method: 'POST',
       headers: apiClient.withAccessToken(),
     });
   }

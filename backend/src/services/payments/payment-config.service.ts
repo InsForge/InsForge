@@ -275,6 +275,22 @@ export class PaymentConfigService {
     );
   }
 
+  async configureManagedStripeWebhook(environment: StripeEnvironment): Promise<StripeConnection> {
+    return this.withEnvironmentLock(environment, async () => {
+      const provider = await this.createStripeProvider(environment);
+      const account = await provider.retrieveAccount();
+      const currentStripeAccountId = await this.getCurrentStripeAccountId(environment);
+      const webhookSetup = await this.recreateManagedStripeWebhook(provider, environment);
+
+      return this.persistManagedStripeWebhookConfiguration(
+        environment,
+        account,
+        webhookSetup,
+        currentStripeAccountId !== account.id
+      );
+    });
+  }
+
   async recordConnectionStatus(
     environment: StripeEnvironment,
     status: 'unconfigured' | 'error',
@@ -836,6 +852,117 @@ export class PaymentConfigService {
       );
 
       await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  private async persistManagedStripeWebhookConfiguration(
+    environment: StripeEnvironment,
+    account: StripeAccount,
+    webhookSetup: ManagedStripeWebhookSetup,
+    clearMirror: boolean
+  ): Promise<StripeConnection> {
+    const client = await this.getPool().connect();
+
+    try {
+      await client.query('BEGIN');
+      if (clearMirror) {
+        await this.clearPaymentMirror(client, environment);
+        logger.info(
+          'Cleared Stripe payment mirror during webhook configuration after account change',
+          {
+            environment,
+          }
+        );
+      }
+
+      await this.persistManagedStripeWebhookSecret(client, environment, webhookSetup);
+
+      const result = await client.query(
+        `INSERT INTO payments.stripe_connections (
+           environment,
+           stripe_account_id,
+           stripe_account_email,
+           account_livemode,
+           status,
+           webhook_endpoint_id,
+           webhook_endpoint_url,
+           webhook_configured_at,
+           raw
+         )
+         VALUES (
+           $1,
+           $2,
+           $3,
+           $4,
+           'connected',
+           $5,
+           $6,
+           NOW(),
+           $7
+         )
+         ON CONFLICT (environment) DO UPDATE SET
+           stripe_account_id = EXCLUDED.stripe_account_id,
+           stripe_account_email = EXCLUDED.stripe_account_email,
+           account_livemode = EXCLUDED.account_livemode,
+           status = 'connected',
+           webhook_endpoint_id = EXCLUDED.webhook_endpoint_id,
+           webhook_endpoint_url = EXCLUDED.webhook_endpoint_url,
+           webhook_configured_at = EXCLUDED.webhook_configured_at,
+           last_synced_at = CASE
+             WHEN $8 THEN NULL
+             ELSE payments.stripe_connections.last_synced_at
+           END,
+           last_sync_status = CASE
+             WHEN $8 THEN NULL
+             ELSE payments.stripe_connections.last_sync_status
+           END,
+           last_sync_error = CASE
+             WHEN $8 THEN NULL
+             ELSE payments.stripe_connections.last_sync_error
+           END,
+           last_sync_counts = CASE
+             WHEN $8 THEN '{}'::JSONB
+             ELSE payments.stripe_connections.last_sync_counts
+           END,
+           raw = EXCLUDED.raw,
+           updated_at = NOW()
+         RETURNING
+           environment,
+           status,
+           stripe_account_id AS "stripeAccountId",
+           stripe_account_email AS "stripeAccountEmail",
+           account_livemode AS "accountLivemode",
+           webhook_endpoint_id AS "webhookEndpointId",
+           webhook_endpoint_url AS "webhookEndpointUrl",
+           webhook_configured_at AS "webhookConfiguredAt",
+           last_synced_at AS "lastSyncedAt",
+           last_sync_status AS "lastSyncStatus",
+           last_sync_error AS "lastSyncError",
+           last_sync_counts AS "lastSyncCounts"`,
+        [
+          environment,
+          account.id,
+          account.email ?? null,
+          environment === 'live',
+          webhookSetup.endpointId,
+          webhookSetup.endpointUrl,
+          account,
+          clearMirror,
+        ]
+      );
+
+      await client.query('COMMIT');
+
+      const keyConfig = await this.getStripeKeyConfig(environment);
+      return this.normalizeConnectionRow(
+        result.rows[0] as StripeConnectionRow,
+        keyConfig.maskedKey
+      );
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;

@@ -9,6 +9,7 @@ import type {
   StripeProductRow,
 } from '@/types/payments.js';
 import {
+  buildStripeIdempotencyKey,
   getStripeObjectId,
   normalizePriceRow,
   normalizeProductRow,
@@ -228,11 +229,18 @@ export class PaymentProductService {
   }
 
   async createProduct(input: CreatePaymentProductRequest): Promise<MutatePaymentProductResponse> {
-    const { environment, ...productInput } = input;
+    const { environment, idempotencyKey, ...productInput } = input;
 
     return this.withEnvironmentLock(environment, async () => {
       const provider = await this.configService.createStripeProvider(environment);
-      const product = await provider.createProduct(productInput);
+      const product = await provider.createProduct({
+        ...productInput,
+        ...(idempotencyKey
+          ? {
+              idempotencyKey: buildStripeIdempotencyKey(environment, 'product', idempotencyKey),
+            }
+          : {}),
+      });
 
       await this.upsertProductMirror(environment, product);
 

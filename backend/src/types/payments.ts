@@ -2,6 +2,7 @@ import type Stripe from 'stripe';
 
 type StripeInstance = Stripe.Stripe;
 type AsyncIterableItem<T> = T extends AsyncIterable<infer Item> ? Item : never;
+type StripeResourceData<T> = Omit<T, 'lastResponse'>;
 
 export const STRIPE_ENVIRONMENTS = ['test', 'live'] as const;
 export type StripeEnvironment = (typeof STRIPE_ENVIRONMENTS)[number];
@@ -27,10 +28,21 @@ export type StripeSubscription = AsyncIterableItem<
   ReturnType<StripeInstance['subscriptions']['list']>
 >;
 export type StripeSubscriptionItem = StripeSubscription['items']['data'][number];
-export type StripePaymentIntent = Awaited<ReturnType<StripeInstance['paymentIntents']['retrieve']>>;
-export type StripeCharge = Awaited<ReturnType<StripeInstance['charges']['retrieve']>>;
-export type StripeInvoice = Awaited<ReturnType<StripeInstance['invoices']['retrieve']>>;
-export type StripeRefund = Awaited<ReturnType<StripeInstance['refunds']['retrieve']>>;
+export type StripePaymentIntent = StripeResourceData<
+  Awaited<ReturnType<StripeInstance['paymentIntents']['retrieve']>>
+>;
+export type StripeCharge = StripeResourceData<
+  Awaited<ReturnType<StripeInstance['charges']['retrieve']>>
+>;
+export type StripeInvoice = StripeResourceData<
+  Awaited<ReturnType<StripeInstance['invoices']['retrieve']>>
+>;
+export type StripeInvoicePayment = AsyncIterableItem<
+  ReturnType<StripeInstance['invoicePayments']['list']>
+>;
+export type StripeRefund = StripeResourceData<
+  Awaited<ReturnType<StripeInstance['refunds']['retrieve']>>
+>;
 export type StripeClient = Pick<
   StripeInstance,
   | 'accounts'
@@ -41,6 +53,9 @@ export type StripeClient = Pick<
   | 'webhooks'
   | 'webhookEndpoints'
   | 'subscriptions'
+  | 'paymentIntents'
+  | 'charges'
+  | 'invoicePayments'
 >;
 
 export interface StripeKeyConfig {
@@ -58,6 +73,7 @@ export interface StripeSyncSnapshot {
 export interface StripeCustomerCreateInput {
   email?: string | null;
   metadata?: Record<string, string>;
+  idempotencyKey?: string;
 }
 
 export interface StripeProductCreateInput {
@@ -65,6 +81,7 @@ export interface StripeProductCreateInput {
   description?: string | null;
   active?: boolean;
   metadata?: Record<string, string>;
+  idempotencyKey?: string;
 }
 
 export interface StripeProductUpdateInput {
@@ -94,6 +111,7 @@ export interface StripePriceCreateInput {
   };
   taxBehavior?: StripePriceTaxBehavior;
   metadata?: Record<string, string>;
+  idempotencyKey?: string;
 }
 
 export interface StripePriceUpdateInput {
@@ -116,6 +134,7 @@ export interface StripeCheckoutSessionCreateInput {
   customerId?: string | null;
   customerEmail?: string | null;
   metadata?: Record<string, string>;
+  idempotencyKey?: string;
 }
 
 export interface StripeConnectionRow {
