@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import Stripe from 'stripe';
 import {
   maskStripeKey,
   StripeProvider,
@@ -306,6 +307,7 @@ describe('StripeProvider', () => {
     expect(client.webhookEndpoints.create).toHaveBeenCalledWith({
       url: 'https://example.com/api/webhooks/stripe/test',
       enabled_events: ['checkout.session.completed'],
+      api_version: Stripe.API_VERSION,
       metadata: { managed_by: 'insforge' },
     });
     expect(client.webhookEndpoints.del).toHaveBeenCalledWith('we_123');

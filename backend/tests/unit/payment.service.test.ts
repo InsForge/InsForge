@@ -6,7 +6,7 @@ import type {
   StripeSubscription,
 } from '../../src/types/payments';
 
-const { mockPool, mockProvider, mockGetSecretByKey, mockEncrypt } = vi.hoisted(() => ({
+const { mockPool, mockProvider, mockGetSecretByKey, mockEncrypt, mockLogger } = vi.hoisted(() => ({
   mockPool: {
     query: vi.fn(),
     connect: vi.fn(),
@@ -29,6 +29,7 @@ const { mockPool, mockProvider, mockGetSecretByKey, mockEncrypt } = vi.hoisted((
   },
   mockGetSecretByKey: vi.fn(),
   mockEncrypt: vi.fn(),
+  mockLogger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
 vi.mock('../../src/infra/database/database.manager', () => ({
@@ -64,9 +65,7 @@ vi.mock('../../src/infra/security/encryption.manager', () => ({
   },
 }));
 
-vi.mock('../../src/utils/logger', () => ({
-  default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-}));
+vi.mock('../../src/utils/logger', () => ({ default: mockLogger }));
 
 import { PaymentService } from '../../src/services/payments/payment.service';
 
@@ -784,6 +783,7 @@ describe('PaymentService', () => {
     expect(mockProvider.syncCatalog.mock.invocationCallOrder[0]).toBeLessThan(
       mockProvider.listSubscriptions.mock.invocationCallOrder[0]
     );
+    expect(mockProvider.createWebhookEndpoint).not.toHaveBeenCalled();
     expect(mockSubscriptionsClient.query).toHaveBeenCalledWith(
       expect.stringMatching(/DELETE FROM payments\.subscriptions/i),
       ['test', []]
@@ -881,6 +881,26 @@ describe('PaymentService', () => {
     expect(mockSyncClient.query).toHaveBeenCalledWith(
       'DELETE FROM payments.products WHERE environment = $1',
       ['test']
+    );
+    expect(mockProvider.createWebhookEndpoint).toHaveBeenCalledTimes(1);
+    expect(mockEncrypt).toHaveBeenCalledWith('whsec_new');
+    expect(mockSyncClient.query).toHaveBeenCalledWith(expect.stringMatching(/system\.secrets/i), [
+      'STRIPE_TEST_WEBHOOK_SECRET',
+      'encrypted-secret',
+    ]);
+    expect(mockSyncClient.query).toHaveBeenCalledWith(
+      expect.stringMatching(/INSERT INTO payments\.stripe_connections/i),
+      [
+        'test',
+        'acct_new',
+        'new-owner@example.com',
+        false,
+        { products: 0, prices: 0 },
+        expect.objectContaining({ id: 'acct_new' }),
+        'we_new',
+        'http://localhost:7130/api/webhooks/stripe/test',
+        true,
+      ]
     );
     expect(mockSyncClient.query).toHaveBeenCalledWith('COMMIT');
   });
@@ -1040,7 +1060,7 @@ describe('PaymentService', () => {
   });
 
   it('lists prices from the requested local Stripe mirror with an optional product filter', async () => {
-    mockPool.query.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({
+    mockPool.query.mockResolvedValueOnce({
       rows: [
         {
           environment: 'test',
@@ -1056,23 +1076,6 @@ describe('PaymentService', () => {
           taxBehavior: 'exclusive',
           recurringInterval: 'month',
           recurringIntervalCount: 1,
-          metadata: {},
-          syncedAt: new Date('2026-04-27T00:00:00.000Z'),
-        },
-        {
-          environment: 'test',
-          stripePriceId: 'price_other',
-          stripeProductId: 'prod_other',
-          active: true,
-          currency: 'usd',
-          unitAmount: 2500,
-          unitAmountDecimal: null,
-          type: 'one_time',
-          lookupKey: null,
-          billingScheme: 'per_unit',
-          taxBehavior: null,
-          recurringInterval: null,
-          recurringIntervalCount: null,
           metadata: {},
           syncedAt: new Date('2026-04-27T00:00:00.000Z'),
         },
@@ -1454,6 +1457,7 @@ describe('PaymentService', () => {
         ],
       })
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
         rows: [
           {
@@ -1511,6 +1515,10 @@ describe('PaymentService', () => {
         new Date('2026-04-28T00:00:00.000Z'),
         expect.objectContaining({ id: 'cs_test_123' }),
       ]
+    );
+    expect(mockPool.query).toHaveBeenCalledWith(
+      expect.stringMatching(/WITH refund_totals[\s\S]*UPDATE payments\.payment_history original/i),
+      ['test', 'pi_123', null]
     );
   });
 
@@ -1696,6 +1704,7 @@ describe('PaymentService', () => {
           },
         ],
       })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
         rows: [
@@ -1888,6 +1897,7 @@ describe('PaymentService', () => {
         ],
       })
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
         rows: [
           {
@@ -2003,6 +2013,7 @@ describe('PaymentService', () => {
         ],
       })
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
         rows: [
           {
@@ -2057,6 +2068,10 @@ describe('PaymentService', () => {
         new Date('2026-04-28T00:03:20.000Z'),
         expect.objectContaining({ id: 're_123' }),
       ]
+    );
+    expect(mockPool.query).toHaveBeenCalledWith(
+      expect.stringMatching(/WITH refund_totals[\s\S]*UPDATE payments\.payment_history original/i),
+      ['test', 'pi_invoice_123', 'ch_123']
     );
   });
 
@@ -2232,6 +2247,10 @@ describe('PaymentService', () => {
     });
 
     expect(mockProvider.listSubscriptions).toHaveBeenCalledTimes(1);
+    expect(mockLogger.warn).not.toHaveBeenCalledWith(
+      'Stripe subscription projection is missing InsForge billing subject',
+      expect.any(Object)
+    );
     expect(mockClient.query).toHaveBeenCalledWith(
       expect.stringMatching(/INSERT INTO payments\.subscriptions/i),
       expect.arrayContaining(['test', 'sub_existing', 'cus_existing', null, null, 'active'])

@@ -171,6 +171,7 @@ export class StripeProvider {
     const params: StripeWebhookEndpointCreateParams = {
       url: input.url,
       enabled_events: input.enabledEvents,
+      api_version: Stripe.API_VERSION,
     };
 
     if (input.metadata !== undefined) {
