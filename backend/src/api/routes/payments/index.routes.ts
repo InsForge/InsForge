@@ -1,5 +1,5 @@
 import { Router, Response, NextFunction } from 'express';
-import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
+import { AuthRequest, verifyAdmin, verifyUser } from '@/api/middlewares/auth.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { PaymentService } from '@/services/payments/payment.service.js';
@@ -14,12 +14,35 @@ import {
   listPaymentCatalogRequestSchema,
   listPaymentHistoryRequestSchema,
   listSubscriptionsRequestSchema,
-  syncPaymentCatalogRequestSchema,
-  syncPaymentSubscriptionsRequestSchema,
+  syncPaymentsRequestSchema,
 } from '@insforge/shared-schemas';
 
 const router = Router();
 const paymentService = PaymentService.getInstance();
+
+router.post(
+  '/checkout-sessions',
+  verifyUser,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validation = createCheckoutSessionRequestSchema.safeParse(req.body);
+      if (!validation.success) {
+        throw new AppError(
+          validation.error.issues
+            .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+            .join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const checkoutSession = await paymentService.createCheckoutSession(validation.data);
+      successResponse(res, checkoutSession, 201);
+    } catch (error) {
+      next(normalizeStripeConfigError(error));
+    }
+  }
+);
 
 router.use(verifyAdmin);
 
@@ -96,6 +119,26 @@ router.delete(
 router.use('/products', productsRouter);
 router.use('/prices', pricesRouter);
 
+router.post('/sync', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const validation = syncPaymentsRequestSchema.safeParse(req.body);
+    if (!validation.success) {
+      throw new AppError(
+        validation.error.issues
+          .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+          .join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    const result = await paymentService.syncPayments(validation.data);
+    successResponse(res, result);
+  } catch (error) {
+    next(normalizeStripeConfigError(error));
+  }
+});
+
 router.get('/payment-history', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const validation = listPaymentHistoryRequestSchema.safeParse(req.query);
@@ -136,46 +179,6 @@ router.get('/subscriptions', async (req: AuthRequest, res: Response, next: NextF
   }
 });
 
-router.post('/subscriptions/sync', async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const validation = syncPaymentSubscriptionsRequestSchema.safeParse(req.body);
-    if (!validation.success) {
-      throw new AppError(
-        validation.error.issues
-          .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
-          .join(', '),
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
-    }
-
-    const result = await paymentService.syncSubscriptions(validation.data);
-    successResponse(res, result);
-  } catch (error) {
-    next(normalizeStripeConfigError(error));
-  }
-});
-
-router.post('/checkout-sessions', async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const validation = createCheckoutSessionRequestSchema.safeParse(req.body);
-    if (!validation.success) {
-      throw new AppError(
-        validation.error.issues
-          .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
-          .join(', '),
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
-    }
-
-    const checkoutSession = await paymentService.createCheckoutSession(validation.data);
-    successResponse(res, checkoutSession, 201);
-  } catch (error) {
-    next(normalizeStripeConfigError(error));
-  }
-});
-
 router.get('/catalog', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const validation = listPaymentCatalogRequestSchema.safeParse(req.query);
@@ -191,31 +194,6 @@ router.get('/catalog', async (req: AuthRequest, res: Response, next: NextFunctio
 
     const catalog = await paymentService.listCatalog(validation.data.environment);
     successResponse(res, catalog);
-  } catch (error) {
-    next(error);
-  }
-});
-
-router.post('/catalog/sync', async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const validation = syncPaymentCatalogRequestSchema.safeParse(req.body);
-    if (!validation.success) {
-      throw new AppError(
-        validation.error.issues
-          .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
-          .join(', '),
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
-    }
-
-    const { environment } = validation.data;
-    const connections =
-      environment === 'all'
-        ? await paymentService.syncAll()
-        : [await paymentService.syncEnvironment(environment)];
-
-    successResponse(res, { connections });
   } catch (error) {
     next(error);
   }

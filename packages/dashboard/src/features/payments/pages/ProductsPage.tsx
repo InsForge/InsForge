@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AlertCircle, ChevronRight, Loader2, RefreshCw, Settings } from 'lucide-react';
+import { AlertCircle, ChevronRight, Settings } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
 import { Button, Tab, Tabs } from '@insforge/ui';
 import { Alert, AlertDescription, AlertTitle } from '../../../components/radix';
@@ -131,7 +131,7 @@ function ProductTable({
       <div className="mx-auto flex w-4/5 max-w-[1024px] flex-col items-center justify-center rounded border border-dashed border-[var(--alpha-8)] bg-card p-8 text-center">
         <p className="text-sm font-medium text-foreground">No products found</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Sync Catalog after creating products in your Stripe dashboard.
+          Open Payments Settings and sync after creating products in your Stripe dashboard.
         </p>
       </div>
     );
@@ -324,7 +324,7 @@ export default function ProductsPage() {
   const [environment, setEnvironment] = useState<StripeEnvironment>('test');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<StripeProductMirror | null>(null);
-  const { activeConnection, products, prices, isLoading, isSyncing, error, syncCatalog, refetch } =
+  const { activeConnection, products, prices, isLoading, error, refetch } =
     usePayments(environment);
 
   useEffect(() => {
@@ -397,24 +397,9 @@ export default function ProductsPage() {
         }
         rightActions={
           hasActiveKey ? (
-            <>
-              <span className="text-xs text-muted-foreground">
-                Last synced: {formatLastSynced(activeConnection?.lastSyncedAt ?? null)}
-              </span>
-              <Button
-                variant="secondary"
-                onClick={() => void syncCatalog()}
-                disabled={isSyncing}
-                className="h-9 rounded px-3"
-              >
-                {isSyncing ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4" />
-                )}
-                Sync Catalog
-              </Button>
-            </>
+            <span className="text-xs text-muted-foreground">
+              Last synced: {formatLastSynced(activeConnection?.lastSyncedAt ?? null)}
+            </span>
           ) : null
         }
         showSearch={hasActiveKey}

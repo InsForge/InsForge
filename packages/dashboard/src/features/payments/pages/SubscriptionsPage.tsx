@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ChevronRight, Loader2, RefreshCw, Settings } from 'lucide-react';
+import { ChevronRight, Settings } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
 import { Button, Tab, Tabs } from '@insforge/ui';
 import { ErrorState, LoadingState, TableHeader } from '../../../components';
@@ -349,15 +349,8 @@ export default function SubscriptionsPage() {
   const [selectedSubscription, setSelectedSubscription] = useState<StripeSubscriptionMirror | null>(
     null
   );
-  const {
-    activeConnection,
-    subscriptions,
-    isLoading,
-    isSyncing,
-    error,
-    syncSubscriptions,
-    refetch,
-  } = usePaymentSubscriptions(environment);
+  const { activeConnection, subscriptions, isLoading, error, refetch } =
+    usePaymentSubscriptions(environment);
 
   useEffect(() => {
     setSelectedSubscription(null);
@@ -421,23 +414,6 @@ export default function SubscriptionsPage() {
               </Tab>
             ))}
           </Tabs>
-        }
-        rightActions={
-          hasActiveKey ? (
-            <Button
-              variant="secondary"
-              onClick={() => void syncSubscriptions()}
-              disabled={isSyncing}
-              className="h-9 rounded px-3"
-            >
-              {isSyncing ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-              Sync Subscriptions
-            </Button>
-          ) : null
         }
         showSearch={hasActiveKey}
         searchValue={searchQuery}

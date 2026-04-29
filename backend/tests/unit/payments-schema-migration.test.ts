@@ -6,11 +6,11 @@ import { fileURLToPath } from 'url';
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const migrationPath = path.resolve(
   currentDir,
-  '../../src/infra/database/migrations/036_create-payments-schema.sql'
+  '../../src/infra/database/migrations/038_create-payments-schema.sql'
 );
 const sql = fs.readFileSync(migrationPath, 'utf8');
 
-describe('036_create-payments-schema migration', () => {
+describe('038_create-payments-schema migration', () => {
   it('migration file exists', () => {
     expect(fs.existsSync(migrationPath)).toBe(true);
   });

@@ -1,15 +1,11 @@
 import { useMemo } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { paymentsService } from '../services/payments.service';
-import { useToast } from '../../../lib/hooks/useToast';
 import type { StripeEnvironment } from '@insforge/shared-schemas';
 
 const SUBSCRIPTIONS_LIMIT = 100;
 
 export function usePaymentSubscriptions(environment: StripeEnvironment) {
-  const queryClient = useQueryClient();
-  const { showToast } = useToast();
-
   const {
     data: statusData,
     isLoading: isLoadingStatus,
@@ -46,27 +42,13 @@ export function usePaymentSubscriptions(environment: StripeEnvironment) {
     staleTime: 30 * 1000,
   });
 
-  const syncMutation = useMutation({
-    mutationFn: () => paymentsService.syncSubscriptions({ environment }),
-    onSuccess: async (result) => {
-      await queryClient.invalidateQueries({ queryKey: ['payments', 'subscriptions'] });
-      const unmappedSuffix = result.unmapped > 0 ? ` (${result.unmapped} unmapped)` : '';
-      showToast(`Synced ${result.synced} Stripe subscriptions${unmappedSuffix}`, 'success');
-    },
-    onError: (err: Error) => {
-      showToast(err.message || 'Failed to sync Stripe subscriptions', 'error');
-    },
-  });
-
   return {
     connections,
     activeConnection,
     subscriptions: subscriptionsData?.subscriptions ?? [],
     isLoading: isLoadingStatus || (hasActiveKey && isLoadingSubscriptions),
     isRefreshing: isFetchingStatus || (hasActiveKey && isFetchingSubscriptions),
-    isSyncing: syncMutation.isPending,
     error: statusError ?? subscriptionsError,
-    syncSubscriptions: () => syncMutation.mutateAsync(),
     refetch: () => Promise.all([refetchStatus(), hasActiveKey ? refetchSubscriptions() : null]),
   };
 }

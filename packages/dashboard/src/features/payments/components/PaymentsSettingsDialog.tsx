@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { CheckCircle2, Eye, EyeOff, Loader2, Settings } from 'lucide-react';
+import { CheckCircle2, Eye, EyeOff, Loader2, RefreshCw, Settings } from 'lucide-react';
 import {
   Button,
   MenuDialog,
@@ -17,9 +17,11 @@ import {
   MenuDialogTitle,
 } from '@insforge/ui';
 import { usePaymentsConfig } from '../hooks/usePaymentsConfig';
+import { usePaymentsSync } from '../hooks/usePaymentsSync';
 import type { StripeEnvironment, StripeKeyConfig } from '@insforge/shared-schemas';
 
 const ENVIRONMENTS: StripeEnvironment[] = ['test', 'live'];
+type PaymentsSettingsTab = 'keys' | 'sync';
 
 const KEY_PREFIX_BY_ENVIRONMENT: Record<StripeEnvironment, string> = {
   test: 'sk_test_',
@@ -106,7 +108,7 @@ function EnvironmentKeySection({
       description={
         <>
           Use a Stripe secret key that starts with{' '}
-          <span className="font-mono text-foreground">{expectedPrefix}</span>.
+          <span className="font-mono text-foreground">{expectedPrefix}</span>
         </>
       }
     >
@@ -179,6 +181,8 @@ function EnvironmentKeySection({
 
 export function PaymentsSettingsDialog({ open, onOpenChange }: PaymentsSettingsDialogProps) {
   const { keys, isLoading, error, saveKey, removeKey } = usePaymentsConfig();
+  const { syncPayments } = usePaymentsSync();
+  const [activeTab, setActiveTab] = useState<PaymentsSettingsTab>('keys');
   const [keyInputs, setKeyInputs] = useState<Record<StripeEnvironment, string>>({
     test: '',
     live: '',
@@ -189,8 +193,10 @@ export function PaymentsSettingsDialog({ open, onOpenChange }: PaymentsSettingsD
   });
   const [errors, setErrors] = useState<Partial<Record<StripeEnvironment, string>>>({});
 
-  const isBusy = saveKey.isPending || removeKey.isPending;
+  const isBusy = saveKey.isPending || removeKey.isPending || syncPayments.isPending;
   const canClose = !isBusy;
+  const configuredKeys = keys.filter((key) => key.hasKey);
+  const title = activeTab === 'keys' ? 'Stripe Keys' : 'Sync';
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!canClose) {
@@ -203,6 +209,8 @@ export function PaymentsSettingsDialog({ open, onOpenChange }: PaymentsSettingsD
       setErrors({});
       saveKey.reset();
       removeKey.reset();
+      syncPayments.reset();
+      setActiveTab('keys');
     }
 
     onOpenChange(nextOpen);
@@ -251,6 +259,14 @@ export function PaymentsSettingsDialog({ open, onOpenChange }: PaymentsSettingsD
     }
   };
 
+  const handleSync = async () => {
+    try {
+      await syncPayments.mutateAsync({ environment: 'all' });
+    } catch {
+      // The mutation owns toast/error state.
+    }
+  };
+
   return (
     <MenuDialog open={open} onOpenChange={handleOpenChange}>
       <MenuDialogContent>
@@ -260,8 +276,19 @@ export function PaymentsSettingsDialog({ open, onOpenChange }: PaymentsSettingsD
           </MenuDialogSideNavHeader>
           <MenuDialogNav>
             <MenuDialogNavList>
-              <MenuDialogNavItem icon={<Settings className="h-5 w-5" />} active={true}>
+              <MenuDialogNavItem
+                icon={<Settings className="h-5 w-5" />}
+                active={activeTab === 'keys'}
+                onClick={() => setActiveTab('keys')}
+              >
                 Stripe Keys
+              </MenuDialogNavItem>
+              <MenuDialogNavItem
+                icon={<RefreshCw className="h-5 w-5" />}
+                active={activeTab === 'sync'}
+                onClick={() => setActiveTab('sync')}
+              >
+                Sync
               </MenuDialogNavItem>
             </MenuDialogNavList>
           </MenuDialogNav>
@@ -269,54 +296,114 @@ export function PaymentsSettingsDialog({ open, onOpenChange }: PaymentsSettingsD
 
         <MenuDialogMain>
           <MenuDialogHeader>
-            <MenuDialogTitle>Stripe Keys</MenuDialogTitle>
+            <MenuDialogTitle>{title}</MenuDialogTitle>
             <MenuDialogCloseButton className="ml-auto" />
           </MenuDialogHeader>
 
           <MenuDialogBody>
-            <div className="flex flex-col gap-6">
-              <div>
-                <p className="text-sm leading-6 text-muted-foreground">
-                  Configure the Stripe secret keys InsForge uses for catalog sync, checkout, and
-                  webhooks. The test key is for implementation and validation; the live key is used
-                  only when you intentionally work with production Stripe data.
-                </p>
-              </div>
+            {activeTab === 'keys' ? (
+              <div className="flex flex-col gap-6">
+                <div>
+                  <p className="text-sm leading-6 text-muted-foreground">
+                    Configure the Stripe secret keys to use Payments.
+                  </p>
+                </div>
 
-              {isLoading && !error ? (
-                <div className="flex min-h-[120px] items-center justify-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Loading Stripe key configuration...
+                {isLoading && !error ? (
+                  <div className="flex min-h-[120px] items-center justify-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading Stripe key configuration...
+                  </div>
+                ) : error ? (
+                  <div className="rounded border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+                    Failed to load Stripe key configuration. Close the dialog and try again.
+                  </div>
+                ) : (
+                  ENVIRONMENTS.map((environment) => (
+                    <EnvironmentKeySection
+                      key={environment}
+                      environment={environment}
+                      config={keys.find((key) => key.environment === environment)}
+                      inputValue={keyInputs[environment]}
+                      showKey={visibleKeys[environment]}
+                      error={errors[environment]}
+                      isBusy={isBusy}
+                      onInputChange={(value) =>
+                        setKeyInputs((current) => ({ ...current, [environment]: value }))
+                      }
+                      onToggleShowKey={() =>
+                        setVisibleKeys((current) => ({
+                          ...current,
+                          [environment]: !current[environment],
+                        }))
+                      }
+                      onSave={() => void handleSave(environment)}
+                      onRemove={() => void handleRemove(environment)}
+                    />
+                  ))
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-6">
+                <div>
+                  <p className="text-sm leading-6 text-muted-foreground">
+                    Pull the latest products, prices, and subscriptions from Stripe.
+                  </p>
                 </div>
-              ) : error ? (
-                <div className="rounded border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
-                  Failed to load Stripe key configuration. Close the dialog and try again.
-                </div>
-              ) : (
-                ENVIRONMENTS.map((environment) => (
-                  <EnvironmentKeySection
-                    key={environment}
-                    environment={environment}
-                    config={keys.find((key) => key.environment === environment)}
-                    inputValue={keyInputs[environment]}
-                    showKey={visibleKeys[environment]}
-                    error={errors[environment]}
-                    isBusy={isBusy}
-                    onInputChange={(value) =>
-                      setKeyInputs((current) => ({ ...current, [environment]: value }))
-                    }
-                    onToggleShowKey={() =>
-                      setVisibleKeys((current) => ({
-                        ...current,
-                        [environment]: !current[environment],
-                      }))
-                    }
-                    onSave={() => void handleSave(environment)}
-                    onRemove={() => void handleRemove(environment)}
-                  />
-                ))
-              )}
-            </div>
+
+                {isLoading && !error ? (
+                  <div className="flex min-h-[120px] items-center justify-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading Stripe key configuration...
+                  </div>
+                ) : error ? (
+                  <div className="rounded border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+                    Failed to load Stripe key configuration. Close the dialog and try again.
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-4">
+                    <div className="rounded border border-[var(--alpha-8)] bg-muted/40 p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground">
+                            Sync all configured environments
+                          </p>
+                          <p className="mt-1 text-[13px] leading-5 text-muted-foreground">
+                            {configuredKeys.length > 0
+                              ? `Configured: ${configuredKeys
+                                  .map((key) => (key.environment === 'test' ? 'Test' : 'Live'))
+                                  .join(', ')}`
+                              : 'Configure a Stripe test or live key before syncing.'}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          size="lg"
+                          onClick={() => void handleSync()}
+                          disabled={syncPayments.isPending || configuredKeys.length === 0}
+                          className="h-9 shrink-0"
+                        >
+                          {syncPayments.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-4 w-4" />
+                          )}
+                          Sync Payments
+                        </Button>
+                      </div>
+                    </div>
+
+                    {syncPayments.error && (
+                      <div className="rounded border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+                        {syncPayments.error instanceof Error
+                          ? syncPayments.error.message
+                          : 'Failed to sync Stripe payments.'}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </MenuDialogBody>
         </MenuDialogMain>
       </MenuDialogContent>

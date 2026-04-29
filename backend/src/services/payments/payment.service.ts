@@ -18,7 +18,10 @@ import {
   type StripeCustomer,
   type StripeEnvironment,
   type StripeEvent,
+  type StripeCharge,
+  type StripeInvoice,
   type StripePaymentIntent,
+  type StripeRefund,
   type StripeAccount,
   type StripePrice,
   type StripePriceRow,
@@ -63,8 +66,10 @@ import type {
   ListPaymentHistoryResponse,
   ListSubscriptionsRequest,
   ListSubscriptionsResponse,
-  SyncPaymentSubscriptionsRequest,
-  SyncPaymentSubscriptionsResponse,
+  SyncPaymentsRequest,
+  SyncPaymentsResponse,
+  SyncPaymentsEnvironmentResult,
+  SyncPaymentsSubscriptionsSummary,
 } from '@insforge/shared-schemas';
 
 const SECRET_KEY_BY_ENVIRONMENT: Record<StripeEnvironment, string> = {
@@ -82,13 +87,22 @@ const SUBJECT_METADATA_KEYS = {
   id: 'insforge_subject_id',
 } as const;
 
+const CHECKOUT_MODE_METADATA_KEY = 'insforge_checkout_mode';
+
 const MANAGED_WEBHOOK_EVENTS = [
   'checkout.session.completed',
-  'payment_intent.succeeded',
-  'payment_intent.payment_failed',
+  'checkout.session.async_payment_succeeded',
+  'checkout.session.async_payment_failed',
+  'invoice.paid',
+  'invoice.payment_failed',
+  'refund.created',
+  'refund.updated',
+  'refund.failed',
   'customer.subscription.created',
   'customer.subscription.updated',
   'customer.subscription.deleted',
+  'customer.subscription.paused',
+  'customer.subscription.resumed',
 ] as const;
 
 const MANAGED_WEBHOOK_METADATA = {
@@ -101,6 +115,20 @@ interface ManagedStripeWebhookSetup {
   endpointUrl: string;
   secret: string;
 }
+
+interface PaymentHistoryContext {
+  subjectType: string | null;
+  subjectId: string | null;
+  stripeCustomerId: string | null;
+  customerEmailSnapshot: string | null;
+  stripeInvoiceId: string | null;
+  stripeSubscriptionId: string | null;
+  stripeProductId: string | null;
+  stripePriceId: string | null;
+  description: string | null;
+}
+
+type PaymentHistoryStatus = 'pending' | 'succeeded' | 'failed' | 'refunded' | 'partially_refunded';
 
 interface SubscriptionProjectionResult {
   synced: boolean;
@@ -157,14 +185,7 @@ export class PaymentService {
         webhookSetup
       );
 
-      try {
-        const snapshot = await provider.syncCatalog();
-        await this.writeSnapshot(environment, snapshot, new Date());
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        logger.error('Stripe sync failed after key update', { environment, error: message });
-        await this.recordConnectionStatus(environment, 'error', message);
-      }
+      await this.syncPaymentsEnvironmentUnlocked(environment, provider, false);
     });
   }
 
@@ -881,37 +902,35 @@ export class PaymentService {
     };
   }
 
-  async syncSubscriptions(
-    input: SyncPaymentSubscriptionsRequest
-  ): Promise<SyncPaymentSubscriptionsResponse> {
-    return this.withEnvironmentLock(input.environment, async () => {
-      const provider = await this.createStripeProvider(input.environment);
-      const subscriptions = await provider.listSubscriptions();
-      let synced = 0;
-      let unmapped = 0;
+  private async syncSubscriptionsWithProviderUnlocked(
+    environment: StripeEnvironment,
+    provider: StripeProvider
+  ): Promise<SyncPaymentsSubscriptionsSummary> {
+    const subscriptions = await provider.listSubscriptions();
+    let synced = 0;
+    let unmapped = 0;
 
-      for (const subscription of subscriptions) {
-        const result = await this.upsertSubscriptionProjection(input.environment, subscription);
-        if (result.synced) {
-          synced += 1;
-        }
-        if (result.unmapped) {
-          unmapped += 1;
-        }
+    for (const subscription of subscriptions) {
+      const result = await this.upsertSubscriptionProjection(environment, subscription);
+      if (result.synced) {
+        synced += 1;
       }
+      if (result.unmapped) {
+        unmapped += 1;
+      }
+    }
 
-      const deleted = await this.deleteMissingSyncedSubscriptions(
-        input.environment,
-        subscriptions.map((subscription) => subscription.id)
-      );
+    const deleted = await this.deleteMissingSyncedSubscriptions(
+      environment,
+      subscriptions.map((subscription) => subscription.id)
+    );
 
-      return {
-        environment: input.environment,
-        synced,
-        unmapped,
-        deleted,
-      };
-    });
+    return {
+      environment,
+      synced,
+      unmapped,
+      deleted,
+    };
   }
 
   async createProduct(input: CreatePaymentProductRequest): Promise<MutatePaymentProductResponse> {
@@ -1029,7 +1048,7 @@ export class PaymentService {
 
     return this.withEnvironmentLock(input.environment, async () => {
       const provider = await this.createStripeProvider(input.environment);
-      const metadata = this.buildStripeMetadata(input.metadata, input.subject);
+      const metadata = this.buildStripeMetadata(input.metadata, input.subject, input.mode);
       const customerId = await this.resolveCheckoutCustomer(input, provider, metadata);
       const checkoutSession = await provider.createCheckoutSession({
         mode: input.mode,
@@ -1094,46 +1113,85 @@ export class PaymentService {
     }
   }
 
-  async syncAll(): Promise<StripeConnection[]> {
-    return Promise.all(STRIPE_ENVIRONMENTS.map((environment) => this.syncEnvironment(environment)));
-  }
-
-  async syncEnvironment(environment: StripeEnvironment): Promise<StripeConnection> {
-    return this.withEnvironmentLock(environment, async () =>
-      this.syncEnvironmentUnlocked(environment)
+  async syncPayments(input: SyncPaymentsRequest): Promise<SyncPaymentsResponse> {
+    const environments = input.environment === 'all' ? STRIPE_ENVIRONMENTS : [input.environment];
+    const results = await Promise.all(
+      environments.map((environment) =>
+        this.withEnvironmentLock(environment, async () =>
+          this.syncPaymentsEnvironmentUnlocked(environment)
+        )
+      )
     );
+
+    return { results };
   }
 
-  private async syncEnvironmentUnlocked(environment: StripeEnvironment): Promise<StripeConnection> {
-    let secretKey: string | null;
+  private async syncPaymentsEnvironmentUnlocked(
+    environment: StripeEnvironment,
+    providerOverride?: StripeProvider,
+    checkAccountChange = true
+  ): Promise<SyncPaymentsEnvironmentResult> {
+    let provider = providerOverride;
 
-    try {
-      secretKey = await this.getStripeSecretKey(environment);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return this.recordConnectionStatus(environment, 'error', message);
+    if (!provider) {
+      let secretKey: string | null;
+
+      try {
+        secretKey = await this.getStripeSecretKey(environment);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const connection = await this.recordConnectionStatus(environment, 'error', message);
+        return { environment, connection, subscriptions: null };
+      }
+
+      if (!secretKey) {
+        const connection = await this.recordConnectionStatus(
+          environment,
+          'unconfigured',
+          `STRIPE_${environment.toUpperCase()}_SECRET_KEY is not configured`
+        );
+        return { environment, connection, subscriptions: null };
+      }
+
+      provider = new StripeProvider(secretKey, environment);
     }
 
-    if (!secretKey) {
-      return this.recordConnectionStatus(
+    try {
+      let connection = await this.syncCatalogWithProviderUnlocked(
         environment,
-        'unconfigured',
-        `STRIPE_${environment.toUpperCase()}_SECRET_KEY is not configured`
+        provider,
+        checkAccountChange
       );
-    }
 
-    try {
-      const provider = new StripeProvider(secretKey, environment);
-      const snapshot = await provider.syncCatalog();
+      if (connection.status !== 'connected') {
+        return { environment, connection, subscriptions: null };
+      }
 
-      await this.writeSnapshot(environment, snapshot, new Date());
+      const subscriptions = await this.syncSubscriptionsWithProviderUnlocked(environment, provider);
+      connection = await this.getConnection(environment);
 
-      return this.getConnection(environment);
+      return { environment, connection, subscriptions };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      logger.error('Stripe sync failed', { environment, error: message });
-      return this.recordConnectionStatus(environment, 'error', message);
+      logger.error('Stripe payments sync failed', { environment, error: message });
+      const connection = await this.recordConnectionStatus(environment, 'error', message);
+      return { environment, connection, subscriptions: null };
     }
+  }
+
+  private async syncCatalogWithProviderUnlocked(
+    environment: StripeEnvironment,
+    provider: StripeProvider,
+    checkAccountChange: boolean
+  ): Promise<StripeConnection> {
+    const snapshot = await provider.syncCatalog();
+    const shouldClearMirror = checkAccountChange
+      ? await this.shouldClearPaymentMirrorForNewAccount(environment, snapshot.account.id)
+      : false;
+
+    await this.writeSnapshot(environment, snapshot, new Date(), shouldClearMirror);
+
+    return this.getConnection(environment);
   }
 
   private async getConnection(environment: StripeEnvironment): Promise<StripeConnection> {
@@ -1218,7 +1276,8 @@ export class PaymentService {
   private async writeSnapshot(
     environment: StripeEnvironment,
     snapshot: StripeSyncSnapshot,
-    syncStartedAt: Date
+    syncStartedAt: Date,
+    clearMirror = false
   ): Promise<void> {
     const client = await this.getPool().connect();
 
@@ -1227,6 +1286,13 @@ export class PaymentService {
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
         `payments_sync_${environment}`,
       ]);
+
+      if (clearMirror) {
+        await this.clearPaymentMirror(client, environment);
+        logger.info('Cleared Stripe payment mirror during catalog sync after account change', {
+          environment,
+        });
+      }
 
       await this.upsertConnection(client, environment, snapshot);
       await this.upsertProducts(client, environment, snapshot.products, syncStartedAt);
@@ -1587,9 +1653,13 @@ export class PaymentService {
 
   private buildStripeMetadata(
     metadata: Record<string, string> | undefined,
-    subject: BillingSubject | undefined
+    subject: BillingSubject | undefined,
+    checkoutMode?: 'payment' | 'subscription'
   ): Record<string, string> {
     const stripeMetadata = { ...(metadata ?? {}) };
+    if (checkoutMode) {
+      stripeMetadata[CHECKOUT_MODE_METADATA_KEY] = checkoutMode;
+    }
 
     if (subject) {
       stripeMetadata[SUBJECT_METADATA_KEYS.type] = subject.type;
@@ -1757,23 +1827,61 @@ export class PaymentService {
           environment,
           event.data.object as StripeCheckoutSession
         );
+      case 'checkout.session.async_payment_succeeded':
+        return this.processCheckoutSessionCompleted(
+          environment,
+          event.data.object as StripeCheckoutSession,
+          'succeeded'
+        );
+      case 'checkout.session.async_payment_failed':
+        return this.processCheckoutSessionCompleted(
+          environment,
+          event.data.object as StripeCheckoutSession,
+          'failed'
+        );
+      case 'invoice.paid':
+      case 'invoice.payment_succeeded':
+        await this.upsertInvoicePaymentHistory(
+          environment,
+          event.data.object as StripeInvoice,
+          'succeeded'
+        );
+        return true;
+      case 'invoice.payment_failed':
+        await this.upsertInvoicePaymentHistory(
+          environment,
+          event.data.object as StripeInvoice,
+          'failed'
+        );
+        return true;
       case 'payment_intent.succeeded':
-        await this.upsertPaymentIntentHistory(
+        return this.processPaymentIntentHistory(
           environment,
           event.data.object as StripePaymentIntent,
           'succeeded'
         );
-        return true;
       case 'payment_intent.payment_failed':
-        await this.upsertPaymentIntentHistory(
+        return this.processPaymentIntentHistory(
           environment,
           event.data.object as StripePaymentIntent,
           'failed'
         );
+      case 'charge.refunded':
+        await this.updatePaymentHistoryFromRefundedCharge(
+          environment,
+          event.data.object as StripeCharge
+        );
+        return true;
+      case 'refund.created':
+      case 'refund.updated':
+      case 'refund.failed':
+        await this.upsertRefundPaymentHistory(environment, event.data.object as StripeRefund);
         return true;
       case 'customer.subscription.created':
       case 'customer.subscription.updated':
       case 'customer.subscription.deleted':
+      case 'customer.subscription.paused':
+      case 'customer.subscription.resumed':
         return (
           await this.upsertSubscriptionProjection(
             environment,
@@ -1787,22 +1895,26 @@ export class PaymentService {
 
   private async processCheckoutSessionCompleted(
     environment: StripeEnvironment,
-    checkoutSession: StripeCheckoutSession
+    checkoutSession: StripeCheckoutSession,
+    statusOverride?: PaymentHistoryStatus
   ): Promise<boolean> {
     if (checkoutSession.mode !== 'payment') {
       return false;
     }
 
-    await this.upsertCheckoutPaymentHistory(environment, checkoutSession);
+    await this.upsertCheckoutPaymentHistory(environment, checkoutSession, statusOverride);
     return true;
   }
 
   private async upsertCheckoutPaymentHistory(
     environment: StripeEnvironment,
-    checkoutSession: StripeCheckoutSession
+    checkoutSession: StripeCheckoutSession,
+    statusOverride?: PaymentHistoryStatus
   ): Promise<void> {
     const subject = this.getBillingSubjectFromMetadata(checkoutSession.metadata);
     const stripePaymentIntentId = this.getStripeObjectId(checkoutSession.payment_intent);
+    const status =
+      statusOverride ?? (checkoutSession.payment_status === 'paid' ? 'succeeded' : 'pending');
 
     await this.getPool().query(
       `INSERT INTO payments.payment_history (
@@ -1843,7 +1955,7 @@ export class PaymentService {
          updated_at = NOW()`,
       [
         environment,
-        checkoutSession.payment_status === 'paid' ? 'succeeded' : 'pending',
+        status,
         subject?.type ?? null,
         subject?.id ?? null,
         this.getStripeObjectId(checkoutSession.customer),
@@ -1854,11 +1966,111 @@ export class PaymentService {
         checkoutSession.amount_total ?? null,
         checkoutSession.currency ?? null,
         null,
-        checkoutSession.payment_status === 'paid' ? new Date() : null,
+        status === 'succeeded' ? new Date() : null,
         this.fromStripeTimestamp(checkoutSession.created),
         checkoutSession,
       ]
     );
+  }
+
+  private async upsertInvoicePaymentHistory(
+    environment: StripeEnvironment,
+    invoice: StripeInvoice,
+    status: 'succeeded' | 'failed'
+  ): Promise<void> {
+    const stripeCustomerId = this.getStripeObjectId(invoice.customer);
+    const subscriptionId = this.getInvoiceSubscriptionId(invoice);
+    const subject = await this.resolveInvoiceSubject(environment, invoice, stripeCustomerId);
+    const stripePaymentIntentId = this.getInvoicePaymentIntentId(invoice);
+    const firstLine = invoice.lines?.data?.[0] ?? null;
+    const stripeProductId = this.getInvoiceLineItemProductId(firstLine);
+    const stripePriceId = this.getInvoiceLineItemPriceId(firstLine);
+    const paidAt =
+      status === 'succeeded'
+        ? (this.fromStripeTimestamp(invoice.status_transitions?.paid_at) ??
+          this.fromStripeTimestamp(invoice.created))
+        : null;
+    const failedAt = status === 'failed' ? this.fromStripeTimestamp(invoice.created) : null;
+
+    await this.getPool().query(
+      `INSERT INTO payments.payment_history (
+         environment,
+         type,
+         status,
+         subject_type,
+         subject_id,
+         stripe_customer_id,
+         customer_email_snapshot,
+         stripe_payment_intent_id,
+         stripe_invoice_id,
+         stripe_subscription_id,
+         stripe_product_id,
+         stripe_price_id,
+         amount,
+         currency,
+         description,
+         paid_at,
+         failed_at,
+         stripe_created_at,
+         raw
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+       ON CONFLICT (environment, stripe_invoice_id)
+         WHERE stripe_invoice_id IS NOT NULL
+       DO UPDATE SET
+         type = EXCLUDED.type,
+         status = EXCLUDED.status,
+         subject_type = EXCLUDED.subject_type,
+         subject_id = EXCLUDED.subject_id,
+         stripe_customer_id = EXCLUDED.stripe_customer_id,
+         customer_email_snapshot = EXCLUDED.customer_email_snapshot,
+         stripe_payment_intent_id = EXCLUDED.stripe_payment_intent_id,
+         stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+         stripe_product_id = EXCLUDED.stripe_product_id,
+         stripe_price_id = EXCLUDED.stripe_price_id,
+         amount = EXCLUDED.amount,
+         currency = EXCLUDED.currency,
+         description = EXCLUDED.description,
+         paid_at = EXCLUDED.paid_at,
+         failed_at = EXCLUDED.failed_at,
+         stripe_created_at = EXCLUDED.stripe_created_at,
+         raw = EXCLUDED.raw,
+         updated_at = NOW()`,
+      [
+        environment,
+        subscriptionId ? 'subscription_invoice' : 'one_time_payment',
+        status,
+        subject?.type ?? null,
+        subject?.id ?? null,
+        stripeCustomerId,
+        invoice.customer_email ?? null,
+        stripePaymentIntentId,
+        invoice.id,
+        subscriptionId,
+        stripeProductId,
+        stripePriceId,
+        status === 'succeeded' ? invoice.amount_paid : invoice.amount_due,
+        invoice.currency,
+        invoice.description ?? invoice.number ?? null,
+        paidAt,
+        failedAt,
+        this.fromStripeTimestamp(invoice.created),
+        invoice,
+      ]
+    );
+  }
+
+  private async processPaymentIntentHistory(
+    environment: StripeEnvironment,
+    paymentIntent: StripePaymentIntent,
+    status: 'succeeded' | 'failed'
+  ): Promise<boolean> {
+    if (paymentIntent.metadata?.[CHECKOUT_MODE_METADATA_KEY] !== 'payment') {
+      return false;
+    }
+
+    await this.upsertPaymentIntentHistory(environment, paymentIntent, status);
+    return true;
   }
 
   private async upsertPaymentIntentHistory(
@@ -1925,6 +2137,153 @@ export class PaymentService {
         paymentIntent,
       ]
     );
+  }
+
+  private async upsertRefundPaymentHistory(
+    environment: StripeEnvironment,
+    refund: StripeRefund
+  ): Promise<void> {
+    const stripePaymentIntentId = this.getStripeObjectId(refund.payment_intent);
+    const stripeChargeId = this.getStripeObjectId(refund.charge);
+    const context = await this.findPaymentHistoryContextForRefund(
+      environment,
+      stripePaymentIntentId,
+      stripeChargeId
+    );
+    const mappedStatus = this.mapRefundStatus(refund.status);
+
+    await this.getPool().query(
+      `INSERT INTO payments.payment_history (
+         environment,
+         type,
+         status,
+         subject_type,
+         subject_id,
+         stripe_customer_id,
+         customer_email_snapshot,
+         stripe_payment_intent_id,
+         stripe_invoice_id,
+         stripe_charge_id,
+         stripe_refund_id,
+         stripe_subscription_id,
+         stripe_product_id,
+         stripe_price_id,
+         amount,
+         currency,
+         description,
+         refunded_at,
+         stripe_created_at,
+         raw
+       )
+       VALUES ($1, 'refund', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+       ON CONFLICT (environment, stripe_refund_id)
+         WHERE stripe_refund_id IS NOT NULL
+       DO UPDATE SET
+         status = EXCLUDED.status,
+         subject_type = EXCLUDED.subject_type,
+         subject_id = EXCLUDED.subject_id,
+         stripe_customer_id = EXCLUDED.stripe_customer_id,
+         customer_email_snapshot = EXCLUDED.customer_email_snapshot,
+         stripe_payment_intent_id = EXCLUDED.stripe_payment_intent_id,
+         stripe_invoice_id = EXCLUDED.stripe_invoice_id,
+         stripe_charge_id = EXCLUDED.stripe_charge_id,
+         stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+         stripe_product_id = EXCLUDED.stripe_product_id,
+         stripe_price_id = EXCLUDED.stripe_price_id,
+         amount = EXCLUDED.amount,
+         currency = EXCLUDED.currency,
+         description = EXCLUDED.description,
+         refunded_at = EXCLUDED.refunded_at,
+         stripe_created_at = EXCLUDED.stripe_created_at,
+         raw = EXCLUDED.raw,
+         updated_at = NOW()`,
+      [
+        environment,
+        mappedStatus,
+        context?.subjectType ?? null,
+        context?.subjectId ?? null,
+        context?.stripeCustomerId ?? null,
+        context?.customerEmailSnapshot ?? null,
+        stripePaymentIntentId,
+        context?.stripeInvoiceId ?? null,
+        stripeChargeId,
+        refund.id,
+        context?.stripeSubscriptionId ?? null,
+        context?.stripeProductId ?? null,
+        context?.stripePriceId ?? null,
+        refund.amount,
+        refund.currency,
+        refund.description ?? refund.reason ?? context?.description ?? null,
+        mappedStatus === 'refunded' ? this.fromStripeTimestamp(refund.created) : null,
+        this.fromStripeTimestamp(refund.created),
+        refund,
+      ]
+    );
+  }
+
+  private async updatePaymentHistoryFromRefundedCharge(
+    environment: StripeEnvironment,
+    charge: StripeCharge
+  ): Promise<void> {
+    const stripePaymentIntentId = this.getStripeObjectId(charge.payment_intent);
+    const refundedAt = this.getLatestRefundCreatedAt(charge) ?? new Date();
+
+    await this.getPool().query(
+      `UPDATE payments.payment_history
+       SET amount_refunded = $4,
+           status = CASE WHEN $5 THEN 'refunded' ELSE 'partially_refunded' END,
+           refunded_at = $6,
+           updated_at = NOW()
+       WHERE environment = $1
+         AND type <> 'refund'
+         AND (
+           ($2::TEXT IS NOT NULL AND stripe_payment_intent_id = $2)
+           OR ($3::TEXT IS NOT NULL AND stripe_charge_id = $3)
+         )`,
+      [
+        environment,
+        stripePaymentIntentId,
+        charge.id,
+        charge.amount_refunded,
+        charge.refunded,
+        refundedAt,
+      ]
+    );
+  }
+
+  private async findPaymentHistoryContextForRefund(
+    environment: StripeEnvironment,
+    stripePaymentIntentId: string | null,
+    stripeChargeId: string | null
+  ): Promise<PaymentHistoryContext | null> {
+    if (!stripePaymentIntentId && !stripeChargeId) {
+      return null;
+    }
+
+    const result = await this.getPool().query(
+      `SELECT
+         subject_type AS "subjectType",
+         subject_id AS "subjectId",
+         stripe_customer_id AS "stripeCustomerId",
+         customer_email_snapshot AS "customerEmailSnapshot",
+         stripe_invoice_id AS "stripeInvoiceId",
+         stripe_subscription_id AS "stripeSubscriptionId",
+         stripe_product_id AS "stripeProductId",
+         stripe_price_id AS "stripePriceId",
+         description
+       FROM payments.payment_history
+       WHERE environment = $1
+         AND type <> 'refund'
+         AND (
+           ($2::TEXT IS NOT NULL AND stripe_payment_intent_id = $2)
+           OR ($3::TEXT IS NOT NULL AND stripe_charge_id = $3)
+         )
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [environment, stripePaymentIntentId, stripeChargeId]
+    );
+
+    return (result.rows[0] as PaymentHistoryContext | undefined) ?? null;
   }
 
   private async upsertSubscriptionProjection(
@@ -2130,6 +2489,91 @@ export class PaymentService {
       this.getBillingSubjectFromMetadata(subscription.metadata) ??
       (await this.findSubjectForStripeCustomer(environment, stripeCustomerId))
     );
+  }
+
+  private async resolveInvoiceSubject(
+    environment: StripeEnvironment,
+    invoice: StripeInvoice,
+    stripeCustomerId: string | null
+  ): Promise<BillingSubject | null> {
+    const parentMetadata = invoice.parent?.subscription_details?.metadata;
+
+    return (
+      this.getBillingSubjectFromMetadata(parentMetadata) ??
+      this.getBillingSubjectFromMetadata(invoice.metadata) ??
+      (stripeCustomerId
+        ? await this.findSubjectForStripeCustomer(environment, stripeCustomerId)
+        : null)
+    );
+  }
+
+  private getInvoiceSubscriptionId(invoice: StripeInvoice): string | null {
+    const parentSubscription = this.getStripeObjectId(
+      invoice.parent?.subscription_details?.subscription
+    );
+    if (parentSubscription) {
+      return parentSubscription;
+    }
+
+    for (const line of invoice.lines?.data ?? []) {
+      const lineSubscription =
+        this.getStripeObjectId(line.subscription) ??
+        this.getStripeObjectId(line.parent?.subscription_item_details?.subscription) ??
+        this.getStripeObjectId(line.parent?.invoice_item_details?.subscription);
+      if (lineSubscription) {
+        return lineSubscription;
+      }
+    }
+
+    return null;
+  }
+
+  private getInvoicePaymentIntentId(invoice: StripeInvoice): string | null {
+    for (const payment of invoice.payments?.data ?? []) {
+      const paymentIntentId = this.getStripeObjectId(payment.payment.payment_intent);
+      if (paymentIntentId) {
+        return paymentIntentId;
+      }
+    }
+
+    return null;
+  }
+
+  private getInvoiceLineItemProductId(
+    line: StripeInvoice['lines']['data'][number] | null
+  ): string | null {
+    return line?.pricing?.price_details?.product ?? null;
+  }
+
+  private getInvoiceLineItemPriceId(
+    line: StripeInvoice['lines']['data'][number] | null
+  ): string | null {
+    return this.getStripeObjectId(line?.pricing?.price_details?.price);
+  }
+
+  private mapRefundStatus(status: string | null): PaymentHistoryStatus {
+    if (status === 'failed' || status === 'canceled') {
+      return 'failed';
+    }
+
+    if (status === 'succeeded') {
+      return 'refunded';
+    }
+
+    return 'pending';
+  }
+
+  private getLatestRefundCreatedAt(charge: StripeCharge): Date | null {
+    const refundTimestamps =
+      charge.refunds?.data
+        ?.map((refund) => refund.created)
+        .filter((value): value is number => typeof value === 'number') ?? [];
+
+    if (refundTimestamps.length === 0) {
+      return null;
+    }
+
+    return this.fromStripeTimestamp(Math.max(...refundTimestamps));
   }
 
   private getBillingSubjectFromMetadata(

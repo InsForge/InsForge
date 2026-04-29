@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import {
   createCheckoutSessionRequestSchema,
   createPaymentPriceRequestSchema,
@@ -8,32 +10,57 @@ import {
   listPaymentPricesRequestSchema,
   listPaymentProductsRequestSchema,
   listSubscriptionsRequestSchema,
-  syncPaymentCatalogRequestSchema,
-  syncPaymentSubscriptionsRequestSchema,
+  syncPaymentsRequestSchema,
   updatePaymentPriceRequestSchema,
   updatePaymentProductRequestSchema,
   upsertPaymentsConfigRequestSchema,
 } from '@insforge/shared-schemas';
 
 describe('payments route schemas', () => {
-  it('accepts test, live, and all catalog sync targets', () => {
-    expect(syncPaymentCatalogRequestSchema.parse({ environment: 'test' })).toEqual({
+  const paymentsRouteSource = readFileSync(
+    resolve(__dirname, '../../src/api/routes/payments/index.routes.ts'),
+    'utf-8'
+  );
+
+  it('keeps checkout session creation on runtime auth before admin-only payments routes', () => {
+    expect(paymentsRouteSource).toContain('verifyAdmin, verifyUser');
+    expect(paymentsRouteSource).toMatch(
+      /router\.post\(\s*'\/checkout-sessions'[\s\S]*verifyUser[\s\S]*createCheckoutSession/
+    );
+    expect(paymentsRouteSource.indexOf("'/checkout-sessions'")).toBeLessThan(
+      paymentsRouteSource.indexOf('router.use(verifyAdmin)')
+    );
+  });
+
+  it('accepts test, live, and all unified sync targets', () => {
+    expect(syncPaymentsRequestSchema.parse({ environment: 'test' })).toEqual({
       environment: 'test',
     });
-    expect(syncPaymentCatalogRequestSchema.parse({ environment: 'live' })).toEqual({
+    expect(syncPaymentsRequestSchema.parse({ environment: 'live' })).toEqual({
       environment: 'live',
     });
-    expect(syncPaymentCatalogRequestSchema.parse({ environment: 'all' })).toEqual({
+    expect(syncPaymentsRequestSchema.parse({ environment: 'all' })).toEqual({
       environment: 'all',
     });
   });
 
-  it('defaults catalog sync to all environments', () => {
-    expect(syncPaymentCatalogRequestSchema.parse({})).toEqual({ environment: 'all' });
+  it('defaults unified payment sync to all environments', () => {
+    expect(syncPaymentsRequestSchema.parse({})).toEqual({ environment: 'all' });
   });
 
-  it('rejects unknown catalog sync environments', () => {
-    expect(() => syncPaymentCatalogRequestSchema.parse({ environment: 'prod' })).toThrow();
+  it('keeps unified payment sync behind the admin-only route guard', () => {
+    expect(paymentsRouteSource.indexOf("'/sync'")).toBeGreaterThan(
+      paymentsRouteSource.indexOf('router.use(verifyAdmin)')
+    );
+    expect(paymentsRouteSource).toMatch(
+      /router\.post\(\s*'\/sync'[\s\S]*syncPaymentsRequestSchema[\s\S]*syncPayments/
+    );
+    expect(paymentsRouteSource).not.toContain("'/catalog/sync'");
+    expect(paymentsRouteSource).not.toContain("'/subscriptions/sync'");
+  });
+
+  it('rejects unknown unified sync environments', () => {
+    expect(() => syncPaymentsRequestSchema.parse({ environment: 'prod' })).toThrow();
   });
 
   it('accepts optional catalog environment filters', () => {
@@ -207,12 +234,5 @@ describe('payments route schemas', () => {
     expect(() =>
       listSubscriptionsRequestSchema.parse({ environment: 'test', subjectType: 'team' })
     ).toThrow(/provided together/i);
-  });
-
-  it('requires subscription sync callers to specify the target Stripe environment', () => {
-    expect(syncPaymentSubscriptionsRequestSchema.parse({ environment: 'test' })).toEqual({
-      environment: 'test',
-    });
-    expect(() => syncPaymentSubscriptionsRequestSchema.parse({})).toThrow();
   });
 });
