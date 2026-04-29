@@ -47,6 +47,7 @@ import DeploymentLogsPage from '../features/deployments/pages/DeploymentLogsPage
 import DeploymentOverviewPage from '../features/deployments/pages/DeploymentOverviewPage';
 import DeploymentEnvVarsPage from '../features/deployments/pages/DeploymentEnvVarsPage';
 import DeploymentDomainsPage from '../features/deployments/pages/DeploymentDomainsPage';
+import { AnalyticsPage } from '../features/analytics';
 
 function AuthenticatedRoutes() {
   const dashboardVariant = getFeatureFlag('dashboard-v4-experiment');
@@ -120,6 +121,7 @@ function AuthenticatedRoutes() {
           <Route path="env-vars" element={<DeploymentEnvVarsPage />} />
           <Route path="domains" element={<DeploymentDomainsPage />} />
         </Route>
+        <Route path="/dashboard/analytics" element={<AnalyticsPage />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </AppLayout>

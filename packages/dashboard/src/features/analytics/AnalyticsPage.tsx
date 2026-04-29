@@ -1,0 +1,61 @@
+import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { Button } from '@insforge/ui';
+import { usePosthogConnection } from './hooks/usePosthogConnection';
+import { usePosthogDashboards } from './hooks/usePosthogDashboards';
+import { onPosthogConnectionStatus } from './lib/postMessage';
+import { EmptyConnectPanel } from './components/posthog/EmptyConnectPanel';
+import { ConnectStatusBar } from './components/posthog/ConnectStatusBar';
+import { ApiKeyCard } from './components/posthog/ApiKeyCard';
+import { DashboardsListCard } from './components/posthog/DashboardsListCard';
+import { DisconnectDialog } from './components/posthog/DisconnectDialog';
+import { useProjectId } from '../../lib/hooks/useMetadata';
+
+export function AnalyticsPage() {
+  const { projectId } = useProjectId();
+  const qc = useQueryClient();
+  const conn = usePosthogConnection();
+  const dashboards = usePosthogDashboards(!!conn.data);
+  const [disconnecting, setDisconnecting] = useState(false);
+
+  useEffect(() => {
+    return onPosthogConnectionStatus((e) => {
+      if (e.status === 'connected') {
+        void qc.invalidateQueries({ queryKey: ['posthog'] });
+      }
+    });
+  }, [qc]);
+
+  if (conn.isLoading) {
+    return <div className="p-6">Loading…</div>;
+  }
+
+  if (!conn.data) {
+    return (
+      <div className="p-6">
+        <h1 className="mb-4 text-2xl font-bold">Analytics</h1>
+        <EmptyConnectPanel projectId={projectId ?? ''} />
+      </div>
+    );
+  }
+
+  const c = conn.data;
+  return (
+    <div className="space-y-4 p-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Analytics</h1>
+        <Button variant="ghost" onClick={() => setDisconnecting(true)}>
+          Disconnect
+        </Button>
+      </div>
+      <ConnectStatusBar connection={c} />
+      <ApiKeyCard apiKey={c.apiKey} host={c.host} posthogProjectId={c.posthogProjectId} />
+      <DashboardsListCard
+        data={dashboards.data}
+        isLoading={dashboards.isLoading}
+        error={dashboards.error}
+      />
+      <DisconnectDialog open={disconnecting} onClose={() => setDisconnecting(false)} />
+    </div>
+  );
+}
