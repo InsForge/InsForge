@@ -32,7 +32,9 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
   // Insert deployments after Model Gateway for cloud projects. Compute
   // already terminates the section, so deployments doesn't need sectionEnd.
   const mainMenuItems = useMemo(() => {
-    const items = dashboardStaticMenuItems.map((item) => ({ ...item }));
+    const items = dashboardStaticMenuItems
+      .filter((item) => isCloud || item.id !== 'analytics')
+      .map((item) => ({ ...item }));
 
     if (isCloud) {
       const aiItemIndex = items.findIndex((item) => item.id === 'ai');
