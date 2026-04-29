@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { deploymentsService } from '../services/deployments.service';
 import { useToast } from '../../../lib/hooks/useToast';
-import { isInsForgeCloudProject } from '../../../lib/utils/utils';
+import { isInsForgeCloudProject, isMockCloudMode } from '../../../lib/utils/utils';
 
 const QUERY_KEY = ['deployments', 'custom-domains'];
 
@@ -14,6 +14,7 @@ export function useCustomDomains() {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const isCloudProject = isInsForgeCloudProject();
+  const isMock = isMockCloudMode();
 
   const {
     data: domains = [],
@@ -24,7 +25,7 @@ export function useCustomDomains() {
   } = useQuery({
     queryKey: QUERY_KEY,
     queryFn: () => deploymentsService.listCustomDomains(),
-    enabled: isCloudProject,
+    enabled: isCloudProject && !isMock,
     retry: false,
   });
 

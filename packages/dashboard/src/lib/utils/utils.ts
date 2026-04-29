@@ -160,11 +160,15 @@ export function isEmptyValue(value: unknown): boolean {
   return value === null || value === undefined;
 }
 
-export const isInsForgeCloudProject = () => {
-  if (
+export const isMockCloudMode = () => {
+  return (
     typeof window !== 'undefined' &&
     (window as unknown as Record<string, unknown>).__INSFORGE_MOCK_CLOUD__ === true
-  ) {
+  );
+};
+
+export const isInsForgeCloudProject = () => {
+  if (isMockCloudMode()) {
     return true;
   }
   try {
