@@ -12,7 +12,10 @@ export function ApiKeyCard({
   posthogProjectId: string;
 }) {
   const [revealed, setRevealed] = useState(false);
-  const masked = `${apiKey.slice(0, 4)}${'•'.repeat(Math.max(0, apiKey.length - 8))}${apiKey.slice(-4)}`;
+  const masked =
+    apiKey.length > 8
+      ? `${apiKey.slice(0, 4)}${'•'.repeat(apiKey.length - 8)}${apiKey.slice(-4)}`
+      : '•'.repeat(apiKey.length);
 
   return (
     <div className="rounded-lg border p-4">

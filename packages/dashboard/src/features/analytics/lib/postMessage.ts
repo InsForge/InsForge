@@ -1,3 +1,9 @@
+const PARENT_ORIGIN = import.meta.env.VITE_CLOUD_SHELL_ORIGIN || '*';
+// In dev, '*' is acceptable so the iframe works against any localhost cloud-shell port.
+// In prod / staging, the build sets VITE_CLOUD_SHELL_ORIGIN=https://app.insforge.dev (or
+// staging equivalent) so postMessage can only deliver to that origin and incoming
+// messages from other origins are ignored.
+
 export interface PosthogConnectionStatusEvent {
   type: 'POSTHOG_CONNECTION_STATUS';
   status: 'connected' | 'error' | 'cancelled';
@@ -17,18 +23,27 @@ export function requestPosthogConnect(projectId: string): void {
       projectId,
       timestamp: Date.now(),
     },
-    '*'
+    PARENT_ORIGIN
   );
 }
 
 /**
  * Listen for POSTHOG_CONNECTION_STATUS events posted from the cloud shell
  * after OAuth completes. Returns an unsubscribe function.
+ *
+ * Verifies the message origin matches the configured parent origin (when set)
+ * to prevent cross-origin spoofing.
  */
 export function onPosthogConnectionStatus(
   cb: (e: PosthogConnectionStatusEvent) => void
 ): () => void {
   function listener(ev: MessageEvent) {
+    if (PARENT_ORIGIN !== '*' && ev.origin !== PARENT_ORIGIN) {
+      return;
+    }
+    if (ev.source !== window.parent) {
+      return;
+    }
     if (ev.data?.type === 'POSTHOG_CONNECTION_STATUS') {
       cb(ev.data as PosthogConnectionStatusEvent);
     }
