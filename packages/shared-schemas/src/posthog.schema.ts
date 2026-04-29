@@ -30,3 +30,25 @@ export const posthogDashboardsResponseSchema = z.object({
   count: z.number(),
 });
 export type PosthogDashboardsResponse = z.infer<typeof posthogDashboardsResponseSchema>;
+
+export const posthogSummarySchema = z.object({
+  todayEvents: z.number(),
+  dau24h: z.number(),
+  totalEvents7d: z.number(),
+  topEvents: z.array(z.object({ event: z.string(), count: z.number() })),
+});
+export type PosthogSummary = z.infer<typeof posthogSummarySchema>;
+
+export const posthogEventRecordSchema = z.object({
+  id: z.string(),
+  event: z.string(),
+  distinctId: z.string(),
+  timestamp: z.string(),
+});
+export type PosthogEventRecord = z.infer<typeof posthogEventRecordSchema>;
+
+export const posthogEventsResponseSchema = z.object({
+  events: z.array(posthogEventRecordSchema),
+  next: z.string().nullable(),
+});
+export type PosthogEventsResponse = z.infer<typeof posthogEventsResponseSchema>;
