@@ -33,7 +33,7 @@ export function AnalyticsPage() {
   if (conn.isError) {
     return (
       <div className="p-6">
-        <h1 className="mb-4 text-2xl font-bold">Analytics</h1>
+        <h1 className="mb-4 text-2xl font-bold text-foreground">Analytics</h1>
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           Failed to load PostHog connection. Please refresh, or contact support if it persists.
         </div>
@@ -44,7 +44,7 @@ export function AnalyticsPage() {
   if (!conn.data) {
     return (
       <div className="p-6">
-        <h1 className="mb-4 text-2xl font-bold">Analytics</h1>
+        <h1 className="mb-4 text-2xl font-bold text-foreground">Analytics</h1>
         <EmptyConnectPanel projectId={projectId ?? ''} />
       </div>
     );
@@ -54,7 +54,7 @@ export function AnalyticsPage() {
   return (
     <div className="space-y-4 p-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Analytics</h1>
+        <h1 className="text-2xl font-bold text-foreground">Analytics</h1>
         <Button variant="ghost" onClick={() => setDisconnecting(true)}>
           Disconnect
         </Button>
