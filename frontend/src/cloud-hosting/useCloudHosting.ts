@@ -885,22 +885,33 @@ export function useCloudHosting() {
     return createPendingRequest('advisorLatest', 'Advisor latest request');
   }, [createPendingRequest, postMessageToParent]);
 
+  // The iframe → parent postMessage protocol has a single shared response slot
+  // for advisor issues, so concurrent requests (e.g. the active tab's issues
+  // query plus the per-category count queries firing on mount) would race and
+  // supersede each other. Serialize them through a promise chain so only one
+  // is in flight at a time.
+  const advisorIssuesLockRef = useRef<Promise<unknown>>(Promise.resolve());
+
   const requestAdvisorIssues = useCallback(
-    async (query: DashboardAdvisorIssuesQuery): Promise<DashboardAdvisorIssuesResponse> => {
-      if (
-        !postMessageToParent({
-          type: 'REQUEST_ADVISOR_ISSUES',
-          severity: query.severity,
-          category: query.category,
-          limit: query.limit,
-          offset: query.offset,
-        })
-      ) {
-        throw new Error('Unable to request advisor issues from the parent window');
-      }
-      return createPendingRequest('advisorIssues', 'Advisor issues request', {
-        supersede: true,
-      });
+    (query: DashboardAdvisorIssuesQuery): Promise<DashboardAdvisorIssuesResponse> => {
+      const next = advisorIssuesLockRef.current
+        .catch(() => undefined)
+        .then(() => {
+          if (
+            !postMessageToParent({
+              type: 'REQUEST_ADVISOR_ISSUES',
+              severity: query.severity,
+              category: query.category,
+              limit: query.limit,
+              offset: query.offset,
+            })
+          ) {
+            throw new Error('Unable to request advisor issues from the parent window');
+          }
+          return createPendingRequest('advisorIssues', 'Advisor issues request');
+        });
+      advisorIssuesLockRef.current = next.catch(() => undefined);
+      return next;
     },
     [createPendingRequest, postMessageToParent]
   );
