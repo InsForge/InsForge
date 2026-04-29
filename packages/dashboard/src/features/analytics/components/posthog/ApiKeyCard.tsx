@@ -19,7 +19,7 @@ export function ApiKeyCard({
 
   return (
     <div className="rounded-lg border p-4">
-      <h3 className="mb-3 text-sm font-semibold">Project API Key</h3>
+      <h3 className="mb-3 text-sm font-semibold text-foreground">Project API Key</h3>
       <div className="mb-2 flex items-center gap-2">
         <code
           data-testid="apikey-display"
