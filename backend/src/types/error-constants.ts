@@ -95,6 +95,10 @@ export const NEXT_ACTION = {
   REMOVE_DUPLICATE_COLUMN: (column: string) =>
     `Remove the duplicate "${column}" column definition. Each column name must be unique within a table.`,
 
+  // RLS / authorization next actions
+  CHECK_RLS_POLICY:
+    'A row-level security policy denied this operation. Verify the calling user owns the row (uploaded_by / user_id matches the JWT sub), or that an appropriate INSERT/UPDATE/DELETE policy exists for this role.',
+
   // Add more next actions as needed
 } as const;
 

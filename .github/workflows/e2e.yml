@@ -42,7 +42,7 @@ jobs:
           echo "Backend is ready!"
 
       - name: Install test dependencies in container
-        run: docker compose exec -T insforge apk add --no-cache bash curl jq
+        run: docker compose exec -T insforge apk add --no-cache bash curl jq postgresql-client
 
       - name: Run E2E tests
         run: docker compose exec -T insforge npm run test:e2e

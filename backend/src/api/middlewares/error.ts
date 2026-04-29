@@ -98,6 +98,14 @@ const POSTGRES_ERROR_HANDLERS: Record<
     statusCode: 400,
     nextActions: NEXT_ACTION.CHECK_DATATYPE_MATCH,
   }),
+  '42501': (err) => ({
+    // insufficient_privilege — fired by RLS WITH CHECK on INSERT/UPDATE,
+    // or by GRANT-level denials. Same shape Supabase returns.
+    code: ERROR_CODES.FORBIDDEN,
+    message: err.message,
+    statusCode: 403,
+    nextActions: NEXT_ACTION.CHECK_RLS_POLICY,
+  }),
 };
 
 // Handle database-specific errors
