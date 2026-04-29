@@ -7,7 +7,7 @@ import { apiClient } from '../../../lib/api/client';
 export const posthogApi = {
   async getConnection(): Promise<GetPosthogConnectionResponse | null> {
     try {
-      const res = await apiClient.request('/api/integrations/posthog/connection', {
+      const res = await apiClient.request('/integrations/posthog/connection', {
         headers: apiClient.withAccessToken({}),
       });
       // Backend returns { connected: true, connection: PosthogConnection } on 200
@@ -21,13 +21,13 @@ export const posthogApi = {
   },
 
   async getDashboards(): Promise<GetPosthogDashboardsResponse> {
-    return apiClient.request('/api/integrations/posthog/dashboards', {
+    return apiClient.request('/integrations/posthog/dashboards', {
       headers: apiClient.withAccessToken({}),
     }) as Promise<GetPosthogDashboardsResponse>;
   },
 
   async disconnect(): Promise<void> {
-    await apiClient.request('/api/integrations/posthog/connection', {
+    await apiClient.request('/integrations/posthog/connection', {
       method: 'DELETE',
       headers: apiClient.withAccessToken({}),
     });
