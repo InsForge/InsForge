@@ -79,6 +79,7 @@ describe('ComputeServicesService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.APP_KEY = 'testkey1';
     service = ComputeServicesService.getInstance();
     mockIsConfigured.mockReturnValue(true);
   });
@@ -159,7 +160,7 @@ describe('ComputeServicesService', () => {
       // Verify Fly calls
       expect(mockCreateApp).toHaveBeenCalledWith({
         name: 'my-api-proj-123',
-        network: 'proj-123-network',
+        network: 'testkey1',
         org: 'test-org',
       });
       expect(mockLaunchMachine).toHaveBeenCalledWith(
@@ -473,7 +474,7 @@ describe('ComputeServicesService', () => {
       // Verify Fly app created
       expect(mockCreateApp).toHaveBeenCalledWith({
         name: 'my-api-proj-123',
-        network: 'proj-123-network',
+        network: 'testkey1',
         org: 'test-org',
       });
 

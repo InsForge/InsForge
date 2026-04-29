@@ -86,11 +86,17 @@ export class CloudComputeProvider implements ComputeProvider {
     return text ? (JSON.parse(text) as T) : undefined;
   }
 
-  async createApp(params: { name: string; network: string; org: string }) {
-    const result = await this.call<{ appId: string; serviceId?: string }>('POST', '/apps', {
-      name: params.name,
-      network: params.network,
-    });
+  async createApp(params: { name: string; network?: string; org: string }) {
+    // Forward `network` only if the caller passed one. We keep it short
+    // (services.service.ts uses APP_KEY, ~8 chars) so Fly's network-name
+    // validator accepts it. Live e2e on prod (project 2163e1eb-…) showed
+    // the previous long `${projectId}-network` (~44 chars) 422'd as
+    // "Name not a valid network name".
+    const body: Record<string, unknown> = { name: params.name };
+    if (params.network !== undefined) {
+      body.network = params.network;
+    }
+    const result = await this.call<{ appId: string; serviceId?: string }>('POST', '/apps', body);
     return { appId: result?.appId ?? params.name };
   }
 
