@@ -55,7 +55,7 @@ VITE_MOCK_CLOUD=true npm run dev --workspace=frontend
 
 The app renders with a fake cloud navbar on top (with a "MOCK" badge), a hardcoded fake project, all `isCloud` gates true, and cloud-only data pages (Deployments / Backup / Instance) in empty state. Stop and restart the dev server without the flag to return to normal self-hosting.
 
-See `docs/superpowers/specs/2026-04-20-fake-cloud-shell-design.md` for known gaps (notably: code paths that depend on postMessage from a real cloud parent do not execute in mock mode).
+Known gap: code paths that depend on postMessage from a real cloud parent do not execute in mock mode.
 
 ## Validation
 
