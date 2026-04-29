@@ -78,7 +78,11 @@ function buildSparkline(
 
 function formatHoverTime(ts: number, rangeSeconds: number): string {
   const d = new Date(ts * 1000);
-  const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  const time = d.toLocaleTimeString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
   if (rangeSeconds < 86_400) {
     return time;
   }
@@ -151,6 +155,15 @@ export function MetricChartCard({
   const tooltipTranslateX = hoverLeftPct < 15 ? '0%' : hoverLeftPct > 85 ? '-100%' : '-50%';
 
   const thresholdOffsetPct = threshold !== undefined ? 100 - threshold : 0;
+  const gradientTransitionHalfWidth = 8;
+  const gradientTransitionStart = Math.max(
+    0,
+    Math.min(100, thresholdOffsetPct - gradientTransitionHalfWidth)
+  );
+  const gradientTransitionEnd = Math.max(
+    0,
+    Math.min(100, thresholdOffsetPct + gradientTransitionHalfWidth)
+  );
 
   return (
     <div className="flex flex-col overflow-hidden rounded border border-[var(--alpha-8)] bg-card">
@@ -187,11 +200,11 @@ export function MetricChartCard({
                       >
                         <stop offset="0%" stopColor="rgb(var(--destructive))" />
                         <stop
-                          offset={`${thresholdOffsetPct}%`}
+                          offset={`${gradientTransitionStart}%`}
                           stopColor="rgb(var(--destructive))"
                         />
                         <stop
-                          offset={`${Math.min(100, thresholdOffsetPct + 10)}%`}
+                          offset={`${gradientTransitionEnd}%`}
                           stopColor="rgb(var(--primary))"
                         />
                         <stop offset="100%" stopColor="rgb(var(--primary))" />
@@ -205,6 +218,16 @@ export function MetricChartCard({
                         gradientUnits="userSpaceOnUse"
                       >
                         <stop offset="0%" stopColor="rgb(var(--destructive))" stopOpacity={0.15} />
+                        <stop
+                          offset={`${gradientTransitionStart}%`}
+                          stopColor="rgb(var(--destructive))"
+                          stopOpacity={0.15}
+                        />
+                        <stop
+                          offset={`${gradientTransitionEnd}%`}
+                          stopColor="rgb(var(--primary))"
+                          stopOpacity={0.15}
+                        />
                         <stop offset="100%" stopColor="rgb(var(--primary))" stopOpacity={0.15} />
                       </linearGradient>
                     </defs>
@@ -264,7 +287,17 @@ export function MetricChartCard({
                         transform: `translate(${tooltipTranslateX}, -100%)`,
                       }}
                     >
-                      <div className="font-medium text-foreground">{formatValue(hover.value)}</div>
+                      <div
+                        className={`font-medium ${
+                          threshold === undefined
+                            ? 'text-foreground'
+                            : hover.value > threshold
+                              ? 'text-destructive'
+                              : 'text-primary'
+                        }`}
+                      >
+                        {formatValue(hover.value)}
+                      </div>
                       <div className="text-muted-foreground">
                         {formatHoverTime(hover.timestamp, rangeSeconds)}
                       </div>
