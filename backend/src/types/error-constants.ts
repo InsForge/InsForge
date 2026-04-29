@@ -79,6 +79,7 @@ export enum ERROR_CODES {
   TOO_MANY_REQUESTS = 'TOO_MANY_REQUESTS',
   FORBIDDEN = 'FORBIDDEN',
   RATE_LIMITED = 'RATE_LIMITED',
+  NOT_IMPLEMENTED = 'NOT_IMPLEMENTED',
 }
 
 // Next actions - what the user should do
