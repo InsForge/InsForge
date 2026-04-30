@@ -9,11 +9,12 @@ import {
   AlertTriangle,
   XCircle,
 } from 'lucide-react';
-import { Button, ConfirmDialog } from '@insforge/ui';
+import { Button } from '@insforge/ui';
 import { useComputeServices } from '../hooks/useComputeServices';
 import { ServiceCard } from '../components/ServiceCard';
 import { ServiceLogs } from '../components/ServiceLogs';
 import { CreateServiceDialog } from '../components/CreateServiceDialog';
+import { DeleteServiceDialog } from '../components/DeleteServiceDialog';
 import { statusColors, getReachableUrl } from '../constants';
 import type { ServiceSchema } from '@insforge/shared-schemas';
 
@@ -212,17 +213,15 @@ export default function ComputePage() {
           </div>
         </div>
 
-        <ConfirmDialog
+        <DeleteServiceDialog
           open={deleteTarget !== null}
           onOpenChange={(open) => {
             if (!open) {
               setDeleteTarget(null);
             }
           }}
-          title="Delete service"
-          description={`This will permanently delete "${currentService.name}" and destroy its Fly.io resources. This cannot be undone.`}
-          confirmText="Delete"
-          destructive
+          serviceName={currentService.name}
+          isLoading={isDeleting}
           onConfirm={() => {
             if (deleteTarget) {
               return handleDelete(deleteTarget);
@@ -315,17 +314,15 @@ export default function ComputePage() {
         isCreating={isCreating}
       />
 
-      <ConfirmDialog
+      <DeleteServiceDialog
         open={deleteTarget !== null}
         onOpenChange={(open) => {
           if (!open) {
             setDeleteTarget(null);
           }
         }}
-        title="Delete service"
-        description="This will permanently delete this service and destroy its Fly.io resources. This cannot be undone."
-        confirmText="Delete"
-        destructive
+        serviceName={services.find((s) => s.id === deleteTarget)?.name ?? ''}
+        isLoading={isDeleting}
         onConfirm={() => {
           if (deleteTarget) {
             return handleDelete(deleteTarget);

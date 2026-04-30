@@ -43,6 +43,29 @@ export interface UpdateServiceInput {
   envVars?: Record<string, string>;
 }
 
+/**
+ * Snapshot returned from deleteService — captures everything needed to
+ * reconstruct a service if a delete turns out to have been a mistake. The
+ * route writes this into the audit log; nothing else consumes it. Env vars
+ * are passed through as the still-encrypted ciphertext so the audit log
+ * never contains secret values in plaintext.
+ */
+export interface DeletedServiceSnapshot {
+  id: string;
+  projectId: string;
+  name: string;
+  imageUrl: string;
+  port: number;
+  cpu: string;
+  memory: number;
+  region: string;
+  flyAppId: string | null;
+  flyMachineId: string | null;
+  endpointUrl: string | null;
+  envVarsEncrypted: string | null;
+  createdAt: string;
+}
+
 interface ServiceRow {
   id: string;
   project_id: string;
@@ -630,8 +653,24 @@ export class ComputeServicesService {
     return mapRowToSchema(result.rows[0]);
   }
 
-  async deleteService(id: string): Promise<void> {
-    const svc = await this.getService(id);
+  async deleteService(id: string): Promise<DeletedServiceSnapshot> {
+    // Fetch the raw row (not the schema) so we can capture the encrypted env
+    // blob in the snapshot. mapRowToSchema strips env_vars_encrypted by design;
+    // for the audit-log snapshot we want the ciphertext so a future restore
+    // path could re-deploy with the same secrets without exposing them here.
+    const result = await this.getPool().query<ServiceRow>(
+      `SELECT * FROM compute.services WHERE id = $1`,
+      [id]
+    );
+    if (!result.rows.length) {
+      throw new AppError(
+        'Service not found',
+        404,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
+        NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS
+      );
+    }
+    const row = result.rows[0];
 
     // Mark as destroying first so it's visible in the UI
     await this.getPool().query(`UPDATE compute.services SET status = 'destroying' WHERE id = $1`, [
@@ -640,9 +679,9 @@ export class ComputeServicesService {
 
     // Fly cleanup — abort delete if cleanup fails to preserve the reference
     // Treat 404 as success (resource already destroyed)
-    if (svc.flyMachineId && svc.flyAppId) {
+    if (row.fly_machine_id && row.fly_app_id) {
       try {
-        await this.getCompute().destroyMachine(svc.flyAppId, svc.flyMachineId);
+        await this.getCompute().destroyMachine(row.fly_app_id, row.fly_machine_id);
       } catch (error) {
         const msg = error instanceof Error ? error.message : '';
         if (!msg.includes('404')) {
@@ -661,9 +700,9 @@ export class ComputeServicesService {
       }
     }
 
-    if (svc.flyAppId) {
+    if (row.fly_app_id) {
       try {
-        await this.getCompute().destroyApp(svc.flyAppId);
+        await this.getCompute().destroyApp(row.fly_app_id);
       } catch (error) {
         const msg = error instanceof Error ? error.message : '';
         if (!msg.includes('404')) {
@@ -684,6 +723,22 @@ export class ComputeServicesService {
 
     await this.getPool().query(`DELETE FROM compute.services WHERE id = $1`, [id]);
     logger.info('Compute service deleted', { id });
+
+    return {
+      id: row.id,
+      projectId: row.project_id,
+      name: row.name,
+      imageUrl: row.image_url,
+      port: row.port,
+      cpu: row.cpu,
+      memory: row.memory,
+      region: row.region,
+      flyAppId: row.fly_app_id,
+      flyMachineId: row.fly_machine_id,
+      endpointUrl: row.endpoint_url,
+      envVarsEncrypted: row.env_vars_encrypted,
+      createdAt: row.created_at,
+    };
   }
 
   async stopService(id: string): Promise<ServiceSchema> {

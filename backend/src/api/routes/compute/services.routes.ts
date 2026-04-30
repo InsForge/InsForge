@@ -208,7 +208,11 @@ router.delete('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next:
       throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
     }
 
-    await svc.deleteService(req.params.id);
+    // Returns a snapshot of the deleted row (incl. encrypted env blob) so the
+    // audit log retains enough state to reconstruct the service if the delete
+    // turns out to have been a mistake. Today the row + Fly app are gone the
+    // moment this returns; the audit entry is the only paper trail.
+    const snapshot = await svc.deleteService(req.params.id);
 
     successResponse(res, { message: 'Service deleted' });
 
@@ -216,7 +220,11 @@ router.delete('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next:
       actor: req.user?.email || 'api-key',
       action: 'DELETE_COMPUTE_SERVICE',
       module: 'COMPUTE',
-      details: { serviceId: req.params.id, serviceName: existing.name },
+      details: {
+        serviceId: req.params.id,
+        serviceName: existing.name,
+        snapshot,
+      },
       ip_address: req.ip,
     });
     bestEffortBroadcast();
