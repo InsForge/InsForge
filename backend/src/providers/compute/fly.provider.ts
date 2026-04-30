@@ -14,14 +14,13 @@ export class FlyProvider implements ComputeProvider {
     return FlyProvider.instance;
   }
 
-  // Self-hosters must opt in via COMPUTE_SERVICES_ENABLED=true AND set
-  // FLY_API_TOKEN. The flag exists so an operator can preflight a deploy
-  // (FLY_API_TOKEN populated for testing/secrets management) without the
-  // backend actually accepting compute traffic.
-  // Cloud-managed mode (CloudComputeProvider) detects itself implicitly
-  // from PROJECT_ID + JWT_SECRET + CLOUD_API_HOST and bypasses this check.
+  // Self-hosters enable compute by setting FLY_API_TOKEN AND FLY_ORG. Both
+  // are required: org alone has nothing to authenticate, token alone doesn't
+  // know which org to create apps in.
+  // Cloud-managed mode (CloudComputeProvider) detects itself implicitly from
+  // PROJECT_ID + JWT_SECRET + CLOUD_API_HOST and bypasses this check.
   isConfigured(): boolean {
-    return config.fly.enabled && !!config.fly.apiToken;
+    return !!config.fly.apiToken && !!config.fly.org;
   }
 
   private headers(): Record<string, string> {

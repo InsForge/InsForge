@@ -114,7 +114,7 @@ export const NEXT_ACTION = {
 
   // Compute next actions
   ENABLE_COMPUTE:
-    'Compute services are not enabled. Self-hosted: set COMPUTE_SERVICES_ENABLED=true and FLY_API_TOKEN in your .env, then restart. Cloud: contact your project admin to enable compute.',
+    'Compute services are not enabled. Self-hosted: set FLY_API_TOKEN and FLY_ORG in your .env, then restart. Cloud: contact your project admin to enable compute.',
   CHECK_COMPUTE_SERVICE_EXISTS:
     'The compute service was not found. Run `compute list` to see available services.',
   CHECK_DOCKER_IMAGE:
