@@ -58,6 +58,28 @@ export default function ComputePage() {
   }
 
   if (error) {
+    // Friendly empty-state when compute isn't configured (no Fly token / not
+    // enabled). The API returns 503 COMPUTE_NOT_CONFIGURED with setup
+    // instructions in nextActions — surface those instead of a hard error.
+    const apiError = (error as { response?: { data?: { error?: string; nextActions?: string } } })
+      .response?.data;
+    if (apiError?.error === 'COMPUTE_NOT_CONFIGURED') {
+      return (
+        <div className="flex items-center justify-center h-64 px-6">
+          <div className="max-w-xl text-center space-y-3">
+            <AlertTriangle className="w-8 h-8 text-muted-foreground mx-auto" />
+            <h2 className="text-base font-medium text-foreground">
+              Compute services not configured
+            </h2>
+            {apiError.nextActions && (
+              <p className="text-sm text-muted-foreground whitespace-pre-line">
+                {apiError.nextActions}
+              </p>
+            )}
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="flex items-center justify-center h-64">
         <div className="flex items-center gap-2 text-destructive">
