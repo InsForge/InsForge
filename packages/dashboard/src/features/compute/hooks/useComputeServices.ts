@@ -97,18 +97,18 @@ export function useComputeServices() {
   };
 }
 
-export function useServiceLogs(serviceId: string | null) {
+export function useServiceEvents(serviceId: string | null) {
   return useQuery({
-    queryKey: ['compute', 'services', serviceId, 'logs'],
+    queryKey: ['compute', 'services', serviceId, 'events'],
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by enabled
-    queryFn: () => computeServicesApi.logs(serviceId!, 50),
+    queryFn: () => computeServicesApi.events(serviceId!, 50),
     enabled: !!serviceId,
     staleTime: 0,
   });
 }
 
 // Per-service crash-loop indicator for the grid view. Polls the events
-// endpoint at 30s cadence — same data the detail-view ServiceLogs panel uses,
+// endpoint at 30s cadence — same data the detail-view ServiceEvents panel uses,
 // so we don't introduce a new backend surface, and React Query dedupes the
 // underlying fetch when the user expands a card.
 //
@@ -120,8 +120,8 @@ export function useServiceHealth(
   enabled: boolean
 ): { health: ServiceHealth | null; isLoading: boolean } {
   const query = useQuery({
-    queryKey: ['compute', 'services', serviceId, 'logs'],
-    queryFn: () => computeServicesApi.logs(serviceId, 50),
+    queryKey: ['compute', 'services', serviceId, 'events'],
+    queryFn: () => computeServicesApi.events(serviceId, 50),
     enabled,
     staleTime: 30_000,
     refetchInterval: enabled ? 30_000 : false,

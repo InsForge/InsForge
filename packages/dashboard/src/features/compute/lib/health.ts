@@ -10,7 +10,7 @@
 // pathological loop that today reads as plain "running" on the dashboard.
 //
 // We compute this client-side because the events are already fetched by the
-// existing /api/compute/services/:id/logs endpoint — no new backend route or
+// existing /api/compute/services/:id/events endpoint — no new backend route or
 // derived field on ServiceSchema is needed for the dashboard's purposes.
 
 const CRASH_WINDOW_MS = 60_000;

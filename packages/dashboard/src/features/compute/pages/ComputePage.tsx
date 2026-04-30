@@ -12,7 +12,7 @@ import {
 import { Button } from '@insforge/ui';
 import { useComputeServices } from '../hooks/useComputeServices';
 import { ServiceCard } from '../components/ServiceCard';
-import { ServiceLogs } from '../components/ServiceLogs';
+import { ServiceEvents } from '../components/ServiceEvents';
 import { CreateServiceDialog } from '../components/CreateServiceDialog';
 import { DeleteServiceDialog } from '../components/DeleteServiceDialog';
 import { statusColors, getReachableUrl } from '../constants';
@@ -231,7 +231,7 @@ export default function ComputePage() {
               </dl>
             </div>
 
-            {currentService.flyMachineId && <ServiceLogs serviceId={currentService.id} />}
+            {currentService.flyMachineId && <ServiceEvents serviceId={currentService.id} />}
           </div>
         </div>
 

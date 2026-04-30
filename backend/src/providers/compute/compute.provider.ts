@@ -48,7 +48,11 @@ export interface ComputeProvider {
   destroyMachine(appId: string, machineId: string): Promise<void>;
   listMachines(appId: string): Promise<MachineSummary[]>;
   getMachineStatus(appId: string, machineId: string): Promise<{ state: string }>;
-  getLogs(appId: string, machineId: string, options?: { limit?: number }): Promise<ComputeEvent[]>;
+  getEvents(
+    appId: string,
+    machineId: string,
+    options?: { limit?: number }
+  ): Promise<ComputeEvent[]>;
   waitForState(
     appId: string,
     machineId: string,

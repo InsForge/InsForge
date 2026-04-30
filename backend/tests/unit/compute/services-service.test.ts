@@ -49,7 +49,7 @@ const mockUpdateMachine = vi.fn();
 const mockStopMachine = vi.fn();
 const mockStartMachine = vi.fn();
 const mockDestroyMachine = vi.fn();
-const mockGetLogs = vi.fn();
+const mockGetEvents = vi.fn();
 const mockListMachines = vi.fn();
 const mockIsConfigured = vi.fn(() => true);
 
@@ -61,7 +61,7 @@ const mockFlyInstance = {
   stopMachine: mockStopMachine,
   startMachine: mockStartMachine,
   destroyMachine: mockDestroyMachine,
-  getLogs: mockGetLogs,
+  getEvents: mockGetEvents,
   listMachines: mockListMachines,
   isConfigured: mockIsConfigured,
 };

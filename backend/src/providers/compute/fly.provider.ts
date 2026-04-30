@@ -291,7 +291,7 @@ export class FlyProvider implements ComputeProvider {
    * /apps/:app/machines/:id/events. This is NOT container stdout/stderr —
    * Fly exposes a separate log streaming service for that.
    */
-  async getLogs(
+  async getEvents(
     appId: string,
     machineId: string,
     options?: { limit?: number }

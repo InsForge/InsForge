@@ -83,13 +83,13 @@ describe('CloudComputeProvider', () => {
     expect(result).toEqual([{ id: 'm1', state: 'started', region: 'iad' }]);
   });
 
-  it('getLogs forwards limit in query', async () => {
+  it('getEvents forwards limit in query', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
       text: async () => JSON.stringify([]),
     } as Response);
     const provider = CloudComputeProvider.getInstance();
-    await provider.getLogs('myapp', 'machine-1', { limit: 50 });
+    await provider.getEvents('myapp', 'machine-1', { limit: 50 });
     const call = fetchMock.mock.calls[0];
     expect(call[0]).toContain('appId=myapp');
     expect(call[0]).toContain('limit=50');

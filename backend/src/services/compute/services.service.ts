@@ -850,7 +850,7 @@ export class ComputeServicesService {
     return mapRowToSchema(result.rows[0]);
   }
 
-  async getServiceLogs(
+  async getServiceEvents(
     id: string,
     options?: { limit?: number }
   ): Promise<{ timestamp: number; message: string }[]> {
@@ -865,7 +865,7 @@ export class ComputeServicesService {
       );
     }
 
-    return this.getCompute().getLogs(svc.flyAppId, svc.flyMachineId, options);
+    return this.getCompute().getEvents(svc.flyAppId, svc.flyMachineId, options);
   }
 
   private decryptEnvVars(encrypted: string | null): Record<string, string> {

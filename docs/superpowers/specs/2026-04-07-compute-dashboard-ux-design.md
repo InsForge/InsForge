@@ -37,25 +37,27 @@ Add a button row next to the service name heading:
 
 Uses: `Button` and `ConfirmDialog` from `@insforge/ui`.
 
-### 2. Detail View — Logs Panel
+### 2. Detail View — Events Panel
 
-Below the specs card, add a logs section:
+Below the specs card, add an events section:
 
-- Fetches logs via `computeServicesApi.logs(id, 50)` using a `useQuery` with manual refetch
+- Fetches events via `computeServicesApi.events(id, 50)` using a `useQuery` with manual refetch
 - Displays as a scrollable monospace block with timestamps
 - "Refresh" button to re-fetch
-- Empty state: "No logs available"
-- Only shown when `flyMachineId` exists (no logs for services that never deployed)
+- Empty state: "No events available"
+- Only shown when `flyMachineId` exists (no events for services that never deployed)
 
-New component: `ServiceLogs.tsx`
+New component: `ServiceEvents.tsx`
 
-> **Known limitation (v1):** the `/logs` endpoint currently returns Fly machine
+> **Why `/events` and not `/logs`:** the endpoint surfaces Fly machine
 > **lifecycle events** from `/apps/:app/machines/:id/events` (start/stop/restart/
-> exit), **not container stdout/stderr**. This is enough to spot crash loops via
-> exit-stopped events but not enough to debug what the app actually printed.
+> exit), **not container stdout/stderr**. The honest name is "events"; calling
+> it `/logs` was misleading — it's enough to spot crash loops via exit-stopped
+> events but not enough to debug what the app actually printed.
 >
-> **Real container stdout/stderr is roadmap work.** Three viable paths,
-> evaluated [in this thread](https://github.com/InsForge/InsForge/pull/1062#discussion):
+> **Real container stdout/stderr is roadmap work**, and when it lands it
+> reuses the freshly-vacated `/logs` URL. Three viable paths, evaluated
+> [in this thread](https://github.com/InsForge/InsForge/pull/1062#discussion):
 >
 > | Path | Where flyctl spawns | Token source | Notes |
 > |---|---|---|---|
@@ -64,10 +66,7 @@ New component: `ServiceLogs.tsx`
 > | C. NATS streaming directly | OSS or cloud-backend | org token | What `flyctl logs` uses internally. Most "correct" but largest surface. |
 >
 > Recommendation when this lands: start with A (smallest delta, reuses
-> existing flyctl shell-out infra). Until then, the misleading `/logs` URL
-> stays — alternative is to rename to `/events` to be honest, then add
-> `/container-logs` later. v1 keeps `/logs` for compatibility with the
-> already-shipped CLI command and dashboard panel.
+> existing flyctl shell-out infra).
 
 ### 3. Detail View — Enhanced Specs
 
@@ -114,12 +113,12 @@ In both `ServiceCard` and `ComputePage` detail view:
 
 | File | Action | What |
 |------|--------|------|
-| `ComputePage.tsx` | Modify | Add create button, action buttons, logs, enhanced specs, failed state |
+| `ComputePage.tsx` | Modify | Add create button, action buttons, events, enhanced specs, failed state |
 | `ServiceCard.tsx` | Modify | Add dropdown menu, use `getReachableUrl` |
-| `useComputeServices.ts` | Modify | Add `useLogs` query hook export |
+| `useComputeServices.ts` | Modify | Add `useServiceEvents` query hook export |
 | `constants.ts` | Modify | Add `getReachableUrl` helper |
 | `CreateServiceDialog.tsx` | New | Create service form dialog |
-| `ServiceLogs.tsx` | New | Logs display component |
+| `ServiceEvents.tsx` | New | Events display component |
 
 ## Dependencies
 

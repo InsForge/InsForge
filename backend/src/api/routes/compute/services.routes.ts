@@ -303,9 +303,11 @@ router.post(
   }
 );
 
-// Get service logs
+// Get service lifecycle events (start/stop/exit/restart from Fly machine events).
+// Not container stdout/stderr — that's separate roadmap work; see spec
+// 2026-04-07-compute-dashboard-ux-design.md for the rationale.
 router.get(
-  '/:id/logs',
+  '/:id/events',
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
@@ -317,9 +319,9 @@ router.get(
       }
 
       const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 1000);
-      const logs = await svc.getServiceLogs(req.params.id, { limit });
+      const events = await svc.getServiceEvents(req.params.id, { limit });
 
-      successResponse(res, logs);
+      successResponse(res, events);
     } catch (error) {
       next(error);
     }

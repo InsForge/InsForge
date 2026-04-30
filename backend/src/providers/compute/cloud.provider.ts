@@ -168,7 +168,7 @@ export class CloudComputeProvider implements ComputeProvider {
     return result;
   }
 
-  async getLogs(
+  async getEvents(
     appId: string,
     machineId: string,
     options?: { limit?: number }
