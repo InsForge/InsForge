@@ -474,8 +474,26 @@ export class PaymentService {
       };
     }
 
+    let handled: boolean;
+
     try {
-      const handled = await this.applyStripeWebhookEvent(environment, event, provider);
+      handled = await this.applyStripeWebhookEvent(environment, event, provider);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await this.webhookService
+        .markWebhookEvent(environment, event.id, 'failed', message)
+        .catch((markError) => {
+          logger.error('Failed to mark Stripe webhook event as failed', {
+            environment,
+            stripeEventId: event.id,
+            error: markError instanceof Error ? markError.message : String(markError),
+            originalError: message,
+          });
+        });
+      throw error;
+    }
+
+    try {
       const row = await this.webhookService.markWebhookEvent(
         environment,
         event.id,
@@ -489,8 +507,12 @@ export class PaymentService {
         event: this.webhookService.normalizeWebhookEventRow(row),
       };
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      await this.webhookService.markWebhookEvent(environment, event.id, 'failed', message);
+      logger.error('Failed to finalize Stripe webhook event after processing', {
+        environment,
+        stripeEventId: event.id,
+        handled,
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   }

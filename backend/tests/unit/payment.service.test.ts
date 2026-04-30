@@ -2386,6 +2386,163 @@ describe('PaymentService', () => {
     );
   });
 
+  it('does not mark webhook events failed when finalization fails after processing', async () => {
+    mockGetSecretByKey
+      .mockResolvedValueOnce('whsec_test_123')
+      .mockResolvedValueOnce('sk_test_1234567890');
+    mockProvider.constructWebhookEvent.mockReturnValueOnce({
+      id: 'evt_postprocess_123',
+      type: 'checkout.session.completed',
+      created: 1777334700,
+      livemode: false,
+      data: {
+        object: {
+          id: 'cs_postprocess_123',
+          object: 'checkout.session',
+          mode: 'payment',
+          payment_status: 'paid',
+          amount_total: 4500,
+          currency: 'usd',
+          created: 1777334400,
+          customer: 'cus_123',
+          customer_details: { email: 'buyer@example.com' },
+          payment_intent: 'pi_postprocess_123',
+          subscription: null,
+          metadata: {
+            insforge_subject_type: 'team',
+            insforge_subject_id: 'team_123',
+          },
+        },
+      },
+    });
+    mockPool.query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            environment: 'test',
+            stripeEventId: 'evt_postprocess_123',
+            eventType: 'checkout.session.completed',
+            livemode: false,
+            stripeAccountId: null,
+            objectType: 'checkout.session',
+            objectId: 'cs_postprocess_123',
+            processingStatus: 'pending',
+            attemptCount: 1,
+            lastError: null,
+            receivedAt: new Date('2026-04-28T00:00:00.000Z'),
+            processedAt: null,
+            createdAt: new Date('2026-04-28T00:00:00.000Z'),
+            updatedAt: new Date('2026-04-28T00:00:00.000Z'),
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockRejectedValueOnce(new Error('mark processed failed'));
+
+    await expect(
+      PaymentService.getInstance().handleStripeWebhook(
+        'test',
+        Buffer.from('{"id":"evt_postprocess_123"}'),
+        'sig_123'
+      )
+    ).rejects.toThrow('mark processed failed');
+
+    expect(mockPool.query).toHaveBeenCalledTimes(6);
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      'Failed to finalize Stripe webhook event after processing',
+      {
+        environment: 'test',
+        stripeEventId: 'evt_postprocess_123',
+        handled: true,
+        error: 'mark processed failed',
+      }
+    );
+  });
+
+  it('marks webhook events failed when applying the webhook event fails', async () => {
+    mockGetSecretByKey
+      .mockResolvedValueOnce('whsec_test_123')
+      .mockResolvedValueOnce('sk_test_1234567890');
+    mockProvider.constructWebhookEvent.mockReturnValueOnce({
+      id: 'evt_apply_fail_123',
+      type: 'invoice.paid',
+      livemode: false,
+      data: {
+        object: {
+          id: 'in_apply_fail_123',
+          object: 'invoice',
+          amount_due: 9900,
+          amount_paid: 9900,
+          currency: 'usd',
+          customer: 'cus_123',
+          customer_email: 'buyer@example.com',
+          description: 'Failure invoice',
+          created: 1777334400,
+          status_transitions: { paid_at: 1777334700 },
+          lines: { data: [] },
+        },
+      },
+    });
+    mockPool.query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            environment: 'test',
+            stripeEventId: 'evt_apply_fail_123',
+            eventType: 'invoice.paid',
+            livemode: false,
+            stripeAccountId: null,
+            objectType: 'invoice',
+            objectId: 'in_apply_fail_123',
+            processingStatus: 'pending',
+            attemptCount: 1,
+            lastError: null,
+            receivedAt: new Date('2026-04-28T00:00:00.000Z'),
+            processedAt: null,
+            createdAt: new Date('2026-04-28T00:00:00.000Z'),
+            updatedAt: new Date('2026-04-28T00:00:00.000Z'),
+          },
+        ],
+      })
+      .mockRejectedValueOnce(new Error('history write failed'))
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            environment: 'test',
+            stripeEventId: 'evt_apply_fail_123',
+            eventType: 'invoice.paid',
+            livemode: false,
+            stripeAccountId: null,
+            objectType: 'invoice',
+            objectId: 'in_apply_fail_123',
+            processingStatus: 'failed',
+            attemptCount: 1,
+            lastError: 'history write failed',
+            receivedAt: new Date('2026-04-28T00:00:00.000Z'),
+            processedAt: null,
+            createdAt: new Date('2026-04-28T00:00:00.000Z'),
+            updatedAt: new Date('2026-04-28T00:00:01.000Z'),
+          },
+        ],
+      });
+
+    await expect(
+      PaymentService.getInstance().handleStripeWebhook(
+        'test',
+        Buffer.from('{"id":"evt_apply_fail_123"}'),
+        'sig_123'
+      )
+    ).rejects.toThrow('history write failed');
+
+    expect(mockPool.query).toHaveBeenLastCalledWith(
+      expect.stringMatching(/UPDATE payments\.webhook_events/i),
+      ['test', 'evt_apply_fail_123', 'failed', 'history write failed']
+    );
+  });
+
   it('maps customer identity for completed delayed checkout sessions before payment settles', async () => {
     mockGetSecretByKey
       .mockResolvedValueOnce('whsec_test_123')
