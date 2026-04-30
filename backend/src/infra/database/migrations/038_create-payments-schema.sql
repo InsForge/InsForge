@@ -168,8 +168,6 @@ CREATE TABLE IF NOT EXISTS payments.customer_portal_sessions (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-ALTER TABLE payments.customer_portal_sessions ENABLE ROW LEVEL SECURITY;
-
 GRANT INSERT, SELECT ON payments.customer_portal_sessions TO anon, authenticated, project_admin;
 
 CREATE INDEX IF NOT EXISTS idx_payments_customer_portal_sessions_environment_status
