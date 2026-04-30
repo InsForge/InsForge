@@ -100,6 +100,25 @@ export const checkoutSessionSchema = z.object({
 });
 export type CheckoutSession = z.infer<typeof checkoutSessionSchema>;
 
+export const customerPortalSessionStatusSchema = z.enum(['initialized', 'created', 'failed']);
+export type CustomerPortalSessionStatus = z.infer<typeof customerPortalSessionStatusSchema>;
+
+export const customerPortalSessionSchema = z.object({
+  id: z.string(),
+  environment: stripeEnvironmentSchema,
+  status: customerPortalSessionStatusSchema,
+  subjectType: z.string(),
+  subjectId: z.string(),
+  stripeCustomerId: z.string().nullable(),
+  returnUrl: z.string().nullable(),
+  configuration: z.string().nullable(),
+  url: z.string().nullable(),
+  lastError: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type CustomerPortalSession = z.infer<typeof customerPortalSessionSchema>;
+
 export const stripeCustomerMappingSchema = z.object({
   environment: stripeEnvironmentSchema,
   subjectType: z.string(),

@@ -4,6 +4,8 @@ import type {
   StripeClient,
   StripeCheckoutSession,
   StripeCheckoutSessionCreateInput,
+  StripeCustomerPortalSession,
+  StripeCustomerPortalSessionCreateInput,
   StripeCustomer,
   StripeCustomerCreateInput,
   StripeEnvironment,
@@ -36,6 +38,9 @@ type StripeProductUpdateParams = NonNullable<Parameters<StripeClient['products']
 type StripePriceCreateParams = Parameters<StripeClient['prices']['create']>[0];
 type StripePriceUpdateParams = NonNullable<Parameters<StripeClient['prices']['update']>[1]>;
 type StripeCustomerCreateParams = Parameters<StripeClient['customers']['create']>[0];
+type StripeCustomerPortalSessionCreateParams = Parameters<
+  StripeClient['billingPortal']['sessions']['create']
+>[0];
 type StripeCheckoutSessionCreateParams = Parameters<
   StripeClient['checkout']['sessions']['create']
 >[0];
@@ -127,6 +132,24 @@ export class StripeProvider {
       (options) => this.client.customers.create(params, options),
       input.idempotencyKey
     );
+  }
+
+  async createCustomerPortalSession(
+    input: StripeCustomerPortalSessionCreateInput
+  ): Promise<StripeCustomerPortalSession> {
+    const params: StripeCustomerPortalSessionCreateParams = {
+      customer: input.customerId,
+    };
+
+    if (input.returnUrl !== undefined && input.returnUrl !== null) {
+      params.return_url = input.returnUrl;
+    }
+
+    if (input.configuration !== undefined && input.configuration !== null) {
+      params.configuration = input.configuration;
+    }
+
+    return this.client.billingPortal.sessions.create(params);
   }
 
   async createCheckoutSession(

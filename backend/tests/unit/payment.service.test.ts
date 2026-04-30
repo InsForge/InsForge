@@ -23,6 +23,7 @@ const { mockPool, mockProvider, mockGetSecretByKey, mockEncrypt, mockLogger } = 
     createPrice: vi.fn(),
     updatePrice: vi.fn(),
     createCustomer: vi.fn(),
+    createCustomerPortalSession: vi.fn(),
     createCheckoutSession: vi.fn(),
     constructWebhookEvent: vi.fn(),
     listWebhookEndpoints: vi.fn(),
@@ -119,6 +120,20 @@ describe('PaymentService', () => {
     createdAt: new Date('2026-04-28T00:00:00.000Z'),
     updatedAt: new Date('2026-04-28T00:00:00.000Z'),
   };
+  const customerPortalSessionRow = {
+    id: '5d0d37dc-6304-4be5-8424-0a3de87d01d8',
+    environment: 'test',
+    status: 'initialized',
+    subjectType: 'team',
+    subjectId: 'team_123',
+    stripeCustomerId: null,
+    returnUrl: 'https://example.com/account',
+    configuration: 'bpc_123',
+    url: null,
+    lastError: null,
+    createdAt: new Date('2026-04-29T00:00:00.000Z'),
+    updatedAt: new Date('2026-04-29T00:00:00.000Z'),
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -195,6 +210,13 @@ describe('PaymentService', () => {
       object: 'customer',
       email: 'buyer@example.com',
       metadata: { insforge_subject_type: 'team', insforge_subject_id: 'team_123' },
+    });
+    mockProvider.createCustomerPortalSession.mockResolvedValue({
+      id: 'bps_123',
+      object: 'billing_portal.session',
+      customer: 'cus_123',
+      return_url: 'https://example.com/account',
+      url: 'https://billing.stripe.com/p/session/test_123',
     });
     mockProvider.createCheckoutSession.mockResolvedValue({
       id: 'cs_test_123',
@@ -328,6 +350,9 @@ describe('PaymentService', () => {
         'checkout.session.expired',
         'invoice.paid',
         'invoice.payment_failed',
+        'payment_intent.succeeded',
+        'payment_intent.payment_failed',
+        'charge.refunded',
         'refund.created',
         'refund.updated',
         'refund.failed',
@@ -1915,6 +1940,168 @@ describe('PaymentService', () => {
     expect(mockProvider.createCustomer).not.toHaveBeenCalled();
   });
 
+  it('creates a Stripe customer portal session from an existing billing subject mapping', async () => {
+    const mockClient = {
+      query: vi.fn().mockImplementation((sql: string) => {
+        if (/INSERT INTO payments\.customer_portal_sessions/i.test(sql)) {
+          return Promise.resolve({ rows: [customerPortalSessionRow] });
+        }
+
+        return Promise.resolve({ rows: [] });
+      }),
+      release: vi.fn(),
+    };
+    mockPool.connect.mockResolvedValue(mockClient);
+    mockPool.query
+      .mockResolvedValueOnce({
+        rows: [{ stripeCustomerId: 'cus_123' }],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            ...customerPortalSessionRow,
+            status: 'created',
+            stripeCustomerId: 'cus_123',
+            url: 'https://billing.stripe.com/p/session/test_123',
+          },
+        ],
+      });
+
+    await expect(
+      PaymentService.getInstance().createCustomerPortalSession(
+        {
+          environment: 'test',
+          subject: { type: 'team', id: 'team_123' },
+          returnUrl: 'https://example.com/account',
+          configuration: 'bpc_123',
+        },
+        checkoutUser
+      )
+    ).resolves.toEqual({
+      customerPortalSession: {
+        id: customerPortalSessionRow.id,
+        environment: 'test',
+        status: 'created',
+        subjectType: 'team',
+        subjectId: 'team_123',
+        stripeCustomerId: 'cus_123',
+        returnUrl: 'https://example.com/account',
+        configuration: 'bpc_123',
+        url: 'https://billing.stripe.com/p/session/test_123',
+        lastError: null,
+        createdAt: '2026-04-29T00:00:00.000Z',
+        updatedAt: '2026-04-29T00:00:00.000Z',
+      },
+    });
+
+    expect(mockClient.query).toHaveBeenCalledWith(
+      expect.stringMatching(/SET LOCAL ROLE authenticated/i)
+    );
+    expect(mockClient.query).toHaveBeenCalledWith(
+      expect.stringMatching(/INSERT INTO payments\.customer_portal_sessions/i),
+      expect.arrayContaining([
+        'test',
+        'team',
+        'team_123',
+        'https://example.com/account',
+        'bpc_123',
+      ])
+    );
+    expect(mockProvider.createCustomerPortalSession).toHaveBeenCalledWith({
+      customerId: 'cus_123',
+      returnUrl: 'https://example.com/account',
+      configuration: 'bpc_123',
+    });
+  });
+
+  it('rejects customer portal sessions when the billing subject has no Stripe customer mapping', async () => {
+    const mockClient = {
+      query: vi.fn().mockImplementation((sql: string) => {
+        if (/INSERT INTO payments\.customer_portal_sessions/i.test(sql)) {
+          return Promise.resolve({
+            rows: [{ ...customerPortalSessionRow, subjectId: 'missing_team' }],
+          });
+        }
+
+        return Promise.resolve({ rows: [] });
+      }),
+      release: vi.fn(),
+    };
+    mockPool.connect.mockResolvedValue(mockClient);
+    mockPool.query.mockResolvedValue({ rows: [] });
+
+    await expect(
+      PaymentService.getInstance().createCustomerPortalSession(
+        {
+          environment: 'test',
+          subject: { type: 'team', id: 'missing_team' },
+          returnUrl: 'https://example.com/account',
+        },
+        checkoutUser
+      )
+    ).rejects.toThrow(/No Stripe customer is mapped/i);
+
+    expect(mockClient.query).toHaveBeenCalledWith(
+      expect.stringMatching(/INSERT INTO payments\.customer_portal_sessions/i),
+      expect.any(Array)
+    );
+    expect(mockPool.query).toHaveBeenCalledWith(
+      expect.stringMatching(/UPDATE payments\.customer_portal_sessions/i),
+      [expect.any(String), expect.stringMatching(/No Stripe customer is mapped/i)]
+    );
+    expect(mockProvider.createCustomerPortalSession).not.toHaveBeenCalled();
+  });
+
+  it('does not call Stripe when customer_portal_sessions RLS denies the insert', async () => {
+    const mockClient = {
+      query: vi.fn().mockImplementation((sql: string) => {
+        if (/INSERT INTO payments\.customer_portal_sessions/i.test(sql)) {
+          return Promise.reject({ code: '42501', message: 'new row violates row-level security' });
+        }
+
+        return Promise.resolve({ rows: [] });
+      }),
+      release: vi.fn(),
+    };
+    mockPool.connect.mockResolvedValue(mockClient);
+
+    await expect(
+      PaymentService.getInstance().createCustomerPortalSession(
+        {
+          environment: 'test',
+          subject: { type: 'team', id: 'team_123' },
+          returnUrl: 'https://example.com/account',
+        },
+        checkoutUser
+      )
+    ).rejects.toThrow(/customer_portal_sessions RLS policies/i);
+
+    expect(mockProvider.createCustomerPortalSession).not.toHaveBeenCalled();
+    expect(mockPool.query).not.toHaveBeenCalledWith(
+      expect.stringMatching(/stripe_customer_mappings/i),
+      expect.any(Array)
+    );
+  });
+
+  it('rejects anonymous customer portal sessions', async () => {
+    await expect(
+      PaymentService.getInstance().createCustomerPortalSession(
+        {
+          environment: 'test',
+          subject: { type: 'team', id: 'team_123' },
+          returnUrl: 'https://example.com/account',
+        },
+        anonCheckoutUser
+      )
+    ).rejects.toThrow(/authenticated user/i);
+
+    expect(mockPool.query).not.toHaveBeenCalledWith(
+      expect.stringMatching(/stripe_customer_mappings/i),
+      expect.any(Array)
+    );
+    expect(mockProvider.createCustomerPortalSession).not.toHaveBeenCalled();
+  });
+
   it('stores duplicate processed Stripe webhook events without reprocessing', async () => {
     mockGetSecretByKey
       .mockResolvedValueOnce('whsec_test_123')
@@ -1974,6 +2161,7 @@ describe('PaymentService', () => {
     mockProvider.constructWebhookEvent.mockReturnValueOnce({
       id: 'evt_123',
       type: 'checkout.session.completed',
+      created: 1777334700,
       livemode: false,
       data: {
         object: {
@@ -2073,7 +2261,7 @@ describe('PaymentService', () => {
         4500,
         'usd',
         null,
-        expect.any(Date),
+        new Date('2026-04-28T00:05:00.000Z'),
         new Date('2026-04-28T00:00:00.000Z'),
         expect.objectContaining({ id: 'cs_test_123' }),
       ]

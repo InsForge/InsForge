@@ -621,6 +621,9 @@ export class PaymentConfigService {
     await client.query('DELETE FROM payments.checkout_sessions WHERE environment = $1', [
       environment,
     ]);
+    await client.query('DELETE FROM payments.customer_portal_sessions WHERE environment = $1', [
+      environment,
+    ]);
     await client.query('DELETE FROM payments.stripe_customer_mappings WHERE environment = $1', [
       environment,
     ]);

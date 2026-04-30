@@ -287,6 +287,39 @@ describe('StripeProvider', () => {
     });
   });
 
+  it('creates customer portal sessions through Stripe billing portal API', async () => {
+    const client = {
+      accounts: { retrieveCurrent: vi.fn() },
+      products: { list: vi.fn() },
+      prices: { list: vi.fn() },
+      customers: { create: vi.fn() },
+      billingPortal: {
+        sessions: {
+          create: vi.fn().mockResolvedValue({
+            id: 'bps_123',
+            object: 'billing_portal.session',
+            url: 'https://billing.stripe.com/p/session/test_123',
+          }),
+        },
+      },
+      checkout: { sessions: { create: vi.fn() } },
+      webhooks: { constructEvent: vi.fn() },
+    } as unknown as StripeClient;
+    const provider = new StripeProvider('sk_test_1234567890', 'test', client);
+
+    await provider.createCustomerPortalSession({
+      customerId: 'cus_123',
+      returnUrl: 'https://example.com/account',
+      configuration: 'bpc_123',
+    });
+
+    expect(client.billingPortal.sessions.create).toHaveBeenCalledWith({
+      customer: 'cus_123',
+      return_url: 'https://example.com/account',
+      configuration: 'bpc_123',
+    });
+  });
+
   it('creates checkout sessions and copies metadata onto durable Stripe objects', async () => {
     const client = {
       accounts: { retrieveCurrent: vi.fn() },

@@ -7,6 +7,7 @@ import {
   PaymentCheckoutService,
   type CheckoutUserContext,
 } from '@/services/payments/payment-checkout.service.js';
+import { PaymentCustomerPortalService } from '@/services/payments/payment-customer-portal.service.js';
 import { PaymentHistoryService } from '@/services/payments/payment-history.service.js';
 import { PaymentProductService } from '@/services/payments/payment-product.service.js';
 import { PaymentPriceService } from '@/services/payments/payment-price.service.js';
@@ -20,6 +21,7 @@ import {
 } from '@/services/payments/constants.js';
 import {
   buildStripeIdempotencyKey,
+  fromStripeTimestamp,
   getBillingSubjectFromMetadata,
   getStripeObjectId,
   normalizePriceRow,
@@ -62,6 +64,8 @@ import type {
   UpdatePaymentProductRequest,
   CreateCheckoutSessionRequest,
   CreateCheckoutSessionResponse,
+  CreateCustomerPortalSessionRequest,
+  CreateCustomerPortalSessionResponse,
   CheckoutSession,
   BillingSubject,
   StripeWebhookResponse,
@@ -80,6 +84,7 @@ export class PaymentService {
   private pool: Pool | null = null;
   private readonly configService = PaymentConfigService.getInstance();
   private readonly checkoutService = PaymentCheckoutService.getInstance();
+  private readonly customerPortalService = PaymentCustomerPortalService.getInstance();
   private readonly historyService = PaymentHistoryService.getInstance();
   private readonly productService = PaymentProductService.getInstance();
   private readonly priceService = PaymentPriceService.getInstance();
@@ -352,6 +357,70 @@ export class PaymentService {
     });
   }
 
+  async createCustomerPortalSession(
+    input: CreateCustomerPortalSessionRequest,
+    user: CheckoutUserContext
+  ): Promise<CreateCustomerPortalSessionResponse> {
+    if (user.role === 'anon') {
+      throw new AppError(
+        'Customer portal sessions require an authenticated user',
+        401,
+        ERROR_CODES.AUTH_INVALID_CREDENTIALS
+      );
+    }
+
+    const portalRecord = await this.customerPortalService.insertInitializedCustomerPortalSession(
+      input,
+      user
+    );
+
+    try {
+      const mapping = await this.findStripeCustomerMapping(input.environment, input.subject);
+      if (!mapping) {
+        throw new AppError(
+          'No Stripe customer is mapped to this billing subject',
+          404,
+          ERROR_CODES.NOT_FOUND
+        );
+      }
+
+      const provider = await this.configService.createStripeProvider(input.environment);
+      const portalSession = await provider.createCustomerPortalSession({
+        customerId: mapping.stripeCustomerId,
+        returnUrl: input.returnUrl,
+        configuration: input.configuration,
+      });
+
+      if (!portalSession.url) {
+        throw new AppError(
+          'Stripe did not return a customer portal URL',
+          500,
+          ERROR_CODES.INTERNAL_ERROR
+        );
+      }
+
+      const customerPortalSession =
+        await this.customerPortalService.markCustomerPortalSessionCreated(
+          portalRecord.id,
+          mapping.stripeCustomerId,
+          portalSession
+        );
+
+      return { customerPortalSession };
+    } catch (error) {
+      await this.customerPortalService
+        .markCustomerPortalSessionFailed(portalRecord.id, error)
+        .catch((markError) => {
+          logger.warn('Failed to mark Stripe customer portal session as failed', {
+            environment: input.environment,
+            customerPortalSessionId: portalRecord.id,
+            error: markError instanceof Error ? markError.message : String(markError),
+          });
+        });
+      throw error;
+    }
+  }
+
   private isUsableCheckoutSession(checkoutSession: CheckoutSession): boolean {
     return Boolean(checkoutSession.stripeCheckoutSessionId && checkoutSession.url);
   }
@@ -592,6 +661,8 @@ export class PaymentService {
     event: StripeEvent,
     provider: StripeProvider
   ): Promise<boolean> {
+    const eventCreatedAt = fromStripeTimestamp(event.created);
+
     switch (event.type) {
       case 'checkout.session.completed': {
         const checkoutSession = event.data.object as StripeCheckoutSession;
@@ -602,7 +673,12 @@ export class PaymentService {
             'completed'
           ),
           this.upsertStripeCustomerMappingFromCheckout(environment, checkoutSession),
-          this.historyService.processCheckoutSessionCompleted(environment, checkoutSession),
+          this.historyService.processCheckoutSessionCompleted(
+            environment,
+            checkoutSession,
+            undefined,
+            eventCreatedAt
+          ),
         ]);
 
         return Boolean(checkoutRow) || mapped || historyHandled;
@@ -619,7 +695,8 @@ export class PaymentService {
           this.historyService.processCheckoutSessionCompleted(
             environment,
             checkoutSession,
-            'succeeded'
+            'succeeded',
+            eventCreatedAt
           ),
         ]);
 

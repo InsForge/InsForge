@@ -3,6 +3,7 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import {
   createCheckoutSessionRequestSchema,
+  createCustomerPortalSessionRequestSchema,
   createPaymentPriceRequestSchema,
   createPaymentProductRequestSchema,
   listPaymentCatalogRequestSchema,
@@ -31,6 +32,18 @@ describe('payments route schemas', () => {
       paymentsRouteSource.indexOf('router.use(verifyAdmin)')
     );
     expect(paymentsRouteSource).toContain('Checkout session creation requires a user token');
+  });
+
+  it('keeps customer portal session creation on runtime auth before admin-only payments routes', () => {
+    expect(paymentsRouteSource).toMatch(
+      /router\.post\(\s*'\/customer-portal-sessions'[\s\S]*verifyUser[\s\S]*createCustomerPortalSession/
+    );
+    expect(paymentsRouteSource.indexOf("'/customer-portal-sessions'")).toBeLessThan(
+      paymentsRouteSource.indexOf('router.use(verifyAdmin)')
+    );
+    expect(paymentsRouteSource).toContain(
+      'Customer portal session creation requires a user token'
+    );
   });
 
   it('accepts test, live, and all unified sync targets', () => {
@@ -248,6 +261,36 @@ describe('payments route schemas', () => {
       cancelUrl: 'https://example.com/cancel',
       subject: { type: 'team', id: 'team_123' },
     });
+  });
+
+  it('requires customer portal sessions to specify an environment and billing subject', () => {
+    expect(
+      createCustomerPortalSessionRequestSchema.parse({
+        environment: 'test',
+        subject: { type: 'team', id: 'team_123' },
+        returnUrl: 'https://example.com/account',
+        configuration: 'bpc_123',
+      })
+    ).toEqual({
+      environment: 'test',
+      subject: { type: 'team', id: 'team_123' },
+      returnUrl: 'https://example.com/account',
+      configuration: 'bpc_123',
+    });
+
+    expect(() =>
+      createCustomerPortalSessionRequestSchema.parse({
+        environment: 'test',
+        returnUrl: 'https://example.com/account',
+      })
+    ).toThrow();
+    expect(() =>
+      createCustomerPortalSessionRequestSchema.parse({
+        environment: 'test',
+        subject: { type: 'team', id: 'team_123' },
+        returnUrl: 'not-a-url',
+      })
+    ).toThrow(/valid URL/i);
   });
 
   it('requires runtime list filters to specify explicit environment and complete subject filters', () => {

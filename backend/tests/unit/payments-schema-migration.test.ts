@@ -26,6 +26,7 @@ describe('038_create-payments-schema migration', () => {
     expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS payments\.prices/i);
     expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS payments\.stripe_customer_mappings/i);
     expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS payments\.checkout_sessions/i);
+    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS payments\.customer_portal_sessions/i);
     expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS payments\.payment_history/i);
     expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS payments\.subscriptions/i);
     expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS payments\.subscription_items/i);
@@ -124,7 +125,7 @@ describe('038_create-payments-schema migration', () => {
     expect(sql).toMatch(/customer_email_snapshot TEXT/i);
   });
 
-  it('creates checkout sessions as an RLS gate before Stripe checkout', () => {
+  it('creates checkout sessions for runtime checkout state without default RLS friction', () => {
     expect(sql).toMatch(
       /CREATE TABLE IF NOT EXISTS payments\.checkout_sessions[\s\S]*status TEXT NOT NULL DEFAULT 'initialized'\s+CHECK \(status IN \('initialized', 'open', 'completed', 'expired', 'failed'\)\)/i
     );
@@ -141,9 +142,35 @@ describe('038_create-payments-schema migration', () => {
       /CREATE TABLE IF NOT EXISTS payments\.checkout_sessions\s*\([^;]*customer_email_snapshot/i
     );
     expect(sql).toMatch(/idempotency_key TEXT/i);
-    expect(sql).toMatch(/ALTER TABLE payments\.checkout_sessions ENABLE ROW LEVEL SECURITY/i);
+    expect(sql).not.toMatch(
+      /ALTER TABLE payments\.checkout_sessions ENABLE ROW LEVEL SECURITY/i
+    );
     expect(sql).toMatch(
       /GRANT INSERT, SELECT ON payments\.checkout_sessions TO anon, authenticated, project_admin/i
+    );
+  });
+
+  it('creates customer portal sessions as an RLS-gated billing management surface', () => {
+    expect(sql).toMatch(
+      /CREATE TABLE IF NOT EXISTS payments\.customer_portal_sessions[\s\S]*status TEXT NOT NULL DEFAULT 'initialized'\s+CHECK \(status IN \('initialized', 'created', 'failed'\)\)/i
+    );
+    expect(sql).toMatch(
+      /CREATE TABLE IF NOT EXISTS payments\.customer_portal_sessions[\s\S]*subject_type TEXT NOT NULL/i
+    );
+    expect(sql).toMatch(
+      /CREATE TABLE IF NOT EXISTS payments\.customer_portal_sessions[\s\S]*subject_id TEXT NOT NULL/i
+    );
+    expect(sql).toMatch(
+      /CREATE TABLE IF NOT EXISTS payments\.customer_portal_sessions[\s\S]*stripe_customer_id TEXT/i
+    );
+    expect(sql).toMatch(
+      /CREATE TABLE IF NOT EXISTS payments\.customer_portal_sessions[\s\S]*return_url TEXT/i
+    );
+    expect(sql).toMatch(
+      /ALTER TABLE payments\.customer_portal_sessions ENABLE ROW LEVEL SECURITY/i
+    );
+    expect(sql).toMatch(
+      /GRANT INSERT, SELECT ON payments\.customer_portal_sessions TO anon, authenticated, project_admin/i
     );
   });
 
@@ -175,6 +202,8 @@ describe('038_create-payments-schema migration', () => {
     expect(sql).toMatch(/idx_payments_checkout_sessions_environment_status/i);
     expect(sql).toMatch(/idx_payments_checkout_sessions_environment_subject/i);
     expect(sql).toMatch(/idx_payments_checkout_sessions_environment_idempotency/i);
+    expect(sql).toMatch(/idx_payments_customer_portal_sessions_environment_status/i);
+    expect(sql).toMatch(/idx_payments_customer_portal_sessions_environment_subject/i);
     expect(sql).toMatch(/idx_payments_payment_history_environment_payment_intent/i);
     expect(sql).toMatch(/idx_payments_payment_history_environment_checkout_session/i);
     expect(sql).toMatch(/idx_payments_payment_history_environment_invoice/i);
@@ -204,12 +233,13 @@ describe('038_create-payments-schema migration', () => {
     expect(sql).toMatch(/CREATE TRIGGER trg_payments_prices_updated_at/i);
     expect(sql).toMatch(/CREATE TRIGGER trg_payments_stripe_customer_mappings_updated_at/i);
     expect(sql).toMatch(/CREATE TRIGGER trg_payments_checkout_sessions_updated_at/i);
+    expect(sql).toMatch(/CREATE TRIGGER trg_payments_customer_portal_sessions_updated_at/i);
     expect(sql).toMatch(/CREATE TRIGGER trg_payments_payment_history_updated_at/i);
     expect(sql).toMatch(/CREATE TRIGGER trg_payments_subscriptions_updated_at/i);
     expect(sql).toMatch(/CREATE TRIGGER trg_payments_subscription_items_updated_at/i);
     expect(sql).toMatch(/CREATE TRIGGER trg_payments_webhook_events_updated_at/i);
     expect(
       sql.match(/EXECUTE FUNCTION system\.update_updated_at\(\)/gi)?.length
-    ).toBeGreaterThanOrEqual(9);
+    ).toBeGreaterThanOrEqual(10);
   });
 });

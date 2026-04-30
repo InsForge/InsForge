@@ -11,6 +11,7 @@ import {
   stripeEnvironmentSchema,
   upsertPaymentsConfigRequestSchema,
   createCheckoutSessionRequestSchema,
+  createCustomerPortalSessionRequestSchema,
   listPaymentCatalogRequestSchema,
   listPaymentHistoryRequestSchema,
   listSubscriptionsRequestSchema,
@@ -46,6 +47,41 @@ router.post(
 
       const checkoutSession = await paymentService.createCheckoutSession(validation.data, req.user);
       successResponse(res, checkoutSession, 201);
+    } catch (error) {
+      next(normalizeStripeConfigError(error));
+    }
+  }
+);
+
+router.post(
+  '/customer-portal-sessions',
+  verifyUser,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validation = createCustomerPortalSessionRequestSchema.safeParse(req.body);
+      if (!validation.success) {
+        throw new AppError(
+          validation.error.issues
+            .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+            .join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      if (!req.user) {
+        throw new AppError(
+          'Customer portal session creation requires a user token',
+          401,
+          ERROR_CODES.AUTH_INVALID_CREDENTIALS
+        );
+      }
+
+      const customerPortalSession = await paymentService.createCustomerPortalSession(
+        validation.data,
+        req.user
+      );
+      successResponse(res, customerPortalSession, 201);
     } catch (error) {
       next(normalizeStripeConfigError(error));
     }

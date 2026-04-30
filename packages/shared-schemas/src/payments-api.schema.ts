@@ -3,6 +3,7 @@ import {
   billingSubjectSchema,
   checkoutModeSchema,
   checkoutSessionSchema,
+  customerPortalSessionSchema,
   paymentHistorySchema,
   stripeConnectionSchema,
   stripeEnvironmentSchema,
@@ -198,6 +199,19 @@ export const createCheckoutSessionResponseSchema = z.object({
   checkoutSession: checkoutSessionSchema,
 });
 
+export const createCustomerPortalSessionRequestSchema = z
+  .object({
+    environment: stripeEnvironmentSchema,
+    subject: billingSubjectSchema,
+    returnUrl: z.string().trim().url('Return URL must be a valid URL').optional(),
+    configuration: z.string().trim().min(1).max(255).optional(),
+  })
+  .strict();
+
+export const createCustomerPortalSessionResponseSchema = z.object({
+  customerPortalSession: customerPortalSessionSchema,
+});
+
 const subjectFilterFields = {
   subjectType: z.string().trim().min(1).max(100).optional(),
   subjectId: z.string().trim().min(1).max(255).optional(),
@@ -296,6 +310,12 @@ export type UpdatePaymentPriceRequest = z.infer<typeof updatePaymentPriceRequest
 export type CreateCheckoutSessionLineItem = z.infer<typeof createCheckoutSessionLineItemSchema>;
 export type CreateCheckoutSessionRequest = z.infer<typeof createCheckoutSessionRequestSchema>;
 export type CreateCheckoutSessionResponse = z.infer<typeof createCheckoutSessionResponseSchema>;
+export type CreateCustomerPortalSessionRequest = z.infer<
+  typeof createCustomerPortalSessionRequestSchema
+>;
+export type CreateCustomerPortalSessionResponse = z.infer<
+  typeof createCustomerPortalSessionResponseSchema
+>;
 export type ListPaymentHistoryRequest = z.infer<typeof listPaymentHistoryRequestSchema>;
 export type ListSubscriptionsRequest = z.infer<typeof listSubscriptionsRequestSchema>;
 export type ListPaymentHistoryResponse = z.infer<typeof listPaymentHistoryResponseSchema>;

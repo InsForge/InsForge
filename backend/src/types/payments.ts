@@ -17,6 +17,9 @@ export type StripeCustomer = Awaited<ReturnType<StripeInstance['customers']['cre
 export type StripeCheckoutSession = Awaited<
   ReturnType<StripeInstance['checkout']['sessions']['create']>
 >;
+export type StripeCustomerPortalSession = Awaited<
+  ReturnType<StripeInstance['billingPortal']['sessions']['create']>
+>;
 export type StripeEvent = ReturnType<StripeInstance['webhooks']['constructEvent']>;
 export type StripeWebhookEndpoint = AsyncIterableItem<
   ReturnType<StripeInstance['webhookEndpoints']['list']>
@@ -51,6 +54,7 @@ export type StripeClient = Pick<
   | 'products'
   | 'prices'
   | 'customers'
+  | 'billingPortal'
   | 'checkout'
   | 'webhooks'
   | 'webhookEndpoints'
@@ -143,6 +147,12 @@ export interface StripeCheckoutSessionCreateInput {
   idempotencyKey?: string;
 }
 
+export interface StripeCustomerPortalSessionCreateInput {
+  customerId: string;
+  returnUrl?: string | null;
+  configuration?: string | null;
+}
+
 export interface StripeConnectionRow {
   environment: StripeEnvironment;
   status: StripeConnectionStatus;
@@ -205,6 +215,23 @@ export interface CheckoutSessionRow {
   stripeCustomerId: string | null;
   stripePaymentIntentId: string | null;
   stripeSubscriptionId: string | null;
+  url: string | null;
+  lastError: string | null;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export type CustomerPortalSessionStatus = 'initialized' | 'created' | 'failed';
+
+export interface CustomerPortalSessionRow {
+  id: string;
+  environment: StripeEnvironment;
+  status: CustomerPortalSessionStatus;
+  subjectType: string;
+  subjectId: string;
+  stripeCustomerId: string | null;
+  returnUrl: string | null;
+  configuration: string | null;
   url: string | null;
   lastError: string | null;
   createdAt: Date | string;

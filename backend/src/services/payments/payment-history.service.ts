@@ -120,13 +120,19 @@ export class PaymentHistoryService {
   async processCheckoutSessionCompleted(
     environment: StripeEnvironment,
     checkoutSession: StripeCheckoutSession,
-    statusOverride?: PaymentHistoryStatus
+    statusOverride?: PaymentHistoryStatus,
+    paidAtOverride?: Date | null
   ): Promise<boolean> {
     if (checkoutSession.mode !== 'payment') {
       return false;
     }
 
-    await this.upsertCheckoutPaymentHistory(environment, checkoutSession, statusOverride);
+    await this.upsertCheckoutPaymentHistory(
+      environment,
+      checkoutSession,
+      statusOverride,
+      paidAtOverride
+    );
     return true;
   }
 
@@ -369,12 +375,17 @@ export class PaymentHistoryService {
   private async upsertCheckoutPaymentHistory(
     environment: StripeEnvironment,
     checkoutSession: StripeCheckoutSession,
-    statusOverride?: PaymentHistoryStatus
+    statusOverride?: PaymentHistoryStatus,
+    paidAtOverride?: Date | null
   ): Promise<void> {
     const subject = getBillingSubjectFromMetadata(checkoutSession.metadata);
     const stripePaymentIntentId = getStripeObjectId(checkoutSession.payment_intent);
     const status =
       statusOverride ?? (checkoutSession.payment_status === 'paid' ? 'succeeded' : 'pending');
+    const paidAt =
+      status === 'succeeded'
+        ? (paidAtOverride ?? fromStripeTimestamp(checkoutSession.created))
+        : null;
     const conflictTarget = stripePaymentIntentId
       ? `(environment, stripe_payment_intent_id)
          WHERE stripe_payment_intent_id IS NOT NULL
@@ -458,7 +469,7 @@ export class PaymentHistoryService {
         checkoutSession.amount_total ?? null,
         checkoutSession.currency ?? null,
         null,
-        status === 'succeeded' ? new Date() : null,
+        paidAt,
         fromStripeTimestamp(checkoutSession.created),
         checkoutSession,
       ]

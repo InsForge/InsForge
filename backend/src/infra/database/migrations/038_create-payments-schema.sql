@@ -128,8 +128,6 @@ CREATE TABLE IF NOT EXISTS payments.checkout_sessions (
   UNIQUE (environment, stripe_checkout_session_id)
 );
 
-ALTER TABLE payments.checkout_sessions ENABLE ROW LEVEL SECURITY;
-
 GRANT USAGE ON SCHEMA payments TO anon, authenticated, project_admin;
 GRANT INSERT, SELECT ON payments.checkout_sessions TO anon, authenticated, project_admin;
 
@@ -152,6 +150,37 @@ CREATE INDEX IF NOT EXISTS idx_payments_checkout_sessions_environment_stripe_ses
 CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_checkout_sessions_environment_idempotency
   ON payments.checkout_sessions(environment, idempotency_key)
   WHERE idempotency_key IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS payments.customer_portal_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  environment TEXT NOT NULL CHECK (environment IN ('test', 'live')),
+  status TEXT NOT NULL DEFAULT 'initialized'
+    CHECK (status IN ('initialized', 'created', 'failed')),
+  subject_type TEXT NOT NULL,
+  subject_id TEXT NOT NULL,
+  stripe_customer_id TEXT,
+  return_url TEXT,
+  configuration_id TEXT,
+  url TEXT,
+  last_error TEXT,
+  raw JSONB NOT NULL DEFAULT '{}'::JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE payments.customer_portal_sessions ENABLE ROW LEVEL SECURITY;
+
+GRANT INSERT, SELECT ON payments.customer_portal_sessions TO anon, authenticated, project_admin;
+
+CREATE INDEX IF NOT EXISTS idx_payments_customer_portal_sessions_environment_status
+  ON payments.customer_portal_sessions(environment, status);
+
+CREATE INDEX IF NOT EXISTS idx_payments_customer_portal_sessions_environment_subject
+  ON payments.customer_portal_sessions(environment, subject_type, subject_id);
+
+CREATE INDEX IF NOT EXISTS idx_payments_customer_portal_sessions_environment_customer
+  ON payments.customer_portal_sessions(environment, stripe_customer_id)
+  WHERE stripe_customer_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS payments.payment_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -317,6 +346,11 @@ FOR EACH ROW EXECUTE FUNCTION system.update_updated_at();
 DROP TRIGGER IF EXISTS trg_payments_checkout_sessions_updated_at ON payments.checkout_sessions;
 CREATE TRIGGER trg_payments_checkout_sessions_updated_at
 BEFORE UPDATE ON payments.checkout_sessions
+FOR EACH ROW EXECUTE FUNCTION system.update_updated_at();
+
+DROP TRIGGER IF EXISTS trg_payments_customer_portal_sessions_updated_at ON payments.customer_portal_sessions;
+CREATE TRIGGER trg_payments_customer_portal_sessions_updated_at
+BEFORE UPDATE ON payments.customer_portal_sessions
 FOR EACH ROW EXECUTE FUNCTION system.update_updated_at();
 
 DROP TRIGGER IF EXISTS trg_payments_payment_history_updated_at ON payments.payment_history;
