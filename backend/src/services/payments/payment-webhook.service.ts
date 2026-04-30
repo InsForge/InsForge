@@ -103,7 +103,11 @@ export class PaymentWebhookService {
     );
 
     const existing = existingResult.rows[0] as StripeWebhookEventRow;
-    if (existing.processingStatus === 'processed' || existing.processingStatus === 'ignored') {
+    if (
+      existing.processingStatus === 'processed' ||
+      existing.processingStatus === 'ignored' ||
+      existing.processingStatus === 'pending'
+    ) {
       return { row: existing, shouldProcess: false };
     }
 

@@ -15,6 +15,7 @@ import {
   normalizeProductRow,
   normalizeStripeProduct,
 } from '@/services/payments/helpers.js';
+import { withPaymentSessionAdvisoryLock } from '@/services/payments/payments-advisory-lock.js';
 import { PaymentConfigService } from '@/services/payments/payment-config.service.js';
 import type {
   CreatePaymentProductRequest,
@@ -51,19 +52,8 @@ export class PaymentProductService {
     environment: StripeEnvironment,
     task: () => Promise<T>
   ): Promise<T> {
-    const client = await this.getPool().connect();
     const lockName = `payments_environment_${environment}`;
-
-    try {
-      await client.query('SELECT pg_advisory_lock(hashtext($1))', [lockName]);
-      return await task();
-    } finally {
-      try {
-        await client.query('SELECT pg_advisory_unlock(hashtext($1))', [lockName]);
-      } finally {
-        client.release();
-      }
-    }
+    return withPaymentSessionAdvisoryLock(this.getPool(), lockName, task);
   }
 
   async listProducts(input: ListPaymentProductsRequest): Promise<ListPaymentProductsResponse> {

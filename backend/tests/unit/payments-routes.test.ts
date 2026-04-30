@@ -17,6 +17,8 @@ import {
   upsertPaymentsConfigRequestSchema,
 } from '@insforge/shared-schemas';
 
+const FAKE_LIVE_SECRET_KEY = 'stripe_live_secret_placeholder';
+
 describe('payments route schemas', () => {
   const paymentsRouteSource = readFileSync(
     resolve(__dirname, '../../src/api/routes/payments/index.routes.ts'),
@@ -95,11 +97,11 @@ describe('payments route schemas', () => {
     expect(
       upsertPaymentsConfigRequestSchema.parse({
         environment: 'live',
-        secretKey: 'sk_live_1234567890',
+        secretKey: FAKE_LIVE_SECRET_KEY,
       })
     ).toEqual({
       environment: 'live',
-      secretKey: 'sk_live_1234567890',
+      secretKey: FAKE_LIVE_SECRET_KEY,
     });
   });
 

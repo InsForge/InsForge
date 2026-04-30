@@ -7,6 +7,14 @@ import { stripeWebhookParamsSchema } from '@insforge/shared-schemas';
 const router = Router();
 const paymentService = PaymentService.getInstance();
 
+export function normalizeStripeWebhookError(error: unknown) {
+  if (error instanceof Error && error.name === 'StripeSignatureVerificationError') {
+    return new AppError(error.message, 400, ERROR_CODES.INVALID_INPUT);
+  }
+
+  return error;
+}
+
 /**
  * Stripe webhook endpoint
  * POST /api/webhooks/stripe/:environment
@@ -42,7 +50,7 @@ router.post('/:environment', async (req: Request, res: Response, next: NextFunct
 
     res.status(200).json(result);
   } catch (error) {
-    next(error);
+    next(normalizeStripeWebhookError(error));
   }
 });
 

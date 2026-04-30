@@ -1432,6 +1432,111 @@ describe('PaymentService', () => {
     expect(mockProvider.createCheckoutSession).not.toHaveBeenCalled();
   });
 
+  it('uses a shared environment lock and a key-scoped lock for idempotent checkout creation', async () => {
+    const mockEnvironmentLockClient = {
+      query: vi.fn().mockResolvedValue({ rows: [] }),
+      release: vi.fn(),
+    };
+    const mockIdempotencyLockClient = {
+      query: vi.fn().mockResolvedValue({ rows: [] }),
+      release: vi.fn(),
+    };
+    const mockCheckoutClient = {
+      query: vi.fn().mockResolvedValue({ rows: [], rowCount: 1 }),
+      release: vi.fn(),
+    };
+    mockPool.connect
+      .mockResolvedValueOnce(mockEnvironmentLockClient)
+      .mockResolvedValueOnce(mockIdempotencyLockClient)
+      .mockResolvedValueOnce(mockCheckoutClient);
+    mockPool.query.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({
+      rows: [checkoutSessionRow],
+    });
+
+    await PaymentService.getInstance().createCheckoutSession(
+      {
+        environment: 'test',
+        mode: 'subscription',
+        lineItems: [{ stripePriceId: 'price_123', quantity: 1 }],
+        successUrl: 'https://example.com/success',
+        cancelUrl: 'https://example.com/cancel',
+        customerEmail: 'buyer@example.com',
+        subject: { type: 'team', id: 'team_123' },
+        idempotencyKey: 'checkout-123',
+      },
+      checkoutUser
+    );
+
+    expect(mockEnvironmentLockClient.query).toHaveBeenCalledWith(
+      'SELECT pg_advisory_lock_shared(hashtext($1))',
+      ['payments_environment_test']
+    );
+    expect(mockEnvironmentLockClient.query).toHaveBeenCalledWith(
+      'SELECT pg_advisory_unlock_shared(hashtext($1))',
+      ['payments_environment_test']
+    );
+    expect(mockIdempotencyLockClient.query).toHaveBeenCalledWith(
+      'SELECT pg_advisory_lock(hashtext($1))',
+      ['payments_checkout_test_checkout-123']
+    );
+    expect(mockIdempotencyLockClient.query).toHaveBeenCalledWith(
+      'SELECT pg_advisory_unlock(hashtext($1))',
+      ['payments_checkout_test_checkout-123']
+    );
+  });
+
+  it('uses only the shared environment lock when checkout has no caller idempotency key', async () => {
+    const mockEnvironmentLockClient = {
+      query: vi.fn().mockResolvedValue({ rows: [] }),
+      release: vi.fn(),
+    };
+    const mockCheckoutClient = {
+      query: vi.fn().mockResolvedValue({ rows: [], rowCount: 1 }),
+      release: vi.fn(),
+    };
+    mockPool.connect
+      .mockResolvedValueOnce(mockEnvironmentLockClient)
+      .mockResolvedValueOnce(mockCheckoutClient);
+    mockPool.query.mockResolvedValueOnce({
+      rows: [
+        {
+          ...checkoutSessionRow,
+          id: '8cf48e7a-8e8c-44be-b6f1-68151d4e7331',
+          mode: 'payment',
+          subjectType: null,
+          subjectId: null,
+          customerEmail: 'anon@example.com',
+        },
+      ],
+    });
+
+    await PaymentService.getInstance().createCheckoutSession(
+      {
+        environment: 'test',
+        mode: 'payment',
+        lineItems: [{ stripePriceId: 'price_123', quantity: 1 }],
+        successUrl: 'https://example.com/success',
+        cancelUrl: 'https://example.com/cancel',
+        customerEmail: 'anon@example.com',
+      },
+      anonCheckoutUser
+    );
+
+    expect(mockEnvironmentLockClient.query).toHaveBeenCalledWith(
+      'SELECT pg_advisory_lock_shared(hashtext($1))',
+      ['payments_environment_test']
+    );
+    expect(mockEnvironmentLockClient.query).toHaveBeenCalledWith(
+      'SELECT pg_advisory_unlock_shared(hashtext($1))',
+      ['payments_environment_test']
+    );
+    expect(mockPool.connect).toHaveBeenCalledTimes(2);
+    expect(mockEnvironmentLockClient.query).not.toHaveBeenCalledWith(
+      'SELECT pg_advisory_lock(hashtext($1))',
+      [expect.stringMatching(/^payments_checkout_test_/)]
+    );
+  });
+
   it('creates an authorized checkout row before identified Stripe checkout', async () => {
     const mockClient = {
       query: vi.fn().mockResolvedValue({ rows: [] }),
@@ -1574,6 +1679,11 @@ describe('PaymentService', () => {
         JSON.stringify([{ stripePriceId: 'price_123', quantity: 1 }]),
         'https://example.com/success',
         'https://example.com/cancel',
+        JSON.stringify({
+          insforge_checkout_mode: 'subscription',
+          insforge_subject_type: 'team',
+          insforge_subject_id: 'team_123',
+        }),
       ]
     );
     expect(mockPool.query).not.toHaveBeenCalled();
@@ -1714,6 +1824,11 @@ describe('PaymentService', () => {
         JSON.stringify([{ stripePriceId: 'price_123', quantity: 1 }]),
         'https://example.com/success',
         'https://example.com/cancel',
+        JSON.stringify({
+          insforge_checkout_mode: 'subscription',
+          insforge_subject_type: 'team',
+          insforge_subject_id: 'team_123',
+        }),
       ]
     );
     expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');

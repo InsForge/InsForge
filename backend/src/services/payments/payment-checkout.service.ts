@@ -113,7 +113,11 @@ export class PaymentCheckoutService {
       );
       inserted = result.rowCount !== 0;
       if (!inserted) {
-        existingCheckoutSession = await this.findMatchingIdempotentCheckoutSession(client, input);
+        existingCheckoutSession = await this.findMatchingIdempotentCheckoutSession(
+          client,
+          input,
+          metadata
+        );
       }
       await client.query('COMMIT');
     } catch (error) {
@@ -246,7 +250,8 @@ export class PaymentCheckoutService {
 
   private async findMatchingIdempotentCheckoutSession(
     client: PoolClient,
-    input: CreateCheckoutSessionRequest
+    input: CreateCheckoutSessionRequest,
+    metadata: Record<string, string>
   ): Promise<CheckoutSession> {
     if (!input.idempotencyKey) {
       throw new AppError('Checkout session was not created', 500, ERROR_CODES.INTERNAL_ERROR);
@@ -264,6 +269,7 @@ export class PaymentCheckoutService {
          AND line_items = $7::JSONB
          AND success_url = $8
          AND cancel_url = $9
+         AND metadata = $10::JSONB
        LIMIT 1`,
       [
         input.environment,
@@ -275,6 +281,7 @@ export class PaymentCheckoutService {
         JSON.stringify(input.lineItems),
         input.successUrl,
         input.cancelUrl,
+        JSON.stringify(metadata),
       ]
     );
 

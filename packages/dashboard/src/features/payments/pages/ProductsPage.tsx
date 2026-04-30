@@ -34,7 +34,17 @@ function formatLastSynced(value: string | null) {
   return value ? formatDate(value) : 'Never';
 }
 
-function formatAmount(price: StripePriceMirror) {
+function getCurrencyFractionDigits(currency: string) {
+  return (
+    new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: currency.toUpperCase(),
+      currencyDisplay: 'code',
+    }).resolvedOptions().maximumFractionDigits ?? 2
+  );
+}
+
+export function formatAmount(price: StripePriceMirror) {
   const rawAmount =
     price.unitAmount ?? (price.unitAmountDecimal ? Number(price.unitAmountDecimal) : null);
 
@@ -42,7 +52,14 @@ function formatAmount(price: StripePriceMirror) {
     return 'Custom';
   }
 
-  return `${price.currency.toUpperCase()} ${(rawAmount / 100).toFixed(2)}`;
+  const currency = price.currency.toUpperCase();
+  const fractionDigits = getCurrencyFractionDigits(currency);
+
+  return new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency,
+    currencyDisplay: 'code',
+  }).format(rawAmount / 10 ** fractionDigits);
 }
 
 function formatBilling(price: StripePriceMirror) {

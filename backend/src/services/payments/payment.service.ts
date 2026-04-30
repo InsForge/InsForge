@@ -14,6 +14,10 @@ import { PaymentPriceService } from '@/services/payments/payment-price.service.j
 import { PaymentSubscriptionService } from '@/services/payments/payment-subscription.service.js';
 import { PaymentWebhookService } from '@/services/payments/payment-webhook.service.js';
 import {
+  withPaymentSessionAdvisoryLock,
+  type PaymentSessionAdvisoryLockMode,
+} from '@/services/payments/payments-advisory-lock.js';
+import {
   CHECKOUT_SESSION_METADATA_KEY,
   CHECKOUT_MODE_METADATA_KEY,
   SUBJECT_METADATA_KEYS,
@@ -107,23 +111,41 @@ export class PaymentService {
     return this.pool;
   }
 
+  private async withSessionAdvisoryLock<T>(
+    lockName: string,
+    task: () => Promise<T>,
+    mode: PaymentSessionAdvisoryLockMode = 'exclusive'
+  ): Promise<T> {
+    return withPaymentSessionAdvisoryLock(this.getPool(), lockName, task, mode);
+  }
+
   private async withEnvironmentLock<T>(
     environment: StripeEnvironment,
     task: () => Promise<T>
   ): Promise<T> {
-    const client = await this.getPool().connect();
-    const lockName = `payments_environment_${environment}`;
+    return this.withSessionAdvisoryLock(`payments_environment_${environment}`, task);
+  }
 
-    try {
-      await client.query('SELECT pg_advisory_lock(hashtext($1))', [lockName]);
-      return await task();
-    } finally {
-      try {
-        await client.query('SELECT pg_advisory_unlock(hashtext($1))', [lockName]);
-      } finally {
-        client.release();
-      }
+  private async withEnvironmentSharedLock<T>(
+    environment: StripeEnvironment,
+    task: () => Promise<T>
+  ): Promise<T> {
+    return this.withSessionAdvisoryLock(`payments_environment_${environment}`, task, 'shared');
+  }
+
+  private async withCheckoutIdempotencyLock<T>(
+    environment: StripeEnvironment,
+    idempotencyKey: string | null | undefined,
+    task: () => Promise<T>
+  ): Promise<T> {
+    if (!idempotencyKey) {
+      return task();
     }
+
+    return this.withSessionAdvisoryLock(
+      `payments_checkout_${environment}_${idempotencyKey}`,
+      task
+    );
   }
 
   async getConfig(): Promise<GetPaymentsConfigResponse> {
@@ -294,7 +316,7 @@ export class PaymentService {
       );
     }
 
-    return this.withEnvironmentLock(input.environment, async () => {
+    const runCheckout = async (): Promise<CreateCheckoutSessionResponse> => {
       const baseMetadata = this.buildStripeMetadata(input.metadata, input.subject, input.mode);
       const checkoutRecord = await this.checkoutService.insertInitializedCheckoutSession(
         input,
@@ -354,7 +376,11 @@ export class PaymentService {
           });
         throw error;
       }
-    });
+    };
+
+    return this.withEnvironmentSharedLock(input.environment, () =>
+      this.withCheckoutIdempotencyLock(input.environment, input.idempotencyKey, runCheckout)
+    );
   }
 
   async createCustomerPortalSession(
