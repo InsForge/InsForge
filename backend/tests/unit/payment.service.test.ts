@@ -1778,21 +1778,19 @@ describe('PaymentService', () => {
       release: vi.fn(),
     };
     mockPool.connect.mockResolvedValue(mockClient);
-    mockPool.query
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            ...checkoutSessionRow,
-            id: '81b9f7aa-87c7-4f5a-8d3b-9112730f13af',
-            mode: 'payment',
-            subjectType: 'organization',
-            subjectId: 'org_123',
-            customerEmail: 'buyer@example.com',
-            stripeCustomerId: 'cus_123',
-          },
-        ],
-      });
+    mockPool.query.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({
+      rows: [
+        {
+          ...checkoutSessionRow,
+          id: '81b9f7aa-87c7-4f5a-8d3b-9112730f13af',
+          mode: 'payment',
+          subjectType: 'organization',
+          subjectId: 'org_123',
+          customerEmail: 'buyer@example.com',
+          stripeCustomerId: 'cus_123',
+        },
+      ],
+    });
 
     await PaymentService.getInstance().createCheckoutSession(
       {
@@ -1999,13 +1997,7 @@ describe('PaymentService', () => {
     );
     expect(mockClient.query).toHaveBeenCalledWith(
       expect.stringMatching(/INSERT INTO payments\.customer_portal_sessions/i),
-      expect.arrayContaining([
-        'test',
-        'team',
-        'team_123',
-        'https://example.com/account',
-        'bpc_123',
-      ])
+      expect.arrayContaining(['test', 'team', 'team_123', 'https://example.com/account', 'bpc_123'])
     );
     expect(mockProvider.createCustomerPortalSession).toHaveBeenCalledWith({
       customerId: 'cus_123',
@@ -3628,14 +3620,7 @@ describe('PaymentService', () => {
     );
     expect(mockClient.query).toHaveBeenCalledWith(
       expect.stringMatching(/INSERT INTO payments\.subscription_items/i),
-      expect.arrayContaining([
-        'test',
-        'si_extra',
-        'sub_existing',
-        'prod_extra',
-        'price_extra',
-        2,
-      ])
+      expect.arrayContaining(['test', 'si_extra', 'sub_existing', 'prod_extra', 'price_extra', 2])
     );
     expect(mockClient.query).toHaveBeenCalledWith(
       expect.stringMatching(

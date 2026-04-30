@@ -41,9 +41,7 @@ describe('payments route schemas', () => {
     expect(paymentsRouteSource.indexOf("'/customer-portal-sessions'")).toBeLessThan(
       paymentsRouteSource.indexOf('router.use(verifyAdmin)')
     );
-    expect(paymentsRouteSource).toContain(
-      'Customer portal session creation requires a user token'
-    );
+    expect(paymentsRouteSource).toContain('Customer portal session creation requires a user token');
   });
 
   it('accepts test, live, and all unified sync targets', () => {

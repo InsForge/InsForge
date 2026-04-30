@@ -142,9 +142,7 @@ describe('038_create-payments-schema migration', () => {
       /CREATE TABLE IF NOT EXISTS payments\.checkout_sessions\s*\([^;]*customer_email_snapshot/i
     );
     expect(sql).toMatch(/idempotency_key TEXT/i);
-    expect(sql).not.toMatch(
-      /ALTER TABLE payments\.checkout_sessions ENABLE ROW LEVEL SECURITY/i
-    );
+    expect(sql).not.toMatch(/ALTER TABLE payments\.checkout_sessions ENABLE ROW LEVEL SECURITY/i);
     expect(sql).toMatch(
       /GRANT INSERT, SELECT ON payments\.checkout_sessions TO anon, authenticated, project_admin/i
     );
