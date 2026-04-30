@@ -660,9 +660,7 @@ describe('ComputeServicesService', () => {
       // DELETE cleanup still runs despite destroyApp failure.
       mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
 
-      await expect(service.prepareForDeploy(input)).rejects.toThrow(
-        /IP allocation failed/
-      );
+      await expect(service.prepareForDeploy(input)).rejects.toThrow(/IP allocation failed/);
 
       // destroyApp was attempted (best effort).
       expect(mockDestroyApp).toHaveBeenCalledWith('my-api-proj-123');
@@ -968,9 +966,13 @@ describe('ComputeServicesService', () => {
       // 1. getService initial fetch
       mockQuery.mockResolvedValueOnce({ rows: [baseRow] });
       // 2. SELECT env_vars_encrypted for the patch resolution
-      mockQuery.mockResolvedValueOnce({ rows: [{ env_vars_encrypted: baseRow.env_vars_encrypted }] });
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ env_vars_encrypted: baseRow.env_vars_encrypted }],
+      });
       // 3. SELECT env_vars_encrypted for the Fly redeploy merge
-      mockQuery.mockResolvedValueOnce({ rows: [{ env_vars_encrypted: baseRow.env_vars_encrypted }] });
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ env_vars_encrypted: baseRow.env_vars_encrypted }],
+      });
       mockUpdateMachine.mockResolvedValue(undefined);
       // 4. final UPDATE returning the persisted row
       mockQuery.mockResolvedValueOnce({ rows: [baseRow] });
@@ -992,8 +994,12 @@ describe('ComputeServicesService', () => {
 
     it('removes unset keys while preserving the rest', async () => {
       mockQuery.mockResolvedValueOnce({ rows: [baseRow] });
-      mockQuery.mockResolvedValueOnce({ rows: [{ env_vars_encrypted: baseRow.env_vars_encrypted }] });
-      mockQuery.mockResolvedValueOnce({ rows: [{ env_vars_encrypted: baseRow.env_vars_encrypted }] });
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ env_vars_encrypted: baseRow.env_vars_encrypted }],
+      });
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ env_vars_encrypted: baseRow.env_vars_encrypted }],
+      });
       mockUpdateMachine.mockResolvedValue(undefined);
       mockQuery.mockResolvedValueOnce({ rows: [baseRow] });
 
