@@ -63,9 +63,9 @@ describe('payments route schemas', () => {
   });
 
   it('keeps unified payment sync behind the admin-only route guard', () => {
-    expect(paymentsRouteSource.indexOf("'/sync'")).toBeGreaterThan(
-      paymentsRouteSource.indexOf('router.use(verifyAdmin)')
-    );
+    const adminGuardIndex = paymentsRouteSource.indexOf('router.use(verifyAdmin)');
+    expect(adminGuardIndex).toBeGreaterThan(-1);
+    expect(paymentsRouteSource.indexOf("'/sync'")).toBeGreaterThan(adminGuardIndex);
     expect(paymentsRouteSource).toMatch(
       /router\.post\(\s*'\/sync'[\s\S]*syncPaymentsRequestSchema[\s\S]*syncPayments/
     );
@@ -74,8 +74,10 @@ describe('payments route schemas', () => {
   });
 
   it('keeps managed webhook configuration behind the admin-only route guard', () => {
+    const adminGuardIndex = paymentsRouteSource.indexOf('router.use(verifyAdmin)');
+    expect(adminGuardIndex).toBeGreaterThan(-1);
     expect(paymentsRouteSource.indexOf("'/webhooks/:environment/configure'")).toBeGreaterThan(
-      paymentsRouteSource.indexOf('router.use(verifyAdmin)')
+      adminGuardIndex
     );
     expect(paymentsRouteSource).toMatch(
       /router\.post\(\s*'\/webhooks\/:environment\/configure'[\s\S]*stripeEnvironmentSchema[\s\S]*configureWebhook/

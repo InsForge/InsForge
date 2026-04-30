@@ -142,10 +142,7 @@ export class PaymentService {
       return task();
     }
 
-    return this.withSessionAdvisoryLock(
-      `payments_checkout_${environment}_${idempotencyKey}`,
-      task
-    );
+    return this.withSessionAdvisoryLock(`payments_checkout_${environment}_${idempotencyKey}`, task);
   }
 
   async getConfig(): Promise<GetPaymentsConfigResponse> {

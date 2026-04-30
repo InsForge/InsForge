@@ -4,6 +4,8 @@ import { getStripeObjectId, toISOString, toISOStringOrNull } from '@/services/pa
 import type { StripeEnvironment, StripeEvent, StripeWebhookEventRow } from '@/types/payments.js';
 import type { StripeWebhookEvent } from '@insforge/shared-schemas';
 
+const WEBHOOK_PENDING_RECLAIM_WINDOW_MS = 5 * 60 * 1000;
+
 export class PaymentWebhookService {
   private static instance: PaymentWebhookService;
   private pool: Pool | null = null;
@@ -32,6 +34,7 @@ export class PaymentWebhookService {
     const objectType = this.getStripeObjectType(object);
     const objectId = getStripeObjectId(object);
     const stripeAccountId = typeof event.account === 'string' ? event.account : null;
+    const pendingReclaimCutoff = new Date(Date.now() - WEBHOOK_PENDING_RECLAIM_WINDOW_MS);
 
     const insertResult = await this.getPool().query(
       `INSERT INTO payments.webhook_events (
@@ -80,6 +83,43 @@ export class PaymentWebhookService {
       return { row: inserted, shouldProcess: true };
     }
 
+    const retryResult = await this.getPool().query(
+      `UPDATE payments.webhook_events
+       SET processing_status = 'pending',
+           attempt_count = attempt_count + 1,
+           last_error = NULL,
+           processed_at = NULL,
+           payload = $3,
+           updated_at = NOW()
+       WHERE environment = $1
+         AND stripe_event_id = $2
+         AND (
+           processing_status = 'failed'
+           OR (processing_status = 'pending' AND updated_at < $4)
+         )
+       RETURNING
+         environment,
+         stripe_event_id AS "stripeEventId",
+         event_type AS "eventType",
+         livemode,
+         stripe_account_id AS "stripeAccountId",
+         object_type AS "objectType",
+         object_id AS "objectId",
+         processing_status AS "processingStatus",
+         attempt_count AS "attemptCount",
+         last_error AS "lastError",
+         received_at AS "receivedAt",
+         processed_at AS "processedAt",
+         created_at AS "createdAt",
+         updated_at AS "updatedAt"`,
+      [environment, event.id, event, pendingReclaimCutoff]
+    );
+
+    const retried = retryResult.rows[0] as StripeWebhookEventRow | undefined;
+    if (retried) {
+      return { row: retried, shouldProcess: true };
+    }
+
     const existingResult = await this.getPool().query(
       `SELECT
          environment,
@@ -102,43 +142,10 @@ export class PaymentWebhookService {
       [environment, event.id]
     );
 
-    const existing = existingResult.rows[0] as StripeWebhookEventRow;
-    if (
-      existing.processingStatus === 'processed' ||
-      existing.processingStatus === 'ignored' ||
-      existing.processingStatus === 'pending'
-    ) {
-      return { row: existing, shouldProcess: false };
-    }
-
-    const retryResult = await this.getPool().query(
-      `UPDATE payments.webhook_events
-       SET processing_status = 'pending',
-           attempt_count = attempt_count + 1,
-           last_error = NULL,
-           payload = $3,
-           updated_at = NOW()
-       WHERE environment = $1
-         AND stripe_event_id = $2
-       RETURNING
-         environment,
-         stripe_event_id AS "stripeEventId",
-         event_type AS "eventType",
-         livemode,
-         stripe_account_id AS "stripeAccountId",
-         object_type AS "objectType",
-         object_id AS "objectId",
-         processing_status AS "processingStatus",
-         attempt_count AS "attemptCount",
-         last_error AS "lastError",
-         received_at AS "receivedAt",
-         processed_at AS "processedAt",
-         created_at AS "createdAt",
-         updated_at AS "updatedAt"`,
-      [environment, event.id, event]
-    );
-
-    return { row: retryResult.rows[0] as StripeWebhookEventRow, shouldProcess: true };
+    return {
+      row: existingResult.rows[0] as StripeWebhookEventRow,
+      shouldProcess: false,
+    };
   }
 
   async markWebhookEvent(

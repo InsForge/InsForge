@@ -27,26 +27,19 @@ describe('withPaymentSessionAdvisoryLock', () => {
       withPaymentSessionAdvisoryLock(pool, 'payments_environment_test', async () => 'ok')
     ).resolves.toBe('ok');
 
-    expect(client.query).toHaveBeenNthCalledWith(
-      1,
-      'SELECT pg_advisory_lock(hashtext($1))',
-      ['payments_environment_test']
-    );
-    expect(client.query).toHaveBeenNthCalledWith(
-      2,
-      'SELECT pg_advisory_unlock(hashtext($1))',
-      ['payments_environment_test']
-    );
+    expect(client.query).toHaveBeenNthCalledWith(1, 'SELECT pg_advisory_lock(hashtext($1))', [
+      'payments_environment_test',
+    ]);
+    expect(client.query).toHaveBeenNthCalledWith(2, 'SELECT pg_advisory_unlock(hashtext($1))', [
+      'payments_environment_test',
+    ]);
     expect(client.release).toHaveBeenCalledWith();
   });
 
   it('destroys the pooled client if unlock fails', async () => {
     const unlockError = new Error('unlock failed');
     const client = {
-      query: vi
-        .fn()
-        .mockResolvedValueOnce({ rows: [] })
-        .mockRejectedValueOnce(unlockError),
+      query: vi.fn().mockResolvedValueOnce({ rows: [] }).mockRejectedValueOnce(unlockError),
       release: vi.fn(),
     };
     const pool = {
@@ -57,21 +50,49 @@ describe('withPaymentSessionAdvisoryLock', () => {
       withPaymentSessionAdvisoryLock(pool, 'payments_environment_test', async () => 'ok')
     ).rejects.toThrow('unlock failed');
 
-    expect(client.query).toHaveBeenNthCalledWith(
-      1,
-      'SELECT pg_advisory_lock(hashtext($1))',
-      ['payments_environment_test']
-    );
-    expect(client.query).toHaveBeenNthCalledWith(
-      2,
-      'SELECT pg_advisory_unlock(hashtext($1))',
-      ['payments_environment_test']
-    );
+    expect(client.query).toHaveBeenNthCalledWith(1, 'SELECT pg_advisory_lock(hashtext($1))', [
+      'payments_environment_test',
+    ]);
+    expect(client.query).toHaveBeenNthCalledWith(2, 'SELECT pg_advisory_unlock(hashtext($1))', [
+      'payments_environment_test',
+    ]);
     expect(client.release).toHaveBeenCalledWith(true);
-    expect(mockLogger.error).toHaveBeenCalledWith('Failed to release payments advisory lock', {
-      lockName: 'payments_environment_test',
-      mode: 'exclusive',
-      error: 'unlock failed',
-    });
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      'Failed to release payments advisory lock',
+      expect.objectContaining({
+        lockName: 'payments_environment_test',
+        mode: 'exclusive',
+        error: 'unlock failed',
+      })
+    );
+  });
+
+  it('preserves the original task error when unlock also fails', async () => {
+    const taskError = new Error('task failed');
+    const unlockError = new Error('unlock failed');
+    const client = {
+      query: vi.fn().mockResolvedValueOnce({ rows: [] }).mockRejectedValueOnce(unlockError),
+      release: vi.fn(),
+    };
+    const pool = {
+      connect: vi.fn().mockResolvedValue(client),
+    } as unknown as Pool;
+
+    await expect(
+      withPaymentSessionAdvisoryLock(pool, 'payments_environment_test', async () => {
+        throw taskError;
+      })
+    ).rejects.toThrow('task failed');
+
+    expect(client.release).toHaveBeenCalledWith(true);
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      'Failed to release payments advisory lock',
+      expect.objectContaining({
+        lockName: 'payments_environment_test',
+        mode: 'exclusive',
+        error: 'unlock failed',
+        originalError: 'task failed',
+      })
+    );
   });
 });

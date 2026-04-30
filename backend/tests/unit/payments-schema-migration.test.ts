@@ -148,7 +148,7 @@ describe('038_create-payments-schema migration', () => {
     );
   });
 
-  it('creates customer portal sessions as an RLS-gated billing management surface', () => {
+  it('creates customer portal sessions without default RLS friction', () => {
     expect(sql).toMatch(
       /CREATE TABLE IF NOT EXISTS payments\.customer_portal_sessions[\s\S]*status TEXT NOT NULL DEFAULT 'initialized'\s+CHECK \(status IN \('initialized', 'created', 'failed'\)\)/i
     );
@@ -164,7 +164,7 @@ describe('038_create-payments-schema migration', () => {
     expect(sql).toMatch(
       /CREATE TABLE IF NOT EXISTS payments\.customer_portal_sessions[\s\S]*return_url TEXT/i
     );
-    expect(sql).toMatch(
+    expect(sql).not.toMatch(
       /ALTER TABLE payments\.customer_portal_sessions ENABLE ROW LEVEL SECURITY/i
     );
     expect(sql).toMatch(

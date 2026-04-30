@@ -20,22 +20,44 @@ export async function withPaymentSessionAdvisoryLock<T>(
   mode: PaymentSessionAdvisoryLockMode = 'exclusive'
 ): Promise<T> {
   const client = await pool.connect();
+  let lockAcquired = false;
+  let taskResult: T | undefined;
+  let taskError: unknown;
+  let unlockError: unknown;
 
   try {
     await client.query(LOCK_SQL_BY_MODE[mode], [lockName]);
-    return await task();
+    lockAcquired = true;
+    taskResult = await task();
+  } catch (error) {
+    taskError = error;
   } finally {
-    try {
-      await client.query(UNLOCK_SQL_BY_MODE[mode], [lockName]);
+    if (!lockAcquired) {
       client.release();
-    } catch (unlockError) {
-      logger.error('Failed to release payments advisory lock', {
-        lockName,
-        mode,
-        error: unlockError instanceof Error ? unlockError.message : String(unlockError),
-      });
-      client.release(true);
-      throw unlockError;
+    } else {
+      try {
+        await client.query(UNLOCK_SQL_BY_MODE[mode], [lockName]);
+        client.release();
+      } catch (error) {
+        unlockError = error;
+        logger.error('Failed to release payments advisory lock', {
+          lockName,
+          mode,
+          error: error instanceof Error ? error.message : String(error),
+          originalError: taskError instanceof Error ? taskError.message : undefined,
+        });
+        client.release(true);
+      }
     }
   }
+
+  if (taskError) {
+    throw taskError;
+  }
+
+  if (unlockError) {
+    throw unlockError;
+  }
+
+  return taskResult as T;
 }

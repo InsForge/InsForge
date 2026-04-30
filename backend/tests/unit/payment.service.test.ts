@@ -2219,26 +2219,29 @@ describe('PaymentService', () => {
       livemode: false,
       data: { object: { id: 'cs_test_123', object: 'checkout.session' } },
     });
-    mockPool.query.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({
-      rows: [
-        {
-          environment: 'test',
-          stripeEventId: 'evt_123',
-          eventType: 'checkout.session.completed',
-          livemode: false,
-          stripeAccountId: null,
-          objectType: 'checkout.session',
-          objectId: 'cs_test_123',
-          processingStatus: 'processed',
-          attemptCount: 1,
-          lastError: null,
-          receivedAt: new Date('2026-04-28T00:00:00.000Z'),
-          processedAt: new Date('2026-04-28T00:00:01.000Z'),
-          createdAt: new Date('2026-04-28T00:00:00.000Z'),
-          updatedAt: new Date('2026-04-28T00:00:01.000Z'),
-        },
-      ],
-    });
+    mockPool.query
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            environment: 'test',
+            stripeEventId: 'evt_123',
+            eventType: 'checkout.session.completed',
+            livemode: false,
+            stripeAccountId: null,
+            objectType: 'checkout.session',
+            objectId: 'cs_test_123',
+            processingStatus: 'processed',
+            attemptCount: 1,
+            lastError: null,
+            receivedAt: new Date('2026-04-28T00:00:00.000Z'),
+            processedAt: new Date('2026-04-28T00:00:01.000Z'),
+            createdAt: new Date('2026-04-28T00:00:00.000Z'),
+            updatedAt: new Date('2026-04-28T00:00:01.000Z'),
+          },
+        ],
+      });
 
     await expect(
       PaymentService.getInstance().handleStripeWebhook(
