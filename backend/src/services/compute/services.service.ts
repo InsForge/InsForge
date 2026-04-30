@@ -294,11 +294,7 @@ export class ComputeServicesService {
     // createService is the image-mode immediate-launch path; imageUrl is required.
     // (Source mode goes through prepareForDeploy → CLI flyctl → PATCH-launches-machine.)
     if (!input.imageUrl) {
-      throw new AppError(
-        'imageUrl is required for createService.',
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
+      throw new AppError('imageUrl is required for createService.', 400, ERROR_CODES.INVALID_INPUT);
     }
     const recordedImageUrl = input.imageUrl;
 
