@@ -21,7 +21,6 @@ export interface AppConfig {
     domain: string;
   };
   fly: {
-    enabled: boolean;
     apiToken: string;
     org: string;
     domain: string;
