@@ -366,7 +366,7 @@ describe('ComputeServicesService', () => {
       mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
       mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
 
-      await service.deleteService(serviceId);
+      const snapshot = await service.deleteService(serviceId);
 
       expect(mockDestroyMachine).toHaveBeenCalledWith('app-del-proj-123', 'machine-del');
       expect(mockDestroyApp).toHaveBeenCalledWith('app-del-proj-123');
@@ -379,6 +379,63 @@ describe('ComputeServicesService', () => {
       const deleteCall = mockQuery.mock.calls[mockQuery.mock.calls.length - 1];
       expect(deleteCall[0]).toContain('DELETE FROM compute.services');
       expect(deleteCall[1]).toEqual([serviceId]);
+
+      // Snapshot is enough state to reconstruct the deleted service (used as
+      // an audit-log paper trail for accidental deletes).
+      expect(snapshot).toEqual({
+        id: serviceId,
+        projectId: 'proj-123',
+        name: 'app-del',
+        imageUrl: 'img:1',
+        port: 8080,
+        cpu: 'shared-1x',
+        memory: 256,
+        region: 'iad',
+        flyAppId: 'app-del-proj-123',
+        flyMachineId: 'machine-del',
+        endpointUrl: 'https://app-del-proj-123.fly.dev',
+        envVarsEncrypted: null,
+        createdAt: '2026-01-01T00:00:00Z',
+      });
+    });
+
+    it('snapshot passes the env_vars_encrypted ciphertext through verbatim — never decrypts', async () => {
+      const serviceId = 'svc-delete-env';
+      // Use a deliberately opaque blob with no plaintext substring inside.
+      // Production stores AES-GCM ciphertext; the assertion is that the
+      // service hands the bytes through to the caller unchanged, never
+      // attempting to decrypt them on the delete path.
+      const ciphertext = 'AESGCM:opaque-cipher-blob-xyz';
+
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          {
+            id: serviceId,
+            project_id: 'proj-123',
+            name: 'app-env',
+            image_url: 'img:1',
+            port: 8080,
+            cpu: 'shared-1x',
+            memory: 256,
+            region: 'iad',
+            fly_app_id: 'app-env-proj-123',
+            fly_machine_id: 'machine-env',
+            status: 'running',
+            endpoint_url: 'https://app-env-proj-123.fly.dev',
+            env_vars_encrypted: ciphertext,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+      });
+      mockDestroyMachine.mockResolvedValue(undefined);
+      mockDestroyApp.mockResolvedValue(undefined);
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // UPDATE destroying
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // DELETE
+
+      const snapshot = await service.deleteService(serviceId);
+
+      expect(snapshot.envVarsEncrypted).toBe(ciphertext);
     });
 
     it('marks as failed and throws if Fly destroy fails (preserves DB reference)', async () => {
