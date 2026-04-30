@@ -5,6 +5,7 @@ import { SecretRow } from '../components/SecretRow';
 import SecretEmptyState from '../components/SecretEmptyState';
 import { useSecrets } from '../hooks/useSecrets';
 import { parseEnvAssignment } from '../utils/secretPaste';
+import { useSmartPaste } from '../../../lib/hooks/useSmartPaste';
 
 export default function SecretsPage() {
   const [newSecretKey, setNewSecretKey] = useState('');
@@ -29,20 +30,14 @@ export default function SecretsPage() {
     }
   };
 
-  const handleSmartPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
-    const pasted = e.clipboardData.getData('text');
-    const parsed = parseEnvAssignment(pasted);
-    if (!parsed) {
-      return;
-    }
-
-    e.preventDefault();
-    setNewSecretKey(parsed.key);
-    setNewSecretValue(parsed.value);
-
-    // Give React a tick to commit the value before focusing.
-    queueMicrotask(() => valueInputRef.current?.focus());
-  };
+  const handleSmartPaste = useSmartPaste({
+    parse: parseEnvAssignment,
+    onParsed: ({ key, value }) => {
+      setNewSecretKey(key);
+      setNewSecretValue(value);
+    },
+    focusRef: valueInputRef,
+  });
 
   return (
     <div className="h-full flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
