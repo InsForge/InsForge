@@ -6,10 +6,10 @@ import { fileURLToPath } from 'url';
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const migrationPath = path.resolve(
   currentDir,
-  '../../src/infra/database/migrations/037_schedules-http-timeout.sql'
+  '../../src/infra/database/migrations/038_schedules-http-timeout.sql'
 );
 
-describe('037_schedules-http-timeout migration', () => {
+describe('038_schedules-http-timeout migration', () => {
   const sql = fs.readFileSync(migrationPath, 'utf8');
 
   it('migration file exists', () => {
@@ -77,9 +77,9 @@ describe('037_schedules-http-timeout migration', () => {
       .filter((f) => f.endsWith('.sql'))
       .sort();
 
-    const idx037 = migrations.findIndex((f) => f === '037_schedules-http-timeout.sql');
+    const idx038 = migrations.findIndex((f) => f === '038_schedules-http-timeout.sql');
     const idx021 = migrations.findIndex((f) => f === '021_create-schedules-schema.sql');
     expect(idx021).toBeGreaterThanOrEqual(0);
-    expect(idx037).toBeGreaterThan(idx021);
+    expect(idx038).toBeGreaterThan(idx021);
   });
 });
