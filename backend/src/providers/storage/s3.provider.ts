@@ -52,7 +52,15 @@ export class S3StorageProvider implements StorageProvider {
   constructor(
     private s3Bucket: string,
     private appKey: string,
-    private region: string = 'us-east-2'
+    private region: string = 'us-east-2',
+    /**
+     * When set, this provider runs in branch mode: read methods try the
+     * branch's S3 path first, then fall back to the parent's path on 404.
+     * Writes (put/delete/copy/multipart) are NEVER directed to the parent
+     * path. Injected by StorageService from the PARENT_APP_KEY env var
+     * that cloud-backend sets at branch EC2 startup.
+     */
+    private parentAppKey?: string
   ) {}
 
   initialize(): void {
@@ -92,6 +100,30 @@ export class S3StorageProvider implements StorageProvider {
     return `${this.appKey}/${bucket}/${key}`;
   }
 
+  /**
+   * Parent's S3 key path for the same bucket+key, when this provider is in
+   * branch mode. Returns null when no parent is configured (regular project).
+   */
+  private getParentS3Key(bucket: string, key: string): string | null {
+    return this.parentAppKey ? `${this.parentAppKey}/${bucket}/${key}` : null;
+  }
+
+  /**
+   * Branch fallback wrapper for read paths: try the branch's S3 key first;
+   * on a "not found" miss (provider returned null), retry with the parent's
+   * S3 key when one is configured. Errors other than NotFound propagate.
+   */
+  private async withFallback<T>(
+    branchPath: string,
+    parentPath: string | null,
+    op: (s3Key: string) => Promise<T | null>,
+  ): Promise<T | null> {
+    const primary = await op(branchPath);
+    if (primary !== null) return primary;
+    if (!parentPath) return null;
+    return op(parentPath);
+  }
+
   async putObject(bucket: string, key: string, file: Express.Multer.File): Promise<void> {
     if (!this.s3Client) {
       throw new Error('S3 client not initialized');
@@ -121,20 +153,31 @@ export class S3StorageProvider implements StorageProvider {
     if (!this.s3Client) {
       throw new Error('S3 client not initialized');
     }
+    return this.withFallback(
+      this.getS3Key(bucket, key),
+      this.getParentS3Key(bucket, key),
+      async (s3Key) => this.tryGetObject(s3Key),
+    );
+  }
+
+  private async tryGetObject(s3Key: string): Promise<Buffer | null> {
     try {
       const command = new GetObjectCommand({
         Bucket: this.s3Bucket,
-        Key: this.getS3Key(bucket, key),
+        Key: s3Key,
       });
-      const response = await this.s3Client.send(command);
+      const response = await this.s3Client!.send(command);
       const chunks: Uint8Array[] = [];
-      // Type assertion for readable stream
       const body = response.Body as AsyncIterable<Uint8Array>;
       for await (const chunk of body) {
         chunks.push(chunk);
       }
       return Buffer.concat(chunks);
-    } catch {
+    } catch (err) {
+      if (isS3NotFound(err)) return null;
+      // Match prior behaviour: any error → null. Branch fallback only kicks
+      // in for NotFound; non-404 errors are still treated as "no object" so
+      // service-layer behaviour is unchanged.
       return null;
     }
   }
@@ -249,7 +292,19 @@ export class S3StorageProvider implements StorageProvider {
       throw new Error('S3 client not initialized');
     }
 
-    const s3Key = this.getS3Key(bucket, key);
+    // In branch mode, HEAD the branch path first; if missing and a parent
+    // is configured, sign the parent's S3 path instead. The HEAD adds one
+    // round-trip but is required: we can't tell from key alone whether the
+    // object lives on the branch or fell through to parent.
+    const branchKey = this.getS3Key(bucket, key);
+    const parentKey = this.getParentS3Key(bucket, key);
+    let s3Key = branchKey;
+    if (parentKey) {
+      const branchExists = await this.tryHeadObject(branchKey);
+      if (!branchExists) {
+        s3Key = parentKey;
+      }
+    }
     // Public files get longer expiration (7 days), private files get shorter (1 hour default)
     const actualExpiresIn = isPublic ? SEVEN_DAYS_IN_SECONDS : expiresIn; // 604800 = 7 days
     const cloudFrontUrl = process.env.AWS_CLOUDFRONT_URL;
@@ -392,29 +447,58 @@ export class S3StorageProvider implements StorageProvider {
     if (!this.s3Client) {
       throw new Error('S3 client not initialized');
     }
-    const s3Key = this.getS3Key(bucket, key);
-    const resp = await this.s3Client.send(
-      new GetObjectCommand({ Bucket: this.s3Bucket, Key: s3Key, Range: opts?.range })
+    const branchKey = this.getS3Key(bucket, key);
+    const parentKey = this.getParentS3Key(bucket, key);
+    const range = opts?.range;
+    const result = await this.withFallback(
+      branchKey,
+      parentKey,
+      async (s3Key) => this.tryGetObjectStream(s3Key, range),
     );
-    if (!resp.Body) {
+    if (!result) {
+      // Preserve previous behaviour: missing object surfaces as a thrown
+      // error here (callers expect a stream, not null).
       throw new Error('GetObject returned empty body');
     }
-    return {
-      body: resp.Body as Readable,
-      size: Number(resp.ContentLength ?? 0),
-      etag: stripEtagQuotes(resp.ETag),
-      contentType: resp.ContentType,
-      lastModified: resp.LastModified ?? new Date(),
-    };
+    return result;
+  }
+
+  private async tryGetObjectStream(
+    s3Key: string,
+    range: string | undefined,
+  ): Promise<GetObjectResult | null> {
+    try {
+      const resp = await this.s3Client!.send(
+        new GetObjectCommand({ Bucket: this.s3Bucket, Key: s3Key, Range: range })
+      );
+      if (!resp.Body) return null;
+      return {
+        body: resp.Body as Readable,
+        size: Number(resp.ContentLength ?? 0),
+        etag: stripEtagQuotes(resp.ETag),
+        contentType: resp.ContentType,
+        lastModified: resp.LastModified ?? new Date(),
+      };
+    } catch (err) {
+      if (isS3NotFound(err)) return null;
+      throw err;
+    }
   }
 
   async headObject(bucket: string, key: string): Promise<ObjectMetadata | null> {
     if (!this.s3Client) {
       throw new Error('S3 client not initialized');
     }
-    const s3Key = this.getS3Key(bucket, key);
+    return this.withFallback(
+      this.getS3Key(bucket, key),
+      this.getParentS3Key(bucket, key),
+      async (s3Key) => this.tryHeadObject(s3Key),
+    );
+  }
+
+  private async tryHeadObject(s3Key: string): Promise<ObjectMetadata | null> {
     try {
-      const resp = await this.s3Client.send(
+      const resp = await this.s3Client!.send(
         new HeadObjectCommand({ Bucket: this.s3Bucket, Key: s3Key })
       );
       return {
