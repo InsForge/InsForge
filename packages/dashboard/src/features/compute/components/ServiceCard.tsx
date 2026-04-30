@@ -44,7 +44,7 @@ export function ServiceCard({ service, onClick, onStop, onStart, onDelete }: Ser
           {health?.isCrashLooping && (
             <span
               className="flex items-center gap-1 text-xs text-destructive"
-              title={`${health.recentExitCount} exits in the last 60s — container is restart-looping. Check the Logs panel.`}
+              title={`${health.recentExitCount} exits in the last 60s — container is restart-looping. Container stdout/stderr isn't surfaced yet; reproduce locally with the same image to see why it's exiting.`}
             >
               <AlertTriangle className="h-3 w-3" />
               crash-looping
