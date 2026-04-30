@@ -157,11 +157,24 @@ export class S3StorageProvider implements StorageProvider {
     if (!this.s3Client) {
       throw new Error('S3 client not initialized');
     }
-    return this.withFallback(
-      this.getS3Key(bucket, key),
-      this.getParentS3Key(bucket, key),
-      async (s3Key) => this.tryGetObject(s3Key)
-    );
+    try {
+      return await this.withFallback(
+        this.getS3Key(bucket, key),
+        this.getParentS3Key(bucket, key),
+        async (s3Key) => this.tryGetObject(s3Key)
+      );
+    } catch (err) {
+      // Preserve prior service-layer behaviour: any error reading the object
+      // surfaces as null to callers. Parent fallback is only triggered on
+      // true 404s (tryGetObject rethrows non-404 errors), so transient
+      // failures on the branch path no longer silently read from the parent.
+      logger.warn('S3 getObject failed', {
+        bucket,
+        key,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
   }
 
   private async tryGetObject(s3Key: string): Promise<Buffer | null> {
@@ -184,10 +197,7 @@ export class S3StorageProvider implements StorageProvider {
       if (isS3NotFound(err)) {
         return null;
       }
-      // Match prior behaviour: any error → null. Branch fallback only kicks
-      // in for NotFound; non-404 errors are still treated as "no object" so
-      // service-layer behaviour is unchanged.
-      return null;
+      throw err;
     }
   }
 
@@ -309,9 +319,21 @@ export class S3StorageProvider implements StorageProvider {
     const parentKey = this.getParentS3Key(bucket, key);
     let s3Key = branchKey;
     if (parentKey) {
-      const branchExists = await this.tryHeadObject(branchKey);
-      if (!branchExists) {
-        s3Key = parentKey;
+      try {
+        const branchExists = await this.tryHeadObject(branchKey);
+        if (!branchExists) {
+          s3Key = parentKey;
+        }
+      } catch (headErr) {
+        // HEAD failures (network, IAM, throttling) shouldn't break URL
+        // generation. Default to the branch key; if the object truly only
+        // lives on the parent path, the signed URL will 404 at download
+        // time — degraded but recoverable, vs. failing the whole call.
+        logger.warn('Branch HEAD check failed in getDownloadStrategy; signing branch key', {
+          bucket,
+          key,
+          error: headErr instanceof Error ? headErr.message : String(headErr),
+        });
       }
     }
     // Public files get longer expiration (7 days), private files get shorter (1 hour default)

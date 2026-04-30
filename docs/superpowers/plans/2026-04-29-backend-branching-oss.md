@@ -4,7 +4,7 @@
 
 **Goal:** Add read-only fallback from a branch project's storage to its parent project's S3 directory, gated by a new `PARENT_APP_KEY` env var. Read-only, transparent, no HTTP API changes.
 
-**Architecture:** Extend `S3StorageProvider` with an optional `parentAppKey`. Read methods (`getObject`, `headObject`, `getObjectStream`, `getPresignedUrl`) attempt the branch's S3 path first; on 404, retry the parent's path. Writes always target the branch path. Service layer and HTTP routes unchanged.
+**Architecture:** Extend `S3StorageProvider` with an optional `parentAppKey`. Read methods (`getObject`, `headObject`, `getObjectStream`, `getDownloadStrategy`) attempt the branch's S3 path first; on 404, retry the parent's path. Writes always target the branch path. Service layer and HTTP routes unchanged.
 
 **Tech Stack:** TypeScript, Node.js, Express, AWS SDK v3 (`@aws-sdk/client-s3`), Vitest.
 
@@ -17,7 +17,7 @@
 **Modify:**
 - `backend/src/providers/storage/s3.provider.ts` — accept `parentAppKey`, add fallback in read methods
 - `backend/src/services/storage/storage.service.ts` — pass `PARENT_APP_KEY` env var into provider constructor
-- `backend/src/providers/storage/storage.provider.ts` (interface, if any) — no new methods, just a fallback-aware contract
+- `backend/src/providers/storage/base.provider.ts` (interface, if any) — no new methods, just a fallback-aware contract
 
 **Create:**
 - `backend/tests/unit/storage-s3-fallback.test.ts` — fallback behavior unit tests
@@ -210,10 +210,10 @@ git commit -m "feat(branching): read-only S3 fallback to parent appkey on 404"
 
 ---
 
-## Task 3: Fallback in Presigned URL Generation
+## Task 3: Fallback in Presigned URL Generation (`getDownloadStrategy`)
 
 **Files:**
-- Modify: `backend/src/providers/storage/s3.provider.ts` (`getPresignedUrl` method)
+- Modify: `backend/src/providers/storage/s3.provider.ts` (`getDownloadStrategy` method)
 
 - [ ] **Step 1: Write failing test**
 
@@ -224,19 +224,24 @@ it('presigned URL: signs branch key when present', async () => {
   // Mock HeadObject to succeed for branch path
   sendMock.mockResolvedValueOnce({ ContentLength: 5 });
   const p = new S3StorageProvider('bucket', 'branchkey', 'us-east-2', 'parentkey');
-  (p as any).s3Client = new S3Client({});
-  const url = await p.getPresignedUrl('foo', 'a.txt');
-  expect(url).toContain('branchkey/foo/a.txt');
+  (p as unknown as { s3Client: S3Client }).s3Client = new S3Client({
+    region: 'us-east-2',
+    credentials: { accessKeyId: 'test', secretAccessKey: 'test' },
+  });
+  const strategy = await p.getDownloadStrategy('foo', 'a.txt');
+  expect(strategy.url).toContain('branchkey/foo/a.txt');
 });
 
 it('presigned URL: signs parent key when branch HEAD returns 404', async () => {
   const notFound = Object.assign(new Error('NotFound'), { name: 'NotFound' });
   sendMock.mockRejectedValueOnce(notFound);
-  sendMock.mockResolvedValueOnce({ ContentLength: 7 });
   const p = new S3StorageProvider('bucket', 'branchkey', 'us-east-2', 'parentkey');
-  (p as any).s3Client = new S3Client({});
-  const url = await p.getPresignedUrl('foo', 'a.txt');
-  expect(url).toContain('parentkey/foo/a.txt');
+  (p as unknown as { s3Client: S3Client }).s3Client = new S3Client({
+    region: 'us-east-2',
+    credentials: { accessKeyId: 'test', secretAccessKey: 'test' },
+  });
+  const strategy = await p.getDownloadStrategy('foo', 'a.txt');
+  expect(strategy.url).toContain('parentkey/foo/a.txt');
 });
 ```
 
@@ -245,31 +250,31 @@ it('presigned URL: signs parent key when branch HEAD returns 404', async () => {
 Run: `cd backend && npx vitest run tests/unit/storage-s3-fallback.test.ts`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement fallback for `getPresignedUrl`**
+- [ ] **Step 3: Implement fallback in `getDownloadStrategy`**
+
+`getDownloadStrategy` already constructs a presigned URL via `getSignedUrl`. To support branching, do a HEAD on the branch path first; if missing (and a parent is configured) sign the parent path. HEAD failures other than 404 are caught and logged — URL generation defaults to the branch key rather than aborting.
 
 ```typescript
-async getPresignedUrl(bucket: string, key: string, expiresIn = 3600): Promise<string> {
-  // Decide which path to sign by checking existence first.
-  const branchKey = this.getS3Key(bucket, key);
-  const parentKey = this.getParentS3Key(bucket, key);
-  let signKey = branchKey;
-  if (parentKey) {
-    const exists = await this.objectExists(branchKey);
-    if (!exists) signKey = parentKey;
-  }
-  const cmd = new GetObjectCommand({ Bucket: this.s3Bucket, Key: signKey });
-  return getSignedUrl(this.s3Client!, cmd, { expiresIn });
-}
-
-private async objectExists(s3Key: string): Promise<boolean> {
+const branchKey = this.getS3Key(bucket, key);
+const parentKey = this.getParentS3Key(bucket, key);
+let s3Key = branchKey;
+if (parentKey) {
   try {
-    await this.s3Client!.send(new HeadObjectCommand({ Bucket: this.s3Bucket, Key: s3Key }));
-    return true;
-  } catch (err: any) {
-    if (err?.name === 'NotFound' || err?.$metadata?.httpStatusCode === 404) return false;
-    throw err;
+    const branchExists = await this.tryHeadObject(branchKey);
+    if (!branchExists) {
+      s3Key = parentKey;
+    }
+  } catch (headErr) {
+    // HEAD failures shouldn't break URL generation. Default to the branch
+    // key; if the object truly only lives on the parent, the signed URL
+    // will 404 at download time — degraded but recoverable.
+    logger.warn('Branch HEAD check failed in getDownloadStrategy; signing branch key', {
+      bucket, key,
+      error: headErr instanceof Error ? headErr.message : String(headErr),
+    });
   }
 }
+// ...existing CloudFront / getSignedUrl code uses s3Key.
 ```
 
 - [ ] **Step 4: Run tests**
@@ -374,7 +379,7 @@ git push -u origin feat/branching
 gh pr create --title "feat: storage fallback to parent for branch projects" --body "$(cat <<'EOF'
 ## Summary
 - Adds optional `PARENT_APP_KEY` env var that triggers read-only fallback in S3 storage provider.
-- All read methods (getObject, headObject, getObjectStream, getPresignedUrl) try branch path first, fall back to parent path on 404.
+- All read methods (getObject, headObject, getObjectStream, getDownloadStrategy) try branch path first, fall back to parent path on 404.
 - Writes are unchanged — they always target the branch's own appkey path.
 - Local storage provider is unaffected (no fallback).
 

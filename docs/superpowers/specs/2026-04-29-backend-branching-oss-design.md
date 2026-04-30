@@ -33,7 +33,7 @@ When a branch project is created from a parent, copying every storage object wou
 - `appKey` loaded from `APP_KEY` env var at server startup. Singleton pattern in [backend/src/services/storage/storage.service.ts:29-45](../../../backend/src/services/storage/storage.service.ts).
 - HTTP read endpoint: `GET /api/storage/buckets/:bucketName/objects/*` ([backend/src/api/routes/storage/index.routes.ts:398-459](../../../backend/src/api/routes/storage/index.routes.ts)).
 - `StorageService.getObject` returns `null` if metadata absent or S3 returns nothing — these are the natural interception points for fallback ([backend/src/services/storage/storage.service.ts:201-238](../../../backend/src/services/storage/storage.service.ts)).
-- Presigned URL flow: `getDownloadStrategy` → `getPresignedUrl` (S3 sigV4 GET against `{appKey}/{bucket}/{key}`).
+- Presigned URL flow: `getDownloadStrategy` calls `getSignedUrl` from `@aws-sdk/s3-request-presigner` (S3 sigV4 GET against `{appKey}/{bucket}/{key}`).
 
 ## Design
 
@@ -64,7 +64,7 @@ private getParentS3Key(bucket: string, key: string): string | null {
 }
 ```
 
-Read methods (`getObject`, `headObject`, `getObjectStream`, `getPresignedUrl`) get a single new helper:
+Read methods (`getObject`, `headObject`, `getObjectStream`, `getDownloadStrategy`) get a single new helper:
 
 ```typescript
 private async withFallback<T>(primary: () => Promise<T | null>, parent: () => Promise<T | null>): Promise<T | null> {
@@ -82,7 +82,7 @@ Write methods (`putObject`, `deleteObject`, `createMultipartUpload`, etc.) do **
 
 ### Presigned URLs
 
-`getPresignedUrl(bucket, key)` is the only read path that doesn't actually fetch the object — it just constructs a signed URL. For fallback to work for presigned URLs, we must do a `headObject` first against the branch path; if 404, sign against the parent path. This adds a HEAD round-trip but is required for correctness.
+`getDownloadStrategy(bucket, key)` is the only read path that doesn't actually fetch the object — it just constructs a signed URL. For fallback to work for presigned URLs, we must do a HEAD against the branch path first; if 404, sign against the parent path. This adds a HEAD round-trip but is required for correctness. Non-404 HEAD failures (network, IAM, throttling) are caught and logged: URL generation falls back to the branch key rather than aborting the whole call. If the object truly only lives on the parent path, the signed URL will 404 at download time — degraded but recoverable, and a strict improvement over failing the entire request.
 
 ### Service Layer
 
@@ -94,7 +94,7 @@ For `mode='schema-only'` branches, `storage.objects` is truncated by the cloud-b
 
 - `parentAppKey` set but parent's directory was deleted (branch outlived parent — shouldn't happen given lifecycle cascade): primary 404 + parent 404 → final 404. Same as today.
 - Parent exists but specific key missing on parent too: same 404. No new error path.
-- IAM error reading parent path (cross-prefix permission denied): logged as warning, behaves as 404. The IAM role for the EC2 already has access to the entire `insforge-storage` bucket per the existing single-bucket model; no permissions change required.
+- IAM error reading parent path (cross-prefix permission denied): non-404 errors are propagated by the read helpers (`tryHeadObject`, `tryGetObjectStream`, `tryGetObject`); only true 404s are treated as not-found and trigger parent fallback. The public `getObject` wraps `withFallback` and surfaces any error as `null` to preserve the prior service-layer contract, but parent fallback is no longer triggered by transient/IAM failures. The IAM role for the EC2 already has access to the entire `insforge-storage` bucket per the existing single-bucket model; no permissions change required.
 
 ### Compatibility
 

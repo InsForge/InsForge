@@ -75,6 +75,16 @@ describe('S3StorageProvider — branch fallback', () => {
       expect(await p.getObject('photos', 'a.txt')).toBeNull();
       expect(sendMock).toHaveBeenCalledTimes(1);
     });
+
+    it('returns null on non-404 error WITHOUT calling parent', async () => {
+      // Transient/IAM/etc errors must not silently masquerade as parent reads.
+      sendMock.mockRejectedValueOnce(
+        Object.assign(new Error('boom'), { name: 'AccessDenied' })
+      );
+      const p = makeProvider('parentkey');
+      expect(await p.getObject('photos', 'a.txt')).toBeNull();
+      expect(sendMock).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('headObject', () => {
@@ -167,6 +177,16 @@ describe('S3StorageProvider — branch fallback', () => {
       expect(strategy.url).toContain('branchkey/photos/a.txt');
       // No HEAD call should have happened.
       expect(sendMock).not.toHaveBeenCalled();
+    });
+
+    it('defaults to branch key (no throw) when HEAD fails with non-404', async () => {
+      // HEAD failures (network/IAM/throttling) shouldn't break URL gen.
+      sendMock.mockRejectedValueOnce(
+        Object.assign(new Error('throttled'), { name: 'SlowDown' })
+      );
+      const p = makeProvider('parentkey');
+      const strategy = await p.getDownloadStrategy('photos', 'a.txt');
+      expect(strategy.url).toContain('branchkey/photos/a.txt');
     });
   });
 });
