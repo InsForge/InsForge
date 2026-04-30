@@ -1,4 +1,4 @@
--- Migration 038: Create payments schema for Stripe catalog and runtime state.
+-- Migration 039: Create payments schema for Stripe catalog and runtime state.
 --
 -- Stripe remains the source of truth. These tables store the minimal mirror and
 -- runtime projections needed for agents and the dashboard to reason about
