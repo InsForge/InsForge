@@ -28,7 +28,12 @@ describe('S3StorageProvider — branch fallback', () => {
   function makeProvider(parentAppKey?: string): S3StorageProvider {
     const p = new S3StorageProvider('bucket', 'branchkey', 'us-east-2', parentAppKey);
     // Inject a real client without going through env-driven initialize().
-    (p as unknown as { s3Client: S3Client }).s3Client = new S3Client({ region: 'us-east-2' });
+    // Dummy credentials so getSignedUrl can sign locally without hitting the
+    // SDK credential provider chain (which fails on CI runners with no creds).
+    (p as unknown as { s3Client: S3Client }).s3Client = new S3Client({
+      region: 'us-east-2',
+      credentials: { accessKeyId: 'test', secretAccessKey: 'test' },
+    });
     return p;
   }
 
