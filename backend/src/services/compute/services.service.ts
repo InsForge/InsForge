@@ -40,7 +40,14 @@ export interface UpdateServiceInput {
   cpu?: string;
   memory?: number;
   region?: string;
+  /** Wholesale env replacement. Mutually exclusive with envVarsPatch. */
   envVars?: Record<string, string>;
+  /**
+   * Partial env edit — apply set/unset against the currently-stored env vars.
+   * Lets the CLI rotate one secret without re-stating the other six (the
+   * GET path doesn't return env values, so the merge has to happen here).
+   */
+  envVarsPatch?: { set?: Record<string, string>; unset?: string[] };
 }
 
 /**
@@ -483,6 +490,37 @@ export class ComputeServicesService {
 
   async updateService(id: string, data: UpdateServiceInput): Promise<ServiceSchema> {
     const existing = await this.getService(id);
+
+    // Mutual exclusion is also enforced by the zod schema at the route layer,
+    // but defensively re-check here so service-level callers (cron, tests) get
+    // the same guarantee.
+    if (data.envVars !== undefined && data.envVarsPatch !== undefined) {
+      throw new AppError(
+        'envVars and envVarsPatch are mutually exclusive',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    // Resolve envVarsPatch to a concrete envVars value before the existing
+    // pipeline runs. Doing it here means the rest of the function — the
+    // SQL update list, the Fly updateMachine/launchMachine merge, the
+    // hasDeployChange check — all stay untouched. The CLI sends a sparse
+    // patch; the storage layer keeps writing one full encrypted blob.
+    if (data.envVarsPatch !== undefined) {
+      const existingRow = await this.getPool().query<{ env_vars_encrypted: string | null }>(
+        `SELECT env_vars_encrypted FROM compute.services WHERE id = $1`,
+        [id]
+      );
+      const current = this.decryptEnvVars(existingRow.rows[0]?.env_vars_encrypted ?? null);
+      const merged = { ...current, ...(data.envVarsPatch.set ?? {}) };
+      for (const key of data.envVarsPatch.unset ?? []) {
+        delete merged[key];
+      }
+      // Replace envVarsPatch with the resolved envVars; downstream code
+      // doesn't need to know which API surface the caller used.
+      data = { ...data, envVars: merged, envVarsPatch: undefined };
+    }
 
     const updates: string[] = [];
     const values: unknown[] = [];

@@ -184,6 +184,14 @@ router.patch('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: 
     if ('envVars' in validation.data) {
       auditDetails.envVarsUpdated = true;
     }
+    if ('envVarsPatch' in validation.data && validation.data.envVarsPatch) {
+      // Log only the *keys* touched so an audit reader knows which secrets
+      // rotated, never the values.
+      auditDetails.envVarsPatch = {
+        setKeys: Object.keys(validation.data.envVarsPatch.set ?? {}),
+        unsetKeys: validation.data.envVarsPatch.unset ?? [],
+      };
+    }
 
     bestEffortAudit({
       actor: req.user?.email || 'api-key',

@@ -111,4 +111,45 @@ describe('updateServiceSchema', () => {
     const result = updateServiceSchema.safeParse({});
     expect(result.success).toBe(true);
   });
+
+  it('accepts envVarsPatch with set only', () => {
+    const result = updateServiceSchema.safeParse({
+      envVarsPatch: { set: { DATABASE_URL: 'postgres://...' } },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts envVarsPatch with unset only', () => {
+    const result = updateServiceSchema.safeParse({
+      envVarsPatch: { unset: ['STALE_SECRET'] },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects empty envVarsPatch (no set, no unset) — would be a no-op API call', () => {
+    const result = updateServiceSchema.safeParse({ envVarsPatch: {} });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects envVarsPatch with invalid key in set', () => {
+    const result = updateServiceSchema.safeParse({
+      envVarsPatch: { set: { 'lower-case-key': 'v' } },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects envVarsPatch with invalid key in unset', () => {
+    const result = updateServiceSchema.safeParse({
+      envVarsPatch: { unset: ['lower'] },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects envVars and envVarsPatch sent together (ambiguous intent)', () => {
+    const result = updateServiceSchema.safeParse({
+      envVars: { ALL: 'replace' },
+      envVarsPatch: { set: { ONE: 'merge' } },
+    });
+    expect(result.success).toBe(false);
+  });
 });

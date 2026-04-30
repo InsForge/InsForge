@@ -943,6 +943,86 @@ describe('ComputeServicesService', () => {
       expect(result.flyMachineId).toBe('mach-winner');
     });
   });
+
+  describe('updateService — envVarsPatch (partial env edit)', () => {
+    const SERVICE_ID = 'svc-patch-1';
+    const baseRow = {
+      id: SERVICE_ID,
+      project_id: 'proj-1',
+      name: 'patch-svc',
+      image_url: 'img:1',
+      port: 8080,
+      cpu: 'shared-1x',
+      memory: 256,
+      region: 'iad',
+      fly_app_id: 'patch-svc-proj-1',
+      fly_machine_id: 'mach-1',
+      status: 'running',
+      endpoint_url: 'https://patch-svc-proj-1.fly.dev',
+      env_vars_encrypted: `encrypted:${JSON.stringify({ KEEP: 'k', ROTATE_ME: 'old' })}`,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    };
+
+    it('merges set keys with existing env, preserves untouched keys', async () => {
+      // 1. getService initial fetch
+      mockQuery.mockResolvedValueOnce({ rows: [baseRow] });
+      // 2. SELECT env_vars_encrypted for the patch resolution
+      mockQuery.mockResolvedValueOnce({ rows: [{ env_vars_encrypted: baseRow.env_vars_encrypted }] });
+      // 3. SELECT env_vars_encrypted for the Fly redeploy merge
+      mockQuery.mockResolvedValueOnce({ rows: [{ env_vars_encrypted: baseRow.env_vars_encrypted }] });
+      mockUpdateMachine.mockResolvedValue(undefined);
+      // 4. final UPDATE returning the persisted row
+      mockQuery.mockResolvedValueOnce({ rows: [baseRow] });
+
+      await service.updateService(SERVICE_ID, {
+        envVarsPatch: { set: { ROTATE_ME: 'new', NEW_KEY: 'added' } },
+      });
+
+      // Verify Fly received the merged env: KEEP preserved, ROTATE_ME updated,
+      // NEW_KEY added. None of these would be visible to the caller via the
+      // public API (envVars is never returned), so this assertion is the
+      // contract that secret rotation actually works.
+      expect(mockUpdateMachine).toHaveBeenCalledWith(
+        expect.objectContaining({
+          envVars: { KEEP: 'k', ROTATE_ME: 'new', NEW_KEY: 'added' },
+        })
+      );
+    });
+
+    it('removes unset keys while preserving the rest', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [baseRow] });
+      mockQuery.mockResolvedValueOnce({ rows: [{ env_vars_encrypted: baseRow.env_vars_encrypted }] });
+      mockQuery.mockResolvedValueOnce({ rows: [{ env_vars_encrypted: baseRow.env_vars_encrypted }] });
+      mockUpdateMachine.mockResolvedValue(undefined);
+      mockQuery.mockResolvedValueOnce({ rows: [baseRow] });
+
+      await service.updateService(SERVICE_ID, {
+        envVarsPatch: { unset: ['ROTATE_ME'] },
+      });
+
+      expect(mockUpdateMachine).toHaveBeenCalledWith(
+        expect.objectContaining({
+          envVars: { KEEP: 'k' },
+        })
+      );
+    });
+
+    it('rejects when both envVars (wholesale) and envVarsPatch are sent', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [baseRow] });
+
+      await expect(
+        service.updateService(SERVICE_ID, {
+          envVars: { ALL: 'replace' },
+          envVarsPatch: { set: { ONE: 'merge' } },
+        })
+      ).rejects.toThrow('mutually exclusive');
+
+      // No DB write should have happened — the guard rejects before any
+      // mutation. Only the initial getService SELECT ran.
+      expect(mockUpdateMachine).not.toHaveBeenCalled();
+    });
+  });
 });
 
 // NOTE: Route-level integration tests for compute endpoints are deferred —
