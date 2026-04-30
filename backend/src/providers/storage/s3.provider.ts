@@ -116,11 +116,15 @@ export class S3StorageProvider implements StorageProvider {
   private async withFallback<T>(
     branchPath: string,
     parentPath: string | null,
-    op: (s3Key: string) => Promise<T | null>,
+    op: (s3Key: string) => Promise<T | null>
   ): Promise<T | null> {
     const primary = await op(branchPath);
-    if (primary !== null) return primary;
-    if (!parentPath) return null;
+    if (primary !== null) {
+      return primary;
+    }
+    if (!parentPath) {
+      return null;
+    }
     return op(parentPath);
   }
 
@@ -156,17 +160,20 @@ export class S3StorageProvider implements StorageProvider {
     return this.withFallback(
       this.getS3Key(bucket, key),
       this.getParentS3Key(bucket, key),
-      async (s3Key) => this.tryGetObject(s3Key),
+      async (s3Key) => this.tryGetObject(s3Key)
     );
   }
 
   private async tryGetObject(s3Key: string): Promise<Buffer | null> {
+    if (!this.s3Client) {
+      throw new Error('S3 client not initialized');
+    }
     try {
       const command = new GetObjectCommand({
         Bucket: this.s3Bucket,
         Key: s3Key,
       });
-      const response = await this.s3Client!.send(command);
+      const response = await this.s3Client.send(command);
       const chunks: Uint8Array[] = [];
       const body = response.Body as AsyncIterable<Uint8Array>;
       for await (const chunk of body) {
@@ -174,7 +181,9 @@ export class S3StorageProvider implements StorageProvider {
       }
       return Buffer.concat(chunks);
     } catch (err) {
-      if (isS3NotFound(err)) return null;
+      if (isS3NotFound(err)) {
+        return null;
+      }
       // Match prior behaviour: any error → null. Branch fallback only kicks
       // in for NotFound; non-404 errors are still treated as "no object" so
       // service-layer behaviour is unchanged.
@@ -450,10 +459,8 @@ export class S3StorageProvider implements StorageProvider {
     const branchKey = this.getS3Key(bucket, key);
     const parentKey = this.getParentS3Key(bucket, key);
     const range = opts?.range;
-    const result = await this.withFallback(
-      branchKey,
-      parentKey,
-      async (s3Key) => this.tryGetObjectStream(s3Key, range),
+    const result = await this.withFallback(branchKey, parentKey, async (s3Key) =>
+      this.tryGetObjectStream(s3Key, range)
     );
     if (!result) {
       // Preserve previous behaviour: missing object surfaces as a thrown
@@ -465,13 +472,18 @@ export class S3StorageProvider implements StorageProvider {
 
   private async tryGetObjectStream(
     s3Key: string,
-    range: string | undefined,
+    range: string | undefined
   ): Promise<GetObjectResult | null> {
+    if (!this.s3Client) {
+      throw new Error('S3 client not initialized');
+    }
     try {
-      const resp = await this.s3Client!.send(
+      const resp = await this.s3Client.send(
         new GetObjectCommand({ Bucket: this.s3Bucket, Key: s3Key, Range: range })
       );
-      if (!resp.Body) return null;
+      if (!resp.Body) {
+        return null;
+      }
       return {
         body: resp.Body as Readable,
         size: Number(resp.ContentLength ?? 0),
@@ -480,7 +492,9 @@ export class S3StorageProvider implements StorageProvider {
         lastModified: resp.LastModified ?? new Date(),
       };
     } catch (err) {
-      if (isS3NotFound(err)) return null;
+      if (isS3NotFound(err)) {
+        return null;
+      }
       throw err;
     }
   }
@@ -492,13 +506,16 @@ export class S3StorageProvider implements StorageProvider {
     return this.withFallback(
       this.getS3Key(bucket, key),
       this.getParentS3Key(bucket, key),
-      async (s3Key) => this.tryHeadObject(s3Key),
+      async (s3Key) => this.tryHeadObject(s3Key)
     );
   }
 
   private async tryHeadObject(s3Key: string): Promise<ObjectMetadata | null> {
+    if (!this.s3Client) {
+      throw new Error('S3 client not initialized');
+    }
     try {
-      const resp = await this.s3Client!.send(
+      const resp = await this.s3Client.send(
         new HeadObjectCommand({ Bucket: this.s3Bucket, Key: s3Key })
       );
       return {

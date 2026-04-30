@@ -1,10 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { S3StorageProvider } from '../../src/providers/storage/s3.provider.ts';
-import {
-  GetObjectCommand,
-  HeadObjectCommand,
-  S3Client,
-} from '@aws-sdk/client-s3';
+import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { Readable } from 'stream';
 
 function asyncIterableFromString(s: string): AsyncIterable<Uint8Array> {
@@ -24,13 +20,15 @@ describe('S3StorageProvider — branch fallback', () => {
 
   beforeEach(() => {
     sendMock = vi.fn();
-    vi.spyOn(S3Client.prototype, 'send').mockImplementation(sendMock as any);
+    vi.spyOn(S3Client.prototype, 'send').mockImplementation(
+      sendMock as unknown as typeof S3Client.prototype.send
+    );
   });
 
   function makeProvider(parentAppKey?: string): S3StorageProvider {
     const p = new S3StorageProvider('bucket', 'branchkey', 'us-east-2', parentAppKey);
     // Inject a real client without going through env-driven initialize().
-    (p as any).s3Client = new S3Client({ region: 'us-east-2' });
+    (p as unknown as { s3Client: S3Client }).s3Client = new S3Client({ region: 'us-east-2' });
     return p;
   }
 
