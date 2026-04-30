@@ -1,4 +1,4 @@
-import { ExternalLink, MoreVertical, Play, Square, Trash2 } from 'lucide-react';
+import { AlertTriangle, ExternalLink, MoreVertical, Play, Square, Trash2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -8,6 +8,7 @@ import {
 } from '@insforge/ui';
 import type { ServiceSchema } from '@insforge/shared-schemas';
 import { statusColors, getReachableUrl } from '../constants';
+import { useServiceHealth } from '../hooks/useComputeServices';
 
 interface ServiceCardProps {
   service: ServiceSchema;
@@ -19,6 +20,11 @@ interface ServiceCardProps {
 
 export function ServiceCard({ service, onClick, onStop, onStart, onDelete }: ServiceCardProps) {
   const reachableUrl = getReachableUrl(service);
+  // Only poll Fly events for services that could plausibly be crash-looping —
+  // a stopped/failed/destroying machine has nothing to loop on, and these
+  // calls hit Fly's per-org rate limit.
+  const healthEnabled = service.status === 'running' || service.status === 'deploying';
+  const { health } = useServiceHealth(service.id, healthEnabled);
 
   return (
     <div
@@ -35,6 +41,15 @@ export function ServiceCard({ service, onClick, onStop, onStart, onDelete }: Ser
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-medium text-foreground truncate">{service.name}</h3>
         <div className="flex items-center gap-2">
+          {health?.isCrashLooping && (
+            <span
+              className="flex items-center gap-1 text-xs text-destructive"
+              title={`${health.recentExitCount} exits in the last 60s — container is restart-looping. Check the Logs panel.`}
+            >
+              <AlertTriangle className="h-3 w-3" />
+              crash-looping
+            </span>
+          )}
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <span className={`inline-block h-2 w-2 rounded-full ${statusColors[service.status]}`} />
             {service.status}

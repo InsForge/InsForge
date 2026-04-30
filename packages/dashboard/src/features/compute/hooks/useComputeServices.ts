@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { computeServicesApi } from '../services/compute.service';
 import type { CreateServiceRequest, UpdateServiceRequest } from '@insforge/shared-schemas';
 import { useToast } from '../../../lib/hooks/useToast';
+import { deriveHealth, type ServiceHealth } from '../lib/health';
 
 export function useComputeServices() {
   const queryClient = useQueryClient();
@@ -104,4 +105,27 @@ export function useServiceLogs(serviceId: string | null) {
     enabled: !!serviceId,
     staleTime: 0,
   });
+}
+
+// Per-service crash-loop indicator for the grid view. Polls the events
+// endpoint at 30s cadence — same data the detail-view ServiceLogs panel uses,
+// so we don't introduce a new backend surface, and React Query dedupes the
+// underlying fetch when the user expands a card.
+//
+// `enabled` should be false for stopped/failed/destroying/destroyed services:
+// those don't crash-loop, and we don't want to ping Fly for them on every
+// dashboard render. Caller is expected to gate on service.status.
+export function useServiceHealth(
+  serviceId: string,
+  enabled: boolean
+): { health: ServiceHealth | null; isLoading: boolean } {
+  const query = useQuery({
+    queryKey: ['compute', 'services', serviceId, 'logs'],
+    queryFn: () => computeServicesApi.logs(serviceId, 50),
+    enabled,
+    staleTime: 30_000,
+    refetchInterval: enabled ? 30_000 : false,
+  });
+  const health = query.data ? deriveHealth(query.data) : null;
+  return { health, isLoading: query.isLoading };
 }
