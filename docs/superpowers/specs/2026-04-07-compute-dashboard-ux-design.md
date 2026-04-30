@@ -49,6 +49,26 @@ Below the specs card, add a logs section:
 
 New component: `ServiceLogs.tsx`
 
+> **Known limitation (v1):** the `/logs` endpoint currently returns Fly machine
+> **lifecycle events** from `/apps/:app/machines/:id/events` (start/stop/restart/
+> exit), **not container stdout/stderr**. This is enough to spot crash loops via
+> exit-stopped events but not enough to debug what the app actually printed.
+>
+> **Real container stdout/stderr is roadmap work.** Three viable paths,
+> evaluated [in this thread](https://github.com/InsForge/InsForge/pull/1062#discussion):
+>
+> | Path | Where flyctl spawns | Token source | Notes |
+> |---|---|---|---|
+> | A. Cloud-backend spawns `flyctl logs --no-tail -j` | cloud-backend host | org token in cloud's `process.env` | Token never leaves cloud. ~150 lines + tests. Mirrors existing `flyctl tokens attenuate` pattern in `defaultAttenuator`. |
+> | B. Per-app read-logs macaroon, OSS spawns | user's host | short-lived macaroon minted by cloud (mirrors `compute deploy-token`) | Adds flyctl dep on user laptops + token storage/rotation. ~230 lines + ops burden. |
+> | C. NATS streaming directly | OSS or cloud-backend | org token | What `flyctl logs` uses internally. Most "correct" but largest surface. |
+>
+> Recommendation when this lands: start with A (smallest delta, reuses
+> existing flyctl shell-out infra). Until then, the misleading `/logs` URL
+> stays — alternative is to rename to `/events` to be honest, then add
+> `/container-logs` later. v1 keeps `/logs` for compatibility with the
+> already-shipped CLI command and dashboard panel.
+
 ### 3. Detail View — Enhanced Specs
 
 Add to the existing specs grid:
