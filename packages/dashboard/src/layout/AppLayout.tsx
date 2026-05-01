@@ -55,23 +55,6 @@ function ConnectOverlayBridge({ hostMode, onOpenDialog }: ConnectOverlayBridgePr
   return null;
 }
 
-function DTestViewBroadcaster() {
-  const { pathname } = useLocation();
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || window.parent === window) {
-      return;
-    }
-    if (getFeatureFlag('dashboard-v4-experiment') !== 'd_test') {
-      return;
-    }
-    const view = pathname === '/dashboard/install' ? 'install' : 'dashboard';
-    window.parent.postMessage({ type: 'D_TEST_VIEW_CHANGED', view }, '*');
-  }, [pathname]);
-
-  return null;
-}
-
 function getEmbeddedDashboardRoute(path: string): string | null {
   if (path.startsWith('/dashboard')) {
     return path;
@@ -121,7 +104,6 @@ export default function AppLayout({ children }: LayoutProps) {
     <ThemeProvider forcedTheme={forcedTheme}>
       <ConnectDialogProvider value={openConnectDialog}>
         <ConnectOverlayBridge hostMode={host.mode} onOpenDialog={openConnectDialog} />
-        <DTestViewBroadcaster />
         <DTestConnectTip />
         <div
           className={cn(
