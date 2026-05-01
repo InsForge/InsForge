@@ -26,4 +26,28 @@ export class PosthogService {
   disconnect() {
     return this.provider.disconnect();
   }
+
+  getWebOverview(timeframe: string) {
+    return this.provider.getWebOverview(timeframe);
+  }
+
+  getWebStats(breakdown: string, timeframe: string) {
+    return this.provider.getWebStats(breakdown, timeframe);
+  }
+
+  getTrends(metric: string, timeframe: string) {
+    return this.provider.getTrends(metric, timeframe);
+  }
+
+  getRetention() {
+    return this.provider.getRetention();
+  }
+
+  getRecordings(limit?: number) {
+    return this.provider.getRecordings(limit);
+  }
+
+  createRecordingShare(recordingId: string) {
+    return this.provider.createRecordingShare(recordingId);
+  }
 }

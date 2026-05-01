@@ -35,4 +35,34 @@ export class LocalPosthogProvider implements PosthogProvider {
     await Promise.resolve();
     return this.throwUnsupported();
   }
+
+  async getWebOverview() {
+    await Promise.resolve();
+    return this.throwUnsupported();
+  }
+
+  async getWebStats() {
+    await Promise.resolve();
+    return this.throwUnsupported();
+  }
+
+  async getTrends() {
+    await Promise.resolve();
+    return this.throwUnsupported();
+  }
+
+  async getRetention() {
+    await Promise.resolve();
+    return this.throwUnsupported();
+  }
+
+  async getRecordings() {
+    await Promise.resolve();
+    return this.throwUnsupported();
+  }
+
+  async createRecordingShare() {
+    await Promise.resolve();
+    return this.throwUnsupported();
+  }
 }
