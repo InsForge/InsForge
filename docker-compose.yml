@@ -132,6 +132,12 @@ services:
       - X_CLIENT_SECRET=${X_CLIENT_SECRET:-}
       - APPLE_CLIENT_ID=${APPLE_CLIENT_ID:-}
       - APPLE_CLIENT_SECRET=${APPLE_CLIENT_SECRET:-}
+      # Compute Services (Fly.io self-host). Auto-enables when both
+      # FLY_API_TOKEN and FLY_ORG are set. Cloud-proxied mode activates
+      # automatically when PROJECT_ID, CLOUD_API_HOST, and JWT_SECRET are set.
+      - FLY_API_TOKEN=${FLY_API_TOKEN:-}
+      - FLY_ORG=${FLY_ORG:-}
+      - COMPUTE_DOMAIN=${COMPUTE_DOMAIN:-}
       # Logs directory
       - LOGS_DIR=/insforge-logs
       # Storage directory (for local file storage when S3 is not configured)

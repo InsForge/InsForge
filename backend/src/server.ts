@@ -38,6 +38,7 @@ import { initSqlParser } from '@/utils/sql-parser.js';
 import { FunctionService } from '@/services/functions/function.service.js';
 import packageJson from '../../package.json';
 import { schedulesRouter } from '@/api/routes/schedules/index.routes.js';
+import { servicesRouter } from '@/api/routes/compute/services.routes.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -215,6 +216,7 @@ export async function createApp() {
   apiRouter.use('/deployments', deploymentsRouter);
   apiRouter.use('/schedules', schedulesRouter);
   apiRouter.use('/payments', paymentsRouter);
+  apiRouter.use('/compute/services', servicesRouter);
 
   // Mount all API routes under /api prefix
   app.use('/api', apiRouter);

@@ -48,6 +48,19 @@ export enum ERROR_CODES {
   // LOGS module
   LOGS_AWS_NOT_CONFIGURED = 'LOGS_AWS_NOT_CONFIGURED',
 
+  // COMPUTE module
+  COMPUTE_CLOUD_UNAVAILABLE = 'COMPUTE_CLOUD_UNAVAILABLE',
+  COMPUTE_NOT_CONFIGURED = 'COMPUTE_NOT_CONFIGURED',
+  COMPUTE_PROVIDER_ERROR = 'COMPUTE_PROVIDER_ERROR',
+  COMPUTE_SERVICE_NOT_FOUND = 'COMPUTE_SERVICE_NOT_FOUND',
+  COMPUTE_SERVICE_NOT_CONFIGURED = 'COMPUTE_SERVICE_NOT_CONFIGURED',
+  COMPUTE_SERVICE_DEPLOY_FAILED = 'COMPUTE_SERVICE_DEPLOY_FAILED',
+  COMPUTE_SERVICE_ALREADY_EXISTS = 'COMPUTE_SERVICE_ALREADY_EXISTS',
+  COMPUTE_SERVICE_START_FAILED = 'COMPUTE_SERVICE_START_FAILED',
+  COMPUTE_SERVICE_STOP_FAILED = 'COMPUTE_SERVICE_STOP_FAILED',
+  COMPUTE_SERVICE_DELETE_FAILED = 'COMPUTE_SERVICE_DELETE_FAILED',
+  COMPUTE_REGION_CHANGE_NOT_SUPPORTED = 'COMPUTE_REGION_CHANGE_NOT_SUPPORTED',
+
   // Billing module
   BILLING_INSUFFICIENT_BALANCE = 'BILLING_INSUFFICIENT_BALANCE',
 
@@ -98,6 +111,18 @@ export const NEXT_ACTION = {
   // RLS / authorization next actions
   CHECK_RLS_POLICY:
     'A row-level security policy denied this operation. Verify the calling user owns the row (uploaded_by / user_id matches the JWT sub), or that an appropriate INSERT/UPDATE/DELETE policy exists for this role.',
+
+  // Compute next actions
+  ENABLE_COMPUTE:
+    'Compute services are not enabled. Self-hosted: set FLY_API_TOKEN and FLY_ORG in your .env, then restart. Cloud: contact your project admin to enable compute.',
+  CHECK_COMPUTE_SERVICE_EXISTS:
+    'The compute service was not found. Run `compute list` to see available services.',
+  CHECK_DOCKER_IMAGE:
+    'Check the Docker image URL is valid and accessible. Ensure the image exists in the registry.',
+  CHECK_FLY_CAPACITY:
+    'Compute service deployment failed. Check the Fly.io region has capacity, or try a different region.',
+  RETRY_COMPUTE_OPERATION:
+    'The operation failed due to a transient error. Wait a moment and try again.',
 
   // Add more next actions as needed
 } as const;
