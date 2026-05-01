@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { EmptyState, TableHeader } from '../../../components';
+import { DataGridEmptyState, EmptyState, TableHeader } from '../../../components';
 import { LogsDataGrid, type LogsColumnDef } from '../components';
 import { useMcpUsage } from '../hooks/useMcpUsage';
 import { formatTime } from '../../../lib/utils/utils';
@@ -84,9 +84,9 @@ export default function MCPLogsPage() {
             paginationRecordLabel="logs"
             gridContainerClassName="border-t border-[var(--alpha-8)]"
             emptyState={
-              <div className="text-[13px] text-muted-foreground">
-                {mcpSearchQuery ? 'No MCP logs match your filters' : 'No MCP logs found'}
-              </div>
+              <DataGridEmptyState
+                message={mcpSearchQuery ? 'No MCP logs match your filters' : 'No MCP logs found'}
+              />
             }
           />
         )}

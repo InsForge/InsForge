@@ -2,7 +2,7 @@ import { useMemo, useState, useCallback, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { ExternalLink } from 'lucide-react';
 import { useLogs } from '../hooks/useLogs';
-import { EmptyState, TableHeader } from '../../../components';
+import { DataGridEmptyState, EmptyState, TableHeader } from '../../../components';
 import {
   LogsDataGrid,
   type LogsColumnDef,
@@ -148,9 +148,7 @@ export default function LogsPage() {
                 </div>
               )
             }
-            emptyState={
-              <div className="text-[13px] text-muted-foreground">No logs match your filters</div>
-            }
+            emptyState={<DataGridEmptyState message="No logs match your filters" />}
           />
         )}
       </div>

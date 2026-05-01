@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { logService, type GetBuildLogsResponse, type BuildLogEntry } from '../services/log.service';
 import { LogsDataGrid, type LogsColumnDef } from './LogsDataGrid';
 import { DataGridEmptyState } from '../../../components';
 import { cn } from '../../../lib/utils/utils';
+import { usePageSize } from '../../../lib/hooks/usePageSize';
 
 interface BuildLogsViewProps {
   className?: string;
@@ -49,6 +50,12 @@ interface BuildLogRow extends BuildLogEntry {
 }
 
 export function BuildLogsView({ className }: BuildLogsViewProps) {
+  const [currentPage, setCurrentPage] = useState(1);
+  const {
+    pageSize,
+    pageSizeOptions,
+    onPageSizeChange: handlePageSizeChange,
+  } = usePageSize('function-build-logs');
   const { data: buildLogs, isLoading } = useQuery<GetBuildLogsResponse | null>({
     queryKey: ['function-build-logs'],
     queryFn: () => logService.getFunctionBuildLogs(),
@@ -72,6 +79,31 @@ export function BuildLogsView({ className }: BuildLogsViewProps) {
       id: `build-log-${index}`,
     }));
   }, [buildLogs?.logs]);
+
+  const totalRecords = logsWithIds.length;
+  const totalPages = useMemo(() => Math.ceil(totalRecords / pageSize), [totalRecords, pageSize]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [buildLogs?.deploymentId]);
+
+  useEffect(() => {
+    if (totalPages === 0) {
+      if (currentPage !== 1) {
+        setCurrentPage(1);
+      }
+      return;
+    }
+
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const paginatedLogs = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return logsWithIds.slice(startIndex, startIndex + pageSize);
+  }, [currentPage, logsWithIds, pageSize]);
 
   // Column definitions for build logs
   const columns: LogsColumnDef[] = useMemo(
@@ -124,9 +156,19 @@ export function BuildLogsView({ className }: BuildLogsViewProps) {
       <div className="flex-1 overflow-hidden">
         <LogsDataGrid
           columnDefs={columns}
-          data={logsWithIds}
+          data={paginatedLogs}
           loading={isLoading}
-          showPagination={false}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          pageSizeOptions={pageSizeOptions}
+          totalRecords={totalRecords}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(newSize) => {
+            handlePageSizeChange(newSize);
+            setCurrentPage(1);
+          }}
+          paginationRecordLabel="logs"
           gridContainerClassName="border-t border-[var(--alpha-8)]"
           emptyState={<DataGridEmptyState message="No build logs found" />}
         />
