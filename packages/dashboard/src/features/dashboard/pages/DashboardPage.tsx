@@ -540,8 +540,12 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="h-full min-h-0 min-w-0 overflow-y-auto bg-semantic-0">
-      <div className="flex min-w-0 flex-col lg:flex-row">
+    <main
+      className={`h-full min-h-0 min-w-0 overflow-y-auto bg-semantic-0${isCloudHostingMode ? '' : ' lg:overflow-hidden'}`}
+    >
+      <div
+        className={`flex min-w-0 flex-col lg:flex-row${isCloudHostingMode ? '' : ' min-h-full lg:h-full lg:min-h-0'}`}
+      >
         <section className="insforge-dashboard-home-sidebar min-w-0 shrink-0 border-b border-[var(--alpha-8)] px-10 py-10 lg:border-r lg:border-b-0">
           <div className="mx-auto flex w-full max-w-[400px] flex-col gap-12">
             <div className="flex flex-col gap-12">
@@ -663,10 +667,12 @@ export default function DashboardPage() {
           </div>
         </section>
       </div>
-      <div className="flex flex-col gap-12 px-10 py-10">
-        <ObservabilitySection />
-        <BackendAdvisorSection />
-      </div>
+      {isCloudHostingMode && (
+        <div className="flex flex-col gap-12 px-10 py-10">
+          <ObservabilitySection />
+          <BackendAdvisorSection />
+        </div>
+      )}
     </main>
   );
 }

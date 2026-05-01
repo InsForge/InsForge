@@ -10,6 +10,7 @@ import { isInsForgeCloudProject } from '../../../../lib/utils/utils';
 import { useMcpUsage } from '../../../logs/hooks/useMcpUsage';
 import { useAdvisorLatest } from '../../hooks/useAdvisor';
 import { useLastBackup } from '../../hooks/useLastBackup';
+import { useIsCloudHostingMode } from '../../../../lib/config/DashboardHostContext';
 import CloudDoneIcon from '../../../../assets/icons/cloud_done.svg?react';
 import CriticalIcon from '../../../../assets/icons/severity_critical.svg?react';
 import { DashboardPromptStepper } from './DashboardPromptStepper';
@@ -45,6 +46,7 @@ const STATUS_BADGE_CLASS =
 export function DTestConnectedDashboard() {
   const navigate = useNavigate();
   const isCloudProject = isInsForgeCloudProject();
+  const isCloudHostingMode = useIsCloudHostingMode();
   const {
     metadata,
     tables,
@@ -174,8 +176,12 @@ export function DTestConnectedDashboard() {
         </div>
 
         <DashboardPromptStepper />
-        <ObservabilitySection />
-        <BackendAdvisorSection />
+        {isCloudHostingMode && (
+          <>
+            <ObservabilitySection />
+            <BackendAdvisorSection />
+          </>
+        )}
       </div>
     </main>
   );
