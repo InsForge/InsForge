@@ -12,6 +12,7 @@ import type {
 import { apiClient } from '../../../lib/api/client';
 
 export type Breakdown = 'Page' | 'Country' | 'DeviceType';
+export type TrendMetric = 'visitors' | 'views' | 'bounce_rate';
 
 export const posthogApi = {
   async getConnection(): Promise<GetPosthogConnectionResponse | null> {
@@ -60,16 +61,16 @@ export const posthogApi = {
     }) as Promise<PosthogWebStatsResponse>;
   },
 
-  async getPageviewsTrend(timeframe: PosthogTimeframe): Promise<PosthogTrendsResponse> {
-    const params = new URLSearchParams({ event: '$pageview', timeframe });
+  async getTrend(metric: TrendMetric, timeframe: PosthogTimeframe): Promise<PosthogTrendsResponse> {
+    const params = new URLSearchParams({ metric, timeframe });
     return apiClient.request(`/integrations/posthog/trends?${params.toString()}`, {
       headers: apiClient.withAccessToken({}),
     }) as Promise<PosthogTrendsResponse>;
   },
 
-  async getRetention(timeframe: PosthogTimeframe): Promise<PosthogRetentionResponse> {
-    const params = new URLSearchParams({ timeframe });
-    return apiClient.request(`/integrations/posthog/retention?${params.toString()}`, {
+  async getRetention(): Promise<PosthogRetentionResponse> {
+    // Decoupled from page timeframe — backend hardcodes weekly cohorts.
+    return apiClient.request(`/integrations/posthog/retention`, {
       headers: apiClient.withAccessToken({}),
     }) as Promise<PosthogRetentionResponse>;
   },

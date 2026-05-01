@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { useTimeframe } from '../../context/TimeRangeContext';
 import { useRetention } from '../../hooks/useRetention';
 import { formatNumber } from '../../lib/format';
 
@@ -18,8 +17,7 @@ function cellBackground(pct: number | null): string {
 }
 
 export function RetentionCard({ enabled }: { enabled: boolean }) {
-  const timeframe = useTimeframe();
-  const { data, isLoading, error } = useRetention(timeframe, enabled);
+  const { data, isLoading, error } = useRetention(enabled);
 
   const grid = useMemo(() => {
     if (!data?.rows) {
@@ -45,7 +43,7 @@ export function RetentionCard({ enabled }: { enabled: boolean }) {
 
   if (isLoading) {
     return (
-      <div className="rounded-lg border bg-card p-4">
+      <div className="rounded-lg bg-card p-4">
         <h3 className="mb-3 text-sm font-semibold text-foreground">Retention</h3>
         <div className="text-sm text-muted-foreground">Loading…</div>
       </div>
@@ -54,7 +52,7 @@ export function RetentionCard({ enabled }: { enabled: boolean }) {
 
   if (error) {
     return (
-      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+      <div className="rounded-lg bg-destructive/10 p-4">
         <h3 className="mb-3 text-sm font-semibold text-destructive">Retention</h3>
         <div className="text-sm text-destructive">Failed to load retention.</div>
       </div>
@@ -63,58 +61,56 @@ export function RetentionCard({ enabled }: { enabled: boolean }) {
 
   if (!grid || grid.length === 0) {
     return (
-      <div className="rounded-lg border bg-card p-4">
+      <div className="rounded-lg bg-card p-4">
         <h3 className="mb-3 text-sm font-semibold text-foreground">Retention</h3>
         <div className="text-sm text-muted-foreground">No data</div>
       </div>
     );
   }
 
-  const orderedRows = [...grid].reverse();
   const intervals = grid[0].cells.length;
-  const intervalLabels = Array.from({ length: intervals }, (_, i) => {
-    if (timeframe === '24h') {
-      return `H${i}`;
+  // Always weekly to match PostHog's default Web Analytics retention view.
+  const intervalLabels = Array.from({ length: intervals }, (_, i) => `Week ${i}`);
+
+  function formatCohortRange(iso: string): string {
+    const start = new Date(iso);
+    if (Number.isNaN(start.getTime())) {
+      return iso;
     }
-    if (timeframe === '3m') {
-      return `W${i}`;
-    }
-    return `D${i}`;
-  });
+    const end = new Date(start.getTime() + 6 * 86_400_000);
+    const fmt = (d: Date) => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    return `${fmt(start)} to ${fmt(end)}`;
+  }
 
   return (
-    <div className="rounded-lg border bg-card p-4">
+    <div className="rounded-lg bg-card p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-foreground">Retention</h3>
-        <span className="text-xs text-muted-foreground">
-          $pageview cohort, {intervals} intervals
-        </span>
+        <h3 className="text-sm font-semibold text-foreground">User retention</h3>
+        <span className="text-xs text-muted-foreground">Weekly cohort · {intervals} weeks</span>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-xs">
           <thead>
             <tr>
-              <th className="px-2 py-1 text-left font-medium text-muted-foreground">Cohort</th>
+              <th className="px-3 py-2 text-left font-medium text-muted-foreground">Cohort</th>
+              <th className="px-3 py-2 text-right font-medium text-muted-foreground">Size</th>
               {intervalLabels.map((lbl) => (
-                <th key={lbl} className="px-2 py-1 text-center font-medium text-muted-foreground">
+                <th key={lbl} className="px-2 py-2 text-center font-medium text-muted-foreground">
                   {lbl}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {orderedRows.map((row) => {
-              const cohortDate = new Date(row.date);
-              const cohortLabel = Number.isNaN(cohortDate.getTime())
-                ? row.label
-                : cohortDate.toLocaleDateString(undefined, {
-                    month: 'short',
-                    day: 'numeric',
-                  });
+            {grid.map((row) => {
+              const size = row.cells[0]?.count ?? 0;
               return (
                 <tr key={row.date}>
-                  <td className="whitespace-nowrap px-2 py-1 text-muted-foreground">
-                    {cohortLabel}
+                  <td className="whitespace-nowrap px-3 py-1.5 text-muted-foreground">
+                    {formatCohortRange(row.date)}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-1.5 text-right text-muted-foreground">
+                    {formatNumber(size)}
                   </td>
                   {row.cells.map((cell, i) => (
                     <td
@@ -126,12 +122,16 @@ export function RetentionCard({ enabled }: { enabled: boolean }) {
                           : `${formatNumber(cell.count)} users (${(cell.pct ?? 0).toFixed(1)}%)`
                       }
                     >
-                      <div
-                        className="rounded px-1 py-1 text-foreground"
-                        style={{ backgroundColor: cellBackground(cell.pct) }}
-                      >
-                        {cell.pct === null ? '—' : `${Math.round(cell.pct)}%`}
-                      </div>
+                      {cell.pct === null ? (
+                        <div className="px-1 py-1 text-muted-foreground">—</div>
+                      ) : (
+                        <div
+                          className="rounded px-1 py-1 text-foreground"
+                          style={{ backgroundColor: cellBackground(cell.pct) }}
+                        >
+                          {(cell.pct ?? 0).toFixed(1)}%
+                        </div>
+                      )}
                     </td>
                   ))}
                 </tr>

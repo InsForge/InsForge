@@ -9,7 +9,7 @@ export function RecentReplaysCard({ enabled }: { enabled: boolean }) {
 
   if (isLoading) {
     return (
-      <div className="rounded-lg border bg-card p-4">
+      <div className="rounded-lg bg-card p-4">
         <h3 className="mb-3 text-sm font-semibold text-foreground">Recent replays</h3>
         <div className="text-sm text-muted-foreground">Loading…</div>
       </div>
@@ -18,7 +18,7 @@ export function RecentReplaysCard({ enabled }: { enabled: boolean }) {
 
   if (error) {
     return (
-      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+      <div className="rounded-lg bg-destructive/10 p-4">
         <h3 className="mb-3 text-sm font-semibold text-destructive">Recent replays</h3>
         <div className="text-sm text-destructive">Failed to load replays.</div>
       </div>
@@ -28,7 +28,7 @@ export function RecentReplaysCard({ enabled }: { enabled: boolean }) {
   const items = data?.items ?? [];
   if (items.length === 0) {
     return (
-      <div className="rounded-lg border bg-card p-4">
+      <div className="rounded-lg bg-card p-4">
         <h3 className="mb-3 text-sm font-semibold text-foreground">Recent replays</h3>
         <div className="text-sm text-muted-foreground">
           No replays yet. Make sure session_recording is enabled in your PostHog project.
@@ -39,7 +39,7 @@ export function RecentReplaysCard({ enabled }: { enabled: boolean }) {
 
   return (
     <>
-      <div className="rounded-lg border bg-card p-4">
+      <div className="rounded-lg bg-card p-4">
         <h3 className="mb-3 text-sm font-semibold text-foreground">Recent replays</h3>
         <ul className="divide-y">
           {items.map((rec) => (
