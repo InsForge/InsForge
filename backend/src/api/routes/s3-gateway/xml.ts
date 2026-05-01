@@ -15,6 +15,6 @@ const parser = new Parser({
   trim: true,
 });
 
-export async function parseXml(input: string | Buffer): Promise<unknown> {
+export function parseXml(input: string | Buffer): Promise<unknown> {
   return parser.parseStringPromise(input.toString('utf8'));
 }

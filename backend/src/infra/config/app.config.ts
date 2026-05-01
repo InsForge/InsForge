@@ -9,15 +9,20 @@ export interface AppConfig {
     storageBucket: string;
     instanceProfile: string;
     apiHost: string;
-    projectId: string;
     appKey: string;
     cloudFrontUrl: string;
     cloudFrontKeyPairId: string;
     cloudFrontPrivateKey: string;
+    projectId: string;
   };
   denoSubhosting: {
     token: string;
     organizationId: string;
+    domain: string;
+  };
+  fly: {
+    apiToken: string;
+    org: string;
     domain: string;
   };
 }
@@ -43,5 +48,16 @@ export const config: AppConfig = {
     token: process.env.DENO_SUBHOSTING_TOKEN || '',
     organizationId: process.env.DENO_SUBHOSTING_ORG_ID || '',
     domain: 'functions.insforge.app',
+  },
+  fly: {
+    // Self-hosters enable compute by setting both FLY_API_TOKEN and FLY_ORG.
+    // Presence of credentials is the opt-in — no separate ENABLED flag.
+    apiToken: process.env.FLY_API_TOKEN || '',
+    // FLY_ORG must be set explicitly; defaulting to "insforge" caused
+    // self-hosters to attempt to create apps inside our internal org and get
+    // an opaque auth error from Fly. Empty string makes the misconfig
+    // detectable so we can warn at startup.
+    org: process.env.FLY_ORG || '',
+    domain: process.env.COMPUTE_DOMAIN || '',
   },
 };

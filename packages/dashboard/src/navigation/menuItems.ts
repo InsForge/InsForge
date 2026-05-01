@@ -6,6 +6,7 @@ import {
   HardDrive,
   Code2,
   Radio,
+  Server,
   Sparkles,
   ChartLine,
   Settings,
@@ -98,6 +99,12 @@ export const dashboardStaticMenuItems: DashboardPrimaryMenuItem[] = [
     label: 'Model Gateway',
     href: '/dashboard/ai',
     icon: Sparkles,
+  },
+  {
+    id: 'compute',
+    label: 'Compute',
+    href: '/dashboard/compute',
+    icon: Server,
     sectionEnd: true,
   },
   {
