@@ -3,6 +3,8 @@ import type {
   ConfigurePaymentWebhookResponse,
   GetPaymentsConfigResponse,
   GetPaymentsStatusResponse,
+  ListPaymentHistoryRequest,
+  ListPaymentHistoryResponse,
   ListPaymentCatalogResponse,
   ListSubscriptionsRequest,
   ListSubscriptionsResponse,
@@ -79,6 +81,22 @@ export class PaymentsService {
     }
 
     return apiClient.request(`/payments/subscriptions?${searchParams.toString()}`, {
+      headers: apiClient.withAccessToken(),
+    });
+  }
+
+  async listPaymentHistory(input: ListPaymentHistoryRequest): Promise<ListPaymentHistoryResponse> {
+    const searchParams = new URLSearchParams({
+      environment: input.environment,
+      limit: String(input.limit),
+    });
+
+    if (input.subjectType && input.subjectId) {
+      searchParams.set('subjectType', input.subjectType);
+      searchParams.set('subjectId', input.subjectId);
+    }
+
+    return apiClient.request(`/payments/payment-history?${searchParams.toString()}`, {
       headers: apiClient.withAccessToken(),
     });
   }

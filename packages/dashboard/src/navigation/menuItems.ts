@@ -102,16 +102,16 @@ export const dashboardStaticMenuItems: DashboardPrimaryMenuItem[] = [
     icon: Sparkles,
   },
   {
-    id: 'payments',
-    label: 'Payments',
-    href: '/dashboard/payments',
-    icon: CreditCard,
-  },
-  {
     id: 'compute',
     label: 'Compute',
     href: '/dashboard/compute',
     icon: Server,
+  },
+  {
+    id: 'payments',
+    label: 'Payments',
+    href: '/dashboard/payments',
+    icon: CreditCard,
     sectionEnd: true,
   },
   {

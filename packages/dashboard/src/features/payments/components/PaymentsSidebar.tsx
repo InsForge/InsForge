@@ -16,6 +16,11 @@ const PAYMENTS_SIDEBAR_ITEMS: FeatureSidebarListItem[] = [
     label: 'Subscriptions',
     href: '/dashboard/payments/subscriptions',
   },
+  {
+    id: 'payment-history',
+    label: 'Payment History',
+    href: '/dashboard/payments/payment-history',
+  },
 ];
 
 interface PaymentsSidebarProps {
