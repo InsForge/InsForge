@@ -52,3 +52,80 @@ export const posthogEventsResponseSchema = z.object({
   next: z.string().nullable(),
 });
 export type PosthogEventsResponse = z.infer<typeof posthogEventsResponseSchema>;
+
+// v2.5 dashboard ----------------------------------------------------------
+
+export const posthogTimeframeSchema = z.enum(['24h', '7d', '30d', '3m']);
+export type PosthogTimeframe = z.infer<typeof posthogTimeframeSchema>;
+
+export const posthogWebOverviewItemSchema = z.object({
+  key: z.string(),
+  value: z.number().nullable(),
+  previous: z.number().nullable(),
+  changeFromPreviousPct: z.number().nullable(),
+  isIncreaseBad: z.boolean().nullable().optional(),
+});
+export type PosthogWebOverviewItem = z.infer<typeof posthogWebOverviewItemSchema>;
+
+export const posthogWebOverviewResponseSchema = z.object({
+  items: z.array(posthogWebOverviewItemSchema),
+});
+export type PosthogWebOverviewResponse = z.infer<typeof posthogWebOverviewResponseSchema>;
+
+export const posthogWebStatsRowSchema = z.object({
+  breakdownValue: z.string().nullable(),
+  visitors: z.number(),
+  views: z.number(),
+  uiFillFraction: z.number(),
+});
+export type PosthogWebStatsRow = z.infer<typeof posthogWebStatsRowSchema>;
+
+export const posthogWebStatsResponseSchema = z.object({
+  rows: z.array(posthogWebStatsRowSchema),
+});
+export type PosthogWebStatsResponse = z.infer<typeof posthogWebStatsResponseSchema>;
+
+export const posthogTrendPointSchema = z.object({
+  date: z.string(),
+  count: z.number(),
+});
+export type PosthogTrendPoint = z.infer<typeof posthogTrendPointSchema>;
+
+export const posthogTrendsResponseSchema = z.object({
+  series: z.array(posthogTrendPointSchema),
+});
+export type PosthogTrendsResponse = z.infer<typeof posthogTrendsResponseSchema>;
+
+export const posthogRetentionRowSchema = z.object({
+  date: z.string(),
+  label: z.string(),
+  values: z.array(z.object({ count: z.number().nullable() })),
+});
+export type PosthogRetentionRow = z.infer<typeof posthogRetentionRowSchema>;
+
+export const posthogRetentionResponseSchema = z.object({
+  rows: z.array(posthogRetentionRowSchema),
+});
+export type PosthogRetentionResponse = z.infer<typeof posthogRetentionResponseSchema>;
+
+export const posthogRecordingItemSchema = z.object({
+  id: z.string(),
+  distinctId: z.string(),
+  durationSeconds: z.number(),
+  startTime: z.string(),
+  endTime: z.string(),
+  startUrl: z.string().nullable(),
+  clickCount: z.number(),
+  consoleErrorCount: z.number(),
+});
+export type PosthogRecordingItem = z.infer<typeof posthogRecordingItemSchema>;
+
+export const posthogRecordingsResponseSchema = z.object({
+  items: z.array(posthogRecordingItemSchema),
+});
+export type PosthogRecordingsResponse = z.infer<typeof posthogRecordingsResponseSchema>;
+
+export const posthogShareTokenResponseSchema = z.object({
+  embedUrl: z.string().url(),
+});
+export type PosthogShareTokenResponse = z.infer<typeof posthogShareTokenResponseSchema>;

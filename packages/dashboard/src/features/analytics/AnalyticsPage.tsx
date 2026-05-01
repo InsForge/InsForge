@@ -3,17 +3,19 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@insforge/ui';
 import { usePosthogConnection } from './hooks/usePosthogConnection';
 import { usePosthogDashboards } from './hooks/usePosthogDashboards';
-import { usePosthogSummary } from './hooks/usePosthogSummary';
-import { usePosthogEvents } from './hooks/usePosthogEvents';
 import { onPosthogConnectionStatus, requestPosthogConnect } from './lib/postMessage';
 import { EmptyConnectPanel } from './components/posthog/EmptyConnectPanel';
 import { ConnectStatusBar } from './components/posthog/ConnectStatusBar';
 import { ApiKeyCard } from './components/posthog/ApiKeyCard';
 import { DashboardsListCard } from './components/posthog/DashboardsListCard';
 import { DisconnectDialog } from './components/posthog/DisconnectDialog';
+import { TimeRangeProvider } from './context/TimeRangeContext';
+import { TimeRangeSelector } from './components/posthog/TimeRangeSelector';
 import { KpiRow } from './components/posthog/KpiRow';
-import { TopEventsCard } from './components/posthog/TopEventsCard';
-import { RecentEventsCard } from './components/posthog/RecentEventsCard';
+import { PageviewsTrendChart } from './components/posthog/PageviewsTrendChart';
+import { BreakdownPanel } from './components/posthog/BreakdownPanel';
+import { RetentionCard } from './components/posthog/RetentionCard';
+import { RecentReplaysCard } from './components/posthog/RecentReplaysCard';
 import { useProjectId } from '../../lib/hooks/useMetadata';
 
 export function AnalyticsPage() {
@@ -21,8 +23,6 @@ export function AnalyticsPage() {
   const qc = useQueryClient();
   const conn = usePosthogConnection();
   const dashboards = usePosthogDashboards(!!conn.data);
-  const summary = usePosthogSummary(!!conn.data);
-  const events = usePosthogEvents(!!conn.data, 10);
   const [disconnecting, setDisconnecting] = useState(false);
   const cliAutoTriggeredRef = useRef(false);
 
@@ -37,8 +37,7 @@ export function AnalyticsPage() {
   // CLI handoff: when `insforge posthog setup` opens this page with
   // ?action=connect (and there is no existing connection), auto-fire the same
   // postMessage the Connect button would send. Cloud-shell BroadcastListener
-  // forwards it to /integrations/posthog/start. This is a fallback for when
-  // the cloud-shell's own auto-trigger does not run (e.g., older deploy).
+  // forwards it to /integrations/posthog/start.
   useEffect(() => {
     if (cliAutoTriggeredRef.current || conn.isLoading || conn.data || !projectId) {
       return;
@@ -49,7 +48,6 @@ export function AnalyticsPage() {
     }
     cliAutoTriggeredRef.current = true;
     requestPosthogConnect(projectId);
-    // Strip ?action=connect so refresh doesn't re-fire.
     params.delete('action');
     const remaining = params.toString();
     const cleaned = remaining
@@ -83,27 +81,38 @@ export function AnalyticsPage() {
   }
 
   const c = conn.data;
+  const hasConnection = true;
+
   return (
-    <div className="space-y-4 p-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-foreground">Analytics</h1>
-        <Button variant="ghost" onClick={() => setDisconnecting(true)}>
-          Disconnect
-        </Button>
+    <TimeRangeProvider>
+      <div className="space-y-4 p-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-foreground">Analytics</h1>
+          <div className="flex items-center gap-2">
+            <TimeRangeSelector />
+            <Button variant="ghost" onClick={() => setDisconnecting(true)}>
+              Disconnect
+            </Button>
+          </div>
+        </div>
+        <ConnectStatusBar connection={c} />
+        <KpiRow enabled={hasConnection} />
+        <PageviewsTrendChart enabled={hasConnection} />
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <BreakdownPanel breakdown="Page" enabled={hasConnection} />
+          <BreakdownPanel breakdown="Country" enabled={hasConnection} />
+          <BreakdownPanel breakdown="DeviceType" enabled={hasConnection} />
+        </div>
+        <RetentionCard enabled={hasConnection} />
+        <RecentReplaysCard enabled={hasConnection} />
+        <DashboardsListCard
+          data={dashboards.data}
+          isLoading={dashboards.isLoading}
+          error={dashboards.error}
+        />
+        <ApiKeyCard apiKey={c.apiKey} host={c.host} posthogProjectId={c.posthogProjectId} />
+        <DisconnectDialog open={disconnecting} onClose={() => setDisconnecting(false)} />
       </div>
-      <ConnectStatusBar connection={c} />
-      <KpiRow data={summary.data} isLoading={summary.isLoading} error={summary.error} />
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <RecentEventsCard data={events.data} isLoading={events.isLoading} error={events.error} />
-        <TopEventsCard data={summary.data} isLoading={summary.isLoading} error={summary.error} />
-      </div>
-      <ApiKeyCard apiKey={c.apiKey} host={c.host} posthogProjectId={c.posthogProjectId} />
-      <DashboardsListCard
-        data={dashboards.data}
-        isLoading={dashboards.isLoading}
-        error={dashboards.error}
-      />
-      <DisconnectDialog open={disconnecting} onClose={() => setDisconnecting(false)} />
-    </div>
+    </TimeRangeProvider>
   );
 }
