@@ -85,7 +85,7 @@ export function BuildLogsView({ className }: BuildLogsViewProps) {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [buildLogs?.deploymentId, pageSize]);
+  }, [buildLogs?.deploymentId]);
 
   useEffect(() => {
     if (totalPages === 0) {
