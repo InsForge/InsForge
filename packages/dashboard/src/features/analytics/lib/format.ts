@@ -117,7 +117,7 @@ export function webOverviewValue(key: string, value: number | null): string {
     return '—';
   }
   if (key === 'bounce_rate') {
-    return `${Math.round(value * 100)}%`;
+    return `${Math.round(value)}%`;
   }
   if (key === 'session_duration') {
     return formatDuration(value);
