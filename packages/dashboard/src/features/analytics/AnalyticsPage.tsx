@@ -2,17 +2,14 @@ import { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@insforge/ui';
 import { usePosthogConnection } from './hooks/usePosthogConnection';
-import { usePosthogDashboards } from './hooks/usePosthogDashboards';
 import { onPosthogConnectionStatus, requestPosthogConnect } from './lib/postMessage';
 import { EmptyConnectPanel } from './components/posthog/EmptyConnectPanel';
 import { ConnectStatusBar } from './components/posthog/ConnectStatusBar';
 import { ApiKeyCard } from './components/posthog/ApiKeyCard';
-import { DashboardsListCard } from './components/posthog/DashboardsListCard';
 import { DisconnectDialog } from './components/posthog/DisconnectDialog';
 import { TimeRangeProvider } from './context/TimeRangeContext';
 import { TimeRangeSelector } from './components/posthog/TimeRangeSelector';
-import { KpiRow } from './components/posthog/KpiRow';
-import { PageviewsTrendChart } from './components/posthog/PageviewsTrendChart';
+import { KpiSectionWithTrend } from './components/posthog/KpiSectionWithTrend';
 import { BreakdownPanel } from './components/posthog/BreakdownPanel';
 import { RetentionCard } from './components/posthog/RetentionCard';
 import { RecentReplaysCard } from './components/posthog/RecentReplaysCard';
@@ -22,7 +19,6 @@ export function AnalyticsPage() {
   const { projectId } = useProjectId();
   const qc = useQueryClient();
   const conn = usePosthogConnection();
-  const dashboards = usePosthogDashboards(!!conn.data);
   const [disconnecting, setDisconnecting] = useState(false);
   const cliAutoTriggeredRef = useRef(false);
 
@@ -96,8 +92,8 @@ export function AnalyticsPage() {
           </div>
         </div>
         <ConnectStatusBar connection={c} />
-        <KpiRow enabled={hasConnection} />
-        <PageviewsTrendChart enabled={hasConnection} />
+        <ApiKeyCard apiKey={c.apiKey} host={c.host} posthogProjectId={c.posthogProjectId} />
+        <KpiSectionWithTrend enabled={hasConnection} />
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <BreakdownPanel breakdown="Page" enabled={hasConnection} />
           <BreakdownPanel breakdown="Country" enabled={hasConnection} />
@@ -105,12 +101,6 @@ export function AnalyticsPage() {
         </div>
         <RetentionCard enabled={hasConnection} />
         <RecentReplaysCard enabled={hasConnection} />
-        <DashboardsListCard
-          data={dashboards.data}
-          isLoading={dashboards.isLoading}
-          error={dashboards.error}
-        />
-        <ApiKeyCard apiKey={c.apiKey} host={c.host} posthogProjectId={c.posthogProjectId} />
         <DisconnectDialog open={disconnecting} onClose={() => setDisconnecting(false)} />
       </div>
     </TimeRangeProvider>

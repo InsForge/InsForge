@@ -1,11 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
-import type { PosthogTimeframe } from '@insforge/shared-schemas';
 import { posthogApi } from '../services/posthog.api';
 
-export function useRetention(timeframe: PosthogTimeframe, enabled: boolean) {
+/**
+ * Retention is decoupled from the page timeframe selector — it always returns
+ * weekly cohorts (matches PostHog's default Web Analytics retention view).
+ */
+export function useRetention(enabled: boolean) {
   return useQuery({
-    queryKey: ['posthog', 'retention', timeframe],
-    queryFn: () => posthogApi.getRetention(timeframe),
+    queryKey: ['posthog', 'retention'],
+    queryFn: () => posthogApi.getRetention(),
     enabled,
     staleTime: 60_000,
   });

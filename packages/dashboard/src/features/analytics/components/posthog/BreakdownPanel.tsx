@@ -43,7 +43,7 @@ export function BreakdownPanel({ breakdown, enabled }: Props) {
 
   if (isLoading) {
     return (
-      <div className="rounded-lg border bg-card p-4">
+      <div className="rounded-lg bg-card p-4">
         <h3 className="mb-3 text-sm font-semibold text-foreground">{title}</h3>
         <div className="text-sm text-muted-foreground">Loading…</div>
       </div>
@@ -52,7 +52,7 @@ export function BreakdownPanel({ breakdown, enabled }: Props) {
 
   if (error) {
     return (
-      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+      <div className="rounded-lg bg-destructive/10 p-4">
         <h3 className="mb-3 text-sm font-semibold text-destructive">{title}</h3>
         <div className="text-sm text-destructive">Failed to load.</div>
       </div>
@@ -62,7 +62,7 @@ export function BreakdownPanel({ breakdown, enabled }: Props) {
   const rows = data?.rows ?? [];
   if (rows.length === 0) {
     return (
-      <div className="rounded-lg border bg-card p-4">
+      <div className="rounded-lg bg-card p-4">
         <h3 className="mb-3 text-sm font-semibold text-foreground">{title}</h3>
         <div className="text-sm text-muted-foreground">No data</div>
       </div>
@@ -72,7 +72,7 @@ export function BreakdownPanel({ breakdown, enabled }: Props) {
   const top = rows.slice(0, 8);
 
   return (
-    <div className="rounded-lg border bg-card p-4">
+    <div className="rounded-lg bg-card p-4">
       <h3 className="mb-3 text-sm font-semibold text-foreground">{title}</h3>
       <ul className="flex flex-col gap-2">
         {top.map((row, i) => (
