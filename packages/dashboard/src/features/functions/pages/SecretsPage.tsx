@@ -1,13 +1,16 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button, ConfirmDialog, Input } from '@insforge/ui';
 import { Skeleton, TableHeader } from '../../../components';
 import { SecretRow } from '../components/SecretRow';
 import SecretEmptyState from '../components/SecretEmptyState';
 import { useSecrets } from '../hooks/useSecrets';
+import { parseEnvAssignment } from '../utils/secretPaste';
+import { useSmartPaste } from '../../../lib/hooks/useSmartPaste';
 
 export default function SecretsPage() {
   const [newSecretKey, setNewSecretKey] = useState('');
   const [newSecretValue, setNewSecretValue] = useState('');
+  const valueInputRef = useRef<HTMLInputElement>(null);
 
   const {
     filteredSecrets,
@@ -26,6 +29,15 @@ export default function SecretsPage() {
       setNewSecretValue('');
     }
   };
+
+  const handleSmartPaste = useSmartPaste({
+    parse: parseEnvAssignment,
+    onParsed: ({ key, value }) => {
+      setNewSecretKey(key);
+      setNewSecretValue(value);
+    },
+    focusRef: valueInputRef,
+  });
 
   return (
     <div className="h-full flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
@@ -53,6 +65,7 @@ export default function SecretsPage() {
                   placeholder="e.g CLIENT_KEY"
                   value={newSecretKey}
                   onChange={(e) => setNewSecretKey(e.target.value)}
+                  onPaste={handleSmartPaste}
                 />
               </div>
               <div className="flex-1">
@@ -62,6 +75,8 @@ export default function SecretsPage() {
                   type="text"
                   value={newSecretValue}
                   onChange={(e) => setNewSecretValue(e.target.value)}
+                  onPaste={handleSmartPaste}
+                  ref={valueInputRef}
                 />
               </div>
               <Button
