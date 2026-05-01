@@ -5,7 +5,24 @@ import type {
   DashboardInstanceInfo,
   DashboardProjectInfo,
   DashboardUserInfo,
+  DashboardMetricName,
+  DashboardMetricsRange,
+  DashboardMetricsResponse,
+  DashboardAdvisorSummary,
+  DashboardAdvisorIssuesQuery,
+  DashboardAdvisorIssuesResponse,
 } from '@insforge/dashboard';
+
+const VALID_METRICS_RANGES: readonly DashboardMetricsRange[] = ['1h', '6h', '24h', '3d'] as const;
+const VALID_METRIC_NAMES: readonly DashboardMetricName[] = [
+  'cpu_usage',
+  'memory_usage',
+  'disk_usage',
+  'network_in',
+  'network_out',
+] as const;
+const VALID_ADVISOR_SEVERITIES = ['critical', 'warning', 'info'] as const;
+const VALID_ADVISOR_CATEGORIES = ['security', 'performance', 'health'] as const;
 
 type InstanceTypeChangeResult = {
   success: boolean;
@@ -31,7 +48,11 @@ type PendingRequestKey =
   | 'deleteProject'
   | 'updateVersion'
   | 'userInfo'
-  | 'userApiKey';
+  | 'userApiKey'
+  | 'projectMetrics'
+  | 'advisorLatest'
+  | 'advisorIssues'
+  | 'advisorScan';
 
 type PendingRequest<T> = {
   resolve: (value: T) => void;
@@ -53,6 +74,10 @@ type PendingRequestValues = {
   updateVersion: void;
   userInfo: DashboardUserInfo;
   userApiKey: string;
+  projectMetrics: DashboardMetricsResponse;
+  advisorLatest: DashboardAdvisorSummary;
+  advisorIssues: DashboardAdvisorIssuesResponse;
+  advisorScan: void;
 };
 
 type PendingRequests = {
@@ -230,6 +255,21 @@ export function useCloudHosting() {
         case 'userApiKey':
           pendingRequestsRef.current.userApiKey = pendingRequest as PendingRequest<string>;
           return;
+        case 'projectMetrics':
+          pendingRequestsRef.current.projectMetrics =
+            pendingRequest as PendingRequest<DashboardMetricsResponse>;
+          return;
+        case 'advisorLatest':
+          pendingRequestsRef.current.advisorLatest =
+            pendingRequest as PendingRequest<DashboardAdvisorSummary>;
+          return;
+        case 'advisorIssues':
+          pendingRequestsRef.current.advisorIssues =
+            pendingRequest as PendingRequest<DashboardAdvisorIssuesResponse>;
+          return;
+        case 'advisorScan':
+          pendingRequestsRef.current.advisorScan = pendingRequest as PendingRequest<void>;
+          return;
       }
     },
     []
@@ -282,11 +322,20 @@ export function useCloudHosting() {
   }, []);
 
   const createPendingRequest = useCallback(
-    <K extends PendingRequestKey>(key: K, actionLabel: string, timeoutMs = DEFAULT_TIMEOUT_MS) =>
+    <K extends PendingRequestKey>(
+      key: K,
+      actionLabel: string,
+      options?: { timeoutMs?: number; supersede?: boolean }
+    ) =>
       new Promise<PendingRequestValues[K]>((resolve, reject) => {
+        const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
         if (pendingRequestsRef.current[key]) {
-          reject(new Error(`${actionLabel} is already in progress`));
-          return;
+          if (options?.supersede) {
+            rejectPendingRequest(key, `${actionLabel} superseded by newer request`);
+          } else {
+            reject(new Error(`${actionLabel} is already in progress`));
+            return;
+          }
         }
 
         const timeoutId = window.setTimeout(() => {
@@ -535,6 +584,145 @@ export function useCloudHosting() {
           );
           return;
         }
+        case 'PROJECT_METRICS': {
+          const range: DashboardMetricsRange = VALID_METRICS_RANGES.includes(
+            message.range as DashboardMetricsRange
+          )
+            ? (message.range as DashboardMetricsRange)
+            : '1h';
+          const metrics = Array.isArray(message.metrics)
+            ? message.metrics.flatMap((entry: unknown) => {
+                if (!entry || typeof entry !== 'object') {
+                  return [];
+                }
+                const m = entry as Record<string, unknown>;
+                if (!VALID_METRIC_NAMES.includes(m.metric as DashboardMetricName)) {
+                  return [];
+                }
+                return [
+                  {
+                    metric: m.metric as DashboardMetricName,
+                    instanceId: typeof m.instanceId === 'string' ? m.instanceId : undefined,
+                    data: Array.isArray(m.data)
+                      ? m.data.flatMap((sample: unknown) => {
+                          if (!sample || typeof sample !== 'object') {
+                            return [];
+                          }
+                          const s = sample as Record<string, unknown>;
+                          if (
+                            typeof s.timestamp !== 'number' ||
+                            !Number.isFinite(s.timestamp) ||
+                            typeof s.value !== 'number' ||
+                            !Number.isFinite(s.value)
+                          ) {
+                            return [];
+                          }
+                          return [{ timestamp: s.timestamp, value: s.value }];
+                        })
+                      : [],
+                  },
+                ];
+              })
+            : [];
+          resolvePendingRequest('projectMetrics', { range, metrics });
+          return;
+        }
+        case 'PROJECT_METRICS_ERROR': {
+          rejectPendingRequest(
+            'projectMetrics',
+            message.code === 'unavailable'
+              ? 'METRICS_UNAVAILABLE'
+              : getErrorMessage(message.error, 'Failed to load metrics')
+          );
+          return;
+        }
+        case 'ADVISOR_LATEST': {
+          const summaryRaw = message.summary as Record<string, unknown> | undefined;
+          const finiteCount = (key: string): number => {
+            const v = summaryRaw?.[key];
+            return typeof v === 'number' && Number.isFinite(v) ? v : 0;
+          };
+          resolvePendingRequest('advisorLatest', {
+            scanId: typeof message.scanId === 'string' ? message.scanId : '',
+            status:
+              message.status === 'running' || message.status === 'failed'
+                ? message.status
+                : 'completed',
+            scanType: message.scanType === 'manual' ? 'manual' : 'scheduled',
+            scannedAt: typeof message.scannedAt === 'string' ? message.scannedAt : '',
+            summary: {
+              total: finiteCount('total'),
+              critical: finiteCount('critical'),
+              warning: finiteCount('warning'),
+              info: finiteCount('info'),
+            },
+          });
+          return;
+        }
+        case 'ADVISOR_LATEST_ERROR': {
+          rejectPendingRequest(
+            'advisorLatest',
+            getErrorMessage(message.error, 'Failed to load advisor summary')
+          );
+          return;
+        }
+        case 'ADVISOR_ISSUES': {
+          type AdvisorIssue = DashboardAdvisorIssuesResponse['issues'][number];
+          const issues = Array.isArray(message.issues)
+            ? message.issues.flatMap((entry: unknown): AdvisorIssue[] => {
+                if (!entry || typeof entry !== 'object') {
+                  return [];
+                }
+                const i = entry as Record<string, unknown>;
+                if (!VALID_ADVISOR_SEVERITIES.includes(i.severity as AdvisorIssue['severity'])) {
+                  return [];
+                }
+                if (!VALID_ADVISOR_CATEGORIES.includes(i.category as AdvisorIssue['category'])) {
+                  return [];
+                }
+                return [
+                  {
+                    id: typeof i.id === 'string' ? i.id : '',
+                    ruleId: typeof i.ruleId === 'string' ? i.ruleId : '',
+                    severity: i.severity as AdvisorIssue['severity'],
+                    category: i.category as AdvisorIssue['category'],
+                    title: typeof i.title === 'string' ? i.title : '',
+                    description: typeof i.description === 'string' ? i.description : '',
+                    affectedObject:
+                      typeof i.affectedObject === 'string' ? i.affectedObject : undefined,
+                    recommendation:
+                      typeof i.recommendation === 'string' ? i.recommendation : undefined,
+                    isResolved: !!i.isResolved,
+                  },
+                ];
+              })
+            : [];
+          const totalRaw = message.total;
+          const total =
+            typeof totalRaw === 'number' && Number.isFinite(totalRaw) && totalRaw >= 0
+              ? Math.floor(totalRaw)
+              : issues.length;
+          resolvePendingRequest('advisorIssues', { issues, total });
+          return;
+        }
+        case 'ADVISOR_ISSUES_ERROR': {
+          rejectPendingRequest(
+            'advisorIssues',
+            getErrorMessage(message.error, 'Failed to load advisor issues')
+          );
+          return;
+        }
+        case 'ADVISOR_SCAN_RESULT': {
+          if (message.success === true) {
+            resolvePendingRequest('advisorScan', undefined);
+            return;
+          }
+          rejectPendingRequest(
+            'advisorScan',
+            getErrorMessage(message.error, 'Failed to trigger advisor scan')
+          );
+          return;
+        }
         default:
           return;
       }
@@ -630,11 +818,9 @@ export function useCloudHosting() {
         throw new Error('Unable to request an instance type change from the parent window');
       }
 
-      return createPendingRequest(
-        'instanceTypeChange',
-        'Instance type change',
-        INSTANCE_CHANGE_TIMEOUT_MS
-      );
+      return createPendingRequest('instanceTypeChange', 'Instance type change', {
+        timeoutMs: INSTANCE_CHANGE_TIMEOUT_MS,
+      });
     },
     [createPendingRequest, postMessageToParent]
   );
@@ -680,6 +866,58 @@ export function useCloudHosting() {
     return createPendingRequest('userApiKey', 'User API key request');
   }, [createPendingRequest, postMessageToParent]);
 
+  const requestProjectMetrics = useCallback(
+    async (range: DashboardMetricsRange): Promise<DashboardMetricsResponse> => {
+      if (!postMessageToParent({ type: 'REQUEST_PROJECT_METRICS', range })) {
+        throw new Error('Unable to request project metrics from the parent window');
+      }
+      return createPendingRequest('projectMetrics', 'Project metrics request', {
+        supersede: true,
+      });
+    },
+    [createPendingRequest, postMessageToParent]
+  );
+
+  const requestAdvisorLatest = useCallback(async (): Promise<DashboardAdvisorSummary> => {
+    if (!postMessageToParent({ type: 'REQUEST_ADVISOR_LATEST' })) {
+      throw new Error('Unable to request advisor summary from the parent window');
+    }
+    return createPendingRequest('advisorLatest', 'Advisor latest request');
+  }, [createPendingRequest, postMessageToParent]);
+
+  const advisorIssuesLockRef = useRef<Promise<unknown>>(Promise.resolve());
+
+  const requestAdvisorIssues = useCallback(
+    (query: DashboardAdvisorIssuesQuery): Promise<DashboardAdvisorIssuesResponse> => {
+      const next = advisorIssuesLockRef.current
+        .catch(() => undefined)
+        .then(() => {
+          if (
+            !postMessageToParent({
+              type: 'REQUEST_ADVISOR_ISSUES',
+              severity: query.severity,
+              category: query.category,
+              limit: query.limit,
+              offset: query.offset,
+            })
+          ) {
+            throw new Error('Unable to request advisor issues from the parent window');
+          }
+          return createPendingRequest('advisorIssues', 'Advisor issues request');
+        });
+      advisorIssuesLockRef.current = next.catch(() => undefined);
+      return next;
+    },
+    [createPendingRequest, postMessageToParent]
+  );
+
+  const triggerAdvisorScan = useCallback(async (): Promise<void> => {
+    if (!postMessageToParent({ type: 'TRIGGER_ADVISOR_SCAN' })) {
+      throw new Error('Unable to trigger advisor scan from the parent window');
+    }
+    return createPendingRequest('advisorScan', 'Advisor scan trigger');
+  }, [createPendingRequest, postMessageToParent]);
+
   const navigateToSubscription = useCallback(() => {
     void postMessageToParent({ type: 'NAVIGATE_TO_SUBSCRIPTION' });
   }, [postMessageToParent]);
@@ -708,5 +946,9 @@ export function useCloudHosting() {
     navigateToSubscription,
     requestUserInfo,
     requestUserApiKey,
+    requestProjectMetrics,
+    requestAdvisorLatest,
+    requestAdvisorIssues,
+    triggerAdvisorScan,
   };
 }

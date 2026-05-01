@@ -20,6 +20,10 @@ export function CloudHostingDashboard() {
     updateVersion,
     requestUserInfo,
     requestUserApiKey,
+    requestProjectMetrics,
+    requestAdvisorLatest,
+    requestAdvisorIssues,
+    triggerAdvisorScan,
   } = useCloudHosting();
 
   return (
@@ -43,6 +47,10 @@ export function CloudHostingDashboard() {
       onUpdateVersion={updateVersion}
       onRequestUserInfo={requestUserInfo}
       onRequestUserApiKey={requestUserApiKey}
+      onRequestProjectMetrics={requestProjectMetrics}
+      onRequestAdvisorLatest={requestAdvisorLatest}
+      onRequestAdvisorIssues={requestAdvisorIssues}
+      onTriggerAdvisorScan={triggerAdvisorScan}
     />
   );
 }

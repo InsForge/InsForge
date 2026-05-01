@@ -17,5 +17,17 @@ export type {
   DashboardUserInfo,
   InsForgeDashboardProps,
   SelfHostingDashboardProps,
+  DashboardMetricsRange,
+  DashboardMetricName,
+  DashboardMetricDataPoint,
+  DashboardMetricSeries,
+  DashboardMetricsResponse,
+  DashboardMetricsError,
+  DashboardAdvisorSeverity,
+  DashboardAdvisorCategory,
+  DashboardAdvisorSummary,
+  DashboardAdvisorIssue,
+  DashboardAdvisorIssuesQuery,
+  DashboardAdvisorIssuesResponse,
 } from './types';
 export type { DashboardPrimaryMenuItem } from './navigation/menuItems';

@@ -37,6 +37,8 @@ import { getBackendUrl, isInsForgeCloudProject } from '../../../lib/utils/utils'
 import { useUsers } from '../../auth';
 import { CLISection, MCPSection } from '../components/connect';
 import { useOpenConnectDialog } from '../../../layout/ConnectDialogContext';
+import { ObservabilitySection } from '../components/observability';
+import { BackendAdvisorSection } from '../components/advisor';
 const REGION_COUNTRY_CODE_MAP: Record<string, 'us' | 'de' | 'sg'> = {
   'us-test': 'us',
   'us-east': 'us',
@@ -297,8 +299,8 @@ function MetricCard({ label, value, unit, icon }: MetricCardProps) {
 
 function DashboardLoadingState() {
   return (
-    <main className="h-full min-h-0 min-w-0 overflow-y-auto bg-semantic-0 lg:overflow-hidden">
-      <div className="flex min-h-full min-w-0 flex-col lg:h-full lg:min-h-0 lg:flex-row">
+    <main className="h-full min-h-0 min-w-0 overflow-y-auto bg-semantic-0">
+      <div className="flex min-w-0 flex-col lg:flex-row">
         <section className="insforge-dashboard-home-sidebar min-w-0 shrink-0 border-b border-[var(--alpha-8)] px-10 py-10 lg:border-r lg:border-b-0">
           <div className="mx-auto flex w-full max-w-[400px] flex-col gap-12">
             <div className="flex flex-col gap-12">
@@ -538,8 +540,8 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="h-full min-h-0 min-w-0 overflow-y-auto bg-semantic-0 lg:overflow-hidden">
-      <div className="flex min-h-full min-w-0 flex-col lg:h-full lg:min-h-0 lg:flex-row">
+    <main className="h-full min-h-0 min-w-0 overflow-y-auto bg-semantic-0">
+      <div className="flex min-w-0 flex-col lg:flex-row">
         <section className="insforge-dashboard-home-sidebar min-w-0 shrink-0 border-b border-[var(--alpha-8)] px-10 py-10 lg:border-r lg:border-b-0">
           <div className="mx-auto flex w-full max-w-[400px] flex-col gap-12">
             <div className="flex flex-col gap-12">
@@ -660,6 +662,10 @@ export default function DashboardPage() {
             </ReactFlow>
           </div>
         </section>
+      </div>
+      <div className="flex flex-col gap-12 px-10 py-10">
+        <ObservabilitySection />
+        <BackendAdvisorSection />
       </div>
     </main>
   );

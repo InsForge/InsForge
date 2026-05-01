@@ -38,6 +38,10 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
     onUpdateVersion,
     onRequestUserInfo,
     onRequestUserApiKey,
+    onRequestProjectMetrics,
+    onRequestAdvisorLatest,
+    onRequestAdvisorIssues,
+    onTriggerAdvisorScan,
   } = props;
   const getAuthorizationCode =
     props.mode === 'cloud-hosting' ? props.getAuthorizationCode : undefined;
@@ -64,6 +68,10 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
       onUpdateVersion,
       onRequestUserInfo,
       onRequestUserApiKey,
+      onRequestProjectMetrics,
+      onRequestAdvisorLatest,
+      onRequestAdvisorIssues,
+      onTriggerAdvisorScan,
     }),
     [
       backendUrl,
@@ -85,6 +93,10 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
       onUpdateVersion,
       onRequestUserInfo,
       onRequestUserApiKey,
+      onRequestProjectMetrics,
+      onRequestAdvisorLatest,
+      onRequestAdvisorIssues,
+      onTriggerAdvisorScan,
     ]
   );
   const [queryClient] = useState(
