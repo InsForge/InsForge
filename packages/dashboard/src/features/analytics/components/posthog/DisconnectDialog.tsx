@@ -31,7 +31,7 @@ export function DisconnectDialog({ open, onClose }: { open: boolean; onClose: ()
           </DialogDescription>
         </DialogHeader>
         <DialogBody>
-          <p className="text-sm">
+          <p className="text-sm text-foreground">
             Insforge will stop using your PostHog credentials. Your PostHog project itself will not
             be deleted; you can reconnect anytime.
           </p>
