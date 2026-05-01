@@ -1,0 +1,1998 @@
+openapi: 3.0.3
+info:
+  title: Insforge Payments API
+  version: 1.0.0
+  description: Stripe payment setup, catalog management, runtime Checkout Sessions, Billing Portal Sessions, and webhook projections
+
+tags:
+  - name: Client
+    description: Runtime-safe routes used by generated applications
+  - name: Admin
+    description: Project-admin routes for Stripe keys, catalog management, sync, and projections
+  - name: Webhooks
+    description: Stripe webhook ingestion routes
+
+paths:
+  /api/payments/checkout-sessions:
+    post:
+      summary: Create Checkout Session
+      description: Create a local checkout attempt and then create a Stripe Checkout Session. Subscription mode requires a billing subject.
+      tags:
+        - Client
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCheckoutSessionRequest'
+            example:
+              environment: "test"
+              mode: "subscription"
+              lineItems:
+                - stripePriceId: "price_123"
+                  quantity: 1
+              successUrl: "https://app.example.com/billing/success"
+              cancelUrl: "https://app.example.com/billing/cancel"
+              subject:
+                type: "team"
+                id: "team_123"
+              customerEmail: "buyer@example.com"
+              idempotencyKey: "checkout-team_123-pro"
+      responses:
+        '201':
+          description: Checkout Session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateCheckoutSessionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/payments/customer-portal-sessions:
+    post:
+      summary: Create Customer Portal Session
+      description: Create a Stripe Billing Portal Session for an authenticated user's mapped billing subject.
+      tags:
+        - Client
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCustomerPortalSessionRequest'
+            example:
+              environment: "test"
+              subject:
+                type: "team"
+                id: "team_123"
+              returnUrl: "https://app.example.com/billing"
+      responses:
+        '201':
+          description: Customer Portal Session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateCustomerPortalSessionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/payments/status:
+    get:
+      summary: Get Payments Status
+      description: Return Stripe connection, sync, and managed webhook status for each environment.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      responses:
+        '200':
+          description: Payments status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetPaymentsStatusResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/payments/config:
+    get:
+      summary: Get Stripe Key Configuration
+      description: Return masked Stripe key configuration for test and live environments.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      responses:
+        '200':
+          description: Stripe key configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetPaymentsConfigResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      summary: Configure Stripe Secret Key
+      description: Validate and store a Stripe secret key. New Stripe accounts trigger managed webhook setup and a unified sync.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpsertPaymentsConfigRequest'
+            example:
+              environment: "test"
+              secretKey: "sk_test_xxx"
+      responses:
+        '200':
+          description: Updated Stripe key configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetPaymentsConfigResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/payments/config/{environment}:
+    delete:
+      summary: Remove Stripe Secret Key
+      description: Remove the configured Stripe secret key for one environment and best-effort remove managed webhook endpoints.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentPath'
+      responses:
+        '200':
+          description: Updated Stripe key configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetPaymentsConfigResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/payments/sync:
+    post:
+      summary: Sync Stripe Payments State
+      description: Sync products, prices, and subscriptions from Stripe into InsForge. Stripe remains the source of truth.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncPaymentsRequest'
+            example:
+              environment: "all"
+      responses:
+        '200':
+          description: Sync result for configured environments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncPaymentsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/payments/webhooks/{environment}/configure:
+    post:
+      summary: Configure Managed Stripe Webhook
+      description: Create or recreate the InsForge-managed Stripe webhook endpoint for one environment.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentPath'
+      responses:
+        '200':
+          description: Managed webhook configuration result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigurePaymentWebhookResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/payments/catalog:
+    get:
+      summary: List Payment Catalog
+      description: Return mirrored Stripe products and prices, optionally filtered by environment.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/OptionalEnvironmentQuery'
+      responses:
+        '200':
+          description: Mirrored products and prices
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListPaymentCatalogResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/payments/products:
+    get:
+      summary: List Products
+      description: List mirrored Stripe products for one environment.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentQuery'
+      responses:
+        '200':
+          description: Products
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListPaymentProductsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      summary: Create Product
+      description: Create a Stripe product in the requested environment, then mirror it locally after Stripe succeeds.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentProductRequest'
+            example:
+              environment: "test"
+              name: "Pro Plan"
+              description: "Monthly access to Pro features"
+              active: true
+              metadata:
+                tier: "pro"
+              idempotencyKey: "product-pro-plan"
+      responses:
+        '201':
+          description: Product created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MutatePaymentProductResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/payments/products/{productId}:
+    get:
+      summary: Get Product
+      description: Get one mirrored Stripe product and its associated prices.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/ProductIdPath'
+        - $ref: '#/components/parameters/EnvironmentQuery'
+      responses:
+        '200':
+          description: Product and prices
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetPaymentProductResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      summary: Update Product
+      description: Update a Stripe product, then mirror it locally after Stripe succeeds.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/ProductIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePaymentProductRequest'
+            example:
+              environment: "test"
+              name: "Pro Plan"
+              active: true
+      responses:
+        '200':
+          description: Product updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MutatePaymentProductResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      summary: Delete Product
+      description: Delete a Stripe product from one environment, then remove it from the local mirror.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/ProductIdPath'
+        - $ref: '#/components/parameters/EnvironmentQuery'
+      responses:
+        '200':
+          description: Product deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletePaymentProductResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/payments/prices:
+    get:
+      summary: List Prices
+      description: List mirrored Stripe prices for one environment, optionally filtered by product.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentQuery'
+        - name: stripeProductId
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 1
+          description: Filter prices by Stripe product ID.
+          example: "prod_123"
+      responses:
+        '200':
+          description: Prices
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListPaymentPricesResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      summary: Create Price
+      description: Create a Stripe price in the requested environment, then mirror it locally after Stripe succeeds.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentPriceRequest'
+            example:
+              environment: "test"
+              stripeProductId: "prod_123"
+              currency: "usd"
+              unitAmount: 2900
+              recurring:
+                interval: "month"
+                intervalCount: 1
+              lookupKey: "pro_monthly"
+              idempotencyKey: "price-pro-monthly"
+      responses:
+        '201':
+          description: Price created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MutatePaymentPriceResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/payments/prices/{priceId}:
+    get:
+      summary: Get Price
+      description: Get one mirrored Stripe price.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/PriceIdPath'
+        - $ref: '#/components/parameters/EnvironmentQuery'
+      responses:
+        '200':
+          description: Price
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetPaymentPriceResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      summary: Update Price
+      description: Update mutable Stripe price fields, then mirror the price locally after Stripe succeeds.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/PriceIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePaymentPriceRequest'
+            example:
+              environment: "test"
+              active: true
+              lookupKey: "pro_monthly"
+      responses:
+        '200':
+          description: Price updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MutatePaymentPriceResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      summary: Archive Price
+      description: Archive a Stripe price in one environment, then mirror the archived state locally.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/PriceIdPath'
+        - $ref: '#/components/parameters/EnvironmentQuery'
+      responses:
+        '200':
+          description: Price archived
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArchivePaymentPriceResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/payments/subscriptions:
+    get:
+      summary: List Subscriptions
+      description: Admin/debug read for mirrored Stripe subscriptions. Use app-owned tables with RLS for end-user payment state.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentQuery'
+        - $ref: '#/components/parameters/SubjectTypeQuery'
+        - $ref: '#/components/parameters/SubjectIdQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+      responses:
+        '200':
+          description: Subscriptions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListSubscriptionsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/payments/payment-history:
+    get:
+      summary: List Payment History
+      description: Admin/debug read for mirrored payment history. Use app-owned fulfillment tables with RLS for end-user order, credit, or entitlement state.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentQuery'
+        - $ref: '#/components/parameters/SubjectTypeQuery'
+        - $ref: '#/components/parameters/SubjectIdQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+      responses:
+        '200':
+          description: Payment history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListPaymentHistoryResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/webhooks/stripe/{environment}:
+    post:
+      summary: Receive Stripe Webhook
+      description: Receive Stripe events for one environment. The request body must be the raw Stripe JSON body and must include the Stripe signature header.
+      tags:
+        - Webhooks
+      security:
+        - stripeSignature: []
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Webhook received
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StripeWebhookResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    apiKey:
+      type: apiKey
+      in: header
+      name: x-api-key
+    stripeSignature:
+      type: apiKey
+      in: header
+      name: stripe-signature
+
+  parameters:
+    EnvironmentPath:
+      name: environment
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/StripeEnvironment'
+      description: Stripe environment.
+    EnvironmentQuery:
+      name: environment
+      in: query
+      required: true
+      schema:
+        $ref: '#/components/schemas/StripeEnvironment'
+      description: Stripe environment.
+    OptionalEnvironmentQuery:
+      name: environment
+      in: query
+      required: false
+      schema:
+        $ref: '#/components/schemas/StripeEnvironment'
+      description: Optional Stripe environment filter.
+    ProductIdPath:
+      name: productId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+      description: Stripe product ID.
+      example: "prod_123"
+    PriceIdPath:
+      name: priceId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+      description: Stripe price ID.
+      example: "price_123"
+    SubjectTypeQuery:
+      name: subjectType
+      in: query
+      required: false
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 100
+      description: Billing subject type. Must be provided together with subjectId.
+      example: "team"
+    SubjectIdQuery:
+      name: subjectId
+      in: query
+      required: false
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 255
+      description: Billing subject ID. Must be provided together with subjectType.
+      example: "team_123"
+    LimitQuery:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+      description: Maximum rows to return.
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    StripeEnvironment:
+      type: string
+      enum:
+        - test
+        - live
+
+    StripeConnectionStatus:
+      type: string
+      enum:
+        - unconfigured
+        - connected
+        - error
+
+    StripeLatestSyncStatus:
+      type: string
+      enum:
+        - succeeded
+        - failed
+
+    Metadata:
+      type: object
+      additionalProperties:
+        type: string
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+        - statusCode
+      properties:
+        error:
+          type: string
+          example: "INVALID_INPUT"
+        message:
+          type: string
+          example: "environment: Invalid enum value"
+        statusCode:
+          type: integer
+          example: 400
+        nextActions:
+          type: string
+          nullable: true
+
+    StripeConnection:
+      type: object
+      required:
+        - environment
+        - status
+        - stripeAccountId
+        - stripeAccountEmail
+        - accountLivemode
+        - webhookEndpointId
+        - webhookEndpointUrl
+        - webhookConfiguredAt
+        - maskedKey
+        - lastSyncedAt
+        - lastSyncStatus
+        - lastSyncError
+        - lastSyncCounts
+      properties:
+        environment:
+          $ref: '#/components/schemas/StripeEnvironment'
+        status:
+          $ref: '#/components/schemas/StripeConnectionStatus'
+        stripeAccountId:
+          type: string
+          nullable: true
+          example: "acct_123"
+        stripeAccountEmail:
+          type: string
+          nullable: true
+          example: "owner@example.com"
+        accountLivemode:
+          type: boolean
+          nullable: true
+        webhookEndpointId:
+          type: string
+          nullable: true
+          example: "we_123"
+        webhookEndpointUrl:
+          type: string
+          nullable: true
+          example: "https://api.example.com/api/webhooks/stripe/test"
+        webhookConfiguredAt:
+          type: string
+          format: date-time
+          nullable: true
+        maskedKey:
+          type: string
+          nullable: true
+          example: "sk_test_...abcd"
+        lastSyncedAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastSyncStatus:
+          allOf:
+            - $ref: '#/components/schemas/StripeLatestSyncStatus'
+          nullable: true
+        lastSyncError:
+          type: string
+          nullable: true
+        lastSyncCounts:
+          type: object
+          additionalProperties:
+            type: number
+
+    StripeProductMirror:
+      type: object
+      required:
+        - environment
+        - stripeProductId
+        - name
+        - description
+        - active
+        - defaultPriceId
+        - metadata
+        - syncedAt
+      properties:
+        environment:
+          $ref: '#/components/schemas/StripeEnvironment'
+        stripeProductId:
+          type: string
+          example: "prod_123"
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        active:
+          type: boolean
+        defaultPriceId:
+          type: string
+          nullable: true
+          example: "price_123"
+        metadata:
+          $ref: '#/components/schemas/Metadata'
+        syncedAt:
+          type: string
+          format: date-time
+
+    StripePriceMirror:
+      type: object
+      required:
+        - environment
+        - stripePriceId
+        - stripeProductId
+        - active
+        - currency
+        - unitAmount
+        - unitAmountDecimal
+        - type
+        - lookupKey
+        - billingScheme
+        - taxBehavior
+        - recurringInterval
+        - recurringIntervalCount
+        - metadata
+        - syncedAt
+      properties:
+        environment:
+          $ref: '#/components/schemas/StripeEnvironment'
+        stripePriceId:
+          type: string
+          example: "price_123"
+        stripeProductId:
+          type: string
+          nullable: true
+          example: "prod_123"
+        active:
+          type: boolean
+        currency:
+          type: string
+          example: "usd"
+        unitAmount:
+          type: integer
+          nullable: true
+          example: 2900
+        unitAmountDecimal:
+          type: string
+          nullable: true
+          example: "2900"
+        type:
+          type: string
+          example: "recurring"
+        lookupKey:
+          type: string
+          nullable: true
+          example: "pro_monthly"
+        billingScheme:
+          type: string
+          nullable: true
+          example: "per_unit"
+        taxBehavior:
+          type: string
+          nullable: true
+          enum:
+            - exclusive
+            - inclusive
+            - unspecified
+          example: "unspecified"
+        recurringInterval:
+          type: string
+          nullable: true
+          enum:
+            - day
+            - week
+            - month
+            - year
+          example: "month"
+        recurringIntervalCount:
+          type: integer
+          nullable: true
+          example: 1
+        metadata:
+          $ref: '#/components/schemas/Metadata'
+        syncedAt:
+          type: string
+          format: date-time
+
+    BillingSubject:
+      type: object
+      required:
+        - type
+        - id
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: "team"
+        id:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: "team_123"
+
+    CheckoutMode:
+      type: string
+      enum:
+        - payment
+        - subscription
+
+    CheckoutSessionStatus:
+      type: string
+      enum:
+        - initialized
+        - open
+        - completed
+        - expired
+        - failed
+
+    CheckoutSessionPaymentStatus:
+      type: string
+      enum:
+        - paid
+        - unpaid
+        - no_payment_required
+
+    CheckoutSession:
+      type: object
+      required:
+        - id
+        - environment
+        - mode
+        - status
+        - paymentStatus
+        - subjectType
+        - subjectId
+        - customerEmail
+        - stripeCheckoutSessionId
+        - stripeCustomerId
+        - stripePaymentIntentId
+        - stripeSubscriptionId
+        - url
+        - lastError
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        environment:
+          $ref: '#/components/schemas/StripeEnvironment'
+        mode:
+          $ref: '#/components/schemas/CheckoutMode'
+        status:
+          $ref: '#/components/schemas/CheckoutSessionStatus'
+        paymentStatus:
+          allOf:
+            - $ref: '#/components/schemas/CheckoutSessionPaymentStatus'
+          nullable: true
+        subjectType:
+          type: string
+          nullable: true
+        subjectId:
+          type: string
+          nullable: true
+        customerEmail:
+          type: string
+          format: email
+          nullable: true
+        stripeCheckoutSessionId:
+          type: string
+          nullable: true
+          example: "cs_test_123"
+        stripeCustomerId:
+          type: string
+          nullable: true
+          example: "cus_123"
+        stripePaymentIntentId:
+          type: string
+          nullable: true
+          example: "pi_123"
+        stripeSubscriptionId:
+          type: string
+          nullable: true
+          example: "sub_123"
+        url:
+          type: string
+          nullable: true
+          example: "https://checkout.stripe.com/c/pay/cs_test_123"
+        lastError:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CustomerPortalSessionStatus:
+      type: string
+      enum:
+        - initialized
+        - created
+        - failed
+
+    CustomerPortalSession:
+      type: object
+      required:
+        - id
+        - environment
+        - status
+        - subjectType
+        - subjectId
+        - stripeCustomerId
+        - returnUrl
+        - configuration
+        - url
+        - lastError
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        environment:
+          $ref: '#/components/schemas/StripeEnvironment'
+        status:
+          $ref: '#/components/schemas/CustomerPortalSessionStatus'
+        subjectType:
+          type: string
+        subjectId:
+          type: string
+        stripeCustomerId:
+          type: string
+          nullable: true
+          example: "cus_123"
+        returnUrl:
+          type: string
+          nullable: true
+          example: "https://app.example.com/billing"
+        configuration:
+          type: string
+          nullable: true
+        url:
+          type: string
+          nullable: true
+          example: "https://billing.stripe.com/p/session/test_123"
+        lastError:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    StripeSubscriptionStatus:
+      type: string
+      enum:
+        - incomplete
+        - incomplete_expired
+        - trialing
+        - active
+        - past_due
+        - canceled
+        - unpaid
+        - paused
+
+    StripeSubscriptionItem:
+      type: object
+      required:
+        - environment
+        - stripeSubscriptionItemId
+        - stripeSubscriptionId
+        - stripeProductId
+        - stripePriceId
+        - quantity
+        - metadata
+        - createdAt
+        - updatedAt
+      properties:
+        environment:
+          $ref: '#/components/schemas/StripeEnvironment'
+        stripeSubscriptionItemId:
+          type: string
+          example: "si_123"
+        stripeSubscriptionId:
+          type: string
+          example: "sub_123"
+        stripeProductId:
+          type: string
+          nullable: true
+          example: "prod_123"
+        stripePriceId:
+          type: string
+          nullable: true
+          example: "price_123"
+        quantity:
+          type: integer
+          nullable: true
+          example: 1
+        metadata:
+          $ref: '#/components/schemas/Metadata'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    StripeSubscription:
+      type: object
+      required:
+        - environment
+        - stripeSubscriptionId
+        - stripeCustomerId
+        - subjectType
+        - subjectId
+        - status
+        - currentPeriodStart
+        - currentPeriodEnd
+        - cancelAtPeriodEnd
+        - cancelAt
+        - canceledAt
+        - trialStart
+        - trialEnd
+        - latestInvoiceId
+        - metadata
+        - syncedAt
+        - createdAt
+        - updatedAt
+      properties:
+        environment:
+          $ref: '#/components/schemas/StripeEnvironment'
+        stripeSubscriptionId:
+          type: string
+          example: "sub_123"
+        stripeCustomerId:
+          type: string
+          example: "cus_123"
+        subjectType:
+          type: string
+          nullable: true
+        subjectId:
+          type: string
+          nullable: true
+        status:
+          $ref: '#/components/schemas/StripeSubscriptionStatus'
+        currentPeriodStart:
+          type: string
+          format: date-time
+          nullable: true
+        currentPeriodEnd:
+          type: string
+          format: date-time
+          nullable: true
+        cancelAtPeriodEnd:
+          type: boolean
+        cancelAt:
+          type: string
+          format: date-time
+          nullable: true
+        canceledAt:
+          type: string
+          format: date-time
+          nullable: true
+        trialStart:
+          type: string
+          format: date-time
+          nullable: true
+        trialEnd:
+          type: string
+          format: date-time
+          nullable: true
+        latestInvoiceId:
+          type: string
+          nullable: true
+          example: "in_123"
+        metadata:
+          $ref: '#/components/schemas/Metadata'
+        syncedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/StripeSubscriptionItem'
+
+    PaymentHistoryType:
+      type: string
+      enum:
+        - one_time_payment
+        - subscription_invoice
+        - refund
+        - failed_payment
+
+    PaymentHistoryStatus:
+      type: string
+      enum:
+        - succeeded
+        - failed
+        - pending
+        - refunded
+        - partially_refunded
+
+    PaymentHistory:
+      type: object
+      required:
+        - environment
+        - type
+        - status
+        - subjectType
+        - subjectId
+        - stripeCustomerId
+        - customerEmailSnapshot
+        - stripeCheckoutSessionId
+        - stripePaymentIntentId
+        - stripeInvoiceId
+        - stripeChargeId
+        - stripeRefundId
+        - stripeSubscriptionId
+        - stripeProductId
+        - stripePriceId
+        - amount
+        - amountRefunded
+        - currency
+        - description
+        - paidAt
+        - failedAt
+        - refundedAt
+        - stripeCreatedAt
+        - createdAt
+        - updatedAt
+      properties:
+        environment:
+          $ref: '#/components/schemas/StripeEnvironment'
+        type:
+          $ref: '#/components/schemas/PaymentHistoryType'
+        status:
+          $ref: '#/components/schemas/PaymentHistoryStatus'
+        subjectType:
+          type: string
+          nullable: true
+        subjectId:
+          type: string
+          nullable: true
+        stripeCustomerId:
+          type: string
+          nullable: true
+          example: "cus_123"
+        customerEmailSnapshot:
+          type: string
+          format: email
+          nullable: true
+        stripeCheckoutSessionId:
+          type: string
+          nullable: true
+          example: "cs_test_123"
+        stripePaymentIntentId:
+          type: string
+          nullable: true
+          example: "pi_123"
+        stripeInvoiceId:
+          type: string
+          nullable: true
+          example: "in_123"
+        stripeChargeId:
+          type: string
+          nullable: true
+          example: "ch_123"
+        stripeRefundId:
+          type: string
+          nullable: true
+          example: "re_123"
+        stripeSubscriptionId:
+          type: string
+          nullable: true
+          example: "sub_123"
+        stripeProductId:
+          type: string
+          nullable: true
+          example: "prod_123"
+        stripePriceId:
+          type: string
+          nullable: true
+          example: "price_123"
+        amount:
+          type: integer
+          nullable: true
+          example: 2900
+        amountRefunded:
+          type: integer
+          nullable: true
+          example: 0
+        currency:
+          type: string
+          nullable: true
+          example: "usd"
+        description:
+          type: string
+          nullable: true
+        paidAt:
+          type: string
+          format: date-time
+          nullable: true
+        failedAt:
+          type: string
+          format: date-time
+          nullable: true
+        refundedAt:
+          type: string
+          format: date-time
+          nullable: true
+        stripeCreatedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    StripeWebhookProcessingStatus:
+      type: string
+      enum:
+        - pending
+        - processed
+        - failed
+        - ignored
+
+    StripeWebhookEvent:
+      type: object
+      required:
+        - environment
+        - stripeEventId
+        - eventType
+        - livemode
+        - stripeAccountId
+        - objectType
+        - objectId
+        - processingStatus
+        - attemptCount
+        - lastError
+        - receivedAt
+        - processedAt
+        - createdAt
+        - updatedAt
+      properties:
+        environment:
+          $ref: '#/components/schemas/StripeEnvironment'
+        stripeEventId:
+          type: string
+          example: "evt_123"
+        eventType:
+          type: string
+          example: "checkout.session.completed"
+        livemode:
+          type: boolean
+        stripeAccountId:
+          type: string
+          nullable: true
+          example: "acct_123"
+        objectType:
+          type: string
+          nullable: true
+          example: "checkout.session"
+        objectId:
+          type: string
+          nullable: true
+          example: "cs_test_123"
+        processingStatus:
+          $ref: '#/components/schemas/StripeWebhookProcessingStatus'
+        attemptCount:
+          type: integer
+        lastError:
+          type: string
+          nullable: true
+        receivedAt:
+          type: string
+          format: date-time
+        processedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    StripeKeyConfig:
+      type: object
+      required:
+        - environment
+        - hasKey
+        - maskedKey
+      properties:
+        environment:
+          $ref: '#/components/schemas/StripeEnvironment'
+        hasKey:
+          type: boolean
+        maskedKey:
+          type: string
+          nullable: true
+          example: "sk_test_...abcd"
+
+    CreatePaymentProductRequest:
+      type: object
+      required:
+        - environment
+        - name
+      additionalProperties: false
+      properties:
+        environment:
+          $ref: '#/components/schemas/StripeEnvironment'
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+          nullable: true
+          maxLength: 5000
+        active:
+          type: boolean
+        metadata:
+          $ref: '#/components/schemas/Metadata'
+        idempotencyKey:
+          type: string
+          minLength: 1
+          maxLength: 200
+
+    UpdatePaymentProductRequest:
+      type: object
+      required:
+        - environment
+      additionalProperties: false
+      properties:
+        environment:
+          $ref: '#/components/schemas/StripeEnvironment'
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+          nullable: true
+          maxLength: 5000
+        active:
+          type: boolean
+        metadata:
+          $ref: '#/components/schemas/Metadata'
+      minProperties: 2
+
+    StripePriceRecurringInterval:
+      type: string
+      enum:
+        - day
+        - week
+        - month
+        - year
+
+    StripePriceTaxBehavior:
+      type: string
+      enum:
+        - exclusive
+        - inclusive
+        - unspecified
+
+    CreatePaymentPriceRequest:
+      type: object
+      required:
+        - environment
+        - stripeProductId
+        - currency
+        - unitAmount
+      additionalProperties: false
+      properties:
+        environment:
+          $ref: '#/components/schemas/StripeEnvironment'
+        stripeProductId:
+          type: string
+          minLength: 1
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          example: "usd"
+        unitAmount:
+          type: integer
+          minimum: 0
+          example: 2900
+        lookupKey:
+          type: string
+          nullable: true
+          minLength: 1
+          maxLength: 200
+        active:
+          type: boolean
+        recurring:
+          type: object
+          additionalProperties: false
+          required:
+            - interval
+          properties:
+            interval:
+              $ref: '#/components/schemas/StripePriceRecurringInterval'
+            intervalCount:
+              type: integer
+              minimum: 1
+        taxBehavior:
+          $ref: '#/components/schemas/StripePriceTaxBehavior'
+        metadata:
+          $ref: '#/components/schemas/Metadata'
+        idempotencyKey:
+          type: string
+          minLength: 1
+          maxLength: 200
+
+    UpdatePaymentPriceRequest:
+      type: object
+      required:
+        - environment
+      additionalProperties: false
+      properties:
+        environment:
+          $ref: '#/components/schemas/StripeEnvironment'
+        active:
+          type: boolean
+        lookupKey:
+          type: string
+          nullable: true
+          minLength: 1
+          maxLength: 200
+        taxBehavior:
+          $ref: '#/components/schemas/StripePriceTaxBehavior'
+        metadata:
+          $ref: '#/components/schemas/Metadata'
+      minProperties: 2
+
+    CreateCheckoutSessionLineItem:
+      type: object
+      required:
+        - stripePriceId
+      additionalProperties: false
+      properties:
+        stripePriceId:
+          type: string
+          minLength: 1
+          example: "price_123"
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 999
+          default: 1
+
+    CreateCheckoutSessionRequest:
+      type: object
+      required:
+        - environment
+        - mode
+        - lineItems
+        - successUrl
+        - cancelUrl
+      additionalProperties: false
+      description: Metadata keys starting with insforge_ are reserved and rejected.
+      properties:
+        environment:
+          $ref: '#/components/schemas/StripeEnvironment'
+        mode:
+          $ref: '#/components/schemas/CheckoutMode'
+        lineItems:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/CreateCheckoutSessionLineItem'
+        successUrl:
+          type: string
+          format: uri
+        cancelUrl:
+          type: string
+          format: uri
+        subject:
+          $ref: '#/components/schemas/BillingSubject'
+        customerEmail:
+          type: string
+          format: email
+          nullable: true
+        metadata:
+          $ref: '#/components/schemas/Metadata'
+        idempotencyKey:
+          type: string
+          minLength: 1
+          maxLength: 200
+
+    CreateCheckoutSessionResponse:
+      type: object
+      required:
+        - checkoutSession
+      properties:
+        checkoutSession:
+          $ref: '#/components/schemas/CheckoutSession'
+
+    CreateCustomerPortalSessionRequest:
+      type: object
+      required:
+        - environment
+        - subject
+      additionalProperties: false
+      properties:
+        environment:
+          $ref: '#/components/schemas/StripeEnvironment'
+        subject:
+          $ref: '#/components/schemas/BillingSubject'
+        returnUrl:
+          type: string
+          format: uri
+        configuration:
+          type: string
+          minLength: 1
+          maxLength: 255
+
+    CreateCustomerPortalSessionResponse:
+      type: object
+      required:
+        - customerPortalSession
+      properties:
+        customerPortalSession:
+          $ref: '#/components/schemas/CustomerPortalSession'
+
+    GetPaymentsStatusResponse:
+      type: object
+      required:
+        - connections
+      properties:
+        connections:
+          type: array
+          items:
+            $ref: '#/components/schemas/StripeConnection'
+
+    GetPaymentsConfigResponse:
+      type: object
+      required:
+        - keys
+      properties:
+        keys:
+          type: array
+          items:
+            $ref: '#/components/schemas/StripeKeyConfig'
+
+    UpsertPaymentsConfigRequest:
+      type: object
+      required:
+        - environment
+        - secretKey
+      properties:
+        environment:
+          $ref: '#/components/schemas/StripeEnvironment'
+        secretKey:
+          type: string
+          minLength: 1
+          writeOnly: true
+          example: "sk_test_xxx"
+
+    SyncPaymentsRequest:
+      type: object
+      properties:
+        environment:
+          oneOf:
+            - $ref: '#/components/schemas/StripeEnvironment'
+            - type: string
+              enum:
+                - all
+          default: "all"
+
+    SyncPaymentsSubscriptionsSummary:
+      type: object
+      required:
+        - environment
+        - synced
+        - unmapped
+        - deleted
+      properties:
+        environment:
+          $ref: '#/components/schemas/StripeEnvironment'
+        synced:
+          type: integer
+          minimum: 0
+        unmapped:
+          type: integer
+          minimum: 0
+        deleted:
+          type: integer
+          minimum: 0
+
+    SyncPaymentsEnvironmentResult:
+      type: object
+      required:
+        - environment
+        - connection
+        - subscriptions
+      properties:
+        environment:
+          $ref: '#/components/schemas/StripeEnvironment'
+        connection:
+          $ref: '#/components/schemas/StripeConnection'
+        subscriptions:
+          allOf:
+            - $ref: '#/components/schemas/SyncPaymentsSubscriptionsSummary'
+          nullable: true
+
+    SyncPaymentsResponse:
+      type: object
+      required:
+        - results
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncPaymentsEnvironmentResult'
+
+    ConfigurePaymentWebhookResponse:
+      type: object
+      required:
+        - connection
+      properties:
+        connection:
+          $ref: '#/components/schemas/StripeConnection'
+
+    ListPaymentCatalogResponse:
+      type: object
+      required:
+        - products
+        - prices
+      properties:
+        products:
+          type: array
+          items:
+            $ref: '#/components/schemas/StripeProductMirror'
+        prices:
+          type: array
+          items:
+            $ref: '#/components/schemas/StripePriceMirror'
+
+    ListPaymentProductsResponse:
+      type: object
+      required:
+        - products
+      properties:
+        products:
+          type: array
+          items:
+            $ref: '#/components/schemas/StripeProductMirror'
+
+    ListPaymentPricesResponse:
+      type: object
+      required:
+        - prices
+      properties:
+        prices:
+          type: array
+          items:
+            $ref: '#/components/schemas/StripePriceMirror'
+
+    GetPaymentProductResponse:
+      type: object
+      required:
+        - product
+        - prices
+      properties:
+        product:
+          $ref: '#/components/schemas/StripeProductMirror'
+        prices:
+          type: array
+          items:
+            $ref: '#/components/schemas/StripePriceMirror'
+
+    MutatePaymentProductResponse:
+      type: object
+      required:
+        - product
+      properties:
+        product:
+          $ref: '#/components/schemas/StripeProductMirror'
+
+    DeletePaymentProductResponse:
+      type: object
+      required:
+        - stripeProductId
+        - deleted
+      properties:
+        stripeProductId:
+          type: string
+          example: "prod_123"
+        deleted:
+          type: boolean
+
+    GetPaymentPriceResponse:
+      type: object
+      required:
+        - price
+      properties:
+        price:
+          $ref: '#/components/schemas/StripePriceMirror'
+
+    MutatePaymentPriceResponse:
+      type: object
+      required:
+        - price
+      properties:
+        price:
+          $ref: '#/components/schemas/StripePriceMirror'
+
+    ArchivePaymentPriceResponse:
+      type: object
+      required:
+        - price
+        - archived
+      properties:
+        price:
+          $ref: '#/components/schemas/StripePriceMirror'
+        archived:
+          type: boolean
+
+    ListSubscriptionsResponse:
+      type: object
+      required:
+        - subscriptions
+      properties:
+        subscriptions:
+          type: array
+          items:
+            $ref: '#/components/schemas/StripeSubscription'
+
+    ListPaymentHistoryResponse:
+      type: object
+      required:
+        - paymentHistory
+      properties:
+        paymentHistory:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaymentHistory'
+
+    StripeWebhookResponse:
+      type: object
+      required:
+        - received
+        - handled
+      properties:
+        received:
+          type: boolean
+        handled:
+          type: boolean
+        event:
+          $ref: '#/components/schemas/StripeWebhookEvent'
