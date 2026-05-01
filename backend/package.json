@@ -15,7 +15,6 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
-    "test:bootstrap-import": "tsx tests/verify-bootstrap-import.js",
     "test:e2e": "./tests/run-all-tests.sh",
     "migrate:bootstrap": "tsx src/infra/database/migrations/bootstrap/bootstrap-migrations.js",
     "migrate:up": "npm run migrate:bootstrap && node-pg-migrate up --migrations-dir src/infra/database/migrations --migrations-schema system --migrations-table migrations",
@@ -25,7 +24,7 @@
     "migrate:up:local": "dotenv -e ../.env -- npm run migrate:bootstrap && dotenv -e ../.env -- node-pg-migrate up --migrations-dir src/infra/database/migrations --migrations-schema system --migrations-table migrations",
     "migrate:down:local": "dotenv -e ../.env -- node-pg-migrate down --migrations-dir src/infra/database/migrations --migrations-schema system --migrations-table migrations",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src/"
+    "lint": "eslint ."
   },
   "keywords": [
     "backend-as-a-service",
