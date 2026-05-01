@@ -3,9 +3,9 @@ import { Button } from '@insforge/ui';
 
 export function ConnectStatusBar({ connection }: { connection: PosthogConnection }) {
   return (
-    <div className="flex items-center justify-between rounded-lg border bg-card p-4">
+    <div className="flex items-center justify-between rounded-lg bg-card p-4">
       <div className="flex items-center gap-3">
-        <span className="text-[rgb(var(--success))]" aria-hidden="true">
+        <span className="text-primary" aria-hidden="true">
           ✓
         </span>
         <div>
@@ -20,7 +20,7 @@ export function ConnectStatusBar({ connection }: { connection: PosthogConnection
         target="_blank"
         rel="noreferrer"
       >
-        <Button variant="outline">Open in PostHog</Button>
+        <Button variant="primary">Open in PostHog</Button>
       </a>
     </div>
   );
