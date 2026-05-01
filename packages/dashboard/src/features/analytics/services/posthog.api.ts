@@ -1,10 +1,17 @@
 import type {
   GetPosthogConnectionResponse,
   GetPosthogDashboardsResponse,
-  PosthogSummary,
-  PosthogEventsResponse,
+  PosthogTimeframe,
+  PosthogWebOverviewResponse,
+  PosthogWebStatsResponse,
+  PosthogTrendsResponse,
+  PosthogRetentionResponse,
+  PosthogRecordingsResponse,
+  PosthogShareTokenResponse,
 } from '@insforge/shared-schemas';
 import { apiClient } from '../../../lib/api/client';
+
+export type Breakdown = 'Page' | 'Country' | 'DeviceType';
 
 export const posthogApi = {
   async getConnection(): Promise<GetPosthogConnectionResponse | null> {
@@ -12,7 +19,6 @@ export const posthogApi = {
       const res = await apiClient.request('/integrations/posthog/connection', {
         headers: apiClient.withAccessToken({}),
       });
-      // Backend returns { connected: true, connection: PosthogConnection } on 200
       return (res?.connection ?? null) as GetPosthogConnectionResponse | null;
     } catch (err: unknown) {
       if ((err as { response?: { status: number } })?.response?.status === 404) {
@@ -35,16 +41,53 @@ export const posthogApi = {
     });
   },
 
-  async getSummary(): Promise<PosthogSummary> {
-    return apiClient.request('/integrations/posthog/summary', {
+  // v2.5 endpoints --------------------------------------------------------
+
+  async getWebOverview(timeframe: PosthogTimeframe): Promise<PosthogWebOverviewResponse> {
+    const params = new URLSearchParams({ timeframe });
+    return apiClient.request(`/integrations/posthog/web-overview?${params.toString()}`, {
       headers: apiClient.withAccessToken({}),
-    }) as Promise<PosthogSummary>;
+    }) as Promise<PosthogWebOverviewResponse>;
   },
 
-  async getRecentEvents(limit = 10): Promise<PosthogEventsResponse> {
-    const params = new URLSearchParams({ limit: String(limit) });
-    return apiClient.request(`/integrations/posthog/events?${params.toString()}`, {
+  async getWebStats(
+    breakdown: Breakdown,
+    timeframe: PosthogTimeframe
+  ): Promise<PosthogWebStatsResponse> {
+    const params = new URLSearchParams({ breakdown, timeframe });
+    return apiClient.request(`/integrations/posthog/web-stats?${params.toString()}`, {
       headers: apiClient.withAccessToken({}),
-    }) as Promise<PosthogEventsResponse>;
+    }) as Promise<PosthogWebStatsResponse>;
+  },
+
+  async getPageviewsTrend(timeframe: PosthogTimeframe): Promise<PosthogTrendsResponse> {
+    const params = new URLSearchParams({ event: '$pageview', timeframe });
+    return apiClient.request(`/integrations/posthog/trends?${params.toString()}`, {
+      headers: apiClient.withAccessToken({}),
+    }) as Promise<PosthogTrendsResponse>;
+  },
+
+  async getRetention(timeframe: PosthogTimeframe): Promise<PosthogRetentionResponse> {
+    const params = new URLSearchParams({ timeframe });
+    return apiClient.request(`/integrations/posthog/retention?${params.toString()}`, {
+      headers: apiClient.withAccessToken({}),
+    }) as Promise<PosthogRetentionResponse>;
+  },
+
+  async getRecordings(limit = 10): Promise<PosthogRecordingsResponse> {
+    const params = new URLSearchParams({ limit: String(limit) });
+    return apiClient.request(`/integrations/posthog/recordings?${params.toString()}`, {
+      headers: apiClient.withAccessToken({}),
+    }) as Promise<PosthogRecordingsResponse>;
+  },
+
+  async createRecordingShare(recordingId: string): Promise<PosthogShareTokenResponse> {
+    return apiClient.request(
+      `/integrations/posthog/recordings/${encodeURIComponent(recordingId)}/share`,
+      {
+        method: 'POST',
+        headers: apiClient.withAccessToken({}),
+      }
+    ) as Promise<PosthogShareTokenResponse>;
   },
 };
