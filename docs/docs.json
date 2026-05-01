@@ -77,16 +77,23 @@
                 ]
               },
               {
-                "group": "Email (Experimental)",
+                "group": "Email (Private Preview)",
                 "pages": [
                   "core-concepts/email/architecture",
                   "core-concepts/email/custom-smtp"
                 ]
               },
               {
-                "group": "Deployments (Experimental)",
+                "group": "Deployments",
                 "pages": [
                   "core-concepts/deployments/architecture"
+                ]
+              },
+              {
+                "group": "Payments (Private Preview)",
+                "pages": [
+                  "core-concepts/payments/architecture",
+                  "core-concepts/payments/cli"
                 ]
               }
             ]
@@ -122,6 +129,7 @@
               "sdks/typescript/ai",
               "sdks/typescript/realtime",
               "sdks/typescript/email",
+              "sdks/typescript/payments",
               {
                 "group": "Framework Guides",
                 "pages": [
@@ -213,6 +221,10 @@
           {
             "group": "Email",
             "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/email.yaml"
+          },
+          {
+            "group": "Payments (Private Preview)",
+            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/payments.yaml"
           },
           {
             "group": "Secrets",

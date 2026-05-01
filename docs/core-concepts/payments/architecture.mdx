@@ -1,0 +1,441 @@
+---
+title: Payments Architecture
+description: Stripe-powered checkout, subscriptions, and billing portal flows
+---
+
+<Warning>
+  Payments is a private preview feature. APIs and behavior may change.
+</Warning>
+
+## Overview
+
+InsForge Payments helps developers add Stripe payment flows to generated applications without putting Stripe secret keys in frontend code. Developers configure their own Stripe account, agents manage products and prices, and app frontends create Stripe Checkout and Billing Portal sessions through InsForge.
+
+Stripe remains the source of truth. InsForge mirrors Stripe catalog and runtime payment state into a `payments` schema so the dashboard, agents, and custom app logic can reason about products, prices, checkout sessions, subscriptions, refunds, and webhook processing.
+
+<Note>
+  InsForge does not decide what a successful payment means for your app. Use the payment projection tables to update your own app tables, such as `orders`, `credits`, `team_entitlements`, or `billing_status`.
+</Note>
+
+## Technology Stack
+
+```mermaid
+graph TB
+    Dashboard[InsForge Dashboard] --> API[Payments API]
+    CLI[InsForge CLI / Agents] --> API
+    App[Your App Frontend] --> SDK[InsForge SDK]
+    SDK --> Runtime[Runtime Payment Routes]
+
+    API --> SecretStore[Secret Store]
+    API --> Stripe[Stripe API]
+    Runtime --> Stripe
+
+    Stripe --> Webhook[Stripe Webhook]
+    Webhook --> Projection[Payment Projection Services]
+
+    Projection --> DB[(PostgreSQL payments schema)]
+    API --> DB
+    Runtime --> DB
+
+    DB --> CustomLogic[App-specific triggers or jobs]
+    CustomLogic --> AppTables[(Your app tables)]
+    AppTables --> App
+
+    style Dashboard fill:#1e293b,stroke:#475569,color:#e2e8f0
+    style CLI fill:#1e293b,stroke:#475569,color:#e2e8f0
+    style App fill:#1e293b,stroke:#475569,color:#e2e8f0
+    style SDK fill:#1e40af,stroke:#3b82f6,color:#dbeafe
+    style API fill:#166534,stroke:#22c55e,color:#dcfce7
+    style Runtime fill:#166534,stroke:#22c55e,color:#dcfce7
+    style SecretStore fill:#7c3aed,stroke:#a78bfa,color:#ede9fe
+    style Stripe fill:#635bff,stroke:#a5b4fc,color:#eef2ff
+    style Webhook fill:#635bff,stroke:#a5b4fc,color:#eef2ff
+    style Projection fill:#166534,stroke:#22c55e,color:#dcfce7
+    style DB fill:#0e7490,stroke:#06b6d4,color:#cffafe
+    style CustomLogic fill:#92400e,stroke:#f59e0b,color:#fef3c7
+    style AppTables fill:#0e7490,stroke:#06b6d4,color:#cffafe
+```
+
+## Core Model
+
+InsForge uses the developer-owned Stripe account model. Each project can configure:
+
+| Environment | Secret key | Purpose |
+|-------------|------------|---------|
+| `test` | `STRIPE_TEST_SECRET_KEY` | Development and agent implementation |
+| `live` | `STRIPE_LIVE_SECRET_KEY` | Production payments |
+
+Test and live are independent targets. Every mirrored payment table stores an `environment` column instead of using separate test/live table sets.
+
+<Warning>
+  Agents should default to Stripe test mode while building. Only target `live` after the developer explicitly approves production Stripe changes.
+</Warning>
+
+## Configuration Flow
+
+Configure Stripe from the dashboard Payments settings, or through the CLI:
+
+```bash
+npx @insforge/cli payments status
+npx @insforge/cli payments config set test sk_test_xxx
+npx @insforge/cli payments config set live sk_live_xxx
+npx @insforge/cli payments sync
+```
+
+See [Payments CLI](/core-concepts/payments/cli) for the full admin and agent command workflow.
+
+When a key is configured, InsForge validates it against Stripe, records the Stripe account identity, stores the secret in the InsForge secret store, best-effort configures the managed webhook, and syncs Stripe state when the account changes.
+
+If the backend URL is not publicly accessible, Stripe webhook creation can fail while key configuration still succeeds. Retry webhook setup after deploying to a public URL:
+
+```bash
+npx @insforge/cli payments webhooks configure test
+npx @insforge/cli payments webhooks configure live
+```
+
+## Catalog Management
+
+Products and prices are managed in Stripe first, then mirrored into InsForge.
+
+```bash
+npx @insforge/cli payments products create \
+  --environment test \
+  --name "Pro Plan" \
+  --description "Monthly access" \
+  --idempotency-key "product:pro"
+
+npx @insforge/cli payments prices create \
+  --environment test \
+  --product prod_123 \
+  --currency usd \
+  --unit-amount 1900 \
+  --interval month \
+  --idempotency-key "price:pro:monthly"
+```
+
+Stripe prices are immutable for amount, currency, and recurring cadence. To change those fields, create a new price and archive the old one.
+
+## Data Model
+
+The `payments` schema stores Stripe connection metadata, catalog mirrors, checkout attempts, subscriptions, payment history, and webhook processing state.
+
+| Table | Purpose |
+|-------|---------|
+| `payments.stripe_connections` | One row per environment with Stripe account, key, webhook, and sync status |
+| `payments.products` | Mirrored Stripe products |
+| `payments.prices` | Mirrored Stripe prices |
+| `payments.checkout_sessions` | Local Checkout Session attempts created by app frontends |
+| `payments.customer_portal_sessions` | Local Billing Portal Session attempts |
+| `payments.stripe_customer_mappings` | Maps app billing subjects to Stripe customers |
+| `payments.subscriptions` | Mirrored Stripe subscription state |
+| `payments.subscription_items` | Mirrored subscription item and price state |
+| `payments.payment_history` | One-time payments, subscription invoices, failed payments, and refunds |
+| `payments.webhook_events` | Stripe webhook deduplication and processing status |
+
+### Billing Subjects
+
+A billing subject is the app-defined owner of a customer or subscription:
+
+```json
+{ "type": "team", "id": "team_123" }
+```
+
+The subject can represent a user, team, organization, workspace, tenant, group, or any other app-specific billing owner. InsForge stores this as `subject_type` and `subject_id`; your app decides what those values mean.
+
+## Runtime Checkout Flow
+
+Use the TypeScript SDK from your app frontend:
+
+```typescript
+const { data, error } = await insforge.payments.createCheckoutSession({
+  environment: 'test',
+  mode: 'payment',
+  lineItems: [{ stripePriceId: 'price_123', quantity: 1 }],
+  successUrl: `${window.location.origin}/checkout/success`,
+  cancelUrl: `${window.location.origin}/pricing`,
+  customerEmail: user?.email ?? null,
+  metadata: { order_id: orderId },
+  idempotencyKey: `order:${orderId}`
+});
+
+if (error) throw error;
+if (data?.checkoutSession.url) {
+  window.location.assign(data.checkoutSession.url);
+}
+```
+
+Checkout creation works in two steps:
+
+1. InsForge inserts a row in `payments.checkout_sessions` using the caller's role and JWT context.
+2. InsForge creates the Stripe Checkout Session. If Stripe succeeds, the local row becomes `open` and stores the Stripe URL.
+
+For one-time checkout, `subject` is optional. For subscription checkout, `subject` is required because ongoing access belongs to an app-defined billing owner.
+
+```typescript
+await insforge.payments.createCheckoutSession({
+  environment: 'test',
+  mode: 'subscription',
+  subject: { type: 'team', id: teamId },
+  lineItems: [{ stripePriceId: 'price_monthly_123', quantity: 1 }],
+  successUrl: `${window.location.origin}/billing/success`,
+  cancelUrl: `${window.location.origin}/billing`,
+  customerEmail: user.email,
+  idempotencyKey: `team:${teamId}:pro-monthly`
+});
+```
+
+<Warning>
+  Success URLs are for user experience only. Do not fulfill orders, grant credits, or activate subscriptions from the success page. Use webhook-projected payment state instead.
+</Warning>
+
+## Customer Portal Flow
+
+Use Stripe Billing Portal when customers need to manage subscriptions, invoices, payment methods, or cancellation.
+
+```typescript
+const { data, error } = await insforge.payments.createCustomerPortalSession({
+  environment: 'test',
+  subject: { type: 'team', id: teamId },
+  returnUrl: `${window.location.origin}/billing`
+});
+
+if (error) throw error;
+if (data?.customerPortalSession.url) {
+  window.location.assign(data.customerPortalSession.url);
+}
+```
+
+Portal creation requires an authenticated user and an existing `payments.stripe_customer_mappings` row for the subject. That mapping is usually created after a Checkout Session completes and Stripe returns a customer.
+
+## Webhook Projection Flow
+
+Managed Stripe webhooks update InsForge's payment projections. The webhook handler verifies Stripe signatures, deduplicates events, and records processing state in `payments.webhook_events`.
+
+InsForge listens for events that keep checkout, subscriptions, payment history, and refunds current:
+
+| Event family | Examples | Projection |
+|--------------|----------|------------|
+| Checkout | `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.expired` | `checkout_sessions`, customer mappings, one-time payment history |
+| Invoices | `invoice.paid`, `invoice.payment_failed` | subscription invoice payment history |
+| PaymentIntents | `payment_intent.succeeded`, `payment_intent.payment_failed` | payment history |
+| Refunds | `charge.refunded`, `refund.created`, `refund.updated`, `refund.failed` | refund rows and original payment refund status |
+| Subscriptions | `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted` | subscriptions and subscription items |
+
+Webhook delivery can be duplicated or out of order. InsForge processing is idempotent, and your custom fulfillment logic should be idempotent too.
+
+## Custom Fulfillment Logic
+
+InsForge cannot know what a successful payment means for every app. Your agent should create app-specific tables, triggers, or jobs based on your product model.
+
+Typical app-owned tables include:
+
+| Use case | App-owned table |
+|----------|-----------------|
+| Ecommerce orders | `public.orders` |
+| Credit packs | `public.credit_ledger` |
+| Paid content | `public.user_entitlements` |
+| Team subscriptions | `public.team_billing_status` |
+| Async side effects | `public.fulfillment_jobs` |
+
+### One-Time Checkout Example
+
+Create your order before Checkout, pass the order id in Checkout metadata, then fulfill from webhook-projected payment history.
+
+```sql
+CREATE OR REPLACE FUNCTION public.fulfill_paid_order()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.type <> 'one_time_payment' OR NEW.status <> 'succeeded' THEN
+    RETURN NEW;
+  END IF;
+
+  WITH checkout_order AS (
+    SELECT (cs.metadata->>'order_id')::uuid AS order_id
+    FROM payments.checkout_sessions AS cs
+    WHERE cs.stripe_checkout_session_id = NEW.stripe_checkout_session_id
+      AND cs.metadata->>'order_id' ~* '^[0-9a-f-]{8}-[0-9a-f-]{4}-[0-9a-f-]{4}-[0-9a-f-]{4}-[0-9a-f-]{12}$'
+  )
+  UPDATE public.orders AS o
+  SET
+    status = 'paid',
+    paid_at = COALESCE(NEW.paid_at, NOW()),
+    stripe_payment_intent_id = NEW.stripe_payment_intent_id,
+    updated_at = NOW()
+  FROM checkout_order
+  WHERE o.id = checkout_order.order_id
+    AND o.status <> 'paid';
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER fulfill_paid_order
+AFTER INSERT OR UPDATE OF status
+ON payments.payment_history
+FOR EACH ROW
+EXECUTE FUNCTION public.fulfill_paid_order();
+```
+
+### Subscription Entitlement Example
+
+For subscriptions, update an app-owned entitlement or billing status table from `payments.subscriptions`.
+
+```sql
+CREATE OR REPLACE FUNCTION public.sync_team_billing_status()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.subject_type <> 'team'
+     OR NEW.subject_id IS NULL
+     OR NEW.subject_id !~* '^[0-9a-f-]{8}-[0-9a-f-]{4}-[0-9a-f-]{4}-[0-9a-f-]{4}-[0-9a-f-]{12}$' THEN
+    RETURN NEW;
+  END IF;
+
+  INSERT INTO public.team_billing_status (
+    team_id,
+    stripe_subscription_id,
+    status,
+    current_period_end,
+    updated_at
+  )
+  VALUES (
+    NEW.subject_id::uuid,
+    NEW.stripe_subscription_id,
+    NEW.status,
+    NEW.current_period_end,
+    NOW()
+  )
+  ON CONFLICT (team_id) DO UPDATE SET
+    stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+    status = EXCLUDED.status,
+    current_period_end = EXCLUDED.current_period_end,
+    updated_at = NOW();
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER sync_team_billing_status
+AFTER INSERT OR UPDATE OF status, current_period_end, cancel_at_period_end
+ON payments.subscriptions
+FOR EACH ROW
+EXECUTE FUNCTION public.sync_team_billing_status();
+```
+
+<Warning>
+  Do not call external APIs directly from database triggers. For emails, shipping, webhooks, or other side effects, insert a row into an app-owned outbox table and process it from an edge function or background worker.
+</Warning>
+
+## Session Authorization and RLS
+
+The runtime payment routes insert into `payments.checkout_sessions` and `payments.customer_portal_sessions` using the caller context. By default, the migration grants insert/select access for these session tables so apps can start quickly.
+
+If users can pass a `subject`, add app-specific RLS policies before shipping subscription checkout or portal UI. For example, if subscriptions belong to teams, only team members should be able to create checkout or portal sessions for that team.
+
+```sql
+ALTER TABLE payments.checkout_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE payments.customer_portal_sessions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "team members create checkout sessions"
+ON payments.checkout_sessions
+FOR INSERT
+TO authenticated
+WITH CHECK (
+  subject_type = 'team'
+  AND EXISTS (
+    SELECT 1
+    FROM public.team_members tm
+    WHERE tm.team_id = subject_id::uuid
+      AND tm.user_id = auth.uid()
+  )
+);
+
+CREATE POLICY "team members create portal sessions"
+ON payments.customer_portal_sessions
+FOR INSERT
+TO authenticated
+WITH CHECK (
+  subject_type = 'team'
+  AND EXISTS (
+    SELECT 1
+    FROM public.team_members tm
+    WHERE tm.team_id = subject_id::uuid
+      AND tm.user_id = auth.uid()
+  )
+);
+```
+
+Adjust table names, casts, and membership checks to match your app schema.
+
+## Runtime Payment State
+
+The frontend SDK currently exposes creation flows only:
+
+- `insforge.payments.createCheckoutSession(...)`
+- `insforge.payments.createCustomerPortalSession(...)`
+
+Admin payment projections such as `payments.subscriptions` and `payments.payment_history` are not a generic end-user read surface. If your app needs users to see subscription status, order status, credits, or entitlements, create app-owned tables with RLS and populate them from payment projections.
+
+## Local Development
+
+Stripe requires webhook endpoints to be publicly accessible. Localhost backend URLs cannot be registered as Stripe webhook endpoints from the dashboard or CLI.
+
+For local testing:
+
+1. Configure the Stripe test key.
+2. Build checkout with `environment: 'test'`.
+3. Use the Stripe CLI to forward events to your local backend webhook endpoint.
+4. Confirm your app-owned fulfillment tables update from webhook-projected payment state.
+
+## Current Limitations
+
+<Note>
+  Payments private preview intentionally starts with a small, stable surface.
+</Note>
+
+| Limitation | Details |
+|------------|---------|
+| Developer-owned Stripe accounts only | Connected Accounts, claimable sandboxes, and platform-managed onboarding are not part of this phase |
+| No test-to-live publishing | Agents explicitly target `test` or `live` environments |
+| No generic end-user read API | Build app-owned read models with RLS for entitlements and billing status |
+| No full Stripe object mirror | Customers, invoices, charges, payment methods, and checkout line-item projections are intentionally limited |
+| No default business fulfillment | Agents generate custom triggers/jobs based on your app schema |
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Start in Test Mode" icon="flask">
+    Build and verify checkout with Stripe test keys before touching live data.
+  </Card>
+
+  <Card title="Use Idempotency Keys" icon="fingerprint">
+    Use stable keys for product, price, and checkout creation to avoid duplicates during retries.
+  </Card>
+
+  <Card title="Fulfill from Webhooks" icon="webhook">
+    Use payment projection tables, not success redirects, to grant access or mark orders paid.
+  </Card>
+
+  <Card title="Own Your App State" icon="table">
+    Store user-facing status in app-owned tables with RLS.
+  </Card>
+
+  <Card title="Protect Billing Subjects" icon="shield-check">
+    Add RLS before exposing team, organization, or subscription management flows.
+  </Card>
+
+  <Card title="Keep Secrets Server-Side" icon="key">
+    Never put Stripe secret keys in frontend code or public deployment variables.
+  </Card>
+</CardGroup>
+
+## Related Pages
+
+<CardGroup cols={2}>
+  <Card title="Payments CLI" icon="terminal" href="/core-concepts/payments/cli">
+    Configure Stripe keys, sync catalog state, manage products and prices, and inspect projections
+  </Card>
+
+  <Card title="TypeScript" icon="js" href="/sdks/typescript/payments">
+    Create Checkout Sessions and Billing Portal Sessions from web applications
+  </Card>
+</CardGroup>

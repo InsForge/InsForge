@@ -193,13 +193,13 @@ This phase does not mirror full Stripe customers, invoices, charges, payment met
 
 This phase does not define default app-specific RLS policies for payment history, subscriptions, customer mappings, or customer portal sessions. Agents should generate policies based on the developer's app schema.
 
-## CLI, SDK, Docs, and OpenAPI Follow-Ups
+## CLI, SDK, Docs, and OpenAPI Surfaces
 
 CLI and SDK work should expose the runtime route pair first: create Checkout Session and create Customer Portal Session. These are the APIs generated apps need to collect money and let customers manage subscriptions.
 
 Admin SDK and CLI work should then expose key configuration, status, unified sync, webhook configuration, catalog reads, product CRUD, price CRUD, subscription reads, and payment history reads.
 
-OpenAPI should document the current `/api/payments` and `/api/webhooks/stripe/:environment` surfaces from the shared schemas, including environment targeting and the distinction between runtime routes and admin routes.
+OpenAPI documents the current `/api/payments` and `/api/webhooks/stripe/:environment` surfaces in `openapi/payments.yaml`, including environment targeting and the distinction between runtime routes and admin routes.
 
 Agent docs should focus on workflows:
 
