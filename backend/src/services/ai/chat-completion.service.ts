@@ -11,6 +11,8 @@ import type {
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import { ChatCompletionOptions } from '@/types/ai.js';
+import { AppError } from '@/api/middlewares/error.js';
+import { ERROR_CODES } from '@/types/error-constants.js';
 
 // OpenRouter plugin type for web search
 interface OpenRouterWebPlugin {
@@ -94,7 +96,11 @@ export class ChatCompletionService {
       // Handle tool response messages
       if (msg.role === 'tool') {
         if (!msg.tool_call_id) {
-          throw new Error('Tool message is missing required tool_call_id');
+          throw new AppError(
+            'Tool message is missing required tool_call_id',
+            400,
+            ERROR_CODES.INVALID_INPUT
+          );
         }
         formattedMessages.push({
           role: 'tool',
@@ -153,8 +159,10 @@ export class ChatCompletionService {
     const actualModelId = this.buildModelId(modelId, thinking);
     const aiConfig = await this.aiConfigService.findByModelId(actualModelId);
     if (!aiConfig) {
-      throw new Error(
-        `Model ${actualModelId} is not enabled. Please contact your administrator to enable this model.`
+      throw new AppError(
+        `Model ${actualModelId} is not enabled. Please contact your administrator to enable this model.`,
+        400,
+        ERROR_CODES.AI_INVALID_MODEL
       );
     }
     return aiConfig;
@@ -357,8 +365,10 @@ export class ChatCompletionService {
       };
     } catch (error) {
       logger.error('Chat error', { error });
-      throw new Error(
-        `Failed to get response: ${error instanceof Error ? error.message : String(error)}`
+      throw new AppError(
+        `Failed to get response: ${error instanceof Error ? error.message : String(error)}`,
+        500,
+        ERROR_CODES.AI_UPSTREAM_UNAVAILABLE
       );
     }
   }
@@ -497,8 +507,10 @@ export class ChatCompletionService {
       }
     } catch (error) {
       logger.error('Streaming error', { error });
-      throw new Error(
-        `Failed to stream response: ${error instanceof Error ? error.message : String(error)}`
+      throw new AppError(
+        `Failed to stream response: ${error instanceof Error ? error.message : String(error)}`,
+        500,
+        ERROR_CODES.AI_UPSTREAM_UNAVAILABLE
       );
     }
   }

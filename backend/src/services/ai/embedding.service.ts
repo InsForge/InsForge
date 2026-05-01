@@ -3,6 +3,8 @@ import type { EmbeddingsRequest, EmbeddingsResponse } from '@insforge/shared-sch
 import logger from '@/utils/logger.js';
 import { AIConfigService } from './ai-config.service.js';
 import { AIUsageService } from './ai-usage.service.js';
+import { AppError } from '@/api/middlewares/error.js';
+import { ERROR_CODES } from '@/types/error-constants.js';
 
 export class EmbeddingService {
   private static instance: EmbeddingService;
@@ -85,8 +87,10 @@ export class EmbeddingService {
         error: error instanceof Error ? error.message : String(error),
         model: options.model,
       });
-      throw new Error(
-        `Failed to generate embeddings: ${error instanceof Error ? error.message : String(error)}`
+      throw new AppError(
+        `Failed to generate embeddings: ${error instanceof Error ? error.message : String(error)}`,
+        500,
+        ERROR_CODES.AI_UPSTREAM_UNAVAILABLE
       );
     }
   }

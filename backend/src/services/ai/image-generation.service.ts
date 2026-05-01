@@ -10,6 +10,8 @@ import type {
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import { OpenRouterImageMessage } from '@/types/ai.js';
+import { AppError } from '@/api/middlewares/error.js';
+import { ERROR_CODES } from '@/types/error-constants.js';
 
 export class ImageGenerationService {
   private static aiUsageService = AIUsageService.getInstance();
@@ -24,8 +26,10 @@ export class ImageGenerationService {
   ): Promise<AIConfigurationSchema | null> {
     const aiConfig = await ImageGenerationService.aiConfigService.findByModelId(modelId);
     if (!aiConfig) {
-      throw new Error(
-        `Model ${modelId} is not enabled. Please contact your administrator to enable this model.`
+      throw new AppError(
+        `Model ${modelId} is not enabled. Please contact your administrator to enable this model.`,
+        400,
+        ERROR_CODES.AI_INVALID_MODEL
       );
     }
     return aiConfig;
@@ -146,8 +150,10 @@ export class ImageGenerationService {
       return result;
     } catch (error) {
       logger.error('Image generation error', { error });
-      throw new Error(
-        `Failed to generate image: ${error instanceof Error ? error.message : String(error)}`
+      throw new AppError(
+        `Failed to generate image: ${error instanceof Error ? error.message : String(error)}`,
+        500,
+        ERROR_CODES.AI_UPSTREAM_UNAVAILABLE
       );
     }
   }
