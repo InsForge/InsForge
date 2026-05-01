@@ -149,6 +149,9 @@ export class ImageGenerationService {
 
       return result;
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       logger.error('Image generation error', { error });
       throw new AppError(
         `Failed to generate image: ${error instanceof Error ? error.message : String(error)}`,

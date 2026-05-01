@@ -83,6 +83,9 @@ export class EmbeddingService {
         },
       };
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       logger.warn('Embedding error', {
         error: error instanceof Error ? error.message : String(error),
         model: options.model,

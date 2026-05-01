@@ -364,6 +364,9 @@ export class ChatCompletionService {
         },
       };
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       logger.error('Chat error', { error });
       throw new AppError(
         `Failed to get response: ${error instanceof Error ? error.message : String(error)}`,
@@ -506,6 +509,9 @@ export class ChatCompletionService {
         );
       }
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       logger.error('Streaming error', { error });
       throw new AppError(
         `Failed to stream response: ${error instanceof Error ? error.message : String(error)}`,
