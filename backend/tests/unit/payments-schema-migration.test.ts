@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
-const migrationFile = '038_create-payments-schema.sql';
+const migrationFile = '039_create-payments-schema.sql';
 const migrationPath = path.resolve(
   currentDir,
   `../../src/infra/database/migrations/${migrationFile}`
