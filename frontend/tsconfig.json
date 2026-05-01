@@ -15,7 +15,6 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "baseUrl": ".",
     "paths": {
       "@insforge/dashboard": ["../packages/dashboard/src"],
       "@insforge/shared-schemas": ["../packages/shared-schemas/src"],

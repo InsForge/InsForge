@@ -4,7 +4,7 @@
     "module": "ES2022",
     "lib": ["ES2022"],
     "outDir": "../dist",
-    "baseUrl": ".",
+    "rootDir": "..",
     "paths": {
       "@/*": ["./src/*"],
       "@insforge/shared-schemas": ["../packages/shared-schemas/src/index.ts"]
@@ -13,7 +13,7 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
     "types": ["node","vitest" ]

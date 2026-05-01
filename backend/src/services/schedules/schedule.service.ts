@@ -1,7 +1,7 @@
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import logger from '@/utils/logger.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
-import { ERROR_CODES } from '@/types/error-constants';
+import { ERROR_CODES } from '@/types/error-constants.js';
 import { AppError } from '@/api/middlewares/error.js';
 import {
   type CreateScheduleRequest,
