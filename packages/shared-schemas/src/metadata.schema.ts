@@ -48,11 +48,21 @@ export const realtimeMetadataSchema = z.object({
   permissions: realtimePermissionsResponseSchema,
 });
 
+// Compute services availability. The dashboard uses `enabled` to hide the
+// Compute sidebar item entirely when neither a Fly token (self-host) nor
+// cloud-proxy creds (PROJECT_ID + CLOUD_API_HOST + JWT_SECRET) are set —
+// rather than letting users click into a page that returns 503 on every
+// request.
+export const computeMetadataSchema = z.object({
+  enabled: z.boolean(),
+});
+
 export const appMetaDataSchema = z.object({
   auth: authMetadataSchema,
   database: databaseMetadataSchema,
   storage: storageMetadataSchema,
   aiIntegration: aiMetadataSchema.optional(),
+  compute: computeMetadataSchema.optional(),
   functions: z.array(edgeFunctionMetadataSchema),
   realtime: realtimeMetadataSchema.optional(),
   version: z.string().optional(),
@@ -65,6 +75,7 @@ export type StorageMetadataSchema = z.infer<typeof storageMetadataSchema>;
 export type EdgeFunctionMetadataSchema = z.infer<typeof edgeFunctionMetadataSchema>;
 export type AIMetadataSchema = z.infer<typeof aiMetadataSchema>;
 export type RealtimeMetadataSchema = z.infer<typeof realtimeMetadataSchema>;
+export type ComputeMetadataSchema = z.infer<typeof computeMetadataSchema>;
 export type AppMetadataSchema = z.infer<typeof appMetaDataSchema>;
 
 // Database connection schemas

@@ -174,6 +174,15 @@ function rewrapCloudError(error: unknown, defaultMessage: string): AppError {
   );
 }
 
+// Cheap availability probe used by the metadata route to gate the dashboard
+// sidebar. Mirrors the precedence in `selectComputeProvider` but never
+// throws — neither path configured returns false instead of an AppError.
+export function isComputeConfigured(): boolean {
+  return (
+    FlyProvider.getInstance().isConfigured() || CloudComputeProvider.getInstance().isConfigured()
+  );
+}
+
 export function selectComputeProvider(): ComputeProvider {
   // Self-host takes precedence: if FLY_API_TOKEN is set, the user has their own
   // Fly account and wants direct control. Otherwise fall through to cloud-proxy

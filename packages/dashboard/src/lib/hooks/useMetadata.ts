@@ -24,6 +24,7 @@ export function useMetadata(options?: UseMetadataOptions) {
     auth: metadata?.auth,
     tables: metadata?.database.tables,
     storage: metadata?.storage,
+    compute: metadata?.compute,
     version: metadata?.version || 'Unknown',
     isLoading,
     error,

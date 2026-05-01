@@ -1083,3 +1083,47 @@ describe('selectComputeProvider factory', () => {
     expect(() => selectComputeProvider()).toThrow(/COMPUTE_NOT_CONFIGURED|not configured/);
   });
 });
+
+describe('isComputeConfigured probe', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.doUnmock('@/providers/compute/fly.provider.js');
+    vi.doUnmock('@/providers/compute/cloud.provider.js');
+  });
+
+  it('returns true when FLY_API_TOKEN is set', async () => {
+    vi.doMock('@/infra/config/app.config.js', () => ({
+      config: {
+        fly: { apiToken: 'tok', org: 'o', enabled: true, domain: 'd' },
+        cloud: { projectId: 'local', apiHost: '' },
+        app: { jwtSecret: 'x' },
+      },
+    }));
+    const { isComputeConfigured } = await import('@/services/compute/services.service.js');
+    expect(isComputeConfigured()).toBe(true);
+  });
+
+  it('returns true when only cloud-proxy creds are set', async () => {
+    vi.doMock('@/infra/config/app.config.js', () => ({
+      config: {
+        fly: { apiToken: '', org: '', enabled: false, domain: '' },
+        cloud: { projectId: 'p', apiHost: 'https://x' },
+        app: { jwtSecret: 'x' },
+      },
+    }));
+    const { isComputeConfigured } = await import('@/services/compute/services.service.js');
+    expect(isComputeConfigured()).toBe(true);
+  });
+
+  it('returns false when neither path is configured (does not throw)', async () => {
+    vi.doMock('@/infra/config/app.config.js', () => ({
+      config: {
+        fly: { apiToken: '', org: '', enabled: false, domain: '' },
+        cloud: { projectId: 'local', apiHost: '' },
+        app: { jwtSecret: 'x' },
+      },
+    }));
+    const { isComputeConfigured } = await import('@/services/compute/services.service.js');
+    expect(isComputeConfigured()).toBe(false);
+  });
+});

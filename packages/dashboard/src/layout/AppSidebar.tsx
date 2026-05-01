@@ -14,6 +14,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insfo
 import { ProjectSettingsMenuDialog } from '../features/dashboard/components';
 import { getFeatureFlag } from '../lib/analytics/posthog';
 import { useDashboardHost } from '../lib/config/DashboardHostContext';
+import { useMetadata } from '../lib/hooks/useMetadata';
 
 interface AppSidebarProps extends React.HTMLAttributes<HTMLElement> {
   isCollapsed: boolean;
@@ -28,11 +29,19 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
   const host = useDashboardHost();
   const isDTest = getFeatureFlag('dashboard-v4-experiment') === 'd_test';
   const isDTestCloud = isDTest && host.mode === 'cloud-hosting';
+  const { compute } = useMetadata();
+  // Treat as enabled until metadata loads to avoid a flash of the item
+  // appearing then disappearing on the first render. The metadata route is
+  // hit early in the dashboard's bootstrap so the window is small.
+  const isComputeEnabled = compute?.enabled ?? true;
 
   // Insert deployments after Model Gateway for cloud projects. Compute
   // already terminates the section, so deployments doesn't need sectionEnd.
+  // When compute is disabled (no Fly token / no cloud-proxy creds), hide
+  // the item entirely and shift sectionEnd onto the preceding item so the
+  // section divider stays correct.
   const mainMenuItems = useMemo(() => {
-    const items = dashboardStaticMenuItems.map((item) => ({ ...item }));
+    let items = dashboardStaticMenuItems.map((item) => ({ ...item }));
 
     if (isCloud) {
       const aiItemIndex = items.findIndex((item) => item.id === 'ai');
@@ -40,14 +49,24 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
 
       if (aiItemIndex >= 0) {
         items.splice(aiItemIndex + 1, 0, deploymentsItem);
-        return items;
+      } else {
+        items = [...items, deploymentsItem];
       }
+    }
 
-      return [...items, deploymentsItem];
+    if (!isComputeEnabled) {
+      const computeIndex = items.findIndex((item) => item.id === 'compute');
+      if (computeIndex >= 0) {
+        const computeItem = items[computeIndex];
+        items.splice(computeIndex, 1);
+        if (computeItem.sectionEnd && computeIndex > 0) {
+          items[computeIndex - 1] = { ...items[computeIndex - 1], sectionEnd: true };
+        }
+      }
     }
 
     return items;
-  }, [isCloud]);
+  }, [isCloud, isComputeEnabled]);
 
   // d_test + cloud-hosting prepends Install + Doc above Settings in the
   // bottom nav. Other shells just show Settings.

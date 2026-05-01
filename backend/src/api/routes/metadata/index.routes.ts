@@ -13,6 +13,7 @@ import type { AppMetadataSchema, ProjectIdResponse } from '@insforge/shared-sche
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { CloudDatabaseProvider } from '@/providers/database/cloud.provider.js';
+import { isComputeConfigured } from '@/services/compute/services.service.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
@@ -48,6 +49,7 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
       storage,
       functions,
       aiIntegration: aiConfig,
+      compute: { enabled: isComputeConfigured() },
       version,
     };
 
