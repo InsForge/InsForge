@@ -210,7 +210,7 @@ Before exposing subscription checkout or customer portal UI, add app-specific RL
 
 The Payments SDK does not expose generic end-user reads for `payments.subscriptions` or `payments.payment_history`. Those tables are admin projections.
 
-For user-facing billing state, create app-owned tables with RLS:
+For user-facing billing state, create app-owned tables with RLS and populate them from payment projection triggers:
 
 - `public.orders`
 - `public.credit_ledger`
@@ -218,6 +218,42 @@ For user-facing billing state, create app-owned tables with RLS:
 - `public.team_billing_status`
 
 Populate those tables from webhook-projected payment state. See [Payments Architecture](/core-concepts/payments/architecture#custom-fulfillment-logic) for examples.
+
+<Warning>
+  Do not mark an order paid, grant credits, or activate a subscription from the success URL alone. Stripe recommends webhooks for reliable fulfillment because customers might complete payment without returning to your app.
+</Warning>
+
+### Frontend Pattern for One-Time Orders
+
+For one-time purchases, create an app-owned pending order before Checkout and pass that order ID as metadata:
+
+```typescript
+const { data: order, error: orderError } = await insforge
+  .from('orders')
+  .insert([{ user_id: user.id, status: 'pending' }])
+  .select()
+  .single();
+
+if (orderError) throw orderError;
+
+const { data, error } = await insforge.payments.createCheckoutSession({
+  environment: 'test',
+  mode: 'payment',
+  lineItems: [{ stripePriceId: 'price_123', quantity: 1 }],
+  successUrl: `${window.location.origin}/orders/${order.id}`,
+  cancelUrl: `${window.location.origin}/pricing`,
+  customerEmail: user.email,
+  metadata: { order_id: order.id },
+  idempotencyKey: `order:${order.id}`
+});
+
+if (error) throw error;
+if (data?.checkoutSession.url) {
+  window.location.assign(data.checkoutSession.url);
+}
+```
+
+Then add a database trigger that listens to `payments.payment_history` and updates `public.orders` when the matching row becomes `type = 'one_time_payment'` and `status = 'succeeded'`. The success page can read the order and show `pending`, `paid`, or `fulfilled`.
 
 ## Live/Test Environment
 

@@ -223,9 +223,29 @@ InsForge listens for events that keep checkout, subscriptions, payment history, 
 
 Webhook delivery can be duplicated or out of order. InsForge processing is idempotent, and your custom fulfillment logic should be idempotent too.
 
+Stripe's own guidance is the same: use webhooks for fulfillment, make fulfillment safe to run multiple times, don't depend on event ordering, and return quickly from webhook handlers. See Stripe's [Checkout fulfillment guide](https://docs.stripe.com/checkout/fulfillment) and [webhook best practices](https://docs.stripe.com/webhooks#best-practices).
+
 ## Custom Fulfillment Logic
 
-InsForge cannot know what a successful payment means for every app. Your agent should create app-specific tables, triggers, or jobs based on your product model.
+InsForge cannot know what a successful payment means for every app. Your agent should create app-specific tables, triggers, or jobs based on your product model. Treat the `payments` schema as an internal projection layer, then copy the business result into your own public tables with RLS.
+
+For example, a SaaS app might turn a paid subscription into `public.team_billing_status`, while a marketplace might turn a one-time payment into `public.orders.status = 'paid'`. The frontend should read those app-owned tables, not the admin payment projection tables.
+
+If the frontend needs to be notified immediately, publish or subscribe from the app-owned table. For example, use Realtime on `public.orders` after the fulfillment trigger marks the order `paid`. Avoid subscribing end users directly to `payments.payment_history`.
+
+### Which Table Should Trigger Business Logic?
+
+Use the most final payment projection available for the job:
+
+| Business need | Recommended source | Why |
+|---------------|--------------------|-----|
+| Mark a one-time order paid | `payments.payment_history` where `type = 'one_time_payment'` and `status = 'succeeded'` | Handles webhook confirmation and delayed payment methods |
+| Apply refunds or reduce credits | `payments.payment_history` refund rows, or original rows with `amount_refunded` | Refunds can arrive separately from the original payment |
+| Activate or revoke subscription access | `payments.subscriptions` status and period fields | Captures subscription lifecycle changes, renewals, cancellations, and sync repair |
+| Record invoice/payment ledger entries | `payments.payment_history` where `type = 'subscription_invoice'` | Captures paid and failed recurring invoices |
+| Track local checkout attempts | `payments.checkout_sessions` | Useful for metadata, idempotency, and debugging, but not the final fulfillment signal |
+
+Do not fulfill directly from `payments.checkout_sessions.status = 'completed'`. Checkout completion is not always the same as money being available, especially with delayed payment methods. Use `payment_history.status = 'succeeded'` for one-time payment fulfillment and `subscriptions.status` for subscription access.
 
 Typical app-owned tables include:
 
@@ -237,11 +257,30 @@ Typical app-owned tables include:
 | Team subscriptions | `public.team_billing_status` |
 | Async side effects | `public.fulfillment_jobs` |
 
-### One-Time Checkout Example
+### One-Time Checkout Fulfillment Example
 
-Create your order before Checkout, pass the order id in Checkout metadata, then fulfill from webhook-projected payment history.
+Create your order before Checkout, pass the order ID in Checkout metadata, then fulfill from webhook-projected payment history. The trigger below is intentionally idempotent: repeated webhook deliveries or manual sync repairs update the same order and do not double-fulfill it.
 
 ```sql
+CREATE TABLE IF NOT EXISTS public.orders (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id),
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'paid', 'fulfilled', 'canceled', 'refunded')),
+  stripe_checkout_session_id TEXT,
+  stripe_payment_intent_id TEXT,
+  paid_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "users read own orders"
+ON public.orders
+FOR SELECT
+TO authenticated
+USING (user_id = auth.uid());
+
 CREATE OR REPLACE FUNCTION public.fulfill_paid_order()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -259,11 +298,12 @@ BEGIN
   SET
     status = 'paid',
     paid_at = COALESCE(NEW.paid_at, NOW()),
+    stripe_checkout_session_id = NEW.stripe_checkout_session_id,
     stripe_payment_intent_id = NEW.stripe_payment_intent_id,
     updated_at = NOW()
   FROM checkout_order
   WHERE o.id = checkout_order.order_id
-    AND o.status <> 'paid';
+    AND o.status = 'pending';
 
   RETURN NEW;
 END;
@@ -275,6 +315,34 @@ ON payments.payment_history
 FOR EACH ROW
 EXECUTE FUNCTION public.fulfill_paid_order();
 ```
+
+Frontend checkout code should create the pending order first and include the order ID in metadata:
+
+```typescript
+const { data: order } = await insforge
+  .from('orders')
+  .insert([{ user_id: user.id, status: 'pending' }])
+  .select()
+  .single();
+
+const { data, error } = await insforge.payments.createCheckoutSession({
+  environment: 'test',
+  mode: 'payment',
+  lineItems: [{ stripePriceId: 'price_123', quantity: 1 }],
+  successUrl: `${window.location.origin}/orders/${order.id}`,
+  cancelUrl: `${window.location.origin}/pricing`,
+  customerEmail: user.email,
+  metadata: { order_id: order.id },
+  idempotencyKey: `order:${order.id}`
+});
+
+if (error) throw error;
+if (data?.checkoutSession.url) window.location.assign(data.checkoutSession.url);
+```
+
+<Warning>
+  The success page may show "processing" and poll the app-owned `orders` row, but it should not mark the order paid by itself. Stripe explicitly recommends webhooks because customers are not guaranteed to reach the success page after payment.
+</Warning>
 
 ### Subscription Entitlement Example
 
@@ -321,9 +389,24 @@ FOR EACH ROW
 EXECUTE FUNCTION public.sync_team_billing_status();
 ```
 
+In most SaaS apps, treat `active` and `trialing` as access-granting states, and treat `canceled`, `unpaid`, and `incomplete_expired` as access-revoking states. Stripe also recommends handling `past_due` deliberately: you might keep access during retry windows, show a billing warning, or restrict premium features based on your product policy.
+
 <Warning>
   Do not call external APIs directly from database triggers. For emails, shipping, webhooks, or other side effects, insert a row into an app-owned outbox table and process it from an edge function or background worker.
 </Warning>
+
+### Agent Fulfillment Checklist
+
+When an agent integrates Payments into an app, it should:
+
+1. Identify the app's billing owner: user, team, organization, tenant, or anonymous order.
+2. Create app-owned read models such as `orders`, `credit_ledger`, or `team_billing_status`.
+3. Add RLS to app-owned tables before exposing them in the frontend.
+4. Add RLS to `payments.checkout_sessions` and `payments.customer_portal_sessions` when users can pass a `subject`.
+5. Add idempotent triggers from `payments.payment_history` or `payments.subscriptions` into the app-owned tables.
+6. Use app-owned table updates or Realtime messages to notify the frontend.
+7. Use outbox rows or edge functions for emails, shipping, analytics, or other external side effects.
+8. Test with Stripe test mode, including success, failed payment, delayed payment, renewal, cancellation, and refund paths.
 
 ## Session Authorization and RLS
 
