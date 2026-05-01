@@ -60,6 +60,7 @@ export function BackendAdvisorSection() {
   );
   const { pageSize, pageSizeOptions, onPageSizeChange } = usePageSize('advisor-issues');
   const [currentPage, setCurrentPage] = useState(1);
+  const [expandedIssueId, setExpandedIssueId] = useState<string | null>(null);
 
   const allSeveritiesSelected = selectedSeverities.size === ALL_SEVERITIES.length;
   const noSeveritiesSelected = selectedSeverities.size === 0;
@@ -75,6 +76,11 @@ export function BackendAdvisorSection() {
   useEffect(() => {
     setCurrentPage(1);
   }, [tab, pageSize, selectedSeverities]);
+
+  // Collapse any expanded item when filters or page change so the visible row set stays in sync.
+  useEffect(() => {
+    setExpandedIssueId(null);
+  }, [tab, pageSize, selectedSeverities, currentPage]);
 
   const issuesQuery = useMemo(
     () => ({
@@ -303,7 +309,14 @@ export function BackendAdvisorSection() {
           ) : visibleIssues.length > 0 ? (
             <div className="flex flex-col">
               {visibleIssues.map((issue) => (
-                <AdvisoryItem key={issue.id} issue={issue} />
+                <AdvisoryItem
+                  key={issue.id}
+                  issue={issue}
+                  expanded={expandedIssueId === issue.id}
+                  onToggle={() =>
+                    setExpandedIssueId((current) => (current === issue.id ? null : issue.id))
+                  }
+                />
               ))}
             </div>
           ) : (
