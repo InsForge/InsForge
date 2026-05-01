@@ -362,18 +362,27 @@ export class FunctionService {
     }
 
     const dangerousPatterns = [
-      /Deno\.run/i,
-      /Deno\.spawn/i,
-      /Deno\.Command/i,
-      /child_process/i,
-      /process\.exit/i,
-      /require\(['"]fs['"]\)/i,
+      /globalThis/i,
+      /\bself\b/i,
+      /\bprocess\b/i,
+      /Deno\.(run|spawn|Command|makeTemp|remove|write|chmod|chown)/i,
+      /import\b/i,
+      /require\b/i,
+      /eval\b/i,
+      /\bFunction\s*\(/, // Case-sensitive: Block constructor but allow 'function' keyword
+
+      /constructor\b/i,
+      /\bDeno\s*\[|\bprocess\s*\[|\bglobalThis\s*\[/i, // Block bracket notation property access like obj['Deno']
     ];
 
     for (const pattern of dangerousPatterns) {
       if (pattern.test(code)) {
+        logger.warn('Dangerous code pattern blocked', {
+          pattern: pattern.toString(),
+          codeLength: code.length,
+        });
         throw new AppError(
-          `Code contains potentially dangerous pattern: ${pattern.toString()}`,
+          'Code contains a potentially dangerous pattern.',
           400,
           ERROR_CODES.INVALID_INPUT
         );
