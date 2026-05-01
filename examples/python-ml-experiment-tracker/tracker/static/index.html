@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ML Experiment Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --navy: #1e293b;
+      --navy-text: #f8fafc;
+      --surface: #f1f5f9;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --accent: #3b82f6;
+      --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+           background: var(--surface); color: var(--text); font-size: 14px; line-height: 1.5; }
+
+    /* ── Navbar ── */
+    nav {
+      background: var(--navy); color: var(--navy-text);
+      padding: 0 1.5rem; height: 56px;
+      display: flex; align-items: center; justify-content: space-between;
+      box-shadow: 0 1px 4px rgba(0,0,0,.2);
+      position: sticky; top: 0; z-index: 10;
+    }
+    .nav-title { font-size: 1rem; font-weight: 600; letter-spacing: .01em;
+                 display: flex; align-items: center; gap: .5rem; }
+    .nav-title svg { opacity: .8; }
+    .nav-right { display: flex; align-items: center; gap: 1rem; }
+    #last-refreshed { font-size: .75rem; opacity: .6; }
+    #toggle-refresh {
+      font-size: .75rem; font-weight: 600; padding: .3rem .75rem;
+      border: 1px solid rgba(255,255,255,.35); border-radius: 6px;
+      background: transparent; color: var(--navy-text); cursor: pointer;
+      transition: background .15s;
+    }
+    #toggle-refresh:hover { background: rgba(255,255,255,.1); }
+    #toggle-refresh.off { opacity: .55; }
+
+    /* ── Main layout ── */
+    main { max-width: 1280px; margin: 0 auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
+
+    /* ── Error banner ── */
+    #error-banner {
+      padding: .875rem 1rem; border-radius: 8px; font-size: .875rem;
+      display: flex; align-items: flex-start; gap: .625rem;
+    }
+    #error-banner[hidden] { display: none; }
+    #error-banner[data-type="auth"]    { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+    #error-banner[data-type="connect"] { background: #ffedd5; color: #9a3412; border: 1px solid #fed7aa; }
+    #error-banner[data-type="generic"] { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+    #error-banner .banner-icon { font-size: 1rem; flex-shrink: 0; }
+    #error-banner code { font-family: monospace; background: rgba(0,0,0,.06);
+                         padding: .1em .35em; border-radius: 3px; }
+
+    /* ── Controls row ── */
+    #controls { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+    #experiment-filter {
+      padding: .45rem .75rem; border: 1px solid var(--border); border-radius: 6px;
+      background: var(--card); font-size: .875rem; color: var(--text);
+      cursor: pointer; min-width: 220px;
+    }
+    #run-count { font-size: .8rem; color: var(--muted); }
+
+    /* ── Card ── */
+    .card { background: var(--card); border-radius: 10px; border: 1px solid var(--border);
+            box-shadow: var(--shadow); overflow: hidden; }
+    .card-header { padding: .875rem 1.25rem; border-bottom: 1px solid var(--border);
+                   display: flex; align-items: center; justify-content: space-between; }
+    .card-header h2 { font-size: .9rem; font-weight: 600; }
+    .card-header .subtitle { font-size: .75rem; color: var(--muted); }
+
+    /* ── Loading spinner ── */
+    #loading-indicator { display: flex; justify-content: center; padding: 2rem; }
+    .spinner {
+      width: 28px; height: 28px; border-radius: 50%;
+      border: 3px solid var(--border); border-top-color: var(--accent);
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Table ── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      text-align: left; padding: .625rem 1rem;
+      background: var(--surface); color: var(--muted);
+      font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
+      border-bottom: 1px solid var(--border); white-space: nowrap;
+    }
+    td {
+      padding: .6rem 1rem; border-bottom: 1px solid var(--border);
+      vertical-align: top; max-width: 260px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    td.wrap { white-space: normal; word-break: break-word; }
+    tr:last-child td { border-bottom: none; }
+    tbody tr:hover td { background: #f8fafc; }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-block; padding: .2rem .55rem; border-radius: 9999px;
+      font-size: .7rem; font-weight: 700; letter-spacing: .02em;
+    }
+    .badge-completed { background: #dcfce7; color: #15803d; }
+    .badge-running   { background: #dbeafe; color: #1d4ed8; }
+    .badge-failed    { background: #fee2e2; color: #b91c1c; }
+    .badge-default   { background: #f1f5f9; color: #475569; }
+
+    /* ── Empty state ── */
+    #empty-state { padding: 3rem 1rem; text-align: center; color: var(--muted); font-size: .875rem; }
+
+    /* ── Chart ── */
+    #chart-section canvas { padding: 1rem 1.25rem 1.25rem; max-height: 320px; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-title">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+    </svg>
+    ML Experiment Tracker
+  </div>
+  <div class="nav-right">
+    <span id="last-refreshed"></span>
+    <button id="toggle-refresh">Auto-Refresh: ON</button>
+  </div>
+</nav>
+
+<main>
+  <div id="error-banner" hidden data-type="generic">
+    <span class="banner-icon">⚠</span>
+    <span id="error-message"></span>
+  </div>
+
+  <div id="controls">
+    <select id="experiment-filter">
+      <option value="">All Experiments</option>
+    </select>
+    <span id="run-count"></span>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h2>Runs</h2></div>
+    <div id="loading-indicator"><div class="spinner"></div></div>
+    <div class="table-wrap">
+      <table id="runs-table" hidden>
+        <thead>
+          <tr>
+            <th>Experiment</th>
+            <th>Run Name</th>
+            <th>Status</th>
+            <th>Params</th>
+            <th>Metrics</th>
+            <th>Started At</th>
+          </tr>
+        </thead>
+        <tbody id="runs-tbody"></tbody>
+      </table>
+    </div>
+    <p id="empty-state" hidden>No runs found.</p>
+  </div>
+
+  <div id="chart-section" class="card" hidden>
+    <div class="card-header">
+      <h2>Metrics Over Time</h2>
+      <span class="subtitle" id="chart-subtitle"></span>
+    </div>
+    <canvas id="metrics-chart"></canvas>
+  </div>
+</main>
+
+<script>
+  // ── State ──────────────────────────────────────────────────────────────
+  let allRuns        = [];
+  let allExperiments = [];
+  let filteredRuns   = [];
+  let selectedExperiment = '';
+  let autoRefresh    = true;
+  let refreshTimer   = null;
+  let chartInstance  = null;
+
+  // ── DOM refs ───────────────────────────────────────────────────────────
+  const errorBanner      = document.getElementById('error-banner');
+  const errorMessage     = document.getElementById('error-message');
+  const loadingIndicator = document.getElementById('loading-indicator');
+  const runsTable        = document.getElementById('runs-table');
+  const runsTbody        = document.getElementById('runs-tbody');
+  const emptyState       = document.getElementById('empty-state');
+  const chartSection     = document.getElementById('chart-section');
+  const chartSubtitle    = document.getElementById('chart-subtitle');
+  const experimentFilter = document.getElementById('experiment-filter');
+  const runCount         = document.getElementById('run-count');
+  const lastRefreshed    = document.getElementById('last-refreshed');
+  const toggleBtn        = document.getElementById('toggle-refresh');
+
+  // ── Utilities ──────────────────────────────────────────────────────────
+  function formatKV(obj) {
+    const entries = Object.entries(obj || {});
+    if (!entries.length) return '—';
+    return entries.map(([k, v]) => {
+      const formatted = typeof v === 'number'
+        ? (Number.isInteger(v) ? v : v.toFixed(4))
+        : v;
+      return `${k}: ${formatted}`;
+    }).join(', ');
+  }
+
+  function badgeClass(status) {
+    const map = { completed: 'badge-completed', running: 'badge-running', failed: 'badge-failed' };
+    return map[status] || 'badge-default';
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleString(undefined, {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit',
+    });
+  }
+
+  function showError(type, msg) {
+    errorBanner.dataset.type = type;
+    errorMessage.innerHTML = msg;
+    errorBanner.hidden = false;
+  }
+
+  function hideError() { errorBanner.hidden = true; }
+
+  // ── Data fetching ──────────────────────────────────────────────────────
+  async function fetchData() {
+    loadingIndicator.hidden = false;
+    hideError();
+
+    let runsResp, expsResp;
+    try {
+      [runsResp, expsResp] = await Promise.all([
+        fetch('/api/database/records/runs?limit=100&order=created_at.desc'),
+        fetch('/api/database/records/experiments?limit=50&order=created_at.desc'),
+      ]);
+    } catch (e) {
+      loadingIndicator.hidden = true;
+      showError('connect', 'Cannot reach the local proxy server. Is <code>tracker serve</code> still running?');
+      return;
+    }
+
+    if (runsResp.status === 401 || expsResp.status === 401) {
+      loadingIndicator.hidden = true;
+      showError('auth', 'Not logged in. Run <code>tracker login</code> in your terminal, then reload.');
+      return;
+    }
+    if (runsResp.status === 502 || expsResp.status === 502) {
+      loadingIndicator.hidden = true;
+      const body = await runsResp.json().catch(() => ({}));
+      showError('connect', body.message || 'Cannot connect to InsForge. Is it running?');
+      return;
+    }
+    if (!runsResp.ok || !expsResp.ok) {
+      loadingIndicator.hidden = true;
+      const body = await (runsResp.ok ? expsResp : runsResp).json().catch(() => ({}));
+      showError('generic', body.message || `Unexpected error (${runsResp.status})`);
+      return;
+    }
+
+    allRuns        = await runsResp.json();
+    allExperiments = await expsResp.json();
+
+    loadingIndicator.hidden = true;
+    lastRefreshed.textContent = 'Updated ' + new Date().toLocaleTimeString();
+
+    populateExperimentFilter();
+    applyFilter();
+  }
+
+  // ── Experiment filter ──────────────────────────────────────────────────
+  function populateExperimentFilter() {
+    const prev = selectedExperiment;
+    experimentFilter.innerHTML = '<option value="">All Experiments</option>';
+    const sorted = [...allExperiments].sort((a, b) => a.name.localeCompare(b.name));
+    sorted.forEach(exp => {
+      const opt = document.createElement('option');
+      opt.value = exp.name;
+      opt.textContent = exp.name;
+      experimentFilter.appendChild(opt);
+    });
+    // Restore previous selection if it still exists
+    if (prev && sorted.some(e => e.name === prev)) {
+      experimentFilter.value = prev;
+    } else {
+      selectedExperiment = '';
+      experimentFilter.value = '';
+    }
+  }
+
+  function applyFilter() {
+    filteredRuns = selectedExperiment
+      ? allRuns.filter(r => r.experiment_name === selectedExperiment)
+      : allRuns;
+    runCount.textContent = `Showing ${filteredRuns.length} run${filteredRuns.length !== 1 ? 's' : ''}`;
+    renderTable(filteredRuns);
+    renderChart(filteredRuns);
+  }
+
+  // ── Table rendering ────────────────────────────────────────────────────
+  function renderTable(runs) {
+    runsTbody.innerHTML = '';
+    if (!runs.length) {
+      runsTable.hidden = true;
+      emptyState.hidden = false;
+      return;
+    }
+    emptyState.hidden = true;
+    runsTable.hidden = false;
+
+    runs.forEach(run => {
+      const tr = document.createElement('tr');
+
+      const paramsStr = formatKV(run.params);
+      const metricsStr = formatKV(run.metrics);
+
+      tr.innerHTML = `
+        <td title="${esc(run.experiment_name)}">${esc(run.experiment_name)}</td>
+        <td title="${esc(run.run_name || '—')}">${esc(run.run_name || '—')}</td>
+        <td><span class="badge ${badgeClass(run.status)}">${esc(run.status)}</span></td>
+        <td class="wrap" title="${esc(paramsStr)}">${esc(paramsStr)}</td>
+        <td class="wrap" title="${esc(metricsStr)}">${esc(metricsStr)}</td>
+        <td>${fmtDate(run.started_at)}</td>
+      `;
+      runsTbody.appendChild(tr);
+    });
+  }
+
+  function esc(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // ── Chart rendering ────────────────────────────────────────────────────
+  function renderChart(runs) {
+    const eligible = runs
+      .filter(r => r.metrics && 'accuracy' in r.metrics && 'loss' in r.metrics)
+      .sort((a, b) => new Date(a.started_at) - new Date(b.started_at));
+
+    if (!selectedExperiment || eligible.length < 2) {
+      chartSection.hidden = true;
+      if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+      return;
+    }
+
+    chartSection.hidden = false;
+    chartSubtitle.textContent = `${eligible.length} runs · ${selectedExperiment}`;
+
+    const labels   = eligible.map(r => r.run_name || r.id.slice(0, 8));
+    const accuracy = eligible.map(r => r.metrics.accuracy);
+    const loss     = eligible.map(r => r.metrics.loss);
+
+    if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+
+    try {
+      chartInstance = new Chart(document.getElementById('metrics-chart'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Accuracy',
+              data: accuracy,
+              borderColor: '#3b82f6',
+              backgroundColor: 'rgba(59,130,246,.08)',
+              yAxisID: 'yAcc',
+              tension: 0.3,
+              pointRadius: 4,
+              pointHoverRadius: 6,
+            },
+            {
+              label: 'Loss',
+              data: loss,
+              borderColor: '#ef4444',
+              backgroundColor: 'rgba(239,68,68,.08)',
+              yAxisID: 'yLoss',
+              tension: 0.3,
+              pointRadius: 4,
+              pointHoverRadius: 6,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { position: 'top' },
+            tooltip: { usePointStyle: true },
+          },
+          scales: {
+            yAcc: {
+              type: 'linear',
+              position: 'left',
+              title: { display: true, text: 'Accuracy', color: '#3b82f6' },
+              grid: { color: 'rgba(0,0,0,.05)' },
+            },
+            yLoss: {
+              type: 'linear',
+              position: 'right',
+              title: { display: true, text: 'Loss', color: '#ef4444' },
+              grid: { drawOnChartArea: false },
+            },
+          },
+        },
+      });
+    } catch (_) {
+      chartSection.hidden = true;
+    }
+  }
+
+  // ── Auto-refresh ───────────────────────────────────────────────────────
+  function toggleAutoRefresh() {
+    autoRefresh = !autoRefresh;
+    if (autoRefresh) {
+      refreshTimer = setInterval(fetchData, 30000);
+      toggleBtn.textContent = 'Auto-Refresh: ON';
+      toggleBtn.classList.remove('off');
+    } else {
+      clearInterval(refreshTimer);
+      refreshTimer = null;
+      toggleBtn.textContent = 'Auto-Refresh: OFF';
+      toggleBtn.classList.add('off');
+    }
+  }
+
+  // ── Init ───────────────────────────────────────────────────────────────
+  experimentFilter.addEventListener('change', e => {
+    selectedExperiment = e.target.value;
+    applyFilter();
+  });
+  toggleBtn.addEventListener('click', toggleAutoRefresh);
+
+  fetchData();
+  refreshTimer = setInterval(fetchData, 30000);
+</script>
+</body>
+</html>
