@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@insforge/ui';
 import { usePosthogConnection } from './hooks/usePosthogConnection';
-import { onPosthogConnectionStatus, requestPosthogConnect } from './lib/postMessage';
+import { onPosthogConnectionStatus } from './lib/postMessage';
 import { EmptyConnectPanel } from './components/posthog/EmptyConnectPanel';
 import { ConnectStatusBar } from './components/posthog/ConnectStatusBar';
 import { ApiKeyCard } from './components/posthog/ApiKeyCard';
@@ -20,7 +20,6 @@ export function AnalyticsPage() {
   const qc = useQueryClient();
   const conn = usePosthogConnection();
   const [disconnecting, setDisconnecting] = useState(false);
-  const cliAutoTriggeredRef = useRef(false);
 
   useEffect(() => {
     return onPosthogConnectionStatus((e) => {
@@ -29,28 +28,6 @@ export function AnalyticsPage() {
       }
     });
   }, [qc]);
-
-  // CLI handoff: when `insforge posthog setup` opens this page with
-  // ?action=connect (and there is no existing connection), auto-fire the same
-  // postMessage the Connect button would send. Cloud-shell BroadcastListener
-  // forwards it to /integrations/posthog/start.
-  useEffect(() => {
-    if (cliAutoTriggeredRef.current || conn.isLoading || conn.data || !projectId) {
-      return;
-    }
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('action') !== 'connect') {
-      return;
-    }
-    cliAutoTriggeredRef.current = true;
-    requestPosthogConnect(projectId);
-    params.delete('action');
-    const remaining = params.toString();
-    const cleaned = remaining
-      ? `${window.location.pathname}?${remaining}`
-      : window.location.pathname;
-    window.history.replaceState({}, '', cleaned);
-  }, [conn.isLoading, conn.data, projectId]);
 
   if (conn.isLoading) {
     return <div className="p-6">Loading…</div>;
