@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@insforge/ui';
-import { posthogApi } from '../../services/posthog.api';
+import { posthogApi } from '#features/analytics/services/posthog.api';
 
 export function DisconnectDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const qc = useQueryClient();

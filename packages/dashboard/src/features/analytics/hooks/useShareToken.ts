@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { posthogApi } from '../services/posthog.api';
+import { posthogApi } from '#features/analytics/services/posthog.api';
 
 /** Lazy: only fetches when `enabled` flips true (e.g. modal opens). */
 export function useShareToken(recordingId: string | null, enabled: boolean) {

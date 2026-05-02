@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useRecordings } from '../../hooks/useRecordings';
-import { formatDuration, formatRelativeTime, truncateId } from '../../lib/format';
+import { useRecordings } from '#features/analytics/hooks/useRecordings';
+import { formatDuration, formatRelativeTime, truncateId } from '#features/analytics/lib/format';
 import { ReplayModal } from './ReplayModal';
 
 export function RecentReplaysCard({ enabled }: { enabled: boolean }) {

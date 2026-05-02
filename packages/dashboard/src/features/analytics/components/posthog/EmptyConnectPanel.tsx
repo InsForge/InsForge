@@ -1,5 +1,5 @@
 import { Button } from '@insforge/ui';
-import { requestPosthogConnect } from '../../lib/postMessage';
+import { requestPosthogConnect } from '#features/analytics/lib/postMessage';
 
 export function EmptyConnectPanel({ projectId }: { projectId: string }) {
   return (

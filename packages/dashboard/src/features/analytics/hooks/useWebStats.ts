@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import type { PosthogTimeframe } from '@insforge/shared-schemas';
-import { posthogApi, type Breakdown } from '../services/posthog.api';
+import { posthogApi, type Breakdown } from '#features/analytics/services/posthog.api';
 
 export function useWebStats(breakdown: Breakdown, timeframe: PosthogTimeframe, enabled: boolean) {
   return useQuery({

@@ -13,7 +13,7 @@ import { KpiSectionWithTrend } from './components/posthog/KpiSectionWithTrend';
 import { BreakdownPanel } from './components/posthog/BreakdownPanel';
 import { RetentionCard } from './components/posthog/RetentionCard';
 import { RecentReplaysCard } from './components/posthog/RecentReplaysCard';
-import { useProjectId } from '../../lib/hooks/useMetadata';
+import { useProjectId } from '#lib/hooks/useMetadata';
 
 export function AnalyticsPage() {
   const { projectId } = useProjectId();

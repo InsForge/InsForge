@@ -1,7 +1,7 @@
-import { useTimeframe } from '../../context/TimeRangeContext';
-import { useWebStats } from '../../hooks/useWebStats';
-import { type Breakdown } from '../../services/posthog.api';
-import { flagEmoji, countryName, formatNumber } from '../../lib/format';
+import { useTimeframe } from '#features/analytics/context/TimeRangeContext';
+import { useWebStats } from '#features/analytics/hooks/useWebStats';
+import { type Breakdown } from '#features/analytics/services/posthog.api';
+import { flagEmoji, countryName, formatNumber } from '#features/analytics/lib/format';
 
 interface Props {
   breakdown: Breakdown;

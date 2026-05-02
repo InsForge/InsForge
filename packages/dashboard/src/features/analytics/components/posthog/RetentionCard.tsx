@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import { useRetention } from '../../hooks/useRetention';
-import { formatNumber } from '../../lib/format';
+import { useRetention } from '#features/analytics/hooks/useRetention';
+import { formatNumber } from '#features/analytics/lib/format';
 
 interface Cell {
   pct: number | null;

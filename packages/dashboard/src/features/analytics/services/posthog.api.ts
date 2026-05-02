@@ -9,7 +9,7 @@ import type {
   PosthogRecordingsResponse,
   PosthogShareTokenResponse,
 } from '@insforge/shared-schemas';
-import { apiClient } from '../../../lib/api/client';
+import { apiClient } from '#lib/api/client';
 
 export type Breakdown = 'Page' | 'Country' | 'DeviceType';
 export type TrendMetric = 'visitors' | 'views' | 'bounce_rate';

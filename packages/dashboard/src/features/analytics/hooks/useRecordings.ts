@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { posthogApi } from '../services/posthog.api';
+import { posthogApi } from '#features/analytics/services/posthog.api';
 
 export function useRecordings(limit: number, enabled: boolean) {
   return useQuery({

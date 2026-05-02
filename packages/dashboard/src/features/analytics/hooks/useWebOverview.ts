@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import type { PosthogTimeframe } from '@insforge/shared-schemas';
-import { posthogApi } from '../services/posthog.api';
+import { posthogApi } from '#features/analytics/services/posthog.api';
 
 export function useWebOverview(timeframe: PosthogTimeframe, enabled: boolean) {
   return useQuery({

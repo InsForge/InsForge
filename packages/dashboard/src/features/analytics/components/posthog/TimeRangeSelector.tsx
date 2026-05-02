@@ -7,7 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@insforge/ui';
-import { useTimeframe, useSetTimeframe } from '../../context/TimeRangeContext';
+import { useTimeframe, useSetTimeframe } from '#features/analytics/context/TimeRangeContext';
 
 const OPTIONS: Array<{ value: PosthogTimeframe; label: string }> = [
   { value: '24h', label: 'Last 24 hours' },

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import type { PosthogTimeframe } from '@insforge/shared-schemas';
-import { posthogApi, type TrendMetric } from '../services/posthog.api';
+import { posthogApi, type TrendMetric } from '#features/analytics/services/posthog.api';
 
 export function useTrend(metric: TrendMetric, timeframe: PosthogTimeframe, enabled: boolean) {
   return useQuery({
