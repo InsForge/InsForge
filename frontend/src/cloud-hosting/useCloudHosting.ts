@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import type {
   DashboardBackup,
   DashboardBackupInfo,
@@ -103,7 +103,16 @@ function normalizeOrigin(value: string): string | null {
 }
 
 function isInsForgeOrigin(origin: string): boolean {
-  return origin === INSFORGE_ROOT_ORIGIN || origin.endsWith(INSFORGE_SUBDOMAIN_SUFFIX);
+  try {
+    const url = new URL(origin);
+    return (
+      url.protocol === 'https:' &&
+      (url.origin === INSFORGE_ROOT_ORIGIN ||
+        (url.port === '' && url.hostname.endsWith(INSFORGE_SUBDOMAIN_SUFFIX)))
+    );
+  } catch {
+    return false;
+  }
 }
 
 async function isTrustedCloudOrigin(origin: string): Promise<boolean> {
@@ -118,6 +127,42 @@ async function isTrustedCloudOrigin(origin: string): Promise<boolean> {
 
   const partnerOrigins = await partnerService.fetchPartnerOrigins();
   return partnerOrigins.has(normalizedOrigin);
+}
+
+async function establishTrustedOrigin(
+  candidateOrigin: string | null,
+  originRef: MutableRefObject<string | null>,
+  trustedRef: MutableRefObject<boolean>
+): Promise<string | null> {
+  const normalizedOrigin = candidateOrigin ? normalizeOrigin(candidateOrigin) : null;
+  if (!normalizedOrigin) {
+    return null;
+  }
+
+  const expectedOrigin = originRef.current;
+  if (expectedOrigin && normalizedOrigin !== expectedOrigin) {
+    return null;
+  }
+
+  if (trustedRef.current) {
+    return originRef.current === normalizedOrigin ? normalizedOrigin : null;
+  }
+
+  if (!(await isTrustedCloudOrigin(normalizedOrigin))) {
+    return null;
+  }
+
+  if (trustedRef.current) {
+    return originRef.current === normalizedOrigin ? normalizedOrigin : null;
+  }
+
+  if (originRef.current && originRef.current !== normalizedOrigin) {
+    return null;
+  }
+
+  originRef.current = normalizedOrigin;
+  trustedRef.current = true;
+  return normalizedOrigin;
 }
 
 function getParentWindow(): Window | null {
@@ -343,15 +388,38 @@ export function useCloudHosting() {
     [clearPendingRequest]
   );
 
-  const postMessageToParent = useCallback((message: CloudHostingMessage): boolean => {
-    const parentWindow = getParentWindow();
-    if (!parentWindow || !parentOriginRef.current) {
-      return false;
-    }
+  const ensureTrustedParentOrigin = useCallback(
+    () =>
+      establishTrustedOrigin(
+        parentOriginRef.current ?? getParentOrigin(),
+        parentOriginRef,
+        parentOriginTrustedRef
+      ),
+    []
+  );
 
-    parentWindow.postMessage(message, parentOriginRef.current);
-    return true;
-  }, []);
+  const postMessageToParent = useCallback(
+    async (message: CloudHostingMessage): Promise<boolean> => {
+      const parentOrigin = await ensureTrustedParentOrigin();
+      const parentWindow = getParentWindow();
+      if (!parentWindow || !parentOrigin) {
+        return false;
+      }
+
+      parentWindow.postMessage(message, parentOrigin);
+      return true;
+    },
+    [ensureTrustedParentOrigin]
+  );
+
+  const sendMessageToParent = useCallback(
+    async (message: CloudHostingMessage, errorMessage: string): Promise<void> => {
+      if (!(await postMessageToParent(message))) {
+        throw new Error(errorMessage);
+      }
+    },
+    [postMessageToParent]
+  );
 
   const createPendingRequest = useCallback(
     <K extends PendingRequestKey>(
@@ -394,30 +462,22 @@ export function useCloudHosting() {
         }
 
         if (isParentMessage) {
-          if (parentOriginRef.current && event.origin !== parentOriginRef.current) {
+          const trustedOrigin = await establishTrustedOrigin(
+            event.origin,
+            parentOriginRef,
+            parentOriginTrustedRef
+          );
+          if (!trustedOrigin) {
             return;
-          }
-
-          if (!parentOriginTrustedRef.current) {
-            const isTrustedOrigin = await isTrustedCloudOrigin(event.origin);
-            if (!isTrustedOrigin) {
-              return;
-            }
-            parentOriginRef.current = event.origin;
-            parentOriginTrustedRef.current = true;
           }
         } else {
-          if (openerOriginRef.current && event.origin !== openerOriginRef.current) {
+          const trustedOrigin = await establishTrustedOrigin(
+            event.origin,
+            openerOriginRef,
+            openerOriginTrustedRef
+          );
+          if (!trustedOrigin) {
             return;
-          }
-
-          if (!openerOriginTrustedRef.current) {
-            const isTrustedOrigin = await isTrustedCloudOrigin(event.origin);
-            if (!isTrustedOrigin) {
-              return;
-            }
-            openerOriginRef.current = event.origin;
-            openerOriginTrustedRef.current = true;
           }
         }
 
@@ -800,143 +860,147 @@ export function useCloudHosting() {
   const getAuthorizationCode = useCallback(async (): Promise<string> => {
     // Even if the send fails, keep the pending request open so a proactive parent or opener
     // message can still resolve it when the cloud hosting transport finishes initializing.
-    postMessageToParent({ type: 'REQUEST_AUTHORIZATION_CODE' });
+    void postMessageToParent({ type: 'REQUEST_AUTHORIZATION_CODE' });
 
     return createPendingRequest('authCode', 'Authorization code request');
   }, [createPendingRequest, postMessageToParent]);
 
   const requestBackupInfo = useCallback(async (): Promise<DashboardBackupInfo> => {
-    if (!postMessageToParent({ type: 'REQUEST_BACKUP_INFO' })) {
-      throw new Error('Unable to request backup information from the parent window');
-    }
-
+    await sendMessageToParent(
+      { type: 'REQUEST_BACKUP_INFO' },
+      'Unable to request backup information from the parent window'
+    );
     return createPendingRequest('backupInfo', 'Backup info request');
-  }, [createPendingRequest, postMessageToParent]);
+  }, [createPendingRequest, sendMessageToParent]);
 
   const createBackup = useCallback(
     async (name: string): Promise<void> => {
-      if (!postMessageToParent({ type: 'CREATE_BACKUP', name })) {
-        throw new Error('Unable to request a backup creation from the parent window');
-      }
-
+      await sendMessageToParent(
+        { type: 'CREATE_BACKUP', name },
+        'Unable to request a backup creation from the parent window'
+      );
       return createPendingRequest('createBackup', 'Backup creation');
     },
-    [createPendingRequest, postMessageToParent]
+    [createPendingRequest, sendMessageToParent]
   );
 
   const deleteBackup = useCallback(
     async (backupId: string): Promise<void> => {
-      if (!postMessageToParent({ type: 'DELETE_BACKUP', backupId })) {
-        throw new Error('Unable to request a backup deletion from the parent window');
-      }
-
+      await sendMessageToParent(
+        { type: 'DELETE_BACKUP', backupId },
+        'Unable to request a backup deletion from the parent window'
+      );
       return createPendingRequest('deleteBackup', 'Backup deletion');
     },
-    [createPendingRequest, postMessageToParent]
+    [createPendingRequest, sendMessageToParent]
   );
 
   const renameBackup = useCallback(
     async (backupId: string, name: string | null): Promise<void> => {
-      if (!postMessageToParent({ type: 'RENAME_BACKUP', backupId, name })) {
-        throw new Error('Unable to request a backup rename from the parent window');
-      }
-
+      await sendMessageToParent(
+        { type: 'RENAME_BACKUP', backupId, name },
+        'Unable to request a backup rename from the parent window'
+      );
       return createPendingRequest('renameBackup', 'Backup rename');
     },
-    [createPendingRequest, postMessageToParent]
+    [createPendingRequest, sendMessageToParent]
   );
 
   const restoreBackup = useCallback(
     async (backupId: string): Promise<void> => {
-      if (!postMessageToParent({ type: 'RESTORE_BACKUP', backupId })) {
-        throw new Error('Unable to request a backup restore from the parent window');
-      }
-
+      await sendMessageToParent(
+        { type: 'RESTORE_BACKUP', backupId },
+        'Unable to request a backup restore from the parent window'
+      );
       return createPendingRequest('restoreBackup', 'Backup restore');
     },
-    [createPendingRequest, postMessageToParent]
+    [createPendingRequest, sendMessageToParent]
   );
 
   const requestInstanceInfo = useCallback(async (): Promise<DashboardInstanceInfo> => {
-    if (!postMessageToParent({ type: 'REQUEST_INSTANCE_INFO' })) {
-      throw new Error('Unable to request instance information from the parent window');
-    }
-
+    await sendMessageToParent(
+      { type: 'REQUEST_INSTANCE_INFO' },
+      'Unable to request instance information from the parent window'
+    );
     return createPendingRequest('instanceInfo', 'Instance info request');
-  }, [createPendingRequest, postMessageToParent]);
+  }, [createPendingRequest, sendMessageToParent]);
 
   const requestInstanceTypeChange = useCallback(
     async (instanceType: string): Promise<InstanceTypeChangeResult> => {
-      if (!postMessageToParent({ type: 'REQUEST_INSTANCE_TYPE_CHANGE', instanceType })) {
-        throw new Error('Unable to request an instance type change from the parent window');
-      }
-
+      await sendMessageToParent(
+        { type: 'REQUEST_INSTANCE_TYPE_CHANGE', instanceType },
+        'Unable to request an instance type change from the parent window'
+      );
       return createPendingRequest('instanceTypeChange', 'Instance type change', {
         timeoutMs: INSTANCE_CHANGE_TIMEOUT_MS,
       });
     },
-    [createPendingRequest, postMessageToParent]
+    [createPendingRequest, sendMessageToParent]
   );
 
   const renameProject = useCallback(
     async (name: string): Promise<void> => {
-      if (!postMessageToParent({ type: 'UPDATE_PROJECT_NAME', name })) {
-        throw new Error('Unable to request a project rename from the parent window');
-      }
-
+      await sendMessageToParent(
+        { type: 'UPDATE_PROJECT_NAME', name },
+        'Unable to request a project rename from the parent window'
+      );
       return createPendingRequest('renameProject', 'Project rename');
     },
-    [createPendingRequest, postMessageToParent]
+    [createPendingRequest, sendMessageToParent]
   );
 
   const deleteProject = useCallback(async (): Promise<void> => {
-    if (!postMessageToParent({ type: 'DELETE_PROJECT' })) {
-      throw new Error('Unable to request project deletion from the parent window');
-    }
-
+    await sendMessageToParent(
+      { type: 'DELETE_PROJECT' },
+      'Unable to request project deletion from the parent window'
+    );
     return createPendingRequest('deleteProject', 'Project deletion');
-  }, [createPendingRequest, postMessageToParent]);
+  }, [createPendingRequest, sendMessageToParent]);
 
   const updateVersion = useCallback(async (): Promise<void> => {
-    if (!postMessageToParent({ type: 'UPDATE_PROJECT_VERSION' })) {
-      throw new Error('Unable to request a project version update from the parent window');
-    }
-
+    await sendMessageToParent(
+      { type: 'UPDATE_PROJECT_VERSION' },
+      'Unable to request a project version update from the parent window'
+    );
     return createPendingRequest('updateVersion', 'Project version update');
-  }, [createPendingRequest, postMessageToParent]);
+  }, [createPendingRequest, sendMessageToParent]);
 
   const requestUserInfo = useCallback(async (): Promise<DashboardUserInfo> => {
-    if (!postMessageToParent({ type: 'REQUEST_USER_INFO' })) {
-      throw new Error('Unable to request user info from the parent window');
-    }
+    await sendMessageToParent(
+      { type: 'REQUEST_USER_INFO' },
+      'Unable to request user info from the parent window'
+    );
     return createPendingRequest('userInfo', 'User info request');
-  }, [createPendingRequest, postMessageToParent]);
+  }, [createPendingRequest, sendMessageToParent]);
 
   const requestUserApiKey = useCallback(async (): Promise<string> => {
-    if (!postMessageToParent({ type: 'REQUEST_USER_API_KEY' })) {
-      throw new Error('Unable to request a user API key from the parent window');
-    }
+    await sendMessageToParent(
+      { type: 'REQUEST_USER_API_KEY' },
+      'Unable to request a user API key from the parent window'
+    );
     return createPendingRequest('userApiKey', 'User API key request');
-  }, [createPendingRequest, postMessageToParent]);
+  }, [createPendingRequest, sendMessageToParent]);
 
   const requestProjectMetrics = useCallback(
     async (range: DashboardMetricsRange): Promise<DashboardMetricsResponse> => {
-      if (!postMessageToParent({ type: 'REQUEST_PROJECT_METRICS', range })) {
-        throw new Error('Unable to request project metrics from the parent window');
-      }
+      await sendMessageToParent(
+        { type: 'REQUEST_PROJECT_METRICS', range },
+        'Unable to request project metrics from the parent window'
+      );
       return createPendingRequest('projectMetrics', 'Project metrics request', {
         supersede: true,
       });
     },
-    [createPendingRequest, postMessageToParent]
+    [createPendingRequest, sendMessageToParent]
   );
 
   const requestAdvisorLatest = useCallback(async (): Promise<DashboardAdvisorSummary> => {
-    if (!postMessageToParent({ type: 'REQUEST_ADVISOR_LATEST' })) {
-      throw new Error('Unable to request advisor summary from the parent window');
-    }
+    await sendMessageToParent(
+      { type: 'REQUEST_ADVISOR_LATEST' },
+      'Unable to request advisor summary from the parent window'
+    );
     return createPendingRequest('advisorLatest', 'Advisor latest request');
-  }, [createPendingRequest, postMessageToParent]);
+  }, [createPendingRequest, sendMessageToParent]);
 
   const advisorIssuesLockRef = useRef<Promise<unknown>>(Promise.resolve());
 
@@ -944,32 +1008,32 @@ export function useCloudHosting() {
     (query: DashboardAdvisorIssuesQuery): Promise<DashboardAdvisorIssuesResponse> => {
       const next = advisorIssuesLockRef.current
         .catch(() => undefined)
-        .then(() => {
-          if (
-            !postMessageToParent({
+        .then(async () => {
+          await sendMessageToParent(
+            {
               type: 'REQUEST_ADVISOR_ISSUES',
               severity: query.severity,
               category: query.category,
               limit: query.limit,
               offset: query.offset,
-            })
-          ) {
-            throw new Error('Unable to request advisor issues from the parent window');
-          }
+            },
+            'Unable to request advisor issues from the parent window'
+          );
           return createPendingRequest('advisorIssues', 'Advisor issues request');
         });
       advisorIssuesLockRef.current = next.catch(() => undefined);
       return next;
     },
-    [createPendingRequest, postMessageToParent]
+    [createPendingRequest, sendMessageToParent]
   );
 
   const triggerAdvisorScan = useCallback(async (): Promise<void> => {
-    if (!postMessageToParent({ type: 'TRIGGER_ADVISOR_SCAN' })) {
-      throw new Error('Unable to trigger advisor scan from the parent window');
-    }
+    await sendMessageToParent(
+      { type: 'TRIGGER_ADVISOR_SCAN' },
+      'Unable to trigger advisor scan from the parent window'
+    );
     return createPendingRequest('advisorScan', 'Advisor scan trigger');
-  }, [createPendingRequest, postMessageToParent]);
+  }, [createPendingRequest, sendMessageToParent]);
 
   const navigateToSubscription = useCallback(() => {
     void postMessageToParent({ type: 'NAVIGATE_TO_SUBSCRIPTION' });
