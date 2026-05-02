@@ -1,4 +1,4 @@
-import { apiClient } from '../../../lib/api/client';
+import { apiClient } from '#lib/api/client';
 import { StorageConfigSchema, UpdateStorageConfigRequest } from '@insforge/shared-schemas';
 
 /** Client-side service for interacting with the storage configuration API. */

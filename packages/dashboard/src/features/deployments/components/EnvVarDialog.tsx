@@ -2,13 +2,13 @@ import { useEffect, useMemo, useState, type ClipboardEvent } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button, Dialog, DialogContent, DialogDescription, DialogTitle, Input } from '@insforge/ui';
 import type { DeploymentEnvVar } from '@insforge/shared-schemas';
-import { useToast } from '../../../lib/hooks/useToast';
+import { useToast } from '#lib/hooks/useToast';
 import {
   createEnvVarDraft,
   normalizeEnvVarDrafts,
   parseDotEnvInput,
   type EnvVarDraft,
-} from '../helpers';
+} from '#features/deployments/helpers';
 
 type EnvVarSaveInput = {
   key: string;

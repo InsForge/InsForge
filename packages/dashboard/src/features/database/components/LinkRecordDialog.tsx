@@ -20,14 +20,14 @@ import {
   type DatabaseRecord,
   type ConvertedValue,
   type DataGridRowType,
-} from '../../../components';
-import { useTables } from '../hooks/useTables';
-import { useRecords } from '../hooks/useRecords';
-import { useUsers } from '../../auth/hooks/useUsers';
+} from '#components';
+import { useTables } from '#features/database/hooks/useTables';
+import { useRecords } from '#features/database/hooks/useRecords';
+import { useUsers } from '#features/auth/hooks/useUsers';
 import { convertSchemaToColumns } from './DatabaseDataGrid';
-import { formatValueForDisplay } from '../../../lib/utils/utils';
+import { formatValueForDisplay } from '#lib/utils/utils';
 import { ColumnType } from '@insforge/shared-schemas';
-import { AUTH_USERS_TABLE, authUsersSchema } from '../constants';
+import { AUTH_USERS_TABLE, authUsersSchema } from '#features/database/constants';
 
 const PAGE_SIZE = 50;
 

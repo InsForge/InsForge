@@ -9,14 +9,14 @@ import {
   PopoverTrigger,
   ConvertedValue,
   DataGrid,
-} from '../../../components';
-import { useTables } from '../hooks/useTables';
-import { useRecords } from '../hooks/useRecords';
+} from '#components';
+import { useTables } from '#features/database/hooks/useTables';
+import { useRecords } from '#features/database/hooks/useRecords';
 import { convertSchemaToColumns } from './DatabaseDataGrid';
-import { formatValueForDisplay } from '../../../lib/utils/utils';
+import { formatValueForDisplay } from '#lib/utils/utils';
 import { useQuery } from '@tanstack/react-query';
-import { useUsers } from '../../auth/hooks/useUsers';
-import { AUTH_USERS_TABLE, authUsersSchema } from '../constants';
+import { useUsers } from '#features/auth/hooks/useUsers';
+import { AUTH_USERS_TABLE, authUsersSchema } from '#features/database/constants';
 
 const POPOVER_WIDTH = 520;
 

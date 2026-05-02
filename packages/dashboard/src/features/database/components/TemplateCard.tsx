@@ -1,5 +1,5 @@
 import { Table2 } from 'lucide-react';
-import { DatabaseTemplate } from '../templates';
+import { DatabaseTemplate } from '#features/database/templates';
 
 interface TemplateCardProps {
   template: DatabaseTemplate;

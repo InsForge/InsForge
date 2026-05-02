@@ -1,11 +1,11 @@
 import { useRef, useState } from 'react';
 import { Button, ConfirmDialog, Input } from '@insforge/ui';
-import { Skeleton, TableHeader } from '../../../components';
-import { SecretRow } from '../components/SecretRow';
-import SecretEmptyState from '../components/SecretEmptyState';
-import { useSecrets } from '../hooks/useSecrets';
-import { parseEnvAssignment } from '../utils/secretPaste';
-import { useSmartPaste } from '../../../lib/hooks/useSmartPaste';
+import { Skeleton, TableHeader } from '#components';
+import { SecretRow } from '#features/functions/components/SecretRow';
+import SecretEmptyState from '#features/functions/components/SecretEmptyState';
+import { useSecrets } from '#features/functions/hooks/useSecrets';
+import { parseEnvAssignment } from '#features/functions/utils/secretPaste';
+import { useSmartPaste } from '#lib/hooks/useSmartPaste';
 
 export default function SecretsPage() {
   const [newSecretKey, setNewSecretKey] = useState('');

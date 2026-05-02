@@ -1,6 +1,6 @@
 import { CopyButton } from '@insforge/ui';
-import { useProjectId } from '../../../../lib/hooks/useMetadata';
-import { cn } from '../../../../lib/utils/utils';
+import { useProjectId } from '#lib/hooks/useMetadata';
+import { cn } from '#lib/utils/utils';
 
 interface CLISectionV2Props {
   className?: string;

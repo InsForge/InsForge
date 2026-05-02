@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge, Button, CopyButton } from '@insforge/ui';
-import { Skeleton } from '../../../components';
+import { Skeleton } from '#components';
 import {
   Braces,
   Check,
@@ -12,19 +12,19 @@ import {
   Sparkles,
   Rocket,
 } from 'lucide-react';
-import StepUserIcon from '../../../assets/icons/step_user.svg?react';
-import StepUploadIcon from '../../../assets/icons/step_upload.svg?react';
-import { useMetadata, useApiKey, useProjectId } from '../../../lib/hooks/useMetadata';
-import { useIsCloudHostingMode } from '../../../lib/config/DashboardHostContext';
-import { useCloudProjectInfo } from '../../../lib/hooks/useCloudProjectInfo';
-import { useMcpUsage } from '../../logs/hooks/useMcpUsage';
-import { getBackendUrl, isInsForgeCloudProject } from '../../../lib/utils/utils';
-import { useUsers } from '../../auth';
-import { useAIUsageSummary } from '../../ai/hooks/useAIUsage';
-import { useDeploymentMetadata } from '../../deployments/hooks/useDeploymentMetadata';
-import { NewCLISection } from '../components/connect/NewCLISection';
-import { MCPSection } from '../components/connect';
-import stepBgDecoration from '../../../assets/images/step_bg_decoration.svg';
+import StepUserIcon from '#assets/icons/step_user.svg?react';
+import StepUploadIcon from '#assets/icons/step_upload.svg?react';
+import { useMetadata, useApiKey, useProjectId } from '#lib/hooks/useMetadata';
+import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
+import { useCloudProjectInfo } from '#lib/hooks/useCloudProjectInfo';
+import { useMcpUsage } from '#features/logs/hooks/useMcpUsage';
+import { getBackendUrl, isInsForgeCloudProject } from '#lib/utils/utils';
+import { useUsers } from '#features/auth';
+import { useAIUsageSummary } from '#features/ai/hooks/useAIUsage';
+import { useDeploymentMetadata } from '#features/deployments/hooks/useDeploymentMetadata';
+import { NewCLISection } from '#features/dashboard/components/connect/NewCLISection';
+import { MCPSection } from '#features/dashboard/components/connect';
+import stepBgDecoration from '#assets/images/step_bg_decoration.svg';
 
 // --- Prompt Stepper Data ---
 

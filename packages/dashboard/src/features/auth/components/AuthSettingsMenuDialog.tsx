@@ -32,9 +32,9 @@ import {
   type AuthConfigSchema,
   type UpdateAuthConfigRequest,
 } from '@insforge/shared-schemas';
-import { useAuthConfig } from '../hooks/useAuthConfig';
-import { useToast } from '../../../lib/hooks/useToast';
-import { isInsForgeCloudProject } from '../../../lib/utils/utils';
+import { useAuthConfig } from '#features/auth/hooks/useAuthConfig';
+import { useToast } from '#lib/hooks/useToast';
+import { isInsForgeCloudProject } from '#lib/utils/utils';
 
 interface AuthSettingsMenuDialogProps {
   open: boolean;

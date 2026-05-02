@@ -1,5 +1,5 @@
-import { ConvertedValue } from '../../../components/datagrid/datagridTypes';
-import { apiClient } from '../../../lib/api/client';
+import { ConvertedValue } from '#components/datagrid/datagridTypes';
+import { apiClient } from '#lib/api/client';
 import { ColumnSchema, BulkUpsertResponse } from '@insforge/shared-schemas';
 import { tableService } from './table.service';
 

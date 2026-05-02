@@ -1,5 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import { realtimeService, type RealtimePermissionsResponse } from '../services/realtime.service';
+import {
+  realtimeService,
+  type RealtimePermissionsResponse,
+} from '#features/realtime/services/realtime.service';
 
 export function useRealtimePermissions() {
   const {

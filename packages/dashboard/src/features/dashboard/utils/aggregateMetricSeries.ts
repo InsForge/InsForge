@@ -1,4 +1,4 @@
-import type { DashboardMetricDataPoint } from '../../../types';
+import type { DashboardMetricDataPoint } from '#types';
 
 export interface MetricAggregates {
   avg: number | null;

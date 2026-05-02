@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useSchedules } from '../hooks/useSchedules';
-import type { ScheduleFormSchema } from '../types';
+import { useSchedules } from '#features/functions/hooks/useSchedules';
+import type { ScheduleFormSchema } from '#features/functions/types';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createScheduleRequestSchema, type ScheduleSchema } from '@insforge/shared-schemas';
@@ -18,9 +18,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@insforge/ui';
-import { JsonCellEditor } from '../../../components/datagrid/cell-editors/JsonCellEditor';
-import { Alert, AlertDescription } from '../../../components/radix/Alert';
-import { ScrollArea } from '../../../components/radix/ScrollArea';
+import { JsonCellEditor } from '#components/datagrid/cell-editors/JsonCellEditor';
+import { Alert, AlertDescription } from '#components/radix/Alert';
+import { ScrollArea } from '#components/radix/ScrollArea';
 import { Pencil } from 'lucide-react';
 
 interface ScheduleFormDialogProps {

@@ -1,6 +1,6 @@
 import { ChevronDown } from 'lucide-react';
 import { Checkbox, DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@insforge/ui';
-import type { DashboardAdvisorSeverity } from '../../../../types';
+import type { DashboardAdvisorSeverity } from '#types';
 
 const SEVERITIES: Array<{ value: DashboardAdvisorSeverity; label: string }> = [
   { value: 'critical', label: 'Critical' },

@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { CirclePlus } from 'lucide-react';
-import RefreshIcon from '../../../assets/icons/refresh.svg?react';
+import RefreshIcon from '#assets/icons/refresh.svg?react';
 import {
   Button,
   ConfirmDialog,
@@ -9,13 +9,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@insforge/ui';
-import { Skeleton, TableHeader } from '../../../components';
-import { useConfirm } from '../../../lib/hooks/useConfirm';
-import { useRealtimeChannels } from '../hooks/useRealtimeChannels';
-import { ChannelRow } from '../components/ChannelRow';
-import { ChannelFormDialog } from '../components/ChannelFormDialog';
-import RealtimeEmptyState from '../components/RealtimeEmptyState';
-import type { RealtimeChannel } from '../services/realtime.service';
+import { Skeleton, TableHeader } from '#components';
+import { useConfirm } from '#lib/hooks/useConfirm';
+import { useRealtimeChannels } from '#features/realtime/hooks/useRealtimeChannels';
+import { ChannelRow } from '#features/realtime/components/ChannelRow';
+import { ChannelFormDialog } from '#features/realtime/components/ChannelFormDialog';
+import RealtimeEmptyState from '#features/realtime/components/RealtimeEmptyState';
+import type { RealtimeChannel } from '#features/realtime/services/realtime.service';
 import type { CreateChannelRequest, UpdateChannelRequest } from '@insforge/shared-schemas';
 
 export default function RealtimeChannelsPage() {

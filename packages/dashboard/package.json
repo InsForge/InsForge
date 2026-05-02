@@ -25,6 +25,19 @@
     },
     "./styles.css": "./dist/styles.css"
   },
+  "imports": {
+    "#app/*": "./dist/app/*.js",
+    "#assets/*": "./src/assets/*",
+    "#components": "./dist/components/index.js",
+    "#components/*": "./dist/components/*.js",
+    "#features/*": "./dist/features/*.js",
+    "#layout/*": "./dist/layout/*.js",
+    "#lib/*": "./dist/lib/*.js",
+    "#navigation/*": "./dist/navigation/*.js",
+    "#router/*": "./dist/router/*.js",
+    "#types": "./dist/types/index.d.ts",
+    "#types/*": "./dist/types/*.d.ts"
+  },
   "scripts": {
     "build": "vite build && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",

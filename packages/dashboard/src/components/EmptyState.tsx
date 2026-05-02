@@ -1,6 +1,6 @@
 import { LucideIcon } from 'lucide-react';
 import { Button } from '@insforge/ui';
-import { cn } from '../lib/utils/utils';
+import { cn } from '#lib/utils/utils';
 
 interface EmptyStateProps {
   icon?: LucideIcon;

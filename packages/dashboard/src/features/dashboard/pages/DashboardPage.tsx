@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge, Button } from '@insforge/ui';
-import { Skeleton } from '../../../components';
+import { Skeleton } from '#components';
 import {
   Braces,
   CheckCircle,
@@ -29,16 +29,16 @@ import {
   useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { useApiKey, useMetadata } from '../../../lib/hooks/useMetadata';
-import { useIsCloudHostingMode } from '../../../lib/config/DashboardHostContext';
-import { useCloudProjectInfo } from '../../../lib/hooks/useCloudProjectInfo';
-import { useMcpUsage } from '../../logs/hooks/useMcpUsage';
-import { getBackendUrl, isInsForgeCloudProject } from '../../../lib/utils/utils';
-import { useUsers } from '../../auth';
-import { CLISection, MCPSection } from '../components/connect';
-import { useOpenConnectDialog } from '../../../layout/ConnectDialogContext';
-import { ObservabilitySection } from '../components/observability';
-import { BackendAdvisorSection } from '../components/advisor';
+import { useApiKey, useMetadata } from '#lib/hooks/useMetadata';
+import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
+import { useCloudProjectInfo } from '#lib/hooks/useCloudProjectInfo';
+import { useMcpUsage } from '#features/logs/hooks/useMcpUsage';
+import { getBackendUrl, isInsForgeCloudProject } from '#lib/utils/utils';
+import { useUsers } from '#features/auth';
+import { CLISection, MCPSection } from '#features/dashboard/components/connect';
+import { useOpenConnectDialog } from '#layout/ConnectDialogContext';
+import { ObservabilitySection } from '#features/dashboard/components/observability';
+import { BackendAdvisorSection } from '#features/dashboard/components/advisor';
 const REGION_COUNTRY_CODE_MAP: Record<string, 'us' | 'de' | 'sg'> = {
   'us-test': 'us',
   'us-east': 'us',

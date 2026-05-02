@@ -1,7 +1,7 @@
 import { ColumnType } from '@insforge/shared-schemas';
 import type { ConvertedValue, DataGridRowType } from './datagridTypes';
 import { RenderCellProps } from 'react-data-grid';
-import { cn, formatValueForDisplay, isEmptyValue } from '../../lib/utils/utils';
+import { cn, formatValueForDisplay, isEmptyValue } from '#lib/utils/utils';
 import { Badge } from '@insforge/ui';
 import IdCell from './IdCell';
 

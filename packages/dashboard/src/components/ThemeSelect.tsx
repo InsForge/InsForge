@@ -1,5 +1,5 @@
 import { Sun, Moon, Monitor } from 'lucide-react';
-import { useTheme } from '../lib/contexts/ThemeContext';
+import { useTheme } from '#lib/contexts/ThemeContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@insforge/ui';
 
 export function ThemeSelect() {

@@ -9,21 +9,21 @@ export interface MCPAgent {
 export const MCP_SETUP_BASE_URL = 'https://docs.insforge.dev/mcp-setup';
 export const EXTENSION_DOCS_URL = 'https://docs.insforge.dev/vscode-extension';
 
-import TraeLogo from '../../../../../assets/logos/trae.svg?react';
-import CursorLogo from '../../../../../assets/logos/cursor.svg?react';
-import ClaudeLogo from '../../../../../assets/logos/claude_code.svg?react';
-import WindsurfLogo from '../../../../../assets/logos/windsurf.svg?react';
-import ClineLogo from '../../../../../assets/logos/cline.svg?react';
-import QoderLogo from '../../../../../assets/logos/qoder.svg?react';
-import CopilotLogo from '../../../../../assets/logos/copilot.svg?react';
-import AntigravityLogo from '../../../../../assets/logos/antigravity.png';
-import OpenAILogo from '../../../../../assets/logos/openai.svg?react';
-import KiroLogo from '../../../../../assets/logos/kiro.png';
-import RooCodeLogo from '../../../../../assets/logos/roo_code.svg?react';
-import OpenCodeLogo from '../../../../../assets/logos/opencode.svg?react';
-import OpenClawLogo from '../../../../../assets/logos/openclaw.svg?react';
-import { getBackendUrl } from '../../../../../lib/utils/utils';
-// import CodexLogo from '../../../../../assets/logos/openai.svg?react';
+import TraeLogo from '#assets/logos/trae.svg?react';
+import CursorLogo from '#assets/logos/cursor.svg?react';
+import ClaudeLogo from '#assets/logos/claude_code.svg?react';
+import WindsurfLogo from '#assets/logos/windsurf.svg?react';
+import ClineLogo from '#assets/logos/cline.svg?react';
+import QoderLogo from '#assets/logos/qoder.svg?react';
+import CopilotLogo from '#assets/logos/copilot.svg?react';
+import AntigravityLogo from '#assets/logos/antigravity.png';
+import OpenAILogo from '#assets/logos/openai.svg?react';
+import KiroLogo from '#assets/logos/kiro.png';
+import RooCodeLogo from '#assets/logos/roo_code.svg?react';
+import OpenCodeLogo from '#assets/logos/opencode.svg?react';
+import OpenClawLogo from '#assets/logos/openclaw.svg?react';
+import { getBackendUrl } from '#lib/utils/utils';
+// import CodexLogo from '#assets/logos/openai.svg?react';
 
 export type PlatformType = 'macos-linux' | 'windows';
 

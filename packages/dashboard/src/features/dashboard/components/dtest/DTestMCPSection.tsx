@@ -7,10 +7,10 @@ import {
   createMCPServerConfig,
   type MCPAgent,
   type PlatformType,
-} from '../connect/mcp/helpers';
-import { MCP_VERIFY_CONNECTION_PROMPT } from '../connect/constants';
+} from '#features/dashboard/components/connect/mcp/helpers';
+import { MCP_VERIFY_CONNECTION_PROMPT } from '#features/dashboard/components/connect/constants';
 import { QuickStartPromptCard } from './QuickStartPromptCard';
-import { cn } from '../../../../lib/utils/utils';
+import { cn } from '#lib/utils/utils';
 
 function buildMcpDeeplink(agentId: string, apiKey: string, appUrl: string): string | null {
   const config = createMCPServerConfig(apiKey, 'macos-linux' as PlatformType, appUrl);

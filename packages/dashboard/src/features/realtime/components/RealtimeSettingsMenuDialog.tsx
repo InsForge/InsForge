@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@insforge/ui';
-import { useRealtimeConfig } from '../hooks/useRealtimeConfig';
+import { useRealtimeConfig } from '#features/realtime/hooks/useRealtimeConfig';
 
 interface RealtimeSettingsMenuDialogProps {
   open: boolean;

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import type {
   DashboardBackup,
   DashboardBackupInfo,
@@ -12,6 +12,7 @@ import type {
   DashboardAdvisorIssuesQuery,
   DashboardAdvisorIssuesResponse,
 } from '@insforge/dashboard';
+import { partnerService } from './partner.service';
 
 const VALID_METRICS_RANGES: readonly DashboardMetricsRange[] = ['1h', '6h', '24h', '3d'] as const;
 const VALID_METRIC_NAMES: readonly DashboardMetricName[] = [
@@ -86,8 +87,82 @@ type PendingRequests = {
 
 const DEFAULT_TIMEOUT_MS = 15000;
 const INSTANCE_CHANGE_TIMEOUT_MS = 5 * 60 * 1000;
+const INSFORGE_ROOT_ORIGIN = 'https://insforge.dev';
+const INSFORGE_SUBDOMAIN_SUFFIX = '.insforge.dev';
+
 function normalizeUrl(url: string) {
   return url.replace(/\/$/, '');
+}
+
+function normalizeOrigin(value: string): string | null {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+}
+
+function isInsForgeOrigin(origin: string): boolean {
+  try {
+    const url = new URL(origin);
+    return (
+      url.protocol === 'https:' &&
+      (url.origin === INSFORGE_ROOT_ORIGIN ||
+        (url.port === '' && url.hostname.endsWith(INSFORGE_SUBDOMAIN_SUFFIX)))
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function isTrustedCloudOrigin(origin: string): Promise<boolean> {
+  const normalizedOrigin = normalizeOrigin(origin);
+  if (!normalizedOrigin) {
+    return false;
+  }
+
+  if (isInsForgeOrigin(normalizedOrigin)) {
+    return true;
+  }
+
+  const partnerOrigins = await partnerService.fetchPartnerOrigins();
+  return partnerOrigins.has(normalizedOrigin);
+}
+
+async function establishTrustedOrigin(
+  candidateOrigin: string | null,
+  originRef: MutableRefObject<string | null>,
+  trustedRef: MutableRefObject<boolean>
+): Promise<string | null> {
+  const normalizedOrigin = candidateOrigin ? normalizeOrigin(candidateOrigin) : null;
+  if (!normalizedOrigin) {
+    return null;
+  }
+
+  const expectedOrigin = originRef.current;
+  if (expectedOrigin && normalizedOrigin !== expectedOrigin) {
+    return null;
+  }
+
+  if (trustedRef.current) {
+    return originRef.current === normalizedOrigin ? normalizedOrigin : null;
+  }
+
+  if (!(await isTrustedCloudOrigin(normalizedOrigin))) {
+    return null;
+  }
+
+  if (trustedRef.current) {
+    return originRef.current === normalizedOrigin ? normalizedOrigin : null;
+  }
+
+  if (originRef.current && originRef.current !== normalizedOrigin) {
+    return null;
+  }
+
+  originRef.current = normalizedOrigin;
+  trustedRef.current = true;
+  return normalizedOrigin;
 }
 
 function getParentWindow(): Window | null {
@@ -205,6 +280,8 @@ export function useCloudHosting() {
   const [projectInfo, setProjectInfo] = useState<DashboardProjectInfo>();
   const parentOriginRef = useRef<string | null>(getParentOrigin());
   const openerOriginRef = useRef<string | null>(null);
+  const parentOriginTrustedRef = useRef(false);
+  const openerOriginTrustedRef = useRef(false);
   const pendingRequestsRef = useRef<PendingRequests>({});
 
   const setPendingRequest = useCallback(
@@ -311,15 +388,38 @@ export function useCloudHosting() {
     [clearPendingRequest]
   );
 
-  const postMessageToParent = useCallback((message: CloudHostingMessage): boolean => {
-    const parentWindow = getParentWindow();
-    if (!parentWindow || !parentOriginRef.current) {
-      return false;
-    }
+  const ensureTrustedParentOrigin = useCallback(
+    () =>
+      establishTrustedOrigin(
+        parentOriginRef.current ?? getParentOrigin(),
+        parentOriginRef,
+        parentOriginTrustedRef
+      ),
+    []
+  );
 
-    parentWindow.postMessage(message, parentOriginRef.current);
-    return true;
-  }, []);
+  const postMessageToParent = useCallback(
+    async (message: CloudHostingMessage): Promise<boolean> => {
+      const parentOrigin = await ensureTrustedParentOrigin();
+      const parentWindow = getParentWindow();
+      if (!parentWindow || !parentOrigin) {
+        return false;
+      }
+
+      parentWindow.postMessage(message, parentOrigin);
+      return true;
+    },
+    [ensureTrustedParentOrigin]
+  );
+
+  const sendMessageToParent = useCallback(
+    async (message: CloudHostingMessage, errorMessage: string): Promise<void> => {
+      if (!(await postMessageToParent(message))) {
+        throw new Error(errorMessage);
+      }
+    },
+    [postMessageToParent]
+  );
 
   const createPendingRequest = useCallback(
     <K extends PendingRequestKey>(
@@ -353,379 +453,392 @@ export function useCloudHosting() {
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent<CloudHostingMessage>) => {
-      const isParentMessage = event.source === getParentWindow();
-      const isOpenerMessage = event.source === getOpenerWindow();
+      void (async () => {
+        const isParentMessage = event.source === getParentWindow();
+        const isOpenerMessage = event.source === getOpenerWindow();
 
-      if (!isParentMessage && !isOpenerMessage) {
-        return;
-      }
-
-      if (isParentMessage) {
-        if (!parentOriginRef.current) {
-          parentOriginRef.current = event.origin;
-        } else if (event.origin !== parentOriginRef.current) {
+        if (!isParentMessage && !isOpenerMessage) {
           return;
         }
-      } else if (!openerOriginRef.current) {
-        openerOriginRef.current = event.origin;
-      } else if (event.origin !== openerOriginRef.current) {
-        return;
-      }
 
-      const message = event.data;
-      if (!message || typeof message !== 'object' || typeof message.type !== 'string') {
-        return;
-      }
-
-      if (
-        isOpenerMessage &&
-        message.type !== 'AUTHORIZATION_CODE' &&
-        message.type !== 'AUTHORIZATION_CODE_ERROR' &&
-        message.type !== 'AUTH_ERROR'
-      ) {
-        return;
-      }
-
-      switch (message.type) {
-        case 'AUTHORIZATION_CODE': {
-          const code =
-            typeof message.code === 'string' && message.code.trim() ? message.code : null;
-
-          if (!code) {
-            rejectPendingRequest('authCode', 'Received an invalid authorization code');
+        if (isParentMessage) {
+          const trustedOrigin = await establishTrustedOrigin(
+            event.origin,
+            parentOriginRef,
+            parentOriginTrustedRef
+          );
+          if (!trustedOrigin) {
             return;
           }
-
-          if (pendingRequestsRef.current.authCode) {
-            resolvePendingRequest('authCode', code);
-          }
-
-          return;
-        }
-        case 'AUTHORIZATION_CODE_ERROR':
-        case 'AUTH_ERROR': {
-          rejectPendingRequest(
-            'authCode',
-            getErrorMessage(
-              message.error ?? message.message,
-              'Failed to generate authorization code'
-            )
+        } else {
+          const trustedOrigin = await establishTrustedOrigin(
+            event.origin,
+            openerOriginRef,
+            openerOriginTrustedRef
           );
-          return;
-        }
-        case 'PROJECT_INFO': {
-          setProjectInfo((previous) => normalizeProjectInfo(previous, currentOrigin, message));
-          return;
-        }
-        case 'BACKUP_INFO': {
-          resolvePendingRequest('backupInfo', {
-            manualBackups: normalizeBackups(message.manualBackups),
-            scheduledBackups: normalizeBackups(message.scheduledBackups),
-          });
-          return;
-        }
-        case 'BACKUP_INFO_ERROR': {
-          rejectPendingRequest(
-            'backupInfo',
-            getErrorMessage(message.error, 'Failed to load backup information')
-          );
-          return;
-        }
-        case 'BACKUP_CREATE_RESULT': {
-          if (message.success === true) {
-            resolvePendingRequest('createBackup', undefined);
+          if (!trustedOrigin) {
             return;
           }
+        }
 
-          rejectPendingRequest(
-            'createBackup',
-            getErrorMessage(message.error, 'Failed to create backup')
-          );
+        const message = event.data;
+        if (!message || typeof message !== 'object' || typeof message.type !== 'string') {
           return;
         }
-        case 'BACKUP_DELETE_RESULT': {
-          if (message.success === true) {
-            resolvePendingRequest('deleteBackup', undefined);
-            return;
-          }
 
-          rejectPendingRequest(
-            'deleteBackup',
-            getErrorMessage(message.error, 'Failed to delete backup')
-          );
+        if (
+          isOpenerMessage &&
+          message.type !== 'AUTHORIZATION_CODE' &&
+          message.type !== 'AUTHORIZATION_CODE_ERROR' &&
+          message.type !== 'AUTH_ERROR'
+        ) {
           return;
         }
-        case 'BACKUP_RENAME_RESULT': {
-          if (message.success === true) {
-            resolvePendingRequest('renameBackup', undefined);
-            return;
-          }
 
-          rejectPendingRequest(
-            'renameBackup',
-            getErrorMessage(message.error, 'Failed to rename backup')
-          );
-          return;
-        }
-        case 'BACKUP_RESTORE_RESULT': {
-          if (message.success === true) {
-            resolvePendingRequest('restoreBackup', undefined);
-            return;
-          }
+        switch (message.type) {
+          case 'AUTHORIZATION_CODE': {
+            const code =
+              typeof message.code === 'string' && message.code.trim() ? message.code : null;
 
-          rejectPendingRequest(
-            'restoreBackup',
-            getErrorMessage(message.error, 'Failed to restore backup')
-          );
-          return;
-        }
-        case 'USER_INFO': {
-          const userId = typeof message.userId === 'string' ? message.userId : '';
-          const email = typeof message.email === 'string' ? message.email : '';
-          if (!userId || !email) {
-            rejectPendingRequest('userInfo', 'Received an invalid user info payload');
-            return;
-          }
-          resolvePendingRequest('userInfo', {
-            userId,
-            email,
-            name: typeof message.name === 'string' ? message.name : undefined,
-          });
-          return;
-        }
-        case 'USER_API_KEY': {
-          const apiKey =
-            typeof message.apiKey === 'string' && message.apiKey.trim() ? message.apiKey : '';
-          if (!apiKey) {
-            rejectPendingRequest('userApiKey', 'Received an invalid user API key payload');
-            return;
-          }
-          resolvePendingRequest('userApiKey', apiKey);
-          return;
-        }
-        case 'USER_API_KEY_ERROR': {
-          rejectPendingRequest(
-            'userApiKey',
-            getErrorMessage(message.error, 'Failed to create user API key')
-          );
-          return;
-        }
-        case 'INSTANCE_INFO': {
-          resolvePendingRequest('instanceInfo', {
-            currentInstanceType:
-              typeof message.currentInstanceType === 'string' ? message.currentInstanceType : '',
-            planName: typeof message.planName === 'string' ? message.planName : '',
-            computeCredits: typeof message.computeCredits === 'number' ? message.computeCredits : 0,
-            currentOrgComputeCost:
-              typeof message.currentOrgComputeCost === 'number' ? message.currentOrgComputeCost : 0,
-            instanceTypes: Array.isArray(message.instanceTypes)
-              ? (message.instanceTypes as DashboardInstanceInfo['instanceTypes'])
-              : [],
-            projects: Array.isArray(message.projects)
-              ? (message.projects as DashboardInstanceInfo['projects'])
-              : [],
-          });
-          return;
-        }
-        case 'INSTANCE_TYPE_CHANGE_RESULT': {
-          resolvePendingRequest('instanceTypeChange', {
-            success: Boolean(message.success),
-            instanceType:
-              typeof message.instanceType === 'string' ? message.instanceType : undefined,
-            error: typeof message.error === 'string' ? message.error : undefined,
-          });
-          return;
-        }
-        case 'PROJECT_NAME_UPDATE_RESULT': {
-          if (message.success === true) {
-            if (typeof message.name === 'string' && message.name.trim()) {
-              setProjectInfo((previous) =>
-                normalizeProjectInfo(previous, currentOrigin, {
-                  type: 'PROJECT_INFO',
-                  name: message.name,
-                })
-              );
+            if (!code) {
+              rejectPendingRequest('authCode', 'Received an invalid authorization code');
+              return;
             }
-            resolvePendingRequest('renameProject', undefined);
+
+            if (pendingRequestsRef.current.authCode) {
+              resolvePendingRequest('authCode', code);
+            }
+
             return;
           }
-
-          rejectPendingRequest(
-            'renameProject',
-            getErrorMessage(message.error, 'Failed to update project name')
-          );
-          return;
-        }
-        case 'DELETE_PROJECT_RESULT': {
-          if (message.success === true) {
-            resolvePendingRequest('deleteProject', undefined);
+          case 'AUTHORIZATION_CODE_ERROR':
+          case 'AUTH_ERROR': {
+            rejectPendingRequest(
+              'authCode',
+              getErrorMessage(
+                message.error ?? message.message,
+                'Failed to generate authorization code'
+              )
+            );
             return;
           }
+          case 'PROJECT_INFO': {
+            setProjectInfo((previous) => normalizeProjectInfo(previous, currentOrigin, message));
+            return;
+          }
+          case 'BACKUP_INFO': {
+            resolvePendingRequest('backupInfo', {
+              manualBackups: normalizeBackups(message.manualBackups),
+              scheduledBackups: normalizeBackups(message.scheduledBackups),
+            });
+            return;
+          }
+          case 'BACKUP_INFO_ERROR': {
+            rejectPendingRequest(
+              'backupInfo',
+              getErrorMessage(message.error, 'Failed to load backup information')
+            );
+            return;
+          }
+          case 'BACKUP_CREATE_RESULT': {
+            if (message.success === true) {
+              resolvePendingRequest('createBackup', undefined);
+              return;
+            }
 
-          rejectPendingRequest(
-            'deleteProject',
-            getErrorMessage(message.error, 'Failed to delete project')
-          );
-          return;
-        }
-        case 'VERSION_UPDATE_STARTED': {
-          resolvePendingRequest('updateVersion', undefined);
-          return;
-        }
-        case 'VERSION_UPDATE_RESULT': {
-          if (message.success === true) {
+            rejectPendingRequest(
+              'createBackup',
+              getErrorMessage(message.error, 'Failed to create backup')
+            );
+            return;
+          }
+          case 'BACKUP_DELETE_RESULT': {
+            if (message.success === true) {
+              resolvePendingRequest('deleteBackup', undefined);
+              return;
+            }
+
+            rejectPendingRequest(
+              'deleteBackup',
+              getErrorMessage(message.error, 'Failed to delete backup')
+            );
+            return;
+          }
+          case 'BACKUP_RENAME_RESULT': {
+            if (message.success === true) {
+              resolvePendingRequest('renameBackup', undefined);
+              return;
+            }
+
+            rejectPendingRequest(
+              'renameBackup',
+              getErrorMessage(message.error, 'Failed to rename backup')
+            );
+            return;
+          }
+          case 'BACKUP_RESTORE_RESULT': {
+            if (message.success === true) {
+              resolvePendingRequest('restoreBackup', undefined);
+              return;
+            }
+
+            rejectPendingRequest(
+              'restoreBackup',
+              getErrorMessage(message.error, 'Failed to restore backup')
+            );
+            return;
+          }
+          case 'USER_INFO': {
+            const userId = typeof message.userId === 'string' ? message.userId : '';
+            const email = typeof message.email === 'string' ? message.email : '';
+            if (!userId || !email) {
+              rejectPendingRequest('userInfo', 'Received an invalid user info payload');
+              return;
+            }
+            resolvePendingRequest('userInfo', {
+              userId,
+              email,
+              name: typeof message.name === 'string' ? message.name : undefined,
+            });
+            return;
+          }
+          case 'USER_API_KEY': {
+            const apiKey =
+              typeof message.apiKey === 'string' && message.apiKey.trim() ? message.apiKey : '';
+            if (!apiKey) {
+              rejectPendingRequest('userApiKey', 'Received an invalid user API key payload');
+              return;
+            }
+            resolvePendingRequest('userApiKey', apiKey);
+            return;
+          }
+          case 'USER_API_KEY_ERROR': {
+            rejectPendingRequest(
+              'userApiKey',
+              getErrorMessage(message.error, 'Failed to create user API key')
+            );
+            return;
+          }
+          case 'INSTANCE_INFO': {
+            resolvePendingRequest('instanceInfo', {
+              currentInstanceType:
+                typeof message.currentInstanceType === 'string' ? message.currentInstanceType : '',
+              planName: typeof message.planName === 'string' ? message.planName : '',
+              computeCredits:
+                typeof message.computeCredits === 'number' ? message.computeCredits : 0,
+              currentOrgComputeCost:
+                typeof message.currentOrgComputeCost === 'number'
+                  ? message.currentOrgComputeCost
+                  : 0,
+              instanceTypes: Array.isArray(message.instanceTypes)
+                ? (message.instanceTypes as DashboardInstanceInfo['instanceTypes'])
+                : [],
+              projects: Array.isArray(message.projects)
+                ? (message.projects as DashboardInstanceInfo['projects'])
+                : [],
+            });
+            return;
+          }
+          case 'INSTANCE_TYPE_CHANGE_RESULT': {
+            resolvePendingRequest('instanceTypeChange', {
+              success: Boolean(message.success),
+              instanceType:
+                typeof message.instanceType === 'string' ? message.instanceType : undefined,
+              error: typeof message.error === 'string' ? message.error : undefined,
+            });
+            return;
+          }
+          case 'PROJECT_NAME_UPDATE_RESULT': {
+            if (message.success === true) {
+              if (typeof message.name === 'string' && message.name.trim()) {
+                setProjectInfo((previous) =>
+                  normalizeProjectInfo(previous, currentOrigin, {
+                    type: 'PROJECT_INFO',
+                    name: message.name,
+                  })
+                );
+              }
+              resolvePendingRequest('renameProject', undefined);
+              return;
+            }
+
+            rejectPendingRequest(
+              'renameProject',
+              getErrorMessage(message.error, 'Failed to update project name')
+            );
+            return;
+          }
+          case 'DELETE_PROJECT_RESULT': {
+            if (message.success === true) {
+              resolvePendingRequest('deleteProject', undefined);
+              return;
+            }
+
+            rejectPendingRequest(
+              'deleteProject',
+              getErrorMessage(message.error, 'Failed to delete project')
+            );
+            return;
+          }
+          case 'VERSION_UPDATE_STARTED': {
             resolvePendingRequest('updateVersion', undefined);
             return;
           }
+          case 'VERSION_UPDATE_RESULT': {
+            if (message.success === true) {
+              resolvePendingRequest('updateVersion', undefined);
+              return;
+            }
 
-          rejectPendingRequest(
-            'updateVersion',
-            getErrorMessage(message.error, 'Failed to update project version')
-          );
-          return;
-        }
-        case 'PROJECT_METRICS': {
-          const range: DashboardMetricsRange = VALID_METRICS_RANGES.includes(
-            message.range as DashboardMetricsRange
-          )
-            ? (message.range as DashboardMetricsRange)
-            : '1h';
-          const metrics = Array.isArray(message.metrics)
-            ? message.metrics.flatMap((entry: unknown) => {
-                if (!entry || typeof entry !== 'object') {
-                  return [];
-                }
-                const m = entry as Record<string, unknown>;
-                if (!VALID_METRIC_NAMES.includes(m.metric as DashboardMetricName)) {
-                  return [];
-                }
-                return [
-                  {
-                    metric: m.metric as DashboardMetricName,
-                    instanceId: typeof m.instanceId === 'string' ? m.instanceId : undefined,
-                    data: Array.isArray(m.data)
-                      ? m.data.flatMap((sample: unknown) => {
-                          if (!sample || typeof sample !== 'object') {
-                            return [];
-                          }
-                          const s = sample as Record<string, unknown>;
-                          if (
-                            typeof s.timestamp !== 'number' ||
-                            !Number.isFinite(s.timestamp) ||
-                            typeof s.value !== 'number' ||
-                            !Number.isFinite(s.value)
-                          ) {
-                            return [];
-                          }
-                          return [{ timestamp: s.timestamp, value: s.value }];
-                        })
-                      : [],
-                  },
-                ];
-              })
-            : [];
-          resolvePendingRequest('projectMetrics', { range, metrics });
-          return;
-        }
-        case 'PROJECT_METRICS_ERROR': {
-          rejectPendingRequest(
-            'projectMetrics',
-            message.code === 'unavailable'
-              ? 'METRICS_UNAVAILABLE'
-              : getErrorMessage(message.error, 'Failed to load metrics')
-          );
-          return;
-        }
-        case 'ADVISOR_LATEST': {
-          const summaryRaw = message.summary as Record<string, unknown> | undefined;
-          const finiteCount = (key: string): number => {
-            const v = summaryRaw?.[key];
-            return typeof v === 'number' && Number.isFinite(v) ? v : 0;
-          };
-          resolvePendingRequest('advisorLatest', {
-            scanId: typeof message.scanId === 'string' ? message.scanId : '',
-            status:
-              message.status === 'running' || message.status === 'failed'
-                ? message.status
-                : 'completed',
-            scanType: message.scanType === 'manual' ? 'manual' : 'scheduled',
-            scannedAt: typeof message.scannedAt === 'string' ? message.scannedAt : '',
-            summary: {
-              total: finiteCount('total'),
-              critical: finiteCount('critical'),
-              warning: finiteCount('warning'),
-              info: finiteCount('info'),
-            },
-          });
-          return;
-        }
-        case 'ADVISOR_LATEST_ERROR': {
-          rejectPendingRequest(
-            'advisorLatest',
-            getErrorMessage(message.error, 'Failed to load advisor summary')
-          );
-          return;
-        }
-        case 'ADVISOR_ISSUES': {
-          type AdvisorIssue = DashboardAdvisorIssuesResponse['issues'][number];
-          const issues = Array.isArray(message.issues)
-            ? message.issues.flatMap((entry: unknown): AdvisorIssue[] => {
-                if (!entry || typeof entry !== 'object') {
-                  return [];
-                }
-                const i = entry as Record<string, unknown>;
-                if (!VALID_ADVISOR_SEVERITIES.includes(i.severity as AdvisorIssue['severity'])) {
-                  return [];
-                }
-                if (!VALID_ADVISOR_CATEGORIES.includes(i.category as AdvisorIssue['category'])) {
-                  return [];
-                }
-                return [
-                  {
-                    id: typeof i.id === 'string' ? i.id : '',
-                    ruleId: typeof i.ruleId === 'string' ? i.ruleId : '',
-                    severity: i.severity as AdvisorIssue['severity'],
-                    category: i.category as AdvisorIssue['category'],
-                    title: typeof i.title === 'string' ? i.title : '',
-                    description: typeof i.description === 'string' ? i.description : '',
-                    affectedObject:
-                      typeof i.affectedObject === 'string' ? i.affectedObject : undefined,
-                    recommendation:
-                      typeof i.recommendation === 'string' ? i.recommendation : undefined,
-                    isResolved: !!i.isResolved,
-                  },
-                ];
-              })
-            : [];
-          const totalRaw = message.total;
-          const total =
-            typeof totalRaw === 'number' && Number.isFinite(totalRaw) && totalRaw >= 0
-              ? Math.floor(totalRaw)
-              : issues.length;
-          resolvePendingRequest('advisorIssues', { issues, total });
-          return;
-        }
-        case 'ADVISOR_ISSUES_ERROR': {
-          rejectPendingRequest(
-            'advisorIssues',
-            getErrorMessage(message.error, 'Failed to load advisor issues')
-          );
-          return;
-        }
-        case 'ADVISOR_SCAN_RESULT': {
-          if (message.success === true) {
-            resolvePendingRequest('advisorScan', undefined);
+            rejectPendingRequest(
+              'updateVersion',
+              getErrorMessage(message.error, 'Failed to update project version')
+            );
             return;
           }
-          rejectPendingRequest(
-            'advisorScan',
-            getErrorMessage(message.error, 'Failed to trigger advisor scan')
-          );
-          return;
+          case 'PROJECT_METRICS': {
+            const range: DashboardMetricsRange = VALID_METRICS_RANGES.includes(
+              message.range as DashboardMetricsRange
+            )
+              ? (message.range as DashboardMetricsRange)
+              : '1h';
+            const metrics = Array.isArray(message.metrics)
+              ? message.metrics.flatMap((entry: unknown) => {
+                  if (!entry || typeof entry !== 'object') {
+                    return [];
+                  }
+                  const m = entry as Record<string, unknown>;
+                  if (!VALID_METRIC_NAMES.includes(m.metric as DashboardMetricName)) {
+                    return [];
+                  }
+                  return [
+                    {
+                      metric: m.metric as DashboardMetricName,
+                      instanceId: typeof m.instanceId === 'string' ? m.instanceId : undefined,
+                      data: Array.isArray(m.data)
+                        ? m.data.flatMap((sample: unknown) => {
+                            if (!sample || typeof sample !== 'object') {
+                              return [];
+                            }
+                            const s = sample as Record<string, unknown>;
+                            if (
+                              typeof s.timestamp !== 'number' ||
+                              !Number.isFinite(s.timestamp) ||
+                              typeof s.value !== 'number' ||
+                              !Number.isFinite(s.value)
+                            ) {
+                              return [];
+                            }
+                            return [{ timestamp: s.timestamp, value: s.value }];
+                          })
+                        : [],
+                    },
+                  ];
+                })
+              : [];
+            resolvePendingRequest('projectMetrics', { range, metrics });
+            return;
+          }
+          case 'PROJECT_METRICS_ERROR': {
+            rejectPendingRequest(
+              'projectMetrics',
+              message.code === 'unavailable'
+                ? 'METRICS_UNAVAILABLE'
+                : getErrorMessage(message.error, 'Failed to load metrics')
+            );
+            return;
+          }
+          case 'ADVISOR_LATEST': {
+            const summaryRaw = message.summary as Record<string, unknown> | undefined;
+            const finiteCount = (key: string): number => {
+              const v = summaryRaw?.[key];
+              return typeof v === 'number' && Number.isFinite(v) ? v : 0;
+            };
+            resolvePendingRequest('advisorLatest', {
+              scanId: typeof message.scanId === 'string' ? message.scanId : '',
+              status:
+                message.status === 'running' || message.status === 'failed'
+                  ? message.status
+                  : 'completed',
+              scanType: message.scanType === 'manual' ? 'manual' : 'scheduled',
+              scannedAt: typeof message.scannedAt === 'string' ? message.scannedAt : '',
+              summary: {
+                total: finiteCount('total'),
+                critical: finiteCount('critical'),
+                warning: finiteCount('warning'),
+                info: finiteCount('info'),
+              },
+            });
+            return;
+          }
+          case 'ADVISOR_LATEST_ERROR': {
+            rejectPendingRequest(
+              'advisorLatest',
+              getErrorMessage(message.error, 'Failed to load advisor summary')
+            );
+            return;
+          }
+          case 'ADVISOR_ISSUES': {
+            type AdvisorIssue = DashboardAdvisorIssuesResponse['issues'][number];
+            const issues = Array.isArray(message.issues)
+              ? message.issues.flatMap((entry: unknown): AdvisorIssue[] => {
+                  if (!entry || typeof entry !== 'object') {
+                    return [];
+                  }
+                  const i = entry as Record<string, unknown>;
+                  if (!VALID_ADVISOR_SEVERITIES.includes(i.severity as AdvisorIssue['severity'])) {
+                    return [];
+                  }
+                  if (!VALID_ADVISOR_CATEGORIES.includes(i.category as AdvisorIssue['category'])) {
+                    return [];
+                  }
+                  return [
+                    {
+                      id: typeof i.id === 'string' ? i.id : '',
+                      ruleId: typeof i.ruleId === 'string' ? i.ruleId : '',
+                      severity: i.severity as AdvisorIssue['severity'],
+                      category: i.category as AdvisorIssue['category'],
+                      title: typeof i.title === 'string' ? i.title : '',
+                      description: typeof i.description === 'string' ? i.description : '',
+                      affectedObject:
+                        typeof i.affectedObject === 'string' ? i.affectedObject : undefined,
+                      recommendation:
+                        typeof i.recommendation === 'string' ? i.recommendation : undefined,
+                      isResolved: !!i.isResolved,
+                    },
+                  ];
+                })
+              : [];
+            const totalRaw = message.total;
+            const total =
+              typeof totalRaw === 'number' && Number.isFinite(totalRaw) && totalRaw >= 0
+                ? Math.floor(totalRaw)
+                : issues.length;
+            resolvePendingRequest('advisorIssues', { issues, total });
+            return;
+          }
+          case 'ADVISOR_ISSUES_ERROR': {
+            rejectPendingRequest(
+              'advisorIssues',
+              getErrorMessage(message.error, 'Failed to load advisor issues')
+            );
+            return;
+          }
+          case 'ADVISOR_SCAN_RESULT': {
+            if (message.success === true) {
+              resolvePendingRequest('advisorScan', undefined);
+              return;
+            }
+            rejectPendingRequest(
+              'advisorScan',
+              getErrorMessage(message.error, 'Failed to trigger advisor scan')
+            );
+            return;
+          }
+          default:
+            return;
         }
-        default:
-          return;
-      }
+      })();
     };
 
     const pendingRequests = pendingRequestsRef.current;
@@ -747,143 +860,147 @@ export function useCloudHosting() {
   const getAuthorizationCode = useCallback(async (): Promise<string> => {
     // Even if the send fails, keep the pending request open so a proactive parent or opener
     // message can still resolve it when the cloud hosting transport finishes initializing.
-    postMessageToParent({ type: 'REQUEST_AUTHORIZATION_CODE' });
+    void postMessageToParent({ type: 'REQUEST_AUTHORIZATION_CODE' });
 
     return createPendingRequest('authCode', 'Authorization code request');
   }, [createPendingRequest, postMessageToParent]);
 
   const requestBackupInfo = useCallback(async (): Promise<DashboardBackupInfo> => {
-    if (!postMessageToParent({ type: 'REQUEST_BACKUP_INFO' })) {
-      throw new Error('Unable to request backup information from the parent window');
-    }
-
+    await sendMessageToParent(
+      { type: 'REQUEST_BACKUP_INFO' },
+      'Unable to request backup information from the parent window'
+    );
     return createPendingRequest('backupInfo', 'Backup info request');
-  }, [createPendingRequest, postMessageToParent]);
+  }, [createPendingRequest, sendMessageToParent]);
 
   const createBackup = useCallback(
     async (name: string): Promise<void> => {
-      if (!postMessageToParent({ type: 'CREATE_BACKUP', name })) {
-        throw new Error('Unable to request a backup creation from the parent window');
-      }
-
+      await sendMessageToParent(
+        { type: 'CREATE_BACKUP', name },
+        'Unable to request a backup creation from the parent window'
+      );
       return createPendingRequest('createBackup', 'Backup creation');
     },
-    [createPendingRequest, postMessageToParent]
+    [createPendingRequest, sendMessageToParent]
   );
 
   const deleteBackup = useCallback(
     async (backupId: string): Promise<void> => {
-      if (!postMessageToParent({ type: 'DELETE_BACKUP', backupId })) {
-        throw new Error('Unable to request a backup deletion from the parent window');
-      }
-
+      await sendMessageToParent(
+        { type: 'DELETE_BACKUP', backupId },
+        'Unable to request a backup deletion from the parent window'
+      );
       return createPendingRequest('deleteBackup', 'Backup deletion');
     },
-    [createPendingRequest, postMessageToParent]
+    [createPendingRequest, sendMessageToParent]
   );
 
   const renameBackup = useCallback(
     async (backupId: string, name: string | null): Promise<void> => {
-      if (!postMessageToParent({ type: 'RENAME_BACKUP', backupId, name })) {
-        throw new Error('Unable to request a backup rename from the parent window');
-      }
-
+      await sendMessageToParent(
+        { type: 'RENAME_BACKUP', backupId, name },
+        'Unable to request a backup rename from the parent window'
+      );
       return createPendingRequest('renameBackup', 'Backup rename');
     },
-    [createPendingRequest, postMessageToParent]
+    [createPendingRequest, sendMessageToParent]
   );
 
   const restoreBackup = useCallback(
     async (backupId: string): Promise<void> => {
-      if (!postMessageToParent({ type: 'RESTORE_BACKUP', backupId })) {
-        throw new Error('Unable to request a backup restore from the parent window');
-      }
-
+      await sendMessageToParent(
+        { type: 'RESTORE_BACKUP', backupId },
+        'Unable to request a backup restore from the parent window'
+      );
       return createPendingRequest('restoreBackup', 'Backup restore');
     },
-    [createPendingRequest, postMessageToParent]
+    [createPendingRequest, sendMessageToParent]
   );
 
   const requestInstanceInfo = useCallback(async (): Promise<DashboardInstanceInfo> => {
-    if (!postMessageToParent({ type: 'REQUEST_INSTANCE_INFO' })) {
-      throw new Error('Unable to request instance information from the parent window');
-    }
-
+    await sendMessageToParent(
+      { type: 'REQUEST_INSTANCE_INFO' },
+      'Unable to request instance information from the parent window'
+    );
     return createPendingRequest('instanceInfo', 'Instance info request');
-  }, [createPendingRequest, postMessageToParent]);
+  }, [createPendingRequest, sendMessageToParent]);
 
   const requestInstanceTypeChange = useCallback(
     async (instanceType: string): Promise<InstanceTypeChangeResult> => {
-      if (!postMessageToParent({ type: 'REQUEST_INSTANCE_TYPE_CHANGE', instanceType })) {
-        throw new Error('Unable to request an instance type change from the parent window');
-      }
-
+      await sendMessageToParent(
+        { type: 'REQUEST_INSTANCE_TYPE_CHANGE', instanceType },
+        'Unable to request an instance type change from the parent window'
+      );
       return createPendingRequest('instanceTypeChange', 'Instance type change', {
         timeoutMs: INSTANCE_CHANGE_TIMEOUT_MS,
       });
     },
-    [createPendingRequest, postMessageToParent]
+    [createPendingRequest, sendMessageToParent]
   );
 
   const renameProject = useCallback(
     async (name: string): Promise<void> => {
-      if (!postMessageToParent({ type: 'UPDATE_PROJECT_NAME', name })) {
-        throw new Error('Unable to request a project rename from the parent window');
-      }
-
+      await sendMessageToParent(
+        { type: 'UPDATE_PROJECT_NAME', name },
+        'Unable to request a project rename from the parent window'
+      );
       return createPendingRequest('renameProject', 'Project rename');
     },
-    [createPendingRequest, postMessageToParent]
+    [createPendingRequest, sendMessageToParent]
   );
 
   const deleteProject = useCallback(async (): Promise<void> => {
-    if (!postMessageToParent({ type: 'DELETE_PROJECT' })) {
-      throw new Error('Unable to request project deletion from the parent window');
-    }
-
+    await sendMessageToParent(
+      { type: 'DELETE_PROJECT' },
+      'Unable to request project deletion from the parent window'
+    );
     return createPendingRequest('deleteProject', 'Project deletion');
-  }, [createPendingRequest, postMessageToParent]);
+  }, [createPendingRequest, sendMessageToParent]);
 
   const updateVersion = useCallback(async (): Promise<void> => {
-    if (!postMessageToParent({ type: 'UPDATE_PROJECT_VERSION' })) {
-      throw new Error('Unable to request a project version update from the parent window');
-    }
-
+    await sendMessageToParent(
+      { type: 'UPDATE_PROJECT_VERSION' },
+      'Unable to request a project version update from the parent window'
+    );
     return createPendingRequest('updateVersion', 'Project version update');
-  }, [createPendingRequest, postMessageToParent]);
+  }, [createPendingRequest, sendMessageToParent]);
 
   const requestUserInfo = useCallback(async (): Promise<DashboardUserInfo> => {
-    if (!postMessageToParent({ type: 'REQUEST_USER_INFO' })) {
-      throw new Error('Unable to request user info from the parent window');
-    }
+    await sendMessageToParent(
+      { type: 'REQUEST_USER_INFO' },
+      'Unable to request user info from the parent window'
+    );
     return createPendingRequest('userInfo', 'User info request');
-  }, [createPendingRequest, postMessageToParent]);
+  }, [createPendingRequest, sendMessageToParent]);
 
   const requestUserApiKey = useCallback(async (): Promise<string> => {
-    if (!postMessageToParent({ type: 'REQUEST_USER_API_KEY' })) {
-      throw new Error('Unable to request a user API key from the parent window');
-    }
+    await sendMessageToParent(
+      { type: 'REQUEST_USER_API_KEY' },
+      'Unable to request a user API key from the parent window'
+    );
     return createPendingRequest('userApiKey', 'User API key request');
-  }, [createPendingRequest, postMessageToParent]);
+  }, [createPendingRequest, sendMessageToParent]);
 
   const requestProjectMetrics = useCallback(
     async (range: DashboardMetricsRange): Promise<DashboardMetricsResponse> => {
-      if (!postMessageToParent({ type: 'REQUEST_PROJECT_METRICS', range })) {
-        throw new Error('Unable to request project metrics from the parent window');
-      }
+      await sendMessageToParent(
+        { type: 'REQUEST_PROJECT_METRICS', range },
+        'Unable to request project metrics from the parent window'
+      );
       return createPendingRequest('projectMetrics', 'Project metrics request', {
         supersede: true,
       });
     },
-    [createPendingRequest, postMessageToParent]
+    [createPendingRequest, sendMessageToParent]
   );
 
   const requestAdvisorLatest = useCallback(async (): Promise<DashboardAdvisorSummary> => {
-    if (!postMessageToParent({ type: 'REQUEST_ADVISOR_LATEST' })) {
-      throw new Error('Unable to request advisor summary from the parent window');
-    }
+    await sendMessageToParent(
+      { type: 'REQUEST_ADVISOR_LATEST' },
+      'Unable to request advisor summary from the parent window'
+    );
     return createPendingRequest('advisorLatest', 'Advisor latest request');
-  }, [createPendingRequest, postMessageToParent]);
+  }, [createPendingRequest, sendMessageToParent]);
 
   const advisorIssuesLockRef = useRef<Promise<unknown>>(Promise.resolve());
 
@@ -891,32 +1008,32 @@ export function useCloudHosting() {
     (query: DashboardAdvisorIssuesQuery): Promise<DashboardAdvisorIssuesResponse> => {
       const next = advisorIssuesLockRef.current
         .catch(() => undefined)
-        .then(() => {
-          if (
-            !postMessageToParent({
+        .then(async () => {
+          await sendMessageToParent(
+            {
               type: 'REQUEST_ADVISOR_ISSUES',
               severity: query.severity,
               category: query.category,
               limit: query.limit,
               offset: query.offset,
-            })
-          ) {
-            throw new Error('Unable to request advisor issues from the parent window');
-          }
+            },
+            'Unable to request advisor issues from the parent window'
+          );
           return createPendingRequest('advisorIssues', 'Advisor issues request');
         });
       advisorIssuesLockRef.current = next.catch(() => undefined);
       return next;
     },
-    [createPendingRequest, postMessageToParent]
+    [createPendingRequest, sendMessageToParent]
   );
 
   const triggerAdvisorScan = useCallback(async (): Promise<void> => {
-    if (!postMessageToParent({ type: 'TRIGGER_ADVISOR_SCAN' })) {
-      throw new Error('Unable to trigger advisor scan from the parent window');
-    }
+    await sendMessageToParent(
+      { type: 'TRIGGER_ADVISOR_SCAN' },
+      'Unable to trigger advisor scan from the parent window'
+    );
     return createPendingRequest('advisorScan', 'Advisor scan trigger');
-  }, [createPendingRequest, postMessageToParent]);
+  }, [createPendingRequest, sendMessageToParent]);
 
   const navigateToSubscription = useCallback(() => {
     void postMessageToParent({ type: 'NAVIGATE_TO_SUBSCRIPTION' });

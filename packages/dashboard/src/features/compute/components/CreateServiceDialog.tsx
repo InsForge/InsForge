@@ -15,7 +15,7 @@ import {
   SelectContent,
   SelectItem,
 } from '@insforge/ui';
-import { CPU_TIERS, MEMORY_OPTIONS, REGIONS } from '../constants';
+import { CPU_TIERS, MEMORY_OPTIONS, REGIONS } from '#features/compute/constants';
 import type { CreateServiceRequest } from '@insforge/shared-schemas';
 
 interface CreateServiceDialogProps {

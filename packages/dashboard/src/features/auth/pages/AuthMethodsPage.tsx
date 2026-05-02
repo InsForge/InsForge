@@ -1,9 +1,9 @@
 import { useState, useCallback, useMemo } from 'react';
 import { MoreHorizontal, Plus, Trash2, Pencil, Mail, ChevronDown, KeyRound } from 'lucide-react';
-import { OAuthConfigDialog, CustomOAuthConfigDialog } from '../components';
-import { useOAuthConfig } from '../hooks/useOAuthConfig';
-import { useCustomOAuthConfig } from '../hooks/useCustomOAuthConfig';
-import { useConfirm } from '../../../lib/hooks/useConfirm';
+import { OAuthConfigDialog, CustomOAuthConfigDialog } from '#features/auth/components';
+import { useOAuthConfig } from '#features/auth/hooks/useOAuthConfig';
+import { useCustomOAuthConfig } from '#features/auth/hooks/useCustomOAuthConfig';
+import { useConfirm } from '#lib/hooks/useConfirm';
 import {
   Badge,
   Button,
@@ -15,7 +15,7 @@ import {
   ConfirmDialog,
 } from '@insforge/ui';
 import type { OAuthProvidersSchema, CustomOAuthConfigSchema } from '@insforge/shared-schemas';
-import { oauthProviders, type OAuthProviderInfo } from '../helpers';
+import { oauthProviders, type OAuthProviderInfo } from '#features/auth/helpers';
 
 export default function AuthMethodsPage() {
   const [selectedProvider, setSelectedProvider] = useState<OAuthProviderInfo>();

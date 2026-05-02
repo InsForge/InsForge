@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { recordService } from '../services/record.service';
-import { databaseTableQueryKeys } from '../queryKeys';
-import { useToast } from '../../../lib/hooks/useToast';
-import { ConvertedValue } from '../../../components/datagrid/datagridTypes';
+import { recordService } from '#features/database/services/record.service';
+import { databaseTableQueryKeys } from '#features/database/queryKeys';
+import { useToast } from '#lib/hooks/useToast';
+import { ConvertedValue } from '#components/datagrid/datagridTypes';
 
 export function useRecords(tableName: string) {
   const queryClient = useQueryClient();

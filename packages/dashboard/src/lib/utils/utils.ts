@@ -13,13 +13,9 @@ import {
   jsonSchema,
   stringSchema,
 } from './schemaValidations';
-import { getDashboardBackendUrl } from '../config/runtime';
+import { getDashboardBackendUrl } from '#lib/config/runtime';
 import { v4 as uuidv4 } from 'uuid';
-import type {
-  ConvertedValue,
-  DisplayValue,
-  ValueConversionResult,
-} from '../../components/datagrid';
+import type { ConvertedValue, DisplayValue, ValueConversionResult } from '#components/datagrid';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));

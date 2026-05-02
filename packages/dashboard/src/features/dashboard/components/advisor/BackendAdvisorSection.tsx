@@ -6,16 +6,16 @@ import {
   useAdvisorIssues,
   useAdvisorLatest,
   useTriggerAdvisorScan,
-} from '../../hooks/useAdvisor';
+} from '#features/dashboard/hooks/useAdvisor';
 import type {
   DashboardAdvisorCategory,
   DashboardAdvisorIssue,
   DashboardAdvisorSeverity,
-} from '../../../../types';
-import { useDashboardHost } from '../../../../lib/config/DashboardHostContext';
-import { useToast } from '../../../../lib/hooks/useToast';
-import { usePageSize } from '../../../../lib/hooks/usePageSize';
-import { EmptyState, PaginationControls } from '../../../../components';
+} from '#types';
+import { useDashboardHost } from '#lib/config/DashboardHostContext';
+import { useToast } from '#lib/hooks/useToast';
+import { usePageSize } from '#lib/hooks/usePageSize';
+import { EmptyState, PaginationControls } from '#components';
 import { AdvisoryItem } from './AdvisoryItem';
 import { AdvisoryTabs, type AdvisoryTabValue } from './AdvisoryTabs';
 import { SeverityFilterDropdown } from './SeverityFilterDropdown';

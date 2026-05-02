@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { X } from 'lucide-react';
-import { getFeatureFlag } from '../../../../lib/analytics/posthog';
-import { useProjectId } from '../../../../lib/hooks/useMetadata';
-import { useDashboardHost, useDashboardProject } from '../../../../lib/config/DashboardHostContext';
+import { getFeatureFlag } from '#lib/analytics/posthog';
+import { useProjectId } from '#lib/hooks/useMetadata';
+import { useDashboardHost, useDashboardProject } from '#lib/config/DashboardHostContext';
 
 const getConnectTipKey = (projectId: string | null | undefined) =>
   `insforge-dtest-connect-tip-dismissed-${projectId || 'default'}`;

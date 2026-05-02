@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Link, useMatch } from 'react-router-dom';
 import { LucideIcon, MoreVertical } from 'lucide-react';
-import { cn } from '../lib/utils/utils';
+import { cn } from '#lib/utils/utils';
 import { ScrollArea } from './radix/ScrollArea';
 import {
   Button,

@@ -7,8 +7,8 @@ import {
   DropdownMenuSeparator,
 } from '@insforge/ui';
 import type { ServiceSchema } from '@insforge/shared-schemas';
-import { statusColors, getReachableUrl } from '../constants';
-import { useServiceHealth } from '../hooks/useComputeServices';
+import { statusColors, getReachableUrl } from '#features/compute/constants';
+import { useServiceHealth } from '#features/compute/hooks/useComputeServices';
 
 interface ServiceCardProps {
   service: ServiceSchema;

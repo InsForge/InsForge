@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { healthService } from '../services/health.service';
+import { healthService } from '#lib/services/health.service';
 
 interface UseHealthOptions {
   enabled?: boolean;

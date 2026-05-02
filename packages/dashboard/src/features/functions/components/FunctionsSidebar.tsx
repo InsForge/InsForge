@@ -1,4 +1,4 @@
-import { FeatureSidebar, type FeatureSidebarListItem } from '../../../components';
+import { FeatureSidebar, type FeatureSidebarListItem } from '#components';
 
 const FUNCTIONS_SIDEBAR_ITEMS: FeatureSidebarListItem[] = [
   {

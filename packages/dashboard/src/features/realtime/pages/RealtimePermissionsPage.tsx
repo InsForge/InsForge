@@ -8,10 +8,10 @@ import {
   EmptyState,
   TableHeader,
   SortableHeaderRenderer,
-} from '../../../components';
-import { SQLModal, SQLCellButton } from '../../database';
-import { useRealtimePermissions } from '../hooks/useRealtimePermissions';
-import type { RlsPolicy } from '../services/realtime.service';
+} from '#components';
+import { SQLModal, SQLCellButton } from '#features/database';
+import { useRealtimePermissions } from '#features/realtime/hooks/useRealtimePermissions';
+import type { RlsPolicy } from '#features/realtime/services/realtime.service';
 import { Tabs, Tab } from '@insforge/ui';
 
 type TabType = 'subscribe' | 'publish';

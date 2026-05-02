@@ -4,20 +4,20 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Plus, X, Link, MoveRight } from 'lucide-react';
 import { Button, Input } from '@insforge/ui';
-import { Alert, AlertDescription } from '../../../components';
-import { tableService } from '../services/table.service';
+import { Alert, AlertDescription } from '#components';
+import { tableService } from '#features/database/services/table.service';
 import {
   TableFormColumnSchema,
   TableFormForeignKeySchema,
   tableFormSchema,
   TableFormSchema,
-} from '../schema';
-import { useToast } from '../../../lib/hooks/useToast';
+} from '#features/database/schema';
+import { useToast } from '#lib/hooks/useToast';
 import { TableFormColumn } from './TableFormColumn';
 import { ForeignKeyPopover } from './ForeignKeyPopover';
 import { ColumnType, TableSchema, UpdateTableSchemaRequest } from '@insforge/shared-schemas';
-import { SYSTEM_FIELDS } from '../helpers';
-import { databaseTableQueryKeys } from '../queryKeys';
+import { SYSTEM_FIELDS } from '#features/database/helpers';
+import { databaseTableQueryKeys } from '#features/database/queryKeys';
 
 const newColumn: TableFormColumnSchema = {
   columnName: '',

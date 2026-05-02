@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
-import { LogsDataGrid, LogsColumnDef } from '../../logs/components/LogsDataGrid';
-import { useScheduleLogs } from '../hooks/useSchedules';
+import { LogsDataGrid, LogsColumnDef } from '#features/logs/components/LogsDataGrid';
+import { useScheduleLogs } from '#features/functions/hooks/useSchedules';
 import { format } from 'date-fns';
 
 const PAGE_SIZE = 50;

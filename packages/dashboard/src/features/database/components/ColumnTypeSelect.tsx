@@ -1,8 +1,8 @@
 import { memo } from 'react';
 import { Controller, Control } from 'react-hook-form';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@insforge/ui';
-import { columnTypeIcons } from '../constants';
-import { TableFormSchema } from '../schema';
+import { columnTypeIcons } from '#features/database/constants';
+import { TableFormSchema } from '#features/database/schema';
 import { columnTypeSchema } from '@insforge/shared-schemas';
 
 const COLUMN_TYPES_ARRAY = columnTypeSchema.options;

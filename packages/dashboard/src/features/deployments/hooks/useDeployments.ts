@@ -1,7 +1,10 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { deploymentsService, type DeploymentSchema } from '../services/deployments.service';
-import { useToast } from '../../../lib/hooks/useToast';
+import {
+  deploymentsService,
+  type DeploymentSchema,
+} from '#features/deployments/services/deployments.service';
+import { useToast } from '#lib/hooks/useToast';
 import type { StartDeploymentRequest } from '@insforge/shared-schemas';
 
 export function useDeployments() {

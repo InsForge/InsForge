@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { userService } from '../services/user.service';
-import { loginService } from '../../login/services/login.service';
+import { userService } from '#features/auth/services/user.service';
+import { loginService } from '#features/login/services/login.service';
 
 interface UseUsersOptions {
   pageSize?: number;

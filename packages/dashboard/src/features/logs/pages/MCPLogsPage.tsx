@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
-import { DataGridEmptyState, EmptyState, TableHeader } from '../../../components';
-import { LogsDataGrid, type LogsColumnDef } from '../components';
-import { useMcpUsage } from '../hooks/useMcpUsage';
-import { formatTime } from '../../../lib/utils/utils';
-import { usePageSize } from '../../../lib/hooks/usePageSize';
+import { DataGridEmptyState, EmptyState, TableHeader } from '#components';
+import { LogsDataGrid, type LogsColumnDef } from '#features/logs/components';
+import { useMcpUsage } from '#features/logs/hooks/useMcpUsage';
+import { formatTime } from '#lib/utils/utils';
+import { usePageSize } from '#lib/hooks/usePageSize';
 
 export default function MCPLogsPage() {
   const {

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { databaseService } from '../services/database.service';
+import { databaseService } from '#features/database/services/database.service';
 
 export function useFunctions(enabled = false) {
   const { data, isLoading, error, refetch } = useQuery({

@@ -1,18 +1,15 @@
 import { useMemo, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
-import { AuthProvider } from '../lib/contexts/AuthContext';
-import { AppRoutes } from '../router/AppRoutes';
-import { ToastProvider } from '../lib/hooks/useToast';
-import { SocketProvider } from '../lib/contexts/SocketContext';
-import { PostHogAnalyticsProvider } from '../lib/analytics/posthog';
-import { SQLEditorProvider } from '../features/database/contexts/SQLEditorContext';
-import {
-  DashboardHostProvider,
-  DashboardProjectProvider,
-} from '../lib/config/DashboardHostContext';
-import { setDashboardBackendUrl } from '../lib/config/runtime';
-import type { InsForgeDashboardProps } from '../types';
+import { AuthProvider } from '#lib/contexts/AuthContext';
+import { AppRoutes } from '#router/AppRoutes';
+import { ToastProvider } from '#lib/hooks/useToast';
+import { SocketProvider } from '#lib/contexts/SocketContext';
+import { PostHogAnalyticsProvider } from '#lib/analytics/posthog';
+import { SQLEditorProvider } from '#features/database/contexts/SQLEditorContext';
+import { DashboardHostProvider, DashboardProjectProvider } from '#lib/config/DashboardHostContext';
+import { setDashboardBackendUrl } from '#lib/config/runtime';
+import type { InsForgeDashboardProps } from '#types';
 
 function normalizeBackendUrl(url?: string) {
   return url?.replace(/\/$/, '') || undefined;

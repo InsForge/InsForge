@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { FileJson, AlertCircle, CheckCircle } from 'lucide-react';
 import { Badge, Button, ConfirmDialog } from '@insforge/ui';
-import { Popover, PopoverContent, PopoverTrigger } from '../..';
-import { cn } from '../../../lib/utils/utils';
+import { Popover, PopoverContent, PopoverTrigger } from '#components';
+import { cn } from '#lib/utils/utils';
 import type { JsonCellEditorProps } from './types';
 
 export function JsonCellEditor({

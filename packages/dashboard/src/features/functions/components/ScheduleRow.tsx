@@ -1,4 +1,4 @@
-import { cn } from '../../../lib/utils/utils';
+import { cn } from '#lib/utils/utils';
 import type { ScheduleSchema } from '@insforge/shared-schemas';
 import { format } from 'date-fns';
 import { MoreVertical, Pencil, Trash2 } from 'lucide-react';

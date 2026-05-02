@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { useDashboardHost } from '../../../lib/config/DashboardHostContext';
-import type { DashboardMetricsRange, DashboardMetricsResponse } from '../../../types';
+import { useDashboardHost } from '#lib/config/DashboardHostContext';
+import type { DashboardMetricsRange, DashboardMetricsResponse } from '#types';
 
 export const PROJECT_METRICS_QUERY_KEY = 'project-metrics';
 

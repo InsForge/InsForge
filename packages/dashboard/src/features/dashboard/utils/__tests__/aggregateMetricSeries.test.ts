@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aggregateMetricSeries } from '../aggregateMetricSeries';
+import { aggregateMetricSeries } from '#features/dashboard/utils/aggregateMetricSeries';
 
 describe('aggregateMetricSeries', () => {
   it('returns null aggregates when data is empty', () => {

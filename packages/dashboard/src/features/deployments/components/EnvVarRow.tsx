@@ -12,8 +12,8 @@ import {
   TooltipTrigger,
 } from '@insforge/ui';
 import type { DeploymentEnvVar } from '@insforge/shared-schemas';
-import { cn, formatTime } from '../../../lib/utils/utils';
-import { deploymentsService } from '../services/deployments.service';
+import { cn, formatTime } from '#lib/utils/utils';
+import { deploymentsService } from '#features/deployments/services/deployments.service';
 
 interface EnvVarRowProps {
   envVar: DeploymentEnvVar;

@@ -1,12 +1,12 @@
 import { useState, useCallback, useRef } from 'react';
 import { ChevronRight } from 'lucide-react';
-import RefreshIcon from '../../../assets/icons/refresh.svg?react';
+import RefreshIcon from '#assets/icons/refresh.svg?react';
 import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
-import { Skeleton, PaginationControls, TableHeader } from '../../../components';
-import { useRealtimeMessages } from '../hooks/useRealtimeMessages';
-import { MessageRow } from '../components/MessageRow';
-import RealtimeEmptyState from '../components/RealtimeEmptyState';
-import type { RealtimeMessage } from '../services/realtime.service';
+import { Skeleton, PaginationControls, TableHeader } from '#components';
+import { useRealtimeMessages } from '#features/realtime/hooks/useRealtimeMessages';
+import { MessageRow } from '#features/realtime/components/MessageRow';
+import RealtimeEmptyState from '#features/realtime/components/RealtimeEmptyState';
+import type { RealtimeMessage } from '#features/realtime/services/realtime.service';
 
 export default function RealtimeMessagesPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);

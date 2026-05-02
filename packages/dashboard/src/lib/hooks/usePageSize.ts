@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
-import { LOCAL_STORAGE_KEY_PREFIXES } from '../utils/constants';
-import { getLocalStorageItem, setLocalStorageItem } from '../utils/local-storage';
+import { LOCAL_STORAGE_KEY_PREFIXES } from '#lib/utils/constants';
+import { getLocalStorageItem, setLocalStorageItem } from '#lib/utils/local-storage';
 
 const PAGE_SIZE_OPTIONS = [50, 100, 250, 500];
 const DEFAULT_PAGE_SIZE = 50;

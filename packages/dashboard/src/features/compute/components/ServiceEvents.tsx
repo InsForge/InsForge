@@ -1,6 +1,6 @@
 import { RefreshCw } from 'lucide-react';
 import { Button } from '@insforge/ui';
-import { useServiceEvents } from '../hooks/useComputeServices';
+import { useServiceEvents } from '#features/compute/hooks/useComputeServices';
 
 interface ServiceEventsProps {
   serviceId: string;

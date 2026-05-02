@@ -1,5 +1,5 @@
 import { Badge } from '@insforge/ui';
-import type { DashboardAdvisorCategory } from '../../../../types';
+import type { DashboardAdvisorCategory } from '#types';
 
 export type AdvisoryTabValue = 'all' | DashboardAdvisorCategory;
 

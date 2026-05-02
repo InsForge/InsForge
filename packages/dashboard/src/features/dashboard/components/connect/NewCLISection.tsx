@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { CopyButton, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
-import { useProjectId } from '../../../../lib/hooks/useMetadata';
-import { useCloudProjectInfo } from '../../../../lib/hooks/useCloudProjectInfo';
-import { cn } from '../../../../lib/utils/utils';
+import { useProjectId } from '#lib/hooks/useMetadata';
+import { useCloudProjectInfo } from '#lib/hooks/useCloudProjectInfo';
+import { cn } from '#lib/utils/utils';
 
 interface StepProps {
   number: number;

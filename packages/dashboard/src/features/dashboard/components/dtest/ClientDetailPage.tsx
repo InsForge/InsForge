@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@insforge/ui';
-import { ConnectionStringSectionV2 } from '../connect/ConnectionStringSectionV2';
-import { APIKeysSectionV2 } from '../connect/APIKeysSectionV2';
+import { ConnectionStringSectionV2 } from '#features/dashboard/components/connect/ConnectionStringSectionV2';
+import { APIKeysSectionV2 } from '#features/dashboard/components/connect/APIKeysSectionV2';
 import { DTestMCPSection } from './DTestMCPSection';
 import { DTestCLISection } from './DTestCLISection';
 import { QuickStartPromptCard } from './QuickStartPromptCard';
@@ -11,9 +11,9 @@ import {
   useApiKey,
   useDatabaseConnectionString,
   useDatabasePassword,
-} from '../../../../lib/hooks/useMetadata';
-import { useAnonToken } from '../../../auth/hooks/useAnonToken';
-import { cn, getBackendUrl } from '../../../../lib/utils/utils';
+} from '#lib/hooks/useMetadata';
+import { useAnonToken } from '#features/auth/hooks/useAnonToken';
+import { cn, getBackendUrl } from '#lib/utils/utils';
 
 interface ClientDetailPageProps {
   clientId: ClientId;

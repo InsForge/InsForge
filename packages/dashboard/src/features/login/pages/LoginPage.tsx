@@ -18,10 +18,10 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '../../../components';
+} from '#components';
 import { Button, Input } from '@insforge/ui';
-import { useAuth } from '../../../lib/contexts/AuthContext';
-import { loginFormSchema, LoginForm } from '../../../lib/utils/schemaValidations';
+import { useAuth } from '#lib/contexts/AuthContext';
+import { loginFormSchema, LoginForm } from '#lib/utils/schemaValidations';
 
 export default function LoginPage() {
   const navigate = useNavigate();

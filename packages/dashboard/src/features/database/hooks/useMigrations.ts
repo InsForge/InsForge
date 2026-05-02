@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { migrationService } from '../services/migration.service';
+import { migrationService } from '#features/database/services/migration.service';
 
 export function useMigrations(enabled = false) {
   const query = useQuery({

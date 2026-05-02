@@ -1,4 +1,4 @@
-import type { DashboardAdvisorIssue } from '../../../../types';
+import type { DashboardAdvisorIssue } from '#types';
 
 function formatIssueBody(issue: DashboardAdvisorIssue): string[] {
   const lines: string[] = [`Rule: ${issue.ruleId}`, `Title: ${issue.title}`];

@@ -1,7 +1,7 @@
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
-import { tableService } from '../services/table.service';
-import { databaseTableQueryKeys } from '../queryKeys';
-import { useToast } from '../../../lib/hooks/useToast';
+import { tableService } from '#features/database/services/table.service';
+import { databaseTableQueryKeys } from '#features/database/queryKeys';
+import { useToast } from '#lib/hooks/useToast';
 import {
   ColumnSchema,
   GetTableSchemaResponse,

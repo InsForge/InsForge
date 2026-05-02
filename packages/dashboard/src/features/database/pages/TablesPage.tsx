@@ -1,16 +1,16 @@
 import { useState, useEffect, useCallback, useMemo, useRef, type CSSProperties } from 'react';
 import { CirclePlus, LogIn } from 'lucide-react';
-import PencilIcon from '../../../assets/icons/pencil.svg?react';
-import RefreshIcon from '../../../assets/icons/refresh.svg?react';
-import EmptyBoxSvg from '../../../assets/images/empty_box.svg?react';
-import { useTables } from '../hooks/useTables';
-import { useRecords } from '../hooks/useRecords';
-import { DatabaseSidebar } from '../components/DatabaseSidebar';
-import { RecordFormDialog } from '../components/RecordFormDialog';
-import { TableForm } from '../components/TableForm';
-import { TablesEmptyState } from '../components/TablesEmptyState';
-import { TemplatePreview } from '../components/TemplatePreview';
-import { DATABASE_TEMPLATES, DatabaseTemplate } from '../templates';
+import PencilIcon from '#assets/icons/pencil.svg?react';
+import RefreshIcon from '#assets/icons/refresh.svg?react';
+import EmptyBoxSvg from '#assets/images/empty_box.svg?react';
+import { useTables } from '#features/database/hooks/useTables';
+import { useRecords } from '#features/database/hooks/useRecords';
+import { DatabaseSidebar } from '#features/database/components/DatabaseSidebar';
+import { RecordFormDialog } from '#features/database/components/RecordFormDialog';
+import { TableForm } from '#features/database/components/TableForm';
+import { TablesEmptyState } from '#features/database/components/TablesEmptyState';
+import { TemplatePreview } from '#features/database/components/TemplatePreview';
+import { DATABASE_TEMPLATES, DatabaseTemplate } from '#features/database/templates';
 import {
   Button,
   ConfirmDialog,
@@ -26,16 +26,16 @@ import {
   SelectionClearButton,
   DeleteActionButton,
   TableHeader,
-} from '../../../components';
-import { useConfirm } from '../../../lib/hooks/useConfirm';
-import { useToast } from '../../../lib/hooks/useToast';
-import { DatabaseDataGrid } from '../components/DatabaseDataGrid';
+} from '#components';
+import { useConfirm } from '#lib/hooks/useConfirm';
+import { useToast } from '#lib/hooks/useToast';
+import { DatabaseDataGrid } from '#features/database/components/DatabaseDataGrid';
 import { SortColumn } from 'react-data-grid';
-import { convertValueForColumn } from '../../../lib/utils/utils';
-import { useCSVImport } from '../hooks/useCSVImport';
-import { useTableColumnWidthsPreference } from '../hooks/useTableColumnWidthsPreference';
+import { convertValueForColumn } from '#lib/utils/utils';
+import { useCSVImport } from '#features/database/hooks/useCSVImport';
+import { useTableColumnWidthsPreference } from '#features/database/hooks/useTableColumnWidthsPreference';
 import { useLocation, useSearchParams } from 'react-router-dom';
-import { usePageSize } from '../../../lib/hooks/usePageSize';
+import { usePageSize } from '#lib/hooks/usePageSize';
 
 export default function TablesPage() {
   const location = useLocation();

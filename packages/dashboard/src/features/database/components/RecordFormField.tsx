@@ -8,9 +8,9 @@ import {
   JsonCellEditor,
   type DatabaseRecord,
   type ConvertedValue,
-} from '../../../components';
+} from '#components';
 import { ColumnSchema, ColumnType } from '@insforge/shared-schemas';
-import { convertValueForColumn, cn, formatValueForDisplay } from '../../../lib/utils/utils';
+import { convertValueForColumn, cn, formatValueForDisplay } from '#lib/utils/utils';
 import { LinkRecordDialog } from './LinkRecordDialog';
 import { isValid, parseISO } from 'date-fns';
 

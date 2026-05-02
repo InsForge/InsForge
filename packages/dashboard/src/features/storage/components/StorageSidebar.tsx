@@ -1,13 +1,13 @@
 import { useState, type CSSProperties } from 'react';
 import { Pencil, Plus, Settings, Trash2 } from 'lucide-react';
-import EmptyBoxSvg from '../../../assets/images/empty_box.svg?react';
+import EmptyBoxSvg from '#assets/images/empty_box.svg?react';
 import {
   FeatureSidebar,
   type FeatureSidebarActionButton,
   type FeatureSidebarHeaderButton,
   type FeatureSidebarItemAction,
   type FeatureSidebarListItem,
-} from '../../../components';
+} from '#components';
 import { StorageSettingsMenuDialog } from './StorageSettingsMenuDialog';
 
 /** Props accepted by the StorageSidebar component. */

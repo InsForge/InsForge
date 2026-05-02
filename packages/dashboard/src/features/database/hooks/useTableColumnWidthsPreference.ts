@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { LOCAL_STORAGE_KEYS } from '../../../lib/utils/constants';
+import { LOCAL_STORAGE_KEYS } from '#lib/utils/constants';
 import {
   getLocalStorageJSON,
   removeLocalStorageItem,
   setLocalStorageJSON,
-} from '../../../lib/utils/local-storage';
+} from '#lib/utils/local-storage';
 
 const STORAGE_SAVE_DEBOUNCE_MS = 300;
 

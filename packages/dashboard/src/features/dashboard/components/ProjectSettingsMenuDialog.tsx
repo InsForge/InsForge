@@ -23,24 +23,19 @@ import {
   MenuDialogCloseButton,
 } from '@insforge/ui';
 import type { InstanceInfoEvent } from '@insforge/shared-schemas';
-import { useApiKey } from '../../../lib/hooks/useMetadata';
-import { useDashboardHost, useIsCloudHostingMode } from '../../../lib/config/DashboardHostContext';
-import { useHealth } from '../../../lib/hooks/useHealth';
+import { useApiKey } from '#lib/hooks/useMetadata';
+import { useDashboardHost, useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
+import { useHealth } from '#lib/hooks/useHealth';
 import {
   CLOUD_PROJECT_INFO_QUERY_KEY,
   useCloudProjectInfo,
   type CloudProjectInfo,
-} from '../../../lib/hooks/useCloudProjectInfo';
-import { useConfirm } from '../../../lib/hooks/useConfirm';
-import { useToast } from '../../../lib/hooks/useToast';
-import {
-  cn,
-  compareVersions,
-  getBackendUrl,
-  isInsForgeCloudProject,
-} from '../../../lib/utils/utils';
+} from '#lib/hooks/useCloudProjectInfo';
+import { useConfirm } from '#lib/hooks/useConfirm';
+import { useToast } from '#lib/hooks/useToast';
+import { cn, compareVersions, getBackendUrl, isInsForgeCloudProject } from '#lib/utils/utils';
 import { MCPSection, CLISection, ConnectionStringSection } from './connect';
-import { metadataService } from '../../../lib/services/metadata.service';
+import { metadataService } from '#lib/services/metadata.service';
 
 type TabType = 'info' | 'compute' | 'connect';
 
