@@ -17,11 +17,15 @@ _STATIC_DIR = pathlib.Path(__file__).parent / "static"
 
 
 def make_proxy_handler(server_url: str, token_lock: threading.Lock) -> type:
+    """Build and return a BaseHTTPRequestHandler subclass bound to *server_url* and *token_lock*."""
     class ProxyHandler(http.server.BaseHTTPRequestHandler):
+        """HTTP handler that serves the dashboard UI and proxies /api/* calls to InsForge."""
+
         _server_url = server_url
         _lock = token_lock
 
         def do_GET(self) -> None:
+            """Route GET requests to the static dashboard or the upstream API proxy."""
             parsed = urllib.parse.urlparse(self.path)
             if parsed.path in ("/", ""):
                 self._serve_static()
@@ -31,6 +35,7 @@ def make_proxy_handler(server_url: str, token_lock: threading.Lock) -> type:
                 self.send_error(404)
 
         def _serve_static(self) -> None:
+            """Respond with the dashboard index.html."""
             html_path = _STATIC_DIR / "index.html"
             try:
                 data = html_path.read_bytes()
@@ -44,6 +49,7 @@ def make_proxy_handler(server_url: str, token_lock: threading.Lock) -> type:
             self.wfile.write(data)
 
         def _proxy_api(self) -> None:
+            """Forward an /api/* request to InsForge, handling auth and transparent token refresh."""
             cfg = load_config()
             if not cfg.access_token:
                 self._send_json_error(
@@ -91,10 +97,12 @@ def make_proxy_handler(server_url: str, token_lock: threading.Lock) -> type:
             self.wfile.write(body)
 
         def _attempt_upstream(self, url: str, access_token: str) -> httpx.Response:
+            """Make a single authenticated GET request to the InsForge upstream URL."""
             with httpx.Client(timeout=15.0) as client:
                 return client.get(url, headers={"Authorization": f"Bearer {access_token}"})
 
         def _do_refresh(self) -> str | None:
+            """Attempt to refresh the access token; return the new token or None on failure."""
             with self._lock:
                 cfg = load_config()
                 if not cfg.refresh_token:
@@ -110,6 +118,9 @@ def make_proxy_handler(server_url: str, token_lock: threading.Lock) -> type:
                         return None
                     data = resp.json()
                     new_access = data.get("accessToken") or data.get("access_token", "")
+                    if not new_access:
+                        clear_tokens()
+                        return None
                     new_refresh = data.get("refreshToken") or data.get(
                         "refresh_token", cfg.refresh_token
                     )
@@ -119,6 +130,7 @@ def make_proxy_handler(server_url: str, token_lock: threading.Lock) -> type:
                     return None
 
         def _send_json_error(self, status: int, code: str, message: str) -> None:
+            """Send a JSON error response with the given HTTP status, error code, and message."""
             import json
             body = json.dumps({"error": code, "message": message}).encode()
             self.send_response(status)
@@ -128,6 +140,7 @@ def make_proxy_handler(server_url: str, token_lock: threading.Lock) -> type:
             self.wfile.write(body)
 
         def log_message(self, fmt: str, *args: object) -> None:
+            """Write a timestamped access-log line to stderr."""
             ts = datetime.datetime.now().strftime("%H:%M:%S")
             sys.stderr.write(f"  [{ts}] {fmt % args}\n")
 

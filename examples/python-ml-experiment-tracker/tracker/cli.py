@@ -44,8 +44,10 @@ CREATE TABLE IF NOT EXISTS runs (
 
 
 def handle_errors(fn):
+    """Decorator that converts tracker exceptions into stderr messages and SystemExit(1)."""
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):
+        """Invoke the wrapped command, translating known exceptions to user-facing output."""
         try:
             return fn(*args, **kwargs)
         except AuthError as e:
@@ -63,10 +65,14 @@ def handle_errors(fn):
         except httpx.TimeoutException:
             err_console.print("[bold red]Request timed out.[/]")
             raise SystemExit(1)
+        except httpx.RequestError as e:
+            err_console.print(f"[bold red]Network error:[/] {e}")
+            raise SystemExit(1)
     return wrapper
 
 
 def parse_kv_pairs(pairs: tuple[str, ...]) -> dict[str, Any]:
+    """Parse KEY=VALUE strings into a typed dict, coercing bool/int/float where applicable."""
     result: dict[str, Any] = {}
     for pair in pairs:
         if "=" not in pair:
@@ -77,14 +83,23 @@ def parse_kv_pairs(pairs: tuple[str, ...]) -> dict[str, Any]:
         key, _, raw = pair.partition("=")
         key = key.strip()
         raw = raw.strip()
-        try:
-            result[key] = float(raw)
-        except ValueError:
-            result[key] = raw
+        if raw.lower() == "true":
+            result[key] = True
+        elif raw.lower() == "false":
+            result[key] = False
+        else:
+            try:
+                result[key] = int(raw)
+            except ValueError:
+                try:
+                    result[key] = float(raw)
+                except ValueError:
+                    result[key] = raw
     return result
 
 
 def now_iso() -> str:
+    """Return the current UTC time as an ISO-8601 string."""
     return datetime.now(timezone.utc).isoformat()
 
 
@@ -238,7 +253,7 @@ def cmd_runs_list(experiment: str | None, limit: int, offset: int) -> None:
         return
 
     table = Table(title="Experiment Runs", show_header=True, header_style="bold cyan")
-    table.add_column("ID", style="dim", width=10)
+    table.add_column("ID", style="dim")
     table.add_column("Experiment")
     table.add_column("Run Name")
     table.add_column("Status")
@@ -248,7 +263,7 @@ def cmd_runs_list(experiment: str | None, limit: int, offset: int) -> None:
 
     for r in runs:
         table.add_row(
-            r.id[:8],
+            r.id,
             r.experiment_name,
             r.run_name or "—",
             r.status,
@@ -309,6 +324,7 @@ def cmd_experiments_list(limit: int) -> None:
 # ── Helpers ───────────────────────────────────────────────────────────────
 
 def _print_run_panel(run) -> None:
+    """Print a Rich-formatted panel showing run details, hyperparameters, and metrics."""
     params_table = Table(show_header=True, header_style="bold", box=None, padding=(0, 1))
     params_table.add_column("Key")
     params_table.add_column("Value")

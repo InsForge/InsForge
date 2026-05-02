@@ -9,11 +9,14 @@ from tracker.models import Experiment, Run
 
 
 class AuthError(Exception):
-    pass
+    """Raised when an operation requires valid credentials that are absent or expired."""
 
 
 class APIError(Exception):
+    """Raised when the InsForge API returns a non-2xx response."""
+
     def __init__(self, status_code: int, code: str, message: str) -> None:
+        """Store the HTTP status code, machine-readable error code, and human-readable message."""
         super().__init__(message)
         self.status_code = status_code
         self.code = code
@@ -21,7 +24,10 @@ class APIError(Exception):
 
 
 class InsForgeClient:
+    """HTTP client for the InsForge BaaS API with automatic token refresh on 401."""
+
     def __init__(self, config: Config | None = None) -> None:
+        """Initialise the client, loading config from disk if not provided."""
         self._config = config or load_config()
         self._http = httpx.Client(
             base_url=self._config.server_url,
@@ -29,22 +35,27 @@ class InsForgeClient:
         )
 
     def close(self) -> None:
+        """Close the underlying HTTP connection pool."""
         self._http.close()
 
     def __enter__(self) -> "InsForgeClient":
+        """Support use as a context manager, returning self."""
         return self
 
     def __exit__(self, *args: Any) -> None:
+        """Close the HTTP client on context-manager exit."""
         self.close()
 
     # ── Internal helpers ──────────────────────────────────────────────────
 
     def _auth_headers(self) -> dict[str, str]:
+        """Return the Authorization header dict, raising AuthError if not logged in."""
         if not self._config.access_token:
             raise AuthError("Not logged in. Run `tracker login` first.")
         return {"Authorization": f"Bearer {self._config.access_token}"}
 
     def _raise_for_error(self, response: httpx.Response) -> None:
+        """Raise APIError if the response is not a 2xx success."""
         if response.is_success:
             return
         try:
@@ -57,6 +68,7 @@ class InsForgeClient:
         raise APIError(response.status_code, code, message)
 
     def _refresh_token(self) -> None:
+        """Exchange the stored refresh token for a new access token, updating config on disk."""
         if not self._config.refresh_token:
             raise AuthError("Session expired. Run `tracker login` again.")
         resp = self._http.post(
@@ -83,6 +95,7 @@ class InsForgeClient:
         extra_headers: dict[str, str] | None = None,
         retry_on_401: bool = True,
     ) -> httpx.Response:
+        """Send an authenticated request, transparently retrying once after a 401."""
         headers = {**self._auth_headers(), **(extra_headers or {})}
         resp = self._http.request(method, path, json=json, params=params, headers=headers)
 
@@ -100,11 +113,13 @@ class InsForgeClient:
     # ── Auth ──────────────────────────────────────────────────────────────
 
     def register(self, email: str, password: str) -> dict[str, Any]:
+        """Create a new InsForge user account and return the raw response body."""
         resp = self._http.post("/api/auth/users", json={"email": email, "password": password})
         self._raise_for_error(resp)
         return resp.json()
 
     def login(self, email: str, password: str) -> tuple[str, str]:
+        """Authenticate with email/password and return (access_token, refresh_token)."""
         resp = self._http.post("/api/auth/sessions", json={"email": email, "password": password})
         self._raise_for_error(resp)
         data = resp.json()
@@ -135,6 +150,7 @@ class InsForgeClient:
         order: str | None = None,
         select: str | None = None,
     ) -> list[dict[str, Any]]:
+        """Fetch rows from a database table with optional filtering, ordering, and pagination."""
         params: dict[str, Any] = {"offset": offset}
         if limit is not None:
             params["limit"] = limit
@@ -148,6 +164,7 @@ class InsForgeClient:
         return resp.json()
 
     def _create_record(self, table: str, record: dict[str, Any]) -> dict[str, Any]:
+        """Insert a single record into a table and return the created row."""
         resp = self._request(
             "POST",
             f"/api/database/records/{table}",
@@ -162,6 +179,7 @@ class InsForgeClient:
     def get_or_create_experiment(
         self, name: str, description: str | None = None
     ) -> Experiment:
+        """Return the named experiment, creating it if it does not yet exist."""
         rows = self._list_records(
             "experiments",
             filters={"name": f"eq.{name}"},
@@ -189,6 +207,7 @@ class InsForgeClient:
             raise
 
     def list_experiments(self, limit: int = 50) -> list[Experiment]:
+        """Return up to *limit* experiments ordered by creation time, newest first."""
         rows = self._list_records("experiments", limit=limit, order="created_at.desc")
         return [Experiment.from_dict(r) for r in rows]
 
@@ -205,6 +224,7 @@ class InsForgeClient:
         started_at: str,
         finished_at: str,
     ) -> Run:
+        """Insert a run record and return the persisted Run model."""
         record: dict[str, Any] = {
             "experiment_id": experiment_id,
             "experiment_name": experiment_name,
@@ -226,6 +246,7 @@ class InsForgeClient:
         limit: int = 20,
         offset: int = 0,
     ) -> list[Run]:
+        """Return recent runs, optionally filtered by experiment name."""
         filters: dict[str, str] = {}
         if experiment_name:
             filters["experiment_name"] = f"eq.{experiment_name}"
@@ -239,6 +260,7 @@ class InsForgeClient:
         return [Run.from_dict(r) for r in rows]
 
     def get_run(self, run_id: str) -> Run:
+        """Fetch a single run by its full UUID, raising APIError(404) if missing."""
         rows = self._list_records("runs", filters={"id": f"eq.{run_id}"}, limit=1)
         if not rows:
             raise APIError(404, "NOT_FOUND", f"Run not found: {run_id}")

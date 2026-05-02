@@ -229,7 +229,7 @@
 
   function showError(type, msg) {
     errorBanner.dataset.type = type;
-    errorMessage.innerHTML = msg;
+    errorMessage.textContent = msg;
     errorBanner.hidden = false;
   }
 
@@ -248,13 +248,13 @@
       ]);
     } catch (e) {
       loadingIndicator.hidden = true;
-      showError('connect', 'Cannot reach the local proxy server. Is <code>tracker serve</code> still running?');
+      showError('connect', 'Cannot reach the local proxy server. Is "tracker serve" still running?');
       return;
     }
 
     if (runsResp.status === 401 || expsResp.status === 401) {
       loadingIndicator.hidden = true;
-      showError('auth', 'Not logged in. Run <code>tracker login</code> in your terminal, then reload.');
+      showError('auth', 'Not logged in. Run "tracker login" in your terminal, then reload.');
       return;
     }
     if (runsResp.status === 502 || expsResp.status === 502) {
@@ -265,8 +265,9 @@
     }
     if (!runsResp.ok || !expsResp.ok) {
       loadingIndicator.hidden = true;
-      const body = await (runsResp.ok ? expsResp : runsResp).json().catch(() => ({}));
-      showError('generic', body.message || `Unexpected error (${runsResp.status})`);
+      const failedResp = runsResp.ok ? expsResp : runsResp;
+      const body = await failedResp.json().catch(() => ({}));
+      showError('generic', body.message || `Unexpected error (${failedResp.status})`);
       return;
     }
 

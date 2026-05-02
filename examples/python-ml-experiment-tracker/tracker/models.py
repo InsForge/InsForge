@@ -6,6 +6,8 @@ from typing import Any
 
 @dataclasses.dataclass
 class Experiment:
+    """An experiment groups related runs under a shared name."""
+
     id: str
     name: str
     description: str | None
@@ -13,6 +15,7 @@ class Experiment:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Experiment":
+        """Construct an Experiment from a raw API response dict."""
         return cls(
             id=data["id"],
             name=data["name"],
@@ -23,6 +26,8 @@ class Experiment:
 
 @dataclasses.dataclass
 class Run:
+    """A single execution record belonging to an experiment."""
+
     id: str
     experiment_id: str | None
     experiment_name: str
@@ -37,6 +42,7 @@ class Run:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Run":
+        """Construct a Run from a raw API response dict, applying safe defaults."""
         return cls(
             id=data["id"],
             experiment_id=data.get("experiment_id"),
