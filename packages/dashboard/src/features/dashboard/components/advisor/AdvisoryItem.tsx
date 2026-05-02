@@ -43,10 +43,9 @@ export function AdvisoryItem({ issue, expanded, onToggle }: AdvisoryItemProps) {
     }
   };
 
-  const copyButtonVisibility =
-    expanded || copied
-      ? 'opacity-100'
-      : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100';
+  const copyButtonVisibility = expanded
+    ? 'opacity-100'
+    : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100';
 
   return (
     <div className="group border-b border-[var(--alpha-8)] transition-colors last:border-b-0 hover:bg-[var(--alpha-8)]">
