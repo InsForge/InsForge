@@ -80,6 +80,9 @@ class InsForgeClient:
             raise AuthError("Session expired. Run `tracker login` again.")
         data = resp.json()
         new_access = data.get("accessToken") or data.get("access_token", "")
+        if not new_access:
+            clear_tokens()
+            raise AuthError("Session expired. Run `tracker login` again.")
         new_refresh = data.get("refreshToken") or data.get("refresh_token", self._config.refresh_token)
         self._config.access_token = new_access
         self._config.refresh_token = new_refresh
