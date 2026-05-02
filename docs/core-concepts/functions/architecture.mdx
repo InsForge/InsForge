@@ -1,13 +1,49 @@
 ---
 title: Functions Architecture
-description: Serverless JavaScript functions running in isolated Deno runtime
+description: Serverless JavaScript functions with dual runtime support — Deno Subhosting (cloud) and local Deno runtime (self-hosted)
 ---
 
 ## Overview
 
-InsForge Functions provide a secure, scalable serverless compute platform that runs JavaScript/TypeScript code in isolated Deno workers with full access to the InsForge SDK.
+InsForge Functions provide a secure, scalable serverless compute platform that runs JavaScript/TypeScript code with full access to the InsForge SDK. The architecture supports two runtime modes depending on your deployment:
 
-## Technology Stack
+- **Cloud (InsForge Cloud)**: Functions are deployed to [Deno Subhosting](https://deno.com/subhosting), giving you globally distributed edge execution with zero infrastructure management.
+- **Self-Hosted (Docker)**: Functions run in a local Deno runtime process alongside your backend, executing in isolated Web Workers.
+
+## Architecture
+
+### Cloud — Deno Subhosting
+
+```mermaid
+graph TB
+    Client[Client Application] -->|"1. Direct: {appKey}.functions.insforge.app/{slug}"| Subhosting[Deno Subhosting]
+    Client -->|"2. Fallback: /functions/{slug}"| Backend[Backend API :7130]
+    Backend -->|Proxy| Subhosting
+
+    Backend -->|Deploy via API| DenoAPI[Deno Subhosting API]
+    DenoAPI --> Subhosting
+
+    Backend --> DB[(PostgreSQL)]
+    Subhosting --> SDK[InsForge SDK]
+    SDK --> Backend
+
+    style Client fill:#1e293b,stroke:#475569,color:#e2e8f0
+    style Backend fill:#166534,stroke:#22c55e,color:#dcfce7
+    style Subhosting fill:#c2410c,stroke:#fb923c,color:#fed7aa
+    style DenoAPI fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
+    style DB fill:#0e7490,stroke:#06b6d4,color:#cffafe
+    style SDK fill:#1e40af,stroke:#3b82f6,color:#dbeafe
+```
+
+In cloud mode, the SDK routes requests using a smart fallback strategy:
+
+1. **Direct**: SDK calls `https://{appKey}.functions.insforge.app/{slug}` (Deno Subhosting)
+2. **Fallback**: If direct returns 404, SDK falls back to `https://{appKey}.{region}.insforge.app/functions/{slug}` (backend proxy)
+3. **Error**: Non-404 errors from direct are returned immediately (no fallback)
+
+The SDK automatically derives the subhosting URL from your base URL when it matches the `*.insforge.app` domain pattern.
+
+### Self-Hosted — Local Deno Runtime
 
 ```mermaid
 graph TB
@@ -32,26 +68,61 @@ graph TB
     style SDK fill:#1e40af,stroke:#3b82f6,color:#dbeafe
 ```
 
+In self-hosted mode, requests always go through the backend proxy:
+
+1. Client calls `POST /functions/{slug}` on the backend
+2. Backend proxies to the local Deno runtime (`localhost:7133`)
+3. Deno runtime loads function code and executes it in an isolated Web Worker
+4. Response is returned through the proxy
+
 ## Core Components
+
+### Cloud
+
+| Component | Technology | Purpose |
+|-----------|------------|---------|
+| **Backend API** | Node.js/Express | Function management, deployment orchestration, proxy fallback |
+| **Deno Subhosting** | Deno Deploy infrastructure | Globally distributed edge execution |
+| **Deno Subhosting API** | `api.deno.com/v1` | Deployment, project, and domain management |
+| **Database** | PostgreSQL | Function code, metadata, and deployment records |
+| **SDK** | @insforge/sdk | Client-side invocation with smart routing |
+| **Secrets** | AES-256-GCM | Encrypted environment variables passed to deployments |
+
+### Self-Hosted
 
 | Component | Technology | Port | Purpose |
 |-----------|------------|------|---------|
 | **Backend API** | Node.js/Express | 7130 | Function management, authentication, proxy |
-| **Runtime** | Deno v2.0.6 | 7133 | Secure JavaScript/TypeScript execution |
-| **Sandbox** | Web Workers | - | Isolated execution environment |
+| **Runtime** | Deno | 7133 | Secure JavaScript/TypeScript execution |
+| **Sandbox** | Web Workers | — | Isolated execution environment |
 | **Database** | PostgreSQL | 5432 | Function code and metadata storage |
-| **SDK** | @insforge/sdk | - | Pre-injected client for backend access |
-| **Secrets** | AES-256-GCM | - | Encrypted environment variables |
+| **SDK** | @insforge/sdk | — | Available inside functions for backend access |
+| **Secrets** | AES-256-GCM | — | Encrypted environment variables |
 
 ## How It Works
+
+### Cloud Deployment
+
+When a function is created or updated with `status: "active"`:
+
+1. Backend saves the function code to the database
+2. Backend bundles **all** active functions into a single Deno Subhosting project
+3. An auto-generated router (`main.ts`) handles path-based routing between functions
+4. Legacy `module.exports` format is automatically transformed to Deno-native `export default`
+5. Deployment is pushed to Deno Subhosting API with secrets as environment variables
+6. Backend polls until deployment succeeds, then records the deployment URL
+
+Once deployed, functions are accessible at `https://{appKey}.functions.insforge.app/{slug}`.
+
+### Self-Hosted Execution
 
 When a client makes a request to `/functions/{slug}`:
 
 1. The backend API receives and validates the request
-2. Request is proxied to the Deno runtime
-3. Function code is executed in an isolated Web Worker
+2. Request is proxied to the local Deno runtime on port 7133
+3. Function code is loaded from the database and executed in an isolated Web Worker
 4. The function has access to the InsForge SDK and environment variables
-5. Response is returned to the client
+5. Response is returned to the client through the proxy
 
 ### Authentication Flow
 
@@ -59,39 +130,44 @@ When a client makes a request to `/functions/{slug}`:
 sequenceDiagram
     participant C as Client
     participant B as Backend API
-    participant D as Deno Runtime
-    participant W as Worker
+    participant R as Runtime (Subhosting or Local)
     participant SDK as InsForge SDK
 
-    C->>B: POST /functions/my-api<br/>Authorization: Bearer TOKEN
-    B->>D: Proxy request with headers
-    D->>D: Fetch function code from DB
-    D->>D: Decrypt secrets
-    D->>W: Create worker with code + secrets
-    W->>SDK: createClient({token})
-    SDK->>B: Validate token
-    B-->>SDK: User data
-    W->>C: HTTP Response
+    C->>R: POST /{slug}<br/>Authorization: Bearer TOKEN
+    Note over C,R: Cloud: direct to Subhosting<br/>Self-Hosted: via Backend proxy
+    R->>R: Execute function code
+    R->>SDK: createClient({edgeFunctionToken: TOKEN})
+    SDK->>B: Authenticated request (validates token)
+    B-->>SDK: User data / query results
+    R-->>C: HTTP Response
 ```
+
+Functions receive the user's auth token via the `Authorization` header. Inside the function, create an SDK client with `edgeFunctionToken` to make authenticated requests that respect Row Level Security.
 
 ## Performance Characteristics
 
 ### Execution Limits
 
-| Limit | Value | Description |
-|-------|-------|-------------|
-| **Timeout** | 30 seconds | Maximum execution time per invocation |
-| **Memory** | Worker default | Depends on Deno worker allocation |
-| **Payload Size** | 10MB | Maximum request/response size |
-| **Concurrent Workers** | System dependent | Limited by server resources |
-| **Cold Start** | ~50-200ms | Time to create new worker |
+| Limit | Cloud (Subhosting) | Self-Hosted |
+|-------|-------------------|-------------|
+| **Timeout** | 30 seconds | 30 seconds |
+| **Payload Size** | 10MB | 10MB |
+| **Cold Start** | Managed by Deno Subhosting | ~50–200ms (worker creation) |
+| **Concurrency** | Managed by Deno Subhosting | Limited by server resources |
+| **Memory** | Managed by Deno Subhosting | Depends on Deno worker allocation |
 
 ### Optimization Strategies
 
-1. **Worker Pooling**: Workers are created on-demand
-2. **Code Caching**: Function code cached in memory
-3. **Secret Caching**: Decrypted secrets cached per execution
-4. **SDK Reuse**: SDK client created once per worker
+**Cloud:**
+1. **Global Distribution**: Deno Subhosting runs functions at the edge, close to users
+2. **Bundled Deployment**: All active functions deploy as a single project, sharing startup cost
+3. **Automatic Scaling**: Deno Subhosting handles scaling and isolate management
+
+**Self-Hosted:**
+1. **On-Demand Workers**: A new worker is created per invocation and terminated after completion/timeout
+2. **Keep Function Logic Lean**: Minimize startup work inside handlers to reduce per-request overhead
+3. **Runtime Health**: Monitor runtime availability and latency to avoid proxy failures
+4. **Scale Host Resources**: Concurrency is bounded by host CPU/memory in self-hosted mode
 
 ## Best Practices
 
@@ -113,5 +189,5 @@ sequenceDiagram
 </CardGroup>
 
 <Note>
-Functions SDK is currently only available for TypeScript. Mobile SDKs (Swift, Kotlin, Flutter) can invoke functions via HTTP requests to the functions endpoint.
+Functions SDK is currently only available for TypeScript. Mobile SDKs (Swift, Kotlin) can invoke functions via HTTP requests to the functions endpoint.
 </Note>

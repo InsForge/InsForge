@@ -83,6 +83,10 @@ InsForge supports both `code` and `link` methods for email verification and pass
 - `redirectTo` must be included in `allowedRedirectUrls` before link-based flows can use it.
 - If `allowedRedirectUrls` is empty, InsForge allows all redirects for smoother development UX. Do not rely on that behavior in production.
 
+<Note>
+Verification and password-reset emails are sent through InsForge Cloud by default. To send them from your own server with custom subject lines and HTML, configure [Custom SMTP](/core-concepts/email/custom-smtp) under **Authentication → Email** in the dashboard — the four `email-verification-*` and `reset-password-*` templates are fully editable.
+</Note>
+
 For link-based email verification:
 
 - The email link opens `GET /api/auth/email/verify-link?token=...`
@@ -351,26 +355,5 @@ Choose the authentication SDK guide for your platform:
   <Card title="Kotlin" icon="android" href="/sdks/kotlin/auth">
     Android applications with Google Sign-In integration
   </Card>
-
-  <Card title="Flutter" icon="mobile" href="/sdks/flutter/auth">
-    Cross-platform mobile apps for iOS and Android
-  </Card>
 </CardGroup>
 
-### UI Components (TypeScript)
-
-For web applications, we also provide pre-built authentication UI components:
-
-<CardGroup cols={3}>
-  <Card title="React" icon="react" href="/sdks/typescript/ui-components/react">
-    React + Vite apps
-  </Card>
-
-  <Card title="Next.js" icon="n" href="/sdks/typescript/ui-components/nextjs">
-    Next.js with SSR
-  </Card>
-
-  <Card title="Custom UI" icon="paintbrush" href="/sdks/typescript/ui-components/customization">
-    Build your own
-  </Card>
-</CardGroup>

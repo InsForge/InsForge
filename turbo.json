@@ -1,0 +1,49 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["src/**", "tsconfig*.json", "package.json", "vite.config.*", "tsup.config.*"],
+      "env": ["VITE_*"]
+    },
+    "@insforge/backend#build": {
+      "outputs": ["../dist/server.js", "../dist/server.js.map"]
+    },
+    "frontend#build": {
+      "dependsOn": [],
+      "outputs": ["../dist/frontend/**"]
+    },
+    "@insforge/ui#build": {
+      "outputs": ["dist/**"]
+    },
+    "@insforge/dashboard#build": {
+      "outputs": ["dist/**"]
+    },
+    "@insforge/shared-schemas#build": {
+      "outputs": ["dist/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "outputs": [],
+      "inputs": ["src/**", "tsconfig*.json", "package.json"]
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "outputs": [],
+      "cache": false
+    },
+    "lint": {
+      "outputs": [],
+      "inputs": ["src/**", "*.config.*", "package.json"],
+      "cache": false
+    },
+    "dev": {
+      "dependsOn": ["^build"],
+      "persistent": true,
+      "cache": false
+    },
+    "clean": {
+      "cache": false
+    }
+  }
+}

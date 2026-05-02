@@ -1,6 +1,10 @@
 import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
+import { SocketManager } from '@/infra/socket/socket.manager.js';
+import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import logger from '@/utils/logger.js';
+import { AppError } from '@/api/middlewares/error.js';
+import { ERROR_CODES } from '@/types/error-constants.js';
 import type {
   AIUsageDataSchema,
   AIUsageRecordSchema,
@@ -28,6 +32,20 @@ export class AIUsageService {
     return this.pool;
   }
 
+  private broadcastUsageUpdate(): void {
+    try {
+      const socket = SocketManager.getInstance();
+      socket.broadcastToRoom(
+        'role:project_admin',
+        ServerEvents.DATA_UPDATE,
+        { resource: DataUpdateResourceType.AI_USAGE },
+        'system'
+      );
+    } catch (error) {
+      logger.debug('AI usage update broadcast skipped', { error });
+    }
+  }
+
   async trackUsage(data: AIUsageDataSchema): Promise<{ id: string }> {
     try {
       const result = await this.getPool().query(
@@ -51,10 +69,11 @@ export class AIUsageService {
         imageCount: data.imageCount,
       });
 
+      this.broadcastUsageUpdate();
       return { id: result.rows[0].id };
     } catch (error) {
       logger.error('Failed to track AI usage', { error, data });
-      throw new Error('Failed to track AI usage');
+      throw new AppError('Failed to track AI usage', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
 
@@ -83,10 +102,11 @@ export class AIUsageService {
         modelId,
       });
 
+      this.broadcastUsageUpdate();
       return { id: usageResult.rows[0].id };
     } catch (error) {
       logger.error('Failed to track chat usage', { error, configId });
-      throw new Error('Failed to track chat usage');
+      throw new AppError('Failed to track chat usage', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
 
@@ -123,10 +143,11 @@ export class AIUsageService {
         modelId,
       });
 
+      this.broadcastUsageUpdate();
       return { id: usageResult.rows[0].id };
     } catch (error) {
       logger.error('Failed to track image usage', { error, configId });
-      throw new Error('Failed to track image usage');
+      throw new AppError('Failed to track image usage', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
 
@@ -163,7 +184,7 @@ export class AIUsageService {
       return result.rows;
     } catch (error) {
       logger.error('Failed to fetch usage by config', { error, configId });
-      throw new Error('Failed to fetch usage records');
+      throw new AppError('Failed to fetch usage records', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
 
@@ -212,7 +233,7 @@ export class AIUsageService {
       };
     } catch (error) {
       logger.error('Failed to fetch usage summary', { error, configId });
-      throw new Error('Failed to fetch usage summary');
+      throw new AppError('Failed to fetch usage summary', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
 
@@ -277,7 +298,7 @@ export class AIUsageService {
       };
     } catch (error) {
       logger.error('Failed to fetch all usage records', { error });
-      throw new Error('Failed to fetch usage records');
+      throw new AppError('Failed to fetch usage records', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
 }

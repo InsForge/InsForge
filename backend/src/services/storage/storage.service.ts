@@ -1,6 +1,7 @@
 import path from 'path';
-import { Pool } from 'pg';
+import { Pool, PoolClient } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
+import { withUserContext, UserContext } from '@/services/db/user-context.service.js';
 import { StorageRecord } from '@/types/storage.js';
 import {
   StorageBucketSchema,
@@ -97,15 +98,22 @@ export class StorageService {
    * @param originalKey - The original filename
    * @returns The next available key
    */
-  private async generateNextAvailableKey(bucket: string, originalKey: string): Promise<string> {
+  private async generateNextAvailableKey(
+    bucket: string,
+    originalKey: string,
+    db: PoolClient | Pool
+  ): Promise<string> {
     // Parse filename and extension for potential auto-renaming
     const lastDotIndex = originalKey.lastIndexOf('.');
     const baseName = lastDotIndex > 0 ? originalKey.substring(0, lastDotIndex) : originalKey;
     const extension = lastDotIndex > 0 ? originalKey.substring(lastDotIndex) : '';
 
-    // Use efficient SQL query to find the highest existing counter
-    // This query finds all files matching the pattern and extracts the counter number
-    const result = await this.getPool().query(
+    // Dedup runs on the admin pool so it sees ALL rows, not just those
+    // RLS lets the caller view. Otherwise an RLS-hidden collision would
+    // pass the check and silently overwrite another user's blob — the
+    // (bucket, key) keyspace is globally unique. Two users uploading
+    // `note.txt` get `note.txt` and `note (1).txt` respectively.
+    const result = await db.query(
       `
         SELECT key FROM storage.objects
         WHERE bucket = $1
@@ -148,57 +156,64 @@ export class StorageService {
   }
 
   async putObject(
+    ctx: UserContext,
     bucket: string,
     originalKey: string,
-    file: Express.Multer.File,
-    userId?: string
+    file: Express.Multer.File
   ): Promise<StorageFileSchema> {
     this.validateBucketName(bucket);
     this.validateKey(originalKey);
 
-    // Generate next available key using (1), (2), (3) pattern if duplicates exist
-    const finalKey = await this.generateNextAvailableKey(bucket, originalKey);
+    // Admin-pool dedup (sees all rows; avoids silent cross-user blob overwrite).
+    const finalKey = await this.generateNextAvailableKey(bucket, originalKey, this.getPool());
 
-    // Save file using backend
-    await this.provider.putObject(bucket, finalKey, file);
+    return withUserContext(this.getPool(), ctx, async (db) => {
+      // INSERT before provider write so UNIQUE (bucket, key) catches any
+      // race-window collision before any blob is touched. Provider write
+      // stays inside the transaction — a provider failure throws, the tx
+      // rolls back, and no orphan row remains.
+      const result = await db.query(
+        `
+        INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by, uploaded_via)
+        VALUES ($1, $2, $3, $4, $5, 'rest')
+        RETURNING uploaded_at as "uploadedAt"
+      `,
+        [bucket, finalKey, file.size, file.mimetype || null, ctx.userId || null]
+      );
 
-    // Save metadata to database and return the timestamp in one operation
-    const result = await this.getPool().query(
-      `
-      INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING uploaded_at as "uploadedAt"
-    `,
-      [bucket, finalKey, file.size, file.mimetype || null, userId || null]
-    );
+      if (!result.rows[0]) {
+        throw new Error(`Failed to retrieve upload timestamp for ${bucket}/${finalKey}`);
+      }
 
-    if (!result.rows[0]) {
-      throw new Error(`Failed to retrieve upload timestamp for ${bucket}/${finalKey}`);
-    }
+      await this.provider.putObject(bucket, finalKey, file);
 
-    return {
-      bucket,
-      key: finalKey,
-      size: file.size,
-      mimeType: file.mimetype,
-      uploadedAt: result.rows[0].uploadedAt,
-      url: `${getApiBaseUrl()}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(finalKey)}`,
-    };
+      return {
+        bucket,
+        key: finalKey,
+        size: file.size,
+        mimeType: file.mimetype,
+        uploadedAt: result.rows[0].uploadedAt,
+        url: `${getApiBaseUrl()}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(finalKey)}`,
+      };
+    });
   }
 
   async getObject(
+    ctx: UserContext,
     bucket: string,
     key: string
   ): Promise<{ file: Buffer; metadata: StorageFileSchema } | null> {
     this.validateBucketName(bucket);
     this.validateKey(key);
 
-    const result = await this.getPool().query(
-      'SELECT * FROM storage.objects WHERE bucket = $1 AND key = $2',
-      [bucket, key]
-    );
-
-    const metadata = result.rows[0] as StorageRecord | undefined;
+    // RLS filters this SELECT — non-owners get an empty result and a 404.
+    const metadata = await withUserContext(this.getPool(), ctx, async (db) => {
+      const result = await db.query(
+        'SELECT * FROM storage.objects WHERE bucket = $1 AND key = $2',
+        [bucket, key]
+      );
+      return result.rows[0] as StorageRecord | undefined;
+    });
 
     if (!metadata) {
       return null;
@@ -222,72 +237,71 @@ export class StorageService {
     };
   }
 
-  async deleteObject(
-    bucket: string,
-    key: string,
-    userId: string,
-    isAdmin: boolean
-  ): Promise<boolean> {
+  async deleteObject(ctx: UserContext, bucket: string, key: string): Promise<boolean> {
     this.validateBucketName(bucket);
     this.validateKey(key);
 
-    // Admin can delete any object, non-admin can only delete their own uploads
-    const result = isAdmin
-      ? await this.getPool().query('DELETE FROM storage.objects WHERE bucket = $1 AND key = $2', [
-          bucket,
-          key,
-        ])
-      : await this.getPool().query(
-          'DELETE FROM storage.objects WHERE bucket = $1 AND key = $2 AND uploaded_by = $3',
-          [bucket, key, userId]
-        );
+    // DB DELETE first (RLS DELETE policy gates authorization) so a permissive
+    // SELECT + restrictive DELETE policy combo can't be exploited to destroy
+    // other users' blobs. If rowCount=0 the caller had no DELETE permission
+    // (or the row was already gone) — return false without touching storage.
+    // Provider delete then runs outside the tx; failure here leaves an orphan
+    // blob that an external GC sweep can reclaim, but never an orphan row.
+    const deleted = await withUserContext(this.getPool(), ctx, async (db) => {
+      const result = await db.query('DELETE FROM storage.objects WHERE bucket = $1 AND key = $2', [
+        bucket,
+        key,
+      ]);
+      return (result.rowCount ?? 0) > 0;
+    });
 
-    // If delete succeeded in DB, also delete from storage provider
-    if (result.rowCount !== null && result.rowCount > 0) {
-      await this.provider.deleteObject(bucket, key);
-      return true;
+    if (!deleted) {
+      return false;
     }
 
-    return false;
+    await this.provider.deleteObject(bucket, key);
+    return true;
   }
 
   async listObjects(
+    ctx: UserContext,
     bucket: string,
-    prefix?: string,
+    prefix: string | undefined,
     limit: number = DEFAULT_LIST_LIMIT,
     offset: number = 0,
-    searchQuery?: string
+    searchQuery: string | undefined
   ): Promise<{ objects: StorageFileSchema[]; total: number }> {
     this.validateBucketName(bucket);
 
-    const client = await this.getPool().connect();
-    try {
-      let query = 'SELECT * FROM storage.objects WHERE bucket = $1';
-      let countQuery = 'SELECT COUNT(*) as count FROM storage.objects WHERE bucket = $1';
-      const params: (string | number)[] = [bucket];
-      let paramIndex = 2;
+    let query = 'SELECT * FROM storage.objects WHERE bucket = $1';
+    let countQuery = 'SELECT COUNT(*) as count FROM storage.objects WHERE bucket = $1';
+    const params: (string | number)[] = [bucket];
+    let paramIndex = 2;
 
-      if (prefix) {
-        query += ` AND key LIKE $${paramIndex}`;
-        countQuery += ` AND key LIKE $${paramIndex}`;
-        params.push(`${escapeSqlLikePattern(prefix)}%`);
-        paramIndex++;
-      }
+    if (prefix) {
+      query += ` AND key LIKE $${paramIndex}`;
+      countQuery += ` AND key LIKE $${paramIndex}`;
+      params.push(`${escapeSqlLikePattern(prefix)}%`);
+      paramIndex++;
+    }
 
-      // Add search functionality for file names (key field)
-      if (searchQuery && searchQuery.trim()) {
-        query += ` AND key LIKE $${paramIndex}`;
-        countQuery += ` AND key LIKE $${paramIndex}`;
-        const searchPattern = `%${escapeSqlLikePattern(searchQuery.trim())}%`;
-        params.push(searchPattern);
-        paramIndex++;
-      }
+    // Add search functionality for file names (key field)
+    if (searchQuery && searchQuery.trim()) {
+      query += ` AND key LIKE $${paramIndex}`;
+      countQuery += ` AND key LIKE $${paramIndex}`;
+      const searchPattern = `%${escapeSqlLikePattern(searchQuery.trim())}%`;
+      params.push(searchPattern);
+      paramIndex++;
+    }
 
-      query += ` ORDER BY key LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-      const queryParams = [...params, limit, offset];
+    query += ` ORDER BY key LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    const queryParams = [...params, limit, offset];
 
-      const objectsResult = await client.query(query, queryParams);
-      const totalResult = await client.query(countQuery, params);
+    // RLS scopes both queries — admin sees everything, authenticated callers
+    // see only rows their policies allow. No app-side filter.
+    return withUserContext(this.getPool(), ctx, async (db) => {
+      const objectsResult = await db.query(query, queryParams);
+      const totalResult = await db.query(countQuery, params);
 
       return {
         objects: objectsResult.rows.map((obj) => ({
@@ -298,9 +312,7 @@ export class StorageService {
         })),
         total: parseInt(totalResult.rows[0].count, 10),
       };
-    } finally {
-      client.release();
-    }
+    });
   }
 
   async isBucketPublic(bucket: string): Promise<boolean> {
@@ -409,6 +421,7 @@ export class StorageService {
 
   // New methods for universal upload/download strategies
   async getUploadStrategy(
+    ctx: UserContext,
     bucket: string,
     metadata: {
       filename: string;
@@ -418,8 +431,7 @@ export class StorageService {
   ) {
     this.validateBucketName(bucket);
 
-    const client = await this.getPool().connect();
-    try {
+    return withUserContext(this.getPool(), ctx, async (client) => {
       // Check if bucket exists
       const bucketResult = await client.query('SELECT name FROM storage.buckets WHERE name = $1', [
         bucket,
@@ -429,13 +441,12 @@ export class StorageService {
         throw new Error(`Bucket "${bucket}" does not exist`);
       }
 
-      // Generate next available key using (1), (2), (3) pattern if duplicates exist
-      const key = await this.generateNextAvailableKey(bucket, metadata.filename);
+      // Generate next available key using (1), (2), (3) pattern. RLS scopes
+      // the dedup query so users don't conflict on filenames they can't see.
+      const key = await this.generateNextAvailableKey(bucket, metadata.filename, client);
       const maxFileSizeBytes = await StorageConfigService.getInstance().getMaxFileSizeBytes();
       return this.provider.getUploadStrategy(bucket, key, metadata, maxFileSizeBytes);
-    } finally {
-      client.release();
-    }
+    });
   }
 
   async getDownloadStrategy(bucket: string, key: string) {
@@ -451,15 +462,36 @@ export class StorageService {
     return this.provider.getDownloadStrategy(bucket, key, expiresIn, isPublic);
   }
 
+  /**
+   * RLS-gated existence check. Returns true iff the caller is allowed by
+   * `storage.objects` RLS policies to see this row. Used by routes that
+   * issue presigned URLs (S3 backend) before redirecting — the presigned
+   * URL itself bypasses RLS, so the route must do the ownership check
+   * before handing the URL out. Admin contexts always return true (admin
+   * bypasses RLS at the DB level).
+   */
+  async objectIsVisible(ctx: UserContext, bucket: string, key: string): Promise<boolean> {
+    this.validateBucketName(bucket);
+    this.validateKey(key);
+
+    return withUserContext(this.getPool(), ctx, async (db) => {
+      const result = await db.query(
+        'SELECT 1 FROM storage.objects WHERE bucket = $1 AND key = $2',
+        [bucket, key]
+      );
+      return (result.rowCount ?? 0) > 0;
+    });
+  }
+
   async confirmUpload(
+    ctx: UserContext,
     bucket: string,
     key: string,
     metadata: {
       size: number;
       contentType?: string;
       etag?: string;
-    },
-    userId?: string
+    }
   ): Promise<StorageFileSchema> {
     this.validateBucketName(bucket);
     this.validateKey(key);
@@ -478,7 +510,12 @@ export class StorageService {
       throw new Error(`File size exceeds the configured maximum upload size of ${limitMb} MB`);
     }
 
-    // Check if already confirmed
+    // Already-confirmed check runs on the admin pool deliberately — the
+    // friendly "already confirmed" error must fire even when the existing
+    // row was uploaded by a different user (RLS would hide it). Falling
+    // through to the INSERT in that case would either raise a unique
+    // constraint violation (worse UX) or silently shadow the original
+    // row depending on the schema.
     const existingResult = await this.getPool().query(
       'SELECT key FROM storage.objects WHERE bucket = $1 AND key = $2',
       [bucket, key]
@@ -488,14 +525,18 @@ export class StorageService {
       throw new Error(`File "${key}" already confirmed in bucket "${bucket}"`);
     }
 
-    // Save metadata to database and return the timestamp in one operation
-    const result = await this.getPool().query(
-      `
-      INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING uploaded_at as "uploadedAt"
-    `,
-      [bucket, key, fileSize, metadata.contentType || null, userId || null]
+    // INSERT runs through withUserContext, matching the rest of the
+    // user-facing write surface (putObject, deleteObject, etc.). For
+    // end-user contexts the RLS WITH CHECK on storage_objects_owner_insert
+    // verifies uploaded_by = jwt.sub. Admin contexts bypass RLS via the
+    // postgres role.
+    const result = await withUserContext(this.getPool(), ctx, (db) =>
+      db.query(
+        `INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by, uploaded_via)
+         VALUES ($1, $2, $3, $4, $5, 'rest')
+         RETURNING uploaded_at as "uploadedAt"`,
+        [bucket, key, fileSize, metadata.contentType || null, ctx.userId || null]
+      )
     );
 
     if (!result.rows[0]) {
@@ -581,5 +622,154 @@ export class StorageService {
       });
       return 0;
     }
+  }
+
+  // ==========================================================================
+  // S3 Protocol helpers — used by /storage/v1/s3 handlers.
+  // ==========================================================================
+
+  getProvider(): StorageProvider {
+    return this.provider;
+  }
+
+  isS3Provider(): boolean {
+    return this.provider instanceof S3StorageProvider;
+  }
+
+  /**
+   * Upsert object metadata after an S3-protocol PutObject or CompleteMultipartUpload.
+   * uploaded_by stays NULL; uploaded_via='s3' + s3_access_key_id distinguish S3 uploads.
+   *
+   * Note on RLS: under the migration's default `storage_objects_owner_select`
+   * policy (`uploaded_by = auth.jwt() ->> 'sub'`), `NULL = '<sub>'` is never
+   * true — so S3-uploaded rows are invisible to authenticated end-users via
+   * the user API. Admin (API key / project_admin) bypasses RLS and sees them.
+   * Projects that mix the S3 protocol and the user API on the same bucket
+   * should write a custom SELECT policy that handles `uploaded_by IS NULL`
+   * explicitly (e.g., `uploaded_by IS NULL OR uploaded_by = auth.jwt()...`).
+   */
+  async upsertS3Object(params: {
+    bucket: string;
+    key: string;
+    size: number;
+    etag: string;
+    contentType?: string | null;
+    s3AccessKeyId: string;
+  }): Promise<void> {
+    // ON CONFLICT preserves uploaded_by — clobbering to NULL would silently
+    // strip ownership when S3 overwrites a REST-uploaded key.
+    await this.getPool().query(
+      `INSERT INTO storage.objects
+         (bucket, key, size, mime_type, etag, uploaded_at, uploaded_by, uploaded_via, s3_access_key_id)
+       VALUES ($1, $2, $3, $4, $5, NOW(), NULL, 's3', $6)
+       ON CONFLICT (bucket, key) DO UPDATE SET
+         size             = EXCLUDED.size,
+         mime_type        = EXCLUDED.mime_type,
+         etag             = EXCLUDED.etag,
+         uploaded_at      = EXCLUDED.uploaded_at,
+         uploaded_via     = EXCLUDED.uploaded_via,
+         s3_access_key_id = EXCLUDED.s3_access_key_id`,
+      [
+        params.bucket,
+        params.key,
+        params.size,
+        params.contentType ?? null,
+        params.etag,
+        params.s3AccessKeyId,
+      ]
+    );
+  }
+
+  async getObjectMetadataRow(
+    bucket: string,
+    key: string
+  ): Promise<null | {
+    size: number;
+    etag: string | null;
+    mimeType: string | null;
+    uploadedAt: Date;
+  }> {
+    const r = await this.getPool().query(
+      `SELECT size, etag, mime_type, uploaded_at
+       FROM storage.objects
+       WHERE bucket = $1 AND key = $2`,
+      [bucket, key]
+    );
+    if (r.rowCount === 0) {
+      return null;
+    }
+    const row = r.rows[0];
+    return {
+      size: Number(row.size),
+      etag: row.etag,
+      mimeType: row.mime_type,
+      uploadedAt: row.uploaded_at,
+    };
+  }
+
+  async deleteObjectRow(bucket: string, key: string): Promise<void> {
+    await this.getPool().query('DELETE FROM storage.objects WHERE bucket=$1 AND key=$2', [
+      bucket,
+      key,
+    ]);
+  }
+
+  async deleteObjectRowsBatch(bucket: string, keys: string[]): Promise<void> {
+    if (keys.length === 0) {
+      return;
+    }
+    await this.getPool().query(
+      `DELETE FROM storage.objects WHERE bucket=$1 AND key = ANY($2::text[])`,
+      [bucket, keys]
+    );
+  }
+
+  async bucketExists(bucket: string): Promise<boolean> {
+    const r = await this.getPool().query('SELECT 1 FROM storage.buckets WHERE name=$1 LIMIT 1', [
+      bucket,
+    ]);
+    return (r.rowCount ?? 0) === 1;
+  }
+
+  async bucketIsEmpty(bucket: string): Promise<boolean> {
+    const r = await this.getPool().query('SELECT 1 FROM storage.objects WHERE bucket=$1 LIMIT 1', [
+      bucket,
+    ]);
+    return (r.rowCount ?? 0) === 0;
+  }
+
+  async listAllBucketsSimple(): Promise<Array<{ name: string; createdAt: Date }>> {
+    const r = await this.getPool().query(
+      'SELECT name, created_at FROM storage.buckets ORDER BY name'
+    );
+    return r.rows.map((row) => ({ name: row.name, createdAt: row.created_at }));
+  }
+
+  async listObjectsV2Db(params: {
+    bucket: string;
+    prefix?: string;
+    startAfter?: string;
+    maxKeys: number;
+  }): Promise<Array<{ key: string; size: number; etag: string | null; lastModified: Date }>> {
+    const prefix = params.prefix ?? '';
+    // S3 prefixes are literal strings. `_` and `%` are SQL LIKE wildcards,
+    // so a prefix like "foo_" would match "fooX" keys without escaping.
+    const likePrefix = escapeSqlLikePattern(prefix) + '%';
+    const rows = await this.getPool().query(
+      `SELECT key, size, etag, uploaded_at
+       FROM storage.objects
+       WHERE bucket = $1
+         AND key LIKE $2
+         AND ($3::text IS NULL OR key > $3)
+       ORDER BY key
+       LIMIT $4`,
+      [params.bucket, likePrefix, params.startAfter ?? null, params.maxKeys]
+    );
+    return rows.rows.map((r) => ({
+      key: r.key,
+      size: Number(r.size),
+      etag: r.etag,
+      lastModified: r.uploaded_at,
+    }));
   }
 }

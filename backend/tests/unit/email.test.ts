@@ -103,14 +103,14 @@ describe('EmailService', () => {
         'user@example.com',
         'John Doe',
         'email-verification-link',
-        { magic_link: 'https://example.com/verify?token=abc123' }
+        { link: 'https://example.com/verify?token=abc123' }
       );
 
       expect(axios.post).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
           template: 'email-verification-link',
-          variables: { magic_link: 'https://example.com/verify?token=abc123' },
+          variables: { link: 'https://example.com/verify?token=abc123' },
         }),
         expect.any(Object)
       );
@@ -141,14 +141,14 @@ describe('EmailService', () => {
       });
 
       await emailService.sendWithTemplate('user@example.com', 'Jane Smith', 'reset-password-link', {
-        magic_link: 'https://example.com/reset?token=xyz789',
+        link: 'https://example.com/reset?token=xyz789',
       });
 
       expect(axios.post).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
           template: 'reset-password-link',
-          variables: { magic_link: 'https://example.com/reset?token=xyz789' },
+          variables: { link: 'https://example.com/reset?token=xyz789' },
         }),
         expect.any(Object)
       );

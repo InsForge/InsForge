@@ -8,7 +8,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      '@insforge/shared-schemas': path.resolve(__dirname, '../shared-schemas/src'),
+      '@insforge/shared-schemas': path.resolve(__dirname, '../packages/shared-schemas/src'),
     },
   },
   test: {

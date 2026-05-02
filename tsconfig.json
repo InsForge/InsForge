@@ -3,6 +3,8 @@
   "references": [
     { "path": "./frontend" },
     { "path": "./backend" },
-    { "path": "./shared-schemas" }
+    { "path": "./packages/shared-schemas" },
+    { "path": "./packages/ui" },
+    { "path": "./packages/dashboard" }
   ]
 }

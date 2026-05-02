@@ -3,7 +3,9 @@ title: Emails SDK Reference
 description: Send custom transactional emails with the InsForge SDK
 ---
 
-<Note>**Private Preview** - This feature is currently in private preview.</Note>
+<Warning>
+  **Private Preview** — This feature is currently in private preview. APIs and behavior may change.
+</Warning>
 
 import Installation from '/snippets/sdk-installation.mdx';
 
@@ -22,6 +24,10 @@ Send custom HTML emails to one or more recipients.
 - `bcc` (string | string[], optional) - BCC recipient(s), max 50 recipients
 - `from` (string, optional) - Custom sender name, max 100 characters
 - `replyTo` (string, optional) - Reply-to email address, must be a valid email address
+
+<Note>
+When [Custom SMTP](/core-concepts/email/custom-smtp) is enabled for your project, the `from` field is ignored — the sender name and email are always taken from your SMTP configuration to prevent spoofing through your server.
+</Note>
 
 ### Returns
 

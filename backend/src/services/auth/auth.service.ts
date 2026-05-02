@@ -130,6 +130,7 @@ export class AuthService {
     redirectTo?: string,
     options?: {
       isAdminCreation?: boolean;
+      autoConfirm?: boolean;
     }
   ): Promise<CreateUserResponse> {
     // Get email auth configuration and validate password
@@ -183,7 +184,13 @@ export class AuthService {
       await client.query(
         `INSERT INTO auth.users (id, email, password, profile, email_verified, created_at, updated_at)
          VALUES ($1, $2, $3, $4::jsonb, $5, NOW(), NOW())`,
-        [userId, email, hashedPassword, profile, false]
+        [
+          userId,
+          email,
+          hashedPassword,
+          profile,
+          options?.autoConfirm && options?.isAdminCreation ? true : false,
+        ]
       );
 
       await client.query('COMMIT');
@@ -209,6 +216,12 @@ export class AuthService {
         logger.info('Skipping verification email during admin user creation', {
           email,
         });
+        if (isAdminCreation && options?.autoConfirm) {
+          return {
+            accessToken: null,
+            requireEmailVerification: false,
+          };
+        }
         return {
           accessToken: null,
           requireEmailVerification: true,
@@ -222,8 +235,12 @@ export class AuthService {
           this.queueVerificationEmail(email, 'code');
         }
       } catch (error) {
-        logger.warn('Verification email enqueue failed during register', { error });
-      }
+          const msg = error instanceof Error ? error.message : 'Unknown error';
+
+          logger.warn('Verification email process failed during register', {
+            error,
+            message: msg,
+          });
       return {
         accessToken: null,
         requireEmailVerification: true,

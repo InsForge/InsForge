@@ -80,6 +80,8 @@ services:
       - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-}
       # Storage limits
       - MAX_FILE_SIZE=${MAX_FILE_SIZE:-}
+      - MAX_JSON_BODY_SIZE=${MAX_JSON_BODY_SIZE:-}
+      - MAX_URLENCODED_BODY_SIZE=${MAX_URLENCODED_BODY_SIZE:-}
       # PostgreSQL connection
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
@@ -100,6 +102,10 @@ services:
       - AWS_CLOUDFRONT_URL=${AWS_CLOUDFRONT_URL:-}
       - AWS_CLOUDFRONT_KEY_PAIR_ID=${AWS_CLOUDFRONT_KEY_PAIR_ID:-}
       - AWS_CLOUDFRONT_PRIVATE_KEY=${AWS_CLOUDFRONT_PRIVATE_KEY:-}
+      # Deployment Configuration
+      - VERCEL_TOKEN=${VERCEL_TOKEN:-}
+      - VERCEL_TEAM_ID=${VERCEL_TEAM_ID:-}
+      - VERCEL_PROJECT_ID=${VERCEL_PROJECT_ID:-}
       # Multi-tenant Cloud Configuration
       - DEPLOYMENT_ID=${DEPLOYMENT_ID:-}
       - PROJECT_ID=${PROJECT_ID:-}
@@ -123,25 +129,32 @@ services:
       - X_CLIENT_SECRET=${X_CLIENT_SECRET:-}
       - APPLE_CLIENT_ID=${APPLE_CLIENT_ID:-}
       - APPLE_CLIENT_SECRET=${APPLE_CLIENT_SECRET:-}
+      # Compute Services (Fly.io self-host). Auto-enables when both
+      # FLY_API_TOKEN and FLY_ORG are set. Cloud-proxied mode activates
+      # automatically when PROJECT_ID, CLOUD_API_HOST, and JWT_SECRET are set.
+      - FLY_API_TOKEN=${FLY_API_TOKEN:-}
+      - FLY_ORG=${FLY_ORG:-}
+      - COMPUTE_DOMAIN=${COMPUTE_DOMAIN:-}
       # Logs directory
       - LOGS_DIR=/insforge-logs
       # Storage directory (for local file storage when S3 is not configured)
       - STORAGE_DIR=/insforge-storage
     volumes:
       - ./package.json:/app/package.json
+      - ./package-lock.json:/app/package-lock.json
+      - ./turbo.json:/app/turbo.json
       - ./backend:/app/backend
       - ./frontend:/app/frontend
-      - ./shared-schemas:/app/shared-schemas
-      - ./ui:/app/ui
+      - ./packages:/app/packages
       - ./docs:/app/docs
       - node_modules:/app/node_modules
       - backend_node_modules:/app/backend/node_modules
       - frontend_node_modules:/app/frontend/node_modules
-      - shared_schemas_node_modules:/app/shared-schemas/node_modules
-      - ui_node_modules:/app/ui/node_modules
+      - shared_schemas_node_modules:/app/packages/shared-schemas/node_modules
+      - ui_node_modules:/app/packages/ui/node_modules
       - shared-logs:/insforge-logs
       - storage-data:/insforge-storage
-    command: sh -c "npm install && npm run build:shared-schemas && npm run build:ui && cd backend && npm run migrate:up && cd .. && npm run dev"
+    command: sh -c 'npm install && npx turbo run build --filter=@insforge/shared-schemas --filter=@insforge/ui --filter=@insforge/dashboard && cd backend && npm run migrate:up && cd .. && npx concurrently -n backend,frontend -c cyan,magenta "npm run dev:backend" "npm run dev:frontend"'
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
@@ -184,40 +197,6 @@ services:
         deno run --allow-net --allow-env --allow-read=./functions/worker-template.js --watch functions/server.ts
       "
     restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
-    networks:
-      - insforge-network
-
-  # Vector.dev for log collection and shipping
-  vector:
-    image: timberio/vector:0.28.1-alpine
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-      postgrest:
-        condition: service_started
-      insforge:
-        condition: service_started
-      deno:
-        condition: service_started
-    volumes:
-      - ./deploy/docker-init/logs/vector.yml:/etc/vector/vector.yml:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - shared-logs:/insforge-logs
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:7135/health"]
-      timeout: 5s
-      interval: 5s
-      retries: 3
-    environment:
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
-      - AWS_REGION=${AWS_REGION:-skip}
-      - PROJECT_ID=${PROJECT_ID:-}
-      - HOSTNAME_OVERRIDE=${HOSTNAME_OVERRIDE:-}
-    command: ["--config", "/etc/vector/vector.yml"]
     security_opt:
       - no-new-privileges:true
     networks:

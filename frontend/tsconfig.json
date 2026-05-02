@@ -15,13 +15,23 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@insforge/shared-schemas": ["../shared-schemas/src/index.ts"],
-      "@insforge/ui": ["../ui/src/index.ts"]
+      "@insforge/dashboard": ["../packages/dashboard/src"],
+      "#app/*": ["../packages/dashboard/src/app/*"],
+      "#assets/*": ["../packages/dashboard/src/assets/*"],
+      "#components": ["../packages/dashboard/src/components/index.ts"],
+      "#components/*": ["../packages/dashboard/src/components/*"],
+      "#features/*": ["../packages/dashboard/src/features/*"],
+      "#layout/*": ["../packages/dashboard/src/layout/*"],
+      "#lib/*": ["../packages/dashboard/src/lib/*"],
+      "#navigation/*": ["../packages/dashboard/src/navigation/*"],
+      "#router/*": ["../packages/dashboard/src/router/*"],
+      "#types": ["../packages/dashboard/src/types/index.ts"],
+      "#types/*": ["../packages/dashboard/src/types/*"],
+      "@insforge/shared-schemas": ["../packages/shared-schemas/src"],
+      "@insforge/ui": ["../packages/ui/src"]
     }
   },
-  "include": ["src", "src/vite-env.d.ts", "../shared-schemas", "../ui"],
+  "include": ["src", "../packages/dashboard"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

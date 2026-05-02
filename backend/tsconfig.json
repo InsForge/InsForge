@@ -4,20 +4,20 @@
     "module": "ES2022",
     "lib": ["ES2022"],
     "outDir": "../dist",
-    "baseUrl": ".",
+    "rootDir": "..",
     "paths": {
       "@/*": ["./src/*"],
-      "@insforge/shared-schemas": ["../shared-schemas/src/index.ts"]
+      "@insforge/shared-schemas": ["../packages/shared-schemas/src/index.ts"]
     },
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
     "types": ["node","vitest" ]
   },
-  "include": ["src/**/*", "../shared-schemas/src/**/*"],
+  "include": ["src/**/*", "../packages/shared-schemas/src/**/*"],
   "exclude": ["node_modules", "dist"]
 }

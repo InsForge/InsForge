@@ -6,8 +6,8 @@
  */
 export const DeploymentStatus = {
   // InsForge internal statuses
-  WAITING: 'WAITING', // Record created, waiting for client to upload zip to S3
-  UPLOADING: 'UPLOADING', // Server is downloading from S3 and uploading to Vercel
+  WAITING: 'WAITING', // Record created, waiting for source zip upload or direct file registration/content
+  UPLOADING: 'UPLOADING', // File uploads or Vercel deployment creation are in progress
   // Vercel statuses (stored directly)
   QUEUED: 'QUEUED',
   BUILDING: 'BUILDING',

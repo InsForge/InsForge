@@ -5,26 +5,24 @@ export interface AppConfig {
     apiKey: string;
     logLevel: string;
   };
-  database: {
-    host: string;
-    port: number;
-    username: string;
-    password: string;
-    databaseName: string;
-  };
   cloud: {
     storageBucket: string;
     instanceProfile: string;
     apiHost: string;
-    projectId: string;
     appKey: string;
     cloudFrontUrl: string;
     cloudFrontKeyPairId: string;
     cloudFrontPrivateKey: string;
+    projectId: string;
   };
   denoSubhosting: {
     token: string;
     organizationId: string;
+    domain: string;
+  };
+  fly: {
+    apiToken: string;
+    org: string;
     domain: string;
   };
 }
@@ -35,13 +33,6 @@ export const config: AppConfig = {
     jwtSecret: process.env.JWT_SECRET || 'your_jwt_secret',
     apiKey: process.env.ACCESS_API_KEY || 'your_api_key',
     logLevel: process.env.LOG_LEVEL || 'info',
-  },
-  database: {
-    host: process.env.POSTGRES_HOST || 'localhost',
-    port: parseInt(process.env.POSTGRES_PORT || '5432', 10),
-    username: process.env.POSTGRES_USERNAME || 'user',
-    password: process.env.POSTGRES_PASSWORD || 'password',
-    databaseName: process.env.POSTGRES_NAME || 'insforge',
   },
   cloud: {
     storageBucket: process.env.AWS_S3_BUCKET || 'insforge-test-bucket',
@@ -57,5 +48,16 @@ export const config: AppConfig = {
     token: process.env.DENO_SUBHOSTING_TOKEN || '',
     organizationId: process.env.DENO_SUBHOSTING_ORG_ID || '',
     domain: 'functions.insforge.app',
+  },
+  fly: {
+    // Self-hosters enable compute by setting both FLY_API_TOKEN and FLY_ORG.
+    // Presence of credentials is the opt-in — no separate ENABLED flag.
+    apiToken: process.env.FLY_API_TOKEN || '',
+    // FLY_ORG must be set explicitly; defaulting to "insforge" caused
+    // self-hosters to attempt to create apps inside our internal org and get
+    // an opaque auth error from Fly. Empty string makes the misconfig
+    // detectable so we can warn at startup.
+    org: process.env.FLY_ORG || '',
+    domain: process.env.COMPUTE_DOMAIN || '',
   },
 };

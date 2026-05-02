@@ -1,5 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { verifyAdmin, AuthRequest, verifyUser } from '@/api/middlewares/auth.js';
+import {
+  verifyAdmin,
+  AuthRequest,
+  verifyUser,
+  getUserContextFromReq,
+} from '@/api/middlewares/auth.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { StorageService } from '@/services/storage/storage.service.js';
 import { StorageConfigService } from '@/services/storage/storage-config.service.js';
@@ -10,14 +15,19 @@ import {
   createBucketRequestSchema,
   updateBucketRequestSchema,
   updateStorageConfigRequestSchema,
+  createS3AccessKeyRequestSchema,
 } from '@insforge/shared-schemas';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import { AuditService } from '@/services/logs/audit.service.js';
+import { S3AccessKeyService } from '@/services/storage/s3-access-key.service.js';
+import { s3AccessKeyManagementRateLimiter } from '@/api/middlewares/rate-limiters.js';
+import { UserContext } from '@/services/db/user-context.service.js';
 
 const router = Router();
 const auditService = AuditService.getInstance();
 const storageConfigService = StorageConfigService.getInstance();
+const s3AccessKeyService = S3AccessKeyService.getInstance();
 
 // Middleware to conditionally apply authentication based on bucket visibility
 const conditionalAuth = async (req: Request, res: Response, next: NextFunction) => {
@@ -196,13 +206,17 @@ router.patch(
         ip_address: req.ip,
       });
 
-      const socket = SocketManager.getInstance();
-      socket.broadcastToRoom(
-        'role:project_admin',
-        ServerEvents.DATA_UPDATE,
-        { resource: DataUpdateResourceType.BUCKETS, data: { bucketName } },
-        'system'
-      );
+      try {
+        const socket = SocketManager.getInstance();
+        socket.broadcastToRoom(
+          'role:project_admin',
+          ServerEvents.DATA_UPDATE,
+          { resource: DataUpdateResourceType.BUCKETS, data: { bucketName } },
+          'system'
+        );
+      } catch {
+        // Best-effort notification; do not fail completed storage mutation
+      }
 
       const accessInfo = isPublic
         ? 'Bucket is now PUBLIC - objects can be accessed without authentication.'
@@ -228,10 +242,13 @@ router.patch(
   }
 );
 
-// GET /api/storage/buckets/:bucketName/objects - List objects in bucket (requires auth)
+// GET /api/storage/buckets/:bucketName/objects - List objects in bucket.
+// Visibility is decided by RLS on storage.objects: admin (apiKey /
+// project_admin) bypasses, authenticated callers see only rows their
+// policies allow.
 router.get(
   '/buckets/:bucketName/objects',
-  verifyAdmin,
+  verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { bucketName } = req.params;
@@ -240,8 +257,8 @@ router.get(
       const limit = Math.min(Math.max(1, parseInt(req.query.limit as string) || 100), 1000);
       const offset = Math.max(0, parseInt(req.query.offset as string) || 0);
 
-      const storageService = StorageService.getInstance();
-      const result = await storageService.listObjects(
+      const result = await StorageService.getInstance().listObjects(
+        getUserContextFromReq(req),
         bucketName,
         prefix,
         limit,
@@ -288,13 +305,24 @@ router.put(
         throw new AppError('File is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
 
-      const storageService = StorageService.getInstance();
-      const storedFile = await storageService.putObject(
+      const storedFile = await StorageService.getInstance().putObject(
+        getUserContextFromReq(req),
         bucketName,
         objectKey,
-        req.file,
-        req.user?.id
+        req.file
       );
+
+      try {
+        const socket = SocketManager.getInstance();
+        socket.broadcastToRoom(
+          'role:project_admin',
+          ServerEvents.DATA_UPDATE,
+          { resource: DataUpdateResourceType.BUCKETS, data: { bucketName } },
+          'system'
+        );
+      } catch {
+        // Best-effort notification; do not fail completed storage mutation
+      }
 
       successResponse(res, storedFile, 201);
     } catch (error) {
@@ -329,11 +357,23 @@ router.post(
       const objectKey = storageService.generateObjectKey(req.file.originalname);
 
       const storedFile = await storageService.putObject(
+        getUserContextFromReq(req),
         bucketName,
         objectKey,
-        req.file,
-        req.user?.id
+        req.file
       );
+
+      try {
+        const socket = SocketManager.getInstance();
+        socket.broadcastToRoom(
+          'role:project_admin',
+          ServerEvents.DATA_UPDATE,
+          { resource: DataUpdateResourceType.BUCKETS, data: { bucketName } },
+          'system'
+        );
+      } catch {
+        // Best-effort notification; do not fail completed storage mutation
+      }
 
       successResponse(res, storedFile, 201);
     } catch (error) {
@@ -370,14 +410,32 @@ router.get(
 
       const storageService = StorageService.getInstance();
 
+      // Public-bucket reads bypass RLS: conditionalAuth has already confirmed
+      // public=true before letting an unauthed request through, so the bypass
+      // only triggers in that case. Authed callers always go through RLS.
+      const authReq = req as AuthRequest;
+      const ctx: UserContext =
+        !authReq.user && !authReq.apiKey
+          ? { isAdmin: true, role: 'authenticated' }
+          : getUserContextFromReq(authReq);
+
       // Get download strategy (service auto-calculates expiry based on bucket visibility)
       const strategy = await storageService.getDownloadStrategy(bucketName, objectKey);
 
       if (strategy.method === 'presigned') {
+        // Presigned URLs bypass the backend, so RLS doesn't fire when the
+        // client redeems them. Gate the redirect on an RLS-scoped existence
+        // check — without this, an authenticated non-owner could redeem any
+        // known key in a private bucket. Admin/anon-public-bucket contexts
+        // bypass RLS at the DB level and always return true.
+        const visible = await storageService.objectIsVisible(ctx, bucketName, objectKey);
+        if (!visible) {
+          throw new AppError('Object not found', 404, ERROR_CODES.NOT_FOUND);
+        }
         return res.redirect(strategy.url);
       }
 
-      const result = await storageService.getObject(bucketName, objectKey);
+      const result = await storageService.getObject(ctx, bucketName, objectKey);
       if (!result) {
         throw new AppError('Object not found', 404, ERROR_CODES.NOT_FOUND);
       }
@@ -461,12 +519,10 @@ router.delete(
         throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
 
-      const storageService = StorageService.getInstance();
-      const deleted = await storageService.deleteObject(
+      const deleted = await StorageService.getInstance().deleteObject(
+        getUserContextFromReq(req),
         bucketName,
-        objectKey,
-        req.user?.id || '',
-        !!req.apiKey || req.user?.role === 'project_admin'
+        objectKey
       );
 
       if (!deleted) {
@@ -497,12 +553,11 @@ router.post(
         throw new AppError('Filename is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
 
-      const storageService = StorageService.getInstance();
-      const strategy = await storageService.getUploadStrategy(bucketName, {
-        filename,
-        contentType,
-        size,
-      });
+      const strategy = await StorageService.getInstance().getUploadStrategy(
+        getUserContextFromReq(req),
+        bucketName,
+        { filename, contentType, size }
+      );
 
       successResponse(res, strategy);
     } catch (error) {
@@ -530,15 +585,27 @@ router.post(
 
       const storageService = StorageService.getInstance();
       const fileInfo = await storageService.confirmUpload(
+        getUserContextFromReq(req),
         bucketName,
         objectKey,
         {
           size,
           contentType,
           etag,
-        },
-        req.user?.id
+        }
       );
+
+      try {
+        const socket = SocketManager.getInstance();
+        socket.broadcastToRoom(
+          'role:project_admin',
+          ServerEvents.DATA_UPDATE,
+          { resource: DataUpdateResourceType.BUCKETS, data: { bucketName } },
+          'system'
+        );
+      } catch {
+        // Best-effort notification; do not fail completed storage mutation
+      }
 
       successResponse(res, fileInfo, 201);
     } catch (error) {
@@ -567,6 +634,21 @@ router.post(
       const { bucketName, objectKey } = req.params;
 
       const storageService = StorageService.getInstance();
+
+      // RLS-gate the strategy hand-off, same as GET /objects/*. A presigned
+      // URL bypasses RLS at redeem time, so we must verify ownership before
+      // issuing one. Public-bucket unauthed callers bypass via isAdmin: true
+      // because conditionalAuth has already confirmed public=true.
+      const authReq = req as AuthRequest;
+      const ctx: UserContext =
+        !authReq.user && !authReq.apiKey
+          ? { isAdmin: true, role: 'authenticated' }
+          : getUserContextFromReq(authReq);
+      const visible = await storageService.objectIsVisible(ctx, bucketName, objectKey);
+      if (!visible) {
+        throw new AppError('Object not found', 404, ERROR_CODES.NOT_FOUND);
+      }
+
       const strategy = await storageService.getDownloadStrategy(bucketName, objectKey);
 
       successResponse(res, strategy);
@@ -579,4 +661,94 @@ router.post(
     }
   }
 );
+// ============================================================================
+// S3 Protocol — Gateway Config + Access Key Management (admin only)
+// Per-IP rate limiting applied across all three access-key endpoints since
+// they mint / revoke long-lived credentials.
+// ============================================================================
+
+// GET /api/storage/s3/config - Return the gateway endpoint + signing region.
+// Endpoint is assembled from VITE_API_BASE_URL (the externally-reachable base
+// URL clients use for this backend) plus the fixed /storage/v1/s3 path. The
+// signing region is the value the SigV4 middleware validates against; clients
+// must sign with exactly this value.
+router.get('/s3/config', verifyAdmin, (_req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const base = (process.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
+    const endpoint = base ? `${base}/storage/v1/s3` : '/storage/v1/s3';
+    const region = process.env.AWS_REGION || 'us-east-2';
+    successResponse(res, { endpoint, region });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/storage/s3/access-keys - Create a new access key. Plaintext secret
+// is returned ONCE in the response and never again.
+router.post(
+  '/s3/access-keys',
+  s3AccessKeyManagementRateLimiter,
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validation = createS3AccessKeyRequestSchema.safeParse(req.body ?? {});
+      if (!validation.success) {
+        throw new AppError(
+          validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.STORAGE_INVALID_PARAMETER
+        );
+      }
+      const result = await s3AccessKeyService.create(validation.data);
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'CREATE_S3_ACCESS_KEY',
+        module: 'STORAGE',
+        details: { accessKeyId: result.accessKeyId },
+        ip_address: req.ip,
+      });
+      successResponse(res, result, 201);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// GET /api/storage/s3/access-keys - List all access keys (no secrets)
+router.get(
+  '/s3/access-keys',
+  s3AccessKeyManagementRateLimiter,
+  verifyAdmin,
+  async (_req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const keys = await s3AccessKeyService.list();
+      successResponse(res, keys);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// DELETE /api/storage/s3/access-keys/:id - Revoke an access key
+router.delete(
+  '/s3/access-keys/:id',
+  s3AccessKeyManagementRateLimiter,
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      await s3AccessKeyService.delete(req.params.id);
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'DELETE_S3_ACCESS_KEY',
+        module: 'STORAGE',
+        details: { id: req.params.id },
+        ip_address: req.ip,
+      });
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 export { router as storageRouter };

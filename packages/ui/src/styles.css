@@ -1,0 +1,166 @@
+/*
+ * InsForge UI — Styles
+ *
+ * Import this once in your app's entry CSS:
+ *   @import '@insforge/ui/styles.css';
+ *
+ * Token layers:
+ *   1. Primitives       — static colors (Tailwind palette)
+ *   2. natural/semantic — surface scale 0-6, switches per mode
+ *   3. natural/alpha    — transparent overlays (4/8/12/16%)
+ *   4. natural/alpha-inverse — inverted transparent overlays
+ *   5. general          — purpose colors (primary, alert, etc.)
+ *   6. special          — composite surfaces (card, toast, page)
+ *
+ * Values are RGB triplets for Tailwind compatibility:
+ *   tailwind.config.js maps these as `primary: 'rgb(var(--primary))'`.
+ */
+
+/* ============================================================
+   GLOBAL TOKENS
+   ============================================================ */
+
+:root {
+  --insforge-font:
+    'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* ============================================================
+   PRIMITIVE TOKENS
+   Static RGB triplets. Never change between modes.
+   ============================================================ */
+
+:root {
+  --insforge-white: 255 255 255;
+  --insforge-black: 0 0 0;
+  --insforge-neutral-400: 163 163 163;
+  --insforge-neutral-600: 82 82 82;
+  --insforge-emerald-300: 110 231 183;
+  --insforge-emerald-600: 5 150 105;
+  --insforge-red-500: 239 68 68;
+  --insforge-red-600: 220 38 38;
+  --insforge-green-500: 34 197 94;
+  --insforge-green-600: 22 163 74;
+  --insforge-amber-500: 245 158 11;
+  --insforge-amber-600: 217 119 6;
+  --insforge-sky-500: 14 165 233;
+  --insforge-sky-600: 2 132 199;
+}
+
+/* ============================================================
+   LIGHT MODE
+   ============================================================ */
+
+:root {
+  /* natural/semantic */
+  --semantic-0: 255 255 255; /* #FFFFFF */
+  --semantic-1: 247 247 247; /* #F7F7F7 */
+  --semantic-2: 240 240 240; /* #F0F0F0 */
+  --semantic-3: 232 232 232; /* #E8E8E8 */
+  --semantic-4: 224 224 224; /* #E0E0E0 */
+  --semantic-5: 217 217 217; /* #D9D9D9 */
+  --semantic-6: 209 209 209; /* #D1D1D1 */
+
+  /* natural/alpha */
+  --alpha-4: rgba(0, 0, 0, 0.04);
+  --alpha-8: rgba(0, 0, 0, 0.08);
+  --alpha-12: rgba(0, 0, 0, 0.12);
+  --alpha-16: rgba(0, 0, 0, 0.16);
+
+  /* natural/alpha-inverse */
+  --alpha-inverse-4: rgba(255, 255, 255, 0.04);
+  --alpha-inverse-8: rgba(255, 255, 255, 0.08);
+  --alpha-inverse-12: rgba(255, 255, 255, 0.12);
+  --alpha-inverse-16: rgba(255, 255, 255, 0.16);
+
+  /* general */
+  --foreground: var(--insforge-black); /* general.default */
+  --muted-foreground: var(--insforge-neutral-600); /* general.weak */
+  --disabled: var(--insforge-neutral-400); /* general.disabled */
+  --inverse: var(--insforge-white); /* general.inverse */
+  --primary: var(--insforge-emerald-600); /* general.primary */
+  --success: var(--insforge-green-600); /* general.success */
+  --destructive: var(--insforge-red-600); /* general.alert */
+  --warning: var(--insforge-amber-600); /* general.warning */
+  --info: var(--insforge-sky-600); /* general.info */
+  --border: var(--alpha-8); /* general.border */
+
+  /* special */
+  --card: var(--insforge-white); /* special.card */
+  --toast: var(--insforge-white); /* special.toast */
+  --page: var(--semantic-1); /* special.page */
+}
+
+/* ============================================================
+   DARK MODE
+   ============================================================ */
+
+.dark {
+  /* natural/semantic */
+  --semantic-0: 22 22 22; /* #161616 */
+  --semantic-1: 27 27 27; /* #1B1B1B */
+  --semantic-2: 31 31 31; /* #1F1F1F */
+  --semantic-3: 36 36 36; /* #242424 */
+  --semantic-4: 41 41 41; /* #292929 */
+  --semantic-5: 45 45 45; /* #2D2D2D */
+  --semantic-6: 50 50 50; /* #323232 */
+
+  /* natural/alpha */
+  --alpha-4: rgba(255, 255, 255, 0.04);
+  --alpha-8: rgba(255, 255, 255, 0.08);
+  --alpha-12: rgba(255, 255, 255, 0.12);
+  --alpha-16: rgba(255, 255, 255, 0.16);
+
+  /* natural/alpha-inverse */
+  --alpha-inverse-4: rgba(0, 0, 0, 0.04);
+  --alpha-inverse-8: rgba(0, 0, 0, 0.08);
+  --alpha-inverse-12: rgba(0, 0, 0, 0.12);
+  --alpha-inverse-16: rgba(0, 0, 0, 0.16);
+
+  /* general */
+  --foreground: var(--insforge-white); /* general.default */
+  --muted-foreground: var(--insforge-neutral-400); /* general.weak */
+  --disabled: var(--insforge-neutral-600); /* general.disabled */
+  --inverse: var(--insforge-black); /* general.inverse */
+  --primary: var(--insforge-emerald-300); /* general.primary */
+  --success: var(--insforge-green-500); /* general.success */
+  --destructive: var(--insforge-red-500); /* general.alert */
+  --warning: var(--insforge-amber-500); /* general.warning */
+  --info: var(--insforge-sky-500); /* general.info */
+  --border: var(--alpha-8); /* general.border */
+
+  /* special */
+  --card: var(--semantic-3); /* special.card */
+  --toast: var(--semantic-6); /* special.toast */
+  --page: var(--semantic-0); /* special.page */
+}
+
+/* ============================================================
+   SCROLLBAR
+   Figma: 2px inset + 4px thumb, rounded 2px, alpha-16 tone
+   ============================================================ */
+
+* {
+  scrollbar-color: var(--alpha-16) transparent;
+  scrollbar-width: thin;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--alpha-16);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 2px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--alpha-16);
+}

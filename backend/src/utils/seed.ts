@@ -242,6 +242,16 @@ async function seedLocalOAuthConfigs(): Promise<void> {
         clientIdEnv: 'MICROSOFT_CLIENT_ID',
         clientSecretEnv: 'MICROSOFT_CLIENT_SECRET',
       },
+      {
+        provider: 'x',
+        clientIdEnv: 'X_CLIENT_ID',
+        clientSecretEnv: 'X_CLIENT_SECRET',
+      },
+      {
+        provider: 'apple',
+        clientIdEnv: 'APPLE_CLIENT_ID',
+        clientSecretEnv: 'APPLE_CLIENT_SECRET',
+      },
     ];
 
     for (const { provider, clientIdEnv, clientSecretEnv } of envMappings) {
@@ -345,6 +355,21 @@ export async function seedBackend(): Promise<void> {
         value: getApiBaseUrl(),
       });
       logger.info('✅ INSFORGE_BASE_URL secret initialized');
+    }
+
+    // Add JWT_SECRET so CLI/SDK can access it via secrets API
+    const jwtSecret = process.env.JWT_SECRET;
+    if (jwtSecret) {
+      const existingJwtSecret = await secretService.getSecretByKey('JWT_SECRET');
+
+      if (existingJwtSecret === null) {
+        await secretService.createSecret({
+          key: 'JWT_SECRET',
+          isReserved: true,
+          value: jwtSecret,
+        });
+        logger.info('✅ JWT_SECRET secret initialized');
+      }
     }
 
     logger.info(`API key generated: ${apiKey}`);

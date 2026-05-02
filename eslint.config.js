@@ -15,22 +15,36 @@ export default defineConfig(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   prettierConfig,
-  // Frontend configuration
+  // Frontend and shared React packages configuration
   {
-    files: ['frontend/**/*.ts', 'frontend/**/*.tsx', 'auth/**/*.ts', 'auth/**/*.tsx'],
+    files: [
+      'frontend/**/*.ts',
+      'frontend/**/*.tsx',
+      'packages/dashboard/**/*.ts',
+      'packages/dashboard/**/*.tsx',
+      'packages/ui/**/*.ts',
+      'packages/ui/**/*.tsx',
+    ],
     ignores: [
       'frontend/tests/**/*',
       'frontend/**/*.test.*',
       'frontend/**/*.spec.*',
-      'auth/tests/**/*',
-      'auth/**/*.test.*',
-      'auth/**/*.spec.*',
+      'packages/dashboard/tests/**/*',
+      'packages/dashboard/**/*.test.*',
+      'packages/dashboard/**/*.spec.*',
+      'packages/ui/tests/**/*',
+      'packages/ui/**/*.test.*',
+      'packages/ui/**/*.spec.*',
     ],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
       parserOptions: {
-        project: ['./frontend/tsconfig.json', './auth/tsconfig.json'],
+        project: [
+          './frontend/tsconfig.json',
+          './packages/dashboard/tsconfig.json',
+          './packages/ui/tsconfig.json',
+        ],
         tsconfigRootDir: __dirname,
         ecmaFeatures: {
           jsx: true,
@@ -198,14 +212,31 @@ export default defineConfig(
       'prettier/prettier': 'error',
     },
   },
+  {
+    files: ['packages/dashboard/**/*.ts', 'packages/dashboard/**/*.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '^\\.\\.(?:/|$)',
+              message:
+                'Use relative imports only within the same folder. Use dashboard #... aliases for imports outside the current folder.',
+            },
+          ],
+        },
+      ],
+    },
+  },
   // Shared schemas configuration - minimal rules for schema definitions
   {
-    files: ['shared-schemas/**/*.ts'],
+    files: ['packages/shared-schemas/**/*.ts'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
       parserOptions: {
-        project: './shared-schemas/tsconfig.json',
+        project: './packages/shared-schemas/tsconfig.json',
         tsconfigRootDir: __dirname,
       },
       globals: {
@@ -251,45 +282,6 @@ export default defineConfig(
       // Essential rules
       'no-duplicate-imports': 'error',
       'prefer-const': 'error',
-
-      // Prettier integration
-      'prettier/prettier': 'error',
-    },
-  },
-  // MCP configuration - minimal linting without TypeScript project
-  {
-    files: ['mcp/**/*.ts'],
-    languageOptions: {
-      ecmaVersion: 'latest',
-      sourceType: 'module',
-      globals: {
-        ...globals.node,
-        ...globals.es2021,
-      },
-    },
-    plugins: {
-      prettier: prettierPlugin,
-    },
-    rules: {
-      // Basic TypeScript rules that don't require type checking
-      '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-unused-vars': [
-        'error',
-        {
-          argsIgnorePattern: '^_',
-          varsIgnorePattern: '^_',
-        },
-      ],
-
-      // General rules
-      'no-console': ['warn', { allow: ['warn', 'error'] }],
-      'no-debugger': 'error',
-      'no-duplicate-imports': 'error',
-      'no-unused-expressions': 'error',
-      'prefer-const': 'error',
-      'no-var': 'error',
-      eqeqeq: ['error', 'always'],
-      curly: ['error', 'all'],
 
       // Prettier integration
       'prettier/prettier': 'error',

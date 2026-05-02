@@ -1,6 +1,8 @@
 import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import logger from '@/utils/logger.js';
+import { AppError } from '@/api/middlewares/error.js';
+import { ERROR_CODES } from '@/types/error-constants.js';
 import { AIConfigurationSchema, AIConfigurationWithUsageSchema } from '@insforge/shared-schemas';
 
 export class AIConfigService {
@@ -49,7 +51,7 @@ export class AIConfigService {
       return { id: result.rows[0].id };
     } catch (error) {
       logger.error('Failed to create AI configuration', { error });
-      throw new Error('Failed to create AI configuration');
+      throw new AppError('Failed to create AI configuration', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
 
@@ -63,7 +65,11 @@ export class AIConfigService {
       return result.rows.length > 0;
     } catch (error) {
       logger.error('Failed to check AI configuration existence', { error });
-      throw new Error('Failed to check AI configuration existence');
+      throw new AppError(
+        'Failed to check AI configuration existence',
+        500,
+        ERROR_CODES.INTERNAL_ERROR
+      );
     }
   }
 
@@ -107,7 +113,7 @@ export class AIConfigService {
       }));
     } catch (error) {
       logger.error('Failed to fetch AI configurations with usage', { error });
-      throw new Error('Failed to fetch AI configurations');
+      throw new AppError('Failed to fetch AI configurations', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
 
@@ -127,7 +133,7 @@ export class AIConfigService {
       return success;
     } catch (error) {
       logger.error('Failed to update AI configuration', { error, id });
-      throw new Error('Failed to update AI configuration');
+      throw new AppError('Failed to update AI configuration', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
 
@@ -147,7 +153,7 @@ export class AIConfigService {
       return success;
     } catch (error) {
       logger.error('Failed to disable AI configuration', { error, id });
-      throw new Error('Failed to disable AI configuration');
+      throw new AppError('Failed to disable AI configuration', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
 
@@ -179,7 +185,7 @@ export class AIConfigService {
         error,
         modelId,
       });
-      throw new Error('Failed to fetch AI configuration');
+      throw new AppError('Failed to fetch AI configuration', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
 

@@ -3,6 +3,7 @@ dist/
 data/
 coverage/
 .env
+.worktrees/
 .DS_Store
 *.log
 *.db
@@ -12,8 +13,11 @@ CLAUDE.md
 .claude/*
 !.claude/skills/
 .claude/skills/*
+!.claude/skills/README.md
 !.claude/skills/insforge-dev/
 !.claude/skills/insforge-dev/**
+!.claude/skills/doc-author/
+!.claude/skills/doc-author/**
 .agents/*
 !.agents/skills/
 .agents/skills/*
@@ -23,3 +27,7 @@ deno.lock
 better-auth/
 .mcp.json
 backend/logs/*
+
+# Turborepo
+.turbo
+.gstack/

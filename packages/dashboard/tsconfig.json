@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "jsx": "react-jsx",
+    "declarationMap": true,
+    "sourceMap": true,
+    "declaration": true,
+    "outDir": "dist",
+    "rootDir": "./src",
+    "skipLibCheck": true,
+    "paths": {
+      "#app/*": ["./src/app/*"],
+      "#assets/*": ["./src/assets/*"],
+      "#components": ["./src/components/index.ts"],
+      "#components/*": ["./src/components/*"],
+      "#features/*": ["./src/features/*"],
+      "#layout/*": ["./src/layout/*"],
+      "#lib/*": ["./src/lib/*"],
+      "#navigation/*": ["./src/navigation/*"],
+      "#router/*": ["./src/router/*"],
+      "#types": ["./src/types/index.ts"],
+      "#types/*": ["./src/types/*"]
+    }
+  },
+  "include": ["src"]
+}

@@ -1,0 +1,109 @@
+@import './rdg.css';
+@import '@insforge/ui/styles.css';
+@import 'tailwindcss';
+@config "../tailwind.config.js";
+
+@layer utilities {
+  :root {
+    --pb-primary: #1a1a24;
+    --pb-text-primary: #1a1a24;
+    --pb-text-hint: #617079;
+    --pb-text-disabled: #a0a6ac;
+    --pb-body: #f8f9fa;
+    --pb-base: #ffffff;
+    --pb-base-alt1: #e3e8ed;
+    --pb-base-alt2: #d7dde3;
+    --pb-base-alt3: #c9d0da;
+    --pb-base-alt4: #a5b0c0;
+    --pb-info: #5499e8;
+    --pb-success: #32ad84;
+    --pb-danger: #e34562;
+    --pb-warning: #ff944d;
+    --pb-spacing-xs: 15px;
+    --pb-spacing-sm: 20px;
+    --pb-spacing-base: 30px;
+    --pb-spacing-lg: 50px;
+    --pb-spacing-xl: 60px;
+    --pb-animation-base: 150ms;
+    --pb-animation-active: 70ms;
+    --pb-animation-entrance: 250ms;
+  }
+}
+
+@layer base {
+  :root {
+    --baseSpacing: 2rem;
+    --smSpacing: 1.25rem;
+    --xsSpacing: 1rem;
+    --baseFontSize: 0.875rem;
+    --smFontSize: 0.8125rem;
+    --xsFontSize: 0.75rem;
+    --lgFontSize: 1.25rem;
+    --xlFontSize: 1.375rem;
+    --fontWeightNormal: 400;
+    --fontWeightMedium: 500;
+    --fontWeightSemibold: 600;
+    --fontFamilyBase: var(--insforge-font);
+    --fontFamilyMono: 'Ubuntu Mono', ui-monospace, monospace;
+    --fontFamilyManrope: 'Manrope', sans-serif;
+  }
+
+  .insforge-dashboard {
+    overflow: hidden;
+    height: 100%;
+    width: 100%;
+    min-width: 0;
+    font-family: var(--fontFamilyBase);
+    font-size: var(--baseFontSize);
+    font-weight: var(--fontWeightNormal);
+  }
+
+  .insforge-dashboard h1 {
+    font-size: var(--xlFontSize);
+    font-weight: var(--fontWeightSemibold);
+    line-height: 1.3;
+  }
+
+  .insforge-dashboard h2 {
+    font-size: var(--lgFontSize);
+    font-weight: var(--fontWeightSemibold);
+    line-height: 1.3;
+  }
+
+  .insforge-dashboard .text-xs {
+    font-size: var(--xsFontSize);
+  }
+
+  .insforge-dashboard .text-sm {
+    font-size: var(--smFontSize);
+  }
+
+  .insforge-dashboard .font-mono {
+    font-family: var(--fontFamilyMono);
+  }
+}
+
+@layer components {
+  .insforge-dashboard-home-sidebar {
+    width: auto;
+  }
+
+  @media (min-width: 64rem) {
+    .insforge-dashboard-home-sidebar {
+      width: 480px;
+    }
+  }
+}
+
+@theme {
+  --color-border-gray: #e4e4e7;
+  --color-chart-blue-dark: #2c7fff;
+  --color-text-gray: #a1a1a1;
+  --color-bg-gray: #f8f9fa;
+  --color-link-blue: #2c7fff;
+  --color-bg-gray-hover: #ebebeb;
+}
+
+[data-radix-popper-content-wrapper] {
+  position: fixed !important;
+}
