@@ -23,6 +23,7 @@ import {
   clearRefreshTokenCookie,
 } from '@/utils/cookies.js';
 import { parseClientType } from '@/utils/utils.js';
+import { jobQueue, JobType, JobPriority } from '@/services/job-queue.service.js';
 import {
   userIdSchema,
   createUserRequestSchema,
@@ -983,9 +984,26 @@ router.post(
           );
         }
 
-        await authService.sendResetPasswordEmailWithLink(email, redirectTo);
+        jobQueue.enqueue(
+          JobType.EMAIL,
+          {
+            action: 'password-reset',
+            email,
+            type: 'link',
+            redirectTo,
+          },
+          JobPriority.HIGH
+        );
       } else {
-        await authService.sendResetPasswordEmailWithCode(email);
+        jobQueue.enqueue(
+          JobType.EMAIL,
+          {
+            action: 'password-reset',
+            email,
+            type: 'code',
+          },
+          JobPriority.HIGH
+        );
       }
 
       // Always return 202 Accepted with generic message

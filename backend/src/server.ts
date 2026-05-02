@@ -35,8 +35,11 @@ import { seedBackend } from '@/utils/seed.js';
 import logger from '@/utils/logger.js';
 import { initSqlParser } from '@/utils/sql-parser.js';
 import { FunctionService } from '@/services/functions/function.service.js';
+import { AuthService } from '@/services/auth/auth.service.js';
 import packageJson from '../../package.json';
 import { schedulesRouter } from '@/api/routes/schedules/index.routes.js';
+import { jobQueue, JobType } from '@/services/job-queue.service.js';
+// import { EmailService } from '@/services/email/email.service.js';
 import { servicesRouter } from '@/api/routes/compute/services.routes.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -72,6 +75,42 @@ export async function createApp() {
   // Initialize logs service
   const logService = LogService.getInstance();
   await logService.initialize(); // connect to CloudWatch
+
+  // Initialize job queue service and register handlers
+  jobQueue.registerHandler(JobType.EMAIL, async (payload) => {
+    const authService = AuthService.getInstance();
+
+    if (
+      typeof payload !== 'object' ||
+      payload === null ||
+      !('action' in payload) ||
+      !('email' in payload)
+    ) {
+      throw new Error('Invalid payload: missing action or email');
+    }
+
+    const action = String(payload.action);
+    const email = String(payload.email);
+    const type = payload.type ? String(payload.type) : 'code';
+    const redirectTo = payload.redirectTo ? String(payload.redirectTo) : undefined;
+
+    if (action === 'verification') {
+      if (type === 'link' && redirectTo) {
+        await authService.sendVerificationEmailWithLink(email, redirectTo);
+      } else {
+        await authService.sendVerificationEmailWithCode(email);
+      }
+    } else if (action === 'password-reset') {
+      if (type === 'link' && redirectTo) {
+        await authService.sendResetPasswordEmailWithLink(email, redirectTo);
+      } else {
+        await authService.sendResetPasswordEmailWithCode(email);
+      }
+    } else {
+      throw new Error(`Unknown email action: ${action}`);
+    }
+  });
+  jobQueue.start();
 
   // Initialize SQL parser WASM module
   await initSqlParser();
@@ -384,6 +423,14 @@ async function cleanup() {
     destroyEmailCooldownInterval();
   } catch (error) {
     logger.error('Error clearing email cooldown interval', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  try {
+    await jobQueue.drain(5000);
+  } catch (error) {
+    logger.error('Error draining job queue', {
       error: error instanceof Error ? error.message : String(error),
     });
   }
