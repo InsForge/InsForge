@@ -1,5 +1,5 @@
 import { Router, Response, NextFunction } from 'express';
-import { verifyUser, AuthRequest } from '@/api/middlewares/auth.js';
+import { verifyUser, verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { PosthogService } from '@/services/posthog/posthog.service.js';
 
 export const posthogRouter = Router();
@@ -69,7 +69,7 @@ posthogRouter.get(
 // DELETE /api/integrations/posthog/connection
 posthogRouter.delete(
   '/connection',
-  verifyUser,
+  verifyAdmin,
   async (_req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       await service.disconnect();

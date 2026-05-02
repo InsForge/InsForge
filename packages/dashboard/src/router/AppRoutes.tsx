@@ -8,6 +8,7 @@ import DashboardPage from '#features/dashboard/pages/DashboardPage';
 import DTestDashboardPage from '#features/dashboard/pages/DTestDashboardPage';
 import DTestInstallPage from '#features/dashboard/pages/DTestInstallPage';
 import { getFeatureFlag } from '#lib/analytics/posthog';
+import { isInsForgeCloudProject } from '#lib/utils/utils';
 import DatabaseLayout from '#features/database/components/DatabaseLayout';
 import SQLEditorLayout from '#features/database/components/SQLEditorLayout';
 import TablesPage from '#features/database/pages/TablesPage';
@@ -54,6 +55,7 @@ function AuthenticatedRoutes() {
   const dashboardVariant = getFeatureFlag('dashboard-v4-experiment');
   const isDTest = dashboardVariant === 'd_test';
   const DashboardHomePage = isDTest ? DTestDashboardPage : DashboardPage;
+  const isCloud = isInsForgeCloudProject();
 
   return (
     <AppLayout>
@@ -123,7 +125,10 @@ function AuthenticatedRoutes() {
           <Route path="domains" element={<DeploymentDomainsPage />} />
         </Route>
         <Route path="/dashboard/compute" element={<ComputePage />} />
-        <Route path="/dashboard/analytics" element={<AnalyticsPage />} />
+        <Route
+          path="/dashboard/analytics"
+          element={isCloud ? <AnalyticsPage /> : <Navigate to="/dashboard" replace />}
+        />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </AppLayout>

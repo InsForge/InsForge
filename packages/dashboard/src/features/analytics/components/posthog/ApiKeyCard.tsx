@@ -31,7 +31,7 @@ export function ApiKeyCard({
           variant="ghost"
           size="icon"
           aria-label={revealed ? 'Hide API key' : 'Reveal API key'}
-          onClick={() => setRevealed((v) => !v)}
+          onClick={() => setRevealed((isRevealed) => !isRevealed)}
         >
           {revealed ? <EyeOff /> : <Eye />}
         </Button>
