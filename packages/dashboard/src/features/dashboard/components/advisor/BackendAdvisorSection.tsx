@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Copy, Loader2, RotateCw } from 'lucide-react';
+import { Check, Copy, Loader2, RotateCw } from 'lucide-react';
 import {
   useAdvisorCategoryCounts,
   useAdvisorIssues,
@@ -102,6 +102,7 @@ export function BackendAdvisorSection() {
   const queryClient = useQueryClient();
 
   const [isScanning, setIsScanning] = useState(false);
+  const [copiedAll, setCopiedAll] = useState(false);
   const baselineScanIdRef = useRef<string | undefined>(undefined);
   const pollStartRef = useRef<number | null>(null);
   const refetchLatest = latest.refetch;
@@ -238,10 +239,8 @@ export function BackendAdvisorSection() {
         return;
       }
       await navigator.clipboard.writeText(formatRemediationPromptBatch(actionable));
-      showToast(
-        `Copied ${actionable.length} remediation${actionable.length === 1 ? '' : 's'}`,
-        'success'
-      );
+      setCopiedAll(true);
+      setTimeout(() => setCopiedAll(false), 2000);
     } catch {
       showToast('Failed to copy remediations', 'error');
     }
@@ -281,8 +280,8 @@ export function BackendAdvisorSection() {
             onClick={() => void handleCopyAll()}
             className={ADVISOR_BUTTON_CLASS}
           >
-            <Copy className="h-4 w-4" />
-            <span>Copy All</span>
+            {copiedAll ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+            <span>{copiedAll ? 'Copied' : 'Copy All'}</span>
           </button>
         </div>
       </div>

@@ -1,4 +1,5 @@
-import { ChevronDown, ChevronUp, Copy } from 'lucide-react';
+import { useState } from 'react';
+import { Check, ChevronDown, ChevronUp, Copy } from 'lucide-react';
 import type { DashboardAdvisorIssue } from '#types';
 import { useToast } from '#lib/hooks/useToast';
 import { formatRemediationPrompt } from './remediationPrompt';
@@ -26,6 +27,7 @@ const SEVERITY_TONE = {
 
 export function AdvisoryItem({ issue, expanded, onToggle }: AdvisoryItemProps) {
   const { showToast } = useToast();
+  const [copied, setCopied] = useState(false);
   const Icon = SEVERITY_ICON[issue.severity];
 
   const handleCopyRemediation = async () => {
@@ -34,7 +36,8 @@ export function AdvisoryItem({ issue, expanded, onToggle }: AdvisoryItemProps) {
     }
     try {
       await navigator.clipboard.writeText(formatRemediationPrompt(issue));
-      showToast('Remediation copied', 'success');
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     } catch {
       showToast('Failed to copy remediation', 'error');
     }
@@ -80,8 +83,8 @@ export function AdvisoryItem({ issue, expanded, onToggle }: AdvisoryItemProps) {
                 }}
                 className={`flex items-center gap-1 rounded border border-[var(--alpha-8)] bg-card px-1 py-1 text-sm leading-5 text-foreground transition-opacity hover:bg-[var(--alpha-4)] ${copyButtonVisibility}`}
               >
-                <Copy className="h-5 w-5" />
-                <span className="px-1">Copy Remediation</span>
+                {copied ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
+                <span className="px-1">{copied ? 'Copied' : 'Copy Remediation'}</span>
               </button>
             )}
             <span
