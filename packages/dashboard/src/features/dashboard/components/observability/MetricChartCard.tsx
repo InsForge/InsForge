@@ -1,6 +1,6 @@
 import { type MouseEventHandler, type ReactNode, useId, useMemo, useRef, useState } from 'react';
-import type { DashboardMetricDataPoint } from '../../../../types';
-import { aggregateMetricSeries } from '../../utils/aggregateMetricSeries';
+import type { DashboardMetricDataPoint } from '#types';
+import { aggregateMetricSeries } from '#features/dashboard/utils/aggregateMetricSeries';
 
 export interface MetricChartCardProps {
   title: string;

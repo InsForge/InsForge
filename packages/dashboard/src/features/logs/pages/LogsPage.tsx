@@ -1,18 +1,18 @@
 import { useMemo, useState, useCallback, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { ExternalLink } from 'lucide-react';
-import { useLogs } from '../hooks/useLogs';
-import { DataGridEmptyState, EmptyState, TableHeader } from '../../../components';
+import { useLogs } from '#features/logs/hooks/useLogs';
+import { DataGridEmptyState, EmptyState, TableHeader } from '#components';
 import {
   LogsDataGrid,
   type LogsColumnDef,
   SeverityBadge,
   LogDetailPanel,
   SeverityFilterDropdown,
-} from '../components';
-import { formatTime } from '../../../lib/utils/utils';
+} from '#features/logs/components';
+import { formatTime } from '#lib/utils/utils';
 import { LogSchema } from '@insforge/shared-schemas';
-import { usePageSize } from '../../../lib/hooks/usePageSize';
+import { usePageSize } from '#lib/hooks/usePageSize';
 
 export default function LogsPage() {
   const { source = 'insforge.logs' } = useParams<{ source?: string }>();

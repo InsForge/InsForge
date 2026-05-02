@@ -12,13 +12,13 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import { Button, Dialog, DialogContent, DialogDescription, DialogTitle, Input } from '@insforge/ui';
-import { Skeleton } from '../../../components';
-import { useDeployments } from '../hooks/useDeployments';
-import { useDeploymentSlug } from '../hooks/useDeploymentSlug';
-import { useDeploymentMetadata } from '../hooks/useDeploymentMetadata';
-import { useCustomDomains } from '../hooks/useCustomDomains';
-import { useToast } from '../../../lib/hooks/useToast';
-import type { CustomDomain } from '../services/deployments.service';
+import { Skeleton } from '#components';
+import { useDeployments } from '#features/deployments/hooks/useDeployments';
+import { useDeploymentSlug } from '#features/deployments/hooks/useDeploymentSlug';
+import { useDeploymentMetadata } from '#features/deployments/hooks/useDeploymentMetadata';
+import { useCustomDomains } from '#features/deployments/hooks/useCustomDomains';
+import { useToast } from '#lib/hooks/useToast';
+import type { CustomDomain } from '#features/deployments/services/deployments.service';
 
 /**
  * Extracts the slug portion from a custom insforge.site domain URL.

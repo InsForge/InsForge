@@ -13,13 +13,13 @@ import {
   SelectionClearButton,
   DeleteActionButton,
   TableHeader,
-} from '../../../components';
-import { UsersDataGrid, UserFormDialog } from '../components';
+} from '#components';
+import { UsersDataGrid, UserFormDialog } from '#features/auth/components';
 import { SortColumn } from 'react-data-grid';
 import { UserSchema } from '@insforge/shared-schemas';
-import { useToast } from '../../../lib/hooks/useToast';
-import { useUsers } from '../hooks/useUsers';
-import { usePageSize } from '../../../lib/hooks/usePageSize';
+import { useToast } from '#lib/hooks/useToast';
+import { useUsers } from '#features/auth/hooks/useUsers';
+import { usePageSize } from '#lib/hooks/usePageSize';
 
 export default function UsersPage() {
   const [searchValue, setSearchValue] = useState('');

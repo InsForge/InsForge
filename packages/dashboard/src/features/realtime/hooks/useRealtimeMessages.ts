@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { realtimeService } from '../services/realtime.service';
+import { realtimeService } from '#features/realtime/services/realtime.service';
 import type { ListMessagesRequest } from '@insforge/shared-schemas';
 
 export function useRealtimeMessages() {

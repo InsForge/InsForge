@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { computeServicesApi } from '../services/compute.service';
+import { computeServicesApi } from '#features/compute/services/compute.service';
 import type { CreateServiceRequest, UpdateServiceRequest } from '@insforge/shared-schemas';
-import { useToast } from '../../../lib/hooks/useToast';
-import { deriveHealth, type ServiceHealth } from '../lib/health';
+import { useToast } from '#lib/hooks/useToast';
+import { deriveHealth, type ServiceHealth } from '#features/compute/lib/health';
 
 export function useComputeServices() {
   const queryClient = useQueryClient();

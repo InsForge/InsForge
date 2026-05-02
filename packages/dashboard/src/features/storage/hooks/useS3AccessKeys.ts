@@ -5,8 +5,8 @@ import type {
   CreateS3AccessKeyRequest,
   S3GatewayConfigSchema,
 } from '@insforge/shared-schemas';
-import { s3AccessKeyService } from '../services/s3-access-key.service';
-import { useToast } from '../../../lib/hooks/useToast';
+import { s3AccessKeyService } from '#features/storage/services/s3-access-key.service';
+import { useToast } from '#lib/hooks/useToast';
 
 /** React Query hook for the read-only S3 gateway config (endpoint + region). */
 export function useS3GatewayConfig() {

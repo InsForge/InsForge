@@ -10,12 +10,12 @@ import {
   XCircle,
 } from 'lucide-react';
 import { Button } from '@insforge/ui';
-import { useComputeServices } from '../hooks/useComputeServices';
-import { ServiceCard } from '../components/ServiceCard';
-import { ServiceEvents } from '../components/ServiceEvents';
-import { CreateServiceDialog } from '../components/CreateServiceDialog';
-import { DeleteServiceDialog } from '../components/DeleteServiceDialog';
-import { statusColors, getReachableUrl } from '../constants';
+import { useComputeServices } from '#features/compute/hooks/useComputeServices';
+import { ServiceCard } from '#features/compute/components/ServiceCard';
+import { ServiceEvents } from '#features/compute/components/ServiceEvents';
+import { CreateServiceDialog } from '#features/compute/components/CreateServiceDialog';
+import { DeleteServiceDialog } from '#features/compute/components/DeleteServiceDialog';
+import { statusColors, getReachableUrl } from '#features/compute/constants';
 import type { ServiceSchema } from '@insforge/shared-schemas';
 
 export default function ComputePage() {

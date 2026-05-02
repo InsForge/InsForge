@@ -14,12 +14,12 @@ import {
   Badge,
   Input,
 } from '@insforge/ui';
-import { PaginationControls, Skeleton } from '../../../components';
-import { useDeployments } from '../hooks/useDeployments';
-import type { DeploymentSchema } from '../services/deployments.service';
-import DeploymentsEmptyState from '../components/DeploymentsEmptyState';
-import { DeploymentMetaDataDialog } from '../components/DeploymentMetaDataDialog';
-import { cn, formatTime } from '../../../lib/utils/utils';
+import { PaginationControls, Skeleton } from '#components';
+import { useDeployments } from '#features/deployments/hooks/useDeployments';
+import type { DeploymentSchema } from '#features/deployments/services/deployments.service';
+import DeploymentsEmptyState from '#features/deployments/components/DeploymentsEmptyState';
+import { DeploymentMetaDataDialog } from '#features/deployments/components/DeploymentMetaDataDialog';
+import { cn, formatTime } from '#lib/utils/utils';
 
 type DeploymentStatus =
   | 'ALL'

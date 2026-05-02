@@ -15,8 +15,8 @@ import '@xyflow/react/dist/style.css';
 import { TableNode } from './TableNode';
 import { AuthNode } from './AuthNode';
 import { BucketNode } from './BucketNode';
-import { useAllTableSchemas } from '../../database/hooks/useTables';
-import { useTheme } from '../../../lib/contexts/ThemeContext';
+import { useAllTableSchemas } from '#features/database/hooks/useTables';
+import { useTheme } from '#lib/contexts/ThemeContext';
 import {
   StorageBucketSchema,
   GetTableSchemaResponse,

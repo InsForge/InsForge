@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { storageService } from '../services/storage.service';
-import { useToast } from '../../../lib/hooks/useToast';
+import { storageService } from '#features/storage/services/storage.service';
+import { useToast } from '#lib/hooks/useToast';
 
 export function useBuckets() {
   const queryClient = useQueryClient();

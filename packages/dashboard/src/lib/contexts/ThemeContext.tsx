@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { useMediaQuery } from '../hooks/useMediaQuery';
-import { LOCAL_STORAGE_KEYS } from '../utils/constants';
-import { getLocalStorageItem, setLocalStorageItem } from '../utils/local-storage';
+import { useMediaQuery } from '#lib/hooks/useMediaQuery';
+import { LOCAL_STORAGE_KEYS } from '#lib/utils/constants';
+import { getLocalStorageItem, setLocalStorageItem } from '#lib/utils/local-storage';
 
 type Theme = 'light' | 'dark' | 'system';
 type ResolvedTheme = 'light' | 'dark';

@@ -9,15 +9,18 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@insforge/ui';
-import { CreateBackupDialog } from '../components/CreateBackupDialog';
-import { ConfirmRestoreDialog } from '../components/ConfirmRestoreDialog';
-import { DatabaseEmptyState } from '../components/DatabaseEmptyState';
-import { DatabaseStudioSidebarPanel } from '../components/DatabaseSidebar';
-import { RenameBackupDialog } from '../components/RenameBackupDialog';
-import { useDatabaseBackupInfo, useDatabaseBackupInstanceInfo } from '../hooks/useDatabaseBackup';
-import { useDashboardHost } from '../../../lib/config/DashboardHostContext';
-import { useConfirm } from '../../../lib/hooks/useConfirm';
-import { useToast } from '../../../lib/hooks/useToast';
+import { CreateBackupDialog } from '#features/database/components/CreateBackupDialog';
+import { ConfirmRestoreDialog } from '#features/database/components/ConfirmRestoreDialog';
+import { DatabaseEmptyState } from '#features/database/components/DatabaseEmptyState';
+import { DatabaseStudioSidebarPanel } from '#features/database/components/DatabaseSidebar';
+import { RenameBackupDialog } from '#features/database/components/RenameBackupDialog';
+import {
+  useDatabaseBackupInfo,
+  useDatabaseBackupInstanceInfo,
+} from '#features/database/hooks/useDatabaseBackup';
+import { useDashboardHost } from '#lib/config/DashboardHostContext';
+import { useConfirm } from '#lib/hooks/useConfirm';
+import { useToast } from '#lib/hooks/useToast';
 
 function formatBackupTimestamp(timestamp: string) {
   const date = new Date(timestamp);

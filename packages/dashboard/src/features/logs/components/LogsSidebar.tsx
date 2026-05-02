@@ -1,5 +1,5 @@
-import { FeatureSidebar } from '../../../components';
-import { useLogSources } from '../hooks/useLogSources';
+import { FeatureSidebar } from '#components';
+import { useLogSources } from '#features/logs/hooks/useLogSources';
 
 export function LogsSidebar() {
   const { menuItems, isLoading } = useLogSources();

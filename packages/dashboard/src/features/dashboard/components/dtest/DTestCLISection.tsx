@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CopyButton } from '@insforge/ui';
-import { useProjectId } from '../../../../lib/hooks/useMetadata';
-import { useDashboardHost } from '../../../../lib/config/DashboardHostContext';
-import { cn } from '../../../../lib/utils/utils';
+import { useProjectId } from '#lib/hooks/useMetadata';
+import { useDashboardHost } from '#lib/config/DashboardHostContext';
+import { cn } from '#lib/utils/utils';
 
 interface DTestCLISectionProps {
   className?: string;

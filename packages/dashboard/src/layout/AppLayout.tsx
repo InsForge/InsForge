@@ -2,14 +2,14 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import AppSidebar from './AppSidebar';
 import AppHeader from './AppHeader';
-import { ThemeProvider } from '../lib/contexts/ThemeContext';
-import { ConnectDialog } from '../features/dashboard/components/connect';
-import { ProjectRestoringPage } from '../features/dashboard/components/ProjectRestoringPage';
-import { useDashboardHost, useDashboardProject } from '../lib/config/DashboardHostContext';
-import { cn } from '../lib/utils/utils';
+import { ThemeProvider } from '#lib/contexts/ThemeContext';
+import { ConnectDialog } from '#features/dashboard/components/connect';
+import { ProjectRestoringPage } from '#features/dashboard/components/ProjectRestoringPage';
+import { useDashboardHost, useDashboardProject } from '#lib/config/DashboardHostContext';
+import { cn } from '#lib/utils/utils';
 import { ConnectDialogProvider } from './ConnectDialogContext';
-import { getFeatureFlag } from '../lib/analytics/posthog';
-import { DTestConnectTip } from '../features/dashboard/components/dtest/DTestConnectTip';
+import { getFeatureFlag } from '#lib/analytics/posthog';
+import { DTestConnectTip } from '#features/dashboard/components/dtest/DTestConnectTip';
 
 const CONNECT_DIALOG_MESSAGE_TYPES = new Set(['SHOW_ONBOARDING_OVERLAY', 'SHOW_CONNECT_OVERLAY']);
 

@@ -1,15 +1,15 @@
 import { type ReactNode } from 'react';
 import { Database } from 'lucide-react';
-import KeyHorizontalIcon from '../../../../assets/icons/key_horizontal.svg?react';
-import ClaudeLogo from '../../../../assets/logos/claude_code.png';
-import CodexLogo from '../../../../assets/logos/codex.svg?react';
-import CursorLogo from '../../../../assets/logos/cursor.svg?react';
-import CopilotLogo from '../../../../assets/logos/copilot.svg?react';
-import OpenCodeLogo from '../../../../assets/logos/opencode.svg?react';
-import OpenClawLogo from '../../../../assets/logos/openclaw.svg?react';
-import ClineLogo from '../../../../assets/logos/cline.svg?react';
-import AntigravityLogo from '../../../../assets/logos/antigravity.png';
-import OtherAgentsLogo from '../../../../assets/logos/other_agents.svg?react';
+import KeyHorizontalIcon from '#assets/icons/key_horizontal.svg?react';
+import ClaudeLogo from '#assets/logos/claude_code.png';
+import CodexLogo from '#assets/logos/codex.svg?react';
+import CursorLogo from '#assets/logos/cursor.svg?react';
+import CopilotLogo from '#assets/logos/copilot.svg?react';
+import OpenCodeLogo from '#assets/logos/opencode.svg?react';
+import OpenClawLogo from '#assets/logos/openclaw.svg?react';
+import ClineLogo from '#assets/logos/cline.svg?react';
+import AntigravityLogo from '#assets/logos/antigravity.png';
+import OtherAgentsLogo from '#assets/logos/other_agents.svg?react';
 
 export type ClientId =
   | 'openclaw'

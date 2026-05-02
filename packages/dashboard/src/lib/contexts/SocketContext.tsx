@@ -10,13 +10,13 @@ import {
 } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '../api/client';
+import { apiClient } from '#lib/api/client';
 import { useAuth } from './AuthContext';
-import { getDashboardBackendUrl } from '../config/runtime';
+import { getDashboardBackendUrl } from '#lib/config/runtime';
 import type { SocketMessage } from '@insforge/shared-schemas';
-import { databaseTableQueryKeys } from '../../features/database/queryKeys';
-import { useMcpUsage } from '../../features/logs/hooks/useMcpUsage';
-import { trackPostHog, getFeatureFlag } from '../analytics/posthog';
+import { databaseTableQueryKeys } from '#features/database/queryKeys';
+import { useMcpUsage } from '#features/logs/hooks/useMcpUsage';
+import { trackPostHog, getFeatureFlag } from '#lib/analytics/posthog';
 
 // ============================================================================
 // Types & Enums

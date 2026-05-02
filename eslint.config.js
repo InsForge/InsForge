@@ -212,6 +212,23 @@ export default defineConfig(
       'prettier/prettier': 'error',
     },
   },
+  {
+    files: ['packages/dashboard/**/*.ts', 'packages/dashboard/**/*.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '^\\.\\.(?:/|$)',
+              message:
+                'Use relative imports only within the same folder. Use dashboard #... aliases for imports outside the current folder.',
+            },
+          ],
+        },
+      ],
+    },
+  },
   // Shared schemas configuration - minimal rules for schema definitions
   {
     files: ['packages/shared-schemas/**/*.ts'],

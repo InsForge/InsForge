@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { anonTokenService } from '../services/anonToken.service';
+import { anonTokenService } from '#features/auth/services/anonToken.service';
 
 interface UseAnonTokenOptions {
   enabled?: boolean;

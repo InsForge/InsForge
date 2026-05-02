@@ -15,16 +15,16 @@ import {
   Input,
   Switch,
 } from '@insforge/ui';
-import WarningIcon from '../../../assets/icons/warning.svg';
+import WarningIcon from '#assets/icons/warning.svg';
 import {
   oAuthConfigSchema,
   OAuthConfigSchema,
   OAuthProvidersSchema,
 } from '@insforge/shared-schemas';
-import { type OAuthProviderInfo } from '../helpers';
+import { type OAuthProviderInfo } from '#features/auth/helpers';
 import { SecretInput } from './SecretInput';
-import { useOAuthConfig } from '../hooks/useOAuthConfig';
-import { getBackendUrl, isInsForgeCloudProject } from '../../../lib/utils/utils';
+import { useOAuthConfig } from '#features/auth/hooks/useOAuthConfig';
+import { getBackendUrl, isInsForgeCloudProject } from '#lib/utils/utils';
 
 const getCallbackUrl = (provider?: string) => {
   // Use backend API URL for OAuth callback

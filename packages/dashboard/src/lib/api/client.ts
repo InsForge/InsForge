@@ -1,4 +1,4 @@
-import { getDashboardApiBaseUrl } from '../config/runtime';
+import { getDashboardApiBaseUrl } from '#lib/config/runtime';
 
 const CSRF_COOKIE_NAME = 'insforge_csrf';
 

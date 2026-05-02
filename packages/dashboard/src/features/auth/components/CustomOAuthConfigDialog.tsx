@@ -17,8 +17,8 @@ import {
   type UpdateCustomOAuthConfigRequest,
 } from '@insforge/shared-schemas';
 import { SecretInput } from './SecretInput';
-import { useCustomOAuthConfig } from '../hooks/useCustomOAuthConfig';
-import { getBackendUrl } from '../../../lib/utils/utils';
+import { useCustomOAuthConfig } from '#features/auth/hooks/useCustomOAuthConfig';
+import { getBackendUrl } from '#lib/utils/utils';
 
 interface CustomOAuthConfigDialogProps {
   isOpen: boolean;

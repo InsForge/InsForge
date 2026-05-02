@@ -1,11 +1,11 @@
 import { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
-import { LOCAL_STORAGE_KEYS } from '../../../lib/utils/constants';
+import { LOCAL_STORAGE_KEYS } from '#lib/utils/constants';
 import {
   getLocalStorageItem,
   getLocalStorageJSON,
   setLocalStorageItem,
   setLocalStorageJSON,
-} from '../../../lib/utils/local-storage';
+} from '#lib/utils/local-storage';
 
 export interface SQLTab {
   id: string;

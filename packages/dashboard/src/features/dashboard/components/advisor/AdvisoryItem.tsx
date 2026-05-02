@@ -1,10 +1,10 @@
 import { ChevronDown, ChevronUp, Copy } from 'lucide-react';
-import type { DashboardAdvisorIssue } from '../../../../types';
-import { useToast } from '../../../../lib/hooks/useToast';
+import type { DashboardAdvisorIssue } from '#types';
+import { useToast } from '#lib/hooks/useToast';
 import { formatRemediationPrompt } from './remediationPrompt';
-import CriticalIcon from '../../../../assets/icons/severity_critical.svg?react';
-import InfoIcon from '../../../../assets/icons/severity_info.svg?react';
-import WarningIcon from '../../../../assets/icons/severity_warning.svg?react';
+import CriticalIcon from '#assets/icons/severity_critical.svg?react';
+import InfoIcon from '#assets/icons/severity_info.svg?react';
+import WarningIcon from '#assets/icons/severity_warning.svg?react';
 
 interface AdvisoryItemProps {
   issue: DashboardAdvisorIssue;

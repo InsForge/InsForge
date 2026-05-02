@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { logService, type GetBuildLogsResponse, type BuildLogEntry } from '../services/log.service';
+import {
+  logService,
+  type GetBuildLogsResponse,
+  type BuildLogEntry,
+} from '#features/logs/services/log.service';
 import { LogsDataGrid, type LogsColumnDef } from './LogsDataGrid';
-import { DataGridEmptyState } from '../../../components';
-import { cn } from '../../../lib/utils/utils';
-import { usePageSize } from '../../../lib/hooks/usePageSize';
+import { DataGridEmptyState } from '#components';
+import { cn } from '#lib/utils/utils';
+import { usePageSize } from '#lib/hooks/usePageSize';
 
 interface BuildLogsViewProps {
   className?: string;

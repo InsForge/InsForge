@@ -1,8 +1,8 @@
 import { useNavigate } from 'react-router-dom';
-import { DATABASE_TEMPLATES, type DatabaseTemplate } from '../templates';
-import { useSQLEditorContext } from '../contexts/SQLEditorContext';
-import { TemplateCard } from '../components/TemplateCard';
-import { DatabaseStudioSidebarPanel } from '../components/DatabaseSidebar';
+import { DATABASE_TEMPLATES, type DatabaseTemplate } from '#features/database/templates';
+import { useSQLEditorContext } from '#features/database/contexts/SQLEditorContext';
+import { TemplateCard } from '#features/database/components/TemplateCard';
+import { DatabaseStudioSidebarPanel } from '#features/database/components/DatabaseSidebar';
 
 export default function TemplatesPage() {
   const navigate = useNavigate();

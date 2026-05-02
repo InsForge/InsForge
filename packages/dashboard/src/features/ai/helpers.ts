@@ -19,13 +19,13 @@ export interface ModelOption {
   systemPrompt?: string | null;
 }
 
-import GrokIcon from '../../assets/logos/grok.svg?react';
-import GeminiIcon from '../../assets/logos/gemini.svg?react';
-import ClaudeIcon from '../../assets/logos/claude_code.svg?react';
-import OpenAIIcon from '../../assets/logos/openai.svg?react';
-import AmazonIcon from '../../assets/logos/amazon.svg?react';
-import DeepseekIcon from '../../assets/logos/deepseek.svg?react';
-import QwenIcon from '../../assets/logos/qwen.svg?react';
+import GrokIcon from '#assets/logos/grok.svg?react';
+import GeminiIcon from '#assets/logos/gemini.svg?react';
+import ClaudeIcon from '#assets/logos/claude_code.svg?react';
+import OpenAIIcon from '#assets/logos/openai.svg?react';
+import AmazonIcon from '#assets/logos/amazon.svg?react';
+import DeepseekIcon from '#assets/logos/deepseek.svg?react';
+import QwenIcon from '#assets/logos/qwen.svg?react';
 
 // Provider tab configuration
 export interface ProviderTab {

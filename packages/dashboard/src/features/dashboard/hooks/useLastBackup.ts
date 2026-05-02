@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { useDashboardHost, useDashboardProject } from '../../../lib/config/DashboardHostContext';
-import type { DashboardBackup } from '../../../types';
+import { useDashboardHost, useDashboardProject } from '#lib/config/DashboardHostContext';
+import type { DashboardBackup } from '#types';
 
 export const LAST_BACKUP_QUERY_KEY = ['dashboard-last-backup'] as const;
 

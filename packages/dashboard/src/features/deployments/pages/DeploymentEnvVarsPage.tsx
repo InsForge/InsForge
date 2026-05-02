@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import { Button, ConfirmDialog } from '@insforge/ui';
-import { Skeleton } from '../../../components';
-import { EnvVarRow } from '../components/EnvVarRow';
-import { EnvVarDialog } from '../components/EnvVarDialog';
-import EnvVarsEmptyState from '../components/EnvVarsEmptyState';
-import { useDeploymentEnvVars } from '../hooks/useDeploymentEnvVars';
+import { Skeleton } from '#components';
+import { EnvVarRow } from '#features/deployments/components/EnvVarRow';
+import { EnvVarDialog } from '#features/deployments/components/EnvVarDialog';
+import EnvVarsEmptyState from '#features/deployments/components/EnvVarsEmptyState';
+import { useDeploymentEnvVars } from '#features/deployments/hooks/useDeploymentEnvVars';
 import type { DeploymentEnvVar } from '@insforge/shared-schemas';
 
 export default function DeploymentEnvVarsPage() {

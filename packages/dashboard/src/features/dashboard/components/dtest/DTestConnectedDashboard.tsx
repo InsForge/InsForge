@@ -2,20 +2,20 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '@insforge/ui';
 import { Braces, Database, Download, HardDrive, User } from 'lucide-react';
-import { MetricCard } from '../MetricCard';
-import { useMetadata } from '../../../../lib/hooks/useMetadata';
-import { useCloudProjectInfo } from '../../../../lib/hooks/useCloudProjectInfo';
-import { useUsers } from '../../../auth';
-import { isInsForgeCloudProject } from '../../../../lib/utils/utils';
-import { useMcpUsage } from '../../../logs/hooks/useMcpUsage';
-import { useAdvisorLatest } from '../../hooks/useAdvisor';
-import { useLastBackup } from '../../hooks/useLastBackup';
-import { useIsCloudHostingMode } from '../../../../lib/config/DashboardHostContext';
-import CloudDoneIcon from '../../../../assets/icons/cloud_done.svg?react';
-import CriticalIcon from '../../../../assets/icons/severity_critical.svg?react';
+import { MetricCard } from '#features/dashboard/components/MetricCard';
+import { useMetadata } from '#lib/hooks/useMetadata';
+import { useCloudProjectInfo } from '#lib/hooks/useCloudProjectInfo';
+import { useUsers } from '#features/auth';
+import { isInsForgeCloudProject } from '#lib/utils/utils';
+import { useMcpUsage } from '#features/logs/hooks/useMcpUsage';
+import { useAdvisorLatest } from '#features/dashboard/hooks/useAdvisor';
+import { useLastBackup } from '#features/dashboard/hooks/useLastBackup';
+import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
+import CloudDoneIcon from '#assets/icons/cloud_done.svg?react';
+import CriticalIcon from '#assets/icons/severity_critical.svg?react';
 import { DashboardPromptStepper } from './DashboardPromptStepper';
-import { ObservabilitySection } from '../observability';
-import { BackendAdvisorSection } from '../advisor';
+import { ObservabilitySection } from '#features/dashboard/components/observability';
+import { BackendAdvisorSection } from '#features/dashboard/components/advisor';
 
 function formatBackupAge(iso: string | undefined): string | null {
   if (!iso) {

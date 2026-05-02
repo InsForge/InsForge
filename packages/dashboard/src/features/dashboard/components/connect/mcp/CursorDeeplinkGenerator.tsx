@@ -1,8 +1,8 @@
 import { useMemo, useCallback } from 'react';
 import { createMCPServerConfig, type PlatformType } from './helpers';
-import CursorLogo from '../../../../../assets/logos/cursor.svg?react';
-import { getBackendUrl } from '../../../../../lib/utils/utils';
-import { trackPostHog, getFeatureFlag } from '../../../../../lib/analytics/posthog';
+import CursorLogo from '#assets/logos/cursor.svg?react';
+import { getBackendUrl } from '#lib/utils/utils';
+import { trackPostHog, getFeatureFlag } from '#lib/analytics/posthog';
 
 interface CursorDeeplinkGeneratorProps {
   apiKey?: string;

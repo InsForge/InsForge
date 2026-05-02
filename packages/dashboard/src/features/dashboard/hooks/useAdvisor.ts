@@ -1,12 +1,12 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useDashboardHost } from '../../../lib/config/DashboardHostContext';
+import { useDashboardHost } from '#lib/config/DashboardHostContext';
 import type {
   DashboardAdvisorCategory,
   DashboardAdvisorIssuesQuery,
   DashboardAdvisorIssuesResponse,
   DashboardAdvisorSeverity,
   DashboardAdvisorSummary,
-} from '../../../types';
+} from '#types';
 
 export type AdvisorCategorySeverityMatrix = Record<
   DashboardAdvisorCategory,

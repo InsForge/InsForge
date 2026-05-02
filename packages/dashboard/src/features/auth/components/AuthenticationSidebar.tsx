@@ -4,7 +4,7 @@ import {
   FeatureSidebar,
   type FeatureSidebarHeaderButton,
   type FeatureSidebarListItem,
-} from '../../../components';
+} from '#components';
 import { AuthSettingsMenuDialog } from './AuthSettingsMenuDialog';
 
 const AUTHENTICATION_SIDEBAR_ITEMS: FeatureSidebarListItem[] = [

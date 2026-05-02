@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { FeatureSidebarListItem } from '../../../components';
-import { LOCAL_STORAGE_KEYS } from '../../../lib/utils/constants';
+import type { FeatureSidebarListItem } from '#components';
+import { LOCAL_STORAGE_KEYS } from '#lib/utils/constants';
 import {
   getLocalStorageItem,
   removeLocalStorageItem,
   setLocalStorageItem,
-} from '../../../lib/utils/local-storage';
-import { logService } from '../services/log.service';
+} from '#lib/utils/local-storage';
+import { logService } from '#features/logs/services/log.service';
 import type { LogSourceSchema } from '@insforge/shared-schemas';
 
 export function useLogSources() {

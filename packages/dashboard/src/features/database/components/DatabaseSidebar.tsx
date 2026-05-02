@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { ArrowLeft, Database, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Link, useMatch, useNavigate } from 'react-router-dom';
-import EmptyBoxSvg from '../../../assets/images/empty_box.svg?react';
+import EmptyBoxSvg from '#assets/images/empty_box.svg?react';
 import {
   FeatureSidebar,
   type FeatureSidebarActionButton,
   type FeatureSidebarItemAction,
   type FeatureSidebarListItem,
-} from '../../../components';
-import { ScrollArea } from '../../../components/radix/ScrollArea';
-import { useIsCloudHostingMode } from '../../../lib/config/DashboardHostContext';
-import { cn } from '../../../lib/utils/utils';
+} from '#components';
+import { ScrollArea } from '#components/radix/ScrollArea';
+import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
+import { cn } from '#lib/utils/utils';
 import { Button } from '@insforge/ui';
 
 const DATABASE_STUDIO_SIDEBAR_BASE_ITEMS: Array<{

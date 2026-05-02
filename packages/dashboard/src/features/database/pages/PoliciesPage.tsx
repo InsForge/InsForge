@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import RefreshIcon from '../../../assets/icons/refresh.svg?react';
+import RefreshIcon from '#assets/icons/refresh.svg?react';
 import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -10,10 +10,10 @@ import {
   type DataGridRowType,
   EmptyState,
   TableHeader,
-} from '../../../components';
-import { usePolicies } from '../hooks/useDatabase';
-import { SQLModal, SQLCellButton } from '../components/SQLModal';
-import { DatabaseStudioSidebarPanel } from '../components/DatabaseSidebar';
+} from '#components';
+import { usePolicies } from '#features/database/hooks/useDatabase';
+import { SQLModal, SQLCellButton } from '#features/database/components/SQLModal';
+import { DatabaseStudioSidebarPanel } from '#features/database/components/DatabaseSidebar';
 import type { DatabasePoliciesResponse } from '@insforge/shared-schemas';
 
 interface PolicyRow extends DataGridRowType {

@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { Controller, Control } from 'react-hook-form';
 import { X, Key } from 'lucide-react';
 import { Checkbox, Input } from '@insforge/ui';
-import { TableFormColumnSchema, TableFormSchema } from '../schema';
+import { TableFormColumnSchema, TableFormSchema } from '#features/database/schema';
 import { ColumnTypeSelect } from './ColumnTypeSelect';
 
 interface TableFormColumnProps {

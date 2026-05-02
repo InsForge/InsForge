@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { aiService } from '../services/ai.service';
+import { aiService } from '#features/ai/services/ai.service';
 import {
   AIUsageSummarySchema,
   AIUsageRecordSchema,

@@ -11,7 +11,7 @@ import {
   DateCellEditor,
   JsonCellEditor,
   TextCellEditor,
-} from '../../../components/datagrid';
+} from '#components/datagrid';
 import { ColumnSchema, ColumnType, TableSchema } from '@insforge/shared-schemas';
 import { ForeignKeyCell } from './ForeignKeyCell';
 

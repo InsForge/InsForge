@@ -4,7 +4,7 @@ import { sql } from '@codemirror/lang-sql';
 import { EditorView } from '@codemirror/view';
 import { vscodeDark, vscodeLight } from '@uiw/codemirror-theme-vscode';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@insforge/ui';
-import { useTheme } from '../../../lib/contexts/ThemeContext';
+import { useTheme } from '#lib/contexts/ThemeContext';
 
 const customTheme = EditorView.theme({
   '&': { backgroundColor: 'transparent', maxHeight: '400px' },

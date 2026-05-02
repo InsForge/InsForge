@@ -1,12 +1,12 @@
 import { ReactElement } from 'react';
-import Github from '../../assets/logos/github.svg?react';
-import Google from '../../assets/logos/google.svg?react';
-import Microsoft from '../../assets/logos/microsoft.svg?react';
-import Discord from '../../assets/logos/discord.svg?react';
-import LinkedIn from '../../assets/logos/linkedin.svg?react';
-import Facebook from '../../assets/logos/facebook.svg?react';
-import X from '../../assets/logos/x.svg?react';
-import Apple from '../../assets/logos/apple.svg?react';
+import Github from '#assets/logos/github.svg?react';
+import Google from '#assets/logos/google.svg?react';
+import Microsoft from '#assets/logos/microsoft.svg?react';
+import Discord from '#assets/logos/discord.svg?react';
+import LinkedIn from '#assets/logos/linkedin.svg?react';
+import Facebook from '#assets/logos/facebook.svg?react';
+import X from '#assets/logos/x.svg?react';
+import Apple from '#assets/logos/apple.svg?react';
 import type { OAuthProvidersSchema } from '@insforge/shared-schemas';
 
 export enum AuthTab {

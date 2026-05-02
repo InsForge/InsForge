@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { metadataService } from '../services/metadata.service';
+import { metadataService } from '#lib/services/metadata.service';
 
 interface UseMetadataOptions {
   enabled?: boolean;

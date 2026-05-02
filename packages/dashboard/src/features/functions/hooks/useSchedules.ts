@@ -7,8 +7,8 @@ import type {
   UpdateScheduleRequest,
   UpdateScheduleResponse,
 } from '@insforge/shared-schemas';
-import { scheduleService } from '../services/schedule.service';
-import { useToast } from '../../../lib/hooks/useToast';
+import { scheduleService } from '#features/functions/services/schedule.service';
+import { useToast } from '#lib/hooks/useToast';
 
 const SCHEDULES_QUERY_KEY = ['schedules'];
 

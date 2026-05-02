@@ -1,4 +1,4 @@
-import { apiClient } from '../../../lib/api/client';
+import { apiClient } from '#lib/api/client';
 import type { DatabaseMigrationsResponse } from '@insforge/shared-schemas';
 
 export class MigrationService {

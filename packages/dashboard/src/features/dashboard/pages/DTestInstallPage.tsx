@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Skeleton } from '../../../components';
-import { useMcpUsage } from '../../logs/hooks/useMcpUsage';
-import { ClientDetailPage } from '../components/dtest/ClientDetailPage';
-import { InstallInsForgePage } from '../components/dtest/InstallInsForgePage';
-import type { ClientId } from '../components/dtest/clientRegistry';
+import { Skeleton } from '#components';
+import { useMcpUsage } from '#features/logs/hooks/useMcpUsage';
+import { ClientDetailPage } from '#features/dashboard/components/dtest/ClientDetailPage';
+import { InstallInsForgePage } from '#features/dashboard/components/dtest/InstallInsForgePage';
+import type { ClientId } from '#features/dashboard/components/dtest/clientRegistry';
 
 function DTestLoadingState() {
   return (

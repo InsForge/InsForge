@@ -6,14 +6,14 @@ import {
   dashboardSettingsMenuItem,
   dashboardStaticMenuItems,
   type DashboardPrimaryMenuItem,
-} from '../navigation/menuItems';
+} from '#navigation/menuItems';
 import { Link, useLocation, matchPath } from 'react-router-dom';
 import { ExternalLink, PanelLeftOpen, PanelRightOpen } from 'lucide-react';
-import { cn, isInsForgeCloudProject } from '../lib/utils/utils';
+import { cn, isInsForgeCloudProject } from '#lib/utils/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
-import { ProjectSettingsMenuDialog } from '../features/dashboard/components';
-import { getFeatureFlag } from '../lib/analytics/posthog';
-import { useDashboardHost } from '../lib/config/DashboardHostContext';
+import { ProjectSettingsMenuDialog } from '#features/dashboard/components';
+import { getFeatureFlag } from '#lib/analytics/posthog';
+import { useDashboardHost } from '#lib/config/DashboardHostContext';
 
 interface AppSidebarProps extends React.HTMLAttributes<HTMLElement> {
   isCollapsed: boolean;

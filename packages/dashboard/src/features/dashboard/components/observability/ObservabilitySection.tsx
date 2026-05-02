@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ArrowDownToLine, ArrowUpFromLine, Cpu, HardDrive, MemoryStick } from 'lucide-react';
-import { useProjectMetrics } from '../../hooks/useProjectMetrics';
-import type { DashboardMetricName, DashboardMetricsRange } from '../../../../types';
+import { useProjectMetrics } from '#features/dashboard/hooks/useProjectMetrics';
+import type { DashboardMetricName, DashboardMetricsRange } from '#types';
 import { MetricChartCard } from './MetricChartCard';
 
 const RANGES: DashboardMetricsRange[] = ['1h', '6h', '24h', '3d'];

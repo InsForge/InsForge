@@ -10,7 +10,7 @@ import type {
   DashboardAdvisorSummary,
   DashboardAdvisorIssuesQuery,
   DashboardAdvisorIssuesResponse,
-} from '../../types';
+} from '#types';
 
 interface DashboardHostContextValue {
   backendUrl?: string;
