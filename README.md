@@ -71,13 +71,14 @@ graph TB
     SL --> ST[Storage]
     SL --> EF[Edge Functions]
     SL --> MG[Model Gateway]
+    SL --> CP[Compute]
     SL --> DEP[Deployment]
 
     classDef bar fill:#0b0f14,stroke:#30363d,stroke-width:1px,color:#ffffff
     classDef card fill:#161b22,stroke:#30363d,stroke-width:1px,color:#ffffff
 
     class AG,SL bar
-    class AUTH,DB,ST,EF,MG,DEP card
+    class AUTH,DB,ST,EF,MG,CP,DEP card
 
     style TOP fill:transparent,stroke:transparent
     style MID fill:transparent,stroke:transparent
@@ -91,6 +92,7 @@ graph TB
 - **Storage**: S3 compatible file storage
 - **Model Gateway**: OpenAI compatible API across multiple LLM providers
 - **Edge Functions**: Serverless code running on the edge
+- **Compute** (experimental): Long-running container services on Fly.io with public URLs ([docs](https://docs.insforge.dev/core-concepts/compute/architecture))
 - **Site Deployment**: Site build and deployment
 
 
