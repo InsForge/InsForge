@@ -2,6 +2,7 @@ import { Pool, PoolClient } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import logger from '@/utils/logger.js';
 import { RoleSchema } from '@insforge/shared-schemas';
+import { getSafeDatabaseRole } from '@/utils/database-role.js';
 
 /**
  * Handles channel authorization by checking RLS policies on the messages table.
@@ -49,12 +50,13 @@ export class RealtimeAuthService {
     userId: string | undefined,
     role: RoleSchema
   ): Promise<boolean> {
+    const safeRole = getSafeDatabaseRole(role);
     const client = await this.getPool().connect();
     try {
       // Begin transaction to ensure settings persist across queries
       await client.query('BEGIN');
       // Switch to specified role to enforce RLS policies
-      await client.query(`SET LOCAL ROLE ${role}`);
+      await client.query(`SET LOCAL ROLE ${safeRole}`);
       await this.setUserContext(client, userId, channelName);
 
       // Test SELECT permission via RLS on channels table

@@ -4,6 +4,7 @@ import logger from '@/utils/logger.js';
 import type { RealtimeMessage, RoleSchema } from '@insforge/shared-schemas';
 import { RealtimeChannelService } from './realtime-channel.service.js';
 import { RealtimeAuthService } from './realtime-auth.service.js';
+import { getSafeDatabaseRole } from '@/utils/database-role.js';
 
 export class RealtimeMessageService {
   private static instance: RealtimeMessageService;
@@ -48,6 +49,7 @@ export class RealtimeMessageService {
     // Get channel info
     const channelService = RealtimeChannelService.getInstance();
     const channel = await channelService.getByName(channelName);
+    const safeRole = getSafeDatabaseRole(userRole);
 
     if (!channel) {
       logger.debug('Channel not found for message insert', { channelName });
@@ -61,7 +63,7 @@ export class RealtimeMessageService {
       await client.query('BEGIN');
 
       // Switch to specified role to enforce RLS policies
-      await client.query(`SET LOCAL ROLE ${userRole}`);
+      await client.query(`SET LOCAL ROLE ${safeRole}`);
 
       // Set user context for RLS policy evaluation
       const authService = RealtimeAuthService.getInstance();
