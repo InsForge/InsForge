@@ -92,7 +92,8 @@
               {
                 "group": "Compute (Experimental)",
                 "pages": [
-                  "core-concepts/compute/architecture"
+                  "core-concepts/compute/architecture",
+                  "core-concepts/compute/infrastructure"
                 ]
               }
             ]
