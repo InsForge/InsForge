@@ -95,6 +95,13 @@
                   "core-concepts/payments/architecture",
                   "core-concepts/payments/cli"
                 ]
+              },
+              {
+                "group": "Compute (Experimental)",
+                "pages": [
+                  "core-concepts/compute/architecture",
+                  "core-concepts/compute/infrastructure"
+                ]
               }
             ]
           },
