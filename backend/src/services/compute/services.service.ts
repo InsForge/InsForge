@@ -201,8 +201,8 @@ export function selectComputeProvider(): ComputeProvider {
     'Compute services not configured.',
     503,
     ERROR_CODES.COMPUTE_NOT_CONFIGURED,
-    'Self-hosted: set FLY_API_TOKEN and FLY_ORG in .env. ' +
-      'Cloud: ensure PROJECT_ID, CLOUD_API_HOST, and JWT_SECRET are set (provisioned by insforge-cloud).'
+    'Set FLY_API_TOKEN and FLY_ORG in your .env, then restart the container. ' +
+      'See https://docs.insforge.dev/core-concepts/compute/architecture for setup details.'
   );
 }
 
