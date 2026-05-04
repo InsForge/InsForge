@@ -17,6 +17,7 @@ interface FeatureSidebarProps {
   items: FeatureSidebarListItem[];
   loading?: boolean;
   headerButtons?: FeatureSidebarHeaderButton[];
+  headerContent?: ReactNode;
   actionButtons?: FeatureSidebarActionButton[];
   emptyState?: ReactNode;
   activeItemId?: string | null;
@@ -179,6 +180,7 @@ export function FeatureSidebar({
   items,
   loading,
   headerButtons,
+  headerContent,
   actionButtons,
   emptyState,
   activeItemId,
@@ -237,6 +239,8 @@ export function FeatureSidebar({
           </div>
         )}
       </div>
+
+      {headerContent && <div className="px-3 pb-3">{headerContent}</div>}
 
       {/* Action Buttons */}
       {!!actionButtons?.length && (

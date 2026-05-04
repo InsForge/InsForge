@@ -3,6 +3,7 @@ import {
   columnSchema,
   foreignKeySchema,
   tableSchema,
+  databaseSchemaInfoSchema,
   databaseFunctionSchema,
   databaseIndexSchema,
   databasePolicySchema,
@@ -21,6 +22,7 @@ export const createTableRequestSchema = tableSchema
 
 export const createTableResponseSchema = tableSchema
   .pick({
+    schemaName: true,
     tableName: true,
     columns: true,
   })
@@ -74,12 +76,14 @@ export const updateTableSchemaRequestSchema = z.object({
 });
 
 export const updateTableSchemaResponse = z.object({
+  schemaName: z.string().optional(),
   message: z.string(),
   tableName: z.string(),
   operations: z.array(z.string()),
 });
 
 export const deleteTableResponse = z.object({
+  schemaName: z.string().optional(),
   message: z.string(),
   tableName: z.string(),
   nextActions: z.string(),
@@ -229,6 +233,7 @@ export const importResponseSchema = z.object({
 
 // Bulk Upsert Schemas
 export const bulkUpsertRequestSchema = z.object({
+  schema: z.string().default('public'),
   table: z.string().min(1, 'Table name is required'),
   upsertKey: z.string().optional(),
   // Note: File handling is done at the API layer via multipart/form-data
@@ -241,6 +246,76 @@ export const bulkUpsertResponseSchema = z.object({
   rowsAffected: z.number(),
   totalRecords: z.number(),
   filename: z.string(),
+});
+
+export const adminTableRecordSchema = z.record(z.string(), z.unknown());
+
+export const adminTableRecordsSortClauseSchema = z.object({
+  columnName: z.string().trim().min(1, 'Column name is required'),
+  direction: z.enum(['asc', 'desc']),
+});
+
+export const adminTableRecordsListQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(500).default(50),
+    offset: z.coerce.number().int().min(0).default(0),
+    search: z.string().trim().optional(),
+    sort: z.string().trim().optional(),
+    filterColumn: z.string().trim().optional(),
+    filterValue: z.string().optional(),
+  })
+  .refine(
+    (value) =>
+      (value.filterColumn === undefined && value.filterValue === undefined) ||
+      (value.filterColumn !== undefined && value.filterValue !== undefined),
+    {
+      message: 'filterColumn and filterValue must be provided together.',
+      path: ['filterColumn'],
+    }
+  );
+
+export const adminTableRecordLookupQuerySchema = z.object({
+  column: z.string().trim().min(1, 'Column is required'),
+  value: z.string(),
+});
+
+export const adminTableRecordsCreateRequestSchema = z
+  .array(adminTableRecordSchema)
+  .min(1, 'At least one record is required');
+
+export const adminTableRecordUpdateQuerySchema = z.object({
+  pkColumn: z.string().trim().min(1, 'Primary key column is required'),
+});
+
+export const adminTableRecordUpdateRequestSchema = adminTableRecordSchema.refine(
+  (record) => Object.keys(record).length > 0,
+  {
+    message: 'At least one field is required.',
+  }
+);
+
+export const adminTableRecordsDeleteQuerySchema = z.object({
+  pkColumn: z.string().trim().min(1, 'Primary key column is required'),
+  pkValues: z.string().trim().min(1, 'At least one primary key value is required'),
+});
+
+export const adminTableRecordResponseSchema = adminTableRecordSchema;
+
+export const adminTableRecordLookupResponseSchema = adminTableRecordSchema.nullable();
+
+export const adminTableRecordsCreateResponseSchema = z.array(adminTableRecordSchema);
+
+export const adminTableRecordsListResponseSchema = z.object({
+  data: z.array(adminTableRecordSchema),
+  pagination: z.object({
+    offset: z.number().int().min(0),
+    limit: z.number().int().min(1),
+    total: z.number().int().min(0),
+  }),
+});
+
+export const adminTableRecordsDeleteResponseSchema = z.object({
+  deletedCount: z.number().int().min(0),
 });
 
 export const createMigrationRequestSchema = z.object({
@@ -287,12 +362,29 @@ export type ImportDatabaseResponse = z.infer<typeof importResponseSchema>;
 // Bulk Upsert Types
 export type BulkUpsertRequest = z.infer<typeof bulkUpsertRequestSchema>;
 export type BulkUpsertResponse = z.infer<typeof bulkUpsertResponseSchema>;
+export type AdminTableRecord = z.infer<typeof adminTableRecordSchema>;
+export type AdminTableRecordsSortClause = z.infer<typeof adminTableRecordsSortClauseSchema>;
+export type AdminTableRecordsListQuery = z.infer<typeof adminTableRecordsListQuerySchema>;
+export type AdminTableRecordLookupQuery = z.infer<typeof adminTableRecordLookupQuerySchema>;
+export type AdminTableRecordsCreateRequest = z.infer<typeof adminTableRecordsCreateRequestSchema>;
+export type AdminTableRecordUpdateQuery = z.infer<typeof adminTableRecordUpdateQuerySchema>;
+export type AdminTableRecordUpdateRequest = z.infer<typeof adminTableRecordUpdateRequestSchema>;
+export type AdminTableRecordsDeleteQuery = z.infer<typeof adminTableRecordsDeleteQuerySchema>;
+export type AdminTableRecordResponse = z.infer<typeof adminTableRecordResponseSchema>;
+export type AdminTableRecordLookupResponse = z.infer<typeof adminTableRecordLookupResponseSchema>;
+export type AdminTableRecordsCreateResponse = z.infer<typeof adminTableRecordsCreateResponseSchema>;
+export type AdminTableRecordsListResponse = z.infer<typeof adminTableRecordsListResponseSchema>;
+export type AdminTableRecordsDeleteResponse = z.infer<typeof adminTableRecordsDeleteResponseSchema>;
 export type CreateMigrationRequest = z.infer<typeof createMigrationRequestSchema>;
 export type CreateMigrationResponse = z.infer<typeof createMigrationResponseSchema>;
 
 // Database Metadata Response Schemas
 export const databaseFunctionsResponseSchema = z.object({
   functions: z.array(databaseFunctionSchema),
+});
+
+export const databaseSchemasResponseSchema = z.object({
+  schemas: z.array(databaseSchemaInfoSchema),
 });
 
 export const databaseIndexesResponseSchema = z.object({
@@ -313,6 +405,7 @@ export const databaseMigrationsResponseSchema = z.object({
 
 // Database Metadata Response Types
 export type DatabaseFunctionsResponse = z.infer<typeof databaseFunctionsResponseSchema>;
+export type DatabaseSchemasResponse = z.infer<typeof databaseSchemasResponseSchema>;
 export type DatabaseIndexesResponse = z.infer<typeof databaseIndexesResponseSchema>;
 export type DatabasePoliciesResponse = z.infer<typeof databasePoliciesResponseSchema>;
 export type DatabaseTriggersResponse = z.infer<typeof databaseTriggersResponseSchema>;

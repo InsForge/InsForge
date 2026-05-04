@@ -1,0 +1,284 @@
+---
+title: Payments SDK Reference
+description: Create Stripe Checkout and Billing Portal sessions with the InsForge TypeScript SDK
+---
+
+<Warning>
+  **Private Preview** — Payments is currently in private preview. APIs and behavior may change.
+</Warning>
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+<Installation />
+
+## Overview
+
+The Payments SDK exposes runtime-safe methods for generated app frontends:
+
+- `insforge.payments.createCheckoutSession(...)`
+- `insforge.payments.createCustomerPortalSession(...)`
+
+Stripe secret keys, catalog management, sync, and webhook setup are admin operations. Configure them from the dashboard or CLI before using the SDK.
+
+```bash
+npx @insforge/cli payments status
+npx @insforge/cli payments catalog --environment test
+```
+
+<Note>
+  See [Payments Architecture](/core-concepts/payments/architecture) for setup, Stripe key management, webhook projections, and fulfillment patterns.
+</Note>
+
+## createCheckoutSession()
+
+Create a Stripe Checkout Session through the InsForge backend.
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `environment` | `'test' \| 'live'` | Yes | Stripe environment to target |
+| `mode` | `'payment' \| 'subscription'` | Yes | Checkout mode |
+| `lineItems` | `{ stripePriceId: string; quantity?: number }[]` | Yes | Stripe price IDs and quantities. Quantity defaults to `1` |
+| `successUrl` | `string` | Yes | URL Stripe redirects to after Checkout completes |
+| `cancelUrl` | `string` | Yes | URL Stripe redirects to if the customer cancels |
+| `subject` | `{ type: string; id: string }` | Required for subscriptions | App-defined billing owner |
+| `customerEmail` | `string \| null` | No | Email hint for Checkout customer creation |
+| `metadata` | `Record<string, string>` | No | App metadata copied to Stripe Checkout |
+| `idempotencyKey` | `string` | No | Stable key for retry-safe Checkout creation |
+
+<Warning>
+  Metadata keys starting with `insforge_` are reserved.
+</Warning>
+
+### Returns
+
+```typescript
+{
+  data: {
+    checkoutSession: {
+      id: string
+      environment: 'test' | 'live'
+      mode: 'payment' | 'subscription'
+      status: 'initialized' | 'open' | 'completed' | 'expired' | 'failed'
+      paymentStatus: 'paid' | 'unpaid' | 'no_payment_required' | null
+      subjectType: string | null
+      subjectId: string | null
+      customerEmail: string | null
+      stripeCheckoutSessionId: string | null
+      stripeCustomerId: string | null
+      stripePaymentIntentId: string | null
+      stripeSubscriptionId: string | null
+      url: string | null
+      lastError: string | null
+      createdAt: string
+      updatedAt: string
+    }
+  } | null,
+  error: Error | null
+}
+```
+
+### One-Time Checkout
+
+```typescript
+const { data, error } = await insforge.payments.createCheckoutSession({
+  environment: 'test',
+  mode: 'payment',
+  lineItems: [{ stripePriceId: 'price_123', quantity: 1 }],
+  successUrl: `${window.location.origin}/checkout/success`,
+  cancelUrl: `${window.location.origin}/pricing`,
+  customerEmail: user?.email ?? null,
+  metadata: { order_id: orderId },
+  idempotencyKey: `order:${orderId}`
+});
+
+if (error) {
+  console.error('Checkout failed:', error.message);
+  return;
+}
+
+if (data?.checkoutSession.url) {
+  window.location.assign(data.checkoutSession.url);
+}
+```
+
+For anonymous one-time purchases, omit `subject` and pass `customerEmail` when available.
+
+### Subscription Checkout
+
+```typescript
+const { data, error } = await insforge.payments.createCheckoutSession({
+  environment: 'test',
+  mode: 'subscription',
+  subject: { type: 'team', id: teamId },
+  lineItems: [{ stripePriceId: 'price_monthly_123', quantity: 1 }],
+  successUrl: `${window.location.origin}/billing/success`,
+  cancelUrl: `${window.location.origin}/billing`,
+  customerEmail: user.email,
+  idempotencyKey: `team:${teamId}:pro-monthly`
+});
+
+if (error) throw error;
+if (data?.checkoutSession.url) {
+  window.location.assign(data.checkoutSession.url);
+}
+```
+
+Subscription checkout requires `subject` because recurring access belongs to an app-defined billing owner, such as a user, team, organization, workspace, tenant, or group.
+
+<Warning>
+  Do not treat the success URL as proof of payment. Use webhook-projected payment state to fulfill orders and grant subscription access.
+</Warning>
+
+## createCustomerPortalSession()
+
+Create a Stripe Billing Portal Session for a mapped billing subject.
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `environment` | `'test' \| 'live'` | Yes | Stripe environment to target |
+| `subject` | `{ type: string; id: string }` | Yes | App-defined billing owner |
+| `returnUrl` | `string` | No | URL Stripe redirects to when the customer leaves the portal |
+| `configuration` | `string` | No | Stripe Billing Portal configuration ID |
+
+### Returns
+
+```typescript
+{
+  data: {
+    customerPortalSession: {
+      id: string
+      environment: 'test' | 'live'
+      status: 'initialized' | 'created' | 'failed'
+      subjectType: string
+      subjectId: string
+      stripeCustomerId: string | null
+      returnUrl: string | null
+      configuration: string | null
+      url: string | null
+      lastError: string | null
+      createdAt: string
+      updatedAt: string
+    }
+  } | null,
+  error: Error | null
+}
+```
+
+### Example
+
+```typescript
+const { data, error } = await insforge.payments.createCustomerPortalSession({
+  environment: 'test',
+  subject: { type: 'team', id: teamId },
+  returnUrl: `${window.location.origin}/billing`
+});
+
+if (error) {
+  if ('statusCode' in error && error.statusCode === 404) {
+    // No Stripe customer mapping exists yet. Show a subscribe CTA instead.
+    return;
+  }
+
+  throw error;
+}
+
+if (data?.customerPortalSession.url) {
+  window.location.assign(data.customerPortalSession.url);
+}
+```
+
+Customer portal sessions require an authenticated user and an existing Stripe customer mapping for the subject. The mapping is usually created after a Checkout Session completes and Stripe returns a customer.
+
+## Authorization and RLS
+
+The SDK methods call runtime routes using the current InsForge token. The backend inserts local session rows using the caller context:
+
+- `payments.checkout_sessions` for Checkout attempts
+- `payments.customer_portal_sessions` for Billing Portal attempts
+
+Before exposing subscription checkout or customer portal UI, add app-specific RLS policies for these tables. For example, if subscriptions belong to teams, only team members should be able to create sessions for that team.
+
+<Warning>
+  Do not let users submit arbitrary `subject.type` and `subject.id` values unless your app has matching RLS policies.
+</Warning>
+
+## Reading Payment State
+
+The Payments SDK does not expose generic end-user reads for `payments.subscriptions` or `payments.payment_history`. Those tables are admin projections.
+
+For user-facing billing state, create app-owned tables with RLS and populate them from payment projection triggers:
+
+- `public.orders`
+- `public.credit_ledger`
+- `public.user_entitlements`
+- `public.team_billing_status`
+
+Populate those tables from webhook-projected payment state. See [Payments Architecture](/core-concepts/payments/architecture#custom-fulfillment-logic) for examples.
+
+<Warning>
+  Do not mark an order paid, grant credits, or activate a subscription from the success URL alone. Stripe recommends webhooks for reliable fulfillment because customers might complete payment without returning to your app.
+</Warning>
+
+### Frontend Pattern for One-Time Orders
+
+For one-time purchases, create an app-owned pending order before Checkout and pass that order ID as metadata:
+
+```typescript
+const { data: order, error: orderError } = await insforge
+  .from('orders')
+  .insert([{ user_id: user.id, status: 'pending' }])
+  .select()
+  .single();
+
+if (orderError) throw orderError;
+
+const { data, error } = await insforge.payments.createCheckoutSession({
+  environment: 'test',
+  mode: 'payment',
+  lineItems: [{ stripePriceId: 'price_123', quantity: 1 }],
+  successUrl: `${window.location.origin}/orders/${order.id}`,
+  cancelUrl: `${window.location.origin}/pricing`,
+  customerEmail: user.email,
+  metadata: { order_id: order.id },
+  idempotencyKey: `order:${order.id}`
+});
+
+if (error) throw error;
+if (data?.checkoutSession.url) {
+  window.location.assign(data.checkoutSession.url);
+}
+```
+
+Then add a database trigger that listens to `payments.payment_history` and updates `public.orders` when the matching row becomes `type = 'one_time_payment'` and `status = 'succeeded'`. The success page can read the order and show `pending`, `paid`, or `fulfilled`.
+
+## Live/Test Environment
+
+Use `environment: 'test'` while developing. Only switch to `live` after the developer explicitly approves production Stripe changes and live prices are configured.
+
+<Warning>
+  Never put Stripe secret keys in frontend code or public deployment environment variables. Configure Stripe keys through the InsForge dashboard or CLI.
+</Warning>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Stable Idempotency Keys" icon="fingerprint">
+    Use order, cart, or subject IDs to avoid duplicate sessions during retries.
+  </Card>
+
+  <Card title="Redirect with Returned URLs" icon="arrow-up-right-from-square">
+    Never construct Stripe Checkout or Portal URLs manually.
+  </Card>
+
+  <Card title="Fulfill from Webhooks" icon="webhook">
+    Success and return URLs are UX only. Grant access from payment projections.
+  </Card>
+
+  <Card title="Protect Billing Subjects" icon="shield-check">
+    Add RLS before exposing subscription or portal flows.
+  </Card>
+</CardGroup>

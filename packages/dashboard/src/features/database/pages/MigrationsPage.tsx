@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import RefreshIcon from '#assets/icons/refresh.svg?react';
 import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   DataGrid,
   DataGridEmptyState,
@@ -49,6 +49,7 @@ function parseMigrationsFromResponse(
 }
 
 export default function MigrationsPage() {
+  const location = useLocation();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -130,7 +131,13 @@ export default function MigrationsPage() {
       <div className="flex h-full min-h-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
         <DatabaseStudioSidebarPanel
           onBack={() =>
-            void navigate('/dashboard/database/tables', { state: { slideFromStudio: true } })
+            void navigate(
+              {
+                pathname: '/dashboard/database/tables',
+                search: location.search,
+              },
+              { state: { slideFromStudio: true } }
+            )
           }
         />
         <div className="min-w-0 flex-1 flex items-center justify-center bg-[rgb(var(--semantic-1))]">
@@ -147,7 +154,13 @@ export default function MigrationsPage() {
     <div className="flex h-full min-h-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
       <DatabaseStudioSidebarPanel
         onBack={() =>
-          void navigate('/dashboard/database/tables', { state: { slideFromStudio: true } })
+          void navigate(
+            {
+              pathname: '/dashboard/database/tables',
+              search: location.search,
+            },
+            { state: { slideFromStudio: true } }
+          )
         }
       />
       <div className="min-w-0 flex-1 flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">

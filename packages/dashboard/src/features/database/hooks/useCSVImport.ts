@@ -1,4 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
+import { DEFAULT_DATABASE_SCHEMA } from '#features/database/helpers';
 import { recordService } from '#features/database/services/record.service.js';
 import { BulkUpsertResponse } from '@insforge/shared-schemas';
 
@@ -7,9 +8,13 @@ interface UseCSVImportOptions {
   onError?: (error: Error) => void;
 }
 
-export function useCSVImport(tableName: string, options?: UseCSVImportOptions) {
+export function useCSVImport(
+  tableName: string,
+  schemaName: string = DEFAULT_DATABASE_SCHEMA,
+  options?: UseCSVImportOptions
+) {
   const mutation = useMutation({
-    mutationFn: (file: File) => recordService.importCSV(tableName, file),
+    mutationFn: (file: File) => recordService.importCSV(tableName, file, schemaName),
     onSuccess: (data) => {
       // Always call onSuccess, let the component decide what to do based on data.success
       options?.onSuccess?.(data);

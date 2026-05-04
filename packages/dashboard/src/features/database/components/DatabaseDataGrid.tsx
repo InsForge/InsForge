@@ -175,8 +175,9 @@ function DatabaseJsonCellEditor({
 export function convertSchemaToColumns(
   schema?: TableSchema,
   onCellEdit?: (rowId: string, columnKey: string, newValue: string) => Promise<void>,
-  onJumpToTable?: (tableName: string) => void,
-  columnWidths?: Record<string, number>
+  onJumpToTable?: (tableName: string, schemaName?: string) => void,
+  columnWidths?: Record<string, number>,
+  readOnly: boolean = false
 ): DataGridColumn<DatabaseDataGridRow>[] {
   if (!schema?.columns) {
     return [];
@@ -197,6 +198,7 @@ export function convertSchemaToColumns(
         : 'minmax(200px, 1fr)';
 
     const isEditable =
+      !readOnly &&
       !col.isPrimaryKey &&
       [
         ColumnType.UUID,
@@ -296,8 +298,9 @@ export function convertSchemaToColumns(
 export interface DatabaseDataGridProps extends Omit<DataGridProps<DatabaseDataGridRow>, 'columns'> {
   schema?: TableSchema;
   onCellEdit?: (rowId: string, columnKey: string, newValue: string) => Promise<void>;
-  onJumpToTable?: (tableName: string) => void;
+  onJumpToTable?: (tableName: string, schemaName?: string) => void;
   columnWidths?: Record<string, number>;
+  readOnly?: boolean;
 }
 
 // Specialized DataGrid for database tables
@@ -306,18 +309,21 @@ export function DatabaseDataGrid({
   onCellEdit,
   onJumpToTable,
   columnWidths,
+  readOnly = false,
+  showSelection = true,
+  showPagination = true,
   ...props
 }: DatabaseDataGridProps) {
   const columns = useMemo(() => {
-    return convertSchemaToColumns(schema, onCellEdit, onJumpToTable, columnWidths);
-  }, [schema, onCellEdit, onJumpToTable, columnWidths]);
+    return convertSchemaToColumns(schema, onCellEdit, onJumpToTable, columnWidths, readOnly);
+  }, [schema, onCellEdit, onJumpToTable, columnWidths, readOnly]);
 
   return (
     <DataGrid<DatabaseDataGridRow>
       {...props}
       columns={columns}
-      showSelection={true}
-      showPagination={true}
+      showSelection={showSelection}
+      showPagination={showPagination}
     />
   );
 }

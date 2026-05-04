@@ -1,6 +1,28 @@
 import { jsonSchema } from '#lib/utils/schemaValidations';
-import { ColumnSchema, ColumnType } from '@insforge/shared-schemas';
+import { ColumnSchema, ColumnType, type DatabaseSchemaInfo } from '@insforge/shared-schemas';
 import { z } from 'zod';
+
+export const DEFAULT_DATABASE_SCHEMA = 'public' as const;
+
+export const INSFORGE_MANAGED_DATABASE_SCHEMAS = [
+  'ai',
+  'auth',
+  'compute',
+  'cron',
+  'deployments',
+  'email',
+  'functions',
+  'realtime',
+  'schedules',
+  'storage',
+  'system',
+] as const;
+
+const insforgeManagedDatabaseSchemaSet = new Set<string>(INSFORGE_MANAGED_DATABASE_SCHEMAS);
+
+export function isInsForgeManagedDatabaseSchema(schemaName: string): boolean {
+  return insforgeManagedDatabaseSchemaSet.has(schemaName);
+}
 
 export const SYSTEM_FIELDS = ['id', 'created_at', 'updated_at'];
 
@@ -122,4 +144,58 @@ export function getInitialValues(columns: ColumnSchema[]): Record<string, unknow
   });
 
   return values;
+}
+
+export function buildDatabaseSchemaSearch(schemaName: string): string {
+  return schemaName === DEFAULT_DATABASE_SCHEMA
+    ? ''
+    : `?${new URLSearchParams({ schema: schemaName }).toString()}`;
+}
+
+export function parseDatabaseTableReference(
+  tableReference: string,
+  defaultSchemaName: string = DEFAULT_DATABASE_SCHEMA
+): { schemaName: string; tableName: string } {
+  const normalizedTableReference = tableReference.trim();
+
+  if (normalizedTableReference.length === 0) {
+    return {
+      schemaName: defaultSchemaName,
+      tableName: '',
+    };
+  }
+
+  const parts = normalizedTableReference.split('.');
+
+  if (parts.length === 2) {
+    if (!parts[0] || !parts[1]) {
+      throw new Error(`Invalid table reference "${tableReference}"`);
+    }
+
+    return {
+      schemaName: parts[0],
+      tableName: parts[1],
+    };
+  }
+
+  if (parts.length > 2) {
+    throw new Error(`Invalid table reference "${tableReference}"`);
+  }
+
+  return {
+    schemaName: defaultSchemaName,
+    tableName: normalizedTableReference,
+  };
+}
+
+export function getDatabaseSchemaInfo(
+  schemas: DatabaseSchemaInfo[] | undefined,
+  schemaName: string
+): DatabaseSchemaInfo {
+  return (
+    schemas?.find((schema) => schema.name === schemaName) ?? {
+      name: schemaName,
+      isProtected: isInsForgeManagedDatabaseSchema(schemaName),
+    }
+  );
 }

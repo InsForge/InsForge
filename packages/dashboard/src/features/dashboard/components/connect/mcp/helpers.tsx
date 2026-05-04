@@ -18,7 +18,7 @@ import QoderLogo from '#assets/logos/qoder.svg?react';
 import CopilotLogo from '#assets/logos/copilot.svg?react';
 import AntigravityLogo from '#assets/logos/antigravity.png';
 import OpenAILogo from '#assets/logos/openai.svg?react';
-import KiroLogo from '#assets/logos/kiro.png';
+import KiroLogo from '#assets/logos/kiro.svg?react';
 import RooCodeLogo from '#assets/logos/roo_code.svg?react';
 import OpenCodeLogo from '#assets/logos/opencode.svg?react';
 import OpenClawLogo from '#assets/logos/openclaw.svg?react';
@@ -96,7 +96,7 @@ export const MCP_AGENTS: MCPAgent[] = [
     id: 'kiro',
     slug: 'kiro',
     displayName: 'Kiro',
-    logo: <img src={KiroLogo} alt="Kiro" className="h-5 w-5 object-contain" />,
+    logo: <KiroLogo className="h-5 w-5" />,
   },
   {
     id: 'opencode',

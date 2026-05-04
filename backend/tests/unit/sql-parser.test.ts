@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   parseSQLStatements,
+  checkManagedSchemaWriteOperations,
   checkSystemSchemaOperations,
   checkAuthSchemaOperations,
 } from '../../src/utils/sql-parser';
@@ -211,5 +212,48 @@ describe('checkAuthSchemaOperations', () => {
 
   it('allows SELECT on auth schema', () => {
     expect(checkAuthSchemaOperations('SELECT * FROM auth.users')).toBeNull();
+  });
+});
+
+describe('checkManagedSchemaWriteOperations', () => {
+  it('blocks INSERT on auth schema', () => {
+    expect(
+      checkManagedSchemaWriteOperations(
+        "INSERT INTO auth.users (email, password) VALUES ('test@example.com', 'hashed')"
+      )
+    ).not.toBeNull();
+  });
+
+  it('blocks CREATE INDEX on storage schema', () => {
+    expect(
+      checkManagedSchemaWriteOperations(
+        'CREATE INDEX idx_storage_objects_name ON storage.objects(name)'
+      )
+    ).not.toBeNull();
+  });
+
+  it('blocks INSERT on cron schema', () => {
+    expect(
+      checkManagedSchemaWriteOperations(
+        "INSERT INTO cron.job (schedule, command) VALUES ('* * * * *', 'SELECT 1')"
+      )
+    ).not.toBeNull();
+  });
+
+  it('blocks CREATE POLICY on auth schema', () => {
+    expect(
+      checkManagedSchemaWriteOperations('CREATE POLICY p ON auth.users FOR SELECT USING (true)')
+    ).not.toBeNull();
+  });
+
+  it('allows SELECT on managed schemas', () => {
+    expect(checkManagedSchemaWriteOperations('SELECT * FROM auth.users')).toBeNull();
+    expect(checkManagedSchemaWriteOperations('SELECT * FROM storage.objects')).toBeNull();
+  });
+
+  it('allows writes on public schema', () => {
+    expect(
+      checkManagedSchemaWriteOperations("INSERT INTO public.products (name) VALUES ('test')")
+    ).toBeNull();
   });
 });

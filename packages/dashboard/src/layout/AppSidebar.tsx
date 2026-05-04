@@ -29,8 +29,7 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
   const isDTest = getFeatureFlag('dashboard-v4-experiment') === 'd_test';
   const isDTestCloud = isDTest && host.mode === 'cloud-hosting';
 
-  // Insert deployments after Model Gateway for cloud projects. Compute
-  // already terminates the section, so deployments doesn't need sectionEnd.
+  // Insert deployments into the feature section for cloud projects.
   const mainMenuItems = useMemo(() => {
     const items = dashboardStaticMenuItems
       .filter((item) => isCloud || item.id !== 'analytics')

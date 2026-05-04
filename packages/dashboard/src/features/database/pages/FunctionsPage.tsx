@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import RefreshIcon from '#assets/icons/refresh.svg?react';
 import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   DataGridEmptyState,
   EmptyState,
@@ -11,10 +11,13 @@ import {
   type ConvertedValue,
   TableHeader,
 } from '#components';
-import { useFunctions } from '#features/database/hooks/useDatabase';
+import { useDatabaseSchemas, useFunctions } from '#features/database/hooks/useDatabase';
+import { useDatabaseSchemaSelection } from '#features/database/hooks/useDatabaseSchemaSelection';
 import { SQLModal, SQLCellButton } from '#features/database/components/SQLModal';
 import { DatabaseStudioSidebarPanel } from '#features/database/components/DatabaseSidebar';
-import type { DatabaseFunctionsResponse } from '@insforge/shared-schemas';
+import { type DatabaseFunctionsResponse } from '@insforge/shared-schemas';
+import { DatabaseSchemaSelect } from '#features/database/components/DatabaseSchemaSelect';
+import { DEFAULT_DATABASE_SCHEMA, getDatabaseSchemaInfo } from '#features/database/helpers';
 
 interface FunctionRow extends DataGridRowType {
   id: string;
@@ -46,10 +49,14 @@ function parseFunctionsFromResponse(
 }
 
 export default function FunctionsPage() {
+  const location = useLocation();
   const navigate = useNavigate();
+  const { selectedSchema, setSelectedSchema } = useDatabaseSchemaSelection();
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { data, isLoading, error, refetch } = useFunctions(true);
+  const { schemas, isLoading: isLoadingSchemas } = useDatabaseSchemas();
+  const selectedSchemaInfo = getDatabaseSchemaInfo(schemas, selectedSchema);
+  const { data, isLoading, error, refetch } = useFunctions(selectedSchema, true);
   const [sqlModal, setSqlModal] = useState({ open: false, title: '', value: '' });
 
   const allFunctions = useMemo(() => parseFunctionsFromResponse(data), [data]);
@@ -116,12 +123,49 @@ export default function FunctionsPage() {
     [setSqlModal]
   );
 
+  useEffect(() => {
+    if (isLoadingSchemas || schemas.length === 0) {
+      return;
+    }
+
+    if (!schemas.some((schema) => schema.name === selectedSchema)) {
+      setSelectedSchema(DEFAULT_DATABASE_SCHEMA, { replace: true });
+    }
+  }, [isLoadingSchemas, schemas, selectedSchema, setSelectedSchema]);
+
+  const refreshButton = (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
+            onClick={() => void handleRefresh()}
+            disabled={isRefreshing}
+          >
+            <RefreshIcon className={isRefreshing ? 'h-5 w-5 animate-spin' : 'h-5 w-5'} />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" align="center">
+          <p>{isRefreshing ? 'Refreshing...' : 'Refresh functions'}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+
   if (error) {
     return (
       <div className="flex h-full min-h-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
         <DatabaseStudioSidebarPanel
           onBack={() =>
-            void navigate('/dashboard/database/tables', { state: { slideFromStudio: true } })
+            void navigate(
+              {
+                pathname: '/dashboard/database/tables',
+                search: location.search,
+              },
+              { state: { slideFromStudio: true } }
+            )
           }
         />
         <div className="min-w-0 flex-1 flex items-center justify-center bg-[rgb(var(--semantic-1))]">
@@ -138,7 +182,13 @@ export default function FunctionsPage() {
     <div className="flex h-full min-h-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
       <DatabaseStudioSidebarPanel
         onBack={() =>
-          void navigate('/dashboard/database/tables', { state: { slideFromStudio: true } })
+          void navigate(
+            {
+              pathname: '/dashboard/database/tables',
+              search: location.search,
+            },
+            { state: { slideFromStudio: true } }
+          )
         }
       />
       <div className="min-w-0 flex-1 flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
@@ -146,25 +196,19 @@ export default function FunctionsPage() {
           title="Database Functions"
           showDividerAfterTitle
           titleButtons={
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
-                    onClick={() => void handleRefresh()}
-                    disabled={isRefreshing}
-                  >
-                    <RefreshIcon className={isRefreshing ? 'h-5 w-5 animate-spin' : 'h-5 w-5'} />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" align="center">
-                  <p>{isRefreshing ? 'Refreshing...' : 'Refresh functions'}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <div className="w-56">
+              <DatabaseSchemaSelect
+                schemas={schemas}
+                value={selectedSchemaInfo.name}
+                onValueChange={(schemaName) => {
+                  setSearchQuery('');
+                  setSelectedSchema(schemaName, { replace: true });
+                }}
+                disabled={isLoadingSchemas}
+              />
+            </div>
           }
+          leftSlot={refreshButton}
           searchValue={searchQuery}
           onSearchChange={setSearchQuery}
           searchPlaceholder="Search function"

@@ -1,12 +1,15 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { recordService } from '#features/database/services/record.service';
-import { databaseTableQueryKeys } from '#features/database/queryKeys';
-import { useToast } from '#lib/hooks/useToast';
 import { ConvertedValue } from '#components/datagrid/datagridTypes';
+import { DEFAULT_DATABASE_SCHEMA } from '#features/database/helpers';
+import { databaseTableQueryKeys } from '#features/database/queryKeys';
+import { recordService } from '#features/database/services/record.service';
+import { useToast } from '#lib/hooks/useToast';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-export function useRecords(tableName: string) {
+export function useRecords(tableName: string, schemaName: string = DEFAULT_DATABASE_SCHEMA) {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
+
+  const recordsQueryKeyPrefix = ['records', schemaName, tableName] as const;
 
   // Hook to fetch table records with pagination, search, and sorting
   const useTableRecords = (
@@ -17,19 +20,34 @@ export function useRecords(tableName: string) {
     enabled = true
   ) => {
     return useQuery({
-      queryKey: ['records', tableName, limit, offset, searchQuery, JSON.stringify(sortColumns)],
+      queryKey: [
+        'records',
+        schemaName,
+        tableName,
+        limit,
+        offset,
+        searchQuery,
+        JSON.stringify(sortColumns),
+      ],
       queryFn: () =>
-        recordService.getTableRecords(tableName, limit, offset, searchQuery, sortColumns),
+        recordService.getTableRecords(
+          tableName,
+          schemaName,
+          limit,
+          offset,
+          searchQuery,
+          sortColumns
+        ),
       enabled: enabled && !!tableName,
-      staleTime: 30 * 1000, // Cache for 30 seconds
+      staleTime: 30 * 1000,
     });
   };
 
   // Hook to fetch records with custom query params
   const useRecordsWithQuery = (queryParams: string = '', enabled = true) => {
     return useQuery({
-      queryKey: ['records', tableName, 'query', queryParams],
-      queryFn: () => recordService.getRecords(tableName, queryParams),
+      queryKey: ['records', schemaName, tableName, 'query', queryParams],
+      queryFn: () => recordService.getRecords(tableName, schemaName, queryParams),
       enabled: enabled && !!tableName,
       staleTime: 30 * 1000,
     });
@@ -38,8 +56,9 @@ export function useRecords(tableName: string) {
   // Hook to fetch a single record by foreign key value
   const useRecordByForeignKey = (columnName: string, value: string, enabled = true) => {
     return useQuery({
-      queryKey: ['records', tableName, 'foreignKey', columnName, value],
-      queryFn: () => recordService.getRecordByForeignKeyValue(tableName, columnName, value),
+      queryKey: ['records', schemaName, tableName, 'foreignKey', columnName, value],
+      queryFn: () =>
+        recordService.getRecordByForeignKeyValue(tableName, columnName, value, schemaName),
       enabled: enabled && !!tableName && !!columnName && !!value,
       staleTime: 30 * 1000,
     });
@@ -48,10 +67,12 @@ export function useRecords(tableName: string) {
   // Mutation to create a single record
   const createRecordMutation = useMutation({
     mutationFn: (data: { [key: string]: ConvertedValue }) =>
-      recordService.createRecord(tableName, data),
+      recordService.createRecord(tableName, data, schemaName),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['records', tableName] });
-      void queryClient.invalidateQueries({ queryKey: databaseTableQueryKeys.schema(tableName) });
+      void queryClient.invalidateQueries({ queryKey: recordsQueryKeyPrefix });
+      void queryClient.invalidateQueries({
+        queryKey: databaseTableQueryKeys.tableSchema(schemaName, tableName),
+      });
       showToast('Record created successfully', 'success');
     },
     onError: (error: Error) => {
@@ -63,10 +84,12 @@ export function useRecords(tableName: string) {
   // Mutation to create multiple records
   const createRecordsMutation = useMutation({
     mutationFn: (records: { [key: string]: ConvertedValue }[]) =>
-      recordService.createRecords(tableName, records),
+      recordService.createRecords(tableName, records, schemaName),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['records', tableName] });
-      void queryClient.invalidateQueries({ queryKey: databaseTableQueryKeys.schema(tableName) });
+      void queryClient.invalidateQueries({ queryKey: recordsQueryKeyPrefix });
+      void queryClient.invalidateQueries({
+        queryKey: databaseTableQueryKeys.tableSchema(schemaName, tableName),
+      });
       showToast('Records created successfully', 'success');
     },
     onError: (error: Error) => {
@@ -85,10 +108,12 @@ export function useRecords(tableName: string) {
       pkColumn: string;
       pkValue: string;
       data: { [key: string]: ConvertedValue };
-    }) => recordService.updateRecord(tableName, pkColumn, pkValue, data),
+    }) => recordService.updateRecord(tableName, pkColumn, pkValue, data, schemaName),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['records', tableName] });
-      void queryClient.invalidateQueries({ queryKey: databaseTableQueryKeys.schema(tableName) });
+      void queryClient.invalidateQueries({ queryKey: recordsQueryKeyPrefix });
+      void queryClient.invalidateQueries({
+        queryKey: databaseTableQueryKeys.tableSchema(schemaName, tableName),
+      });
       showToast('Record updated successfully', 'success');
     },
     onError: (error: Error) => {
@@ -100,10 +125,12 @@ export function useRecords(tableName: string) {
   // Mutation to delete a record
   const deleteRecordsMutation = useMutation({
     mutationFn: (variables: { pkColumn: string; pkValues: string[] }) =>
-      recordService.deleteRecords(tableName, variables.pkColumn, variables.pkValues),
+      recordService.deleteRecords(tableName, variables.pkColumn, variables.pkValues, schemaName),
     onSuccess: (_data, variables) => {
-      void queryClient.invalidateQueries({ queryKey: ['records', tableName] });
-      void queryClient.invalidateQueries({ queryKey: databaseTableQueryKeys.schema(tableName) });
+      void queryClient.invalidateQueries({ queryKey: recordsQueryKeyPrefix });
+      void queryClient.invalidateQueries({
+        queryKey: databaseTableQueryKeys.tableSchema(schemaName, tableName),
+      });
       const count = variables.pkValues.length;
       if (count === 1) {
         showToast('Record deleted successfully', 'success');
@@ -134,6 +161,7 @@ export function useRecords(tableName: string) {
 
     // Actions - all using mutateAsync for consistency
     createRecord: createRecordMutation.mutateAsync,
+    createRecords: createRecordsMutation.mutateAsync,
     updateRecord: updateRecordMutation.mutateAsync,
     deleteRecords: deleteRecordsMutation.mutateAsync,
   };

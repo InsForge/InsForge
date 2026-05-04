@@ -17,6 +17,7 @@ import { formatValueForDisplay } from '#lib/utils/utils';
 import { useQuery } from '@tanstack/react-query';
 import { useUsers } from '#features/auth/hooks/useUsers';
 import { AUTH_USERS_TABLE, authUsersSchema } from '#features/database/constants';
+import { parseDatabaseTableReference } from '#features/database/helpers';
 
 const POPOVER_WIDTH = 520;
 
@@ -26,17 +27,18 @@ interface ForeignKeyCellProps {
     table: string;
     column: string;
   };
-  onJumpToTable?: (tableName: string) => void;
+  onJumpToTable?: (tableName: string, schemaName?: string) => void;
 }
 
 export function ForeignKeyCell({ value, foreignKey, onJumpToTable }: ForeignKeyCellProps) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
-  const { useTableSchema } = useTables();
   const isAuthUsers = foreignKey.table === AUTH_USERS_TABLE;
+  const { schemaName, tableName } = parseDatabaseTableReference(foreignKey.table);
+  const { useTableSchema } = useTables(schemaName);
 
   // Regular table records hook (disabled for auth.users)
-  const recordsHook = useRecords(foreignKey.table);
+  const recordsHook = useRecords(tableName, schemaName);
 
   // Auth users hook
   const { getUser } = useUsers({ enabled: false });
@@ -68,7 +70,11 @@ export function ForeignKeyCell({ value, foreignKey, onJumpToTable }: ForeignKeyC
   const error = isAuthUsers ? authUserError : recordError;
 
   // Fetch schema for the referenced table (skip for auth.users)
-  const { data: fetchedSchema } = useTableSchema(foreignKey.table, !isAuthUsers && open && !!value);
+  const { data: fetchedSchema } = useTableSchema(
+    tableName,
+    schemaName,
+    !isAuthUsers && open && !!value
+  );
   const schema = isAuthUsers ? authUsersSchema : fetchedSchema;
 
   // Convert schema to columns for the mini DataGrid
@@ -177,7 +183,7 @@ export function ForeignKeyCell({ value, foreignKey, onJumpToTable }: ForeignKeyC
                           if (isAuthUsers) {
                             void navigate('/dashboard/authentication/users');
                           } else if (onJumpToTable) {
-                            onJumpToTable(foreignKey.table);
+                            onJumpToTable(tableName, schemaName);
                           }
                           setOpen(false);
                         }}

@@ -1,5 +1,9 @@
 export const databaseTableQueryKeys = {
-  list: ['database', 'tables', 'list'] as const,
-  schemaRoot: ['database', 'tables', 'schema'] as const,
-  schema: (tableName: string) => ['database', 'tables', 'schema', tableName] as const,
+  tables: (schemaName: string) => ['database', 'tables', schemaName] as const,
+  tableSchema: (schemaName: string, tableName: string) =>
+    ['database', 'table-schemas', schemaName, tableName] as const,
+};
+
+export const databaseSchemaQueryKeys = {
+  allSchemas: ['database', 'schemas'] as const,
 };

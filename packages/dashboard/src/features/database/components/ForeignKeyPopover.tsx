@@ -17,9 +17,11 @@ import { TableFormSchema, TableFormForeignKeySchema } from '#features/database/s
 import { ColumnSchema, OnDeleteActionSchema, OnUpdateActionSchema } from '@insforge/shared-schemas';
 import { cn } from '#lib/utils/utils';
 import { AUTH_USERS_TABLE } from '#features/database/constants';
+import { parseDatabaseTableReference } from '#features/database/helpers';
 
 interface ForeignKeyPopoverProps {
   form: UseFormReturn<TableFormSchema>;
+  schemaName: string;
   mode: 'create' | 'edit';
   editTableName?: string;
   open: boolean;
@@ -30,6 +32,7 @@ interface ForeignKeyPopoverProps {
 
 export function ForeignKeyPopover({
   form,
+  schemaName,
   mode,
   editTableName,
   open,
@@ -46,7 +49,7 @@ export function ForeignKeyPopover({
   });
 
   const columns = form.watch('columns');
-  const { tables, useTableSchema } = useTables();
+  const { tables, useTableSchema } = useTables(schemaName);
 
   // Set initial values when editing
   useEffect(() => {
@@ -71,15 +74,21 @@ export function ForeignKeyPopover({
   }, [open, initialValue]);
 
   // Get available tables (include auth.users as a special option)
-  const availableTables = [
-    AUTH_USERS_TABLE,
-    ...tables.filter((tableName) => mode === 'create' || tableName !== editTableName),
-  ];
+  const availableTables = Array.from(
+    new Set([
+      AUTH_USERS_TABLE,
+      ...tables.filter((tableName) => mode === 'create' || tableName !== editTableName),
+      ...(newForeignKey.referenceTable ? [newForeignKey.referenceTable] : []),
+    ])
+  );
 
   // Get columns for selected reference table (skip fetch for auth.users)
   const isAuthUsers = newForeignKey.referenceTable === AUTH_USERS_TABLE;
+  const { schemaName: referenceSchemaName, tableName: referenceTableName } =
+    parseDatabaseTableReference(newForeignKey.referenceTable || '', schemaName);
   const { data: fetchedTableSchema } = useTableSchema(
-    newForeignKey.referenceTable || '',
+    referenceTableName,
+    referenceSchemaName,
     !!newForeignKey.referenceTable && !isAuthUsers && open
   );
 

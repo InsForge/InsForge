@@ -110,15 +110,14 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
       });
     });
 
-    test('allows UPDATE on auth schema (not blocked)', () => {
-      // UPDATE is allowed on auth schema
+    test('blocks UPDATE on auth schema', () => {
       const queries = [
         'UPDATE auth.users SET email = $1 WHERE id = $2',
         'UPDATE auth.user_providers SET provider = $1 WHERE id = $2',
       ];
 
       queries.forEach((query) => {
-        expect(() => service.sanitizeQuery(query)).not.toThrow();
+        expect(() => service.sanitizeQuery(query)).toThrow(AppError);
       });
     });
 
@@ -171,31 +170,31 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
       });
     });
 
-    test('allows INSERT into auth schema (for test users)', () => {
+    test('blocks INSERT into auth schema', () => {
       const queries = [
         "INSERT INTO auth.users (email, password) VALUES ('test@example.com', 'hashed')",
         'INSERT INTO auth.user_providers (user_id, provider) VALUES ($1, $2)',
       ];
 
       queries.forEach((query) => {
-        expect(() => service.sanitizeQuery(query)).not.toThrow();
+        expect(() => service.sanitizeQuery(query)).toThrow(AppError);
       });
     });
 
-    test('allows CREATE TRIGGER on auth schema', () => {
+    test('blocks CREATE TRIGGER on auth schema', () => {
       const query =
         'CREATE TRIGGER user_profile_trigger AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION create_user_profile()';
-      expect(() => service.sanitizeQuery(query)).not.toThrow();
+      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
     });
 
-    test('allows ALTER TABLE on auth schema (for indexes, constraints)', () => {
+    test('blocks ALTER TABLE and CREATE INDEX on auth schema', () => {
       const queries = [
         'ALTER TABLE auth.users ADD CONSTRAINT email_unique UNIQUE (email)',
         'CREATE INDEX idx_auth_users_email ON auth.users(email)',
       ];
 
       queries.forEach((query) => {
-        expect(() => service.sanitizeQuery(query)).not.toThrow();
+        expect(() => service.sanitizeQuery(query)).toThrow(AppError);
       });
     });
 
@@ -415,6 +414,24 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
           expect(error.code).toBe(ERROR_CODES.FORBIDDEN);
         }
       }
+    });
+  });
+
+  describe('other managed schema blocking', () => {
+    test('blocks INSERT on storage schema', () => {
+      const query = "INSERT INTO storage.objects (name) VALUES ('avatar.png')";
+      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+      expect(() => service.sanitizeQuery(query)).toThrow(/storage schema/i);
+    });
+
+    test('blocks CREATE INDEX on storage schema', () => {
+      const query = 'CREATE INDEX idx_storage_objects_name ON storage.objects(name)';
+      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+    });
+
+    test('allows SELECT on storage schema', () => {
+      const query = 'SELECT * FROM storage.objects';
+      expect(() => service.sanitizeQuery(query)).not.toThrow();
     });
   });
 

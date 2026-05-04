@@ -15,6 +15,7 @@ import {
   SquarePen,
   Download,
   BookOpen,
+  CreditCard,
 } from 'lucide-react';
 
 export interface DashboardSecondaryMenuItem {
@@ -106,6 +107,12 @@ export const dashboardStaticMenuItems: DashboardPrimaryMenuItem[] = [
     label: 'Compute',
     href: '/dashboard/compute',
     icon: Server,
+  },
+  {
+    id: 'payments',
+    label: 'Payments',
+    href: '/dashboard/payments',
+    icon: CreditCard,
     sectionEnd: true,
   },
   {

@@ -11,6 +11,9 @@ import { ERROR_CODES } from '@/types/error-constants.js';
 import { isPgErrorLike } from '@/utils/errors.js';
 import {
   analyzeQuery,
+  checkAuthSchemaOperations,
+  checkManagedSchemaWriteOperations,
+  checkSystemSchemaOperations,
   initSqlParser,
   parseSQLStatements,
   type DatabaseResourceUpdate,
@@ -38,6 +41,23 @@ export function assertMigrationDoesNotManageTransactions(statement: string): voi
         ERROR_CODES.DATABASE_FORBIDDEN
       );
     }
+  }
+}
+
+export function assertMigrationStatementIsAllowed(statement: string): void {
+  const managedSchemaError = checkManagedSchemaWriteOperations(statement);
+  if (managedSchemaError) {
+    throw new AppError(managedSchemaError, 403, ERROR_CODES.FORBIDDEN);
+  }
+
+  const authSchemaError = checkAuthSchemaOperations(statement);
+  if (authSchemaError) {
+    throw new AppError(authSchemaError, 403, ERROR_CODES.FORBIDDEN);
+  }
+
+  const systemSchemaError = checkSystemSchemaOperations(statement);
+  if (systemSchemaError) {
+    throw new AppError(systemSchemaError, 403, ERROR_CODES.FORBIDDEN);
   }
 }
 
@@ -84,6 +104,7 @@ export class DatabaseMigrationService {
 
     for (const statement of statements) {
       assertMigrationDoesNotManageTransactions(statement);
+      assertMigrationStatementIsAllowed(statement);
     }
 
     const client = await this.dbManager.getPool().connect();
