@@ -14,10 +14,27 @@ A command-line tool for logging and browsing ML experiments. Each run records hy
 
 ---
 
+## Screenshots & Demo
+
+The runs table lists every experiment with its hyperparameters, metrics, and timestamps in a single view.
+
+![Dashboard — all runs](docs/dashboard-all-runs.png)
+
+Selecting an experiment reveals a metrics-over-time chart with dual axes for accuracy and loss.
+
+![Dashboard — metrics chart](docs/dashboard-chart.png)
+
+The full workflow from `tracker log` to browsing results in the dashboard.
+
+![Demo](docs/demo.gif)
+
+---
+
 ## Installation
 
 ```bash
-# From the project root
+# From the example directory
+cd examples/python-ml-experiment-tracker
 pip install -e .
 ```
 
