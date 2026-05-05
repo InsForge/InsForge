@@ -77,7 +77,7 @@ Table creation requires admin access in InsForge. Run `tracker init` to check wh
 tracker init
 ```
 
-If the `experiments` and `runs` tables are missing, the command prints the SQL you need to run. Execute it via the InsForge dashboard or admin API:
+If the `experiments` and `runs` tables are missing, the command prints the SQL you need to run. To run it via the dashboard, open `http://localhost:7130` in your browser after starting InsForge, navigate to the SQL editor, and paste and execute the SQL below. Alternatively, submit it through the InsForge admin API.
 
 ```sql
 CREATE TABLE IF NOT EXISTS experiments (
