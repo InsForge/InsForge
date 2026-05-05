@@ -31,12 +31,6 @@ function getPaymentsSyncToast(result: SyncPaymentsResponse): PaymentsSyncToast {
     (item) => item.connection.status !== 'unconfigured'
   );
   const failedResults = attemptedResults.filter(isFailedSyncResult);
-  const succeededResults = attemptedResults.filter((item) => !isFailedSyncResult(item));
-  const syncedSubscriptions = succeededResults.reduce(
-    (count, item) => count + (item.subscriptions?.synced ?? 0),
-    0
-  );
-
   const failedEnvironments = failedResults.map((item) => item.environment);
 
   if (attemptedResults.length === 0) {
@@ -55,7 +49,7 @@ function getPaymentsSyncToast(result: SyncPaymentsResponse): PaymentsSyncToast {
 
   return {
     type: 'success',
-    message: `Stripe payments synced (${syncedSubscriptions} subscriptions).`,
+    message: 'Stripe payments synced successfully.',
   };
 }
 
@@ -69,6 +63,7 @@ export function usePaymentsSync() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['payments', 'status'] }),
         queryClient.invalidateQueries({ queryKey: ['payments', 'catalog'] }),
+        queryClient.invalidateQueries({ queryKey: ['payments', 'customers'] }),
         queryClient.invalidateQueries({ queryKey: ['payments', 'subscriptions'] }),
       ]);
 

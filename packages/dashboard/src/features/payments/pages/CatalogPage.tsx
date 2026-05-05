@@ -16,7 +16,7 @@ import {
   TableHeader,
 } from '#components';
 import type { PaymentsOutletContext } from '#features/payments/components/PaymentsLayout';
-import { usePayments } from '#features/payments/hooks/usePayments';
+import { usePaymentCatalog } from '#features/payments/hooks/usePaymentCatalog';
 
 const ENVIRONMENTS: StripeEnvironment[] = ['test', 'live'];
 
@@ -292,7 +292,7 @@ function ProductDetail({
           onClick={onBack}
           className="text-base font-medium leading-7 text-muted-foreground transition-colors hover:text-foreground"
         >
-          Products
+          Catalog
         </button>
         <ChevronRight className="h-5 w-5 text-muted-foreground" />
         <p className="truncate text-base font-medium leading-7 text-foreground">{product.name}</p>
@@ -342,13 +342,13 @@ function ProductDetail({
   );
 }
 
-export default function ProductsPage() {
+export default function CatalogPage() {
   const { openPaymentsSettings } = useOutletContext<PaymentsOutletContext>();
   const [environment, setEnvironment] = useState<StripeEnvironment>('test');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<StripeProductMirror | null>(null);
   const { activeConnection, products, prices, isLoading, error, refetch } =
-    usePayments(environment);
+    usePaymentCatalog(environment);
 
   useEffect(() => {
     setSelectedProduct(null);
@@ -400,7 +400,7 @@ export default function ProductsPage() {
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
       <TableHeader
-        title="Products"
+        title="Catalog"
         className="h-14 min-h-14"
         leftClassName="py-0"
         rightClassName="py-0"
@@ -429,7 +429,7 @@ export default function ProductsPage() {
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}
         searchDebounceTime={300}
-        searchPlaceholder="Search products"
+        searchPlaceholder="Search catalog"
       />
 
       <div className="relative min-h-0 flex-1 overflow-y-auto">

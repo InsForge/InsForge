@@ -2,19 +2,20 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import {
-  createCheckoutSessionRequestSchema,
-  createCustomerPortalSessionRequestSchema,
-  createPaymentPriceRequestSchema,
-  createPaymentProductRequestSchema,
-  listPaymentCatalogRequestSchema,
-  listPaymentHistoryRequestSchema,
-  listPaymentPricesRequestSchema,
-  listPaymentProductsRequestSchema,
-  listSubscriptionsRequestSchema,
-  syncPaymentsRequestSchema,
-  updatePaymentPriceRequestSchema,
-  updatePaymentProductRequestSchema,
-  upsertPaymentsConfigRequestSchema,
+  createCheckoutSessionBodySchema,
+  createCustomerPortalSessionBodySchema,
+  createPaymentPriceBodySchema,
+  createPaymentProductBodySchema,
+  listPaymentCatalogQuerySchema,
+  listPaymentCustomersQuerySchema,
+  listPaymentHistoryQuerySchema,
+  listPaymentPricesQuerySchema,
+  listPaymentProductsQuerySchema,
+  listSubscriptionsQuerySchema,
+  paymentEnvironmentParamsSchema,
+  updatePaymentPriceBodySchema,
+  updatePaymentProductBodySchema,
+  upsertPaymentsConfigBodySchema,
 } from '@insforge/shared-schemas';
 
 const FAKE_LIVE_SECRET_KEY = 'stripe_live_secret_placeholder';
@@ -24,13 +25,21 @@ describe('payments route schemas', () => {
     resolve(__dirname, '../../src/api/routes/payments/index.routes.ts'),
     'utf-8'
   );
+  const configRouteSource = readFileSync(
+    resolve(__dirname, '../../src/api/routes/payments/config.routes.ts'),
+    'utf-8'
+  );
+  const catalogRouteSource = readFileSync(
+    resolve(__dirname, '../../src/api/routes/payments/catalog.routes.ts'),
+    'utf-8'
+  );
 
   it('keeps checkout session creation on runtime auth before admin-only payments routes', () => {
     expect(paymentsRouteSource).toContain('verifyAdmin, verifyUser');
     expect(paymentsRouteSource).toMatch(
-      /router\.post\(\s*'\/checkout-sessions'[\s\S]*verifyUser[\s\S]*createCheckoutSession/
+      /router\.post\(\s*'\/:environment\/checkout-sessions'[\s\S]*verifyUser[\s\S]*createCheckoutSessionBodySchema/
     );
-    expect(paymentsRouteSource.indexOf("'/checkout-sessions'")).toBeLessThan(
+    expect(paymentsRouteSource.indexOf("'/:environment/checkout-sessions'")).toBeLessThan(
       paymentsRouteSource.indexOf('router.use(verifyAdmin)')
     );
     expect(paymentsRouteSource).toContain('Checkout session creation requires a user token');
@@ -38,90 +47,102 @@ describe('payments route schemas', () => {
 
   it('keeps customer portal session creation on runtime auth before admin-only payments routes', () => {
     expect(paymentsRouteSource).toMatch(
-      /router\.post\(\s*'\/customer-portal-sessions'[\s\S]*verifyUser[\s\S]*createCustomerPortalSession/
+      /router\.post\(\s*'\/:environment\/customer-portal-sessions'[\s\S]*verifyUser[\s\S]*createCustomerPortalSessionBodySchema/
     );
-    expect(paymentsRouteSource.indexOf("'/customer-portal-sessions'")).toBeLessThan(
+    expect(paymentsRouteSource.indexOf("'/:environment/customer-portal-sessions'")).toBeLessThan(
       paymentsRouteSource.indexOf('router.use(verifyAdmin)')
     );
     expect(paymentsRouteSource).toContain('Customer portal session creation requires a user token');
   });
 
-  it('accepts test, live, and all unified sync targets', () => {
-    expect(syncPaymentsRequestSchema.parse({ environment: 'test' })).toEqual({
-      environment: 'test',
-    });
-    expect(syncPaymentsRequestSchema.parse({ environment: 'live' })).toEqual({
-      environment: 'live',
-    });
-    expect(syncPaymentsRequestSchema.parse({ environment: 'all' })).toEqual({
-      environment: 'all',
-    });
-  });
-
-  it('defaults unified payment sync to all environments', () => {
-    expect(syncPaymentsRequestSchema.parse({})).toEqual({ environment: 'all' });
-  });
-
-  it('keeps unified payment sync behind the admin-only route guard', () => {
+  it('mounts config and catalog routers behind the admin-only route guard', () => {
     const adminGuardIndex = paymentsRouteSource.indexOf('router.use(verifyAdmin)');
     expect(adminGuardIndex).toBeGreaterThan(-1);
-    expect(paymentsRouteSource.indexOf("'/sync'")).toBeGreaterThan(adminGuardIndex);
-    expect(paymentsRouteSource).toMatch(
-      /router\.post\(\s*'\/sync'[\s\S]*syncPaymentsRequestSchema[\s\S]*syncPayments/
+    expect(paymentsRouteSource.indexOf('router.use(configRouter)')).toBeGreaterThan(adminGuardIndex);
+    expect(paymentsRouteSource.indexOf("router.use('/:environment/catalog', catalogRouter)")).toBeGreaterThan(adminGuardIndex);
+  });
+
+  it('keeps environment-specific admin reads behind the admin-only route guard', () => {
+    const adminGuardIndex = paymentsRouteSource.indexOf('router.use(verifyAdmin)');
+    expect(adminGuardIndex).toBeGreaterThan(-1);
+    expect(paymentsRouteSource.indexOf("'/:environment/payment-history'")).toBeGreaterThan(
+      adminGuardIndex
     );
-    expect(paymentsRouteSource).not.toContain("'/catalog/sync'");
-    expect(paymentsRouteSource).not.toContain("'/subscriptions/sync'");
-  });
-
-  it('keeps managed webhook configuration behind the admin-only route guard', () => {
-    const adminGuardIndex = paymentsRouteSource.indexOf('router.use(verifyAdmin)');
-    expect(adminGuardIndex).toBeGreaterThan(-1);
-    expect(paymentsRouteSource.indexOf("'/webhooks/:environment/configure'")).toBeGreaterThan(
+    expect(paymentsRouteSource.indexOf("'/:environment/subscriptions'")).toBeGreaterThan(
+      adminGuardIndex
+    );
+    expect(paymentsRouteSource.indexOf("'/:environment/customers'")).toBeGreaterThan(
       adminGuardIndex
     );
     expect(paymentsRouteSource).toMatch(
-      /router\.post\(\s*'\/webhooks\/:environment\/configure'[\s\S]*stripeEnvironmentSchema[\s\S]*configureWebhook/
+      /router\.get\(\s*'\/:environment\/customers'[\s\S]*listPaymentCustomersQuerySchema[\s\S]*listCustomers/
     );
   });
 
-  it('rejects unknown unified sync environments', () => {
-    expect(() => syncPaymentsRequestSchema.parse({ environment: 'prod' })).toThrow();
+  it('keeps sync, config, and webhook operations in the config router', () => {
+    expect(configRouteSource).toMatch(/router\.get\(\s*'\/status'/);
+    expect(configRouteSource).toMatch(/router\.get\(\s*'\/config'/);
+    expect(configRouteSource).toMatch(
+      /router\.put\(\s*'\/:environment\/config'[\s\S]*upsertPaymentsConfigBodySchema/
+    );
+    expect(configRouteSource).toMatch(/router\.delete\(\s*'\/:environment\/config'/);
+    expect(configRouteSource).toMatch(
+      /router\.post\(\s*'\/sync'[\s\S]*environment: 'all'/
+    );
+    expect(configRouteSource).toMatch(/router\.post\(\s*'\/:environment\/sync'/);
+    expect(configRouteSource).toMatch(/router\.post\(\s*'\/:environment\/webhook'/);
   });
 
-  it('accepts optional catalog environment filters', () => {
-    expect(listPaymentCatalogRequestSchema.parse({})).toEqual({});
-    expect(listPaymentCatalogRequestSchema.parse({ environment: 'test' })).toEqual({
+  it('keeps products and prices consolidated in the catalog router', () => {
+    expect(catalogRouteSource).toMatch(/router\.get\(\s*'\/'[\s\S]*listCatalog/);
+    expect(catalogRouteSource).toMatch(/router\.get\(\s*'\/products'/);
+    expect(catalogRouteSource).toMatch(/router\.get\(\s*'\/prices'/);
+    expect(catalogRouteSource).toMatch(
+      /router\.post\(\s*'\/products'[\s\S]*createPaymentProductBodySchema/
+    );
+    expect(catalogRouteSource).toMatch(
+      /router\.post\(\s*'\/prices'[\s\S]*createPaymentPriceBodySchema/
+    );
+    expect(catalogRouteSource).not.toContain('products.routes');
+    expect(catalogRouteSource).not.toContain('prices.routes');
+  });
+
+  it('requires environment path params for environment-scoped routes', () => {
+    expect(paymentEnvironmentParamsSchema.parse({ environment: 'test' })).toEqual({
       environment: 'test',
     });
+    expect(paymentEnvironmentParamsSchema.parse({ environment: 'live' })).toEqual({
+      environment: 'live',
+    });
+    expect(() => paymentEnvironmentParamsSchema.parse({ environment: 'prod' })).toThrow();
   });
 
-  it('accepts Stripe key configuration requests', () => {
+  it('accepts empty catalog and products query strings for environment-scoped reads', () => {
+    expect(listPaymentCatalogQuerySchema.parse({})).toEqual({});
+    expect(listPaymentProductsQuerySchema.parse({})).toEqual({});
+    expect(() => listPaymentCatalogQuerySchema.parse({ environment: 'test' })).toThrow();
+  });
+
+  it('accepts Stripe key configuration bodies without embedding environment in the body', () => {
     expect(
-      upsertPaymentsConfigRequestSchema.parse({
-        environment: 'live',
+      upsertPaymentsConfigBodySchema.parse({
         secretKey: FAKE_LIVE_SECRET_KEY,
       })
     ).toEqual({
-      environment: 'live',
       secretKey: FAKE_LIVE_SECRET_KEY,
     });
-  });
-
-  it('rejects Stripe key configuration requests without a key', () => {
+    expect(() => upsertPaymentsConfigBodySchema.parse({ secretKey: '' })).toThrow();
     expect(() =>
-      upsertPaymentsConfigRequestSchema.parse({ environment: 'test', secretKey: '' })
+      upsertPaymentsConfigBodySchema.parse({
+        environment: 'live',
+        secretKey: FAKE_LIVE_SECRET_KEY,
+      })
     ).toThrow();
   });
 
-  it('requires products CRUD callers to specify the target Stripe environment', () => {
-    expect(listPaymentProductsRequestSchema.parse({ environment: 'live' })).toEqual({
-      environment: 'live',
-    });
-    expect(() => listPaymentProductsRequestSchema.parse({})).toThrow();
-
+  it('accepts product CRUD bodies without embedding environment in the body', () => {
     expect(
-      createPaymentProductRequestSchema.parse({
-        environment: 'test',
+      createPaymentProductBodySchema.parse({
         name: 'Pro',
         description: null,
         active: true,
@@ -129,7 +150,6 @@ describe('payments route schemas', () => {
         idempotencyKey: 'agent-product-123',
       })
     ).toEqual({
-      environment: 'test',
       name: 'Pro',
       description: null,
       active: true,
@@ -137,36 +157,26 @@ describe('payments route schemas', () => {
       idempotencyKey: 'agent-product-123',
     });
 
-    expect(() => createPaymentProductRequestSchema.parse({ name: 'Pro' })).toThrow();
+    expect(() => createPaymentProductBodySchema.parse({ name: 'Pro', environment: 'test' })).toThrow();
     expect(() =>
-      createPaymentProductRequestSchema.parse({
-        environment: 'test',
+      createPaymentProductBodySchema.parse({
         name: 'Pro',
         idempotencyKey: 'x'.repeat(201),
       })
     ).toThrow(/200 characters/i);
-    expect(() => updatePaymentProductRequestSchema.parse({})).toThrow();
-    expect(() => updatePaymentProductRequestSchema.parse({ environment: 'live' })).toThrow();
-    expect(updatePaymentProductRequestSchema.parse({ active: false, environment: 'live' })).toEqual(
-      {
-        active: false,
-        environment: 'live',
-      }
-    );
+    expect(() => updatePaymentProductBodySchema.parse({})).toThrow();
+    expect(updatePaymentProductBodySchema.parse({ active: false })).toEqual({
+      active: false,
+    });
+    expect(() => updatePaymentProductBodySchema.parse({ environment: 'live' })).toThrow();
   });
 
-  it('requires prices CRUD callers to specify the target Stripe environment', () => {
-    expect(
-      listPaymentPricesRequestSchema.parse({ environment: 'test', stripeProductId: 'prod_123' })
-    ).toEqual({
-      environment: 'test',
+  it('accepts price CRUD bodies and query filters without embedding environment in the body', () => {
+    expect(listPaymentPricesQuerySchema.parse({ stripeProductId: 'prod_123' })).toEqual({
       stripeProductId: 'prod_123',
     });
-    expect(() => listPaymentPricesRequestSchema.parse({ stripeProductId: 'prod_123' })).toThrow();
-
     expect(
-      createPaymentPriceRequestSchema.parse({
-        environment: 'test',
+      createPaymentPriceBodySchema.parse({
         stripeProductId: 'prod_123',
         currency: 'USD',
         unitAmount: 2000,
@@ -174,33 +184,28 @@ describe('payments route schemas', () => {
         idempotencyKey: 'agent-price-123',
       })
     ).toEqual({
-      environment: 'test',
       stripeProductId: 'prod_123',
       currency: 'usd',
       unitAmount: 2000,
       recurring: { interval: 'month', intervalCount: 1 },
       idempotencyKey: 'agent-price-123',
     });
-
     expect(() =>
-      createPaymentPriceRequestSchema.parse({
+      createPaymentPriceBodySchema.parse({
         stripeProductId: 'prod_123',
         currency: 'usd',
         unitAmount: 2000,
+        environment: 'test',
       })
     ).toThrow();
-    expect(() => updatePaymentPriceRequestSchema.parse({})).toThrow();
-    expect(() => updatePaymentPriceRequestSchema.parse({ environment: 'live' })).toThrow();
-    expect(updatePaymentPriceRequestSchema.parse({ active: false, environment: 'live' })).toEqual({
-      active: false,
-      environment: 'live',
-    });
+    expect(() => updatePaymentPriceBodySchema.parse({})).toThrow();
+    expect(updatePaymentPriceBodySchema.parse({ active: false })).toEqual({ active: false });
+    expect(() => updatePaymentPriceBodySchema.parse({ environment: 'live' })).toThrow();
   });
 
-  it('allows anonymous one-time checkout sessions', () => {
+  it('allows anonymous one-time checkout sessions without embedding environment in the body', () => {
     expect(
-      createCheckoutSessionRequestSchema.parse({
-        environment: 'test',
+      createCheckoutSessionBodySchema.parse({
         mode: 'payment',
         lineItems: [{ stripePriceId: 'price_123', quantity: 2 }],
         successUrl: 'https://example.com/success',
@@ -209,7 +214,6 @@ describe('payments route schemas', () => {
         idempotencyKey: 'checkout-123',
       })
     ).toEqual({
-      environment: 'test',
       mode: 'payment',
       lineItems: [{ stripePriceId: 'price_123', quantity: 2 }],
       successUrl: 'https://example.com/success',
@@ -221,8 +225,7 @@ describe('payments route schemas', () => {
 
   it('rejects caller-provided InsForge-reserved checkout metadata', () => {
     expect(() =>
-      createCheckoutSessionRequestSchema.parse({
-        environment: 'test',
+      createCheckoutSessionBodySchema.parse({
         mode: 'payment',
         lineItems: [{ stripePriceId: 'price_123' }],
         successUrl: 'https://example.com/success',
@@ -237,8 +240,7 @@ describe('payments route schemas', () => {
 
   it('requires subscription checkout sessions to specify a billing subject', () => {
     expect(() =>
-      createCheckoutSessionRequestSchema.parse({
-        environment: 'test',
+      createCheckoutSessionBodySchema.parse({
         mode: 'subscription',
         lineItems: [{ stripePriceId: 'price_123' }],
         successUrl: 'https://example.com/success',
@@ -247,8 +249,7 @@ describe('payments route schemas', () => {
     ).toThrow(/billing subject/i);
 
     expect(
-      createCheckoutSessionRequestSchema.parse({
-        environment: 'test',
+      createCheckoutSessionBodySchema.parse({
         mode: 'subscription',
         lineItems: [{ stripePriceId: 'price_123' }],
         successUrl: 'https://example.com/success',
@@ -256,7 +257,6 @@ describe('payments route schemas', () => {
         subject: { type: 'team', id: 'team_123' },
       })
     ).toEqual({
-      environment: 'test',
       mode: 'subscription',
       lineItems: [{ stripePriceId: 'price_123', quantity: 1 }],
       successUrl: 'https://example.com/success',
@@ -265,58 +265,72 @@ describe('payments route schemas', () => {
     });
   });
 
-  it('requires customer portal sessions to specify an environment and billing subject', () => {
+  it('requires customer portal session bodies to specify a billing subject without embedding environment', () => {
     expect(
-      createCustomerPortalSessionRequestSchema.parse({
-        environment: 'test',
+      createCustomerPortalSessionBodySchema.parse({
         subject: { type: 'team', id: 'team_123' },
         returnUrl: 'https://example.com/account',
         configuration: 'bpc_123',
       })
     ).toEqual({
-      environment: 'test',
       subject: { type: 'team', id: 'team_123' },
       returnUrl: 'https://example.com/account',
       configuration: 'bpc_123',
     });
 
     expect(() =>
-      createCustomerPortalSessionRequestSchema.parse({
-        environment: 'test',
+      createCustomerPortalSessionBodySchema.parse({
         returnUrl: 'https://example.com/account',
       })
     ).toThrow();
     expect(() =>
-      createCustomerPortalSessionRequestSchema.parse({
-        environment: 'test',
+      createCustomerPortalSessionBodySchema.parse({
         subject: { type: 'team', id: 'team_123' },
         returnUrl: 'not-a-url',
       })
     ).toThrow(/valid URL/i);
+    expect(() =>
+      createCustomerPortalSessionBodySchema.parse({
+        environment: 'test',
+        subject: { type: 'team', id: 'team_123' },
+      })
+    ).toThrow();
   });
 
-  it('requires runtime list filters to specify explicit environment and complete subject filters', () => {
-    expect(listPaymentHistoryRequestSchema.parse({ environment: 'live' })).toEqual({
-      environment: 'live',
-      limit: 50,
-    });
+  it('requires runtime list query filters to omit environment and keep complete subject filters', () => {
+    expect(listPaymentHistoryQuerySchema.parse({})).toEqual({ limit: 50 });
     expect(
-      listSubscriptionsRequestSchema.parse({
-        environment: 'test',
+      listSubscriptionsQuerySchema.parse({
         subjectType: 'organization',
         subjectId: 'org_123',
         limit: '25',
       })
     ).toEqual({
-      environment: 'test',
       subjectType: 'organization',
       subjectId: 'org_123',
       limit: 25,
     });
 
-    expect(() => listPaymentHistoryRequestSchema.parse({})).toThrow();
-    expect(() =>
-      listSubscriptionsRequestSchema.parse({ environment: 'test', subjectType: 'team' })
-    ).toThrow(/provided together/i);
+    expect(() => listPaymentHistoryQuerySchema.parse({ environment: 'live' })).toThrow();
+    expect(() => listSubscriptionsQuerySchema.parse({ subjectType: 'team' })).toThrow(
+      /provided together/i
+    );
+  });
+
+  it('requires admin customer mirror reads to omit environment from the query and normalize limit', () => {
+    expect(
+      listPaymentCustomersQuerySchema.parse({
+        limit: '25',
+      })
+    ).toEqual({
+      limit: 25,
+    });
+
+    expect(listPaymentCustomersQuerySchema.parse({})).toEqual({
+      limit: 50,
+    });
+
+    expect(() => listPaymentCustomersQuerySchema.parse({ environment: 'test' })).toThrow();
+    expect(() => listPaymentCustomersQuerySchema.parse({ limit: 0 })).toThrow();
   });
 });

@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { StripeEnvironment } from '@insforge/shared-schemas';
 import { paymentsService } from '#features/payments/services/payments.service';
 
-export function usePayments(environment: StripeEnvironment) {
+export function usePaymentCatalog(environment: StripeEnvironment) {
   const {
     data: statusData,
     isLoading: isLoadingStatus,

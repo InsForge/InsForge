@@ -13,6 +13,7 @@ export type StripeAccount = Awaited<ReturnType<Stripe['accounts']['retrieveCurre
 export type StripeProduct = AsyncIterableItem<ReturnType<Stripe['products']['list']>>;
 export type StripePrice = AsyncIterableItem<ReturnType<Stripe['prices']['list']>>;
 export type StripeCustomer = Awaited<ReturnType<Stripe['customers']['create']>>;
+export type StripeCustomerListItem = AsyncIterableItem<ReturnType<Stripe['customers']['list']>>;
 export type StripeCheckoutSession = Awaited<ReturnType<Stripe['checkout']['sessions']['create']>>;
 export type StripeCustomerPortalSession = Awaited<
   ReturnType<Stripe['billingPortal']['sessions']['create']>
@@ -182,6 +183,18 @@ export interface StripePriceRow {
   recurringInterval: string | null;
   recurringIntervalCount: number | null;
   metadata: Record<string, string>;
+  syncedAt: Date | string;
+}
+
+export interface StripeCustomerRow {
+  environment: StripeEnvironment;
+  stripeCustomerId: string;
+  email: string | null;
+  name: string | null;
+  phone: string | null;
+  deleted: boolean;
+  metadata: Record<string, string>;
+  stripeCreatedAt: Date | string | null;
   syncedAt: Date | string;
 }
 

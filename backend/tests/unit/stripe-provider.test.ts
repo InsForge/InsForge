@@ -287,6 +287,30 @@ describe('StripeProvider', () => {
     });
   });
 
+  it('lists Stripe customers for mirror syncs', async () => {
+    const client = {
+      accounts: { retrieveCurrent: vi.fn() },
+      products: { list: vi.fn() },
+      prices: { list: vi.fn() },
+      customers: {
+        list: vi.fn().mockReturnValue(
+          createAsyncList([
+            { id: 'cus_123', object: 'customer', email: 'buyer@example.com' },
+            { id: 'cus_456', object: 'customer', email: null, deleted: true },
+          ])
+        ),
+      },
+    } as unknown as StripeClient;
+    const provider = new StripeProvider('sk_test_1234567890', 'test', client);
+
+    await expect(provider.listCustomers()).resolves.toEqual([
+      { id: 'cus_123', object: 'customer', email: 'buyer@example.com' },
+      { id: 'cus_456', object: 'customer', email: null, deleted: true },
+    ]);
+
+    expect(client.customers.list).toHaveBeenCalledWith({ limit: 100 });
+  });
+
   it('creates customer portal sessions through Stripe billing portal API', async () => {
     const client = {
       accounts: { retrieveCurrent: vi.fn() },

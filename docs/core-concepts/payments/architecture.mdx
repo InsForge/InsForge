@@ -117,13 +117,14 @@ Stripe prices are immutable for amount, currency, and recurring cadence. To chan
 
 ## Data Model
 
-The `payments` schema stores Stripe connection metadata, catalog mirrors, checkout attempts, subscriptions, payment history, and webhook processing state.
+The `payments` schema stores Stripe connection metadata, catalog mirrors, customer mirrors, checkout attempts, subscriptions, payment history, and webhook processing state.
 
 | Table | Purpose |
 |-------|---------|
 | `payments.stripe_connections` | One row per environment with Stripe account, key, webhook, and sync status |
 | `payments.products` | Mirrored Stripe products |
 | `payments.prices` | Mirrored Stripe prices |
+| `payments.customers` | Mirrored Stripe customers for admin visibility and debugging |
 | `payments.checkout_sessions` | Local Checkout Session attempts created by app frontends |
 | `payments.customer_portal_sessions` | Local Billing Portal Session attempts |
 | `payments.stripe_customer_mappings` | Maps app billing subjects to Stripe customers |
@@ -456,7 +457,7 @@ The frontend SDK currently exposes creation flows only:
 - `insforge.payments.createCheckoutSession(...)`
 - `insforge.payments.createCustomerPortalSession(...)`
 
-Admin payment projections such as `payments.subscriptions` and `payments.payment_history` are not a generic end-user read surface. If your app needs users to see subscription status, order status, credits, or entitlements, create app-owned tables with RLS and populate them from payment projections.
+Admin payment projections such as `payments.customers`, `payments.subscriptions`, and `payments.payment_history` are not a generic end-user read surface. If your app needs users to see subscription status, order status, credits, or entitlements, create app-owned tables with RLS and populate them from payment projections.
 
 ## Local Development
 

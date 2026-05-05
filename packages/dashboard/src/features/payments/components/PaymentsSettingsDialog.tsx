@@ -502,7 +502,7 @@ export function PaymentsSettingsDialog({ open, onOpenChange }: PaymentsSettingsD
               <div className="flex flex-col gap-6">
                 <div>
                   <p className="text-sm leading-6 text-muted-foreground">
-                    Pull the latest products, prices, and subscriptions from Stripe.
+                    Pull the latest products, prices, customers, and subscriptions from Stripe.
                   </p>
                 </div>
 
@@ -562,7 +562,8 @@ export function PaymentsSettingsDialog({ open, onOpenChange }: PaymentsSettingsD
               <div className="flex flex-col gap-6">
                 <div>
                   <p className="text-sm leading-6 text-muted-foreground">
-                    Configure Stripe webhook endpoints for payment history and subscription updates.
+                    Configure Stripe webhook endpoints for customer, payment history, and
+                    subscription updates.
                   </p>
                 </div>
 

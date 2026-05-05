@@ -7,9 +7,14 @@ import {
 
 const PAYMENTS_SIDEBAR_ITEMS: FeatureSidebarListItem[] = [
   {
-    id: 'products',
-    label: 'Products',
-    href: '/dashboard/payments/products',
+    id: 'catalog',
+    label: 'Catalog',
+    href: '/dashboard/payments/catalog',
+  },
+  {
+    id: 'customers',
+    label: 'Customers',
+    href: '/dashboard/payments/customers',
   },
   {
     id: 'subscriptions',

@@ -57,6 +57,19 @@ export const stripePriceMirrorSchema = z.object({
 });
 export type StripePriceMirror = z.infer<typeof stripePriceMirrorSchema>;
 
+export const stripeCustomerMirrorSchema = z.object({
+  environment: stripeEnvironmentSchema,
+  stripeCustomerId: z.string(),
+  email: z.string().nullable(),
+  name: z.string().nullable(),
+  phone: z.string().nullable(),
+  deleted: z.boolean(),
+  metadata: z.record(z.string()),
+  stripeCreatedAt: z.string().nullable(),
+  syncedAt: z.string(),
+});
+export type StripeCustomerMirror = z.infer<typeof stripeCustomerMirrorSchema>;
+
 export const billingSubjectSchema = z
   .object({
     type: z.string().trim().min(1).max(100),

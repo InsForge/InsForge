@@ -39,8 +39,9 @@ import FunctionLogsPage from '#features/logs/pages/FunctionLogsPage';
 import LogsPage from '#features/logs/pages/LogsPage';
 import MCPLogsPage from '#features/logs/pages/MCPLogsPage';
 import PaymentsLayout from '#features/payments/components/PaymentsLayout';
+import CatalogPage from '#features/payments/pages/CatalogPage';
+import CustomersPage from '#features/payments/pages/CustomersPage';
 import PaymentHistoryPage from '#features/payments/pages/PaymentHistoryPage';
-import ProductsPage from '#features/payments/pages/ProductsPage';
 import SubscriptionsPage from '#features/payments/pages/SubscriptionsPage';
 import RealtimeLayout from '#features/realtime/components/RealtimeLayout';
 import RealtimeChannelsPage from '#features/realtime/pages/RealtimeChannelsPage';
@@ -113,8 +114,9 @@ function AuthenticatedRoutes() {
           <Route index element={<AIPage />} />
         </Route>
         <Route path="/dashboard/payments" element={<PaymentsLayout />}>
-          <Route index element={<Navigate to="products" replace />} />
-          <Route path="products" element={<ProductsPage />} />
+          <Route index element={<Navigate to="catalog" replace />} />
+          <Route path="catalog" element={<CatalogPage />} />
+          <Route path="customers" element={<CustomersPage />} />
           <Route path="subscriptions" element={<SubscriptionsPage />} />
           <Route path="payment-history" element={<PaymentHistoryPage />} />
         </Route>
