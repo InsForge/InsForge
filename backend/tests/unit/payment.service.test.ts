@@ -4378,4 +4378,102 @@ describe('PaymentService', () => {
       ]
     );
   });
+
+  it('clears Stripe customer mappings when customer.deleted webhooks arrive', async () => {
+    mockGetSecretByKey
+      .mockResolvedValueOnce('whsec_test_123')
+      .mockResolvedValueOnce('sk_test_1234567890');
+    mockProvider.constructWebhookEvent.mockReturnValueOnce({
+      id: 'evt_customer_deleted_123',
+      type: 'customer.deleted',
+      created: 1777334700,
+      livemode: false,
+      data: {
+        object: {
+          id: 'cus_deleted_123',
+          object: 'customer',
+          deleted: true,
+        },
+      },
+    });
+    mockPool.query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            environment: 'test',
+            stripeEventId: 'evt_customer_deleted_123',
+            eventType: 'customer.deleted',
+            livemode: false,
+            stripeAccountId: null,
+            objectType: 'customer',
+            objectId: 'cus_deleted_123',
+            processingStatus: 'pending',
+            attemptCount: 1,
+            lastError: null,
+            receivedAt: new Date('2026-05-02T00:00:00.000Z'),
+            processedAt: null,
+            createdAt: new Date('2026-05-02T00:00:00.000Z'),
+            updatedAt: new Date('2026-05-02T00:00:00.000Z'),
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            environment: 'test',
+            stripeEventId: 'evt_customer_deleted_123',
+            eventType: 'customer.deleted',
+            livemode: false,
+            stripeAccountId: null,
+            objectType: 'customer',
+            objectId: 'cus_deleted_123',
+            processingStatus: 'processed',
+            attemptCount: 1,
+            lastError: null,
+            receivedAt: new Date('2026-05-02T00:00:00.000Z'),
+            processedAt: new Date('2026-05-02T00:00:01.000Z'),
+            createdAt: new Date('2026-05-02T00:00:00.000Z'),
+            updatedAt: new Date('2026-05-02T00:00:01.000Z'),
+          },
+        ],
+      });
+
+    await expect(
+      PaymentService.getInstance().handleStripeWebhook(
+        'test',
+        Buffer.from('{"id":"evt_customer_deleted_123"}'),
+        'sig_123'
+      )
+    ).resolves.toMatchObject({
+      received: true,
+      handled: true,
+      event: {
+        stripeEventId: 'evt_customer_deleted_123',
+        processingStatus: 'processed',
+      },
+    });
+
+    expect(mockPool.query).toHaveBeenCalledWith(
+      expect.stringMatching(/INSERT INTO payments\.customers/i),
+      [
+        'test',
+        'cus_deleted_123',
+        null,
+        null,
+        null,
+        true,
+        {},
+        expect.objectContaining({ id: 'cus_deleted_123', deleted: true }),
+        null,
+        expect.any(Date),
+        true,
+      ]
+    );
+    expect(mockPool.query).toHaveBeenCalledWith(
+      expect.stringMatching(/DELETE FROM payments\.stripe_customer_mappings/i),
+      ['test', 'cus_deleted_123']
+    );
+  });
 });

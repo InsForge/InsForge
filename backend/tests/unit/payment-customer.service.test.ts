@@ -160,7 +160,11 @@ describe('PaymentCustomerService', () => {
     expect(provider.listCustomers).toHaveBeenCalledTimes(1);
     expect(mockPool.connect).toHaveBeenCalledTimes(1);
     expect(mockClient.query).toHaveBeenCalledWith('BEGIN');
-    expect(mockClient.query).toHaveBeenCalledWith(
+    const insertCalls = mockClient.query.mock.calls.filter(([sql]) =>
+      typeof sql === 'string' ? /INSERT INTO payments\.customers/i.test(sql) : false
+    );
+    expect(insertCalls).toHaveLength(1);
+    expect(insertCalls[0]).toEqual([
       expect.stringMatching(/INSERT INTO payments\.customers/i),
       [
         'test',
@@ -173,9 +177,18 @@ describe('PaymentCustomerService', () => {
         expect.objectContaining({ id: 'cus_123' }),
         new Date('2026-05-01T00:00:00.000Z'),
         expect.any(Date),
+        'test',
+        'cus_456',
+        null,
+        'Second Customer',
+        null,
         false,
-      ]
-    );
+        {},
+        expect.objectContaining({ id: 'cus_456' }),
+        new Date('2026-05-02T00:00:00.000Z'),
+        expect.any(Date),
+      ],
+    ]);
     expect(mockClient.query).toHaveBeenCalledWith(
       expect.stringMatching(/UPDATE payments\.customers[\s\S]*NOT \(stripe_customer_id = ANY/i),
       ['test', expect.any(Date), ['cus_123', 'cus_456']]

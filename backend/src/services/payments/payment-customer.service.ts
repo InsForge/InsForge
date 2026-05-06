@@ -33,6 +33,8 @@ type StripeCustomerLike =
       created?: number | null;
     };
 
+const CUSTOMER_SYNC_BATCH_SIZE = 100;
+
 export class PaymentCustomerService {
   private static instance: PaymentCustomerService;
   private pool: Pool | null = null;
@@ -231,8 +233,13 @@ export class PaymentCustomerService {
     try {
       await client.query('BEGIN');
 
-      for (const customer of customers) {
-        await this.upsertCustomerRecord(client, environment, customer, syncedAt, false);
+      for (let start = 0; start < customers.length; start += CUSTOMER_SYNC_BATCH_SIZE) {
+        await this.bulkUpsertCustomerRecords(
+          client,
+          environment,
+          customers.slice(start, start + CUSTOMER_SYNC_BATCH_SIZE),
+          syncedAt
+        );
       }
 
       await this.markMissingCustomersDeleted(
@@ -268,16 +275,19 @@ export class PaymentCustomerService {
     return true;
   }
 
-  private async upsertCustomerRecord(
+  private async bulkUpsertCustomerRecords(
     client: PoolClient,
     environment: StripeEnvironment,
-    customer: StripeCustomerLike,
-    syncedAt: Date,
-    preserveExistingDetails: boolean
+    customers: StripeCustomerLike[],
+    syncedAt: Date
   ): Promise<void> {
+    if (customers.length === 0) {
+      return;
+    }
+
     await client.query(
-      this.buildUpsertCustomerSql(),
-      this.buildUpsertCustomerParams(environment, customer, syncedAt, preserveExistingDetails)
+      this.buildBulkUpsertCustomerSql(customers.length),
+      this.buildBulkUpsertCustomerParams(environment, customers, syncedAt)
     );
   }
 
@@ -297,6 +307,37 @@ export class PaymentCustomerService {
          AND NOT (stripe_customer_id = ANY($3::TEXT[]))`,
       [environment, syncedAt, syncedCustomerIds]
     );
+  }
+
+  private buildBulkUpsertCustomerSql(customerCount: number): string {
+    const values = Array.from({ length: customerCount }, (_, index) => {
+      const offset = index * 10;
+      return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10})`;
+    }).join(',\n    ');
+
+    return `INSERT INTO payments.customers (
+      environment,
+      stripe_customer_id,
+      email,
+      name,
+      phone,
+      deleted,
+      metadata,
+      raw,
+      stripe_created_at,
+      synced_at
+    )
+    VALUES ${values}
+    ON CONFLICT (environment, stripe_customer_id) DO UPDATE SET
+      email = EXCLUDED.email,
+      name = EXCLUDED.name,
+      phone = EXCLUDED.phone,
+      deleted = EXCLUDED.deleted,
+      metadata = EXCLUDED.metadata,
+      raw = EXCLUDED.raw,
+      stripe_created_at = EXCLUDED.stripe_created_at,
+      synced_at = EXCLUDED.synced_at,
+      updated_at = NOW()`;
   }
 
   private buildUpsertCustomerSql(): string {
@@ -326,6 +367,25 @@ export class PaymentCustomerService {
       END,
       synced_at = EXCLUDED.synced_at,
       updated_at = NOW()`;
+  }
+
+  private buildBulkUpsertCustomerParams(
+    environment: StripeEnvironment,
+    customers: StripeCustomerLike[],
+    syncedAt: Date
+  ): Array<
+    | StripeEnvironment
+    | string
+    | boolean
+    | Record<string, string>
+    | StripeCustomerLike
+    | Date
+    | null
+  > {
+    return customers.flatMap((customer) => {
+      const params = this.buildUpsertCustomerParams(environment, customer, syncedAt, false);
+      return params.slice(0, 10);
+    });
   }
 
   private buildUpsertCustomerParams(

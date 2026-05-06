@@ -695,6 +695,20 @@ export class PaymentService {
     return true;
   }
 
+  private async deleteStripeCustomerMappingsByCustomerId(
+    environment: StripeEnvironment,
+    stripeCustomerId: string
+  ): Promise<boolean> {
+    const result = await this.getPool().query(
+      `DELETE FROM payments.stripe_customer_mappings
+       WHERE environment = $1
+         AND stripe_customer_id = $2`,
+      [environment, stripeCustomerId]
+    );
+
+    return (result.rowCount ?? 0) > 0;
+  }
+
   private buildStripeMetadata(
     metadata: Record<string, string> | undefined,
     subject: BillingSubject | undefined,
@@ -732,11 +746,28 @@ export class PaymentService {
     switch (event.type) {
       case 'customer.created':
       case 'customer.updated':
-      case 'customer.deleted':
         return this.customerService.upsertCustomerProjection(
           environment,
           event.data.object as { id: string; deleted?: boolean }
         );
+      case 'customer.deleted': {
+        const customer = event.data.object as { id?: string; deleted?: boolean };
+        if (!customer.id) {
+          return false;
+        }
+
+        const deletedCustomer = {
+          id: customer.id,
+          deleted: customer.deleted,
+        };
+
+        const [projectionHandled, mappingsDeleted] = await Promise.all([
+          this.customerService.upsertCustomerProjection(environment, deletedCustomer),
+          this.deleteStripeCustomerMappingsByCustomerId(environment, customer.id),
+        ]);
+
+        return projectionHandled || mappingsDeleted;
+      }
       case 'checkout.session.completed': {
         const checkoutSession = event.data.object as StripeCheckoutSession;
         const [checkoutRow, mapped, historyHandled] = await Promise.all([

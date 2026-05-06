@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { StripeEnvironment } from '@insforge/shared-schemas';
 import { paymentsService } from '#features/payments/services/payments.service';
 
-const PAYMENT_CUSTOMERS_LIMIT = 100;
+export const PAYMENT_CUSTOMERS_LIMIT = 100;
 
 export function usePaymentCustomers(environment: StripeEnvironment) {
   const {
