@@ -7,17 +7,38 @@ import logger from './logger.js';
 let initialized = false;
 
 // These are the documented managed tables where developers are expected to add
-// app-specific RLS, triggers, or runtime rows through raw SQL.
+// app-specific runtime rows through raw SQL.
 const MANAGED_SCHEMA_WRITE_TABLE_EXCEPTIONS = new Set(
   [
+    'realtime.channels',
+  ].map((tableName) => tableName.toLowerCase())
+);
+
+// These are the documented managed tables where developers are expected to add
+// business-logic triggers, but not broad table writes.
+const MANAGED_SCHEMA_TRIGGER_TABLE_EXCEPTIONS = new Set(
+  ['payments.payment_history', 'payments.subscriptions'].map((tableName) =>
+    tableName.toLowerCase()
+  )
+);
+
+// These are the documented managed tables where developers are expected to
+// enable/manage RLS and policies, but not perform broad writes.
+const MANAGED_SCHEMA_RLS_TABLE_EXCEPTIONS = new Set(
+  [
+    'storage.objects',
     'payments.checkout_sessions',
     'payments.customer_portal_sessions',
-    'payments.payment_history',
-    'payments.subscriptions',
-    'realtime.channels',
     'realtime.messages',
   ].map((tableName) => tableName.toLowerCase())
 );
+
+const ALLOWED_RLS_ALTER_TABLE_SUBTYPES = new Set([
+  'AT_EnableRowSecurity',
+  'AT_DisableRowSecurity',
+  'AT_ForceRowSecurity',
+  'AT_NoForceRowSecurity',
+]);
 
 /**
  * Initialize the SQL parser WASM module.
@@ -339,6 +360,53 @@ function isManagedSchemaWriteTableException(
   );
 }
 
+function isManagedSchemaTriggerTableException(
+  schemaName: string | null,
+  tableName: string | null
+): boolean {
+  if (!schemaName || !tableName) {
+    return false;
+  }
+
+  return MANAGED_SCHEMA_TRIGGER_TABLE_EXCEPTIONS.has(
+    `${schemaName.toLowerCase()}.${tableName.toLowerCase()}`
+  );
+}
+
+function isManagedSchemaRlsTableException(
+  schemaName: string | null,
+  tableName: string | null
+): boolean {
+  if (!schemaName || !tableName) {
+    return false;
+  }
+
+  return MANAGED_SCHEMA_RLS_TABLE_EXCEPTIONS.has(
+    `${schemaName.toLowerCase()}.${tableName.toLowerCase()}`
+  );
+}
+
+function isManagedSchemaRlsAlterTableException(
+  data: Record<string, unknown>,
+  schemaName: string | null,
+  tableName: string | null
+): boolean {
+  if (!isManagedSchemaRlsTableException(schemaName, tableName)) {
+    return false;
+  }
+
+  const commands = (data.cmds as Array<Record<string, unknown>>) ?? [];
+  if (commands.length === 0) {
+    return false;
+  }
+
+  return commands.every((command) => {
+    const alterTableCmd = command.AlterTableCmd as Record<string, unknown> | undefined;
+    const subtype = alterTableCmd?.subtype as string | undefined;
+    return subtype ? ALLOWED_RLS_ALTER_TABLE_SUBTYPES.has(subtype) : false;
+  });
+}
+
 function getDropManagedRelation(
   removeType: string,
   obj: Record<string, unknown>
@@ -421,7 +489,8 @@ export function checkManagedSchemaWriteOperations(
         const relationTableName = getRelationName(relation);
         if (
           relationSchema &&
-          !isManagedSchemaWriteTableException(relationSchema, relationTableName)
+          !isManagedSchemaWriteTableException(relationSchema, relationTableName) &&
+          !isManagedSchemaTriggerTableException(relationSchema, relationTableName)
         ) {
           return buildManagedSchemaWriteError(relationSchema);
         }
@@ -449,7 +518,18 @@ export function checkManagedSchemaWriteOperations(
             relation &&
             relation.schemaName &&
             relation.tableName &&
-            isManagedSchemaWriteTableException(relation.schemaName, relation.tableName)
+            ((removeType === 'OBJECT_TRIGGER' &&
+              (isManagedSchemaWriteTableException(relation.schemaName, relation.tableName) ||
+                isManagedSchemaTriggerTableException(
+                  relation.schemaName,
+                  relation.tableName
+                ))) ||
+              (removeType === 'OBJECT_POLICY' &&
+                (isManagedSchemaWriteTableException(relation.schemaName, relation.tableName) ||
+                  isManagedSchemaRlsTableException(
+                    relation.schemaName,
+                    relation.tableName
+                  ))))
           ) {
             continue;
           }
@@ -464,7 +544,7 @@ export function checkManagedSchemaWriteOperations(
         }
       }
 
-      if (stmtType === 'CreateStmt' || stmtType === 'IndexStmt' || stmtType === 'RenameStmt') {
+      if (stmtType === 'CreateStmt' || stmtType === 'IndexStmt') {
         const relation = data.relation as Record<string, unknown> | undefined;
         const schemaName = getProtectedSchema(getSchemaName(relation), protectedSchemas);
         const tableName = getRelationName(relation);
@@ -473,11 +553,23 @@ export function checkManagedSchemaWriteOperations(
         }
       }
 
+      if (stmtType === 'RenameStmt') {
+        const relation = data.relation as Record<string, unknown> | undefined;
+        const schemaName = getProtectedSchema(getSchemaName(relation), protectedSchemas);
+        if (schemaName) {
+          return buildManagedSchemaWriteError(schemaName);
+        }
+      }
+
       if (stmtType === 'AlterTableStmt') {
         const relation = data.relation as Record<string, unknown> | undefined;
         const schemaName = getProtectedSchema(getSchemaName(relation), protectedSchemas);
         const tableName = getRelationName(relation);
-        if (schemaName && !isManagedSchemaWriteTableException(schemaName, tableName)) {
+        if (
+          schemaName &&
+          !isManagedSchemaWriteTableException(schemaName, tableName) &&
+          !isManagedSchemaRlsAlterTableException(data, schemaName, tableName)
+        ) {
           return buildManagedSchemaWriteError(schemaName);
         }
       }
@@ -495,7 +587,11 @@ export function checkManagedSchemaWriteOperations(
         const relation = data.table as Record<string, unknown> | undefined;
         const schemaName = getProtectedSchema(getSchemaName(relation), protectedSchemas);
         const tableName = getRelationName(relation);
-        if (schemaName && !isManagedSchemaWriteTableException(schemaName, tableName)) {
+        if (
+          schemaName &&
+          !isManagedSchemaWriteTableException(schemaName, tableName) &&
+          !isManagedSchemaRlsTableException(schemaName, tableName)
+        ) {
           return buildManagedSchemaWriteError(schemaName);
         }
       }

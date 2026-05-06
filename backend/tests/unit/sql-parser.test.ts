@@ -275,9 +275,20 @@ describe('checkManagedSchemaWriteOperations', () => {
       checkManagedSchemaWriteOperations('ALTER TABLE realtime.channels ENABLE ROW LEVEL SECURITY')
     ).toBeNull();
     expect(
+      checkManagedSchemaWriteOperations('ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY')
+    ).toBeNull();
+    expect(
       checkManagedSchemaWriteOperations(
         'ALTER TABLE payments.checkout_sessions ENABLE ROW LEVEL SECURITY'
       )
+    ).toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        'ALTER TABLE payments.customer_portal_sessions FORCE ROW LEVEL SECURITY'
+      )
+    ).toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations('ALTER TABLE realtime.messages ENABLE ROW LEVEL SECURITY')
     ).toBeNull();
     expect(
       checkManagedSchemaWriteOperations(
@@ -286,12 +297,42 @@ describe('checkManagedSchemaWriteOperations', () => {
     ).toBeNull();
     expect(
       checkManagedSchemaWriteOperations(
+        'DROP POLICY checkout_subject_guard ON payments.checkout_sessions'
+      )
+    ).toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        'DROP POLICY IF EXISTS portal_subject_guard ON payments.customer_portal_sessions'
+      )
+    ).toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
         "CREATE POLICY publish_guard ON realtime.messages FOR INSERT TO authenticated WITH CHECK (channel_name LIKE 'chat:%')"
+      )
+    ).toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        'CREATE POLICY storage_owner_select ON storage.objects FOR SELECT TO authenticated USING (true)'
+      )
+    ).toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        'DROP POLICY IF EXISTS storage_owner_select ON storage.objects'
       )
     ).toBeNull();
   });
 
   it('allows documented writes on exempted managed tables', () => {
+    expect(
+      checkManagedSchemaWriteOperations(
+        "INSERT INTO realtime.channels (pattern, description, enabled) VALUES ('orders', 'Order events', true)"
+      )
+    ).toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        "UPDATE realtime.channels SET enabled = false WHERE pattern = 'orders'"
+      )
+    ).toBeNull();
     expect(
       checkManagedSchemaWriteOperations(
         'CREATE TRIGGER fulfill_paid_order AFTER INSERT ON payments.payment_history FOR EACH ROW EXECUTE FUNCTION public.fulfill_paid_order()'
@@ -307,16 +348,44 @@ describe('checkManagedSchemaWriteOperations', () => {
         'CREATE TRIGGER sync_team_billing_status AFTER INSERT ON payments.subscriptions FOR EACH ROW EXECUTE FUNCTION public.sync_team_billing_status()'
       )
     ).toBeNull();
+  });
+
+  it('blocks broad writes on RLS-only and trigger-only managed tables', () => {
     expect(
       checkManagedSchemaWriteOperations(
         "INSERT INTO payments.checkout_sessions (environment, mode, success_url, cancel_url) VALUES ('test', 'payment', 'https://example.com/success', 'https://example.com/cancel')"
       )
-    ).toBeNull();
+    ).not.toBeNull();
     expect(
       checkManagedSchemaWriteOperations(
         'ALTER TABLE payments.checkout_sessions ADD COLUMN internal_note TEXT'
       )
-    ).toBeNull();
+    ).not.toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        'ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY, ADD COLUMN owner_note TEXT'
+      )
+    ).not.toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        'ALTER TABLE realtime.channels RENAME TO realtime_channels_v2'
+      )
+    ).not.toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        'ALTER TABLE realtime.channels RENAME COLUMN description TO details'
+      )
+    ).not.toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        "INSERT INTO realtime.messages (event_name, channel_name, payload) VALUES ('new_message', 'chat:1', '{}'::jsonb)"
+      )
+    ).not.toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        "UPDATE payments.subscriptions SET status = 'canceled' WHERE id = 'sub_123'"
+      )
+    ).not.toBeNull();
   });
 
   it('allows SELECT on managed schemas', () => {
