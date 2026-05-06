@@ -23,6 +23,15 @@ const uuidParamSchema = z.string().uuid();
 // Mount sub-routers first to avoid conflicts with parameterized routes
 router.use('/env-vars', envVarsRouter);
 
+function parseDeploymentId(id: string): string {
+  const validationResult = uuidParamSchema.safeParse(id);
+  if (!validationResult.success) {
+    throw new AppError('Invalid deployment ID', 400, ERROR_CODES.INVALID_INPUT);
+  }
+
+  return validationResult.data;
+}
+
 /**
  * Create a new deployment record with WAITING status
  * Returns presigned upload info for the legacy source zip flow
@@ -144,7 +153,7 @@ router.post(
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const { id } = req.params;
+      const id = parseDeploymentId(req.params.id);
 
       const validationResult = startDeploymentRequestSchema.safeParse(req.body);
       if (!validationResult.success) {
@@ -368,7 +377,7 @@ router.delete(
  */
 router.get('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { id } = req.params;
+    const id = parseDeploymentId(req.params.id);
 
     const deployment = await deploymentService.getDeploymentById(id);
 
@@ -391,7 +400,7 @@ router.post(
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const { id } = req.params;
+      const id = parseDeploymentId(req.params.id);
 
       const deployment = await deploymentService.syncDeploymentById(id);
 
@@ -415,7 +424,7 @@ router.post(
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const { id } = req.params;
+      const id = parseDeploymentId(req.params.id);
 
       await deploymentService.cancelDeploymentById(id);
 
