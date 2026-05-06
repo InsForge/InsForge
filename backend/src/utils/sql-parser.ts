@@ -9,17 +9,13 @@ let initialized = false;
 // These are the documented managed tables where developers are expected to add
 // app-specific runtime rows through raw SQL.
 const MANAGED_SCHEMA_WRITE_TABLE_EXCEPTIONS = new Set(
-  [
-    'realtime.channels',
-  ].map((tableName) => tableName.toLowerCase())
+  ['realtime.channels'].map((tableName) => tableName.toLowerCase())
 );
 
 // These are the documented managed tables where developers are expected to add
 // business-logic triggers, but not broad table writes.
 const MANAGED_SCHEMA_TRIGGER_TABLE_EXCEPTIONS = new Set(
-  ['payments.payment_history', 'payments.subscriptions'].map((tableName) =>
-    tableName.toLowerCase()
-  )
+  ['payments.payment_history', 'payments.subscriptions'].map((tableName) => tableName.toLowerCase())
 );
 
 // These are the documented managed tables where developers are expected to
@@ -520,16 +516,10 @@ export function checkManagedSchemaWriteOperations(
             relation.tableName &&
             ((removeType === 'OBJECT_TRIGGER' &&
               (isManagedSchemaWriteTableException(relation.schemaName, relation.tableName) ||
-                isManagedSchemaTriggerTableException(
-                  relation.schemaName,
-                  relation.tableName
-                ))) ||
+                isManagedSchemaTriggerTableException(relation.schemaName, relation.tableName))) ||
               (removeType === 'OBJECT_POLICY' &&
                 (isManagedSchemaWriteTableException(relation.schemaName, relation.tableName) ||
-                  isManagedSchemaRlsTableException(
-                    relation.schemaName,
-                    relation.tableName
-                  ))))
+                  isManagedSchemaRlsTableException(relation.schemaName, relation.tableName))))
           ) {
             continue;
           }
