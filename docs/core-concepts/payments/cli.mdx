@@ -1,6 +1,6 @@
 ---
 title: Payments CLI
-description: Configure Stripe keys, sync catalog state, manage products and prices, and inspect payment projections
+description: Configure Stripe keys, sync payment data, manage products and prices, and inspect payment projections
 ---
 
 <Warning>
@@ -9,12 +9,16 @@ description: Configure Stripe keys, sync catalog state, manage products and pric
 
 ## Overview
 
-The Payments CLI is the admin and agent control surface for Stripe setup. Use it to configure Stripe keys, sync Stripe as the source of truth, manage catalog objects, configure webhooks, and inspect mirrored subscriptions or payment history.
+The Payments CLI is the admin and agent control surface for Stripe setup. Use it to configure Stripe keys, sync Stripe as the source of truth, manage catalog objects, configure webhooks, and inspect synced subscription or payment-history state.
 
 Runtime checkout and Billing Portal redirects belong in application code through the [TypeScript Payments SDK](/sdks/typescript/payments), not in the CLI.
 
 <Note>
   All examples use `npx @insforge/cli`. Do not install the CLI globally.
+</Note>
+
+<Note>
+  The CLI is meant for setup and visibility. For refunds, disputes, and other sensitive financial operations, continue using the Stripe Dashboard directly.
 </Note>
 
 ## Command Summary
@@ -25,13 +29,13 @@ Runtime checkout and Billing Portal redirects belong in application code through
 | `payments config` | Show configured test/live Stripe keys |
 | `payments config set <environment> [secretKey]` | Configure a Stripe test or live secret key |
 | `payments config remove <environment>` | Remove a configured Stripe key |
-| `payments sync` | Sync products, prices, and subscriptions from Stripe |
-| `payments catalog` | Show mirrored products and prices together |
+| `payments sync` | Sync products, prices, customers, and subscriptions from Stripe |
+| `payments catalog` | Show synced products and prices together |
 | `payments products ...` | List, get, create, update, or delete Stripe products |
 | `payments prices ...` | List, get, create, update, or archive Stripe prices |
 | `payments webhooks configure <environment>` | Create or recreate the managed Stripe webhook endpoint |
-| `payments subscriptions` | Admin/debug reads for mirrored subscriptions |
-| `payments history` | Admin/debug reads for mirrored payment history |
+| `payments subscriptions` | Read synced subscriptions |
+| `payments history` | Read synced payment history |
 
 ## Recommended Workflow
 
@@ -54,7 +58,7 @@ Runtime checkout and Billing Portal redirects belong in application code through
   </Step>
 
   <Step title="Sync Stripe state">
-    Pull products, prices, and subscriptions from every configured Stripe environment.
+    Pull products, prices, customers, and subscriptions from every configured Stripe environment.
 
     ```bash
     npx @insforge/cli payments sync
@@ -124,13 +128,15 @@ npx @insforge/cli payments sync --environment test
 npx @insforge/cli payments sync --environment live
 ```
 
-Sync pulls products, prices, and subscriptions from Stripe into InsForge. Unconfigured environments are skipped.
+Sync pulls products, prices, customers, and subscriptions from Stripe into InsForge. Unconfigured environments are skipped.
 
 Manual sync does not configure webhooks. Use `payments webhooks configure <environment>` for webhook setup.
 
 <Note>
   Stripe is the source of truth. Sync overwrites local catalog drift with Stripe data.
 </Note>
+
+The customer data pulled by sync feeds the dashboard's Customers page and stays separate from `payments.stripe_customer_mappings`, which is the operational subject-to-customer lookup used by portal creation and subscription ownership.
 
 ## Catalog
 
@@ -231,13 +237,13 @@ npx @insforge/cli payments webhooks configure test
 npx @insforge/cli payments webhooks configure live
 ```
 
-Webhook setup creates or recreates the InsForge-managed Stripe webhook endpoint for an environment. Webhooks keep checkout sessions, subscriptions, payment history, refunds, and customer mappings current.
+Webhook setup creates or recreates the InsForge-managed Stripe webhook endpoint for an environment. Webhooks keep checkout sessions, dashboard customer data, customer mappings, subscriptions, payment history, and refunds current.
 
 Stripe requires webhook URLs to be publicly accessible. Localhost backend URLs cannot be registered from the CLI. For local webhook testing, use the Stripe CLI to forward events to your local backend.
 
 ## Subscriptions and Payment History
 
-These commands are admin/debug reads over InsForge's payment projections:
+These commands are read-only operational views over InsForge's synced payment data:
 
 ```bash
 npx @insforge/cli payments subscriptions --environment test
