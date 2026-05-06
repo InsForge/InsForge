@@ -32,9 +32,6 @@ export type StripeSubscriptionItem = AsyncIterableItem<
 export type StripePaymentIntent = StripeResourceData<
   Awaited<ReturnType<Stripe['paymentIntents']['retrieve']>>
 >;
-export type StripePaymentMethod = Awaited<
-  ReturnType<Stripe['paymentMethods']['list']>
->['data'][number];
 export type StripeCharge = StripeResourceData<Awaited<ReturnType<Stripe['charges']['retrieve']>>>;
 export type StripeInvoice = StripeResourceData<Awaited<ReturnType<Stripe['invoices']['retrieve']>>>;
 export type StripeInvoicePayment = AsyncIterableItem<ReturnType<Stripe['invoicePayments']['list']>>;
@@ -52,7 +49,6 @@ export type StripeClient = Pick<
   | 'subscriptions'
   | 'subscriptionItems'
   | 'paymentIntents'
-  | 'paymentMethods'
   | 'charges'
   | 'invoicePayments'
 >;

@@ -101,6 +101,29 @@ describe('PaymentCustomerService', () => {
     );
   });
 
+  it('builds customer payment stats by combining Stripe-customer and email-only history', async () => {
+    mockPool.query.mockResolvedValueOnce({ rows: [] });
+
+    await PaymentCustomerService.getInstance().listCustomers({
+      environment: 'test',
+      limit: 25,
+    });
+
+    const [sql] = mockPool.query.mock.calls[0] ?? [];
+    expect(sql).toMatch(/WITH unique_customer_emails AS/i);
+    expect(sql).toMatch(/HAVING COUNT\(\*\) = 1/i);
+    expect(sql).toMatch(
+      /COALESCE\(payment_totals_by_customer\.payments_count, 0\)\s*\+\s*COALESCE\(payment_totals_by_email\.payments_count, 0\)/i
+    );
+    expect(sql).toMatch(/GREATEST\(\s*payment_totals_by_customer\.last_payment_at/i);
+    expect(sql).toMatch(
+      /WHEN COALESCE\(payment_totals_by_customer\.payments_count, 0\) = 0\s+THEN payment_totals_by_email\.total_spend/i
+    );
+    expect(sql).toMatch(
+      /WHEN COALESCE\(payment_totals_by_email\.payments_count, 0\) = 0\s+THEN payment_totals_by_customer\.total_spend/i
+    );
+  });
+
   it('syncs Stripe customers and soft-deletes mirror rows missing from the latest provider import', async () => {
     const provider = {
       listCustomers: vi.fn().mockResolvedValue([
@@ -185,6 +208,11 @@ describe('PaymentCustomerService', () => {
         true,
       ]
     );
+
+    const [sql] = mockPool.query.mock.calls[0] ?? [];
+    expect(sql).toMatch(
+      /raw = CASE WHEN \$11 THEN payments\.customers\.raw ELSE EXCLUDED\.raw END/i
+    );
   });
 
   it('ignores webhook customer projections that are missing an id', async () => {
@@ -198,55 +226,4 @@ describe('PaymentCustomerService', () => {
     expect(mockPool.query).not.toHaveBeenCalled();
   });
 
-  it('enriches missing payment method and country fields from Stripe when the mirror is sparse', async () => {
-    const provider = {
-      listCustomerCardPaymentMethods: vi.fn().mockResolvedValue([
-        {
-          card: {
-            brand: 'mastercard',
-            last4: '4444',
-          },
-          billing_details: {
-            address: {
-              country: 'ca',
-            },
-          },
-        },
-      ]),
-    };
-
-    await expect(
-      PaymentCustomerService.getInstance().enrichCustomersWithProvider(
-        [
-          {
-            environment: 'test',
-            stripeCustomerId: 'cus_sparse',
-            email: 'buyer@example.com',
-            name: 'Buyer Example',
-            phone: null,
-            deleted: false,
-            metadata: {},
-            stripeCreatedAt: '2026-05-01T00:00:00.000Z',
-            syncedAt: '2026-05-02T00:00:00.000Z',
-            paymentsCount: 1,
-            lastPaymentAt: '2026-05-03T12:30:00.000Z',
-            totalSpend: 1200,
-            totalSpendCurrency: 'usd',
-            paymentMethodBrand: null,
-            paymentMethodLast4: null,
-            countryCode: null,
-          },
-        ],
-        provider as unknown as StripeProvider
-      )
-    ).resolves.toEqual([
-      expect.objectContaining({
-        paymentMethodBrand: 'mastercard',
-        paymentMethodLast4: '4444',
-        countryCode: 'CA',
-      }),
-    ]);
-
-    expect(provider.listCustomerCardPaymentMethods).toHaveBeenCalledWith('cus_sparse', 1);
-  });
 });

@@ -404,7 +404,7 @@ export const getPaymentsConfigResponseSchema = z.object({
 
 export const upsertPaymentsConfigBodySchema = z
   .object({
-    secretKey: z.string().min(1, 'Stripe secret key is required'),
+    secretKey: z.string().trim().min(1, 'Stripe secret key is required'),
   })
   .strict();
 

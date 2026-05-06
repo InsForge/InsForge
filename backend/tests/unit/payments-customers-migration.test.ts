@@ -9,7 +9,7 @@ const migrationPath = path.resolve(
   currentDir,
   `../../src/infra/database/migrations/${migrationFile}`
 );
-const sql = fs.readFileSync(migrationPath, 'utf8');
+const readMigrationSql = () => fs.readFileSync(migrationPath, 'utf8');
 
 describe('payments-customers migration', () => {
   it('migration file exists', () => {
@@ -17,10 +17,11 @@ describe('payments-customers migration', () => {
   });
 
   it('labels the migration with a migration version comment', () => {
-    expect(sql).toMatch(/^-- Migration \d+:/);
+    expect(readMigrationSql()).toMatch(/^-- Migration \d+:/);
   });
 
   it('creates the payments customers mirror table', () => {
+    const sql = readMigrationSql();
     expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS payments\.customers/i);
     expect(sql).toMatch(/stripe_customer_id TEXT NOT NULL/i);
     expect(sql).toMatch(/deleted BOOLEAN NOT NULL DEFAULT false/i);
@@ -31,10 +32,11 @@ describe('payments-customers migration', () => {
   });
 
   it('uses environment checks for test and live rows', () => {
-    expect(sql).toMatch(/CHECK \(environment IN \('test', 'live'\)\)/i);
+    expect(readMigrationSql()).toMatch(/CHECK \(environment IN \('test', 'live'\)\)/i);
   });
 
   it('uses idempotent guards for table, indexes, and trigger recreation', () => {
+    const sql = readMigrationSql();
     expect(sql).not.toMatch(/CREATE TABLE payments\./i);
     expect(sql).not.toMatch(/CREATE INDEX idx_payments/i);
     expect(sql).not.toMatch(/CREATE UNIQUE INDEX idx_payments/i);
@@ -43,16 +45,18 @@ describe('payments-customers migration', () => {
   });
 
   it('creates a unique environment and stripe customer id constraint', () => {
-    expect(sql).toMatch(/UNIQUE \(environment, stripe_customer_id\)/i);
+    expect(readMigrationSql()).toMatch(/UNIQUE \(environment, stripe_customer_id\)/i);
   });
 
   it('adds useful customer mirror indexes', () => {
+    const sql = readMigrationSql();
     expect(sql).toMatch(/idx_payments_customers_environment_deleted/i);
     expect(sql).toMatch(/idx_payments_customers_environment_email/i);
     expect(sql).toMatch(/idx_payments_customers_environment_created/i);
   });
 
   it('keeps the customer mirror decoupled from payments mappings and runtime tables', () => {
+    const sql = readMigrationSql();
     expect(sql).not.toMatch(/FOREIGN KEY/i);
     expect(sql).not.toMatch(/REFERENCES payments\./i);
     expect(sql).not.toMatch(/GRANT INSERT, SELECT ON payments\.customers/i);

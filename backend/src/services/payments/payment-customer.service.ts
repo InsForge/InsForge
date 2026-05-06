@@ -55,7 +55,18 @@ export class PaymentCustomerService {
 
   async listCustomers(input: ListPaymentCustomersRequest): Promise<ListPaymentCustomersResponse> {
     const result = await this.getPool().query(
-      `WITH payment_totals_by_customer AS (
+      `WITH unique_customer_emails AS (
+         SELECT
+           environment,
+           LOWER(email) AS customer_email,
+           MIN(stripe_customer_id) AS stripe_customer_id
+         FROM payments.customers
+         WHERE environment = $1
+           AND email IS NOT NULL
+         GROUP BY environment, LOWER(email)
+         HAVING COUNT(*) = 1
+       ),
+       payment_totals_by_customer AS (
          SELECT
            environment,
            stripe_customer_id,
@@ -152,17 +163,50 @@ export class PaymentCustomerService {
          customers.raw,
          customers.stripe_created_at AS "stripeCreatedAt",
          customers.synced_at AS "syncedAt",
-         COALESCE(payment_totals_by_customer.payments_count, payment_totals_by_email.payments_count, 0) AS "paymentsCount",
-         COALESCE(payment_totals_by_customer.last_payment_at, payment_totals_by_email.last_payment_at) AS "lastPaymentAt",
-         COALESCE(payment_totals_by_customer.total_spend, payment_totals_by_email.total_spend) AS "totalSpend",
-         COALESCE(payment_totals_by_customer.total_spend_currency, payment_totals_by_email.total_spend_currency) AS "totalSpendCurrency"
+         COALESCE(payment_totals_by_customer.payments_count, 0)
+           + COALESCE(payment_totals_by_email.payments_count, 0) AS "paymentsCount",
+         CASE
+           WHEN payment_totals_by_customer.last_payment_at IS NULL
+             THEN payment_totals_by_email.last_payment_at
+           WHEN payment_totals_by_email.last_payment_at IS NULL
+             THEN payment_totals_by_customer.last_payment_at
+           ELSE GREATEST(
+             payment_totals_by_customer.last_payment_at,
+             payment_totals_by_email.last_payment_at
+           )
+         END AS "lastPaymentAt",
+         CASE
+           WHEN COALESCE(payment_totals_by_customer.payments_count, 0) = 0
+             THEN payment_totals_by_email.total_spend
+           WHEN COALESCE(payment_totals_by_email.payments_count, 0) = 0
+             THEN payment_totals_by_customer.total_spend
+           WHEN payment_totals_by_customer.total_spend IS NOT NULL
+             AND payment_totals_by_email.total_spend IS NOT NULL
+             AND payment_totals_by_customer.total_spend_currency = payment_totals_by_email.total_spend_currency
+             THEN payment_totals_by_customer.total_spend + payment_totals_by_email.total_spend
+           ELSE NULL
+         END AS "totalSpend",
+         CASE
+           WHEN COALESCE(payment_totals_by_customer.payments_count, 0) = 0
+             THEN payment_totals_by_email.total_spend_currency
+           WHEN COALESCE(payment_totals_by_email.payments_count, 0) = 0
+             THEN payment_totals_by_customer.total_spend_currency
+           WHEN payment_totals_by_customer.total_spend IS NOT NULL
+             AND payment_totals_by_email.total_spend IS NOT NULL
+             AND payment_totals_by_customer.total_spend_currency = payment_totals_by_email.total_spend_currency
+             THEN payment_totals_by_customer.total_spend_currency
+           ELSE NULL
+         END AS "totalSpendCurrency"
        FROM payments.customers AS customers
        LEFT JOIN payment_totals_by_customer
          ON payment_totals_by_customer.environment = customers.environment
         AND payment_totals_by_customer.stripe_customer_id = customers.stripe_customer_id
+       LEFT JOIN unique_customer_emails
+         ON unique_customer_emails.environment = customers.environment
+        AND unique_customer_emails.stripe_customer_id = customers.stripe_customer_id
        LEFT JOIN payment_totals_by_email
-         ON payment_totals_by_email.environment = customers.environment
-        AND payment_totals_by_email.customer_email = LOWER(customers.email)
+         ON payment_totals_by_email.environment = unique_customer_emails.environment
+        AND payment_totals_by_email.customer_email = unique_customer_emails.customer_email
        WHERE customers.environment = $1
        ORDER BY customers.deleted ASC, COALESCE(customers.email, customers.name, customers.stripe_customer_id), customers.stripe_customer_id
        LIMIT $2`,
@@ -224,48 +268,6 @@ export class PaymentCustomerService {
     return true;
   }
 
-  async enrichCustomersWithProvider(
-    customers: PaymentCustomerListItem[],
-    provider: StripeProvider
-  ): Promise<PaymentCustomerListItem[]> {
-    return Promise.all(
-      customers.map(async (customer) => {
-        if (
-          customer.deleted ||
-          (customer.paymentMethodBrand && customer.paymentMethodLast4 && customer.countryCode)
-        ) {
-          return customer;
-        }
-
-        const paymentMethods = await provider.listCustomerCardPaymentMethods(
-          customer.stripeCustomerId,
-          1
-        );
-        const primaryPaymentMethod = paymentMethods[0] ?? null;
-        const card = this.readRecord(primaryPaymentMethod?.card);
-        const countryCode =
-          customer.countryCode ??
-          this.normalizeCountryCode(
-            this.readString(
-              this.readRecord(this.readRecord(primaryPaymentMethod?.billing_details)?.address)
-                ?.country
-            )
-          );
-
-        return {
-          ...customer,
-          paymentMethodBrand:
-            customer.paymentMethodBrand ??
-            this.readString(card?.brand)?.trim().toLowerCase() ??
-            null,
-          paymentMethodLast4:
-            customer.paymentMethodLast4 ?? this.readString(card?.last4)?.trim() ?? null,
-          countryCode,
-        };
-      })
-    );
-  }
-
   private async upsertCustomerRecord(
     client: PoolClient,
     environment: StripeEnvironment,
@@ -317,7 +319,7 @@ export class PaymentCustomerService {
       phone = CASE WHEN $11 THEN payments.customers.phone ELSE EXCLUDED.phone END,
       deleted = EXCLUDED.deleted,
       metadata = CASE WHEN $11 THEN payments.customers.metadata ELSE EXCLUDED.metadata END,
-      raw = EXCLUDED.raw,
+      raw = CASE WHEN $11 THEN payments.customers.raw ELSE EXCLUDED.raw END,
       stripe_created_at = CASE
         WHEN $11 THEN COALESCE(payments.customers.stripe_created_at, EXCLUDED.stripe_created_at)
         ELSE EXCLUDED.stripe_created_at

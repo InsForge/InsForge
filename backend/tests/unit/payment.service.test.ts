@@ -1041,6 +1041,68 @@ describe('PaymentService', () => {
     );
   });
 
+  it('continues syncing subscriptions when customer mirroring fails', async () => {
+    const mockLockClient = {
+      query: vi.fn().mockResolvedValue({ rows: [] }),
+      release: vi.fn(),
+    };
+    const mockCatalogClient = {
+      query: vi.fn().mockResolvedValue({ rows: [] }),
+      release: vi.fn(),
+    };
+    const mockSubscriptionsClient = {
+      query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+      release: vi.fn(),
+    };
+    const connectedRow = {
+      environment: 'test',
+      status: 'connected',
+      stripeAccountId: 'acct_123',
+      stripeAccountEmail: 'owner@example.com',
+      accountLivemode: false,
+      webhookEndpointId: 'we_123',
+      webhookEndpointUrl: 'https://example.com/api/webhooks/stripe/test',
+      webhookConfiguredAt: new Date('2026-04-27T00:00:00.000Z'),
+      lastSyncedAt: new Date('2026-04-27T00:00:00.000Z'),
+      lastSyncStatus: 'succeeded',
+      lastSyncError: null,
+      lastSyncCounts: { products: 1, prices: 1 },
+    };
+
+    mockPool.connect
+      .mockResolvedValueOnce(mockLockClient)
+      .mockResolvedValueOnce(mockCatalogClient)
+      .mockResolvedValueOnce(mockSubscriptionsClient);
+    mockPool.query
+      .mockResolvedValueOnce({
+        rows: [{ stripeAccountId: 'acct_123' }],
+      })
+      .mockResolvedValueOnce({ rows: [connectedRow] })
+      .mockResolvedValueOnce({ rows: [connectedRow] });
+    mockProvider.listCustomers.mockRejectedValueOnce(new Error('customer sync failed'));
+
+    await expect(
+      PaymentService.getInstance().syncPayments({ environment: 'test' })
+    ).resolves.toMatchObject({
+      results: [
+        {
+          environment: 'test',
+          connection: { status: 'connected', stripeAccountId: 'acct_123' },
+          subscriptions: { environment: 'test', synced: 0, unmapped: 0, deleted: 0 },
+        },
+      ],
+    });
+
+    expect(mockProvider.listSubscriptions).toHaveBeenCalledTimes(1);
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      'Stripe customer mirror sync failed during payments sync',
+      {
+        environment: 'test',
+        error: 'customer sync failed',
+      }
+    );
+  });
+
   it('clears account-scoped payment mirrors when catalog sync resolves to a different account', async () => {
     const mockLockClient = {
       query: vi.fn().mockResolvedValue({ rows: [] }),
@@ -4095,6 +4157,59 @@ describe('PaymentService', () => {
       expect.stringMatching(/FROM payments\.customers/i),
       ['test', 10]
     );
+  });
+
+  it('lists mirrored Stripe customers without live Stripe enrichment', async () => {
+    mockPool.query.mockResolvedValueOnce({
+      rows: [
+        {
+          environment: 'test',
+          stripeCustomerId: 'cus_sparse',
+          email: 'sparse@example.com',
+          name: 'Sparse Customer',
+          phone: null,
+          deleted: false,
+          metadata: {},
+          raw: {},
+          stripeCreatedAt: new Date('2026-05-01T00:00:00.000Z'),
+          syncedAt: new Date('2026-05-02T00:00:00.000Z'),
+          paymentsCount: 0,
+          lastPaymentAt: null,
+          totalSpend: null,
+          totalSpendCurrency: null,
+        },
+      ],
+    });
+
+    await expect(
+      PaymentService.getInstance().listCustomers({
+        environment: 'test',
+        limit: 10,
+      })
+    ).resolves.toEqual({
+      customers: [
+        {
+          environment: 'test',
+          stripeCustomerId: 'cus_sparse',
+          email: 'sparse@example.com',
+          name: 'Sparse Customer',
+          phone: null,
+          deleted: false,
+          metadata: {},
+          stripeCreatedAt: '2026-05-01T00:00:00.000Z',
+          syncedAt: '2026-05-02T00:00:00.000Z',
+          paymentsCount: 0,
+          lastPaymentAt: null,
+          totalSpend: null,
+          totalSpendCurrency: null,
+          paymentMethodBrand: null,
+          paymentMethodLast4: null,
+          countryCode: null,
+        },
+      ],
+    });
+
+    expect(mockGetSecretByKey).not.toHaveBeenCalled();
   });
 
   it('lists subscriptions with their subscription items', async () => {

@@ -230,29 +230,7 @@ export class PaymentService {
   }
 
   async listCustomers(input: ListPaymentCustomersRequest): Promise<ListPaymentCustomersResponse> {
-    const customersResponse = await this.customerService.listCustomers(input);
-
-    if (
-      customersResponse.customers.every(
-        (customer) =>
-          customer.deleted ||
-          (customer.paymentMethodBrand && customer.paymentMethodLast4 && customer.countryCode)
-      )
-    ) {
-      return customersResponse;
-    }
-
-    try {
-      const provider = await this.configService.createStripeProvider(input.environment);
-      return {
-        customers: await this.customerService.enrichCustomersWithProvider(
-          customersResponse.customers,
-          provider
-        ),
-      };
-    } catch {
-      return customersResponse;
-    }
+    return this.customerService.listCustomers(input);
   }
 
   async listProducts(input: ListPaymentProductsRequest): Promise<ListPaymentProductsResponse> {
@@ -609,7 +587,15 @@ export class PaymentService {
         return { environment, connection, subscriptions: null };
       }
 
-      await this.syncCustomersWithProviderUnlocked(environment, provider);
+      try {
+        await this.syncCustomersWithProviderUnlocked(environment, provider);
+      } catch (error) {
+        logger.warn('Stripe customer mirror sync failed during payments sync', {
+          environment,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
       const subscriptions = await this.syncSubscriptionsWithProviderUnlocked(environment, provider);
       connection = await this.configService.getConnection(environment);
 

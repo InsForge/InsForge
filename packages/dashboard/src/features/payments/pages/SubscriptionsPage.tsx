@@ -261,12 +261,15 @@ function SubscriptionRow({
   onToggle: () => void;
 }) {
   const items = subscription.items ?? [];
+  const detailsId = `subscription-details-${subscription.stripeSubscriptionId}`;
 
   return (
     <div className="overflow-hidden rounded border border-[var(--alpha-8)] bg-card">
       <button
         type="button"
         onClick={onToggle}
+        aria-expanded={expanded}
+        aria-controls={detailsId}
         className="w-full text-left transition-colors hover:bg-alpha-4"
       >
         <div
@@ -319,7 +322,10 @@ function SubscriptionRow({
       </button>
 
       {expanded && (
-        <div className="border-t border-[var(--alpha-8)] pb-3 pl-[30px] pr-3 pt-0">
+        <div
+          id={detailsId}
+          className="border-t border-[var(--alpha-8)] pb-3 pl-[30px] pr-3 pt-0"
+        >
           <div className="bg-[rgb(var(--semantic-1))] px-4 py-4">
             <div className="flex flex-col gap-2">
               <div>

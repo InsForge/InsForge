@@ -327,6 +327,8 @@ paths:
       security:
         - bearerAuth: []
         - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentPath'
       requestBody:
         required: true
         content:
@@ -486,6 +488,8 @@ paths:
       security:
         - bearerAuth: []
         - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentPath'
       requestBody:
         required: true
         content:

@@ -39,8 +39,8 @@ export function usePaymentCatalog(environment: StripeEnvironment) {
   return {
     connections,
     activeConnection,
-    products: catalogData?.products ?? [],
-    prices: catalogData?.prices ?? [],
+    products: hasActiveKey ? (catalogData?.products ?? []) : [],
+    prices: hasActiveKey ? (catalogData?.prices ?? []) : [],
     isLoading: isLoadingStatus || (hasActiveKey && isLoadingCatalog),
     isRefreshing: isFetchingStatus || (hasActiveKey && isFetchingCatalog),
     error: statusError ?? catalogError,
