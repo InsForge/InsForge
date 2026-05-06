@@ -322,10 +322,7 @@ function SubscriptionRow({
       </button>
 
       {expanded && (
-        <div
-          id={detailsId}
-          className="border-t border-[var(--alpha-8)] pb-3 pl-[30px] pr-3 pt-0"
-        >
+        <div id={detailsId} className="border-t border-[var(--alpha-8)] pb-3 pl-[30px] pr-3 pt-0">
           <div className="bg-[rgb(var(--semantic-1))] px-4 py-4">
             <div className="flex flex-col gap-2">
               <div>

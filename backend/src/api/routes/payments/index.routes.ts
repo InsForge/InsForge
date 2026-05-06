@@ -17,6 +17,7 @@ import {
 } from '@insforge/shared-schemas';
 
 const router = Router();
+const environmentRouter = Router({ mergeParams: true });
 const paymentService = PaymentService.getInstance();
 
 function formatValidationIssues(error: {
@@ -50,8 +51,35 @@ function getEnvironment(params: unknown) {
   return validation.data.environment;
 }
 
-router.post(
-  '/:environment/checkout-sessions',
+router.get('/status', verifyAdmin, async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const status = await paymentService.getStatus();
+    successResponse(res, status);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/config', verifyAdmin, async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const config = await paymentService.getConfig();
+    successResponse(res, config);
+  } catch (error) {
+    next(normalizeStripeConfigError(error));
+  }
+});
+
+router.post('/sync', verifyAdmin, async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const result = await paymentService.syncPayments({ environment: 'all' });
+    successResponse(res, result);
+  } catch (error) {
+    next(normalizeStripeConfigError(error));
+  }
+});
+
+environmentRouter.post(
+  '/checkout-sessions',
   verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
@@ -83,8 +111,8 @@ router.post(
   }
 );
 
-router.post(
-  '/:environment/customer-portal-sessions',
+environmentRouter.post(
+  '/customer-portal-sessions',
   verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
@@ -116,12 +144,12 @@ router.post(
   }
 );
 
-router.use(verifyAdmin);
-router.use(configRouter);
-router.use('/:environment/catalog', catalogRouter);
+environmentRouter.use(verifyAdmin);
+environmentRouter.use(configRouter);
+environmentRouter.use('/catalog', catalogRouter);
 
-router.get(
-  '/:environment/payment-history',
+environmentRouter.get(
+  '/payment-history',
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const environment = getEnvironment(req.params);
@@ -141,8 +169,8 @@ router.get(
   }
 );
 
-router.get(
-  '/:environment/subscriptions',
+environmentRouter.get(
+  '/subscriptions',
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const environment = getEnvironment(req.params);
@@ -162,25 +190,24 @@ router.get(
   }
 );
 
-router.get(
-  '/:environment/customers',
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const environment = getEnvironment(req.params);
-      const validation = listPaymentCustomersQuerySchema.safeParse(req.query);
-      if (!validation.success) {
-        throw invalidInputFromZod(validation.error);
-      }
-
-      const customers = await paymentService.listCustomers({
-        environment,
-        ...validation.data,
-      });
-      successResponse(res, customers);
-    } catch (error) {
-      next(error);
+environmentRouter.get('/customers', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const environment = getEnvironment(req.params);
+    const validation = listPaymentCustomersQuerySchema.safeParse(req.query);
+    if (!validation.success) {
+      throw invalidInputFromZod(validation.error);
     }
+
+    const customers = await paymentService.listCustomers({
+      environment,
+      ...validation.data,
+    });
+    successResponse(res, customers);
+  } catch (error) {
+    next(error);
   }
-);
+});
+
+router.use('/:environment', environmentRouter);
 
 export { router as paymentsRouter };

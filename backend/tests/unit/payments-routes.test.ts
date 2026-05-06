@@ -34,65 +34,70 @@ describe('payments route schemas', () => {
     'utf-8'
   );
 
-  it('keeps checkout session creation on runtime auth before admin-only payments routes', () => {
-    expect(paymentsRouteSource).toContain('verifyAdmin, verifyUser');
+  it('keeps checkout session creation on runtime auth before environment admin routes', () => {
+    const adminGuardIndex = paymentsRouteSource.indexOf('environmentRouter.use(verifyAdmin)');
+    expect(adminGuardIndex).toBeGreaterThan(-1);
     expect(paymentsRouteSource).toMatch(
-      /router\.post\(\s*'\/:environment\/checkout-sessions'[\s\S]*verifyUser[\s\S]*createCheckoutSessionBodySchema/
+      /environmentRouter\.post\(\s*'\/checkout-sessions'[\s\S]*verifyUser[\s\S]*createCheckoutSessionBodySchema/
     );
-    expect(paymentsRouteSource.indexOf("'/:environment/checkout-sessions'")).toBeLessThan(
-      paymentsRouteSource.indexOf('router.use(verifyAdmin)')
-    );
+    expect(paymentsRouteSource.indexOf("'/checkout-sessions'")).toBeLessThan(adminGuardIndex);
     expect(paymentsRouteSource).toContain('Checkout session creation requires a user token');
   });
 
-  it('keeps customer portal session creation on runtime auth before admin-only payments routes', () => {
+  it('keeps customer portal session creation on runtime auth before environment admin routes', () => {
+    const adminGuardIndex = paymentsRouteSource.indexOf('environmentRouter.use(verifyAdmin)');
+    expect(adminGuardIndex).toBeGreaterThan(-1);
     expect(paymentsRouteSource).toMatch(
-      /router\.post\(\s*'\/:environment\/customer-portal-sessions'[\s\S]*verifyUser[\s\S]*createCustomerPortalSessionBodySchema/
+      /environmentRouter\.post\(\s*'\/customer-portal-sessions'[\s\S]*verifyUser[\s\S]*createCustomerPortalSessionBodySchema/
     );
-    expect(paymentsRouteSource.indexOf("'/:environment/customer-portal-sessions'")).toBeLessThan(
-      paymentsRouteSource.indexOf('router.use(verifyAdmin)')
+    expect(paymentsRouteSource.indexOf("'/customer-portal-sessions'")).toBeLessThan(
+      adminGuardIndex
     );
     expect(paymentsRouteSource).toContain('Customer portal session creation requires a user token');
   });
 
-  it('mounts config and catalog routers behind the admin-only route guard', () => {
-    const adminGuardIndex = paymentsRouteSource.indexOf('router.use(verifyAdmin)');
+  it('keeps global admin config routes explicit and admin-guarded', () => {
+    expect(paymentsRouteSource).toMatch(/router\.get\(\s*'\/status',\s*verifyAdmin/);
+    expect(paymentsRouteSource).toMatch(/router\.get\(\s*'\/config',\s*verifyAdmin/);
+    expect(paymentsRouteSource).toMatch(
+      /router\.post\(\s*'\/sync',\s*verifyAdmin[\s\S]*environment: 'all'/
+    );
+  });
+
+  it('mounts all environment-scoped payments routes under one shared environment router', () => {
+    expect(paymentsRouteSource).toContain(
+      'const environmentRouter = Router({ mergeParams: true });'
+    );
+    expect(paymentsRouteSource).toContain("router.use('/:environment', environmentRouter)");
+  });
+
+  it('keeps environment-scoped config, catalog, and admin reads behind the environment admin guard', () => {
+    const adminGuardIndex = paymentsRouteSource.indexOf('environmentRouter.use(verifyAdmin)');
     expect(adminGuardIndex).toBeGreaterThan(-1);
-    expect(paymentsRouteSource.indexOf('router.use(configRouter)')).toBeGreaterThan(
+    expect(paymentsRouteSource.indexOf('environmentRouter.use(configRouter)')).toBeGreaterThan(
       adminGuardIndex
     );
     expect(
-      paymentsRouteSource.indexOf("router.use('/:environment/catalog', catalogRouter)")
+      paymentsRouteSource.indexOf("environmentRouter.use('/catalog', catalogRouter)")
     ).toBeGreaterThan(adminGuardIndex);
-  });
-
-  it('keeps environment-specific admin reads behind the admin-only route guard', () => {
-    const adminGuardIndex = paymentsRouteSource.indexOf('router.use(verifyAdmin)');
-    expect(adminGuardIndex).toBeGreaterThan(-1);
-    expect(paymentsRouteSource.indexOf("'/:environment/payment-history'")).toBeGreaterThan(
-      adminGuardIndex
-    );
-    expect(paymentsRouteSource.indexOf("'/:environment/subscriptions'")).toBeGreaterThan(
-      adminGuardIndex
-    );
-    expect(paymentsRouteSource.indexOf("'/:environment/customers'")).toBeGreaterThan(
-      adminGuardIndex
-    );
+    expect(paymentsRouteSource.indexOf("'/payment-history'")).toBeGreaterThan(adminGuardIndex);
+    expect(paymentsRouteSource.indexOf("'/subscriptions'")).toBeGreaterThan(adminGuardIndex);
+    expect(paymentsRouteSource.indexOf("'/customers'")).toBeGreaterThan(adminGuardIndex);
     expect(paymentsRouteSource).toMatch(
-      /router\.get\(\s*'\/:environment\/customers'[\s\S]*listPaymentCustomersQuerySchema[\s\S]*listCustomers/
+      /environmentRouter\.get\(\s*'\/customers'[\s\S]*listPaymentCustomersQuerySchema[\s\S]*listCustomers/
     );
   });
 
-  it('keeps sync, config, and webhook operations in the config router', () => {
-    expect(configRouteSource).toMatch(/router\.get\(\s*'\/status'/);
-    expect(configRouteSource).toMatch(/router\.get\(\s*'\/config'/);
+  it('keeps environment-scoped config routes in the dedicated config router', () => {
+    expect(configRouteSource).toContain('const router = Router({ mergeParams: true });');
     expect(configRouteSource).toMatch(
-      /router\.put\(\s*'\/:environment\/config'[\s\S]*upsertPaymentsConfigBodySchema/
+      /router\.put\(\s*'\/config'[\s\S]*upsertPaymentsConfigBodySchema/
     );
-    expect(configRouteSource).toMatch(/router\.delete\(\s*'\/:environment\/config'/);
-    expect(configRouteSource).toMatch(/router\.post\(\s*'\/sync'[\s\S]*environment: 'all'/);
-    expect(configRouteSource).toMatch(/router\.post\(\s*'\/:environment\/sync'/);
-    expect(configRouteSource).toMatch(/router\.post\(\s*'\/:environment\/webhook'/);
+    expect(configRouteSource).toMatch(/router\.delete\(\s*'\/config'/);
+    expect(configRouteSource).toMatch(/router\.post\(\s*'\/sync'/);
+    expect(configRouteSource).toMatch(/router\.post\(\s*'\/webhook'/);
+    expect(configRouteSource).not.toMatch(/router\.get\(\s*'\/status'/);
+    expect(configRouteSource).not.toMatch(/router\.get\(\s*'\/config'/);
   });
 
   it('keeps products and prices consolidated in the catalog router', () => {

@@ -225,5 +225,4 @@ describe('PaymentCustomerService', () => {
 
     expect(mockPool.query).not.toHaveBeenCalled();
   });
-
 });

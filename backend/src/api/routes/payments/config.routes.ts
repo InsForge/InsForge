@@ -10,7 +10,7 @@ import {
   upsertPaymentsConfigBodySchema,
 } from '@insforge/shared-schemas';
 
-const router = Router();
+const router = Router({ mergeParams: true });
 const paymentService = PaymentService.getInstance();
 
 function formatValidationIssues(error: {
@@ -38,31 +38,13 @@ function getEnvironment(params: unknown) {
       : params;
   const validation = paymentEnvironmentParamsSchema.safeParse(environment);
   if (!validation.success) {
-    throw new AppError(formatValidationIssues(validation.error), 400, ERROR_CODES.INVALID_INPUT);
+    throw invalidInputFromZod(validation.error);
   }
 
   return validation.data.environment;
 }
 
-router.get('/status', async (_req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const status = await paymentService.getStatus();
-    successResponse(res, status);
-  } catch (error) {
-    next(error);
-  }
-});
-
-router.get('/config', async (_req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const config = await paymentService.getConfig();
-    successResponse(res, config);
-  } catch (error) {
-    next(normalizeStripeConfigError(error));
-  }
-});
-
-router.put('/:environment/config', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.put('/config', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const environment = getEnvironment(req.params);
     const validation = upsertPaymentsConfigBodySchema.safeParse(req.body);
@@ -79,34 +61,22 @@ router.put('/:environment/config', async (req: AuthRequest, res: Response, next:
   }
 });
 
-router.delete(
-  '/:environment/config',
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const environment = getEnvironment(req.params);
-      const removed = await paymentService.removeStripeSecretKey(environment);
-      if (!removed) {
-        throw new AppError('No Stripe key configured', 404, ERROR_CODES.NOT_FOUND);
-      }
-
-      const config = await paymentService.getConfig();
-      successResponse(res, config);
-    } catch (error) {
-      next(normalizeStripeConfigError(error));
-    }
-  }
-);
-
-router.post('/sync', async (_req: AuthRequest, res: Response, next: NextFunction) => {
+router.delete('/config', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const result = await paymentService.syncPayments({ environment: 'all' });
-    successResponse(res, result);
+    const environment = getEnvironment(req.params);
+    const removed = await paymentService.removeStripeSecretKey(environment);
+    if (!removed) {
+      throw new AppError('No Stripe key configured', 404, ERROR_CODES.NOT_FOUND);
+    }
+
+    const config = await paymentService.getConfig();
+    successResponse(res, config);
   } catch (error) {
     next(normalizeStripeConfigError(error));
   }
 });
 
-router.post('/:environment/sync', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/sync', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const environment = getEnvironment(req.params);
     const result = await paymentService.syncPayments({ environment });
@@ -116,17 +86,14 @@ router.post('/:environment/sync', async (req: AuthRequest, res: Response, next: 
   }
 });
 
-router.post(
-  '/:environment/webhook',
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const environment = getEnvironment(req.params);
-      const result = await paymentService.configureWebhook(environment);
-      successResponse(res, result);
-    } catch (error) {
-      next(normalizeStripeConfigError(error));
-    }
+router.post('/webhook', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const environment = getEnvironment(req.params);
+    const result = await paymentService.configureWebhook(environment);
+    successResponse(res, result);
+  } catch (error) {
+    next(normalizeStripeConfigError(error));
   }
-);
+});
 
 export { router as configRouter };
