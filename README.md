@@ -8,7 +8,7 @@
   </a>
 
   <p>
-    The backend built for agentic development.<br />
+    The backend platform for AI-native developers.<br />
   </p>
 
   <p>
