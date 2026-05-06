@@ -230,7 +230,29 @@ export class PaymentService {
   }
 
   async listCustomers(input: ListPaymentCustomersRequest): Promise<ListPaymentCustomersResponse> {
-    return this.customerService.listCustomers(input);
+    const customersResponse = await this.customerService.listCustomers(input);
+
+    if (
+      customersResponse.customers.every(
+        (customer) =>
+          customer.deleted ||
+          (customer.paymentMethodBrand && customer.paymentMethodLast4 && customer.countryCode)
+      )
+    ) {
+      return customersResponse;
+    }
+
+    try {
+      const provider = await this.configService.createStripeProvider(input.environment);
+      return {
+        customers: await this.customerService.enrichCustomersWithProvider(
+          customersResponse.customers,
+          provider
+        ),
+      };
+    } catch {
+      return customersResponse;
+    }
   }
 
   async listProducts(input: ListPaymentProductsRequest): Promise<ListPaymentProductsResponse> {

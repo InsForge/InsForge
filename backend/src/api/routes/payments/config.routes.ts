@@ -19,9 +19,7 @@ function formatValidationIssues(error: {
   return error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join(', ');
 }
 
-function invalidInputFromZod(error: {
-  issues: Array<{ path: PropertyKey[]; message: string }>;
-}) {
+function invalidInputFromZod(error: { issues: Array<{ path: PropertyKey[]; message: string }> }) {
   return new AppError(formatValidationIssues(error), 400, ERROR_CODES.INVALID_INPUT);
 }
 

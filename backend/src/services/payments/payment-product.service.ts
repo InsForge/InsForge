@@ -139,7 +139,7 @@ export class PaymentProductService {
     };
   }
 
-  private async upsertProductMirror(
+  private async upsertProductRecord(
     environment: StripeEnvironment,
     product: StripeProduct
   ): Promise<void> {
@@ -189,7 +189,7 @@ export class PaymentProductService {
     }
   }
 
-  private async deleteProductMirror(
+  private async deleteProductRecord(
     environment: StripeEnvironment,
     stripeProductId: string
   ): Promise<void> {
@@ -232,7 +232,7 @@ export class PaymentProductService {
           : {}),
       });
 
-      await this.upsertProductMirror(environment, product);
+      await this.upsertProductRecord(environment, product);
 
       return {
         product: normalizeStripeProduct(product, environment),
@@ -250,7 +250,7 @@ export class PaymentProductService {
       const provider = await this.configService.createStripeProvider(environment);
       const product = await provider.updateProduct(stripeProductId, productInput);
 
-      await this.upsertProductMirror(environment, product);
+      await this.upsertProductRecord(environment, product);
 
       return {
         product: normalizeStripeProduct(product, environment),
@@ -267,7 +267,7 @@ export class PaymentProductService {
       const deletedProduct = await provider.deleteProduct(stripeProductId);
 
       if (deletedProduct.deleted) {
-        await this.deleteProductMirror(environment, deletedProduct.id);
+        await this.deleteProductRecord(environment, deletedProduct.id);
       }
 
       return {

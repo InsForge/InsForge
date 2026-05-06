@@ -14,6 +14,7 @@ import type {
   StripeInvoice,
   StripeInvoicePayment,
   StripePaymentIntent,
+  StripePaymentMethod,
   StripeCustomerListItem,
   StripePrice,
   StripePriceCreateInput,
@@ -49,6 +50,7 @@ type StripeSubscriptionListParams = Parameters<StripeClient['subscriptions']['li
 type StripeSubscriptionItemListParams = Parameters<StripeClient['subscriptionItems']['list']>[0];
 type StripeWebhookEndpointCreateParams = Parameters<StripeClient['webhookEndpoints']['create']>[0];
 type StripeInvoicePaymentListParams = Parameters<StripeClient['invoicePayments']['list']>[0];
+type StripePaymentMethodListParams = Parameters<StripeClient['paymentMethods']['list']>[0];
 type StripeWebhookEndpointEnabledEvent =
   StripeWebhookEndpointCreateParams['enabled_events'][number];
 type StripeRequestOptions = NonNullable<Parameters<StripeClient['customers']['create']>[1]>;
@@ -138,11 +140,28 @@ export class StripeProvider {
   async listCustomers(): Promise<StripeCustomerListItem[]> {
     const customers: StripeCustomerListItem[] = [];
 
-    for await (const customer of this.client.customers.list({ limit: 100 })) {
+    for await (const customer of this.client.customers.list({
+      limit: 100,
+      expand: ['data.invoice_settings.default_payment_method', 'data.default_source'],
+    })) {
       customers.push(customer);
     }
 
     return customers;
+  }
+
+  async listCustomerCardPaymentMethods(
+    customerId: string,
+    limit = 1
+  ): Promise<StripePaymentMethod[]> {
+    const params: StripePaymentMethodListParams = {
+      customer: customerId,
+      type: 'card',
+      limit,
+    };
+
+    const result = await this.client.paymentMethods.list(params);
+    return result.data;
   }
 
   createCustomerPortalSession(

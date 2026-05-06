@@ -308,7 +308,45 @@ describe('StripeProvider', () => {
       { id: 'cus_456', object: 'customer', email: null, deleted: true },
     ]);
 
-    expect(client.customers.list).toHaveBeenCalledWith({ limit: 100 });
+    expect(client.customers.list).toHaveBeenCalledWith({
+      limit: 100,
+      expand: ['data.invoice_settings.default_payment_method', 'data.default_source'],
+    });
+  });
+
+  it('lists attached card payment methods for a customer', async () => {
+    const client = {
+      accounts: { retrieveCurrent: vi.fn() },
+      products: { list: vi.fn() },
+      prices: { list: vi.fn() },
+      customers: { create: vi.fn() },
+      paymentMethods: {
+        list: vi.fn().mockResolvedValue({
+          data: [
+            {
+              id: 'pm_123',
+              type: 'card',
+              card: { brand: 'visa', last4: '4242' },
+            },
+          ],
+        }),
+      },
+    } as unknown as StripeClient;
+    const provider = new StripeProvider('sk_test_1234567890', 'test', client);
+
+    await expect(provider.listCustomerCardPaymentMethods('cus_123', 1)).resolves.toEqual([
+      {
+        id: 'pm_123',
+        type: 'card',
+        card: { brand: 'visa', last4: '4242' },
+      },
+    ]);
+
+    expect(client.paymentMethods.list).toHaveBeenCalledWith({
+      customer: 'cus_123',
+      type: 'card',
+      limit: 1,
+    });
   });
 
   it('creates customer portal sessions through Stripe billing portal API', async () => {

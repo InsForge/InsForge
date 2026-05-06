@@ -81,9 +81,12 @@ export class PaymentsService {
       searchParams.set('subjectId', input.subjectId);
     }
 
-    return apiClient.request(`/payments/${input.environment}/subscriptions?${searchParams.toString()}`, {
-      headers: apiClient.withAccessToken(),
-    });
+    return apiClient.request(
+      `/payments/${input.environment}/subscriptions?${searchParams.toString()}`,
+      {
+        headers: apiClient.withAccessToken(),
+      }
+    );
   }
 
   async listCustomers(input: ListPaymentCustomersRequest): Promise<ListPaymentCustomersResponse> {
@@ -91,9 +94,12 @@ export class PaymentsService {
       limit: String(input.limit),
     });
 
-    return apiClient.request(`/payments/${input.environment}/customers?${searchParams.toString()}`, {
-      headers: apiClient.withAccessToken(),
-    });
+    return apiClient.request(
+      `/payments/${input.environment}/customers?${searchParams.toString()}`,
+      {
+        headers: apiClient.withAccessToken(),
+      }
+    );
   }
 
   async listPaymentHistory(input: ListPaymentHistoryRequest): Promise<ListPaymentHistoryResponse> {
@@ -106,9 +112,12 @@ export class PaymentsService {
       searchParams.set('subjectId', input.subjectId);
     }
 
-    return apiClient.request(`/payments/${input.environment}/payment-history?${searchParams.toString()}`, {
-      headers: apiClient.withAccessToken(),
-    });
+    return apiClient.request(
+      `/payments/${input.environment}/payment-history?${searchParams.toString()}`,
+      {
+        headers: apiClient.withAccessToken(),
+      }
+    );
   }
 }
 

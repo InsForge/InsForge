@@ -4,12 +4,12 @@ import {
   checkoutModeSchema,
   checkoutSessionSchema,
   customerPortalSessionSchema,
+  paymentCustomerListItemSchema,
   paymentHistorySchema,
   stripeConnectionSchema,
-  stripeCustomerMirrorSchema,
   stripeEnvironmentSchema,
-  stripePriceMirrorSchema,
-  stripeProductMirrorSchema,
+  stripePriceSchema,
+  stripeProductSchema,
   stripeSubscriptionSchema,
   stripeWebhookEventSchema,
 } from './payments.schema.js';
@@ -182,8 +182,8 @@ export const getPaymentsStatusResponseSchema = z.object({
 });
 
 export const listPaymentCatalogResponseSchema = z.object({
-  products: z.array(stripeProductMirrorSchema),
-  prices: z.array(stripePriceMirrorSchema),
+  products: z.array(stripeProductSchema),
+  prices: z.array(stripePriceSchema),
 });
 
 export const listPaymentCustomersQuerySchema = z
@@ -200,36 +200,36 @@ export const listPaymentCustomersRequestSchema = z
   .strict();
 
 export const listPaymentCustomersResponseSchema = z.object({
-  customers: z.array(stripeCustomerMirrorSchema),
+  customers: z.array(paymentCustomerListItemSchema),
 });
 
 export const listPaymentProductsResponseSchema = z.object({
-  products: z.array(stripeProductMirrorSchema),
+  products: z.array(stripeProductSchema),
 });
 
 export const listPaymentPricesResponseSchema = z.object({
-  prices: z.array(stripePriceMirrorSchema),
+  prices: z.array(stripePriceSchema),
 });
 
 export const getPaymentProductResponseSchema = z.object({
-  product: stripeProductMirrorSchema,
-  prices: z.array(stripePriceMirrorSchema),
+  product: stripeProductSchema,
+  prices: z.array(stripePriceSchema),
 });
 
 export const getPaymentPriceResponseSchema = z.object({
-  price: stripePriceMirrorSchema,
+  price: stripePriceSchema,
 });
 
 export const mutatePaymentProductResponseSchema = z.object({
-  product: stripeProductMirrorSchema,
+  product: stripeProductSchema,
 });
 
 export const mutatePaymentPriceResponseSchema = z.object({
-  price: stripePriceMirrorSchema,
+  price: stripePriceSchema,
 });
 
 export const archivePaymentPriceResponseSchema = z.object({
-  price: stripePriceMirrorSchema,
+  price: stripePriceSchema,
   archived: z.boolean(),
 });
 
@@ -439,9 +439,7 @@ export type CreateCheckoutSessionLineItem = z.infer<typeof createCheckoutSession
 export type CreateCheckoutSessionBody = z.infer<typeof createCheckoutSessionBodySchema>;
 export type CreateCheckoutSessionRequest = z.infer<typeof createCheckoutSessionRequestSchema>;
 export type CreateCheckoutSessionResponse = z.infer<typeof createCheckoutSessionResponseSchema>;
-export type CreateCustomerPortalSessionBody = z.infer<
-  typeof createCustomerPortalSessionBodySchema
->;
+export type CreateCustomerPortalSessionBody = z.infer<typeof createCustomerPortalSessionBodySchema>;
 export type CreateCustomerPortalSessionRequest = z.infer<
   typeof createCustomerPortalSessionRequestSchema
 >;

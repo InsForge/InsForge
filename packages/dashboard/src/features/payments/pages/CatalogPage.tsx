@@ -1,24 +1,19 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AlertCircle, ChevronRight, Settings } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
-import { Button, Tab, Tabs } from '@insforge/ui';
-import type {
-  StripeEnvironment,
-  StripePriceMirror,
-  StripeProductMirror,
-} from '@insforge/shared-schemas';
+import type { StripePrice, StripeProduct } from '@insforge/shared-schemas';
 import {
   Alert,
   AlertDescription,
   AlertTitle,
   ErrorState,
   LoadingState,
+  PaginationControls,
   TableHeader,
 } from '#components';
+import { PaymentsKeyMissingState } from '#features/payments/components/PaymentsKeyMissingState';
 import type { PaymentsOutletContext } from '#features/payments/components/PaymentsLayout';
 import { usePaymentCatalog } from '#features/payments/hooks/usePaymentCatalog';
-
-const ENVIRONMENTS: StripeEnvironment[] = ['test', 'live'];
 
 function formatDate(value: string | null) {
   if (!value) {
@@ -50,7 +45,7 @@ function getCurrencyFractionDigits(currency: string) {
   );
 }
 
-export function formatAmount(price: StripePriceMirror) {
+function formatAmount(price: StripePrice) {
   const rawAmount =
     price.unitAmount ?? (price.unitAmountDecimal ? Number(price.unitAmountDecimal) : null);
 
@@ -68,7 +63,7 @@ export function formatAmount(price: StripePriceMirror) {
   }).format(rawAmount / 10 ** fractionDigits);
 }
 
-function formatBilling(price: StripePriceMirror) {
+function formatBilling(price: StripePrice) {
   if (price.type !== 'recurring' || !price.recurringInterval) {
     return 'One time';
   }
@@ -79,158 +74,79 @@ function formatBilling(price: StripePriceMirror) {
     : `Every ${intervalCount} ${price.recurringInterval}s`;
 }
 
+function sortProductPrices(prices: StripePrice[], defaultPriceId: string | null) {
+  return [...prices].sort((left, right) => {
+    const leftIsDefault = left.stripePriceId === defaultPriceId;
+    const rightIsDefault = right.stripePriceId === defaultPriceId;
+
+    if (leftIsDefault !== rightIsDefault) {
+      return leftIsDefault ? -1 : 1;
+    }
+
+    if (left.active !== right.active) {
+      return left.active ? -1 : 1;
+    }
+
+    if (left.lookupKey && right.lookupKey) {
+      return left.lookupKey.localeCompare(right.lookupKey);
+    }
+
+    if (left.lookupKey || right.lookupKey) {
+      return left.lookupKey ? -1 : 1;
+    }
+
+    return left.stripePriceId.localeCompare(right.stripePriceId);
+  });
+}
+
 function StatusBadge({
-  active,
   label,
-  tone = 'default',
+  tone,
 }: {
-  active: boolean;
   label: string;
-  tone?: 'default' | 'primary';
+  tone: 'success' | 'warning' | 'info' | 'neutral';
 }) {
-  const activeClass =
-    tone === 'primary'
-      ? 'bg-primary/20 text-primary ring-primary/30'
-      : 'bg-emerald-50 text-emerald-700 ring-emerald-200';
+  const toneClassName = {
+    success: 'bg-[var(--alpha-8)] text-emerald-400',
+    warning: 'bg-[var(--alpha-8)] text-amber-400',
+    info: 'bg-primary/20 text-primary',
+    neutral: 'bg-[var(--alpha-8)] text-muted-foreground',
+  }[tone];
 
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${
-        active ? activeClass : 'bg-[var(--alpha-3)] text-muted-foreground ring-[var(--alpha-8)]'
-      }`}
+      className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${toneClassName}`}
     >
       {label}
     </span>
   );
 }
 
-function ConfigureStripeKeyEmptyState({
-  environment,
-  onConfigure,
-}: {
-  environment: StripeEnvironment;
-  onConfigure: () => void;
-}) {
-  const keyName = environment === 'test' ? 'STRIPE_TEST_SECRET_KEY' : 'STRIPE_LIVE_SECRET_KEY';
-
+function EmptyCatalogState({ hasSearchQuery }: { hasSearchQuery: boolean }) {
   return (
-    <div className="flex h-full min-h-[320px] items-center justify-center px-6 text-center">
-      <div className="flex max-w-md flex-col items-center gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--alpha-3)] text-muted-foreground">
-          <Settings className="h-5 w-5" />
-        </div>
-        <div className="flex flex-col gap-1">
-          <h2 className="text-sm font-medium text-foreground">
-            Configure your Stripe {environment} key
-          </h2>
-          <p className="text-sm leading-6 text-muted-foreground">
-            Add {keyName} before syncing or managing {environment} products and prices.
-          </p>
-        </div>
-        <Button variant="secondary" onClick={onConfigure} className="mt-1 h-9 rounded px-3">
-          <Settings className="h-4 w-4" />
-          Configure Stripe API keys
-        </Button>
-      </div>
+    <div className="rounded border border-dashed border-[var(--alpha-8)] bg-card p-8 text-center">
+      <p className="text-sm font-medium text-foreground">
+        {hasSearchQuery ? 'No products match your search' : 'No products found'}
+      </p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        {hasSearchQuery
+          ? 'Try a different product name, ID, or default price reference.'
+          : 'Open Payments Settings and sync after creating products in your Stripe dashboard.'}
+      </p>
     </div>
   );
 }
 
-function ProductStatus({ product }: { product: StripeProductMirror }) {
-  return <StatusBadge active={product.active} label={product.active ? 'Active' : 'Inactive'} />;
-}
-
-function ProductTable({
-  products,
-  pricesByProductId,
-  onSelectProduct,
-}: {
-  products: StripeProductMirror[];
-  pricesByProductId: Map<string, StripePriceMirror[]>;
-  onSelectProduct: (product: StripeProductMirror) => void;
-}) {
-  if (products.length === 0) {
-    return (
-      <div className="mx-auto flex w-4/5 max-w-[1024px] flex-col items-center justify-center rounded border border-dashed border-[var(--alpha-8)] bg-card p-8 text-center">
-        <p className="text-sm font-medium text-foreground">No products found</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Open Payments Settings and sync after creating products in your Stripe dashboard.
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="mx-auto flex w-4/5 max-w-[1024px] flex-col gap-1">
-      {products.map((product) => {
-        const productPrices = pricesByProductId.get(product.stripeProductId) ?? [];
-
-        return (
-          <button
-            key={`${product.environment}:${product.stripeProductId}`}
-            type="button"
-            onClick={() => onSelectProduct(product)}
-            className="rounded border border-[var(--alpha-8)] bg-card text-left"
-          >
-            <div className="flex cursor-pointer items-center rounded transition-colors hover:bg-[var(--alpha-8)]">
-              <div className="flex w-[30px] shrink-0 items-center justify-center">
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </div>
-
-              <div className="flex h-12 min-w-0 flex-[1.5] flex-col justify-center px-2.5">
-                <p className="truncate text-sm font-medium leading-[18px] text-foreground">
-                  {product.name}
-                </p>
-                <p className="truncate font-mono text-xs leading-4 text-muted-foreground">
-                  {product.stripeProductId}
-                </p>
-              </div>
-
-              <div className="flex h-12 w-[120px] shrink-0 items-center px-2.5">
-                <ProductStatus product={product} />
-              </div>
-
-              <div className="flex h-12 w-[100px] shrink-0 items-center px-2.5">
-                <span className="text-sm leading-[18px] text-foreground">
-                  {productPrices.length}
-                </span>
-              </div>
-
-              <div className="flex h-12 min-w-0 flex-1 items-center px-2.5">
-                <span
-                  className="block truncate font-mono text-xs leading-[18px] text-muted-foreground"
-                  title={product.defaultPriceId ?? ''}
-                >
-                  {product.defaultPriceId ?? '-'}
-                </span>
-              </div>
-            </div>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function ProductDetailCard({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="rounded border border-[var(--alpha-8)] bg-card p-4">
-      <p className="mb-1 text-sm text-muted-foreground">{label}</p>
-      <div className="text-sm text-foreground">{value}</div>
-    </div>
-  );
-}
-
-function PricesForProductTable({
+function ProductPricesTable({
   product,
   prices,
 }: {
-  product: StripeProductMirror;
-  prices: StripePriceMirror[];
+  product: StripeProduct;
+  prices: StripePrice[];
 }) {
   if (prices.length === 0) {
     return (
-      <div className="rounded border border-dashed border-[var(--alpha-8)] bg-card p-8 text-center">
+      <div className="rounded border border-dashed border-[var(--alpha-8)] bg-card p-6 text-center">
         <p className="text-sm font-medium text-foreground">No prices synced for this product</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Prices attached to this Stripe product will appear after the next sync.
@@ -239,123 +155,173 @@ function PricesForProductTable({
     );
   }
 
+  const sortedPrices = sortProductPrices(prices, product.defaultPriceId);
+
   return (
-    <div className="overflow-hidden rounded border border-[var(--alpha-8)] bg-card">
-      <div className="grid grid-cols-[minmax(180px,1.2fr)_120px_150px_150px] border-b border-[var(--alpha-8)] px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        <div>Price</div>
-        <div>Amount</div>
-        <div>Billing</div>
-        <div>Status</div>
-      </div>
-      {prices.map((price) => {
-        const isDefault = price.stripePriceId === product.defaultPriceId;
-        return (
-          <div
-            key={`${price.environment}:${price.stripePriceId}`}
-            className="grid grid-cols-[minmax(180px,1.2fr)_120px_150px_150px] items-center border-b border-[var(--alpha-6)] px-4 py-3 text-sm last:border-0"
-          >
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <p className="truncate font-mono text-xs text-foreground">{price.stripePriceId}</p>
-                {isDefault && <StatusBadge active label="Default" tone="primary" />}
+    <div className="overflow-x-auto">
+      <div className="min-w-[920px] overflow-hidden rounded border border-[var(--alpha-8)] bg-card">
+        <div className="grid grid-cols-[160px_120px_140px_minmax(220px,1fr)_minmax(180px,1fr)] border-b border-[var(--alpha-8)] bg-alpha-4 px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <div>Amount</div>
+          <div>Status</div>
+          <div>Billing</div>
+          <div>Price ID</div>
+          <div>Lookup Key</div>
+        </div>
+
+        {sortedPrices.map((price) => {
+          const isDefault = price.stripePriceId === product.defaultPriceId;
+
+          return (
+            <div
+              key={`${price.environment}:${price.stripePriceId}`}
+              className="grid grid-cols-[160px_120px_140px_minmax(220px,1fr)_minmax(180px,1fr)] items-center border-b border-[var(--alpha-8)] px-4 py-3 text-sm last:border-0"
+            >
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="truncate text-foreground">{formatAmount(price)}</span>
+                  {isDefault && <StatusBadge label="Default" tone="info" />}
+                </div>
               </div>
-              {price.lookupKey && (
-                <p className="truncate text-xs text-muted-foreground">{price.lookupKey}</p>
-              )}
+
+              <div>
+                <StatusBadge
+                  label={price.active ? 'Active' : 'Inactive'}
+                  tone={price.active ? 'success' : 'warning'}
+                />
+              </div>
+
+              <div className="min-w-0 truncate text-muted-foreground">{formatBilling(price)}</div>
+
+              <div className="min-w-0">
+                <p
+                  className="truncate font-mono text-xs text-foreground"
+                  title={price.stripePriceId}
+                >
+                  {price.stripePriceId}
+                </p>
+              </div>
+
+              <div className="min-w-0">
+                {price.lookupKey ? (
+                  <p className="truncate font-mono text-xs text-foreground" title={price.lookupKey}>
+                    {price.lookupKey}
+                  </p>
+                ) : (
+                  <span className="text-muted-foreground">-</span>
+                )}
+              </div>
             </div>
-            <div className="font-medium text-foreground">{formatAmount(price)}</div>
-            <div className="text-muted-foreground">{formatBilling(price)}</div>
-            <div>
-              <StatusBadge active={price.active} label={price.active ? 'Active' : 'Inactive'} />
-            </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-function ProductDetail({
+function CatalogRow({
   product,
-  prices,
-  onBack,
+  productPrices,
+  defaultPrice,
+  expanded,
+  onToggle,
 }: {
-  product: StripeProductMirror;
-  prices: StripePriceMirror[];
-  onBack: () => void;
+  product: StripeProduct;
+  productPrices: StripePrice[];
+  defaultPrice: StripePrice | null;
+  expanded: boolean;
+  onToggle: () => void;
 }) {
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
-      <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))] px-4">
-        <button
-          type="button"
-          onClick={onBack}
-          className="text-base font-medium leading-7 text-muted-foreground transition-colors hover:text-foreground"
-        >
-          Catalog
-        </button>
-        <ChevronRight className="h-5 w-5 text-muted-foreground" />
-        <p className="truncate text-base font-medium leading-7 text-foreground">{product.name}</p>
-      </div>
+    <div className="overflow-hidden rounded border border-[var(--alpha-8)] bg-card">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full text-left transition-colors hover:bg-alpha-4"
+      >
+        <div className="grid min-h-12 grid-cols-[32px_minmax(240px,1.5fr)_120px_90px_140px_minmax(220px,1fr)] items-center gap-0 px-2 text-sm">
+          <div className="flex items-center justify-center text-muted-foreground">
+            {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </div>
 
-      <div className="min-h-0 flex-1 overflow-auto p-4">
-        <div className="mx-auto flex w-4/5 max-w-[1024px] flex-col gap-4">
-          <div className="grid grid-cols-3 gap-4">
-            <ProductDetailCard label="Status" value={<ProductStatus product={product} />} />
-            <ProductDetailCard label="Prices" value={prices.length} />
-            <ProductDetailCard
-              label="Default price"
-              value={
-                product.defaultPriceId ? (
-                  <span className="font-mono text-xs">{product.defaultPriceId}</span>
-                ) : (
-                  '-'
-                )
-              }
+          <div className="min-w-0 px-2 py-3">
+            <p className="truncate text-foreground">{product.name}</p>
+          </div>
+
+          <div className="px-2 py-3">
+            <StatusBadge
+              label={product.active ? 'Active' : 'Inactive'}
+              tone={product.active ? 'success' : 'warning'}
             />
           </div>
 
-          <div className="rounded border border-[var(--alpha-8)] bg-card p-4">
-            <p className="mb-2 text-sm text-muted-foreground">Product</p>
-            <p className="text-sm font-medium text-foreground">{product.name}</p>
-            <p className="mt-1 font-mono text-xs text-muted-foreground">
-              {product.stripeProductId}
-            </p>
-            {product.description && (
-              <p className="mt-3 text-sm leading-6 text-muted-foreground">{product.description}</p>
+          <div className="px-2 py-3 text-foreground">{productPrices.length}</div>
+
+          <div className="min-w-0 px-2 py-3">
+            {defaultPrice ? (
+              <span className="truncate text-foreground">{formatAmount(defaultPrice)}</span>
+            ) : product.defaultPriceId ? (
+              <span className="truncate font-mono text-xs text-muted-foreground">
+                {product.defaultPriceId}
+              </span>
+            ) : (
+              <span className="text-muted-foreground">-</span>
             )}
           </div>
 
-          <section className="flex flex-col gap-3">
-            <div>
-              <h2 className="text-base font-medium text-foreground">Prices</h2>
-              <p className="text-sm text-muted-foreground">
-                Prices associated with this product. Active prices and the default price are
-                labeled.
-              </p>
-            </div>
-            <PricesForProductTable product={product} prices={prices} />
-          </section>
+          <div className="min-w-0 px-2 py-3">
+            <span
+              className="block truncate font-mono text-xs text-muted-foreground"
+              title={product.stripeProductId}
+            >
+              {product.stripeProductId}
+            </span>
+          </div>
         </div>
-      </div>
+      </button>
+
+      {expanded && (
+        <div className="border-t border-[var(--alpha-8)] px-4 py-4">
+          <div className="flex flex-col gap-4">
+            <section>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Description
+              </p>
+              <p className="mt-2 text-sm leading-6 text-foreground">
+                {product.description?.trim() || 'No description set for this product.'}
+              </p>
+            </section>
+
+            <div className="h-px bg-[var(--alpha-8)]" />
+
+            <section className="flex flex-col gap-2">
+              <div>
+                <h2 className="text-sm font-medium text-foreground">Prices</h2>
+                <p className="text-sm text-muted-foreground">
+                  Active prices, Stripe price IDs, and Stripe lookup keys are shown here.
+                </p>
+              </div>
+              <ProductPricesTable product={product} prices={productPrices} />
+            </section>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 export default function CatalogPage() {
-  const { openPaymentsSettings } = useOutletContext<PaymentsOutletContext>();
-  const [environment, setEnvironment] = useState<StripeEnvironment>('test');
+  const { openPaymentsSettings, environment } = useOutletContext<PaymentsOutletContext>();
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedProduct, setSelectedProduct] = useState<StripeProductMirror | null>(null);
+  const [expandedProductId, setExpandedProductId] = useState<string | null>(null);
   const { activeConnection, products, prices, isLoading, error, refetch } =
     usePaymentCatalog(environment);
 
   useEffect(() => {
-    setSelectedProduct(null);
+    setExpandedProductId(null);
   }, [environment]);
 
   const pricesByProductId = useMemo(() => {
-    const nextPricesByProductId = new Map<string, StripePriceMirror[]>();
+    const nextPricesByProductId = new Map<string, StripePrice[]>();
     for (const price of prices) {
       if (!price.stripeProductId) {
         continue;
@@ -367,6 +333,15 @@ export default function CatalogPage() {
     }
 
     return nextPricesByProductId;
+  }, [prices]);
+
+  const pricesById = useMemo(() => {
+    const nextPricesById = new Map<string, StripePrice>();
+    for (const price of prices) {
+      nextPricesById.set(price.stripePriceId, price);
+    }
+
+    return nextPricesById;
   }, [prices]);
 
   const filteredProducts = useMemo(() => {
@@ -382,20 +357,18 @@ export default function CatalogPage() {
     );
   }, [products, searchQuery]);
 
-  const selectedProductPrices = selectedProduct
-    ? (pricesByProductId.get(selectedProduct.stripeProductId) ?? [])
-    : [];
-  const hasActiveKey = !!activeConnection?.maskedKey;
+  useEffect(() => {
+    if (
+      expandedProductId &&
+      !filteredProducts.some((product) => product.stripeProductId === expandedProductId)
+    ) {
+      setExpandedProductId(null);
+    }
+  }, [expandedProductId, filteredProducts]);
 
-  if (selectedProduct) {
-    return (
-      <ProductDetail
-        product={selectedProduct}
-        prices={selectedProductPrices}
-        onBack={() => setSelectedProduct(null)}
-      />
-    );
-  }
+  const handlePageChange = useCallback((_page: number) => {}, []);
+
+  const hasActiveKey = !!activeConnection?.maskedKey;
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
@@ -405,77 +378,97 @@ export default function CatalogPage() {
         leftClassName="py-0"
         rightClassName="py-0"
         showDividerAfterTitle
-        titleButtons={
-          <Tabs
-            value={environment}
-            onValueChange={(value) => setEnvironment(value as StripeEnvironment)}
-            className="h-8"
-          >
-            {ENVIRONMENTS.map((item) => (
-              <Tab key={item} value={item} className="h-8 py-0">
-                {item === 'test' ? 'Test' : 'Live'}
-              </Tab>
-            ))}
-          </Tabs>
-        }
-        rightActions={
+        leftSlot={
           hasActiveKey ? (
             <span className="text-xs text-muted-foreground">
               Last synced: {formatLastSynced(activeConnection?.lastSyncedAt ?? null)}
             </span>
           ) : null
         }
+        rightActions={null}
         showSearch={hasActiveKey}
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}
         searchDebounceTime={300}
-        searchPlaceholder="Search catalog"
+        searchPlaceholder="Search product"
+        searchInputClassName="w-[280px]"
       />
 
       <div className="relative min-h-0 flex-1 overflow-y-auto">
         {error ? (
           <ErrorState error={error as Error} onRetry={() => void refetch()} />
         ) : isLoading ? (
-          <LoadingState message="Loading Stripe products..." />
+          <LoadingState message="Loading Stripe catalog..." />
         ) : !hasActiveKey ? (
-          <ConfigureStripeKeyEmptyState
+          <PaymentsKeyMissingState
             environment={environment}
+            resourceLabel="catalog"
             onConfigure={openPaymentsSettings}
           />
         ) : (
-          <>
-            <div className="h-10" />
+          <div className="flex h-full flex-col">
+            <div className="min-h-0 flex-1 overflow-auto px-3 py-3">
+              <div className="flex min-w-[960px] flex-col gap-3">
+                {activeConnection?.lastSyncError && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Latest sync failed</AlertTitle>
+                    <AlertDescription className="mt-2">
+                      {activeConnection.lastSyncError}
+                    </AlertDescription>
+                  </Alert>
+                )}
 
-            <div className="sticky top-0 z-10 bg-[rgb(var(--semantic-1))] px-3">
-              <div className="mx-auto w-4/5 max-w-[1024px]">
-                <div className="flex h-8 items-center text-sm text-muted-foreground">
-                  <div className="w-[30px] shrink-0" />
-                  <div className="flex-[1.5] px-2.5 py-1.5">Product</div>
-                  <div className="w-[120px] shrink-0 px-2.5 py-1.5">Status</div>
-                  <div className="w-[100px] shrink-0 px-2.5 py-1.5">Prices</div>
-                  <div className="flex-1 px-2.5 py-1.5">Default Price</div>
+                <div className="grid grid-cols-[32px_minmax(240px,1.5fr)_120px_90px_140px_minmax(220px,1fr)] gap-0 px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <div />
+                  <div className="px-2 py-1.5">Product</div>
+                  <div className="px-2 py-1.5">Status</div>
+                  <div className="px-2 py-1.5">Prices</div>
+                  <div className="px-2 py-1.5">Default Price</div>
+                  <div className="px-2 py-1.5">Product ID</div>
                 </div>
+
+                {filteredProducts.length === 0 ? (
+                  <EmptyCatalogState hasSearchQuery={searchQuery.trim().length > 0} />
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {filteredProducts.map((product) => {
+                      const productPrices = pricesByProductId.get(product.stripeProductId) ?? [];
+                      const defaultPrice = product.defaultPriceId
+                        ? (pricesById.get(product.defaultPriceId) ?? null)
+                        : null;
+
+                      return (
+                        <CatalogRow
+                          key={`${product.environment}:${product.stripeProductId}`}
+                          product={product}
+                          productPrices={productPrices}
+                          defaultPrice={defaultPrice}
+                          expanded={expandedProductId === product.stripeProductId}
+                          onToggle={() =>
+                            setExpandedProductId((current) =>
+                              current === product.stripeProductId ? null : product.stripeProductId
+                            )
+                          }
+                        />
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="flex flex-col gap-4 px-3 pb-4 pt-1">
-              {activeConnection?.lastSyncError && (
-                <Alert variant="destructive" className="mx-auto w-4/5 max-w-[1024px]">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Latest sync failed</AlertTitle>
-                  <AlertDescription className="mt-2">
-                    {activeConnection.lastSyncError}
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              <ProductTable
-                products={filteredProducts}
-                pricesByProductId={pricesByProductId}
-                onSelectProduct={setSelectedProduct}
+            <div className="border-t border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))]">
+              <PaginationControls
+                currentPage={1}
+                totalPages={1}
+                onPageChange={handlePageChange}
+                totalRecords={filteredProducts.length}
+                pageSize={Math.max(filteredProducts.length, 1)}
+                recordLabel="products"
               />
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>

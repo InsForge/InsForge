@@ -282,7 +282,7 @@ paths:
         - $ref: '#/components/parameters/EnvironmentPath'
       responses:
         '200':
-          description: Mirrored products and prices
+          description: Synced Stripe products and prices
           content:
             application/json:
               schema:
@@ -932,7 +932,7 @@ components:
           additionalProperties:
             type: number
 
-    StripeProductMirror:
+    StripeProduct:
       type: object
       required:
         - environment
@@ -966,7 +966,7 @@ components:
           type: string
           format: date-time
 
-    StripePriceMirror:
+    StripePrice:
       type: object
       required:
         - environment
@@ -1045,7 +1045,7 @@ components:
           type: string
           format: date-time
 
-    StripeCustomerMirror:
+    StripeCustomer:
       type: object
       required:
         - environment
@@ -1086,6 +1086,45 @@ components:
         syncedAt:
           type: string
           format: date-time
+
+    PaymentCustomerListItem:
+      allOf:
+        - $ref: '#/components/schemas/StripeCustomer'
+        - type: object
+          required:
+            - paymentsCount
+            - lastPaymentAt
+            - totalSpend
+            - totalSpendCurrency
+            - paymentMethodBrand
+            - paymentMethodLast4
+            - countryCode
+          properties:
+            paymentsCount:
+              type: integer
+              minimum: 0
+            lastPaymentAt:
+              type: string
+              format: date-time
+              nullable: true
+            totalSpend:
+              type: integer
+              minimum: 0
+              nullable: true
+            totalSpendCurrency:
+              type: string
+              nullable: true
+            paymentMethodBrand:
+              type: string
+              nullable: true
+            paymentMethodLast4:
+              type: string
+              nullable: true
+            countryCode:
+              type: string
+              nullable: true
+              minLength: 2
+              maxLength: 2
 
     BillingSubject:
       type: object
@@ -1927,11 +1966,11 @@ components:
         products:
           type: array
           items:
-            $ref: '#/components/schemas/StripeProductMirror'
+            $ref: '#/components/schemas/StripeProduct'
         prices:
           type: array
           items:
-            $ref: '#/components/schemas/StripePriceMirror'
+            $ref: '#/components/schemas/StripePrice'
 
     ListPaymentProductsResponse:
       type: object
@@ -1941,7 +1980,7 @@ components:
         products:
           type: array
           items:
-            $ref: '#/components/schemas/StripeProductMirror'
+            $ref: '#/components/schemas/StripeProduct'
 
     ListPaymentPricesResponse:
       type: object
@@ -1951,7 +1990,7 @@ components:
         prices:
           type: array
           items:
-            $ref: '#/components/schemas/StripePriceMirror'
+            $ref: '#/components/schemas/StripePrice'
 
     GetPaymentProductResponse:
       type: object
@@ -1960,11 +1999,11 @@ components:
         - prices
       properties:
         product:
-          $ref: '#/components/schemas/StripeProductMirror'
+          $ref: '#/components/schemas/StripeProduct'
         prices:
           type: array
           items:
-            $ref: '#/components/schemas/StripePriceMirror'
+            $ref: '#/components/schemas/StripePrice'
 
     MutatePaymentProductResponse:
       type: object
@@ -1972,7 +2011,7 @@ components:
         - product
       properties:
         product:
-          $ref: '#/components/schemas/StripeProductMirror'
+          $ref: '#/components/schemas/StripeProduct'
 
     DeletePaymentProductResponse:
       type: object
@@ -1992,7 +2031,7 @@ components:
         - price
       properties:
         price:
-          $ref: '#/components/schemas/StripePriceMirror'
+          $ref: '#/components/schemas/StripePrice'
 
     MutatePaymentPriceResponse:
       type: object
@@ -2000,7 +2039,7 @@ components:
         - price
       properties:
         price:
-          $ref: '#/components/schemas/StripePriceMirror'
+          $ref: '#/components/schemas/StripePrice'
 
     ArchivePaymentPriceResponse:
       type: object
@@ -2009,7 +2048,7 @@ components:
         - archived
       properties:
         price:
-          $ref: '#/components/schemas/StripePriceMirror'
+          $ref: '#/components/schemas/StripePrice'
         archived:
           type: boolean
 
@@ -2031,7 +2070,7 @@ components:
         customers:
           type: array
           items:
-            $ref: '#/components/schemas/StripeCustomerMirror'
+            $ref: '#/components/schemas/PaymentCustomerListItem'
 
     ListPaymentHistoryResponse:
       type: object

@@ -58,8 +58,12 @@ describe('payments route schemas', () => {
   it('mounts config and catalog routers behind the admin-only route guard', () => {
     const adminGuardIndex = paymentsRouteSource.indexOf('router.use(verifyAdmin)');
     expect(adminGuardIndex).toBeGreaterThan(-1);
-    expect(paymentsRouteSource.indexOf('router.use(configRouter)')).toBeGreaterThan(adminGuardIndex);
-    expect(paymentsRouteSource.indexOf("router.use('/:environment/catalog', catalogRouter)")).toBeGreaterThan(adminGuardIndex);
+    expect(paymentsRouteSource.indexOf('router.use(configRouter)')).toBeGreaterThan(
+      adminGuardIndex
+    );
+    expect(
+      paymentsRouteSource.indexOf("router.use('/:environment/catalog', catalogRouter)")
+    ).toBeGreaterThan(adminGuardIndex);
   });
 
   it('keeps environment-specific admin reads behind the admin-only route guard', () => {
@@ -86,9 +90,7 @@ describe('payments route schemas', () => {
       /router\.put\(\s*'\/:environment\/config'[\s\S]*upsertPaymentsConfigBodySchema/
     );
     expect(configRouteSource).toMatch(/router\.delete\(\s*'\/:environment\/config'/);
-    expect(configRouteSource).toMatch(
-      /router\.post\(\s*'\/sync'[\s\S]*environment: 'all'/
-    );
+    expect(configRouteSource).toMatch(/router\.post\(\s*'\/sync'[\s\S]*environment: 'all'/);
     expect(configRouteSource).toMatch(/router\.post\(\s*'\/:environment\/sync'/);
     expect(configRouteSource).toMatch(/router\.post\(\s*'\/:environment\/webhook'/);
   });
@@ -157,7 +159,9 @@ describe('payments route schemas', () => {
       idempotencyKey: 'agent-product-123',
     });
 
-    expect(() => createPaymentProductBodySchema.parse({ name: 'Pro', environment: 'test' })).toThrow();
+    expect(() =>
+      createPaymentProductBodySchema.parse({ name: 'Pro', environment: 'test' })
+    ).toThrow();
     expect(() =>
       createPaymentProductBodySchema.parse({
         name: 'Pro',

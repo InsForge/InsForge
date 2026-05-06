@@ -8,8 +8,8 @@ import type {
 } from '@/types/payments.js';
 import type {
   BillingSubject,
-  StripePriceMirror,
-  StripeProductMirror,
+  StripePrice as SharedStripePrice,
+  StripeProduct as SharedStripeProduct,
 } from '@insforge/shared-schemas';
 
 export type StripeIdempotencyOperation = 'checkout_session' | 'customer' | 'product' | 'price';
@@ -90,7 +90,7 @@ export function buildStripeIdempotencyKey(
   return `insforge:${environment}:${operation}:${callerKey}`;
 }
 
-export function normalizeProductRow(row: StripeProductRow): StripeProductMirror {
+export function normalizeProductRow(row: StripeProductRow): SharedStripeProduct {
   return {
     ...row,
     syncedAt: toISOString(row.syncedAt),
@@ -100,7 +100,7 @@ export function normalizeProductRow(row: StripeProductRow): StripeProductMirror 
 export function normalizeStripeProduct(
   product: StripeProduct,
   environment: StripeEnvironment
-): StripeProductMirror {
+): SharedStripeProduct {
   return {
     environment,
     stripeProductId: product.id,
@@ -113,7 +113,7 @@ export function normalizeStripeProduct(
   };
 }
 
-export function normalizePriceRow(row: StripePriceRow): StripePriceMirror {
+export function normalizePriceRow(row: StripePriceRow): SharedStripePrice {
   return {
     ...row,
     unitAmount: row.unitAmount === null ? null : Number(row.unitAmount),
@@ -125,7 +125,7 @@ export function normalizePriceRow(row: StripePriceRow): StripePriceMirror {
 export function normalizeStripePrice(
   price: StripePrice,
   environment: StripeEnvironment
-): StripePriceMirror {
+): SharedStripePrice {
   return {
     environment,
     stripePriceId: price.id,

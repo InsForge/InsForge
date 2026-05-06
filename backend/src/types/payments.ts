@@ -32,6 +32,9 @@ export type StripeSubscriptionItem = AsyncIterableItem<
 export type StripePaymentIntent = StripeResourceData<
   Awaited<ReturnType<Stripe['paymentIntents']['retrieve']>>
 >;
+export type StripePaymentMethod = Awaited<
+  ReturnType<Stripe['paymentMethods']['list']>
+>['data'][number];
 export type StripeCharge = StripeResourceData<Awaited<ReturnType<Stripe['charges']['retrieve']>>>;
 export type StripeInvoice = StripeResourceData<Awaited<ReturnType<Stripe['invoices']['retrieve']>>>;
 export type StripeInvoicePayment = AsyncIterableItem<ReturnType<Stripe['invoicePayments']['list']>>;
@@ -49,6 +52,7 @@ export type StripeClient = Pick<
   | 'subscriptions'
   | 'subscriptionItems'
   | 'paymentIntents'
+  | 'paymentMethods'
   | 'charges'
   | 'invoicePayments'
 >;
@@ -196,6 +200,14 @@ export interface StripeCustomerRow {
   metadata: Record<string, string>;
   stripeCreatedAt: Date | string | null;
   syncedAt: Date | string;
+}
+
+export interface PaymentCustomerListRow extends StripeCustomerRow {
+  raw: unknown;
+  paymentsCount: number;
+  lastPaymentAt: Date | string | null;
+  totalSpend: number | string | null;
+  totalSpendCurrency: string | null;
 }
 
 export type CheckoutSessionStatus = 'initialized' | 'open' | 'completed' | 'expired' | 'failed';

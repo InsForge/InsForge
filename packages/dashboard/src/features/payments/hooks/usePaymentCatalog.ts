@@ -9,20 +9,10 @@ export function usePaymentCatalog(environment: StripeEnvironment) {
     isLoading: isLoadingStatus,
     error: statusError,
     refetch: refetchStatus,
+    isFetching: isFetchingStatus,
   } = useQuery({
     queryKey: ['payments', 'status'],
     queryFn: () => paymentsService.getStatus(),
-    staleTime: 30 * 1000,
-  });
-
-  const {
-    data: catalogData,
-    isLoading: isLoadingCatalog,
-    error: catalogError,
-    refetch: refetchCatalog,
-  } = useQuery({
-    queryKey: ['payments', 'catalog', environment],
-    queryFn: () => paymentsService.listCatalog(environment),
     staleTime: 30 * 1000,
   });
 
@@ -31,14 +21,29 @@ export function usePaymentCatalog(environment: StripeEnvironment) {
     () => connections.find((connection) => connection.environment === environment) ?? null,
     [connections, environment]
   );
+  const hasActiveKey = !!activeConnection?.maskedKey;
+
+  const {
+    data: catalogData,
+    isLoading: isLoadingCatalog,
+    error: catalogError,
+    refetch: refetchCatalog,
+    isFetching: isFetchingCatalog,
+  } = useQuery({
+    queryKey: ['payments', 'catalog', environment],
+    queryFn: () => paymentsService.listCatalog(environment),
+    enabled: hasActiveKey,
+    staleTime: 30 * 1000,
+  });
 
   return {
     connections,
     activeConnection,
     products: catalogData?.products ?? [],
     prices: catalogData?.prices ?? [],
-    isLoading: isLoadingStatus || isLoadingCatalog,
+    isLoading: isLoadingStatus || (hasActiveKey && isLoadingCatalog),
+    isRefreshing: isFetchingStatus || (hasActiveKey && isFetchingCatalog),
     error: statusError ?? catalogError,
-    refetch: () => Promise.all([refetchStatus(), refetchCatalog()]),
+    refetch: () => Promise.all([refetchStatus(), hasActiveKey ? refetchCatalog() : null]),
   };
 }

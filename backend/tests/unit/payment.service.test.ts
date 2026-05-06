@@ -4042,8 +4042,23 @@ describe('PaymentService', () => {
           phone: '+1 555-0100',
           deleted: false,
           metadata: { segment: 'pro' },
+          raw: {
+            address: { country: 'us' },
+            invoice_settings: {
+              default_payment_method: {
+                card: {
+                  brand: 'visa',
+                  last4: '4242',
+                },
+              },
+            },
+          },
           stripeCreatedAt: new Date('2026-05-01T00:00:00.000Z'),
           syncedAt: new Date('2026-05-02T00:00:00.000Z'),
+          paymentsCount: 3,
+          lastPaymentAt: new Date('2026-05-03T12:30:00.000Z'),
+          totalSpend: 4200,
+          totalSpendCurrency: 'usd',
         },
       ],
     });
@@ -4065,6 +4080,13 @@ describe('PaymentService', () => {
           metadata: { segment: 'pro' },
           stripeCreatedAt: '2026-05-01T00:00:00.000Z',
           syncedAt: '2026-05-02T00:00:00.000Z',
+          paymentsCount: 3,
+          lastPaymentAt: '2026-05-03T12:30:00.000Z',
+          totalSpend: 4200,
+          totalSpendCurrency: 'usd',
+          paymentMethodBrand: 'visa',
+          paymentMethodLast4: '4242',
+          countryCode: 'US',
         },
       ],
     });

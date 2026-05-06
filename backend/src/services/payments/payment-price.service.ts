@@ -126,7 +126,7 @@ export class PaymentPriceService {
     return { price };
   }
 
-  private async upsertPriceMirror(
+  private async upsertPriceRecord(
     environment: StripeEnvironment,
     price: StripePrice
   ): Promise<void> {
@@ -211,7 +211,7 @@ export class PaymentPriceService {
           : {}),
       });
 
-      await this.upsertPriceMirror(environment, price);
+      await this.upsertPriceRecord(environment, price);
 
       return {
         price: normalizeStripePrice(price, environment),
@@ -229,7 +229,7 @@ export class PaymentPriceService {
       const provider = await this.configService.createStripeProvider(environment);
       const price = await provider.updatePrice(stripePriceId, priceInput);
 
-      await this.upsertPriceMirror(environment, price);
+      await this.upsertPriceRecord(environment, price);
 
       return {
         price: normalizeStripePrice(price, environment),
@@ -245,7 +245,7 @@ export class PaymentPriceService {
       const provider = await this.configService.createStripeProvider(environment);
       const price = await provider.updatePrice(stripePriceId, { active: false });
 
-      await this.upsertPriceMirror(environment, price);
+      await this.upsertPriceRecord(environment, price);
 
       return {
         price: normalizeStripePrice(price, environment),

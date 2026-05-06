@@ -46,8 +46,23 @@ describe('PaymentCustomerService', () => {
           phone: '+1 555-0100',
           deleted: false,
           metadata: { segment: 'pro' },
+          raw: {
+            address: { country: 'us' },
+            invoice_settings: {
+              default_payment_method: {
+                card: {
+                  brand: 'visa',
+                  last4: '4242',
+                },
+              },
+            },
+          },
           stripeCreatedAt: new Date('2026-05-01T00:00:00.000Z'),
           syncedAt: new Date('2026-05-02T00:00:00.000Z'),
+          paymentsCount: 3,
+          lastPaymentAt: new Date('2026-05-03T12:30:00.000Z'),
+          totalSpend: 4200,
+          totalSpendCurrency: 'usd',
         },
       ],
     });
@@ -69,6 +84,13 @@ describe('PaymentCustomerService', () => {
           metadata: { segment: 'pro' },
           stripeCreatedAt: '2026-05-01T00:00:00.000Z',
           syncedAt: '2026-05-02T00:00:00.000Z',
+          paymentsCount: 3,
+          lastPaymentAt: '2026-05-03T12:30:00.000Z',
+          totalSpend: 4200,
+          totalSpendCurrency: 'usd',
+          paymentMethodBrand: 'visa',
+          paymentMethodLast4: '4242',
+          countryCode: 'US',
         },
       ],
     });
@@ -174,5 +196,57 @@ describe('PaymentCustomerService', () => {
     ).resolves.toBe(false);
 
     expect(mockPool.query).not.toHaveBeenCalled();
+  });
+
+  it('enriches missing payment method and country fields from Stripe when the mirror is sparse', async () => {
+    const provider = {
+      listCustomerCardPaymentMethods: vi.fn().mockResolvedValue([
+        {
+          card: {
+            brand: 'mastercard',
+            last4: '4444',
+          },
+          billing_details: {
+            address: {
+              country: 'ca',
+            },
+          },
+        },
+      ]),
+    };
+
+    await expect(
+      PaymentCustomerService.getInstance().enrichCustomersWithProvider(
+        [
+          {
+            environment: 'test',
+            stripeCustomerId: 'cus_sparse',
+            email: 'buyer@example.com',
+            name: 'Buyer Example',
+            phone: null,
+            deleted: false,
+            metadata: {},
+            stripeCreatedAt: '2026-05-01T00:00:00.000Z',
+            syncedAt: '2026-05-02T00:00:00.000Z',
+            paymentsCount: 1,
+            lastPaymentAt: '2026-05-03T12:30:00.000Z',
+            totalSpend: 1200,
+            totalSpendCurrency: 'usd',
+            paymentMethodBrand: null,
+            paymentMethodLast4: null,
+            countryCode: null,
+          },
+        ],
+        provider as unknown as StripeProvider
+      )
+    ).resolves.toEqual([
+      expect.objectContaining({
+        paymentMethodBrand: 'mastercard',
+        paymentMethodLast4: '4444',
+        countryCode: 'CA',
+      }),
+    ]);
+
+    expect(provider.listCustomerCardPaymentMethods).toHaveBeenCalledWith('cus_sparse', 1);
   });
 });

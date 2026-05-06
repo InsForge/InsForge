@@ -1,8 +1,13 @@
 import type { Pool, PoolClient } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import type { StripeProvider } from '@/providers/payments/stripe.provider.js';
-import { fromStripeTimestamp, toISOString, toISOStringOrNull } from '@/services/payments/helpers.js';
+import {
+  fromStripeTimestamp,
+  toISOString,
+  toISOStringOrNull,
+} from '@/services/payments/helpers.js';
 import type {
+  PaymentCustomerListRow,
   StripeCustomer,
   StripeCustomerListItem,
   StripeCustomerRow,
@@ -11,7 +16,8 @@ import type {
 import type {
   ListPaymentCustomersRequest,
   ListPaymentCustomersResponse,
-  StripeCustomerMirror,
+  PaymentCustomerListItem,
+  StripeCustomer as SharedStripeCustomer,
 } from '@insforge/shared-schemas';
 
 type StripeCustomerLike =
@@ -49,25 +55,124 @@ export class PaymentCustomerService {
 
   async listCustomers(input: ListPaymentCustomersRequest): Promise<ListPaymentCustomersResponse> {
     const result = await this.getPool().query(
-      `SELECT
-         environment,
-         stripe_customer_id AS "stripeCustomerId",
-         email,
-         name,
-         phone,
-         deleted,
-         metadata,
-         stripe_created_at AS "stripeCreatedAt",
-         synced_at AS "syncedAt"
-       FROM payments.customers
-       WHERE environment = $1
-       ORDER BY deleted ASC, COALESCE(email, name, stripe_customer_id), stripe_customer_id
+      `WITH payment_totals_by_customer AS (
+         SELECT
+           environment,
+           stripe_customer_id,
+           COUNT(*) FILTER (
+             WHERE type <> 'refund'
+               AND status IN ('succeeded', 'refunded', 'partially_refunded')
+           )::INT AS payments_count,
+           MAX(COALESCE(paid_at, stripe_created_at, created_at)) FILTER (
+             WHERE type <> 'refund'
+               AND status IN ('succeeded', 'refunded', 'partially_refunded')
+           ) AS last_payment_at
+           ,
+           CASE
+             WHEN COUNT(DISTINCT currency) FILTER (
+               WHERE type <> 'refund'
+                 AND status IN ('succeeded', 'refunded', 'partially_refunded')
+                 AND currency IS NOT NULL
+             ) = 1
+             THEN SUM(GREATEST(COALESCE(amount, 0) - COALESCE(amount_refunded, 0), 0)) FILTER (
+               WHERE type <> 'refund'
+                 AND status IN ('succeeded', 'refunded', 'partially_refunded')
+             )
+             ELSE NULL
+           END AS total_spend,
+           CASE
+             WHEN COUNT(DISTINCT currency) FILTER (
+               WHERE type <> 'refund'
+                 AND status IN ('succeeded', 'refunded', 'partially_refunded')
+                 AND currency IS NOT NULL
+             ) = 1
+             THEN MIN(currency) FILTER (
+               WHERE type <> 'refund'
+                 AND status IN ('succeeded', 'refunded', 'partially_refunded')
+                 AND currency IS NOT NULL
+             )
+             ELSE NULL
+           END AS total_spend_currency
+         FROM payments.payment_history
+         WHERE environment = $1
+           AND stripe_customer_id IS NOT NULL
+         GROUP BY environment, stripe_customer_id
+       ),
+       payment_totals_by_email AS (
+         SELECT
+           environment,
+           LOWER(customer_email_snapshot) AS customer_email,
+           COUNT(*) FILTER (
+             WHERE type <> 'refund'
+               AND status IN ('succeeded', 'refunded', 'partially_refunded')
+           )::INT AS payments_count,
+           MAX(COALESCE(paid_at, stripe_created_at, created_at)) FILTER (
+             WHERE type <> 'refund'
+               AND status IN ('succeeded', 'refunded', 'partially_refunded')
+           ) AS last_payment_at,
+           CASE
+             WHEN COUNT(DISTINCT currency) FILTER (
+               WHERE type <> 'refund'
+                 AND status IN ('succeeded', 'refunded', 'partially_refunded')
+                 AND currency IS NOT NULL
+             ) = 1
+             THEN SUM(GREATEST(COALESCE(amount, 0) - COALESCE(amount_refunded, 0), 0)) FILTER (
+               WHERE type <> 'refund'
+                 AND status IN ('succeeded', 'refunded', 'partially_refunded')
+             )
+             ELSE NULL
+           END AS total_spend,
+           CASE
+             WHEN COUNT(DISTINCT currency) FILTER (
+               WHERE type <> 'refund'
+                 AND status IN ('succeeded', 'refunded', 'partially_refunded')
+                 AND currency IS NOT NULL
+             ) = 1
+             THEN MIN(currency) FILTER (
+               WHERE type <> 'refund'
+                 AND status IN ('succeeded', 'refunded', 'partially_refunded')
+                 AND currency IS NOT NULL
+             )
+             ELSE NULL
+           END AS total_spend_currency
+         FROM payments.payment_history
+         WHERE environment = $1
+           AND stripe_customer_id IS NULL
+           AND customer_email_snapshot IS NOT NULL
+         GROUP BY environment, LOWER(customer_email_snapshot)
+       )
+       SELECT
+         customers.environment,
+         customers.stripe_customer_id AS "stripeCustomerId",
+         customers.email,
+         customers.name,
+         customers.phone,
+         customers.deleted,
+         customers.metadata,
+         customers.raw,
+         customers.stripe_created_at AS "stripeCreatedAt",
+         customers.synced_at AS "syncedAt",
+         COALESCE(payment_totals_by_customer.payments_count, payment_totals_by_email.payments_count, 0) AS "paymentsCount",
+         COALESCE(payment_totals_by_customer.last_payment_at, payment_totals_by_email.last_payment_at) AS "lastPaymentAt",
+         COALESCE(payment_totals_by_customer.total_spend, payment_totals_by_email.total_spend) AS "totalSpend",
+         COALESCE(payment_totals_by_customer.total_spend_currency, payment_totals_by_email.total_spend_currency) AS "totalSpendCurrency"
+       FROM payments.customers AS customers
+       LEFT JOIN payment_totals_by_customer
+         ON payment_totals_by_customer.environment = customers.environment
+        AND payment_totals_by_customer.stripe_customer_id = customers.stripe_customer_id
+       LEFT JOIN payment_totals_by_email
+         ON payment_totals_by_email.environment = customers.environment
+        AND payment_totals_by_email.customer_email = LOWER(customers.email)
+       WHERE customers.environment = $1
+       ORDER BY customers.deleted ASC, COALESCE(customers.email, customers.name, customers.stripe_customer_id), customers.stripe_customer_id
        LIMIT $2`,
       [input.environment, input.limit]
     );
 
     return {
-      customers: (result.rows as StripeCustomerRow[]).map((row) => this.normalizeCustomerRow(row)),
+      customers: (result.rows as PaymentCustomerListRow[]).map((row) =>
+        this.normalizeCustomerListRow(row)
+      ),
     };
   }
 
@@ -83,7 +188,7 @@ export class PaymentCustomerService {
       await client.query('BEGIN');
 
       for (const customer of customers) {
-        await this.upsertCustomerMirror(client, environment, customer, syncedAt, false);
+        await this.upsertCustomerRecord(client, environment, customer, syncedAt, false);
       }
 
       await this.markMissingCustomersDeleted(
@@ -113,18 +218,55 @@ export class PaymentCustomerService {
 
     await this.getPool().query(
       this.buildUpsertCustomerSql(),
-      this.buildUpsertCustomerParams(
-        environment,
-        customer,
-        new Date(),
-        customer.deleted === true
-      )
+      this.buildUpsertCustomerParams(environment, customer, new Date(), customer.deleted === true)
     );
 
     return true;
   }
 
-  private async upsertCustomerMirror(
+  async enrichCustomersWithProvider(
+    customers: PaymentCustomerListItem[],
+    provider: StripeProvider
+  ): Promise<PaymentCustomerListItem[]> {
+    return Promise.all(
+      customers.map(async (customer) => {
+        if (
+          customer.deleted ||
+          (customer.paymentMethodBrand && customer.paymentMethodLast4 && customer.countryCode)
+        ) {
+          return customer;
+        }
+
+        const paymentMethods = await provider.listCustomerCardPaymentMethods(
+          customer.stripeCustomerId,
+          1
+        );
+        const primaryPaymentMethod = paymentMethods[0] ?? null;
+        const card = this.readRecord(primaryPaymentMethod?.card);
+        const countryCode =
+          customer.countryCode ??
+          this.normalizeCountryCode(
+            this.readString(
+              this.readRecord(this.readRecord(primaryPaymentMethod?.billing_details)?.address)
+                ?.country
+            )
+          );
+
+        return {
+          ...customer,
+          paymentMethodBrand:
+            customer.paymentMethodBrand ??
+            this.readString(card?.brand)?.trim().toLowerCase() ??
+            null,
+          paymentMethodLast4:
+            customer.paymentMethodLast4 ?? this.readString(card?.last4)?.trim() ?? null,
+          countryCode,
+        };
+      })
+    );
+  }
+
+  private async upsertCustomerRecord(
     client: PoolClient,
     environment: StripeEnvironment,
     customer: StripeCustomerLike,
@@ -217,7 +359,7 @@ export class PaymentCustomerService {
     ];
   }
 
-  private normalizeCustomerRow(row: StripeCustomerRow): StripeCustomerMirror {
+  private normalizeCustomerRow(row: StripeCustomerRow): SharedStripeCustomer {
     return {
       environment: row.environment,
       stripeCustomerId: row.stripeCustomerId,
@@ -229,5 +371,78 @@ export class PaymentCustomerService {
       stripeCreatedAt: toISOStringOrNull(row.stripeCreatedAt),
       syncedAt: toISOString(row.syncedAt),
     };
+  }
+
+  private normalizeCustomerListRow(row: PaymentCustomerListRow): PaymentCustomerListItem {
+    const paymentMethod = this.extractDefaultPaymentMethod(row.raw);
+
+    return {
+      ...this.normalizeCustomerRow(row),
+      paymentsCount: row.paymentsCount,
+      lastPaymentAt: toISOStringOrNull(row.lastPaymentAt),
+      totalSpend: row.totalSpend === null ? null : Number(row.totalSpend),
+      totalSpendCurrency: row.totalSpendCurrency ?? null,
+      paymentMethodBrand: paymentMethod.brand,
+      paymentMethodLast4: paymentMethod.last4,
+      countryCode: this.extractCountryCode(row.raw),
+    };
+  }
+
+  private extractCountryCode(raw: unknown): string | null {
+    if (!this.isRecord(raw)) {
+      return null;
+    }
+
+    const country =
+      this.readString(this.readRecord(raw.address)?.country) ??
+      this.readString(this.readRecord(this.readRecord(raw.shipping)?.address)?.country);
+
+    if (!country) {
+      return null;
+    }
+
+    const normalizedCountry = country.trim().toUpperCase();
+    return normalizedCountry.length === 2 ? normalizedCountry : null;
+  }
+
+  private extractDefaultPaymentMethod(raw: unknown): {
+    brand: string | null;
+    last4: string | null;
+  } {
+    if (!this.isRecord(raw)) {
+      return { brand: null, last4: null };
+    }
+
+    const paymentMethodCard = this.readRecord(
+      this.readRecord(this.readRecord(raw.invoice_settings)?.default_payment_method)?.card
+    );
+    const sourceCard = this.readRecord(raw.default_source);
+    const card = paymentMethodCard ?? sourceCard;
+
+    return {
+      brand: this.readString(card?.brand)?.trim().toLowerCase() ?? null,
+      last4: this.readString(card?.last4)?.trim() ?? null,
+    };
+  }
+
+  private readRecord(value: unknown): Record<string, unknown> | null {
+    return this.isRecord(value) ? value : null;
+  }
+
+  private readString(value: unknown): string | null {
+    return typeof value === 'string' && value.length > 0 ? value : null;
+  }
+
+  private normalizeCountryCode(value: string | null): string | null {
+    if (!value) {
+      return null;
+    }
+
+    const normalizedCountry = value.trim().toUpperCase();
+    return normalizedCountry.length === 2 ? normalizedCountry : null;
+  }
+
+  private isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
   }
 }
