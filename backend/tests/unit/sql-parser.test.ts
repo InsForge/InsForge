@@ -272,9 +272,7 @@ describe('checkManagedSchemaWriteOperations', () => {
 
   it('allows RLS changes on documented managed tables', () => {
     expect(
-      checkManagedSchemaWriteOperations(
-        'ALTER TABLE realtime.channels ENABLE ROW LEVEL SECURITY'
-      )
+      checkManagedSchemaWriteOperations('ALTER TABLE realtime.channels ENABLE ROW LEVEL SECURITY')
     ).toBeNull();
     expect(
       checkManagedSchemaWriteOperations(
@@ -283,12 +281,12 @@ describe('checkManagedSchemaWriteOperations', () => {
     ).toBeNull();
     expect(
       checkManagedSchemaWriteOperations(
-        'CREATE POLICY checkout_subject_guard ON payments.checkout_sessions FOR INSERT TO authenticated WITH CHECK (subject_type = \'team\')'
+        "CREATE POLICY checkout_subject_guard ON payments.checkout_sessions FOR INSERT TO authenticated WITH CHECK (subject_type = 'team')"
       )
     ).toBeNull();
     expect(
       checkManagedSchemaWriteOperations(
-        'CREATE POLICY publish_guard ON realtime.messages FOR INSERT TO authenticated WITH CHECK (channel_name LIKE \'chat:%\')'
+        "CREATE POLICY publish_guard ON realtime.messages FOR INSERT TO authenticated WITH CHECK (channel_name LIKE 'chat:%')"
       )
     ).toBeNull();
   });
