@@ -254,6 +254,73 @@ describe('checkManagedSchemaWriteOperations', () => {
     ).not.toBeNull();
   });
 
+  it('allows realtime channel management through raw SQL', () => {
+    expect(
+      checkManagedSchemaWriteOperations(
+        "INSERT INTO realtime.channels (pattern, description, enabled) VALUES ('orders', 'Order events', true)"
+      )
+    ).toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        "UPDATE realtime.channels SET enabled = false WHERE pattern = 'orders'"
+      )
+    ).toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations("DELETE FROM realtime.channels WHERE pattern = 'orders'")
+    ).toBeNull();
+  });
+
+  it('allows RLS changes on documented managed tables', () => {
+    expect(
+      checkManagedSchemaWriteOperations(
+        'ALTER TABLE realtime.channels ENABLE ROW LEVEL SECURITY'
+      )
+    ).toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        'ALTER TABLE payments.checkout_sessions ENABLE ROW LEVEL SECURITY'
+      )
+    ).toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        'CREATE POLICY checkout_subject_guard ON payments.checkout_sessions FOR INSERT TO authenticated WITH CHECK (subject_type = \'team\')'
+      )
+    ).toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        'CREATE POLICY publish_guard ON realtime.messages FOR INSERT TO authenticated WITH CHECK (channel_name LIKE \'chat:%\')'
+      )
+    ).toBeNull();
+  });
+
+  it('allows documented writes on exempted managed tables', () => {
+    expect(
+      checkManagedSchemaWriteOperations(
+        'CREATE TRIGGER fulfill_paid_order AFTER INSERT ON payments.payment_history FOR EACH ROW EXECUTE FUNCTION public.fulfill_paid_order()'
+      )
+    ).toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        'DROP TRIGGER IF EXISTS fulfill_paid_order ON payments.payment_history'
+      )
+    ).toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        'CREATE TRIGGER sync_team_billing_status AFTER INSERT ON payments.subscriptions FOR EACH ROW EXECUTE FUNCTION public.sync_team_billing_status()'
+      )
+    ).toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        "INSERT INTO payments.checkout_sessions (environment, mode, success_url, cancel_url) VALUES ('test', 'payment', 'https://example.com/success', 'https://example.com/cancel')"
+      )
+    ).toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        'ALTER TABLE payments.checkout_sessions ADD COLUMN internal_note TEXT'
+      )
+    ).toBeNull();
+  });
+
   it('allows SELECT on managed schemas', () => {
     expect(checkManagedSchemaWriteOperations('SELECT * FROM auth.users')).toBeNull();
     expect(checkManagedSchemaWriteOperations('SELECT * FROM storage.objects')).toBeNull();
