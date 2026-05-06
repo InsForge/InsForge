@@ -97,10 +97,9 @@
                 ]
               },
               {
-                "group": "Compute (Experimental)",
+                "group": "Compute (Private Preview)",
                 "pages": [
-                  "core-concepts/compute/architecture",
-                  "core-concepts/compute/infrastructure"
+                  "core-concepts/compute/architecture"
                 ]
               }
             ]

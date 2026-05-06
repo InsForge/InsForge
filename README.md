@@ -92,7 +92,7 @@ graph TB
 - **Storage**: S3 compatible file storage
 - **Model Gateway**: OpenAI compatible API across multiple LLM providers
 - **Edge Functions**: Serverless code running on the edge
-- **Compute** (experimental): Long-running container services on Fly.io with public URLs ([docs](https://docs.insforge.dev/core-concepts/compute/architecture))
+- **Compute** (private preview): Long-running container services on Fly.io with public URLs ([docs](https://docs.insforge.dev/core-concepts/compute/architecture))
 - **Site Deployment**: Site build and deployment
 
 
