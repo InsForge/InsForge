@@ -118,6 +118,27 @@ describe('SMTP Config Request Schema', () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it('accepts disabled config with empty connection fields', () => {
+    // Regression: disabling custom SMTP should not require filling in host/username/etc.
+    const result = upsertSmtpConfigRequestSchema.safeParse({
+      enabled: false,
+      host: '',
+      port: 587,
+      username: '',
+      senderEmail: '',
+      senderName: '',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts disabled config with only enabled and port', () => {
+    const result = upsertSmtpConfigRequestSchema.safeParse({
+      enabled: false,
+      port: 587,
+    });
+    expect(result.success).toBe(true);
+  });
 });
 
 describe('Email Template Request Schema', () => {
