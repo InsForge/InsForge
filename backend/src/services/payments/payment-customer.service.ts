@@ -374,13 +374,7 @@ export class PaymentCustomerService {
     customers: StripeCustomerLike[],
     syncedAt: Date
   ): Array<
-    | StripeEnvironment
-    | string
-    | boolean
-    | Record<string, string>
-    | StripeCustomerLike
-    | Date
-    | null
+    StripeEnvironment | string | boolean | Record<string, string> | StripeCustomerLike | Date | null
   > {
     return customers.flatMap((customer) => {
       const params = this.buildUpsertCustomerParams(environment, customer, syncedAt, false);
