@@ -4,9 +4,6 @@ import { applyConfig } from './apply.js';
 // Mock the section appliers so we test orchestration, not real DB writes.
 vi.mock('../auth/settings.js', () => ({
   getAuthSettings: vi.fn().mockResolvedValue({
-    jwtExpiry: 3600,
-    enableSignup: true,
-    siteUrl: 'http://x',
     additionalRedirectUrls: [],
   }),
   setAuthSettings: vi.fn().mockResolvedValue(undefined),
@@ -23,7 +20,7 @@ describe('applyConfig', () => {
     const { upsertBucket } = await import('../storage/buckets.js');
     vi.clearAllMocks();
     const result = await applyConfig({
-      config: { auth: { jwt_expiry: 7200 } },
+      config: { auth: { additional_redirect_urls: ['http://b'] } },
       dry_run: true,
       prune: false,
     });
@@ -37,11 +34,13 @@ describe('applyConfig', () => {
     const { setAuthSettings } = await import('../auth/settings.js');
     vi.clearAllMocks();
     await applyConfig({
-      config: { auth: { jwt_expiry: 7200 } },
+      config: { auth: { additional_redirect_urls: ['http://b'] } },
       dry_run: false,
       prune: false,
     });
-    expect(setAuthSettings).toHaveBeenCalledWith(expect.objectContaining({ jwtExpiry: 7200 }));
+    expect(setAuthSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ additionalRedirectUrls: ['http://b'] }),
+    );
   });
 
   it('does NOT delete orphaned bucket when prune=false', async () => {
@@ -73,9 +72,6 @@ describe('applyConfig', () => {
     const result = await applyConfig({
       config: {
         auth: {
-          jwt_expiry: 3600,
-          enable_signup: true,
-          site_url: 'http://x',
           additional_redirect_urls: [],
         },
         storage: { buckets: { avatars: { public: false } } },

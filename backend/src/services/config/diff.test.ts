@@ -3,10 +3,18 @@ import { diffConfig } from './diff.js';
 
 describe('diffConfig', () => {
   it('detects auth modifications', () => {
-    const live = { auth: { jwt_expiry: 3600, enable_signup: true } };
-    const file = { auth: { jwt_expiry: 7200, enable_signup: true } };
+    const live = { auth: { additional_redirect_urls: ['http://a'] } };
+    const file = { auth: { additional_redirect_urls: ['http://a', 'http://b'] } };
     expect(diffConfig({ live, file })).toEqual({
-      changes: [{ section: 'auth', op: 'modify', key: 'jwt_expiry', from: 3600, to: 7200 }],
+      changes: [
+        {
+          section: 'auth',
+          op: 'modify',
+          key: 'additional_redirect_urls',
+          from: ['http://a'],
+          to: ['http://a', 'http://b'],
+        },
+      ],
       summary: { add: 0, modify: 1, remove: 0, kept: 0 },
     });
   });
@@ -60,7 +68,7 @@ describe('diffConfig', () => {
 
   it('returns no changes for converged state (idempotence sanity)', () => {
     const same = {
-      auth: { jwt_expiry: 3600, enable_signup: true },
+      auth: { additional_redirect_urls: ['http://a'] },
       storage: { buckets: { a: { public: true } } },
     };
     expect(diffConfig({ live: same, file: same })).toEqual({

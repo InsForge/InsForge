@@ -20,15 +20,5 @@ export async function readLiveConfig(): Promise<InsforgeConfig> {
     },
   };
 
-  if (auth.jwtExpiry !== undefined) {
-    out.auth!.jwt_expiry = auth.jwtExpiry;
-  }
-  if (auth.enableSignup !== undefined) {
-    out.auth!.enable_signup = auth.enableSignup;
-  }
-  if (auth.siteUrl !== undefined) {
-    out.auth!.site_url = auth.siteUrl;
-  }
-
   return out;
 }

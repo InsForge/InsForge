@@ -28,9 +28,6 @@ export async function applyConfig(input: ApplyInput): Promise<ApplyResult> {
   const authChanges = plan.changes.filter((c) => c.section === 'auth');
   if (authChanges.length > 0 && file.auth) {
     await setAuthSettings({
-      jwtExpiry: file.auth.jwt_expiry ?? live.auth?.jwt_expiry,
-      enableSignup: file.auth.enable_signup ?? live.auth?.enable_signup,
-      siteUrl: file.auth.site_url ?? live.auth?.site_url,
       additionalRedirectUrls:
         file.auth.additional_redirect_urls ?? live.auth?.additional_redirect_urls ?? [],
     });

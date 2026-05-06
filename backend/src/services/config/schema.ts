@@ -8,9 +8,6 @@ export interface InsforgeConfig {
 }
 
 export interface AuthConfig {
-  jwt_expiry?: number;
-  enable_signup?: boolean;
-  site_url?: string;
   additional_redirect_urls?: string[];
 }
 
@@ -59,28 +56,6 @@ function validateAuth(input: unknown): AuthConfig {
   }
   const obj = input as Record<string, unknown>;
   const out: AuthConfig = {};
-  if ('jwt_expiry' in obj) {
-    if (
-      typeof obj.jwt_expiry !== 'number' ||
-      !Number.isInteger(obj.jwt_expiry) ||
-      obj.jwt_expiry <= 0
-    ) {
-      throw new ConfigValidationError('auth.jwt_expiry', 'must be a positive integer');
-    }
-    out.jwt_expiry = obj.jwt_expiry;
-  }
-  if ('enable_signup' in obj) {
-    if (typeof obj.enable_signup !== 'boolean') {
-      throw new ConfigValidationError('auth.enable_signup', 'must be a boolean');
-    }
-    out.enable_signup = obj.enable_signup;
-  }
-  if ('site_url' in obj) {
-    if (typeof obj.site_url !== 'string') {
-      throw new ConfigValidationError('auth.site_url', 'must be a string');
-    }
-    out.site_url = obj.site_url;
-  }
   if ('additional_redirect_urls' in obj) {
     if (
       !Array.isArray(obj.additional_redirect_urls) ||
