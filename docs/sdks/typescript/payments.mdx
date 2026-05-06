@@ -18,7 +18,7 @@ The Payments SDK exposes runtime-safe methods for generated app frontends:
 - `insforge.payments.createCheckoutSession(...)`
 - `insforge.payments.createCustomerPortalSession(...)`
 
-Stripe secret keys, catalog management, sync, and webhook setup are admin operations. Configure them from the dashboard or CLI before using the SDK.
+Stripe secret keys, catalog management, sync, webhook setup, and payment monitoring in the InsForge dashboard are admin operations. Configure them from the dashboard or CLI before using the SDK.
 
 ```bash
 npx @insforge/cli payments status
@@ -104,6 +104,8 @@ if (data?.checkoutSession.url) {
 ```
 
 For anonymous one-time purchases, omit `subject` and pass `customerEmail` when available.
+
+If one-time checkout includes a `subject` and there is no existing Stripe customer mapping yet, InsForge lets Stripe create the customer during Checkout and backfills the subject mapping from the completion webhook.
 
 ### Subscription Checkout
 
@@ -191,7 +193,7 @@ if (data?.customerPortalSession.url) {
 }
 ```
 
-Customer portal sessions require an authenticated user and an existing Stripe customer mapping for the subject. The mapping is usually created after a Checkout Session completes and Stripe returns a customer.
+Customer portal sessions require an authenticated user and an existing Stripe customer mapping for the subject. The mapping is usually created after a Checkout Session completes and Stripe returns a customer. The synced customer data shown in the Payments dashboard can help you verify what happened, but portal creation relies on `payments.stripe_customer_mappings`.
 
 ## Authorization and RLS
 
@@ -200,7 +202,9 @@ The SDK methods call runtime routes using the current InsForge token. The backen
 - `payments.checkout_sessions` for Checkout attempts
 - `payments.customer_portal_sessions` for Billing Portal attempts
 
-Before exposing subscription checkout or customer portal UI, add app-specific RLS policies for these tables. For example, if subscriptions belong to teams, only team members should be able to create sessions for that team.
+In practice, one-time checkout can support guest or signed-in flows, while customer portal creation requires an authenticated user because it operates on an existing billing subject mapping.
+
+If users can pass shared subjects such as teams or organizations, enable app-specific RLS policies before exposing subscription checkout or customer portal UI. For example, if subscriptions belong to teams, only team members should be able to create sessions for that team.
 
 <Warning>
   Do not let users submit arbitrary `subject.type` and `subject.id` values unless your app has matching RLS policies.
@@ -208,7 +212,9 @@ Before exposing subscription checkout or customer portal UI, add app-specific RL
 
 ## Reading Payment State
 
-The Payments SDK does not expose generic end-user reads for `payments.subscriptions` or `payments.payment_history`. Those tables are admin projections.
+The Payments SDK does not expose generic end-user reads for `payments.customers`, `payments.subscriptions`, or `payments.payment_history`. Those tables are operational records used for dashboard visibility and fulfillment workflows.
+
+Refunds, disputes, and other sensitive financial operations should still be handled in the Stripe Dashboard.
 
 For user-facing billing state, create app-owned tables with RLS and populate them from payment projection triggers:
 
