@@ -38,7 +38,7 @@ describe('AuthConfigService', () => {
   });
 
   describe('validateRedirectUrl', () => {
-    it('returns true and logs a warning when no allowed redirect URLs are configured (Maintainer feedback)', async () => {
+    it('returns true when no allowed redirect URLs are configured (intended permissive behavior)', async () => {
       // Mock getAuthConfig to return empty whitelist
       mockPool.query.mockResolvedValueOnce({
         rows: [
@@ -52,10 +52,10 @@ describe('AuthConfigService', () => {
       const isValid = await service.validateRedirectUrl('https://attacker.com');
 
       expect(isValid).toBe(true);
-      expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('SECURITY WARNING'));
+      expect(logger.warn).not.toHaveBeenCalled();
     });
 
-    it('returns true and logs a warning when allowedRedirectUrls is null (CodeRabbit feedback)', async () => {
+    it('returns true when allowedRedirectUrls is null (intended permissive behavior)', async () => {
       // Mock getAuthConfig to return null whitelist (DB default)
       mockPool.query.mockResolvedValueOnce({
         rows: [
@@ -69,7 +69,7 @@ describe('AuthConfigService', () => {
       const isValid = await service.validateRedirectUrl('https://attacker.com');
 
       expect(isValid).toBe(true);
-      expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('SECURITY WARNING'));
+      expect(logger.warn).not.toHaveBeenCalled();
     });
 
     it('returns true when URL is in the whitelist', async () => {

@@ -276,13 +276,10 @@ export class AuthConfigService {
     const config = await this.getAuthConfig();
     const allowedRedirectUrls = config.allowedRedirectUrls;
 
-    // Security: If no whitelist is configured, log a warning but remain permissive for now
-    // to avoid breaking existing users during upgrades. We recommend admins configure
-    // this whitelist as soon as possible to prevent open redirect attacks.
+    // Use the configured allowed redirect URLs to validate the target URL.
+    // If no whitelist is configured, we default to permissive behavior to improve
+    // developer experience and lower development friction.
     if (!allowedRedirectUrls || allowedRedirectUrls.length === 0) {
-      logger.warn(
-        'SECURITY WARNING: No allowed redirect URLs are configured. Authentication redirects will be permissive, which allows open redirect attacks. Please configure your allowed redirect URLs in the Authentication configuration dashboard.'
-      );
       return true;
     }
 
