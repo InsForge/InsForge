@@ -23,14 +23,16 @@ export function DTestInstallCliSection({ className }: DTestInstallCliSectionProp
         className
       )}
     >
-      <div className="flex items-center justify-between">
-        <h2 className="text-base font-medium leading-7 text-foreground">Use InsForge with CLI</h2>
-        <CopyButton text={command} showText={false} disabled={!canCopy} className="shrink-0" />
-      </div>
+      <h2 className="text-base font-medium leading-7 text-foreground">Use InsForge with CLI</h2>
 
-      <div className="rounded border border-[var(--alpha-8)] bg-semantic-1 px-3 py-2">
-        <pre className="m-0 overflow-x-auto whitespace-nowrap font-mono text-sm leading-6 text-foreground">
-          <span className="select-none text-muted-foreground">$ </span>
+      <div className="flex flex-col gap-2 rounded border border-[var(--alpha-8)] bg-semantic-1 p-3">
+        <div className="flex items-center justify-between">
+          <span className="rounded bg-[var(--alpha-8)] px-2 py-0.5 text-xs font-medium leading-4 text-muted-foreground">
+            Command
+          </span>
+          <CopyButton text={command} showText={false} disabled={!canCopy} className="shrink-0" />
+        </div>
+        <pre className="m-0 whitespace-pre-wrap break-all font-mono text-sm leading-6 text-foreground">
           {command}
         </pre>
       </div>
