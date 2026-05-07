@@ -1,63 +1,41 @@
-import { useState, useEffect, useCallback } from 'react';
-import { toast } from 'sonner';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { scheduleService, type SchedulesConfig } from '#features/functions/services/schedule.service';
+import { useToast } from '#lib/hooks/useToast';
 
-interface SchedulesConfig {
-  retentionDays: number | null;
-}
+const SCHEDULES_CONFIG_QUERY_KEY = ['schedules', 'config'] as const;
 
 export function useSchedulesConfig() {
-  const [config, setConfig] = useState<SchedulesConfig | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+  const queryClient = useQueryClient();
+  const { showToast } = useToast();
 
-  const fetchConfig = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      const response = await fetch('/api/schedules/config', {
-        credentials: 'include',
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch schedules config');
-      }
-      const data = await response.json();
-      setConfig(data);
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error('Unknown error'));
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const {
+    data: config,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: SCHEDULES_CONFIG_QUERY_KEY,
+    queryFn: () => scheduleService.getSchedulesConfig(),
+    staleTime: 2 * 60 * 1000,
+  });
 
-  useEffect(() => {
-    void fetchConfig();
-  }, [fetchConfig]);
-
-  const updateConfig = useCallback(
-    async (updates: Partial<SchedulesConfig>) => {
-      try {
-        setIsUpdating(true);
-        const response = await fetch('/api/schedules/config', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(updates),
-        });
-        if (!response.ok) {
-          throw new Error('Failed to update schedules config');
-        }
-        toast.success('Schedules config updated');
-        await fetchConfig();
-      } catch (err) {
-        toast.error('Failed to update schedules config');
-        throw err;
-      } finally {
-        setIsUpdating(false);
-      }
+  const updateSchedulesConfigMutation = useMutation({
+    mutationFn: (nextConfig: SchedulesConfig) => scheduleService.updateSchedulesConfig(nextConfig),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: SCHEDULES_CONFIG_QUERY_KEY });
+      showToast('Schedules settings saved successfully.', 'success');
     },
-    [fetchConfig]
-  );
+    onError: (mutationError: Error) => {
+      showToast(mutationError.message || 'Failed to save schedules settings.', 'error');
+    },
+  });
 
-  return { config, isLoading, isUpdating, error, updateConfig };
+  return {
+    config,
+    isLoading,
+    isUpdating: updateSchedulesConfigMutation.isPending,
+    error,
+    updateConfig: updateSchedulesConfigMutation.mutateAsync,
+    refetch,
+  };
 }

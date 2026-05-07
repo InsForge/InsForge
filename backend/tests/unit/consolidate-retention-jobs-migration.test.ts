@@ -4,20 +4,25 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
-const migrationFile = '041_job-logs-retention.sql';
+const migrationFile = '041_consolidate-retention-jobs.sql';
 const migrationPath = path.resolve(
   currentDir,
   `../../src/infra/database/migrations/${migrationFile}`
 );
 
-describe('job-logs-retention migration', () => {
+describe('consolidate retention jobs migration', () => {
   const sql = fs.readFileSync(migrationPath, 'utf8');
 
   it('migration file exists', () => {
     expect(fs.existsSync(migrationPath)).toBe(true);
   });
 
-  // ── config table ──────────────────────────────────────────────────
+  it('does not introduce extra system job metadata tables', () => {
+    expect(sql).not.toMatch(/CREATE TABLE IF NOT EXISTS realtime\.system_jobs/i);
+    expect(sql).not.toMatch(/CREATE TABLE IF NOT EXISTS schedules\.system_jobs/i);
+  });
+
+  // ── schedules config table ────────────────────────────────────────
   it('creates a schedules.config table for retention settings', () => {
     expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS schedules\.config/i);
     expect(sql).toMatch(/retention_days/i);
@@ -40,11 +45,17 @@ describe('job-logs-retention migration', () => {
 
   it('deletes in batches to prevent performance impact', () => {
     expect(sql).toMatch(/p_batch_size/i);
+    expect(sql).toMatch(/LOOP/i);
+    expect(sql).toMatch(/DELETE FROM schedules\.job_logs/i);
+    expect(sql).toMatch(/ORDER BY executed_at ASC/i);
+    expect(sql).toMatch(/LIMIT p_batch_size/i);
+    expect(sql).toMatch(/EXIT WHEN v_deleted_count < p_batch_size/i);
   });
 
   // ── idempotency ───────────────────────────────────────────────────
-  it('unschedules any existing cron job before re-scheduling (idempotent)', () => {
+  it('unschedules existing cron jobs before re-scheduling both retention jobs', () => {
     expect(sql).toMatch(/cron\.unschedule/i);
+    expect(sql).toMatch(/realtime-message-retention/i);
     expect(sql).toMatch(/schedules-job-logs-retention/i);
   });
 
@@ -62,9 +73,20 @@ describe('job-logs-retention migration', () => {
   });
 
   // ── schedule configuration ────────────────────────────────────────
-  it('schedules a pg_cron job named schedules-job-logs-retention', () => {
-    expect(sql).toMatch(/cron\.schedule\(/i);
+  it('schedules a named pg_cron job for realtime message retention', () => {
+    expect(sql).toMatch(/PERFORM cron\.schedule\(/i);
+    expect(sql).toMatch(/'realtime-message-retention'/);
+    expect(sql).toMatch(/'SELECT realtime\.cleanup_messages\(\)'/i);
+  });
+
+  it('runs realtime message retention daily at midnight', () => {
+    expect(sql).toMatch(/'0 0 \* \* \*'/);
+  });
+
+  it('schedules a named pg_cron job for schedules job log retention', () => {
+    expect(sql).toMatch(/PERFORM cron\.schedule\(/i);
     expect(sql).toMatch(/'schedules-job-logs-retention'/);
+    expect(sql).toMatch(/'SELECT schedules\.cleanup_job_logs\(\)'/i);
   });
 
   it('runs hourly (every hour at minute 0)', () => {
@@ -76,7 +98,7 @@ describe('job-logs-retention migration', () => {
   });
 
   // ── ordering ─────────────────────────────────────────────────────
-  it('runs after migration 021 (schedules schema)', () => {
+  it('runs after migrations 021 and 024', () => {
     const migrationDir = path.resolve(currentDir, '../../src/infra/database/migrations');
     const migrations = fs
       .readdirSync(migrationDir)
@@ -85,7 +107,10 @@ describe('job-logs-retention migration', () => {
 
     const idx041 = migrations.findIndex((f) => f === migrationFile);
     const idx021 = migrations.findIndex((f) => f === '021_create-schedules-schema.sql');
+    const idx024 = migrations.findIndex((f) => f === '024_add-realtime-message-retention.sql');
     expect(idx021).toBeGreaterThanOrEqual(0);
+    expect(idx024).toBeGreaterThanOrEqual(0);
     expect(idx041).toBeGreaterThan(idx021);
+    expect(idx041).toBeGreaterThan(idx024);
   });
 });

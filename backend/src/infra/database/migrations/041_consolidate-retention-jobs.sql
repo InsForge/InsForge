@@ -1,18 +1,16 @@
--- Migration 041: Add retention policy for schedules.job_logs
+-- Migration 041: Consolidate retention jobs
 --
--- schedules.job_logs grows unbounded — every schedule fire inserts a row and
--- nothing ever deletes them.  A 2-second schedule accumulates ~15.8 M rows
--- (~3.3 GB) per year.  This migration adds a pg_cron job that runs hourly to
--- delete rows older than the configured retention period.
+-- Keep retention settings and cleanup functions in their feature schemas while
+-- normalizing the underlying pg_cron jobs.
 --
--- The retention interval is configurable through the dashboard via schedules.config.
--- Default is 7 days if not configured.
---
--- Dependencies: pg_cron (already enabled in migration 021)
+-- Dependencies:
+--   - migration 021 (pg_cron + schedules schema)
+--   - migration 024 (realtime message retention function/config)
 
 -- ============================================================================
--- CONFIGURATION TABLE
+-- SCHEDULES CONFIGURATION
 -- ============================================================================
+
 CREATE TABLE IF NOT EXISTS schedules.config (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   retention_days INTEGER DEFAULT 7 CHECK (retention_days IS NULL OR retention_days > 0),
@@ -20,10 +18,11 @@ CREATE TABLE IF NOT EXISTS schedules.config (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Ensure only one row exists (singleton pattern)
+ALTER TABLE schedules.config ALTER COLUMN retention_days DROP NOT NULL;
+ALTER TABLE schedules.config ALTER COLUMN retention_days SET DEFAULT 7;
+
 CREATE UNIQUE INDEX IF NOT EXISTS idx_schedules_config_singleton ON schedules.config ((1));
 
--- Trigger for updated_at
 DROP TRIGGER IF EXISTS update_schedules_config_updated_at ON schedules.config;
 CREATE TRIGGER update_schedules_config_updated_at
   BEFORE UPDATE ON schedules.config
@@ -31,10 +30,10 @@ CREATE TRIGGER update_schedules_config_updated_at
   EXECUTE FUNCTION system.update_updated_at();
 
 -- ============================================================================
--- CLEANUP FUNCTION
+-- SCHEDULES CLEANUP FUNCTION
 -- ============================================================================
--- Deletes job_logs older than the configured retention period.
--- Default retention is 7 days if not set in schedules.config.
+-- Default retention is 7 days unless configured.
+-- Deletes in batches to prevent performance impact.
 
 CREATE OR REPLACE FUNCTION schedules.cleanup_job_logs(p_batch_size INT DEFAULT 1000)
 RETURNS INT AS $$
@@ -44,16 +43,13 @@ DECLARE
   v_deleted_count INT := 0;
   v_total_deleted INT := 0;
 BEGIN
-  -- Get retention days from schedules.config
   SELECT retention_days INTO v_retention_days
   FROM schedules.config LIMIT 1;
   
-  -- Handle "Never" (e.g. NULL or < 0)
   IF v_retention_days IS NULL OR v_retention_days < 0 THEN
     RETURN 0;
   END IF;
   
-  -- Calculate cutoff time
   v_cutoff := NOW() - (v_retention_days || ' days')::INTERVAL;
   
   LOOP
@@ -71,7 +67,6 @@ BEGIN
     
     v_total_deleted := v_total_deleted + v_deleted_count;
     
-    -- Exit loop if no rows deleted or batch not full
     EXIT WHEN v_deleted_count < p_batch_size;
   END LOOP;
   
@@ -88,24 +83,63 @@ REVOKE ALL ON FUNCTION schedules.cleanup_job_logs FROM PUBLIC;
 -- ============================================================================
 -- SEED CONFIGURATION
 -- ============================================================================
--- Insert default retention period (7 days)
 
 INSERT INTO schedules.config (retention_days)
 SELECT 7
 WHERE NOT EXISTS (SELECT 1 FROM schedules.config);
 
 -- ============================================================================
--- SCHEDULE CLEANUP
+-- REALTIME MESSAGE RETENTION JOB
 -- ============================================================================
--- Schedule the cleanup function to run hourly using pg_cron.
+-- Replace any legacy realtime retention job with a named pg_cron entry.
 
 DO $$
+DECLARE
+  v_existing_job_id BIGINT;
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'schedules-job-logs-retention') THEN
-    PERFORM cron.schedule(
-      'schedules-job-logs-retention',
-      '0 * * * *',  -- hourly at minute 0
-      'SELECT schedules.cleanup_job_logs()'
-    );
-  END IF;
+  FOR v_existing_job_id IN
+    SELECT DISTINCT existing_jobs.jobid
+    FROM (
+      SELECT jobid
+      FROM cron.job
+      WHERE command = 'SELECT realtime.cleanup_messages()'
+         OR jobname = 'realtime-message-retention'
+    ) AS existing_jobs
+  LOOP
+    PERFORM cron.unschedule(v_existing_job_id);
+  END LOOP;
+
+  PERFORM cron.schedule(
+    'realtime-message-retention',
+    '0 0 * * *',
+    'SELECT realtime.cleanup_messages()'
+  );
+END $$;
+
+-- ============================================================================
+-- SCHEDULES JOB LOG RETENTION JOB
+-- ============================================================================
+-- Replace any legacy schedules retention job with a named pg_cron entry.
+
+DO $$
+DECLARE
+  v_existing_job_id BIGINT;
+BEGIN
+  FOR v_existing_job_id IN
+    SELECT DISTINCT existing_jobs.jobid
+    FROM (
+      SELECT jobid
+      FROM cron.job
+      WHERE command = 'SELECT schedules.cleanup_job_logs()'
+         OR jobname = 'schedules-job-logs-retention'
+    ) AS existing_jobs
+  LOOP
+    PERFORM cron.unschedule(v_existing_job_id);
+  END LOOP;
+
+  PERFORM cron.schedule(
+    'schedules-job-logs-retention',
+    '0 * * * *',
+    'SELECT schedules.cleanup_job_logs()'
+  );
 END $$;

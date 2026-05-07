@@ -10,6 +10,10 @@ import type {
   DeleteScheduleResponse,
 } from '@insforge/shared-schemas';
 
+export interface SchedulesConfig {
+  retentionDays: number | null;
+}
+
 export class ScheduleService {
   async listSchedules(): Promise<ScheduleSchema[]> {
     const response: ListSchedulesResponse = await apiClient.request('/schedules', {
@@ -80,6 +84,20 @@ export class ScheduleService {
       }
     );
     return response;
+  }
+
+  async getSchedulesConfig(): Promise<SchedulesConfig> {
+    return apiClient.request('/schedules/config', {
+      headers: apiClient.withAccessToken(),
+    });
+  }
+
+  async updateSchedulesConfig(payload: SchedulesConfig): Promise<void> {
+    await apiClient.request('/schedules/config', {
+      method: 'PATCH',
+      headers: apiClient.withAccessToken(),
+      body: JSON.stringify(payload),
+    });
   }
 }
 

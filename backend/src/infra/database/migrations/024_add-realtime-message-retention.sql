@@ -33,7 +33,7 @@ CREATE TRIGGER update_realtime_config_updated_at
 -- CLEANUP FUNCTION
 -- ============================================================================
 -- Deletes messages older than the configured retention period.
--- Default retention is 30 days if not set in realtime.config.
+-- Default retention is NULL ("Never") unless configured.
 -- Deletes in batches to prevent performance impact.
 
 CREATE OR REPLACE FUNCTION realtime.cleanup_messages(p_batch_size INT DEFAULT 1000)

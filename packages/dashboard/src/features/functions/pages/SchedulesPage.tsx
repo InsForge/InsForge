@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useRef } from 'react';
-import { ArrowLeft, CirclePlus, Settings } from 'lucide-react';
+import { ArrowLeft, CirclePlus } from 'lucide-react';
 import { useSchedules } from '#features/functions/hooks/useSchedules';
 import {
   Button,
@@ -17,7 +17,6 @@ import ScheduleRow from '#features/functions/components/ScheduleRow';
 import ScheduleLogs from '#features/functions/components/ScheduleLogs';
 import { Alert, AlertDescription } from '#components/radix/Alert';
 import ScheduleEmptyState from '#features/functions/components/ScheduleEmptyState';
-import { SchedulesSettingsMenuDialog } from '#features/functions/components/SchedulesSettingsMenuDialog';
 import { useConfirm } from '#lib/hooks/useConfirm';
 import RefreshIcon from '#assets/icons/refresh.svg?react';
 
@@ -26,7 +25,6 @@ const PAGE_SIZE = 50;
 export default function SchedulesPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -238,23 +236,6 @@ export default function SchedulesPage() {
               <CirclePlus className="h-6 w-6 stroke-[1.5] text-primary" />
               <span className="px-1 text-sm font-medium leading-5">Add Schedule</span>
             </Button>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setSettingsOpen(true)}
-                    className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
-                  >
-                    <Settings className="h-5 w-5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" align="center">
-                  <p>Schedules Settings</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
           </div>
         }
         searchValue={searchQuery}
@@ -386,11 +367,6 @@ export default function SchedulesPage() {
       )}
 
       <ConfirmDialog {...confirmDialogProps} />
-
-      <SchedulesSettingsMenuDialog
-        open={settingsOpen}
-        onOpenChange={setSettingsOpen}
-      />
     </div>
   );
 }

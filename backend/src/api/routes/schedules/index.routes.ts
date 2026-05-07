@@ -31,6 +31,44 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
 });
 
 /**
+ * GET /api/schedules/config
+ * Get schedules config (retention days)
+ */
+router.get('/config', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const config = getSchedulesConfigResponseSchema.parse({
+      retentionDays: await scheduleService.getRetentionDays(),
+    });
+    successResponse(res, config);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * PATCH /api/schedules/config
+ * Update schedules config (retention days)
+ */
+router.patch('/config', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const validation = updateSchedulesConfigRequestSchema.safeParse(req.body);
+    if (!validation.success) {
+      throw new AppError(
+        validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    const { retentionDays } = validation.data;
+    await scheduleService.updateRetentionDays(retentionDays);
+    successResponse(res, { message: 'Schedules config updated successfully' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * GET /api/schedules/:id
  * Get a single schedule by its ID
  */
@@ -64,6 +102,20 @@ router.get('/:id/logs', async (req: AuthRequest, res: Response, next: NextFuncti
       limit: result.limit,
       offset: result.offset,
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * DELETE /api/schedules/:id
+ * Delete a schedule by its ID
+ */
+router.delete('/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    await scheduleService.deleteSchedule(id);
+    successResponse(res, { message: 'Schedule deleted successfully.' });
   } catch (error) {
     next(error);
   }
@@ -122,62 +174,6 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       cronJobId: result.cron_job_id,
       message: 'Schedule updated successfully',
     });
-  } catch (error) {
-    next(error);
-  }
-});
-
-/**
- * DELETE /api/schedules/:id
- * Delete a schedule by its ID
- */
-router.delete('/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
-    await scheduleService.deleteSchedule(id);
-    successResponse(res, { message: 'Schedule deleted successfully.' });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// ============================================================================
-// Config Routes
-// ============================================================================
-
-/**
- * GET /api/schedules/config
- * Get schedules config (retention days)
- */
-router.get('/config', async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const config = getSchedulesConfigResponseSchema.parse({
-      retentionDays: await scheduleService.getRetentionDays(),
-    });
-    successResponse(res, config);
-  } catch (error) {
-    next(error);
-  }
-});
-
-/**
- * PATCH /api/schedules/config
- * Update schedules config (retention days)
- */
-router.patch('/config', async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const validation = updateSchedulesConfigRequestSchema.safeParse(req.body);
-    if (!validation.success) {
-      throw new AppError(
-        validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
-    }
-
-    const { retentionDays } = validation.data;
-    await scheduleService.updateRetentionDays(retentionDays);
-    successResponse(res, { message: 'Schedules config updated successfully' });
   } catch (error) {
     next(error);
   }

@@ -24,7 +24,7 @@ import {
 } from '@insforge/ui';
 import { useSchedulesConfig } from '#features/functions/hooks/useSchedulesConfig';
 
-interface SchedulesSettingsMenuDialogProps {
+interface FunctionsSettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -59,10 +59,10 @@ function toRetentionOption(retentionDays: number | null): RetentionOption {
   return retentionDays === null ? 'never' : String(retentionDays);
 }
 
-export function SchedulesSettingsMenuDialog({
+export function FunctionsSettingsDialog({
   open,
   onOpenChange,
-}: SchedulesSettingsMenuDialogProps) {
+}: FunctionsSettingsDialogProps) {
   const [retentionDays, setRetentionDays] = useState<RetentionOption | null>(null);
   const [initialRetentionDays, setInitialRetentionDays] = useState<RetentionOption | null>(null);
   const { config, isLoading, isUpdating, error, updateConfig } = useSchedulesConfig();
@@ -115,12 +115,12 @@ export function SchedulesSettingsMenuDialog({
       <MenuDialogContent>
         <MenuDialogSideNav>
           <MenuDialogSideNavHeader>
-            <MenuDialogSideNavTitle>Schedules Settings</MenuDialogSideNavTitle>
+            <MenuDialogSideNavTitle>Functions Settings</MenuDialogSideNavTitle>
           </MenuDialogSideNavHeader>
           <MenuDialogNav>
             <MenuDialogNavList>
               <MenuDialogNavItem icon={<Settings className="h-5 w-5" />} active={true}>
-                General
+                Schedules
               </MenuDialogNavItem>
             </MenuDialogNavList>
           </MenuDialogNav>
@@ -128,7 +128,7 @@ export function SchedulesSettingsMenuDialog({
 
         <MenuDialogMain>
           <MenuDialogHeader>
-            <MenuDialogTitle>General</MenuDialogTitle>
+            <MenuDialogTitle>Schedules</MenuDialogTitle>
             <MenuDialogCloseButton className="ml-auto" />
           </MenuDialogHeader>
 
