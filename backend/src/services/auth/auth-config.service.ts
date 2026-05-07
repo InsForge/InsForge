@@ -276,13 +276,14 @@ export class AuthConfigService {
     const config = await this.getAuthConfig();
     const allowedRedirectUrls = config.allowedRedirectUrls;
 
-    // Security: Default-deny when no whitelist is configured.
-    // Accepting any redirect URL on unconfigured instances allows phishing attacks
-    // where an attacker crafts a legitimate-looking verification/reset link that
-    // redirects the user to a malicious site after the action completes.
-    // Admins must explicitly add allowed URLs in Authentication → Configuration.
+    // Security: If no whitelist is configured, log a warning but remain permissive for now
+    // to avoid breaking existing users during upgrades. We recommend admins configure
+    // this whitelist as soon as possible to prevent open redirect attacks.
     if (!allowedRedirectUrls || allowedRedirectUrls.length === 0) {
-      return false;
+      logger.warn(
+        'SECURITY WARNING: No allowed redirect URLs are configured. Authentication redirects will be permissive, which allows open redirect attacks. Please configure your allowed redirect URLs in the Authentication configuration dashboard.'
+      );
+      return true;
     }
 
     const targetUrl = this.normalizeUrl(urlStr);

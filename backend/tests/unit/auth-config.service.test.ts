@@ -14,8 +14,8 @@ vi.mock('../../src/infra/database/database.manager', () => ({
   },
 }));
 
-vi.mock('../../src/utils/logger', () => ({
-  default: {
+const { mockLogger } = vi.hoisted(() => ({
+  mockLogger: {
     info: vi.fn(),
     error: vi.fn(),
     warn: vi.fn(),
@@ -23,7 +23,14 @@ vi.mock('../../src/utils/logger', () => ({
   },
 }));
 
+vi.mock('../../src/utils/logger', () => ({
+  __esModule: true,
+  default: mockLogger,
+  logger: mockLogger,
+}));
+
 import { AuthConfigService } from '../../src/services/auth/auth-config.service';
+import { logger } from '../../src/utils/logger';
 
 describe('AuthConfigService', () => {
   beforeEach(() => {
@@ -31,7 +38,7 @@ describe('AuthConfigService', () => {
   });
 
   describe('validateRedirectUrl', () => {
-    it('returns false when no allowed redirect URLs are configured (SEC-002 fix)', async () => {
+    it('returns true and logs a warning when no allowed redirect URLs are configured (Maintainer feedback)', async () => {
       // Mock getAuthConfig to return empty whitelist
       mockPool.query.mockResolvedValueOnce({
         rows: [
@@ -44,7 +51,25 @@ describe('AuthConfigService', () => {
       const service = AuthConfigService.getInstance();
       const isValid = await service.validateRedirectUrl('https://attacker.com');
 
-      expect(isValid).toBe(false);
+      expect(isValid).toBe(true);
+      expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('SECURITY WARNING'));
+    });
+
+    it('returns true and logs a warning when allowedRedirectUrls is null (CodeRabbit feedback)', async () => {
+      // Mock getAuthConfig to return null whitelist (DB default)
+      mockPool.query.mockResolvedValueOnce({
+        rows: [
+          {
+            allowedRedirectUrls: null,
+          },
+        ],
+      });
+
+      const service = AuthConfigService.getInstance();
+      const isValid = await service.validateRedirectUrl('https://attacker.com');
+
+      expect(isValid).toBe(true);
+      expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('SECURITY WARNING'));
     });
 
     it('returns true when URL is in the whitelist', async () => {
