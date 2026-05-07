@@ -34,9 +34,11 @@ describe('AuthConfigService', () => {
     it('returns false when no allowed redirect URLs are configured (SEC-002 fix)', async () => {
       // Mock getAuthConfig to return empty whitelist
       mockPool.query.mockResolvedValueOnce({
-        rows: [{
-          allowedRedirectUrls: []
-        }]
+        rows: [
+          {
+            allowedRedirectUrls: [],
+          },
+        ],
       });
 
       const service = AuthConfigService.getInstance();
@@ -47,9 +49,11 @@ describe('AuthConfigService', () => {
 
     it('returns true when URL is in the whitelist', async () => {
       mockPool.query.mockResolvedValue({
-        rows: [{
-          allowedRedirectUrls: ['https://myapp.com']
-        }]
+        rows: [
+          {
+            allowedRedirectUrls: ['https://myapp.com'],
+          },
+        ],
       });
 
       const service = AuthConfigService.getInstance();
@@ -60,9 +64,11 @@ describe('AuthConfigService', () => {
 
     it('returns false when URL is not in the whitelist', async () => {
       mockPool.query.mockResolvedValue({
-        rows: [{
-          allowedRedirectUrls: ['https://myapp.com']
-        }]
+        rows: [
+          {
+            allowedRedirectUrls: ['https://myapp.com'],
+          },
+        ],
       });
 
       const service = AuthConfigService.getInstance();
@@ -73,9 +79,11 @@ describe('AuthConfigService', () => {
 
     it('handles wildcards correctly', async () => {
       mockPool.query.mockResolvedValue({
-        rows: [{
-          allowedRedirectUrls: ['https://*.myapp.com']
-        }]
+        rows: [
+          {
+            allowedRedirectUrls: ['https://*.myapp.com'],
+          },
+        ],
       });
 
       const service = AuthConfigService.getInstance();
@@ -85,9 +93,11 @@ describe('AuthConfigService', () => {
 
     it('handles multiple URLs in whitelist', async () => {
       mockPool.query.mockResolvedValue({
-        rows: [{
-          allowedRedirectUrls: ['https://myapp.com', 'https://otherapp.io']
-        }]
+        rows: [
+          {
+            allowedRedirectUrls: ['https://myapp.com', 'https://otherapp.io'],
+          },
+        ],
       });
 
       const service = AuthConfigService.getInstance();
