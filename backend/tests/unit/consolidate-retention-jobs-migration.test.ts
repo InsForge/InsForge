@@ -75,8 +75,12 @@ describe('consolidate retention jobs migration', () => {
   });
 
   it('does not add redundant retention_days ALTER TABLE statements', () => {
-    expect(sql).not.toMatch(/ALTER TABLE schedules\.config ALTER COLUMN retention_days DROP NOT NULL/i);
-    expect(sql).not.toMatch(/ALTER TABLE schedules\.config ALTER COLUMN retention_days SET DEFAULT 7/i);
+    expect(sql).not.toMatch(
+      /ALTER TABLE schedules\.config ALTER COLUMN retention_days DROP NOT NULL/i
+    );
+    expect(sql).not.toMatch(
+      /ALTER TABLE schedules\.config ALTER COLUMN retention_days SET DEFAULT 7/i
+    );
   });
 
   it('contains no top-level transaction control', () => {

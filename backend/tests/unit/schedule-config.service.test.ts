@@ -71,10 +71,7 @@ describe('ScheduleService schedules config', () => {
       expect.stringContaining('INSERT INTO schedules.config (retention_days)'),
       [14]
     );
-    expect(mockPool.query).toHaveBeenCalledWith(
-      expect.stringContaining('ON CONFLICT ((1))'),
-      [14]
-    );
+    expect(mockPool.query).toHaveBeenCalledWith(expect.stringContaining('ON CONFLICT ((1))'), [14]);
   });
 
   it('upserts the singleton config row when one already exists', async () => {

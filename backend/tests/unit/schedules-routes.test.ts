@@ -7,14 +7,16 @@ vi.hoisted(() => {
 import { schedulesRouter } from '../../src/api/routes/schedules/index.routes';
 
 describe('schedules route wiring', () => {
-  const routeEntries = (schedulesRouter as unknown as {
-    stack: Array<{
-      route?: {
-        path: string;
-        methods: Record<string, boolean>;
-      };
-    }>;
-  }).stack
+  const routeEntries = (
+    schedulesRouter as unknown as {
+      stack: Array<{
+        route?: {
+          path: string;
+          methods: Record<string, boolean>;
+        };
+      }>;
+    }
+  ).stack
     .filter((layer) => layer.route)
     .map((layer) => ({
       path: layer.route!.path,
