@@ -908,15 +908,25 @@ export class AuthService {
     const authConfigService = AuthConfigService.getInstance();
     const oAuthConfigService = OAuthConfigService.getInstance();
     const customOAuthConfigService = CustomOAuthConfigService.getInstance();
-    const [oAuthProviders, customOAuthConfigs, authConfigs] = await Promise.all([
+    const [oAuthProviders, customOAuthConfigs, authConfig] = await Promise.all([
       oAuthConfigService.getConfiguredProviders(),
       customOAuthConfigService.listConfigs(),
-      authConfigService.getPublicAuthConfig(),
+      // Use the admin-scoped reader so allowedRedirectUrls is included.
+      // The metadata endpoint is already gated behind verifyAdmin.
+      authConfigService.getAuthConfig(),
     ]);
+    const {
+      id: _id,
+      createdAt: _c,
+      updatedAt: _u,
+      allowedRedirectUrls,
+      ...configFields
+    } = authConfig;
     return {
       oAuthProviders,
       customOAuthProviders: customOAuthConfigs.map((config) => config.key),
-      ...authConfigs,
+      ...configFields,
+      allowedRedirectUrls: allowedRedirectUrls ?? [],
     };
   }
 

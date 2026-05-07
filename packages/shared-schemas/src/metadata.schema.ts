@@ -4,7 +4,12 @@ import { realtimeChannelSchema } from './realtime.schema.js';
 import { realtimePermissionsResponseSchema } from './realtime-api.schema.js';
 import { getPublicAuthConfigResponseSchema } from './auth-api.schema.js';
 
-export const authMetadataSchema = getPublicAuthConfigResponseSchema;
+export const authMetadataSchema = getPublicAuthConfigResponseSchema.extend({
+  // Surfaced for config-as-code (insforge.toml) round-tripping.
+  // Hidden from the public auth-config response by design, but admin metadata
+  // — which already requires verifyAdmin — exposes it for the CLI to render.
+  allowedRedirectUrls: z.array(z.string()).default([]),
+});
 
 export const databaseMetadataSchema = z.object({
   tables: z.array(
