@@ -480,4 +480,44 @@ export class ScheduleService {
       throw error;
     }
   }
+
+  // ============================================================================
+  // Config Methods
+  // ============================================================================
+
+  async getRetentionDays(): Promise<number | null> {
+    try {
+      const result = await this.dbManager.query(
+        'SELECT retention_days as "retentionDays" FROM schedules.config LIMIT 1'
+      );
+      return result.rows.length === 0 ? null : result.rows[0].retentionDays;
+    } catch (error) {
+      logger.error('Error getting schedules retention config:', { error });
+      throw error;
+    }
+  }
+
+  async updateRetentionDays(retentionDays: number | null): Promise<void> {
+    try {
+      // Check if config row exists
+      const existing = await this.dbManager.query('SELECT 1 FROM schedules.config LIMIT 1');
+
+      if (existing.rows.length === 0) {
+        await this.dbManager.query(
+          'INSERT INTO schedules.config (retention_days) VALUES ($1)',
+          [retentionDays]
+        );
+      } else {
+        await this.dbManager.query(
+          'UPDATE schedules.config SET retention_days = $1, updated_at = NOW()',
+          [retentionDays]
+        );
+      }
+
+      logger.info('Schedules retention config updated', { retentionDays });
+    } catch (error) {
+      logger.error('Error updating schedules retention config:', { error });
+      throw error;
+    }
+  }
 }

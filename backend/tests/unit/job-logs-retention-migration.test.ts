@@ -17,7 +17,32 @@ describe('job-logs-retention migration', () => {
     expect(fs.existsSync(migrationPath)).toBe(true);
   });
 
-  // ── idempotency ─────────────────────────────────────────────────────
+  // ── config table ──────────────────────────────────────────────────
+  it('creates a schedules.config table for retention settings', () => {
+    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS schedules\.config/i);
+    expect(sql).toMatch(/retention_days/i);
+  });
+
+  it('uses singleton pattern for config table', () => {
+    expect(sql).toMatch(/idx_schedules_config_singleton/i);
+  });
+
+  // ── cleanup function ──────────────────────────────────────────────
+  it('creates a cleanup function that reads from config', () => {
+    expect(sql).toMatch(/CREATE OR REPLACE FUNCTION schedules\.cleanup_job_logs/i);
+    expect(sql).toMatch(/SELECT retention_days INTO v_retention_days/i);
+    expect(sql).toMatch(/FROM schedules\.config/i);
+  });
+
+  it('handles "Never" retention (NULL config)', () => {
+    expect(sql).toMatch(/v_retention_days IS NULL/i);
+  });
+
+  it('deletes in batches to prevent performance impact', () => {
+    expect(sql).toMatch(/p_batch_size/i);
+  });
+
+  // ── idempotency ───────────────────────────────────────────────────
   it('unschedules any existing cron job before re-scheduling (idempotent)', () => {
     expect(sql).toMatch(/cron\.unschedule/i);
     expect(sql).toMatch(/schedules-job-logs-retention/i);
@@ -36,7 +61,7 @@ describe('job-logs-retention migration', () => {
     expect(outsideDoBlocks).not.toMatch(/^\s*ROLLBACK\s*;/im);
   });
 
-  // ── retention configuration ─────────────────────────────────────────
+  // ── schedule configuration ────────────────────────────────────────
   it('schedules a pg_cron job named schedules-job-logs-retention', () => {
     expect(sql).toMatch(/cron\.schedule\(/i);
     expect(sql).toMatch(/'schedules-job-logs-retention'/);
@@ -46,16 +71,11 @@ describe('job-logs-retention migration', () => {
     expect(sql).toMatch(/'0 \* \* \* \*'/);
   });
 
-  it('deletes rows older than 7 days', () => {
-    expect(sql).toMatch(/DELETE FROM schedules\.job_logs/i);
-    expect(sql).toMatch(/7 days/i);
+  it('calls the cleanup function', () => {
+    expect(sql).toMatch(/SELECT schedules\.cleanup_job_logs\(\)/i);
   });
 
-  it('filters on executed_at column', () => {
-    expect(sql).toMatch(/executed_at\s*<\s*now\(\)\s*-\s*interval/i);
-  });
-
-  // ── ordering ─────────────────────────────────────────────────────────
+  // ── ordering ─────────────────────────────────────────────────────
   it('runs after migration 021 (schedules schema)', () => {
     const migrationDir = path.resolve(currentDir, '../../src/infra/database/migrations');
     const migrations = fs
