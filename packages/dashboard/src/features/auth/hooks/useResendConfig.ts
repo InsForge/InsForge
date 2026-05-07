@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ResendConfigSchema, UpsertResendConfigRequest } from '@insforge/shared-schemas';
-import { resendConfigService } from '../services/resend-config.service';
-import { useToast } from '../../../lib/hooks/useToast';
+import { resendConfigService } from '#features/auth/services/resend-config.service';
+import { useToast } from '#lib/hooks/useToast';
 
 export function useResendConfig() {
   const queryClient = useQueryClient();
