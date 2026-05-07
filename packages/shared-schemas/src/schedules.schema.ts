@@ -38,3 +38,13 @@ export const scheduleLogSchema = z.object({
 
 export type ScheduleSchema = z.infer<typeof scheduleSchema>;
 export type ScheduleLogSchema = z.infer<typeof scheduleLogSchema>;
+
+// ============================================================================
+// Config Schema
+// ============================================================================
+
+export const schedulesConfigSchema = z.object({
+  retentionDays: z.number().int().positive().nullable(),
+});
+
+export type SchedulesConfig = z.infer<typeof schedulesConfigSchema>;

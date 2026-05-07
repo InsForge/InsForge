@@ -11,12 +11,13 @@ import {
 import { CronExpressionParser } from 'cron-parser';
 import { randomUUID } from 'crypto';
 
-import { QueryResult } from 'pg';
+import { Pool, QueryResult } from 'pg';
 
 export class ScheduleService {
   private static instance: ScheduleService;
   private dbManager: DatabaseManager;
   private secretService: SecretService;
+  private pool: Pool | null = null;
 
   private constructor() {
     this.dbManager = DatabaseManager.getInstance();
@@ -28,6 +29,13 @@ export class ScheduleService {
       ScheduleService.instance = new ScheduleService();
     }
     return ScheduleService.instance;
+  }
+
+  private getPool(): Pool {
+    if (!this.pool) {
+      this.pool = this.dbManager.getPool();
+    }
+    return this.pool;
   }
 
   /**
@@ -198,7 +206,7 @@ export class ScheduleService {
       FROM schedules.jobs
       ORDER BY created_at DESC
     `;
-      const result = await this.dbManager.getPool().query(sql);
+      const result = await this.getPool().query(sql);
       const schedules = result.rows as ScheduleSchema[];
 
       const formatted = schedules.map((s) => {
@@ -233,7 +241,7 @@ export class ScheduleService {
       FROM schedules.jobs
       WHERE id = $1
     `;
-      const result = await this.dbManager.getPool().query(sql, [id]);
+      const result = await this.getPool().query(sql, [id]);
       const schedule = (result.rows[0] as ScheduleSchema) || null;
       if (!schedule) {
         logger.warn('Schedule not found for ID', { scheduleId: id });
@@ -270,7 +278,7 @@ export class ScheduleService {
         resolvedHeaders,
         data.body || {},
       ];
-      const result = await this.dbManager.getPool().query(sql, values);
+      const result = await this.getPool().query(sql, values);
       const jobResult = (result.rows && result.rows[0]) as
         | { success?: boolean; cron_job_id?: string; message?: string }
         | undefined;
@@ -341,7 +349,7 @@ export class ScheduleService {
           resolvedHeaders,
           data.body ?? existingSchedule.body ?? {},
         ];
-        const result = await this.dbManager.getPool().query(sql, values);
+        const result = await this.getPool().query(sql, values);
         const jobResult = (result.rows && result.rows[0]) as
           | { success?: boolean; cron_job_id?: string; message?: string }
           | undefined;
@@ -365,7 +373,7 @@ export class ScheduleService {
         const toggleSql = data.isActive
           ? 'SELECT * FROM schedules.enable_job($1::UUID)'
           : 'SELECT * FROM schedules.disable_job($1::UUID)';
-        await this.dbManager.getPool().query(toggleSql, [id]);
+        await this.getPool().query(toggleSql, [id]);
       }
 
       logger.info('Successfully updated schedule', { scheduleId: id });
@@ -379,7 +387,7 @@ export class ScheduleService {
   async deleteSchedule(id: string) {
     try {
       const sql = 'SELECT * FROM schedules.delete_job($1::UUID)';
-      const result = await this.dbManager.getPool().query(sql, [id]);
+      const result = await this.getPool().query(sql, [id]);
       const deleteResult = (result.rows && result.rows[0]) as
         | {
             success?: boolean;
@@ -433,15 +441,17 @@ export class ScheduleService {
         message: string | null;
       };
 
-      const logs = (await this.dbManager
-        .getPool()
-        .query(sql, [scheduleId, limit, offset])) as QueryResult<ExecRow>;
+      const logs = (await this.getPool().query(sql, [
+        scheduleId,
+        limit,
+        offset,
+      ])) as QueryResult<ExecRow>;
 
       const countSql = `
         SELECT COUNT(*) as total FROM schedules.job_logs
         WHERE job_id = $1::UUID
       `;
-      const countResult = await this.dbManager.getPool().query(countSql, [scheduleId]);
+      const countResult = await this.getPool().query(countSql, [scheduleId]);
       const total = parseInt((countResult.rows[0] as { total: string })?.total || '0', 10);
 
       const formattedLogs = (logs.rows as ExecRow[]).map((log) => {
@@ -477,6 +487,43 @@ export class ScheduleService {
       };
     } catch (error) {
       logger.error('Error retrieving execution logs:', { scheduleId, error });
+      throw error;
+    }
+  }
+
+  // ============================================================================
+  // Config Methods
+  // ============================================================================
+
+  async getRetentionDays(): Promise<number | null> {
+    try {
+      const result = await this.getPool().query(
+        'SELECT retention_days as "retentionDays" FROM schedules.config LIMIT 1'
+      );
+      return result.rows.length === 0 ? null : result.rows[0].retentionDays;
+    } catch (error) {
+      logger.error('Error getting schedules retention config', {
+        error: error instanceof Error ? { message: error.message, stack: error.stack } : error,
+      });
+      throw error;
+    }
+  }
+
+  async updateRetentionDays(retentionDays: number | null): Promise<void> {
+    try {
+      await this.getPool().query(
+        `INSERT INTO schedules.config (retention_days)
+         VALUES ($1)
+         ON CONFLICT ((1))
+         DO UPDATE SET retention_days = EXCLUDED.retention_days, updated_at = NOW()`,
+        [retentionDays]
+      );
+      logger.info('Schedules retention config updated', { retentionDays });
+    } catch (error) {
+      logger.error('Error updating schedules retention config', {
+        retentionDays,
+        error: error instanceof Error ? { message: error.message, stack: error.stack } : error,
+      });
       throw error;
     }
   }
