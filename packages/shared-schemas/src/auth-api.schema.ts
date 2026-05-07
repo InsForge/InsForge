@@ -349,18 +349,33 @@ export const updateAuthConfigRequestSchema = authConfigSchema
 export const getAuthConfigResponseSchema = authConfigSchema;
 
 /**
- * Response for GET /api/auth/public-config - Unified public auth configuration endpoint
- * Combines OAuth providers and email auth configuration
+ * Admin auth response — the full shape including admin-only fields. This is
+ * the canonical source; the public response is derived from this by omitting
+ * sensitive fields below. Re-exported as `authMetadataSchema` from
+ * metadata.schema.ts for the admin-gated /api/metadata route.
+ *
+ * CONVENTION: new admin-only fields land in `authConfigSchema` and appear
+ * here automatically. To expose a field publicly, REMOVE it from the .omit()
+ * call in `getPublicAuthConfigResponseSchema`. This way the safer default
+ * (admin-only) is what you get if you forget to think about it.
  */
-export const getPublicAuthConfigResponseSchema = z.object({
+export const authConfigAdminResponseSchema = z.object({
   oAuthProviders: z.array(oAuthProvidersSchema),
   customOAuthProviders: z.array(customOAuthKeySchema),
   ...authConfigSchema.omit({
     id: true,
     updatedAt: true,
     createdAt: true,
-    allowedRedirectUrls: true,
   }).shape,
+});
+
+/**
+ * Response for GET /api/auth/public-config — admin response minus
+ * admin-only fields. This route is unauthenticated, so anything sensitive
+ * MUST be omitted here.
+ */
+export const getPublicAuthConfigResponseSchema = authConfigAdminResponseSchema.omit({
+  allowedRedirectUrls: true,
 });
 
 // ============================================================================

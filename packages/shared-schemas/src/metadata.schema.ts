@@ -2,14 +2,13 @@ import { z } from 'zod';
 import { storageBucketSchema } from './storage.schema.js';
 import { realtimeChannelSchema } from './realtime.schema.js';
 import { realtimePermissionsResponseSchema } from './realtime-api.schema.js';
-import { getPublicAuthConfigResponseSchema } from './auth-api.schema.js';
+import { authConfigAdminResponseSchema } from './auth-api.schema.js';
 
-export const authMetadataSchema = getPublicAuthConfigResponseSchema.extend({
-  // Surfaced for config-as-code (insforge.toml) round-tripping.
-  // Hidden from the public auth-config response by design, but admin metadata
-  // — which already requires verifyAdmin — exposes it for the CLI to render.
-  allowedRedirectUrls: z.array(z.string()).default([]),
-});
+// Admin metadata for /api/metadata/auth (gated behind verifyAdmin). Identical
+// shape to the canonical admin auth response — public response in
+// auth-api.schema.ts is derived from the same source by omitting sensitive
+// fields, so they can't drift.
+export const authMetadataSchema = authConfigAdminResponseSchema;
 
 export const databaseMetadataSchema = z.object({
   tables: z.array(
