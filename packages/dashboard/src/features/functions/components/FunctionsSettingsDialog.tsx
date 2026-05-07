@@ -59,10 +59,7 @@ function toRetentionOption(retentionDays: number | null): RetentionOption {
   return retentionDays === null ? 'never' : String(retentionDays);
 }
 
-export function FunctionsSettingsDialog({
-  open,
-  onOpenChange,
-}: FunctionsSettingsDialogProps) {
+export function FunctionsSettingsDialog({ open, onOpenChange }: FunctionsSettingsDialogProps) {
   const [retentionDays, setRetentionDays] = useState<RetentionOption | null>(null);
   const [initialRetentionDays, setInitialRetentionDays] = useState<RetentionOption | null>(null);
   const { config, isLoading, isUpdating, error, updateConfig } = useSchedulesConfig();

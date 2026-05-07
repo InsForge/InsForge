@@ -441,9 +441,11 @@ export class ScheduleService {
         message: string | null;
       };
 
-      const logs = (await this.getPool().query(sql, [scheduleId, limit, offset])) as QueryResult<
-        ExecRow
-      >;
+      const logs = (await this.getPool().query(sql, [
+        scheduleId,
+        limit,
+        offset,
+      ])) as QueryResult<ExecRow>;
 
       const countSql = `
         SELECT COUNT(*) as total FROM schedules.job_logs
@@ -514,15 +516,13 @@ export class ScheduleService {
       const existing = await client.query('SELECT 1 FROM schedules.config LIMIT 1 FOR UPDATE');
 
       if (existing.rows.length === 0) {
-        await client.query(
-          'INSERT INTO schedules.config (retention_days) VALUES ($1)',
-          [retentionDays]
-        );
+        await client.query('INSERT INTO schedules.config (retention_days) VALUES ($1)', [
+          retentionDays,
+        ]);
       } else {
-        await client.query(
-          'UPDATE schedules.config SET retention_days = $1, updated_at = NOW()',
-          [retentionDays]
-        );
+        await client.query('UPDATE schedules.config SET retention_days = $1, updated_at = NOW()', [
+          retentionDays,
+        ]);
       }
 
       await client.query('COMMIT');
