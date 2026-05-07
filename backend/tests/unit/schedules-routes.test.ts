@@ -1,20 +1,38 @@
-import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'fs';
-import { resolve } from 'path';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.hoisted(() => {
+  process.env.JWT_SECRET = 'test-secret-long-enough-for-signing-32chars';
+});
+
+import { schedulesRouter } from '../../src/api/routes/schedules/index.routes';
 
 describe('schedules route wiring', () => {
-  const schedulesRouteSource = readFileSync(
-    resolve(__dirname, '../../src/api/routes/schedules/index.routes.ts'),
-    'utf-8'
-  );
+  const routeEntries = (schedulesRouter as unknown as {
+    stack: Array<{
+      route?: {
+        path: string;
+        methods: Record<string, boolean>;
+      };
+    }>;
+  }).stack
+    .filter((layer) => layer.route)
+    .map((layer) => ({
+      path: layer.route!.path,
+      methods: Object.keys(layer.route!.methods).sort(),
+    }));
+
+  const routeIndex = (path: string, method: string) =>
+    routeEntries.findIndex(
+      (entry) => entry.path === path && entry.methods.includes(method.toLowerCase())
+    );
 
   it('registers explicit config routes before dynamic schedule id routes', () => {
-    const getConfigIndex = schedulesRouteSource.indexOf("router.get('/config'");
-    const patchConfigIndex = schedulesRouteSource.indexOf("router.patch('/config'");
-    const getByIdIndex = schedulesRouteSource.indexOf("router.get('/:id'");
-    const getLogsIndex = schedulesRouteSource.indexOf("router.get('/:id/logs'");
-    const patchByIdIndex = schedulesRouteSource.indexOf("router.patch('/:id'");
-    const deleteByIdIndex = schedulesRouteSource.indexOf("router.delete('/:id'");
+    const getConfigIndex = routeIndex('/config', 'get');
+    const patchConfigIndex = routeIndex('/config', 'patch');
+    const getByIdIndex = routeIndex('/:id', 'get');
+    const getLogsIndex = routeIndex('/:id/logs', 'get');
+    const patchByIdIndex = routeIndex('/:id', 'patch');
+    const deleteByIdIndex = routeIndex('/:id', 'delete');
 
     expect(getConfigIndex).toBeGreaterThan(-1);
     expect(patchConfigIndex).toBeGreaterThan(-1);

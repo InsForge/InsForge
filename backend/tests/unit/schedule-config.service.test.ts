@@ -38,7 +38,6 @@ describe('ScheduleService schedules config', () => {
     mockClient.query.mockReset();
     mockClient.release.mockReset();
     mockSecretService.getSecretByKey.mockReset();
-    mockPool.connect.mockResolvedValue(mockClient);
   });
 
   it('returns null when schedules config row is missing', async () => {
@@ -63,50 +62,38 @@ describe('ScheduleService schedules config', () => {
     expect(retentionDays).toBe(30);
   });
 
-  it('inserts the singleton config row when one does not exist', async () => {
-    mockClient.query
-      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
-      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
-      .mockResolvedValueOnce({ rows: [], rowCount: 0 });
+  it('upserts the singleton config row when one does not exist', async () => {
+    mockPool.query.mockResolvedValue({ rows: [], rowCount: 1 });
 
     await ScheduleService.getInstance().updateRetentionDays(14);
 
-    expect(mockPool.connect).toHaveBeenCalledOnce();
-    expect(mockClient.query).toHaveBeenNthCalledWith(1, 'BEGIN');
-    expect(mockClient.query).toHaveBeenNthCalledWith(
-      2,
-      'SELECT 1 FROM schedules.config LIMIT 1 FOR UPDATE'
-    );
-    expect(mockClient.query).toHaveBeenNthCalledWith(
-      3,
-      'INSERT INTO schedules.config (retention_days) VALUES ($1)',
+    expect(mockPool.query).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO schedules.config (retention_days)'),
       [14]
     );
-    expect(mockClient.query).toHaveBeenNthCalledWith(4, 'COMMIT');
-    expect(mockClient.release).toHaveBeenCalledOnce();
+    expect(mockPool.query).toHaveBeenCalledWith(
+      expect.stringContaining('ON CONFLICT ((1))'),
+      [14]
+    );
   });
 
-  it('updates the existing singleton config row when one already exists', async () => {
-    mockClient.query
-      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
-      .mockResolvedValueOnce({ rows: [{ '?column?': 1 }], rowCount: 1 })
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
-      .mockResolvedValueOnce({ rows: [], rowCount: 0 });
+  it('upserts the singleton config row when one already exists', async () => {
+    mockPool.query.mockResolvedValue({ rows: [], rowCount: 1 });
 
     await ScheduleService.getInstance().updateRetentionDays(null);
 
-    expect(mockClient.query).toHaveBeenNthCalledWith(1, 'BEGIN');
-    expect(mockClient.query).toHaveBeenNthCalledWith(
-      2,
-      'SELECT 1 FROM schedules.config LIMIT 1 FOR UPDATE'
-    );
-    expect(mockClient.query).toHaveBeenNthCalledWith(
-      3,
-      'UPDATE schedules.config SET retention_days = $1, updated_at = NOW()',
+    expect(mockPool.query).toHaveBeenCalledWith(
+      expect.stringContaining('DO UPDATE SET retention_days = EXCLUDED.retention_days'),
       [null]
     );
-    expect(mockClient.query).toHaveBeenNthCalledWith(4, 'COMMIT');
-    expect(mockClient.release).toHaveBeenCalledOnce();
+  });
+
+  it('rethrows when the upsert query fails', async () => {
+    const boom = new Error('db exploded');
+    mockPool.query.mockRejectedValue(boom);
+
+    await expect(ScheduleService.getInstance().updateRetentionDays(7)).rejects.toThrow(
+      'db exploded'
+    );
   });
 });

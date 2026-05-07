@@ -510,32 +510,21 @@ export class ScheduleService {
   }
 
   async updateRetentionDays(retentionDays: number | null): Promise<void> {
-    const client = await this.getPool().connect();
     try {
-      await client.query('BEGIN');
-      const existing = await client.query('SELECT 1 FROM schedules.config LIMIT 1 FOR UPDATE');
-
-      if (existing.rows.length === 0) {
-        await client.query('INSERT INTO schedules.config (retention_days) VALUES ($1)', [
-          retentionDays,
-        ]);
-      } else {
-        await client.query('UPDATE schedules.config SET retention_days = $1, updated_at = NOW()', [
-          retentionDays,
-        ]);
-      }
-
-      await client.query('COMMIT');
+      await this.getPool().query(
+        `INSERT INTO schedules.config (retention_days)
+         VALUES ($1)
+         ON CONFLICT ((1))
+         DO UPDATE SET retention_days = EXCLUDED.retention_days, updated_at = NOW()`,
+        [retentionDays]
+      );
       logger.info('Schedules retention config updated', { retentionDays });
     } catch (error) {
-      await client.query('ROLLBACK').catch(() => {});
       logger.error('Error updating schedules retention config', {
         retentionDays,
         error: error instanceof Error ? { message: error.message, stack: error.stack } : error,
       });
       throw error;
-    } finally {
-      client.release();
     }
   }
 }

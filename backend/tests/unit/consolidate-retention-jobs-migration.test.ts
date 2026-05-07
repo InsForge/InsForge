@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { beforeAll, describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -11,7 +11,11 @@ const migrationPath = path.resolve(
 );
 
 describe('consolidate retention jobs migration', () => {
-  const sql = fs.readFileSync(migrationPath, 'utf8');
+  let sql = '';
+
+  beforeAll(() => {
+    sql = fs.readFileSync(migrationPath, 'utf8');
+  });
 
   it('migration file exists', () => {
     expect(fs.existsSync(migrationPath)).toBe(true);
@@ -43,6 +47,11 @@ describe('consolidate retention jobs migration', () => {
     expect(sql).toMatch(/v_retention_days IS NULL/i);
   });
 
+  it('guards against non-positive retention values', () => {
+    expect(sql).toMatch(/v_retention_days <= 0/i);
+    expect(sql).toMatch(/p_batch_size IS NULL OR p_batch_size <= 0/i);
+  });
+
   it('deletes in batches to prevent performance impact', () => {
     expect(sql).toMatch(/p_batch_size/i);
     expect(sql).toMatch(/LOOP/i);
@@ -63,6 +72,11 @@ describe('consolidate retention jobs migration', () => {
     expect(sql).not.toMatch(/DROP TABLE/i);
     expect(sql).not.toMatch(/DROP SCHEMA/i);
     expect(sql).not.toMatch(/ALTER TABLE[\s\S]*?RENAME TO/i);
+  });
+
+  it('does not add redundant retention_days ALTER TABLE statements', () => {
+    expect(sql).not.toMatch(/ALTER TABLE schedules\.config ALTER COLUMN retention_days DROP NOT NULL/i);
+    expect(sql).not.toMatch(/ALTER TABLE schedules\.config ALTER COLUMN retention_days SET DEFAULT 7/i);
   });
 
   it('contains no top-level transaction control', () => {

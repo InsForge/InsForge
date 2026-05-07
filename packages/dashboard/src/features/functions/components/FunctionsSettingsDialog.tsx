@@ -76,9 +76,12 @@ export function FunctionsSettingsDialog({ open, onOpenChange }: FunctionsSetting
     }
 
     const nextRetentionDays = toRetentionOption(config.retentionDays);
-    setRetentionDays(nextRetentionDays);
-    setInitialRetentionDays(nextRetentionDays);
-  }, [config, open]);
+
+    if (initialRetentionDays === null || retentionDays === initialRetentionDays) {
+      setRetentionDays(nextRetentionDays);
+      setInitialRetentionDays(nextRetentionDays);
+    }
+  }, [config, initialRetentionDays, open, retentionDays]);
 
   const isLoaded = retentionDays !== null && initialRetentionDays !== null;
   const hasChanges = isLoaded && retentionDays !== initialRetentionDays;
@@ -140,7 +143,7 @@ export function FunctionsSettingsDialog({ open, onOpenChange }: FunctionsSetting
               <MenuDialogBody>
                 <SettingRow
                   label="Log Retention"
-                  description="How long execution logs are kept before cleanup. Set to Never to disable automatic cleanup."
+                  description="How long execution logs are kept before cleanup."
                 >
                   <div className="flex justify-end">
                     <Select

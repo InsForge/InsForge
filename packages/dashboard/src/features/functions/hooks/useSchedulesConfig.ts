@@ -1,8 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  scheduleService,
-  type SchedulesConfig,
-} from '#features/functions/services/schedule.service';
+import type { SchedulesConfig } from '@insforge/shared-schemas';
+import { scheduleService } from '#features/functions/services/schedule.service';
 import { useToast } from '#lib/hooks/useToast';
 
 const SCHEDULES_CONFIG_QUERY_KEY = ['schedules', 'config'] as const;

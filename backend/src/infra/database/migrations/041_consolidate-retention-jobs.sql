@@ -18,9 +18,6 @@ CREATE TABLE IF NOT EXISTS schedules.config (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-ALTER TABLE schedules.config ALTER COLUMN retention_days DROP NOT NULL;
-ALTER TABLE schedules.config ALTER COLUMN retention_days SET DEFAULT 7;
-
 CREATE UNIQUE INDEX IF NOT EXISTS idx_schedules_config_singleton ON schedules.config ((1));
 
 DROP TRIGGER IF EXISTS update_schedules_config_updated_at ON schedules.config;
@@ -43,10 +40,15 @@ DECLARE
   v_deleted_count INT := 0;
   v_total_deleted INT := 0;
 BEGIN
+  IF p_batch_size IS NULL OR p_batch_size <= 0 THEN
+    RAISE WARNING 'schedules.cleanup_job_logs received invalid batch size: %', p_batch_size;
+    RETURN 0;
+  END IF;
+
   SELECT retention_days INTO v_retention_days
   FROM schedules.config LIMIT 1;
   
-  IF v_retention_days IS NULL OR v_retention_days < 0 THEN
+  IF v_retention_days IS NULL OR v_retention_days <= 0 THEN
     RETURN 0;
   END IF;
   

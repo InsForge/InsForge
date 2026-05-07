@@ -1,6 +1,7 @@
 import { apiClient } from '#lib/api/client';
 import type {
   ScheduleSchema,
+  SchedulesConfig,
   ListSchedulesResponse,
   ListExecutionLogsResponse,
   CreateScheduleRequest,
@@ -9,10 +10,6 @@ import type {
   UpdateScheduleResponse,
   DeleteScheduleResponse,
 } from '@insforge/shared-schemas';
-
-export interface SchedulesConfig {
-  retentionDays: number | null;
-}
 
 export class ScheduleService {
   async listSchedules(): Promise<ScheduleSchema[]> {
