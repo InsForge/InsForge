@@ -939,18 +939,18 @@ export class AuthService {
       customOAuthConfigService.listConfigs(),
       authConfigService.getAuthConfig(),
     ]);
-    const {
-      id: _id,
-      createdAt: _c,
-      updatedAt: _u,
-      allowedRedirectUrls,
-      ...configFields
-    } = authConfig;
     return {
       oAuthProviders,
       customOAuthProviders: customOAuthConfigs.map((config) => config.key),
-      ...configFields,
-      allowedRedirectUrls: allowedRedirectUrls ?? [],
+      requireEmailVerification: authConfig.requireEmailVerification,
+      passwordMinLength: authConfig.passwordMinLength,
+      requireNumber: authConfig.requireNumber,
+      requireLowercase: authConfig.requireLowercase,
+      requireUppercase: authConfig.requireUppercase,
+      requireSpecialChar: authConfig.requireSpecialChar,
+      verifyEmailMethod: authConfig.verifyEmailMethod,
+      resetPasswordMethod: authConfig.resetPasswordMethod,
+      allowedRedirectUrls: authConfig.allowedRedirectUrls ?? [],
     };
   }
 
