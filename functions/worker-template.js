@@ -50,6 +50,7 @@ try {
     status: 500,
   });
   self.close();
+  throw new Error('Security initialization failed - halting worker');
 }
 // ----------------------------
 

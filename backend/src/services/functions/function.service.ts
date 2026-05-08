@@ -366,7 +366,7 @@ export class FunctionService {
       /\bself\b/i,
       /\bprocess\b/i,
       /Deno\.(run|spawn|Command|makeTemp|remove|write|chmod|chown)/i,
-      /import\b/i,
+      /import\s*\(/i, // Block dynamic imports only; static imports are safe in the sandboxed worker
       /require\b/i,
       /eval\b/i,
       /\bFunction\s*\(/, // Case-sensitive: Block constructor but allow 'function' keyword

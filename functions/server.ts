@@ -164,14 +164,17 @@ async function executeInWorker(code: string, request: Request): Promise<Response
     const worker = new Worker(workerUrl, {
       type: 'module',
       deno: {
-        // RESTRICTED: Native environment access is disabled to shield host secrets.
-        // Secrets are passed explicitly via message payload.
-        env: false,
-        // SDK REQUIREMENT: Whitelist internal backend for API/Database connectivity.
-        net: ['localhost:7130', 'insforge:7130'],
-        read: false,
-        write: false,
-        run: false,
+        permissions: {
+          // RESTRICTED: Native environment access is disabled to shield host secrets.
+          // Secrets are passed explicitly via message payload.
+          env: false,
+          // SDK REQUIREMENT: Whitelist internal backend for API/Database connectivity.
+          net: ['localhost:7130', 'insforge:7130'],
+          read: false,
+          write: false,
+          run: false,
+          ffi: false,
+        },
       },
     });
 
