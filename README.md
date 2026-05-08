@@ -41,9 +41,7 @@
 ## InsForge
 The all-in-one, open-source backend platform for agentic coding. InsForge gives your coding agent database, auth, storage, compute, hosting, and AI gateway to ship full-stack apps end-to-end.
 
-<p align="center">
-  <video width="100%" src="https://github.com/user-attachments/assets/345efbc6-ca63-4189-bde0-12ef3bda561b" controls></video>
-</p>
+https://github.com/user-attachments/assets/345efbc6-ca63-4189-bde0-12ef3bda561b
 
 ### How it works
 
