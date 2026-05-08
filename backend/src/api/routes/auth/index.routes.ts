@@ -229,7 +229,7 @@ router.get(
 // GET /api/auth/public-config - Get all public authentication configuration (public endpoint)
 router.get('/public-config', async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const response: GetPublicAuthConfigResponse = await authService.getMetadata();
+    const response: GetPublicAuthConfigResponse = await authService.getPublicMetadata();
 
     successResponse(res, response);
   } catch (error) {

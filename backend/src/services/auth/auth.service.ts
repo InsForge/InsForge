@@ -13,6 +13,7 @@ import type {
   CreateAdminSessionResponse,
   AuthMetadataSchema,
   OAuthProvidersSchema,
+  GetPublicAuthConfigResponse,
 } from '@insforge/shared-schemas';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { CustomOAuthConfigService } from '@/services/auth/custom-oauth-config.service.js';
@@ -904,11 +905,16 @@ export class AuthService {
     }
   }
 
-  async getMetadata(): Promise<AuthMetadataSchema> {
+  /**
+   * Public auth metadata for the unauthenticated /api/auth/public-config route.
+   * Reads via getPublicAuthConfig(), which intentionally omits allowedRedirectUrls
+   * and other admin-only fields.
+   */
+  async getPublicMetadata(): Promise<GetPublicAuthConfigResponse> {
     const authConfigService = AuthConfigService.getInstance();
     const oAuthConfigService = OAuthConfigService.getInstance();
     const customOAuthConfigService = CustomOAuthConfigService.getInstance();
-    const [oAuthProviders, customOAuthConfigs, authConfigs] = await Promise.all([
+    const [oAuthProviders, customOAuthConfigs, authConfig] = await Promise.all([
       oAuthConfigService.getConfiguredProviders(),
       customOAuthConfigService.listConfigs(),
       authConfigService.getPublicAuthConfig(),
@@ -916,7 +922,35 @@ export class AuthService {
     return {
       oAuthProviders,
       customOAuthProviders: customOAuthConfigs.map((config) => config.key),
-      ...authConfigs,
+      ...authConfig,
+    };
+  }
+
+  /**
+   * Admin auth metadata for /api/metadata (gated behind verifyAdmin).
+   * Includes allowedRedirectUrls so the CLI can render insforge.toml.
+   */
+  async getMetadata(): Promise<AuthMetadataSchema> {
+    const authConfigService = AuthConfigService.getInstance();
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const customOAuthConfigService = CustomOAuthConfigService.getInstance();
+    const [oAuthProviders, customOAuthConfigs, authConfig] = await Promise.all([
+      oAuthConfigService.getConfiguredProviders(),
+      customOAuthConfigService.listConfigs(),
+      authConfigService.getAuthConfig(),
+    ]);
+    return {
+      oAuthProviders,
+      customOAuthProviders: customOAuthConfigs.map((config) => config.key),
+      requireEmailVerification: authConfig.requireEmailVerification,
+      passwordMinLength: authConfig.passwordMinLength,
+      requireNumber: authConfig.requireNumber,
+      requireLowercase: authConfig.requireLowercase,
+      requireUppercase: authConfig.requireUppercase,
+      requireSpecialChar: authConfig.requireSpecialChar,
+      verifyEmailMethod: authConfig.verifyEmailMethod,
+      resetPasswordMethod: authConfig.resetPasswordMethod,
+      allowedRedirectUrls: authConfig.allowedRedirectUrls ?? [],
     };
   }
 
