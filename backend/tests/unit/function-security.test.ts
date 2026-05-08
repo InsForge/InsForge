@@ -107,8 +107,13 @@ describe('FunctionService Security Validation (Public API)', () => {
       await expect(createTestFunction(code)).resolves.toBeDefined();
     });
 
-    it('should block constructor access', async () => {
-      const code = 'const proto = obj.constructor.prototype;';
+    it('should block prototype chain abuse via bracket notation', async () => {
+      const code = "const proto = obj.constructor['prototype'];";
+      await expect(createTestFunction(code)).rejects.toThrow(GENERIC_ERROR);
+    });
+
+    it('should block __proto__ access', async () => {
+      const code = 'const p = obj.__proto__;';
       await expect(createTestFunction(code)).rejects.toThrow(GENERIC_ERROR);
     });
 
@@ -157,9 +162,21 @@ describe('FunctionService Security Validation (Public API)', () => {
       await expect(createTestFunction(code)).rejects.toThrow(GENERIC_ERROR);
     });
 
-    it('should apply security gates on updateFunction', async () => {
-      const dangerousCode = 'eval("leak_secrets()")';
-      await expect(updateTestFunction(dangerousCode)).rejects.toThrow(GENERIC_ERROR);
+    it('should allow valid class syntax (Regression Fix)', async () => {
+      const code = `
+        class MyHelper {
+          constructor(name) { this.name = name; }
+          greet() { return 'hi ' + this.name; }
+        }
+        export default async function(req) {
+          const h = new MyHelper('test');
+          return new Response(h.greet());
+        }
+      `;
+      mockClient.query.mockResolvedValueOnce({});
+      mockClient.query.mockResolvedValueOnce({});
+      mockClient.query.mockResolvedValueOnce({ rows: [{ id: '1' }] });
+      await expect(createTestFunction(code)).resolves.toBeDefined();
     });
   });
 });

@@ -13,13 +13,12 @@
 // when using a strict native whitelist (env: false).
 const sterileEnv = {
   NODE_ENV: 'production',
-  DEBUG: undefined,
 };
 
 try {
   // Shadow Deno.env with a pure JS implementation
   const mockDenoEnv = {
-    get: (key) => sterileEnv[key] || undefined,
+    get: (key) => sterileEnv[key] ?? undefined,
     set: () => {
       throw new Error('Deno.env.set is disabled');
     },
@@ -31,7 +30,6 @@ try {
   };
 
   // Replace global Deno.env
-  const originalDeno = globalThis.Deno;
   Object.defineProperty(globalThis, 'Deno', {
     value: Object.freeze({ env: mockDenoEnv }),
     configurable: false, // Lock down permanently (Audit Finding)
@@ -77,7 +75,7 @@ self.onmessage = async (e) => {
     const mockDeno = {
       // Mock only the required Deno.env API for secret retrieval
       env: {
-        get: (key) => secrets[key] || undefined,
+        get: (key) => secrets[key] ?? undefined,
         // (toObject removed for security to prevent secret enumeration)
       },
       // Explicitly block all subprocess APIs as a secondary defense tier

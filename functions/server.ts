@@ -168,12 +168,15 @@ async function executeInWorker(code: string, request: Request): Promise<Response
           // RESTRICTED: Native environment access is disabled to shield host secrets.
           // Secrets are passed explicitly via message payload.
           env: false,
-          // SDK REQUIREMENT: Whitelist internal backend for API/Database connectivity.
-          net: ['localhost:7130', 'insforge:7130'],
+          // SDK/External REQUIREMENT: Allow network access for API connectivity and external integrations.
+          net: true,
           read: false,
           write: false,
           run: false,
           ffi: false,
+          sys: false,
+          import: false,
+          hrtime: false,
         },
       },
     });

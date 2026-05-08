@@ -366,15 +366,21 @@ export class FunctionService {
       /\bself\b/i,
       /\bprocess\b/i,
       /Deno\.(run|spawn|Command|makeTemp|remove|write|chmod|chown)/i,
-      /import\s*\(/i, // Block dynamic imports only; static imports are safe in the sandboxed worker
+      /\bimport\b[^;]*\(/i, // Block dynamic imports even with comments (e.g., import /* */ ('...'))
       /require\b/i,
       /eval\b/i,
       /\bFunction\s*\(/, // Case-sensitive: Block constructor but allow 'function' keyword
 
-      /constructor\b/i,
+      /__proto__|\.constructor\s*\[/i, // Block prototype chain abuse; allow valid JS/TS class constructors
       /\bDeno\s*\[|\bprocess\s*\[|\bglobalThis\s*\[/i, // Block bracket notation property access like obj['Deno']
     ];
 
+    /**
+     * TIER 1 VALIDATION (Convenience Filter):
+     * This regex suite is a high-level filter designed to reject obvious malicious patterns
+     * at the API layer. The ACTUAL enforcement boundary is the Tier 2 native Deno sandbox
+     * (permissions: false) which blocks the underlying syscalls.
+     */
     for (const pattern of dangerousPatterns) {
       if (pattern.test(code)) {
         logger.warn('Dangerous code pattern blocked', {
