@@ -59,12 +59,6 @@ describe('FunctionService Security Validation (Public API)', () => {
     });
   };
 
-  const updateTestFunction = (code: string) => {
-    return service.updateFunction('test-function', {
-      code,
-    });
-  };
-
   describe('Security Patterns', () => {
     const GENERIC_ERROR = /Code contains a potentially dangerous pattern/i;
 
