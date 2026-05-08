@@ -138,7 +138,14 @@ function makeFlyAppName(name: string, projectId: string): string {
 // Using it as the network name keeps per-project 6PN isolation AND stays
 // well under Fly's network-name validator length cap on every org.
 function makeNetwork(): string {
-  return process.env.APP_KEY || 'default-app-key';
+  if (!process.env.APP_KEY) {
+    throw new AppError(
+      'APP_KEY environment variable is required for compute network isolation',
+      500,
+      ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED
+    );
+  }
+  return process.env.APP_KEY;
 }
 
 // Default to Fly's own .fly.dev hostname (which Fly routes automatically for
