@@ -130,8 +130,22 @@ function makeFlyAppName(name: string, projectId: string): string {
   return `${truncated}-${hash}${suffix}`;
 }
 
-function makeNetwork(projectId: string): string {
-  return `${projectId}-network`;
+// Network name is sent on Fly POST /apps. Fly validates network names more
+// strictly than app names (varies by org — prod's Fly org rejected the old
+// `${projectId}-network` (~44 chars) with 422 "Name not a valid network
+// name"). APP_KEY is the project's short DNS-safe slug (~8 chars, e.g.
+// `d9byq46t`), unique per project, already used as the OSS hostname prefix.
+// Using it as the network name keeps per-project 6PN isolation AND stays
+// well under Fly's network-name validator length cap on every org.
+function makeNetwork(): string {
+  if (!process.env.APP_KEY) {
+    throw new AppError(
+      'APP_KEY environment variable is required for compute network isolation',
+      500,
+      ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED
+    );
+  }
+  return process.env.APP_KEY;
 }
 
 // Default to Fly's own .fly.dev hostname (which Fly routes automatically for
@@ -334,7 +348,7 @@ export class ComputeServicesService {
     const row: ServiceRow = insertResult.rows[0];
     const serviceId = row.id;
     const flyAppName = makeFlyAppName(input.name, input.projectId);
-    const network = makeNetwork(input.projectId);
+    const network = makeNetwork();
     const endpointUrl = makeEndpointUrl(flyAppName);
 
     let flyMachineId: string | undefined;
@@ -414,7 +428,7 @@ export class ComputeServicesService {
       : null;
 
     const flyAppName = makeFlyAppName(input.name, input.projectId);
-    const network = makeNetwork(input.projectId);
+    const network = makeNetwork();
     const endpointUrl = makeEndpointUrl(flyAppName);
 
     // Insert row — check for duplicate name before calling Fly APIs
