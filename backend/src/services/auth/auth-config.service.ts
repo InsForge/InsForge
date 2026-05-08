@@ -276,6 +276,9 @@ export class AuthConfigService {
     const config = await this.getAuthConfig();
     const allowedRedirectUrls = config.allowedRedirectUrls;
 
+    // Use the configured allowed redirect URLs to validate the target URL.
+    // If no whitelist is configured, we default to permissive behavior to improve
+    // developer experience and lower development friction.
     if (!allowedRedirectUrls || allowedRedirectUrls.length === 0) {
       return true;
     }
