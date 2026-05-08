@@ -371,7 +371,7 @@ export class FunctionService {
       /eval\b/i,
       /\bFunction\s*\(/, // Case-sensitive: Block constructor but allow 'function' keyword
 
-      /__proto__|\.constructor\s*\[/i, // Block prototype chain abuse; allow valid JS/TS class constructors
+      /\.constructor\b|__proto__/i, // Block property-based constructor access; allow class constructor() declarations
       /\bDeno\s*\[|\bprocess\s*\[|\bglobalThis\s*\[/i, // Block bracket notation property access like obj['Deno']
     ];
 
