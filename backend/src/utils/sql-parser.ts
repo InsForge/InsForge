@@ -1,9 +1,40 @@
 import splitSqlQuery from '@databases/split-sql-query';
 import sql from '@databases/sql';
 import { parseSync, loadModule } from 'libpg-query';
+import { INSFORGE_MANAGED_DATABASE_SCHEMAS } from '@/services/database/helpers.js';
 import logger from './logger.js';
 
 let initialized = false;
+
+// These are the documented managed tables where developers are expected to add
+// app-specific runtime rows through raw SQL.
+const MANAGED_SCHEMA_WRITE_TABLE_EXCEPTIONS = new Set(
+  ['realtime.channels'].map((tableName) => tableName.toLowerCase())
+);
+
+// These are the documented managed tables where developers are expected to add
+// business-logic triggers, but not broad table writes.
+const MANAGED_SCHEMA_TRIGGER_TABLE_EXCEPTIONS = new Set(
+  ['payments.payment_history', 'payments.subscriptions'].map((tableName) => tableName.toLowerCase())
+);
+
+// These are the documented managed tables where developers are expected to
+// enable/manage RLS and policies, but not perform broad writes.
+const MANAGED_SCHEMA_RLS_TABLE_EXCEPTIONS = new Set(
+  [
+    'storage.objects',
+    'payments.checkout_sessions',
+    'payments.customer_portal_sessions',
+    'realtime.messages',
+  ].map((tableName) => tableName.toLowerCase())
+);
+
+const ALLOWED_RLS_ALTER_TABLE_SUBTYPES = new Set([
+  'AT_EnableRowSecurity',
+  'AT_DisableRowSecurity',
+  'AT_ForceRowSecurity',
+  'AT_NoForceRowSecurity',
+]);
 
 /**
  * Initialize the SQL parser WASM module.
@@ -125,6 +156,25 @@ function getSchemaName(relation: Record<string, unknown> | undefined): string | 
   return null;
 }
 
+function getRelationName(relation: Record<string, unknown> | undefined): string | null {
+  if (!relation) {
+    return null;
+  }
+
+  if (relation.relname) {
+    return relation.relname as string;
+  }
+
+  if (relation.RangeVar) {
+    const rangeVar = relation.RangeVar as Record<string, unknown>;
+    if (rangeVar.relname) {
+      return rangeVar.relname as string;
+    }
+  }
+
+  return null;
+}
+
 /**
  * Check if a query contains dangerous operations on the auth schema
  * Returns an error message if blocked, null if allowed
@@ -236,8 +286,325 @@ function getSchemaFromNameList(items: Array<Record<string, unknown>>): string | 
   if (items.length < 1) {
     return null;
   }
-  const first = items[0];
-  return ((first.String as Record<string, unknown> | undefined)?.sval as string) ?? null;
+  return getStringNodeValue(items[0]);
+}
+
+function getTableFromNameList(items: Array<Record<string, unknown>>): string | null {
+  if (items.length < 2) {
+    return null;
+  }
+  return getStringNodeValue(items[1]);
+}
+
+function getStringNodeValue(item: Record<string, unknown> | undefined): string | null {
+  return ((item?.String as Record<string, unknown> | undefined)?.sval as string) ?? null;
+}
+
+function getDropObjectSchema(obj: Record<string, unknown>): string | null {
+  if (obj.String) {
+    return ((obj.String as Record<string, unknown>).sval as string) ?? null;
+  }
+
+  if (obj.List) {
+    const items =
+      ((obj.List as Record<string, unknown>).items as Array<Record<string, unknown>>) ?? [];
+    return items.length > 1 ? getSchemaFromNameList(items) : null;
+  }
+
+  if (obj.ObjectWithArgs) {
+    const objname =
+      ((obj.ObjectWithArgs as Record<string, unknown>).objname as Array<Record<string, unknown>>) ??
+      [];
+    return objname.length > 1 ? getSchemaFromNameList(objname) : null;
+  }
+
+  if (obj.TypeName) {
+    const names =
+      ((obj.TypeName as Record<string, unknown>).names as Array<Record<string, unknown>>) ?? [];
+    return names.length > 1 ? getSchemaFromNameList(names) : null;
+  }
+
+  return null;
+}
+
+function getProtectedSchema(
+  schemaName: string | null,
+  protectedSchemas: ReadonlySet<string>
+): string | null {
+  if (!schemaName) {
+    return null;
+  }
+
+  const normalizedSchemaName = schemaName.toLowerCase();
+  return protectedSchemas.has(normalizedSchemaName) ? normalizedSchemaName : null;
+}
+
+function buildManagedSchemaWriteError(schemaName: string): string {
+  return `Write operations on ${schemaName} schema are not allowed. InsForge-managed schemas are protected in the dashboard.`;
+}
+
+function isManagedSchemaWriteTableException(
+  schemaName: string | null,
+  tableName: string | null
+): boolean {
+  if (!schemaName || !tableName) {
+    return false;
+  }
+
+  return MANAGED_SCHEMA_WRITE_TABLE_EXCEPTIONS.has(
+    `${schemaName.toLowerCase()}.${tableName.toLowerCase()}`
+  );
+}
+
+function isManagedSchemaTriggerTableException(
+  schemaName: string | null,
+  tableName: string | null
+): boolean {
+  if (!schemaName || !tableName) {
+    return false;
+  }
+
+  return MANAGED_SCHEMA_TRIGGER_TABLE_EXCEPTIONS.has(
+    `${schemaName.toLowerCase()}.${tableName.toLowerCase()}`
+  );
+}
+
+function isManagedSchemaRlsTableException(
+  schemaName: string | null,
+  tableName: string | null
+): boolean {
+  if (!schemaName || !tableName) {
+    return false;
+  }
+
+  return MANAGED_SCHEMA_RLS_TABLE_EXCEPTIONS.has(
+    `${schemaName.toLowerCase()}.${tableName.toLowerCase()}`
+  );
+}
+
+function isManagedSchemaRlsAlterTableException(
+  data: Record<string, unknown>,
+  schemaName: string | null,
+  tableName: string | null
+): boolean {
+  if (!isManagedSchemaRlsTableException(schemaName, tableName)) {
+    return false;
+  }
+
+  const commands = (data.cmds as Array<Record<string, unknown>>) ?? [];
+  if (commands.length === 0) {
+    return false;
+  }
+
+  return commands.every((command) => {
+    const alterTableCmd = command.AlterTableCmd as Record<string, unknown> | undefined;
+    const subtype = alterTableCmd?.subtype as string | undefined;
+    return subtype ? ALLOWED_RLS_ALTER_TABLE_SUBTYPES.has(subtype) : false;
+  });
+}
+
+function getDropManagedRelation(
+  removeType: string,
+  obj: Record<string, unknown>
+): { schemaName: string | null; tableName: string | null } | null {
+  if (removeType !== 'OBJECT_POLICY' && removeType !== 'OBJECT_TRIGGER') {
+    return null;
+  }
+
+  const items =
+    ((obj.List as Record<string, unknown> | undefined)?.items as Array<Record<string, unknown>>) ??
+    [];
+  if (items.length < 2) {
+    return null;
+  }
+
+  return {
+    schemaName: getSchemaFromNameList(items),
+    tableName: getTableFromNameList(items),
+  };
+}
+
+export function checkManagedSchemaWriteOperations(
+  query: string,
+  protectedSchemaNames: readonly string[] = INSFORGE_MANAGED_DATABASE_SCHEMAS
+): string | null {
+  const protectedSchemas = new Set(
+    protectedSchemaNames.map((schemaName) => schemaName.toLowerCase())
+  );
+
+  try {
+    const { stmts } = parseSync(query);
+
+    for (const stmtWrapper of stmts) {
+      const stmt = stmtWrapper.stmt as Record<string, unknown>;
+      const [stmtType, data] = Object.entries(stmt)[0] as [string, Record<string, unknown>];
+
+      if (stmtType === 'CreateSchemaStmt') {
+        const schemaName = getProtectedSchema(
+          (data.schemaname as string) ?? null,
+          protectedSchemas
+        );
+        if (schemaName) {
+          return buildManagedSchemaWriteError(schemaName);
+        }
+      }
+
+      if (stmtType === 'AlterObjectSchemaStmt') {
+        const schemaName = getProtectedSchema((data.newschema as string) ?? null, protectedSchemas);
+        if (schemaName) {
+          return buildManagedSchemaWriteError(schemaName);
+        }
+      }
+
+      if (stmtType === 'CreateFunctionStmt') {
+        const funcname = (data.funcname as Array<Record<string, unknown>>) ?? [];
+        const schemaName =
+          funcname.length > 1
+            ? getProtectedSchema(getSchemaFromNameList(funcname), protectedSchemas)
+            : null;
+        if (schemaName) {
+          return buildManagedSchemaWriteError(schemaName);
+        }
+      }
+
+      if (stmtType === 'AlterFunctionStmt') {
+        const func = data.func as Record<string, unknown> | undefined;
+        const objname = (func?.objname as Array<Record<string, unknown>>) ?? [];
+        const schemaName =
+          objname.length > 1
+            ? getProtectedSchema(getSchemaFromNameList(objname), protectedSchemas)
+            : null;
+        if (schemaName) {
+          return buildManagedSchemaWriteError(schemaName);
+        }
+      }
+
+      if (stmtType === 'CreateTrigStmt') {
+        const relation = data.relation as Record<string, unknown> | undefined;
+        const relationSchema = getProtectedSchema(getSchemaName(relation), protectedSchemas);
+        const relationTableName = getRelationName(relation);
+        if (
+          relationSchema &&
+          !isManagedSchemaWriteTableException(relationSchema, relationTableName) &&
+          !isManagedSchemaTriggerTableException(relationSchema, relationTableName)
+        ) {
+          return buildManagedSchemaWriteError(relationSchema);
+        }
+
+        const funcname = (data.funcname as Array<Record<string, unknown>>) ?? [];
+        const functionSchema =
+          funcname.length > 1
+            ? getProtectedSchema(getSchemaFromNameList(funcname), protectedSchemas)
+            : null;
+        if (functionSchema) {
+          return buildManagedSchemaWriteError(functionSchema);
+        }
+      }
+
+      if (stmtType === 'DropStmt') {
+        const removeType = (data.removeType as string) ?? '';
+        const objects = (data.objects as Array<unknown>) ?? [];
+        for (const obj of objects) {
+          if (typeof obj !== 'object' || obj === null) {
+            continue;
+          }
+
+          const relation = getDropManagedRelation(removeType, obj as Record<string, unknown>);
+          if (
+            relation &&
+            relation.schemaName &&
+            relation.tableName &&
+            ((removeType === 'OBJECT_TRIGGER' &&
+              (isManagedSchemaWriteTableException(relation.schemaName, relation.tableName) ||
+                isManagedSchemaTriggerTableException(relation.schemaName, relation.tableName))) ||
+              (removeType === 'OBJECT_POLICY' &&
+                (isManagedSchemaWriteTableException(relation.schemaName, relation.tableName) ||
+                  isManagedSchemaRlsTableException(relation.schemaName, relation.tableName))))
+          ) {
+            continue;
+          }
+
+          const schemaName = getProtectedSchema(
+            getDropObjectSchema(obj as Record<string, unknown>),
+            protectedSchemas
+          );
+          if (schemaName) {
+            return buildManagedSchemaWriteError(schemaName);
+          }
+        }
+      }
+
+      if (stmtType === 'CreateStmt' || stmtType === 'IndexStmt') {
+        const relation = data.relation as Record<string, unknown> | undefined;
+        const schemaName = getProtectedSchema(getSchemaName(relation), protectedSchemas);
+        const tableName = getRelationName(relation);
+        if (schemaName && !isManagedSchemaWriteTableException(schemaName, tableName)) {
+          return buildManagedSchemaWriteError(schemaName);
+        }
+      }
+
+      if (stmtType === 'RenameStmt') {
+        const relation = data.relation as Record<string, unknown> | undefined;
+        const schemaName = getProtectedSchema(getSchemaName(relation), protectedSchemas);
+        if (schemaName) {
+          return buildManagedSchemaWriteError(schemaName);
+        }
+      }
+
+      if (stmtType === 'AlterTableStmt') {
+        const relation = data.relation as Record<string, unknown> | undefined;
+        const schemaName = getProtectedSchema(getSchemaName(relation), protectedSchemas);
+        const tableName = getRelationName(relation);
+        if (
+          schemaName &&
+          !isManagedSchemaWriteTableException(schemaName, tableName) &&
+          !isManagedSchemaRlsAlterTableException(data, schemaName, tableName)
+        ) {
+          return buildManagedSchemaWriteError(schemaName);
+        }
+      }
+
+      if (stmtType === 'InsertStmt' || stmtType === 'UpdateStmt' || stmtType === 'DeleteStmt') {
+        const relation = data.relation as Record<string, unknown> | undefined;
+        const schemaName = getProtectedSchema(getSchemaName(relation), protectedSchemas);
+        const tableName = getRelationName(relation);
+        if (schemaName && !isManagedSchemaWriteTableException(schemaName, tableName)) {
+          return buildManagedSchemaWriteError(schemaName);
+        }
+      }
+
+      if (stmtType === 'CreatePolicyStmt' || stmtType === 'AlterPolicyStmt') {
+        const relation = data.table as Record<string, unknown> | undefined;
+        const schemaName = getProtectedSchema(getSchemaName(relation), protectedSchemas);
+        const tableName = getRelationName(relation);
+        if (
+          schemaName &&
+          !isManagedSchemaWriteTableException(schemaName, tableName) &&
+          !isManagedSchemaRlsTableException(schemaName, tableName)
+        ) {
+          return buildManagedSchemaWriteError(schemaName);
+        }
+      }
+
+      if (stmtType === 'TruncateStmt') {
+        const relations = (data.relations as Array<Record<string, unknown>>) ?? [];
+        for (const relation of relations) {
+          const schemaName = getProtectedSchema(getSchemaName(relation), protectedSchemas);
+          if (schemaName) {
+            return buildManagedSchemaWriteError(schemaName);
+          }
+        }
+      }
+    }
+
+    return null;
+  } catch (parseError) {
+    logger.warn(
+      'SQL parse error in checkManagedSchemaWriteOperations, rejecting query:',
+      parseError
+    );
+    return 'Query could not be parsed and was rejected for security reasons.';
+  }
 }
 
 /**
@@ -333,38 +700,7 @@ export function checkSystemSchemaOperations(query: string): string | null {
           if (typeof obj !== 'object' || obj === null) {
             continue;
           }
-          const o = obj as Record<string, unknown>;
-          let schema: string | null = null;
-
-          if (o.String) {
-            // DROP SCHEMA system
-            schema = ((o.String as Record<string, unknown>).sval as string) ?? null;
-          } else if (o.List) {
-            // DROP TABLE system.foo
-            const items =
-              ((o.List as Record<string, unknown>).items as Array<Record<string, unknown>>) ?? [];
-            if (items.length > 1) {
-              schema = getSchemaFromNameList(items);
-            }
-          } else if (o.ObjectWithArgs) {
-            // DROP FUNCTION system.foo(...)
-            const objname =
-              ((o.ObjectWithArgs as Record<string, unknown>).objname as Array<
-                Record<string, unknown>
-              >) ?? [];
-            if (objname.length > 1) {
-              schema = getSchemaFromNameList(objname);
-            }
-          } else if (o.TypeName) {
-            // DROP TYPE/DOMAIN system.foo
-            const names =
-              ((o.TypeName as Record<string, unknown>).names as Array<Record<string, unknown>>) ??
-              [];
-            if (names.length > 1) {
-              schema = getSchemaFromNameList(names);
-            }
-          }
-
+          const schema = getDropObjectSchema(obj as Record<string, unknown>);
           if (isSystem(schema)) {
             return 'DROP operations on the "system" schema are not allowed.';
           }

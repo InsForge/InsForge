@@ -24,6 +24,14 @@ spec:
           type: STRING
           name: OpenRouter API Key
           description: API key for OpenRouter LLM services (optional).
+        - key: STRIPE_TEST_SECRET_KEY
+          type: STRING
+          name: Stripe Test Secret Key
+          description: Stripe test mode secret key for payment catalog sync (optional).
+        - key: STRIPE_LIVE_SECRET_KEY
+          type: STRING
+          name: Stripe Live Secret Key
+          description: Stripe live mode secret key for payment catalog sync (optional).
     tags:
         - Development
         - Database
@@ -925,6 +933,10 @@ spec:
                     default: ""
                 OPENROUTER_API_KEY:
                     default: ${OPENROUTER_API_KEY}
+                STRIPE_TEST_SECRET_KEY:
+                    default: ${STRIPE_TEST_SECRET_KEY}
+                STRIPE_LIVE_SECRET_KEY:
+                    default: ${STRIPE_LIVE_SECRET_KEY}
             healthCheck:
                 type: HTTP
                 port: web

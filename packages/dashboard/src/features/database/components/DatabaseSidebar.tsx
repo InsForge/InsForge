@@ -1,17 +1,19 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { ArrowLeft, Database, Pencil, Plus, Trash2 } from 'lucide-react';
-import { Link, useMatch, useNavigate } from 'react-router-dom';
-import EmptyBoxSvg from '../../../assets/images/empty_box.svg?react';
+import { Link, useLocation, useMatch, useNavigate } from 'react-router-dom';
+import EmptyBoxSvg from '#assets/images/empty_box.svg?react';
 import {
   FeatureSidebar,
   type FeatureSidebarActionButton,
   type FeatureSidebarItemAction,
   type FeatureSidebarListItem,
-} from '../../../components';
-import { ScrollArea } from '../../../components/radix/ScrollArea';
-import { useIsCloudHostingMode } from '../../../lib/config/DashboardHostContext';
-import { cn } from '../../../lib/utils/utils';
+} from '#components';
+import { ScrollArea } from '#components/radix/ScrollArea';
+import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
+import { cn } from '#lib/utils/utils';
 import { Button } from '@insforge/ui';
+import { DatabaseSchemaSelect } from '#features/database/components/DatabaseSchemaSelect';
+import type { DatabaseSchemaInfo } from '@insforge/shared-schemas';
 
 const DATABASE_STUDIO_SIDEBAR_BASE_ITEMS: Array<{
   id: string;
@@ -53,6 +55,9 @@ const DATABASE_STUDIO_SIDEBAR_BASE_ITEMS: Array<{
 ];
 
 export interface DatabaseSidebarProps {
+  schemas: DatabaseSchemaInfo[];
+  selectedSchema: string;
+  onSchemaSelect: (schemaName: string) => void;
   tables: string[];
   selectedTable?: string;
   onTableSelect: (tableName: string) => void;
@@ -75,6 +80,7 @@ interface DatabaseStudioSidebarItemProps {
 }
 
 function DatabaseStudioSidebarItem({ label, href, sectionEnd }: DatabaseStudioSidebarItemProps) {
+  const location = useLocation();
   const match = useMatch({ path: href, end: false });
   const isSelected = !!match;
 
@@ -88,7 +94,13 @@ function DatabaseStudioSidebarItem({ label, href, sectionEnd }: DatabaseStudioSi
             : 'text-muted-foreground hover:bg-alpha-4 hover:text-foreground'
         )}
       >
-        <Link to={href} className="flex min-w-0 flex-1 items-center px-2">
+        <Link
+          to={{
+            pathname: href,
+            search: location.search,
+          }}
+          className="flex min-w-0 flex-1 items-center px-2"
+        >
           <p className={cn('truncate text-sm leading-5', isSelected && 'text-inherit')}>{label}</p>
         </Link>
       </div>
@@ -143,6 +155,9 @@ export function DatabaseStudioSidebarPanel({ onBack }: DatabaseStudioSidebarPane
 }
 
 export function DatabaseSidebar({
+  schemas,
+  selectedSchema,
+  onSchemaSelect,
   tables,
   selectedTable,
   onTableSelect,
@@ -154,6 +169,7 @@ export function DatabaseSidebar({
   animateToMode,
 }: DatabaseSidebarProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [mode, setMode] = useState<'tables' | 'studio'>(initialMode);
   const showEmptyState = tables.length === 0;
   const navigateTimerRef = useRef<number | null>(null);
@@ -207,7 +223,10 @@ export function DatabaseSidebar({
           window.clearTimeout(navigateTimerRef.current);
         }
         navigateTimerRef.current = window.setTimeout(() => {
-          void navigate('/dashboard/database/indexes');
+          void navigate({
+            pathname: '/dashboard/database/indexes',
+            search: location.search,
+          });
         }, STUDIO_MENU_TRANSITION_MS);
       },
     },
@@ -249,6 +268,13 @@ export function DatabaseSidebar({
         <div className="h-full w-1/2">
           <FeatureSidebar
             title="Database"
+            headerContent={
+              <DatabaseSchemaSelect
+                schemas={schemas}
+                value={selectedSchema}
+                onValueChange={onSchemaSelect}
+              />
+            }
             items={tableMenuItems}
             activeItemId={selectedTable}
             loading={loading}

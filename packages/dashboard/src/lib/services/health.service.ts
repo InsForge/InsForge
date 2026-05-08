@@ -1,4 +1,4 @@
-import { apiClient } from '../api/client';
+import { apiClient } from '#lib/api/client';
 
 export interface HealthResponse {
   version: string;

@@ -15,7 +15,7 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "baseUrl": ".",
+    "rootDir": "./src",
     "paths": {
       "@insforge/ui": ["./src/index.ts"]
     }

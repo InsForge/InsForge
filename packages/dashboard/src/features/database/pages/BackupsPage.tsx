@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Info, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Button,
   ConfirmDialog,
@@ -9,15 +9,18 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@insforge/ui';
-import { CreateBackupDialog } from '../components/CreateBackupDialog';
-import { ConfirmRestoreDialog } from '../components/ConfirmRestoreDialog';
-import { DatabaseEmptyState } from '../components/DatabaseEmptyState';
-import { DatabaseStudioSidebarPanel } from '../components/DatabaseSidebar';
-import { RenameBackupDialog } from '../components/RenameBackupDialog';
-import { useDatabaseBackupInfo, useDatabaseBackupInstanceInfo } from '../hooks/useDatabaseBackup';
-import { useDashboardHost } from '../../../lib/config/DashboardHostContext';
-import { useConfirm } from '../../../lib/hooks/useConfirm';
-import { useToast } from '../../../lib/hooks/useToast';
+import { CreateBackupDialog } from '#features/database/components/CreateBackupDialog';
+import { ConfirmRestoreDialog } from '#features/database/components/ConfirmRestoreDialog';
+import { DatabaseEmptyState } from '#features/database/components/DatabaseEmptyState';
+import { DatabaseStudioSidebarPanel } from '#features/database/components/DatabaseSidebar';
+import { RenameBackupDialog } from '#features/database/components/RenameBackupDialog';
+import {
+  useDatabaseBackupInfo,
+  useDatabaseBackupInstanceInfo,
+} from '#features/database/hooks/useDatabaseBackup';
+import { useDashboardHost } from '#lib/config/DashboardHostContext';
+import { useConfirm } from '#lib/hooks/useConfirm';
+import { useToast } from '#lib/hooks/useToast';
 
 function formatBackupTimestamp(timestamp: string) {
   const date = new Date(timestamp);
@@ -37,6 +40,7 @@ function formatBackupTimestamp(timestamp: string) {
 }
 
 export default function BackupsPage() {
+  const location = useLocation();
   const navigate = useNavigate();
   const host = useDashboardHost();
   const { showToast } = useToast();
@@ -133,7 +137,13 @@ export default function BackupsPage() {
       <div className="flex h-full min-h-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
         <DatabaseStudioSidebarPanel
           onBack={() =>
-            void navigate('/dashboard/database/tables', { state: { slideFromStudio: true } })
+            void navigate(
+              {
+                pathname: '/dashboard/database/tables',
+                search: location.search,
+              },
+              { state: { slideFromStudio: true } }
+            )
           }
         />
         <div className="min-w-0 flex-1 overflow-auto bg-[rgb(var(--semantic-1))]">

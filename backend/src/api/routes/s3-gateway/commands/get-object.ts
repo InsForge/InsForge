@@ -14,6 +14,18 @@ export async function handle(req: S3AuthenticatedRequest, res: Response): Promis
     });
     return;
   }
+  // Branch DB is the source of truth for "does this object exist in this
+  // branch?". Without this check, the provider's branch→parent S3 fallback
+  // could resurrect an inherited object that the branch already deleted, or
+  // expose a parent-side post-fork upload that this branch never received.
+  // HeadObject already gates on the metadata row; GetObject must match.
+  if (!(await svc.getObjectMetadataRow(bucket, key))) {
+    sendS3Error(res, 'NoSuchKey', 'Object does not exist', {
+      resource: req.path,
+      requestId: req.s3Auth.requestId,
+    });
+    return;
+  }
   const range = req.headers['range'] as string | undefined;
   try {
     const result = await svc.getProvider().getObjectStream(bucket, key, { range });

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { StorageConfigSchema, UpdateStorageConfigRequest } from '@insforge/shared-schemas';
-import { storageConfigService } from '../services/storage-config.service';
-import { useToast } from '../../../lib/hooks/useToast';
+import { storageConfigService } from '#features/storage/services/storage-config.service';
+import { useToast } from '#lib/hooks/useToast';
 
 /**
  * React Query hook for fetching and updating the storage configuration.

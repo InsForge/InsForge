@@ -104,6 +104,17 @@ export function validateTableName(tableName: string): boolean {
 }
 
 /**
+ * Validates schema name with additional checks
+ * @param schemaName - The schema name to validate
+ * @returns true if valid
+ * @throws AppError if invalid
+ */
+export function validateSchemaName(schemaName: string): boolean {
+  validateIdentifier(schemaName, 'schema');
+  return true;
+}
+
+/**
  * Validates PostgreSQL function name for RPC calls
  * @param functionName - The function name to validate
  * @returns true if valid

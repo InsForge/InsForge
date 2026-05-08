@@ -11,40 +11,102 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export default defineConfig(
-  js.configs.recommended,
-  ...tseslint.configs.recommended,
-  prettierConfig,
-  // Frontend and shared React packages configuration
-  {
-    files: [
-      'frontend/**/*.ts',
-      'frontend/**/*.tsx',
-      'packages/dashboard/**/*.ts',
-      'packages/dashboard/**/*.tsx',
-      'packages/ui/**/*.ts',
-      'packages/ui/**/*.tsx',
-    ],
-    ignores: [
-      'frontend/tests/**/*',
-      'frontend/**/*.test.*',
-      'frontend/**/*.spec.*',
-      'packages/dashboard/tests/**/*',
-      'packages/dashboard/**/*.test.*',
-      'packages/dashboard/**/*.spec.*',
-      'packages/ui/tests/**/*',
-      'packages/ui/**/*.test.*',
-      'packages/ui/**/*.spec.*',
-    ],
+const reactPackageRules = {
+  // TypeScript rules
+  '@typescript-eslint/explicit-function-return-type': 'off',
+  '@typescript-eslint/explicit-module-boundary-types': 'off',
+  '@typescript-eslint/no-explicit-any': 'warn',
+  '@typescript-eslint/no-unused-vars': [
+    'error',
+    {
+      argsIgnorePattern: '^_',
+      varsIgnorePattern: '^_',
+    },
+  ],
+  '@typescript-eslint/no-non-null-assertion': 'warn',
+  '@typescript-eslint/strict-boolean-expressions': 'off',
+  '@typescript-eslint/no-floating-promises': 'error',
+  '@typescript-eslint/no-misused-promises': 'error',
+  '@typescript-eslint/await-thenable': 'error',
+  '@typescript-eslint/require-await': 'error',
+
+  // Naming conventions
+  '@typescript-eslint/naming-convention': [
+    'error',
+    // Variables and parameters - camelCase
+    {
+      selector: ['parameter', 'function'],
+      format: ['camelCase', 'PascalCase'],
+      leadingUnderscore: 'allow',
+      trailingUnderscore: 'forbid',
+    },
+    // Types, interfaces, type parameters, classes - PascalCase
+    {
+      selector: ['typeLike', 'class'],
+      format: ['PascalCase'],
+    },
+    // Enum members - UPPER_CASE
+    {
+      selector: 'enumMember',
+      format: ['UPPER_CASE'],
+    },
+    // React components (functions starting with capital letter) - PascalCase
+    {
+      selector: 'variable',
+      format: ['camelCase', 'PascalCase', 'UPPER_CASE'],
+      leadingUnderscore: 'allow',
+    },
+  ],
+
+  // React rules
+  'react/react-in-jsx-scope': 'off',
+  'react/prop-types': 'off',
+  'react/jsx-uses-react': 'off',
+  'react/jsx-uses-vars': 'error',
+  'react/jsx-no-duplicate-props': 'error',
+  'react/jsx-no-undef': 'error',
+  'react/jsx-pascal-case': 'error',
+  'react/no-children-prop': 'error',
+  'react/no-danger-with-children': 'error',
+  'react/no-deprecated': 'error',
+  'react/no-direct-mutation-state': 'error',
+  'react/no-find-dom-node': 'error',
+  'react/no-is-mounted': 'error',
+  'react/no-render-return-value': 'error',
+  'react/no-string-refs': 'error',
+  'react/no-unescaped-entities': 'error',
+  'react/no-unknown-property': 'error',
+  'react/require-render-return': 'error',
+  'react/self-closing-comp': 'error',
+
+  // React Hooks rules
+  'react-hooks/rules-of-hooks': 'error',
+  'react-hooks/exhaustive-deps': 'warn',
+
+  // General rules
+  'no-console': ['warn', { allow: ['warn', 'error'] }],
+  'no-debugger': 'error',
+  'no-duplicate-imports': 'error',
+  'no-unused-expressions': 'error',
+  'prefer-const': 'error',
+  'no-var': 'error',
+  eqeqeq: ['error', 'always'],
+  curly: ['error', 'all'],
+
+  // Prettier integration
+  'prettier/prettier': 'error',
+};
+
+function createReactPackageConfig(packageDir, project) {
+  return {
+    basePath: path.join(__dirname, packageDir),
+    files: ['**/*.ts', '**/*.tsx'],
+    ignores: ['tests/**/*', '**/*.test.*', '**/*.spec.*'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
       parserOptions: {
-        project: [
-          './frontend/tsconfig.json',
-          './packages/dashboard/tsconfig.json',
-          './packages/ui/tsconfig.json',
-        ],
+        project,
         tsconfigRootDir: __dirname,
         ecmaFeatures: {
           jsx: true,
@@ -66,92 +128,18 @@ export default defineConfig(
         version: 'detect',
       },
     },
-    rules: {
-      // TypeScript rules
-      '@typescript-eslint/explicit-function-return-type': 'off',
-      '@typescript-eslint/explicit-module-boundary-types': 'off',
-      '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-unused-vars': [
-        'error',
-        {
-          argsIgnorePattern: '^_',
-          varsIgnorePattern: '^_',
-        },
-      ],
-      '@typescript-eslint/no-non-null-assertion': 'warn',
-      '@typescript-eslint/strict-boolean-expressions': 'off',
-      '@typescript-eslint/no-floating-promises': 'error',
-      '@typescript-eslint/no-misused-promises': 'error',
-      '@typescript-eslint/await-thenable': 'error',
-      '@typescript-eslint/require-await': 'error',
+    rules: reactPackageRules,
+  };
+}
 
-      // Naming conventions
-      '@typescript-eslint/naming-convention': [
-        'error',
-        // Variables and parameters - camelCase
-        {
-          selector: ['parameter', 'function'],
-          format: ['camelCase', 'PascalCase'],
-          leadingUnderscore: 'allow',
-          trailingUnderscore: 'forbid',
-        },
-        // Types, interfaces, type parameters, classes - PascalCase
-        {
-          selector: ['typeLike', 'class'],
-          format: ['PascalCase'],
-        },
-        // Enum members - UPPER_CASE
-        {
-          selector: 'enumMember',
-          format: ['UPPER_CASE'],
-        },
-        // React components (functions starting with capital letter) - PascalCase
-        {
-          selector: 'variable',
-          format: ['camelCase', 'PascalCase', 'UPPER_CASE'],
-          leadingUnderscore: 'allow',
-        },
-      ],
-
-      // React rules
-      'react/react-in-jsx-scope': 'off',
-      'react/prop-types': 'off',
-      'react/jsx-uses-react': 'off',
-      'react/jsx-uses-vars': 'error',
-      'react/jsx-no-duplicate-props': 'error',
-      'react/jsx-no-undef': 'error',
-      'react/jsx-pascal-case': 'error',
-      'react/no-children-prop': 'error',
-      'react/no-danger-with-children': 'error',
-      'react/no-deprecated': 'error',
-      'react/no-direct-mutation-state': 'error',
-      'react/no-find-dom-node': 'error',
-      'react/no-is-mounted': 'error',
-      'react/no-render-return-value': 'error',
-      'react/no-string-refs': 'error',
-      'react/no-unescaped-entities': 'error',
-      'react/no-unknown-property': 'error',
-      'react/require-render-return': 'error',
-      'react/self-closing-comp': 'error',
-
-      // React Hooks rules
-      'react-hooks/rules-of-hooks': 'error',
-      'react-hooks/exhaustive-deps': 'warn',
-
-      // General rules
-      'no-console': ['warn', { allow: ['warn', 'error'] }],
-      'no-debugger': 'error',
-      'no-duplicate-imports': 'error',
-      'no-unused-expressions': 'error',
-      'prefer-const': 'error',
-      'no-var': 'error',
-      eqeqeq: ['error', 'always'],
-      curly: ['error', 'all'],
-
-      // Prettier integration
-      'prettier/prettier': 'error',
-    },
-  },
+export default defineConfig(
+  js.configs.recommended,
+  ...tseslint.configs.recommended,
+  prettierConfig,
+  // Frontend and shared React packages configuration
+  createReactPackageConfig('frontend', './frontend/tsconfig.json'),
+  createReactPackageConfig('packages/dashboard', './packages/dashboard/tsconfig.json'),
+  createReactPackageConfig('packages/ui', './packages/ui/tsconfig.json'),
   // Backend configuration
   {
     files: ['backend/**/*.ts', 'backend/**/*.tsx'],
@@ -210,6 +198,24 @@ export default defineConfig(
 
       // Prettier integration
       'prettier/prettier': 'error',
+    },
+  },
+  {
+    basePath: path.join(__dirname, 'packages/dashboard'),
+    files: ['**/*.ts', '**/*.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '^\\.\\.(?:/|$)',
+              message:
+                'Use relative imports only within the same folder. Use dashboard #... aliases for imports outside the current folder.',
+            },
+          ],
+        },
+      ],
     },
   },
   // Shared schemas configuration - minimal rules for schema definitions

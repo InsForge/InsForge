@@ -1,5 +1,5 @@
 import { SearchInput } from '@insforge/ui';
-import { cn } from '../lib/utils/utils';
+import { cn } from '#lib/utils/utils';
 
 interface TableHeaderProps {
   title?: React.ReactNode;

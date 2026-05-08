@@ -8,10 +8,10 @@ import ReactDataGrid, {
   type CellMouseEvent,
   type RenderCellProps,
 } from 'react-data-grid';
-import { cn } from '../../lib/utils/utils';
-import { PaginationControls } from '../PaginationControls';
+import { cn } from '#lib/utils/utils';
+import { PaginationControls } from '#components/PaginationControls';
 import { Checkbox } from '@insforge/ui';
-import { useTheme } from '../../lib/contexts/ThemeContext';
+import { useTheme } from '#lib/contexts/ThemeContext';
 import type { DataGridColumn, DataGridRow, DataGridRowType } from './datagridTypes';
 import SortableHeaderRenderer from './SortableHeader';
 

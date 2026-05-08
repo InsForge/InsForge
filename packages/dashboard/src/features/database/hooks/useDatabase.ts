@@ -1,11 +1,29 @@
 import { useQuery } from '@tanstack/react-query';
-import { databaseService } from '../services/database.service';
+import { databaseService } from '#features/database/services/database.service';
+import { databaseSchemaQueryKeys } from '#features/database/queryKeys';
 
-export function useFunctions(enabled = false) {
+export function useDatabaseSchemas(enabled = true) {
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['database', 'functions'],
-    queryFn: () => databaseService.getFunctions(),
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    queryKey: databaseSchemaQueryKeys.allSchemas,
+    queryFn: () => databaseService.getSchemas(),
+    staleTime: 5 * 60 * 1000,
+    enabled,
+  });
+
+  return {
+    data,
+    schemas: data?.schemas ?? [],
+    isLoading,
+    error,
+    refetch,
+  };
+}
+
+export function useFunctions(schemaName: string, enabled = false) {
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['database', 'functions', schemaName],
+    queryFn: () => databaseService.getFunctions(schemaName),
+    staleTime: 5 * 60 * 1000,
     enabled,
   });
 
@@ -17,11 +35,11 @@ export function useFunctions(enabled = false) {
   };
 }
 
-export function useIndexes(enabled = false) {
+export function useIndexes(schemaName: string, enabled = false) {
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['database', 'indexes'],
-    queryFn: () => databaseService.getIndexes(),
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    queryKey: ['database', 'indexes', schemaName],
+    queryFn: () => databaseService.getIndexes(schemaName),
+    staleTime: 5 * 60 * 1000,
     enabled,
   });
 
@@ -33,11 +51,11 @@ export function useIndexes(enabled = false) {
   };
 }
 
-export function usePolicies(enabled = false) {
+export function usePolicies(schemaName: string, enabled = false) {
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['database', 'policies'],
-    queryFn: () => databaseService.getPolicies(),
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    queryKey: ['database', 'policies', schemaName],
+    queryFn: () => databaseService.getPolicies(schemaName),
+    staleTime: 5 * 60 * 1000,
     enabled,
   });
 
@@ -49,11 +67,11 @@ export function usePolicies(enabled = false) {
   };
 }
 
-export function useTriggers(enabled = false) {
+export function useTriggers(schemaName: string, enabled = false) {
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['database', 'triggers'],
-    queryFn: () => databaseService.getTriggers(),
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    queryKey: ['database', 'triggers', schemaName],
+    queryFn: () => databaseService.getTriggers(schemaName),
+    staleTime: 5 * 60 * 1000,
     enabled,
   });
 

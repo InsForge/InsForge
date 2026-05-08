@@ -180,12 +180,12 @@ Only tables in the `public` schema are exposed via PostgREST auto-generated APIs
 
 ### Custom Migrations
 
-InsForge supports developer-facing custom migrations through the admin API:
+InsForge supports developer-facing custom migrations through the admin API and the InsForge CLI. For the day-to-day workflow, use the [Database Migrations](/core-concepts/database/migrations) guide.
 
 - `POST /api/database/migrations` parses and immediately executes SQL in one transaction
 - `GET /api/database/migrations` returns the successful migration history
 - Only migrations that fully succeed are stored in `system.custom_migrations`
-- Custom migrations may target only the `public` schema
+- The executor sets `search_path` to `public`, so unqualified app tables resolve there by default
 
 This is intentionally separate from `system.migrations`, which tracks InsForge's own internal platform migrations.
 

@@ -1,9 +1,9 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Loader2, ChevronUp, ChevronDown, ChevronsUpDown, Settings } from 'lucide-react';
-import { useAIConfigs } from '../hooks/useAIConfigs';
-import { useAIRemainingCredits } from '../hooks/useAIUsage';
-import { useConfirm } from '../../../lib/hooks/useConfirm';
-import { isInsForgeCloudProject } from '../../../lib/utils/utils';
+import { useAIConfigs } from '#features/ai/hooks/useAIConfigs';
+import { useAIRemainingCredits } from '#features/ai/hooks/useAIUsage';
+import { useConfirm } from '#lib/hooks/useConfirm';
+import { isInsForgeCloudProject } from '#lib/utils/utils';
 import { Tabs, Tab, ConfirmDialog, Button } from '@insforge/ui';
 import {
   generateProviderTabs,
@@ -12,8 +12,8 @@ import {
   formatCredits,
   type SortField,
   type SortDirection,
-} from '../helpers';
-import { GatewayConfigDialog, ModelRow } from '../components';
+} from '#features/ai/helpers';
+import { GatewayConfigDialog, ModelRow } from '#features/ai/components';
 import type { AIModelSchema } from '@insforge/shared-schemas';
 
 export default function AIPage() {

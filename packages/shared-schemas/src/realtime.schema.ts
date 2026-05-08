@@ -81,6 +81,48 @@ export const publishEventPayloadSchema = z.object({
 
 export type PublishEventPayload = z.infer<typeof publishEventPayloadSchema>;
 
+// ============================================================================
+// Presence Schemas
+// ============================================================================
+
+/**
+ * A member present in a realtime channel.
+ * Presence is ephemeral — tracked in-memory, not persisted to the database.
+ * `presenceId` is the user ID for `type: 'user'` and the socket ID for `type: 'anonymous'`.
+ */
+export const presenceIdentityTypeSchema = z.enum(['user', 'anonymous']);
+
+export type PresenceIdentityType = z.infer<typeof presenceIdentityTypeSchema>;
+
+const basePresenceMemberSchema = z.object({
+  presenceId: z.string().min(1),
+  joinedAt: z.string().datetime(),
+});
+
+export const presenceUserMemberSchema = basePresenceMemberSchema.extend({
+  type: z.literal('user'),
+});
+
+export const presenceAnonymousMemberSchema = basePresenceMemberSchema.extend({
+  type: z.literal('anonymous'),
+});
+
+export const presenceMemberSchema = z.discriminatedUnion('type', [
+  presenceUserMemberSchema,
+  presenceAnonymousMemberSchema,
+]);
+
+export type PresenceMember = z.infer<typeof presenceMemberSchema>;
+
+/**
+ * Initial presence state returned from a successful subscribe ack.
+ */
+export const presenceSnapshotSchema = z.object({
+  members: z.array(presenceMemberSchema),
+});
+
+export type PresenceSnapshot = z.infer<typeof presenceSnapshotSchema>;
+
 /**
  * Response for subscribe operations (used in Socket.IO ack callbacks)
  */
@@ -88,6 +130,7 @@ export const subscribeResponseSchema = z.discriminatedUnion('ok', [
   z.object({
     ok: z.literal(true),
     channel: z.string().min(1),
+    presence: presenceSnapshotSchema,
   }),
   z.object({
     ok: z.literal(false),
@@ -151,3 +194,21 @@ export const socketMessageSchema = z
   .passthrough();
 
 export type SocketMessage = z.infer<typeof socketMessageSchema>;
+
+/**
+ * Message for presence:join — broadcast when a new member becomes present
+ */
+export const presenceJoinMessageSchema = socketMessageSchema.extend({
+  member: presenceMemberSchema,
+});
+
+export type PresenceJoinMessage = z.infer<typeof presenceJoinMessageSchema>;
+
+/**
+ * Message for presence:leave — broadcast when a member is no longer present
+ */
+export const presenceLeaveMessageSchema = socketMessageSchema.extend({
+  member: presenceMemberSchema,
+});
+
+export type PresenceLeaveMessage = z.infer<typeof presenceLeaveMessageSchema>;

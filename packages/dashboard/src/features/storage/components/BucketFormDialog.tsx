@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useBuckets } from '../hooks/useBuckets';
-import { isInsForgeCloudProject } from '../../../lib/utils/utils';
-import DiscordIcon from '../../../assets/logos/discord.svg?react';
+import { useBuckets } from '#features/storage/hooks/useBuckets';
+import { isInsForgeCloudProject } from '#lib/utils/utils';
+import DiscordIcon from '#assets/logos/discord.svg?react';
 import {
   Button,
   Dialog,

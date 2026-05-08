@@ -10,15 +10,18 @@ import type {
   SocketMessageMeta,
   SubscribeResponse,
   UnsubscribeChannelPayload,
+  PresenceMember,
 } from '@insforge/shared-schemas';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
 import { RealtimeAuthService } from '@/services/realtime/realtime-auth.service.js';
 import { RealtimeMessageService } from '@/services/realtime/realtime-message.service.js';
+import { RealtimePresenceService } from '@/services/realtime/realtime-presence.service.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 
 const tokenManager = TokenManager.getInstance();
 const secretService = SecretService.getInstance();
+const presenceService = RealtimePresenceService.getInstance();
 
 /**
  * SocketManager - Industrial-grade Socket.IO implementation
@@ -81,6 +84,7 @@ export class SocketManager {
               email: 'api-key@client',
               role: 'project_admin',
             };
+            socket.data.presenceType = 'anonymous';
             logger.debug('Socket authenticated via API key');
             return next();
           }
@@ -117,6 +121,7 @@ export class SocketManager {
           email: payload.email,
           role: payload.role,
         };
+        socket.data.presenceType = 'user';
 
         next();
       } catch (error) {
@@ -207,6 +212,18 @@ export class SocketManager {
       connectionDuration: metadata ? Date.now() - metadata.connectedAt.getTime() : 0,
     });
 
+    // Presence: if this was the final socket for any logical member, notify remaining subscribers.
+    for (const result of presenceService.removeSocketFromAllRooms(socket.id)) {
+      const channel = result.roomName.replace(/^realtime:/, '');
+      this.emitPresenceMemberEvent(
+        ServerEvents.PRESENCE_LEAVE,
+        this.io,
+        result.roomName,
+        channel,
+        result.member
+      );
+    }
+
     // Cleanup
     this.socketMetadata.delete(socket.id);
   }
@@ -290,11 +307,39 @@ export class SocketManager {
         metadata.subscriptions.add(roomName);
       }
 
-      ack?.({ ok: true, channel });
+      const presence =
+        socket.data.presenceType === 'user' && userId
+          ? presenceService.trackMember(roomName, socket.id, {
+              type: 'user',
+              presenceId: userId,
+              joinedAt: new Date().toISOString(),
+            })
+          : presenceService.trackMember(roomName, socket.id, {
+              type: 'anonymous',
+              presenceId: socket.id,
+              joinedAt: new Date().toISOString(),
+            });
+
+      ack?.({
+        ok: true,
+        channel,
+        presence: presence.presence,
+      });
+
+      if (presence.joinedMember) {
+        this.emitPresenceMemberEvent(
+          ServerEvents.PRESENCE_JOIN,
+          socket,
+          roomName,
+          channel,
+          presence.joinedMember
+        );
+      }
 
       logger.debug('Socket subscribed to realtime channel', {
         socketId: socket.id,
         channel,
+        presenceCount: presence.presence.members.length,
       });
     } catch (error) {
       logger.error('Error handling realtime subscribe', { error, channel });
@@ -312,6 +357,17 @@ export class SocketManager {
   private handleRealtimeUnsubscribe(socket: Socket, payload: UnsubscribeChannelPayload): void {
     const { channel } = payload;
     const roomName = `realtime:${channel}`;
+
+    const leavingMember = presenceService.removeSocketFromRoom(roomName, socket.id);
+    if (leavingMember) {
+      this.emitPresenceMemberEvent(
+        ServerEvents.PRESENCE_LEAVE,
+        socket,
+        roomName,
+        channel,
+        leavingMember
+      );
+    }
 
     void socket.leave(roomName);
 
@@ -536,6 +592,30 @@ export class SocketManager {
   }
 
   /**
+   * Emit a presence event to everyone else subscribed to the room.
+   */
+  private emitPresenceMemberEvent(
+    event: ServerEvents.PRESENCE_JOIN | ServerEvents.PRESENCE_LEAVE,
+    emitter: Socket | SocketIOServer | null,
+    roomName: string,
+    channel: string,
+    member: PresenceMember
+  ): void {
+    if (!emitter) {
+      return;
+    }
+
+    const message = this.buildSocketMessage(
+      { member },
+      {
+        channel,
+        senderType: 'system',
+      }
+    );
+    emitter.to(roomName).emit(event, message);
+  }
+
+  /**
    * Gracefully close the Socket.IO server
    */
   close(): void {
@@ -554,6 +634,7 @@ export class SocketManager {
 
     // Clear metadata
     this.socketMetadata.clear();
+    presenceService.clear();
   }
 }
 

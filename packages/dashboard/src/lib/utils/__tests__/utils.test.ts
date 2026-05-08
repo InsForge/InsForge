@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cn, isEmptyValue, compareVersions, formatTime, formatDate } from '../utils';
+import { cn, isEmptyValue, compareVersions, formatTime, formatDate } from '#lib/utils/utils';
 
 describe('cn', () => {
   it('merges class names', () => {

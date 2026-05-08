@@ -9,18 +9,18 @@ import {
   type DataGridProps,
   type RenderCellProps,
   type SelectionCellProps,
-} from '../../../components';
-import AppleLogo from '../../../assets/logos/apple.svg?react';
-import DiscordLogo from '../../../assets/logos/discord.svg?react';
-import FacebookLogo from '../../../assets/logos/facebook.svg?react';
-import GithubLogo from '../../../assets/logos/github.svg?react';
-import GoogleLogo from '../../../assets/logos/google.svg?react';
-import InstagramLogo from '../../../assets/logos/instagram.svg?react';
-import LinkedinLogo from '../../../assets/logos/linkedin.svg?react';
-import MicrosoftLogo from '../../../assets/logos/microsoft.svg?react';
-import SpotifyLogo from '../../../assets/logos/spotify.svg?react';
-import TiktokLogo from '../../../assets/logos/tiktok.svg?react';
-import XLogo from '../../../assets/logos/x.svg?react';
+} from '#components';
+import AppleLogo from '#assets/logos/apple.svg?react';
+import DiscordLogo from '#assets/logos/discord.svg?react';
+import FacebookLogo from '#assets/logos/facebook.svg?react';
+import GithubLogo from '#assets/logos/github.svg?react';
+import GoogleLogo from '#assets/logos/google.svg?react';
+import InstagramLogo from '#assets/logos/instagram.svg?react';
+import LinkedinLogo from '#assets/logos/linkedin.svg?react';
+import MicrosoftLogo from '#assets/logos/microsoft.svg?react';
+import SpotifyLogo from '#assets/logos/spotify.svg?react';
+import TiktokLogo from '#assets/logos/tiktok.svg?react';
+import XLogo from '#assets/logos/x.svg?react';
 import {
   Badge,
   Checkbox,
@@ -29,9 +29,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@insforge/ui';
-import { cn, formatTime } from '../../../lib/utils/utils';
+import { cn, formatTime } from '#lib/utils/utils';
 import type { UserSchema } from '@insforge/shared-schemas';
-import { useCustomOAuthConfig } from '../hooks/useCustomOAuthConfig';
+import { useCustomOAuthConfig } from '#features/auth/hooks/useCustomOAuthConfig';
 
 type UserDataGridRow = UserSchema & {
   [key: string]: string | number | boolean | null | string[] | Record<string, unknown>;

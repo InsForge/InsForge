@@ -1,5 +1,5 @@
-import { SEVERITY_CONFIG, type SeverityType } from '../helpers';
-import { cn } from '../../../lib/utils/utils';
+import { SEVERITY_CONFIG, type SeverityType } from '#features/logs/helpers';
+import { cn } from '#lib/utils/utils';
 
 interface SeverityBadgeProps {
   severity: SeverityType;

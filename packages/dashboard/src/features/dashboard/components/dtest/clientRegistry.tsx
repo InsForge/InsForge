@@ -1,15 +1,14 @@
 import { type ReactNode } from 'react';
 import { Database } from 'lucide-react';
-import KeyHorizontalIcon from '../../../../assets/icons/key_horizontal.svg?react';
-import ClaudeLogo from '../../../../assets/logos/claude_code.png';
-import CodexLogo from '../../../../assets/logos/codex.svg?react';
-import CursorLogo from '../../../../assets/logos/cursor.svg?react';
-import CopilotLogo from '../../../../assets/logos/copilot.svg?react';
-import OpenCodeLogo from '../../../../assets/logos/opencode.svg?react';
-import OpenClawLogo from '../../../../assets/logos/openclaw.svg?react';
-import ClineLogo from '../../../../assets/logos/cline.svg?react';
-import AntigravityLogo from '../../../../assets/logos/antigravity.png';
-import OtherAgentsLogo from '../../../../assets/logos/other_agents.svg?react';
+import KeyHorizontalIcon from '#assets/icons/key_horizontal.svg?react';
+import ClaudeLogo from '#assets/logos/claude_code.png';
+import CodexLogo from '#assets/logos/codex.svg?react';
+import CursorLogo from '#assets/logos/cursor.svg?react';
+import OpenCodeLogo from '#assets/logos/opencode.svg?react';
+import OpenClawLogo from '#assets/logos/openclaw.svg?react';
+import ClineLogo from '#assets/logos/cline.svg?react';
+import AntigravityLogo from '#assets/logos/antigravity.png';
+import OtherAgentsLogo from '#assets/logos/other_agents.svg?react';
 
 export type ClientId =
   | 'openclaw'
@@ -18,7 +17,6 @@ export type ClientId =
   | 'antigravity'
   | 'cursor'
   | 'opencode'
-  | 'copilot'
   | 'cline'
   | 'other'
   | 'connection-string'
@@ -100,14 +98,6 @@ export const CLIENT_ENTRIES: Record<ClientId, ClientEntry> = {
     kind: 'agent',
     mcpAgentId: 'opencode',
   },
-  copilot: {
-    id: 'copilot',
-    label: 'Copilot',
-    icon: iconTile(<CopilotLogo className="h-8 w-8 dark:text-white" />),
-    detailIcon: <CopilotLogo className="h-8 w-8 dark:text-white" />,
-    kind: 'agent',
-    mcpAgentId: 'copilot',
-  },
   cline: {
     id: 'cline',
     label: 'Cline',
@@ -141,18 +131,16 @@ export const CLIENT_ENTRIES: Record<ClientId, ClientEntry> = {
   },
 };
 
-/** Ordered ids for the "Install in Coding Agent" grid (displayed row-by-row, 2 per row). */
+/** Ordered ids for the "Install in Agent" grid (displayed row-by-row, 2 per row). */
 export const CODING_AGENT_GRID_IDS: ClientId[] = [
   'claude-code',
   'codex',
   'antigravity',
   'cursor',
   'opencode',
-  'copilot',
+  'openclaw',
   'cline',
   'other',
 ];
-
-export const FEATURED_OPENCLAW_ID: ClientId = 'openclaw';
 
 export const DIRECT_CONNECT_IDS: ClientId[] = ['connection-string', 'api-keys'];

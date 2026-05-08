@@ -6,7 +6,7 @@ import {
   type RenderHeaderCellProps,
   type DataGridColumn,
   type DataGridRowType,
-} from '../../../components/datagrid';
+} from '#components/datagrid';
 import type { CellClickArgs, CellMouseEvent } from 'react-data-grid';
 
 // Column definition type for LogsDataGrid

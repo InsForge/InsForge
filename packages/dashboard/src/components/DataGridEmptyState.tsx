@@ -1,5 +1,5 @@
 import { CSSProperties } from 'react';
-import EmptyBoxSvg from '../assets/images/empty_box.svg?react';
+import EmptyBoxSvg from '#assets/images/empty_box.svg?react';
 
 interface DataGridEmptyStateProps {
   message: string;

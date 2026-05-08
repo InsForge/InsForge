@@ -4,7 +4,7 @@ import {
   FeatureSidebar,
   type FeatureSidebarHeaderButton,
   type FeatureSidebarListItem,
-} from '../../../components';
+} from '#components';
 import { RealtimeSettingsMenuDialog } from './RealtimeSettingsMenuDialog';
 
 const REALTIME_SIDEBAR_ITEMS: FeatureSidebarListItem[] = [

@@ -12,13 +12,15 @@ import { ERROR_CODES } from '@/types/error-constants.js';
 import { hasPgErrorCode } from '@/utils/errors.js';
 import {
   parseSQLStatements,
+  checkManagedSchemaWriteOperations,
   checkAuthSchemaOperations,
   checkSystemSchemaOperations,
 } from '@/utils/sql-parser.js';
-import { validateTableName } from '@/utils/validations.js';
+import { validateSchemaName, validateTableName } from '@/utils/validations.js';
 import pgFormat from 'pg-format';
 import { parse } from 'csv-parse/sync';
 import { type PoolClient } from 'pg';
+import { assertWritableDatabaseSchema } from './helpers.js';
 
 export class DatabaseAdvanceService {
   private static instance: DatabaseAdvanceService;
@@ -76,15 +78,10 @@ export class DatabaseAdvanceService {
    * Blocks:
    * - DROP DATABASE, CREATE DATABASE, ALTER DATABASE
    * - pg_catalog and information_schema access
-   * - DELETE operations on auth schema (prevents user deletion via raw SQL)
-   * - TRUNCATE operations on auth schema (prevents mass user deletion)
-   * - DROP operations on auth schema (prevents destruction of tables, indexes, triggers, functions, views, sequences, schemas, policies, types, domains)
+   * - Write operations on InsForge-managed schemas
    *
    * Allows:
-   * - SELECT queries on auth schema (for reading user data)
-   * - INSERT operations on auth schema (for test users)
-   * - CREATE TRIGGER on auth tables (for automatic profile creation, etc.)
-   * - Other DDL operations on auth schema (ALTER TABLE for indexes, etc.)
+   * - Read-only queries against InsForge-managed schemas
    */
   sanitizeQuery(query: string, _mode: 'strict' | 'relaxed' = 'strict'): string {
     // Block database-level operations
@@ -99,6 +96,14 @@ export class DatabaseAdvanceService {
       if (pattern.test(query)) {
         throw new AppError('Query contains restricted operations', 403, ERROR_CODES.FORBIDDEN);
       }
+    }
+
+    const managedSchemaError = checkManagedSchemaWriteOperations(query);
+    if (managedSchemaError) {
+      logger.warn('Blocked operation on protected schema', {
+        query: query.substring(0, 100),
+      });
+      throw new AppError(managedSchemaError, 403, ERROR_CODES.FORBIDDEN);
     }
 
     // Use parser-based check for auth schema operations
@@ -868,12 +873,15 @@ export class DatabaseAdvanceService {
   }
 
   async bulkUpsertFromFile(
+    schemaName: string,
     table: string,
     fileBuffer: Buffer,
     filename: string,
     upsertKey?: string
   ): Promise<BulkUpsertResponse> {
+    validateSchemaName(schemaName);
     validateTableName(table);
+    assertWritableDatabaseSchema(schemaName);
 
     const fileExtension = filename.toLowerCase().substring(filename.lastIndexOf('.'));
     let records: Record<string, unknown>[] = [];
@@ -913,7 +921,7 @@ export class DatabaseAdvanceService {
     }
 
     // Perform the bulk insert
-    const result = await this.bulkInsert(table, records, upsertKey);
+    const result = await this.bulkInsert(schemaName, table, records, upsertKey);
 
     return {
       success: true,
@@ -926,6 +934,7 @@ export class DatabaseAdvanceService {
   }
 
   private async bulkInsert(
+    schemaName: string,
     table: string,
     records: Record<string, unknown>[],
     upsertKey?: string
@@ -972,7 +981,8 @@ export class DatabaseAdvanceService {
             .join(', ');
 
           query = pgFormat(
-            'INSERT INTO %I (%I) VALUES %L ON CONFLICT (%I) DO UPDATE SET %s',
+            'INSERT INTO %I.%I (%I) VALUES %L ON CONFLICT (%I) DO UPDATE SET %s',
+            schemaName,
             table,
             columns,
             values,
@@ -982,7 +992,8 @@ export class DatabaseAdvanceService {
         } else {
           // No columns to update, just do nothing on conflict
           query = pgFormat(
-            'INSERT INTO %I (%I) VALUES %L ON CONFLICT (%I) DO NOTHING',
+            'INSERT INTO %I.%I (%I) VALUES %L ON CONFLICT (%I) DO NOTHING',
+            schemaName,
             table,
             columns,
             values,
@@ -991,7 +1002,7 @@ export class DatabaseAdvanceService {
         }
       } else {
         // Simple insert
-        query = pgFormat('INSERT INTO %I (%I) VALUES %L', table, columns, values);
+        query = pgFormat('INSERT INTO %I.%I (%I) VALUES %L', schemaName, table, columns, values);
       }
 
       // Execute query

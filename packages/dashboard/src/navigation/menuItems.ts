@@ -6,6 +6,7 @@ import {
   HardDrive,
   Code2,
   Radio,
+  Server,
   Sparkles,
   ChartLine,
   Settings,
@@ -13,6 +14,7 @@ import {
   SquarePen,
   Download,
   BookOpen,
+  CreditCard,
 } from 'lucide-react';
 
 export interface DashboardSecondaryMenuItem {
@@ -98,6 +100,18 @@ export const dashboardStaticMenuItems: DashboardPrimaryMenuItem[] = [
     label: 'Model Gateway',
     href: '/dashboard/ai',
     icon: Sparkles,
+  },
+  {
+    id: 'compute',
+    label: 'Compute',
+    href: '/dashboard/compute',
+    icon: Server,
+  },
+  {
+    id: 'payments',
+    label: 'Payments',
+    href: '/dashboard/payments',
+    icon: CreditCard,
     sectionEnd: true,
   },
   {

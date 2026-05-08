@@ -1,9 +1,9 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { secretService } from '../services/secret.service';
+import { secretService } from '#features/functions/services/secret.service';
 import type { SecretSchema, CreateSecretRequest } from '@insforge/shared-schemas';
-import { useToast } from '../../../lib/hooks/useToast';
-import { useConfirm } from '../../../lib/hooks/useConfirm';
+import { useToast } from '#lib/hooks/useToast';
+import { useConfirm } from '#lib/hooks/useConfirm';
 
 export function useSecretValue(secret: Pick<SecretSchema, 'key' | 'updatedAt'>) {
   const { showToast } = useToast();

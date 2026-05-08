@@ -1,11 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
-import { loginService } from '../../features/login/services/login.service';
-import { databaseTableQueryKeys } from '../../features/database/queryKeys';
-import { useDashboardHost } from '../config/DashboardHostContext';
-import { apiClient } from '../api/client';
-import { getCurrentDistinctId, identifyUser } from '../analytics/posthog';
+import { loginService } from '#features/login/services/login.service';
+import { useDashboardHost } from '#lib/config/DashboardHostContext';
+import { apiClient } from '#lib/api/client';
+import { getCurrentDistinctId, identifyUser } from '#lib/analytics/posthog';
 import type { UserSchema } from '@insforge/shared-schemas';
 
 interface AuthContextType {
@@ -66,7 +65,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       queryClient.invalidateQueries({ queryKey: ['apiKey'] }),
       queryClient.invalidateQueries({ queryKey: ['metadata'] }),
       queryClient.invalidateQueries({ queryKey: ['users'] }),
-      queryClient.invalidateQueries({ queryKey: databaseTableQueryKeys.list }),
+      queryClient.invalidateQueries({ queryKey: ['database', 'tables'] }),
       queryClient.invalidateQueries({ queryKey: ['mcp-usage'] }),
     ]);
   }, [queryClient]);

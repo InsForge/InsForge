@@ -12,6 +12,9 @@ export enum ServerEvents {
   MCP_CONNECTED = 'mcp:connected',
   // Realtime events
   REALTIME_ERROR = 'realtime:error',
+  // Presence events
+  PRESENCE_JOIN = 'presence:join',
+  PRESENCE_LEAVE = 'presence:leave',
 }
 
 /**
@@ -42,6 +45,7 @@ export enum DataUpdateResourceType {
   DEPLOYMENTS = 'deployments',
   REALTIME = 'realtime',
   AI_USAGE = 'ai_usage',
+  COMPUTE_SERVICES = 'compute_services',
 }
 
 /**

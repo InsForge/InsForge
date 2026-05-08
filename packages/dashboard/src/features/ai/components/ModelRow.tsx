@@ -1,5 +1,5 @@
 import { Switch } from '@insforge/ui';
-import { ModelOption, formatPrice, formatModality } from '../helpers';
+import { ModelOption, formatPrice, formatModality } from '#features/ai/helpers';
 
 interface ModelRowProps {
   model: ModelOption;

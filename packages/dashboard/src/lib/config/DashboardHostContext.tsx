@@ -5,7 +5,12 @@ import type {
   DashboardMode,
   DashboardProjectInfo,
   DashboardUserInfo,
-} from '../../types';
+  DashboardMetricsRange,
+  DashboardMetricsResponse,
+  DashboardAdvisorSummary,
+  DashboardAdvisorIssuesQuery,
+  DashboardAdvisorIssuesResponse,
+} from '#types';
 
 interface DashboardHostContextValue {
   backendUrl?: string;
@@ -29,6 +34,12 @@ interface DashboardHostContextValue {
   onUpdateVersion?: () => Promise<void>;
   onRequestUserInfo?: () => Promise<DashboardUserInfo>;
   onRequestUserApiKey?: () => Promise<string>;
+  onRequestProjectMetrics?: (range: DashboardMetricsRange) => Promise<DashboardMetricsResponse>;
+  onRequestAdvisorLatest?: () => Promise<DashboardAdvisorSummary | null>;
+  onRequestAdvisorIssues?: (
+    query: DashboardAdvisorIssuesQuery
+  ) => Promise<DashboardAdvisorIssuesResponse>;
+  onTriggerAdvisorScan?: () => Promise<void>;
 }
 
 const DashboardHostContext = createContext<DashboardHostContextValue | null>(null);

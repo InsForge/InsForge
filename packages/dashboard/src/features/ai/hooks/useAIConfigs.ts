@@ -1,6 +1,6 @@
 import { useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { aiService } from '../services/ai.service';
+import { aiService } from '#features/ai/services/ai.service';
 import {
   CreateAIConfigurationRequest,
   UpdateAIConfigurationRequest,
@@ -8,13 +8,13 @@ import {
   AIModelSchema,
   AIConfigurationWithUsageSchema,
 } from '@insforge/shared-schemas';
-import { useToast } from '../../../lib/hooks/useToast';
+import { useToast } from '#lib/hooks/useToast';
 import {
   filterModelsByModalities,
   sortModelsByConfigurationStatus,
   type ModelOption,
   toModelOption,
-} from '../helpers';
+} from '#features/ai/helpers';
 
 interface UseAIConfigsOptions {
   enabled?: boolean;

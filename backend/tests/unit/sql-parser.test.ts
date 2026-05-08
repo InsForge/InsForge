@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   parseSQLStatements,
+  checkManagedSchemaWriteOperations,
   checkSystemSchemaOperations,
   checkAuthSchemaOperations,
 } from '../../src/utils/sql-parser';
@@ -211,5 +212,190 @@ describe('checkAuthSchemaOperations', () => {
 
   it('allows SELECT on auth schema', () => {
     expect(checkAuthSchemaOperations('SELECT * FROM auth.users')).toBeNull();
+  });
+});
+
+describe('checkManagedSchemaWriteOperations', () => {
+  it('blocks INSERT on auth schema', () => {
+    expect(
+      checkManagedSchemaWriteOperations(
+        "INSERT INTO auth.users (email, password) VALUES ('test@example.com', 'hashed')"
+      )
+    ).not.toBeNull();
+  });
+
+  it('blocks CREATE INDEX on storage schema', () => {
+    expect(
+      checkManagedSchemaWriteOperations(
+        'CREATE INDEX idx_storage_objects_name ON storage.objects(name)'
+      )
+    ).not.toBeNull();
+  });
+
+  it('blocks INSERT on cron schema', () => {
+    expect(
+      checkManagedSchemaWriteOperations(
+        "INSERT INTO cron.job (schedule, command) VALUES ('* * * * *', 'SELECT 1')"
+      )
+    ).not.toBeNull();
+  });
+
+  it('blocks UPDATE on payments schema', () => {
+    expect(
+      checkManagedSchemaWriteOperations(
+        "UPDATE payments.customers SET email = 'new@example.com' WHERE id = 'cus_123'"
+      )
+    ).not.toBeNull();
+  });
+
+  it('blocks CREATE POLICY on auth schema', () => {
+    expect(
+      checkManagedSchemaWriteOperations('CREATE POLICY p ON auth.users FOR SELECT USING (true)')
+    ).not.toBeNull();
+  });
+
+  it('allows realtime channel management through raw SQL', () => {
+    expect(
+      checkManagedSchemaWriteOperations(
+        "INSERT INTO realtime.channels (pattern, description, enabled) VALUES ('orders', 'Order events', true)"
+      )
+    ).toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        "UPDATE realtime.channels SET enabled = false WHERE pattern = 'orders'"
+      )
+    ).toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations("DELETE FROM realtime.channels WHERE pattern = 'orders'")
+    ).toBeNull();
+  });
+
+  it('allows RLS changes on documented managed tables', () => {
+    expect(
+      checkManagedSchemaWriteOperations('ALTER TABLE realtime.channels ENABLE ROW LEVEL SECURITY')
+    ).toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations('ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY')
+    ).toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        'ALTER TABLE payments.checkout_sessions ENABLE ROW LEVEL SECURITY'
+      )
+    ).toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        'ALTER TABLE payments.customer_portal_sessions FORCE ROW LEVEL SECURITY'
+      )
+    ).toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations('ALTER TABLE realtime.messages ENABLE ROW LEVEL SECURITY')
+    ).toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        "CREATE POLICY checkout_subject_guard ON payments.checkout_sessions FOR INSERT TO authenticated WITH CHECK (subject_type = 'team')"
+      )
+    ).toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        'DROP POLICY checkout_subject_guard ON payments.checkout_sessions'
+      )
+    ).toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        'DROP POLICY IF EXISTS portal_subject_guard ON payments.customer_portal_sessions'
+      )
+    ).toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        "CREATE POLICY publish_guard ON realtime.messages FOR INSERT TO authenticated WITH CHECK (channel_name LIKE 'chat:%')"
+      )
+    ).toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        'CREATE POLICY storage_owner_select ON storage.objects FOR SELECT TO authenticated USING (true)'
+      )
+    ).toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        'DROP POLICY IF EXISTS storage_owner_select ON storage.objects'
+      )
+    ).toBeNull();
+  });
+
+  it('allows documented writes on exempted managed tables', () => {
+    expect(
+      checkManagedSchemaWriteOperations(
+        "INSERT INTO realtime.channels (pattern, description, enabled) VALUES ('orders', 'Order events', true)"
+      )
+    ).toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        "UPDATE realtime.channels SET enabled = false WHERE pattern = 'orders'"
+      )
+    ).toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        'CREATE TRIGGER fulfill_paid_order AFTER INSERT ON payments.payment_history FOR EACH ROW EXECUTE FUNCTION public.fulfill_paid_order()'
+      )
+    ).toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        'DROP TRIGGER IF EXISTS fulfill_paid_order ON payments.payment_history'
+      )
+    ).toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        'CREATE TRIGGER sync_team_billing_status AFTER INSERT ON payments.subscriptions FOR EACH ROW EXECUTE FUNCTION public.sync_team_billing_status()'
+      )
+    ).toBeNull();
+  });
+
+  it('blocks broad writes on RLS-only and trigger-only managed tables', () => {
+    expect(
+      checkManagedSchemaWriteOperations(
+        "INSERT INTO payments.checkout_sessions (environment, mode, success_url, cancel_url) VALUES ('test', 'payment', 'https://example.com/success', 'https://example.com/cancel')"
+      )
+    ).not.toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        'ALTER TABLE payments.checkout_sessions ADD COLUMN internal_note TEXT'
+      )
+    ).not.toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        'ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY, ADD COLUMN owner_note TEXT'
+      )
+    ).not.toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        'ALTER TABLE realtime.channels RENAME TO realtime_channels_v2'
+      )
+    ).not.toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        'ALTER TABLE realtime.channels RENAME COLUMN description TO details'
+      )
+    ).not.toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        "INSERT INTO realtime.messages (event_name, channel_name, payload) VALUES ('new_message', 'chat:1', '{}'::jsonb)"
+      )
+    ).not.toBeNull();
+    expect(
+      checkManagedSchemaWriteOperations(
+        "UPDATE payments.subscriptions SET status = 'canceled' WHERE id = 'sub_123'"
+      )
+    ).not.toBeNull();
+  });
+
+  it('allows SELECT on managed schemas', () => {
+    expect(checkManagedSchemaWriteOperations('SELECT * FROM auth.users')).toBeNull();
+    expect(checkManagedSchemaWriteOperations('SELECT * FROM storage.objects')).toBeNull();
+  });
+
+  it('allows writes on public schema', () => {
+    expect(
+      checkManagedSchemaWriteOperations("INSERT INTO public.products (name) VALUES ('test')")
+    ).toBeNull();
   });
 });

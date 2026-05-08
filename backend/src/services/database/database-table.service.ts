@@ -21,8 +21,14 @@ import {
   OnUpdateActionSchema,
   ForeignKeySchema,
 } from '@insforge/shared-schemas';
-import { validateIdentifier } from '@/utils/validations.js';
+import { validateIdentifier, validateSchemaName } from '@/utils/validations.js';
 import { convertSqlTypeToColumnType } from '@/utils/utils.js';
+import {
+  assertWritableDatabaseSchema,
+  DEFAULT_DATABASE_SCHEMA,
+  quoteQualifiedName,
+  splitQualifiedTableReference,
+} from './helpers.js';
 
 const reservedColumns = {
   id: ColumnType.UUID,
@@ -117,14 +123,17 @@ export class DatabaseTableService {
   /**
    * List all tables
    */
-  async listTables(): Promise<string[]> {
+  async listTables(schemaName: string = DEFAULT_DATABASE_SCHEMA): Promise<string[]> {
+    validateSchemaName(schemaName);
     const result = await this.getPool().query(
       `
         SELECT table_name as name
         FROM information_schema.tables
-        WHERE table_schema = 'public'
+        WHERE table_schema = $1
         AND table_type = 'BASE TABLE'
-      `
+        ORDER BY table_name
+      `,
+      [schemaName]
     );
 
     return result.rows.map((t: { name: string }) => t.name);
@@ -134,10 +143,13 @@ export class DatabaseTableService {
    * Create a new table
    */
   async createTable(
+    schemaName: string,
     table_name: string,
     columns: ColumnSchema[],
     use_RLS = true
   ): Promise<CreateTableResponse> {
+    validateSchemaName(schemaName);
+    assertWritableDatabaseSchema(schemaName);
     // Validate table name
     validateIdentifier(table_name, 'table');
 
@@ -172,17 +184,23 @@ export class DatabaseTableService {
     });
 
     const client = await this.getPool().connect();
+    let transactionStarted = false;
     try {
+      await client.query('BEGIN');
+      transactionStarted = true;
+
+      const safeQualifiedTableName = quoteQualifiedName(schemaName, table_name);
+
       // Check if table exists
       const tableExistsResult = await client.query(
         `
           SELECT EXISTS (
             SELECT FROM information_schema.tables
-            WHERE table_schema = 'public'
-            AND table_name = $1
+            WHERE table_schema = $1
+            AND table_name = $2
           ) as exists
         `,
-        [table_name]
+        [schemaName, table_name]
       );
 
       if (tableExistsResult.rows[0]?.exists) {
@@ -217,7 +235,7 @@ export class DatabaseTableService {
       // Prepare foreign key constraints
       const foreignKeyConstraints = validatedColumns
         .filter((col) => col.foreignKey)
-        .map((col) => this.generateFkeyConstraintStatement(col, true))
+        .map((col) => this.generateFkeyConstraintStatement(col, schemaName, true))
         .join(', ');
 
       // Create table with auto fields and foreign keys
@@ -233,7 +251,7 @@ export class DatabaseTableService {
 
       await client.query(
         `
-          CREATE TABLE ${this.quoteIdentifier(table_name)} (
+          CREATE TABLE ${safeQualifiedTableName} (
             ${tableDefinition}
           );
           NOTIFY pgrst, 'reload schema';
@@ -244,7 +262,7 @@ export class DatabaseTableService {
         // Enable RLS policies
         await client.query(
           `
-            ALTER TABLE ${this.quoteIdentifier(table_name)} ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE ${safeQualifiedTableName} ENABLE ROW LEVEL SECURITY;
           `
         );
       }
@@ -253,7 +271,7 @@ export class DatabaseTableService {
       await client.query(
         `
           CREATE TRIGGER ${this.quoteIdentifier(table_name + '_update_timestamp')}
-          BEFORE UPDATE ON ${this.quoteIdentifier(table_name)}
+          BEFORE UPDATE ON ${safeQualifiedTableName}
           FOR EACH ROW EXECUTE FUNCTION system.update_updated_at();
         `
       );
@@ -261,7 +279,8 @@ export class DatabaseTableService {
       // Update metadata
       // Metadata is now updated on-demand
 
-      return {
+      const response = {
+        schemaName,
         message: 'table created successfully',
         tableName: table_name,
         columns: validatedColumns.map((col) => ({
@@ -272,6 +291,16 @@ export class DatabaseTableService {
         nextActions:
           'you can now use the table with the POST /api/database/tables/{table} endpoint',
       };
+
+      await client.query('COMMIT');
+      transactionStarted = false;
+      return response;
+    } catch (error) {
+      if (transactionStarted) {
+        await client.query('ROLLBACK');
+        transactionStarted = false;
+      }
+      throw error;
     } finally {
       client.release();
     }
@@ -304,9 +333,13 @@ export class DatabaseTableService {
     return defaultValue;
   }
 
-  async getTableSchema(table: string): Promise<GetTableSchemaResponse> {
+  async getTableSchema(schemaName: string, table: string): Promise<GetTableSchemaResponse> {
+    validateSchemaName(schemaName);
+    validateIdentifier(table, 'table');
     const client = await this.getPool().connect();
     try {
+      const safeQualifiedTableName = quoteQualifiedName(schemaName, table);
+
       // Get column information from information_schema
       const columnsResult = await client.query(
         `
@@ -318,11 +351,11 @@ export class DatabaseTableService {
             column_default,
             character_maximum_length
           FROM information_schema.columns
-          WHERE table_schema = 'public'
-          AND table_name = $1
+          WHERE table_schema = $1
+          AND table_name = $2
           ORDER BY ordinal_position
         `,
-        [table]
+        [schemaName, table]
       );
 
       const columns = columnsResult.rows;
@@ -337,24 +370,24 @@ export class DatabaseTableService {
       }
 
       // Get foreign key information
-      const foreignKeyMap = await this.getFkeyConstraints(table);
+      const foreignKeyMap = await this.getFkeyConstraints(schemaName, table);
 
       // Get primary key information
       const primaryKeysResult = await client.query(
         `
           SELECT column_name
           FROM information_schema.key_column_usage
-          WHERE table_schema = 'public'
-          AND table_name = $1
+          WHERE table_schema = $1
+          AND table_name = $2
           AND constraint_name = (
             SELECT constraint_name
             FROM information_schema.table_constraints
-            WHERE table_schema = 'public'
-            AND table_name = $2
+            WHERE table_schema = $1
+            AND table_name = $3
             AND constraint_type = 'PRIMARY KEY'
           )
         `,
-        [table, table]
+        [schemaName, table, table]
       );
 
       const primaryKeys = primaryKeysResult.rows;
@@ -368,22 +401,23 @@ export class DatabaseTableService {
           JOIN information_schema.key_column_usage kcu
             ON tc.constraint_name = kcu.constraint_name
             AND tc.table_schema = kcu.table_schema
-          WHERE tc.table_schema = 'public'
-            AND tc.table_name = $1
+          WHERE tc.table_schema = $1
+            AND tc.table_name = $2
             AND tc.constraint_type = 'UNIQUE'
         `,
-        [table]
+        [schemaName, table]
       );
 
       const uniqueColumns = uniqueColumnsResult.rows;
       const uniqueSet = new Set(uniqueColumns.map((u: { column_name: string }) => u.column_name));
 
       // Get row count
-      const sql = `SELECT COUNT(*) as row_count FROM ${this.quoteIdentifier(table)}`;
+      const sql = `SELECT COUNT(*) as row_count FROM ${safeQualifiedTableName}`;
       const rowCountResult = await client.query(sql);
       const row_count = rowCountResult.rows[0].row_count;
 
       return {
+        schemaName,
         tableName: table,
         columns: columns.map((col: ColumnInfo) => {
           // For USER-DEFINED types (extensions like pgvector), use udt_name
@@ -411,24 +445,33 @@ export class DatabaseTableService {
    * Update table schema
    */
   async updateTableSchema(
+    schemaName: string,
     tableName: string,
     operations: UpdateTableSchemaRequest
   ): Promise<UpdateTableSchemaResponse> {
+    validateSchemaName(schemaName);
+    assertWritableDatabaseSchema(schemaName);
     const { addColumns, dropColumns, updateColumns, addForeignKeys, dropForeignKeys, renameTable } =
       operations;
 
     const client = await this.getPool().connect();
+    let transactionStarted = false;
     try {
+      await client.query('BEGIN');
+      transactionStarted = true;
+
+      const safeQualifiedTableName = quoteQualifiedName(schemaName, tableName);
+
       // Check if table exists
       const tableExistsResult = await client.query(
         `
           SELECT EXISTS (
             SELECT FROM information_schema.tables
-            WHERE table_schema = 'public'
-            AND table_name = $1
+            WHERE table_schema = $1
+            AND table_name = $2
           ) as exists
         `,
-        [tableName]
+        [schemaName, tableName]
       );
 
       if (!tableExistsResult.rows[0]?.exists) {
@@ -439,7 +482,7 @@ export class DatabaseTableService {
           'Please check the table name, it must be a valid table name, or you can create a new table with the POST /api/database/tables endpoint'
         );
       }
-      const currentSchema = await this.getTableSchema(tableName);
+      const currentSchema = await this.getTableSchema(schemaName, tableName);
       const currentUserColumns = currentSchema.columns.filter(
         (col) => !Object.keys(reservedColumns).includes(col.columnName)
       );
@@ -463,8 +506,7 @@ export class DatabaseTableService {
         );
       }
 
-      const safeTableName = this.quoteIdentifier(tableName);
-      const foreignKeyMap = await this.getFkeyConstraints(tableName);
+      const foreignKeyMap = await this.getFkeyConstraints(schemaName, tableName);
       const completedOperations: string[] = [];
 
       // Execute operations
@@ -476,7 +518,7 @@ export class DatabaseTableService {
           if (constraintName) {
             await client.query(
               `
-                ALTER TABLE ${safeTableName}
+                ALTER TABLE ${safeQualifiedTableName}
                 DROP CONSTRAINT ${this.quoteIdentifier(constraintName)}
               `
             );
@@ -499,7 +541,7 @@ export class DatabaseTableService {
           }
           await client.query(
             `
-              ALTER TABLE ${safeTableName}
+              ALTER TABLE ${safeQualifiedTableName}
               DROP COLUMN ${this.quoteIdentifier(col)}
             `
           );
@@ -526,7 +568,7 @@ export class DatabaseTableService {
               // Drop default
               await client.query(
                 `
-                ALTER TABLE ${safeTableName}
+                ALTER TABLE ${safeQualifiedTableName}
                 ALTER COLUMN ${this.quoteIdentifier(column.columnName)} DROP DEFAULT
               `
               );
@@ -534,7 +576,7 @@ export class DatabaseTableService {
               // Set default
               await client.query(
                 `
-                ALTER TABLE ${safeTableName}
+                ALTER TABLE ${safeQualifiedTableName}
                 ALTER COLUMN ${this.quoteIdentifier(column.columnName)} SET ${formatDefaultValue(column.defaultValue)}
               `
               );
@@ -545,7 +587,7 @@ export class DatabaseTableService {
           if (column.newColumnName) {
             await client.query(
               `
-              ALTER TABLE ${safeTableName}
+              ALTER TABLE ${safeQualifiedTableName}
               RENAME COLUMN ${this.quoteIdentifier(column.columnName)} TO ${this.quoteIdentifier(column.newColumnName as string)}
             `
             );
@@ -576,7 +618,7 @@ export class DatabaseTableService {
 
           await client.query(
             `
-              ALTER TABLE ${safeTableName}
+              ALTER TABLE ${safeQualifiedTableName}
               ADD COLUMN ${this.quoteIdentifier(col.columnName)} ${sqlType} ${nullable} ${unique} ${defaultClause}
             `
           );
@@ -596,10 +638,10 @@ export class DatabaseTableService {
               `You cannot add foreign key on the system column '${col.columnName}'`
             );
           }
-          const fkeyConstraint = this.generateFkeyConstraintStatement(col, true);
+          const fkeyConstraint = this.generateFkeyConstraintStatement(col, schemaName, true);
           await client.query(
             `
-              ALTER TABLE ${safeTableName}
+              ALTER TABLE ${safeQualifiedTableName}
               ADD ${fkeyConstraint}
             `
           );
@@ -609,11 +651,12 @@ export class DatabaseTableService {
       }
 
       if (renameTable && renameTable.newTableName) {
+        validateIdentifier(renameTable.newTableName, 'table');
         const safeNewTableName = this.quoteIdentifier(renameTable.newTableName);
         // Rename the table
         await client.query(
           `
-            ALTER TABLE ${safeTableName}
+            ALTER TABLE ${safeQualifiedTableName}
             RENAME TO ${safeNewTableName}
           `
         );
@@ -631,11 +674,22 @@ export class DatabaseTableService {
         `
       );
 
-      return {
+      const response = {
+        schemaName,
         message: 'table schema updated successfully',
         tableName,
         operations: completedOperations,
       };
+
+      await client.query('COMMIT');
+      transactionStarted = false;
+      return response;
+    } catch (error) {
+      if (transactionStarted) {
+        await client.query('ROLLBACK');
+        transactionStarted = false;
+      }
+      throw error;
     } finally {
       client.release();
     }
@@ -644,10 +698,12 @@ export class DatabaseTableService {
   /**
    * Delete a table
    */
-  async deleteTable(table: string): Promise<DeleteTableResponse> {
+  async deleteTable(schemaName: string, table: string): Promise<DeleteTableResponse> {
+    validateSchemaName(schemaName);
+    assertWritableDatabaseSchema(schemaName);
     const client = await this.getPool().connect();
     try {
-      await client.query(`DROP TABLE IF EXISTS ${this.quoteIdentifier(table)} CASCADE`);
+      await client.query(`DROP TABLE IF EXISTS ${quoteQualifiedName(schemaName, table)} CASCADE`);
 
       // Update metadata
       // Metadata is now updated on-demand
@@ -660,6 +716,7 @@ export class DatabaseTableService {
       );
 
       return {
+        schemaName,
         message: 'table deleted successfully',
         tableName: table,
         nextActions:
@@ -675,13 +732,9 @@ export class DatabaseTableService {
     return `"${identifier.replace(/"/g, '""')}"`;
   }
 
-  // Quote a table reference, with special handling for auth.users
-  private quoteTableReference(tableRef: string): string {
-    // Only allow auth.users as a cross-schema reference
-    if (tableRef === 'auth.users') {
-      return '"auth"."users"';
-    }
-    return this.quoteIdentifier(tableRef);
+  private quoteTableReference(tableRef: string, defaultSchemaName: string): string {
+    const { schemaName, tableName } = splitQualifiedTableReference(tableRef, defaultSchemaName);
+    return quoteQualifiedName(schemaName, tableName);
   }
 
   private validateReservedFields(columns: ColumnSchema[]): ColumnSchema[] {
@@ -708,6 +761,7 @@ export class DatabaseTableService {
 
   private generateFkeyConstraintStatement(
     col: { columnName: string; foreignKey?: ForeignKeySchema },
+    defaultSchemaName: string,
     include_source_column: boolean = true
   ) {
     if (!col.foreignKey) {
@@ -716,19 +770,22 @@ export class DatabaseTableService {
     // Store foreign_key in a const to avoid repeated non-null assertions
     const fk = col.foreignKey;
     // Use "auth_users" in constraint name for auth.users references
-    const safeTableName = fk.referenceTable === 'auth.users' ? 'auth_users' : fk.referenceTable;
+    const safeTableName = fk.referenceTable.replace(/\./g, '_');
     const constraintName = `fk_${col.columnName}_${safeTableName}_${fk.referenceColumn}`;
     const onDelete = fk.onDelete || 'RESTRICT';
     const onUpdate = fk.onUpdate || 'RESTRICT';
 
     if (include_source_column) {
-      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} FOREIGN KEY (${this.quoteIdentifier(col.columnName)}) REFERENCES ${this.quoteTableReference(fk.referenceTable)}(${this.quoteIdentifier(fk.referenceColumn)}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
+      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} FOREIGN KEY (${this.quoteIdentifier(col.columnName)}) REFERENCES ${this.quoteTableReference(fk.referenceTable, defaultSchemaName)}(${this.quoteIdentifier(fk.referenceColumn)}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
     } else {
-      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} REFERENCES ${this.quoteTableReference(fk.referenceTable)}(${this.quoteIdentifier(fk.referenceColumn)}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
+      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} REFERENCES ${this.quoteTableReference(fk.referenceTable, defaultSchemaName)}(${this.quoteIdentifier(fk.referenceColumn)}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
     }
   }
 
-  private async getFkeyConstraints(table: string): Promise<Map<string, ForeignKeyInfo>> {
+  private async getFkeyConstraints(
+    schemaName: string,
+    table: string
+  ): Promise<Map<string, ForeignKeyInfo>> {
     const result = await this.getPool().query(
       `
         SELECT
@@ -749,9 +806,10 @@ export class DatabaseTableService {
           ON rc.constraint_name = tc.constraint_name
           AND rc.constraint_schema = tc.table_schema
         WHERE tc.constraint_type = 'FOREIGN KEY'
-        AND tc.table_name = $1
+        AND tc.table_schema = $1
+        AND tc.table_name = $2
       `,
-      [table]
+      [schemaName, table]
     );
 
     const foreignKeys = result.rows;

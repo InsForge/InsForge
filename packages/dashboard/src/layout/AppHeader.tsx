@@ -8,18 +8,18 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@insforge/ui';
-import { Avatar, AvatarFallback, Separator, ThemeSelect } from '../components';
-import { cn } from '../lib/utils/utils';
-import { useTheme } from '../lib/contexts/ThemeContext';
-import { useAuth } from '../lib/contexts/AuthContext';
+import { Avatar, AvatarFallback, Separator, ThemeSelect } from '#components';
+import { cn } from '#lib/utils/utils';
+import { useTheme } from '#lib/contexts/ThemeContext';
+import { useAuth } from '#lib/contexts/AuthContext';
 import { useOpenConnectDialog } from './ConnectDialogContext';
-import { getFeatureFlag } from '../lib/analytics/posthog';
+import { getFeatureFlag } from '#lib/analytics/posthog';
 
 // Import SVG icons
-import DiscordIcon from '../assets/logos/discord.svg?react';
-import GitHubIcon from '../assets/logos/github.svg?react';
-import InsForgeLogoLight from '../assets/logos/insforge_light.svg';
-import InsForgeLogoDark from '../assets/logos/insforge_dark.svg';
+import DiscordIcon from '#assets/logos/discord.svg?react';
+import GitHubIcon from '#assets/logos/github.svg?react';
+import InsForgeLogoLight from '#assets/logos/insforge_light.svg';
+import InsForgeLogoDark from '#assets/logos/insforge_dark.svg';
 
 export default function AppHeader() {
   const { resolvedTheme } = useTheme();

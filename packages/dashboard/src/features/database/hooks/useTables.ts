@@ -1,14 +1,15 @@
-import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
-import { tableService } from '../services/table.service';
-import { databaseTableQueryKeys } from '../queryKeys';
-import { useToast } from '../../../lib/hooks/useToast';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { DEFAULT_DATABASE_SCHEMA } from '#features/database/helpers';
+import { tableService } from '#features/database/services/table.service';
+import { databaseTableQueryKeys } from '#features/database/queryKeys';
+import { useToast } from '#lib/hooks/useToast';
 import {
   ColumnSchema,
   GetTableSchemaResponse,
   UpdateTableSchemaRequest,
 } from '@insforge/shared-schemas';
 
-export function useTables() {
+export function useTables(schemaName: string = DEFAULT_DATABASE_SCHEMA) {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
@@ -19,16 +20,20 @@ export function useTables() {
     error: tablesError,
     refetch: refetchTables,
   } = useQuery({
-    queryKey: databaseTableQueryKeys.list,
-    queryFn: () => tableService.listTables(),
-    staleTime: 2 * 60 * 1000, // Cache for 2 minutes
+    queryKey: databaseTableQueryKeys.tables(schemaName),
+    queryFn: () => tableService.listTables(schemaName),
+    staleTime: 2 * 60 * 1000,
   });
 
   // Query to fetch a specific table schema (cached per table)
-  const useTableSchema = (tableName: string, enabled = true) => {
+  const useTableSchema = (
+    tableName: string,
+    tableSchemaName: string = schemaName,
+    enabled = true
+  ) => {
     return useQuery({
-      queryKey: databaseTableQueryKeys.schema(tableName),
-      queryFn: () => tableService.getTableSchema(tableName),
+      queryKey: databaseTableQueryKeys.tableSchema(tableSchemaName, tableName),
+      queryFn: () => tableService.getTableSchema(tableName, tableSchemaName),
       enabled: enabled && !!tableName,
       staleTime: 2 * 60 * 1000,
     });
@@ -37,9 +42,9 @@ export function useTables() {
   // Mutation to create a table
   const createTableMutation = useMutation({
     mutationFn: ({ tableName, columns }: { tableName: string; columns: ColumnSchema[] }) =>
-      tableService.createTable(tableName, columns),
+      tableService.createTable(schemaName, tableName, columns),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: databaseTableQueryKeys.list });
+      void queryClient.invalidateQueries({ queryKey: databaseTableQueryKeys.tables(schemaName) });
       showToast('Table created successfully', 'success');
     },
     onError: (error: Error) => {
@@ -50,9 +55,9 @@ export function useTables() {
 
   // Mutation to delete a table
   const deleteTableMutation = useMutation({
-    mutationFn: (tableName: string) => tableService.deleteTable(tableName),
+    mutationFn: (tableName: string) => tableService.deleteTable(tableName, schemaName),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: databaseTableQueryKeys.list });
+      void queryClient.invalidateQueries({ queryKey: databaseTableQueryKeys.tables(schemaName) });
       showToast('Table deleted successfully', 'success');
     },
     onError: (error: Error) => {
@@ -69,9 +74,11 @@ export function useTables() {
     }: {
       tableName: string;
       operations: UpdateTableSchemaRequest;
-    }) => tableService.updateTableSchema(tableName, operations),
+    }) => tableService.updateTableSchema(tableName, operations, schemaName),
     onSuccess: (_, { tableName }) => {
-      void queryClient.invalidateQueries({ queryKey: databaseTableQueryKeys.schema(tableName) });
+      void queryClient.invalidateQueries({
+        queryKey: databaseTableQueryKeys.tableSchema(schemaName, tableName),
+      });
       showToast('Table schema updated successfully', 'success');
     },
     onError: (error: Error) => {
@@ -110,14 +117,14 @@ export function useTables() {
  * Use this only when you need ALL schemas (e.g., for visualizations).
  * For individual tables, use useTables().useTableSchema() instead.
  */
-export function useAllTableSchemas(enabled = true) {
-  const { tables, isLoadingTables } = useTables();
+export function useAllTableSchemas(schemaName: string = DEFAULT_DATABASE_SCHEMA, enabled = true) {
+  const { tables, isLoadingTables } = useTables(schemaName);
 
   const { allSchemas, isLoadingSchemas } = useQueries({
     queries: enabled
       ? tables.map((tableName) => ({
-          queryKey: databaseTableQueryKeys.schema(tableName),
-          queryFn: () => tableService.getTableSchema(tableName),
+          queryKey: databaseTableQueryKeys.tableSchema(schemaName, tableName),
+          queryFn: () => tableService.getTableSchema(tableName, schemaName),
           staleTime: 2 * 60 * 1000,
         }))
       : [],

@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@insforge/ui';
-import { useAIGatewayConfig } from '../hooks/useAIGatewayConfig';
+import { useAIGatewayConfig } from '#features/ai/hooks/useAIGatewayConfig';
 import type { GatewayConfigResponse } from '@insforge/shared-schemas';
 
 function KeySourceBadge({ config }: { config: GatewayConfigResponse }) {

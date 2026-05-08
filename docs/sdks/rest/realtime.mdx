@@ -52,6 +52,7 @@ const socket = io('https://your-app.insforge.app', {
 socket.emit('REALTIME_SUBSCRIBE', { channel: 'orders' }, (response) => {
   if (response.ok) {
     console.log('Subscribed to:', response.channel);
+    console.log('Members already present:', response.presence.members);
   } else {
     console.error('Subscribe failed:', response.error);
   }
@@ -68,6 +69,14 @@ socket.on('UPDATE', (message) => {
 
 socket.on('DELETE', (message) => {
   console.log('Record deleted:', message);
+});
+
+socket.on('presence:join', (message) => {
+  console.log('Member joined:', message.member);
+});
+
+socket.on('presence:leave', (message) => {
+  console.log('Member left:', message.member);
 });
 
 // Publish a message
@@ -94,6 +103,8 @@ socket.disconnect();
 | `INSERT` | Server → Client | Database insert notification |
 | `UPDATE` | Server → Client | Database update notification |
 | `DELETE` | Server → Client | Database delete notification |
+| `presence:join` | Server → Client | A logical member became present in the channel |
+| `presence:leave` | Server → Client | A logical member is no longer present in the channel |
 | Custom events | Both | Any custom event name |
 
 ---

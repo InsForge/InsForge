@@ -5,6 +5,7 @@ import { AIConfigService } from '@/services/ai/ai-config.service.js';
 import { isCloudEnvironment, getApiBaseUrl } from '@/utils/environment.js';
 import logger from '@/utils/logger.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
+import { PaymentService } from '@/services/payments/payment.service.js';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { OAuthProvidersSchema, aiConfigurationInputSchema } from '@insforge/shared-schemas';
 import { z } from 'zod';
@@ -292,6 +293,9 @@ export async function seedBackend(): Promise<void> {
 
     // Initialize API key (from env or generate)
     const apiKey = await secretService.initializeApiKey();
+
+    // Seed Stripe secret keys into the secret store so payment code has one lookup path.
+    await PaymentService.getInstance().seedStripeKeysFromEnv();
 
     // Get database stats
     const tables = await dbManager.getUserTables();

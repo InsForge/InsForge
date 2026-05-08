@@ -1,8 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { advanceService } from '../services/advance.service';
-import { databaseTableQueryKeys } from '../queryKeys';
+import { advanceService } from '#features/database/services/advance.service';
 import { RawSQLResponse } from '@insforge/shared-schemas';
-import { useToast } from '../../../lib/hooks/useToast';
+import { useToast } from '#lib/hooks/useToast';
 
 interface UseRawSQLOptions {
   onSuccess?: (data: RawSQLResponse) => void;
@@ -26,8 +25,8 @@ export function useRawSQL(options?: UseRawSQLOptions) {
     },
     onSuccess: (data) => {
       // Invalidate database schema queries to ensure UI reflects any schema changes
-      void queryClient.invalidateQueries({ queryKey: databaseTableQueryKeys.list });
-      void queryClient.invalidateQueries({ queryKey: databaseTableQueryKeys.schemaRoot });
+      void queryClient.invalidateQueries({ queryKey: ['database', 'tables'] });
+      void queryClient.invalidateQueries({ queryKey: ['database', 'table-schemas'] });
 
       if (options?.showSuccessToast !== false) {
         const message = 'SQL query executed successfully';

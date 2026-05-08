@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { KeyRound, Trash2 } from 'lucide-react';
 import { Button, ConfirmDialog, CopyButton, Input } from '@insforge/ui';
 import type { S3AccessKeySchema } from '@insforge/shared-schemas';
-import { useS3AccessKeys, useS3GatewayConfig } from '../hooks/useS3AccessKeys';
+import { useS3AccessKeys, useS3GatewayConfig } from '#features/storage/hooks/useS3AccessKeys';
 import { S3AccessKeyCreateDialog } from './S3AccessKeyCreateDialog';
 
 /** Formats an ISO timestamp as "N minutes/hours/days ago", or "—" when null. */

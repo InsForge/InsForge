@@ -6,14 +6,14 @@ import {
   dashboardSettingsMenuItem,
   dashboardStaticMenuItems,
   type DashboardPrimaryMenuItem,
-} from '../navigation/menuItems';
+} from '#navigation/menuItems';
 import { Link, useLocation, matchPath } from 'react-router-dom';
 import { ExternalLink, PanelLeftOpen, PanelRightOpen } from 'lucide-react';
-import { cn, isInsForgeCloudProject } from '../lib/utils/utils';
+import { cn, isInsForgeCloudProject } from '#lib/utils/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
-import { ProjectSettingsMenuDialog } from '../features/dashboard/components';
-import { getFeatureFlag } from '../lib/analytics/posthog';
-import { useDashboardHost } from '../lib/config/DashboardHostContext';
+import { ProjectSettingsMenuDialog } from '#features/dashboard/components';
+import { getFeatureFlag } from '#lib/analytics/posthog';
+import { useDashboardHost } from '#lib/config/DashboardHostContext';
 
 interface AppSidebarProps extends React.HTMLAttributes<HTMLElement> {
   isCollapsed: boolean;
@@ -29,19 +29,15 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
   const isDTest = getFeatureFlag('dashboard-v4-experiment') === 'd_test';
   const isDTestCloud = isDTest && host.mode === 'cloud-hosting';
 
-  // Insert deployments at the end of section 2 for cloud projects.
+  // Insert deployments into the feature section for cloud projects.
   const mainMenuItems = useMemo(() => {
     const items = dashboardStaticMenuItems.map((item) => ({ ...item }));
 
     if (isCloud) {
       const aiItemIndex = items.findIndex((item) => item.id === 'ai');
-      const deploymentsItem: DashboardPrimaryMenuItem = {
-        ...dashboardDeploymentsMenuItem,
-        sectionEnd: true,
-      };
+      const deploymentsItem: DashboardPrimaryMenuItem = { ...dashboardDeploymentsMenuItem };
 
       if (aiItemIndex >= 0) {
-        items[aiItemIndex] = { ...items[aiItemIndex], sectionEnd: false };
         items.splice(aiItemIndex + 1, 0, deploymentsItem);
         return items;
       }

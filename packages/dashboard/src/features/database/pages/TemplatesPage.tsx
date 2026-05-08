@@ -1,10 +1,11 @@
-import { useNavigate } from 'react-router-dom';
-import { DATABASE_TEMPLATES, type DatabaseTemplate } from '../templates';
-import { useSQLEditorContext } from '../contexts/SQLEditorContext';
-import { TemplateCard } from '../components/TemplateCard';
-import { DatabaseStudioSidebarPanel } from '../components/DatabaseSidebar';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { DATABASE_TEMPLATES, type DatabaseTemplate } from '#features/database/templates';
+import { useSQLEditorContext } from '#features/database/contexts/SQLEditorContext';
+import { TemplateCard } from '#features/database/components/TemplateCard';
+import { DatabaseStudioSidebarPanel } from '#features/database/components/DatabaseSidebar';
 
 export default function TemplatesPage() {
+  const location = useLocation();
   const navigate = useNavigate();
   const { addTab } = useSQLEditorContext();
 
@@ -19,7 +20,13 @@ export default function TemplatesPage() {
     <div className="flex h-full min-h-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
       <DatabaseStudioSidebarPanel
         onBack={() =>
-          void navigate('/dashboard/database/tables', { state: { slideFromStudio: true } })
+          void navigate(
+            {
+              pathname: '/dashboard/database/tables',
+              search: location.search,
+            },
+            { state: { slideFromStudio: true } }
+          )
         }
       />
       <div className="min-w-0 flex-1 overflow-auto bg-[rgb(var(--semantic-1))]">

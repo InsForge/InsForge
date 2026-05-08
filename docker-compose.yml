@@ -114,6 +114,9 @@ services:
       - CLOUD_API_HOST=${CLOUD_API_HOST:-}
       # LLM Model API keys
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      # Stripe Payments Configuration
+      - STRIPE_TEST_SECRET_KEY=${STRIPE_TEST_SECRET_KEY:-}
+      - STRIPE_LIVE_SECRET_KEY=${STRIPE_LIVE_SECRET_KEY:-}
       # OAuth Configuration
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
@@ -129,6 +132,12 @@ services:
       - X_CLIENT_SECRET=${X_CLIENT_SECRET:-}
       - APPLE_CLIENT_ID=${APPLE_CLIENT_ID:-}
       - APPLE_CLIENT_SECRET=${APPLE_CLIENT_SECRET:-}
+      # Compute Services (Fly.io self-host). Auto-enables when both
+      # FLY_API_TOKEN and FLY_ORG are set. Cloud-proxied mode activates
+      # automatically when PROJECT_ID, CLOUD_API_HOST, and JWT_SECRET are set.
+      - FLY_API_TOKEN=${FLY_API_TOKEN:-}
+      - FLY_ORG=${FLY_ORG:-}
+      - COMPUTE_DOMAIN=${COMPUTE_DOMAIN:-}
       # Logs directory
       - LOGS_DIR=/insforge-logs
       # Storage directory (for local file storage when S3 is not configured)

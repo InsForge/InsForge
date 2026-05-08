@@ -25,9 +25,9 @@ import {
   type StorageConfigSchema,
   type UpdateStorageConfigRequest,
 } from '@insforge/shared-schemas';
-import { useStorageConfig } from '../hooks/useStorageConfig';
+import { useStorageConfig } from '#features/storage/hooks/useStorageConfig';
 import { S3SettingsPanel } from './S3SettingsPanel';
-import { isInsForgeCloudProject } from '../../../lib/utils/utils';
+import { isInsForgeCloudProject } from '#lib/utils/utils';
 
 type StorageSettingsTab = 'general' | 's3';
 

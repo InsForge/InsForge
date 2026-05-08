@@ -2,14 +2,14 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import AppSidebar from './AppSidebar';
 import AppHeader from './AppHeader';
-import { ThemeProvider } from '../lib/contexts/ThemeContext';
-import { ConnectDialog } from '../features/dashboard/components/connect';
-import { ProjectRestoringPage } from '../features/dashboard/components/ProjectRestoringPage';
-import { useDashboardHost, useDashboardProject } from '../lib/config/DashboardHostContext';
-import { cn } from '../lib/utils/utils';
+import { ThemeProvider } from '#lib/contexts/ThemeContext';
+import { ConnectDialog } from '#features/dashboard/components/connect';
+import { ProjectRestoringPage } from '#features/dashboard/components/ProjectRestoringPage';
+import { useDashboardHost, useDashboardProject } from '#lib/config/DashboardHostContext';
+import { cn } from '#lib/utils/utils';
 import { ConnectDialogProvider } from './ConnectDialogContext';
-import { getFeatureFlag } from '../lib/analytics/posthog';
-import { DTestConnectTip } from '../features/dashboard/components/dtest/DTestConnectTip';
+import { getFeatureFlag } from '#lib/analytics/posthog';
+import { DTestConnectTip } from '#features/dashboard/components/dtest/DTestConnectTip';
 
 const CONNECT_DIALOG_MESSAGE_TYPES = new Set(['SHOW_ONBOARDING_OVERLAY', 'SHOW_CONNECT_OVERLAY']);
 
@@ -51,23 +51,6 @@ function ConnectOverlayBridge({ hostMode, onOpenDialog }: ConnectOverlayBridgePr
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [hostMode, navigate, onOpenDialog]);
-
-  return null;
-}
-
-function DTestViewBroadcaster() {
-  const { pathname } = useLocation();
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || window.parent === window) {
-      return;
-    }
-    if (getFeatureFlag('dashboard-v4-experiment') !== 'd_test') {
-      return;
-    }
-    const view = pathname === '/dashboard/install' ? 'install' : 'dashboard';
-    window.parent.postMessage({ type: 'D_TEST_VIEW_CHANGED', view }, '*');
-  }, [pathname]);
 
   return null;
 }
@@ -121,7 +104,6 @@ export default function AppLayout({ children }: LayoutProps) {
     <ThemeProvider forcedTheme={forcedTheme}>
       <ConnectDialogProvider value={openConnectDialog}>
         <ConnectOverlayBridge hostMode={host.mode} onOpenDialog={openConnectDialog} />
-        <DTestViewBroadcaster />
         <DTestConnectTip />
         <div
           className={cn(

@@ -1,8 +1,8 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { logService } from '../services/log.service';
+import { logService } from '#features/logs/services/log.service';
 import type { LogSchema } from '@insforge/shared-schemas';
-import { LOGS_PAGE_SIZE, SeverityType } from '../helpers';
+import { LOGS_PAGE_SIZE, SeverityType } from '#features/logs/helpers';
 
 const FETCH_SIZE = 200;
 

@@ -1,4 +1,4 @@
-export { OAuthConfigDialog } from './OAuthConfigDialog';
+export { OAuthConfigDialog, type OAuthDialogMode } from './OAuthConfigDialog';
 export { CustomOAuthConfigDialog } from './CustomOAuthConfigDialog';
 export { AuthSettingsMenuDialog } from './AuthSettingsMenuDialog';
 export { OAuthEmptyState } from './OAuthEmptyState';

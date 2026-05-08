@@ -1,4 +1,5 @@
-import { FeatureSidebar, type FeatureSidebarListItem } from '../../../components';
+import { Settings } from 'lucide-react';
+import { FeatureSidebar, type FeatureSidebarListItem } from '#components';
 
 const FUNCTIONS_SIDEBAR_ITEMS: FeatureSidebarListItem[] = [
   {
@@ -18,6 +19,23 @@ const FUNCTIONS_SIDEBAR_ITEMS: FeatureSidebarListItem[] = [
   },
 ];
 
-export function FunctionsSidebar() {
-  return <FeatureSidebar title="Edge Functions" items={FUNCTIONS_SIDEBAR_ITEMS} />;
+interface FunctionsSidebarProps {
+  onOpenSettings: () => void;
+}
+
+export function FunctionsSidebar({ onOpenSettings }: FunctionsSidebarProps) {
+  return (
+    <FeatureSidebar
+      title="Edge Functions"
+      items={FUNCTIONS_SIDEBAR_ITEMS}
+      headerButtons={[
+        {
+          id: 'functions-settings',
+          label: 'Functions settings',
+          icon: Settings,
+          onClick: onOpenSettings,
+        },
+      ]}
+    />
+  );
 }

@@ -1,7 +1,10 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { realtimeService, type RealtimeChannel } from '../services/realtime.service';
-import { useToast } from '../../../lib/hooks/useToast';
+import {
+  realtimeService,
+  type RealtimeChannel,
+} from '#features/realtime/services/realtime.service';
+import { useToast } from '#lib/hooks/useToast';
 import type { CreateChannelRequest, UpdateChannelRequest } from '@insforge/shared-schemas';
 
 export function useRealtimeChannels() {

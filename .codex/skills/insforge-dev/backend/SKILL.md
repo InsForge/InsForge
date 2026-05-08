@@ -1,6 +1,6 @@
 ---
 name: backend
-description: Use this skill when contributing to InsForge's backend package. This is for maintainers editing backend routes, services, providers, auth, database logic, realtime, schedules, or backend tests in the InsForge monorepo.
+description: Use this skill when contributing to InsForge's backend package. This is for maintainers editing backend routes, services, providers, auth, database logic (including RLS-enforced surfaces like storage and realtime), schedules, or backend tests in the InsForge monorepo.
 ---
 
 # InsForge Dev Backend
@@ -51,10 +51,18 @@ Use this skill for `backend/` work in the InsForge repository.
    - For critical flows with multiple dependent database writes, use an explicit transactional process so the whole operation succeeds or fails together.
    - Be especially careful with transactions around auth, secrets, billing-like usage updates, schema changes, and any flow that would leave the system inconsistent if partially applied.
 
-5. Always write unit tests for new code.
+5. Use Postgres Row Level Security, not app-side filters, for tables accessed via authenticated end-user routes (anything where `req.user` reaches the service layer). `storage.objects` uses this via `withUserContext`. The `realtime` services use the same set-role + set-config pattern with their own inline copy and should be migrated to `withUserContext` in a follow-up. Tables accessed only by admin or service-internal paths (audit logs, billing aggregations) don't need RLS. Do not write `WHERE user_id = $1` filters in services; let RLS evaluate `auth.jwt() ->> 'sub'` against the row.
+   - Plumb identity through `withUserContext(pool, ctx, fn)` from `services/db/user-context.service.ts`. It opens a transaction, sets `SET LOCAL ROLE` plus `request.jwt.claims` via `set_config`, runs `fn`, commits, and resets role on `finally` so policies see the calling user via `auth.jwt() ->> 'sub'`.
+   - Build the `UserContext` from request state. Admin callers (API key, `project_admin`) get `{ isAdmin: true }` and bypass RLS via the elevated postgres role. End users get `{ userId, role: 'authenticated', email }`. Anonymous users get `{ role: 'anon' }`.
+   - Routes that issue out-of-band URLs (S3 presigned redirects, signed download links, anything the client redeems against a service that won't re-evaluate RLS) must do an explicit RLS-scoped existence check before handing the URL out — RLS does not fire when the client redeems the URL directly. See `StorageService.objectIsVisible` as the template.
+   - Migrations that enable RLS on an existing populated table must auto-install a sensible default policy set so the upgrade does not silently break existing rows. See migration 036's `IF EXISTS (SELECT 1 FROM <table>) THEN <create policies> END IF` pattern.
+   - When adding a new RLS-enforced table: enable RLS, `GRANT` table-level CRUD to `authenticated`, and write per-operation policies (SELECT, INSERT, UPDATE, DELETE). Public-bucket-style anonymous bypasses live at the route layer (build `ctx` with `isAdmin: true`), not in policies.
+
+6. Always write unit tests for new code.
    - Every new feature, migration, service, or bug fix should have accompanying unit tests.
    - For migrations, write tests that validate SQL structure and idempotency guards (see `tests/unit/redirect-url-whitelist-migration.test.ts` for the pattern).
    - For services, test business logic and error cases.
+   - For RLS-gated services, mock the pool/client and pin the SQL sequence (see `tests/unit/user-context.service.test.ts` and `tests/unit/storage-object-is-visible.test.ts`).
    - Run the full test suite before submitting work: `cd backend && npm test`.
 
 ## Validation

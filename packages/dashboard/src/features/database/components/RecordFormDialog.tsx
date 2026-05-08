@@ -12,13 +12,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@insforge/ui';
-import { ScrollArea } from '../../../components';
-import { useRecords } from '../hooks/useRecords';
-import { buildDynamicSchema, getInitialValues } from '..';
+import { ScrollArea } from '#components';
+import { useRecords } from '#features/database/hooks/useRecords';
+import { buildDynamicSchema, getInitialValues } from '#features/database';
 import { RecordFormField } from './RecordFormField';
-import { cn } from '../../../lib/utils/utils';
+import { cn } from '#lib/utils/utils';
 import { ColumnSchema } from '@insforge/shared-schemas';
-import { SYSTEM_FIELDS } from '../helpers';
+import { SYSTEM_FIELDS } from '#features/database/helpers';
 
 interface RecordFormDialogProps {
   open: boolean;

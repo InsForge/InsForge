@@ -1,5 +1,5 @@
-import DiscordIcon from '../../../assets/logos/discord.svg?react';
-import { cn } from '../../../lib/utils/utils';
+import DiscordIcon from '#assets/logos/discord.svg?react';
+import { cn } from '#lib/utils/utils';
 
 interface JoinDiscordCtaProps {
   className?: string;

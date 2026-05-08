@@ -21,6 +21,7 @@ import { emailRouter } from '@/api/routes/email/index.routes.js';
 import { deploymentsRouter } from '@/api/routes/deployments/index.routes.js';
 import { webhooksRouter } from '@/api/routes/webhooks/index.routes.js';
 import { s3GatewayRouter } from '@/api/routes/s3-gateway/index.routes.js';
+import { paymentsRouter } from '@/api/routes/payments/index.routes.js';
 import { errorMiddleware } from '@/api/middlewares/error.js';
 import { destroyEmailCooldownInterval } from '@/api/middlewares/rate-limiters.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
@@ -37,6 +38,7 @@ import { initSqlParser } from '@/utils/sql-parser.js';
 import { FunctionService } from '@/services/functions/function.service.js';
 import packageJson from '../../package.json';
 import { schedulesRouter } from '@/api/routes/schedules/index.routes.js';
+import { servicesRouter } from '@/api/routes/compute/services.routes.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -213,6 +215,8 @@ export async function createApp() {
   apiRouter.use('/email', emailRouter);
   apiRouter.use('/deployments', deploymentsRouter);
   apiRouter.use('/schedules', schedulesRouter);
+  apiRouter.use('/payments', paymentsRouter);
+  apiRouter.use('/compute/services', servicesRouter);
 
   // Mount all API routes under /api prefix
   app.use('/api', apiRouter);

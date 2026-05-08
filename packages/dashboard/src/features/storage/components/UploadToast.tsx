@@ -1,4 +1,4 @@
-import { useToast } from '../../../lib/hooks/useToast';
+import { useToast } from '#lib/hooks/useToast';
 
 interface UploadToastOptions {
   onCancel?: () => void;

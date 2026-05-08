@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { aiService } from '../services/ai.service';
+import { aiService } from '#features/ai/services/ai.service';
 import type { GatewayConfigResponse } from '@insforge/shared-schemas';
 
 const GATEWAY_CONFIG_QUERY_KEY = ['ai-gateway-config'];

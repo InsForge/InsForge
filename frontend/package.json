@@ -9,7 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src/"
+    "lint": "eslint ."
   },
   "dependencies": {
     "@insforge/dashboard": "*",

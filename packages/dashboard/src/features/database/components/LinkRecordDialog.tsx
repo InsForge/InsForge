@@ -20,14 +20,15 @@ import {
   type DatabaseRecord,
   type ConvertedValue,
   type DataGridRowType,
-} from '../../../components';
-import { useTables } from '../hooks/useTables';
-import { useRecords } from '../hooks/useRecords';
-import { useUsers } from '../../auth/hooks/useUsers';
+} from '#components';
+import { useTables } from '#features/database/hooks/useTables';
+import { useRecords } from '#features/database/hooks/useRecords';
+import { useUsers } from '#features/auth/hooks/useUsers';
 import { convertSchemaToColumns } from './DatabaseDataGrid';
-import { formatValueForDisplay } from '../../../lib/utils/utils';
+import { formatValueForDisplay } from '#lib/utils/utils';
 import { ColumnType } from '@insforge/shared-schemas';
-import { AUTH_USERS_TABLE, authUsersSchema } from '../constants';
+import { AUTH_USERS_TABLE, authUsersSchema } from '#features/database/constants';
+import { parseDatabaseTableReference } from '#features/database/helpers';
 
 const PAGE_SIZE = 50;
 
@@ -49,11 +50,12 @@ export function LinkRecordDialog({
   const [selectedRecord, setSelectedRecord] = useState<DatabaseRecord | null>(null);
   const [sortColumns, setSortColumns] = useState<SortColumn[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const { useTableSchema } = useTables();
   const isAuthUsers = referenceTable === AUTH_USERS_TABLE;
+  const { schemaName, tableName } = parseDatabaseTableReference(referenceTable);
+  const { useTableSchema } = useTables(schemaName);
 
   // Regular table records hook (disabled for auth.users)
-  const recordsHook = useRecords(isAuthUsers ? '' : referenceTable);
+  const recordsHook = useRecords(isAuthUsers ? '' : tableName, schemaName);
 
   // Auth users hook
   const {
@@ -75,7 +77,7 @@ export function LinkRecordDialog({
   }, [currentPage, isAuthUsers, setUsersCurrentPage]);
 
   // Fetch table schema (skip for auth.users)
-  const { data: fetchedSchema } = useTableSchema(referenceTable, !isAuthUsers && open);
+  const { data: fetchedSchema } = useTableSchema(tableName, schemaName, !isAuthUsers && open);
   const schema = isAuthUsers ? authUsersSchema : fetchedSchema;
 
   // Fetch records from the reference table (skip for auth.users)

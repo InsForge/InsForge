@@ -2,14 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, CopyButton } from '@insforge/ui';
 import { Database, Sparkles, Rocket } from 'lucide-react';
-import StepUserIcon from '../../../../assets/icons/step_user.svg?react';
-import StepUploadIcon from '../../../../assets/icons/step_upload.svg?react';
-import stepBgDecoration from '../../../../assets/images/step_bg_decoration.svg';
-import { useMetadata, useProjectId } from '../../../../lib/hooks/useMetadata';
-import { useUsers } from '../../../auth';
-import { useAIUsageSummary } from '../../../ai/hooks/useAIUsage';
-import { useDeploymentMetadata } from '../../../deployments/hooks/useDeploymentMetadata';
-import { useMcpUsage } from '../../../logs/hooks/useMcpUsage';
+import StepUserIcon from '#assets/icons/step_user.svg?react';
+import StepUploadIcon from '#assets/icons/step_upload.svg?react';
+import stepBgDecoration from '#assets/images/step_bg_decoration.svg';
+import { useMetadata, useProjectId } from '#lib/hooks/useMetadata';
+import { useUsers } from '#features/auth';
+import { useAIUsageSummary } from '#features/ai/hooks/useAIUsage';
+import { useDeploymentMetadata } from '#features/deployments/hooks/useDeploymentMetadata';
+import { useMcpUsage } from '#features/logs/hooks/useMcpUsage';
 
 // --- Prompt Stepper Data ---
 

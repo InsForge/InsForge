@@ -3,6 +3,8 @@ import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
 import type { RawOpenRouterModel } from '@/types/ai.js';
 import type { AIModelSchema } from '@insforge/shared-schemas';
 import { calculatePricePerMillion, filterAndSortModalities, getProviderOrder } from './helpers.js';
+import { AppError } from '@/api/middlewares/error.js';
+import { ERROR_CODES } from '@/types/error-constants.js';
 
 export class AIModelService {
   /**
@@ -33,7 +35,11 @@ export class AIModelService {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch models: ${response.statusText}`);
+      throw new AppError(
+        `Failed to fetch models: ${response.statusText}`,
+        500,
+        ERROR_CODES.AI_UPSTREAM_UNAVAILABLE
+      );
     }
 
     const data = (await response.json()) as { data: RawOpenRouterModel[] };

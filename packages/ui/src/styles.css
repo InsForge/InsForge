@@ -43,6 +43,8 @@
   --insforge-green-600: 22 163 74;
   --insforge-amber-500: 245 158 11;
   --insforge-amber-600: 217 119 6;
+  --insforge-sky-500: 14 165 233;
+  --insforge-sky-600: 2 132 199;
 }
 
 /* ============================================================
@@ -80,6 +82,7 @@
   --success: var(--insforge-green-600); /* general.success */
   --destructive: var(--insforge-red-600); /* general.alert */
   --warning: var(--insforge-amber-600); /* general.warning */
+  --info: var(--insforge-sky-600); /* general.info */
   --border: var(--alpha-8); /* general.border */
 
   /* special */
@@ -123,6 +126,7 @@
   --success: var(--insforge-green-500); /* general.success */
   --destructive: var(--insforge-red-500); /* general.alert */
   --warning: var(--insforge-amber-500); /* general.warning */
+  --info: var(--insforge-sky-500); /* general.info */
   --border: var(--alpha-8); /* general.border */
 
   /* special */

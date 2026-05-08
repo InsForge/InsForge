@@ -1,16 +1,18 @@
 import { useState, useEffect, useCallback, useMemo, useRef, type CSSProperties } from 'react';
 import { CirclePlus, LogIn } from 'lucide-react';
-import PencilIcon from '../../../assets/icons/pencil.svg?react';
-import RefreshIcon from '../../../assets/icons/refresh.svg?react';
-import EmptyBoxSvg from '../../../assets/images/empty_box.svg?react';
-import { useTables } from '../hooks/useTables';
-import { useRecords } from '../hooks/useRecords';
-import { DatabaseSidebar } from '../components/DatabaseSidebar';
-import { RecordFormDialog } from '../components/RecordFormDialog';
-import { TableForm } from '../components/TableForm';
-import { TablesEmptyState } from '../components/TablesEmptyState';
-import { TemplatePreview } from '../components/TemplatePreview';
-import { DATABASE_TEMPLATES, DatabaseTemplate } from '../templates';
+import PencilIcon from '#assets/icons/pencil.svg?react';
+import RefreshIcon from '#assets/icons/refresh.svg?react';
+import EmptyBoxSvg from '#assets/images/empty_box.svg?react';
+import { useDatabaseSchemas } from '#features/database/hooks/useDatabase';
+import { useDatabaseSchemaSelection } from '#features/database/hooks/useDatabaseSchemaSelection';
+import { useTables } from '#features/database/hooks/useTables';
+import { useRecords } from '#features/database/hooks/useRecords';
+import { DatabaseSidebar } from '#features/database/components/DatabaseSidebar';
+import { RecordFormDialog } from '#features/database/components/RecordFormDialog';
+import { TableForm } from '#features/database/components/TableForm';
+import { TablesEmptyState } from '#features/database/components/TablesEmptyState';
+import { TemplatePreview } from '#features/database/components/TemplatePreview';
+import { DATABASE_TEMPLATES, DatabaseTemplate } from '#features/database/templates';
 import {
   Button,
   ConfirmDialog,
@@ -26,19 +28,21 @@ import {
   SelectionClearButton,
   DeleteActionButton,
   TableHeader,
-} from '../../../components';
-import { useConfirm } from '../../../lib/hooks/useConfirm';
-import { useToast } from '../../../lib/hooks/useToast';
-import { DatabaseDataGrid } from '../components/DatabaseDataGrid';
+} from '#components';
+import { useConfirm } from '#lib/hooks/useConfirm';
+import { useToast } from '#lib/hooks/useToast';
+import { DatabaseDataGrid } from '#features/database/components/DatabaseDataGrid';
 import { SortColumn } from 'react-data-grid';
-import { convertValueForColumn } from '../../../lib/utils/utils';
-import { useCSVImport } from '../hooks/useCSVImport';
-import { useTableColumnWidthsPreference } from '../hooks/useTableColumnWidthsPreference';
+import { convertValueForColumn } from '#lib/utils/utils';
+import { useCSVImport } from '#features/database/hooks/useCSVImport';
+import { useTableColumnWidthsPreference } from '#features/database/hooks/useTableColumnWidthsPreference';
 import { useLocation, useSearchParams } from 'react-router-dom';
-import { usePageSize } from '../../../lib/hooks/usePageSize';
+import { usePageSize } from '#lib/hooks/usePageSize';
+import { DEFAULT_DATABASE_SCHEMA, getDatabaseSchemaInfo } from '#features/database/helpers';
 
 export default function TablesPage() {
   const location = useLocation();
+  const { selectedSchema, setSelectedSchema } = useDatabaseSchemaSelection();
   const [searchParams, setSearchParams] = useSearchParams();
   const shouldSlideBackToTables =
     (location.state as { slideFromStudio?: boolean } | null)?.slideFromStudio === true;
@@ -60,8 +64,13 @@ export default function TablesPage() {
   const { confirm, confirmDialogProps } = useConfirm();
   const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { schemas, isLoading: isLoadingSchemas } = useDatabaseSchemas();
+  const selectedSchemaInfo = useMemo(
+    () => getDatabaseSchemaInfo(schemas, selectedSchema),
+    [schemas, selectedSchema]
+  );
   const { tables, isLoadingTables, tablesError, deleteTable, useTableSchema, refetchTables } =
-    useTables();
+    useTables(selectedSchema);
   const selectedTable = useMemo(() => {
     if (isLoadingTables || !tables.length) {
       return null;
@@ -86,7 +95,27 @@ export default function TablesPage() {
     [searchParams, setSearchParams]
   );
 
-  const recordsHook = useRecords(selectedTable || '');
+  const selectTableInSchema = useCallback(
+    (tableName: string | null, schemaName: string = selectedSchema, replace: boolean = false) => {
+      const nextSearchParams = new URLSearchParams(searchParams);
+      if (schemaName === DEFAULT_DATABASE_SCHEMA) {
+        nextSearchParams.delete('schema');
+      } else {
+        nextSearchParams.set('schema', schemaName);
+      }
+
+      if (tableName) {
+        nextSearchParams.set('table', tableName);
+      } else {
+        nextSearchParams.delete('table');
+      }
+
+      setSearchParams(nextSearchParams, { replace });
+    },
+    [searchParams, selectedSchema, setSearchParams]
+  );
+
+  const recordsHook = useRecords(selectedTable || '', selectedSchema);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -112,6 +141,17 @@ export default function TablesPage() {
     selectTable(selectedTable, true);
   }, [selectedTable, selectedTableFromQuery, isLoadingTables, selectTable]);
 
+  useEffect(() => {
+    if (isLoadingSchemas || schemas.length === 0) {
+      return;
+    }
+
+    const schemaExists = schemas.some((schema) => schema.name === selectedSchema);
+    if (!schemaExists) {
+      setSelectedSchema(DEFAULT_DATABASE_SCHEMA, { replace: true, clearTable: true });
+    }
+  }, [isLoadingSchemas, schemas, selectedSchema, setSelectedSchema]);
+
   const handlePageSizeChange = useCallback(
     (newPageSize: number) => {
       onPageSizeChange(newPageSize);
@@ -128,7 +168,7 @@ export default function TablesPage() {
   // Clear selected rows when table changes
   useEffect(() => {
     setSelectedRows(new Set());
-  }, [selectedTable]);
+  }, [selectedTable, selectedSchema]);
 
   // Safe sort columns change handler
   const handleSortColumnsChange = useCallback(
@@ -148,7 +188,7 @@ export default function TablesPage() {
   );
 
   // Fetch schema for selected table
-  const { data: schemaData } = useTableSchema(selectedTable || '', !!selectedTable);
+  const { data: schemaData } = useTableSchema(selectedTable || '', selectedSchema, !!selectedTable);
   const availableColumns = useMemo(
     () => schemaData?.columns.map((column) => column.columnName) ?? [],
     [schemaData]
@@ -159,11 +199,16 @@ export default function TablesPage() {
   );
   const { columnWidths, setColumnWidth } = useTableColumnWidthsPreference(
     selectedTable,
+    selectedSchema,
     availableColumns
   );
 
   // Fetch schema for editing table
-  const { data: editingTableSchema } = useTableSchema(editingTable || '', !!editingTable);
+  const { data: editingTableSchema } = useTableSchema(
+    editingTable || '',
+    selectedSchema,
+    !!editingTable
+  );
 
   const primaryKeyColumn = useMemo(() => {
     return schemaData?.columns.find((col) => col.isPrimaryKey)?.columnName;
@@ -173,7 +218,7 @@ export default function TablesPage() {
     mutate: importCSV,
     isPending: isImporting,
     reset: resetImport,
-  } = useCSVImport(selectedTable || '', {
+  } = useCSVImport(selectedTable || '', selectedSchema, {
     onSuccess: (data) => {
       if (data.success) {
         showToast(data.message || 'Import successful!', 'success');
@@ -288,6 +333,19 @@ export default function TablesPage() {
     }
   };
 
+  const handleSelectSchema = (schemaName: string) => {
+    if (showTableForm) {
+      void handleTableFormClose().then((discarded) => {
+        if (discarded) {
+          setSelectedSchema(schemaName, { clearTable: true });
+        }
+      });
+      return;
+    }
+
+    setSelectedSchema(schemaName, { clearTable: true });
+  };
+
   const handleCreateTable = () => {
     setEditingTable(null);
     setShowTableForm(true);
@@ -330,7 +388,7 @@ export default function TablesPage() {
 
   // Handle record update
   const handleRecordUpdate = async (rowId: string, columnKey: string, newValue: string) => {
-    if (!selectedTable) {
+    if (!selectedTable || selectedSchemaInfo.isProtected) {
       return;
     }
 
@@ -360,7 +418,7 @@ export default function TablesPage() {
 
   // Handle bulk delete
   const handleBulkDelete = async (ids: string[]) => {
-    if (!selectedTable || !ids.length) {
+    if (!selectedTable || !ids.length || selectedSchemaInfo.isProtected) {
       return;
     }
 
@@ -385,6 +443,7 @@ export default function TablesPage() {
 
   // Show empty state when there are no tables and not loading
   const showEmptyState = !isLoadingTables && tables?.length === 0 && !showTableForm;
+  const canMutateSelectedSchema = !selectedSchemaInfo.isProtected;
 
   // Show template preview - takes full width without sidebar
   if (previewingTemplate) {
@@ -395,13 +454,18 @@ export default function TablesPage() {
     <div className="flex h-full min-h-0 min-w-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
       {/* Secondary Sidebar - Table List */}
       <DatabaseSidebar
+        schemas={schemas}
+        selectedSchema={selectedSchema}
+        onSchemaSelect={handleSelectSchema}
         tables={tables}
         selectedTable={selectedTable || undefined}
         onTableSelect={handleSelectTable}
         loading={isLoadingTables}
-        onNewTable={handleCreateTable}
-        onEditTable={handleEditTable}
-        onDeleteTable={(tableName) => void handleDeleteTable(tableName)}
+        onNewTable={canMutateSelectedSchema ? handleCreateTable : undefined}
+        onEditTable={canMutateSelectedSchema ? handleEditTable : undefined}
+        onDeleteTable={
+          canMutateSelectedSchema ? (tableName) => void handleDeleteTable(tableName) : undefined
+        }
         initialMode={shouldSlideBackToTables ? 'studio' : 'tables'}
         animateToMode={shouldSlideBackToTables ? 'tables' : undefined}
       />
@@ -411,6 +475,7 @@ export default function TablesPage() {
         {showTableForm ? (
           // Show TableForm replacing entire main content area
           <TableForm
+            schemaName={selectedSchema}
             open={showTableForm}
             onOpenChange={(open) => {
               if (!open) {
@@ -453,25 +518,32 @@ export default function TablesPage() {
                       <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">
                         {selectedTable}
                       </h1>
+                      {selectedSchemaInfo.isProtected && (
+                        <span className="rounded bg-alpha-4 px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                          Protected
+                        </span>
+                      )}
                       <div className="flex h-5 w-5 shrink-0 items-center justify-center">
                         <div className="h-5 w-px bg-[var(--alpha-8)]" />
                       </div>
                       <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleEditTable(selectedTable)}
-                              className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
-                            >
-                              <PencilIcon className="h-5 w-5" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom" align="center">
-                            <p>Edit table</p>
-                          </TooltipContent>
-                        </Tooltip>
+                        {canMutateSelectedSchema && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleEditTable(selectedTable)}
+                                className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
+                              >
+                                <PencilIcon className="h-5 w-5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" align="center">
+                              <p>Edit table</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
@@ -491,30 +563,34 @@ export default function TablesPage() {
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
-                      <div className="flex h-5 w-5 shrink-0 items-center justify-center">
-                        <div className="h-5 w-px bg-[var(--alpha-8)]" />
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 rounded px-1.5 text-primary hover:bg-[var(--alpha-4)] hover:text-primary active:bg-[var(--alpha-8)]"
-                        onClick={() => setShowRecordForm(true)}
-                      >
-                        <CirclePlus className="h-6 w-6 stroke-[1.5] text-primary" />
-                        <span className="px-1 text-sm font-medium leading-5">Add Record</span>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 rounded px-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] hover:text-foreground active:bg-[var(--alpha-8)]"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isImporting}
-                      >
-                        <LogIn className="h-6 w-6 stroke-[1.5]" />
-                        <span className="px-1 text-sm font-medium leading-5">
-                          {isImporting ? 'Importing...' : 'Import CSV'}
-                        </span>
-                      </Button>
+                      {canMutateSelectedSchema && (
+                        <>
+                          <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+                            <div className="h-5 w-px bg-[var(--alpha-8)]" />
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 rounded px-1.5 text-primary hover:bg-[var(--alpha-4)] hover:text-primary active:bg-[var(--alpha-8)]"
+                            onClick={() => setShowRecordForm(true)}
+                          >
+                            <CirclePlus className="h-6 w-6 stroke-[1.5] text-primary" />
+                            <span className="px-1 text-sm font-medium leading-5">Add Record</span>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 rounded px-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] hover:text-foreground active:bg-[var(--alpha-8)]"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isImporting}
+                          >
+                            <LogIn className="h-6 w-6 stroke-[1.5]" />
+                            <span className="px-1 text-sm font-medium leading-5">
+                              {isImporting ? 'Importing...' : 'Import CSV'}
+                            </span>
+                          </Button>
+                        </>
+                      )}
                     </div>
                   )
                 }
@@ -533,12 +609,23 @@ export default function TablesPage() {
                 </Alert>
               )}
 
-              {showEmptyState ? (
+              {showEmptyState && canMutateSelectedSchema ? (
                 <TablesEmptyState
                   templates={DATABASE_TEMPLATES}
                   onCreateTable={handleCreateTable}
                   onTemplateClick={handleTemplateClick}
                 />
+              ) : showEmptyState ? (
+                <div className="flex-1 flex items-center justify-center">
+                  <EmptyState
+                    title={`No tables in ${selectedSchema}`}
+                    description={
+                      selectedSchemaInfo.isProtected
+                        ? 'InsForge-managed schemas are protected in the dashboard.'
+                        : 'Create a table from the sidebar to get started.'
+                    }
+                  />
+                </div>
               ) : !selectedTable ? (
                 <div className="flex-1 flex items-center justify-center">
                   <EmptyState
@@ -561,8 +648,12 @@ export default function TablesPage() {
                   sortColumns={sortColumns}
                   onSortColumnsChange={handleSortColumnsChange}
                   onColumnResize={setColumnWidth}
-                  onCellEdit={handleRecordUpdate}
-                  onJumpToTable={(tableName) => selectTable(tableName)}
+                  onCellEdit={canMutateSelectedSchema ? handleRecordUpdate : undefined}
+                  onJumpToTable={(tableName, schemaName) =>
+                    selectTableInSchema(tableName, schemaName ?? selectedSchema)
+                  }
+                  readOnly={selectedSchemaInfo.isProtected}
+                  showSelection={!selectedSchemaInfo.isProtected}
                   currentPage={currentPage}
                   totalPages={totalPages}
                   pageSize={pageSize}
@@ -586,7 +677,7 @@ export default function TablesPage() {
                       <p className="text-sm font-medium leading-6 text-muted-foreground">
                         No Records Found
                       </p>
-                      {!searchQuery && (
+                      {!searchQuery && canMutateSelectedSchema && (
                         <button
                           type="button"
                           className="text-xs leading-4 text-primary hover:underline"
@@ -613,7 +704,7 @@ export default function TablesPage() {
       />
 
       {/* Add Record Form */}
-      {selectedTable && schemaData && (
+      {selectedTable && schemaData && canMutateSelectedSchema && (
         // In the RecordForm onSuccess callback
         <RecordFormDialog
           open={showRecordForm}

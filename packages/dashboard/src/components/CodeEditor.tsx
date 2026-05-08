@@ -3,7 +3,7 @@ import { sql } from '@codemirror/lang-sql';
 import { javascript } from '@codemirror/lang-javascript';
 import { EditorView } from '@codemirror/view';
 import { vscodeDark, vscodeLight } from '@uiw/codemirror-theme-vscode';
-import { useTheme } from '../lib/contexts/ThemeContext';
+import { useTheme } from '#lib/contexts/ThemeContext';
 
 interface CodeEditorProps {
   code?: string;

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AuthConfigSchema, UpdateAuthConfigRequest } from '@insforge/shared-schemas';
-import { authConfigService } from '../services/config.service';
-import { useToast } from '../../../lib/hooks/useToast';
+import { authConfigService } from '#features/auth/services/config.service';
+import { useToast } from '#lib/hooks/useToast';
 
 export function useAuthConfig() {
   const queryClient = useQueryClient();

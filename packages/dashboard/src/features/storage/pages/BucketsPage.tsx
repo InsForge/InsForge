@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, type DragEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Upload } from 'lucide-react';
-import PencilIcon from '../../../assets/icons/pencil.svg?react';
-import RefreshIcon from '../../../assets/icons/refresh.svg?react';
-import { useBuckets } from '../hooks/useBuckets';
-import { useStorageObjects } from '../hooks/useStorageObjects';
-import { StorageSidebar } from '../components/StorageSidebar';
-import { StorageDataGrid } from '../components/StorageDataGrid';
-import { BucketFormDialog } from '../components/BucketFormDialog';
+import PencilIcon from '#assets/icons/pencil.svg?react';
+import RefreshIcon from '#assets/icons/refresh.svg?react';
+import { useBuckets } from '#features/storage/hooks/useBuckets';
+import { useStorageObjects } from '#features/storage/hooks/useStorageObjects';
+import { StorageSidebar } from '#features/storage/components/StorageSidebar';
+import { StorageDataGrid } from '#features/storage/components/StorageDataGrid';
+import { BucketFormDialog } from '#features/storage/components/BucketFormDialog';
 
-import { useConfirm } from '../../../lib/hooks/useConfirm';
-import { useToast } from '../../../lib/hooks/useToast';
-import { useUploadToast } from '../components/UploadToast';
+import { useConfirm } from '#lib/hooks/useConfirm';
+import { useToast } from '#lib/hooks/useToast';
+import { useUploadToast } from '#features/storage/components/UploadToast';
 import {
   Button,
   ConfirmDialog,
@@ -28,7 +28,7 @@ import {
   AlertDescription,
   TableHeader,
   DataGridEmptyState,
-} from '../../../components';
+} from '#components';
 
 interface BucketFormState {
   mode: 'create' | 'edit';

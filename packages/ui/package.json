@@ -53,7 +53,7 @@
     "build": "tsc -p tsconfig.build.json && cp src/styles.css dist/styles.css",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build",
-    "lint": "eslint src/"
+    "lint": "eslint ."
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.3",

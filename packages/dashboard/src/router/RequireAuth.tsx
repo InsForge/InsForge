@@ -1,8 +1,8 @@
 import { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
-import { useAuth } from '../lib/contexts/AuthContext';
-import { useDashboardHost } from '../lib/config/DashboardHostContext';
-import { LoadingState } from '../components/LoadingState';
+import { useAuth } from '#lib/contexts/AuthContext';
+import { useDashboardHost } from '#lib/config/DashboardHostContext';
+import { LoadingState } from '#components/LoadingState';
 
 interface RequireAuthProps {
   children: ReactNode;

@@ -77,6 +77,9 @@ services:
       - POSTGREST_BASE_URL=http://postgrest:3000
       # LLM Model API keys
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      # Stripe Payments Configuration
+      - STRIPE_TEST_SECRET_KEY=${STRIPE_TEST_SECRET_KEY:-}
+      - STRIPE_LIVE_SECRET_KEY=${STRIPE_LIVE_SECRET_KEY:-}
       # Deployment Configuration
       - VERCEL_TOKEN=${VERCEL_TOKEN:-}
       - VERCEL_TEAM_ID=${VERCEL_TEAM_ID:-}

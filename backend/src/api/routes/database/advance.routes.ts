@@ -17,6 +17,7 @@ import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import { successResponse } from '@/utils/response.js';
 import { analyzeQuery, DatabaseResourceUpdate } from '@/utils/sql-parser.js';
+import { buildQualifiedTableKey } from '@/services/database/helpers.js';
 
 const router = Router();
 const dbAdvanceService = DatabaseAdvanceService.getInstance();
@@ -243,9 +244,10 @@ router.post(
         );
       }
 
-      const { table, upsertKey } = validation.data;
+      const { schema, table, upsertKey } = validation.data;
 
       const response = await dbAdvanceService.bulkUpsertFromFile(
+        schema,
         table,
         req.file.buffer,
         req.file.originalname,
@@ -258,6 +260,7 @@ router.post(
         action: 'BULK_UPSERT',
         module: 'DATABASE',
         details: {
+          schemaName: schema,
           table,
           filename: req.file.originalname,
           fileSize: req.file.size,
@@ -274,7 +277,11 @@ router.post(
         ServerEvents.DATA_UPDATE,
         {
           resource: DataUpdateResourceType.DATABASE,
-          data: { changes: [{ type: 'records', name: table }] as DatabaseResourceUpdate[] },
+          data: {
+            changes: [
+              { type: 'records', name: buildQualifiedTableKey(table, schema) },
+            ] as DatabaseResourceUpdate[],
+          },
         },
         'system'
       );

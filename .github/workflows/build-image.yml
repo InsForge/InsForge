@@ -159,7 +159,7 @@ jobs:
   push-to-ecr:
     needs: merge-manifests
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')
     permissions:
       id-token: write
       contents: read

@@ -2,10 +2,10 @@ import { useEffect, useRef } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Lock } from 'lucide-react';
 import { Button } from '@insforge/ui';
-import { useDashboardHost } from '../../../lib/config/DashboardHostContext';
-import { useAuth } from '../../../lib/contexts/AuthContext';
-import { getFeatureFlag } from '../../../lib/analytics/posthog';
-import { useMcpUsage } from '../../logs/hooks/useMcpUsage';
+import { useDashboardHost } from '#lib/config/DashboardHostContext';
+import { useAuth } from '#lib/contexts/AuthContext';
+import { getFeatureFlag } from '#lib/analytics/posthog';
+import { useMcpUsage } from '#features/logs/hooks/useMcpUsage';
 
 export default function CloudLoginPage() {
   const navigate = useNavigate();

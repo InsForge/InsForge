@@ -1,7 +1,7 @@
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import logger from '@/utils/logger.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
-import { ERROR_CODES } from '@/types/error-constants';
+import { ERROR_CODES } from '@/types/error-constants.js';
 import { AppError } from '@/api/middlewares/error.js';
 import {
   type CreateScheduleRequest,
@@ -11,12 +11,13 @@ import {
 import { CronExpressionParser } from 'cron-parser';
 import { randomUUID } from 'crypto';
 
-import { QueryResult } from 'pg';
+import { Pool, QueryResult } from 'pg';
 
 export class ScheduleService {
   private static instance: ScheduleService;
   private dbManager: DatabaseManager;
   private secretService: SecretService;
+  private pool: Pool | null = null;
 
   private constructor() {
     this.dbManager = DatabaseManager.getInstance();
@@ -30,22 +31,55 @@ export class ScheduleService {
     return ScheduleService.instance;
   }
 
+  private getPool(): Pool {
+    if (!this.pool) {
+      this.pool = this.dbManager.getPool();
+    }
+    return this.pool;
+  }
+
   /**
-   * Validate that the cron expression is exactly 5 fields (minute, hour, day, month, day-of-week).
-   * pg_cron does not support 6-field expressions with seconds.
+   * Match pg_cron's sub-minute interval syntax: "<n> seconds" (pg_cron >= 1.5).
+   * Restricted to seconds because anything ≥ 1 minute is expressible — and
+   * less ambiguous — as a 5-field cron expression. Allowing "5 minutes"
+   * here would silently differ from a star-slash-5 5-field cron (drift from
+   * last run vs. minute-boundary firing).
+   * Captures: [1] = numeric value.
+   */
+  private static readonly INTERVAL_RE = /^\s*(\d+)\s+seconds?\s*$/i;
+
+  /**
+   * Validate that the cron expression is either a 5-field cron expression or a pg_cron
+   * sub-minute interval expression ("1 second" through "59 seconds").
+   * 6-field cron-with-seconds (Quartz/Spring style) is NOT supported by pg_cron.
    */
   private validateCronExpression(cronSchedule: string): void {
-    const fields = cronSchedule.trim().split(/\s+/);
+    const trimmed = cronSchedule.trim();
+
+    const interval = trimmed.match(ScheduleService.INTERVAL_RE);
+    if (interval) {
+      const n = Number(interval[1]);
+      if (!Number.isFinite(n) || n < 1 || n > 59) {
+        throw new AppError(
+          'Interval form is only for sub-minute cadence. Use 1–59 seconds (e.g., "30 seconds"); for ≥ 1 minute use 5-field cron (e.g., "*/5 * * * *").',
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+      return;
+    }
+
+    const fields = trimmed.split(/\s+/);
     if (fields.length !== 5) {
       throw new AppError(
-        `Cron expression must be exactly 5 fields (minute, hour, day, month, day-of-week). Got ${fields.length} fields. Example: "*/5 * * * *" for every 5 minutes.`,
+        `Cron expression must be exactly 5 fields (minute, hour, day, month, day-of-week) or a sub-minute interval like "30 seconds". Got ${fields.length} fields. Examples: "*/5 * * * *" for every 5 minutes, "30 seconds" for every 30 seconds.`,
         400,
         ERROR_CODES.INVALID_INPUT
       );
     }
 
     try {
-      CronExpressionParser.parse(cronSchedule, { strict: false });
+      CronExpressionParser.parse(trimmed, { strict: false });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       throw new AppError(`Invalid cron expression: ${msg}`, 400, ERROR_CODES.INVALID_INPUT);
@@ -73,6 +107,13 @@ export class ScheduleService {
 
       if (updatedAt && updatedAt > after) {
         after = updatedAt;
+      }
+
+      // Sub-minute interval syntax (pg_cron >= 1.5) — cron-parser cannot parse this.
+      const interval = schedule.cronSchedule.trim().match(ScheduleService.INTERVAL_RE);
+      if (interval) {
+        const n = Number(interval[1]);
+        return new Date(after.getTime() + n * 1_000).toISOString();
       }
 
       const cronExpression = CronExpressionParser.parse(schedule.cronSchedule, {
@@ -165,7 +206,7 @@ export class ScheduleService {
       FROM schedules.jobs
       ORDER BY created_at DESC
     `;
-      const result = await this.dbManager.getPool().query(sql);
+      const result = await this.getPool().query(sql);
       const schedules = result.rows as ScheduleSchema[];
 
       const formatted = schedules.map((s) => {
@@ -200,7 +241,7 @@ export class ScheduleService {
       FROM schedules.jobs
       WHERE id = $1
     `;
-      const result = await this.dbManager.getPool().query(sql, [id]);
+      const result = await this.getPool().query(sql, [id]);
       const schedule = (result.rows[0] as ScheduleSchema) || null;
       if (!schedule) {
         logger.warn('Schedule not found for ID', { scheduleId: id });
@@ -237,7 +278,7 @@ export class ScheduleService {
         resolvedHeaders,
         data.body || {},
       ];
-      const result = await this.dbManager.getPool().query(sql, values);
+      const result = await this.getPool().query(sql, values);
       const jobResult = (result.rows && result.rows[0]) as
         | { success?: boolean; cron_job_id?: string; message?: string }
         | undefined;
@@ -308,7 +349,7 @@ export class ScheduleService {
           resolvedHeaders,
           data.body ?? existingSchedule.body ?? {},
         ];
-        const result = await this.dbManager.getPool().query(sql, values);
+        const result = await this.getPool().query(sql, values);
         const jobResult = (result.rows && result.rows[0]) as
           | { success?: boolean; cron_job_id?: string; message?: string }
           | undefined;
@@ -332,7 +373,7 @@ export class ScheduleService {
         const toggleSql = data.isActive
           ? 'SELECT * FROM schedules.enable_job($1::UUID)'
           : 'SELECT * FROM schedules.disable_job($1::UUID)';
-        await this.dbManager.getPool().query(toggleSql, [id]);
+        await this.getPool().query(toggleSql, [id]);
       }
 
       logger.info('Successfully updated schedule', { scheduleId: id });
@@ -346,7 +387,7 @@ export class ScheduleService {
   async deleteSchedule(id: string) {
     try {
       const sql = 'SELECT * FROM schedules.delete_job($1::UUID)';
-      const result = await this.dbManager.getPool().query(sql, [id]);
+      const result = await this.getPool().query(sql, [id]);
       const deleteResult = (result.rows && result.rows[0]) as
         | {
             success?: boolean;
@@ -400,15 +441,17 @@ export class ScheduleService {
         message: string | null;
       };
 
-      const logs = (await this.dbManager
-        .getPool()
-        .query(sql, [scheduleId, limit, offset])) as QueryResult<ExecRow>;
+      const logs = (await this.getPool().query(sql, [
+        scheduleId,
+        limit,
+        offset,
+      ])) as QueryResult<ExecRow>;
 
       const countSql = `
         SELECT COUNT(*) as total FROM schedules.job_logs
         WHERE job_id = $1::UUID
       `;
-      const countResult = await this.dbManager.getPool().query(countSql, [scheduleId]);
+      const countResult = await this.getPool().query(countSql, [scheduleId]);
       const total = parseInt((countResult.rows[0] as { total: string })?.total || '0', 10);
 
       const formattedLogs = (logs.rows as ExecRow[]).map((log) => {
@@ -444,6 +487,43 @@ export class ScheduleService {
       };
     } catch (error) {
       logger.error('Error retrieving execution logs:', { scheduleId, error });
+      throw error;
+    }
+  }
+
+  // ============================================================================
+  // Config Methods
+  // ============================================================================
+
+  async getRetentionDays(): Promise<number | null> {
+    try {
+      const result = await this.getPool().query(
+        'SELECT retention_days as "retentionDays" FROM schedules.config LIMIT 1'
+      );
+      return result.rows.length === 0 ? null : result.rows[0].retentionDays;
+    } catch (error) {
+      logger.error('Error getting schedules retention config', {
+        error: error instanceof Error ? { message: error.message, stack: error.stack } : error,
+      });
+      throw error;
+    }
+  }
+
+  async updateRetentionDays(retentionDays: number | null): Promise<void> {
+    try {
+      await this.getPool().query(
+        `INSERT INTO schedules.config (retention_days)
+         VALUES ($1)
+         ON CONFLICT ((1))
+         DO UPDATE SET retention_days = EXCLUDED.retention_days, updated_at = NOW()`,
+        [retentionDays]
+      );
+      logger.info('Schedules retention config updated', { retentionDays });
+    } catch (error) {
+      logger.error('Error updating schedules retention config', {
+        retentionDays,
+        error: error instanceof Error ? { message: error.message, stack: error.stack } : error,
+      });
       throw error;
     }
   }
