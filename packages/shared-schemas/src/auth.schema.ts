@@ -108,6 +108,10 @@ export const authConfigSchema = z.object({
     .array(z.string().regex(allowedRedirectUrlsRegex, { message: 'Invalid URL or wildcard URL' }))
     .optional()
     .nullable(),
+  verifyEmailCodeExpiryMinutes: z.number().int().min(1).max(10080),
+  verifyEmailLinkExpiryMinutes: z.number().int().min(1).max(10080),
+  resetPasswordCodeExpiryMinutes: z.number().int().min(1).max(10080),
+  resetPasswordLinkExpiryMinutes: z.number().int().min(1).max(10080),
   createdAt: z.string(), // PostgreSQL timestamp
   updatedAt: z.string(), // PostgreSQL timestamp
 });

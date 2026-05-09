@@ -951,6 +951,10 @@ export class AuthService {
       verifyEmailMethod: authConfig.verifyEmailMethod,
       resetPasswordMethod: authConfig.resetPasswordMethod,
       allowedRedirectUrls: authConfig.allowedRedirectUrls ?? [],
+      verifyEmailCodeExpiryMinutes: authConfig.verifyEmailCodeExpiryMinutes,
+      verifyEmailLinkExpiryMinutes: authConfig.verifyEmailLinkExpiryMinutes,
+      resetPasswordCodeExpiryMinutes: authConfig.resetPasswordCodeExpiryMinutes,
+      resetPasswordLinkExpiryMinutes: authConfig.resetPasswordLinkExpiryMinutes,
     };
   }
 

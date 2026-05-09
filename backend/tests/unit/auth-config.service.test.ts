@@ -35,6 +35,7 @@ import { logger } from '../../src/utils/logger';
 describe('AuthConfigService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    AuthConfigService.getInstance().clearCache();
   });
 
   describe('validateRedirectUrl', () => {

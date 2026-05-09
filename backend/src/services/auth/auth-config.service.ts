@@ -9,6 +9,8 @@ import { URL } from 'url';
 export class AuthConfigService {
   private static instance: AuthConfigService;
   private pool: Pool | null = null;
+  private configCache: { data: AuthConfigSchema; expiresAt: number } | null = null;
+  private static readonly CACHE_TTL_MS = 30_000;
 
   private constructor() {
     logger.info('AuthConfigService initialized');
@@ -19,6 +21,10 @@ export class AuthConfigService {
       AuthConfigService.instance = new AuthConfigService();
     }
     return AuthConfigService.instance;
+  }
+
+  clearCache(): void {
+    this.configCache = null;
   }
 
   private getPool(): Pool {
@@ -43,7 +49,11 @@ export class AuthConfigService {
           require_uppercase as "requireUppercase",
           require_special_char as "requireSpecialChar",
           verify_email_method as "verifyEmailMethod",
-          reset_password_method as "resetPasswordMethod"
+          reset_password_method as "resetPasswordMethod",
+          verify_email_code_expiry_minutes as "verifyEmailCodeExpiryMinutes",
+          verify_email_link_expiry_minutes as "verifyEmailLinkExpiryMinutes",
+          reset_password_code_expiry_minutes as "resetPasswordCodeExpiryMinutes",
+          reset_password_link_expiry_minutes as "resetPasswordLinkExpiryMinutes"
          FROM auth.config
          LIMIT 1`
       );
@@ -60,6 +70,10 @@ export class AuthConfigService {
           requireSpecialChar: false,
           verifyEmailMethod: 'code' as const,
           resetPasswordMethod: 'code' as const,
+          verifyEmailCodeExpiryMinutes: 15,
+          verifyEmailLinkExpiryMinutes: 1440,
+          resetPasswordCodeExpiryMinutes: 10,
+          resetPasswordLinkExpiryMinutes: 60,
         };
       }
 
@@ -79,6 +93,10 @@ export class AuthConfigService {
    * Returns the singleton configuration row with all columns
    */
   async getAuthConfig(): Promise<AuthConfigSchema> {
+    if (this.configCache && Date.now() < this.configCache.expiresAt) {
+      return this.configCache.data;
+    }
+
     try {
       const result = await this.getPool().query(
         `SELECT
@@ -92,6 +110,10 @@ export class AuthConfigService {
           verify_email_method as "verifyEmailMethod",
           reset_password_method as "resetPasswordMethod",
           allowed_redirect_urls as "allowedRedirectUrls",
+          verify_email_code_expiry_minutes as "verifyEmailCodeExpiryMinutes",
+          verify_email_link_expiry_minutes as "verifyEmailLinkExpiryMinutes",
+          reset_password_code_expiry_minutes as "resetPasswordCodeExpiryMinutes",
+          reset_password_link_expiry_minutes as "resetPasswordLinkExpiryMinutes",
           created_at as "createdAt",
           updated_at as "updatedAt"
          FROM auth.config
@@ -113,12 +135,21 @@ export class AuthConfigService {
           verifyEmailMethod: 'code' as const,
           resetPasswordMethod: 'code' as const,
           allowedRedirectUrls: [],
+          verifyEmailCodeExpiryMinutes: 15,
+          verifyEmailLinkExpiryMinutes: 1440,
+          resetPasswordCodeExpiryMinutes: 10,
+          resetPasswordLinkExpiryMinutes: 60,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
       }
 
-      return result.rows[0];
+      const config = result.rows[0];
+      this.configCache = {
+        data: config,
+        expiresAt: Date.now() + AuthConfigService.CACHE_TTL_MS,
+      };
+      return config;
     } catch (error) {
       logger.error('Failed to get auth config', { error });
       throw new AppError(
@@ -205,6 +236,26 @@ export class AuthConfigService {
         values.push(input.allowedRedirectUrls);
       }
 
+      if (input.verifyEmailCodeExpiryMinutes !== undefined) {
+        updates.push(`verify_email_code_expiry_minutes = $${paramCount++}`);
+        values.push(input.verifyEmailCodeExpiryMinutes);
+      }
+
+      if (input.verifyEmailLinkExpiryMinutes !== undefined) {
+        updates.push(`verify_email_link_expiry_minutes = $${paramCount++}`);
+        values.push(input.verifyEmailLinkExpiryMinutes);
+      }
+
+      if (input.resetPasswordCodeExpiryMinutes !== undefined) {
+        updates.push(`reset_password_code_expiry_minutes = $${paramCount++}`);
+        values.push(input.resetPasswordCodeExpiryMinutes);
+      }
+
+      if (input.resetPasswordLinkExpiryMinutes !== undefined) {
+        updates.push(`reset_password_link_expiry_minutes = $${paramCount++}`);
+        values.push(input.resetPasswordLinkExpiryMinutes);
+      }
+
       if (!updates.length) {
         await client.query('COMMIT');
         // Return current config if no updates
@@ -228,12 +279,17 @@ export class AuthConfigService {
            verify_email_method as "verifyEmailMethod",
            reset_password_method as "resetPasswordMethod",
            allowed_redirect_urls as "allowedRedirectUrls",
+           verify_email_code_expiry_minutes as "verifyEmailCodeExpiryMinutes",
+           verify_email_link_expiry_minutes as "verifyEmailLinkExpiryMinutes",
+           reset_password_code_expiry_minutes as "resetPasswordCodeExpiryMinutes",
+           reset_password_link_expiry_minutes as "resetPasswordLinkExpiryMinutes",
            created_at as "createdAt",
            updated_at as "updatedAt"`,
         values
       );
 
       await client.query('COMMIT');
+      this.configCache = null;
       logger.info('Auth config updated', { updatedFields: Object.keys(input) });
       return result.rows[0];
     } catch (error) {

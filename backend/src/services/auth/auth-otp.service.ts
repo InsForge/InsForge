@@ -6,6 +6,7 @@ import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import logger from '@/utils/logger.js';
 import { generateNumericCode, generateSecureToken } from '@/utils/utils.js';
+import { AuthConfigService } from '@/services/auth/auth-config.service.js';
 
 /**
  * OTP purpose types - used to categorize different OTP use cases
@@ -62,10 +63,14 @@ export class AuthOTPService {
 
   // Configuration constants
   private readonly NUMERIC_CODE_LENGTH = 6; // 6 digits = 1 million combinations
-  private readonly NUMERIC_CODE_EXPIRY_MINUTES = 15; // 15 minutes expiry for numeric codes
   private readonly HASH_TOKEN_BYTES = 32; // 32 bytes = 64 hex characters = 256 bits entropy
-  private readonly HASH_TOKEN_EXPIRY_HOURS = 24; // 24 hours expiry for hash tokens
   private readonly BCRYPT_SALT_ROUNDS = 10; // Salt rounds for numeric codes (2^10 iterations)
+
+  // Fallback expiry defaults (used only when config is unavailable)
+  private readonly DEFAULT_VERIFY_EMAIL_CODE_EXPIRY_MINUTES = 15;
+  private readonly DEFAULT_VERIFY_EMAIL_LINK_EXPIRY_MINUTES = 1440;
+  private readonly DEFAULT_RESET_PASSWORD_CODE_EXPIRY_MINUTES = 10;
+  private readonly DEFAULT_RESET_PASSWORD_LINK_EXPIRY_MINUTES = 60;
 
   private constructor() {
     logger.info('AuthOTPService initialized');
@@ -83,6 +88,34 @@ export class AuthOTPService {
       this.pool = DatabaseManager.getInstance().getPool();
     }
     return this.pool;
+  }
+
+  /**
+   * Resolve the configured expiry (in minutes) for a given purpose + token type.
+   * Falls back to hardcoded defaults if config is unavailable.
+   */
+  private async getExpiryMinutes(purpose: OTPPurpose, otpType: OTPType): Promise<number> {
+    try {
+      const config = await AuthConfigService.getInstance().getAuthConfig();
+      if (purpose === OTPPurpose.VERIFY_EMAIL) {
+        return otpType === OTPType.NUMERIC_CODE
+          ? config.verifyEmailCodeExpiryMinutes
+          : config.verifyEmailLinkExpiryMinutes;
+      }
+      return otpType === OTPType.NUMERIC_CODE
+        ? config.resetPasswordCodeExpiryMinutes
+        : config.resetPasswordLinkExpiryMinutes;
+    } catch {
+      logger.warn('Failed to read token expiry config, using defaults');
+      if (purpose === OTPPurpose.VERIFY_EMAIL) {
+        return otpType === OTPType.NUMERIC_CODE
+          ? this.DEFAULT_VERIFY_EMAIL_CODE_EXPIRY_MINUTES
+          : this.DEFAULT_VERIFY_EMAIL_LINK_EXPIRY_MINUTES;
+      }
+      return otpType === OTPType.NUMERIC_CODE
+        ? this.DEFAULT_RESET_PASSWORD_CODE_EXPIRY_MINUTES
+        : this.DEFAULT_RESET_PASSWORD_LINK_EXPIRY_MINUTES;
+    }
   }
 
   /**
@@ -108,6 +141,9 @@ export class AuthOTPService {
     }
   ): Promise<CreateOTPResult> {
     try {
+      // Resolve configured expiry for this purpose + type
+      const expiryMinutes = await this.getExpiryMinutes(purpose, otpType);
+
       // Generate token based on type
       let otp: string;
       let expiresAt: Date;
@@ -116,13 +152,13 @@ export class AuthOTPService {
       if (otpType === OTPType.NUMERIC_CODE) {
         // Generate 6-digit numeric code for manual entry
         otp = generateNumericCode(this.NUMERIC_CODE_LENGTH);
-        expiresAt = new Date(Date.now() + this.NUMERIC_CODE_EXPIRY_MINUTES * 60 * 1000);
+        expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000);
         // Use bcrypt for low-entropy codes (defense against brute force)
         otpHash = await bcrypt.hash(otp, this.BCRYPT_SALT_ROUNDS);
       } else {
         // Generate cryptographically secure token for hash-based lookup
         otp = generateSecureToken(this.HASH_TOKEN_BYTES);
-        expiresAt = new Date(Date.now() + this.HASH_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000);
+        expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000);
         // Use SHA-256 for high-entropy tokens (enables direct lookup)
         otpHash = crypto.createHash('sha256').update(otp).digest('hex');
       }
@@ -385,8 +421,9 @@ export class AuthOTPService {
       await this.verifyEmailOTPWithCode(email, purpose, numericCode, client);
 
       // Step 2: Generate a long-lived hash token
+      const linkExpiryMinutes = await this.getExpiryMinutes(purpose, OTPType.HASH_TOKEN);
       const token = generateSecureToken(this.HASH_TOKEN_BYTES);
-      const expiresAt = new Date(Date.now() + this.HASH_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000);
+      const expiresAt = new Date(Date.now() + linkExpiryMinutes * 60 * 1000);
       const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
       // Step 3: Insert the new token (replaces the consumed numeric code)

@@ -53,6 +53,10 @@ const defaultValues: UpdateAuthConfigRequest = {
   verifyEmailMethod: 'code',
   resetPasswordMethod: 'code',
   allowedRedirectUrls: [],
+  verifyEmailCodeExpiryMinutes: 15,
+  verifyEmailLinkExpiryMinutes: 1440,
+  resetPasswordCodeExpiryMinutes: 10,
+  resetPasswordLinkExpiryMinutes: 60,
 };
 
 const toFormValues = (config?: AuthConfigSchema): UpdateAuthConfigRequest => {
@@ -70,6 +74,10 @@ const toFormValues = (config?: AuthConfigSchema): UpdateAuthConfigRequest => {
     verifyEmailMethod: config.verifyEmailMethod,
     resetPasswordMethod: config.resetPasswordMethod,
     allowedRedirectUrls: config.allowedRedirectUrls ?? [],
+    verifyEmailCodeExpiryMinutes: config.verifyEmailCodeExpiryMinutes,
+    verifyEmailLinkExpiryMinutes: config.verifyEmailLinkExpiryMinutes,
+    resetPasswordCodeExpiryMinutes: config.resetPasswordCodeExpiryMinutes,
+    resetPasswordLinkExpiryMinutes: config.resetPasswordLinkExpiryMinutes,
   };
 };
 
@@ -375,6 +383,60 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                             />
                           </SettingRow>
                         )}
+
+                        {requireEmailVerification && (
+                          <>
+                            <SettingRow
+                              label="Verification Code Expiry"
+                              description="How long a 6-digit verification code remains valid (in minutes)"
+                            >
+                              <Input
+                                type="number"
+                                min="1"
+                                max="10080"
+                                {...form.register('verifyEmailCodeExpiryMinutes', {
+                                  valueAsNumber: true,
+                                })}
+                                className={
+                                  form.formState.errors.verifyEmailCodeExpiryMinutes
+                                    ? 'border-destructive'
+                                    : ''
+                                }
+                              />
+                              {form.formState.errors.verifyEmailCodeExpiryMinutes && (
+                                <p className="pt-1 text-xs text-destructive">
+                                  {form.formState.errors.verifyEmailCodeExpiryMinutes.message ||
+                                    'Must be between 1 and 10080 minutes'}
+                                </p>
+                              )}
+                            </SettingRow>
+
+                            <SettingRow
+                              label="Verification Link Expiry"
+                              description="How long a verification link remains valid (in minutes)"
+                            >
+                              <Input
+                                type="number"
+                                min="1"
+                                max="10080"
+                                {...form.register('verifyEmailLinkExpiryMinutes', {
+                                  valueAsNumber: true,
+                                })}
+                                className={
+                                  form.formState.errors.verifyEmailLinkExpiryMinutes
+                                    ? 'border-destructive'
+                                    : ''
+                                }
+                              />
+                              {form.formState.errors.verifyEmailLinkExpiryMinutes && (
+                                <p className="pt-1 text-xs text-destructive">
+                                  {form.formState.errors.verifyEmailLinkExpiryMinutes.message ||
+                                    'Must be between 1 and 10080 minutes'}
+                                </p>
+                              )}
+                            </SettingRow>
+                          </>
+                        )}
                       </>
                     )}
                   </>
@@ -499,6 +561,60 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                           )}
                         />
                       </SettingRow>
+                    )}
+
+                    {isCloudProject && (
+                      <>
+                        <SettingRow
+                          label="Reset Code Expiry"
+                          description="How long a 6-digit password reset code remains valid (in minutes)"
+                        >
+                          <Input
+                            type="number"
+                            min="1"
+                            max="10080"
+                            {...form.register('resetPasswordCodeExpiryMinutes', {
+                              valueAsNumber: true,
+                            })}
+                            className={
+                              form.formState.errors.resetPasswordCodeExpiryMinutes
+                                ? 'border-destructive'
+                                : ''
+                            }
+                          />
+                          {form.formState.errors.resetPasswordCodeExpiryMinutes && (
+                            <p className="pt-1 text-xs text-destructive">
+                              {form.formState.errors.resetPasswordCodeExpiryMinutes.message ||
+                                'Must be between 1 and 10080 minutes'}
+                            </p>
+                          )}
+                        </SettingRow>
+
+                        <SettingRow
+                          label="Reset Link Expiry"
+                          description="How long a password reset link remains valid (in minutes)"
+                        >
+                          <Input
+                            type="number"
+                            min="1"
+                            max="10080"
+                            {...form.register('resetPasswordLinkExpiryMinutes', {
+                              valueAsNumber: true,
+                            })}
+                            className={
+                              form.formState.errors.resetPasswordLinkExpiryMinutes
+                                ? 'border-destructive'
+                                : ''
+                            }
+                          />
+                          {form.formState.errors.resetPasswordLinkExpiryMinutes && (
+                            <p className="pt-1 text-xs text-destructive">
+                              {form.formState.errors.resetPasswordLinkExpiryMinutes.message ||
+                                'Must be between 1 and 10080 minutes'}
+                            </p>
+                          )}
+                        </SettingRow>
+                      </>
                     )}
                   </>
                 )}
