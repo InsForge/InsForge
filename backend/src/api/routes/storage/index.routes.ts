@@ -472,9 +472,7 @@ router.get(
         // RFC 6266: provide a quoted ASCII fallback plus a UTF-8
         // percent-encoded filename* so non-ASCII keys round-trip safely.
         const lastSegment = (objectKey.split('/').pop() || 'download').slice(0, 255);
-        const asciiFallback = lastSegment
-          .replace(/[^\x20-\x7e]+/g, '_')
-          .replace(/["\\\r\n]/g, '_');
+        const asciiFallback = lastSegment.replace(/[^\x20-\x7e]+/g, '_').replace(/["\\\r\n]/g, '_');
         const utf8Encoded = encodeURIComponent(lastSegment);
         res.setHeader(
           'Content-Disposition',
