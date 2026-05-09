@@ -47,7 +47,8 @@
               {
                 "group": "Authentication",
                 "pages": [
-                  "core-concepts/authentication/architecture"
+                  "core-concepts/authentication/architecture",
+                  "core-concepts/authentication/redirect-urls"
                 ]
               },
               {

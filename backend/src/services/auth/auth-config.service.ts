@@ -1,4 +1,5 @@
 import { Pool } from 'pg';
+import picomatch from 'picomatch';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
@@ -270,7 +271,103 @@ export class AuthConfigService {
   }
 
   /**
-   * Validates a redirect URL against the server's configured allowed redirect URLs
+   * Characters that indicate a glob pattern (as opposed to a literal URL).
+   */
+  private static readonly GLOB_CHARS = /[*?[\]]/;
+
+  /**
+   * Normalises a glob *pattern* string.
+   *
+   * Unlike `normalizeUrl`, this must preserve the glob meta-characters that
+   * `new URL()` would percent-encode or reject. The approach:
+   *   1. Replace every glob meta-char with a unique placeholder.
+   *   2. Run the resulting (valid) URL through `normalizeUrl`.
+   *   3. Restore the placeholders back to their original globs.
+   *
+   * If the pattern is not a parseable URL even after placeholder substitution
+   * we return the original string lowercased + trailing-slash-stripped as a
+   * best-effort fallback (the caller will still match via picomatch).
+   */
+  private normalizePattern(pattern: string): string {
+    // Map of placeholder → original glob token, built on-the-fly.
+    const replacements: Array<{ placeholder: string; original: string }> = [];
+    let idx = 0;
+
+    // Replace glob tokens with safe placeholders.
+    // Order matters: replace ** before * so ** is not split.
+    const safe = pattern.replace(/\*\*|\*|\?|\[([^\]]*)\]/g, (match) => {
+      const placeholder = `__GLOB${idx++}__`;
+      replacements.push({ placeholder, original: match });
+      return placeholder;
+    });
+
+    const normalized = this.normalizeUrl(safe);
+    if (!normalized) {
+      // Best-effort: lowercase and strip trailing slash.
+      let fallback = pattern.toLowerCase().replace(/\/$/, '');
+      for (const { placeholder, original } of replacements) {
+        fallback = fallback.replace(placeholder.toLowerCase(), original);
+      }
+      return fallback;
+    }
+
+    // Restore glob tokens in the normalised URL.
+    // The URL class lowercases the hostname but not the path, so we use a
+    // case-insensitive regex to find placeholders regardless of position.
+    let result = normalized;
+    for (const { placeholder, original } of replacements) {
+      result = result.replace(new RegExp(placeholder, 'i'), original);
+    }
+    return result;
+  }
+
+  /**
+   * Tests whether a single allowed-redirect pattern matches the target URL.
+   *
+   * Pattern semantics (picomatch defaults):
+   * - `*`   — matches any sequence of characters except `/`
+   * - `**`  — matches any sequence of characters including `/`
+   * - `?`   — matches exactly one character that is not `/`
+   * - `[…]` — character class (e.g. `[!a-z]`)
+   *
+   * Note: `*` matches across `.` boundaries. This is intentional and preserves
+   * back-compat with the legacy `*.host.com` matcher (which used
+   * `hostname.endsWith('.' + base)` and therefore matched arbitrarily deep
+   * subdomains). Existing customers relying on `*.example.com` matching
+   * `deep.sub.example.com` continue to work.
+   *
+   * Protocol and port are matched strictly — the glob never crosses those
+   * boundaries because they are literal characters in the normalised strings.
+   */
+  private matchesGlobPattern(pattern: string, normalizedTarget: string): boolean {
+    // Fast path: pattern without glob chars → exact match.
+    if (!AuthConfigService.GLOB_CHARS.test(pattern)) {
+      const normalizedPattern = this.normalizeUrl(pattern);
+      return normalizedPattern === normalizedTarget;
+    }
+
+    const normalizedPattern = this.normalizePattern(pattern);
+
+    try {
+      return picomatch.isMatch(normalizedTarget, normalizedPattern, { dot: true });
+    } catch {
+      // If picomatch throws (e.g. malformed bracket expression), reject.
+      return false;
+    }
+  }
+
+  /**
+   * Validates a redirect URL against the server's configured allowed redirect URLs.
+   *
+   * Supports Supabase-compatible glob patterns:
+   * - `https://*.example.com`          — any subdomain
+   * - `https://example.com/*`          — single path segment
+   * - `https://example.com/**`         — any path depth
+   * - `https://*.example.com/auth/*`   — combined subdomain + path
+   * - `https://example.com/?session=*` — query-string wildcards
+   *
+   * When no allowlist is configured the method returns `true` (permissive
+   * default for better developer experience).
    */
   async validateRedirectUrl(urlStr: string): Promise<boolean> {
     const config = await this.getAuthConfig();
@@ -288,42 +385,6 @@ export class AuthConfigService {
       return false;
     }
 
-    let targetUrlObj: URL;
-    try {
-      targetUrlObj = new URL(targetUrl);
-    } catch {
-      return false;
-    }
-
-    return allowedRedirectUrls.some((item) => {
-      if (!item.includes('*.')) {
-        return this.normalizeUrl(item) === targetUrl;
-      }
-
-      try {
-        const dummyPrefix = '__wildcard__.';
-        const normalizedItem = this.normalizeUrl(item.replace('*.', dummyPrefix));
-        if (!normalizedItem) {
-          return false;
-        }
-        const parsedItem = new URL(normalizedItem);
-
-        if (parsedItem.protocol !== targetUrlObj.protocol) {
-          return false;
-        }
-        if (parsedItem.port !== targetUrlObj.port) {
-          return false;
-        }
-        if (parsedItem.pathname !== '/' && parsedItem.pathname !== targetUrlObj.pathname) {
-          return false;
-        }
-
-        const baseDomain = parsedItem.hostname.replace(dummyPrefix, '');
-
-        return targetUrlObj.hostname.endsWith('.' + baseDomain);
-      } catch {
-        return false;
-      }
-    });
+    return allowedRedirectUrls.some((pattern) => this.matchesGlobPattern(pattern, targetUrl));
   }
 }
