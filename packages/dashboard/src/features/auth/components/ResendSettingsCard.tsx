@@ -13,7 +13,9 @@ const resendFormSchema = z
     senderName: z.string(),
   })
   .superRefine((data, ctx) => {
-    if (!data.enabled) return;
+    if (!data.enabled) {
+      return;
+    }
     if (!data.senderEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.senderEmail)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
