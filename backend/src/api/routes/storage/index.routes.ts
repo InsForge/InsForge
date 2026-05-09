@@ -442,9 +442,45 @@ router.get(
 
       const { file, metadata } = result;
 
-      // Set appropriate headers
-      res.setHeader('Content-Type', metadata.mimeType || 'application/octet-stream');
+      // The stored mime type originates from the multipart Content-Type the
+      // uploader chose, so it must be treated as untrusted when the local
+      // provider serves the object back from this same origin. Without these
+      // headers, a low-privilege uploader can pivot a stored object into
+      // stored XSS in the dashboard origin (text/html, image/svg+xml,
+      // application/xml/javascript, etc.). nosniff blocks browser MIME
+      // sniffing from promoting an octet-stream into HTML/JS, and active
+      // content types are forced to download instead of rendering inline.
+      const rawType = metadata.mimeType || 'application/octet-stream';
+      const baseType = rawType.toLowerCase().split(';')[0].trim();
+      const ACTIVE_TYPES = new Set([
+        'text/html',
+        'application/xhtml+xml',
+        'image/svg+xml',
+        'application/xml',
+        'text/xml',
+        'application/javascript',
+        'text/javascript',
+        'application/ecmascript',
+        'text/ecmascript',
+      ]);
+      const isActive = ACTIVE_TYPES.has(baseType);
+
+      res.setHeader('Content-Type', rawType);
       res.setHeader('Content-Length', file.length.toString());
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      if (isActive) {
+        // RFC 6266: provide a quoted ASCII fallback plus a UTF-8
+        // percent-encoded filename* so non-ASCII keys round-trip safely.
+        const lastSegment = (objectKey.split('/').pop() || 'download').slice(0, 255);
+        const asciiFallback = lastSegment
+          .replace(/[^\x20-\x7e]+/g, '_')
+          .replace(/["\\\r\n]/g, '_');
+        const utf8Encoded = encodeURIComponent(lastSegment);
+        res.setHeader(
+          'Content-Disposition',
+          `attachment; filename="${asciiFallback}"; filename*=UTF-8''${utf8Encoded}`
+        );
+      }
 
       // Send object content
       res.send(file);
