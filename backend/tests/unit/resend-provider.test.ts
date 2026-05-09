@@ -79,7 +79,7 @@ describe('ResendEmailProvider', () => {
 
       expect(sendMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          from: 'Test App <noreply@example.com>',
+          from: '"Test App" <noreply@example.com>',
           to: ['user@example.com'],
           subject: 'Verify your email',
           html: expect.stringContaining('123456'),
@@ -135,7 +135,7 @@ describe('ResendEmailProvider', () => {
 
       expect(sendMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          from: 'Test App <noreply@example.com>',
+          from: '"Test App" <noreply@example.com>',
           to: ['recipient@example.com'],
           subject: 'Test Subject',
           html: '<p>Hello</p>',

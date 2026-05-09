@@ -190,7 +190,13 @@ export class ResendConfigService {
            updated_at = NOW()
          WHERE id = $5
          RETURNING ${RESEND_CONFIG_COLUMNS}`,
-        [input.enabled, apiKeyEncrypted, input.senderEmail ?? null, input.senderName ?? null, existingRow.id]
+        [
+          input.enabled,
+          apiKeyEncrypted,
+          input.senderEmail ?? null,
+          input.senderName ?? null,
+          existingRow.id,
+        ]
       );
 
       await client.query('COMMIT');
