@@ -161,6 +161,16 @@ export class ResendConfigService {
   // -------------------------------------------------------------------------
 
   async upsertResendConfig(input: UpsertResendConfigRequest): Promise<ResendConfigSchema> {
+    // Verify outside the transaction to avoid holding a DB connection and row lock
+    // during the external HTTP call to Resend.
+    if (input.enabled) {
+      const existing = await this.getPool().query(
+        'SELECT api_key_encrypted FROM email.resend_config LIMIT 1'
+      );
+      const existingEncrypted: string = existing.rows[0]?.api_key_encrypted ?? '';
+      await this.verifyResendConnection(input, existingEncrypted);
+    }
+
     const client = await this.getPool().connect();
     try {
       await client.query('BEGIN');
@@ -172,18 +182,15 @@ export class ResendConfigService {
         apiKeyEncrypted = EncryptionManager.encrypt(input.apiKey);
       }
 
-      if (input.enabled) {
-        await this.verifyResendConnection(input, existingRow.api_key_encrypted);
-      }
-
       const result = await client.query(
         `UPDATE email.resend_config SET
            enabled = $1, api_key_encrypted = $2,
-           sender_email = $3, sender_name = $4,
+           sender_email = COALESCE($3, sender_email),
+           sender_name = COALESCE($4, sender_name),
            updated_at = NOW()
          WHERE id = $5
          RETURNING ${RESEND_CONFIG_COLUMNS}`,
-        [input.enabled, apiKeyEncrypted, input.senderEmail, input.senderName, existingRow.id]
+        [input.enabled, apiKeyEncrypted, input.senderEmail ?? null, input.senderName ?? null, existingRow.id]
       );
 
       await client.query('COMMIT');
@@ -244,19 +251,38 @@ export class ResendConfigService {
     input: UpsertResendConfigRequest,
     existingApiKeyEncrypted: string
   ): Promise<void> {
-    const apiKey = input.apiKey ?? this.getDecryptedApiKey(existingApiKeyEncrypted) ?? '';
+    let apiKey: string;
 
-    if (!apiKey) {
+    if (input.apiKey) {
+      apiKey = input.apiKey;
+    } else if (!existingApiKeyEncrypted) {
       throw new AppError(
         'Resend API key is required when enabling Resend',
         400,
         ERROR_CODES.INVALID_INPUT
       );
+    } else {
+      const decrypted = this.getDecryptedApiKey(existingApiKeyEncrypted);
+      if (decrypted === null) {
+        throw new AppError(
+          'Resend API key is corrupted — cannot decrypt stored credentials',
+          500,
+          ERROR_CODES.EMAIL_RESEND_CONNECTION_FAILED
+        );
+      }
+      apiKey = decrypted;
     }
 
     try {
       const resend = new Resend(apiKey);
-      const { error } = await resend.apiKeys.list();
+      // Use a test send to delivered@resend.dev — works with both full_access and
+      // sending_access keys, unlike apiKeys.list() which requires full_access.
+      const { error } = await resend.emails.send({
+        from: 'onboarding@resend.dev',
+        to: ['delivered@resend.dev'],
+        subject: 'API Key Verification',
+        text: 'Testing Resend configuration.',
+      });
       if (error) {
         throw new Error(error.message);
       }

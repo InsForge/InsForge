@@ -407,8 +407,8 @@ export const upsertResendConfigRequestSchema = z.discriminatedUnion('enabled', [
   z.object({
     enabled: z.literal(false),
     apiKey: z.string().optional(),
-    senderEmail: z.string().optional().default(''),
-    senderName: z.string().optional().default(''),
+    senderEmail: z.string().optional(),
+    senderName: z.string().optional(),
   }),
   z.object({
     enabled: z.literal(true),
