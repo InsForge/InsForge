@@ -160,7 +160,7 @@ describe('ComputeServicesService', () => {
       // Verify Fly calls
       expect(mockCreateApp).toHaveBeenCalledWith({
         name: 'my-api-proj-123',
-        network: 'testkey1',
+        network: 'n-testkey1',
         org: 'test-org',
       });
       expect(mockLaunchMachine).toHaveBeenCalledWith(
@@ -531,7 +531,7 @@ describe('ComputeServicesService', () => {
       // Verify Fly app created
       expect(mockCreateApp).toHaveBeenCalledWith({
         name: 'my-api-proj-123',
-        network: 'testkey1',
+        network: 'n-testkey1',
         org: 'test-org',
       });
 

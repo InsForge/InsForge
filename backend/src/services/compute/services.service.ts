@@ -130,13 +130,13 @@ function makeFlyAppName(name: string, projectId: string): string {
   return `${truncated}-${hash}${suffix}`;
 }
 
-// Network name is sent on Fly POST /apps. Fly validates network names more
-// strictly than app names (varies by org — prod's Fly org rejected the old
-// `${projectId}-network` (~44 chars) with 422 "Name not a valid network
-// name"). APP_KEY is the project's short DNS-safe slug (~8 chars, e.g.
-// `d9byq46t`), unique per project, already used as the OSS hostname prefix.
-// Using it as the network name keeps per-project 6PN isolation AND stays
-// well under Fly's network-name validator length cap on every org.
+// Network name is sent on Fly POST /apps. Fly's documented rule: "Network
+// names can have letters, numbers, and dashes, but must start with a letter."
+// The old `${projectId}-network` failed for the ~63% of projects whose UUID
+// begins with a hex digit; using bare APP_KEY still failed for the ~30% of
+// keys generateAppKey() produces digit-leading. The static `n-` prefix
+// guarantees a letter-leading name for every project, and APP_KEY's
+// per-project uniqueness still preserves 6PN isolation.
 function makeNetwork(): string {
   if (!process.env.APP_KEY) {
     throw new AppError(
@@ -145,7 +145,7 @@ function makeNetwork(): string {
       ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED
     );
   }
-  return process.env.APP_KEY;
+  return `n-${process.env.APP_KEY}`;
 }
 
 // Default to Fly's own .fly.dev hostname (which Fly routes automatically for
