@@ -348,6 +348,48 @@ describe('AuthConfigService', () => {
   });
 
   // --------------------------------------------------------------------------
+  // IPv6 hosts — brackets must be matched as URL syntax, not as glob char class
+  // --------------------------------------------------------------------------
+  describe('validateRedirectUrl — IPv6 hosts', () => {
+    it('matches IPv6 host pattern against itself', async () => {
+      stubAllowedUrls(['https://[::1]/cb']);
+
+      const service = AuthConfigService.getInstance();
+      expect(await service.validateRedirectUrl('https://[::1]/cb')).toBe(true);
+    });
+
+    it('matches a longer IPv6 address', async () => {
+      stubAllowedUrls(['https://[2001:db8::1]/cb']);
+
+      const service = AuthConfigService.getInstance();
+      expect(await service.validateRedirectUrl('https://[2001:db8::1]/cb')).toBe(true);
+    });
+
+    it('matches IPv6 case-insensitively (URL.href lowercases the host)', async () => {
+      stubAllowedUrls(['https://[FFFF::1]/cb']);
+
+      const service = AuthConfigService.getInstance();
+      expect(await service.validateRedirectUrl('https://[ffff::1]/cb')).toBe(true);
+    });
+
+    it('does NOT match a single-character host (regression: char-class over-match)', async () => {
+      stubAllowedUrls(['https://[::1]/cb']);
+
+      const service = AuthConfigService.getInstance();
+      // Without the IPv6 escape, picomatch would treat `[::1]` as a char
+      // class and let `1` (a single char from the class) match the host.
+      expect(await service.validateRedirectUrl('https://1/cb')).toBe(false);
+    });
+
+    it('does NOT match a different IPv6 address', async () => {
+      stubAllowedUrls(['https://[::1]/cb']);
+
+      const service = AuthConfigService.getInstance();
+      expect(await service.validateRedirectUrl('https://[::2]/cb')).toBe(false);
+    });
+  });
+
+  // --------------------------------------------------------------------------
   // Custom scheme support (deep links)
   // --------------------------------------------------------------------------
   describe('validateRedirectUrl — custom schemes', () => {

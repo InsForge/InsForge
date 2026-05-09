@@ -296,15 +296,27 @@ export class AuthConfigService {
    * the input bypassed schema validation and is treated as unmatchable.
    */
   private static normalizePattern(pattern: string): string {
-    // Map of placeholder → original glob token, built on-the-fly.
+    // Map of placeholder → restoration token, built on-the-fly.
     const replacements: Array<{ placeholder: string; original: string }> = [];
     let idx = 0;
 
     // Replace glob tokens with safe placeholders.
     // Order matters: replace ** before * so ** is not split.
-    const safe = pattern.replace(/\*\*|\*|\?|\[([^\]]*)\]/g, (match) => {
+    const safe = pattern.replace(/\*\*|\*|\?|\[([^\]]*)\]/g, (match, classContent) => {
       const placeholder = `__GLOB${idx++}__`;
-      replacements.push({ placeholder, original: match });
+      // Distinguish IPv6 host brackets from glob character classes. IPv6
+      // contents are hex digits / colons / dots and contain at least two
+      // colons (`::1` is the shortest valid form). Picomatch otherwise
+      // produces a tolerant regex that also matches single chars from the
+      // class (`https://[::1]/cb` would match `https://1/cb`), so we escape
+      // the brackets on restoration to force literal matching, and lowercase
+      // to align with `URL.href`'s hostname normalisation.
+      const isIpv6Brackets =
+        classContent !== undefined &&
+        /^[0-9A-Fa-f:.]+$/.test(classContent) &&
+        (classContent.match(/:/g) ?? []).length >= 2;
+      const original = isIpv6Brackets ? `\\[${classContent.toLowerCase()}\\]` : match;
+      replacements.push({ placeholder, original });
       return placeholder;
     });
 
