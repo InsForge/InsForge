@@ -22,7 +22,7 @@ function escapeRegex(str: string): string {
 
 function formatFromAddress(name: string, email: string): string {
   const safeName = name.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-  return `${safeName} <${email}>`;
+  return `"${safeName}" <${email}>`;
 }
 
 export class ResendEmailProvider implements EmailProvider {
@@ -30,7 +30,11 @@ export class ResendEmailProvider implements EmailProvider {
     return true;
   }
 
-  private renderTemplate(template: string, variables: Record<string, string>): string {
+  private renderTemplate(
+    template: string,
+    variables: Record<string, string>,
+    escapeForHtml = true
+  ): string {
     let rendered = template;
     for (const [key, value] of Object.entries(variables)) {
       let safeValue: string;
@@ -38,7 +42,7 @@ export class ResendEmailProvider implements EmailProvider {
         logger.error('Rejected non-HTTP link value in email template', { key });
         safeValue = '#';
       } else {
-        safeValue = escapeHtml(value);
+        safeValue = escapeForHtml ? escapeHtml(value) : value;
       }
       const pattern = new RegExp(`\\{\\{\\s*${escapeRegex(key)}\\s*\\}\\}`, 'g');
       rendered = rendered.replace(pattern, safeValue);
@@ -110,10 +114,10 @@ export class ResendEmailProvider implements EmailProvider {
       config,
       {
         to: email,
-        subject: this.renderTemplate(emailTemplate.subject, allVariables),
+        subject: this.renderTemplate(emailTemplate.subject, allVariables, false),
         html: this.renderTemplate(emailTemplate.bodyHtml, allVariables),
       },
-      { template, to: email }
+      { template }
     );
   }
 
@@ -130,7 +134,7 @@ export class ResendEmailProvider implements EmailProvider {
         bcc: options.bcc,
         replyTo: options.replyTo,
       },
-      { to: options.to }
+      { recipientCount: Array.isArray(options.to) ? options.to.length : 1 }
     );
   }
 }

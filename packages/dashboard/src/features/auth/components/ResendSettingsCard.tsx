@@ -5,12 +5,30 @@ import { Button, Input, Switch } from '@insforge/ui';
 import { z } from 'zod';
 import { type ResendConfigSchema, type UpsertResendConfigRequest } from '@insforge/shared-schemas';
 
-const resendFormSchema = z.object({
-  enabled: z.boolean(),
-  apiKey: z.string().optional(),
-  senderEmail: z.string(),
-  senderName: z.string(),
-});
+const resendFormSchema = z
+  .object({
+    enabled: z.boolean(),
+    apiKey: z.string().optional(),
+    senderEmail: z.string(),
+    senderName: z.string(),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.enabled) return;
+    if (!data.senderEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.senderEmail)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Invalid sender email',
+        path: ['senderEmail'],
+      });
+    }
+    if (!data.senderName) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Sender name is required',
+        path: ['senderName'],
+      });
+    }
+  });
 
 type ResendFormValues = z.infer<typeof resendFormSchema>;
 
