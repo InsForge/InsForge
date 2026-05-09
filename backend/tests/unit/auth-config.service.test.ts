@@ -47,6 +47,7 @@ function stubAllowedUrls(urls: string[] | null) {
 describe('AuthConfigService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    AuthConfigService.getInstance().clearCache();
   });
 
   // --------------------------------------------------------------------------

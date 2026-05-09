@@ -29,12 +29,12 @@ import {
   UserRecord,
   OAuthUserData,
 } from '@/types/auth.js';
+import { ADMIN_ID } from '@/utils/constants.js';
 import { AppError } from '@/utils/errors.js';
 import { EmailService } from '@/services/email/email.service.js';
 import { XOAuthProvider } from '@/providers/oauth/x.provider.js';
 import { AppleOAuthProvider } from '@/providers/oauth/apple.provider.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
-import { appConfig } from '@/infra/config/app.config.js';
 import {
   ERROR_CODES,
   type AuthMetadataSchema,
@@ -54,7 +54,7 @@ import {
  */
 export class AuthService {
   private static instance: AuthService;
-  private adminUsername: string;
+  private adminEmail: string;
   private adminPassword: string;
   private pool: Pool | null = null;
   private tokenManager: TokenManager;
@@ -70,13 +70,11 @@ export class AuthService {
   private appleOAuthProvider: AppleOAuthProvider;
 
   private constructor() {
-    this.adminUsername = appConfig.auth.rootAdminUsername;
-    this.adminPassword = appConfig.auth.rootAdminPassword;
+    this.adminEmail = process.env.ADMIN_EMAIL ?? '';
+    this.adminPassword = process.env.ADMIN_PASSWORD ?? '';
 
-    if (!this.adminUsername || !this.adminPassword) {
-      throw new Error(
-        'ROOT_ADMIN_USERNAME and ROOT_ADMIN_PASSWORD environment variables are required'
-      );
+    if (!this.adminEmail || !this.adminPassword) {
+      throw new Error('ADMIN_EMAIL and ADMIN_PASSWORD environment variables are required');
     }
 
     // Initialize token manager
@@ -656,20 +654,31 @@ export class AuthService {
   /**
    * Admin login (validates against env variables only)
    */
-  adminLogin(username: string, password: string): CreateAdminSessionResponse {
+  adminLogin(email: string, password: string): CreateAdminSessionResponse {
     // Simply validate against environment variables
-    if (username !== this.adminUsername || password !== this.adminPassword) {
+    if (email !== this.adminEmail || password !== this.adminPassword) {
       throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
-    const sub = `local:${username}`;
+    // Use a fixed admin ID for the system administrator
+
+    // Return admin user with JWT token (24h expiration) - no database interaction
     const accessToken = this.tokenManager.generateAccessToken({
-      sub,
+      sub: ADMIN_ID,
+      email,
       role: 'project_admin',
     });
 
     return {
-      admin: { sub },
+      user: {
+        id: ADMIN_ID,
+        email: email,
+        emailVerified: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        profile: { name: 'Administrator' },
+        metadata: null,
+      },
       accessToken,
     };
   }
@@ -678,17 +687,36 @@ export class AuthService {
    * Admin login with authorization token (validates JWT from external issuer)
    */
   async adminLoginWithAuthorizationCode(code: string): Promise<CreateAdminSessionResponse> {
-    const { payload } = await this.tokenManager.verifyCloudToken(code);
-    const sub = `cloud:${payload.userId}`;
-    const accessToken = this.tokenManager.generateAccessToken({
-      sub,
-      role: 'project_admin',
-    });
+    try {
+      // Use TokenManager to verify cloud token
+      const { payload } = await this.tokenManager.verifyCloudToken(code);
 
-    return {
-      admin: { sub },
-      accessToken,
-    };
+      // If verification succeeds, extract user info and generate internal token
+      const email = payload['email'] || payload['sub'] || 'admin@insforge.local';
+
+      // Generate internal access token (24h expiration)
+      const accessToken = this.tokenManager.generateAccessToken({
+        sub: ADMIN_ID,
+        email: email as string,
+        role: 'project_admin',
+      });
+
+      return {
+        user: {
+          id: ADMIN_ID,
+          email: email as string,
+          emailVerified: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          profile: { name: 'Administrator' },
+          metadata: null,
+        },
+        accessToken,
+      };
+    } catch (error) {
+      logger.error('Admin token verification failed:', error);
+      throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+    }
   }
 
   /**
@@ -953,6 +981,10 @@ export class AuthService {
       verifyEmailMethod: authConfig.verifyEmailMethod,
       resetPasswordMethod: authConfig.resetPasswordMethod,
       allowedRedirectUrls: authConfig.allowedRedirectUrls ?? [],
+      verifyEmailCodeExpiryMinutes: authConfig.verifyEmailCodeExpiryMinutes,
+      verifyEmailLinkExpiryMinutes: authConfig.verifyEmailLinkExpiryMinutes,
+      resetPasswordCodeExpiryMinutes: authConfig.resetPasswordCodeExpiryMinutes,
+      resetPasswordLinkExpiryMinutes: authConfig.resetPasswordLinkExpiryMinutes,
       disableSignup: authConfig.disableSignup,
     };
   }
@@ -1172,6 +1204,7 @@ export class AuthService {
         u.profile,
         u.metadata,
         u.email_verified,
+        u.is_project_admin,
         u.is_anonymous,
         u.created_at,
         u.updated_at,
@@ -1189,7 +1222,7 @@ export class AuthService {
   }
 
   /**
-   * Get user by ID (returns raw database record)
+   * Get user by ID (returns raw database record with is_project_admin field)
    */
   async getUserById(userId: string): Promise<UserRecord | null> {
     const pool = this.getPool();
@@ -1201,6 +1234,7 @@ export class AuthService {
         u.profile,
         u.metadata,
         u.email_verified,
+        u.is_project_admin,
         u.is_anonymous,
         u.created_at,
         u.updated_at,
@@ -1216,6 +1250,22 @@ export class AuthService {
 
     if (result.rows[0]) {
       return result.rows[0];
+    }
+
+    // Fallback: if admin record is missing from DB, construct it from env vars
+    if (userId === ADMIN_ID) {
+      const now = new Date().toISOString();
+      return {
+        id: ADMIN_ID,
+        email: this.adminEmail,
+        profile: { name: 'Administrator' },
+        metadata: {},
+        email_verified: true,
+        is_project_admin: true,
+        is_anonymous: false,
+        created_at: now,
+        updated_at: now,
+      };
     }
 
     return null;
@@ -1267,6 +1317,7 @@ export class AuthService {
         u.profile,
         u.metadata,
         u.email_verified,
+        u.is_project_admin,
         u.is_anonymous,
         u.created_at,
         u.updated_at,
@@ -1274,8 +1325,7 @@ export class AuthService {
         STRING_AGG(a.provider, ',') as providers
       FROM auth.users u
       LEFT JOIN auth.user_providers a ON u.id = a.user_id
-      WHERE u.is_anonymous = false
-        AND u.is_project_admin = false
+      WHERE u.is_project_admin = false AND u.is_anonymous = false
     `;
     const params: (string | number)[] = [];
 
@@ -1293,9 +1343,9 @@ export class AuthService {
     // Transform users
     const users = dbUsers.map((dbUser) => this.transformUserRecordToSchema(dbUser));
 
-    // Get total count (exclude anonymous and legacy project-admin users)
+    // Get total count (exclude admins and anonymous users)
     let countQuery =
-      'SELECT COUNT(*) as count FROM auth.users WHERE is_anonymous = false AND is_project_admin = false';
+      'SELECT COUNT(*) as count FROM auth.users WHERE is_project_admin = false AND is_anonymous = false';
     const countParams: string[] = [];
     if (search) {
       countQuery += ` AND (email LIKE $1 OR profile->>'name' LIKE $2)`;
@@ -1370,11 +1420,16 @@ export class AuthService {
    * Delete multiple users by IDs
    */
   async deleteUsers(userIds: string[]): Promise<number> {
+    const filtered = userIds.filter((id) => id !== ADMIN_ID);
+    if (filtered.length === 0) {
+      return 0;
+    }
+
     const pool = this.getPool();
-    const placeholders = userIds.map((_, i) => `$${i + 1}`).join(',');
+    const placeholders = filtered.map((_, i) => `$${i + 1}`).join(',');
     const result = await pool.query(
       `DELETE FROM auth.users WHERE id IN (${placeholders})`,
-      userIds
+      filtered
     );
 
     return result.rowCount || 0;
