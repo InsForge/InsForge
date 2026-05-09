@@ -202,6 +202,20 @@ describe('AuthConfigService', () => {
       const service = AuthConfigService.getInstance();
       expect(await service.validateRedirectUrl('https://example.com/path?param=value')).toBe(true);
     });
+
+    it('matches the root URL itself (trailing-slash form)', async () => {
+      stubAllowedUrls(['https://example.com/**']);
+
+      const service = AuthConfigService.getInstance();
+      expect(await service.validateRedirectUrl('https://example.com/')).toBe(true);
+    });
+
+    it('matches the bare apex URL (no trailing slash)', async () => {
+      stubAllowedUrls(['https://example.com/**']);
+
+      const service = AuthConfigService.getInstance();
+      expect(await service.validateRedirectUrl('https://example.com')).toBe(true);
+    });
   });
 
   // --------------------------------------------------------------------------
@@ -317,6 +331,19 @@ describe('AuthConfigService', () => {
 
       const service = AuthConfigService.getInstance();
       expect(await service.validateRedirectUrl('')).toBe(false);
+    });
+
+    // Pins the behavior of the unparseable-pattern branch in normalizePattern.
+    // A pattern that fails URL parsing even after glob-placeholder substitution
+    // should never match anything. The schema regex normally blocks such input;
+    // this test bypasses it via the mocked DB to verify the runtime guard.
+    it('rejects unparseable pattern that bypassed schema validation', async () => {
+      // 'not a url' fails URL parsing whether or not we substitute glob tokens,
+      // so normalizePattern returns the unmatchable sentinel.
+      stubAllowedUrls(['not a url *']);
+
+      const service = AuthConfigService.getInstance();
+      expect(await service.validateRedirectUrl('https://example.com/foo')).toBe(false);
     });
   });
 

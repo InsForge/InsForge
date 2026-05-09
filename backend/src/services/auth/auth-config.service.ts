@@ -260,7 +260,7 @@ export class AuthConfigService {
    * - Removes trailing slash
    * Returns null if the URL is malformed.
    */
-  private normalizeUrl(urlStr: string): string | null {
+  private static normalizeUrl(urlStr: string): string | null {
     try {
       const url = new URL(urlStr);
       return url.href.replace(/\/$/, '');
@@ -276,6 +276,13 @@ export class AuthConfigService {
   private static readonly GLOB_CHARS = /[*?[\]]/;
 
   /**
+   * Sentinel returned by `normalizePattern` when the placeholder-substituted
+   * pattern still fails URL parsing. `\0` cannot appear in a normalised URL
+   * produced by `new URL().href`, so picomatch will never match it.
+   */
+  private static readonly UNMATCHABLE_PATTERN = '\0';
+
+  /**
    * Normalises a glob *pattern* string.
    *
    * Unlike `normalizeUrl`, this must preserve the glob meta-characters that
@@ -284,11 +291,11 @@ export class AuthConfigService {
    *   2. Run the resulting (valid) URL through `normalizeUrl`.
    *   3. Restore the placeholders back to their original globs.
    *
-   * If the pattern is not a parseable URL even after placeholder substitution
-   * we return the original string lowercased + trailing-slash-stripped as a
-   * best-effort fallback (the caller will still match via picomatch).
+   * Any pattern that passes `allowedRedirectUrlsRegex` is a parseable URL
+   * after placeholder substitution. If a pattern still fails to parse here,
+   * the input bypassed schema validation and is treated as unmatchable.
    */
-  private normalizePattern(pattern: string): string {
+  private static normalizePattern(pattern: string): string {
     // Map of placeholder → original glob token, built on-the-fly.
     const replacements: Array<{ placeholder: string; original: string }> = [];
     let idx = 0;
@@ -301,14 +308,9 @@ export class AuthConfigService {
       return placeholder;
     });
 
-    const normalized = this.normalizeUrl(safe);
+    const normalized = AuthConfigService.normalizeUrl(safe);
     if (!normalized) {
-      // Best-effort: lowercase and strip trailing slash.
-      let fallback = pattern.toLowerCase().replace(/\/$/, '');
-      for (const { placeholder, original } of replacements) {
-        fallback = fallback.replace(placeholder.toLowerCase(), original);
-      }
-      return fallback;
+      return AuthConfigService.UNMATCHABLE_PATTERN;
     }
 
     // Restore glob tokens in the normalised URL.
@@ -342,11 +344,11 @@ export class AuthConfigService {
   private matchesGlobPattern(pattern: string, normalizedTarget: string): boolean {
     // Fast path: pattern without glob chars → exact match.
     if (!AuthConfigService.GLOB_CHARS.test(pattern)) {
-      const normalizedPattern = this.normalizeUrl(pattern);
+      const normalizedPattern = AuthConfigService.normalizeUrl(pattern);
       return normalizedPattern === normalizedTarget;
     }
 
-    const normalizedPattern = this.normalizePattern(pattern);
+    const normalizedPattern = AuthConfigService.normalizePattern(pattern);
 
     try {
       return picomatch.isMatch(normalizedTarget, normalizedPattern, { dot: true });
@@ -380,7 +382,7 @@ export class AuthConfigService {
       return true;
     }
 
-    const targetUrl = this.normalizeUrl(urlStr);
+    const targetUrl = AuthConfigService.normalizeUrl(urlStr);
     if (!targetUrl) {
       return false;
     }
