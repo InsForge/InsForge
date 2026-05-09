@@ -31,6 +31,7 @@ vi.mock('../../src/utils/logger', () => ({
 
 import { AuthConfigService } from '../../src/services/auth/auth-config.service';
 import { logger } from '../../src/utils/logger';
+import { allowedRedirectUrlsRegex } from '@insforge/shared-schemas';
 
 /**
  * Helper: stub `getAuthConfig` to return the given allowedRedirectUrls.
@@ -335,6 +336,56 @@ describe('AuthConfigService', () => {
 
       const service = AuthConfigService.getInstance();
       expect(await service.validateRedirectUrl('otherapp://auth/callback')).toBe(false);
+    });
+  });
+});
+
+// ----------------------------------------------------------------------------
+// Schema-level input validation regex
+// ----------------------------------------------------------------------------
+describe('allowedRedirectUrlsRegex — input validation', () => {
+  describe('rejects degenerate / empty hosts', () => {
+    it.each([
+      ['https://'],
+      ['http://'],
+      ['https://:8080'],
+      ['https:///path'],
+      ['https://*'],
+      ['https://*.'],
+      ['https://*.:8080'],
+      ['https://.'],
+    ])('rejects %s', (input) => {
+      expect(allowedRedirectUrlsRegex.test(input)).toBe(false);
+    });
+  });
+
+  describe('accepts valid patterns and URLs', () => {
+    it.each([
+      ['https://example.com'],
+      ['https://*.example.com'],
+      ['https://example.com/*'],
+      ['https://example.com/**'],
+      ['https://*.example.com/auth/*'],
+      ['https://example.com/?session=*'],
+      ['https://example.com/[a-z]*'],
+      ['https://*foo.example.com'],
+      ['https://example.com:3000/*'],
+      ['https://[::1]/cb'],
+      ['https://[::1]:8080'],
+      ['myapp://auth/callback'],
+    ])('accepts %s', (input) => {
+      expect(allowedRedirectUrlsRegex.test(input)).toBe(true);
+    });
+  });
+
+  describe('rejects unsafe / malformed inputs', () => {
+    it.each([
+      ['*.example.com'], // missing scheme
+      ['javascript:alert(1)'],
+      ['data:text/html,xss'],
+      ['file:///etc/passwd'],
+    ])('rejects %s', (input) => {
+      expect(allowedRedirectUrlsRegex.test(input)).toBe(false);
     });
   });
 });

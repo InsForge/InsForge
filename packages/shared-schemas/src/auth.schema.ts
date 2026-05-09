@@ -102,9 +102,14 @@ export const oAuthConfigSchema = z.object({
  *
  * Protocol must be explicit (http/https or a custom scheme).
  * Glob characters are NOT allowed in the protocol itself.
+ *
+ * For non-IPv6 hosts a lookahead requires at least one alphanumeric character
+ * in the host portion, so degenerate inputs like `https://`, `https://:8080`,
+ * or `https://*.` are rejected. IPv6 hosts are validated via the bracketed
+ * `\[[0-9A-Fa-f:.]+\]` alternative which already enforces a non-empty host.
  */
 export const allowedRedirectUrlsRegex =
-  /^(?:(?:https?:\/\/)(?:(?:\*\.)?[^\s/:?#*[\]]*(?:\*[^\s/:?#*[\]]*)*|(?:\*\.)?[^\s/:?#]+|\[[0-9A-Fa-f:.]+\])(?::\d+)?(?:\/[^\s]*)?|(?!(?:https?|javascript|data|file|vbscript):)[a-zA-Z][a-zA-Z0-9+.-]*:(?:\/\/[^\s/]+(?:\/[^\s]*)?|\/[^\s]*))$/i;
+  /^(?:(?:https?:\/\/)(?:(?=[^\s/:?#]*[a-zA-Z0-9])(?:(?:\*\.)?[^\s/:?#*[\]]*(?:\*[^\s/:?#*[\]]*)*|(?:\*\.)?[^\s/:?#]+)|\[[0-9A-Fa-f:.]+\])(?::\d+)?(?:\/[^\s]*)?|(?!(?:https?|javascript|data|file|vbscript):)[a-zA-Z][a-zA-Z0-9+.-]*:(?:\/\/[^\s/]+(?:\/[^\s]*)?|\/[^\s]*))$/i;
 
 // Email authentication configuration schema
 export const authConfigSchema = z.object({
