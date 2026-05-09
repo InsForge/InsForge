@@ -52,12 +52,14 @@ describe('AuthOTPService - configurable expiry', () => {
     AuthConfigService.getInstance().clearCache();
   });
 
-  function mockAuthConfig(overrides: Partial<{
-    verifyEmailCodeExpiryMinutes: number;
-    verifyEmailLinkExpiryMinutes: number;
-    resetPasswordCodeExpiryMinutes: number;
-    resetPasswordLinkExpiryMinutes: number;
-  }> = {}) {
+  function mockAuthConfig(
+    overrides: Partial<{
+      verifyEmailCodeExpiryMinutes: number;
+      verifyEmailLinkExpiryMinutes: number;
+      resetPasswordCodeExpiryMinutes: number;
+      resetPasswordLinkExpiryMinutes: number;
+    }> = {}
+  ) {
     const defaults = {
       id: '00000000-0000-0000-0000-000000000001',
       requireEmailVerification: false,

@@ -21,27 +21,19 @@ describe('053_add-token-expiry-config migration', () => {
   });
 
   it('adds verify_email_code_expiry_minutes with IF NOT EXISTS', () => {
-    expect(sql).toMatch(
-      /ADD COLUMN IF NOT EXISTS verify_email_code_expiry_minutes INTEGER/i
-    );
+    expect(sql).toMatch(/ADD COLUMN IF NOT EXISTS verify_email_code_expiry_minutes INTEGER/i);
   });
 
   it('adds verify_email_link_expiry_minutes with IF NOT EXISTS', () => {
-    expect(sql).toMatch(
-      /ADD COLUMN IF NOT EXISTS verify_email_link_expiry_minutes INTEGER/i
-    );
+    expect(sql).toMatch(/ADD COLUMN IF NOT EXISTS verify_email_link_expiry_minutes INTEGER/i);
   });
 
   it('adds reset_password_code_expiry_minutes with IF NOT EXISTS', () => {
-    expect(sql).toMatch(
-      /ADD COLUMN IF NOT EXISTS reset_password_code_expiry_minutes INTEGER/i
-    );
+    expect(sql).toMatch(/ADD COLUMN IF NOT EXISTS reset_password_code_expiry_minutes INTEGER/i);
   });
 
   it('adds reset_password_link_expiry_minutes with IF NOT EXISTS', () => {
-    expect(sql).toMatch(
-      /ADD COLUMN IF NOT EXISTS reset_password_link_expiry_minutes INTEGER/i
-    );
+    expect(sql).toMatch(/ADD COLUMN IF NOT EXISTS reset_password_link_expiry_minutes INTEGER/i);
   });
 
   it('sets verify_email_code_expiry_minutes default to 15', () => {
