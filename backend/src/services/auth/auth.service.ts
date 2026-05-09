@@ -817,6 +817,19 @@ export class AuthService {
       return { user, accessToken };
     }
 
+    // No existing provider account and no existing user by email — this would
+    // create a brand-new user. Honor the project-level signup gate before
+    // creating, so a flipped "disable new user signups" toggle also blocks
+    // first-time OAuth signups (existing OAuth users can still sign in above).
+    const { disableSignup } = await AuthConfigService.getInstance().getAuthConfig();
+    if (disableSignup) {
+      throw new AppError(
+        'User signups are disabled for this project.',
+        403,
+        ERROR_CODES.AUTH_SIGNUP_DISABLED
+      );
+    }
+
     // Create new user with OAuth data
     return this.createThirdPartyUser(
       provider,
@@ -951,6 +964,7 @@ export class AuthService {
       verifyEmailMethod: authConfig.verifyEmailMethod,
       resetPasswordMethod: authConfig.resetPasswordMethod,
       allowedRedirectUrls: authConfig.allowedRedirectUrls ?? [],
+      disableSignup: authConfig.disableSignup,
     };
   }
 
