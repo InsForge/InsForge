@@ -165,9 +165,9 @@ async function executeInWorker(code: string, request: Request): Promise<Response
       type: 'module',
       deno: {
         permissions: {
-          // RESTRICTED: Native environment access is disabled to shield host secrets.
-          // Secrets are passed explicitly via message payload.
-          env: false,
+          // SDK REQUIREMENT: @insforge/sdk uses 'debug' which needs env access at import time.
+          // User code still sees mocked env (secrets passed via postMessage, not native env).
+          env: true,
           // SDK/External REQUIREMENT: Allow network access for API connectivity and external integrations.
           net: true,
           read: false,
@@ -175,8 +175,10 @@ async function executeInWorker(code: string, request: Request): Promise<Response
           run: false,
           ffi: false,
           sys: false,
-          import: false,
-          hrtime: false,
+          // REQUIRED: worker imports the SDK and base64 helpers; user code
+          // is loaded via dynamic import() of a base64 data URL so static
+          // imports in user functions work too.
+          import: true,
         },
       },
     });
@@ -193,15 +195,34 @@ async function executeInWorker(code: string, request: Request): Promise<Response
       );
     }, WORKER_TIMEOUT_MS);
 
-    // Handle worker response
+    // Prepare request data
+    const body = request.body ? await request.text() : null;
+    const requestData = {
+      url: request.url,
+      method: request.method,
+      headers: Object.fromEntries(request.headers),
+      body,
+    };
+
+    // Two-phase worker protocol:
+    //   1. Worker sends { ready: true } once top-level imports finish.
+    //   2. Host posts the code; worker replies with the result message.
+    // This replaces a fixed-time sleep, so we don't add latency on warm
+    // workers and don't race the onmessage handler on cold imports.
+    let codePosted = false;
     worker.onmessage = (e) => {
+      if (e.data?.ready && !codePosted) {
+        codePosted = true;
+        worker.postMessage({ code, requestData, secrets });
+        return;
+      }
+
       clearTimeout(timeout);
       worker.terminate();
       URL.revokeObjectURL(workerUrl);
 
       if (e.data.success) {
         const { response } = e.data;
-        // The worker now properly sends null for bodyless responses
         resolve(
           new Response(response.body, {
             status: response.status,
@@ -232,18 +253,6 @@ async function executeInWorker(code: string, request: Request): Promise<Response
         })
       );
     };
-
-    // Prepare request data
-    const body = request.body ? await request.text() : null;
-    const requestData = {
-      url: request.url,
-      method: request.method,
-      headers: Object.fromEntries(request.headers),
-      body,
-    };
-
-    // Send message with code, request data, and secrets
-    worker.postMessage({ code, requestData, secrets });
   });
 }
 

@@ -3,44 +3,87 @@
  *
  * This code runs inside a Web Worker environment created by Deno.
  * Each worker is created fresh for a single request, executes once, and terminates.
+ *
+ * Supports two function formats:
+ * 1. Legacy (CommonJS): module.exports = async function(req) { ... }
+ * 2. ESM (export default): export default async function(req) { ... }
+ *
+ * User code is loaded via dynamic import() with a base64 data URL, which means
+ * static `import` statements in user code work. Tier-1 backend validation blocks
+ * dynamic import() calls and other dangerous patterns; Tier-2 native Deno
+ * permissions (read/write/run/ffi/sys = false) provide the real boundary.
  */
 /* eslint-env worker */
 /* global self, Request, Deno */
 
 // --- SECURITY BLACKOUT (Top-level) ---
-// We polyfill Deno.env and process.env BEFORE any imports using Top-Level Await.
-// This prevents libraries (like 'debug') from triggering 'NotCapable' errors
-// when using a strict native whitelist (env: false).
+// Polyfill Deno.env and process.env BEFORE any imports using Top-Level Await.
+// Libraries (like 'debug') call Object.keys(process.env) at import time, so the
+// shadow has to be in place before the SDK loads.
 const sterileEnv = {
   NODE_ENV: 'production',
 };
 
+// Mutable secrets container the env mock closes over.
+// Populated per-request from postMessage data; never enumerable.
+const userSecrets = {};
+
 try {
-  // Shadow Deno.env with a pure JS implementation
   const mockDenoEnv = {
-    get: (key) => sterileEnv[key] ?? undefined,
+    get: (key) =>
+      Object.prototype.hasOwnProperty.call(userSecrets, key) ? userSecrets[key] : sterileEnv[key],
+    has: (key) =>
+      Object.prototype.hasOwnProperty.call(userSecrets, key) ||
+      Object.prototype.hasOwnProperty.call(sterileEnv, key),
     set: () => {
       throw new Error('Deno.env.set is disabled');
     },
     delete: () => {
       throw new Error('Deno.env.delete is disabled');
     },
-    toObject: () => ({ ...sterileEnv }),
-    has: (key) => key in sterileEnv,
+    // toObject intentionally omitted to prevent secret enumeration
   };
 
-  // Replace global Deno.env
+  // Block subprocess and dangerous APIs as secondary defense
+  const lockedDeno = Object.freeze({
+    env: mockDenoEnv,
+    run: () => {
+      throw new Error('Deno.run is disabled');
+    },
+    spawn: () => {
+      throw new Error('Deno.spawn is disabled');
+    },
+    Command: function () {
+      throw new Error('Deno.Command is disabled');
+    },
+  });
+
   Object.defineProperty(globalThis, 'Deno', {
-    value: Object.freeze({ env: mockDenoEnv }),
-    configurable: false, // Lock down permanently (Audit Finding)
+    value: lockedDeno,
+    configurable: false,
     writable: false,
   });
 
-  // Shadow process.env (Node compatibility)
+  // Shadow process.env (Node compatibility) — read-through to userSecrets/sterileEnv
   if (!globalThis.process) globalThis.process = {};
-  globalThis.process.env = { ...sterileEnv };
+  globalThis.process.env = new Proxy(
+    {},
+    {
+      get: (_target, key) =>
+        Object.prototype.hasOwnProperty.call(userSecrets, key) ? userSecrets[key] : sterileEnv[key],
+      has: (_target, key) =>
+        Object.prototype.hasOwnProperty.call(userSecrets, key) ||
+        Object.prototype.hasOwnProperty.call(sterileEnv, key),
+      ownKeys: () => Object.keys(sterileEnv), // Hide secrets from enumeration
+      getOwnPropertyDescriptor: (_target, key) => {
+        if (Object.prototype.hasOwnProperty.call(sterileEnv, key)) {
+          return { enumerable: true, configurable: true, value: sterileEnv[key] };
+        }
+        return undefined;
+      },
+    }
+  );
 } catch (e) {
-  // FATAL: Security setup failed. Terminate immediately to prevent leakage.
   console.error('Security shadow application failed:', e);
   self.postMessage({
     success: false,
@@ -55,107 +98,112 @@ try {
 // ----------------------------
 // LATE IMPORTS (Pre-emptive Mocking)
 // ----------------------------
-// We use dynamic imports AFTER the environment is shadowed.
+// Worker loads SDK helpers via real imports (allowed by import: true permission).
+// User code can also import npm/jsr/https packages directly via static imports.
 const { createClient } = await import('npm:@insforge/sdk');
 const { encodeBase64, decodeBase64 } =
   await import('https://deno.land/std@0.224.0/encoding/base64.ts');
+
+// Inject SDK helpers as globals for user code (backward compat with existing demos)
+globalThis.createClient = createClient;
+globalThis.encodeBase64 = encodeBase64;
+globalThis.decodeBase64 = decodeBase64;
+
+/**
+ * Convert legacy CommonJS to ESM so dynamic import() can load it.
+ * Only applied when the code does not already use export default.
+ *
+ * Anchored to start-of-line (with optional leading whitespace) so that
+ * mentions of `module.exports` inside JSDoc comments (` * ...`) or string
+ * literals do not get rewritten — only the real assignment statement does.
+ *
+ * Handles:
+ *   module.exports = async function(req) {...}
+ *   module.exports = function(req) {...}
+ *   module.exports = (req) => {...}
+ */
+function legacyToESM(code) {
+  return code.replace(/^[ \t]*module\.exports\s*=\s*/m, 'export default ');
+}
+
+// Signal to the host that the worker is fully initialised. The host waits
+// for this handshake before posting the user code message — without it, on
+// cold imports the postMessage would race against the onmessage handler.
+self.postMessage({ ready: true });
 
 // Handle the single message with code, request data, and secrets
 self.onmessage = async (e) => {
   const { code, requestData, secrets = {} } = e.data;
 
   try {
-    /**
-     * MOCK DENO OBJECT:
-     * Providing safe secrets access even under strict native lock-down (env: false).
-     * This fake 'Deno' object is injected into the user function's scope, ensuring
-     * they only see the secrets we explicitly allow, while the native Deno runtime
-     * remains blindfolded at the C++ layer.
-     */
-    const mockDeno = {
-      // Mock only the required Deno.env API for secret retrieval
-      env: {
-        get: (key) => secrets[key] ?? undefined,
-        // (toObject removed for security to prevent secret enumeration)
-      },
-      // Explicitly block all subprocess APIs as a secondary defense tier
-      run: () => {
-        throw new Error('Deno.run is natively disabled');
-      },
-      spawn: () => {
-        throw new Error('Deno.spawn is natively disabled');
-      },
-      Command: function () {
-        throw new Error('Deno.Command is natively disabled');
-      },
-    };
+    // Inject secrets into the env mock closure
+    Object.assign(userSecrets, secrets);
 
-    /**
-     * FUNCTION WRAPPING:
-     * Injecting mocks into the user function execution scope.
-     * We pass mockDeno instead of the real Deno global.
-     */
-    const wrapper = new Function(
-      'exports',
-      'module',
-      'createClient',
-      'Deno',
-      'encodeBase64',
-      'decodeBase64',
-      code
-    );
-    const exports = {};
-    const module = { exports };
+    // Legacy detection: anchor on `module.exports = ` at start of line. This
+    // skips JSDoc-comment mentions (` * module.exports = ...`) and string
+    // literals, which would otherwise cause false positives in either direction.
+    const isLegacy = /^[ \t]*module\.exports\s*=/m.test(code);
+    const finalCode = isLegacy ? legacyToESM(code) : code;
 
-    // Execute the wrapper, passing mockDeno as the Deno global
-    wrapper(exports, module, createClient, mockDeno, encodeBase64, decodeBase64);
+    // Encode as base64 data URL so dynamic import() can load it as a module.
+    // application/typescript MIME tells Deno to strip TypeScript types.
+    const codeBytes = new TextEncoder().encode(finalCode);
+    const encoded = encodeBase64(codeBytes);
+    const dataUrl = `data:application/typescript;base64,${encoded}`;
 
-    // Get the exported function
-    const functionHandler = module.exports || exports.default || exports;
+    // Dynamic import — user's static `import` statements work as expected.
+    // Backend Tier-1 validation blocks user-side dynamic import() calls; this
+    // worker-side import() is part of the trusted runtime.
+    const userModule = await import(dataUrl);
+    const handler = userModule.default;
 
-    if (typeof functionHandler !== 'function') {
+    if (typeof handler !== 'function') {
       throw new Error(
-        'No function exported. Expected: module.exports = async function(req) { ... }'
+        'No function exported. Use: export default async function(req) { ... } or module.exports = async function(req) { ... }'
       );
     }
 
-    // Create Request object from data
+    // Create Request object from serialized data
     const request = new Request(requestData.url, {
       method: requestData.method,
       headers: requestData.headers,
       body: requestData.body,
     });
 
-    // Execute the function
-    const response = await functionHandler(request);
+    // Execute the user's handler
+    const response = await handler(request);
 
-    // Serialize and send response
+    // Serialize response for postMessage
     let body = null;
     if (![204, 205, 304].includes(response.status)) {
       body = await response.text();
     }
 
-    const responseData = {
-      status: response.status,
-      statusText: response.statusText,
-      headers: Object.fromEntries(response.headers),
-      body: body,
-    };
-
-    self.postMessage({ success: true, response: responseData });
+    self.postMessage({
+      success: true,
+      response: {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers),
+        body,
+      },
+    });
   } catch (error) {
+    // Handle Response objects thrown as errors (early returns)
     if (error instanceof Response) {
       let body = null;
       if (![204, 205, 304].includes(error.status)) {
         body = await error.text();
       }
-      const responseData = {
-        status: error.status,
-        statusText: error.statusText,
-        headers: Object.fromEntries(error.headers),
-        body: body,
-      };
-      self.postMessage({ success: true, response: responseData });
+      self.postMessage({
+        success: true,
+        response: {
+          status: error.status,
+          statusText: error.statusText,
+          headers: Object.fromEntries(error.headers),
+          body,
+        },
+      });
     } else {
       self.postMessage({
         success: false,
