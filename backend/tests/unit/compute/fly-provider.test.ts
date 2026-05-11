@@ -171,6 +171,10 @@ describe('FlyProvider', () => {
         { port: 443, handlers: ['tls', 'http'] },
         { port: 80, handlers: ['http'] },
       ]);
+      // Scale-to-zero defaults — without these Fly keeps the machine warm 24/7.
+      expect(body.config.services[0].auto_stop_machines).toBe('stop');
+      expect(body.config.services[0].auto_start_machines).toBe(true);
+      expect(body.config.services[0].min_machines_running).toBe(0);
       expect(body.region).toBe('iad');
     });
   });

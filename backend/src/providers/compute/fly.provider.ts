@@ -165,6 +165,29 @@ export class FlyProvider implements ComputeProvider {
     await this.request(`/apps/${appId}`, { method: 'DELETE' });
   }
 
+  // Single source of truth for the per-machine service block. Both launch
+  // and update need to send the same shape, including the autostop fields:
+  // without them Fly defaults to never stopping and machines run 24/7 even
+  // when idle.
+  private serviceConfig(internalPort: number) {
+    return {
+      ports: [
+        { port: 443, handlers: ['tls', 'http'] },
+        { port: 80, handlers: ['http'] },
+      ],
+      internal_port: internalPort,
+      protocol: 'tcp',
+      // Scale-to-zero defaults. Fly stops the machine when traffic is idle
+      // and wakes it on the next incoming request. `min_machines_running: 0`
+      // is required for full scale-to-zero (any value >0 keeps that many
+      // warm). `stop` (vs `suspend`) fully releases the machine — cheaper
+      // for compute that isn't sensitive to ~1s cold-start latency.
+      auto_stop_machines: 'stop',
+      auto_start_machines: true,
+      min_machines_running: 0,
+    };
+  }
+
   async launchMachine(params: {
     appId: string;
     image: string;
@@ -182,16 +205,7 @@ export class FlyProvider implements ComputeProvider {
           image: params.image,
           guest,
           env: params.envVars,
-          services: [
-            {
-              ports: [
-                { port: 443, handlers: ['tls', 'http'] },
-                { port: 80, handlers: ['http'] },
-              ],
-              internal_port: params.port,
-              protocol: 'tcp',
-            },
-          ],
+          services: [this.serviceConfig(params.port)],
         },
         region: params.region,
       }),
@@ -216,16 +230,7 @@ export class FlyProvider implements ComputeProvider {
           image: params.image,
           guest,
           env: params.envVars,
-          services: [
-            {
-              ports: [
-                { port: 443, handlers: ['tls', 'http'] },
-                { port: 80, handlers: ['http'] },
-              ],
-              internal_port: params.port,
-              protocol: 'tcp',
-            },
-          ],
+          services: [this.serviceConfig(params.port)],
         },
       }),
     });
