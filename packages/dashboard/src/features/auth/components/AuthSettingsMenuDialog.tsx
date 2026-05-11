@@ -43,6 +43,11 @@ interface AuthSettingsMenuDialogProps {
 
 type AuthSettingsSection = 'general' | 'email-verification' | 'password';
 
+const VERIFY_EMAIL_CODE_EXPIRY_MINUTES = 15;
+const VERIFY_EMAIL_LINK_EXPIRY_MINUTES = 1440;
+const RESET_PASSWORD_CODE_EXPIRY_MINUTES = 10;
+const RESET_PASSWORD_LINK_EXPIRY_MINUTES = 60;
+
 const defaultValues: UpdateAuthConfigRequest = {
   requireEmailVerification: false,
   passwordMinLength: 6,
@@ -53,10 +58,10 @@ const defaultValues: UpdateAuthConfigRequest = {
   verifyEmailMethod: 'code',
   resetPasswordMethod: 'code',
   allowedRedirectUrls: [],
-  verifyEmailCodeExpiryMinutes: 15,
-  verifyEmailLinkExpiryMinutes: 1440,
-  resetPasswordCodeExpiryMinutes: 10,
-  resetPasswordLinkExpiryMinutes: 60,
+  verifyEmailCodeExpiryMinutes: VERIFY_EMAIL_CODE_EXPIRY_MINUTES,
+  verifyEmailLinkExpiryMinutes: VERIFY_EMAIL_LINK_EXPIRY_MINUTES,
+  resetPasswordCodeExpiryMinutes: RESET_PASSWORD_CODE_EXPIRY_MINUTES,
+  resetPasswordLinkExpiryMinutes: RESET_PASSWORD_LINK_EXPIRY_MINUTES,
   disableSignup: false,
 };
 
@@ -391,12 +396,12 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                                       if (value === 'code') {
                                         form.setValue(
                                           'verifyEmailLinkExpiryMinutes',
-                                          defaultValues.verifyEmailLinkExpiryMinutes!
+                                          VERIFY_EMAIL_LINK_EXPIRY_MINUTES
                                         );
                                       } else {
                                         form.setValue(
                                           'verifyEmailCodeExpiryMinutes',
-                                          defaultValues.verifyEmailCodeExpiryMinutes!
+                                          VERIFY_EMAIL_CODE_EXPIRY_MINUTES
                                         );
                                       }
                                     }
@@ -580,12 +585,12 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                                 if (value === 'code') {
                                   form.setValue(
                                     'resetPasswordLinkExpiryMinutes',
-                                    defaultValues.resetPasswordLinkExpiryMinutes!
+                                    RESET_PASSWORD_LINK_EXPIRY_MINUTES
                                   );
                                 } else {
                                   form.setValue(
                                     'resetPasswordCodeExpiryMinutes',
-                                    defaultValues.resetPasswordCodeExpiryMinutes!
+                                    RESET_PASSWORD_CODE_EXPIRY_MINUTES
                                   );
                                 }
                               }
