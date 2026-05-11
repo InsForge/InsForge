@@ -169,6 +169,12 @@ export class FlyProvider implements ComputeProvider {
   // and update need to send the same shape, including the autostop fields:
   // without them Fly defaults to never stopping and machines run 24/7 even
   // when idle.
+  //
+  // Field names are the **Machines API** spelling (`autostart` / `autostop`),
+  // NOT fly.toml's longer `auto_start_machines` / `auto_stop_machines`. The
+  // Machines API silently ignores unknown fields, so getting these wrong
+  // looks like it works but leaves machines always-on. Source of truth:
+  // https://docs.machines.dev/spec/openapi3.json — fly.MachineService.
   private serviceConfig(internalPort: number) {
     return {
       ports: [
@@ -182,8 +188,8 @@ export class FlyProvider implements ComputeProvider {
       // is required for full scale-to-zero (any value >0 keeps that many
       // warm). `stop` (vs `suspend`) fully releases the machine — cheaper
       // for compute that isn't sensitive to ~1s cold-start latency.
-      auto_stop_machines: 'stop',
-      auto_start_machines: true,
+      autostop: 'stop',
+      autostart: true,
       min_machines_running: 0,
     };
   }

@@ -172,8 +172,13 @@ describe('FlyProvider', () => {
         { port: 80, handlers: ['http'] },
       ]);
       // Scale-to-zero defaults — without these Fly keeps the machine warm 24/7.
-      expect(body.config.services[0].auto_stop_machines).toBe('stop');
-      expect(body.config.services[0].auto_start_machines).toBe(true);
+      // Note: the Machines API uses the short field names (`autostop`/`autostart`),
+      // NOT fly.toml's `auto_stop_machines`/`auto_start_machines`. The API
+      // silently ignores unknown fields, so the wrong names look healthy at
+      // request time but leave the machine always-on. Schema reference:
+      // https://docs.machines.dev/spec/openapi3.json (fly.MachineService).
+      expect(body.config.services[0].autostop).toBe('stop');
+      expect(body.config.services[0].autostart).toBe(true);
       expect(body.config.services[0].min_machines_running).toBe(0);
       expect(body.region).toBe('iad');
     });
