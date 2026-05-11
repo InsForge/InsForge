@@ -50,6 +50,9 @@ paths:
                     type: string
                     enum: [code, link]
                     description: Method for password reset (code = 6-digit OTP + exchange flow, link = magic link)
+                  disableSignup:
+                    type: boolean
+                    description: When true, new user sign-ups are disabled. Existing users can still sign in.
 
   /api/auth/profiles/current:
     patch:
@@ -162,6 +165,9 @@ paths:
                     items:
                       type: string
                     description: List of allowed URLs for authentication redirects. If empty, all redirects are allowed for smoother development UX. This is not recommended in production.
+                  disableSignup:
+                    type: boolean
+                    description: When true, public sign-up endpoints (POST /api/auth/users and first-time OAuth) are rejected with 403 AUTH_SIGNUP_DISABLED. Admin-authenticated user creation is unaffected.
                   createdAt:
                     type: string
                     format: date-time
@@ -214,6 +220,9 @@ paths:
                   items:
                     type: string
                   description: List of allowed URLs for authentication redirects. If empty, all redirects are allowed for smoother development UX. This is not recommended in production.
+                disableSignup:
+                  type: boolean
+                  description: When true, public sign-up endpoints (POST /api/auth/users and first-time OAuth) are rejected with 403 AUTH_SIGNUP_DISABLED. Admin-authenticated user creation is unaffected.
       responses:
         '200':
           description: Configuration updated successfully
@@ -250,6 +259,9 @@ paths:
                     items:
                       type: string
                     description: List of allowed URLs for authentication redirects. If empty, all redirects are allowed for smoother development UX. This is not recommended in production.
+                  disableSignup:
+                    type: boolean
+                    description: When true, public sign-up endpoints (POST /api/auth/users and first-time OAuth) are rejected with 403 AUTH_SIGNUP_DISABLED. Admin-authenticated user creation is unaffected.
                   createdAt:
                     type: string
                     format: date-time
@@ -337,6 +349,16 @@ paths:
                     description: Whether email verification is required before login
         '400':
           description: Invalid request
+        '403':
+          description: Signups disabled — project has disabled new user registration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: AUTH_SIGNUP_DISABLED
+                message: User signups are disabled for this project.
+                statusCode: 403
         '409':
           description: User already exists
 
