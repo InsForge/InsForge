@@ -153,8 +153,7 @@ describe('AuthConfigService – disableSignup', () => {
       const result = await service.updateAuthConfig({ disableSignup: true });
 
       const updateCall = mockClient.query.mock.calls.find(
-        (call: unknown[]) =>
-          typeof call[0] === 'string' && call[0].includes('UPDATE auth.config')
+        (call: unknown[]) => typeof call[0] === 'string' && call[0].includes('UPDATE auth.config')
       );
       expect(updateCall).toBeDefined();
       expect(updateCall![0]).toContain('disable_signup');
@@ -172,8 +171,7 @@ describe('AuthConfigService – disableSignup', () => {
       const result = await service.updateAuthConfig({ disableSignup: false });
 
       const updateCall = mockClient.query.mock.calls.find(
-        (call: unknown[]) =>
-          typeof call[0] === 'string' && call[0].includes('UPDATE auth.config')
+        (call: unknown[]) => typeof call[0] === 'string' && call[0].includes('UPDATE auth.config')
       );
       expect(updateCall).toBeDefined();
       expect(updateCall![0]).toContain('disable_signup');
@@ -193,8 +191,7 @@ describe('AuthConfigService – disableSignup', () => {
       await service.updateAuthConfig({ requireEmailVerification: true });
 
       const updateCall = mockClient.query.mock.calls.find(
-        (call: unknown[]) =>
-          typeof call[0] === 'string' && call[0].includes('UPDATE auth.config')
+        (call: unknown[]) => typeof call[0] === 'string' && call[0].includes('UPDATE auth.config')
       );
       expect(updateCall).toBeDefined();
       // RETURNING clause always lists all columns; only check the SET portion
