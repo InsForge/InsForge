@@ -29,7 +29,7 @@ export function TextCellEditor({ value, onValueChange, onCancel, className }: Te
       onKeyDown={handleKeyDown}
       onBlur={handleSave}
       className={cn(
-        'w-full border-none outline-none bg-white dark:bg-neutral-800 focus:border-0! focus:ring-0! focus:ring-offset-0! focus:outline-none!',
+        'w-full border-none bg-white dark:bg-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
         className
       )}
       autoFocus
