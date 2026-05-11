@@ -14,7 +14,6 @@ import type {
 } from '#types';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
 import { useToast } from '#lib/hooks/useToast';
-import { usePageSize } from '#lib/hooks/usePageSize';
 import { EmptyState, PaginationControls } from '#components';
 import { AdvisoryItem } from './AdvisoryItem';
 import { AdvisoryTabs, type AdvisoryTabValue } from './AdvisoryTabs';
@@ -22,6 +21,7 @@ import { SeverityFilterDropdown } from './SeverityFilterDropdown';
 import { formatRemediationPromptBatch } from './remediationPrompt';
 
 const ADVISOR_FETCH_PAGE_SIZE = 100;
+const ADVISOR_PAGE_SIZE = 10;
 const SCAN_POLL_INTERVAL_MS = 3_000;
 const SCAN_POLL_MAX_DURATION_MS = 30_000;
 
@@ -58,7 +58,7 @@ export function BackendAdvisorSection() {
   const [selectedSeverities, setSelectedSeverities] = useState<Set<DashboardAdvisorSeverity>>(
     () => new Set(ALL_SEVERITIES)
   );
-  const { pageSize, pageSizeOptions, onPageSizeChange } = usePageSize('advisor-issues');
+  const pageSize = ADVISOR_PAGE_SIZE;
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedIssueId, setExpandedIssueId] = useState<string | null>(null);
 
@@ -346,10 +346,6 @@ export function BackendAdvisorSection() {
             onPageChange={setCurrentPage}
             totalRecords={totalRecords}
             pageSize={pageSize}
-            pageSizeOptions={pageSizeOptions}
-            onPageSizeChange={(size) => {
-              onPageSizeChange(size);
-            }}
             recordLabel="issues"
           />
         )}
