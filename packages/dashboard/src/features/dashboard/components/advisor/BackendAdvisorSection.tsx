@@ -169,11 +169,9 @@ export function BackendAdvisorSection() {
 
   const lastScanLabel = formatRelative(latest.data?.scannedAt);
   const hasScan = !!latest.data?.scanId;
-  const summaryTotal = latest.data?.summary.total;
-  const reservedItemsHeight =
-    hasScan && summaryTotal && summaryTotal > 0 ? summaryTotal * 68 + 64 : 0;
 
   const summary = latest.data?.summary;
+  const summaryTotal = summary?.total;
   const filteredAllCount =
     summary === undefined
       ? undefined
@@ -188,6 +186,22 @@ export function BackendAdvisorSection() {
         health: [...selectedSeverities].reduce((s, sev) => s + matrix.health[sev], 0),
       }
     : undefined;
+
+  // Predict filtered total so reserved height matches what this page will render.
+  const predictedFilteredTotal = noSeveritiesSelected
+    ? 0
+    : tab === 'all'
+      ? (filteredAllCount ?? summaryTotal ?? 0)
+      : (filteredCategoryCounts?.[tab as DashboardAdvisorCategory] ??
+        filteredAllCount ??
+        summaryTotal ??
+        0);
+  const expectedPageItemCount = Math.max(
+    0,
+    Math.min(pageSize, predictedFilteredTotal - (currentPage - 1) * pageSize)
+  );
+  const reservedItemsHeight =
+    hasScan && expectedPageItemCount > 0 ? expectedPageItemCount * 68 + 64 : 0;
 
   // Apply client-side severity filter when needed, then derive pagination.
   const fetchedIssues = issues.data?.issues ?? [];
