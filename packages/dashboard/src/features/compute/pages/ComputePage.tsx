@@ -284,7 +284,7 @@ export default function ComputePage() {
                       Use the button above, the CLI:
                     </p>
                     <code className="block px-3 py-2 bg-muted text-foreground rounded text-xs font-mono break-all">
-                      npx @insforge/cli compute deploy --name my-api --image nginx:alpine
+                      npx @insforge/cli compute deploy --name my-api --image nginx:alpine --port 80
                     </code>
                   </div>
                   <div>
