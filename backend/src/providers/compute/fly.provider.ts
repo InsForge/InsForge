@@ -4,6 +4,16 @@ import type { ComputeProvider } from './compute.provider.js';
 
 const FLY_API_BASE = 'https://api.machines.dev/v1';
 
+// Fly Machines API field names for the autostop/autostart block on a
+// service. Kept narrow on purpose: extend when we expose CLI overrides.
+// `autostop` accepts `"off" | "stop" | "suspend"` per fly.MachineService
+// in https://docs.machines.dev/spec/openapi3.json.
+type ScaleOptions = {
+  autostop: 'off' | 'stop' | 'suspend';
+  autostart: boolean;
+  min_machines_running: number;
+};
+
 export class FlyProvider implements ComputeProvider {
   private static instance: FlyProvider;
 
@@ -165,6 +175,18 @@ export class FlyProvider implements ComputeProvider {
     await this.request(`/apps/${appId}`, { method: 'DELETE' });
   }
 
+  // Scale-to-zero is v1's only mode — see compute-deploy.md in the skill
+  // for the rationale. Callers don't pass autostop overrides today. When
+  // we do want to expose `--autostop` / `--min-machines` CLI flags later,
+  // this is the one spot to plumb them through: extend `ScaleOptions` and
+  // pass it from launchMachine/updateMachine. The defaults stay correct
+  // regardless of how callers evolve.
+  private static readonly SCALE_TO_ZERO: ScaleOptions = {
+    autostop: 'stop',
+    autostart: true,
+    min_machines_running: 0,
+  };
+
   // Single source of truth for the per-machine service block. Both launch
   // and update need to send the same shape, including the autostop fields:
   // without them Fly defaults to never stopping and machines run 24/7 even
@@ -175,7 +197,7 @@ export class FlyProvider implements ComputeProvider {
   // Machines API silently ignores unknown fields, so getting these wrong
   // looks like it works but leaves machines always-on. Source of truth:
   // https://docs.machines.dev/spec/openapi3.json — fly.MachineService.
-  private serviceConfig(internalPort: number) {
+  private serviceConfig(internalPort: number, scale: ScaleOptions = FlyProvider.SCALE_TO_ZERO) {
     return {
       ports: [
         { port: 443, handlers: ['tls', 'http'] },
@@ -183,14 +205,13 @@ export class FlyProvider implements ComputeProvider {
       ],
       internal_port: internalPort,
       protocol: 'tcp',
-      // Scale-to-zero defaults. Fly stops the machine when traffic is idle
-      // and wakes it on the next incoming request. `min_machines_running: 0`
-      // is required for full scale-to-zero (any value >0 keeps that many
-      // warm). `stop` (vs `suspend`) fully releases the machine — cheaper
-      // for compute that isn't sensitive to ~1s cold-start latency.
-      autostop: 'stop',
-      autostart: true,
-      min_machines_running: 0,
+      // Scale config. `stop` (vs `suspend`) fully releases the machine —
+      // cheaper for compute that isn't sensitive to ~1s cold-start latency.
+      // `min_machines_running: 0` is required for full scale-to-zero (any
+      // value > 0 keeps that many warm).
+      autostop: scale.autostop,
+      autostart: scale.autostart,
+      min_machines_running: scale.min_machines_running,
     };
   }
 
