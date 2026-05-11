@@ -162,7 +162,6 @@ export function BucketFormDialog({
                 <Switch id="bucket-public" checked={isPublic} onCheckedChange={setIsPublic} />
               </div>
             </BucketFormRow>
-
           </DialogBody>
           <DialogFooter className="gap-3 p-4">
             <Button type="button" variant="secondary" onClick={handleClose} className="h-8 px-2">
