@@ -187,21 +187,8 @@ export function BackendAdvisorSection() {
       }
     : undefined;
 
-  // Predict filtered total so reserved height matches what this page will render.
-  const predictedFilteredTotal = noSeveritiesSelected
-    ? 0
-    : tab === 'all'
-      ? (filteredAllCount ?? summaryTotal ?? 0)
-      : (filteredCategoryCounts?.[tab as DashboardAdvisorCategory] ??
-        filteredAllCount ??
-        summaryTotal ??
-        0);
-  const expectedPageItemCount = Math.max(
-    0,
-    Math.min(pageSize, predictedFilteredTotal - (currentPage - 1) * pageSize)
-  );
-  const reservedItemsHeight =
-    hasScan && expectedPageItemCount > 0 ? expectedPageItemCount * 68 + 64 : 0;
+  // Reserve a full page worth of height so layout stays stable across tab/severity switches.
+  const reservedItemsHeight = hasScan && summaryTotal && summaryTotal > 0 ? pageSize * 68 + 64 : 0;
 
   // Apply client-side severity filter when needed, then derive pagination.
   const fetchedIssues = issues.data?.issues ?? [];
