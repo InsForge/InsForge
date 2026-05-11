@@ -3,6 +3,12 @@ title: "Changelog"
 description: "New features, improvements, and fixes shipped to InsForge."
 ---
 
+<Update label="May 11, 2026" tags={["Auth"]}>
+  ## Disable New User Signups Toggle
+
+  Auth Settings now has a **Disable New User Signups** toggle. When on, `POST /api/auth/users` and first-time OAuth signups return `403 AUTH_SIGNUP_DISABLED`. Existing users can still sign in and project admins can still create users via the dashboard or API. Useful for closed-beta, capacity limits, or stopping a bot wave mid-incident without taking auth down.
+</Update>
+
 <Update label="Dec 21, 2025" tags={["Realtime", "Auth", "Payments", "AI"]}>
   ## Realtime Module
 

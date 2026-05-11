@@ -364,6 +364,17 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
       );
     }
 
+    if (!adminCreatingUser) {
+      const { disableSignup } = await authConfigService.getAuthConfig();
+      if (disableSignup) {
+        throw new AppError(
+          'User signups are disabled for this project.',
+          403,
+          ERROR_CODES.AUTH_SIGNUP_DISABLED
+        );
+      }
+    }
+
     const {
       email,
       password,

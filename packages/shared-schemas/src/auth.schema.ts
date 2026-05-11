@@ -126,6 +126,9 @@ export const authConfigSchema = z.object({
     .array(z.string().regex(allowedRedirectUrlsRegex, { message: 'Invalid URL or wildcard URL' }))
     .optional()
     .nullable(),
+  // When true, public sign-up endpoints (POST /api/auth/users and first-time OAuth)
+  // are rejected. Admin-authenticated user creation is unaffected.
+  disableSignup: z.boolean(),
   createdAt: z.string(), // PostgreSQL timestamp
   updatedAt: z.string(), // PostgreSQL timestamp
 });

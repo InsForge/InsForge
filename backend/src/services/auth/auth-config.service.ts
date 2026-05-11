@@ -44,7 +44,8 @@ export class AuthConfigService {
           require_uppercase as "requireUppercase",
           require_special_char as "requireSpecialChar",
           verify_email_method as "verifyEmailMethod",
-          reset_password_method as "resetPasswordMethod"
+          reset_password_method as "resetPasswordMethod",
+          disable_signup as "disableSignup"
          FROM auth.config
          LIMIT 1`
       );
@@ -61,6 +62,7 @@ export class AuthConfigService {
           requireSpecialChar: false,
           verifyEmailMethod: 'code' as const,
           resetPasswordMethod: 'code' as const,
+          disableSignup: false,
         };
       }
 
@@ -93,6 +95,7 @@ export class AuthConfigService {
           verify_email_method as "verifyEmailMethod",
           reset_password_method as "resetPasswordMethod",
           allowed_redirect_urls as "allowedRedirectUrls",
+          disable_signup as "disableSignup",
           created_at as "createdAt",
           updated_at as "updatedAt"
          FROM auth.config
@@ -114,6 +117,7 @@ export class AuthConfigService {
           verifyEmailMethod: 'code' as const,
           resetPasswordMethod: 'code' as const,
           allowedRedirectUrls: [],
+          disableSignup: false,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
@@ -206,6 +210,11 @@ export class AuthConfigService {
         values.push(input.allowedRedirectUrls);
       }
 
+      if (input.disableSignup !== undefined) {
+        updates.push(`disable_signup = $${paramCount++}`);
+        values.push(input.disableSignup);
+      }
+
       if (!updates.length) {
         await client.query('COMMIT');
         // Return current config if no updates
@@ -229,6 +238,7 @@ export class AuthConfigService {
            verify_email_method as "verifyEmailMethod",
            reset_password_method as "resetPasswordMethod",
            allowed_redirect_urls as "allowedRedirectUrls",
+           disable_signup as "disableSignup",
            created_at as "createdAt",
            updated_at as "updatedAt"`,
         values

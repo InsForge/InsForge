@@ -53,6 +53,7 @@ const defaultValues: UpdateAuthConfigRequest = {
   verifyEmailMethod: 'code',
   resetPasswordMethod: 'code',
   allowedRedirectUrls: [],
+  disableSignup: false,
 };
 
 const toFormValues = (config?: AuthConfigSchema): UpdateAuthConfigRequest => {
@@ -70,6 +71,7 @@ const toFormValues = (config?: AuthConfigSchema): UpdateAuthConfigRequest => {
     verifyEmailMethod: config.verifyEmailMethod,
     resetPasswordMethod: config.resetPasswordMethod,
     allowedRedirectUrls: config.allowedRedirectUrls ?? [],
+    disableSignup: config.disableSignup,
   };
 };
 
@@ -269,6 +271,22 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
               <MenuDialogBody>
                 {activeSection === 'general' && (
                   <>
+                    <SettingRow
+                      label="Disable New User Signups"
+                      description="When on, public sign-up is rejected and only existing users can sign in. Project admins can still create users via the dashboard or API."
+                    >
+                      <Controller
+                        name="disableSignup"
+                        control={form.control}
+                        render={({ field }) => (
+                          <Switch
+                            checked={field.value ?? false}
+                            onCheckedChange={(value) => field.onChange(value)}
+                          />
+                        )}
+                      />
+                    </SettingRow>
+
                     <SettingRow
                       label="Allowed Redirect URLs"
                       description="Allowed redirect destinations for auth flows. Leave empty to allow all URLs."
