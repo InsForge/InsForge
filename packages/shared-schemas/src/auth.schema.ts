@@ -128,8 +128,8 @@ export const authConfigSchema = z.object({
     .nullable(),
   verifyEmailCodeExpiryMinutes: z.number().int().min(1).max(10080),
   verifyEmailLinkExpiryMinutes: z.number().int().min(1).max(10080),
-  resetPasswordCodeExpiryMinutes: z.number().int().min(1).max(10080),
-  resetPasswordLinkExpiryMinutes: z.number().int().min(1).max(10080),
+  resetPasswordCodeExpiryMinutes: z.number().int().min(1).max(1440),
+  resetPasswordLinkExpiryMinutes: z.number().int().min(1).max(1440),
   // When true, public sign-up endpoints (POST /api/auth/users and first-time OAuth)
   // are rejected. Admin-authenticated user creation is unaffected.
   disableSignup: z.boolean(),

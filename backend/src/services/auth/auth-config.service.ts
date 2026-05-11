@@ -51,11 +51,7 @@ export class AuthConfigService {
           require_special_char as "requireSpecialChar",
           verify_email_method as "verifyEmailMethod",
           reset_password_method as "resetPasswordMethod",
-          disable_signup as "disableSignup",
-          verify_email_code_expiry_minutes as "verifyEmailCodeExpiryMinutes",
-          verify_email_link_expiry_minutes as "verifyEmailLinkExpiryMinutes",
-          reset_password_code_expiry_minutes as "resetPasswordCodeExpiryMinutes",
-          reset_password_link_expiry_minutes as "resetPasswordLinkExpiryMinutes"
+          disable_signup as "disableSignup"
          FROM auth.config
          LIMIT 1`
       );
@@ -72,10 +68,6 @@ export class AuthConfigService {
           requireSpecialChar: false,
           verifyEmailMethod: 'code' as const,
           resetPasswordMethod: 'code' as const,
-          verifyEmailCodeExpiryMinutes: 15,
-          verifyEmailLinkExpiryMinutes: 1440,
-          resetPasswordCodeExpiryMinutes: 10,
-          resetPasswordLinkExpiryMinutes: 60,
           disableSignup: false,
         };
       }
