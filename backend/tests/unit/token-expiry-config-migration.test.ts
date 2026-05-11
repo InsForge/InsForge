@@ -58,10 +58,16 @@ describe('053_add-token-expiry-config migration', () => {
     expect(checkMatches!.length).toBe(4);
   });
 
-  it('includes CHECK constraints with upper bound of 10080 (7 days)', () => {
+  it('includes CHECK constraints with upper bound of 10080 (7 days) for verify-email columns', () => {
     const checkMatches = sql.match(/<= 10080/g);
     expect(checkMatches).not.toBeNull();
-    expect(checkMatches!.length).toBe(4);
+    expect(checkMatches!.length).toBe(2);
+  });
+
+  it('includes CHECK constraints with upper bound of 1440 (24h) for reset-password columns', () => {
+    const checkMatches = sql.match(/<= 1440/g);
+    expect(checkMatches).not.toBeNull();
+    expect(checkMatches!.length).toBe(2);
   });
 
   it('marks all columns NOT NULL', () => {
