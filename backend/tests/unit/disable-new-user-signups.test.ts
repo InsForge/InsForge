@@ -116,7 +116,6 @@ vi.mock('../../src/infra/config/app.config', () => ({
 }));
 
 import { AuthService } from '../../src/services/auth/auth.service';
-import { AppError } from '../../src/api/middlewares/error';
 
 const DISABLED_CONFIG = {
   requireEmailVerification: false,
@@ -186,6 +185,7 @@ describe('AuthService.findOrCreateThirdPartyUser – disableSignup gate', () => 
       .mockResolvedValueOnce({ rows: [] }) // UPDATE user_providers (updated_at)
       .mockResolvedValueOnce({ rows: [] }); // UPDATE auth.users (email_verified)
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.spyOn(authService as any, 'getUserById').mockResolvedValue(FAKE_DB_USER);
 
     const result = await authService.findOrCreateThirdPartyUser(
@@ -210,6 +210,7 @@ describe('AuthService.findOrCreateThirdPartyUser – disableSignup gate', () => 
       .mockResolvedValueOnce({ rows: [] }) // INSERT user_providers
       .mockResolvedValueOnce({ rows: [] }); // UPDATE email_verified
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.spyOn(authService as any, 'getUserById').mockResolvedValue(FAKE_DB_USER);
 
     const result = await authService.findOrCreateThirdPartyUser(
@@ -233,6 +234,7 @@ describe('AuthService.findOrCreateThirdPartyUser – disableSignup gate', () => 
     mockGetAuthConfig.mockResolvedValueOnce(ENABLED_CONFIG);
 
     // createThirdPartyUser will be called — spy to avoid full DB simulation
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.spyOn(authService as any, 'createThirdPartyUser').mockResolvedValue({
       user: { id: 'new-id', email: 'brand-new@test.com' },
       accessToken: 'token',
