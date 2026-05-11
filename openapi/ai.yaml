@@ -5,263 +5,6 @@ info:
   description: AI services for chat and image generation with OpenRouter integration
 
 paths:
-  /api/ai/configurations:
-    post:
-      summary: Create AI configuration
-      description: Create a new AI configuration with model and system prompt
-      tags:
-        - Admin
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateAIConfigurationRequest'
-      responses:
-        '201':
-          description: AI configuration created successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  id:
-                    type: string
-                    format: uuid
-                  message:
-                    type: string
-        '400':
-          description: Validation error
-        '401':
-          description: Unauthorized
-        '500':
-          description: Failed to create AI configuration
-
-    get:
-      summary: List AI configurations
-      description: Get all AI configurations
-      tags:
-        - Admin
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: List of AI configurations
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/AIConfiguration'
-        '401':
-          description: Unauthorized
-        '500':
-          description: Failed to fetch AI configurations
-
-  /api/ai/configurations/{id}:
-    patch:
-      summary: Update AI configuration
-      description: Update an existing AI configuration's system prompt
-      tags:
-        - Admin
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateAIConfigurationRequest'
-      responses:
-        '200':
-          description: AI configuration updated successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        '400':
-          description: Validation error
-        '401':
-          description: Unauthorized
-        '404':
-          description: AI configuration not found
-        '500':
-          description: Failed to update AI configuration
-
-    delete:
-      summary: Delete AI configuration
-      description: Delete an AI configuration
-      tags:
-        - Admin
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '200':
-          description: AI configuration deleted successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        '401':
-          description: Unauthorized
-        '404':
-          description: AI configuration not found
-        '500':
-          description: Failed to delete AI configuration
-
-  /api/ai/usage/summary:
-    get:
-      summary: Get AI usage summary
-      description: Get AI usage summary statistics
-      tags:
-        - Admin
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: query
-          name: configId
-          schema:
-            type: string
-            format: uuid
-          description: Filter by configuration ID
-        - in: query
-          name: startDate
-          schema:
-            type: string
-            format: date-time
-          description: Start date for usage period
-        - in: query
-          name: endDate
-          schema:
-            type: string
-            format: date-time
-          description: End date for usage period
-      responses:
-        '200':
-          description: Usage summary
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AIUsageSummary'
-        '400':
-          description: Validation error
-        '401':
-          description: Unauthorized
-        '500':
-          description: Failed to fetch usage summary
-
-  /api/ai/usage:
-    get:
-      summary: Get AI usage records
-      description: Get AI usage records with pagination
-      tags:
-        - Admin
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: query
-          name: startDate
-          schema:
-            type: string
-            format: date-time
-          description: Start date for usage period
-        - in: query
-          name: endDate
-          schema:
-            type: string
-            format: date-time
-          description: End date for usage period
-        - in: query
-          name: limit
-          schema:
-            type: string
-            default: "50"
-          description: Number of records to return
-        - in: query
-          name: offset
-          schema:
-            type: string
-            default: "0"
-          description: Number of records to skip
-      responses:
-        '200':
-          description: Usage records
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/AIUsageRecord'
-        '400':
-          description: Validation error
-        '401':
-          description: Unauthorized
-        '500':
-          description: Failed to fetch usage records
-
-  /api/ai/usage/config/{configId}:
-    get:
-      summary: Get usage by configuration
-      description: Get usage records for a specific AI configuration
-      tags:
-        - Admin
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: configId
-          required: true
-          schema:
-            type: string
-            format: uuid
-        - in: query
-          name: startDate
-          schema:
-            type: string
-            format: date-time
-          description: Start date for usage period
-        - in: query
-          name: endDate
-          schema:
-            type: string
-            format: date-time
-          description: End date for usage period
-      responses:
-        '200':
-          description: Configuration usage records
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/AIUsageRecord'
-        '401':
-          description: Unauthorized
-        '500':
-          description: Failed to fetch config usage records
-
   /api/ai/credits:
     get:
       summary: Get remaining credits
@@ -301,6 +44,34 @@ paths:
           description: Unauthorized
         '500':
           description: Failed to get models list
+
+  /api/ai/overview:
+    get:
+      summary: Get AI Gateway overview
+      description: Returns key-level OpenRouter usage and activity time series when the key has activity access.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: range
+          schema:
+            type: string
+            enum: [1h, 1d, 1w, 1m, 1y]
+            default: 1m
+          description: Time range for chart buckets.
+      responses:
+        '200':
+          description: AI Gateway overview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AIOverview'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Failed to fetch overview
 
   /api/ai/chat/completion:
     post:
@@ -832,126 +603,6 @@ components:
                 items:
                   $ref: '#/components/schemas/OpenRouterModel'
 
-    CreateAIConfigurationRequest:
-      type: object
-      required:
-        - inputModality
-        - outputModality
-        - provider
-        - modelId
-        
-      properties:
-        inputModality:
-          type: array
-          items:
-            type: string
-            enum: [text, image]
-        outputModality:
-          type: array
-          items:
-            type: string
-            enum: [text, image]
-        provider:
-          type: string
-          example: openrouter
-        modelId:
-          type: string
-          example: openai/gpt-4
-        systemPrompt:
-          type: string
-          description: Optional system prompt for the configuration
-
-    UpdateAIConfigurationRequest:
-      type: object
-      properties:
-        systemPrompt:
-          type: string
-          description: Updated system prompt
-
-    AIConfiguration:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        modality:
-          type: string
-          enum: [text, image]
-        provider:
-          type: string
-        modelId:
-          type: string
-        systemPrompt:
-          type: string
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-
-    AIUsageSummary:
-      type: object
-      properties:
-        totalRequests:
-          type: integer
-        totalTokens:
-          type: integer
-        totalCost:
-          type: number
-        byModel:
-          type: object
-          additionalProperties:
-            type: object
-            properties:
-              requests:
-                type: integer
-              tokens:
-                type: integer
-              cost:
-                type: number
-
-    AIUsageRecord:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        configId:
-          type: string
-          format: uuid
-        modelId:
-          type: string
-        promptTokens:
-          type: integer
-        completionTokens:
-          type: integer
-        totalTokens:
-          type: integer
-        cost:
-          type: number
-        createdAt:
-          type: string
-          format: date-time
-        provider:
-          type: string
-          nullable: true
-        model:
-          type: string
-          nullable: true
-        inputModality:
-          type: array
-          nullable: true
-          items:
-            type: string
-            enum: [text, image]
-        outputModality:
-          type: array
-          nullable: true
-          items:
-            type: string
-            enum: [text, image]
-
     CreditsResponse:
       type: object
       properties:
@@ -961,6 +612,89 @@ components:
         usage:
           type: number
           description: Total usage amount
+
+    AIOverviewMetricPoint:
+      type: object
+      properties:
+        label:
+          type: string
+        value:
+          type: number
+
+    AIOverviewRequestRow:
+      type: object
+      properties:
+        id:
+          type: string
+        project:
+          type: string
+        request:
+          type: number
+        avgTokensPerSecond:
+          type: number
+          nullable: true
+        p50Duration:
+          type: number
+          nullable: true
+        p50Ttft:
+          type: number
+          nullable: true
+        cost:
+          type: number
+
+    AIOverview:
+      type: object
+      properties:
+        key:
+          type: object
+          properties:
+            label:
+              type: string
+            limit:
+              type: number
+              nullable: true
+            limitRemaining:
+              type: number
+              nullable: true
+            limitReset:
+              type: string
+              nullable: true
+            usage:
+              type: number
+            usageDaily:
+              type: number
+            usageWeekly:
+              type: number
+            usageMonthly:
+              type: number
+            observabilityAvailable:
+              type: boolean
+            observabilityError:
+              type: string
+        charts:
+          type: object
+          properties:
+            spend:
+              type: array
+              items:
+                $ref: '#/components/schemas/AIOverviewMetricPoint'
+            requests:
+              type: array
+              items:
+                $ref: '#/components/schemas/AIOverviewMetricPoint'
+            tokens:
+              type: array
+              items:
+                $ref: '#/components/schemas/AIOverviewMetricPoint'
+        requests:
+          type: object
+          properties:
+            rows:
+              type: array
+              items:
+                $ref: '#/components/schemas/AIOverviewRequestRow'
+            total:
+              type: number
 
     EmbeddingsRequest:
       type: object

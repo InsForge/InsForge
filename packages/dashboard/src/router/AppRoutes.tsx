@@ -1,7 +1,8 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { RequireAuth } from './RequireAuth';
 import AILayout from '#features/ai/components/AILayout';
-import AIPage from '#features/ai/pages/AIPage';
+import AIOverviewPage from '#features/ai/pages/AIOverviewPage';
+import AIModelsPage from '#features/ai/pages/AIModelsPage';
 import AuthenticationLayout from '#features/auth/components/AuthenticationLayout';
 import AuthMethodsPage from '#features/auth/pages/AuthMethodsPage';
 import EmailPage from '#features/auth/pages/EmailPage';
@@ -111,7 +112,9 @@ function AuthenticatedRoutes() {
           <Route index element={<VisualizerPage />} />
         </Route>
         <Route path="/dashboard/ai" element={<AILayout />}>
-          <Route index element={<AIPage />} />
+          <Route index element={<Navigate to="overview" replace />} />
+          <Route path="overview" element={<AIOverviewPage />} />
+          <Route path="models" element={<AIModelsPage />} />
         </Route>
         <Route path="/dashboard/payments" element={<PaymentsLayout />}>
           <Route index element={<Navigate to="catalog" replace />} />

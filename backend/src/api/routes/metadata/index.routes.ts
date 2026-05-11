@@ -2,7 +2,6 @@ import { Router, Response, NextFunction } from 'express';
 import { DatabaseAdvanceService } from '@/services/database/database-advance.service.js';
 import { AuthService } from '@/services/auth/auth.service.js';
 import { StorageService } from '@/services/storage/storage.service.js';
-import { AIConfigService } from '@/services/ai/ai-config.service.js';
 import { FunctionService } from '@/services/functions/function.service.js';
 import { RealtimeChannelService } from '@/services/realtime/realtime-channel.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
@@ -21,7 +20,6 @@ const functionService = FunctionService.getInstance();
 const realtimeChannelService = RealtimeChannelService.getInstance();
 const dbManager = DatabaseManager.getInstance();
 const dbAdvanceService = DatabaseAdvanceService.getInstance();
-const aiConfigService = AIConfigService.getInstance();
 
 router.use(verifyAdmin);
 
@@ -31,11 +29,10 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
     // Gather metadata from all modules
 
     // Fetch all metadata in parallel for better performance
-    const [auth, database, storage, aiConfig, functions] = await Promise.all([
+    const [auth, database, storage, functions] = await Promise.all([
       authService.getMetadata(),
       dbManager.getMetadata(),
       storageService.getMetadata(),
-      aiConfigService.getMetadata(),
       functionService.getMetadata(),
     ]);
 
@@ -47,7 +44,7 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
       database,
       storage,
       functions,
-      aiIntegration: aiConfig,
+      aiIntegration: { models: [] },
       version,
     };
 
@@ -88,10 +85,9 @@ router.get('/storage', async (_req: AuthRequest, res: Response, next: NextFuncti
 });
 
 // Get AI metadata
-router.get('/ai', async (_req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/ai', (_req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const aiMetadata = await aiConfigService.getMetadata();
-    successResponse(res, aiMetadata);
+    successResponse(res, { models: [] });
   } catch (error) {
     next(error);
   }

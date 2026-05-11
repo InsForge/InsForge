@@ -1,68 +1,33 @@
 import OpenAI from 'openai';
 
-import { AIUsageService } from './ai-usage.service.js';
-import { AIConfigService } from './ai-config.service.js';
 import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
-import type {
-  AIConfigurationSchema,
-  ImageGenerationRequest,
-  ImageGenerationResponse,
-} from '@insforge/shared-schemas';
+import type { ImageGenerationRequest, ImageGenerationResponse } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import { OpenRouterImageMessage } from '@/types/ai.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 
 export class ImageGenerationService {
-  private static aiUsageService = AIUsageService.getInstance();
-  private static aiConfigService = AIConfigService.getInstance();
   private static openRouterProvider = OpenRouterProvider.getInstance();
-
-  /**
-   * Validate model and get config
-   */
-  private static async validateAndGetConfig(
-    modelId: string
-  ): Promise<AIConfigurationSchema | null> {
-    const aiConfig = await ImageGenerationService.aiConfigService.findByModelId(modelId);
-    if (!aiConfig) {
-      throw new AppError(
-        `Model ${modelId} is not enabled. Please contact your administrator to enable this model.`,
-        400,
-        ERROR_CODES.AI_INVALID_MODEL
-      );
-    }
-    return aiConfig;
-  }
 
   /**
    * Generate images using the specified model
    * @param options - Image generation options
    */
   static async generate(options: ImageGenerationRequest): Promise<ImageGenerationResponse> {
-    // Validate model and get config
-    const aiConfig = await ImageGenerationService.validateAndGetConfig(options.model);
-
     const model = options.model;
 
     try {
-      // Concatenate system prompt with user prompt if it exists
-      // This is because OpenRouter image models don't properly handle system messages
-      let finalPrompt = options.prompt;
-      if (aiConfig?.systemPrompt) {
-        finalPrompt = `${aiConfig.systemPrompt}\n\n${options.prompt}`;
-      }
-
       // Build content for the message
       const userContent = options.images?.length
         ? [
-            { type: 'text', text: finalPrompt },
+            { type: 'text', text: options.prompt },
             ...options.images.map((image) => ({
               type: 'image_url',
               image_url: { url: image.url },
             })),
           ]
-        : finalPrompt;
+        : options.prompt;
 
       // Build the request - OpenRouter extends OpenAI's API with additional fields
       const request = {
@@ -129,22 +94,6 @@ export class ImageGenerationService {
             }
           }
         }
-      }
-
-      // Track usage if config is available
-      if (aiConfig?.id) {
-        // Pass token usage information if available
-        const inputTokens = result.metadata?.usage?.promptTokens;
-        const outputTokens = result.metadata?.usage?.completionTokens;
-
-        await ImageGenerationService.aiUsageService.trackImageGenerationUsage(
-          aiConfig.id,
-          result.images.length,
-          undefined, // image resolution not available from OpenRouter
-          inputTokens,
-          outputTokens,
-          options.model
-        );
       }
 
       return result;

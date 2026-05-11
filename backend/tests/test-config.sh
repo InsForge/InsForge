@@ -83,8 +83,6 @@ declare -a TEST_USERS_CREATED=()
 # Array to track test buckets created
 declare -a TEST_BUCKETS_CREATED=()
 
-# Array to track test AI configs created
-declare -a TEST_AI_CONFIGS_CREATED=()
 
 # Function to register a table for cleanup
 register_test_table() {
@@ -102,12 +100,6 @@ register_test_user() {
 register_test_bucket() {
     local bucket_name=$1
     TEST_BUCKETS_CREATED+=("$bucket_name")
-}
-
-# Function to register an AI config for cleanup
-register_test_ai_config() {
-    local config_id=$1
-    TEST_AI_CONFIGS_CREATED+=("$config_id")
 }
 
 # Function to register a user with Better Auth
@@ -258,33 +250,6 @@ cleanup_test_data() {
             print_info "Buckets to delete manually:"
             for bucket in "${TEST_BUCKETS_CREATED[@]}"; do
                 echo "  - $bucket"
-            done
-            cleanup_failed=1
-        fi
-    fi
-
-    # 4. Delete all test AI configurations
-    if [ ${#TEST_AI_CONFIGS_CREATED[@]} -gt 0 ]; then
-        if [ -n "$admin_token" ]; then
-            print_info "Deleting test AI configurations..."
-            for config_id in "${TEST_AI_CONFIGS_CREATED[@]}"; do
-                print_info "  - Deleting AI config: $config_id"
-                delete_response=$(curl -s -w "\n%{http_code}" -X DELETE "$TEST_API_BASE/ai/configurations/$config_id" \
-                    -H "Authorization: Bearer $admin_token" 2>/dev/null || echo "500")
-                status=$(echo "$delete_response" | tail -n 1)
-                # 404 is OK - means already deleted
-                if [ "$status" -ge 200 ] && [ "$status" -lt 300 ] || [ "$status" -eq 404 ]; then
-                    echo "    ✓ Deleted (or already gone)"
-                else
-                    echo "    ✗ Failed (status: $status)"
-                    cleanup_failed=1
-                fi
-            done
-        else
-            print_fail "Cannot delete AI configs without admin token"
-            print_info "AI configs to delete manually:"
-            for config_id in "${TEST_AI_CONFIGS_CREATED[@]}"; do
-                echo "  - $config_id"
             done
             cleanup_failed=1
         fi

@@ -1,10 +1,7 @@
-import {
-  ModalitySchema,
-  AIModelSchema,
-  AIConfigurationWithUsageSchema,
-} from '@insforge/shared-schemas';
+import { ModalitySchema, AIModelSchema } from '@insforge/shared-schemas';
 export interface ModelOption {
   id: string;
+  created?: number;
   modelId: string;
   modelName: string;
   providerName: string;
@@ -13,10 +10,6 @@ export interface ModelOption {
   outputModality: ModalitySchema[];
   inputPrice?: number; // Price per million tokens in USD
   outputPrice?: number; // Price per million tokens in USD
-  usageStats?: {
-    totalRequests: number;
-  };
-  systemPrompt?: string | null;
 }
 
 import GrokIcon from '#assets/logos/grok.svg?react';
@@ -167,7 +160,7 @@ export const getFriendlyModelName = (rawModelName: string): string => {
     .join(' ');
 };
 
-export function toModelOption(model: AIModelSchema | AIConfigurationWithUsageSchema): ModelOption {
+export function toModelOption(model: AIModelSchema): ModelOption {
   const [rawProviderId, rawModelName] = model.modelId.split('/');
 
   return {
@@ -195,7 +188,7 @@ export const sortModelsByConfigurationStatus = (
 };
 
 // Sorting types
-export type SortField = 'inputPrice' | 'outputPrice' | 'requests';
+export type SortField = 'inputPrice' | 'outputPrice' | 'released';
 export type SortDirection = 'asc' | 'desc';
 
 // Format credits display
@@ -223,4 +216,16 @@ export const formatPrice = (price?: number): string => {
 // Format modality for display
 export const formatModality = (modality: string): string => {
   return modality.charAt(0).toUpperCase() + modality.slice(1);
+};
+
+export const formatReleasedDate = (created?: number): string => {
+  if (!created) {
+    return '-';
+  }
+
+  return new Intl.DateTimeFormat('en-US', {
+    month: '2-digit',
+    day: '2-digit',
+    year: 'numeric',
+  }).format(new Date(created * 1000));
 };

@@ -1,2 +1,2 @@
 export { ModelRow } from './ModelRow';
-export { GatewayConfigDialog } from './GatewayConfigDialog';
+export { AISidebar } from './AISidebar';

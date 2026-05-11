@@ -1,7 +1,6 @@
 import type { RawOpenRouterModel } from '@/types/ai.js';
-import type { ModalitySchema } from '@insforge/shared-schemas';
 
-const MODALITY_ORDER = ['text', 'image', 'audio', 'video', 'file'];
+const MODALITY_ORDER = ['text', 'image', 'audio', 'video', 'file', 'embeddings'];
 const PROVIDER_ORDER: Record<string, number> = {
   openai: 1,
   anthropic: 2,
@@ -13,22 +12,27 @@ const PROVIDER_ORDER: Record<string, number> = {
  * Sort modalities by predefined order
  */
 export function sortModalities(modalities: string[]): string[] {
-  return [...modalities].sort((a, b) => {
+  return [...new Set(modalities.filter((modality) => modality.trim().length > 0))].sort((a, b) => {
     const aIndex = MODALITY_ORDER.indexOf(a);
     const bIndex = MODALITY_ORDER.indexOf(b);
+    if (aIndex === -1 && bIndex === -1) {
+      return a.localeCompare(b);
+    }
+    if (aIndex === -1) {
+      return 1;
+    }
+    if (bIndex === -1) {
+      return -1;
+    }
     return aIndex - bIndex;
   });
 }
 
 /**
- * Filter to only supported modalities and sort
+ * Preserve all OpenRouter modalities and sort known ones into a stable order.
  */
-export function filterAndSortModalities(modalities: string[]): ModalitySchema[] {
-  const supportedModalities: ModalitySchema[] = ['text', 'image', 'audio'];
-  const filtered = modalities.filter((m): m is ModalitySchema =>
-    supportedModalities.includes(m as ModalitySchema)
-  );
-  return sortModalities(filtered) as ModalitySchema[];
+export function normalizeModalities(modalities: string[]): string[] {
+  return sortModalities(modalities);
 }
 
 /**
