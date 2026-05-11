@@ -5,10 +5,7 @@ import { fileURLToPath } from 'url';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const migrationDir = path.resolve(currentDir, '../../src/infra/database/migrations');
-const migrationPath = path.resolve(
-  migrationDir,
-  '042_drop-deprecated-ai-configs-and-usage.sql'
-);
+const migrationPath = path.resolve(migrationDir, '042_drop-deprecated-ai-configs-and-usage.sql');
 
 describe('042_drop-deprecated-ai-configs-and-usage migration', () => {
   const sql = fs.readFileSync(migrationPath, 'utf8');
