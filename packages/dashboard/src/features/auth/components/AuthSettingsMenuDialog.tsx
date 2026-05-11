@@ -393,17 +393,6 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                                   onValueChange={(value) => {
                                     if (value) {
                                       field.onChange(value);
-                                      if (value === 'code') {
-                                        form.setValue(
-                                          'verifyEmailLinkExpiryMinutes',
-                                          VERIFY_EMAIL_LINK_EXPIRY_MINUTES
-                                        );
-                                      } else {
-                                        form.setValue(
-                                          'verifyEmailCodeExpiryMinutes',
-                                          VERIFY_EMAIL_CODE_EXPIRY_MINUTES
-                                        );
-                                      }
                                     }
                                   }}
                                 >
@@ -582,17 +571,6 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                             onValueChange={(value) => {
                               if (value) {
                                 field.onChange(value);
-                                if (value === 'code') {
-                                  form.setValue(
-                                    'resetPasswordLinkExpiryMinutes',
-                                    RESET_PASSWORD_LINK_EXPIRY_MINUTES
-                                  );
-                                } else {
-                                  form.setValue(
-                                    'resetPasswordCodeExpiryMinutes',
-                                    RESET_PASSWORD_CODE_EXPIRY_MINUTES
-                                  );
-                                }
                               }
                             }}
                           >
