@@ -161,7 +161,25 @@ async function executeInWorker(code: string, request: Request): Promise<Response
   const workerUrl = URL.createObjectURL(workerBlob);
 
   return new Promise(async (resolve) => {
-    const worker = new Worker(workerUrl, { type: 'module' });
+    const worker = new Worker(workerUrl, {
+      type: 'module',
+      deno: {
+        permissions: {
+          // RESTRICTED: Native environment access is disabled to shield host secrets.
+          // Secrets are passed explicitly via message payload.
+          env: false,
+          // SDK/External REQUIREMENT: Allow network access for API connectivity and external integrations.
+          net: true,
+          read: false,
+          write: false,
+          run: false,
+          ffi: false,
+          sys: false,
+          import: false,
+          hrtime: false,
+        },
+      },
+    });
 
     // Set timeout for worker execution
     const timeout = setTimeout(() => {

@@ -1,7 +1,7 @@
 -- Compute Services: deploy Docker containers, get URLs (Fly.io)
 CREATE SCHEMA IF NOT EXISTS compute;
 
-CREATE TABLE compute.services (
+CREATE TABLE IF NOT EXISTS compute.services (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id          TEXT NOT NULL,
   name                TEXT NOT NULL,
@@ -25,9 +25,10 @@ CREATE TABLE compute.services (
   UNIQUE (project_id, name)
 );
 
-CREATE INDEX idx_compute_services_project ON compute.services(project_id);
-CREATE INDEX idx_compute_services_status ON compute.services(status);
+CREATE INDEX IF NOT EXISTS idx_compute_services_project ON compute.services(project_id);
+CREATE INDEX IF NOT EXISTS idx_compute_services_status ON compute.services(status);
 
+DROP TRIGGER IF EXISTS update_compute_services_updated_at ON compute.services;
 CREATE TRIGGER update_compute_services_updated_at
   BEFORE UPDATE ON compute.services
   FOR EACH ROW EXECUTE FUNCTION system.update_updated_at();

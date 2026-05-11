@@ -7,7 +7,7 @@ export interface DashboardProjectInfo {
   instanceType: string;
   latestVersion?: string | null;
   currentVersion?: string | null;
-  status?: 'active' | 'paused' | 'restoring' | string;
+  status?: string;
 }
 
 export interface DashboardUserInfo {
