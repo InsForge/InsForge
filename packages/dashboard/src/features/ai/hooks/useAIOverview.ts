@@ -7,5 +7,6 @@ export function useAIOverview(range: string) {
     queryKey: ['ai-overview', range],
     queryFn: () => aiService.getOverview(range),
     staleTime: 60 * 1000,
+    retry: false,
   });
 }

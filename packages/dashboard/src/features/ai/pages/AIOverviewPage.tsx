@@ -69,7 +69,7 @@ print(completion.choices[0].message)`,
 }
 
 type CodeTab = keyof ReturnType<typeof getCodeSnippets>;
-type TimeRange = '1h' | '1d' | '1w' | '1m' | '1y';
+type TimeRange = '1d' | '1w' | '1m' | '1y';
 
 const CODE_TAB_LANGUAGE: Record<CodeTab, 'javascript' | 'python'> = {
   sdk: 'javascript',
@@ -96,7 +96,6 @@ const QUICK_START_MODELS = [
 ] as const;
 
 const TIME_RANGE_OPTIONS: { value: TimeRange; label: string }[] = [
-  { value: '1h', label: 'Last 1 hour' },
   { value: '1d', label: 'Last 1 day' },
   { value: '1w', label: 'Last 1 week' },
   { value: '1m', label: 'Last 1 month' },
@@ -153,7 +152,6 @@ function formatBucketLabel(label: string) {
     return {
       axis: label,
       title: label,
-      detail: 'Bucket',
     };
   }
 
@@ -161,21 +159,20 @@ function formatBucketLabel(label: string) {
     return {
       axis: new Intl.DateTimeFormat(undefined, { month: 'short' }).format(date),
       title: new Intl.DateTimeFormat(undefined, { month: 'short', year: 'numeric' }).format(date),
-      detail: 'Monthly',
     };
   }
 
   if (/T/.test(label)) {
+    const hourLabel = new Intl.DateTimeFormat(undefined, {
+      hour: 'numeric',
+      minute: '2-digit',
+    }).format(date);
+
     return {
-      axis: new Intl.DateTimeFormat(undefined, {
-        hour: 'numeric',
-        minute: '2-digit',
-      }).format(date),
-      title: new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(date),
-      detail: new Intl.DateTimeFormat(undefined, {
-        hour: 'numeric',
-        minute: '2-digit',
-      }).format(date),
+      axis: hourLabel,
+      title: `${new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(
+        date
+      )}, ${hourLabel}`,
     };
   }
 
@@ -186,7 +183,6 @@ function formatBucketLabel(label: string) {
       day: 'numeric',
       year: 'numeric',
     }).format(date),
-    detail: 'Daily',
   };
 }
 
@@ -240,12 +236,14 @@ function OpenRouterKeyBox({
   apiKey,
   maskedKey,
   isLoading,
+  error,
 }: {
   apiKey?: string;
   maskedKey?: string;
   isLoading?: boolean;
+  error?: Error | null;
 }) {
-  const displayValue = isLoading ? 'Loading…' : maskedKey || 'Not configured';
+  const displayValue = isLoading ? 'Loading…' : maskedKey || error?.message || 'Not configured';
   const copyValue = apiKey ?? '';
 
   return (
@@ -372,14 +370,15 @@ function ChartCard({
                     >
                       <div className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-10 hidden w-[128px] -translate-x-1/2 rounded border border-[var(--alpha-8)] bg-[rgb(var(--semantic-1))] px-2 py-1.5 text-[11px] leading-4 text-foreground shadow-lg group-hover:block">
                         <div className="truncate font-medium">{label.title}</div>
-                        <div className="truncate text-muted-foreground">{label.detail}</div>
                         <div className="truncate text-muted-foreground">
                           {valueFormatter(point.value)}
                         </div>
                       </div>
                       <div
                         className="w-full rounded-t-sm bg-[rgb(var(--disabled))]"
-                        style={{ height: `${Math.max(8, (point.value / max) * chartHeight)}px` }}
+                        style={{
+                          height: point.value <= 0 ? 0 : `${(point.value / max) * chartHeight}px`,
+                        }}
                       />
                     </div>
                   );
@@ -485,7 +484,11 @@ export default function AIOverviewPage() {
   const [requestsRange, setRequestsRange] = useState<Extract<TimeRange, '1w' | '1m'>>('1m');
   const { data: usageData, isLoading: isUsageLoading } = useAIOverview(usageRange);
   const { data: requestsData } = useAIOverview(requestsRange);
-  const { data: openRouterKey, isLoading: isOpenRouterKeyLoading } = useOpenRouterKey();
+  const {
+    data: openRouterKey,
+    isLoading: isOpenRouterKeyLoading,
+    error: openRouterKeyError,
+  } = useOpenRouterKey();
   const codeSnippets = useMemo(() => getCodeSnippets(selectedModelId), [selectedModelId]);
 
   const totals = useMemo(
@@ -526,12 +529,17 @@ export default function AIOverviewPage() {
                   apiKey={openRouterKey?.apiKey}
                   maskedKey={openRouterKey?.maskedKey}
                   isLoading={isOpenRouterKeyLoading}
+                  error={openRouterKeyError}
                 />
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button size="sm" className="h-8 bg-[#68e5a2] px-4 text-black hover:bg-[#68e5a2]/90">
-                Quick Start
+              <Button
+                asChild
+                size="sm"
+                className="h-8 bg-[#68e5a2] px-4 text-black hover:bg-[#68e5a2]/90"
+              >
+                <Link to="/dashboard/ai/quick-start">Quick Start</Link>
               </Button>
             </div>
           </div>

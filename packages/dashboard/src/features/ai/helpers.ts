@@ -10,6 +10,8 @@ export interface ModelOption {
   outputModality: ModalitySchema[];
   inputPrice?: number; // Price per million tokens in USD
   outputPrice?: number; // Price per million tokens in USD
+  inputPriceLabel?: string;
+  outputPriceLabel?: string;
 }
 
 import GrokIcon from '#assets/logos/grok.svg?react';
@@ -19,6 +21,17 @@ import OpenAIIcon from '#assets/logos/openai.svg?react';
 import AmazonIcon from '#assets/logos/amazon.svg?react';
 import DeepseekIcon from '#assets/logos/deepseek.svg?react';
 import QwenIcon from '#assets/logos/qwen.svg?react';
+
+const PROVIDER_DISPLAY_ORDER: Record<string, number> = {
+  openai: 1,
+  anthropic: 2,
+  google: 3,
+  'x-ai': 4,
+  amazon: 5,
+  deepseek: 6,
+  qwen: 7,
+  other: 999,
+};
 
 // Provider tab configuration
 export interface ProviderTab {
@@ -66,6 +79,9 @@ export const getProviderLogo = (
   };
   return logoMap[providerId];
 };
+
+export const getProviderDisplayOrder = (providerId: string): number =>
+  PROVIDER_DISPLAY_ORDER[providerId] ?? 500;
 
 // Filter models by provider ID
 export const filterModelsByProvider = (
@@ -119,7 +135,10 @@ export const generateProviderTabs = (models: AIModelSchema[]): ProviderTab[] => 
     });
   }
 
-  return mainProviders;
+  return mainProviders.sort((a, b) => {
+    const orderDiff = getProviderDisplayOrder(a.id) - getProviderDisplayOrder(b.id);
+    return orderDiff !== 0 ? orderDiff : a.displayName.localeCompare(b.displayName);
+  });
 };
 
 export const formatTokenCount = (count: number): string => {
@@ -201,7 +220,10 @@ export const formatCredits = (remaining: number): string => {
 
 // Format price per million tokens
 export const formatPrice = (price?: number): string => {
-  if (price === undefined || price === 0) {
+  if (price === undefined) {
+    return '-';
+  }
+  if (price === 0) {
     return 'Free';
   }
   if (price < 0.01) {
@@ -212,6 +234,12 @@ export const formatPrice = (price?: number): string => {
   }
   return `$${price.toFixed(1)}`;
 };
+
+export const formatInputPrice = (model: Pick<ModelOption, 'inputPrice' | 'inputPriceLabel'>) =>
+  model.inputPriceLabel ?? formatPrice(model.inputPrice);
+
+export const formatOutputPrice = (model: Pick<ModelOption, 'outputPrice' | 'outputPriceLabel'>) =>
+  model.outputPriceLabel ?? formatPrice(model.outputPrice);
 
 // Format modality for display
 export const formatModality = (modality: string): string => {

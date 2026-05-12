@@ -14,7 +14,11 @@ import {
 import {
   generateProviderTabs,
   filterModelsByProvider,
+  getProviderDisplayOrder,
+  getProviderIdFromModelId,
+  getProviderLogo,
   toModelOption,
+  type ModelOption,
   type SortField,
   type SortDirection,
 } from '#features/ai/helpers';
@@ -38,10 +42,11 @@ export default function AIModelsPage() {
   const providers = useMemo(() => generateProviderTabs(allAvailableModels), [allAvailableModels]);
 
   const [activeTab, setActiveTab] = useState<string>('all');
-  const [sortField, setSortField] = useState<SortField>('inputPrice');
+  const [sortField, setSortField] = useState<SortField | null>('released');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [searchQuery, setSearchQuery] = useState('');
   const [modalityFilter, setModalityFilter] = useState<ModelModalityFilter>('all');
+  const [collapsedProviders, setCollapsedProviders] = useState<Set<string>>(() => new Set());
 
   // Set default active tab when providers are loaded
   useEffect(() => {
@@ -71,11 +76,26 @@ export default function AIModelsPage() {
       return matchesSearch && matchesModality;
     });
 
-    // Sort models
     return filteredModels.sort((a, b) => {
+      const aProviderId = getProviderIdFromModelId(a.modelId);
+      const bProviderId = getProviderIdFromModelId(b.modelId);
+      const providerCompare =
+        getProviderDisplayOrder(aProviderId) - getProviderDisplayOrder(bProviderId);
+      if (providerCompare !== 0) {
+        return providerCompare;
+      }
+
+      const providerNameCompare = a.providerName.localeCompare(b.providerName);
+      if (providerNameCompare !== 0) {
+        return providerNameCompare;
+      }
+
+      if (!sortField) {
+        return a.modelName.localeCompare(b.modelName);
+      }
+
       let aValue: number;
       let bValue: number;
-
       if (sortField === 'released') {
         aValue = a.created || 0;
         bValue = b.created || 0;
@@ -87,9 +107,24 @@ export default function AIModelsPage() {
         bValue = b.outputPrice || 0;
       }
 
-      return sortDirection === 'desc' ? bValue - aValue : aValue - bValue;
+      const valueCompare = sortDirection === 'desc' ? bValue - aValue : aValue - bValue;
+      return valueCompare !== 0 ? valueCompare : a.modelName.localeCompare(b.modelName);
     });
   }, [allAvailableModels, activeTab, searchQuery, modalityFilter, sortField, sortDirection]);
+
+  const modelGroups = useMemo(() => {
+    const groups: { providerId: string; providerName: string; models: ModelOption[] }[] = [];
+    for (const model of modelsForActiveProvider) {
+      const providerId = getProviderIdFromModelId(model.modelId);
+      const lastGroup = groups[groups.length - 1];
+      if (lastGroup?.providerId === providerId) {
+        lastGroup.models.push(model);
+      } else {
+        groups.push({ providerId, providerName: model.providerName, models: [model] });
+      }
+    }
+    return groups;
+  }, [modelsForActiveProvider]);
 
   // Handle sort click
   const handleSort = (field: SortField) => {
@@ -117,6 +152,18 @@ export default function AIModelsPage() {
 
   const isLoading = isLoadingModels;
 
+  const toggleProviderCollapse = (providerId: string) => {
+    setCollapsedProviders((prev) => {
+      const next = new Set(prev);
+      if (next.has(providerId)) {
+        next.delete(providerId);
+      } else {
+        next.add(providerId);
+      }
+      return next;
+    });
+  };
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-[rgb(var(--semantic-1))]">
       <div className="flex min-h-0 flex-1 justify-center px-10">
@@ -137,7 +184,7 @@ export default function AIModelsPage() {
                 onChange={setSearchQuery}
                 placeholder="Search Model"
                 debounceTime={0}
-                className="w-[155px]"
+                className="min-w-[280px] flex-1"
               />
               <Tabs
                 value={modalityFilter}
@@ -237,9 +284,40 @@ export default function AIModelsPage() {
 
                 {/* Table Body - Scrollable */}
                 <div className="min-h-0 max-h-[calc(100%-36px)] overflow-y-auto">
-                  {modelsForActiveProvider.map((model) => (
-                    <ModelRow key={model.modelId} model={model} />
-                  ))}
+                  {modelGroups.map((group) => {
+                    const isCollapsed = collapsedProviders.has(group.providerId);
+                    const ProviderLogo = getProviderLogo(group.providerId);
+
+                    return (
+                      <div key={group.providerId}>
+                        {activeTab === 'all' && (
+                          <button
+                            type="button"
+                            onClick={() => toggleProviderCollapse(group.providerId)}
+                            className="flex h-10 w-full items-center gap-2 border-b border-[var(--alpha-8)] bg-[rgb(var(--semantic-1))] px-2.5 text-left transition-colors hover:bg-[var(--alpha-4)]"
+                            aria-expanded={!isCollapsed}
+                          >
+                            <ChevronDown
+                              className={[
+                                'size-4 shrink-0 text-muted-foreground transition-transform',
+                                isCollapsed ? '-rotate-90' : '',
+                              ].join(' ')}
+                            />
+                            {ProviderLogo && (
+                              <ProviderLogo className="size-5 shrink-0 text-foreground" />
+                            )}
+                            <span className="text-[15px] font-medium leading-5 text-foreground">
+                              {group.providerName}
+                            </span>
+                          </button>
+                        )}
+                        {(!isCollapsed || activeTab !== 'all') &&
+                          group.models.map((model) => (
+                            <ModelRow key={model.modelId} model={model} />
+                          ))}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

@@ -7,5 +7,6 @@ export function useOpenRouterKey() {
     queryKey: ['openrouter-key'],
     queryFn: () => aiService.getOpenRouterKey(),
     staleTime: 60 * 1000,
+    retry: false,
   });
 }

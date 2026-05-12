@@ -281,6 +281,8 @@ export const aiModelSchema = z.object({
   modelId: z.string(),
   inputPrice: z.number().min(0).optional(), // Price per million tokens in USD
   outputPrice: z.number().min(0).optional(), // Price per million tokens in USD
+  inputPriceLabel: z.string().optional(),
+  outputPriceLabel: z.string().optional(),
 });
 
 export const aiOverviewMetricPointSchema = z.object({

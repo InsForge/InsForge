@@ -6,7 +6,7 @@ import { EmbeddingService } from '@/services/ai/embedding.service.js';
 import { AIModelService } from '@/services/ai/ai-model.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
-import { successResponse } from '@/utils/response.js';
+import { errorResponse, successResponse } from '@/utils/response.js';
 import { OpenRouterProvider, type AIOverviewRange } from '@/providers/ai/openrouter.provider.js';
 import logger from '@/utils/logger.js';
 import {
@@ -63,13 +63,23 @@ router.get(
       const key = await openRouterProvider.getMaskedApiKey();
       successResponse(res, key);
     } catch (error) {
+      if (error instanceof AppError && error.code === ERROR_CODES.AI_INVALID_API_KEY) {
+        errorResponse(
+          res,
+          ERROR_CODES.AI_INVALID_API_KEY,
+          'OpenRouter API key is not configured.',
+          400,
+          'Set OPENROUTER_API_KEY in the backend environment.'
+        );
+        return;
+      }
       next(error);
     }
   }
 );
 
 function parseOverviewRange(value: unknown): AIOverviewRange {
-  return value === '1h' || value === '1d' || value === '1w' || value === '1y' ? value : '1m';
+  return value === '1d' || value === '1w' || value === '1y' ? value : '1m';
 }
 
 /**

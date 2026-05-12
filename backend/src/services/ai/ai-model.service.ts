@@ -1,7 +1,7 @@
 import { isCloudEnvironment } from '@/utils/environment.js';
 import type { RawOpenRouterModel } from '@/types/ai.js';
 import type { AIModelSchema } from '@insforge/shared-schemas';
-import { calculatePricePerMillion, normalizeModalities, getProviderOrder } from './helpers.js';
+import { calculateTokenPrices, normalizeModalities, getProviderOrder } from './helpers.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 
@@ -47,16 +47,24 @@ export class AIModelService {
 
     const models: AIModelSchema[] = rawModels
       .map((rawModel) => {
-        const { inputPrice, outputPrice } = calculatePricePerMillion(rawModel.pricing);
+        const inputModality = normalizeModalities(rawModel.architecture?.input_modalities || []);
+        const outputModality = normalizeModalities(rawModel.architecture?.output_modalities || []);
+        const { inputPrice, outputPrice, inputPriceLabel, outputPriceLabel } = calculateTokenPrices(
+          rawModel.pricing,
+          inputModality,
+          outputModality
+        );
         return {
           id: rawModel.id, // OpenRouter provided model ID
           created: rawModel.created,
           modelId: rawModel.id,
           provider: 'openrouter',
-          inputModality: normalizeModalities(rawModel.architecture?.input_modalities || []),
-          outputModality: normalizeModalities(rawModel.architecture?.output_modalities || []),
+          inputModality,
+          outputModality,
           inputPrice,
           outputPrice,
+          inputPriceLabel,
+          outputPriceLabel,
         };
       })
       .filter((model) => model.inputModality.length > 0 && model.outputModality.length > 0)

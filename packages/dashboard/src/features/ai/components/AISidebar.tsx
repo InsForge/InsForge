@@ -10,6 +10,7 @@ const AI_SIDEBAR_ITEMS: FeatureSidebarListItem[] = [
   {
     id: 'quick-start',
     label: 'Quick Start',
+    href: '/dashboard/ai/quick-start',
   },
   {
     id: 'ai-models',
@@ -20,7 +21,11 @@ const AI_SIDEBAR_ITEMS: FeatureSidebarListItem[] = [
 
 export function AISidebar() {
   const location = useLocation();
-  const activeItemId = location.pathname.endsWith('/models') ? 'ai-models' : 'overview';
+  const activeItemId = location.pathname.endsWith('/models')
+    ? 'ai-models'
+    : location.pathname.endsWith('/quick-start')
+      ? 'quick-start'
+      : 'overview';
 
   return (
     <FeatureSidebar title="Model Gateway" items={AI_SIDEBAR_ITEMS} activeItemId={activeItemId} />

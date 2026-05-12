@@ -1,5 +1,8 @@
--- Migration 042: Drop deprecated AI configuration and usage tables.
+-- Migration 043: Drop deprecated AI configuration and usage tables.
 -- The Model Gateway now supports the full OpenRouter model catalog directly.
+--
+-- Only drop tables in the internal `ai` schema. Do not touch similarly named
+-- user-created tables in `public` or any other schema.
 
-DROP TABLE IF EXISTS ai.usage;
-DROP TABLE IF EXISTS ai.configs;
+DROP TABLE IF EXISTS ai.usage CASCADE;
+DROP TABLE IF EXISTS ai.configs CASCADE;

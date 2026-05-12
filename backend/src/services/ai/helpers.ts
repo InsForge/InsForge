@@ -40,11 +40,11 @@ export function normalizeModalities(modalities: string[]): string[] {
  * OpenRouter pricing is per token, we convert to per million tokens
  */
 export function calculatePricePerMillion(pricing: RawOpenRouterModel['pricing']): {
-  inputPrice: number;
-  outputPrice: number;
+  inputPrice?: number;
+  outputPrice?: number;
 } {
   if (!pricing) {
-    return { inputPrice: 0, outputPrice: 0 };
+    return {};
   }
 
   const promptCostPerToken = parseFloat(pricing.prompt) || 0;
@@ -59,6 +59,54 @@ export function calculatePricePerMillion(pricing: RawOpenRouterModel['pricing'])
     inputPrice: Math.max(0, inputPrice), // Ensure non-negative
     outputPrice: Math.max(0, outputPrice), // Ensure non-negative
   };
+}
+
+export function calculateTokenPrices(
+  pricing: RawOpenRouterModel['pricing'],
+  inputModalities: string[],
+  outputModalities: string[]
+): {
+  inputPrice?: number;
+  outputPrice?: number;
+  inputPriceLabel?: string;
+  outputPriceLabel?: string;
+} {
+  if (!pricing) {
+    return {};
+  }
+
+  const inputIsTokenPriced = inputModalities.some((modality) =>
+    ['text', 'file', 'embeddings'].includes(modality)
+  );
+  const outputIsTokenPriced = outputModalities.includes('text');
+  const prices = calculatePricePerMillion(pricing);
+
+  return {
+    inputPrice: inputIsTokenPriced ? prices.inputPrice : undefined,
+    outputPrice: outputIsTokenPriced ? prices.outputPrice : undefined,
+    inputPriceLabel: inputIsTokenPriced ? formatTokenPriceLabel(prices.inputPrice) : undefined,
+    outputPriceLabel: outputIsTokenPriced ? formatTokenPriceLabel(prices.outputPrice) : undefined,
+  };
+}
+
+function formatTokenPriceLabel(price: number | undefined): string | undefined {
+  if (price === undefined) {
+    return undefined;
+  }
+  if (price === 0) {
+    return 'Free';
+  }
+  return `$${formatTokenPrice(price)} / M tokens`;
+}
+
+function formatTokenPrice(price: number): string {
+  if (price < 0.01) {
+    return price.toFixed(4);
+  }
+  if (price < 1) {
+    return price.toFixed(2);
+  }
+  return price.toFixed(1);
 }
 
 /**

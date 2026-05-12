@@ -63,13 +63,20 @@ interface OpenRouterLimitation {
   };
 }
 
+interface OverviewBucket {
+  label: string;
+  usage: number;
+  requests: number;
+  tokens: number;
+}
+
 export type ApiKeySource = 'cloud' | 'env';
 interface ResolvedApiKey {
   apiKey: string;
   source: ApiKeySource;
 }
 
-export type AIOverviewRange = '1h' | '1d' | '1w' | '1m' | '1y';
+export type AIOverviewRange = '1d' | '1w' | '1m' | '1y';
 
 const EMPTY_AI_OVERVIEW: AIOverview = {
   key: {
@@ -267,55 +274,48 @@ export class OpenRouterProvider {
    * /activity requires a management key; when unavailable, return key-level usage only.
    */
   async getOverview(range: AIOverviewRange = '1m'): Promise<AIOverview> {
-    // LOCAL TESTING: hard-coded mock activity. Revert by setting this to false.
-    const useMockOverview = true;
-
-    if (useMockOverview) {
-      return this.buildMockOverview(range);
-    } else {
-      let resolved: ResolvedApiKey;
-      try {
-        resolved = await this.getApiKeyWithSource();
-      } catch (error) {
-        if (error instanceof AppError && error.code === ERROR_CODES.AI_INVALID_API_KEY) {
-          return EMPTY_AI_OVERVIEW;
-        }
-        throw error;
+    let resolved: ResolvedApiKey;
+    try {
+      resolved = await this.getApiKeyWithSource();
+    } catch (error) {
+      if (error instanceof AppError && error.code === ERROR_CODES.AI_INVALID_API_KEY) {
+        return EMPTY_AI_OVERVIEW;
       }
-
-      const keyInfo = await this.fetchCurrentKeyInfo(resolved.apiKey);
-      const activityResult = await this.fetchActivity(
-        resolved.apiKey,
-        keyInfo.data.hash,
-        resolved.source
-      );
-      const activity = activityResult.data;
-      const charts = this.buildOverviewCharts(activity, range);
-      const requestRows = this.buildOverviewRequestRows(activity, range);
-
-      return {
-        key: {
-          label: keyInfo.data.label,
-          limit: keyInfo.data.limit,
-          limitRemaining:
-            keyInfo.data.limit_remaining ??
-            (keyInfo.data.limit !== null ? keyInfo.data.limit - keyInfo.data.usage : null),
-          limitReset: keyInfo.data.limit_reset ?? null,
-          usage: keyInfo.data.usage ?? 0,
-          usageDaily: keyInfo.data.usage_daily ?? 0,
-          usageWeekly: keyInfo.data.usage_weekly ?? 0,
-          usageMonthly: keyInfo.data.usage_monthly ?? 0,
-          isFreeTier: keyInfo.data.is_free_tier,
-          observabilityAvailable: activityResult.available,
-          observabilityError: activityResult.error,
-        },
-        charts,
-        requests: {
-          rows: requestRows,
-          total: requestRows.length,
-        },
-      };
+      throw error;
     }
+
+    const keyInfo = await this.fetchCurrentKeyInfo(resolved.apiKey);
+    const activityResult = await this.fetchActivity(
+      resolved.apiKey,
+      keyInfo.data.hash,
+      resolved.source
+    );
+    const activity = activityResult.data;
+    const charts = this.buildOverviewCharts(activity, range);
+    const requestRows = this.buildOverviewRequestRows(activity, range);
+
+    return {
+      key: {
+        label: keyInfo.data.label,
+        limit: keyInfo.data.limit,
+        limitRemaining:
+          keyInfo.data.limit_remaining ??
+          (keyInfo.data.limit !== null ? keyInfo.data.limit - keyInfo.data.usage : null),
+        limitReset: keyInfo.data.limit_reset ?? null,
+        usage: keyInfo.data.usage ?? 0,
+        usageDaily: keyInfo.data.usage_daily ?? 0,
+        usageWeekly: keyInfo.data.usage_weekly ?? 0,
+        usageMonthly: keyInfo.data.usage_monthly ?? 0,
+        isFreeTier: keyInfo.data.is_free_tier,
+        observabilityAvailable: activityResult.available,
+        observabilityError: activityResult.error,
+      },
+      charts,
+      requests: {
+        rows: requestRows,
+        total: requestRows.length,
+      },
+    };
   }
 
   private async fetchCurrentKeyInfo(apiKey: string): Promise<OpenRouterKeyInfo> {
@@ -434,17 +434,29 @@ export class OpenRouterProvider {
     activity: OpenRouterActivityItem[],
     range: AIOverviewRange
   ): AIOverview['charts'] {
-    const buckets = this.createOverviewBuckets(range);
+    const allowedBuckets = this.createOverviewBuckets(range);
+    const buckets = new Map<string, OverviewBucket>();
+
     for (const item of activity) {
       const bucketKey = this.resolveActivityBucketKey(item.date, range);
-      const bucket = buckets.get(bucketKey);
-      if (!bucket) {
+      if (!allowedBuckets.has(bucketKey)) {
         continue;
       }
+
+      const bucket =
+        buckets.get(bucketKey) ??
+        ({
+          label: bucketKey,
+          usage: 0,
+          requests: 0,
+          tokens: 0,
+        } satisfies OverviewBucket);
+
       bucket.usage += item.usage ?? 0;
       bucket.requests += item.requests ?? 0;
       bucket.tokens +=
         (item.prompt_tokens ?? 0) + (item.completion_tokens ?? 0) + (item.reasoning_tokens ?? 0);
+      buckets.set(bucketKey, bucket);
     }
 
     const entries = Array.from(buckets.values());
@@ -495,79 +507,9 @@ export class OpenRouterProvider {
     return providerNames[providerId] ?? providerId.charAt(0).toUpperCase() + providerId.slice(1);
   }
 
-  private buildMockOverview(range: AIOverviewRange): AIOverview {
-    const activity = this.buildMockActivity(range);
-    const charts = this.buildOverviewCharts(activity, range);
-    const requestRows = this.buildOverviewRequestRows(activity, range);
-
-    return {
-      key: {
-        label: 'Local mock key',
-        limit: 100,
-        limitRemaining: 76.42,
-        limitReset: null,
-        usage: 23.58,
-        usageDaily: 1.72,
-        usageWeekly: 8.43,
-        usageMonthly: 23.58,
-        isFreeTier: false,
-        observabilityAvailable: true,
-      },
-      charts,
-      requests: {
-        rows: requestRows,
-        total: requestRows.length,
-      },
-    };
-  }
-
-  private buildMockActivity(range: AIOverviewRange): OpenRouterActivityItem[] {
-    return Array.from(this.createOverviewBuckets(range).values()).map((bucket, index) => {
-      const wave = 0.55 + Math.sin(index * 0.72) * 0.25 + (index % 4) * 0.07;
-      const requests = Math.max(1, Math.round(8 + wave * 18 + (index % 3) * 5));
-      const promptTokens = requests * (420 + (index % 5) * 85);
-      const completionTokens = requests * (180 + (index % 4) * 55);
-
-      const mockModel =
-        index % 3 === 0
-          ? { model: 'openai/gpt-5.4', provider: 'OpenAI' }
-          : index % 3 === 1
-            ? { model: 'anthropic/claude-sonnet-4.6', provider: 'Anthropic' }
-            : { model: 'google/gemini-2.5-pro', provider: 'Google' };
-
-      return {
-        date: bucket.label,
-        model: mockModel.model,
-        provider_name: mockModel.provider,
-        usage: Number((requests * wave * 0.0065).toFixed(4)),
-        requests,
-        prompt_tokens: promptTokens,
-        completion_tokens: completionTokens,
-        reasoning_tokens: index % 3 === 0 ? requests * 22 : 0,
-      };
-    });
-  }
-
-  private createOverviewBuckets(
-    range: AIOverviewRange
-  ): Map<string, { label: string; usage: number; requests: number; tokens: number }> {
-    const buckets = new Map<
-      string,
-      { label: string; usage: number; requests: number; tokens: number }
-    >();
+  private createOverviewBuckets(range: AIOverviewRange): Map<string, OverviewBucket> {
+    const buckets = new Map<string, OverviewBucket>();
     const now = new Date();
-
-    if (range === '1h') {
-      const start = new Date(now);
-      start.setUTCMinutes(Math.floor(start.getUTCMinutes() / 2) * 2, 0, 0);
-      start.setUTCMinutes(start.getUTCMinutes() - 58);
-      for (let index = 0; index < 30; index++) {
-        const bucketDate = new Date(start.getTime() + index * 2 * 60 * 1000);
-        const key = this.formatUtcHourBucket(bucketDate);
-        buckets.set(key, { label: key, usage: 0, requests: 0, tokens: 0 });
-      }
-      return buckets;
-    }
 
     if (range === '1d') {
       const start = new Date(now);
@@ -609,7 +551,7 @@ export class OpenRouterProvider {
     if (range === '1y') {
       return date.slice(0, 7);
     }
-    if (range === '1h' || range === '1d') {
+    if (range === '1d') {
       return date;
     }
     return date.slice(0, 10);
