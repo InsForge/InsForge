@@ -359,9 +359,21 @@ export const getAuthConfigResponseSchema = authConfigSchema;
  * call in `getPublicAuthConfigResponseSchema`. This way the safer default
  * (admin-only) is what you get if you forget to think about it.
  */
+/**
+ * SMTP slice for the admin metadata response. Excludes id/createdAt/updatedAt
+ * (rendering metadata, not the row); password is never exposed — hasPassword
+ * is the only signal admins get about credential presence.
+ */
+export const adminSmtpMetadataSchema = smtpConfigSchema.omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const authConfigAdminResponseSchema = z.object({
   oAuthProviders: z.array(oAuthProvidersSchema),
   customOAuthProviders: z.array(customOAuthKeySchema),
+  smtpConfig: adminSmtpMetadataSchema,
   ...authConfigSchema.omit({
     id: true,
     updatedAt: true,
@@ -372,10 +384,13 @@ export const authConfigAdminResponseSchema = z.object({
 /**
  * Response for GET /api/auth/public-config — admin response minus
  * admin-only fields. This route is unauthenticated, so anything sensitive
- * MUST be omitted here.
+ * MUST be omitted here. SMTP host can leak internal infrastructure
+ * (e.g. internal corp mail server), so the entire smtpConfig slice is
+ * admin-only.
  */
 export const getPublicAuthConfigResponseSchema = authConfigAdminResponseSchema.omit({
   allowedRedirectUrls: true,
+  smtpConfig: true,
 });
 
 // ============================================================================
