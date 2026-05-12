@@ -10,7 +10,7 @@ import { isInsForgeCloudProject } from '#lib/utils/utils';
 import { useMcpUsage } from '#features/logs/hooks/useMcpUsage';
 import { useAdvisorLatest } from '#features/dashboard/hooks/useAdvisor';
 import { useLastBackup } from '#features/dashboard/hooks/useLastBackup';
-import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
+import { useDashboardProject, useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
 import CloudDoneIcon from '#assets/icons/cloud_done.svg?react';
 import CriticalIcon from '#assets/icons/severity_critical.svg?react';
 import { DashboardPromptStepper } from './DashboardPromptStepper';
@@ -55,8 +55,10 @@ export function DTestConnectedDashboard() {
     error: metadataError,
   } = useMetadata();
   const { projectInfo } = useCloudProjectInfo();
+  const project = useDashboardProject();
   const { totalUsers } = useUsers();
   const { hasCompletedOnboarding } = useMcpUsage();
+  const isBranch = project?.isBranch === true;
   const lastBackupQuery = useLastBackup();
   const advisorLatest = useAdvisorLatest();
 
@@ -127,7 +129,7 @@ export function DTestConnectedDashboard() {
           </div>
         </div>
 
-        {!hasCompletedOnboarding && (
+        {!hasCompletedOnboarding && !isBranch && (
           <section className="flex w-full flex-col items-center gap-6 rounded-lg border border-[var(--alpha-8)] bg-card px-6 pb-12 pt-10">
             <p className="text-xl font-medium leading-7 text-foreground">
               Let your agent build your backend for you

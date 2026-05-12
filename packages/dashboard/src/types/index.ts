@@ -8,6 +8,7 @@ export interface DashboardProjectInfo {
   latestVersion?: string | null;
   currentVersion?: string | null;
   status?: string;
+  isBranch?: boolean;
 }
 
 export interface DashboardUserInfo {
