@@ -31,6 +31,7 @@ import type {
   ListCustomDomainsResponse,
   AddCustomDomainResponse,
   VerifyCustomDomainResponse,
+  DeploymentsMetadataSchema,
 } from '@insforge/shared-schemas';
 
 export type {
@@ -95,6 +96,25 @@ export class DeploymentService {
       this.pool = DatabaseManager.getInstance().getPool();
     }
     return this.pool;
+  }
+
+  /**
+   * Deployments slice for admin /api/metadata (gated behind verifyAdmin).
+   *
+   * Cloud-only: returns `undefined` in self-hosted backends so the metadata
+   * route omits the slice entirely. The CLI's capability probe uses
+   * presence/absence to gate `[deployments]` TOML sections — self-host
+   * users naturally skip features they can't use, without ever issuing a
+   * PUT to the cloud-only slug endpoint.
+   *
+   * `customSlug: null` means cloud + slug not set (project uses default URL).
+   */
+  async getMetadata(): Promise<DeploymentsMetadataSchema | undefined> {
+    if (!isCloudEnvironment()) {
+      return undefined;
+    }
+    const customSlug = await this.vercelProvider.getSlug();
+    return { customSlug };
   }
 
   private isReservedHostedDomain(domain: string): boolean {
