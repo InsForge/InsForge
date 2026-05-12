@@ -11,10 +11,9 @@ import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
 import logger from '@/utils/logger.js';
 import {
   chatCompletionRequestSchema,
-  imageGenerationRequestSchema,
   embeddingsRequestSchema,
+  imageGenerationRequestSchema,
 } from '@insforge/shared-schemas';
-import type { AIOverviewRange } from '@insforge/shared-schemas';
 
 const router = Router();
 const chatService = ChatCompletionService.getInstance();
@@ -43,8 +42,7 @@ router.get(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const openRouterProvider = OpenRouterProvider.getInstance();
-      const range = parseOverviewRange(req.query.range);
-      const overview = await openRouterProvider.getOverview(range);
+      const overview = await openRouterProvider.getOverview();
       successResponse(res, overview);
     } catch (error) {
       next(error);
@@ -93,15 +91,19 @@ function parseAIProvider(value: string | undefined): AIProvider {
   );
 }
 
-async function getProviderApiKey(provider: AIProvider, openRouterProvider: OpenRouterProvider) {
+function getProviderApiKey(provider: AIProvider, openRouterProvider: OpenRouterProvider) {
   switch (provider) {
     case 'openrouter':
       return openRouterProvider.getMaskedApiKey();
+    default: {
+      const exhaustiveProvider: never = provider;
+      throw new AppError(
+        `Unsupported AI provider: ${exhaustiveProvider}`,
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
   }
-}
-
-function parseOverviewRange(value: unknown): AIOverviewRange {
-  return value === '1d' || value === '1w' || value === '1y' ? value : '1m';
 }
 
 /**
@@ -222,21 +224,6 @@ router.post(
     }
   }
 );
-
-/**
- * GET /api/ai/credits
- * Get remaining credits for the current API key
- */
-router.get('/credits', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const openRouterProvider = OpenRouterProvider.getInstance();
-    const credits = await openRouterProvider.getRemainingCredits();
-
-    successResponse(res, credits);
-  } catch (error) {
-    next(error);
-  }
-});
 
 /**
  * POST /api/ai/embeddings

@@ -3,6 +3,7 @@ import type {
   DashboardBackup,
   DashboardBackupInfo,
   DashboardInstanceInfo,
+  DashboardModelCreditUsage,
   DashboardProjectInfo,
   DashboardUserInfo,
   DashboardMetricName,
@@ -50,6 +51,7 @@ type PendingRequestKey =
   | 'updateVersion'
   | 'userInfo'
   | 'userApiKey'
+  | 'modelCredits'
   | 'projectMetrics'
   | 'advisorLatest'
   | 'advisorIssues'
@@ -75,6 +77,7 @@ type PendingRequestValues = {
   updateVersion: void;
   userInfo: DashboardUserInfo;
   userApiKey: string;
+  modelCredits: DashboardModelCreditUsage;
   projectMetrics: DashboardMetricsResponse;
   advisorLatest: DashboardAdvisorSummary;
   advisorIssues: DashboardAdvisorIssuesResponse;
@@ -619,6 +622,28 @@ export function useCloudHosting() {
             );
             return;
           }
+          case 'MODEL_CREDITS': {
+            const used =
+              typeof message.used === 'number' && Number.isFinite(message.used) ? message.used : 0;
+            const limit =
+              typeof message.limit === 'number' && Number.isFinite(message.limit)
+                ? message.limit
+                : 0;
+
+            resolvePendingRequest('modelCredits', {
+              used,
+              limit,
+              isFree: message.isFree === true,
+            });
+            return;
+          }
+          case 'MODEL_CREDITS_ERROR': {
+            rejectPendingRequest(
+              'modelCredits',
+              getErrorMessage(message.error, 'Failed to load model credit usage')
+            );
+            return;
+          }
           case 'INSTANCE_INFO': {
             resolvePendingRequest('instanceInfo', {
               currentInstanceType:
@@ -981,6 +1006,16 @@ export function useCloudHosting() {
     return createPendingRequest('userApiKey', 'User API key request');
   }, [createPendingRequest, sendMessageToParent]);
 
+  const requestModelCredits = useCallback(async (): Promise<DashboardModelCreditUsage> => {
+    await sendMessageToParent(
+      { type: 'REQUEST_MODEL_CREDITS' },
+      'Unable to request model credit usage from the parent window'
+    );
+    return createPendingRequest('modelCredits', 'Model credits request', {
+      supersede: true,
+    });
+  }, [createPendingRequest, sendMessageToParent]);
+
   const requestProjectMetrics = useCallback(
     async (range: DashboardMetricsRange): Promise<DashboardMetricsResponse> => {
       await sendMessageToParent(
@@ -1063,6 +1098,7 @@ export function useCloudHosting() {
     navigateToSubscription,
     requestUserInfo,
     requestUserApiKey,
+    requestModelCredits,
     requestProjectMetrics,
     requestAdvisorLatest,
     requestAdvisorIssues,

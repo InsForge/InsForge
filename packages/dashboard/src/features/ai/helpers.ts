@@ -231,7 +231,7 @@ export const formatModality = (modality: string): string => {
 };
 
 export const formatReleasedDate = (created?: number): string => {
-  if (created == null) {
+  if (created === undefined || created === null) {
     return '-';
   }
 

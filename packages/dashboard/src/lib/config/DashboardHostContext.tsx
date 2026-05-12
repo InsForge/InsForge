@@ -2,6 +2,7 @@ import { createContext, useContext } from 'react';
 import type {
   DashboardBackupInfo,
   DashboardInstanceInfo,
+  DashboardModelCreditUsage,
   DashboardMode,
   DashboardProjectInfo,
   DashboardUserInfo,
@@ -34,6 +35,7 @@ interface DashboardHostContextValue {
   onUpdateVersion?: () => Promise<void>;
   onRequestUserInfo?: () => Promise<DashboardUserInfo>;
   onRequestUserApiKey?: () => Promise<string>;
+  onRequestModelCredits?: () => Promise<DashboardModelCreditUsage>;
   onRequestProjectMetrics?: (range: DashboardMetricsRange) => Promise<DashboardMetricsResponse>;
   onRequestAdvisorLatest?: () => Promise<DashboardAdvisorSummary | null>;
   onRequestAdvisorIssues?: (

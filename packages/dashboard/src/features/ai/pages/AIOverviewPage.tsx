@@ -1,45 +1,47 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
+import { ArrowUpCircle, Loader2, StopCircle } from 'lucide-react';
 import {
   Button,
   CopyButton,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Tab,
   Tabs,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
 } from '@insforge/ui';
-import type { AIOverviewMetricPoint, AIOverviewRequestRow } from '@insforge/shared-schemas';
-import { CodeEditor, PaginationControls } from '#components';
+import type { AIOverviewMetricPoint } from '@insforge/shared-schemas';
+import { CodeEditor } from '#components';
+import { useAIModelCredits } from '#features/ai/hooks/useAIModelCredits';
 import { useAIOverview } from '#features/ai/hooks/useAIOverview';
 import { useOpenRouterKey } from '#features/ai/hooks/useOpenRouterKey';
-import { getFriendlyModelName, getProviderLogo } from '#features/ai/helpers';
-import { formatTime } from '#lib/utils/utils';
+import { useDashboardHost } from '#lib/config/DashboardHostContext';
+import { useToast } from '#lib/hooks/useToast';
+import type { DashboardModelCreditUsage } from '#types';
 import {
   CODE_TAB_LANGUAGE,
   OVERVIEW_QUICK_START_MODELS,
-  REQUEST_RANGE_OPTIONS,
-  TIME_RANGE_OPTIONS,
   getOverviewCodeSnippets,
   type CodeTab,
-  type TimeRange,
 } from '#features/ai/constants';
 
 function formatCurrency(value: number): string {
   return `$${value.toFixed(value >= 10 ? 0 : 2)}`;
 }
 
+function formatModelCredit(value: number, compact = false): string {
+  if (compact && Number.isInteger(value)) {
+    return `$${value.toFixed(0)}`;
+  }
+
+  return `$${value.toFixed(2)}`;
+}
+
 function formatCompact(value: number): string {
   return new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(
     value
   );
-}
-
-function formatTokenCount(value: number): string {
-  return new Intl.NumberFormat('en').format(value);
 }
 
 function metricTotal(points: AIOverviewMetricPoint[]): number {
@@ -105,52 +107,6 @@ function formatBucketLabel(label: string) {
       year: 'numeric',
     }).format(date),
   };
-}
-
-function normalizeLogDate(value: string): string {
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return `${value}T00:00:00Z`;
-  }
-
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) {
-    return `${value}:00Z`;
-  }
-
-  return value;
-}
-
-function getProviderLogoId(provider: string): string {
-  const normalized = provider.toLowerCase();
-  const providerMap: Record<string, string> = {
-    anthropic: 'anthropic',
-    google: 'google',
-    openai: 'openai',
-    xai: 'x-ai',
-    x: 'x-ai',
-    'x-ai': 'x-ai',
-    amazon: 'amazon',
-    bedrock: 'amazon',
-    deepseek: 'deepseek',
-    qwen: 'qwen',
-  };
-
-  return providerMap[normalized] ?? normalized;
-}
-
-function formatRequestModelName(model: string): string {
-  const modelName = model.includes('/') ? model.split('/').slice(1).join('/') : model;
-  return getFriendlyModelName(modelName).replace(/\bGpt\b/g, 'GPT');
-}
-
-function ProviderCell({ provider }: { provider: string }) {
-  const Logo = getProviderLogo(getProviderLogoId(provider));
-
-  return (
-    <div className="flex min-w-0 items-center gap-2">
-      {Logo && <Logo className="size-4 shrink-0 text-foreground" />}
-      <span className="truncate">{provider}</span>
-    </div>
-  );
 }
 
 function OpenRouterKeyBox({
@@ -336,63 +292,6 @@ function ChartCard({
   );
 }
 
-function RequestTable({ rows }: { rows: AIOverviewRequestRow[] }) {
-  const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
-  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
-  const safeCurrentPage = Math.min(currentPage, totalPages);
-  const offset = (safeCurrentPage - 1) * pageSize;
-  const displayRows = rows.slice(offset, offset + pageSize);
-
-  return (
-    <div className="overflow-hidden rounded border border-[var(--alpha-8)] bg-card">
-      <div className="grid h-12 grid-cols-[1.3fr_1.4fr_1fr_0.75fr_0.75fr_120px] items-center border-b border-[var(--alpha-8)] px-1.5 text-[13px] leading-[18px] text-muted-foreground">
-        <div className="px-2.5">Date</div>
-        <div className="px-2.5">Model</div>
-        <div className="px-2.5">Provider</div>
-        <div className="px-2.5">Input</div>
-        <div className="px-2.5">Output</div>
-        <div className="px-2.5">Cost</div>
-      </div>
-      {displayRows.length === 0 ? (
-        <div className="flex h-[180px] items-center justify-center text-[13px] text-muted-foreground">
-          No OpenRouter activity rows available for this key.
-        </div>
-      ) : (
-        displayRows.map((row, index) => (
-          <div
-            key={row.id}
-            className={[
-              'grid h-12 grid-cols-[1.3fr_1.4fr_1fr_0.75fr_0.75fr_120px] items-center px-1.5 text-[13px] leading-[18px] text-foreground',
-              index === displayRows.length - 1 ? '' : 'border-b border-[var(--alpha-8)]',
-            ].join(' ')}
-          >
-            <div className="truncate px-2.5">{formatTime(normalizeLogDate(row.date))}</div>
-            <div className="truncate px-2.5">{formatRequestModelName(row.model)}</div>
-            <div className="min-w-0 px-2.5">
-              <ProviderCell provider={row.provider} />
-            </div>
-            <div className="px-2.5">{formatTokenCount(row.inputTokens)}</div>
-            <div className="px-2.5">{formatTokenCount(row.outputTokens)}</div>
-            <div className="px-2.5">{formatCurrency(row.cost)}</div>
-          </div>
-        ))
-      )}
-      {rows.length > 0 && (
-        <PaginationControls
-          currentPage={safeCurrentPage}
-          totalPages={totalPages}
-          onPageChange={setCurrentPage}
-          totalRecords={rows.length}
-          pageSize={pageSize}
-          recordLabel="requests"
-          className="[&_button]:h-8 [&_button]:w-8 [&_button]:min-w-8 [&_button]:px-2 [&_svg]:h-5 [&_svg]:w-5 bg-card"
-        />
-      )}
-    </div>
-  );
-}
-
 function OverviewErrorPanel({ message, heightClass }: { message: string; heightClass: string }) {
   return (
     <div
@@ -403,35 +302,201 @@ function OverviewErrorPanel({ message, heightClass }: { message: string; heightC
   );
 }
 
+function ModelCreditPopover({
+  credits,
+  error,
+  isLoading,
+}: {
+  credits?: DashboardModelCreditUsage;
+  error?: Error | null;
+  isLoading?: boolean;
+}) {
+  const used = credits?.used ?? 0;
+  const limit = Math.max(credits?.limit ?? 0, 0);
+  const isFree = credits?.isFree ?? false;
+  const remaining = Math.max(0, limit - used);
+  const overage = Math.max(0, used - limit);
+  const hasOverage = !isFree && overage > 0;
+  const isFreeExhausted = isFree && (limit <= 0 || remaining <= 0);
+  const isLowCredit = isFree
+    ? !isFreeExhausted && limit > 0 && remaining / limit <= 0.2
+    : !hasOverage && limit > 0 && remaining / limit <= 0.2;
+  const displayTotal = hasOverage ? Math.max(used, limit) : limit;
+  const usedWidth =
+    displayTotal > 0 ? Math.min(hasOverage ? limit / displayTotal : used / limit, 1) * 100 : 0;
+  const overageWidth = displayTotal > 0 && hasOverage ? (overage / displayTotal) * 100 : 0;
+  const progressColor = isFreeExhausted ? '#ef4444' : isLowCredit ? '#f59e0b' : '#ffffff';
+  const host = useDashboardHost();
+  const { showToast } = useToast();
+
+  const handleUpgradeClick = () => {
+    if (host.onNavigateToSubscription) {
+      host.onNavigateToSubscription();
+      return;
+    }
+
+    showToast('Subscription management is only available in cloud-hosting mode.', 'info');
+  };
+
+  if (isLoading) {
+    return (
+      <div className="w-[358px] rounded-lg border border-[#404040] bg-[#262626] p-5 text-sm text-[#a3a3a3] shadow-[0_4px_4px_rgba(0,0,0,0.4)]">
+        Loading model credit usage...
+      </div>
+    );
+  }
+
+  if (error || !credits) {
+    return (
+      <div className="w-[358px] rounded-lg border border-[#404040] bg-[#262626] p-5 text-sm text-[#a3a3a3] shadow-[0_4px_4px_rgba(0,0,0,0.4)]">
+        {error?.message || 'Model credit usage is unavailable.'}
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-[358px] rounded-lg border border-[#404040] bg-[#262626] p-3 text-sm shadow-[0_4px_4px_rgba(0,0,0,0.4)]">
+      <div className="flex flex-col gap-3 rounded px-3 py-2">
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between text-[#a3a3a3]">
+            <span>{isFree ? 'Used Credits' : 'Used Included Credits'}</span>
+            <span>{hasOverage ? 'Overage Usage' : 'Remaining'}</span>
+          </div>
+          <div className="flex items-end justify-between text-white">
+            <div>
+              <span className="font-semibold">{formatModelCredit(used)}</span>{' '}
+              <span className="text-[#a3a3a3]">/ {formatModelCredit(limit)}</span>
+            </div>
+            <span className="font-semibold">
+              {hasOverage ? formatModelCredit(overage) : formatModelCredit(remaining)}
+            </span>
+          </div>
+        </div>
+        <div className="flex h-1.5 overflow-hidden rounded-md bg-[#171717]">
+          <div
+            className="h-full"
+            style={{ width: `${usedWidth}%`, backgroundColor: progressColor }}
+          />
+          {hasOverage && (
+            <div className="h-full bg-[#0284c7]" style={{ width: `${overageWidth}%` }} />
+          )}
+        </div>
+        {(isFreeExhausted || isLowCredit || hasOverage) && (
+          <p className="leading-[18px] text-white">
+            {isFreeExhausted
+              ? 'AI features are paused.'
+              : isFree
+                ? 'AI features will pause when credits run out.'
+                : `Additional usage ${hasOverage ? 'is' : 'will be'} billed pay-as-you-go.`}
+          </p>
+        )}
+      </div>
+      {isFree && (
+        <button
+          type="button"
+          onClick={handleUpgradeClick}
+          className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm font-medium leading-5 text-[#6ee7b7] transition-colors hover:bg-[var(--alpha-4)]"
+        >
+          <ArrowUpCircle className="size-5 shrink-0" aria-hidden="true" />
+          <span>Upgrade plan for $10 credit</span>
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ModelCreditBadge({
+  credits,
+  error,
+  isLoading,
+}: {
+  credits?: DashboardModelCreditUsage;
+  error?: Error | null;
+  isLoading?: boolean;
+}) {
+  const limit = Math.max(credits?.limit ?? 0, 0);
+  const used = credits?.used ?? 0;
+  const remaining = Math.max(0, limit - used);
+  const overage = Math.max(0, used - limit);
+  const isFree = credits?.isFree ?? false;
+  const hasOverage = !isFree && overage > 0;
+  const isFreeExhausted = isFree && (limit <= 0 || remaining <= 0);
+  const isLowFreeCredit = isFree && !isFreeExhausted && limit > 0 && remaining / limit <= 0.2;
+  const label = isLoading
+    ? 'Loading'
+    : error
+      ? 'Credit unavailable'
+      : isFree
+        ? `${formatModelCredit(remaining)} Credit`
+        : hasOverage
+          ? `${formatModelCredit(overage)} Overage`
+          : `${formatModelCredit(remaining, true)} Credit`;
+  const iconClass = isFreeExhausted
+    ? 'size-5 text-[#ef4444]'
+    : isLowFreeCredit
+      ? 'size-5 text-[#f59e0b]'
+      : hasOverage
+        ? 'size-5 text-[#0284c7]'
+        : 'size-5 text-muted-foreground';
+
+  return (
+    <TooltipProvider delayDuration={100}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            className={[
+              'flex shrink-0 items-center gap-1 rounded border border-[var(--alpha-8)] bg-card p-2 text-sm font-medium leading-5 text-foreground transition-colors hover:bg-[var(--alpha-4)]',
+              isLoading ? 'animate-pulse' : '',
+            ].join(' ')}
+            aria-label="Model credit usage"
+          >
+            <StopCircle className={iconClass} aria-hidden="true" />
+            <span>{label}</span>
+          </button>
+        </TooltipTrigger>
+        <TooltipContent
+          side="bottom"
+          align="end"
+          sideOffset={8}
+          className="border-0 bg-transparent p-0 text-inherit shadow-none"
+        >
+          <ModelCreditPopover credits={credits} error={error} isLoading={isLoading} />
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
 export default function AIOverviewPage() {
+  const host = useDashboardHost();
   const [codeTab, setCodeTab] = useState<CodeTab>('sdk');
   const [selectedModelId, setSelectedModelId] = useState<
     (typeof OVERVIEW_QUICK_START_MODELS)[number]['id']
   >(OVERVIEW_QUICK_START_MODELS[0].id);
-  const [usageRange, setUsageRange] = useState<TimeRange>('1m');
-  const [requestsRange, setRequestsRange] = useState<Extract<TimeRange, '1w' | '1m'>>('1m');
   const {
     data: usageData,
     isLoading: isUsageLoading,
     isError: isUsageError,
     error: usageError,
-  } = useAIOverview(usageRange);
-  const {
-    data: requestsData,
-    isLoading: isRequestsLoading,
-    isError: isRequestsError,
-    error: requestsError,
-  } = useAIOverview(requestsRange);
+  } = useAIOverview();
   const {
     data: openRouterKey,
     isLoading: isOpenRouterKeyLoading,
     error: openRouterKeyError,
   } = useOpenRouterKey();
+  const {
+    data: modelCredits,
+    isLoading: isModelCreditsLoading,
+    error: modelCreditsError,
+  } = useAIModelCredits();
+  const shouldShowModelCredits = host.mode === 'cloud-hosting' && !!host.onRequestModelCredits;
   const codeSnippets = useMemo(() => getOverviewCodeSnippets(selectedModelId), [selectedModelId]);
 
   const totals = useMemo(
     () => ({
       spend: formatCurrency(metricTotal(usageData?.charts.spend ?? [])),
+      requests: formatCompact(metricTotal(usageData?.charts.requests ?? [])),
       tokens: formatCompact(metricTotal(usageData?.charts.tokens ?? [])),
     }),
     [usageData]
@@ -440,11 +505,20 @@ export default function AIOverviewPage() {
   return (
     <div className="h-full overflow-y-auto bg-[rgb(var(--semantic-1))]">
       <div className="mx-auto flex w-full max-w-[1024px] flex-col gap-6 px-10 py-10">
-        <div className="flex flex-col gap-2">
-          <h1 className="text-2xl font-medium leading-8 text-foreground">Overview</h1>
-          <p className="text-sm leading-5 text-muted-foreground">
-            Your models are ready — build LLM-powered features or add more integrations.
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex min-w-0 flex-col gap-2">
+            <h1 className="text-2xl font-medium leading-8 text-foreground">Overview</h1>
+            <p className="text-sm leading-5 text-muted-foreground">
+              Your models are ready — build LLM-powered features or add more integrations.
+            </p>
+          </div>
+          {shouldShowModelCredits && (
+            <ModelCreditBadge
+              credits={modelCredits}
+              error={modelCreditsError}
+              isLoading={isModelCreditsLoading}
+            />
+          )}
         </div>
 
         <section className="grid min-h-[280px] grid-cols-[360px_1fr] overflow-hidden rounded border border-[var(--alpha-8)] bg-card">
@@ -549,20 +623,11 @@ export default function AIOverviewPage() {
         </section>
 
         <section className="flex flex-col gap-3">
-          <h2 className="text-lg font-medium leading-7 text-foreground">Usage</h2>
-          <div className="flex gap-2">
-            <Select value={usageRange} onValueChange={(value) => setUsageRange(value as TimeRange)}>
-              <SelectTrigger className="h-8 w-[180px]">
-                <SelectValue placeholder="Last 1 month" />
-              </SelectTrigger>
-              <SelectContent>
-                {TIME_RANGE_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex items-end justify-between gap-4">
+            <h2 className="text-lg font-medium leading-7 text-foreground">Usage</h2>
+            <span className="text-[12px] leading-4 text-muted-foreground">
+              Past 30 completed UTC days
+            </span>
           </div>
           {isUsageLoading ? (
             <div className="flex h-[340px] items-center justify-center rounded border border-[var(--alpha-8)] bg-card">
@@ -582,42 +647,16 @@ export default function AIOverviewPage() {
                 valueFormatter={formatCurrency}
               />
               <ChartCard
+                title="Requests"
+                points={usageData?.charts.requests ?? []}
+                value={totals.requests}
+              />
+              <ChartCard
                 title="Tokens"
                 points={usageData?.charts.tokens ?? []}
                 value={totals.tokens}
               />
             </div>
-          )}
-        </section>
-
-        <section className="flex flex-col gap-3">
-          <h2 className="text-lg font-medium leading-7 text-foreground">Requests</h2>
-          <Select
-            value={requestsRange}
-            onValueChange={(value) => setRequestsRange(value as Extract<TimeRange, '1w' | '1m'>)}
-          >
-            <SelectTrigger className="h-8 w-[180px]">
-              <SelectValue placeholder="Last 1 month" />
-            </SelectTrigger>
-            <SelectContent>
-              {REQUEST_RANGE_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {isRequestsLoading ? (
-            <div className="flex h-[180px] items-center justify-center rounded border border-[var(--alpha-8)] bg-card">
-              <Loader2 className="size-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : isRequestsError ? (
-            <OverviewErrorPanel
-              heightClass="h-[180px]"
-              message={requestsError?.message || 'Failed to load request activity.'}
-            />
-          ) : (
-            <RequestTable rows={requestsData?.requests.rows ?? []} />
           )}
         </section>
       </div>

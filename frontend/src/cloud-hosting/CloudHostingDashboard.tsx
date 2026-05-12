@@ -20,6 +20,7 @@ export function CloudHostingDashboard() {
     updateVersion,
     requestUserInfo,
     requestUserApiKey,
+    requestModelCredits,
     requestProjectMetrics,
     requestAdvisorLatest,
     requestAdvisorIssues,
@@ -47,6 +48,7 @@ export function CloudHostingDashboard() {
       onUpdateVersion={updateVersion}
       onRequestUserInfo={requestUserInfo}
       onRequestUserApiKey={requestUserApiKey}
+      onRequestModelCredits={requestModelCredits}
       onRequestProjectMetrics={requestProjectMetrics}
       onRequestAdvisorLatest={requestAdvisorLatest}
       onRequestAdvisorIssues={requestAdvisorIssues}

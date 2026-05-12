@@ -3,7 +3,6 @@ import ClaudeIcon from '#assets/logos/claude_code.svg?react';
 import GeminiIcon from '#assets/logos/gemini.svg?react';
 
 export type CodeTab = 'sdk' | 'python' | 'http';
-export type TimeRange = '1d' | '1w' | '1m' | '1y';
 export type QuickStartMode = 'text' | 'image' | 'video';
 export type ModelModalityFilter = string;
 
@@ -76,18 +75,6 @@ export const OVERVIEW_QUICK_START_MODELS = [
     icon: GeminiIcon,
   },
 ] as const;
-
-export const TIME_RANGE_OPTIONS: { value: TimeRange; label: string }[] = [
-  { value: '1d', label: 'Last 1 day' },
-  { value: '1w', label: 'Last 1 week' },
-  { value: '1m', label: 'Last 1 month' },
-  { value: '1y', label: 'Last 1 year' },
-];
-
-export const REQUEST_RANGE_OPTIONS: { value: Extract<TimeRange, '1w' | '1m'>; label: string }[] = [
-  { value: '1w', label: 'Last 1 week' },
-  { value: '1m', label: 'Last 1 month' },
-];
 
 export const MODEL_MODALITY_FILTERS: { id: ModelModalityFilter; label: string }[] = [
   { id: 'all', label: 'All' },

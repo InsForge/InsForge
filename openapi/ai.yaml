@@ -5,26 +5,6 @@ info:
   description: AI services for chat and image generation with OpenRouter integration
 
 paths:
-  /api/ai/credits:
-    get:
-      summary: Get remaining credits
-      description: Get remaining credits for the current API key from OpenRouter
-      tags:
-        - Admin
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: Remaining credits information
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CreditsResponse'
-        '401':
-          description: Unauthorized
-        '500':
-          description: Failed to fetch credits
-
   /api/ai/models:
     get:
       summary: Get all available AI models
@@ -53,14 +33,6 @@ paths:
         - Admin
       security:
         - bearerAuth: []
-      parameters:
-        - in: query
-          name: range
-          schema:
-            type: string
-            enum: [1d, 1w, 1m, 1y]
-            default: 1m
-          description: Time range for chart buckets.
       responses:
         '200':
           description: AI Gateway overview
@@ -633,21 +605,6 @@ components:
                 items:
                   $ref: '#/components/schemas/OpenRouterModel'
 
-    CreditsResponse:
-      type: object
-      properties:
-        usage:
-          type: number
-          description: Total usage amount
-        limit:
-          type: number
-          nullable: true
-          description: Configured credit limit, or null for unlimited keys
-        remaining:
-          type: number
-          nullable: true
-          description: Remaining credits balance, or null for unlimited keys
-
     OpenRouterKeyResponse:
       type: object
       properties:
@@ -664,24 +621,6 @@ components:
         label:
           type: string
         value:
-          type: number
-
-    AIOverviewRequestRow:
-      type: object
-      properties:
-        id:
-          type: string
-        date:
-          type: string
-        model:
-          type: string
-        provider:
-          type: string
-        inputTokens:
-          type: number
-        outputTokens:
-          type: number
-        cost:
           type: number
 
     AIOverview:
@@ -730,16 +669,6 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/AIOverviewMetricPoint'
-        requests:
-          type: object
-          properties:
-            rows:
-              type: array
-              items:
-                $ref: '#/components/schemas/AIOverviewRequestRow'
-            total:
-              type: number
-
     EmbeddingsRequest:
       type: object
       required:

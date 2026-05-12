@@ -11,6 +11,7 @@ export type {
   DashboardBackupInfo,
   CloudHostingDashboardProps,
   DashboardInstanceInfo,
+  DashboardModelCreditUsage,
   DashboardMode,
   DashboardProjectInfo,
   DashboardProps,

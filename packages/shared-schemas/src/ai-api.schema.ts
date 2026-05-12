@@ -290,18 +290,6 @@ export const aiOverviewMetricPointSchema = z.object({
   value: z.number(),
 });
 
-export const aiOverviewRangeSchema = z.enum(['1d', '1w', '1m', '1y']);
-
-export const aiOverviewRequestRowSchema = z.object({
-  id: z.string(),
-  date: z.string(),
-  model: z.string(),
-  provider: z.string(),
-  inputTokens: z.number(),
-  outputTokens: z.number(),
-  cost: z.number(),
-});
-
 export const aiOverviewSchema = z.object({
   key: z.object({
     label: z.string().optional(),
@@ -320,10 +308,6 @@ export const aiOverviewSchema = z.object({
     spend: z.array(aiOverviewMetricPointSchema),
     requests: z.array(aiOverviewMetricPointSchema),
     tokens: z.array(aiOverviewMetricPointSchema),
-  }),
-  requests: z.object({
-    rows: z.array(aiOverviewRequestRowSchema),
-    total: z.number(),
   }),
 });
 
@@ -357,7 +341,5 @@ export type EmbeddingObject = z.infer<typeof embeddingObjectSchema>;
 export type EmbeddingsResponse = z.infer<typeof embeddingsResponseSchema>;
 export type AIModelSchema = z.infer<typeof aiModelSchema>;
 export type AIOverviewMetricPoint = z.infer<typeof aiOverviewMetricPointSchema>;
-export type AIOverviewRange = z.infer<typeof aiOverviewRangeSchema>;
-export type AIOverviewRequestRow = z.infer<typeof aiOverviewRequestRowSchema>;
 export type AIOverview = z.infer<typeof aiOverviewSchema>;
 export type OpenRouterKey = z.infer<typeof openRouterKeySchema>;

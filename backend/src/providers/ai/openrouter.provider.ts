@@ -5,7 +5,7 @@ import { isCloudEnvironment } from '@/utils/environment.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import logger from '@/utils/logger.js';
-import type { AIOverview, AIOverviewRange } from '@insforge/shared-schemas';
+import type { AIOverview } from '@insforge/shared-schemas';
 
 interface CloudCredentialsResponse {
   openrouter?: {
@@ -39,28 +39,12 @@ interface OpenRouterKeyInfo {
 }
 
 interface OpenRouterActivityItem {
-  completion_tokens?: number;
   date: string;
-  endpoint_id?: string;
-  model?: string;
-  model_permaslug?: string;
-  prompt_tokens?: number;
-  provider_name?: string;
-  reasoning_tokens?: number;
-  requests?: number;
-  usage?: number;
-}
-
-interface OpenRouterLimitation {
-  label: string;
-  credit_limit: number | null;
-  credit_used: number;
-  credit_remaining: number | null;
-  rate_limit?: {
-    requests?: number;
-    interval?: string;
-    note?: string;
-  };
+  usage: number;
+  requests: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  reasoning_tokens: number;
 }
 
 interface OverviewBucket {
@@ -91,10 +75,6 @@ const EMPTY_AI_OVERVIEW: AIOverview = {
     spend: [],
     requests: [],
     tokens: [],
-  },
-  requests: {
-    rows: [],
-    total: 0,
   },
 };
 
@@ -203,75 +183,10 @@ export class OpenRouterProvider {
   }
 
   /**
-   * Get remaining credits for the current API key from OpenRouter
-   */
-  async getRemainingCredits(): Promise<{
-    usage: number;
-    limit: number | null;
-    remaining: number | null;
-  }> {
-    try {
-      const { apiKey, source } = await this.getApiKeyWithSource();
-
-      if (source === 'cloud') {
-        const response = await fetch(
-          `https://api.insforge.dev/ai/v1/limitations?credential=${encodeURIComponent(apiKey)}`,
-          {
-            method: 'GET',
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch key info: ${response.statusText}`);
-        }
-
-        const result = (await response.json()) as { data: OpenRouterLimitation };
-        const keyInfo = result.data;
-
-        return {
-          usage: keyInfo.credit_used,
-          limit: keyInfo.credit_limit,
-          remaining: keyInfo.credit_remaining,
-        };
-      } else {
-        const response = await fetch('https://openrouter.ai/api/v1/key', {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-          },
-        });
-
-        if (!response.ok) {
-          throw new AppError(
-            `Invalid OpenRouter API Key`,
-            500,
-            ERROR_CODES.AI_INVALID_API_KEY,
-            'Check your OpenRouter key and try again.'
-          );
-        }
-
-        const keyInfo = (await response.json()) as OpenRouterKeyInfo;
-
-        return {
-          usage: keyInfo.data.usage,
-          limit: keyInfo.data.limit,
-          remaining: keyInfo.data.limit !== null ? keyInfo.data.limit - keyInfo.data.usage : null,
-        };
-      }
-    } catch (error) {
-      logger.error('Failed to fetch remaining credits', {
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-      });
-      throw error;
-    }
-  }
-
-  /**
    * Fetch OpenRouter key usage and activity for the active gateway key.
    * /activity requires a management key; when unavailable, return key-level usage only.
    */
-  async getOverview(range: AIOverviewRange = '1m'): Promise<AIOverview> {
+  async getOverview(): Promise<AIOverview> {
     let resolved: ResolvedApiKey;
     try {
       resolved = await this.getApiKeyWithSource();
@@ -289,8 +204,7 @@ export class OpenRouterProvider {
       resolved.source
     );
     const activity = activityResult.data;
-    const charts = this.buildOverviewCharts(activity, range);
-    const requestRows = this.buildOverviewRequestRows(activity, range);
+    const charts = this.buildOverviewCharts(activity);
 
     return {
       key: {
@@ -309,10 +223,6 @@ export class OpenRouterProvider {
         observabilityError: activityResult.error,
       },
       charts,
-      requests: {
-        rows: requestRows,
-        total: requestRows.length,
-      },
     };
   }
 
@@ -372,8 +282,8 @@ export class OpenRouterProvider {
       };
     }
 
-    const payload = (await response.json()) as { data?: OpenRouterActivityItem[] };
-    return { available: true, data: payload.data ?? [] };
+    const payload = (await response.json()) as { data?: Partial<OpenRouterActivityItem>[] };
+    return { available: true, data: this.normalizeActivity(payload.data ?? []) };
   }
 
   private async fetchCloudActivity(): Promise<{
@@ -419,8 +329,8 @@ export class OpenRouterProvider {
       };
     }
 
-    const payload = (await response.json()) as { data?: OpenRouterActivityItem[] };
-    return { available: true, data: payload.data ?? [] };
+    const payload = (await response.json()) as { data?: Partial<OpenRouterActivityItem>[] };
+    return { available: true, data: this.normalizeActivity(payload.data ?? []) };
   }
 
   private resolveActivityApiKeyHash(apiKey: string, apiKeyHashFromOpenRouter?: string): string {
@@ -428,15 +338,23 @@ export class OpenRouterProvider {
     return documentedHash ?? createHash('sha256').update(apiKey).digest('hex');
   }
 
-  private buildOverviewCharts(
-    activity: OpenRouterActivityItem[],
-    range: AIOverviewRange
-  ): AIOverview['charts'] {
-    const allowedBuckets = this.createOverviewBuckets(range);
+  private normalizeActivity(items: Partial<OpenRouterActivityItem>[]): OpenRouterActivityItem[] {
+    return items.map((item) => ({
+      date: String(item.date || ''),
+      usage: Number(item.usage || 0),
+      requests: Number(item.requests || 0),
+      prompt_tokens: Number(item.prompt_tokens || 0),
+      completion_tokens: Number(item.completion_tokens || 0),
+      reasoning_tokens: Number(item.reasoning_tokens || 0),
+    }));
+  }
+
+  private buildOverviewCharts(activity: OpenRouterActivityItem[]): AIOverview['charts'] {
+    const allowedBuckets = this.createOverviewBuckets();
     const buckets = new Map<string, OverviewBucket>();
 
     for (const item of activity) {
-      const bucketKey = this.resolveActivityBucketKey(item.date, range);
+      const bucketKey = this.resolveActivityBucketKey(item.date);
       if (!allowedBuckets.has(bucketKey)) {
         continue;
       }
@@ -480,77 +398,13 @@ export class OpenRouterProvider {
     );
   }
 
-  private buildOverviewRequestRows(
-    activity: OpenRouterActivityItem[],
-    range: AIOverviewRange
-  ): AIOverview['requests']['rows'] {
-    const buckets = this.createOverviewBuckets(range);
-
-    return activity
-      .filter((item) => buckets.has(this.resolveActivityBucketKey(item.date, range)))
-      .map((item, index) => ({
-        id: `${item.date}-${item.model ?? 'unknown'}-${item.provider_name ?? 'unknown'}-${index}`,
-        date: item.date,
-        model: item.model ?? item.model_permaslug ?? 'Unknown',
-        provider: item.provider_name ?? this.getProviderNameFromModelId(item.model) ?? 'Unknown',
-        inputTokens: item.prompt_tokens ?? 0,
-        outputTokens: (item.completion_tokens ?? 0) + (item.reasoning_tokens ?? 0),
-        cost: item.usage ?? 0,
-      }))
-      .sort((a, b) => b.date.localeCompare(a.date));
-  }
-
-  private getProviderNameFromModelId(modelId?: string): string | undefined {
-    const providerId = modelId?.split('/')[0];
-    if (!providerId) {
-      return undefined;
-    }
-
-    const providerNames: Record<string, string> = {
-      anthropic: 'Anthropic',
-      google: 'Google',
-      openai: 'OpenAI',
-      'x-ai': 'xAI',
-      amazon: 'Amazon',
-      deepseek: 'DeepSeek',
-      qwen: 'Qwen',
-    };
-
-    return providerNames[providerId] ?? providerId.charAt(0).toUpperCase() + providerId.slice(1);
-  }
-
-  private createOverviewBuckets(range: AIOverviewRange): Map<string, OverviewBucket> {
+  private createOverviewBuckets(): Map<string, OverviewBucket> {
     const buckets = new Map<string, OverviewBucket>();
     const now = new Date();
-
-    if (range === '1d') {
-      const start = new Date(now);
-      start.setUTCMinutes(0, 0, 0);
-      start.setUTCHours(start.getUTCHours() - 23);
-      for (let index = 0; index < 24; index++) {
-        const bucketDate = new Date(start.getTime() + index * 60 * 60 * 1000);
-        const key = this.formatUtcHourBucket(bucketDate);
-        buckets.set(key, { label: key, usage: 0, requests: 0, tokens: 0 });
-      }
-      return buckets;
-    }
-
-    if (range === '1y') {
-      const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 11, 1));
-      for (let index = 0; index < 12; index++) {
-        const bucketDate = new Date(
-          Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + index, 1)
-        );
-        const key = this.formatUtcMonthBucket(bucketDate);
-        buckets.set(key, { label: key, usage: 0, requests: 0, tokens: 0 });
-      }
-      return buckets;
-    }
-
-    const dayCount = range === '1w' ? 7 : 30;
     const start = new Date(now);
     start.setUTCHours(0, 0, 0, 0);
-    start.setUTCDate(start.getUTCDate() - (dayCount - 1));
+    start.setUTCDate(start.getUTCDate() - 30);
+    const dayCount = 30;
     for (let index = 0; index < dayCount; index++) {
       const bucketDate = new Date(start.getTime() + index * 24 * 60 * 60 * 1000);
       const key = this.formatUtcDayBucket(bucketDate);
@@ -559,32 +413,12 @@ export class OpenRouterProvider {
     return buckets;
   }
 
-  private resolveActivityBucketKey(date: string, range: AIOverviewRange): string {
-    if (range === '1y') {
-      return date.slice(0, 7);
-    }
-    if (range === '1d') {
-      const hourMatch = date.match(/^(\d{4}-\d{2}-\d{2}T\d{2})/);
-      if (hourMatch) {
-        return `${hourMatch[1]}:00`;
-      }
-
-      const parsed = new Date(date);
-      return Number.isNaN(parsed.getTime()) ? date : this.formatUtcHourBucket(parsed);
-    }
+  private resolveActivityBucketKey(date: string): string {
     return date.slice(0, 10);
   }
 
   private formatUtcDayBucket(date: Date): string {
     return date.toISOString().slice(0, 10);
-  }
-
-  private formatUtcHourBucket(date: Date): string {
-    return date.toISOString().slice(0, 13) + ':00';
-  }
-
-  private formatUtcMonthBucket(date: Date): string {
-    return date.toISOString().slice(0, 7);
   }
 
   private createCloudProjectToken(projectId: string): string {

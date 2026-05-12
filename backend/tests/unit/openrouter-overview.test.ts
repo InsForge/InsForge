@@ -29,7 +29,7 @@ describe('OpenRouterProvider.getOverview', () => {
     vi.useRealTimers();
   });
 
-  it('returns no chart buckets when the selected range has no activity', async () => {
+  it('returns no chart buckets when the past 30 completed UTC days have no activity', async () => {
     vi.stubEnv('OPENROUTER_API_KEY', 'sk-or-test');
     fetchMock
       .mockResolvedValueOnce({
@@ -53,17 +53,16 @@ describe('OpenRouterProvider.getOverview', () => {
         json: () => Promise.resolve({ data: [] }),
       });
 
-    const overview = await provider.getOverview('1w');
+    const overview = await provider.getOverview();
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(overview.key.label).toBe('Test key');
     expect(overview.charts.spend).toEqual([]);
     expect(overview.charts.requests).toEqual([]);
     expect(overview.charts.tokens).toEqual([]);
-    expect(overview.requests.rows).toEqual([]);
   });
 
-  it('returns only buckets with activity inside the selected range', async () => {
+  it('returns only buckets with activity inside the past 30 completed UTC days', async () => {
     vi.stubEnv('OPENROUTER_API_KEY', 'sk-or-test');
     fetchMock
       .mockResolvedValueOnce({
@@ -97,6 +96,15 @@ describe('OpenRouterProvider.getOverview', () => {
                 completion_tokens: 0,
               },
               {
+                date: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+                model: 'anthropic/claude-sonnet-4.6',
+                provider_name: 'Anthropic',
+                usage: 0.99,
+                requests: 99,
+                prompt_tokens: 100,
+                completion_tokens: 100,
+              },
+              {
                 date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
                 model: 'google/gemini-2.5-pro',
                 provider_name: 'Google',
@@ -109,15 +117,15 @@ describe('OpenRouterProvider.getOverview', () => {
           }),
       });
 
-    const overview = await provider.getOverview('1w');
+    const overview = await provider.getOverview();
 
-    expect(overview.charts.spend).toHaveLength(2);
-    expect(overview.charts.spend.map((point) => point.value)).toEqual([0.42, 0]);
-    expect(overview.charts.requests.map((point) => point.value)).toEqual([12, 0]);
-    expect(overview.charts.tokens.map((point) => point.value)).toEqual([1520, 0]);
+    expect(overview.charts.spend).toHaveLength(1);
+    expect(overview.charts.spend.map((point) => point.value)).toEqual([0.42]);
+    expect(overview.charts.requests.map((point) => point.value)).toEqual([12]);
+    expect(overview.charts.tokens.map((point) => point.value)).toEqual([1520]);
   });
 
-  it('normalizes 1d activity timestamps to hourly buckets in chronological order', async () => {
+  it('sorts daily buckets in chronological order', async () => {
     vi.stubEnv('OPENROUTER_API_KEY', 'sk-or-test');
     fetchMock
       .mockResolvedValueOnce({
@@ -142,7 +150,7 @@ describe('OpenRouterProvider.getOverview', () => {
           Promise.resolve({
             data: [
               {
-                date: '2026-05-12T12:21:35Z',
+                date: '2026-05-10',
                 model: 'openai/gpt-5.4',
                 provider_name: 'OpenAI',
                 usage: 0.2,
@@ -151,7 +159,7 @@ describe('OpenRouterProvider.getOverview', () => {
                 completion_tokens: 10,
               },
               {
-                date: '2026-05-12T10:03:00Z',
+                date: '2026-05-09',
                 model: 'google/gemini-2.5-pro',
                 provider_name: 'Google',
                 usage: 0.25,
@@ -163,22 +171,21 @@ describe('OpenRouterProvider.getOverview', () => {
           }),
       });
 
-    const overview = await provider.getOverview('1d');
+    const overview = await provider.getOverview();
 
     expect(overview.charts.spend).toEqual([
-      { label: '2026-05-12T10:00', value: 0.25 },
-      { label: '2026-05-12T12:00', value: 0.2 },
+      { label: '2026-05-09', value: 0.25 },
+      { label: '2026-05-10', value: 0.2 },
     ]);
     expect(overview.charts.requests.map((point) => point.value)).toEqual([3, 2]);
     expect(overview.charts.tokens.map((point) => point.value)).toEqual([45, 30]);
   });
 
   it('returns empty overview when the OpenRouter key is not configured', async () => {
-    const overview = await provider.getOverview('1w');
+    const overview = await provider.getOverview();
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(overview.key.observabilityAvailable).toBe(false);
     expect(overview.charts.spend).toEqual([]);
-    expect(overview.requests.rows).toEqual([]);
   });
 });
