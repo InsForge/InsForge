@@ -29,7 +29,7 @@ describe('OpenRouterProvider.getOverview', () => {
     vi.useRealTimers();
   });
 
-  it('returns no chart buckets when the past 30 completed UTC days have no activity', async () => {
+  it('returns no chart buckets when the past 30 UTC days have no activity', async () => {
     vi.stubEnv('OPENROUTER_API_KEY', 'sk-or-test');
     fetchMock
       .mockResolvedValueOnce({
@@ -62,7 +62,7 @@ describe('OpenRouterProvider.getOverview', () => {
     expect(overview.charts.tokens).toEqual([]);
   });
 
-  it('returns only buckets with activity inside the past 30 completed UTC days', async () => {
+  it('returns only buckets with activity inside the past 30 UTC days, including today', async () => {
     vi.stubEnv('OPENROUTER_API_KEY', 'sk-or-test');
     fetchMock
       .mockResolvedValueOnce({
@@ -90,13 +90,13 @@ describe('OpenRouterProvider.getOverview', () => {
                 date: new Date().toISOString().slice(0, 10),
                 model: 'openai/gpt-5.4',
                 provider_name: 'OpenAI',
-                usage: 0,
-                requests: 0,
-                prompt_tokens: 0,
-                completion_tokens: 0,
+                usage: 0.11,
+                requests: 4,
+                prompt_tokens: 400,
+                completion_tokens: 44,
               },
               {
-                date: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+                date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
                 model: 'anthropic/claude-sonnet-4.6',
                 provider_name: 'Anthropic',
                 usage: 0.99,
@@ -119,10 +119,10 @@ describe('OpenRouterProvider.getOverview', () => {
 
     const overview = await provider.getOverview();
 
-    expect(overview.charts.spend).toHaveLength(1);
-    expect(overview.charts.spend.map((point) => point.value)).toEqual([0.42]);
-    expect(overview.charts.requests.map((point) => point.value)).toEqual([12]);
-    expect(overview.charts.tokens.map((point) => point.value)).toEqual([1520]);
+    expect(overview.charts.spend).toHaveLength(2);
+    expect(overview.charts.spend.map((point) => point.value)).toEqual([0.42, 0.11]);
+    expect(overview.charts.requests.map((point) => point.value)).toEqual([12, 4]);
+    expect(overview.charts.tokens.map((point) => point.value)).toEqual([1520, 444]);
   });
 
   it('sorts daily buckets in chronological order', async () => {

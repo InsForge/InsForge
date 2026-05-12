@@ -359,7 +359,7 @@ function ModelCreditPopover({
       <div className="flex flex-col gap-3 rounded px-3 py-2">
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between text-[#a3a3a3]">
-            <span>{isFree ? 'Used Credits' : 'Used Included Credits'}</span>
+            <span>Used Credits</span>
             <span>{hasOverage ? 'Overage Usage' : 'Remaining'}</span>
           </div>
           <div className="flex items-end justify-between text-white">
@@ -427,10 +427,10 @@ function ModelCreditBadge({
     : error
       ? 'Credit unavailable'
       : isFree
-        ? `${formatModelCredit(remaining)} Credit`
+        ? `${formatModelCredit(remaining)} Credits`
         : hasOverage
           ? `${formatModelCredit(overage)} Overage`
-          : `${formatModelCredit(remaining, true)} Credit`;
+          : `${formatModelCredit(remaining, true)} Credits`;
   const iconClass = isFreeExhausted
     ? 'size-5 text-[#ef4444]'
     : isLowFreeCredit
@@ -572,7 +572,7 @@ export default function AIOverviewPage() {
                   OpenAI HTTP
                 </Tab>
               </Tabs>
-              <div className="relative h-[156px] min-h-0 overflow-hidden rounded-b bg-[#1e1e1e]">
+              <div className="relative h-[156px] min-h-0 overflow-hidden rounded-b bg-white dark:bg-[#1e1e1e]">
                 <CopyButton
                   text={codeSnippets[codeTab]}
                   showText={false}
@@ -625,9 +625,7 @@ export default function AIOverviewPage() {
         <section className="flex flex-col gap-3">
           <div className="flex items-end justify-between gap-4">
             <h2 className="text-lg font-medium leading-7 text-foreground">Usage</h2>
-            <span className="text-[12px] leading-4 text-muted-foreground">
-              Past 30 completed UTC days
-            </span>
+            <span className="text-[12px] leading-4 text-muted-foreground">Past 30 UTC days</span>
           </div>
           {isUsageLoading ? (
             <div className="flex h-[340px] items-center justify-center rounded border border-[var(--alpha-8)] bg-card">

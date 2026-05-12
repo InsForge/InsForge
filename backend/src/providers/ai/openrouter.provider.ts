@@ -400,11 +400,11 @@ export class OpenRouterProvider {
 
   private createOverviewBuckets(): Map<string, OverviewBucket> {
     const buckets = new Map<string, OverviewBucket>();
+    const dayCount = 30;
     const now = new Date();
     const start = new Date(now);
     start.setUTCHours(0, 0, 0, 0);
-    start.setUTCDate(start.getUTCDate() - 30);
-    const dayCount = 30;
+    start.setUTCDate(start.getUTCDate() - (dayCount - 1));
     for (let index = 0; index < dayCount; index++) {
       const bucketDate = new Date(start.getTime() + index * 24 * 60 * 60 * 1000);
       const key = this.formatUtcDayBucket(bucketDate);

@@ -64,7 +64,7 @@ function ShellCodeBlock({ code, copyText, badge }: CodeBlockProps) {
   const lines = code.split('\n');
 
   return (
-    <div className="w-full rounded border border-[var(--border)] bg-[rgb(var(--semantic-0))] py-2">
+    <div className="w-full rounded border border-[var(--border)] bg-white py-2 dark:bg-[#1e1e1e]">
       <div className="flex items-start gap-3 px-3 py-1.5">
         <div className="min-w-0 flex-1">
           {badge && (
@@ -118,7 +118,7 @@ function EnvCodeBlock({ code, copyText, badge }: CodeBlockProps) {
   const lines = code.split('\n');
 
   return (
-    <div className="w-full rounded border border-[var(--border)] bg-[#1e1e1e] py-2">
+    <div className="w-full rounded border border-[var(--border)] bg-white py-2 dark:bg-[#1e1e1e]">
       <div className="flex items-start gap-3 px-3 py-1.5">
         <div className="min-w-0 flex-1">
           {badge && (
@@ -151,7 +151,7 @@ function JavaScriptCodeBlock({ code, copyText, badge }: CodeBlockProps) {
   const editorHeight = Math.max(44, lineCount * 20 + (badge ? 54 : 28));
 
   return (
-    <div className="relative w-full rounded border border-[var(--border)] bg-[#1e1e1e]">
+    <div className="relative w-full rounded border border-[var(--border)] bg-white dark:bg-[#1e1e1e]">
       {badge && (
         <div className="absolute left-4 top-3 z-10 inline-flex rounded bg-[var(--alpha-8)] px-2 py-0.5 text-xs font-medium leading-4 text-muted-foreground">
           {badge}
