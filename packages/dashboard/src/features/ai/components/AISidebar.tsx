@@ -1,4 +1,3 @@
-import { useLocation } from 'react-router-dom';
 import { FeatureSidebar, type FeatureSidebarListItem } from '#components';
 
 const AI_SIDEBAR_ITEMS: FeatureSidebarListItem[] = [
@@ -20,14 +19,5 @@ const AI_SIDEBAR_ITEMS: FeatureSidebarListItem[] = [
 ];
 
 export function AISidebar() {
-  const location = useLocation();
-  const activeItemId = location.pathname.endsWith('/models')
-    ? 'ai-models'
-    : location.pathname.endsWith('/quick-start')
-      ? 'quick-start'
-      : 'overview';
-
-  return (
-    <FeatureSidebar title="Model Gateway" items={AI_SIDEBAR_ITEMS} activeItemId={activeItemId} />
-  );
+  return <FeatureSidebar title="Model Gateway" items={AI_SIDEBAR_ITEMS} />;
 }

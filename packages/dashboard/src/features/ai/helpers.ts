@@ -81,7 +81,7 @@ export const getProviderLogo = (
 };
 
 export const getProviderDisplayOrder = (providerId: string): number =>
-  PROVIDER_DISPLAY_ORDER[providerId] ?? 500;
+  PROVIDER_DISPLAY_ORDER[providerId.toLowerCase()] ?? 500;
 
 // Filter models by provider ID
 export const filterModelsByProvider = (
@@ -231,7 +231,7 @@ export const formatModality = (modality: string): string => {
 };
 
 export const formatReleasedDate = (created?: number): string => {
-  if (!created) {
+  if (created == null) {
     return '-';
   }
 

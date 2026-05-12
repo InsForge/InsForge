@@ -290,6 +290,8 @@ export const aiOverviewMetricPointSchema = z.object({
   value: z.number(),
 });
 
+export const aiOverviewRangeSchema = z.enum(['1d', '1w', '1m', '1y']);
+
 export const aiOverviewRequestRowSchema = z.object({
   id: z.string(),
   date: z.string(),
@@ -355,6 +357,7 @@ export type EmbeddingObject = z.infer<typeof embeddingObjectSchema>;
 export type EmbeddingsResponse = z.infer<typeof embeddingsResponseSchema>;
 export type AIModelSchema = z.infer<typeof aiModelSchema>;
 export type AIOverviewMetricPoint = z.infer<typeof aiOverviewMetricPointSchema>;
+export type AIOverviewRange = z.infer<typeof aiOverviewRangeSchema>;
 export type AIOverviewRequestRow = z.infer<typeof aiOverviewRequestRowSchema>;
 export type AIOverview = z.infer<typeof aiOverviewSchema>;
 export type OpenRouterKey = z.infer<typeof openRouterKeySchema>;

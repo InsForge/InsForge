@@ -8,13 +8,13 @@ const migrationDir = path.resolve(currentDir, '../../src/infra/database/migratio
 const migrationPath = path.resolve(migrationDir, '043_drop-deprecated-ai-configs-and-usage.sql');
 
 describe('043_drop-deprecated-ai-configs-and-usage migration', () => {
-  const sql = fs.readFileSync(migrationPath, 'utf8');
-
   it('migration file exists', () => {
     expect(fs.existsSync(migrationPath)).toBe(true);
   });
 
   it('drops current AI config/usage tables idempotently', () => {
+    const sql = fs.readFileSync(migrationPath, 'utf8');
+
     expect(sql).toMatch(/information_schema\.schemata/i);
     expect(sql).toMatch(/schema_name\s*=\s*'ai'/i);
     expect(sql).toMatch(/DROP TABLE IF EXISTS ai\.usage\s+CASCADE\s*;/i);
@@ -22,10 +22,14 @@ describe('043_drop-deprecated-ai-configs-and-usage migration', () => {
   });
 
   it('drops usage tables before config tables to satisfy foreign keys', () => {
+    const sql = fs.readFileSync(migrationPath, 'utf8');
+
     expect(sql.indexOf('ai.usage')).toBeLessThan(sql.indexOf('ai.configs'));
   });
 
   it('does not drop legacy-looking public tables because they may be user-owned', () => {
+    const sql = fs.readFileSync(migrationPath, 'utf8');
+
     expect(sql).not.toMatch(/DROP TABLE IF EXISTS public\._ai_usage/i);
     expect(sql).not.toMatch(/DROP TABLE IF EXISTS public\._ai_configs/i);
   });

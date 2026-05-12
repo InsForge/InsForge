@@ -7,13 +7,14 @@ import { AIModelService } from '@/services/ai/ai-model.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { errorResponse, successResponse } from '@/utils/response.js';
-import { OpenRouterProvider, type AIOverviewRange } from '@/providers/ai/openrouter.provider.js';
+import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
 import logger from '@/utils/logger.js';
 import {
   chatCompletionRequestSchema,
   imageGenerationRequestSchema,
   embeddingsRequestSchema,
 } from '@insforge/shared-schemas';
+import type { AIOverviewRange } from '@insforge/shared-schemas';
 
 const router = Router();
 const chatService = ChatCompletionService.getInstance();

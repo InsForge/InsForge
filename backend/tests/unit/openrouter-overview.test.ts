@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../src/utils/environment.js', () => ({
   isCloudEnvironment: () => false,
@@ -13,13 +13,20 @@ import { OpenRouterProvider } from '../../src/providers/ai/openrouter.provider.j
 describe('OpenRouterProvider.getOverview', () => {
   let provider: OpenRouterProvider;
   let fetchMock: ReturnType<typeof vi.fn>;
+  const fixedNow = new Date('2026-05-12T12:34:56Z');
 
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();
+    vi.useFakeTimers();
+    vi.setSystemTime(fixedNow);
     fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
     provider = OpenRouterProvider.getInstance();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('returns no chart buckets when the selected range has no activity', async () => {
@@ -105,9 +112,65 @@ describe('OpenRouterProvider.getOverview', () => {
     const overview = await provider.getOverview('1w');
 
     expect(overview.charts.spend).toHaveLength(2);
-    expect(overview.charts.spend.map((point) => point.value)).toEqual([0, 0.42]);
-    expect(overview.charts.requests.map((point) => point.value)).toEqual([0, 12]);
-    expect(overview.charts.tokens.map((point) => point.value)).toEqual([0, 1520]);
+    expect(overview.charts.spend.map((point) => point.value)).toEqual([0.42, 0]);
+    expect(overview.charts.requests.map((point) => point.value)).toEqual([12, 0]);
+    expect(overview.charts.tokens.map((point) => point.value)).toEqual([1520, 0]);
+  });
+
+  it('normalizes 1d activity timestamps to hourly buckets in chronological order', async () => {
+    vi.stubEnv('OPENROUTER_API_KEY', 'sk-or-test');
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: {
+              hash: 'hash',
+              label: 'Test key',
+              usage: 0.45,
+              usage_daily: 0,
+              usage_weekly: 0.45,
+              usage_monthly: 0.45,
+              limit: null,
+              is_free_tier: false,
+            },
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: [
+              {
+                date: '2026-05-12T12:21:35Z',
+                model: 'openai/gpt-5.4',
+                provider_name: 'OpenAI',
+                usage: 0.2,
+                requests: 2,
+                prompt_tokens: 20,
+                completion_tokens: 10,
+              },
+              {
+                date: '2026-05-12T10:03:00Z',
+                model: 'google/gemini-2.5-pro',
+                provider_name: 'Google',
+                usage: 0.25,
+                requests: 3,
+                prompt_tokens: 30,
+                completion_tokens: 15,
+              },
+            ],
+          }),
+      });
+
+    const overview = await provider.getOverview('1d');
+
+    expect(overview.charts.spend).toEqual([
+      { label: '2026-05-12T10:00', value: 0.25 },
+      { label: '2026-05-12T12:00', value: 0.2 },
+    ]);
+    expect(overview.charts.requests.map((point) => point.value)).toEqual([3, 2]);
+    expect(overview.charts.tokens.map((point) => point.value)).toEqual([45, 30]);
   });
 
   it('returns empty overview when the OpenRouter key is not configured', async () => {

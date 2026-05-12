@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronDown, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import {
   Button,
   CopyButton,
@@ -253,10 +253,7 @@ function ChartCard({
   return (
     <div className="flex h-[280px] flex-col rounded border border-[var(--alpha-8)] bg-card">
       <div className="flex h-10 shrink-0 items-center justify-between px-2.5">
-        <button className="flex items-center gap-1 text-[13px] leading-[18px] text-foreground">
-          {title}
-          <ChevronDown className="size-3 text-muted-foreground" />
-        </button>
+        <div className="text-[13px] leading-[18px] text-foreground">{title}</div>
         <div className="text-lg font-medium leading-6 text-foreground">{value}</div>
       </div>
       <div className="relative min-h-0 flex-1 px-2.5 pb-4">
@@ -396,6 +393,16 @@ function RequestTable({ rows }: { rows: AIOverviewRequestRow[] }) {
   );
 }
 
+function OverviewErrorPanel({ message, heightClass }: { message: string; heightClass: string }) {
+  return (
+    <div
+      className={`flex ${heightClass} items-center justify-center rounded border border-[var(--alpha-8)] bg-card px-4 text-center text-sm text-muted-foreground`}
+    >
+      {message}
+    </div>
+  );
+}
+
 export default function AIOverviewPage() {
   const [codeTab, setCodeTab] = useState<CodeTab>('sdk');
   const [selectedModelId, setSelectedModelId] = useState<
@@ -403,8 +410,18 @@ export default function AIOverviewPage() {
   >(OVERVIEW_QUICK_START_MODELS[0].id);
   const [usageRange, setUsageRange] = useState<TimeRange>('1m');
   const [requestsRange, setRequestsRange] = useState<Extract<TimeRange, '1w' | '1m'>>('1m');
-  const { data: usageData, isLoading: isUsageLoading } = useAIOverview(usageRange);
-  const { data: requestsData } = useAIOverview(requestsRange);
+  const {
+    data: usageData,
+    isLoading: isUsageLoading,
+    isError: isUsageError,
+    error: usageError,
+  } = useAIOverview(usageRange);
+  const {
+    data: requestsData,
+    isLoading: isRequestsLoading,
+    isError: isRequestsError,
+    error: requestsError,
+  } = useAIOverview(requestsRange);
   const {
     data: openRouterKey,
     isLoading: isOpenRouterKeyLoading,
@@ -551,6 +568,11 @@ export default function AIOverviewPage() {
             <div className="flex h-[340px] items-center justify-center rounded border border-[var(--alpha-8)] bg-card">
               <Loader2 className="size-8 animate-spin text-muted-foreground" />
             </div>
+          ) : isUsageError ? (
+            <OverviewErrorPanel
+              heightClass="h-[340px]"
+              message={usageError?.message || 'Failed to load usage overview.'}
+            />
           ) : (
             <div className="grid grid-cols-2 gap-4">
               <ChartCard
@@ -585,7 +607,18 @@ export default function AIOverviewPage() {
               ))}
             </SelectContent>
           </Select>
-          <RequestTable rows={requestsData?.requests.rows ?? []} />
+          {isRequestsLoading ? (
+            <div className="flex h-[180px] items-center justify-center rounded border border-[var(--alpha-8)] bg-card">
+              <Loader2 className="size-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : isRequestsError ? (
+            <OverviewErrorPanel
+              heightClass="h-[180px]"
+              message={requestsError?.message || 'Failed to load request activity.'}
+            />
+          ) : (
+            <RequestTable rows={requestsData?.requests.rows ?? []} />
+          )}
         </section>
       </div>
     </div>

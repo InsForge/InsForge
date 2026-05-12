@@ -1,5 +1,6 @@
 import { apiClient } from '#lib/api/client';
 import { AIModelSchema, AIOverview, OpenRouterKey } from '@insforge/shared-schemas';
+import type { AIOverviewRange } from '@insforge/shared-schemas';
 
 export type AIProvider = 'openrouter';
 
@@ -10,7 +11,7 @@ export class AIService {
     });
   }
 
-  getOverview(range: string = '1m'): Promise<AIOverview> {
+  getOverview(range: AIOverviewRange = '1m'): Promise<AIOverview> {
     return apiClient.request(`/ai/overview?range=${encodeURIComponent(range)}`, {
       headers: apiClient.withAccessToken(),
     });

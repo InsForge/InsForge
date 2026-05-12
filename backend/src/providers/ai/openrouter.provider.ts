@@ -5,7 +5,7 @@ import { isCloudEnvironment } from '@/utils/environment.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import logger from '@/utils/logger.js';
-import type { AIOverview } from '@insforge/shared-schemas';
+import type { AIOverview, AIOverviewRange } from '@insforge/shared-schemas';
 
 interface CloudCredentialsResponse {
   openrouter?: {
@@ -75,8 +75,6 @@ interface ResolvedApiKey {
   apiKey: string;
   source: ApiKeySource;
 }
-
-export type AIOverviewRange = '1d' | '1w' | '1m' | '1y';
 
 const EMPTY_AI_OVERVIEW: AIOverview = {
   key: {
@@ -459,13 +457,27 @@ export class OpenRouterProvider {
       buckets.set(bucketKey, bucket);
     }
 
-    const entries = Array.from(buckets.values());
+    const entries = this.sortOverviewBuckets(Array.from(buckets.values()), allowedBuckets);
 
     return {
       spend: entries.map((bucket) => ({ label: bucket.label, value: bucket.usage })),
       requests: entries.map((bucket) => ({ label: bucket.label, value: bucket.requests })),
       tokens: entries.map((bucket) => ({ label: bucket.label, value: bucket.tokens })),
     };
+  }
+
+  private sortOverviewBuckets(
+    entries: OverviewBucket[],
+    allowedBuckets: Map<string, OverviewBucket>
+  ): OverviewBucket[] {
+    const bucketOrder = new Map(
+      Array.from(allowedBuckets.keys()).map((key, index) => [key, index])
+    );
+    return [...entries].sort(
+      (a, b) =>
+        (bucketOrder.get(a.label) ?? Number.MAX_SAFE_INTEGER) -
+        (bucketOrder.get(b.label) ?? Number.MAX_SAFE_INTEGER)
+    );
   }
 
   private buildOverviewRequestRows(
@@ -552,7 +564,13 @@ export class OpenRouterProvider {
       return date.slice(0, 7);
     }
     if (range === '1d') {
-      return date;
+      const hourMatch = date.match(/^(\d{4}-\d{2}-\d{2}T\d{2})/);
+      if (hourMatch) {
+        return `${hourMatch[1]}:00`;
+      }
+
+      const parsed = new Date(date);
+      return Number.isNaN(parsed.getTime()) ? date : this.formatUtcHourBucket(parsed);
     }
     return date.slice(0, 10);
   }

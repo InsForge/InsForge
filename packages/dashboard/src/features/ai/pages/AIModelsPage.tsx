@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@insforge/ui';
+import { ErrorState } from '#components';
 import {
   generateProviderTabs,
   filterModelsByProvider,
@@ -26,7 +27,7 @@ import { ModelRow } from '#features/ai/components';
 import { MODEL_MODALITY_FILTERS, type ModelModalityFilter } from '#features/ai/constants';
 
 export default function AIModelsPage() {
-  const { allAvailableModels, isLoadingModels } = useAIModels();
+  const { allAvailableModels, isLoadingModels, modelsError } = useAIModels();
 
   // Dynamically generate provider tabs from available models
   const providers = useMemo(() => generateProviderTabs(allAvailableModels), [allAvailableModels]);
@@ -38,10 +39,10 @@ export default function AIModelsPage() {
   const [modalityFilter, setModalityFilter] = useState<ModelModalityFilter>('all');
   const [collapsedProviders, setCollapsedProviders] = useState<Set<string>>(() => new Set());
 
-  // Set default active tab when providers are loaded
   useEffect(() => {
-    if (providers.length > 0 && !activeTab) {
-      setActiveTab(providers[0].id);
+    const providerIds = new Set(['all', ...providers.map((provider) => provider.id)]);
+    if (!providerIds.has(activeTab)) {
+      setActiveTab('all');
     }
   }, [providers, activeTab]);
 
@@ -215,6 +216,12 @@ export default function AIModelsPage() {
               <div className="flex items-center justify-center h-64">
                 <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
               </div>
+            ) : modelsError ? (
+              <ErrorState
+                title="Failed to load models"
+                error={modelsError}
+                className="border-[var(--alpha-8)] bg-card"
+              />
             ) : modelsForActiveProvider.length === 0 ? (
               <div className="flex items-center justify-center h-64 text-muted-foreground">
                 No models match the current filters.
