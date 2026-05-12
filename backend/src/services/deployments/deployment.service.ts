@@ -109,7 +109,7 @@ export class DeploymentService {
    *
    * `customSlug: null` means cloud + slug not set (project uses default URL).
    */
-  async getMetadata(): Promise<DeploymentsMetadataSchema | undefined> {
+  async getConfigMetadata(): Promise<DeploymentsMetadataSchema | undefined> {
     if (!isCloudEnvironment()) {
       return undefined;
     }

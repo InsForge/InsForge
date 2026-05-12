@@ -39,7 +39,7 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
       storageService.getMetadata(),
       aiConfigService.getMetadata(),
       functionService.getMetadata(),
-      deploymentService.getMetadata(),
+      deploymentService.getConfigMetadata(),
     ]);
 
     // Get version from package.json or default
@@ -52,10 +52,10 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
       functions,
       aiIntegration: aiConfig,
       // Deployments slice is omitted entirely on self-hosted backends
-      // (deploymentService.getMetadata returns undefined). Cloud projects
-      // see { customSlug: string | null }. The CLI capability probe
-      // depends on this presence/absence signal to gate [deployments]
-      // TOML sections.
+      // (deploymentService.getConfigMetadata returns undefined). Cloud
+      // projects see { customSlug: string | null }. The CLI capability
+      // probe depends on this presence/absence signal to gate
+      // [deployments] TOML sections.
       ...(deployments ? { deployments } : {}),
       version,
     };
