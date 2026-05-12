@@ -335,6 +335,10 @@ export function useCloudHosting() {
         case 'userApiKey':
           pendingRequestsRef.current.userApiKey = pendingRequest as PendingRequest<string>;
           return;
+        case 'modelCredits':
+          pendingRequestsRef.current.modelCredits =
+            pendingRequest as PendingRequest<DashboardModelCreditUsage>;
+          return;
         case 'projectMetrics':
           pendingRequestsRef.current.projectMetrics =
             pendingRequest as PendingRequest<DashboardMetricsResponse>;
@@ -350,6 +354,10 @@ export function useCloudHosting() {
         case 'advisorScan':
           pendingRequestsRef.current.advisorScan = pendingRequest as PendingRequest<void>;
           return;
+        default: {
+          const exhaustiveKey: never = key;
+          throw new Error(`Unhandled pending request key: ${exhaustiveKey}`);
+        }
       }
     },
     []
