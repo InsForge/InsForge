@@ -3,9 +3,4 @@ export { ChatCompletionService } from './chat-completion.service.js';
 export { ImageGenerationService } from './image-generation.service.js';
 
 // Helper functions
-export {
-  sortModalities,
-  normalizeModalities,
-  calculatePricePerMillion,
-  getProviderOrder,
-} from './helpers.js';
+export { sortModalities, normalizeModalities, getProviderOrder } from './helpers.js';

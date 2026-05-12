@@ -6,10 +6,6 @@ const { mockFetch } = vi.hoisted(() => ({
 
 vi.stubGlobal('fetch', mockFetch);
 
-vi.mock('../../src/utils/environment', () => ({
-  isCloudEnvironment: () => false,
-}));
-
 import { AIModelService } from '../../src/services/ai/ai-model.service';
 
 describe('AIModelService', () => {

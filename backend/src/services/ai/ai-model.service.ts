@@ -1,4 +1,3 @@
-import { isCloudEnvironment } from '@/utils/environment.js';
 import type { RawOpenRouterModel } from '@/types/ai.js';
 import type { AIModelSchema } from '@insforge/shared-schemas';
 import { calculateTokenPrices, normalizeModalities, getProviderOrder } from './helpers.js';
@@ -6,6 +5,7 @@ import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 
 const MODELS_CACHE_TTL_MS = 60 * 60 * 1000;
+const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models?output_modalities=all';
 
 let modelsCache: {
   expiresAt: number;
@@ -15,7 +15,7 @@ let modelsCache: {
 export class AIModelService {
   /**
    * Get all available AI models
-   * Fetches from cloud API if in cloud environment, otherwise from OpenRouter directly
+   * Fetches the public OpenRouter catalog directly.
    */
   static async getModels(): Promise<AIModelSchema[]> {
     const now = Date.now();
@@ -23,13 +23,7 @@ export class AIModelService {
       return modelsCache.models;
     }
 
-    // Determine the API endpoint based on environment
-    const apiUrl = isCloudEnvironment()
-      ? 'https://api.insforge.dev/ai/v1/models'
-      : 'https://openrouter.ai/api/v1/models?output_modalities=all';
-
-    // Fetch models from the appropriate endpoint
-    const response = await fetch(apiUrl);
+    const response = await fetch(OPENROUTER_MODELS_URL);
 
     if (!response.ok) {
       if (modelsCache) {

@@ -14,98 +14,19 @@ import {
 } from '@insforge/ui';
 import type { AIOverviewMetricPoint, AIOverviewRequestRow } from '@insforge/shared-schemas';
 import { CodeEditor, PaginationControls } from '#components';
-import OpenAIIcon from '#assets/logos/openai.svg?react';
-import ClaudeIcon from '#assets/logos/claude_code.svg?react';
-import GeminiIcon from '#assets/logos/gemini.svg?react';
 import { useAIOverview } from '#features/ai/hooks/useAIOverview';
 import { useOpenRouterKey } from '#features/ai/hooks/useOpenRouterKey';
 import { getFriendlyModelName, getProviderLogo } from '#features/ai/helpers';
 import { formatTime } from '#lib/utils/utils';
-
-function getCodeSnippets(modelId: string) {
-  return {
-    sdk: `import OpenAI from 'openai';
-
-const openai = new OpenAI({
-  baseURL: 'https://openrouter.ai/api/v1',
-  apiKey: process.env.OPENROUTER_API_KEY,
-});
-
-const completion = await openai.chat.completions.create({
-  model: '${modelId}',
-  messages: [
-    {
-      role: 'user',
-      content: 'Why is the sky blue?',
-    },
-  ],
-});
-
-console.log(completion.choices[0].message);`,
-    python: `from openai import OpenAI
-import os
-
-client = OpenAI(
-    base_url="https://openrouter.ai/api/v1",
-    api_key=os.environ["OPENROUTER_API_KEY"],
-)
-
-completion = client.chat.completions.create(
-    model="${modelId}",
-    messages=[
-        {
-            "role": "user",
-            "content": "Why is the sky blue?",
-        }
-    ],
-)
-
-print(completion.choices[0].message)`,
-    http: `curl https://openrouter.ai/api/v1/chat/completions \\
-  -H "Authorization: Bearer $OPENROUTER_API_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{"model":"${modelId}","messages":[{"role":"user","content":"Why is the sky blue?"}]}'`,
-  };
-}
-
-type CodeTab = keyof ReturnType<typeof getCodeSnippets>;
-type TimeRange = '1d' | '1w' | '1m' | '1y';
-
-const CODE_TAB_LANGUAGE: Record<CodeTab, 'javascript' | 'python'> = {
-  sdk: 'javascript',
-  python: 'python',
-  http: 'python',
-};
-
-const QUICK_START_MODELS = [
-  {
-    id: 'openai/gpt-5.5',
-    label: 'OpenAI',
-    icon: OpenAIIcon,
-  },
-  {
-    id: 'anthropic/claude-sonnet-4.6',
-    label: 'Anthropic',
-    icon: ClaudeIcon,
-  },
-  {
-    id: 'google/gemini-2.5-pro',
-    label: 'Gemini',
-    icon: GeminiIcon,
-  },
-] as const;
-
-const TIME_RANGE_OPTIONS: { value: TimeRange; label: string }[] = [
-  { value: '1d', label: 'Last 1 day' },
-  { value: '1w', label: 'Last 1 week' },
-  { value: '1m', label: 'Last 1 month' },
-  { value: '1y', label: 'Last 1 year' },
-];
-
-const REQUEST_RANGE_OPTIONS: { value: Extract<TimeRange, '1w' | '1m'>; label: string }[] = [
-  { value: '1w', label: 'Last 1 week' },
-  { value: '1m', label: 'Last 1 month' },
-];
+import {
+  CODE_TAB_LANGUAGE,
+  OVERVIEW_QUICK_START_MODELS,
+  REQUEST_RANGE_OPTIONS,
+  TIME_RANGE_OPTIONS,
+  getOverviewCodeSnippets,
+  type CodeTab,
+  type TimeRange,
+} from '#features/ai/constants';
 
 function formatCurrency(value: number): string {
   return `$${value.toFixed(value >= 10 ? 0 : 2)}`;
@@ -477,9 +398,9 @@ function RequestTable({ rows }: { rows: AIOverviewRequestRow[] }) {
 
 export default function AIOverviewPage() {
   const [codeTab, setCodeTab] = useState<CodeTab>('sdk');
-  const [selectedModelId, setSelectedModelId] = useState<(typeof QUICK_START_MODELS)[number]['id']>(
-    QUICK_START_MODELS[0].id
-  );
+  const [selectedModelId, setSelectedModelId] = useState<
+    (typeof OVERVIEW_QUICK_START_MODELS)[number]['id']
+  >(OVERVIEW_QUICK_START_MODELS[0].id);
   const [usageRange, setUsageRange] = useState<TimeRange>('1m');
   const [requestsRange, setRequestsRange] = useState<Extract<TimeRange, '1w' | '1m'>>('1m');
   const { data: usageData, isLoading: isUsageLoading } = useAIOverview(usageRange);
@@ -489,7 +410,7 @@ export default function AIOverviewPage() {
     isLoading: isOpenRouterKeyLoading,
     error: openRouterKeyError,
   } = useOpenRouterKey();
-  const codeSnippets = useMemo(() => getCodeSnippets(selectedModelId), [selectedModelId]);
+  const codeSnippets = useMemo(() => getOverviewCodeSnippets(selectedModelId), [selectedModelId]);
 
   const totals = useMemo(
     () => ({
@@ -576,7 +497,7 @@ export default function AIOverviewPage() {
               </div>
             </div>
             <div className="flex h-8 items-center gap-2 text-[12px] text-muted-foreground">
-              {QUICK_START_MODELS.map((model) => {
+              {OVERVIEW_QUICK_START_MODELS.map((model) => {
                 const Icon = model.icon;
                 const isSelected = selectedModelId === model.id;
 

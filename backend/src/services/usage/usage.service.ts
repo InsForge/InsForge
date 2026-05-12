@@ -2,18 +2,10 @@ import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import logger from '@/utils/logger.js';
 
-export interface AIUsageByModel {
-  model: string;
-  total_input_tokens: number;
-  total_output_tokens: number;
-  total_images: number;
-}
-
 export interface UsageStats {
   mcp_usage_count: number;
   database_size_bytes: number;
   storage_size_bytes: number;
-  ai_usage_by_model: AIUsageByModel[];
 }
 
 export interface MCPUsageRecord {
@@ -91,7 +83,6 @@ export class UsageService {
 
   /**
    * Get comprehensive usage statistics for a date range.
-   * AI usage tables are deprecated, so AI usage is no longer reported here.
    */
   async getUsageStats(startDate: Date, endDate: Date): Promise<UsageStats> {
     try {
@@ -119,7 +110,6 @@ export class UsageService {
         mcp_usage_count: parseInt(mcpResult.rows[0]?.count || '0'),
         database_size_bytes: parseInt(dbSizeResult.rows[0]?.size || '0'),
         storage_size_bytes: parseInt(storageResult.rows[0]?.total_size || '0'),
-        ai_usage_by_model: [],
       };
     } catch (error) {
       logger.error('Failed to get usage stats', { error });

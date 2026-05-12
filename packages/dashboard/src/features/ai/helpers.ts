@@ -190,22 +190,6 @@ export function toModelOption(model: AIModelSchema): ModelOption {
   };
 }
 
-// Sort models with configured ones at the end
-export const sortModelsByConfigurationStatus = (
-  models: ModelOption[],
-  configuredModelIds: string[]
-): ModelOption[] => {
-  return [...models].sort((a, b) => {
-    const aConfigured = configuredModelIds.includes(a.modelId);
-    const bConfigured = configuredModelIds.includes(b.modelId);
-
-    if (aConfigured === bConfigured) {
-      return 0;
-    }
-    return aConfigured ? 1 : -1;
-  });
-};
-
 // Sorting types
 export type SortField = 'inputPrice' | 'outputPrice' | 'released';
 export type SortDirection = 'asc' | 'desc';

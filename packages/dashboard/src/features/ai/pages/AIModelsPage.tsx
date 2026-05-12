@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Loader2, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
-import { useAIConfigs } from '#features/ai/hooks/useAIConfigs';
+import { useAIModels } from '#features/ai/hooks/useAIModels';
 import {
   Tabs,
   Tab,
@@ -23,20 +23,10 @@ import {
   type SortDirection,
 } from '#features/ai/helpers';
 import { ModelRow } from '#features/ai/components';
-
-type ModelModalityFilter = string;
-
-const MODALITY_FILTERS: { id: ModelModalityFilter; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'text', label: 'Text' },
-  { id: 'image', label: 'Image' },
-  { id: 'audio', label: 'Audio' },
-  { id: 'video', label: 'Video' },
-  { id: 'embeddings', label: 'Embed' },
-];
+import { MODEL_MODALITY_FILTERS, type ModelModalityFilter } from '#features/ai/constants';
 
 export default function AIModelsPage() {
-  const { allAvailableModels, isLoadingModels } = useAIConfigs();
+  const { allAvailableModels, isLoadingModels } = useAIModels();
 
   // Dynamically generate provider tabs from available models
   const providers = useMemo(() => generateProviderTabs(allAvailableModels), [allAvailableModels]);
@@ -191,7 +181,7 @@ export default function AIModelsPage() {
                 onValueChange={(value) => setModalityFilter(value as ModelModalityFilter)}
                 className="h-8"
               >
-                {MODALITY_FILTERS.map((filter) => (
+                {MODEL_MODALITY_FILTERS.map((filter) => (
                   <Tab key={filter.id} value={filter.id} className="h-8 min-w-[66px]">
                     {filter.label}
                   </Tab>

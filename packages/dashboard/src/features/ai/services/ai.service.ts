@@ -1,6 +1,8 @@
 import { apiClient } from '#lib/api/client';
 import { AIModelSchema, AIOverview, OpenRouterKey } from '@insforge/shared-schemas';
 
+export type AIProvider = 'openrouter';
+
 export class AIService {
   getModels(): Promise<AIModelSchema[]> {
     return apiClient.request('/ai/models', {
@@ -14,8 +16,8 @@ export class AIService {
     });
   }
 
-  getOpenRouterKey(): Promise<OpenRouterKey> {
-    return apiClient.request('/ai/openrouter-key', {
+  getProviderApiKey(provider: AIProvider): Promise<OpenRouterKey> {
+    return apiClient.request(`/ai/${provider}/api-key`, {
       headers: apiClient.withAccessToken(),
     });
   }

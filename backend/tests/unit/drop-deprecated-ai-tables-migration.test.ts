@@ -15,6 +15,8 @@ describe('043_drop-deprecated-ai-configs-and-usage migration', () => {
   });
 
   it('drops current AI config/usage tables idempotently', () => {
+    expect(sql).toMatch(/information_schema\.schemata/i);
+    expect(sql).toMatch(/schema_name\s*=\s*'ai'/i);
     expect(sql).toMatch(/DROP TABLE IF EXISTS ai\.usage\s+CASCADE\s*;/i);
     expect(sql).toMatch(/DROP TABLE IF EXISTS ai\.configs\s+CASCADE\s*;/i);
   });

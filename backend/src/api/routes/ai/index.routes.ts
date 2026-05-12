@@ -17,6 +17,7 @@ import {
 
 const router = Router();
 const chatService = ChatCompletionService.getInstance();
+type AIProvider = 'openrouter';
 
 /**
  * GET /api/ai/models
@@ -51,16 +52,17 @@ router.get(
 );
 
 /**
- * GET /api/ai/openrouter-key
- * Get the active OpenRouter key for Model Gateway display/copy.
+ * GET /api/ai/:provider/api-key
+ * Get the active provider API key for Model Gateway display/copy.
  */
 router.get(
-  '/openrouter-key',
+  '/:provider/api-key',
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      const provider = parseAIProvider(req.params.provider);
       const openRouterProvider = OpenRouterProvider.getInstance();
-      const key = await openRouterProvider.getMaskedApiKey();
+      const key = await getProviderApiKey(provider, openRouterProvider);
       successResponse(res, key);
     } catch (error) {
       if (error instanceof AppError && error.code === ERROR_CODES.AI_INVALID_API_KEY) {
@@ -77,6 +79,25 @@ router.get(
     }
   }
 );
+
+function parseAIProvider(value: string | undefined): AIProvider {
+  if (value === 'openrouter') {
+    return value;
+  }
+
+  throw new AppError(
+    `Unsupported AI provider: ${value || 'unknown'}`,
+    400,
+    ERROR_CODES.INVALID_INPUT
+  );
+}
+
+async function getProviderApiKey(provider: AIProvider, openRouterProvider: OpenRouterProvider) {
+  switch (provider) {
+    case 'openrouter':
+      return openRouterProvider.getMaskedApiKey();
+  }
+}
 
 function parseOverviewRange(value: unknown): AIOverviewRange {
   return value === '1d' || value === '1w' || value === '1y' ? value : '1m';

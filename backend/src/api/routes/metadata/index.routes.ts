@@ -44,7 +44,6 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
       database,
       storage,
       functions,
-      aiIntegration: { models: [] },
       version,
     };
 
@@ -79,15 +78,6 @@ router.get('/storage', async (_req: AuthRequest, res: Response, next: NextFuncti
   try {
     const storageMetadata = await storageService.getMetadata();
     successResponse(res, storageMetadata);
-  } catch (error) {
-    next(error);
-  }
-});
-
-// Get AI metadata
-router.get('/ai', (_req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    successResponse(res, { models: [] });
   } catch (error) {
     next(error);
   }

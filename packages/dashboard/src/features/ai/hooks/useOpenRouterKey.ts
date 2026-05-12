@@ -5,7 +5,7 @@ import type { OpenRouterKey } from '@insforge/shared-schemas';
 export function useOpenRouterKey() {
   return useQuery<OpenRouterKey>({
     queryKey: ['openrouter-key'],
-    queryFn: () => aiService.getOpenRouterKey(),
+    queryFn: () => aiService.getProviderApiKey('openrouter'),
     staleTime: 60 * 1000,
     retry: false,
   });
