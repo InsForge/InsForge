@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { aiConfigurationSchema, aiUsageRecordSchema, modalitySchema } from './ai.schema.js';
+import { modalitySchema } from './ai.schema.js';
 
 // ============= Chat Completion Schemas =============
 
@@ -274,52 +274,46 @@ export const imageGenerationResponseSchema = z.object({
 
 export const aiModelSchema = z.object({
   id: z.string(),
+  created: z.number().optional(),
   inputModality: z.array(modalitySchema).min(1),
   outputModality: z.array(modalitySchema).min(1),
   provider: z.string(),
   modelId: z.string(),
   inputPrice: z.number().min(0).optional(), // Price per million tokens in USD
   outputPrice: z.number().min(0).optional(), // Price per million tokens in USD
+  inputPriceLabel: z.string().optional(),
+  outputPriceLabel: z.string().optional(),
 });
 
-export const createAIConfigurationRequestSchema = aiConfigurationSchema.omit({
-  id: true,
+export const aiOverviewMetricPointSchema = z.object({
+  label: z.string(),
+  value: z.number(),
 });
 
-export const updateAIConfigurationRequestSchema = z.object({
-  systemPrompt: z.string().nullable(),
+export const aiOverviewSchema = z.object({
+  key: z.object({
+    label: z.string().optional(),
+    limit: z.number().nullable(),
+    limitRemaining: z.number().nullable(),
+    limitReset: z.string().nullable().optional(),
+    usage: z.number(),
+    usageDaily: z.number(),
+    usageWeekly: z.number(),
+    usageMonthly: z.number(),
+    isFreeTier: z.boolean().optional(),
+    observabilityAvailable: z.boolean(),
+    observabilityError: z.string().optional(),
+  }),
+  charts: z.object({
+    spend: z.array(aiOverviewMetricPointSchema),
+    requests: z.array(aiOverviewMetricPointSchema),
+    tokens: z.array(aiOverviewMetricPointSchema),
+  }),
 });
 
-export const listAIUsageResponseSchema = z.object({
-  records: z.array(aiUsageRecordSchema),
-  total: z.number(),
-});
-
-export const getAIUsageRequestSchema = z.object({
-  startDate: z.string().datetime().optional(),
-  endDate: z.string().datetime().optional(),
-  limit: z.string().regex(/^\d+$/).default('50'),
-  offset: z.string().regex(/^\d+$/).default('0'),
-});
-
-export const getAIUsageSummaryRequestSchema = z.object({
-  configId: z.string().uuid().optional(),
-  startDate: z.string().datetime().optional(),
-  endDate: z.string().datetime().optional(),
-});
-
-// ============= AI Gateway BYOK Schemas =============
-
-export const keySourceSchema = z.enum(['byok', 'cloud', 'env', 'unconfigured']);
-
-export const gatewayConfigResponseSchema = z.object({
-  keySource: keySourceSchema,
-  hasByokKey: z.boolean(),
-  maskedKey: z.string().optional(),
-});
-
-export const setGatewayBYOKKeyRequestSchema = z.object({
-  apiKey: z.string().min(1, 'API key is required'),
+export const openRouterKeySchema = z.object({
+  apiKey: z.string(),
+  maskedKey: z.string(),
 });
 
 // Export types
@@ -346,11 +340,6 @@ export type EmbeddingsRequest = z.infer<typeof embeddingsRequestSchema>;
 export type EmbeddingObject = z.infer<typeof embeddingObjectSchema>;
 export type EmbeddingsResponse = z.infer<typeof embeddingsResponseSchema>;
 export type AIModelSchema = z.infer<typeof aiModelSchema>;
-export type CreateAIConfigurationRequest = z.infer<typeof createAIConfigurationRequestSchema>;
-export type UpdateAIConfigurationRequest = z.infer<typeof updateAIConfigurationRequestSchema>;
-export type ListAIUsageResponse = z.infer<typeof listAIUsageResponseSchema>;
-export type GetAIUsageRequest = z.infer<typeof getAIUsageRequestSchema>;
-export type GetAIUsageSummaryRequest = z.infer<typeof getAIUsageSummaryRequestSchema>;
-export type KeySource = z.infer<typeof keySourceSchema>;
-export type GatewayConfigResponse = z.infer<typeof gatewayConfigResponseSchema>;
-export type SetGatewayBYOKKeyRequest = z.infer<typeof setGatewayBYOKKeyRequestSchema>;
+export type AIOverviewMetricPoint = z.infer<typeof aiOverviewMetricPointSchema>;
+export type AIOverview = z.infer<typeof aiOverviewSchema>;
+export type OpenRouterKey = z.infer<typeof openRouterKeySchema>;

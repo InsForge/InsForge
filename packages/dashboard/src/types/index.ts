@@ -54,6 +54,12 @@ export interface DashboardInstanceInfo {
   }>;
 }
 
+export interface DashboardModelCreditUsage {
+  used: number;
+  limit: number;
+  isFree: boolean;
+}
+
 export type DashboardMetricsRange = '1h' | '6h' | '24h' | '3d';
 export type DashboardMetricName =
   | 'cpu_usage'
@@ -120,7 +126,7 @@ export interface DashboardProps {
   showNavbar?: boolean;
   project?: DashboardProjectInfo;
   onRouteChange?: (path: string) => void;
-  onNavigateToSubscription?: () => void;
+  onShowUpgradeDialog?: () => void;
   onRenameProject?: (name: string) => Promise<void>;
   onDeleteProject?: () => Promise<void>;
   onRequestBackupInfo?: () => Promise<DashboardBackupInfo>;
@@ -135,6 +141,7 @@ export interface DashboardProps {
   onUpdateVersion?: () => Promise<void>;
   onRequestUserInfo?: () => Promise<DashboardUserInfo>;
   onRequestUserApiKey?: () => Promise<string>;
+  onRequestModelCredits?: () => Promise<DashboardModelCreditUsage>;
   onRequestProjectMetrics?: (range: DashboardMetricsRange) => Promise<DashboardMetricsResponse>;
   onRequestAdvisorLatest?: () => Promise<DashboardAdvisorSummary | null>;
   onRequestAdvisorIssues?: (

@@ -44,7 +44,6 @@ export enum DataUpdateResourceType {
   FUNCTIONS = 'functions',
   DEPLOYMENTS = 'deployments',
   REALTIME = 'realtime',
-  AI_USAGE = 'ai_usage',
   COMPUTE_SERVICES = 'compute_services',
 }
 

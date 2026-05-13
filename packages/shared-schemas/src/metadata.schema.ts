@@ -37,16 +37,6 @@ export const edgeFunctionMetadataSchema = z.object({
   status: z.string(),
 });
 
-export const aiMetadataSchema = z.object({
-  models: z.array(
-    z.object({
-      inputModality: z.array(z.string()),
-      outputModality: z.array(z.string()),
-      modelId: z.string(),
-    })
-  ),
-});
-
 export const realtimeMetadataSchema = z.object({
   channels: z.array(realtimeChannelSchema),
   permissions: realtimePermissionsResponseSchema,
@@ -69,7 +59,6 @@ export const appMetaDataSchema = z.object({
   auth: authMetadataSchema,
   database: databaseMetadataSchema,
   storage: storageMetadataSchema,
-  aiIntegration: aiMetadataSchema.optional(),
   functions: z.array(edgeFunctionMetadataSchema),
   realtime: realtimeMetadataSchema.optional(),
   deployments: deploymentsMetadataSchema.optional(),
@@ -81,7 +70,6 @@ export type DatabaseMetadataSchema = z.infer<typeof databaseMetadataSchema>;
 export type BucketMetadataSchema = z.infer<typeof bucketMetadataSchema>;
 export type StorageMetadataSchema = z.infer<typeof storageMetadataSchema>;
 export type EdgeFunctionMetadataSchema = z.infer<typeof edgeFunctionMetadataSchema>;
-export type AIMetadataSchema = z.infer<typeof aiMetadataSchema>;
 export type RealtimeMetadataSchema = z.infer<typeof realtimeMetadataSchema>;
 export type DeploymentsMetadataSchema = z.infer<typeof deploymentsMetadataSchema>;
 export type AppMetadataSchema = z.infer<typeof appMetaDataSchema>;

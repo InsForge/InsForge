@@ -43,7 +43,6 @@ export enum DataUpdateResourceType {
   FUNCTIONS = 'functions',
   DEPLOYMENTS = 'deployments',
   REALTIME = 'realtime',
-  AI_USAGE = 'ai_usage',
 }
 
 export interface DatabaseResourceUpdate {
@@ -326,9 +325,6 @@ export function SocketProvider({ children }: SocketProviderProps) {
           break;
         case DataUpdateResourceType.REALTIME:
           void queryClient.invalidateQueries({ queryKey: ['realtime'] });
-          break;
-        case DataUpdateResourceType.AI_USAGE:
-          void queryClient.invalidateQueries({ queryKey: ['ai-usage-summary'] });
           break;
       }
     };

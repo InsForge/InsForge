@@ -6,30 +6,18 @@ import { EmbeddingService } from '@/services/ai/embedding.service.js';
 import { AIModelService } from '@/services/ai/ai-model.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
-import { successResponse } from '@/utils/response.js';
-import { AIConfigService } from '@/services/ai/ai-config.service.js';
-import { AIUsageService } from '@/services/ai/ai-usage.service.js';
-import { AIGatewayConfigService } from '@/services/ai/ai-gateway-config.service.js';
+import { errorResponse, successResponse } from '@/utils/response.js';
 import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
-import { AuditService } from '@/services/logs/audit.service.js';
 import logger from '@/utils/logger.js';
 import {
-  createAIConfigurationRequestSchema,
-  updateAIConfigurationRequestSchema,
-  getAIUsageRequestSchema,
-  getAIUsageSummaryRequestSchema,
   chatCompletionRequestSchema,
-  imageGenerationRequestSchema,
   embeddingsRequestSchema,
-  setGatewayBYOKKeyRequestSchema,
+  imageGenerationRequestSchema,
 } from '@insforge/shared-schemas';
 
 const router = Router();
 const chatService = ChatCompletionService.getInstance();
-const aiConfigService = AIConfigService.getInstance();
-const aiUsageService = AIUsageService.getInstance();
-const auditService = AuditService.getInstance();
-const aiGatewayConfigService = AIGatewayConfigService.getInstance();
+type AIProvider = 'openrouter';
 
 /**
  * GET /api/ai/models
@@ -43,6 +31,80 @@ router.get('/models', verifyAdmin, async (req: AuthRequest, res: Response, next:
     next(error);
   }
 });
+
+/**
+ * GET /api/ai/overview
+ * Get key-level Model Gateway observability from OpenRouter.
+ */
+router.get(
+  '/overview',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const openRouterProvider = OpenRouterProvider.getInstance();
+      const overview = await openRouterProvider.getOverview();
+      successResponse(res, overview);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * GET /api/ai/:provider/api-key
+ * Get the active provider API key for Model Gateway display/copy.
+ */
+router.get(
+  '/:provider/api-key',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const provider = parseAIProvider(req.params.provider);
+      const openRouterProvider = OpenRouterProvider.getInstance();
+      const key = await getProviderApiKey(provider, openRouterProvider);
+      successResponse(res, key);
+    } catch (error) {
+      if (error instanceof AppError && error.code === ERROR_CODES.AI_INVALID_API_KEY) {
+        errorResponse(
+          res,
+          ERROR_CODES.AI_INVALID_API_KEY,
+          'OpenRouter API key is not configured.',
+          400,
+          'Set OPENROUTER_API_KEY in the backend environment.'
+        );
+        return;
+      }
+      next(error);
+    }
+  }
+);
+
+function parseAIProvider(value: string | undefined): AIProvider {
+  if (value === 'openrouter') {
+    return value;
+  }
+
+  throw new AppError(
+    `Unsupported AI provider: ${value || 'unknown'}`,
+    400,
+    ERROR_CODES.INVALID_INPUT
+  );
+}
+
+function getProviderApiKey(provider: AIProvider, openRouterProvider: OpenRouterProvider) {
+  switch (provider) {
+    case 'openrouter':
+      return openRouterProvider.getMaskedApiKey();
+    default: {
+      const exhaustiveProvider: never = provider;
+      throw new AppError(
+        `Unsupported AI provider: ${exhaustiveProvider}`,
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+  }
+}
 
 /**
  * POST /api/ai/chat/completion
@@ -164,323 +226,6 @@ router.post(
 );
 
 /**
- * POST /api/ai/configurations
- * Create a new AI configuration
- */
-router.post(
-  '/configurations',
-  verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const validationResult = createAIConfigurationRequestSchema.safeParse(req.body);
-
-      if (!validationResult.success) {
-        throw new AppError(
-          `Validation error: ${validationResult.error.errors.map((e) => e.message).join(', ')}`,
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
-      }
-      const { inputModality, outputModality, provider, modelId, systemPrompt } =
-        validationResult.data;
-
-      const result = await aiConfigService.create(
-        inputModality,
-        outputModality,
-        provider,
-        modelId,
-        systemPrompt
-      );
-
-      // Log audit for AI configuration creation
-      await auditService.log({
-        actor: req.user?.email || 'api-key',
-        action: 'CREATE_CONFIGURATION',
-        module: 'AI',
-        details: {
-          configId: result.id,
-          inputModality,
-          outputModality,
-          provider,
-          modelId,
-        },
-        ip_address: req.ip,
-      });
-
-      successResponse(
-        res,
-        {
-          id: result.id,
-          message: 'AI configuration created successfully',
-        },
-        201
-      );
-    } catch (error) {
-      if (error instanceof AppError) {
-        next(error);
-      } else {
-        next(
-          new AppError(
-            error instanceof Error ? error.message : 'Failed to create AI configuration',
-            500,
-            ERROR_CODES.INTERNAL_ERROR
-          )
-        );
-      }
-    }
-  }
-);
-
-/**
- * GET /api/ai/configurations
- * List all AI configurations
- */
-router.get(
-  '/configurations',
-  verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const configurations = await aiConfigService.findAll();
-
-      successResponse(res, configurations);
-    } catch (error) {
-      next(
-        new AppError(
-          error instanceof Error ? error.message : 'Failed to fetch AI configurations',
-          500,
-          ERROR_CODES.INTERNAL_ERROR
-        )
-      );
-    }
-  }
-);
-
-/**
- * PATCH /api/ai/configurations/:id
- * Update an AI configuration
- */
-router.patch(
-  '/configurations/:id',
-  verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const validationResult = updateAIConfigurationRequestSchema.safeParse(req.body);
-
-      if (!validationResult.success) {
-        throw new AppError(
-          `Validation error: ${validationResult.error.errors.map((e) => e.message).join(', ')}`,
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
-      }
-
-      const { systemPrompt } = validationResult.data;
-
-      const updated = await aiConfigService.update(req.params.id, systemPrompt);
-
-      if (!updated) {
-        throw new AppError('AI configuration not found', 404, ERROR_CODES.NOT_FOUND);
-      }
-
-      // Log audit for AI configuration update
-      await auditService.log({
-        actor: req.user?.email || 'api-key',
-        action: 'UPDATE_CONFIGURATION',
-        module: 'AI',
-        details: {
-          configId: req.params.id,
-          changes: { systemPrompt },
-        },
-        ip_address: req.ip,
-      });
-
-      successResponse(res, {
-        message: 'AI configuration updated successfully',
-      });
-    } catch (error) {
-      if (error instanceof AppError) {
-        next(error);
-      } else {
-        next(
-          new AppError(
-            error instanceof Error ? error.message : 'Failed to update AI configuration',
-            500,
-            ERROR_CODES.INTERNAL_ERROR
-          )
-        );
-      }
-    }
-  }
-);
-
-/**
- * DELETE /api/ai/configurations/:id
- * Disable an AI configuration
- */
-router.delete(
-  '/configurations/:id',
-  verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const disabled = await aiConfigService.disable(req.params.id);
-
-      if (!disabled) {
-        throw new AppError('AI configuration not found', 404, ERROR_CODES.NOT_FOUND);
-      }
-
-      // Log audit for AI configuration disable
-      await auditService.log({
-        actor: req.user?.email || 'api-key',
-        action: 'DISABLE_CONFIGURATION',
-        module: 'AI',
-        details: {
-          configId: req.params.id,
-        },
-        ip_address: req.ip,
-      });
-
-      successResponse(res, {
-        message: 'AI configuration disabled successfully',
-      });
-    } catch (error) {
-      if (error instanceof AppError) {
-        next(error);
-      } else {
-        next(
-          new AppError(
-            error instanceof Error ? error.message : 'Failed to disable AI configuration',
-            500,
-            ERROR_CODES.INTERNAL_ERROR
-          )
-        );
-      }
-    }
-  }
-);
-
-/**
- * GET /api/ai/usage/summary
- * Get AI usage summary statistics
- */
-router.get(
-  '/usage/summary',
-  verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const validationResult = getAIUsageSummaryRequestSchema.safeParse(req.query);
-
-      if (!validationResult.success) {
-        throw new AppError(
-          `Validation error: ${validationResult.error.errors.map((e) => e.message).join(', ')}`,
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
-      }
-
-      const { configId, startDate, endDate } = validationResult.data;
-
-      const summary = await aiUsageService.getUsageSummary(
-        configId,
-        startDate ? new Date(startDate) : undefined,
-        endDate ? new Date(endDate) : undefined
-      );
-
-      successResponse(res, summary);
-    } catch (error) {
-      next(
-        new AppError(
-          error instanceof Error ? error.message : 'Failed to fetch usage summary',
-          500,
-          ERROR_CODES.INTERNAL_ERROR
-        )
-      );
-    }
-  }
-);
-
-/**
- * GET /api/ai/usage
- * Get AI usage records with pagination
- */
-router.get('/usage', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const validationResult = getAIUsageRequestSchema.safeParse(req.query);
-
-    if (!validationResult.success) {
-      throw new AppError(
-        `Validation error: ${validationResult.error.errors.map((e) => e.message).join(', ')}`,
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
-    }
-
-    const { startDate, endDate, limit, offset } = validationResult.data;
-
-    const usage = await aiUsageService.getAllUsage(
-      startDate ? new Date(startDate) : undefined,
-      endDate ? new Date(endDate) : undefined,
-      parseInt(limit),
-      parseInt(offset)
-    );
-
-    successResponse(res, usage);
-  } catch (error) {
-    next(
-      new AppError(
-        error instanceof Error ? error.message : 'Failed to fetch usage records',
-        500,
-        ERROR_CODES.INTERNAL_ERROR
-      )
-    );
-  }
-});
-
-/**
- * GET /api/ai/usage/config/:configId
- * Get usage records for a specific AI configuration
- */
-router.get(
-  '/usage/config/:configId',
-  verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const { startDate, endDate } = req.query;
-
-      const records = await aiUsageService.getUsageByConfig(
-        req.params.configId,
-        startDate ? new Date(startDate as string) : undefined,
-        endDate ? new Date(endDate as string) : undefined
-      );
-
-      successResponse(res, records);
-    } catch (error) {
-      next(
-        new AppError(
-          error instanceof Error ? error.message : 'Failed to fetch config usage records',
-          500,
-          ERROR_CODES.INTERNAL_ERROR
-        )
-      );
-    }
-  }
-);
-
-/**
- * GET /api/ai/credits
- * Get remaining credits for the current API key
- */
-router.get('/credits', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const openRouterProvider = OpenRouterProvider.getInstance();
-    const credits = await openRouterProvider.getRemainingCredits();
-
-    successResponse(res, credits);
-  } catch (error) {
-    next(error);
-  }
-});
-
-/**
  * POST /api/ai/embeddings
  * Generate embeddings for text input
  */
@@ -509,108 +254,6 @@ router.post(
         next(
           new AppError(
             error instanceof Error ? error.message : 'Failed to generate embeddings',
-            500,
-            ERROR_CODES.INTERNAL_ERROR
-          )
-        );
-      }
-    }
-  }
-);
-
-/**
- * GET /api/ai/gateway/config
- * Get current AI gateway credential configuration (key source + masked key status)
- */
-router.get(
-  '/gateway/config',
-  verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const config = await aiGatewayConfigService.getConfig();
-      successResponse(res, config);
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-/**
- * POST /api/ai/gateway/config
- * Set a developer-provided (BYOK) OpenRouter API key
- */
-router.post(
-  '/gateway/config',
-  verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const validationResult = setGatewayBYOKKeyRequestSchema.safeParse(req.body);
-      if (!validationResult.success) {
-        throw new AppError(
-          `Validation error: ${validationResult.error.errors.map((e) => e.message).join(', ')}`,
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
-      }
-
-      await aiGatewayConfigService.setBYOKKey(validationResult.data.apiKey);
-
-      await auditService.log({
-        actor: req.user?.email || 'api-key',
-        action: 'SET_BYOK_OPENROUTER_KEY',
-        module: 'AI',
-        details: {},
-        ip_address: req.ip,
-      });
-
-      successResponse(res, { message: 'OpenRouter API key configured successfully' });
-    } catch (error) {
-      if (error instanceof AppError) {
-        next(error);
-      } else {
-        next(
-          new AppError(
-            error instanceof Error ? error.message : 'Failed to configure API key',
-            500,
-            ERROR_CODES.INTERNAL_ERROR
-          )
-        );
-      }
-    }
-  }
-);
-
-/**
- * DELETE /api/ai/gateway/config
- * Remove the BYOK OpenRouter API key, reverting to the default credential source
- */
-router.delete(
-  '/gateway/config',
-  verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const removed = await aiGatewayConfigService.removeBYOKKey();
-
-      if (!removed) {
-        throw new AppError('No BYOK key configured', 404, ERROR_CODES.NOT_FOUND);
-      }
-
-      await auditService.log({
-        actor: req.user?.email || 'api-key',
-        action: 'REMOVE_BYOK_OPENROUTER_KEY',
-        module: 'AI',
-        details: {},
-        ip_address: req.ip,
-      });
-
-      successResponse(res, { message: 'OpenRouter API key removed successfully' });
-    } catch (error) {
-      if (error instanceof AppError) {
-        next(error);
-      } else {
-        next(
-          new AppError(
-            error instanceof Error ? error.message : 'Failed to remove API key',
             500,
             ERROR_CODES.INTERNAL_ERROR
           )

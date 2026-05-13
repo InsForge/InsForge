@@ -630,7 +630,7 @@ export default function ProjectSettingsMenuDialog({
                             <Button
                               type="button"
                               className="h-8 rounded px-3 text-sm font-medium"
-                              onClick={() => host.onNavigateToSubscription?.()}
+                              onClick={() => host.onShowUpgradeDialog?.()}
                             >
                               Upgrade Plan
                             </Button>

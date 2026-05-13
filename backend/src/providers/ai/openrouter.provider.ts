@@ -1,10 +1,11 @@
 import OpenAI from 'openai';
 import jwt from 'jsonwebtoken';
+import { createHash } from 'crypto';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import logger from '@/utils/logger.js';
-import { SecretService } from '@/services/secrets/secret.service.js';
+import type { AIOverview } from '@insforge/shared-schemas';
 
 interface CloudCredentialsResponse {
   openrouter?: {
@@ -23,31 +24,62 @@ interface CloudCredentials {
 
 interface OpenRouterKeyInfo {
   data: {
+    hash?: string;
     label: string;
     usage: number;
+    usage_daily?: number;
+    usage_weekly?: number;
+    usage_monthly?: number;
     limit: number | null;
+    limit_remaining?: number | null;
+    limit_reset?: string | null;
     is_free_tier: boolean;
+    is_management_key?: boolean;
   };
 }
 
-interface OpenRouterLimitation {
+interface OpenRouterActivityItem {
+  date: string;
+  usage: number;
+  requests: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  reasoning_tokens: number;
+}
+
+interface OverviewBucket {
   label: string;
-  credit_limit: number | null;
-  credit_used: number;
-  credit_remaining: number | null;
-  rate_limit?: {
-    requests?: number;
-    interval?: string;
-    note?: string;
-  };
+  usage: number;
+  requests: number;
+  tokens: number;
 }
 
-export const BYOK_SECRET_KEY = 'AI_GATEWAY_OPENROUTER_KEY';
-
-export type ApiKeySource = 'byok' | 'cloud' | 'env';
+export type ApiKeySource = 'cloud' | 'env';
 interface ResolvedApiKey {
   apiKey: string;
   source: ApiKeySource;
+}
+
+const EMPTY_AI_OVERVIEW: AIOverview = {
+  key: {
+    limit: null,
+    limitRemaining: null,
+    limitReset: null,
+    usage: 0,
+    usageDaily: 0,
+    usageWeekly: 0,
+    usageMonthly: 0,
+    observabilityAvailable: false,
+  },
+  charts: {
+    spend: [],
+    requests: [],
+    tokens: [],
+  },
+};
+
+function getCaughtErrorMessage(error: unknown): string {
+  return error instanceof Error && error.message ? error.message : 'Unknown error';
 }
 
 export class OpenRouterProvider {
@@ -57,8 +89,6 @@ export class OpenRouterProvider {
   private currentApiKey: string | undefined;
   private renewalPromise: Promise<string> | null = null;
   private fetchPromise: Promise<string> | null = null;
-  private byokKeyCache: string | null | undefined = undefined; // undefined = not yet fetched
-  private byokCacheGeneration = 0;
 
   private constructor() {}
 
@@ -85,63 +115,11 @@ export class OpenRouterProvider {
   }
 
   /**
-   * Get BYOK API key from secrets store (developer-provided key)
-   * Returns null if no BYOK key is configured
-   */
-  private async getBYOKApiKey(): Promise<string | null> {
-    if (this.byokKeyCache !== undefined) {
-      return this.byokKeyCache;
-    }
-    const generation = this.byokCacheGeneration;
-    try {
-      const secretService = SecretService.getInstance();
-      const key = await secretService.getSecretByKey(BYOK_SECRET_KEY);
-      if (this.byokCacheGeneration === generation) {
-        this.byokKeyCache = key;
-      }
-      return key;
-    } catch (error) {
-      logger.error('Failed to read BYOK secret, cannot determine BYOK state', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      // Don't cache null on transient errors — next request will retry
-      return null;
-    }
-  }
-
-  /**
-   * Returns true if a BYOK key is currently active (uses in-memory cache).
-   * Use this to skip cloud-specific behaviors like usage tracking.
-   */
-  async isByokActive(): Promise<boolean> {
-    return !!(await this.getBYOKApiKey());
-  }
-
-  /**
-   * Clear cached key and client, forcing re-resolution on next request.
-   * Call this after updating or removing the BYOK key.
-   */
-  clearKeyCache(): void {
-    this.openRouterClient = null;
-    this.currentApiKey = undefined;
-    this.cloudCredentials = undefined;
-    this.byokKeyCache = undefined;
-    this.byokCacheGeneration++;
-  }
-
-  /**
    * Resolve the API key and its source in one call.
-   * Priority: BYOK > cloud-managed > env variable.
+   * Cloud projects use InsForge Cloud-managed credentials; self-hosting uses OPENROUTER_API_KEY.
    * Use this instead of getApiKey() when downstream logic depends on the source.
    */
   async getApiKeyWithSource(): Promise<ResolvedApiKey> {
-    // 1. BYOK key (highest priority for both cloud and self-hosted)
-    const byokKey = await this.getBYOKApiKey();
-    if (byokKey) {
-      return { apiKey: byokKey, source: 'byok' };
-    }
-
-    // 2. Cloud environment: fetch from InsForge Cloud
     if (isCloudEnvironment()) {
       const apiKey = this.cloudCredentials
         ? this.cloudCredentials.apiKey
@@ -153,7 +131,7 @@ export class OpenRouterProvider {
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
       throw new AppError(
-        'OpenRouter API key not configured. Set it via the AI Gateway dashboard or OPENROUTER_API_KEY environment variable.',
+        'OpenRouter API key not configured. Set OPENROUTER_API_KEY in the backend environment.',
         500,
         ERROR_CODES.AI_INVALID_API_KEY
       );
@@ -163,12 +141,19 @@ export class OpenRouterProvider {
 
   /**
    * Get OpenRouter API key with priority order:
-   * 1. Developer-provided BYOK key (stored in secrets)
-   * 2. InsForge Cloud-managed key (cloud environment only)
-   * 3. OPENROUTER_API_KEY environment variable (self-hosted fallback)
+   * 1. InsForge Cloud-managed key (cloud environment only)
+   * 2. OPENROUTER_API_KEY environment variable (self-hosted)
    */
   async getApiKey(): Promise<string> {
     return (await this.getApiKeyWithSource()).apiKey;
+  }
+
+  async getMaskedApiKey(): Promise<{ apiKey: string; maskedKey: string }> {
+    const apiKey = await this.getApiKey();
+    return {
+      apiKey,
+      maskedKey: this.maskApiKey(apiKey),
+    };
   }
 
   /**
@@ -187,10 +172,13 @@ export class OpenRouterProvider {
     return this.openRouterClient;
   }
 
-  /**
-   * Sync check — returns true if a static key source is configured.
-   * Does NOT check BYOK (async). Use isConfiguredAsync() for a full check.
-   */
+  private maskApiKey(apiKey: string): string {
+    if (apiKey.length <= 12) {
+      return '••••••••';
+    }
+    return `${apiKey.slice(0, 8)}••••••••${apiKey.slice(-4)}`;
+  }
+
   isConfigured(): boolean {
     if (isCloudEnvironment()) {
       return true;
@@ -199,80 +187,274 @@ export class OpenRouterProvider {
   }
 
   /**
-   * Async check — includes BYOK. Use this wherever an async call is acceptable.
+   * Fetch OpenRouter key usage and activity for the active gateway key.
+   * /activity requires a management key; when unavailable, return key-level usage only.
    */
-  async isConfiguredAsync(): Promise<boolean> {
-    if (this.isConfigured()) {
-      return true;
-    }
-    return this.isByokActive();
-  }
-
-  /**
-   * Get remaining credits for the current API key from OpenRouter
-   */
-  async getRemainingCredits(): Promise<{
-    usage: number;
-    limit: number | null;
-    remaining: number | null;
-  }> {
+  async getOverview(): Promise<AIOverview> {
+    let resolved: ResolvedApiKey;
     try {
-      const { apiKey, source } = await this.getApiKeyWithSource();
-
-      if (source === 'cloud') {
-        // Use InsForge API for cloud-managed keys only (never forward BYOK secrets)
-        const response = await fetch(
-          `https://api.insforge.dev/ai/v1/limitations?credential=${encodeURIComponent(apiKey)}`,
-          {
-            method: 'GET',
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch key info: ${response.statusText}`);
-        }
-
-        const result = (await response.json()) as { data: OpenRouterLimitation };
-        const keyInfo = result.data;
-
-        return {
-          usage: keyInfo.credit_used,
-          limit: keyInfo.credit_limit,
-          remaining: keyInfo.credit_remaining,
-        };
-      } else {
-        // Use OpenRouter API directly for BYOK and env-var keys
-        const response = await fetch('https://openrouter.ai/api/v1/key', {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-          },
-        });
-
-        if (!response.ok) {
-          throw new AppError(
-            `Invalid OpenRouter API Key`,
-            500,
-            ERROR_CODES.AI_INVALID_API_KEY,
-            'Check your OpenRouter key and try again.'
-          );
-        }
-
-        const keyInfo = (await response.json()) as OpenRouterKeyInfo;
-
-        return {
-          usage: keyInfo.data.usage,
-          limit: keyInfo.data.limit,
-          remaining: keyInfo.data.limit !== null ? keyInfo.data.limit - keyInfo.data.usage : null,
-        };
-      }
+      resolved = await this.getApiKeyWithSource();
     } catch (error) {
-      logger.error('Failed to fetch remaining credits', {
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-      });
+      if (error instanceof AppError && error.code === ERROR_CODES.AI_INVALID_API_KEY) {
+        return EMPTY_AI_OVERVIEW;
+      }
       throw error;
     }
+
+    const keyInfo = await this.fetchCurrentKeyInfo(resolved.apiKey);
+    const activityResult = await this.fetchActivity(
+      resolved.apiKey,
+      keyInfo.data.hash,
+      resolved.source
+    );
+    const activity = activityResult.data;
+    const charts = this.buildOverviewCharts(activity);
+
+    return {
+      key: {
+        label: keyInfo.data.label,
+        limit: keyInfo.data.limit,
+        limitRemaining:
+          keyInfo.data.limit_remaining ??
+          (keyInfo.data.limit !== null ? keyInfo.data.limit - keyInfo.data.usage : null),
+        limitReset: keyInfo.data.limit_reset ?? null,
+        usage: keyInfo.data.usage ?? 0,
+        usageDaily: keyInfo.data.usage_daily ?? 0,
+        usageWeekly: keyInfo.data.usage_weekly ?? 0,
+        usageMonthly: keyInfo.data.usage_monthly ?? 0,
+        isFreeTier: keyInfo.data.is_free_tier,
+        observabilityAvailable: activityResult.available,
+        observabilityError: activityResult.error,
+      },
+      charts,
+    };
+  }
+
+  private async fetchCurrentKeyInfo(apiKey: string): Promise<OpenRouterKeyInfo> {
+    const response = await fetch('https://openrouter.ai/api/v1/key', {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+
+    if (!response.ok) {
+      throw new AppError(
+        'Invalid OpenRouter API Key',
+        500,
+        ERROR_CODES.AI_INVALID_API_KEY,
+        'Check your OpenRouter key and try again.'
+      );
+    }
+
+    return (await response.json()) as OpenRouterKeyInfo;
+  }
+
+  private async fetchActivity(
+    apiKey: string,
+    apiKeyHashFromOpenRouter: string | undefined,
+    source: ApiKeySource
+  ): Promise<{ available: boolean; data: OpenRouterActivityItem[]; error?: string }> {
+    if (source === 'cloud') {
+      return this.fetchCloudActivity();
+    }
+
+    const apiKeyHash = this.resolveActivityApiKeyHash(apiKey, apiKeyHashFromOpenRouter);
+    const url = new URL('https://openrouter.ai/api/v1/activity');
+    url.searchParams.set('api_key_hash', apiKeyHash);
+
+    let response: Response | undefined;
+    try {
+      response = await fetch(url, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+
+      if (response.status === 401 || response.status === 403 || response.status === 404) {
+        return {
+          available: false,
+          data: [],
+          error: 'Activity requires an OpenRouter management key with access to this API key hash.',
+        };
+      }
+
+      if (!response.ok) {
+        logger.warn('OpenRouter activity request failed', {
+          status: response.status,
+          statusText: response.statusText,
+        });
+        return {
+          available: false,
+          data: [],
+          error: 'OpenRouter activity is temporarily unavailable.',
+        };
+      }
+
+      const payload = (await response.json()) as { data?: Partial<OpenRouterActivityItem>[] };
+      return { available: true, data: this.normalizeActivity(payload.data ?? []) };
+    } catch (error) {
+      const errorMessage = getCaughtErrorMessage(error);
+      logger.warn('OpenRouter activity request failed', {
+        status: response?.status,
+        statusText: response?.statusText,
+        error: errorMessage,
+      });
+      return {
+        available: false,
+        data: [],
+        error: 'OpenRouter activity is temporarily unavailable.',
+      };
+    }
+  }
+
+  private async fetchCloudActivity(): Promise<{
+    available: boolean;
+    data: OpenRouterActivityItem[];
+    error?: string;
+  }> {
+    const projectId = process.env.PROJECT_ID;
+    if (!projectId) {
+      return {
+        available: false,
+        data: [],
+        error: 'PROJECT_ID is not configured for cloud activity lookup.',
+      };
+    }
+
+    let token: string;
+    try {
+      token = this.createCloudProjectToken(projectId);
+    } catch (error) {
+      return {
+        available: false,
+        data: [],
+        error: error instanceof Error ? error.message : 'Unable to sign cloud activity request.',
+      };
+    }
+
+    const url = new URL(
+      `${process.env.CLOUD_API_HOST || 'https://api.insforge.dev'}/ai/v1/activity/${projectId}`
+    );
+    url.searchParams.set('sign', token);
+
+    let response: Response | undefined;
+    try {
+      response = await fetch(url, { method: 'GET' });
+      if (!response.ok) {
+        logger.warn('Cloud OpenRouter activity request failed', {
+          status: response.status,
+          statusText: response.statusText,
+        });
+        return {
+          available: false,
+          data: [],
+          error: 'Cloud OpenRouter activity is temporarily unavailable.',
+        };
+      }
+
+      const payload = (await response.json()) as { data?: Partial<OpenRouterActivityItem>[] };
+      return { available: true, data: this.normalizeActivity(payload.data ?? []) };
+    } catch (error) {
+      const errorMessage = getCaughtErrorMessage(error);
+      logger.warn('Cloud OpenRouter activity request failed', {
+        status: response?.status,
+        statusText: response?.statusText,
+        error: errorMessage,
+      });
+      return {
+        available: false,
+        data: [],
+        error: 'Cloud OpenRouter activity is temporarily unavailable.',
+      };
+    }
+  }
+
+  private resolveActivityApiKeyHash(apiKey: string, apiKeyHashFromOpenRouter?: string): string {
+    const documentedHash = apiKeyHashFromOpenRouter?.match(/[a-f0-9]{64}$/i)?.[0];
+    return documentedHash ?? createHash('sha256').update(apiKey).digest('hex');
+  }
+
+  private normalizeActivity(items: Partial<OpenRouterActivityItem>[]): OpenRouterActivityItem[] {
+    return items.map((item) => ({
+      date: String(item.date || ''),
+      usage: Number(item.usage || 0),
+      requests: Number(item.requests || 0),
+      prompt_tokens: Number(item.prompt_tokens || 0),
+      completion_tokens: Number(item.completion_tokens || 0),
+      reasoning_tokens: Number(item.reasoning_tokens || 0),
+    }));
+  }
+
+  private buildOverviewCharts(activity: OpenRouterActivityItem[]): AIOverview['charts'] {
+    const allowedBuckets = this.createOverviewBuckets();
+    const buckets = new Map<string, OverviewBucket>(
+      Array.from(allowedBuckets.entries()).map(([key, bucket]) => [key, { ...bucket }])
+    );
+
+    for (const item of activity) {
+      const bucketKey = this.resolveActivityBucketKey(item.date);
+      const bucket = buckets.get(bucketKey);
+      if (!bucket) {
+        continue;
+      }
+
+      bucket.usage += item.usage ?? 0;
+      bucket.requests += item.requests ?? 0;
+      bucket.tokens +=
+        (item.prompt_tokens ?? 0) + (item.completion_tokens ?? 0) + (item.reasoning_tokens ?? 0);
+    }
+
+    const entries = this.sortOverviewBuckets(Array.from(buckets.values()), allowedBuckets);
+
+    return {
+      spend: entries.map((bucket) => ({ label: bucket.label, value: bucket.usage })),
+      requests: entries.map((bucket) => ({ label: bucket.label, value: bucket.requests })),
+      tokens: entries.map((bucket) => ({ label: bucket.label, value: bucket.tokens })),
+    };
+  }
+
+  private sortOverviewBuckets(
+    entries: OverviewBucket[],
+    allowedBuckets: Map<string, OverviewBucket>
+  ): OverviewBucket[] {
+    const bucketOrder = new Map(
+      Array.from(allowedBuckets.keys()).map((key, index) => [key, index])
+    );
+    return [...entries].sort(
+      (a, b) =>
+        (bucketOrder.get(a.label) ?? Number.MAX_SAFE_INTEGER) -
+        (bucketOrder.get(b.label) ?? Number.MAX_SAFE_INTEGER)
+    );
+  }
+
+  private createOverviewBuckets(): Map<string, OverviewBucket> {
+    const buckets = new Map<string, OverviewBucket>();
+    const dayCount = 30;
+    const end = new Date();
+    end.setUTCHours(0, 0, 0, 0);
+    end.setUTCDate(end.getUTCDate() - 1);
+    const start = new Date(end);
+    start.setUTCDate(end.getUTCDate() - (dayCount - 1));
+    for (let index = 0; index < dayCount; index++) {
+      const bucketDate = new Date(start.getTime() + index * 24 * 60 * 60 * 1000);
+      const key = this.formatUtcDayBucket(bucketDate);
+      buckets.set(key, { label: key, usage: 0, requests: 0, tokens: 0 });
+    }
+    return buckets;
+  }
+
+  private resolveActivityBucketKey(date: string): string {
+    return date.slice(0, 10);
+  }
+
+  private formatUtcDayBucket(date: Date): string {
+    return date.toISOString().slice(0, 10);
+  }
+
+  private createCloudProjectToken(projectId: string): string {
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      throw new Error('JWT_SECRET not found in environment variables');
+    }
+    return jwt.sign({ projectId }, jwtSecret, { expiresIn: '1h' });
   }
 
   /**
@@ -293,14 +475,7 @@ export class OpenRouterProvider {
         if (!projectId) {
           throw new Error('PROJECT_ID not found in environment variables');
         }
-
-        const jwtSecret = process.env.JWT_SECRET;
-        if (!jwtSecret) {
-          throw new Error('JWT_SECRET not found in environment variables');
-        }
-
-        // Sign a token for authentication
-        const token = jwt.sign({ projectId }, jwtSecret, { expiresIn: '1h' });
+        const token = this.createCloudProjectToken(projectId);
 
         // Fetch API key from cloud service with sign token as query parameter
         const response = await fetch(
@@ -360,14 +535,7 @@ export class OpenRouterProvider {
         if (!projectId) {
           throw new Error('PROJECT_ID not found in environment variables');
         }
-
-        const jwtSecret = process.env.JWT_SECRET;
-        if (!jwtSecret) {
-          throw new Error('JWT_SECRET not found in environment variables');
-        }
-
-        // Sign a token for authentication
-        const token = jwt.sign({ projectId }, jwtSecret, { expiresIn: '1h' });
+        const token = this.createCloudProjectToken(projectId);
 
         // Renew API key from cloud service with sign token in request body
         const response = await fetch(
@@ -435,7 +603,7 @@ export class OpenRouterProvider {
     try {
       return { result: await request(client), source };
     } catch (error) {
-      // Only renew cloud-managed keys on 402/403 — never touch BYOK or env keys
+      // Only renew cloud-managed keys on 402/403; self-hosted env keys are never renewed.
       if (
         source === 'cloud' &&
         error instanceof OpenAI.APIError &&
@@ -474,12 +642,12 @@ export class OpenRouterProvider {
       if (error instanceof OpenAI.APIError) {
         if (error.status === 401 || error.status === 403) {
           throw new AppError(
-            source === 'byok'
-              ? 'Your BYOK API key is invalid or has been revoked. Please update it in Gateway settings.'
-              : 'AI provider authentication failed. Check your API key configuration.',
+            'AI provider authentication failed. Check your API key configuration.',
             401,
             ERROR_CODES.AI_INVALID_API_KEY,
-            'Update your API key in the Gateway credentials page.'
+            source === 'cloud'
+              ? 'Check the cloud-managed OpenRouter credential.'
+              : 'Set a valid OPENROUTER_API_KEY in the backend environment.'
           );
         }
         if (error.status === 429) {
