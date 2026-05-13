@@ -113,8 +113,19 @@ export class DeploymentService {
     if (!isCloudEnvironment()) {
       return undefined;
     }
-    const customSlug = await this.vercelProvider.getSlug();
-    return { customSlug };
+    try {
+      const customSlug = await this.vercelProvider.getSlug();
+      return { customSlug };
+    } catch (error) {
+      // Cloud slug lookup hits CLOUD_API_HOST + Vercel; transient failures
+      // here must not take down the whole /api/metadata response. Surface
+      // the slice with a null slug so the CLI still sees the cloud signal
+      // (it'll just skip the [deployments] section as if no slug is set).
+      logger.warn('deployments.customSlug lookup failed; reporting null slug', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return { customSlug: null };
+    }
   }
 
   private isReservedHostedDomain(domain: string): boolean {
