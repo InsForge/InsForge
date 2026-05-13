@@ -24,7 +24,7 @@ import { s3GatewayRouter } from '@/api/routes/s3-gateway/index.routes.js';
 import { paymentsRouter } from '@/api/routes/payments/index.routes.js';
 import { errorMiddleware } from '@/api/middlewares/error.js';
 import { destroyEmailCooldownInterval } from '@/api/middlewares/rate-limiters.js';
-import { isCloudEnvironment } from '@/utils/environment.js';
+import { isCloudEnvironment, isDevelopment, getApiBaseUrl } from '@/utils/environment.js';
 import { RealtimeManager } from '@/infra/realtime/realtime.manager.js';
 import fetch from 'node-fetch';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
@@ -89,11 +89,76 @@ export async function createApp() {
     skip: shouldSkipGlobalRateLimit,
   });
 
-  // Basic middleware
+  /**
+   * CORS origin validation.
+   *
+   * Previously `origin: true` reflected every requesting Origin, which combined
+   * with `credentials: true` created an authenticated CSRF vulnerability
+   * (issue #1243).
+   *
+   * The new logic:
+   *  1. Reads an optional CORS_ORIGIN env var (comma-separated whitelist).
+   *  2. If not set, derives a sensible default from API_BASE_URL.
+   *  3. In development mode the built-in Vite dev server origin
+   *     (http://localhost:5173) is also accepted.
+   *  4. Requests with no Origin header (curl, server-to-server) are allowed.
+   *  5. Requests whose Origin matches the whitelist receive a reflected
+   *     `Access-Control-Allow-Origin` + `Access-Control-Allow-Credentials: true`.
+   *  6. All other origins are rejected (CORS preflight returns 415).
+   */
+  const allowedOrigins = (() => {
+    const origins: string[] = [];
+
+    // Explicitly configured whitelist
+    if (process.env.CORS_ORIGIN) {
+      origins.push(
+        ...process.env.CORS_ORIGIN
+          .split(',')
+          .map((o) => o.trim())
+          .filter(Boolean)
+      );
+    }
+
+    // Always include the API base URL origin
+    try {
+      const apiBase = new URL(getApiBaseUrl());
+      const apiOrigin = apiBase.origin;
+      if (!origins.includes(apiOrigin)) {
+        origins.push(apiOrigin);
+      }
+    } catch {
+      // ignore invalid URL
+    }
+
+    // In development, also allow the Vite dev server
+    if (isDevelopment()) {
+      const viteOrigin = 'http://localhost:5173';
+      if (!origins.includes(viteOrigin)) {
+        origins.push(viteOrigin);
+      }
+    }
+
+    return origins;
+  })();
+
+  logger.info('CORS allowed origins', { origins: allowedOrigins });
+
   app.use(
     cors({
-      origin: true, // Allow all origins (matches Better Auth's trustedOrigins: ['*'])
-      credentials: true, // Allow cookies/credentials
+      origin: (requestOrigin, callback) => {
+        // Requests without an Origin header (server-to-server, curl, etc.)
+        if (!requestOrigin) {
+          return callback(null, true);
+        }
+
+        if (allowedOrigins.includes(requestOrigin)) {
+          return callback(null, true);
+        }
+
+        logger.warn('CORS: blocked origin', { origin: requestOrigin });
+        return callback(new Error('CORS origin not allowed'), false);
+      },
+      credentials: true,
       exposedHeaders: ['Content-Range', 'Preference-Applied'],
     })
   );
