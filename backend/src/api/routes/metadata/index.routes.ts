@@ -5,6 +5,7 @@ import { StorageService } from '@/services/storage/storage.service.js';
 import { AIConfigService } from '@/services/ai/ai-config.service.js';
 import { FunctionService } from '@/services/functions/function.service.js';
 import { RealtimeChannelService } from '@/services/realtime/realtime-channel.service.js';
+import { DeploymentService } from '@/services/deployments/deployment.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { successResponse } from '@/utils/response.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
@@ -22,6 +23,7 @@ const realtimeChannelService = RealtimeChannelService.getInstance();
 const dbManager = DatabaseManager.getInstance();
 const dbAdvanceService = DatabaseAdvanceService.getInstance();
 const aiConfigService = AIConfigService.getInstance();
+const deploymentService = DeploymentService.getInstance();
 
 router.use(verifyAdmin);
 
@@ -31,12 +33,13 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
     // Gather metadata from all modules
 
     // Fetch all metadata in parallel for better performance
-    const [auth, database, storage, aiConfig, functions] = await Promise.all([
+    const [auth, database, storage, aiConfig, functions, deployments] = await Promise.all([
       authService.getMetadata(),
       dbManager.getMetadata(),
       storageService.getMetadata(),
       aiConfigService.getMetadata(),
       functionService.getMetadata(),
+      deploymentService.getConfigMetadata(),
     ]);
 
     // Get version from package.json or default
@@ -48,6 +51,12 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
       storage,
       functions,
       aiIntegration: aiConfig,
+      // Deployments slice is omitted entirely on self-hosted backends
+      // (deploymentService.getConfigMetadata returns undefined). Cloud
+      // projects see { customSlug: string | null }. The CLI capability
+      // probe depends on this presence/absence signal to gate
+      // [deployments] TOML sections.
+      ...(deployments ? { deployments } : {}),
       version,
     };
 
