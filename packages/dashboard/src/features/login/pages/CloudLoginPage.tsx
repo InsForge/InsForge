@@ -32,7 +32,7 @@ export default function CloudLoginPage() {
       return;
     }
 
-    if (isDTest && isMcpUsageLoading) {
+    if (isDTest && (isMcpUsageLoading || project === undefined)) {
       return;
     }
     const target =
@@ -44,6 +44,7 @@ export default function CloudLoginPage() {
     isDTest,
     hasCompletedOnboarding,
     isMcpUsageLoading,
+    project,
     isBranch,
     navigate,
   ]);
