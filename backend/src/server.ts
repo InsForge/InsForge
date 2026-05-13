@@ -112,10 +112,7 @@ export async function createApp() {
     // Explicitly configured whitelist
     if (process.env.CORS_ORIGIN) {
       origins.push(
-        ...process.env.CORS_ORIGIN
-          .split(',')
-          .map((o) => o.trim())
-          .filter(Boolean)
+        ...process.env.CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean)
       );
     }
 
