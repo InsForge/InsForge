@@ -78,6 +78,10 @@ const EMPTY_AI_OVERVIEW: AIOverview = {
   },
 };
 
+function getCaughtErrorMessage(error: unknown): string {
+  return error instanceof Error && error.message ? error.message : 'Unknown error';
+}
+
 export class OpenRouterProvider {
   private static instance: OpenRouterProvider;
   private cloudCredentials: CloudCredentials | undefined;
@@ -257,23 +261,41 @@ export class OpenRouterProvider {
     const url = new URL('https://openrouter.ai/api/v1/activity');
     url.searchParams.set('api_key_hash', apiKeyHash);
 
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
+    let response: Response | undefined;
+    try {
+      response = await fetch(url, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
 
-    if (response.status === 401 || response.status === 403 || response.status === 404) {
-      return {
-        available: false,
-        data: [],
-        error: 'Activity requires an OpenRouter management key with access to this API key hash.',
-      };
-    }
+      if (response.status === 401 || response.status === 403 || response.status === 404) {
+        return {
+          available: false,
+          data: [],
+          error: 'Activity requires an OpenRouter management key with access to this API key hash.',
+        };
+      }
 
-    if (!response.ok) {
+      if (!response.ok) {
+        logger.warn('OpenRouter activity request failed', {
+          status: response.status,
+          statusText: response.statusText,
+        });
+        return {
+          available: false,
+          data: [],
+          error: 'OpenRouter activity is temporarily unavailable.',
+        };
+      }
+
+      const payload = (await response.json()) as { data?: Partial<OpenRouterActivityItem>[] };
+      return { available: true, data: this.normalizeActivity(payload.data ?? []) };
+    } catch (error) {
+      const errorMessage = getCaughtErrorMessage(error);
       logger.warn('OpenRouter activity request failed', {
-        status: response.status,
-        statusText: response.statusText,
+        status: response?.status,
+        statusText: response?.statusText,
+        error: errorMessage,
       });
       return {
         available: false,
@@ -281,9 +303,6 @@ export class OpenRouterProvider {
         error: 'OpenRouter activity is temporarily unavailable.',
       };
     }
-
-    const payload = (await response.json()) as { data?: Partial<OpenRouterActivityItem>[] };
-    return { available: true, data: this.normalizeActivity(payload.data ?? []) };
   }
 
   private async fetchCloudActivity(): Promise<{
@@ -316,11 +335,29 @@ export class OpenRouterProvider {
     );
     url.searchParams.set('sign', token);
 
-    const response = await fetch(url, { method: 'GET' });
-    if (!response.ok) {
+    let response: Response | undefined;
+    try {
+      response = await fetch(url, { method: 'GET' });
+      if (!response.ok) {
+        logger.warn('Cloud OpenRouter activity request failed', {
+          status: response.status,
+          statusText: response.statusText,
+        });
+        return {
+          available: false,
+          data: [],
+          error: 'Cloud OpenRouter activity is temporarily unavailable.',
+        };
+      }
+
+      const payload = (await response.json()) as { data?: Partial<OpenRouterActivityItem>[] };
+      return { available: true, data: this.normalizeActivity(payload.data ?? []) };
+    } catch (error) {
+      const errorMessage = getCaughtErrorMessage(error);
       logger.warn('Cloud OpenRouter activity request failed', {
-        status: response.status,
-        statusText: response.statusText,
+        status: response?.status,
+        statusText: response?.statusText,
+        error: errorMessage,
       });
       return {
         available: false,
@@ -328,9 +365,6 @@ export class OpenRouterProvider {
         error: 'Cloud OpenRouter activity is temporarily unavailable.',
       };
     }
-
-    const payload = (await response.json()) as { data?: Partial<OpenRouterActivityItem>[] };
-    return { available: true, data: this.normalizeActivity(payload.data ?? []) };
   }
 
   private resolveActivityApiKeyHash(apiKey: string, apiKeyHashFromOpenRouter?: string): string {
@@ -351,28 +385,21 @@ export class OpenRouterProvider {
 
   private buildOverviewCharts(activity: OpenRouterActivityItem[]): AIOverview['charts'] {
     const allowedBuckets = this.createOverviewBuckets();
-    const buckets = new Map<string, OverviewBucket>();
+    const buckets = new Map<string, OverviewBucket>(
+      Array.from(allowedBuckets.entries()).map(([key, bucket]) => [key, { ...bucket }])
+    );
 
     for (const item of activity) {
       const bucketKey = this.resolveActivityBucketKey(item.date);
-      if (!allowedBuckets.has(bucketKey)) {
+      const bucket = buckets.get(bucketKey);
+      if (!bucket) {
         continue;
       }
-
-      const bucket =
-        buckets.get(bucketKey) ??
-        ({
-          label: bucketKey,
-          usage: 0,
-          requests: 0,
-          tokens: 0,
-        } satisfies OverviewBucket);
 
       bucket.usage += item.usage ?? 0;
       bucket.requests += item.requests ?? 0;
       bucket.tokens +=
         (item.prompt_tokens ?? 0) + (item.completion_tokens ?? 0) + (item.reasoning_tokens ?? 0);
-      buckets.set(bucketKey, bucket);
     }
 
     const entries = this.sortOverviewBuckets(Array.from(buckets.values()), allowedBuckets);
@@ -401,10 +428,11 @@ export class OpenRouterProvider {
   private createOverviewBuckets(): Map<string, OverviewBucket> {
     const buckets = new Map<string, OverviewBucket>();
     const dayCount = 30;
-    const now = new Date();
-    const start = new Date(now);
-    start.setUTCHours(0, 0, 0, 0);
-    start.setUTCDate(start.getUTCDate() - (dayCount - 1));
+    const end = new Date();
+    end.setUTCHours(0, 0, 0, 0);
+    end.setUTCDate(end.getUTCDate() - 1);
+    const start = new Date(end);
+    start.setUTCDate(end.getUTCDate() - (dayCount - 1));
     for (let index = 0; index < dayCount; index++) {
       const bucketDate = new Date(start.getTime() + index * 24 * 60 * 60 * 1000);
       const key = this.formatUtcDayBucket(bucketDate);

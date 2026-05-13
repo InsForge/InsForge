@@ -1078,8 +1078,8 @@ export function useCloudHosting() {
     return createPendingRequest('advisorScan', 'Advisor scan trigger');
   }, [createPendingRequest, sendMessageToParent]);
 
-  const navigateToSubscription = useCallback(() => {
-    void postMessageToParent({ type: 'NAVIGATE_TO_SUBSCRIPTION' });
+  const showUpgradeDialog = useCallback(() => {
+    void postMessageToParent({ type: 'SHOW_UPGRADE_DIALOG' });
   }, [postMessageToParent]);
 
   const reportRouteChange = useCallback(
@@ -1103,7 +1103,7 @@ export function useCloudHosting() {
     renameProject,
     deleteProject,
     updateVersion,
-    navigateToSubscription,
+    showUpgradeDialog,
     requestUserInfo,
     requestUserApiKey,
     requestModelCredits,

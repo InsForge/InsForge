@@ -126,7 +126,7 @@ export interface DashboardProps {
   showNavbar?: boolean;
   project?: DashboardProjectInfo;
   onRouteChange?: (path: string) => void;
-  onNavigateToSubscription?: () => void;
+  onShowUpgradeDialog?: () => void;
   onRenameProject?: (name: string) => Promise<void>;
   onDeleteProject?: () => Promise<void>;
   onRequestBackupInfo?: () => Promise<DashboardBackupInfo>;

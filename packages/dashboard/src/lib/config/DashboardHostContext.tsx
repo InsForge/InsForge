@@ -20,7 +20,7 @@ interface DashboardHostContextValue {
   getAuthorizationCode?: () => Promise<string>;
   useAuthorizationCodeRefresh?: boolean;
   onRouteChange?: (path: string) => void;
-  onNavigateToSubscription?: () => void;
+  onShowUpgradeDialog?: () => void;
   onRenameProject?: (name: string) => Promise<void>;
   onDeleteProject?: () => Promise<void>;
   onRequestBackupInfo?: () => Promise<DashboardBackupInfo>;

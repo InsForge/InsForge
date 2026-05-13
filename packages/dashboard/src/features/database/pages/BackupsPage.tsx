@@ -66,8 +66,8 @@ export default function BackupsPage() {
   };
 
   const handleUpgradeClick = () => {
-    if (host.onNavigateToSubscription) {
-      host.onNavigateToSubscription();
+    if (host.onShowUpgradeDialog) {
+      host.onShowUpgradeDialog();
       return;
     }
 

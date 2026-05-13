@@ -7,7 +7,7 @@ export function CloudHostingDashboard() {
     getAuthorizationCode,
     projectInfo,
     reportRouteChange,
-    navigateToSubscription,
+    showUpgradeDialog,
     renameProject,
     deleteProject,
     requestBackupInfo,
@@ -35,7 +35,7 @@ export function CloudHostingDashboard() {
       useAuthorizationCodeRefresh={isInIframe()}
       project={projectInfo}
       onRouteChange={reportRouteChange}
-      onNavigateToSubscription={navigateToSubscription}
+      onShowUpgradeDialog={showUpgradeDialog}
       onRenameProject={renameProject}
       onDeleteProject={deleteProject}
       onRequestBackupInfo={requestBackupInfo}
