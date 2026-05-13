@@ -51,11 +51,7 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
       storage,
       functions,
       aiIntegration: aiConfig,
-      // Deployments slice is omitted entirely on self-hosted backends
-      // (deploymentService.getConfigMetadata returns undefined). Cloud
-      // projects see { customSlug: string | null }. The CLI capability
-      // probe depends on this presence/absence signal to gate
-      // [deployments] TOML sections.
+      // Cloud-only slice; self-host returns undefined. See getConfigMetadata().
       ...(deployments ? { deployments } : {}),
       version,
     };
