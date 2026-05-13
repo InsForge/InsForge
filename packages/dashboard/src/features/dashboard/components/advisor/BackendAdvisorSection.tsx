@@ -14,7 +14,6 @@ import type {
 } from '#types';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
 import { useToast } from '#lib/hooks/useToast';
-import { usePageSize } from '#lib/hooks/usePageSize';
 import { EmptyState, PaginationControls } from '#components';
 import { AdvisoryItem } from './AdvisoryItem';
 import { AdvisoryTabs, type AdvisoryTabValue } from './AdvisoryTabs';
@@ -22,6 +21,7 @@ import { SeverityFilterDropdown } from './SeverityFilterDropdown';
 import { formatRemediationPromptBatch } from './remediationPrompt';
 
 const ADVISOR_FETCH_PAGE_SIZE = 100;
+const ADVISOR_PAGE_SIZE = 10;
 const SCAN_POLL_INTERVAL_MS = 3_000;
 const SCAN_POLL_MAX_DURATION_MS = 30_000;
 
@@ -58,7 +58,7 @@ export function BackendAdvisorSection() {
   const [selectedSeverities, setSelectedSeverities] = useState<Set<DashboardAdvisorSeverity>>(
     () => new Set(ALL_SEVERITIES)
   );
-  const { pageSize, pageSizeOptions, onPageSizeChange } = usePageSize('advisor-issues');
+  const pageSize = ADVISOR_PAGE_SIZE;
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedIssueId, setExpandedIssueId] = useState<string | null>(null);
 
@@ -169,11 +169,9 @@ export function BackendAdvisorSection() {
 
   const lastScanLabel = formatRelative(latest.data?.scannedAt);
   const hasScan = !!latest.data?.scanId;
-  const summaryTotal = latest.data?.summary.total;
-  const reservedItemsHeight =
-    hasScan && summaryTotal && summaryTotal > 0 ? summaryTotal * 68 + 64 : 0;
 
   const summary = latest.data?.summary;
+  const summaryTotal = summary?.total;
   const filteredAllCount =
     summary === undefined
       ? undefined
@@ -188,6 +186,22 @@ export function BackendAdvisorSection() {
         health: [...selectedSeverities].reduce((s, sev) => s + matrix.health[sev], 0),
       }
     : undefined;
+
+  // Predict filtered total so reserved height matches what this page will render.
+  const predictedFilteredTotal = noSeveritiesSelected
+    ? 0
+    : tab === 'all'
+      ? (filteredAllCount ?? summaryTotal ?? 0)
+      : (filteredCategoryCounts?.[tab as DashboardAdvisorCategory] ??
+        filteredAllCount ??
+        summaryTotal ??
+        0);
+  const expectedPageItemCount = Math.max(
+    0,
+    Math.min(pageSize, predictedFilteredTotal - (currentPage - 1) * pageSize)
+  );
+  const reservedItemsHeight =
+    hasScan && expectedPageItemCount > 0 ? expectedPageItemCount * 68 + 64 : 0;
 
   // Apply client-side severity filter when needed, then derive pagination.
   const fetchedIssues = issues.data?.issues ?? [];
@@ -332,10 +346,6 @@ export function BackendAdvisorSection() {
             onPageChange={setCurrentPage}
             totalRecords={totalRecords}
             pageSize={pageSize}
-            pageSizeOptions={pageSizeOptions}
-            onPageSizeChange={(size) => {
-              onPageSizeChange(size);
-            }}
             recordLabel="issues"
           />
         )}

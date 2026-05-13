@@ -4,6 +4,7 @@ import { AuthService } from '@/services/auth/auth.service.js';
 import { StorageService } from '@/services/storage/storage.service.js';
 import { FunctionService } from '@/services/functions/function.service.js';
 import { RealtimeChannelService } from '@/services/realtime/realtime-channel.service.js';
+import { DeploymentService } from '@/services/deployments/deployment.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { successResponse } from '@/utils/response.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
@@ -20,6 +21,7 @@ const functionService = FunctionService.getInstance();
 const realtimeChannelService = RealtimeChannelService.getInstance();
 const dbManager = DatabaseManager.getInstance();
 const dbAdvanceService = DatabaseAdvanceService.getInstance();
+const deploymentService = DeploymentService.getInstance();
 
 router.use(verifyAdmin);
 
@@ -29,11 +31,12 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
     // Gather metadata from all modules
 
     // Fetch all metadata in parallel for better performance
-    const [auth, database, storage, functions] = await Promise.all([
+    const [auth, database, storage, functions, deployments] = await Promise.all([
       authService.getMetadata(),
       dbManager.getMetadata(),
       storageService.getMetadata(),
       functionService.getMetadata(),
+      deploymentService.getConfigMetadata(),
     ]);
 
     // Get version from package.json or default
@@ -44,6 +47,12 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
       database,
       storage,
       functions,
+      // Deployments slice is omitted entirely on self-hosted backends
+      // (deploymentService.getConfigMetadata returns undefined). Cloud
+      // projects see { customSlug: string | null }. The CLI capability
+      // probe depends on this presence/absence signal to gate
+      // [deployments] TOML sections.
+      ...(deployments ? { deployments } : {}),
       version,
     };
 

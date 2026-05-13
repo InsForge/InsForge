@@ -42,12 +42,26 @@ export const realtimeMetadataSchema = z.object({
   permissions: realtimePermissionsResponseSchema,
 });
 
+/**
+ * Deployments slice for the admin metadata response. Cloud-only: this slice
+ * is omitted entirely in self-hosted backends (where custom slugs are not
+ * available). The CLI's capability probe uses presence/absence of this slice
+ * to decide whether to apply `[deployments]` TOML sections.
+ *
+ * `customSlug: null` means cloud + slug not set (project uses default URL).
+ * Absent slice means self-host (feature doesn't exist).
+ */
+export const deploymentsMetadataSchema = z.object({
+  customSlug: z.string().nullable(),
+});
+
 export const appMetaDataSchema = z.object({
   auth: authMetadataSchema,
   database: databaseMetadataSchema,
   storage: storageMetadataSchema,
   functions: z.array(edgeFunctionMetadataSchema),
   realtime: realtimeMetadataSchema.optional(),
+  deployments: deploymentsMetadataSchema.optional(),
   version: z.string().optional(),
 });
 
@@ -57,6 +71,7 @@ export type BucketMetadataSchema = z.infer<typeof bucketMetadataSchema>;
 export type StorageMetadataSchema = z.infer<typeof storageMetadataSchema>;
 export type EdgeFunctionMetadataSchema = z.infer<typeof edgeFunctionMetadataSchema>;
 export type RealtimeMetadataSchema = z.infer<typeof realtimeMetadataSchema>;
+export type DeploymentsMetadataSchema = z.infer<typeof deploymentsMetadataSchema>;
 export type AppMetadataSchema = z.infer<typeof appMetaDataSchema>;
 
 // Database connection schemas
