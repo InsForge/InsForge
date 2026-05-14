@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ArrowDownToLine, ArrowUpFromLine, Cpu, HardDrive, MemoryStick } from 'lucide-react';
 import { useProjectMetrics } from '#features/dashboard/hooks/useProjectMetrics';
 import type { DashboardMetricName, DashboardMetricsRange } from '#types';
@@ -70,6 +70,23 @@ export function ObservabilitySection() {
   const [range, setRange] = useState<DashboardMetricsRange>('1h');
   const { data, isLoading, isUnavailable, error } = useProjectMetrics(range);
 
+  // Memoize disk card derivations so the [0, totalBytes] domain array reference
+  // is stable across renders — otherwise MetricChartCard's sparkline useMemo
+  // re-runs every parent render.
+  const diskCardProps = useMemo(() => {
+    const diskUsedData = data?.metrics.find((m) => m.metric === 'disk_used')?.data ?? [];
+    const diskTotalData = data?.metrics.find((m) => m.metric === 'disk_total')?.data ?? [];
+    const totalBytes =
+      [...diskTotalData].reverse().find((p) => Number.isFinite(p.value))?.value ?? null;
+    return {
+      data: diskUsedData,
+      threshold: totalBytes !== null ? 0.9 * totalBytes : undefined,
+      fixedDomain: (totalBytes !== null ? [0, totalBytes] : undefined) as
+        | [number, number]
+        | undefined,
+    };
+  }, [data]);
+
   return (
     <section className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -124,11 +141,6 @@ export function ObservabilitySection() {
               );
             });
 
-            const diskUsed = data?.metrics.find((m) => m.metric === 'disk_used');
-            const diskTotal = data?.metrics.find((m) => m.metric === 'disk_total');
-            const totalBytes =
-              [...(diskTotal?.data ?? [])].reverse().find((p) => Number.isFinite(p.value))?.value ??
-              null;
             cards.splice(
               DISK_GRID_INDEX,
               0,
@@ -136,12 +148,12 @@ export function ObservabilitySection() {
                 key="disk_used"
                 title="Disk Usage"
                 icon={<HardDrive className="h-5 w-5" />}
-                data={diskUsed?.data ?? []}
+                data={diskCardProps.data}
                 rangeSeconds={RANGE_SECONDS[range]}
                 formatValue={BYTES_TO_GIB}
                 isLoading={isLoading}
-                threshold={totalBytes !== null ? 0.9 * totalBytes : undefined}
-                fixedDomain={totalBytes !== null ? [0, totalBytes] : undefined}
+                threshold={diskCardProps.threshold}
+                fixedDomain={diskCardProps.fixedDomain}
                 formatAxisLabel={BYTES_TO_GIB}
               />
             );
