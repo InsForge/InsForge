@@ -131,7 +131,11 @@ When a merge is blocked, you get a structured report of which object diverged an
 
 Platform config tables (auth providers, storage buckets, email templates, edge function definitions, schedules) merge by stable key. User-data rows on the branch are **not** auto-merged — branches are for schema and configuration, not data backfills.
 
-## Quotas and Limits (not been finalized yet, and may change in the future)
+## Quotas and Limits
+
+<Warning>
+  These limits have not been finalized and may change in the future.
+</Warning>
 
 - Up to **3** parent projects per organization can have at least one active branch.
 - Up to **2** active branches per parent project.
