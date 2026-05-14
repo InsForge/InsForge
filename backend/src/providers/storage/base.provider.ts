@@ -38,11 +38,22 @@ export interface StorageProvider {
     metadata: { contentType?: string; size?: number },
     maxFileSizeBytes: number
   ): Promise<UploadStrategyResponse>;
+  /**
+   * Generate a download URL. The optional `version` is a cache-bust stamp
+   * (etag/uploaded_at-ms) that providers may incorporate into the URL where
+   * safe. Specifically: CloudFront signed URLs and local direct URLs tolerate
+   * extra query params, but raw S3 SigV4 presigned URLs do NOT — the
+   * signature covers every query parameter, and appending `?v=` after signing
+   * yields `SignatureDoesNotMatch` 403. The S3 provider therefore ignores
+   * `version` on the raw-presigned path (there is no CDN in front to bust
+   * anyway when CloudFront is not configured).
+   */
   getDownloadStrategy(
     bucket: string,
     key: string,
     expiresIn?: number,
-    isPublic?: boolean
+    isPublic?: boolean,
+    version?: string | null
   ): Promise<DownloadStrategyResponse>;
   verifyObjectExists(bucket: string, key: string): Promise<{ exists: boolean; size?: number }>;
 

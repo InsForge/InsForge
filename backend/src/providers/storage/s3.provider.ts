@@ -310,7 +310,8 @@ export class S3StorageProvider implements StorageProvider {
     bucket: string,
     key: string,
     expiresIn: number = ONE_HOUR_IN_SECONDS,
-    isPublic: boolean = false
+    isPublic: boolean = false,
+    version?: string | null
   ): Promise<DownloadStrategyResponse> {
     if (!this.s3Client) {
       throw new Error('S3 client not initialized');
@@ -382,9 +383,17 @@ export class S3StorageProvider implements StorageProvider {
 
             logger.info('CloudFront signed URL generated successfully.');
 
+            // CloudFront's canned-policy signature covers only `Expires`,
+            // `Signature`, and `Key-Pair-Id` — appending `?v=<version>` after
+            // signing is safe and gives CDN cache entries a deterministic
+            // version key so overwrites are picked up immediately.
+            const finalUrl = version
+              ? `${signedUrl}${signedUrl.includes('?') ? '&' : '?'}v=${encodeURIComponent(version)}`
+              : signedUrl;
+
             return {
               method: 'presigned',
-              url: signedUrl,
+              url: finalUrl,
               expiresAt: dateLessThan,
             };
           } catch (cfError) {
@@ -404,7 +413,12 @@ export class S3StorageProvider implements StorageProvider {
       // so we always use presigned URLs for security.
       // The "public" setting only affects the URL expiration time.
 
-      // Always generate presigned URL for security in multi-tenant environment
+      // Always generate presigned URL for security in multi-tenant environment.
+      // SigV4's canonical query string covers every parameter in the URL, so
+      // we intentionally do NOT append `?v=<version>` here — doing so after
+      // signing would yield SignatureDoesNotMatch. When no CloudFront is
+      // configured there is no CDN in front of S3 anyway; the per-request
+      // signature (X-Amz-Signature, X-Amz-Date) already makes the URL unique.
       const command = new GetObjectCommand({
         Bucket: this.s3Bucket,
         Key: s3Key,

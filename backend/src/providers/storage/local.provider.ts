@@ -120,13 +120,16 @@ export class LocalStorageProvider implements StorageProvider {
     bucket: string,
     key: string,
     _expiresIn?: number,
-    _isPublic?: boolean
+    _isPublic?: boolean,
+    version?: string | null
   ): Promise<DownloadStrategyResponse> {
-    // For local storage, return direct download URL with absolute URL
+    // Direct URL points at our own API — safe to append the cache-bust stamp.
     const baseUrl = getApiBaseUrl();
+    const base = `${baseUrl}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(key)}`;
+    const url = version ? `${base}?v=${encodeURIComponent(version)}` : base;
     return Promise.resolve({
       method: 'direct',
-      url: `${baseUrl}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(key)}`,
+      url,
     });
   }
 

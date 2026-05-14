@@ -112,21 +112,6 @@ export class StorageService {
   }
 
   /**
-   * Append `&v=<version>` (or `?v=`) to a presigned/CDN URL so cache
-   * lookups vary by content version. The presigned URL already varies by
-   * signature on each call, but CDN cache keys typically exclude the
-   * signature; the explicit version param makes the bust deterministic.
-   */
-  private appendVersionParam(url: string, version: string | Date | null | undefined): string {
-    const stamp = this.toVersionStamp(version);
-    if (!stamp) {
-      return url;
-    }
-    const sep = url.includes('?') ? '&' : '?';
-    return `${url}${sep}v=${encodeURIComponent(stamp)}`;
-  }
-
-  /**
    * Generate a unique object key with timestamp and random string
    * @param originalFilename - The original filename from the upload
    * @returns Generated unique key
@@ -217,7 +202,7 @@ export class StorageService {
     // Admin-pool dedup (sees all rows; avoids silent cross-user blob overwrite).
     const finalKey = await this.generateNextAvailableKey(bucket, originalKey, this.getPool());
 
-    return withUserContext(this.getPool(), ctx, async (db) => {
+    const { etag, uploadedAt } = await withUserContext(this.getPool(), ctx, async (db) => {
       // INSERT before provider write so UNIQUE (bucket, key) catches any
       // race-window collision before any blob is touched. Provider write
       // stays inside the transaction — a provider failure throws, the tx
@@ -235,28 +220,42 @@ export class StorageService {
         throw new Error(`Failed to retrieve upload timestamp for ${bucket}/${finalKey}`);
       }
 
-      const { etag } = await this.provider.putObject(bucket, finalKey, file);
-
-      // Persist the etag so subsequent reads (getObject / listObjects /
-      // getDownloadStrategy) can mint a `?v=<etag>` URL that breaks CDN
-      // caches the moment an object is overwritten with new bytes.
-      if (etag) {
-        await db.query('UPDATE storage.objects SET etag = $1 WHERE bucket = $2 AND key = $3', [
-          etag,
-          bucket,
-          finalKey,
-        ]);
-      }
-
-      return {
-        bucket,
-        key: finalKey,
-        size: file.size,
-        mimeType: file.mimetype,
-        uploadedAt: result.rows[0].uploadedAt,
-        url: this.buildObjectUrl(bucket, finalKey, etag || result.rows[0].uploadedAt),
-      };
+      const { etag: providerEtag } = await this.provider.putObject(bucket, finalKey, file);
+      return { etag: providerEtag, uploadedAt: result.rows[0].uploadedAt };
     });
+
+    // Persist the etag as a best-effort step OUTSIDE the user-context
+    // transaction. If we ran this inside the tx and the UPDATE failed, the
+    // INSERT would roll back but the provider blob would already be written
+    // — leaving an orphan in S3. Done out here, an UPDATE failure only
+    // degrades CDN cache-busting precision (URLs fall back to uploaded_at as
+    // the version stamp) instead of permanently leaking storage.
+    if (etag) {
+      try {
+        await this.getPool().query(
+          'UPDATE storage.objects SET etag = $1 WHERE bucket = $2 AND key = $3',
+          [etag, bucket, finalKey]
+        );
+      } catch (err) {
+        logger.warn(
+          'Failed to persist object etag; CDN cache-busting will fall back to uploaded_at',
+          {
+            bucket,
+            key: finalKey,
+            error: err instanceof Error ? err.message : String(err),
+          }
+        );
+      }
+    }
+
+    return {
+      bucket,
+      key: finalKey,
+      size: file.size,
+      mimeType: file.mimetype,
+      uploadedAt,
+      url: this.buildObjectUrl(bucket, finalKey, etag || uploadedAt),
+    };
   }
 
   async getObject(
@@ -520,25 +519,24 @@ export class StorageService {
     // Auto-calculate expiry based on bucket visibility if not provided
     const expiresIn = isPublic ? PUBLIC_BUCKET_EXPIRY : PRIVATE_BUCKET_EXPIRY;
 
-    const strategy = await this.provider.getDownloadStrategy(bucket, key, expiresIn, isPublic);
-
-    // Fetch the version stamp (etag preferred, uploaded_at fallback) so the
-    // CDN-facing URL changes whenever the underlying bytes change. The DB
+    // Fetch the version stamp (etag preferred, uploaded_at fallback) and pass
+    // it to the provider, which knows whether its URL flavor tolerates an
+    // extra `?v=` query param. CloudFront and local direct URLs do; raw S3
+    // SigV4 presigned URLs do NOT (signature covers every query param), so
+    // appending after signing would yield SignatureDoesNotMatch 403s. The DB
     // read is admin-pooled because public-bucket callers reach here without
     // a user context, and the visibility check has already gated access.
     const versionRow = await this.getPool().query(
       'SELECT etag, uploaded_at FROM storage.objects WHERE bucket = $1 AND key = $2',
       [bucket, key]
     );
-    const version =
+    const version = this.toVersionStamp(
       (versionRow.rows[0]?.etag as string | null) ??
-      (versionRow.rows[0]?.uploaded_at as Date | null) ??
-      null;
+        (versionRow.rows[0]?.uploaded_at as Date | null) ??
+        null
+    );
 
-    return {
-      ...strategy,
-      url: this.appendVersionParam(strategy.url, version),
-    };
+    return this.provider.getDownloadStrategy(bucket, key, expiresIn, isPublic, version || null);
   }
 
   /**
