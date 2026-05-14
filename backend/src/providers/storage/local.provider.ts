@@ -136,12 +136,18 @@ export class LocalStorageProvider implements StorageProvider {
   async verifyObjectExists(
     bucket: string,
     key: string
-  ): Promise<{ exists: boolean; size?: number }> {
-    // For local storage, check if file exists on disk and get its size
+  ): Promise<{ exists: boolean; size?: number; etag?: string }> {
+    // For local storage, check if file exists on disk and get its size.
+    // We also compute the MD5 etag here so confirmUpload (called by the
+    // presigned-style flow on local backends) can persist it the same way
+    // the direct PUT path does — keeping the URL cache-bust contract
+    // consistent across upload paths.
     try {
       const filePath = this.getFilePath(bucket, key);
       const stat = await fs.stat(filePath);
-      return { exists: true, size: stat.size };
+      const buf = await fs.readFile(filePath);
+      const etag = crypto.createHash('md5').update(buf).digest('hex');
+      return { exists: true, size: stat.size, etag };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         return { exists: false };

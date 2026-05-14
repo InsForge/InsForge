@@ -573,11 +573,21 @@ export class StorageService {
     this.validateBucketName(bucket);
     this.validateKey(key);
 
-    // Verify the file exists in storage and get its actual size
-    const { exists, size: actualSize } = await this.provider.verifyObjectExists(bucket, key);
+    // Verify the file exists in storage and get its actual size + etag.
+    // The server-side etag overrides whatever the client passed: browsers
+    // don't expose the S3 `ETag` response header on cross-origin PUTs unless
+    // the bucket CORS allowlists it, so client-supplied etag is unreliable.
+    // Trusting the HEAD result guarantees the row has a real digest the
+    // download URL can version on.
+    const {
+      exists,
+      size: actualSize,
+      etag: serverEtag,
+    } = await this.provider.verifyObjectExists(bucket, key);
     if (!exists) {
       throw new Error(`Upload not found for key "${key}" in bucket "${bucket}"`);
     }
+    const finalEtag = serverEtag || metadata.etag || null;
 
     // Defense-in-depth: reject if the actual size exceeds the configured limit
     const fileSize = actualSize ?? metadata.size;
@@ -612,14 +622,7 @@ export class StorageService {
         `INSERT INTO storage.objects (bucket, key, size, mime_type, etag, uploaded_by, uploaded_via)
          VALUES ($1, $2, $3, $4, $5, $6, 'rest')
          RETURNING uploaded_at as "uploadedAt"`,
-        [
-          bucket,
-          key,
-          fileSize,
-          metadata.contentType || null,
-          metadata.etag || null,
-          ctx.userId || null,
-        ]
+        [bucket, key, fileSize, metadata.contentType || null, finalEtag, ctx.userId || null]
       )
     );
 
@@ -633,7 +636,7 @@ export class StorageService {
       size: fileSize,
       mimeType: metadata.contentType,
       uploadedAt: result.rows[0].uploadedAt,
-      url: this.buildObjectUrl(bucket, key, metadata.etag || result.rows[0].uploadedAt),
+      url: this.buildObjectUrl(bucket, key, finalEtag || result.rows[0].uploadedAt),
     };
   }
 

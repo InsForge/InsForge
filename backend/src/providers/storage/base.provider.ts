@@ -55,7 +55,18 @@ export interface StorageProvider {
     isPublic?: boolean,
     version?: string | null
   ): Promise<DownloadStrategyResponse>;
-  verifyObjectExists(bucket: string, key: string): Promise<{ exists: boolean; size?: number }>;
+  /**
+   * Confirms an object exists in the backing store and returns its
+   * authoritative size and etag. `confirmUpload` uses this to overwrite the
+   * client-supplied etag — browsers don't expose `ETag` on cross-origin S3
+   * responses unless the bucket CORS allowlists it, so trusting the client
+   * leaves a hole where the DB row has no etag and CDN cache-busting
+   * silently degrades on overwrites.
+   */
+  verifyObjectExists(
+    bucket: string,
+    key: string
+  ): Promise<{ exists: boolean; size?: number; etag?: string }>;
 
   // ==========================================================================
   // S3 Protocol extensions — required by the /storage/v1/s3 gateway.
