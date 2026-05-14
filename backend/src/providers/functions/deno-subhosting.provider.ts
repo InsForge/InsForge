@@ -63,11 +63,21 @@ async function fetchWithTimeout(
 
     try {
       const initialResponse = await Promise.race([fetchPromise, timeoutPromise]);
+      // Initial fetch returned; outer timer is no longer relevant. Cancel it so
+      // the 429 inner-loop delays don't keep a dangling handle.
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = undefined;
+      }
       let currentResponse = initialResponse;
 
       // 429-aware retry layer. Runs only when the initial response is 429.
       if (currentResponse.status === 429) {
         for (let r = 0; r < rateLimitBackoffMs.length; r++) {
+          // Drain the previous 429 body so node-fetch can release the connection.
+          if (currentResponse.body) {
+            currentResponse.body.resume();
+          }
           const retryAfter = currentResponse.headers.get('retry-after');
           const retryAfterMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : NaN;
           const baseMs = !isNaN(retryAfterMs)
