@@ -5,6 +5,7 @@ import { Database, Sparkles, Rocket } from 'lucide-react';
 import StepUserIcon from '#assets/icons/step_user.svg?react';
 import StepUploadIcon from '#assets/icons/step_upload.svg?react';
 import stepBgDecoration from '#assets/images/step_bg_decoration.svg';
+import { useDashboardProject } from '#lib/config/DashboardHostContext';
 import { useMetadata, useProjectId } from '#lib/hooks/useMetadata';
 import { useUsers } from '#features/auth';
 import { useDeploymentMetadata } from '#features/deployments/hooks/useDeploymentMetadata';
@@ -268,7 +269,10 @@ export function DashboardPromptStepper() {
   // Only surface the stepper after the agent has made at least one MCP call.
   // A user who lands on the connected dashboard without ever invoking MCP
   // (e.g. dismissed the Install view manually) shouldn't be nagged with steps.
+  // Branches inherit the parent's setup, so always show the stepper for them.
   const { hasCompletedOnboarding } = useMcpUsage();
+  const project = useDashboardProject();
+  const isBranch = project?.isBranch === true;
 
   const stepperDismissKey = getStepperDismissKey(projectId ?? undefined);
   const [isDismissed, setIsDismissed] = useState(false);
@@ -366,7 +370,7 @@ export function DashboardPromptStepper() {
     }
   }, [projectId, stepperDismissKey]);
 
-  if (isDismissed || !hasCompletedOnboarding) {
+  if (isDismissed || (!hasCompletedOnboarding && !isBranch)) {
     return null;
   }
 

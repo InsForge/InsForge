@@ -275,6 +275,7 @@ function normalizeProjectInfo(
         : previousInfo.currentVersion,
     status:
       typeof message.status === 'string' && message.status ? message.status : previousInfo.status,
+    isBranch: typeof message.isBranch === 'boolean' ? message.isBranch : previousInfo.isBranch,
   };
 }
 
