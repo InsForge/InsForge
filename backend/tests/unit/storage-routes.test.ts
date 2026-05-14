@@ -1,11 +1,30 @@
 import express from 'express';
-import type { Server } from 'http';
+import http, { type Server } from 'http';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
 const storageMocks = vi.hoisted(() => ({
   isBucketPublic: vi.fn(),
   getDownloadStrategy: vi.fn(),
 }));
+
+const post = (port: number, path: string): Promise<{ statusCode: number }> =>
+  new Promise((resolve, reject) => {
+    const request = http.request(
+      {
+        hostname: '127.0.0.1',
+        port,
+        path,
+        method: 'POST',
+      },
+      (response) => {
+        response.resume();
+        response.on('end', () => resolve({ statusCode: response.statusCode ?? 0 }));
+      }
+    );
+
+    request.on('error', reject);
+    request.end();
+  });
 
 vi.mock('../../src/services/storage/storage.service.js', () => ({
   StorageService: {
@@ -68,12 +87,12 @@ describe('Storage routes', () => {
       throw new Error('Test server did not bind to a TCP port');
     }
 
-    const response = await fetch(
-      `http://127.0.0.1:${address.port}/api/storage/buckets/product-images/objects/products/prod_123/main.jpg/download-strategy`,
-      { method: 'POST' }
+    const response = await post(
+      address.port,
+      '/api/storage/buckets/product-images/objects/products/prod_123/main.jpg/download-strategy'
     );
 
-    expect(response.status).toBe(200);
+    expect(response.statusCode).toBe(200);
     expect(storageMocks.getDownloadStrategy).toHaveBeenCalledWith(
       'product-images',
       'products/prod_123/main.jpg'
