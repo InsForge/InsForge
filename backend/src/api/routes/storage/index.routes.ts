@@ -21,8 +21,12 @@ const storageConfigService = StorageConfigService.getInstance();
 
 // Middleware to conditionally apply authentication based on bucket visibility
 const conditionalAuth = async (req: Request, res: Response, next: NextFunction) => {
-  // For GET and HEAD requests to download objects, check if bucket is public
-  if ((req.method === 'GET' || req.method === 'HEAD') && req.params.bucketName) {
+  const isObjectDownload = req.method === 'GET' || req.method === 'HEAD';
+  const isDownloadStrategy =
+    req.method === 'POST' && req.originalUrl.split('?')[0].endsWith('/download-strategy');
+
+  // For object download requests, check if bucket is public
+  if ((isObjectDownload || isDownloadStrategy) && req.params.bucketName) {
     try {
       const storageService = StorageService.getInstance();
       const isPublic = await storageService.isBucketPublic(req.params.bucketName);
@@ -600,15 +604,19 @@ router.post(
 
 // POST /api/storage/buckets/:bucketName/objects/:objectKey/download-strategy - Get download URL (presigned or direct)
 router.post(
-  '/buckets/:bucketName/objects/:objectKey/download-strategy',
+  '/buckets/:bucketName/objects/*/download-strategy',
   conditionalAuth,
   async (req: AuthRequest | Request, res: Response, next: NextFunction) => {
     try {
-      const { bucketName, objectKey } = req.params;
+      const { bucketName } = req.params;
+      const objectKey = req.params[0]; // Everything between objects and download-strategy
+
+      if (!objectKey) {
+        throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
+      }
 
       const storageService = StorageService.getInstance();
       const strategy = await storageService.getDownloadStrategy(bucketName, objectKey);
-
       successResponse(res, strategy);
     } catch (error) {
       if (error instanceof Error && error.message.includes('Invalid')) {
