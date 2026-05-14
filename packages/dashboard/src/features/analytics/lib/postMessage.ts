@@ -1,8 +1,11 @@
-const PARENT_ORIGIN = import.meta.env.VITE_CLOUD_SHELL_ORIGIN || '*';
-// In dev, '*' is acceptable so the iframe works against any localhost cloud-shell port.
-// In prod / staging, the build sets VITE_CLOUD_SHELL_ORIGIN=https://app.insforge.dev (or
-// staging equivalent) so postMessage can only deliver to that origin and incoming
-// messages from other origins are ignored.
+// Resolve the cloud-shell parent origin. In dev (`import.meta.env.DEV`), an unset
+// VITE_CLOUD_SHELL_ORIGIN falls back to '*' so the iframe works against any
+// localhost cloud-shell port. In a production build, an unset env is a config
+// error — we hard-fail to `''` so `requestPosthogConnect` becomes a no-op and the
+// incoming origin check rejects every message, rather than silently fail-open
+// with '*'.
+const PARENT_ORIGIN: string =
+  import.meta.env.VITE_CLOUD_SHELL_ORIGIN ?? (import.meta.env.DEV ? '*' : '');
 
 export interface PosthogConnectionStatusEvent {
   type: 'POSTHOG_CONNECTION_STATUS';
@@ -17,6 +20,9 @@ export interface PosthogConnectionStatusEvent {
  * BroadcastListener and navigates top.location to the start endpoint.
  */
 export function requestPosthogConnect(projectId: string): void {
+  if (!PARENT_ORIGIN) {
+    return;
+  }
   window.parent.postMessage(
     {
       type: 'POSTHOG_CONNECT_REQUEST',

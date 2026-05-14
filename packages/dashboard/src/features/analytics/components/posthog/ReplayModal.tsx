@@ -44,6 +44,8 @@ export function ReplayModal({ recordingId, onClose }: Props) {
                 title="Session replay"
                 className="h-full w-full border-0"
                 allowFullScreen
+                sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+                referrerPolicy="no-referrer"
               />
             )}
           </div>

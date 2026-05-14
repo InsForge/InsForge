@@ -10,13 +10,15 @@ export function ConnectStatusBar({ connection }: { connection: PosthogConnection
           {connection.region} · {connection.organizationName ?? '—'}
         </div>
       </div>
-      <a
-        href={`${connection.host}/project/${connection.posthogProjectId}`}
-        target="_blank"
-        rel="noreferrer"
-      >
-        <Button variant="primary">Open in PostHog</Button>
-      </a>
+      <Button variant="primary" asChild>
+        <a
+          href={`${connection.host}/project/${connection.posthogProjectId}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Open in PostHog
+        </a>
+      </Button>
     </div>
   );
 }

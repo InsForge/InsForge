@@ -15,6 +15,7 @@ import { BreakdownPanel } from './components/posthog/BreakdownPanel';
 import { RetentionCard } from './components/posthog/RetentionCard';
 import { RecentReplaysCard } from './components/posthog/RecentReplaysCard';
 import { useProjectId } from '#lib/hooks/useMetadata';
+import { useToast } from '#lib/hooks/useToast';
 
 const ANALYTICS_SETUP_PROMPT =
   "I'm using InsForge as my backend platform. I want to add product analytics to this project. Read the current directory and use the InsForge skill to set up PostHog analytics for me.";
@@ -23,15 +24,29 @@ export function AnalyticsPage() {
   const { projectId } = useProjectId();
   const qc = useQueryClient();
   const conn = usePosthogConnection();
+  const { showToast } = useToast();
   const [disconnecting, setDisconnecting] = useState(false);
 
   useEffect(() => {
     return onPosthogConnectionStatus((e) => {
       if (e.status === 'connected') {
         void qc.invalidateQueries({ queryKey: ['posthog'] });
+        return;
+      }
+      if (e.status === 'error') {
+        showToast(
+          e.reason
+            ? `PostHog connection failed: ${e.reason}`
+            : 'PostHog connection failed. Please try again.',
+          'error'
+        );
+        return;
+      }
+      if (e.status === 'cancelled') {
+        showToast('PostHog connection cancelled.', 'info');
       }
     });
-  }, [qc]);
+  }, [qc, showToast]);
 
   if (conn.isLoading) {
     return <div className="p-6">Loading…</div>;
@@ -52,7 +67,7 @@ export function AnalyticsPage() {
     return (
       <div className="p-6">
         <h1 className="mb-4 text-2xl font-bold text-foreground">Analytics</h1>
-        <EmptyConnectPanel projectId={projectId ?? ''} />
+        {projectId ? <EmptyConnectPanel projectId={projectId} /> : <div>Loading…</div>}
       </div>
     );
   }
@@ -95,8 +110,8 @@ export function AnalyticsPage() {
           <Info className="mt-0.5 size-3.5 shrink-0" />
           <p>
             Web Analytics aggregates session data with some delay. After connecting PostHog or
-            capturing your first events, it may take a few hours for visitors, views, and
-            sessions to appear here.
+            capturing your first events, it may take a few hours for visitors, views, and sessions
+            to appear here.
           </p>
         </div>
         <KpiSectionWithTrend enabled={hasConnection} />

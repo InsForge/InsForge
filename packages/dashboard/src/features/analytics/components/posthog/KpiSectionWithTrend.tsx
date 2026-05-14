@@ -34,6 +34,7 @@ function KpiTab({ metric, item, active, onClick }: KpiTabProps) {
   const display = item ? webOverviewValue(metric, item.value) : '—';
   const pct = item?.changeFromPreviousPct ?? null;
   const showDelta = pct !== null && Number.isFinite(pct);
+  const isFlat = (pct ?? 0) === 0;
   const goingUp = (pct ?? 0) > 0;
   const isIncreaseBad = item?.isIncreaseBad === true;
   const goodDirection = goingUp !== isIncreaseBad;
@@ -51,8 +52,12 @@ function KpiTab({ metric, item, active, onClick }: KpiTabProps) {
       <span className="flex items-baseline gap-2">
         <span className="text-2xl font-semibold text-foreground">{display}</span>
         {showDelta && (
-          <span className={`text-xs ${goodDirection ? 'text-primary' : 'text-destructive'}`}>
-            {goingUp ? '↑' : '↓'} {formatPercent(Math.abs(pct ?? 0))}
+          <span
+            className={`text-xs ${
+              isFlat ? 'text-muted-foreground' : goodDirection ? 'text-primary' : 'text-destructive'
+            }`}
+          >
+            {isFlat ? '→' : goingUp ? '↑' : '↓'} {formatPercent(Math.abs(pct ?? 0))}
           </span>
         )}
       </span>
