@@ -93,10 +93,12 @@ router.post(
  * Stream one direct deployment file through the backend to Vercel
  * PUT /api/deployments/:id/files/:fileId/content
  */
+// Intentionally NOT rate-limited: this is the per-file content sub-step of a
+// direct deploy. The parent POST /direct already consumes a writeEndpointLimiter
+// token; capping each chunk separately would break legit deploys with >3 files.
 router.put(
   '/:id/files/:fileId/content',
   verifyAdmin,
-  writeEndpointLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const idValidation = uuidParamSchema.safeParse(req.params.id);
