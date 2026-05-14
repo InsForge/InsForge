@@ -7,7 +7,7 @@ const storageMocks = vi.hoisted(() => ({
   getDownloadStrategy: vi.fn(),
 }));
 
-const post = (port: number, path: string): Promise<{ statusCode: number }> =>
+const post = (port: number, path: string): Promise<{ statusCode: number; body: string }> =>
   new Promise((resolve, reject) => {
     const request = http.request(
       {
@@ -17,8 +17,12 @@ const post = (port: number, path: string): Promise<{ statusCode: number }> =>
         method: 'POST',
       },
       (response) => {
-        response.resume();
-        response.on('end', () => resolve({ statusCode: response.statusCode ?? 0 }));
+        let body = '';
+        response.setEncoding('utf8');
+        response.on('data', (chunk) => {
+          body += chunk;
+        });
+        response.on('end', () => resolve({ statusCode: response.statusCode ?? 0, body }));
       }
     );
 
@@ -69,6 +73,7 @@ describe('Storage routes', () => {
   });
 
   test('download strategy route captures nested object keys', async () => {
+    vi.resetModules();
     storageMocks.isBucketPublic.mockResolvedValue(true);
     storageMocks.getDownloadStrategy.mockResolvedValue({
       method: 'direct',
@@ -92,7 +97,7 @@ describe('Storage routes', () => {
       '/api/storage/buckets/product-images/objects/products/prod_123/main.jpg/download-strategy'
     );
 
-    expect(response.statusCode).toBe(200);
+    expect(response.statusCode, response.body).toBe(200);
     expect(storageMocks.getDownloadStrategy).toHaveBeenCalledWith(
       'product-images',
       'products/prod_123/main.jpg'
