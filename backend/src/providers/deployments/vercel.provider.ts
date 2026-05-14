@@ -122,9 +122,10 @@ export interface VercelRateLimitRetryOptions {
  * present we wait until that instant (capped at `maxDelayMs`). Otherwise we
  * fall back to `2^attempt * baseDelayMs + jitter`.
  *
- * Used by every write endpoint in this provider: createDeployment,
- * uploadFile (existing), upsertEnvironmentVariables, addCustomDomain,
- * removeCustomDomain, cancelDeployment.
+ * Used by these write endpoints: createDeployment, cancelDeployment,
+ * upsertEnvironmentVariables, addCustomDomain, removeCustomDomain,
+ * verifyCustomDomain. uploadFile keeps its own bespoke streaming-aware
+ * retry loop and is intentionally NOT wrapped by this helper.
  */
 export async function withVercelRateLimitRetry<T>(
   op: () => Promise<T>,
@@ -135,21 +136,15 @@ export async function withVercelRateLimitRetry<T>(
     try {
       return await op();
     } catch (error: unknown) {
-      const isAxios429 =
-        // axios.isAxiosError equivalent without an extra import here
-        typeof error === 'object' &&
-        error !== null &&
-        (error as { isAxiosError?: boolean }).isAxiosError === true &&
-        (error as { response?: { status?: number } }).response?.status === 429;
+      const isAxios429 = axios.isAxiosError(error) && error.response?.status === 429;
 
       if (!isAxios429 || attempt >= opts.maxRetries) {
         throw error;
       }
 
-      const headers =
-        (error as { response: { headers?: Record<string, string> } }).response.headers ?? {};
+      const headers = error.response?.headers ?? {};
       const reset = headers['x-ratelimit-reset'];
-      const parsedReset = reset ? parseInt(reset, 10) : NaN;
+      const parsedReset = reset !== undefined && reset !== null ? parseInt(String(reset), 10) : NaN;
       let baseDelay: number;
       if (!isNaN(parsedReset)) {
         const resetMs = parsedReset * 1000;
@@ -169,7 +164,7 @@ export async function withVercelRateLimitRetry<T>(
   }
 }
 
-const DEFAULT_VERCEL_RATE_LIMIT_OPTS: VercelRateLimitRetryOptions = {
+export const DEFAULT_VERCEL_RATE_LIMIT_OPTS: VercelRateLimitRetryOptions = {
   maxRetries: 3,
   baseDelayMs: 1000,
   maxDelayMs: 30_000,
