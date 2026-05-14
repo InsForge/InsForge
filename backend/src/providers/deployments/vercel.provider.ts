@@ -657,9 +657,13 @@ export class VercelProvider {
     const credentials = await this.getCredentials();
 
     try {
-      await axios.delete(
-        `https://api.vercel.com/v10/projects/${credentials.projectId}/env/${envId}?teamId=${credentials.teamId}`,
-        { headers: { Authorization: `Bearer ${credentials.token}` } }
+      await withVercelRateLimitRetry(
+        () =>
+          axios.delete(
+            `https://api.vercel.com/v10/projects/${credentials.projectId}/env/${envId}?teamId=${credentials.teamId}`,
+            { headers: { Authorization: `Bearer ${credentials.token}` } }
+          ),
+        DEFAULT_VERCEL_RATE_LIMIT_OPTS
       );
 
       logger.info('Environment variable deleted', { envId });

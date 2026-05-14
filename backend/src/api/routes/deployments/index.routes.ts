@@ -409,10 +409,13 @@ router.get('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: Ne
  * Sync deployment status from Vercel and update database
  * POST /api/deployments/:id/sync
  */
+// Intentionally NOT rate-limited: this route triggers a Vercel GET
+// (vercelProvider.getDeployment) — a read, not a write. The
+// writeEndpointLimiter is reserved for endpoints that consume Vercel's
+// write quotas (deployment creation, env-var writes, domain CRUD).
 router.post(
   '/:id/sync',
   verifyAdmin,
-  writeEndpointLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
