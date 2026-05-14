@@ -29,7 +29,7 @@ A branch is a real child project — its own EC2 instance, its own Postgres, its
 
 Row-level inserts in your application tables are isolated to the branch like everything else. The branch shares the parent's `JWT_SECRET`, so users authenticated against the parent are still authenticated on the branch with the same tokens — but it gets its own `API_KEY` / `ANON_KEY`.
 
-Website and Vercel deployments, plus Fly.io compute services, are **not** branched. If you need them for a branch, redeploy against the branch's appkey.
+Website and Vercel deployments, plus Fly.io compute services, are **not** branched. If you need them for a branch, redeploy against the branch's `API_KEY`.
 
 ## When To Use a Branch
 
@@ -54,7 +54,7 @@ Skip a branch for:
 
 When you create a branch you choose how much state comes along:
 
-- **`full`** — copies the parent's complete database (schema + data) at the moment of branch creation. Best when you need realistic data to test against.
+- **`full`** (entire schema and data) — copies the parent's complete database (schema + data) at the moment of branch creation. Best when you need realistic data to test against.
 - **`schema-only`** — copies the schema and the platform's mergeable config (auth providers, storage buckets, edge function definitions, …) but leaves user-data tables empty. Faster, lighter, and avoids bringing production rows into a sandbox.
 
 Both modes restore the parent's state once at create time. After that the branch runs on its own infrastructure with no live coupling — drift between parent and branch is what `merge` later resolves.
@@ -69,6 +69,7 @@ A branch moves through a small number of states:
 | `ready` | The branch is usable — edit anything, run code against it. |
 | `merging` | A merge is in flight; branch edits are paused. |
 | `merged` | A merge completed; the branch is read-only but still around. |
+| `paused` | Branch inherited the parent's paused state; resume it explicitly when you need it again. |
 | `deleted` | Tombstoned, EC2 and S3 cleaned up. |
 
 `ready` is where you do nearly all of your work. `merged` lets you keep iterating with `reset` if you want another round after a successful merge. `delete` is always explicit — a successful merge does **not** auto-delete the branch.
@@ -109,7 +110,7 @@ npx @insforge/cli branch reset feat-billing
 npx @insforge/cli branch delete feat-billing
 ```
 
-See the [InsForge CLI reference](/sdks/typescript/overview) for the full set of flags.
+See the `npx @insforge/cli branch --help` for the full set of flags.
 
 ## How Merge Works
 
@@ -130,9 +131,9 @@ When a merge is blocked, you get a structured report of which object diverged an
 
 Platform config tables (auth providers, storage buckets, email templates, edge function definitions, schedules) merge by stable key. User-data rows on the branch are **not** auto-merged — branches are for schema and configuration, not data backfills.
 
-## Quotas and Limits
+## Quotas and Limits (not been finalized yet, and may change in the future)
 
-- Up to **3** parent projects per organization can have at least one active branch (configurable per deployment).
+- Up to **3** parent projects per organization can have at least one active branch.
 - Up to **2** active branches per parent project.
 - Nested branches (a branch of a branch) are **not** supported.
 - When the parent is paused, its branches pause too. Resuming the parent does not auto-resume branches — resume each one explicitly when you need it.
