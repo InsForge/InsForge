@@ -130,8 +130,22 @@ function makeFlyAppName(name: string, projectId: string): string {
   return `${truncated}-${hash}${suffix}`;
 }
 
-function makeNetwork(projectId: string): string {
-  return `${projectId}-network`;
+// Network name is sent on Fly POST /apps. Fly's documented rule: "Network
+// names can have letters, numbers, and dashes, but must start with a letter."
+// The old `${projectId}-network` failed for the ~63% of projects whose UUID
+// begins with a hex digit; using bare APP_KEY still failed for the ~30% of
+// keys generateAppKey() produces digit-leading. The static `n-` prefix
+// guarantees a letter-leading name for every project, and APP_KEY's
+// per-project uniqueness still preserves 6PN isolation.
+function makeNetwork(): string {
+  if (!process.env.APP_KEY) {
+    throw new AppError(
+      'APP_KEY environment variable is required for compute network isolation',
+      500,
+      ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED
+    );
+  }
+  return `n-${process.env.APP_KEY}`;
 }
 
 // Default to Fly's own .fly.dev hostname (which Fly routes automatically for
@@ -334,7 +348,7 @@ export class ComputeServicesService {
     const row: ServiceRow = insertResult.rows[0];
     const serviceId = row.id;
     const flyAppName = makeFlyAppName(input.name, input.projectId);
-    const network = makeNetwork(input.projectId);
+    const network = makeNetwork();
     const endpointUrl = makeEndpointUrl(flyAppName);
 
     let flyMachineId: string | undefined;
@@ -414,7 +428,7 @@ export class ComputeServicesService {
       : null;
 
     const flyAppName = makeFlyAppName(input.name, input.projectId);
-    const network = makeNetwork(input.projectId);
+    const network = makeNetwork();
     const endpointUrl = makeEndpointUrl(flyAppName);
 
     // Insert row — check for duplicate name before calling Fly APIs

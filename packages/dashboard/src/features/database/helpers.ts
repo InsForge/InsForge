@@ -12,6 +12,7 @@ export const INSFORGE_MANAGED_DATABASE_SCHEMAS = [
   'deployments',
   'email',
   'functions',
+  'payments',
   'realtime',
   'schedules',
   'storage',

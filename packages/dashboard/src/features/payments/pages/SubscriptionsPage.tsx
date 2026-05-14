@@ -1,34 +1,49 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ChevronRight, Settings } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
-import { Button, Tab, Tabs } from '@insforge/ui';
 import type {
-  StripeEnvironment,
+  StripeCustomer,
+  StripePrice,
+  StripeProduct,
   StripeSubscriptionItem,
-  StripeSubscriptionMirror,
+  StripeSubscription,
   StripeSubscriptionStatus,
 } from '@insforge/shared-schemas';
-import { ErrorState, LoadingState, TableHeader } from '#components';
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+  ErrorState,
+  LoadingState,
+  PaginationControls,
+  TableHeader,
+} from '#components';
+import { PaymentsKeyMissingState } from '#features/payments/components/PaymentsKeyMissingState';
 import type { PaymentsOutletContext } from '#features/payments/components/PaymentsLayout';
+import { usePaymentCatalog } from '#features/payments/hooks/usePaymentCatalog';
+import { usePaymentCustomers } from '#features/payments/hooks/usePaymentCustomers';
 import { usePaymentSubscriptions } from '#features/payments/hooks/usePaymentSubscriptions';
 import { cn } from '#lib/utils/utils';
 
-const ENVIRONMENTS: StripeEnvironment[] = ['test', 'live'];
-
 const SUBSCRIPTION_STATUS_CLASSES: Record<StripeSubscriptionStatus, string> = {
-  incomplete: 'bg-amber-50 text-amber-700 ring-amber-200',
-  incomplete_expired: 'bg-[var(--alpha-3)] text-muted-foreground ring-[var(--alpha-8)]',
-  trialing: 'bg-sky-50 text-sky-700 ring-sky-200',
-  active: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-  past_due: 'bg-amber-50 text-amber-700 ring-amber-200',
-  canceled: 'bg-[var(--alpha-3)] text-muted-foreground ring-[var(--alpha-8)]',
-  unpaid: 'bg-rose-50 text-rose-700 ring-rose-200',
-  paused: 'bg-[var(--alpha-3)] text-muted-foreground ring-[var(--alpha-8)]',
+  incomplete: 'bg-[var(--alpha-8)] text-amber-400',
+  incomplete_expired: 'bg-[var(--alpha-8)] text-muted-foreground',
+  trialing: 'bg-[var(--alpha-8)] text-sky-400',
+  active: 'bg-[var(--alpha-8)] text-emerald-400',
+  past_due: 'bg-[var(--alpha-8)] text-amber-400',
+  canceled: 'bg-[var(--alpha-8)] text-muted-foreground',
+  unpaid: 'bg-[var(--alpha-8)] text-rose-400',
+  paused: 'bg-[var(--alpha-8)] text-muted-foreground',
 };
+
+const SUBSCRIPTION_ROW_GRID_TEMPLATE =
+  '32px minmax(0, 1.3fr) minmax(0, 1fr) 120px minmax(0, 1.2fr) minmax(0, 0.75fr)';
+
+const SUBSCRIPTION_ITEM_GRID_TEMPLATE = 'minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) 100px';
 
 function formatDate(value: string | null) {
   if (!value) {
-    return 'Not set';
+    return '-';
   }
 
   const date = new Date(value);
@@ -40,6 +55,10 @@ function formatDate(value: string | null) {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(date);
+}
+
+function formatLastSynced(value: string | null) {
+  return value ? formatDate(value) : 'Never';
 }
 
 function formatShortDate(value: string | null) {
@@ -66,7 +85,7 @@ function formatStatusLabel(status: StripeSubscriptionStatus) {
     .join(' ');
 }
 
-function formatPeriod(subscription: StripeSubscriptionMirror) {
+function formatPeriod(subscription: StripeSubscription) {
   if (!subscription.currentPeriodStart && !subscription.currentPeriodEnd) {
     return 'No active period';
   }
@@ -76,19 +95,54 @@ function formatPeriod(subscription: StripeSubscriptionMirror) {
   )}`;
 }
 
-function formatSubject(subscription: StripeSubscriptionMirror) {
-  if (!subscription.subjectType || !subscription.subjectId) {
-    return 'Unmapped';
+function getCurrencyFractionDigits(currency: string) {
+  return (
+    new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: currency.toUpperCase(),
+      currencyDisplay: 'code',
+    }).resolvedOptions().maximumFractionDigits ?? 2
+  );
+}
+
+function formatPriceAmount(price: StripePrice) {
+  const rawAmount =
+    price.unitAmount ?? (price.unitAmountDecimal ? Number(price.unitAmountDecimal) : null);
+
+  if (rawAmount === null || Number.isNaN(rawAmount)) {
+    return 'Custom';
   }
 
-  return `${subscription.subjectType}:${subscription.subjectId}`;
+  const currency = price.currency.toUpperCase();
+  const fractionDigits = getCurrencyFractionDigits(currency);
+
+  return new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency,
+    currencyDisplay: 'code',
+  }).format(rawAmount / 10 ** fractionDigits);
+}
+
+function getCustomerLabel(customer: StripeCustomer | null, subscription: StripeSubscription) {
+  return customer?.email ?? customer?.name ?? subscription.stripeCustomerId;
+}
+
+function getSubscriptionItemProductLabel(
+  item: StripeSubscriptionItem,
+  product: StripeProduct | null
+) {
+  return product?.name ?? item.stripeProductId ?? '-';
+}
+
+function getSubscriptionItemPriceLabel(item: StripeSubscriptionItem, price: StripePrice | null) {
+  return price ? formatPriceAmount(price) : (item.stripePriceId ?? '-');
 }
 
 function SubscriptionStatus({ status }: { status: StripeSubscriptionStatus }) {
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1',
+        'inline-flex items-center rounded px-2 py-0.5 text-xs font-medium',
         SUBSCRIPTION_STATUS_CLASSES[status]
       )}
     >
@@ -97,127 +151,30 @@ function SubscriptionStatus({ status }: { status: StripeSubscriptionStatus }) {
   );
 }
 
-function ConfigureStripeKeyEmptyState({
-  environment,
-  onConfigure,
+function EmptySubscriptionsState({ hasSearchQuery }: { hasSearchQuery: boolean }) {
+  return (
+    <div className="rounded border border-dashed border-[var(--alpha-8)] bg-card p-8 text-center">
+      <p className="text-sm font-medium text-foreground">
+        {hasSearchQuery ? 'No subscriptions match your search' : 'No subscriptions found'}
+      </p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        {hasSearchQuery
+          ? 'Try a different subscription, customer, invoice, or product reference.'
+          : 'Completed subscription checkouts will appear after Stripe webhooks are processed.'}
+      </p>
+    </div>
+  );
+}
+
+function SubscriptionItemsTable({
+  items,
+  productsById,
+  pricesById,
 }: {
-  environment: StripeEnvironment;
-  onConfigure: () => void;
+  items: StripeSubscriptionItem[];
+  productsById: Map<string, StripeProduct>;
+  pricesById: Map<string, StripePrice>;
 }) {
-  const keyName = environment === 'test' ? 'STRIPE_TEST_SECRET_KEY' : 'STRIPE_LIVE_SECRET_KEY';
-
-  return (
-    <div className="flex h-full min-h-[320px] items-center justify-center px-6 text-center">
-      <div className="flex max-w-md flex-col items-center gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--alpha-3)] text-muted-foreground">
-          <Settings className="h-5 w-5" />
-        </div>
-        <div className="flex flex-col gap-1">
-          <h2 className="text-sm font-medium text-foreground">
-            Configure your Stripe {environment} key
-          </h2>
-          <p className="text-sm leading-6 text-muted-foreground">
-            Add {keyName} before viewing {environment} subscriptions and subscription items.
-          </p>
-        </div>
-        <Button variant="secondary" onClick={onConfigure} className="mt-1 h-9 rounded px-3">
-          <Settings className="h-4 w-4" />
-          Configure Stripe API keys
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function DetailCard({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="rounded border border-[var(--alpha-8)] bg-card p-4">
-      <p className="mb-1 text-sm text-muted-foreground">{label}</p>
-      <div className="text-sm text-foreground">{value}</div>
-    </div>
-  );
-}
-
-function MonospaceValue({ value }: { value: string | null }) {
-  return value ? (
-    <span className="block max-w-full truncate font-mono text-xs text-foreground" title={value}>
-      {value}
-    </span>
-  ) : (
-    <span className="block max-w-full truncate text-muted-foreground">Not set</span>
-  );
-}
-
-function SubscriptionsTable({
-  subscriptions,
-  onSelectSubscription,
-}: {
-  subscriptions: StripeSubscriptionMirror[];
-  onSelectSubscription: (subscription: StripeSubscriptionMirror) => void;
-}) {
-  if (subscriptions.length === 0) {
-    return (
-      <div className="mx-auto flex w-4/5 max-w-[1024px] flex-col items-center justify-center rounded border border-dashed border-[var(--alpha-8)] bg-card p-8 text-center">
-        <p className="text-sm font-medium text-foreground">No subscriptions found</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Completed subscription checkouts will appear after Stripe webhooks are processed.
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="mx-auto flex w-4/5 max-w-[1024px] flex-col gap-1">
-      {subscriptions.map((subscription) => (
-        <button
-          key={`${subscription.environment}:${subscription.stripeSubscriptionId}`}
-          type="button"
-          onClick={() => onSelectSubscription(subscription)}
-          className="rounded border border-[var(--alpha-8)] bg-card text-left"
-        >
-          <div className="flex cursor-pointer items-center rounded transition-colors hover:bg-[var(--alpha-8)]">
-            <div className="flex w-[30px] shrink-0 items-center justify-center">
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            </div>
-
-            <div className="flex h-12 min-w-0 flex-[1.5] flex-col justify-center px-2.5">
-              <p className="truncate font-mono text-xs leading-[18px] text-foreground">
-                {subscription.stripeSubscriptionId}
-              </p>
-              <p className="truncate font-mono text-xs leading-4 text-muted-foreground">
-                {subscription.stripeCustomerId}
-              </p>
-            </div>
-
-            <div className="flex h-12 w-[120px] shrink-0 items-center px-2.5">
-              <SubscriptionStatus status={subscription.status} />
-            </div>
-
-            <div className="flex h-12 min-w-0 flex-1 items-center px-2.5">
-              <span className="truncate font-mono text-xs leading-[18px] text-muted-foreground">
-                {formatSubject(subscription)}
-              </span>
-            </div>
-
-            <div className="flex h-12 w-[90px] shrink-0 items-center px-2.5">
-              <span className="text-sm leading-[18px] text-foreground">
-                {subscription.items?.length ?? 0}
-              </span>
-            </div>
-
-            <div className="flex h-12 w-[180px] shrink-0 items-center px-2.5">
-              <span className="truncate text-sm leading-[18px] text-muted-foreground">
-                {formatPeriod(subscription)}
-              </span>
-            </div>
-          </div>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function SubscriptionItemsTable({ items }: { items: StripeSubscriptionItem[] }) {
   if (items.length === 0) {
     return (
       <div className="rounded border border-dashed border-[var(--alpha-8)] bg-card p-8 text-center">
@@ -231,130 +188,202 @@ function SubscriptionItemsTable({ items }: { items: StripeSubscriptionItem[] }) 
 
   return (
     <div className="overflow-hidden rounded border border-[var(--alpha-8)] bg-card">
-      <div className="grid grid-cols-[minmax(140px,1fr)_minmax(120px,0.85fr)_minmax(140px,1fr)_120px] border-b border-[var(--alpha-8)] px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      <div
+        className="grid border-b border-[var(--alpha-8)] bg-alpha-4 px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"
+        style={{ gridTemplateColumns: SUBSCRIPTION_ITEM_GRID_TEMPLATE }}
+      >
         <div>Item</div>
         <div>Product</div>
         <div>Price</div>
         <div>Quantity</div>
       </div>
-      {items.map((item) => (
-        <div
-          key={`${item.environment}:${item.stripeSubscriptionItemId}`}
-          className="grid grid-cols-[minmax(140px,1fr)_minmax(120px,0.85fr)_minmax(140px,1fr)_120px] items-center border-b border-[var(--alpha-6)] px-4 py-3 text-sm last:border-0"
-        >
-          <div className="min-w-0">
-            <p
-              className="block max-w-full truncate font-mono text-xs text-foreground"
-              title={item.stripeSubscriptionItemId}
-            >
-              {item.stripeSubscriptionItemId}
-            </p>
+
+      {items.map((item) => {
+        const product = item.stripeProductId
+          ? (productsById.get(item.stripeProductId) ?? null)
+          : null;
+        const price = item.stripePriceId ? (pricesById.get(item.stripePriceId) ?? null) : null;
+
+        return (
+          <div
+            key={`${item.environment}:${item.stripeSubscriptionItemId}`}
+            className="grid items-center border-b border-[var(--alpha-8)] px-4 py-3 text-sm last:border-0"
+            style={{ gridTemplateColumns: SUBSCRIPTION_ITEM_GRID_TEMPLATE }}
+          >
+            <div className="min-w-0">
+              <p
+                className="truncate font-mono text-xs text-foreground"
+                title={item.stripeSubscriptionItemId}
+              >
+                {item.stripeSubscriptionItemId}
+              </p>
+            </div>
+
+            <div className="min-w-0">
+              <p
+                className="truncate text-foreground"
+                title={product?.stripeProductId ?? item.stripeProductId ?? undefined}
+              >
+                {getSubscriptionItemProductLabel(item, product)}
+              </p>
+            </div>
+
+            <div className="min-w-0">
+              <p
+                className="truncate text-foreground"
+                title={price?.stripePriceId ?? item.stripePriceId ?? undefined}
+              >
+                {getSubscriptionItemPriceLabel(item, price)}
+              </p>
+            </div>
+
+            <div className="min-w-0 truncate text-foreground">{item.quantity ?? '-'}</div>
           </div>
-          <div className="min-w-0">
-            <MonospaceValue value={item.stripeProductId} />
-          </div>
-          <div className="min-w-0">
-            <MonospaceValue value={item.stripePriceId} />
-          </div>
-          <div className="min-w-0 truncate text-foreground">{item.quantity ?? 'Not set'}</div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
 
-function SubscriptionDetail({
+function SubscriptionRow({
   subscription,
-  onBack,
+  customer,
+  productsById,
+  pricesById,
+  expanded,
+  onToggle,
 }: {
-  subscription: StripeSubscriptionMirror;
-  onBack: () => void;
+  subscription: StripeSubscription;
+  customer: StripeCustomer | null;
+  productsById: Map<string, StripeProduct>;
+  pricesById: Map<string, StripePrice>;
+  expanded: boolean;
+  onToggle: () => void;
 }) {
   const items = subscription.items ?? [];
+  const detailsId = `subscription-details-${subscription.stripeSubscriptionId}`;
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
-      <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))] px-4">
-        <button
-          type="button"
-          onClick={onBack}
-          className="text-base font-medium leading-7 text-muted-foreground transition-colors hover:text-foreground"
+    <div className="overflow-hidden rounded border border-[var(--alpha-8)] bg-card">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={expanded}
+        aria-controls={detailsId}
+        className="w-full text-left transition-colors hover:bg-alpha-4"
+      >
+        <div
+          className="grid min-h-12 items-center gap-0 px-2 text-sm"
+          style={{ gridTemplateColumns: SUBSCRIPTION_ROW_GRID_TEMPLATE }}
         >
-          Subscriptions
-        </button>
-        <ChevronRight className="h-5 w-5 text-muted-foreground" />
-        <p className="truncate font-mono text-xs font-medium leading-7 text-foreground">
-          {subscription.stripeSubscriptionId}
-        </p>
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-auto p-4">
-        <div className="mx-auto flex w-4/5 max-w-[1024px] flex-col gap-4">
-          <div className="grid grid-cols-3 gap-4">
-            <DetailCard
-              label="Status"
-              value={<SubscriptionStatus status={subscription.status} />}
-            />
-            <DetailCard label="Items" value={items.length} />
-            <DetailCard label="Current period" value={formatPeriod(subscription)} />
+          <div className="flex items-center justify-center text-muted-foreground">
+            {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </div>
 
-          <div className="rounded border border-[var(--alpha-8)] bg-card p-4">
-            <p className="mb-2 text-sm text-muted-foreground">Subscription</p>
-            <p className="font-mono text-xs text-foreground">{subscription.stripeSubscriptionId}</p>
-
-            <div className="mt-4 grid grid-cols-2 gap-4">
-              <div>
-                <p className="mb-1 text-sm text-muted-foreground">Customer</p>
-                <MonospaceValue value={subscription.stripeCustomerId} />
-              </div>
-              <div>
-                <p className="mb-1 text-sm text-muted-foreground">Subject</p>
-                <span className="font-mono text-xs text-foreground">
-                  {formatSubject(subscription)}
-                </span>
-              </div>
-              <div>
-                <p className="mb-1 text-sm text-muted-foreground">Latest invoice</p>
-                <MonospaceValue value={subscription.latestInvoiceId} />
-              </div>
-              <div>
-                <p className="mb-1 text-sm text-muted-foreground">Updated</p>
-                <span className="text-sm text-foreground">
-                  {formatDate(subscription.updatedAt)}
-                </span>
-              </div>
-            </div>
+          <div className="min-w-0 px-2 py-3">
+            <span
+              className="block truncate font-mono text-xs text-foreground"
+              title={subscription.stripeSubscriptionId}
+            >
+              {subscription.stripeSubscriptionId}
+            </span>
           </div>
 
-          <section className="flex flex-col gap-3">
-            <div>
-              <h2 className="text-base font-medium text-foreground">Subscription items</h2>
-              <p className="text-sm text-muted-foreground">
-                Stripe items associated with this subscription, including product and price links.
-              </p>
-            </div>
-            <SubscriptionItemsTable items={items} />
-          </section>
+          <div className="min-w-0 px-2 py-3">
+            <span
+              className="block truncate text-foreground"
+              title={getCustomerLabel(customer, subscription)}
+            >
+              {getCustomerLabel(customer, subscription)}
+            </span>
+          </div>
+
+          <div className="px-2 py-3">
+            <SubscriptionStatus status={subscription.status} />
+          </div>
+
+          <div className="min-w-0 px-2 py-3">
+            <span className="truncate text-foreground">{formatPeriod(subscription)}</span>
+          </div>
+
+          <div className="min-w-0 px-2 py-3">
+            {subscription.latestInvoiceId ? (
+              <span
+                className="block truncate font-mono text-xs text-foreground"
+                title={subscription.latestInvoiceId}
+              >
+                {subscription.latestInvoiceId}
+              </span>
+            ) : (
+              <span className="text-muted-foreground">-</span>
+            )}
+          </div>
         </div>
-      </div>
+      </button>
+
+      {expanded && (
+        <div id={detailsId} className="border-t border-[var(--alpha-8)] pb-3 pl-[30px] pr-3 pt-0">
+          <div className="bg-[rgb(var(--semantic-1))] px-4 py-4">
+            <div className="flex flex-col gap-2">
+              <div>
+                <h2 className="text-base font-medium text-foreground">Subscription Items</h2>
+                <p className="text-sm text-muted-foreground">
+                  Stripe items associated with this subscription, including product and price links.
+                </p>
+              </div>
+              <SubscriptionItemsTable
+                items={items}
+                productsById={productsById}
+                pricesById={pricesById}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 export default function SubscriptionsPage() {
-  const { openPaymentsSettings } = useOutletContext<PaymentsOutletContext>();
-  const [environment, setEnvironment] = useState<StripeEnvironment>('test');
+  const { openPaymentsSettings, environment } = useOutletContext<PaymentsOutletContext>();
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedSubscription, setSelectedSubscription] = useState<StripeSubscriptionMirror | null>(
-    null
-  );
+  const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<string | null>(null);
+
   const { activeConnection, subscriptions, isLoading, error, refetch } =
     usePaymentSubscriptions(environment);
+  const { customers } = usePaymentCustomers(environment);
+  const { products, prices } = usePaymentCatalog(environment);
 
   useEffect(() => {
-    setSelectedSubscription(null);
+    setExpandedSubscriptionId(null);
   }, [environment]);
+
+  const customersById = useMemo(() => {
+    const nextCustomersById = new Map<string, StripeCustomer>();
+    for (const customer of customers) {
+      nextCustomersById.set(customer.stripeCustomerId, customer);
+    }
+
+    return nextCustomersById;
+  }, [customers]);
+
+  const productsById = useMemo(() => {
+    const nextProductsById = new Map<string, StripeProduct>();
+    for (const product of products) {
+      nextProductsById.set(product.stripeProductId, product);
+    }
+
+    return nextProductsById;
+  }, [products]);
+
+  const pricesById = useMemo(() => {
+    const nextPricesById = new Map<string, StripePrice>();
+    for (const price of prices) {
+      nextPricesById.set(price.stripePriceId, price);
+    }
+
+    return nextPricesById;
+  }, [prices]);
 
   const filteredSubscriptions = useMemo(() => {
     const normalizedSearch = searchQuery.trim().toLowerCase();
@@ -363,36 +392,51 @@ export default function SubscriptionsPage() {
     }
 
     return subscriptions.filter((subscription) => {
-      const itemValues = (subscription.items ?? []).flatMap((item) => [
-        item.stripeSubscriptionItemId,
-        item.stripeProductId,
-        item.stripePriceId,
-      ]);
+      const customer = customersById.get(subscription.stripeCustomerId) ?? null;
+      const itemValues = (subscription.items ?? []).flatMap((item) => {
+        const product = item.stripeProductId
+          ? (productsById.get(item.stripeProductId) ?? null)
+          : null;
+        const price = item.stripePriceId ? (pricesById.get(item.stripePriceId) ?? null) : null;
+
+        return [
+          item.stripeSubscriptionItemId,
+          item.stripeProductId,
+          item.stripePriceId,
+          product?.name,
+          price ? formatPriceAmount(price) : null,
+        ];
+      });
 
       return [
         subscription.stripeSubscriptionId,
         subscription.stripeCustomerId,
-        subscription.subjectType,
-        subscription.subjectId,
+        customer?.email,
+        customer?.name,
         subscription.status,
         subscription.latestInvoiceId,
+        formatPeriod(subscription),
         ...itemValues,
       ]
-        .filter(Boolean)
-        .some((value) => value?.toLowerCase().includes(normalizedSearch));
+        .filter((value): value is string => typeof value === 'string' && value.length > 0)
+        .some((value) => value.toLowerCase().includes(normalizedSearch));
     });
-  }, [subscriptions, searchQuery]);
+  }, [customersById, pricesById, productsById, searchQuery, subscriptions]);
+
+  useEffect(() => {
+    if (
+      expandedSubscriptionId &&
+      !filteredSubscriptions.some(
+        (subscription) => subscription.stripeSubscriptionId === expandedSubscriptionId
+      )
+    ) {
+      setExpandedSubscriptionId(null);
+    }
+  }, [expandedSubscriptionId, filteredSubscriptions]);
+
+  const handlePageChange = useCallback((_page: number) => {}, []);
 
   const hasActiveKey = !!activeConnection?.maskedKey;
-
-  if (selectedSubscription) {
-    return (
-      <SubscriptionDetail
-        subscription={selectedSubscription}
-        onBack={() => setSelectedSubscription(null)}
-      />
-    );
-  }
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
@@ -402,24 +446,20 @@ export default function SubscriptionsPage() {
         leftClassName="py-0"
         rightClassName="py-0"
         showDividerAfterTitle
-        titleButtons={
-          <Tabs
-            value={environment}
-            onValueChange={(value) => setEnvironment(value as StripeEnvironment)}
-            className="h-8"
-          >
-            {ENVIRONMENTS.map((item) => (
-              <Tab key={item} value={item} className="h-8 py-0">
-                {item === 'test' ? 'Test' : 'Live'}
-              </Tab>
-            ))}
-          </Tabs>
+        leftSlot={
+          hasActiveKey ? (
+            <span className="text-xs text-muted-foreground">
+              Last synced: {formatLastSynced(activeConnection?.lastSyncedAt ?? null)}
+            </span>
+          ) : null
         }
+        rightActions={null}
         showSearch={hasActiveKey}
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}
         searchDebounceTime={300}
-        searchPlaceholder="Search subscriptions"
+        searchPlaceholder="Search subscription"
+        searchInputClassName="w-[280px]"
       />
 
       <div className="relative min-h-0 flex-1 overflow-y-auto">
@@ -428,34 +468,74 @@ export default function SubscriptionsPage() {
         ) : isLoading ? (
           <LoadingState message="Loading Stripe subscriptions..." />
         ) : !hasActiveKey ? (
-          <ConfigureStripeKeyEmptyState
+          <PaymentsKeyMissingState
             environment={environment}
+            resourceLabel="subscriptions"
             onConfigure={openPaymentsSettings}
           />
         ) : (
-          <>
-            <div className="h-10" />
+          <div className="flex h-full flex-col">
+            <div className="min-h-0 flex-1 overflow-auto px-3 py-3">
+              <div className="flex flex-col gap-3">
+                {activeConnection?.lastSyncError && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Latest sync failed</AlertTitle>
+                    <AlertDescription className="mt-2">
+                      {activeConnection.lastSyncError}
+                    </AlertDescription>
+                  </Alert>
+                )}
 
-            <div className="sticky top-0 z-10 bg-[rgb(var(--semantic-1))] px-3">
-              <div className="mx-auto w-4/5 max-w-[1024px]">
-                <div className="flex h-8 items-center text-sm text-muted-foreground">
-                  <div className="w-[30px] shrink-0" />
-                  <div className="flex-[1.5] px-2.5 py-1.5">Subscription</div>
-                  <div className="w-[120px] shrink-0 px-2.5 py-1.5">Status</div>
-                  <div className="flex-1 px-2.5 py-1.5">Subject</div>
-                  <div className="w-[90px] shrink-0 px-2.5 py-1.5">Items</div>
-                  <div className="w-[180px] shrink-0 px-2.5 py-1.5">Current Period</div>
+                <div
+                  className="grid gap-0 px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                  style={{ gridTemplateColumns: SUBSCRIPTION_ROW_GRID_TEMPLATE }}
+                >
+                  <div />
+                  <div className="px-2 py-1.5">Subscription</div>
+                  <div className="px-2 py-1.5">Customer</div>
+                  <div className="px-2 py-1.5">Status</div>
+                  <div className="px-2 py-1.5">Current Period</div>
+                  <div className="px-2 py-1.5">Latest Invoice</div>
                 </div>
+
+                {filteredSubscriptions.length === 0 ? (
+                  <EmptySubscriptionsState hasSearchQuery={searchQuery.trim().length > 0} />
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {filteredSubscriptions.map((subscription) => (
+                      <SubscriptionRow
+                        key={`${subscription.environment}:${subscription.stripeSubscriptionId}`}
+                        subscription={subscription}
+                        customer={customersById.get(subscription.stripeCustomerId) ?? null}
+                        productsById={productsById}
+                        pricesById={pricesById}
+                        expanded={expandedSubscriptionId === subscription.stripeSubscriptionId}
+                        onToggle={() =>
+                          setExpandedSubscriptionId((current) =>
+                            current === subscription.stripeSubscriptionId
+                              ? null
+                              : subscription.stripeSubscriptionId
+                          )
+                        }
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="flex flex-col gap-4 px-3 pb-4 pt-1">
-              <SubscriptionsTable
-                subscriptions={filteredSubscriptions}
-                onSelectSubscription={setSelectedSubscription}
+            <div className="border-t border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))]">
+              <PaginationControls
+                currentPage={1}
+                totalPages={1}
+                onPageChange={handlePageChange}
+                totalRecords={filteredSubscriptions.length}
+                pageSize={Math.max(filteredSubscriptions.length, 1)}
+                recordLabel="subscriptions"
               />
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>

@@ -1,11 +1,12 @@
 import { useState, type ReactNode } from 'react';
-import { CheckCircle2, Eye, EyeOff, Loader2, RefreshCw, Settings, Webhook } from 'lucide-react';
+import { CheckCircle2, Eye, EyeOff, KeyRound, Loader2, RefreshCw, Webhook } from 'lucide-react';
 import {
   Button,
   MenuDialog,
   MenuDialogBody,
   MenuDialogCloseButton,
   MenuDialogContent,
+  MenuDialogDescription,
   MenuDialogHeader,
   MenuDialogMain,
   MenuDialogNav,
@@ -47,35 +48,18 @@ interface SettingRowProps {
 function SettingRow({ label, description, children }: SettingRowProps) {
   return (
     <div className="flex w-full items-start gap-6">
-      <div className="w-[240px] shrink-0">
+      <div className="w-[200px] shrink-0">
         <div className="py-1.5">
           <p className="text-sm leading-5 text-foreground">{label}</p>
         </div>
         {description && (
-          <div className="pt-1 pb-2 text-[13px] leading-[18px] text-muted-foreground">
+          <div className="pb-2 pt-1 text-[13px] leading-[18px] text-muted-foreground">
             {description}
           </div>
         )}
       </div>
       <div className="min-w-0 flex-1">{children}</div>
     </div>
-  );
-}
-
-function KeyStatusBadge({ config }: { config?: StripeKeyConfig }) {
-  if (!config?.hasKey) {
-    return (
-      <span className="inline-flex items-center rounded-full border border-[var(--alpha-8)] bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-        Not configured
-      </span>
-    );
-  }
-
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/20 px-2 py-0.5 text-xs font-medium text-primary">
-      <CheckCircle2 className="h-3 w-3" />
-      Configured
-    </span>
   );
 }
 
@@ -138,7 +122,8 @@ function EnvironmentKeySection({
   onRemove,
 }: EnvironmentKeySectionProps) {
   const expectedPrefix = KEY_PREFIX_BY_ENVIRONMENT[environment];
-  const environmentLabel = environment === 'test' ? 'Test mode' : 'Live mode';
+  const environmentLabel = environment === 'test' ? 'Test Mode' : 'Live Mode';
+  const hasPendingInput = inputValue.trim().length > 0;
 
   return (
     <SettingRow
@@ -150,70 +135,307 @@ function EnvironmentKeySection({
         </>
       }
     >
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <KeyStatusBadge config={config} />
-          {config?.maskedKey && (
-            <span className="font-mono text-xs text-muted-foreground">{config.maskedKey}</span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="relative min-w-0 flex-1">
+      <div className="flex flex-col gap-2">
+        <div className="relative min-w-0">
+          <div className="relative">
             <input
               type={showKey ? 'text' : 'password'}
               value={inputValue}
               onChange={(event) => onInputChange(event.target.value)}
-              placeholder={`${expectedPrefix}...`}
+              placeholder={expectedPrefix}
               disabled={isBusy}
-              className="h-9 w-full rounded border border-[var(--alpha-8)] bg-background px-3 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+              className="h-8 w-full rounded border border-[var(--alpha-12)] bg-[var(--alpha-4)] px-2.5 pr-9 text-sm leading-5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:shadow-[0_0_0_1px_rgb(var(--inverse)),0_0_0_2px_rgb(var(--foreground))] hover:bg-[var(--alpha-4)] disabled:opacity-50"
             />
             <button
               type="button"
               onClick={onToggleShowKey}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               aria-label={showKey ? 'Hide key' : 'Show key'}
               disabled={isBusy}
             >
               {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
-
-          <Button
-            type="button"
-            size="lg"
-            onClick={onSave}
-            disabled={isBusy || !inputValue.trim()}
-            className="h-9 shrink-0"
-          >
-            {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Save
-          </Button>
         </div>
 
         {error && <p className="text-xs text-destructive">{error}</p>}
 
-        {config?.hasKey && (
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-3 rounded border border-[var(--alpha-8)] bg-muted/40 p-3">
-              <p className="text-xs leading-5 text-muted-foreground">
-                Remove this Stripe key from InsForge&apos;s secret store.
-              </p>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={onRemove}
-                disabled={isBusy}
-                className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
-              >
-                Remove
-              </Button>
+        {(config?.maskedKey || config?.hasKey || hasPendingInput) && (
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              {config?.maskedKey ? (
+                <span className="truncate font-mono text-xs text-muted-foreground">
+                  {config.maskedKey}
+                </span>
+              ) : config?.hasKey ? (
+                <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Configured in InsForge secret store
+                </span>
+              ) : null}
+            </div>
+
+            <div className="flex items-center gap-2">
+              {config?.hasKey && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={onRemove}
+                  disabled={isBusy}
+                  className="h-7 px-2"
+                >
+                  Remove
+                </Button>
+              )}
+
+              {hasPendingInput && (
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  onClick={onSave}
+                  disabled={isBusy}
+                  className="h-7 px-2"
+                >
+                  {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                  Save
+                </Button>
+              )}
             </div>
           </div>
         )}
       </div>
     </SettingRow>
+  );
+}
+
+function DialogSectionDivider() {
+  return (
+    <div className="flex h-5 items-center justify-center">
+      <div className="h-px w-full bg-[var(--alpha-8)]" />
+    </div>
+  );
+}
+
+function StripeKeysTabContent({
+  keys,
+  isLoading,
+  error,
+  isBusy,
+  keyInputs,
+  visibleKeys,
+  errors,
+  onInputChange,
+  onToggleShowKey,
+  onSave,
+  onRemove,
+}: {
+  keys: StripeKeyConfig[];
+  isLoading: boolean;
+  error: unknown;
+  isBusy: boolean;
+  keyInputs: Record<StripeEnvironment, string>;
+  visibleKeys: Record<StripeEnvironment, boolean>;
+  errors: Partial<Record<StripeEnvironment, string>>;
+  onInputChange: (environment: StripeEnvironment, value: string) => void;
+  onToggleShowKey: (environment: StripeEnvironment) => void;
+  onSave: (environment: StripeEnvironment) => void;
+  onRemove: (environment: StripeEnvironment) => void;
+}) {
+  if (isLoading && !error) {
+    return (
+      <div className="flex min-h-[120px] items-center justify-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Loading Stripe key configuration...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+        Failed to load Stripe key configuration. Close the dialog and try again.
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <p className="text-sm leading-6 text-muted-foreground">
+          Configure the Stripe secret keys to use Payments.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        {ENVIRONMENTS.map((environment, index) => (
+          <div key={environment} className="flex flex-col gap-2">
+            <EnvironmentKeySection
+              environment={environment}
+              config={keys.find((key) => key.environment === environment)}
+              inputValue={keyInputs[environment]}
+              showKey={visibleKeys[environment]}
+              error={errors[environment]}
+              isBusy={isBusy}
+              onInputChange={(value) => onInputChange(environment, value)}
+              onToggleShowKey={() => onToggleShowKey(environment)}
+              onSave={() => onSave(environment)}
+              onRemove={() => onRemove(environment)}
+            />
+            {index < ENVIRONMENTS.length - 1 && <DialogSectionDivider />}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SyncTabContent({
+  isLoading,
+  error,
+  configuredKeys,
+  syncPayments,
+  onSync,
+}: {
+  isLoading: boolean;
+  error: unknown;
+  configuredKeys: StripeKeyConfig[];
+  syncPayments: ReturnType<typeof usePaymentsSync>['syncPayments'];
+  onSync: () => void;
+}) {
+  if (isLoading && !error) {
+    return (
+      <div className="flex min-h-[120px] items-center justify-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Loading Stripe key configuration...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+        Failed to load Stripe key configuration. Close the dialog and try again.
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <p className="text-sm leading-6 text-muted-foreground">
+          Pull the latest products, prices, customers, and subscriptions from Stripe.
+        </p>
+      </div>
+
+      <div className="rounded border border-[var(--alpha-8)] bg-muted/40 p-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-foreground">Sync all configured environments</p>
+            <p className="mt-1 text-[13px] leading-5 text-muted-foreground">
+              {configuredKeys.length > 0
+                ? `Configured: ${configuredKeys
+                    .map((key) => (key.environment === 'test' ? 'Test' : 'Live'))
+                    .join(', ')}`
+                : 'Configure a Stripe test or live key before syncing.'}
+            </p>
+          </div>
+          <Button
+            type="button"
+            size="lg"
+            onClick={onSync}
+            disabled={syncPayments.isPending || configuredKeys.length === 0}
+            className="h-9 shrink-0"
+          >
+            {syncPayments.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+            Sync Payments
+          </Button>
+        </div>
+      </div>
+
+      {syncPayments.error && (
+        <div className="rounded border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+          {syncPayments.error instanceof Error
+            ? syncPayments.error.message
+            : 'Failed to sync Stripe payments.'}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WebhooksTabContent({
+  keys,
+  connections,
+  isLoading,
+  isLoadingWebhooks,
+  error,
+  webhooksError,
+  configureWebhook,
+  isBusy,
+  onConfigure,
+}: {
+  keys: StripeKeyConfig[];
+  connections: StripeConnection[];
+  isLoading: boolean;
+  isLoadingWebhooks: boolean;
+  error: unknown;
+  webhooksError: unknown;
+  configureWebhook: ReturnType<typeof usePaymentsWebhook>['configureWebhook'];
+  isBusy: boolean;
+  onConfigure: (environment: StripeEnvironment) => void;
+}) {
+  if ((isLoading || isLoadingWebhooks) && !error && !webhooksError) {
+    return (
+      <div className="flex min-h-[120px] items-center justify-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Loading Stripe webhook configuration...
+      </div>
+    );
+  }
+
+  if (error || webhooksError) {
+    return (
+      <div className="rounded border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+        Failed to load Stripe webhook configuration. Close the dialog and try again.
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <p className="text-sm leading-6 text-muted-foreground">
+          Configure Stripe webhook endpoints for customer, payment history, and subscription
+          updates.
+        </p>
+      </div>
+
+      {ENVIRONMENTS.map((environment) => (
+        <WebhookEnvironmentSection
+          key={environment}
+          environment={environment}
+          config={keys.find((key) => key.environment === environment)}
+          connection={connections.find((connection) => connection.environment === environment)}
+          isConfiguring={configureWebhook.isPending && configureWebhook.variables === environment}
+          isBusy={isBusy}
+          onConfigure={() => onConfigure(environment)}
+        />
+      ))}
+
+      {configureWebhook.error && (
+        <div className="rounded border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+          {configureWebhook.error instanceof Error
+            ? configureWebhook.error.message
+            : 'Failed to configure Stripe webhook.'}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -425,7 +647,7 @@ export function PaymentsSettingsDialog({ open, onOpenChange }: PaymentsSettingsD
           <MenuDialogNav>
             <MenuDialogNavList>
               <MenuDialogNavItem
-                icon={<Settings className="h-5 w-5" />}
+                icon={<KeyRound className="h-5 w-5" />}
                 active={activeTab === 'keys'}
                 onClick={() => setActiveTab('keys')}
               >
@@ -452,157 +674,52 @@ export function PaymentsSettingsDialog({ open, onOpenChange }: PaymentsSettingsD
         <MenuDialogMain>
           <MenuDialogHeader>
             <MenuDialogTitle>{title}</MenuDialogTitle>
+            <MenuDialogDescription className="sr-only">{title} settings</MenuDialogDescription>
             <MenuDialogCloseButton className="ml-auto" />
           </MenuDialogHeader>
 
           <MenuDialogBody>
             {activeTab === 'keys' ? (
-              <div className="flex flex-col gap-6">
-                <div>
-                  <p className="text-sm leading-6 text-muted-foreground">
-                    Configure the Stripe secret keys to use Payments.
-                  </p>
-                </div>
-
-                {isLoading && !error ? (
-                  <div className="flex min-h-[120px] items-center justify-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Loading Stripe key configuration...
-                  </div>
-                ) : error ? (
-                  <div className="rounded border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
-                    Failed to load Stripe key configuration. Close the dialog and try again.
-                  </div>
-                ) : (
-                  ENVIRONMENTS.map((environment) => (
-                    <EnvironmentKeySection
-                      key={environment}
-                      environment={environment}
-                      config={keys.find((key) => key.environment === environment)}
-                      inputValue={keyInputs[environment]}
-                      showKey={visibleKeys[environment]}
-                      error={errors[environment]}
-                      isBusy={isBusy}
-                      onInputChange={(value) =>
-                        setKeyInputs((current) => ({ ...current, [environment]: value }))
-                      }
-                      onToggleShowKey={() =>
-                        setVisibleKeys((current) => ({
-                          ...current,
-                          [environment]: !current[environment],
-                        }))
-                      }
-                      onSave={() => void handleSave(environment)}
-                      onRemove={() => void handleRemove(environment)}
-                    />
-                  ))
-                )}
-              </div>
+              <StripeKeysTabContent
+                keys={keys}
+                isLoading={isLoading}
+                error={error}
+                isBusy={isBusy}
+                keyInputs={keyInputs}
+                visibleKeys={visibleKeys}
+                errors={errors}
+                onInputChange={(environment, value) =>
+                  setKeyInputs((current) => ({ ...current, [environment]: value }))
+                }
+                onToggleShowKey={(environment) =>
+                  setVisibleKeys((current) => ({
+                    ...current,
+                    [environment]: !current[environment],
+                  }))
+                }
+                onSave={(environment) => void handleSave(environment)}
+                onRemove={(environment) => void handleRemove(environment)}
+              />
             ) : activeTab === 'sync' ? (
-              <div className="flex flex-col gap-6">
-                <div>
-                  <p className="text-sm leading-6 text-muted-foreground">
-                    Pull the latest products, prices, and subscriptions from Stripe.
-                  </p>
-                </div>
-
-                {isLoading && !error ? (
-                  <div className="flex min-h-[120px] items-center justify-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Loading Stripe key configuration...
-                  </div>
-                ) : error ? (
-                  <div className="rounded border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
-                    Failed to load Stripe key configuration. Close the dialog and try again.
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-4">
-                    <div className="rounded border border-[var(--alpha-8)] bg-muted/40 p-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-foreground">
-                            Sync all configured environments
-                          </p>
-                          <p className="mt-1 text-[13px] leading-5 text-muted-foreground">
-                            {configuredKeys.length > 0
-                              ? `Configured: ${configuredKeys
-                                  .map((key) => (key.environment === 'test' ? 'Test' : 'Live'))
-                                  .join(', ')}`
-                              : 'Configure a Stripe test or live key before syncing.'}
-                          </p>
-                        </div>
-                        <Button
-                          type="button"
-                          size="lg"
-                          onClick={() => void handleSync()}
-                          disabled={syncPayments.isPending || configuredKeys.length === 0}
-                          className="h-9 shrink-0"
-                        >
-                          {syncPayments.isPending ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <RefreshCw className="h-4 w-4" />
-                          )}
-                          Sync Payments
-                        </Button>
-                      </div>
-                    </div>
-
-                    {syncPayments.error && (
-                      <div className="rounded border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
-                        {syncPayments.error instanceof Error
-                          ? syncPayments.error.message
-                          : 'Failed to sync Stripe payments.'}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+              <SyncTabContent
+                isLoading={isLoading}
+                error={error}
+                configuredKeys={configuredKeys}
+                syncPayments={syncPayments}
+                onSync={() => void handleSync()}
+              />
             ) : (
-              <div className="flex flex-col gap-6">
-                <div>
-                  <p className="text-sm leading-6 text-muted-foreground">
-                    Configure Stripe webhook endpoints for payment history and subscription updates.
-                  </p>
-                </div>
-
-                {(isLoading || isLoadingWebhooks) && !error && !webhooksError ? (
-                  <div className="flex min-h-[120px] items-center justify-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Loading Stripe webhook configuration...
-                  </div>
-                ) : error || webhooksError ? (
-                  <div className="rounded border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
-                    Failed to load Stripe webhook configuration. Close the dialog and try again.
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-6">
-                    {ENVIRONMENTS.map((environment) => (
-                      <WebhookEnvironmentSection
-                        key={environment}
-                        environment={environment}
-                        config={keys.find((key) => key.environment === environment)}
-                        connection={connections.find(
-                          (connection) => connection.environment === environment
-                        )}
-                        isConfiguring={
-                          configureWebhook.isPending && configureWebhook.variables === environment
-                        }
-                        isBusy={isBusy}
-                        onConfigure={() => void handleConfigureWebhook(environment)}
-                      />
-                    ))}
-
-                    {configureWebhook.error && (
-                      <div className="rounded border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
-                        {configureWebhook.error instanceof Error
-                          ? configureWebhook.error.message
-                          : 'Failed to configure Stripe webhook.'}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+              <WebhooksTabContent
+                keys={keys}
+                connections={connections}
+                isLoading={isLoading}
+                isLoadingWebhooks={isLoadingWebhooks}
+                error={error}
+                webhooksError={webhooksError}
+                configureWebhook={configureWebhook}
+                isBusy={isBusy}
+                onConfigure={(environment) => void handleConfigureWebhook(environment)}
+              />
             )}
           </MenuDialogBody>
         </MenuDialogMain>

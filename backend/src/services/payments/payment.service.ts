@@ -7,6 +7,7 @@ import {
   PaymentCheckoutService,
   type CheckoutUserContext,
 } from '@/services/payments/payment-checkout.service.js';
+import { PaymentCustomerService } from '@/services/payments/payment-customer.service.js';
 import { PaymentCustomerPortalService } from '@/services/payments/payment-customer-portal.service.js';
 import { PaymentHistoryService } from '@/services/payments/payment-history.service.js';
 import { PaymentProductService } from '@/services/payments/payment-product.service.js';
@@ -53,6 +54,8 @@ import type {
   GetPaymentsStatusResponse,
   GetPaymentPriceResponse,
   ListPaymentCatalogResponse,
+  ListPaymentCustomersRequest,
+  ListPaymentCustomersResponse,
   ListPaymentPricesRequest,
   ListPaymentPricesResponse,
   ListPaymentProductsRequest,
@@ -88,6 +91,7 @@ export class PaymentService {
   private pool: Pool | null = null;
   private readonly configService = PaymentConfigService.getInstance();
   private readonly checkoutService = PaymentCheckoutService.getInstance();
+  private readonly customerService = PaymentCustomerService.getInstance();
   private readonly customerPortalService = PaymentCustomerPortalService.getInstance();
   private readonly historyService = PaymentHistoryService.getInstance();
   private readonly productService = PaymentProductService.getInstance();
@@ -178,10 +182,7 @@ export class PaymentService {
     return { connection };
   }
 
-  async listCatalog(environment?: StripeEnvironment): Promise<ListPaymentCatalogResponse> {
-    const environmentFilter = environment ? 'WHERE environment = $1' : '';
-    const params = environment ? [environment] : [];
-
+  async listCatalog(environment: StripeEnvironment): Promise<ListPaymentCatalogResponse> {
     const [productsResult, pricesResult] = await Promise.all([
       this.getPool().query(
         `SELECT
@@ -194,9 +195,9 @@ export class PaymentService {
            metadata,
            synced_at AS "syncedAt"
          FROM payments.products
-         ${environmentFilter}
+         WHERE environment = $1
          ORDER BY environment, name, stripe_product_id`,
-        params
+        [environment]
       ),
       this.getPool().query(
         `SELECT
@@ -216,9 +217,9 @@ export class PaymentService {
            metadata,
            synced_at AS "syncedAt"
          FROM payments.prices
-         ${environmentFilter}
+         WHERE environment = $1
          ORDER BY environment, stripe_product_id, stripe_price_id`,
-        params
+        [environment]
       ),
     ]);
 
@@ -226,6 +227,10 @@ export class PaymentService {
       products: (productsResult.rows as StripeProductRow[]).map((row) => normalizeProductRow(row)),
       prices: (pricesResult.rows as StripePriceRow[]).map((row) => normalizePriceRow(row)),
     };
+  }
+
+  async listCustomers(input: ListPaymentCustomersRequest): Promise<ListPaymentCustomersResponse> {
+    return this.customerService.listCustomers(input);
   }
 
   async listProducts(input: ListPaymentProductsRequest): Promise<ListPaymentProductsResponse> {
@@ -263,6 +268,13 @@ export class PaymentService {
     provider: StripeProvider
   ): Promise<SyncPaymentsSubscriptionsSummary> {
     return this.subscriptionService.syncSubscriptionsWithProvider(environment, provider);
+  }
+
+  private async syncCustomersWithProviderUnlocked(
+    environment: StripeEnvironment,
+    provider: StripeProvider
+  ): Promise<number> {
+    return this.customerService.syncCustomersWithProvider(environment, provider);
   }
 
   async createProduct(input: CreatePaymentProductRequest): Promise<MutatePaymentProductResponse> {
@@ -575,6 +587,15 @@ export class PaymentService {
         return { environment, connection, subscriptions: null };
       }
 
+      try {
+        await this.syncCustomersWithProviderUnlocked(environment, provider);
+      } catch (error) {
+        logger.warn('Stripe customer mirror sync failed during payments sync', {
+          environment,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
       const subscriptions = await this.syncSubscriptionsWithProviderUnlocked(environment, provider);
       connection = await this.configService.getConnection(environment);
 
@@ -674,6 +695,20 @@ export class PaymentService {
     return true;
   }
 
+  private async deleteStripeCustomerMappingsByCustomerId(
+    environment: StripeEnvironment,
+    stripeCustomerId: string
+  ): Promise<boolean> {
+    const result = await this.getPool().query(
+      `DELETE FROM payments.stripe_customer_mappings
+       WHERE environment = $1
+         AND stripe_customer_id = $2`,
+      [environment, stripeCustomerId]
+    );
+
+    return (result.rowCount ?? 0) > 0;
+  }
+
   private buildStripeMetadata(
     metadata: Record<string, string> | undefined,
     subject: BillingSubject | undefined,
@@ -709,6 +744,30 @@ export class PaymentService {
     const eventCreatedAt = fromStripeTimestamp(event.created);
 
     switch (event.type) {
+      case 'customer.created':
+      case 'customer.updated':
+        return this.customerService.upsertCustomerProjection(
+          environment,
+          event.data.object as { id: string; deleted?: boolean }
+        );
+      case 'customer.deleted': {
+        const customer = event.data.object as { id?: string; deleted?: boolean };
+        if (!customer.id) {
+          return false;
+        }
+
+        const deletedCustomer = {
+          id: customer.id,
+          deleted: customer.deleted,
+        };
+
+        const [projectionHandled, mappingsDeleted] = await Promise.all([
+          this.customerService.upsertCustomerProjection(environment, deletedCustomer),
+          this.deleteStripeCustomerMappingsByCustomerId(environment, customer.id),
+        ]);
+
+        return projectionHandled || mappingsDeleted;
+      }
       case 'checkout.session.completed': {
         const checkoutSession = event.data.object as StripeCheckoutSession;
         const [checkoutRow, mapped, historyHandled] = await Promise.all([

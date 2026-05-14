@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useBuckets } from '#features/storage/hooks/useBuckets';
-import { isInsForgeCloudProject } from '#lib/utils/utils';
-import DiscordIcon from '#assets/logos/discord.svg?react';
 import {
   Button,
   Dialog,
@@ -164,33 +162,6 @@ export function BucketFormDialog({
                 <Switch id="bucket-public" checked={isPublic} onCheckedChange={setIsPublic} />
               </div>
             </BucketFormRow>
-
-            {/* File Size Limit - Cloud only, edit mode only */}
-            {mode === 'edit' && isInsForgeCloudProject() && (
-              <>
-                <DialogDivider />
-                <BucketFormRow
-                  label="File Size Limit"
-                  description="Default limit for cloud projects."
-                >
-                  <div className="flex w-full flex-col gap-1">
-                    <p className="text-sm leading-5 text-foreground">50MB per file</p>
-                    <p className="text-[13px] leading-[18px] text-muted-foreground">
-                      Need a higher limit? Reach out to us on{' '}
-                      <a
-                        href="https://discord.gg/DvBtaEc9Jz"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 align-middle text-primary"
-                      >
-                        <DiscordIcon className="h-3.5 w-3.5 text-primary" />
-                        <span className="text-xs font-medium leading-4 text-primary">Discord</span>
-                      </a>
-                    </p>
-                  </div>
-                </BucketFormRow>
-              </>
-            )}
           </DialogBody>
           <DialogFooter className="gap-3 p-4">
             <Button type="button" variant="secondary" onClick={handleClose} className="h-8 px-2">

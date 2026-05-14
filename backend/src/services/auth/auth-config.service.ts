@@ -1,4 +1,5 @@
 import { Pool } from 'pg';
+import picomatch from 'picomatch';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
@@ -43,7 +44,8 @@ export class AuthConfigService {
           require_uppercase as "requireUppercase",
           require_special_char as "requireSpecialChar",
           verify_email_method as "verifyEmailMethod",
-          reset_password_method as "resetPasswordMethod"
+          reset_password_method as "resetPasswordMethod",
+          disable_signup as "disableSignup"
          FROM auth.config
          LIMIT 1`
       );
@@ -60,6 +62,7 @@ export class AuthConfigService {
           requireSpecialChar: false,
           verifyEmailMethod: 'code' as const,
           resetPasswordMethod: 'code' as const,
+          disableSignup: false,
         };
       }
 
@@ -92,6 +95,7 @@ export class AuthConfigService {
           verify_email_method as "verifyEmailMethod",
           reset_password_method as "resetPasswordMethod",
           allowed_redirect_urls as "allowedRedirectUrls",
+          disable_signup as "disableSignup",
           created_at as "createdAt",
           updated_at as "updatedAt"
          FROM auth.config
@@ -113,6 +117,7 @@ export class AuthConfigService {
           verifyEmailMethod: 'code' as const,
           resetPasswordMethod: 'code' as const,
           allowedRedirectUrls: [],
+          disableSignup: false,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
@@ -205,6 +210,11 @@ export class AuthConfigService {
         values.push(input.allowedRedirectUrls);
       }
 
+      if (input.disableSignup !== undefined) {
+        updates.push(`disable_signup = $${paramCount++}`);
+        values.push(input.disableSignup);
+      }
+
       if (!updates.length) {
         await client.query('COMMIT');
         // Return current config if no updates
@@ -228,6 +238,7 @@ export class AuthConfigService {
            verify_email_method as "verifyEmailMethod",
            reset_password_method as "resetPasswordMethod",
            allowed_redirect_urls as "allowedRedirectUrls",
+           disable_signup as "disableSignup",
            created_at as "createdAt",
            updated_at as "updatedAt"`,
         values
@@ -259,7 +270,7 @@ export class AuthConfigService {
    * - Removes trailing slash
    * Returns null if the URL is malformed.
    */
-  private normalizeUrl(urlStr: string): string | null {
+  private static normalizeUrl(urlStr: string): string | null {
     try {
       const url = new URL(urlStr);
       return url.href.replace(/\/$/, '');
@@ -270,57 +281,134 @@ export class AuthConfigService {
   }
 
   /**
-   * Validates a redirect URL against the server's configured allowed redirect URLs
+   * Characters that indicate a glob pattern (as opposed to a literal URL).
+   */
+  private static readonly GLOB_CHARS = /[*?[\]]/;
+
+  /**
+   * Sentinel returned by `normalizePattern` when the placeholder-substituted
+   * pattern still fails URL parsing. `\0` cannot appear in a normalised URL
+   * produced by `new URL().href`, so picomatch will never match it.
+   */
+  private static readonly UNMATCHABLE_PATTERN = '\0';
+
+  /**
+   * Normalises a glob *pattern* string.
+   *
+   * Unlike `normalizeUrl`, this must preserve the glob meta-characters that
+   * `new URL()` would percent-encode or reject. The approach:
+   *   1. Replace every glob meta-char with a unique placeholder.
+   *   2. Run the resulting (valid) URL through `normalizeUrl`.
+   *   3. Restore the placeholders back to their original globs.
+   *
+   * Any pattern that passes `allowedRedirectUrlsRegex` is a parseable URL
+   * after placeholder substitution. If a pattern still fails to parse here,
+   * the input bypassed schema validation and is treated as unmatchable.
+   */
+  private static normalizePattern(pattern: string): string {
+    // Map of placeholder → restoration token, built on-the-fly.
+    const replacements: Array<{ placeholder: string; original: string }> = [];
+    let idx = 0;
+
+    // Replace glob tokens with safe placeholders.
+    // Order matters: replace ** before * so ** is not split.
+    const safe = pattern.replace(/\*\*|\*|\?|\[([^\]]*)\]/g, (match, classContent) => {
+      const placeholder = `__GLOB${idx++}__`;
+      // Distinguish IPv6 host brackets from glob character classes. IPv6
+      // contents are hex digits / colons / dots and contain at least two
+      // colons (`::1` is the shortest valid form). Picomatch otherwise
+      // produces a tolerant regex that also matches single chars from the
+      // class (`https://[::1]/cb` would match `https://1/cb`), so we escape
+      // the brackets on restoration to force literal matching, and lowercase
+      // to align with `URL.href`'s hostname normalisation.
+      const isIpv6Brackets =
+        classContent !== undefined &&
+        /^[0-9A-Fa-f:.]+$/.test(classContent) &&
+        (classContent.match(/:/g) ?? []).length >= 2;
+      const original = isIpv6Brackets ? `\\[${classContent.toLowerCase()}\\]` : match;
+      replacements.push({ placeholder, original });
+      return placeholder;
+    });
+
+    const normalized = AuthConfigService.normalizeUrl(safe);
+    if (!normalized) {
+      return AuthConfigService.UNMATCHABLE_PATTERN;
+    }
+
+    // Restore glob tokens in the normalised URL.
+    // The URL class lowercases the hostname but not the path, so we use a
+    // case-insensitive regex to find placeholders regardless of position.
+    let result = normalized;
+    for (const { placeholder, original } of replacements) {
+      result = result.replace(new RegExp(placeholder, 'i'), original);
+    }
+    return result;
+  }
+
+  /**
+   * Tests whether a single allowed-redirect pattern matches the target URL.
+   *
+   * Pattern semantics (picomatch defaults):
+   * - `*`   — matches any sequence of characters except `/`
+   * - `**`  — matches any sequence of characters including `/`
+   * - `?`   — matches exactly one character that is not `/`
+   * - `[…]` — character class (e.g. `[!a-z]`)
+   *
+   * Note: `*` matches across `.` boundaries. This is intentional and preserves
+   * back-compat with the legacy `*.host.com` matcher (which used
+   * `hostname.endsWith('.' + base)` and therefore matched arbitrarily deep
+   * subdomains). Existing customers relying on `*.example.com` matching
+   * `deep.sub.example.com` continue to work.
+   *
+   * Protocol and port are matched strictly — the glob never crosses those
+   * boundaries because they are literal characters in the normalised strings.
+   */
+  private matchesGlobPattern(pattern: string, normalizedTarget: string): boolean {
+    // Fast path: pattern without glob chars → exact match.
+    if (!AuthConfigService.GLOB_CHARS.test(pattern)) {
+      const normalizedPattern = AuthConfigService.normalizeUrl(pattern);
+      return normalizedPattern === normalizedTarget;
+    }
+
+    const normalizedPattern = AuthConfigService.normalizePattern(pattern);
+
+    try {
+      return picomatch.isMatch(normalizedTarget, normalizedPattern, { dot: true });
+    } catch {
+      // If picomatch throws (e.g. malformed bracket expression), reject.
+      return false;
+    }
+  }
+
+  /**
+   * Validates a redirect URL against the server's configured allowed redirect URLs.
+   *
+   * Supports Supabase-compatible glob patterns:
+   * - `https://*.example.com`          — any subdomain
+   * - `https://example.com/*`          — single path segment
+   * - `https://example.com/**`         — any path depth
+   * - `https://*.example.com/auth/*`   — combined subdomain + path
+   * - `https://example.com/?session=*` — query-string wildcards
+   *
+   * When no allowlist is configured the method returns `true` (permissive
+   * default for better developer experience).
    */
   async validateRedirectUrl(urlStr: string): Promise<boolean> {
     const config = await this.getAuthConfig();
     const allowedRedirectUrls = config.allowedRedirectUrls;
 
+    // Use the configured allowed redirect URLs to validate the target URL.
+    // If no whitelist is configured, we default to permissive behavior to improve
+    // developer experience and lower development friction.
     if (!allowedRedirectUrls || allowedRedirectUrls.length === 0) {
       return true;
     }
 
-    const targetUrl = this.normalizeUrl(urlStr);
+    const targetUrl = AuthConfigService.normalizeUrl(urlStr);
     if (!targetUrl) {
       return false;
     }
 
-    let targetUrlObj: URL;
-    try {
-      targetUrlObj = new URL(targetUrl);
-    } catch {
-      return false;
-    }
-
-    return allowedRedirectUrls.some((item) => {
-      if (!item.includes('*.')) {
-        return this.normalizeUrl(item) === targetUrl;
-      }
-
-      try {
-        const dummyPrefix = '__wildcard__.';
-        const normalizedItem = this.normalizeUrl(item.replace('*.', dummyPrefix));
-        if (!normalizedItem) {
-          return false;
-        }
-        const parsedItem = new URL(normalizedItem);
-
-        if (parsedItem.protocol !== targetUrlObj.protocol) {
-          return false;
-        }
-        if (parsedItem.port !== targetUrlObj.port) {
-          return false;
-        }
-        if (parsedItem.pathname !== '/' && parsedItem.pathname !== targetUrlObj.pathname) {
-          return false;
-        }
-
-        const baseDomain = parsedItem.hostname.replace(dummyPrefix, '');
-
-        return targetUrlObj.hostname.endsWith('.' + baseDomain);
-      } catch {
-        return false;
-      }
-    });
+    return allowedRedirectUrls.some((pattern) => this.matchesGlobPattern(pattern, targetUrl));
   }
 }

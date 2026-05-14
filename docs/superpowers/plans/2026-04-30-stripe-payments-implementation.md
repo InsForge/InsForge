@@ -20,7 +20,7 @@ This implementation supports test and live Stripe environments as independent ta
 
 Developers and agents can manage Stripe products and prices in either environment. Product and price create calls use caller-stable idempotency keys when provided. Updates and archives are applied directly to Stripe, then mirrored locally. Product deletion hard-deletes the local mirror only after Stripe confirms the product was deleted.
 
-Developers can run a unified sync. Sync pulls products, prices, and subscriptions from every configured environment, skips unconfigured environments, and records the latest sync status on the environment connection row. Manual sync also checks the Stripe account id before writing, so switching a key to a different account clears stale mirrored payment data before importing the new account's data.
+Developers can run a unified sync. Sync pulls products, prices, customers, and subscriptions from every configured environment, skips unconfigured environments, and records the latest sync status on the environment connection row. Manual sync also checks the Stripe account id before writing, so switching a key to a different account clears stale mirrored payment data before importing the new account's data.
 
 Generated apps can create Checkout Sessions at runtime. Anonymous one-time checkout is allowed. Identified one-time checkout is allowed and can reuse an existing Stripe customer mapping. Subscription checkout requires a billing subject because subscriptions represent ongoing entitlement.
 
@@ -42,6 +42,8 @@ The payments schema is created by `backend/src/infra/database/migrations/038_cre
 
 `payments.stripe_customer_mappings` maps arbitrary app billing subjects to Stripe customers. The subject is intentionally generic: `subject_type` and `subject_id` can represent a user, team, organization, tenant, group, workspace, or another app-specific billing owner.
 
+`payments.customers` mirrors Stripe customer rows for admin visibility and debugging. It is intentionally read-only from the app's perspective and does not replace `stripe_customer_mappings` as the operational subject-to-customer bridge.
+
 `payments.subscriptions` and `payments.subscription_items` mirror current subscription state. Sync and webhooks fetch full subscription item lists when Stripe pagination requires it, then delete local subscription items not present in Stripe.
 
 `payments.payment_history` records one-time payments, subscription invoices, failed payments, refunds, and refund state on original payments. It is webhook-driven and designed to tolerate out-of-order Stripe events.
@@ -52,23 +54,25 @@ The payments schema is created by `backend/src/infra/database/migrations/038_cre
 
 Runtime routes use `verifyUser` so generated apps can call them with InsForge user tokens, including anon tokens for anonymous one-time checkout.
 
-- `POST /api/payments/checkout-sessions`: creates a local checkout attempt, then creates a Stripe Checkout Session. Subscription mode requires `subject`.
-- `POST /api/payments/customer-portal-sessions`: creates a local portal attempt under the caller context, checks `stripe_customer_mappings`, then creates a Stripe Billing Portal Session. Anonymous users are rejected.
+- `POST /api/payments/:environment/checkout-sessions`: creates a local checkout attempt, then creates a Stripe Checkout Session. Subscription mode requires `subject`.
+- `POST /api/payments/:environment/customer-portal-sessions`: creates a local portal attempt under the caller context, checks `stripe_customer_mappings`, then creates a Stripe Billing Portal Session. Anonymous users are rejected.
 - `POST /api/webhooks/stripe/:environment`: receives Stripe webhooks with a raw body and verifies the Stripe signature.
 
 Admin routes use `verifyAdmin` and are intended for dashboard, agents, CLI, and SDK admin surfaces.
 
 - `GET /api/payments/status`: returns environment connection, sync, and webhook status.
 - `GET /api/payments/config`: returns Stripe key availability and masked key info.
-- `POST /api/payments/config`: stores a Stripe secret key in the secret store. New or different accounts trigger managed webhook setup and unified sync.
-- `DELETE /api/payments/config/:environment`: disables the secret key and best-effort deletes managed Stripe webhook endpoints for that environment.
-- `POST /api/payments/sync`: syncs products, prices, and subscriptions for `test`, `live`, or all configured environments.
-- `POST /api/payments/webhooks/:environment/configure`: recreates the InsForge-managed Stripe webhook endpoint for the environment.
-- `GET /api/payments/catalog`: reads mirrored products and prices.
-- `GET|POST|PATCH|DELETE /api/payments/products...`: manages Stripe products.
-- `GET|POST|PATCH|DELETE /api/payments/prices...`: manages Stripe prices, where delete archives the Stripe price.
-- `GET /api/payments/subscriptions`: reads mirrored subscriptions for dashboard/admin use.
-- `GET /api/payments/payment-history`: reads payment history for dashboard/admin use.
+- `PUT /api/payments/:environment/config`: stores a Stripe secret key in the secret store. New or different accounts trigger managed webhook setup and unified sync.
+- `DELETE /api/payments/:environment/config`: disables the secret key and best-effort deletes managed Stripe webhook endpoints for that environment.
+- `POST /api/payments/sync`: syncs products, prices, customers, and subscriptions for all configured environments.
+- `POST /api/payments/:environment/sync`: syncs products, prices, customers, and subscriptions for one environment.
+- `GET /api/payments/:environment/customers`: lists mirrored Stripe customers for one environment.
+- `POST /api/payments/:environment/webhook`: recreates the InsForge-managed Stripe webhook endpoint for the environment.
+- `GET /api/payments/:environment/catalog`: reads mirrored products and prices.
+- `GET|POST|PATCH|DELETE /api/payments/:environment/catalog/products...`: manages Stripe products.
+- `GET|POST|PATCH|DELETE /api/payments/:environment/catalog/prices...`: manages Stripe prices, where delete archives the Stripe price.
+- `GET /api/payments/:environment/subscriptions`: reads mirrored subscriptions for dashboard/admin use.
+- `GET /api/payments/:environment/payment-history`: reads payment history for dashboard/admin use.
 
 ## Key Management and Sync Semantics
 
@@ -189,7 +193,7 @@ This phase does not implement test-to-live publishing or catalog diff applicatio
 
 This phase does not expose runtime-safe read APIs for end-user subscription/payment state. Admin reads exist today. End-user reads are deferred because permission semantics depend on each app's subject model.
 
-This phase does not mirror full Stripe customers, invoices, charges, payment methods, or checkout session line items.
+This phase does not mirror invoices, charges, payment methods, or checkout session line items beyond the customer projection added for admin visibility.
 
 This phase does not define default app-specific RLS policies for payment history, subscriptions, customer mappings, or customer portal sessions. Agents should generate policies based on the developer's app schema.
 
@@ -221,7 +225,7 @@ Use this checklist when changing the payment implementation:
 - Backend lint, typecheck, and build pass.
 - Shared schema lint, typecheck, and build pass.
 - Dashboard lint, typecheck, and build pass when dashboard payment UI changes.
-- Migration 038 remains idempotent: every create/index/trigger/grant/alter operation is safe to re-run.
+- Payments migrations remain idempotent: every create/index/trigger/grant/alter operation in migrations 039 and 040 is safe to re-run.
 - Stripe webhook secrets are not documented or required as environment variables.
 - Product and price mutations call Stripe first and update the local mirror only after Stripe succeeds.
 - Sync treats Stripe as the source of truth and clears mirrors only when the Stripe account id changes.

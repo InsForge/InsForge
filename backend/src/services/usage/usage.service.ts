@@ -2,18 +2,10 @@ import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import logger from '@/utils/logger.js';
 
-export interface AIUsageByModel {
-  model: string;
-  total_input_tokens: number;
-  total_output_tokens: number;
-  total_images: number;
-}
-
 export interface UsageStats {
   mcp_usage_count: number;
   database_size_bytes: number;
   storage_size_bytes: number;
-  ai_usage_by_model: AIUsageByModel[];
 }
 
 export interface MCPUsageRecord {
@@ -24,7 +16,7 @@ export interface MCPUsageRecord {
 
 /**
  * UsageService - Handles usage tracking and statistics
- * Business logic layer for MCP usage, system resource tracking, and AI usage
+ * Business logic layer for MCP usage and system resource tracking
  */
 export class UsageService {
   private static instance: UsageService;
@@ -90,8 +82,7 @@ export class UsageService {
   }
 
   /**
-   * Get comprehensive usage statistics for a date range
-   * Returns MCP usage, database size, storage size, and AI usage by model
+   * Get comprehensive usage statistics for a date range.
    */
   async getUsageStats(startDate: Date, endDate: Date): Promise<UsageStats> {
     try {
@@ -115,31 +106,10 @@ export class UsageService {
         `SELECT COALESCE(SUM(size), 0) as total_size FROM storage.objects`
       );
 
-      // Get AI usage breakdown by model (only billable metrics)
-      const aiUsageByModel = await this.getPool().query(
-        `SELECT
-          COALESCE(u.model_id, c.model_id) as model,
-          COALESCE(SUM(u.input_tokens), 0) as total_input_tokens,
-          COALESCE(SUM(u.output_tokens), 0) as total_output_tokens,
-          COALESCE(SUM(u.image_count), 0) as total_images
-        FROM ai.usage u
-        LEFT JOIN ai.configs c ON u.config_id = c.id
-        WHERE u.created_at >= $1 AND u.created_at < $2
-        GROUP BY COALESCE(u.model_id, c.model_id)
-        ORDER BY (COALESCE(SUM(u.input_tokens), 0) + COALESCE(SUM(u.output_tokens), 0)) DESC`,
-        [startDate, endDate]
-      );
-
       return {
         mcp_usage_count: parseInt(mcpResult.rows[0]?.count || '0'),
         database_size_bytes: parseInt(dbSizeResult.rows[0]?.size || '0'),
         storage_size_bytes: parseInt(storageResult.rows[0]?.total_size || '0'),
-        ai_usage_by_model: aiUsageByModel.rows.map((row) => ({
-          model: (row.model as string) || 'unknown',
-          total_input_tokens: parseInt(String(row.total_input_tokens || '0')),
-          total_output_tokens: parseInt(String(row.total_output_tokens || '0')),
-          total_images: parseInt(String(row.total_images || '0')),
-        })),
       };
     } catch (error) {
       logger.error('Failed to get usage stats', { error });

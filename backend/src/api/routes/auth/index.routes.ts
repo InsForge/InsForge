@@ -229,7 +229,7 @@ router.get(
 // GET /api/auth/public-config - Get all public authentication configuration (public endpoint)
 router.get('/public-config', async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const response: GetPublicAuthConfigResponse = await authService.getMetadata();
+    const response: GetPublicAuthConfigResponse = await authService.getPublicMetadata();
 
     successResponse(res, response);
   } catch (error) {
@@ -362,6 +362,17 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
         400,
         ERROR_CODES.INVALID_INPUT
       );
+    }
+
+    if (!adminCreatingUser) {
+      const { disableSignup } = await authConfigService.getAuthConfig();
+      if (disableSignup) {
+        throw new AppError(
+          'User signups are disabled for this project.',
+          403,
+          ERROR_CODES.AUTH_SIGNUP_DISABLED
+        );
+      }
     }
 
     const {

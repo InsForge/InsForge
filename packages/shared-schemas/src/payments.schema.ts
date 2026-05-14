@@ -26,7 +26,7 @@ export const stripeConnectionSchema = z.object({
 });
 export type StripeConnection = z.infer<typeof stripeConnectionSchema>;
 
-export const stripeProductMirrorSchema = z.object({
+export const stripeProductSchema = z.object({
   environment: stripeEnvironmentSchema,
   stripeProductId: z.string(),
   name: z.string(),
@@ -36,9 +36,9 @@ export const stripeProductMirrorSchema = z.object({
   metadata: z.record(z.string()),
   syncedAt: z.string(),
 });
-export type StripeProductMirror = z.infer<typeof stripeProductMirrorSchema>;
+export type StripeProduct = z.infer<typeof stripeProductSchema>;
 
-export const stripePriceMirrorSchema = z.object({
+export const stripePriceSchema = z.object({
   environment: stripeEnvironmentSchema,
   stripePriceId: z.string(),
   stripeProductId: z.string().nullable(),
@@ -55,7 +55,31 @@ export const stripePriceMirrorSchema = z.object({
   metadata: z.record(z.string()),
   syncedAt: z.string(),
 });
-export type StripePriceMirror = z.infer<typeof stripePriceMirrorSchema>;
+export type StripePrice = z.infer<typeof stripePriceSchema>;
+
+export const stripeCustomerSchema = z.object({
+  environment: stripeEnvironmentSchema,
+  stripeCustomerId: z.string(),
+  email: z.string().nullable(),
+  name: z.string().nullable(),
+  phone: z.string().nullable(),
+  deleted: z.boolean(),
+  metadata: z.record(z.string()),
+  stripeCreatedAt: z.string().nullable(),
+  syncedAt: z.string(),
+});
+export type StripeCustomer = z.infer<typeof stripeCustomerSchema>;
+
+export const paymentCustomerListItemSchema = stripeCustomerSchema.extend({
+  paymentsCount: z.number().int().nonnegative(),
+  lastPaymentAt: z.string().nullable(),
+  totalSpend: z.number().int().nonnegative().nullable(),
+  totalSpendCurrency: z.string().nullable(),
+  paymentMethodBrand: z.string().nullable(),
+  paymentMethodLast4: z.string().nullable(),
+  countryCode: z.string().trim().length(2).nullable(),
+});
+export type PaymentCustomerListItem = z.infer<typeof paymentCustomerListItemSchema>;
 
 export const billingSubjectSchema = z
   .object({
@@ -221,7 +245,7 @@ export const stripeSubscriptionSchema = z.object({
   updatedAt: z.string(),
   items: z.array(stripeSubscriptionItemSchema).optional(),
 });
-export type StripeSubscriptionMirror = z.infer<typeof stripeSubscriptionSchema>;
+export type StripeSubscription = z.infer<typeof stripeSubscriptionSchema>;
 
 export const stripeWebhookProcessingStatusSchema = z.enum([
   'pending',

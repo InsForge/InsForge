@@ -139,14 +139,14 @@ export class PaymentConfigService {
         return;
       }
 
-      const shouldClearMirror = currentStripeAccountId !== account.id;
+      const shouldClearPaymentData = currentStripeAccountId !== account.id;
       const webhookSetup = await this.tryRecreateManagedStripeWebhook(provider, environment);
 
       await this.persistStripeSecretKey(
         environment,
         encryptedValue,
         account,
-        shouldClearMirror,
+        shouldClearPaymentData,
         webhookSetup
       );
 
@@ -482,7 +482,7 @@ export class PaymentConfigService {
     environment: StripeEnvironment,
     snapshot: StripeSyncSnapshot,
     syncStartedAt: Date,
-    clearMirror = false,
+    clearSyncedData = false,
     webhookSetup: ManagedStripeWebhookSetup | null = null
   ): Promise<void> {
     const client = await this.getPool().connect();
@@ -493,15 +493,15 @@ export class PaymentConfigService {
         `payments_sync_${environment}`,
       ]);
 
-      if (clearMirror) {
-        await this.clearPaymentMirror(client, environment);
+      if (clearSyncedData) {
+        await this.clearPaymentData(client, environment);
         await this.persistManagedStripeWebhookSecret(client, environment, webhookSetup);
-        logger.info('Cleared Stripe payment mirror during catalog sync after account change', {
+        logger.info('Cleared synced Stripe payment data during catalog sync after account change', {
           environment,
         });
       }
 
-      await this.upsertConnection(client, environment, snapshot, clearMirror, webhookSetup);
+      await this.upsertConnection(client, environment, snapshot, clearSyncedData, webhookSetup);
       await this.upsertProducts(client, environment, snapshot.products, syncStartedAt);
       await this.upsertPrices(client, environment, snapshot.prices, syncStartedAt);
       await this.deleteMissingRows(
@@ -597,7 +597,7 @@ export class PaymentConfigService {
     }
   }
 
-  private async clearPaymentMirror(
+  private async clearPaymentData(
     client: PoolClient,
     environment: StripeEnvironment
   ): Promise<void> {
@@ -614,6 +614,7 @@ export class PaymentConfigService {
     await client.query('DELETE FROM payments.customer_portal_sessions WHERE environment = $1', [
       environment,
     ]);
+    await client.query('DELETE FROM payments.customers WHERE environment = $1', [environment]);
     await client.query('DELETE FROM payments.stripe_customer_mappings WHERE environment = $1', [
       environment,
     ]);
@@ -749,7 +750,7 @@ export class PaymentConfigService {
     environment: StripeEnvironment,
     encryptedValue: string,
     account: StripeAccount,
-    clearMirror: boolean,
+    clearSyncedData: boolean,
     webhookSetup: ManagedStripeWebhookSetup | null
   ): Promise<void> {
     const client = await this.getPool().connect();
@@ -757,9 +758,9 @@ export class PaymentConfigService {
     try {
       await client.query('BEGIN');
 
-      if (clearMirror) {
-        await this.clearPaymentMirror(client, environment);
-        logger.info('Cleared Stripe payment mirror after account key change', { environment });
+      if (clearSyncedData) {
+        await this.clearPaymentData(client, environment);
+        logger.info('Cleared synced Stripe payment data after account key change', { environment });
       }
 
       await client.query(
@@ -840,7 +841,7 @@ export class PaymentConfigService {
           webhookEndpointId,
           webhookEndpointUrl,
           account,
-          clearMirror,
+          clearSyncedData,
         ]
       );
 
@@ -857,16 +858,16 @@ export class PaymentConfigService {
     environment: StripeEnvironment,
     account: StripeAccount,
     webhookSetup: ManagedStripeWebhookSetup,
-    clearMirror: boolean
+    clearSyncedData: boolean
   ): Promise<StripeConnection> {
     const client = await this.getPool().connect();
 
     try {
       await client.query('BEGIN');
-      if (clearMirror) {
-        await this.clearPaymentMirror(client, environment);
+      if (clearSyncedData) {
+        await this.clearPaymentData(client, environment);
         logger.info(
-          'Cleared Stripe payment mirror during webhook configuration after account change',
+          'Cleared synced Stripe payment data during webhook configuration after account change',
           {
             environment,
           }
@@ -945,7 +946,7 @@ export class PaymentConfigService {
           webhookSetup.endpointId,
           webhookSetup.endpointUrl,
           account,
-          clearMirror,
+          clearSyncedData,
         ]
       );
 

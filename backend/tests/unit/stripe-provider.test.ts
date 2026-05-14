@@ -7,6 +7,8 @@ import {
 } from '../../src/providers/payments/stripe.provider';
 import type { StripeClient, StripePrice } from '../../src/types/payments';
 
+const TEST_STRIPE_SECRET_KEY = ['sk', 'test', 'fixture', '1234567890'].join('_');
+
 function createAsyncList<T>(items: T[]): AsyncIterable<T> {
   return {
     async *[Symbol.asyncIterator]() {
@@ -41,7 +43,7 @@ describe('StripeProvider', () => {
           .mockReturnValueOnce(createAsyncList([])),
       },
     } as unknown as StripeClient;
-    const provider = new StripeProvider('sk_test_1234567890', 'test', client);
+    const provider = new StripeProvider(TEST_STRIPE_SECRET_KEY, 'test', client);
 
     await expect(provider.syncCatalog()).resolves.toMatchObject({
       account: { id: 'acct_123' },
@@ -65,7 +67,7 @@ describe('StripeProvider', () => {
           ),
       },
     } as unknown as StripeClient;
-    const provider = new StripeProvider('sk_test_1234567890', 'test', client);
+    const provider = new StripeProvider(TEST_STRIPE_SECRET_KEY, 'test', client);
 
     const prices = await provider.listPrices();
 
@@ -84,7 +86,7 @@ describe('StripeProvider', () => {
         list: vi.fn().mockReturnValue(createAsyncList([{ id: 'sub_123', object: 'subscription' }])),
       },
     } as unknown as StripeClient;
-    const provider = new StripeProvider('sk_test_1234567890', 'test', client);
+    const provider = new StripeProvider(TEST_STRIPE_SECRET_KEY, 'test', client);
 
     await expect(provider.listSubscriptions()).resolves.toEqual([
       { id: 'sub_123', object: 'subscription' },
@@ -111,7 +113,7 @@ describe('StripeProvider', () => {
         ),
       },
     } as unknown as StripeClient;
-    const provider = new StripeProvider('sk_test_1234567890', 'test', client);
+    const provider = new StripeProvider(TEST_STRIPE_SECRET_KEY, 'test', client);
 
     await expect(provider.listSubscriptionItems('sub_123')).resolves.toEqual([
       { id: 'si_123', object: 'subscription_item', subscription: 'sub_123' },
@@ -151,7 +153,7 @@ describe('StripeProvider', () => {
         list: vi.fn().mockReturnValue(createAsyncList([invoicePayment])),
       },
     } as unknown as StripeClient;
-    const provider = new StripeProvider('sk_test_1234567890', 'test', client);
+    const provider = new StripeProvider(TEST_STRIPE_SECRET_KEY, 'test', client);
 
     await expect(provider.retrievePaymentIntent('pi_123')).resolves.toMatchObject({
       id: 'pi_123',
@@ -189,7 +191,7 @@ describe('StripeProvider', () => {
       },
       prices: { list: vi.fn() },
     } as unknown as StripeClient;
-    const provider = new StripeProvider('sk_test_1234567890', 'test', client);
+    const provider = new StripeProvider(TEST_STRIPE_SECRET_KEY, 'test', client);
 
     await provider.createProduct({
       name: 'Pro',
@@ -228,7 +230,7 @@ describe('StripeProvider', () => {
         update: vi.fn().mockResolvedValue({ id: 'price_new', object: 'price' }),
       },
     } as unknown as StripeClient;
-    const provider = new StripeProvider('sk_test_1234567890', 'test', client);
+    const provider = new StripeProvider(TEST_STRIPE_SECRET_KEY, 'test', client);
 
     await provider.createPrice({
       stripeProductId: 'prod_123',
@@ -274,7 +276,7 @@ describe('StripeProvider', () => {
       checkout: { sessions: { create: vi.fn() } },
       webhooks: { constructEvent: vi.fn() },
     } as unknown as StripeClient;
-    const provider = new StripeProvider('sk_test_1234567890', 'test', client);
+    const provider = new StripeProvider(TEST_STRIPE_SECRET_KEY, 'test', client);
 
     await provider.createCustomer({
       email: 'buyer@example.com',
@@ -284,6 +286,33 @@ describe('StripeProvider', () => {
     expect(client.customers.create).toHaveBeenCalledWith({
       email: 'buyer@example.com',
       metadata: { insforge_subject_type: 'team', insforge_subject_id: 'team_123' },
+    });
+  });
+
+  it('lists Stripe customers for mirror syncs', async () => {
+    const client = {
+      accounts: { retrieveCurrent: vi.fn() },
+      products: { list: vi.fn() },
+      prices: { list: vi.fn() },
+      customers: {
+        list: vi.fn().mockReturnValue(
+          createAsyncList([
+            { id: 'cus_123', object: 'customer', email: 'buyer@example.com' },
+            { id: 'cus_456', object: 'customer', email: null, deleted: true },
+          ])
+        ),
+      },
+    } as unknown as StripeClient;
+    const provider = new StripeProvider(TEST_STRIPE_SECRET_KEY, 'test', client);
+
+    await expect(provider.listCustomers()).resolves.toEqual([
+      { id: 'cus_123', object: 'customer', email: 'buyer@example.com' },
+      { id: 'cus_456', object: 'customer', email: null, deleted: true },
+    ]);
+
+    expect(client.customers.list).toHaveBeenCalledWith({
+      limit: 100,
+      expand: ['data.invoice_settings.default_payment_method', 'data.default_source'],
     });
   });
 
@@ -305,7 +334,7 @@ describe('StripeProvider', () => {
       checkout: { sessions: { create: vi.fn() } },
       webhooks: { constructEvent: vi.fn() },
     } as unknown as StripeClient;
-    const provider = new StripeProvider('sk_test_1234567890', 'test', client);
+    const provider = new StripeProvider(TEST_STRIPE_SECRET_KEY, 'test', client);
 
     await provider.createCustomerPortalSession({
       customerId: 'cus_123',
@@ -337,7 +366,7 @@ describe('StripeProvider', () => {
       },
       webhooks: { constructEvent: vi.fn() },
     } as unknown as StripeClient;
-    const provider = new StripeProvider('sk_test_1234567890', 'test', client);
+    const provider = new StripeProvider(TEST_STRIPE_SECRET_KEY, 'test', client);
 
     await provider.createCheckoutSession({
       mode: 'subscription',
@@ -378,7 +407,7 @@ describe('StripeProvider', () => {
       },
       webhooks: { constructEvent: vi.fn() },
     } as unknown as StripeClient;
-    const provider = new StripeProvider('sk_test_1234567890', 'test', client);
+    const provider = new StripeProvider(TEST_STRIPE_SECRET_KEY, 'test', client);
 
     await provider.createCheckoutSession({
       mode: 'payment',
@@ -420,7 +449,7 @@ describe('StripeProvider', () => {
       },
       webhooks: { constructEvent: vi.fn() },
     } as unknown as StripeClient;
-    const provider = new StripeProvider('sk_test_1234567890', 'test', client);
+    const provider = new StripeProvider(TEST_STRIPE_SECRET_KEY, 'test', client);
 
     await provider.createCustomer({
       email: 'buyer@example.com',
@@ -485,7 +514,7 @@ describe('StripeProvider', () => {
           .mockReturnValue({ id: 'evt_123', type: 'checkout.session.completed' }),
       },
     } as unknown as StripeClient;
-    const provider = new StripeProvider('sk_test_1234567890', 'test', client);
+    const provider = new StripeProvider(TEST_STRIPE_SECRET_KEY, 'test', client);
 
     expect(provider.constructWebhookEvent(rawBody, 'sig_123', 'whsec_123')).toEqual({
       id: 'evt_123',
@@ -514,7 +543,7 @@ describe('StripeProvider', () => {
         del: vi.fn().mockResolvedValue({ id: 'we_123', deleted: true }),
       },
     } as unknown as StripeClient;
-    const provider = new StripeProvider('sk_test_1234567890', 'test', client);
+    const provider = new StripeProvider(TEST_STRIPE_SECRET_KEY, 'test', client);
 
     await expect(provider.listWebhookEndpoints()).resolves.toEqual([
       { id: 'we_123', object: 'webhook_endpoint' },

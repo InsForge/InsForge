@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { scheduleSchema, scheduleLogSchema } from './schedules.schema.js';
+import { scheduleSchema, scheduleLogSchema, schedulesConfigSchema } from './schedules.schema.js';
 
 // Accept either:
 //   - 5-field cron expression (e.g. "*/5 * * * *", "0 9 * * 1-5")
@@ -117,3 +117,13 @@ export type GetScheduleResponse = z.infer<typeof getScheduleResponseSchema>;
 export type ExecutionLogResponse = z.infer<typeof executionLogResponseSchema>;
 export type ListExecutionLogsResponse = z.infer<typeof listExecutionLogsResponseSchema>;
 export type DeleteScheduleResponse = z.infer<typeof deleteScheduleResponseSchema>;
+
+// ============================================================================
+// Config Schemas
+// ============================================================================
+
+export const getSchedulesConfigResponseSchema = schedulesConfigSchema;
+export const updateSchedulesConfigRequestSchema = schedulesConfigSchema;
+
+export type GetSchedulesConfigResponse = z.infer<typeof getSchedulesConfigResponseSchema>;
+export type UpdateSchedulesConfigRequest = z.infer<typeof updateSchedulesConfigRequestSchema>;

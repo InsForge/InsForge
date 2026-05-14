@@ -95,6 +95,12 @@
                   "core-concepts/payments/architecture",
                   "core-concepts/payments/cli"
                 ]
+              },
+              {
+                "group": "Compute (Private Preview)",
+                "pages": [
+                  "core-concepts/compute/architecture"
+                ]
               }
             ]
           },

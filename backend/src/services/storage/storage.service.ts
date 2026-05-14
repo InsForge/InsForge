@@ -29,16 +29,24 @@ export class StorageService {
   private constructor() {
     const s3Bucket = process.env.AWS_S3_BUCKET;
     const appKey = process.env.APP_KEY || 'local';
+    // PARENT_APP_KEY is set by cloud-backend at branch EC2 startup. When
+    // present, the S3 provider runs in branch mode: read paths fall back to
+    // parent's S3 prefix on 404, write paths target the branch's prefix only.
+    const parentAppKey = process.env.PARENT_APP_KEY?.trim() || undefined;
 
     if (s3Bucket) {
       // Use S3 backend
       this.provider = new S3StorageProvider(
         s3Bucket,
         appKey,
-        process.env.AWS_REGION || 'us-east-2'
+        process.env.AWS_REGION || 'us-east-2',
+        parentAppKey
       );
+      if (parentAppKey) {
+        logger.info('Storage initialized in branch mode', { appKey, parentAppKey });
+      }
     } else {
-      // Use local filesystem backend
+      // Use local filesystem backend (no fallback support — local installs aren't branched)
       const baseDir = process.env.STORAGE_DIR || path.resolve(process.cwd(), 'insforge-storage');
       this.provider = new LocalStorageProvider(baseDir);
     }

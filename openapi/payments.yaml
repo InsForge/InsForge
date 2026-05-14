@@ -13,7 +13,7 @@ tags:
     description: Stripe webhook ingestion routes
 
 paths:
-  /api/payments/checkout-sessions:
+  /api/payments/{environment}/checkout-sessions:
     post:
       summary: Create Checkout Session
       description: Create a local checkout attempt and then create a Stripe Checkout Session. Subscription mode requires a billing subject.
@@ -21,14 +21,15 @@ paths:
         - Client
       security:
         - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentPath'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateCheckoutSessionRequest'
+              $ref: '#/components/schemas/CreateCheckoutSessionBody'
             example:
-              environment: "test"
               mode: "subscription"
               lineItems:
                 - stripePriceId: "price_123"
@@ -56,7 +57,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/payments/customer-portal-sessions:
+  /api/payments/{environment}/customer-portal-sessions:
     post:
       summary: Create Customer Portal Session
       description: Create a Stripe Billing Portal Session for an authenticated user's mapped billing subject.
@@ -64,14 +65,15 @@ paths:
         - Client
       security:
         - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentPath'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateCustomerPortalSessionRequest'
+              $ref: '#/components/schemas/CreateCustomerPortalSessionBody'
             example:
-              environment: "test"
               subject:
                 type: "team"
                 id: "team_123"
@@ -136,7 +138,8 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
-    post:
+  /api/payments/{environment}/config:
+    put:
       summary: Configure Stripe Secret Key
       description: Validate and store a Stripe secret key. New Stripe accounts trigger managed webhook setup and a unified sync.
       tags:
@@ -144,14 +147,15 @@ paths:
       security:
         - bearerAuth: []
         - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentPath'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpsertPaymentsConfigRequest'
+              $ref: '#/components/schemas/UpsertPaymentsConfigBody'
             example:
-              environment: "test"
               secretKey: "sk_test_xxx"
       responses:
         '200':
@@ -166,8 +170,6 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
-
-  /api/payments/config/{environment}:
     delete:
       summary: Remove Stripe Secret Key
       description: Remove the configured Stripe secret key for one environment and best-effort remove managed webhook endpoints.
@@ -197,20 +199,12 @@ paths:
   /api/payments/sync:
     post:
       summary: Sync Stripe Payments State
-      description: Sync products, prices, and subscriptions from Stripe into InsForge. Stripe remains the source of truth.
+      description: Sync products, prices, customers, and subscriptions for every configured Stripe environment. Stripe remains the source of truth.
       tags:
         - Admin
       security:
         - bearerAuth: []
         - apiKey: []
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SyncPaymentsRequest'
-            example:
-              environment: "all"
       responses:
         '200':
           description: Sync result for configured environments
@@ -225,7 +219,32 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
-  /api/payments/webhooks/{environment}/configure:
+  /api/payments/{environment}/sync:
+    post:
+      summary: Sync Stripe Payments State For One Environment
+      description: Sync products, prices, customers, and subscriptions for one Stripe environment. Stripe remains the source of truth.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentPath'
+      responses:
+        '200':
+          description: Sync result for the requested environment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncPaymentsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/payments/{environment}/webhook:
     post:
       summary: Configure Managed Stripe Webhook
       description: Create or recreate the InsForge-managed Stripe webhook endpoint for one environment.
@@ -250,20 +269,20 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
-  /api/payments/catalog:
+  /api/payments/{environment}/catalog:
     get:
       summary: List Payment Catalog
-      description: Return mirrored Stripe products and prices, optionally filtered by environment.
+      description: Return mirrored Stripe products and prices for one environment.
       tags:
         - Admin
       security:
         - bearerAuth: []
         - apiKey: []
       parameters:
-        - $ref: '#/components/parameters/OptionalEnvironmentQuery'
+        - $ref: '#/components/parameters/EnvironmentPath'
       responses:
         '200':
-          description: Mirrored products and prices
+          description: Synced Stripe products and prices
           content:
             application/json:
               schema:
@@ -275,7 +294,7 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
-  /api/payments/products:
+  /api/payments/{environment}/catalog/products:
     get:
       summary: List Products
       description: List mirrored Stripe products for one environment.
@@ -285,7 +304,7 @@ paths:
         - bearerAuth: []
         - apiKey: []
       parameters:
-        - $ref: '#/components/parameters/EnvironmentQuery'
+        - $ref: '#/components/parameters/EnvironmentPath'
       responses:
         '200':
           description: Products
@@ -308,14 +327,15 @@ paths:
       security:
         - bearerAuth: []
         - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentPath'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreatePaymentProductRequest'
+              $ref: '#/components/schemas/CreatePaymentProductBody'
             example:
-              environment: "test"
               name: "Pro Plan"
               description: "Monthly access to Pro features"
               active: true
@@ -336,7 +356,7 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
-  /api/payments/products/{productId}:
+  /api/payments/{environment}/catalog/products/{productId}:
     get:
       summary: Get Product
       description: Get one mirrored Stripe product and its associated prices.
@@ -346,8 +366,8 @@ paths:
         - bearerAuth: []
         - apiKey: []
       parameters:
+        - $ref: '#/components/parameters/EnvironmentPath'
         - $ref: '#/components/parameters/ProductIdPath'
-        - $ref: '#/components/parameters/EnvironmentQuery'
       responses:
         '200':
           description: Product and prices
@@ -373,15 +393,15 @@ paths:
         - bearerAuth: []
         - apiKey: []
       parameters:
+        - $ref: '#/components/parameters/EnvironmentPath'
         - $ref: '#/components/parameters/ProductIdPath'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdatePaymentProductRequest'
+              $ref: '#/components/schemas/UpdatePaymentProductBody'
             example:
-              environment: "test"
               name: "Pro Plan"
               active: true
       responses:
@@ -409,8 +429,8 @@ paths:
         - bearerAuth: []
         - apiKey: []
       parameters:
+        - $ref: '#/components/parameters/EnvironmentPath'
         - $ref: '#/components/parameters/ProductIdPath'
-        - $ref: '#/components/parameters/EnvironmentQuery'
       responses:
         '200':
           description: Product deleted
@@ -427,7 +447,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /api/payments/prices:
+  /api/payments/{environment}/catalog/prices:
     get:
       summary: List Prices
       description: List mirrored Stripe prices for one environment, optionally filtered by product.
@@ -437,7 +457,7 @@ paths:
         - bearerAuth: []
         - apiKey: []
       parameters:
-        - $ref: '#/components/parameters/EnvironmentQuery'
+        - $ref: '#/components/parameters/EnvironmentPath'
         - name: stripeProductId
           in: query
           required: false
@@ -468,14 +488,15 @@ paths:
       security:
         - bearerAuth: []
         - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentPath'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreatePaymentPriceRequest'
+              $ref: '#/components/schemas/CreatePaymentPriceBody'
             example:
-              environment: "test"
               stripeProductId: "prod_123"
               currency: "usd"
               unitAmount: 2900
@@ -498,7 +519,7 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
-  /api/payments/prices/{priceId}:
+  /api/payments/{environment}/catalog/prices/{priceId}:
     get:
       summary: Get Price
       description: Get one mirrored Stripe price.
@@ -508,8 +529,8 @@ paths:
         - bearerAuth: []
         - apiKey: []
       parameters:
+        - $ref: '#/components/parameters/EnvironmentPath'
         - $ref: '#/components/parameters/PriceIdPath'
-        - $ref: '#/components/parameters/EnvironmentQuery'
       responses:
         '200':
           description: Price
@@ -535,15 +556,15 @@ paths:
         - bearerAuth: []
         - apiKey: []
       parameters:
+        - $ref: '#/components/parameters/EnvironmentPath'
         - $ref: '#/components/parameters/PriceIdPath'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdatePaymentPriceRequest'
+              $ref: '#/components/schemas/UpdatePaymentPriceBody'
             example:
-              environment: "test"
               active: true
               lookupKey: "pro_monthly"
       responses:
@@ -571,8 +592,8 @@ paths:
         - bearerAuth: []
         - apiKey: []
       parameters:
+        - $ref: '#/components/parameters/EnvironmentPath'
         - $ref: '#/components/parameters/PriceIdPath'
-        - $ref: '#/components/parameters/EnvironmentQuery'
       responses:
         '200':
           description: Price archived
@@ -589,7 +610,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /api/payments/subscriptions:
+  /api/payments/{environment}/subscriptions:
     get:
       summary: List Subscriptions
       description: Admin/debug read for mirrored Stripe subscriptions. Use app-owned tables with RLS for end-user payment state.
@@ -599,7 +620,7 @@ paths:
         - bearerAuth: []
         - apiKey: []
       parameters:
-        - $ref: '#/components/parameters/EnvironmentQuery'
+        - $ref: '#/components/parameters/EnvironmentPath'
         - $ref: '#/components/parameters/SubjectTypeQuery'
         - $ref: '#/components/parameters/SubjectIdQuery'
         - $ref: '#/components/parameters/LimitQuery'
@@ -617,7 +638,33 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
-  /api/payments/payment-history:
+  /api/payments/{environment}/customers:
+    get:
+      summary: List Customers
+      description: Admin/debug read for mirrored Stripe customers. This is a display mirror only and should not replace app-owned billing tables.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentPath'
+        - $ref: '#/components/parameters/LimitQuery'
+      responses:
+        '200':
+          description: Customers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListPaymentCustomersResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/payments/{environment}/payment-history:
     get:
       summary: List Payment History
       description: Admin/debug read for mirrored payment history. Use app-owned fulfillment tables with RLS for end-user order, credit, or entitlement state.
@@ -627,7 +674,7 @@ paths:
         - bearerAuth: []
         - apiKey: []
       parameters:
-        - $ref: '#/components/parameters/EnvironmentQuery'
+        - $ref: '#/components/parameters/EnvironmentPath'
         - $ref: '#/components/parameters/SubjectTypeQuery'
         - $ref: '#/components/parameters/SubjectIdQuery'
         - $ref: '#/components/parameters/LimitQuery'
@@ -699,20 +746,6 @@ components:
       schema:
         $ref: '#/components/schemas/StripeEnvironment'
       description: Stripe environment.
-    EnvironmentQuery:
-      name: environment
-      in: query
-      required: true
-      schema:
-        $ref: '#/components/schemas/StripeEnvironment'
-      description: Stripe environment.
-    OptionalEnvironmentQuery:
-      name: environment
-      in: query
-      required: false
-      schema:
-        $ref: '#/components/schemas/StripeEnvironment'
-      description: Optional Stripe environment filter.
     ProductIdPath:
       name: productId
       in: path
@@ -903,7 +936,7 @@ components:
           additionalProperties:
             type: number
 
-    StripeProductMirror:
+    StripeProduct:
       type: object
       required:
         - environment
@@ -937,7 +970,7 @@ components:
           type: string
           format: date-time
 
-    StripePriceMirror:
+    StripePrice:
       type: object
       required:
         - environment
@@ -1015,6 +1048,87 @@ components:
         syncedAt:
           type: string
           format: date-time
+
+    StripeCustomer:
+      type: object
+      required:
+        - environment
+        - stripeCustomerId
+        - email
+        - name
+        - phone
+        - deleted
+        - metadata
+        - stripeCreatedAt
+        - syncedAt
+      properties:
+        environment:
+          $ref: '#/components/schemas/StripeEnvironment'
+        stripeCustomerId:
+          type: string
+          example: "cus_123"
+        email:
+          type: string
+          nullable: true
+          example: "buyer@example.com"
+        name:
+          type: string
+          nullable: true
+          example: "Buyer Example"
+        phone:
+          type: string
+          nullable: true
+          example: "+1 555-0100"
+        deleted:
+          type: boolean
+        metadata:
+          $ref: '#/components/schemas/Metadata'
+        stripeCreatedAt:
+          type: string
+          format: date-time
+          nullable: true
+        syncedAt:
+          type: string
+          format: date-time
+
+    PaymentCustomerListItem:
+      allOf:
+        - $ref: '#/components/schemas/StripeCustomer'
+        - type: object
+          required:
+            - paymentsCount
+            - lastPaymentAt
+            - totalSpend
+            - totalSpendCurrency
+            - paymentMethodBrand
+            - paymentMethodLast4
+            - countryCode
+          properties:
+            paymentsCount:
+              type: integer
+              minimum: 0
+            lastPaymentAt:
+              type: string
+              format: date-time
+              nullable: true
+            totalSpend:
+              type: integer
+              minimum: 0
+              nullable: true
+            totalSpendCurrency:
+              type: string
+              nullable: true
+            paymentMethodBrand:
+              type: string
+              nullable: true
+            paymentMethodLast4:
+              type: string
+              nullable: true
+            countryCode:
+              type: string
+              nullable: true
+              minLength: 2
+              maxLength: 2
 
     BillingSubject:
       type: object
@@ -1547,15 +1661,12 @@ components:
           nullable: true
           example: "sk_test_...abcd"
 
-    CreatePaymentProductRequest:
+    CreatePaymentProductBody:
       type: object
       required:
-        - environment
         - name
       additionalProperties: false
       properties:
-        environment:
-          $ref: '#/components/schemas/StripeEnvironment'
         name:
           type: string
           minLength: 1
@@ -1572,14 +1683,10 @@ components:
           minLength: 1
           maxLength: 200
 
-    UpdatePaymentProductRequest:
+    UpdatePaymentProductBody:
       type: object
-      required:
-        - environment
       additionalProperties: false
       properties:
-        environment:
-          $ref: '#/components/schemas/StripeEnvironment'
         name:
           type: string
           minLength: 1
@@ -1591,7 +1698,7 @@ components:
           type: boolean
         metadata:
           $ref: '#/components/schemas/Metadata'
-      minProperties: 2
+      minProperties: 1
 
     StripePriceRecurringInterval:
       type: string
@@ -1608,17 +1715,14 @@ components:
         - inclusive
         - unspecified
 
-    CreatePaymentPriceRequest:
+    CreatePaymentPriceBody:
       type: object
       required:
-        - environment
         - stripeProductId
         - currency
         - unitAmount
       additionalProperties: false
       properties:
-        environment:
-          $ref: '#/components/schemas/StripeEnvironment'
         stripeProductId:
           type: string
           minLength: 1
@@ -1658,14 +1762,10 @@ components:
           minLength: 1
           maxLength: 200
 
-    UpdatePaymentPriceRequest:
+    UpdatePaymentPriceBody:
       type: object
-      required:
-        - environment
       additionalProperties: false
       properties:
-        environment:
-          $ref: '#/components/schemas/StripeEnvironment'
         active:
           type: boolean
         lookupKey:
@@ -1677,7 +1777,7 @@ components:
           $ref: '#/components/schemas/StripePriceTaxBehavior'
         metadata:
           $ref: '#/components/schemas/Metadata'
-      minProperties: 2
+      minProperties: 1
 
     CreateCheckoutSessionLineItem:
       type: object
@@ -1695,10 +1795,9 @@ components:
           maximum: 999
           default: 1
 
-    CreateCheckoutSessionRequest:
+    CreateCheckoutSessionBody:
       type: object
       required:
-        - environment
         - mode
         - lineItems
         - successUrl
@@ -1706,8 +1805,6 @@ components:
       additionalProperties: false
       description: Metadata keys starting with insforge_ are reserved and rejected.
       properties:
-        environment:
-          $ref: '#/components/schemas/StripeEnvironment'
         mode:
           $ref: '#/components/schemas/CheckoutMode'
         lineItems:
@@ -1743,15 +1840,12 @@ components:
         checkoutSession:
           $ref: '#/components/schemas/CheckoutSession'
 
-    CreateCustomerPortalSessionRequest:
+    CreateCustomerPortalSessionBody:
       type: object
       required:
-        - environment
         - subject
       additionalProperties: false
       properties:
-        environment:
-          $ref: '#/components/schemas/StripeEnvironment'
         subject:
           $ref: '#/components/schemas/BillingSubject'
         returnUrl:
@@ -1790,14 +1884,12 @@ components:
           items:
             $ref: '#/components/schemas/StripeKeyConfig'
 
-    UpsertPaymentsConfigRequest:
+    UpsertPaymentsConfigBody:
       type: object
       required:
-        - environment
         - secretKey
+      additionalProperties: false
       properties:
-        environment:
-          $ref: '#/components/schemas/StripeEnvironment'
         secretKey:
           type: string
           minLength: 1
@@ -1878,11 +1970,11 @@ components:
         products:
           type: array
           items:
-            $ref: '#/components/schemas/StripeProductMirror'
+            $ref: '#/components/schemas/StripeProduct'
         prices:
           type: array
           items:
-            $ref: '#/components/schemas/StripePriceMirror'
+            $ref: '#/components/schemas/StripePrice'
 
     ListPaymentProductsResponse:
       type: object
@@ -1892,7 +1984,7 @@ components:
         products:
           type: array
           items:
-            $ref: '#/components/schemas/StripeProductMirror'
+            $ref: '#/components/schemas/StripeProduct'
 
     ListPaymentPricesResponse:
       type: object
@@ -1902,7 +1994,7 @@ components:
         prices:
           type: array
           items:
-            $ref: '#/components/schemas/StripePriceMirror'
+            $ref: '#/components/schemas/StripePrice'
 
     GetPaymentProductResponse:
       type: object
@@ -1911,11 +2003,11 @@ components:
         - prices
       properties:
         product:
-          $ref: '#/components/schemas/StripeProductMirror'
+          $ref: '#/components/schemas/StripeProduct'
         prices:
           type: array
           items:
-            $ref: '#/components/schemas/StripePriceMirror'
+            $ref: '#/components/schemas/StripePrice'
 
     MutatePaymentProductResponse:
       type: object
@@ -1923,7 +2015,7 @@ components:
         - product
       properties:
         product:
-          $ref: '#/components/schemas/StripeProductMirror'
+          $ref: '#/components/schemas/StripeProduct'
 
     DeletePaymentProductResponse:
       type: object
@@ -1943,7 +2035,7 @@ components:
         - price
       properties:
         price:
-          $ref: '#/components/schemas/StripePriceMirror'
+          $ref: '#/components/schemas/StripePrice'
 
     MutatePaymentPriceResponse:
       type: object
@@ -1951,7 +2043,7 @@ components:
         - price
       properties:
         price:
-          $ref: '#/components/schemas/StripePriceMirror'
+          $ref: '#/components/schemas/StripePrice'
 
     ArchivePaymentPriceResponse:
       type: object
@@ -1960,7 +2052,7 @@ components:
         - archived
       properties:
         price:
-          $ref: '#/components/schemas/StripePriceMirror'
+          $ref: '#/components/schemas/StripePrice'
         archived:
           type: boolean
 
@@ -1973,6 +2065,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/StripeSubscription'
+
+    ListPaymentCustomersResponse:
+      type: object
+      required:
+        - customers
+      properties:
+        customers:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaymentCustomerListItem'
 
     ListPaymentHistoryResponse:
       type: object

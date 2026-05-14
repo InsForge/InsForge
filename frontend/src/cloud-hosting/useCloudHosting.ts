@@ -3,6 +3,7 @@ import type {
   DashboardBackup,
   DashboardBackupInfo,
   DashboardInstanceInfo,
+  DashboardModelCreditUsage,
   DashboardProjectInfo,
   DashboardUserInfo,
   DashboardMetricName,
@@ -50,6 +51,7 @@ type PendingRequestKey =
   | 'updateVersion'
   | 'userInfo'
   | 'userApiKey'
+  | 'modelCredits'
   | 'projectMetrics'
   | 'advisorLatest'
   | 'advisorIssues'
@@ -75,6 +77,7 @@ type PendingRequestValues = {
   updateVersion: void;
   userInfo: DashboardUserInfo;
   userApiKey: string;
+  modelCredits: DashboardModelCreditUsage;
   projectMetrics: DashboardMetricsResponse;
   advisorLatest: DashboardAdvisorSummary;
   advisorIssues: DashboardAdvisorIssuesResponse;
@@ -272,6 +275,7 @@ function normalizeProjectInfo(
         : previousInfo.currentVersion,
     status:
       typeof message.status === 'string' && message.status ? message.status : previousInfo.status,
+    isBranch: typeof message.isBranch === 'boolean' ? message.isBranch : previousInfo.isBranch,
   };
 }
 
@@ -332,6 +336,10 @@ export function useCloudHosting() {
         case 'userApiKey':
           pendingRequestsRef.current.userApiKey = pendingRequest as PendingRequest<string>;
           return;
+        case 'modelCredits':
+          pendingRequestsRef.current.modelCredits =
+            pendingRequest as PendingRequest<DashboardModelCreditUsage>;
+          return;
         case 'projectMetrics':
           pendingRequestsRef.current.projectMetrics =
             pendingRequest as PendingRequest<DashboardMetricsResponse>;
@@ -347,6 +355,10 @@ export function useCloudHosting() {
         case 'advisorScan':
           pendingRequestsRef.current.advisorScan = pendingRequest as PendingRequest<void>;
           return;
+        default: {
+          const exhaustiveKey: never = key;
+          throw new Error(`Unhandled pending request key: ${exhaustiveKey}`);
+        }
       }
     },
     []
@@ -616,6 +628,28 @@ export function useCloudHosting() {
             rejectPendingRequest(
               'userApiKey',
               getErrorMessage(message.error, 'Failed to create user API key')
+            );
+            return;
+          }
+          case 'MODEL_CREDITS': {
+            const used =
+              typeof message.used === 'number' && Number.isFinite(message.used) ? message.used : 0;
+            const limit =
+              typeof message.limit === 'number' && Number.isFinite(message.limit)
+                ? message.limit
+                : 0;
+
+            resolvePendingRequest('modelCredits', {
+              used,
+              limit,
+              isFree: message.isFree === true,
+            });
+            return;
+          }
+          case 'MODEL_CREDITS_ERROR': {
+            rejectPendingRequest(
+              'modelCredits',
+              getErrorMessage(message.error, 'Failed to load model credit usage')
             );
             return;
           }
@@ -981,6 +1015,16 @@ export function useCloudHosting() {
     return createPendingRequest('userApiKey', 'User API key request');
   }, [createPendingRequest, sendMessageToParent]);
 
+  const requestModelCredits = useCallback(async (): Promise<DashboardModelCreditUsage> => {
+    await sendMessageToParent(
+      { type: 'REQUEST_MODEL_CREDITS' },
+      'Unable to request model credit usage from the parent window'
+    );
+    return createPendingRequest('modelCredits', 'Model credits request', {
+      supersede: true,
+    });
+  }, [createPendingRequest, sendMessageToParent]);
+
   const requestProjectMetrics = useCallback(
     async (range: DashboardMetricsRange): Promise<DashboardMetricsResponse> => {
       await sendMessageToParent(
@@ -1035,8 +1079,8 @@ export function useCloudHosting() {
     return createPendingRequest('advisorScan', 'Advisor scan trigger');
   }, [createPendingRequest, sendMessageToParent]);
 
-  const navigateToSubscription = useCallback(() => {
-    void postMessageToParent({ type: 'NAVIGATE_TO_SUBSCRIPTION' });
+  const showUpgradeDialog = useCallback(() => {
+    void postMessageToParent({ type: 'SHOW_UPGRADE_DIALOG' });
   }, [postMessageToParent]);
 
   const reportRouteChange = useCallback(
@@ -1060,9 +1104,10 @@ export function useCloudHosting() {
     renameProject,
     deleteProject,
     updateVersion,
-    navigateToSubscription,
+    showUpgradeDialog,
     requestUserInfo,
     requestUserApiKey,
+    requestModelCredits,
     requestProjectMetrics,
     requestAdvisorLatest,
     requestAdvisorIssues,

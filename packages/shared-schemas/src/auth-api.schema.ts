@@ -349,18 +349,48 @@ export const updateAuthConfigRequestSchema = authConfigSchema
 export const getAuthConfigResponseSchema = authConfigSchema;
 
 /**
- * Response for GET /api/auth/public-config - Unified public auth configuration endpoint
- * Combines OAuth providers and email auth configuration
+ * Admin auth response — the full shape including admin-only fields. This is
+ * the canonical source; the public response is derived from this by omitting
+ * sensitive fields below. Re-exported as `authMetadataSchema` from
+ * metadata.schema.ts for the admin-gated /api/metadata route.
+ *
+ * CONVENTION: new admin-only fields land in `authConfigSchema` and appear
+ * here automatically. To expose a field publicly, REMOVE it from the .omit()
+ * call in `getPublicAuthConfigResponseSchema`. This way the safer default
+ * (admin-only) is what you get if you forget to think about it.
  */
-export const getPublicAuthConfigResponseSchema = z.object({
+/**
+ * SMTP slice for the admin metadata response. Excludes id/createdAt/updatedAt
+ * (rendering metadata, not the row); password is never exposed — hasPassword
+ * is the only signal admins get about credential presence.
+ */
+export const adminSmtpMetadataSchema = smtpConfigSchema.omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const authConfigAdminResponseSchema = z.object({
   oAuthProviders: z.array(oAuthProvidersSchema),
   customOAuthProviders: z.array(customOAuthKeySchema),
+  smtpConfig: adminSmtpMetadataSchema,
   ...authConfigSchema.omit({
     id: true,
     updatedAt: true,
     createdAt: true,
-    allowedRedirectUrls: true,
   }).shape,
+});
+
+/**
+ * Response for GET /api/auth/public-config — admin response minus
+ * admin-only fields. This route is unauthenticated, so anything sensitive
+ * MUST be omitted here. SMTP host can leak internal infrastructure
+ * (e.g. internal corp mail server), so the entire smtpConfig slice is
+ * admin-only.
+ */
+export const getPublicAuthConfigResponseSchema = authConfigAdminResponseSchema.omit({
+  allowedRedirectUrls: true,
+  smtpConfig: true,
 });
 
 // ============================================================================
@@ -370,18 +400,54 @@ export const getPublicAuthConfigResponseSchema = z.object({
 /**
  * PUT /api/auth/smtp-config - Upsert SMTP configuration
  */
-export const upsertSmtpConfigRequestSchema = z.object({
-  enabled: z.boolean(),
-  host: z.string().min(1, 'SMTP host is required'),
-  port: z.union([z.literal(25), z.literal(465), z.literal(587), z.literal(2525)], {
-    errorMap: () => ({ message: 'Port must be one of: 25, 465, 587, 2525' }),
-  }),
-  username: z.string().min(1, 'SMTP username is required'),
-  password: z.string().min(1, 'SMTP password is required').optional(),
-  senderEmail: z.string().email('Invalid sender email'),
-  senderName: z.string().min(1, 'Sender name is required'),
-  minIntervalSeconds: z.number().int().min(0).default(60),
-});
+export const upsertSmtpConfigRequestSchema = z
+  .object({
+    enabled: z.boolean(),
+    host: z.string().default(''),
+    port: z.union([z.literal(25), z.literal(465), z.literal(587), z.literal(2525)], {
+      errorMap: () => ({ message: 'Port must be one of: 25, 465, 587, 2525' }),
+    }),
+    username: z.string().default(''),
+    password: z.string().min(1, 'SMTP password is required').optional(),
+    senderEmail: z.string().default(''),
+    senderName: z.string().default(''),
+    minIntervalSeconds: z.number().int().min(0).default(60),
+  })
+  .superRefine((data, ctx) => {
+    // When disabling custom SMTP, allow saving without filling in connection fields —
+    // the user is opting out, so those values are irrelevant.
+    if (!data.enabled) {
+      return;
+    }
+    if (data.host.length < 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['host'],
+        message: 'SMTP host is required',
+      });
+    }
+    if (data.username.length < 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['username'],
+        message: 'SMTP username is required',
+      });
+    }
+    if (!z.string().email().safeParse(data.senderEmail).success) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['senderEmail'],
+        message: 'Invalid sender email',
+      });
+    }
+    if (data.senderName.length < 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['senderName'],
+        message: 'Sender name is required',
+      });
+    }
+  });
 
 /**
  * Response for GET /api/auth/smtp-config

@@ -44,6 +44,7 @@ describe('database helpers', () => {
   it('marks insforge managed schemas as read only', () => {
     expect(() => assertWritableDatabaseSchema('auth')).toThrow(AppError);
     expect(() => assertWritableDatabaseSchema('cron')).toThrow(AppError);
+    expect(() => assertWritableDatabaseSchema('payments')).toThrow(AppError);
     expect(() => assertWritableDatabaseSchema('public')).not.toThrow();
   });
 

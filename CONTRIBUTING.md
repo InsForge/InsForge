@@ -38,7 +38,7 @@ Before you start development, ensure you have the following:
 1. Fork the repository to your GitHub account
 2. Clone your fork locally:
    ```bash
-   git clone https://github.com/insforge/insforge.git
+   git clone https://github.com/InsForge/InsForge.git
    cd insforge
    ```
 3. Install Docker
@@ -80,7 +80,7 @@ Before you start development, ensure you have the following:
 3. Add tests for your changes (see test README for guidelines)
 4. Run the test suite:
    ```bash
-   npm test:e2e
+   npm run test:e2e
    ```
 5. Run linter:
    ```bash

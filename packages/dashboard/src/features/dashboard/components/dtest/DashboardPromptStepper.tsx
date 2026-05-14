@@ -5,9 +5,9 @@ import { Database, Sparkles, Rocket } from 'lucide-react';
 import StepUserIcon from '#assets/icons/step_user.svg?react';
 import StepUploadIcon from '#assets/icons/step_upload.svg?react';
 import stepBgDecoration from '#assets/images/step_bg_decoration.svg';
+import { useDashboardProject } from '#lib/config/DashboardHostContext';
 import { useMetadata, useProjectId } from '#lib/hooks/useMetadata';
 import { useUsers } from '#features/auth';
-import { useAIUsageSummary } from '#features/ai/hooks/useAIUsage';
 import { useDeploymentMetadata } from '#features/deployments/hooks/useDeploymentMetadata';
 import { useMcpUsage } from '#features/logs/hooks/useMcpUsage';
 
@@ -61,9 +61,9 @@ const PROMPT_STEPS: PromptStep[] = [
     category: 'Model Gateway',
     title: 'Add LLM feature',
     prompt:
-      'Use InsForge Skills to add an AI feature to this app using the InsForge AI Gateway.\nUsers should be able to type natural language and have the AI generate a useful response automatically.',
+      'Use InsForge Skills to add an AI feature to this app using the InsForge Model Gateway.\nUsers should be able to type natural language and have the AI generate a useful response automatically.',
     icon: <Sparkles className="size-12 text-[rgb(var(--disabled))]" />,
-    navigateTo: { label: 'Go to Model Gateway', path: '/dashboard/ai' },
+    navigateTo: { label: 'Go to Model Gateway', path: '/dashboard/ai/overview' },
   },
   {
     id: 5,
@@ -254,8 +254,8 @@ function StepperCard({ onDismiss, completedSteps, showDismiss = false }: Stepper
 /**
  * Self-contained "Start building with Prompts" stepper for the connected
  * dashboard. Manages its own dismiss persistence and step-completion tracking
- * (live signals from useMetadata / useUsers / useAIUsageSummary /
- * useDeploymentMetadata, plus a sticky localStorage flag so completion stays
+ * (live signals from useMetadata / useUsers / useDeploymentMetadata, plus a
+ * sticky localStorage flag so completion stays
  * checked even if the agent later deletes the source data).
  *
  * Returns null silently when the user has dismissed it or projectId hasn't
@@ -264,13 +264,15 @@ function StepperCard({ onDismiss, completedSteps, showDismiss = false }: Stepper
 export function DashboardPromptStepper() {
   const { tables, storage } = useMetadata();
   const { totalUsers } = useUsers();
-  const { data: aiUsageSummary } = useAIUsageSummary();
   const { currentDeploymentId } = useDeploymentMetadata();
   const { projectId } = useProjectId();
   // Only surface the stepper after the agent has made at least one MCP call.
   // A user who lands on the connected dashboard without ever invoking MCP
   // (e.g. dismissed the Install view manually) shouldn't be nagged with steps.
+  // Branches inherit the parent's setup, so always show the stepper for them.
   const { hasCompletedOnboarding } = useMcpUsage();
+  const project = useDashboardProject();
+  const isBranch = project?.isBranch === true;
 
   const stepperDismissKey = getStepperDismissKey(projectId ?? undefined);
   const [isDismissed, setIsDismissed] = useState(false);
@@ -314,10 +316,10 @@ export function DashboardPromptStepper() {
       database: databaseStepComplete,
       auth: (totalUsers ?? 0) >= 1,
       storage: storageStepComplete,
-      ai: (aiUsageSummary?.totalRequests ?? 0) > 0,
+      ai: false,
       deployment: !!currentDeploymentId,
     }),
-    [databaseStepComplete, totalUsers, storageStepComplete, aiUsageSummary, currentDeploymentId]
+    [databaseStepComplete, totalUsers, storageStepComplete, currentDeploymentId]
   );
 
   // Persist live completions so they stick even if the agent later removes
@@ -368,7 +370,7 @@ export function DashboardPromptStepper() {
     }
   }, [projectId, stepperDismissKey]);
 
-  if (isDismissed || !hasCompletedOnboarding) {
+  if (isDismissed || (!hasCompletedOnboarding && !isBranch)) {
     return null;
   }
 

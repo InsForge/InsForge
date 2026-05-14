@@ -418,10 +418,60 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
   });
 
   describe('other managed schema blocking', () => {
+    test('allows storage RLS setup', () => {
+      const alterQuery = 'ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY';
+      expect(() => service.sanitizeQuery(alterQuery)).not.toThrow();
+
+      const query =
+        'CREATE POLICY storage_owner_select ON storage.objects FOR SELECT TO authenticated USING (true)';
+      expect(() => service.sanitizeQuery(query)).not.toThrow();
+    });
+
+    test('allows payments session RLS setup', () => {
+      const queries = [
+        'ALTER TABLE payments.checkout_sessions ENABLE ROW LEVEL SECURITY',
+        'ALTER TABLE payments.customer_portal_sessions FORCE ROW LEVEL SECURITY',
+        `CREATE POLICY checkout_subject_guard
+         ON payments.checkout_sessions
+         FOR INSERT TO authenticated
+         WITH CHECK (subject_type = 'team')`,
+      ];
+
+      queries.forEach((query) => {
+        expect(() => service.sanitizeQuery(query)).not.toThrow();
+      });
+    });
+
     test('blocks INSERT on storage schema', () => {
       const query = "INSERT INTO storage.objects (name) VALUES ('avatar.png')";
       expect(() => service.sanitizeQuery(query)).toThrow(AppError);
       expect(() => service.sanitizeQuery(query)).toThrow(/storage schema/i);
+    });
+
+    test('blocks broad writes on payments session tables', () => {
+      const queries = [
+        `INSERT INTO payments.checkout_sessions
+         (environment, mode, success_url, cancel_url)
+         VALUES ('test', 'payment', 'https://example.com/success', 'https://example.com/cancel')`,
+        'ALTER TABLE payments.checkout_sessions ADD COLUMN internal_note TEXT',
+      ];
+
+      queries.forEach((query) => {
+        expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+        expect(() => service.sanitizeQuery(query)).toThrow(/payments schema/i);
+      });
+    });
+
+    test('blocks renames on managed extension tables', () => {
+      const queries = [
+        'ALTER TABLE realtime.channels RENAME TO realtime_channels_v2',
+        'ALTER TABLE realtime.channels RENAME COLUMN description TO details',
+      ];
+
+      queries.forEach((query) => {
+        expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+        expect(() => service.sanitizeQuery(query)).toThrow(/realtime schema/i);
+      });
     });
 
     test('blocks CREATE INDEX on storage schema', () => {

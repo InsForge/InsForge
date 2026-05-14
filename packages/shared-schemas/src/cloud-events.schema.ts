@@ -70,6 +70,7 @@ export const projectInfoEventSchema = z.object({
   instanceType: z.string(),
   region: z.string(),
   latestVersion: z.string().optional(),
+  isBranch: z.boolean().optional(),
 });
 
 export const requestInstanceInfoEventSchema = z.object({

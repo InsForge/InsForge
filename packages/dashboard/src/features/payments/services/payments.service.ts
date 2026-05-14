@@ -2,6 +2,8 @@ import type {
   ConfigurePaymentWebhookResponse,
   GetPaymentsConfigResponse,
   GetPaymentsStatusResponse,
+  ListPaymentCustomersRequest,
+  ListPaymentCustomersResponse,
   ListPaymentHistoryRequest,
   ListPaymentHistoryResponse,
   ListPaymentCatalogResponse,
@@ -21,23 +23,23 @@ export class PaymentsService {
     });
   }
 
-  async listCatalog(environment?: StripeEnvironment): Promise<ListPaymentCatalogResponse> {
-    const searchParams = new URLSearchParams();
-    if (environment) {
-      searchParams.set('environment', environment);
-    }
-
-    const query = searchParams.toString();
-    return apiClient.request(`/payments/catalog${query ? `?${query}` : ''}`, {
+  async listCatalog(environment: StripeEnvironment): Promise<ListPaymentCatalogResponse> {
+    return apiClient.request(`/payments/${environment}/catalog`, {
       headers: apiClient.withAccessToken(),
     });
   }
 
   async syncPayments(input: SyncPaymentsRequest): Promise<SyncPaymentsResponse> {
-    return apiClient.request('/payments/sync', {
+    if (input.environment === 'all') {
+      return apiClient.request('/payments/sync', {
+        method: 'POST',
+        headers: apiClient.withAccessToken(),
+      });
+    }
+
+    return apiClient.request(`/payments/${input.environment}/sync`, {
       method: 'POST',
       headers: apiClient.withAccessToken(),
-      body: JSON.stringify(input),
     });
   }
 
@@ -48,22 +50,22 @@ export class PaymentsService {
   }
 
   async upsertConfig(input: UpsertPaymentsConfigRequest): Promise<GetPaymentsConfigResponse> {
-    return apiClient.request('/payments/config', {
-      method: 'POST',
+    return apiClient.request(`/payments/${input.environment}/config`, {
+      method: 'PUT',
       headers: apiClient.withAccessToken(),
-      body: JSON.stringify(input),
+      body: JSON.stringify({ secretKey: input.secretKey }),
     });
   }
 
   async removeConfig(environment: StripeEnvironment): Promise<GetPaymentsConfigResponse> {
-    return apiClient.request(`/payments/config/${environment}`, {
+    return apiClient.request(`/payments/${environment}/config`, {
       method: 'DELETE',
       headers: apiClient.withAccessToken(),
     });
   }
 
   async configureWebhook(environment: StripeEnvironment): Promise<ConfigurePaymentWebhookResponse> {
-    return apiClient.request(`/payments/webhooks/${environment}/configure`, {
+    return apiClient.request(`/payments/${environment}/webhook`, {
       method: 'POST',
       headers: apiClient.withAccessToken(),
     });
@@ -71,7 +73,6 @@ export class PaymentsService {
 
   async listSubscriptions(input: ListSubscriptionsRequest): Promise<ListSubscriptionsResponse> {
     const searchParams = new URLSearchParams({
-      environment: input.environment,
       limit: String(input.limit),
     });
 
@@ -80,14 +81,29 @@ export class PaymentsService {
       searchParams.set('subjectId', input.subjectId);
     }
 
-    return apiClient.request(`/payments/subscriptions?${searchParams.toString()}`, {
-      headers: apiClient.withAccessToken(),
+    return apiClient.request(
+      `/payments/${input.environment}/subscriptions?${searchParams.toString()}`,
+      {
+        headers: apiClient.withAccessToken(),
+      }
+    );
+  }
+
+  async listCustomers(input: ListPaymentCustomersRequest): Promise<ListPaymentCustomersResponse> {
+    const searchParams = new URLSearchParams({
+      limit: String(input.limit),
     });
+
+    return apiClient.request(
+      `/payments/${input.environment}/customers?${searchParams.toString()}`,
+      {
+        headers: apiClient.withAccessToken(),
+      }
+    );
   }
 
   async listPaymentHistory(input: ListPaymentHistoryRequest): Promise<ListPaymentHistoryResponse> {
     const searchParams = new URLSearchParams({
-      environment: input.environment,
       limit: String(input.limit),
     });
 
@@ -96,9 +112,12 @@ export class PaymentsService {
       searchParams.set('subjectId', input.subjectId);
     }
 
-    return apiClient.request(`/payments/payment-history?${searchParams.toString()}`, {
-      headers: apiClient.withAccessToken(),
-    });
+    return apiClient.request(
+      `/payments/${input.environment}/payment-history?${searchParams.toString()}`,
+      {
+        headers: apiClient.withAccessToken(),
+      }
+    );
   }
 }
 

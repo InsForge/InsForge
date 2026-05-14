@@ -11,10 +11,16 @@ description: Stripe-powered checkout, subscriptions, and billing portal flows
 
 InsForge Payments helps developers add Stripe payment flows to generated applications without putting Stripe secret keys in frontend code. Developers configure their own Stripe account, agents manage products and prices, and app frontends create Stripe Checkout and Billing Portal sessions through InsForge.
 
-Stripe remains the source of truth. InsForge mirrors Stripe catalog and runtime payment state into a `payments` schema so the dashboard, agents, and custom app logic can reason about products, prices, checkout sessions, subscriptions, refunds, and webhook processing.
+Stripe remains the source of truth. InsForge syncs Stripe catalog data and the payment state needed for checkout, subscriptions, and webhook-driven fulfillment into a `payments` schema so the dashboard, agents, and your app logic can work with it reliably.
+
+Inside InsForge, Payments Settings is where you configure Stripe keys, sync data, and manage webhooks. The main Payments area gives you a straightforward dashboard for checking the catalog, customers, subscriptions, and payment history across test and live environments.
 
 <Note>
   InsForge does not decide what a successful payment means for your app. Use the payment projection tables to update your own app tables, such as `orders`, `credits`, `team_entitlements`, or `billing_status`.
+</Note>
+
+<Note>
+  InsForge is not trying to replace the Stripe Dashboard. Use Stripe directly for refunds, disputes, and other sensitive financial operations. Use InsForge to integrate the payment flow quickly and keep an eye on the most important payment data while you build.
 </Note>
 
 ## Technology Stack
@@ -65,7 +71,7 @@ InsForge uses the developer-owned Stripe account model. Each project can configu
 | `test` | `STRIPE_TEST_SECRET_KEY` | Development and agent implementation |
 | `live` | `STRIPE_LIVE_SECRET_KEY` | Production payments |
 
-Test and live are independent targets. Every mirrored payment table stores an `environment` column instead of using separate test/live table sets.
+Test and live are independent targets. Every synced payment table stores an `environment` column instead of using separate test/live table sets.
 
 <Warning>
   Agents should default to Stripe test mode while building. Only target `live` after the developer explicitly approves production Stripe changes.
@@ -93,9 +99,18 @@ npx @insforge/cli payments webhooks configure test
 npx @insforge/cli payments webhooks configure live
 ```
 
+## Dashboard and Stripe Responsibilities
+
+| Surface | What it does |
+|---------|--------------|
+| Dashboard settings | Configure Stripe test/live keys, run sync, and create or recreate managed webhooks |
+| Dashboard pages | Quickly review Catalog, Customers, Subscriptions, and Payment History for `test` or `live` |
+| Admin API + CLI | Power the same configuration, sync, catalog CRUD, projection reads, and webhook setup flows used by agents and automation |
+| Stripe Dashboard | Handle refunds, disputes, and other sensitive payment operations directly in Stripe |
+
 ## Catalog Management
 
-Products and prices are managed in Stripe first, then mirrored into InsForge.
+Products and prices are managed in Stripe first, then synced into InsForge.
 
 ```bash
 npx @insforge/cli payments products create \
@@ -117,20 +132,28 @@ Stripe prices are immutable for amount, currency, and recurring cadence. To chan
 
 ## Data Model
 
-The `payments` schema stores Stripe connection metadata, catalog mirrors, checkout attempts, subscriptions, payment history, and webhook processing state.
+The `payments` schema stores Stripe connection metadata, synced catalog and customer data, checkout attempts, subscriptions, payment history, and webhook processing state.
 
 | Table | Purpose |
 |-------|---------|
 | `payments.stripe_connections` | One row per environment with Stripe account, key, webhook, and sync status |
-| `payments.products` | Mirrored Stripe products |
-| `payments.prices` | Mirrored Stripe prices |
+| `payments.products` | Synced Stripe products |
+| `payments.prices` | Synced Stripe prices |
+| `payments.customers` | Synced Stripe customers shown in the dashboard for quick visibility |
 | `payments.checkout_sessions` | Local Checkout Session attempts created by app frontends |
 | `payments.customer_portal_sessions` | Local Billing Portal Session attempts |
 | `payments.stripe_customer_mappings` | Maps app billing subjects to Stripe customers |
-| `payments.subscriptions` | Mirrored Stripe subscription state |
-| `payments.subscription_items` | Mirrored subscription item and price state |
+| `payments.subscriptions` | Synced Stripe subscription state |
+| `payments.subscription_items` | Synced subscription item and price state |
 | `payments.payment_history` | One-time payments, subscription invoices, failed payments, and refunds |
 | `payments.webhook_events` | Stripe webhook deduplication and processing status |
+
+### Customer Dashboard Data vs Customer Mappings
+
+InsForge keeps customer-related state in two separate places on purpose:
+
+- `payments.customers` stores synced Stripe customer records for the InsForge dashboard. Full sync and customer webhooks keep it current so you can quickly review payment counts, last payment time, total spend, country, and primary payment method details when Stripe provided them.
+- `payments.stripe_customer_mappings` is the operational subject-to-customer lookup. Runtime portal creation and subscription ownership checks use this mapping. Checkout completion upserts mappings, and customer deletion removes them.
 
 ### Billing Subjects
 
@@ -171,6 +194,8 @@ Checkout creation works in two steps:
 
 For one-time checkout, `subject` is optional. For subscription checkout, `subject` is required because ongoing access belongs to an app-defined billing owner.
 
+If one-time checkout includes a `subject` but no existing `payments.stripe_customer_mappings` row, InsForge asks Stripe to create the customer during Checkout and backfills both the subject mapping and the dashboard customer data when the completion webhook arrives.
+
 ```typescript
 await insforge.payments.createCheckoutSession({
   environment: 'test',
@@ -205,21 +230,22 @@ if (data?.customerPortalSession.url) {
 }
 ```
 
-Portal creation requires an authenticated user and an existing `payments.stripe_customer_mappings` row for the subject. That mapping is usually created after a Checkout Session completes and Stripe returns a customer.
+Portal creation requires an authenticated user and an existing `payments.stripe_customer_mappings` row for the subject. That mapping is usually created after a Checkout Session completes and Stripe returns a customer. The dashboard customer row in `payments.customers` is not enough by itself because the portal flow needs a subject-to-customer mapping, not just synced customer data.
 
 ## Webhook Projection Flow
 
 Managed Stripe webhooks update InsForge's payment projections. The webhook handler verifies Stripe signatures, deduplicates events, and records processing state in `payments.webhook_events`.
 
-InsForge listens for events that keep checkout, subscriptions, payment history, and refunds current:
+InsForge listens for events that keep checkout, subscriptions, payment history, and dashboard visibility current:
 
 | Event family | Examples | Projection |
 |--------------|----------|------------|
-| Checkout | `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.expired` | `checkout_sessions`, customer mappings, one-time payment history |
-| Invoices | `invoice.paid`, `invoice.payment_failed` | subscription invoice payment history |
+| Customers | `customer.created`, `customer.updated`, `customer.deleted` | synced customer records for the dashboard, plus mapping cleanup on deletion |
+| Checkout | `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `checkout.session.expired` | `checkout_sessions`, customer mappings, one-time payment history |
+| Invoices | `invoice.paid`, `invoice.payment_succeeded`, `invoice.payment_failed` | subscription invoice payment history |
 | PaymentIntents | `payment_intent.succeeded`, `payment_intent.payment_failed` | payment history |
 | Refunds | `charge.refunded`, `refund.created`, `refund.updated`, `refund.failed` | refund rows and original payment refund status |
-| Subscriptions | `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted` | subscriptions and subscription items |
+| Subscriptions | `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `customer.subscription.paused`, `customer.subscription.resumed` | subscriptions and subscription items |
 
 Webhook delivery can be duplicated or out of order. InsForge processing is idempotent, and your custom fulfillment logic should be idempotent too.
 
@@ -412,6 +438,8 @@ When an agent integrates Payments into an app, it should:
 
 The runtime payment routes insert into `payments.checkout_sessions` and `payments.customer_portal_sessions` using the caller context. By default, the migration grants insert/select access for these session tables so apps can start quickly.
 
+`createCheckoutSession(...)` supports guest or signed-in one-time checkout flows. `createCustomerPortalSession(...)` is stricter and rejects anonymous callers because it operates on an existing billing subject mapping.
+
 If users can pass a `subject`, add app-specific RLS policies before shipping subscription checkout or portal UI. For example, if subscriptions belong to teams, only team members should be able to create checkout or portal sessions for that team.
 
 ```sql
@@ -456,7 +484,7 @@ The frontend SDK currently exposes creation flows only:
 - `insforge.payments.createCheckoutSession(...)`
 - `insforge.payments.createCustomerPortalSession(...)`
 
-Admin payment projections such as `payments.subscriptions` and `payments.payment_history` are not a generic end-user read surface. If your app needs users to see subscription status, order status, credits, or entitlements, create app-owned tables with RLS and populate them from payment projections.
+The synced Payments tables such as `payments.customers`, `payments.subscriptions`, and `payments.payment_history` are not a generic end-user read surface. If your app needs users to see subscription status, order status, credits, or entitlements, create app-owned tables with RLS and populate them from payment projections.
 
 ## Local Development
 
@@ -480,7 +508,7 @@ For local testing:
 | Developer-owned Stripe accounts only | Connected Accounts, claimable sandboxes, and platform-managed onboarding are not part of this phase |
 | No test-to-live publishing | Agents explicitly target `test` or `live` environments |
 | No generic end-user read API | Build app-owned read models with RLS for entitlements and billing status |
-| No full Stripe object mirror | Customers, invoices, charges, payment methods, and checkout line-item projections are intentionally limited |
+| Not a full Stripe Dashboard replacement | InsForge focuses on integration, configuration, and quick visibility. Use Stripe directly for refunds, disputes, and advanced payment operations |
 | No default business fulfillment | Agents generate custom triggers/jobs based on your app schema |
 
 ## Best Practices

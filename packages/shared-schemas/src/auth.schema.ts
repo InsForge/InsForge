@@ -90,8 +90,26 @@ export const oAuthConfigSchema = z.object({
   updatedAt: z.string(), // PostgreSQL timestamp
 });
 
+/**
+ * Regex to validate allowed redirect URL patterns.
+ *
+ * Accepts standard URLs **and** Supabase-compatible glob patterns:
+ * - `*`   in the hostname position (`https://*.example.com`)
+ * - `*`   in path segments       (`https://example.com/*`)
+ * - `**`  for recursive paths    (`https://example.com/**`)
+ * - `?`   single-char wildcard   (`https://example.com/?session=?`)
+ * - `[…]` character ranges       (`https://example.com/[a-z]*`)
+ *
+ * Protocol must be explicit (http/https or a custom scheme).
+ * Glob characters are NOT allowed in the protocol itself.
+ *
+ * For non-IPv6 hosts a lookahead requires at least one alphanumeric character
+ * in the host portion, so degenerate inputs like `https://`, `https://:8080`,
+ * or `https://*.` are rejected. IPv6 hosts are validated via the bracketed
+ * `\[[0-9A-Fa-f:.]+\]` alternative which already enforces a non-empty host.
+ */
 export const allowedRedirectUrlsRegex =
-  /^(?:(?:https?:\/\/)(?:(?:\*\.)?[^\s/:?#]+|\[[0-9A-Fa-f:.]+\])(?::\d+)?(?:\/[^\s]*)?|(?!(?:https?|javascript|data|file|vbscript):)[a-zA-Z][a-zA-Z0-9+.-]*:(?:\/\/[^\s/]+(?:\/[^\s]*)?|\/[^\s]*))$/i;
+  /^(?:(?:https?:\/\/)(?:(?=[^\s/:?#]*[a-zA-Z0-9])(?:(?:\*\.)?[^\s/:?#*[\]]*(?:\*[^\s/:?#*[\]]*)*|(?:\*\.)?[^\s/:?#]+)|\[[0-9A-Fa-f:.]+\])(?::\d+)?(?:\/[^\s]*)?|(?!(?:https?|javascript|data|file|vbscript):)[a-zA-Z][a-zA-Z0-9+.-]*:(?:\/\/[^\s/]+(?:\/[^\s]*)?|\/[^\s]*))$/i;
 
 // Email authentication configuration schema
 export const authConfigSchema = z.object({
@@ -108,6 +126,9 @@ export const authConfigSchema = z.object({
     .array(z.string().regex(allowedRedirectUrlsRegex, { message: 'Invalid URL or wildcard URL' }))
     .optional()
     .nullable(),
+  // When true, public sign-up endpoints (POST /api/auth/users and first-time OAuth)
+  // are rejected. Admin-authenticated user creation is unaffected.
+  disableSignup: z.boolean(),
   createdAt: z.string(), // PostgreSQL timestamp
   updatedAt: z.string(), // PostgreSQL timestamp
 });

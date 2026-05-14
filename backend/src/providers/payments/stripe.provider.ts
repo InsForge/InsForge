@@ -14,6 +14,7 @@ import type {
   StripeInvoice,
   StripeInvoicePayment,
   StripePaymentIntent,
+  StripeCustomerListItem,
   StripePrice,
   StripePriceCreateInput,
   StripePriceUpdateInput,
@@ -132,6 +133,19 @@ export class StripeProvider {
       (options) => this.client.customers.create(params, options),
       input.idempotencyKey
     );
+  }
+
+  async listCustomers(): Promise<StripeCustomerListItem[]> {
+    const customers: StripeCustomerListItem[] = [];
+
+    for await (const customer of this.client.customers.list({
+      limit: 100,
+      expand: ['data.invoice_settings.default_payment_method', 'data.default_source'],
+    })) {
+      customers.push(customer);
+    }
+
+    return customers;
   }
 
   createCustomerPortalSession(

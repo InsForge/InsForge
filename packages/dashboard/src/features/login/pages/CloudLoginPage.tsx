@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Lock } from 'lucide-react';
 import { Button } from '@insforge/ui';
-import { useDashboardHost } from '#lib/config/DashboardHostContext';
+import { useDashboardHost, useDashboardProject } from '#lib/config/DashboardHostContext';
 import { useAuth } from '#lib/contexts/AuthContext';
 import { getFeatureFlag } from '#lib/analytics/posthog';
 import { useMcpUsage } from '#features/logs/hooks/useMcpUsage';
@@ -10,11 +10,13 @@ import { useMcpUsage } from '#features/logs/hooks/useMcpUsage';
 export default function CloudLoginPage() {
   const navigate = useNavigate();
   const host = useDashboardHost();
+  const project = useDashboardProject();
   const { isAuthenticated, isLoading, error, refreshAuth } = useAuth();
   const { hasCompletedOnboarding, isLoading: isMcpUsageLoading } = useMcpUsage();
   const hasRequestedAuthRef = useRef(false);
   const isCloudHosting = host.mode === 'cloud-hosting';
   const isDTest = getFeatureFlag('dashboard-v4-experiment') === 'd_test';
+  const isBranch = project?.isBranch === true;
 
   useEffect(() => {
     if (!isCloudHosting || hasRequestedAuthRef.current || isAuthenticated || isLoading || error) {
@@ -30,10 +32,11 @@ export default function CloudLoginPage() {
       return;
     }
 
-    if (isDTest && isMcpUsageLoading) {
+    if (isDTest && (isMcpUsageLoading || project === undefined)) {
       return;
     }
-    const target = isDTest && !hasCompletedOnboarding ? '/dashboard/install' : '/dashboard';
+    const target =
+      isDTest && !hasCompletedOnboarding && !isBranch ? '/dashboard/install' : '/dashboard';
     void navigate(target, { replace: true });
   }, [
     isAuthenticated,
@@ -41,6 +44,8 @@ export default function CloudLoginPage() {
     isDTest,
     hasCompletedOnboarding,
     isMcpUsageLoading,
+    project,
+    isBranch,
     navigate,
   ]);
 

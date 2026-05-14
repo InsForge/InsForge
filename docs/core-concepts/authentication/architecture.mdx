@@ -110,6 +110,30 @@ For link-based password reset:
   - `insforge_error`: present only on error
 - Your app should render the reset form only when `insforge_status=ready` and `token` is present
 
+### Disabling New User Signups
+
+When a project is in closed-beta, at capacity, or under a bot wave, you can block all new account creation without taking auth down.
+
+**Dashboard:** Auth Settings → General → **Disable New User Signups** toggle.
+
+**API (admin only):**
+```http
+PUT /api/auth/config
+Authorization: Bearer <admin-jwt>
+Content-Type: application/json
+
+{ "disableSignup": true }
+```
+
+Behavior when the toggle is **on**:
+
+| Scenario | Result |
+|----------|--------|
+| `POST /api/auth/users` without admin token | `403 AUTH_SIGNUP_DISABLED` |
+| First-time OAuth login (unknown account) | `403 AUTH_SIGNUP_DISABLED` |
+| Existing user signs in (email or OAuth) | Allowed — unaffected |
+| Admin creates user via dashboard or API | Allowed — bypass is automatic when bearer token carries `role: project_admin` |
+
 ### Session Recovery
 
 InsForge uses short-lived access tokens plus refresh tokens.
@@ -194,6 +218,10 @@ sequenceDiagram
   
   <Card title="Rate Limiting" icon="gauge">
     Protection against brute force attacks
+  </Card>
+
+  <Card title="Signup Toggle" icon="toggle-on">
+    Disable new user signups instantly while existing users keep signing in
   </Card>
 </CardGroup>
 

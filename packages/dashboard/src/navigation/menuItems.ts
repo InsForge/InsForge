@@ -99,7 +99,7 @@ export const dashboardStaticMenuItems: DashboardPrimaryMenuItem[] = [
   {
     id: 'ai',
     label: 'Model Gateway',
-    href: '/dashboard/ai',
+    href: '/dashboard/ai/overview',
     icon: Sparkles,
   },
   {

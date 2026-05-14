@@ -23,6 +23,7 @@ const { mockPool, mockProvider, mockGetSecretByKey, mockEncrypt, mockLogger } = 
     createPrice: vi.fn(),
     updatePrice: vi.fn(),
     createCustomer: vi.fn(),
+    listCustomers: vi.fn(),
     createCustomerPortalSession: vi.fn(),
     createCheckoutSession: vi.fn(),
     constructWebhookEvent: vi.fn(),
@@ -211,6 +212,7 @@ describe('PaymentService', () => {
       email: 'buyer@example.com',
       metadata: { insforge_subject_type: 'team', insforge_subject_id: 'team_123' },
     });
+    mockProvider.listCustomers.mockResolvedValue([]);
     mockProvider.createCustomerPortalSession.mockResolvedValue({
       id: 'bps_123',
       object: 'billing_portal.session',
@@ -344,6 +346,9 @@ describe('PaymentService', () => {
     expect(mockProvider.createWebhookEndpoint).toHaveBeenCalledWith({
       url: 'http://localhost:7130/api/webhooks/stripe/test',
       enabledEvents: [
+        'customer.created',
+        'customer.updated',
+        'customer.deleted',
         'checkout.session.completed',
         'checkout.session.async_payment_succeeded',
         'checkout.session.async_payment_failed',
@@ -392,6 +397,7 @@ describe('PaymentService', () => {
       ['test']
     );
     expect(mockProvider.syncCatalog).toHaveBeenCalledTimes(1);
+    expect(mockProvider.listCustomers).toHaveBeenCalledTimes(1);
     expect(mockProvider.listSubscriptions).toHaveBeenCalledTimes(1);
   });
 
@@ -443,6 +449,7 @@ describe('PaymentService', () => {
     );
     expect(mockEncrypt).not.toHaveBeenCalledWith('whsec_new');
     expect(mockProvider.syncCatalog).toHaveBeenCalledTimes(1);
+    expect(mockProvider.listCustomers).toHaveBeenCalledTimes(1);
     expect(mockProvider.listSubscriptions).toHaveBeenCalledTimes(1);
   });
 
@@ -504,6 +511,7 @@ describe('PaymentService', () => {
     expect(mockProvider.listWebhookEndpoints).not.toHaveBeenCalled();
     expect(mockProvider.createWebhookEndpoint).not.toHaveBeenCalled();
     expect(mockProvider.syncCatalog).not.toHaveBeenCalled();
+    expect(mockProvider.listCustomers).not.toHaveBeenCalled();
     expect(mockProvider.listSubscriptions).not.toHaveBeenCalled();
   });
 
@@ -538,6 +546,7 @@ describe('PaymentService', () => {
     expect(mockProvider.listWebhookEndpoints).toHaveBeenCalledTimes(1);
     expect(mockProvider.createWebhookEndpoint).toHaveBeenCalledTimes(1);
     expect(mockProvider.syncCatalog).not.toHaveBeenCalled();
+    expect(mockProvider.listCustomers).not.toHaveBeenCalled();
     expect(mockProvider.listSubscriptions).not.toHaveBeenCalled();
     expect(mockEncrypt).toHaveBeenCalledWith('whsec_new');
     expect(mockClient.query).toHaveBeenCalledWith(expect.stringMatching(/system\.secrets/i), [
@@ -603,6 +612,10 @@ describe('PaymentService', () => {
       ['test']
     );
     expect(mockClient.query).toHaveBeenCalledWith(
+      'DELETE FROM payments.customers WHERE environment = $1',
+      ['test']
+    );
+    expect(mockClient.query).toHaveBeenCalledWith(
       'DELETE FROM payments.products WHERE environment = $1',
       ['test']
     );
@@ -651,10 +664,15 @@ describe('PaymentService', () => {
       ['test']
     );
     expect(mockClient.query).toHaveBeenCalledWith(
+      'DELETE FROM payments.customers WHERE environment = $1',
+      ['test']
+    );
+    expect(mockClient.query).toHaveBeenCalledWith(
       'DELETE FROM payments.products WHERE environment = $1',
       ['test']
     );
     expect(mockProvider.syncCatalog).toHaveBeenCalledTimes(1);
+    expect(mockProvider.listCustomers).toHaveBeenCalledTimes(1);
     expect(mockProvider.listSubscriptions).toHaveBeenCalledTimes(1);
   });
 
@@ -676,6 +694,7 @@ describe('PaymentService', () => {
     expect(mockProvider.listWebhookEndpoints).not.toHaveBeenCalled();
     expect(mockProvider.createWebhookEndpoint).not.toHaveBeenCalled();
     expect(mockProvider.syncCatalog).not.toHaveBeenCalled();
+    expect(mockProvider.listCustomers).not.toHaveBeenCalled();
     expect(mockProvider.listSubscriptions).not.toHaveBeenCalled();
     expect(mockClient.query).toHaveBeenCalledWith(expect.stringMatching(/system\.secrets/i), [
       'STRIPE_TEST_SECRET_KEY',
@@ -775,6 +794,10 @@ describe('PaymentService', () => {
     );
     expect(mockClient.query).not.toHaveBeenCalledWith(
       'DELETE FROM payments.prices WHERE environment = $1',
+      ['live']
+    );
+    expect(mockClient.query).not.toHaveBeenCalledWith(
+      'DELETE FROM payments.customers WHERE environment = $1',
       ['live']
     );
     expect(mockClient.query).not.toHaveBeenCalledWith(
@@ -927,6 +950,7 @@ describe('PaymentService', () => {
 
     expect(result.results[0]?.connection.status).toBe('connected');
     expect(mockProvider.syncCatalog).toHaveBeenCalledTimes(1);
+    expect(mockProvider.listCustomers).toHaveBeenCalledTimes(1);
     expect(mockLockClient.query).toHaveBeenCalledWith('SELECT pg_advisory_lock(hashtext($1))', [
       'payments_environment_test',
     ]);
@@ -946,6 +970,78 @@ describe('PaymentService', () => {
   });
 
   it('syncs payments by refreshing catalog before subscriptions', async () => {
+    const mockLockClient = {
+      query: vi.fn().mockResolvedValue({ rows: [] }),
+      release: vi.fn(),
+    };
+    const mockCatalogClient = {
+      query: vi.fn().mockResolvedValue({ rows: [] }),
+      release: vi.fn(),
+    };
+    const mockCustomersClient = {
+      query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+      release: vi.fn(),
+    };
+    const mockSubscriptionsClient = {
+      query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+      release: vi.fn(),
+    };
+    const connectedRow = {
+      environment: 'test',
+      status: 'connected',
+      stripeAccountId: 'acct_123',
+      stripeAccountEmail: 'owner@example.com',
+      accountLivemode: false,
+      webhookEndpointId: 'we_123',
+      webhookEndpointUrl: 'https://example.com/api/webhooks/stripe/test',
+      webhookConfiguredAt: new Date('2026-04-27T00:00:00.000Z'),
+      lastSyncedAt: new Date('2026-04-27T00:00:00.000Z'),
+      lastSyncStatus: 'succeeded',
+      lastSyncError: null,
+      lastSyncCounts: { products: 1, prices: 1 },
+    };
+
+    mockPool.connect
+      .mockResolvedValueOnce(mockLockClient)
+      .mockResolvedValueOnce(mockCatalogClient)
+      .mockResolvedValueOnce(mockCustomersClient)
+      .mockResolvedValueOnce(mockSubscriptionsClient);
+    mockPool.query
+      .mockResolvedValueOnce({
+        rows: [{ stripeAccountId: 'acct_123' }],
+      })
+      .mockResolvedValueOnce({ rows: [connectedRow] })
+      .mockResolvedValueOnce({ rows: [connectedRow] });
+
+    const result = await PaymentService.getInstance().syncPayments({ environment: 'test' });
+
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0]).toMatchObject({
+      environment: 'test',
+      connection: { status: 'connected', stripeAccountId: 'acct_123' },
+      subscriptions: { environment: 'test', synced: 0, unmapped: 0, deleted: 0 },
+    });
+    expect(mockProvider.syncCatalog).toHaveBeenCalledTimes(1);
+    expect(mockProvider.listCustomers).toHaveBeenCalledTimes(1);
+    expect(mockProvider.listSubscriptions).toHaveBeenCalledTimes(1);
+    expect(mockProvider.syncCatalog.mock.invocationCallOrder[0]).toBeLessThan(
+      mockProvider.listCustomers.mock.invocationCallOrder[0]
+    );
+    expect(mockProvider.listCustomers.mock.invocationCallOrder[0]).toBeLessThan(
+      mockProvider.listSubscriptions.mock.invocationCallOrder[0]
+    );
+    expect(mockProvider.createWebhookEndpoint).not.toHaveBeenCalled();
+    expect(mockCustomersClient.query).toHaveBeenCalledWith(
+      expect.stringMatching(/UPDATE payments\.customers/i),
+      ['test', expect.any(Date), []]
+    );
+    expect(mockSubscriptionsClient.query).toHaveBeenCalledWith(
+      expect.stringMatching(/DELETE FROM payments\.subscriptions/i),
+      ['test', []]
+    );
+  });
+
+  it('continues syncing subscriptions when customer mirroring fails', async () => {
     const mockLockClient = {
       query: vi.fn().mockResolvedValue({ rows: [] }),
       release: vi.fn(),
@@ -983,24 +1079,27 @@ describe('PaymentService', () => {
       })
       .mockResolvedValueOnce({ rows: [connectedRow] })
       .mockResolvedValueOnce({ rows: [connectedRow] });
+    mockProvider.listCustomers.mockRejectedValueOnce(new Error('customer sync failed'));
 
-    const result = await PaymentService.getInstance().syncPayments({ environment: 'test' });
-
-    expect(result.results).toHaveLength(1);
-    expect(result.results[0]).toMatchObject({
-      environment: 'test',
-      connection: { status: 'connected', stripeAccountId: 'acct_123' },
-      subscriptions: { environment: 'test', synced: 0, unmapped: 0, deleted: 0 },
+    await expect(
+      PaymentService.getInstance().syncPayments({ environment: 'test' })
+    ).resolves.toMatchObject({
+      results: [
+        {
+          environment: 'test',
+          connection: { status: 'connected', stripeAccountId: 'acct_123' },
+          subscriptions: { environment: 'test', synced: 0, unmapped: 0, deleted: 0 },
+        },
+      ],
     });
-    expect(mockProvider.syncCatalog).toHaveBeenCalledTimes(1);
+
     expect(mockProvider.listSubscriptions).toHaveBeenCalledTimes(1);
-    expect(mockProvider.syncCatalog.mock.invocationCallOrder[0]).toBeLessThan(
-      mockProvider.listSubscriptions.mock.invocationCallOrder[0]
-    );
-    expect(mockProvider.createWebhookEndpoint).not.toHaveBeenCalled();
-    expect(mockSubscriptionsClient.query).toHaveBeenCalledWith(
-      expect.stringMatching(/DELETE FROM payments\.subscriptions/i),
-      ['test', []]
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      'Stripe customer mirror sync failed during payments sync',
+      {
+        environment: 'test',
+        error: 'customer sync failed',
+      }
     );
   });
 
@@ -1086,6 +1185,10 @@ describe('PaymentService', () => {
     );
     expect(mockSyncClient.query).toHaveBeenCalledWith(
       'DELETE FROM payments.checkout_sessions WHERE environment = $1',
+      ['test']
+    );
+    expect(mockSyncClient.query).toHaveBeenCalledWith(
+      'DELETE FROM payments.customers WHERE environment = $1',
       ['test']
     );
     expect(mockSyncClient.query).toHaveBeenCalledWith(
@@ -3867,6 +3970,7 @@ describe('PaymentService', () => {
     });
 
     expect(mockProvider.listSubscriptions).toHaveBeenCalledTimes(1);
+    expect(mockProvider.listCustomers).toHaveBeenCalledTimes(1);
     expect(mockProvider.listSubscriptionItems).toHaveBeenCalledWith('sub_existing');
     expect(mockLogger.warn).not.toHaveBeenCalledWith(
       'Stripe subscription projection is missing InsForge billing subject',
@@ -3989,6 +4093,125 @@ describe('PaymentService', () => {
     );
   });
 
+  it('lists mirrored Stripe customers for one environment', async () => {
+    mockPool.query.mockResolvedValueOnce({
+      rows: [
+        {
+          environment: 'test',
+          stripeCustomerId: 'cus_123',
+          email: 'buyer@example.com',
+          name: 'Buyer Example',
+          phone: '+1 555-0100',
+          deleted: false,
+          metadata: { segment: 'pro' },
+          raw: {
+            address: { country: 'us' },
+            invoice_settings: {
+              default_payment_method: {
+                card: {
+                  brand: 'visa',
+                  last4: '4242',
+                },
+              },
+            },
+          },
+          stripeCreatedAt: new Date('2026-05-01T00:00:00.000Z'),
+          syncedAt: new Date('2026-05-02T00:00:00.000Z'),
+          paymentsCount: 3,
+          lastPaymentAt: new Date('2026-05-03T12:30:00.000Z'),
+          totalSpend: 4200,
+          totalSpendCurrency: 'usd',
+        },
+      ],
+    });
+
+    await expect(
+      PaymentService.getInstance().listCustomers({
+        environment: 'test',
+        limit: 10,
+      })
+    ).resolves.toEqual({
+      customers: [
+        {
+          environment: 'test',
+          stripeCustomerId: 'cus_123',
+          email: 'buyer@example.com',
+          name: 'Buyer Example',
+          phone: '+1 555-0100',
+          deleted: false,
+          metadata: { segment: 'pro' },
+          stripeCreatedAt: '2026-05-01T00:00:00.000Z',
+          syncedAt: '2026-05-02T00:00:00.000Z',
+          paymentsCount: 3,
+          lastPaymentAt: '2026-05-03T12:30:00.000Z',
+          totalSpend: 4200,
+          totalSpendCurrency: 'usd',
+          paymentMethodBrand: 'visa',
+          paymentMethodLast4: '4242',
+          countryCode: 'US',
+        },
+      ],
+    });
+
+    expect(mockPool.query).toHaveBeenCalledWith(
+      expect.stringMatching(/FROM payments\.customers/i),
+      ['test', 10]
+    );
+  });
+
+  it('lists mirrored Stripe customers without live Stripe enrichment', async () => {
+    mockPool.query.mockResolvedValueOnce({
+      rows: [
+        {
+          environment: 'test',
+          stripeCustomerId: 'cus_sparse',
+          email: 'sparse@example.com',
+          name: 'Sparse Customer',
+          phone: null,
+          deleted: false,
+          metadata: {},
+          raw: {},
+          stripeCreatedAt: new Date('2026-05-01T00:00:00.000Z'),
+          syncedAt: new Date('2026-05-02T00:00:00.000Z'),
+          paymentsCount: 0,
+          lastPaymentAt: null,
+          totalSpend: null,
+          totalSpendCurrency: null,
+        },
+      ],
+    });
+
+    await expect(
+      PaymentService.getInstance().listCustomers({
+        environment: 'test',
+        limit: 10,
+      })
+    ).resolves.toEqual({
+      customers: [
+        {
+          environment: 'test',
+          stripeCustomerId: 'cus_sparse',
+          email: 'sparse@example.com',
+          name: 'Sparse Customer',
+          phone: null,
+          deleted: false,
+          metadata: {},
+          stripeCreatedAt: '2026-05-01T00:00:00.000Z',
+          syncedAt: '2026-05-02T00:00:00.000Z',
+          paymentsCount: 0,
+          lastPaymentAt: null,
+          totalSpend: null,
+          totalSpendCurrency: null,
+          paymentMethodBrand: null,
+          paymentMethodLast4: null,
+          countryCode: null,
+        },
+      ],
+    });
+
+    expect(mockGetSecretByKey).not.toHaveBeenCalled();
+  });
+
   it('lists subscriptions with their subscription items', async () => {
     mockPool.query
       .mockResolvedValueOnce({
@@ -4057,5 +4280,200 @@ describe('PaymentService', () => {
         },
       ],
     });
+  });
+
+  it('records mirrored Stripe customers from customer.updated webhooks', async () => {
+    mockGetSecretByKey
+      .mockResolvedValueOnce('whsec_test_123')
+      .mockResolvedValueOnce('sk_test_1234567890');
+    mockProvider.constructWebhookEvent.mockReturnValueOnce({
+      id: 'evt_customer_123',
+      type: 'customer.updated',
+      created: 1777334700,
+      livemode: false,
+      data: {
+        object: {
+          id: 'cus_123',
+          object: 'customer',
+          email: 'buyer@example.com',
+          name: 'Buyer Example',
+          phone: '+1 555-0100',
+          metadata: { segment: 'pro' },
+          created: 1777334400,
+        },
+      },
+    });
+    mockPool.query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            environment: 'test',
+            stripeEventId: 'evt_customer_123',
+            eventType: 'customer.updated',
+            livemode: false,
+            stripeAccountId: null,
+            objectType: 'customer',
+            objectId: 'cus_123',
+            processingStatus: 'pending',
+            attemptCount: 1,
+            lastError: null,
+            receivedAt: new Date('2026-05-02T00:00:00.000Z'),
+            processedAt: null,
+            createdAt: new Date('2026-05-02T00:00:00.000Z'),
+            updatedAt: new Date('2026-05-02T00:00:00.000Z'),
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            environment: 'test',
+            stripeEventId: 'evt_customer_123',
+            eventType: 'customer.updated',
+            livemode: false,
+            stripeAccountId: null,
+            objectType: 'customer',
+            objectId: 'cus_123',
+            processingStatus: 'processed',
+            attemptCount: 1,
+            lastError: null,
+            receivedAt: new Date('2026-05-02T00:00:00.000Z'),
+            processedAt: new Date('2026-05-02T00:00:01.000Z'),
+            createdAt: new Date('2026-05-02T00:00:00.000Z'),
+            updatedAt: new Date('2026-05-02T00:00:01.000Z'),
+          },
+        ],
+      });
+
+    await expect(
+      PaymentService.getInstance().handleStripeWebhook(
+        'test',
+        Buffer.from('{"id":"evt_customer_123"}'),
+        'sig_123'
+      )
+    ).resolves.toMatchObject({
+      received: true,
+      handled: true,
+      event: {
+        stripeEventId: 'evt_customer_123',
+        processingStatus: 'processed',
+      },
+    });
+
+    expect(mockPool.query).toHaveBeenCalledWith(
+      expect.stringMatching(/INSERT INTO payments\.customers/i),
+      [
+        'test',
+        'cus_123',
+        'buyer@example.com',
+        'Buyer Example',
+        '+1 555-0100',
+        false,
+        { segment: 'pro' },
+        expect.objectContaining({ id: 'cus_123' }),
+        new Date('2026-04-28T00:00:00.000Z'),
+        expect.any(Date),
+        false,
+      ]
+    );
+  });
+
+  it('clears Stripe customer mappings when customer.deleted webhooks arrive', async () => {
+    mockGetSecretByKey
+      .mockResolvedValueOnce('whsec_test_123')
+      .mockResolvedValueOnce('sk_test_1234567890');
+    mockProvider.constructWebhookEvent.mockReturnValueOnce({
+      id: 'evt_customer_deleted_123',
+      type: 'customer.deleted',
+      created: 1777334700,
+      livemode: false,
+      data: {
+        object: {
+          id: 'cus_deleted_123',
+          object: 'customer',
+          deleted: true,
+        },
+      },
+    });
+    mockPool.query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            environment: 'test',
+            stripeEventId: 'evt_customer_deleted_123',
+            eventType: 'customer.deleted',
+            livemode: false,
+            stripeAccountId: null,
+            objectType: 'customer',
+            objectId: 'cus_deleted_123',
+            processingStatus: 'pending',
+            attemptCount: 1,
+            lastError: null,
+            receivedAt: new Date('2026-05-02T00:00:00.000Z'),
+            processedAt: null,
+            createdAt: new Date('2026-05-02T00:00:00.000Z'),
+            updatedAt: new Date('2026-05-02T00:00:00.000Z'),
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            environment: 'test',
+            stripeEventId: 'evt_customer_deleted_123',
+            eventType: 'customer.deleted',
+            livemode: false,
+            stripeAccountId: null,
+            objectType: 'customer',
+            objectId: 'cus_deleted_123',
+            processingStatus: 'processed',
+            attemptCount: 1,
+            lastError: null,
+            receivedAt: new Date('2026-05-02T00:00:00.000Z'),
+            processedAt: new Date('2026-05-02T00:00:01.000Z'),
+            createdAt: new Date('2026-05-02T00:00:00.000Z'),
+            updatedAt: new Date('2026-05-02T00:00:01.000Z'),
+          },
+        ],
+      });
+
+    await expect(
+      PaymentService.getInstance().handleStripeWebhook(
+        'test',
+        Buffer.from('{"id":"evt_customer_deleted_123"}'),
+        'sig_123'
+      )
+    ).resolves.toMatchObject({
+      received: true,
+      handled: true,
+      event: {
+        stripeEventId: 'evt_customer_deleted_123',
+        processingStatus: 'processed',
+      },
+    });
+
+    expect(mockPool.query).toHaveBeenCalledWith(
+      expect.stringMatching(/INSERT INTO payments\.customers/i),
+      [
+        'test',
+        'cus_deleted_123',
+        null,
+        null,
+        null,
+        true,
+        {},
+        expect.objectContaining({ id: 'cus_deleted_123', deleted: true }),
+        null,
+        expect.any(Date),
+        true,
+      ]
+    );
+    expect(mockPool.query).toHaveBeenCalledWith(
+      expect.stringMatching(/DELETE FROM payments\.stripe_customer_mappings/i),
+      ['test', 'cus_deleted_123']
+    );
   });
 });
