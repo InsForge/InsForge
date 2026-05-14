@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Button } from '@insforge/ui';
+import { Info } from 'lucide-react';
+import { Button, CopyButton } from '@insforge/ui';
 import { usePosthogConnection } from './hooks/usePosthogConnection';
 import { onPosthogConnectionStatus } from './lib/postMessage';
 import { EmptyConnectPanel } from './components/posthog/EmptyConnectPanel';
@@ -14,6 +15,9 @@ import { BreakdownPanel } from './components/posthog/BreakdownPanel';
 import { RetentionCard } from './components/posthog/RetentionCard';
 import { RecentReplaysCard } from './components/posthog/RecentReplaysCard';
 import { useProjectId } from '#lib/hooks/useMetadata';
+
+const ANALYTICS_SETUP_PROMPT =
+  "I'm using InsForge as my backend platform. I want to add product analytics to this project. Read the current directory and use the InsForge skill to set up PostHog analytics for me.";
 
 export function AnalyticsPage() {
   const { projectId } = useProjectId();
@@ -69,7 +73,32 @@ export function AnalyticsPage() {
           </div>
         </div>
         <ConnectStatusBar connection={c} />
+        <section className="flex flex-col gap-3 rounded border border-[var(--alpha-8)] bg-card p-6">
+          <div className="flex flex-col gap-1">
+            <p className="text-base font-medium leading-7 text-foreground">Setup with Prompt</p>
+            <p className="text-sm leading-5 text-muted-foreground">
+              Paste this into your coding agent to set up PostHog analytics for your app.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 rounded border border-[var(--alpha-8)] bg-semantic-0 p-3">
+            <div className="flex items-center justify-between">
+              <div className="flex h-5 items-center rounded bg-[var(--alpha-8)] px-2">
+                <span className="text-xs font-medium leading-4 text-muted-foreground">prompt</span>
+              </div>
+              <CopyButton text={ANALYTICS_SETUP_PROMPT} showText={false} className="shrink-0" />
+            </div>
+            <p className="font-mono text-sm leading-6 text-foreground">{ANALYTICS_SETUP_PROMPT}</p>
+          </div>
+        </section>
         <ApiKeyCard apiKey={c.apiKey} host={c.host} posthogProjectId={c.posthogProjectId} />
+        <div className="flex items-start gap-2 px-1 text-xs text-muted-foreground">
+          <Info className="mt-0.5 size-3.5 shrink-0" />
+          <p>
+            Web Analytics aggregates session data with some delay. After connecting PostHog or
+            capturing your first events, it may take a few hours for visitors, views, and
+            sessions to appear here.
+          </p>
+        </div>
         <KpiSectionWithTrend enabled={hasConnection} />
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <BreakdownPanel breakdown="Page" enabled={hasConnection} />
