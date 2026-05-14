@@ -32,6 +32,7 @@ const BYTES_PER_SEC = (value: number) => {
   }
   return `${v.toFixed(1)} ${units[i]}`;
 };
+const BYTES_TO_GIB = (value: number) => `${(value / 1024 ** 3).toFixed(1)} GiB`;
 
 const METRICS: MetricConfig[] = [
   {
@@ -49,13 +50,6 @@ const METRICS: MetricConfig[] = [
     threshold: 85,
   },
   {
-    metric: 'disk_usage',
-    title: 'Disk Usage',
-    icon: <HardDrive className="h-5 w-5" />,
-    format: PERCENT,
-    threshold: 90,
-  },
-  {
     metric: 'network_in',
     title: 'Network In',
     icon: <ArrowDownToLine className="h-5 w-5" />,
@@ -68,6 +62,9 @@ const METRICS: MetricConfig[] = [
     format: BYTES_PER_SEC,
   },
 ];
+
+// Disk card slot in the grid (after CPU + Memory, before Network).
+const DISK_GRID_INDEX = 2;
 
 export function ObservabilitySection() {
   const [range, setRange] = useState<DashboardMetricsRange>('1h');
@@ -110,21 +107,46 @@ export function ObservabilitySection() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          {METRICS.map((config) => {
-            const series = data?.metrics.find((m) => m.metric === config.metric);
-            return (
+          {(() => {
+            const cards = METRICS.map((config) => {
+              const series = data?.metrics.find((m) => m.metric === config.metric);
+              return (
+                <MetricChartCard
+                  key={config.metric}
+                  title={config.title}
+                  icon={config.icon}
+                  data={series?.data ?? []}
+                  rangeSeconds={RANGE_SECONDS[range]}
+                  formatValue={config.format}
+                  isLoading={isLoading}
+                  threshold={config.threshold}
+                />
+              );
+            });
+
+            const diskUsed = data?.metrics.find((m) => m.metric === 'disk_used');
+            const diskTotal = data?.metrics.find((m) => m.metric === 'disk_total');
+            const totalBytes =
+              [...(diskTotal?.data ?? [])].reverse().find((p) => Number.isFinite(p.value))?.value ??
+              null;
+            cards.splice(
+              DISK_GRID_INDEX,
+              0,
               <MetricChartCard
-                key={config.metric}
-                title={config.title}
-                icon={config.icon}
-                data={series?.data ?? []}
+                key="disk_used"
+                title="Disk Usage"
+                icon={<HardDrive className="h-5 w-5" />}
+                data={diskUsed?.data ?? []}
                 rangeSeconds={RANGE_SECONDS[range]}
-                formatValue={config.format}
+                formatValue={BYTES_TO_GIB}
                 isLoading={isLoading}
-                threshold={config.threshold}
+                threshold={totalBytes !== null ? 0.9 * totalBytes : undefined}
+                fixedDomain={totalBytes !== null ? [0, totalBytes] : undefined}
+                formatAxisLabel={BYTES_TO_GIB}
               />
             );
-          })}
+            return cards;
+          })()}
         </div>
       )}
     </section>
