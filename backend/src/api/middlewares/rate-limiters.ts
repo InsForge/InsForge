@@ -166,3 +166,35 @@ export const sendEmailOTPLimiter = [
  * Only per-IP limit, no per-email limit (to allow legitimate retries)
  */
 export const verifyOTPLimiter = [verifyOTPRateLimiter];
+
+/**
+ * Per-IP rate limiter for "write" endpoints that ultimately drive an external
+ * provider call (Deno Subhosting deploy, Vercel deploy, Fly machine
+ * create/update/destroy).
+ *
+ * Goal: stop a single admin's runaway script from monopolising the platform's
+ * shared Vercel `Token creation 32/hr`, Vercel `Deployments per 5min: 120`,
+ * Fly `app deletions: 100/min`, or Deno `Deployments per hour: 60` quotas.
+ * 3 writes / 5min / IP is generous for human-driven deploy/CRUD; CI loops are
+ * expected to deploy once per commit and stay well below this.
+ *
+ * Counts ALL requests (skipFailedRequests: false) so a buggy script that
+ * loops on a 4xx response can't bypass the cap.
+ */
+export const writeEndpointLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req: Request, _res: Response, next: NextFunction) => {
+    next(
+      new AppError(
+        'Too many write requests. Please wait a few minutes and try again.',
+        429,
+        ERROR_CODES.TOO_MANY_REQUESTS
+      )
+    );
+  },
+  skipSuccessfulRequests: false,
+  skipFailedRequests: false,
+});
