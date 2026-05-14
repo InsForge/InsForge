@@ -180,6 +180,10 @@ export const verifyOTPLimiter = [verifyOTPRateLimiter];
  *
  * Counts ALL requests (skipFailedRequests: false) so a buggy script that
  * loops on a 4xx response can't bypass the cap.
+ *
+ * The budget is shared across ALL wired endpoints regardless of which route
+ * file imports this export — a deploy create + an env-var write + a domain
+ * add all count toward the same 3/5min per-IP total.
  */
 export const writeEndpointLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, // 5 minutes

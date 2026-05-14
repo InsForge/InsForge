@@ -35,7 +35,7 @@ describe('writeEndpointLimiter', () => {
   it('rejects the 4th POST with 429', async () => {
     const app = buildApp();
     for (let i = 0; i < 3; i++) {
-      await request(app).post('/x').send({});
+      await request(app).post('/x').send({}).expect(200);
     }
     const r = await request(app).post('/x').send({});
     expect(r.status).toBe(429);
