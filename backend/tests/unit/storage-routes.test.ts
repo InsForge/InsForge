@@ -4,6 +4,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 
 const storageMocks = vi.hoisted(() => ({
   isBucketPublic: vi.fn(),
+  objectIsVisible: vi.fn(),
   getDownloadStrategy: vi.fn(),
 }));
 
@@ -75,6 +76,7 @@ describe('Storage routes', () => {
   test('download strategy route captures nested object keys', async () => {
     vi.resetModules();
     storageMocks.isBucketPublic.mockResolvedValue(true);
+    storageMocks.objectIsVisible.mockResolvedValue(true);
     storageMocks.getDownloadStrategy.mockResolvedValue({
       method: 'direct',
       url: 'http://localhost:7130/api/storage/buckets/product-images/objects/products%2Fprod_123%2Fmain.jpg',
