@@ -30,6 +30,7 @@ const insforge = createClient({
 - **Functions** - Invoke serverless edge functions
 - **AI** - Chat completions and image generation
 - **Realtime** - WebSocket-based pub/sub messaging
+- **Email (Private Preview)** - Send transactional email. **Works out of the box with no SMTP configuration** — InsForge ships a default cloud email provider. Only set up custom SMTP (Resend, SendGrid, etc.) if you want to send from your own sender domain.
 - **Payments (Private Preview)** - Stripe Checkout and Billing Portal sessions
 
 ## SDK Reference
@@ -52,6 +53,9 @@ const insforge = createClient({
   </Card>
   <Card title="Realtime" icon="signal-stream" href="/sdks/typescript/realtime">
     WebSocket pub/sub messaging
+  </Card>
+  <Card title="Email (Private Preview)" icon="envelope" href="/sdks/typescript/email">
+    Send transactional email — no SMTP setup required
   </Card>
   <Card title="Payments (Private Preview)" icon="credit-card" href="/sdks/typescript/payments">
     Stripe Checkout and Billing Portal sessions

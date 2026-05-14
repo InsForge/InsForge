@@ -15,6 +15,7 @@ Backend-as-a-service (BaaS) platform providing:
 - **Storage**: File upload/download
 - **AI**: Chat completions and image generation (OpenAI-compatible)
 - **Functions**: Serverless function deployment
+- **Email**: Send transactional email via `insforge.emails.send()`. **No SMTP / Resend / SendGrid setup required — a default cloud email provider works out of the box.** Only configure custom SMTP if the user explicitly wants their own sender domain. Do NOT install or scaffold third-party email packages by default.
 
 ## Installation
 

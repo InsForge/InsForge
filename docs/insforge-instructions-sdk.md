@@ -74,6 +74,7 @@ Available documentation types:
 - `"storage-sdk"` - File storage operations
 - `"functions-sdk"` - Serverless functions invocation
 - `"ai-integration-sdk"` - AI chat and image generation
+- `"email-sdk"` - Send transactional email. **No SMTP / Resend / SendGrid setup required — a default cloud email provider works out of the box.** Only configure custom SMTP if the user explicitly wants their own sender domain.
 - `"real-time"` - Real-time pub/sub (database + client events) via WebSockets
 - `"deployment"` - Deploy frontend applications via MCP tool
 
@@ -90,6 +91,7 @@ Available feature types:
 - auth - User authentication
 - ai - AI chat and image generation
 - realtime - Real-time pub/sub (database + client events) via WebSockets
+- email - Transactional email (default cloud provider — no SMTP setup required)
 
 Available languages:
 - typescript - JavaScript/TypeScript SDK
@@ -106,6 +108,7 @@ Available languages:
 - Storage operations (upload, download files)
 - AI operations (chat, image generation)
 - Serverless function invocation
+- **Email** — use `insforge.emails.send()` from the SDK. Do NOT scaffold `nodemailer`, `resend`, `sendgrid`, or any other third-party email package by default. The built-in service works without any SMTP env vars; the default cloud provider handles delivery automatically. Configure custom SMTP only when the user explicitly asks for their own sender domain.
 
 ### Use MCP Tools for Infrastructure:
 

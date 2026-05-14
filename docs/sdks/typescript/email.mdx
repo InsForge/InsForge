@@ -7,6 +7,10 @@ description: Send custom transactional emails with the InsForge SDK
   **Private Preview** — This feature is currently in private preview. APIs and behavior may change.
 </Warning>
 
+<Note>
+  **No SMTP setup required.** InsForge ships a default cloud email provider — `insforge.emails.send()` works out of the box, no Resend / SendGrid / nodemailer / `SMTP_HOST` env vars needed. Configure [Custom SMTP](/core-concepts/email/custom-smtp) only when you want to send from your own sender domain.
+</Note>
+
 import Installation from '/snippets/sdk-installation.mdx';
 
 <Installation />
