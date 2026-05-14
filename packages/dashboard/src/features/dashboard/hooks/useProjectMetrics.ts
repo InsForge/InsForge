@@ -7,10 +7,8 @@ export const PROJECT_METRICS_QUERY_KEY = 'project-metrics';
 export interface UseProjectMetricsResult {
   data?: DashboardMetricsResponse;
   isLoading: boolean;
-  isFetching: boolean;
   isUnavailable: boolean;
   error: Error | null;
-  refetch: () => Promise<void>;
 }
 
 export function useProjectMetrics(range: DashboardMetricsRange): UseProjectMetricsResult {
@@ -36,11 +34,7 @@ export function useProjectMetrics(range: DashboardMetricsRange): UseProjectMetri
   return {
     data: query.data,
     isLoading: query.isLoading && !!fetcher,
-    isFetching: query.isFetching && !!fetcher,
     isUnavailable,
     error: isUnavailable ? null : (query.error as Error | null),
-    refetch: async () => {
-      await query.refetch();
-    },
   };
 }

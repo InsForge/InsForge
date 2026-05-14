@@ -1,13 +1,5 @@
 import { useState } from 'react';
-import {
-  ArrowDownToLine,
-  ArrowUpFromLine,
-  Cpu,
-  HardDrive,
-  MemoryStick,
-  RefreshCw,
-} from 'lucide-react';
-import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
+import { ArrowDownToLine, ArrowUpFromLine, Cpu, HardDrive, MemoryStick } from 'lucide-react';
 import { useProjectMetrics } from '#features/dashboard/hooks/useProjectMetrics';
 import type { DashboardMetricName, DashboardMetricsRange } from '#types';
 import { MetricChartCard } from './MetricChartCard';
@@ -79,68 +71,32 @@ const METRICS: MetricConfig[] = [
 
 export function ObservabilitySection() {
   const [range, setRange] = useState<DashboardMetricsRange>('1h');
-  const { data, isLoading, isUnavailable, error, refetch } = useProjectMetrics(range);
-  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
-
-  const handleRefresh = async () => {
-    setIsManualRefreshing(true);
-    try {
-      await refetch();
-    } finally {
-      setIsManualRefreshing(false);
-    }
-  };
+  const { data, isLoading, isUnavailable, error } = useProjectMetrics(range);
 
   return (
     <section className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-medium leading-7 text-foreground">Observability</h2>
-        <div className="flex items-center gap-2">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => void handleRefresh()}
-                  disabled={isUnavailable || isManualRefreshing}
-                  className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
-                >
-                  <RefreshCw
-                    className={
-                      isManualRefreshing
-                        ? 'h-5 w-5 animate-spin stroke-[1.5]'
-                        : 'h-5 w-5 stroke-[1.5]'
-                    }
-                  />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" align="center">
-                <p>{isManualRefreshing ? 'Refreshing...' : 'Refresh metrics'}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <div
-            role="group"
-            aria-label="Time range"
-            className="flex items-center overflow-hidden rounded border border-[var(--alpha-8)] bg-[var(--alpha-4)]"
-          >
-            {RANGES.map((value) => (
-              <button
-                key={value}
-                type="button"
-                aria-pressed={range === value}
-                onClick={() => setRange(value)}
-                className={`flex items-center px-3 py-1.5 text-sm leading-5 transition-colors ${
-                  range === value
-                    ? 'bg-toast text-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {value}
-              </button>
-            ))}
-          </div>
+        <div
+          role="group"
+          aria-label="Time range"
+          className="flex items-center overflow-hidden rounded border border-[var(--alpha-8)] bg-[var(--alpha-4)]"
+        >
+          {RANGES.map((value) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={range === value}
+              onClick={() => setRange(value)}
+              className={`flex items-center px-3 py-1.5 text-sm leading-5 transition-colors ${
+                range === value
+                  ? 'bg-toast text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {value}
+            </button>
+          ))}
         </div>
       </div>
 
