@@ -128,7 +128,11 @@ export class S3StorageProvider implements StorageProvider {
     return op(parentPath);
   }
 
-  async putObject(bucket: string, key: string, file: Express.Multer.File): Promise<void> {
+  async putObject(
+    bucket: string,
+    key: string,
+    file: Express.Multer.File
+  ): Promise<{ etag: string }> {
     if (!this.s3Client) {
       throw new Error('S3 client not initialized');
     }
@@ -142,7 +146,8 @@ export class S3StorageProvider implements StorageProvider {
     });
 
     try {
-      await this.s3Client.send(command);
+      const resp = await this.s3Client.send(command);
+      return { etag: stripEtagQuotes(resp.ETag) };
     } catch (error) {
       logger.error('S3 Upload error', {
         error: error instanceof Error ? error.message : String(error),

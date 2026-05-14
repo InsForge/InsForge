@@ -18,7 +18,13 @@ export interface GetObjectResult extends ObjectMetadata {
  */
 export interface StorageProvider {
   initialize(): void | Promise<void>;
-  putObject(bucket: string, key: string, file: Express.Multer.File): Promise<void>;
+  /**
+   * Write a multipart-form upload to storage. Returns `etag` so the service
+   * can persist it for cache-busting download URLs (`?v=<etag>`). Providers
+   * that have no native digest (local fs) compute one from the bytes so the
+   * URL still changes when content changes.
+   */
+  putObject(bucket: string, key: string, file: Express.Multer.File): Promise<{ etag: string }>;
   getObject(bucket: string, key: string): Promise<Buffer | null>;
   deleteObject(bucket: string, key: string): Promise<void>;
   createBucket(bucket: string): Promise<void>;

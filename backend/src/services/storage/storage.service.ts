@@ -85,6 +85,48 @@ export class StorageService {
   }
 
   /**
+   * Build the canonical download URL with a cache-busting `?v=<version>`
+   * query param. CDNs (CloudFront, Cloudflare, etc.) key cache entries by
+   * full URL — same key + same URL would serve stale bytes after an
+   * overwrite. The version stamp changes on every upload (etag if known,
+   * otherwise an epoch-ms uploaded_at), so each new upload yields a fresh
+   * URL and a guaranteed cache miss without any invalidation API call.
+   *
+   * The CDN itself must be configured to include `v` in its cache key for
+   * this to take effect (CloudFront default is to ignore query strings).
+   */
+  private buildObjectUrl(bucket: string, key: string, version?: string | Date | null): string {
+    const base = `${getApiBaseUrl()}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(key)}`;
+    const stamp = this.toVersionStamp(version);
+    return stamp ? `${base}?v=${encodeURIComponent(stamp)}` : base;
+  }
+
+  private toVersionStamp(version: string | Date | null | undefined): string {
+    if (!version) {
+      return '';
+    }
+    if (version instanceof Date) {
+      return version.getTime().toString();
+    }
+    return version;
+  }
+
+  /**
+   * Append `&v=<version>` (or `?v=`) to a presigned/CDN URL so cache
+   * lookups vary by content version. The presigned URL already varies by
+   * signature on each call, but CDN cache keys typically exclude the
+   * signature; the explicit version param makes the bust deterministic.
+   */
+  private appendVersionParam(url: string, version: string | Date | null | undefined): string {
+    const stamp = this.toVersionStamp(version);
+    if (!stamp) {
+      return url;
+    }
+    const sep = url.includes('?') ? '&' : '?';
+    return `${url}${sep}v=${encodeURIComponent(stamp)}`;
+  }
+
+  /**
    * Generate a unique object key with timestamp and random string
    * @param originalFilename - The original filename from the upload
    * @returns Generated unique key
@@ -193,7 +235,18 @@ export class StorageService {
         throw new Error(`Failed to retrieve upload timestamp for ${bucket}/${finalKey}`);
       }
 
-      await this.provider.putObject(bucket, finalKey, file);
+      const { etag } = await this.provider.putObject(bucket, finalKey, file);
+
+      // Persist the etag so subsequent reads (getObject / listObjects /
+      // getDownloadStrategy) can mint a `?v=<etag>` URL that breaks CDN
+      // caches the moment an object is overwritten with new bytes.
+      if (etag) {
+        await db.query('UPDATE storage.objects SET etag = $1 WHERE bucket = $2 AND key = $3', [
+          etag,
+          bucket,
+          finalKey,
+        ]);
+      }
 
       return {
         bucket,
@@ -201,7 +254,7 @@ export class StorageService {
         size: file.size,
         mimeType: file.mimetype,
         uploadedAt: result.rows[0].uploadedAt,
-        url: `${getApiBaseUrl()}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(finalKey)}`,
+        url: this.buildObjectUrl(bucket, finalKey, etag || result.rows[0].uploadedAt),
       };
     });
   }
@@ -240,7 +293,7 @@ export class StorageService {
         size: metadata.size,
         mimeType: metadata.mime_type,
         uploadedAt: metadata.uploaded_at,
-        url: `${getApiBaseUrl()}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(key)}`,
+        url: this.buildObjectUrl(bucket, key, metadata.etag || metadata.uploaded_at),
       },
     };
   }
@@ -316,7 +369,7 @@ export class StorageService {
           ...obj,
           mimeType: obj.mime_type,
           uploadedAt: obj.uploaded_at,
-          url: `${getApiBaseUrl()}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(obj.key)}`,
+          url: this.buildObjectUrl(bucket, obj.key, obj.etag || obj.uploaded_at),
         })),
         total: parseInt(totalResult.rows[0].count, 10),
       };
@@ -467,7 +520,25 @@ export class StorageService {
     // Auto-calculate expiry based on bucket visibility if not provided
     const expiresIn = isPublic ? PUBLIC_BUCKET_EXPIRY : PRIVATE_BUCKET_EXPIRY;
 
-    return this.provider.getDownloadStrategy(bucket, key, expiresIn, isPublic);
+    const strategy = await this.provider.getDownloadStrategy(bucket, key, expiresIn, isPublic);
+
+    // Fetch the version stamp (etag preferred, uploaded_at fallback) so the
+    // CDN-facing URL changes whenever the underlying bytes change. The DB
+    // read is admin-pooled because public-bucket callers reach here without
+    // a user context, and the visibility check has already gated access.
+    const versionRow = await this.getPool().query(
+      'SELECT etag, uploaded_at FROM storage.objects WHERE bucket = $1 AND key = $2',
+      [bucket, key]
+    );
+    const version =
+      (versionRow.rows[0]?.etag as string | null) ??
+      (versionRow.rows[0]?.uploaded_at as Date | null) ??
+      null;
+
+    return {
+      ...strategy,
+      url: this.appendVersionParam(strategy.url, version),
+    };
   }
 
   /**
@@ -540,10 +611,17 @@ export class StorageService {
     // postgres role.
     const result = await withUserContext(this.getPool(), ctx, (db) =>
       db.query(
-        `INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by, uploaded_via)
-         VALUES ($1, $2, $3, $4, $5, 'rest')
+        `INSERT INTO storage.objects (bucket, key, size, mime_type, etag, uploaded_by, uploaded_via)
+         VALUES ($1, $2, $3, $4, $5, $6, 'rest')
          RETURNING uploaded_at as "uploadedAt"`,
-        [bucket, key, fileSize, metadata.contentType || null, ctx.userId || null]
+        [
+          bucket,
+          key,
+          fileSize,
+          metadata.contentType || null,
+          metadata.etag || null,
+          ctx.userId || null,
+        ]
       )
     );
 
@@ -557,7 +635,7 @@ export class StorageService {
       size: fileSize,
       mimeType: metadata.contentType,
       uploadedAt: result.rows[0].uploadedAt,
-      url: `${getApiBaseUrl()}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(key)}`,
+      url: this.buildObjectUrl(bucket, key, metadata.etag || result.rows[0].uploadedAt),
     };
   }
 

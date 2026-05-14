@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
 import { UploadStrategyResponse, DownloadStrategyResponse } from '@insforge/shared-schemas';
@@ -40,10 +41,17 @@ export class LocalStorageProvider implements StorageProvider {
     return this.getValidatedPath(bucket, key);
   }
 
-  async putObject(bucket: string, key: string, file: Express.Multer.File): Promise<void> {
+  async putObject(
+    bucket: string,
+    key: string,
+    file: Express.Multer.File
+  ): Promise<{ etag: string }> {
     const filePath = this.getFilePath(bucket, key);
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.writeFile(filePath, file.buffer);
+    // Match S3 single-part etag semantics so downstream URL cache-busting
+    // works identically across providers: same bytes → same etag → same URL.
+    return { etag: crypto.createHash('md5').update(file.buffer).digest('hex') };
   }
 
   async getObject(bucket: string, key: string): Promise<Buffer | null> {

@@ -74,3 +74,53 @@ describe('LocalStorageProvider - deleteBucket', () => {
     );
   });
 });
+
+describe('LocalStorageProvider - putObject etag', () => {
+  const baseDir = path.join(__dirname, 'test-storage-etag');
+  let provider: LocalStorageProvider;
+
+  beforeEach(async () => {
+    provider = new LocalStorageProvider(baseDir);
+    await provider.initialize();
+    await provider.createBucket('etagBucket');
+  });
+
+  afterEach(async () => {
+    await fs.rm(baseDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  function makeFile(buffer: Buffer): Express.Multer.File {
+    return {
+      buffer,
+      mimetype: 'application/octet-stream',
+      originalname: 'x.bin',
+      size: buffer.length,
+      fieldname: 'file',
+      encoding: '7bit',
+      stream: undefined as never,
+      destination: '',
+      filename: '',
+      path: '',
+    } as Express.Multer.File;
+  }
+
+  it('returns an md5 etag for stored bytes', async () => {
+    const file = makeFile(Buffer.from('hello world'));
+    const { etag } = await provider.putObject('etagBucket', 'key1', file);
+    // md5('hello world')
+    expect(etag).toBe('5eb63bbbe01eeed093cb22bb8f5acdc3');
+  });
+
+  it('returns the same etag when the same bytes are written again', async () => {
+    const a = await provider.putObject('etagBucket', 'k', makeFile(Buffer.from('same')));
+    const b = await provider.putObject('etagBucket', 'k', makeFile(Buffer.from('same')));
+    expect(a.etag).toBe(b.etag);
+  });
+
+  it('returns a different etag when bytes change', async () => {
+    const a = await provider.putObject('etagBucket', 'k', makeFile(Buffer.from('v1')));
+    const b = await provider.putObject('etagBucket', 'k', makeFile(Buffer.from('v2')));
+    expect(a.etag).not.toBe(b.etag);
+  });
+});
