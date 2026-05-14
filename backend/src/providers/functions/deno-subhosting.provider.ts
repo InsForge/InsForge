@@ -15,18 +15,33 @@ const execFileAsync = promisify(execFile);
 const DENO_SUBHOSTING_API_BASE = 'https://api.deno.com/v1';
 const DEFAULT_TIMEOUT_MS = 10000;
 
+// Exponential backoff schedule for 429 (rate-limited) responses, in ms.
+// Deno Subhosting doesn't always surface Retry-After, so we fall back to this
+// schedule. When Retry-After is present we honour it (taking the max of the
+// header value and the scheduled backoff), plus a small jitter.
+const DEFAULT_RATE_LIMIT_BACKOFF_MS = [1000, 2000, 4000];
+
 // ============================================
 // Helper functions
 // ============================================
 
 /**
- * Fetch with timeout and retry for transient errors (DNS, network)
+ * Fetch with timeout, retry for transient network errors (DNS/socket), and
+ * a separate retry layer for HTTP 429 (rate-limited) responses with
+ * exponential backoff that honours `Retry-After`.
+ *
+ * The 429 retries sit INSIDE each network-attempt: if a fetch succeeds
+ * network-wise but returns 429, we retry with backoff according to
+ * `rateLimitBackoffMs`. If retries are exhausted while the response is still
+ * 429, we return that final 429 response and let the caller's error handling
+ * deal with it (we do not throw on 429 exhaustion).
  */
 async function fetchWithTimeout(
   url: string,
   options: RequestInit = {},
   timeoutMs: number = DEFAULT_TIMEOUT_MS,
-  maxRetries: number = 2
+  maxRetries: number = 2,
+  rateLimitBackoffMs: number[] = DEFAULT_RATE_LIMIT_BACKOFF_MS
 ): Promise<Response> {
   let lastError: Error | undefined;
 
@@ -47,8 +62,42 @@ async function fetchWithTimeout(
     });
 
     try {
-      const response = await Promise.race([fetchPromise, timeoutPromise]);
-      return response;
+      const initialResponse = await Promise.race([fetchPromise, timeoutPromise]);
+      let currentResponse = initialResponse;
+
+      // 429-aware retry layer. Runs only when the initial response is 429.
+      if (currentResponse.status === 429) {
+        for (let r = 0; r < rateLimitBackoffMs.length; r++) {
+          const retryAfter = currentResponse.headers.get('retry-after');
+          const retryAfterMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : NaN;
+          const baseMs = !isNaN(retryAfterMs)
+            ? Math.max(retryAfterMs, rateLimitBackoffMs[r])
+            : rateLimitBackoffMs[r];
+          const delay = baseMs + Math.floor(Math.random() * 250);
+          logger.warn('Deno Subhosting 429 — retrying', {
+            url,
+            attempt: r + 1,
+            delayMs: delay,
+          });
+          await new Promise((res) => setTimeout(res, delay));
+
+          const retryController = new AbortController();
+          const retryTimeoutId = setTimeout(() => retryController.abort(), timeoutMs);
+          try {
+            currentResponse = await fetch(url, {
+              ...options,
+              signal: retryController.signal,
+            });
+            if (currentResponse.status !== 429) {
+              break;
+            }
+          } finally {
+            clearTimeout(retryTimeoutId);
+          }
+        }
+      }
+
+      return currentResponse;
     } catch (error) {
       // Check if this was a timeout (abort) vs other error
       if (controller.signal.aborted) {
