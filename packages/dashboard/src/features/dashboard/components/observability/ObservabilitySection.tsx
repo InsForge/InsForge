@@ -32,7 +32,19 @@ const BYTES_PER_SEC = (value: number) => {
   }
   return `${v.toFixed(1)} ${units[i]}`;
 };
-const BYTES_TO_GIB = (value: number) => `${(value / 1024 ** 3).toFixed(1)} GiB`;
+const BYTES_SIZE = (value: number) => {
+  if (value === 0) {
+    return '0 bytes';
+  }
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let v = value;
+  let i = 0;
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024;
+    i += 1;
+  }
+  return `${v.toFixed(1)} ${units[i]}`;
+};
 
 const METRICS: MetricConfig[] = [
   {
@@ -150,11 +162,11 @@ export function ObservabilitySection() {
                 icon={<HardDrive className="h-5 w-5" />}
                 data={diskCardProps.data}
                 rangeSeconds={RANGE_SECONDS[range]}
-                formatValue={BYTES_TO_GIB}
+                formatValue={BYTES_SIZE}
                 isLoading={isLoading}
                 threshold={diskCardProps.threshold}
                 fixedDomain={diskCardProps.fixedDomain}
-                formatAxisLabel={BYTES_TO_GIB}
+                formatAxisLabel={BYTES_SIZE}
               />
             );
             return cards;
