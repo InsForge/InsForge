@@ -1,8 +1,7 @@
 import crypto from 'crypto';
-import type { CreateSessionResponse } from '@insforge/shared-schemas';
+import { type CreateSessionResponse, ERROR_CODES } from '@insforge/shared-schemas';
 import { AppError } from '@/api/middlewares/error.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import { generateSecureToken } from '@/utils/utils.js';
 import { AuthService } from './auth.service.js';

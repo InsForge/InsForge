@@ -1028,7 +1028,7 @@ export class VercelProvider {
       }
 
       if (axios.isAxiosError(error) && error.code === 'ERR_CANCELED') {
-        throw new AppError('Vercel file upload was interrupted.', 499, ERROR_CODES.DEPLOYMENT_INVALID_FILE);
+        throw new AppError('Vercel file upload was interrupted.', 499, ERROR_CODES.INTERNAL_ERROR);
       }
 
       logger.error('Failed to stream file to Vercel', {

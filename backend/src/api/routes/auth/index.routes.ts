@@ -6,7 +6,6 @@ import { AuthOTPService, OTPPurpose } from '@/services/auth/auth-otp.service.js'
 import { AuditService } from '@/services/logs/audit.service.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
 import { successResponse } from '@/utils/response.js';
 import {
   AuthRequest,
@@ -53,6 +52,7 @@ import {
   updateAuthConfigRequestSchema,
   upsertSmtpConfigRequestSchema,
   updateEmailTemplateRequestSchema,
+  ERROR_CODES,
 } from '@insforge/shared-schemas';
 import { SmtpConfigService } from '@/services/email/smtp-config.service.js';
 import { EmailTemplateService } from '@/services/email/email-template.service.js';
