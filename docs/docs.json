@@ -106,10 +106,15 @@
             ]
           },
           {
+            "group": "CLI",
+            "pages": [
+              "config-as-code"
+            ]
+          },
+          {
             "group": "Self-Hosting",
             "pages": [
-              "deployment/deployment-security-guide",
-              "config-as-code"
+              "deployment/deployment-security-guide"
             ]
           },
           {

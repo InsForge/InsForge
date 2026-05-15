@@ -11,7 +11,9 @@ description: Manage InsForge auth, SMTP, and deployment settings declaratively f
 - **`config apply`** — push the diff to the live project. Per-change capability gating, env-resolved secrets, dry-run mode.
 - **`config export`** — pull current project state and write a fresh `insforge.toml`. Useful for bootstrapping from an existing project.
 
-You keep **one** `insforge.toml` in your repo. To apply it to a different environment (staging, prod, a self-hosted instance), point the CLI at a different project — re-link or use `--project-id`. Secrets are read from environment variables via `env(...)` references, so the file itself stays free of credentials and can be committed safely.
+You keep **one** `insforge.toml` in your repo. To apply it to a different environment — staging, prod, a teammate's local backend, a self-hosted instance — point the CLI at a different project (re-link or use `--project-id`). Secrets are read from environment variables via `env(...)` references, so the file itself stays free of credentials and can be committed safely.
+
+This works the same way on InsForge Cloud projects and on self-hosted OSS deployments.
 
 <Note>
   All examples use `npx @insforge/cli`. Do not install the CLI globally.
@@ -181,15 +183,13 @@ This is what lets one `insforge.toml` apply cleanly to multiple environments: th
 
 `env(...)` refs in a TOML that's the target of `apply` re-send the resolved password on every run — that's the only way the CLI can tell the backend "the secret may have rotated, please update." Fields without an `env(...)` ref are treated as preserve-existing.
 
-## Self-Hosting Use Cases
-
-Config-as-code is especially valuable on self-hosted InsForge deployments:
+## When to Use This
 
 - **Version control for auth.** Redirect URLs, password policy, email verification mode — all the things you'd otherwise change through the dashboard or curl — live in a file your team reviews via PR.
 - **Multi-environment parity.** One TOML, applied to dev, staging, and prod, guarantees the same auth shape everywhere. Environment-specific values (subdomain, SMTP credentials) flow through `--project-id` overrides and `env(...)` refs.
 - **CI-driven config changes.** Run `config apply --auto-approve --json` from your deploy pipeline. Combine with `config plan` as a PR check so reviewers see what the merge will change in prod.
-- **Disaster recovery.** A committed `insforge.toml` is a known-good config snapshot. Re-apply it after restoring a backend to bring auth/SMTP back to the expected shape in seconds.
-- **Local OSS development.** Run `insforge link --api-base-url http://localhost:7130 --api-key <local-key>` against a docker-compose stack, then point the CLI's config commands at your local OSS instance the same way you'd point at cloud.
+- **Disaster recovery.** A committed `insforge.toml` is a known-good config snapshot. Re-apply it after restoring a project to bring auth/SMTP back to the expected shape in seconds.
+- **Self-hosted and local OSS development.** Run `insforge link --api-base-url http://localhost:7130 --api-key <local-key>` against a docker-compose stack, then point the CLI's config commands at your local OSS instance the same way you'd point at cloud.
 
 ## Troubleshooting
 
