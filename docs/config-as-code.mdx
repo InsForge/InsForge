@@ -1,0 +1,207 @@
+---
+title: Config as Code
+description: Manage InsForge auth, SMTP, and deployment settings declaratively from a single insforge.toml using the CLI's plan, apply, and export workflow.
+---
+
+## Overview
+
+`insforge.toml` is a declarative, version-controlled snapshot of a subset of your project's config — auth policy, allowed redirect URLs, password rules, SMTP, and deployment subdomain. The CLI provides three commands that work against this file:
+
+- **`config plan`** — diff `insforge.toml` against the linked project. Shows what would change.
+- **`config apply`** — push the diff to the live project. Per-change capability gating, env-resolved secrets, dry-run mode.
+- **`config export`** — pull current project state and write a fresh `insforge.toml`. Useful for bootstrapping from an existing project.
+
+You keep **one** `insforge.toml` in your repo. To apply it to a different environment (staging, prod, a self-hosted instance), point the CLI at a different project — re-link or use `--project-id`. Secrets are read from environment variables via `env(...)` references, so the file itself stays free of credentials and can be committed safely.
+
+<Note>
+  All examples use `npx @insforge/cli`. Do not install the CLI globally.
+</Note>
+
+## Command Summary
+
+| Command | Purpose |
+|---------|---------|
+| `config plan` | Show diff between `insforge.toml` and live project state |
+| `config apply` | Apply `insforge.toml` to the live project |
+| `config apply --dry-run` | Print the plan without applying |
+| `config apply --auto-approve` | Skip the interactive confirmation prompt (required in `--json` mode) |
+| `config export` | Pull live config and write `insforge.toml` |
+| `config export --force` | Overwrite an existing `insforge.toml` without confirmation |
+
+All three commands accept `--file <path>` / `--out <path>` if your TOML lives somewhere other than `./insforge.toml`.
+
+## Recommended Workflow
+
+<Steps>
+  <Step title="Bootstrap from an existing project">
+    If you already configured the project through the dashboard, export it once to get a working file:
+
+    ```bash
+    npx @insforge/cli config export
+    ```
+
+    This writes `insforge.toml` reflecting the current backend state.
+  </Step>
+
+  <Step title="Commit it">
+    Check `insforge.toml` into version control. Secrets are referenced via `env(...)`, so the file is safe to commit.
+  </Step>
+
+  <Step title="Edit and plan">
+    Change the TOML, then preview the diff before applying:
+
+    ```bash
+    npx @insforge/cli config plan
+    ```
+  </Step>
+
+  <Step title="Apply">
+    ```bash
+    npx @insforge/cli config apply
+    ```
+
+    Review the rendered plan and confirm. In CI, pass `--auto-approve` and `--json`.
+  </Step>
+
+  <Step title="Apply the same file elsewhere">
+    To push the same config to staging or a self-hosted backend, point the CLI at the other project and re-run apply:
+
+    ```bash
+    npx @insforge/cli --project-id <staging-project-id> config apply
+    ```
+
+    Secrets that differ between environments (SMTP password, etc.) are resolved per-environment from the local shell, so the TOML doesn't need to change.
+  </Step>
+</Steps>
+
+## What `insforge.toml` Covers
+
+The file mirrors a curated subset of project config — the parts that are useful to manage declaratively. Anything not in this list still lives on the dashboard and the API.
+
+| Section | Keys |
+|---------|------|
+| `[auth]` | `allowed_redirect_urls`, `require_email_verification`, `verify_email_method`, `reset_password_method` |
+| `[auth.password]` | `min_length`, `max_length`, `require_uppercase`, `require_lowercase`, `require_number`, `require_special` |
+| `[auth.smtp]` | `enabled`, `host`, `port`, `username`, `password`, `sender_email`, `sender_name`, `min_interval_seconds` |
+| `[deployments]` | `subdomain` |
+
+A minimal example:
+
+```toml
+[auth]
+require_email_verification = true
+verify_email_method = "code"
+reset_password_method = "code"
+allowed_redirect_urls = [
+  "https://app.example.com/auth/callback",
+  "http://localhost:3000/auth/callback",
+]
+
+[auth.password]
+min_length = 12
+require_uppercase = true
+require_number = true
+
+[auth.smtp]
+enabled = true
+host = "smtp.sendgrid.net"
+port = 587
+username = "apikey"
+password = "env(SENDGRID_API_KEY)"
+sender_email = "noreply@example.com"
+sender_name = "Acme"
+
+[deployments]
+subdomain = "acme-prod"
+```
+
+## `config plan`
+
+```bash
+npx @insforge/cli config plan
+npx @insforge/cli config plan --file ./config/insforge.toml
+npx @insforge/cli --json config plan
+```
+
+`plan` reads `insforge.toml`, fetches live state via `/api/metadata`, and prints a rendered diff. It also tags any section the live backend doesn't expose yet (older self-hosted versions, etc.) — apply will skip those instead of failing the whole run.
+
+Use `plan` before every `apply` in interactive sessions, and as a CI gate to catch unintended drift.
+
+## `config apply`
+
+```bash
+npx @insforge/cli config apply
+npx @insforge/cli config apply --dry-run
+npx @insforge/cli config apply --auto-approve
+npx @insforge/cli --json config apply --auto-approve
+```
+
+`apply` runs the same diff as `plan`, then walks the change set:
+
+1. **Per-change capability gate.** Each change is checked against the backend's metadata. If the backend doesn't support a section (e.g. an older self-hosted instance without SMTP exposed), that section is skipped with a named warning — the rest of the changes still apply.
+2. **Secret resolution.** `env(...)` references in the TOML are resolved at apply time from the local environment. If a referenced variable is missing, the command aborts before sending any update, so the backend isn't left half-configured.
+3. **Per-section dispatch.** Each change is sent to the appropriate backend endpoint (`/api/auth/config`, `/api/auth/smtp-config`, `/api/deployments/slug`, etc.). Changes are independent — a failure on one section won't roll back earlier successful sections.
+
+Flags:
+
+- `--dry-run` prints the plan and exits without applying.
+- `--auto-approve` skips the interactive confirmation. Required when `--json` is set, since there's no TTY for the prompt.
+- `--file <path>` overrides the default `./insforge.toml` location.
+
+## `config export`
+
+```bash
+npx @insforge/cli config export
+npx @insforge/cli config export --out ./config/insforge.toml
+npx @insforge/cli config export --force
+```
+
+`export` pulls the live project's configurable surface and writes it to a TOML file. Use it to:
+
+- Bootstrap an `insforge.toml` from a project you've been configuring through the dashboard.
+- Diff hand-edits against current backend state by exporting to a temporary file and comparing.
+- Snapshot config before a risky change so you can re-apply the snapshot if you need to roll back.
+
+The file written by `export` is the same shape the CLI expects from `apply` — round-tripping is supported.
+
+Without `--force`, `export` refuses to overwrite an existing file in interactive mode and surfaces an `OUTPUT_EXISTS` error in `--json` mode.
+
+## Secret References
+
+`auth.smtp.password` and any other sensitive field can be expressed as `env(VAR_NAME)` instead of a literal value:
+
+```toml
+[auth.smtp]
+password = "env(SENDGRID_API_KEY)"
+```
+
+At apply time the CLI reads `SENDGRID_API_KEY` from the local environment, validates it's present, and sends the resolved value to the backend. The TOML itself never contains the secret, so it can be committed.
+
+This is what lets one `insforge.toml` apply cleanly to multiple environments: the dev and prod backends differ only in *which* `SENDGRID_API_KEY` is in scope when you run `apply`.
+
+`env(...)` refs in a TOML that's the target of `apply` re-send the resolved password on every run — that's the only way the CLI can tell the backend "the secret may have rotated, please update." Fields without an `env(...)` ref are treated as preserve-existing.
+
+## Self-Hosting Use Cases
+
+Config-as-code is especially valuable on self-hosted InsForge deployments:
+
+- **Version control for auth.** Redirect URLs, password policy, email verification mode — all the things you'd otherwise change through the dashboard or curl — live in a file your team reviews via PR.
+- **Multi-environment parity.** One TOML, applied to dev, staging, and prod, guarantees the same auth shape everywhere. Environment-specific values (subdomain, SMTP credentials) flow through `--project-id` overrides and `env(...)` refs.
+- **CI-driven config changes.** Run `config apply --auto-approve --json` from your deploy pipeline. Combine with `config plan` as a PR check so reviewers see what the merge will change in prod.
+- **Disaster recovery.** A committed `insforge.toml` is a known-good config snapshot. Re-apply it after restoring a backend to bring auth/SMTP back to the expected shape in seconds.
+- **Local OSS development.** Run `insforge link --api-base-url http://localhost:7130 --api-key <local-key>` against a docker-compose stack, then point the CLI's config commands at your local OSS instance the same way you'd point at cloud.
+
+## Troubleshooting
+
+**`Refusing to apply in --json mode without --auto-approve or --yes`.** The CLI never silently applies changes in non-interactive runs. Pass `--auto-approve` (or `-y`) explicitly.
+
+**`your backend doesn't expose <section>`.** The linked backend is on a version that doesn't have the relevant API yet. The rest of your changes still applied — upgrade the backend (or wait for the next release) to apply that section.
+
+**`env(...)` reference resolves to nothing.** The CLI aborts before any API call when a referenced env var is missing. Set the variable in your shell or your CI's secret store and re-run.
+
+**`Slug is already taken`.** `deployments.subdomain` conflicts with another project's subdomain on the same backend. Pick a different value.
+
+## Related
+
+- [CLI overview](https://github.com/InsForge/CLI) — full command reference and global flags
+- [Self-Hosting Deployment Security Guide](/deployment/deployment-security-guide) — hardening a self-hosted backend after deploy

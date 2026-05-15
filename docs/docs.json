@@ -108,7 +108,8 @@
           {
             "group": "Self-Hosting",
             "pages": [
-              "deployment/deployment-security-guide"
+              "deployment/deployment-security-guide",
+              "config-as-code"
             ]
           },
           {
