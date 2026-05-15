@@ -109,9 +109,9 @@
             "group": "Guides",
             "pages": [
               {
-                "group": "Deployment",
+                "group": "Configuration",
                 "pages": [
-                  "deployment/config-as-code"
+                  "configuration/config-as-code"
                 ]
               },
               {
