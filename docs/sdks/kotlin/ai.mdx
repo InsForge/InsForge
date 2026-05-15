@@ -1,427 +1,91 @@
 ---
-title: AI SDK Reference
-description: AI chat completions, web search, file parsing, and image generation with the InsForge Kotlin SDK
+title: AI Integration
+description: Build AI features from Kotlin with the OpenRouter key provisioned by InsForge
 ---
 
-import KotlinSdkInstallation from '/snippets/kotlin-sdk-installation.mdx';
+## Overview
 
-## Installation
+InsForge provisions an OpenRouter API key for Model Gateway projects. New Kotlin applications should call OpenRouter from trusted server-side code, a backend API, or another secure boundary. Do not embed the OpenRouter key in Android or desktop client binaries.
 
-<KotlinSdkInstallation />
+The previous InsForge Kotlin AI SDK methods are deprecated compatibility wrappers. Use the InsForge SDK for database, auth, storage, functions, and realtime; use OpenRouter for model calls.
 
----
+## Recommended Architecture
 
-## listModels()
+```mermaid
+sequenceDiagram
+    participant App as Kotlin App
+    participant API as Your Backend
+    participant OR as OpenRouter
 
-List all available AI models.
-
-### Example
-
-```kotlin
-val models = client.ai.listModels()
-
-models.forEach { model ->
-    println("${model.provider}/${model.modelId}")
-    println("  Input: ${model.inputModality}, Output: ${model.outputModality}")
-    println("  Max tokens: ${model.maxTokens}")
-}
+    App->>API: User prompt or app request
+    API->>OR: OpenRouter request with server-side key
+    OR-->>API: Model response
+    API-->>App: App-specific response
 ```
 
----
+## Server-Side OpenRouter Call
 
-## chatCompletion()
+Use the OpenAI SDK or REST from your backend. For TypeScript backends:
 
-Create an AI chat completion.
+```typescript
+import OpenAI from 'openai';
 
-### Parameters
+const openai = new OpenAI({
+  baseURL: 'https://openrouter.ai/api/v1',
+  apiKey: process.env.OPENROUTER_API_KEY,
+});
 
-- `model` (String) - Model identifier (e.g., "anthropic/claude-3.5-haiku", "openai/gpt-4o")
-- `messages` (`List<ChatMessage>`) - Conversation messages
-- `temperature` (Double?, optional) - Sampling temperature (0.0-2.0)
-- `maxTokens` (Int?, optional) - Maximum tokens to generate
-- `systemPrompt` (String?, optional) - System prompt
-- `webSearch` (WebSearchPlugin?, optional) - Enable web search capabilities
-- `fileParser` (FileParserPlugin?, optional) - Enable file/PDF parsing
-- `tools` (`List<Tool>?`, optional) - List of tools (functions) the model may call
-- `toolChoice` (ToolChoice?, optional) - Controls tool selection: `ToolChoice.Auto`, `ToolChoice.None`, `ToolChoice.Required`, or `ToolChoice.Function("name")`
-- `parallelToolCalls` (Boolean?, optional) - Allow the model to call multiple tools in parallel
-
-### Returns
-
-```kotlin
-ChatCompletionResponse
+const completion = await openai.chat.completions.create({
+  model: 'openai/gpt-4o-mini',
+  messages: [{ role: 'user', content: 'Summarize this note.' }],
+});
 ```
 
-### Example (Basic)
+## Calling Your Backend from Kotlin
 
 ```kotlin
-val response = client.ai.chatCompletion(
-    model = "anthropic/claude-3.5-haiku",
-    messages = listOf(
-        ChatMessage.user("What is the capital of France?")
-    )
-)
-
-println(response.text)  // Direct access to text content
-println("Tokens used: ${response.metadata.usage.totalTokens}")
-
-// Access annotations if available
-response.annotations?.forEach { annotation ->
-    println("Citation: ${annotation.urlCitation.url}")
-}
-```
-
-### Multimodal Messages
-
-The SDK supports multimodal messages with images, PDFs, and audio.
-
-```kotlin
-// Simple text message (backward compatible)
-val response = client.ai.chatCompletion(
-    model = "openai/gpt-4",
-    messages = listOf(ChatMessage.user("Hello!"))
-)
-
-// Custom multimodal message with multiple content parts
-val customMessage = ChatMessage.multimodal(
-    "user",
-    TextContent(text = "Describe these images"),
-    ImageContent(imageUrl = ImageUrlConfig(url = "https://example.com/1.jpg")),
-    ImageContent(imageUrl = ImageUrlConfig(url = "https://example.com/2.jpg"))
-)
-
-val response = client.ai.chatCompletion(
-    model = "anthropic/claude-sonnet-4.5",
-    messages = listOf(customMessage)
-)
-```
-
-### Example (With Web Search)
-
-```kotlin
-val response = client.ai.chatCompletion(
-    model = "openai/gpt-4",
-    messages = listOf(
-        ChatMessage.user("What are the latest news about AI?")
-    ),
-    webSearch = WebSearchPlugin(
-        enabled = true,
-        maxResults = 5,
-        engine = WebSearchEngine.NATIVE
-    )
-)
-
-println(response.text)
-
-// Access URL citations from search results
-response.annotations?.forEach { annotation ->
-    println("Source: ${annotation.urlCitation.title} - ${annotation.urlCitation.url}")
-}
-```
-
-### Example (With PDF Parsing)
-
-```kotlin
-// Using the convenience method
-val response = client.ai.chatCompletionWithFile(
-    model = "anthropic/claude-sonnet-4.5",
-    text = "Summarize the content of this PDF",
-    filename = "document.pdf",
-    fileData = "https://example.com/document.pdf",
-    pdfEngine = PdfEngine.MISTRAL_OCR
-)
-
-println(response.text)
-
-// Or using custom multimodal message
-val pdfMessage = ChatMessage.multimodal(
-    "user",
-    TextContent(text = "Summarize this document"),
-    FileContent(
-        file = FileConfig(
-            filename = "document.pdf",
-            fileData = "https://example.com/document.pdf"
-        )
-    )
-)
-
-val response2 = client.ai.chatCompletion(
-    model = "anthropic/claude-sonnet-4.5",
-    messages = listOf(pdfMessage),
-    fileParser = FileParserPlugin(
-        enabled = true,
-        pdf = PdfParserConfig(engine = PdfEngine.MISTRAL_OCR)
-    )
-)
-
-println(response2.text)
-```
-
-### Example (Tool Calling)
-
-```kotlin
-val response = client.ai.chatCompletion(
-    model = "openai/gpt-4o-mini",
-    messages = listOf(ChatMessage.user("Your prompt here")),
-    tools = listOf(
-        Tool(function = ToolFunction(
-            name = "your_function_name",
-            description = "Describe what your function does",
-            parameters = buildJsonObject {
-                put("type", JsonPrimitive("object"))
-                putJsonObject("properties") {
-                    putJsonObject("param1") {
-                        put("type", JsonPrimitive("string"))
-                        put("description", JsonPrimitive("First parameter"))
-                    }
-                }
-                put("required", JsonArray(listOf(JsonPrimitive("param1"))))
-            }
-        ))
-    )
-)
-```
-
-When the model decides to call a tool, the response includes `toolCalls`:
-
-```kotlin
-// response.toolCalls = listOf(
-//     ToolCall(
-//         id = "call_abc123",
-//         type = "function",
-//         function = ToolCallFunction(
-//             name = "your_function_name",
-//             arguments = "{\"param1\": \"value1\"}"
-//         )
-//     )
-// )
-```
-
-For multi-turn tool calling, use `ChatMessage.tool(toolCallId, content)` to send tool results back.
-
----
-
-## chatCompletionWithImages()
-
-Convenience method for chat completion with image analysis.
-
-### Parameters
-
-- `model` (String) - Model identifier (must support vision, e.g., "openai/gpt-4o")
-- `text` (String) - Text prompt to accompany the images
-- `imageUrls` (List\<String\>) - List of image URLs to analyze
-- `temperature` (Double?, optional) - Sampling temperature
-- `maxTokens` (Int?, optional) - Maximum tokens to generate
-
-### Example
-
-```kotlin
-val response = client.ai.chatCompletionWithImages(
-    model = "openai/gpt-4o",
-    text = "What is in this image?",
-    imageUrls = listOf("https://example.com/image.jpg")
-)
-
-println(response.text)
-```
-
----
-
-## chatCompletionWithFile()
-
-Convenience method for chat completion with file (PDF) analysis.
-
-### Parameters
-
-- `model` (String) - Model identifier
-- `text` (String) - Text prompt to accompany the file
-- `filename` (String) - Name of the file (e.g., "report.pdf")
-- `fileData` (String) - File URL or base64-encoded data URL
-- `pdfEngine` (PdfEngine?, optional) - PDF processing engine
-- `temperature` (Double?, optional) - Sampling temperature
-- `maxTokens` (Int?, optional) - Maximum tokens to generate
-
-### Example (Base64 Encoded)
-
-```kotlin
-// Load PDF from local file
-val pdfBytes = File("document.pdf").readBytes()
-val base64Data = "data:application/pdf;base64,${Base64.encodeToString(pdfBytes, Base64.NO_WRAP)}"
-
-val response = client.ai.chatCompletionWithFile(
-    model = "anthropic/claude-sonnet-4.5",
-    text = "What are the key points in this document?",
-    filename = "document.pdf",
-    fileData = base64Data
-)
-
-println(response.text)
-```
-
----
-
-## chatCompletionWithWebSearch()
-
-Convenience method for chat completion with web search enabled.
-
-### Parameters
-
-- `model` (String) - Model identifier
-- `messages` (`List<ChatMessage>`) - Conversation messages
-- `maxResults` (Int?, optional) - Maximum search results (default: 5)
-- `engine` (WebSearchEngine?, optional) - Search engine to use
-- `temperature` (Double?, optional) - Sampling temperature
-- `maxTokens` (Int?, optional) - Maximum tokens to generate
-
-### Example
-
-```kotlin
-val response = client.ai.chatCompletionWithWebSearch(
-    model = "openai/gpt-4o",
-    messages = listOf(
-        ChatMessage(role = "user", content = MessageContent.Text("What are today's top news headlines?"))
-    ),
-    maxResults = 5
-)
-
-println(response.text)
-
-// Access citations
-response.annotations?.forEach { annotation ->
-    println("- ${annotation.urlCitation.title}: ${annotation.urlCitation.url}")
-}
-```
-
----
-
-## chatCompletionStream()
-
-Create a streaming chat completion. Returns `Flow<String>` that emits content chunks directly.
-
-### Parameters
-
-- `model` (String) - Model identifier
-- `messages` (`List<ChatMessage>`) - Conversation messages
-- `temperature` (Double?, optional) - Sampling temperature
-- `maxTokens` (Int?, optional) - Maximum tokens to generate
-- `webSearch` (WebSearchPlugin?, optional) - Enable web search capabilities
-- `fileParser` (FileParserPlugin?, optional) - Enable file/PDF parsing
-- `thinking` (Boolean?, optional) - Enable extended reasoning mode
-- `tools` (`List<Tool>?`, optional) - List of tools the model may call
-- `toolChoice` (ToolChoice?, optional) - Controls tool selection
-- `parallelToolCalls` (Boolean?, optional) - Allow parallel tool calls
-
-### Example
-
-```kotlin
-client.ai.chatCompletionStream(
-    model = "anthropic/claude-3.5-haiku",
-    messages = listOf(
-        ChatMessage(role = "user", content = "Tell me a story")
-    )
-).collect { content ->
-    print(content)  // Content string directly
-}
-```
-
----
-
-## generateEmbeddings()
-
-Generate vector embeddings for text input using AI models.
-
-### Parameters
-
-- `model` (String) - Embedding model identifier (e.g., "google/gemini-embedding-001")
-- `input` (String?, optional) - Single text input to embed
-- `inputs` (List\<String\>?, optional) - Multiple text inputs to embed
-- `encodingFormat` (EmbeddingEncodingFormat?, optional) - Output format (FLOAT or BASE64)
-- `dimensions` (Int?, optional) - Number of dimensions for the output embeddings
-
-### Returns
-
-```kotlin
-EmbeddingsResponse
-```
-
-### Example (With Optional Parameters)
-
-```kotlin
-val response = client.ai.generateEmbeddings(
-    model = "google/gemini-embedding-001",
-    input = "Hello world",
-    encodingFormat = EmbeddingEncodingFormat.FLOAT,
-    dimensions = 512
-)
-
-println("Embedding dimensions: ${response.data.first().embedding.size}")  // 512
-```
-
----
-
-## generateImage()
-
-Generate images using AI models.
-
-### Parameters
-
-- `model` (String) - Image generation model (e.g., "openai/dall-e-3")
-- `prompt` (String) - Image description
-
-### Returns
-
-```kotlin
-ImageGenerationResponse
-```
-
-### Example
-
-```kotlin
-val response = client.ai.generateImage(
-    model = "google/gemini-2.5-flash-image-preview",
-    prompt = "A serene mountain landscape at sunset"
-)
-
-println("Generated ${response.count} image(s)")
-
-response.images.forEach { image ->
-    val imageUrl = image.imageUrl.url
-
-    if (imageUrl.startsWith("data:image")) {
-        // Handle base64 encoded image
-        val base64Data = imageUrl.substringAfter("base64,")
-        val imageData = Base64.decode(base64Data, Base64.DEFAULT)
-        val bitmap = BitmapFactory.decodeByteArray(imageData, 0, imageData.size)
-        imageView.setImageBitmap(bitmap)
-    } else {
-        // Handle URL - load with Coil/Glide
-        // AsyncImage(model = imageUrl, ...)
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
+import io.ktor.serialization.kotlinx.json.json
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class ChatRequest(val prompt: String)
+
+@Serializable
+data class ChatResponse(val text: String)
+
+val http = HttpClient {
+    install(ContentNegotiation) {
+        json()
     }
 }
-```
 
----
-
-## Error Handling
-
-```kotlin
-import dev.insforge.exceptions.InsforgeHttpException
-import dev.insforge.exceptions.InsforgeException
-
-try {
-    val response = client.ai.chatCompletion(
-        model = "anthropic/claude-3.5-haiku",
-        messages = listOf(ChatMessage(role = "user", content = "Hello"))
-    )
-    println(response.text)
-} catch (e: InsforgeHttpException) {
-    when (e.error) {
-        "MODEL_NOT_FOUND" -> println("Model not available")
-        "RATE_LIMIT_EXCEEDED" -> println("Rate limit exceeded, try again later")
-        "INVALID_REQUEST" -> println("Invalid request: ${e.message}")
-        else -> println("API Error: ${e.message}")
-    }
-} catch (e: InsforgeException) {
-    println("SDK Error: ${e.message}")
+suspend fun sendPrompt(prompt: String, sessionToken: String): ChatResponse {
+    return http.post("https://your-app.example/api/chat") {
+        header("Authorization", "Bearer $sessionToken")
+        contentType(ContentType.Application.Json)
+        setBody(ChatRequest(prompt))
+    }.body()
 }
 ```
+
+Use an app session token or another user-scoped credential for your backend route. Never send the OpenRouter key from a Kotlin client.
+
+## Legacy InsForge AI Methods
+
+These Kotlin SDK methods are deprecated for new AI integrations:
+
+- `client.ai.listModels()`
+- `client.ai.chatCompletion(...)`
+- `client.ai.chatCompletionStream(...)`
+- `client.ai.generateEmbeddings(...)`
+- `client.ai.generateImage(...)`
+
+They target the deprecated InsForge AI proxy. New integrations should use the OpenRouter key from the dashboard and follow OpenRouter's current API docs for model parameters and capabilities.

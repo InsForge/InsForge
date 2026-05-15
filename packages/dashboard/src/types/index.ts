@@ -66,6 +66,8 @@ export type DashboardMetricName =
   | 'cpu_usage'
   | 'memory_usage'
   | 'disk_usage'
+  | 'disk_used'
+  | 'disk_total'
   | 'network_in'
   | 'network_out';
 
@@ -122,6 +124,13 @@ export interface DashboardAdvisorIssuesQuery {
   offset?: number;
 }
 
+/** Status event posted from cloud-shell after the PostHog OAuth flow finishes. */
+export interface DashboardPosthogConnectionStatus {
+  status: 'connected' | 'error' | 'cancelled';
+  reason?: string;
+  timestamp: number;
+}
+
 export interface DashboardProps {
   backendUrl?: string;
   showNavbar?: boolean;
@@ -149,6 +158,12 @@ export interface DashboardProps {
     query: DashboardAdvisorIssuesQuery
   ) => Promise<DashboardAdvisorIssuesResponse>;
   onTriggerAdvisorScan?: () => Promise<void>;
+  /** Cloud-hosting only: ask the parent shell to start the PostHog OAuth flow. */
+  onConnectPosthog?: (projectId: string) => void;
+  /** Cloud-hosting only: subscribe to PostHog OAuth completion / failure events. */
+  subscribePosthogConnectionStatus?: (
+    cb: (event: DashboardPosthogConnectionStatus) => void
+  ) => () => void;
 }
 
 export interface SelfHostingDashboardProps extends DashboardProps {

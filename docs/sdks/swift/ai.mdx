@@ -1,608 +1,84 @@
 ---
-title: AI SDK Reference
-description: AI chat completions, web search, file parsing, and image generation with the InsForge Swift SDK
+title: AI Integration
+description: Build AI features from Swift with the OpenRouter key provisioned by InsForge
 ---
 
-import SwiftSdkInstallation from '/snippets/swift-sdk-installation.mdx';
+## Overview
 
-## Installation
+InsForge provisions an OpenRouter API key for Model Gateway projects. New Swift applications should call OpenRouter directly from trusted server-side code, a backend API, or another secure boundary. Do not embed the OpenRouter key in an iOS, macOS, tvOS, or watchOS app binary.
 
-<SwiftSdkInstallation />
+The previous InsForge Swift AI SDK methods are deprecated compatibility wrappers. Use the InsForge SDK for database, auth, storage, functions, and realtime; use OpenRouter for model calls.
 
-## chatCompletion()
+## Recommended Architecture
 
-Generate AI chat completions.
+```mermaid
+sequenceDiagram
+    participant App as Swift App
+    participant API as Your Backend
+    participant OR as OpenRouter
 
-### Parameters
-
-- `model` (String) - AI model (e.g., "anthropic/claude-3.5-haiku", "openai/gpt-4o")
-- `messages` ([ChatMessage]) - Array of chat messages
-- `stream` (Bool, optional) - Enable streaming mode (default: false)
-- `temperature` (Double, optional) - Sampling temperature 0-2
-- `maxTokens` (Int, optional) - Max tokens to generate
-- `topP` (Double, optional) - Top-p sampling parameter
-- `systemPrompt` (String, optional) - System prompt for the conversation
-- `webSearch` (WebSearchPlugin?, optional) - Enable web search capabilities
-- `fileParser` (FileParserPlugin?, optional) - Enable file/PDF parsing
-- `tools` ([Tool]?, optional) - Array of tool definitions for function calling
-- `toolChoice` (ToolChoice?, optional) - Controls which tool the model should call
-- `parallelToolCalls` (Bool?, optional) - Allow model to call multiple tools in parallel
-
-### Returns
-
-```swift
-ChatCompletionResponse
+    App->>API: User prompt or app request
+    API->>OR: OpenRouter request with server-side key
+    OR-->>API: Model response
+    API-->>App: App-specific response
 ```
 
-### Example
+## Server-Side OpenRouter Call
+
+Use the OpenAI SDK or REST from your backend. For TypeScript backends:
+
+```typescript
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  baseURL: 'https://openrouter.ai/api/v1',
+  apiKey: process.env.OPENROUTER_API_KEY,
+});
+
+const completion = await openai.chat.completions.create({
+  model: 'openai/gpt-4o-mini',
+  messages: [{ role: 'user', content: 'Summarize this note.' }],
+});
+```
+
+## Calling Your Backend from Swift
 
 ```swift
-let response = try await insforge.ai.chatCompletion(
-    model: "anthropic/claude-3.5-haiku",
-    messages: [
-        ChatMessage(role: .user, content: "What is the capital of France?")
-    ]
-)
-
-print(response.text)
-// "The capital of France is Paris."
-
-// Access metadata
-if let metadata = response.metadata {
-    print("Model: \(metadata.model)")
-    if let usage = metadata.usage {
-        print("Tokens used: \(usage.totalTokens)")
-    }
+struct ChatRequest: Encodable {
+    let prompt: String
 }
 
-// Access annotations if available (from web search)
-if let annotations = response.annotations {
-    for annotation in annotations {
-        print("Citation: \(annotation.urlCitation.url)")
-        if let title = annotation.urlCitation.title {
-            print("Title: \(title)")
-        }
-    }
-}
-```
-
-### Multimodal Messages
-
-The SDK supports multimodal messages with images, PDFs, and audio. You can use either simple text content (backward compatible) or an array of content parts.
-
-```swift
-// Simple text message (backward compatible)
-let textMessage = ChatMessage(role: .user, content: "Hello!")
-
-// Message with image
-let imageMessage = ChatMessage(role: .user, content: [
-    .text("What is in this image?"),
-    .image(url: "https://example.com/image.jpg", detail: .high)
-])
-
-// Message with PDF file
-let fileMessage = ChatMessage(role: .user, content: [
-    .text("Summarize this document"),
-    .file(filename: "doc.pdf", fileData: "https://example.com/doc.pdf")
-])
-
-// Message with audio
-let audioMessage = ChatMessage(role: .user, content: [
-    .text("Transcribe this audio"),
-    .audio(data: "base64encodeddata", format: .mp3)
-])
-```
-
-### Example with Web Search
-
-```swift
-let response = try await insforge.ai.chatCompletion(
-    model: "openai/gpt-4o",
-    messages: [
-        ChatMessage(role: .user, content: "What's the latest news about AI?")
-    ],
-    webSearch: WebSearchPlugin(
-        enabled: true,
-        maxResults: 5,
-        engine: .native
-    )
-)
-
-print(response.text)
-
-// Access URL citations from search results
-if let annotations = response.annotations {
-    for annotation in annotations {
-        print("Source: \(annotation.urlCitation.title ?? "Unknown") - \(annotation.urlCitation.url)")
-    }
-}
-```
-
-### Example with PDF Parsing
-
-```swift
-// Include PDF file in the message content
-let response = try await insforge.ai.chatCompletion(
-    model: "anthropic/claude-sonnet-4.5",
-    messages: [
-        ChatMessage(role: .user, content: [
-            .text("Summarize this document"),
-            .file(filename: "report.pdf", fileData: "https://example.com/report.pdf")
-        ])
-    ],
-    fileParser: FileParserPlugin(
-        enabled: true,
-        pdf: PdfParserConfig(engine: .mistralOcr)
-    )
-)
-
-print(response.text)
-```
-
-### Example (Tool Calling)
-
-```swift
-let response = try await insforge.ai.chatCompletion(
-    model: "openai/gpt-4o-mini",
-    messages: [
-        ChatMessage(role: .user, content: "Your prompt here")
-    ],
-    tools: [
-        Tool(function: ToolFunction(
-            name: "your_function_name",
-            description: "Describe what your function does",
-            parameters: [
-                "type": "object",
-                "properties": [
-                    "param1": [
-                        "type": "string",
-                        "description": "First parameter"
-                    ] as [String: Any]
-                ] as [String: Any],
-                "required": ["param1"]
-            ] as [String: Any]
-        ))
-    ]
-)
-```
-
-When the model decides to call a tool, the response includes `toolCalls`:
-
-```swift
-// response.toolCalls = [
-//     ToolCall(
-//         id: "call_abc123",
-//         type: "function",
-//         function: ToolCallFunction(
-//             name: "your_function_name",
-//             arguments: "{\"param1\": \"value1\"}"
-//         )
-//     )
-// ]
-```
-
-For multi-turn tool calling, use `ChatMessage(toolCallId:content:)` to send tool results back.
-
----
-
-## generateEmbeddings()
-
-Generate vector embeddings for text input using AI models.
-
-### Parameters
-
-- `model` (String) - Embedding model identifier (e.g., "google/gemini-embedding-001")
-- `input` (EmbeddingInput) - Text input to embed (single or multiple)
-- `encodingFormat` (EmbeddingEncodingFormat?, optional) - Output format (.float or .base64)
-- `dimensions` (Int?, optional) - Number of dimensions for the output embeddings
-
-### Returns
-
-```swift
-EmbeddingsResponse
-```
-
-### Example (With Optional Parameters)
-
-```swift
-let response = try await insforge.ai.generateEmbeddings(
-    model: "google/gemini-embedding-001",
-    input: .single("Hello world"),
-    encodingFormat: .float,
-    dimensions: 3072
-)
-
-print("Embedding dimensions: \(response.data.first?.embedding.count ?? 0)")  // 3072
-```
-
----
-
-## generateImage()
-
-Generate images using AI models.
-
-### Parameters
-
-- `model` (String) - Image generation model
-- `prompt` (String) - Text description of the image to generate
-
-### Returns
-
-```swift
-ImageGenerationResponse
-```
-
-### Example
-
-```swift
-let response = try await insforge.ai.generateImage(
-    model: "google/gemini-2.5-flash-image-preview",
-    prompt: "A serene mountain landscape at sunset"
-)
-
-// Access generated images
-for image in response.images {
-    print("Image URL: \(image.imageUrl)")
-    print("Type: \(image.type)")
+struct ChatResponse: Decodable {
+    let text: String
 }
 
-// Get image count
-print("Generated \(response.imageCount) images")
+func sendPrompt(_ prompt: String, sessionToken: String) async throws -> ChatResponse {
+    let url = URL(string: "https://your-app.example/api/chat")!
+    var request = URLRequest(url: url)
+    request.httpMethod = "POST"
+    request.setValue("Bearer \(sessionToken)", forHTTPHeaderField: "Authorization")
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    request.httpBody = try JSONEncoder().encode(ChatRequest(prompt: prompt))
 
-// Access metadata
-if let metadata = response.metadata {
-    print("Model: \(metadata.model)")
-    if let revisedPrompt = metadata.revisedPrompt {
-        print("Revised prompt: \(revisedPrompt)")
-    }
-}
-```
-
----
-
-## listModels()
-
-List available AI models.
-
-### Returns
-
-```swift
-ListModelsResponse
-```
-
-### Example
-
-```swift
-let models = try await insforge.ai.listModels()
-
-// List text generation models
-print("Text Models:")
-for provider in models.text {
-    print("  Provider: \(provider.provider) (configured: \(provider.configured))")
-    for model in provider.models {
-        print("    - \(model.id)")
-        print("      Input: \(model.inputModality)")
-        print("      Output: \(model.outputModality)")
-        print("      Price level: \(model.priceLevel)")
-    }
-}
-
-// List image generation models
-print("\nImage Models:")
-for provider in models.image {
-    print("  Provider: \(provider.provider)")
-    for model in provider.models {
-        print("    - \(model.id)")
-    }
-}
-```
-
----
-
-## Models Reference
-
-### Enums
-
-```swift
-// Search engine options for web search
-public enum WebSearchEngine: String, Codable {
-    case native
-    case exa
-}
-
-// PDF processing engine options
-public enum PdfEngine: String, Codable {
-    case pdfText = "pdf-text"
-    case mistralOcr = "mistral-ocr"
-    case native
-}
-```
-
-### Plugin Configuration
-
-```swift
-// Web search plugin configuration
-public struct WebSearchPlugin: Codable, Sendable {
-    let enabled: Bool
-    let engine: WebSearchEngine?
-    let maxResults: Int?          // 1-10, default: 5
-    let searchPrompt: String?     // Custom prompt for search results
-
-    init(
-        enabled: Bool = true,
-        engine: WebSearchEngine? = nil,
-        maxResults: Int? = nil,
-        searchPrompt: String? = nil
-    )
-}
-
-// PDF parser configuration
-public struct PdfParserConfig: Codable, Sendable {
-    let engine: PdfEngine?
-
-    init(engine: PdfEngine? = nil)
-}
-
-// File parser plugin configuration
-public struct FileParserPlugin: Codable, Sendable {
-    let enabled: Bool
-    let pdf: PdfParserConfig?
-
-    init(enabled: Bool = true, pdf: PdfParserConfig? = nil)
-}
-```
-
-### ChatMessage
-
-```swift
-public struct ChatMessage: Codable, Sendable {
-    let role: Role
-    let content: MessageContent
-    let toolCalls: [ToolCall]?
-    let toolCallId: String?
-
-    enum Role: String, Codable {
-        case user
-        case assistant
-        case system
-        case tool
+    let (data, response) = try await URLSession.shared.data(for: request)
+    guard let httpResponse = response as? HTTPURLResponse,
+          (200..<300).contains(httpResponse.statusCode) else {
+        throw URLError(.badServerResponse)
     }
 
-    // Initialize with simple text (backward compatible)
-    init(role: Role, content: String)
-
-    // Initialize with multimodal content
-    init(role: Role, content: [ContentPart])
-
-    // Initialize a tool response message
-    init(role: Role = .tool, toolCallId: String, content: String)
-
-    // Initialize an assistant message with tool calls
-    init(role: Role = .assistant, content: String, toolCalls: [ToolCall])
-}
-
-// Content can be simple text or multimodal parts
-public enum MessageContent: Codable, Sendable {
-    case text(String)
-    case parts([ContentPart])
-}
-
-// Multimodal content parts
-public enum ContentPart: Codable, Sendable {
-    case text(String)
-    case image(url: String, detail: ImageDetail? = nil)
-    case file(filename: String, fileData: String)
-    case audio(data: String, format: AudioFormat)
-}
-
-// Image detail level
-public enum ImageDetail: String, Codable, Sendable {
-    case auto
-    case low
-    case high
-}
-
-// Supported audio formats
-public enum AudioFormat: String, Codable, Sendable {
-    case wav
-    case mp3
-    case aiff
-    case aac
-    case ogg
-    case flac
-    case m4a
+    return try JSONDecoder().decode(ChatResponse.self, from: data)
 }
 ```
 
-### ChatCompletionResponse
+Use an app session token or another user-scoped credential for your backend route. Never send the OpenRouter key from a Swift client.
 
-```swift
-public struct ChatCompletionResponse: Codable, Sendable {
-    let text: String                              // The generated response text
-    let annotations: [UrlCitationAnnotation]?     // URL citations from web search
-    let toolCalls: [ToolCall]?                    // Tool calls requested by the model
-    let metadata: Metadata?
+## Legacy InsForge AI Methods
 
-    // Computed properties
-    var content: String { text }  // Alias for text
-    var success: Bool             // True if text is not empty
+These Swift SDK methods are deprecated for new AI integrations:
 
-    struct Metadata: Codable {
-        let model: String
-        let usage: TokenUsage?
-    }
-}
-```
+- `insforge.ai.chatCompletion(...)`
+- `insforge.ai.generateEmbeddings(...)`
+- `insforge.ai.generateImage(...)`
+- `insforge.ai.listModels()`
 
-### Tool Calling Types
-
-```swift
-// Function definition for tool calling
-public struct ToolFunction: @unchecked Sendable {
-    let name: String
-    let description: String?
-    let parameters: [String: Any]?
-
-    init(name: String, description: String? = nil, parameters: [String: Any]? = nil)
-}
-
-// Tool definition wrapping a function
-public struct Tool: Sendable {
-    let type: String              // "function"
-    let function: ToolFunction
-
-    init(type: String = "function", function: ToolFunction)
-}
-
-// Function details within a tool call response
-public struct ToolCallFunction: Codable, Sendable {
-    let name: String
-    let arguments: String         // JSON string of arguments
-}
-
-// Tool call made by the model
-public struct ToolCall: Codable, Sendable {
-    let id: String
-    let type: String              // "function"
-    let function: ToolCallFunction
-}
-
-// Controls which tool the model should call
-public enum ToolChoice: Sendable {
-    case auto                     // Model decides (default)
-    case none                     // No tool calls
-    case required                 // Must call at least one tool
-    case function(name: String)   // Must call the specified function
-}
-```
-
-### Annotations
-
-```swift
-// URL citation information from web search results
-public struct UrlCitation: Codable, Sendable {
-    let url: String
-    let title: String?
-    let content: String?
-    let startIndex: Int?
-    let endIndex: Int?
-}
-
-// Annotation containing URL citation
-public struct UrlCitationAnnotation: Codable, Sendable {
-    let type: String              // "url_citation"
-    let urlCitation: UrlCitation
-}
-```
-
-### TokenUsage
-
-```swift
-public struct TokenUsage: Codable, Sendable {
-    let promptTokens: Int
-    let completionTokens: Int
-    let totalTokens: Int
-}
-```
-
-### EmbeddingsResponse
-
-```swift
-// Encoding format options for embeddings
-public enum EmbeddingEncodingFormat: String, Codable, Sendable {
-    case float
-    case base64
-}
-
-// Input type for embeddings (single or multiple texts)
-public enum EmbeddingInput: Sendable {
-    case single(String)
-    case multiple([String])
-}
-
-public struct EmbeddingsResponse: Codable, Sendable {
-    let object: String            // "list"
-    let data: [EmbeddingObject]
-    let metadata: Metadata?
-
-    struct Metadata: Codable {
-        let model: String
-        let usage: EmbeddingsUsage?
-    }
-}
-
-public struct EmbeddingObject: Codable, Sendable {
-    let object: String            // "embedding"
-    let embedding: [Double]       // or String for base64 format
-    let index: Int
-}
-
-public struct EmbeddingsUsage: Codable, Sendable {
-    let promptTokens: Int?
-    let totalTokens: Int?
-}
-```
-
-### ImageGenerationResponse
-
-```swift
-public struct ImageGenerationResponse: Codable, Sendable {
-    let model: String?
-    let images: [ImageMessage]
-    let text: String?
-    let count: Int?
-    let metadata: Metadata?
-
-    // Computed property
-    var imageCount: Int           // count ?? images.count
-
-    struct Metadata: Codable {
-        let model: String
-        let revisedPrompt: String?
-        let usage: TokenUsage?
-    }
-}
-```
-
-### ImageMessage
-
-```swift
-public struct ImageMessage: Codable, Sendable {
-    let type: String
-    let imageUrl: String
-
-    // Computed property
-    var url: String { imageUrl }  // Alias for imageUrl
-}
-```
-
-### AIModel
-
-```swift
-public struct AIModel: Codable, Sendable {
-    let id: String
-    let modelId: String
-    let provider: String
-    let inputModality: [String]   // e.g., ["text"], ["text", "image"]
-    let outputModality: [String]  // e.g., ["text"], ["image"]
-    let priceLevel: Int
-
-    // Computed properties
-    var name: String { id }
-}
-```
-
-### ListModelsResponse
-
-```swift
-public struct ListModelsResponse: Codable, Sendable {
-    let text: [ModelProvider]     // Text generation models
-    let image: [ModelProvider]    // Image generation models
-
-    struct ModelProvider: Codable {
-        let provider: String
-        let configured: Bool
-        let models: [AIModel]
-    }
-}
-```
+They target the deprecated InsForge AI proxy. New integrations should use the OpenRouter key from the dashboard and follow OpenRouter's current API docs for model parameters and capabilities.

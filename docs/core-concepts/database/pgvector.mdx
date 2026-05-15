@@ -7,7 +7,7 @@ description: Store embeddings and perform similarity search with pgvector
 
 InsForge supports **pgvector**, a PostgreSQL extension for vector similarity search. Use it to build semantic search, recommendations, RAG pipelines, or anything that needs "find similar items" functionality.
 
-InsForge also provides a built-in [embeddings SDK](/sdks/typescript/ai#embeddings-create) through the AI gateway, so you can generate and store vectors without configuring external providers.
+For embedding generation, use the OpenRouter key provisioned by InsForge with the OpenAI SDK. Store the resulting vectors in InsForge Postgres with pgvector.
 
 ## Enabling the Extension
 
@@ -34,12 +34,19 @@ create table documents (
 );
 ```
 
-## Generating Embeddings with InsForge AI
+## Generating Embeddings with OpenRouter
 
-Use the InsForge SDK to generate embeddings directly through the AI gateway. No external API keys are needed in your application code.
+Use OpenRouter directly from trusted server-side code. Do not expose `OPENROUTER_API_KEY` in the browser.
 
 ```typescript
-const response = await insforge.ai.embeddings.create({
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  baseURL: 'https://openrouter.ai/api/v1',
+  apiKey: process.env.OPENROUTER_API_KEY,
+});
+
+const response = await openai.embeddings.create({
   model: 'openai/text-embedding-3-small',
   input: 'Your text here',
 });
@@ -67,17 +74,13 @@ The method accepts a single string or an array of strings.
 | openai/text-embedding-ada-002 | 1536 |
 | google/gemini-embedding-001 | 3072 |
 
-<Tip>
-You can also use any external embedding provider (OpenAI, Cohere, Hugging Face, etc.) and store the resulting vectors in pgvector. The InsForge AI gateway is optional.
-</Tip>
-
 ## Storing Embeddings
 
 Generate an embedding and insert it in one step:
 
 ```typescript
 async function storeDocument(content: string) {
-  const response = await insforge.ai.embeddings.create({
+  const response = await openai.embeddings.create({
     model: 'openai/text-embedding-3-small',
     input: content,
   });
@@ -147,7 +150,7 @@ $$;
 Call it from the SDK:
 
 ```typescript
-const queryResponse = await insforge.ai.embeddings.create({
+const queryResponse = await openai.embeddings.create({
   model: 'openai/text-embedding-3-small',
   input: 'What is machine learning?',
 });
@@ -165,14 +168,14 @@ Adjust `match_threshold` based on your use case. Higher values return fewer but 
 
 ## Building a RAG Pipeline
 
-InsForge provides the core primitives for retrieval-augmented generation: embeddings, vector storage, similarity search, and chat completions.
+InsForge provides the Postgres and pgvector primitives for retrieval-augmented generation. Use OpenRouter directly for embeddings and chat completions.
 
 ### Basic RAG Flow
 
 ```typescript
 async function askQuestion(question: string) {
   // 1. Embed the question
-  const embeddingResponse = await insforge.ai.embeddings.create({
+  const embeddingResponse = await openai.embeddings.create({
     model: 'openai/text-embedding-3-small',
     input: question,
   });
@@ -190,7 +193,7 @@ async function askQuestion(question: string) {
     .join('\n\n');
 
   // 4. Generate a response with context
-  const response = await insforge.ai.chat.completions.create({
+  const response = await openai.chat.completions.create({
     model: 'openai/gpt-4o-mini',
     messages: [
       {
@@ -227,7 +230,7 @@ We recommend pairing InsForge with an orchestration framework for production RAG
 | [Haystack](https://github.com/deepset-ai/haystack) | Python | Modular pipelines, evaluation, production components |
 | [Vercel AI SDK](https://github.com/vercel/ai) | TypeScript | Streaming UI, React/Next.js integration |
 
-These frameworks integrate with any Postgres-backed vector store. Point them at your InsForge database, use `insforge.ai.embeddings.create()` for embedding generation, and use `insforge.ai.chat.completions.create()` for the generation step.
+These frameworks integrate with any Postgres-backed vector store. Point them at your InsForge database and use OpenRouter through the OpenAI SDK for embedding generation and the generation step.
 
 ## Indexing
 
@@ -269,7 +272,7 @@ Create IVFFlat indexes **after** inserting initial data. IVFFlat needs represent
 ## Best Practices
 
 - **Match dimensions** -- vector dimensions must match your embedding model
-- **Use the InsForge AI gateway** -- generate embeddings with `insforge.ai.embeddings.create()` to keep API keys out of your application code
+- **Keep AI keys server-side** -- generate embeddings from backend code with `OPENROUTER_API_KEY`, never from browser-exposed code
 - **Use RPC functions for search** -- keep similarity logic in Postgres rather than computing distances client-side
 - **Normalize embeddings** -- use cosine distance for scores between 0 and 1
 - **Index at scale** -- add indexes when you have ~10k+ vectors

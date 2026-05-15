@@ -4,6 +4,7 @@ import type {
   DashboardBackupInfo,
   DashboardInstanceInfo,
   DashboardModelCreditUsage,
+  DashboardPosthogConnectionStatus,
   DashboardProjectInfo,
   DashboardUserInfo,
   DashboardMetricName,
@@ -20,6 +21,8 @@ const VALID_METRIC_NAMES: readonly DashboardMetricName[] = [
   'cpu_usage',
   'memory_usage',
   'disk_usage',
+  'disk_used',
+  'disk_total',
   'network_in',
   'network_out',
 ] as const;
@@ -287,6 +290,9 @@ export function useCloudHosting() {
   const parentOriginTrustedRef = useRef(false);
   const openerOriginTrustedRef = useRef(false);
   const pendingRequestsRef = useRef<PendingRequests>({});
+  const posthogStatusSubscribersRef = useRef<
+    Set<(event: DashboardPosthogConnectionStatus) => void>
+  >(new Set());
 
   const setPendingRequest = useCallback(
     <K extends PendingRequestKey>(
@@ -869,6 +875,25 @@ export function useCloudHosting() {
             );
             return;
           }
+          case 'POSTHOG_CONNECTION_STATUS': {
+            const status = message.status;
+            if (status !== 'connected' && status !== 'error' && status !== 'cancelled') {
+              return;
+            }
+            const rawReason = typeof message.reason === 'string' ? message.reason : undefined;
+            const reason = rawReason ? rawReason.slice(0, 200) : undefined;
+            const timestamp =
+              typeof message.timestamp === 'number' ? message.timestamp : Date.now();
+            const event: DashboardPosthogConnectionStatus = { status, reason, timestamp };
+            posthogStatusSubscribersRef.current.forEach((cb) => {
+              try {
+                cb(event);
+              } catch {
+                // Subscriber crashes shouldn't break delivery to other subscribers.
+              }
+            });
+            return;
+          }
           default:
             return;
         }
@@ -1090,6 +1115,27 @@ export function useCloudHosting() {
     [postMessageToParent]
   );
 
+  const connectPosthog = useCallback(
+    (projectId: string) => {
+      void postMessageToParent({
+        type: 'POSTHOG_CONNECT_REQUEST',
+        projectId,
+        timestamp: Date.now(),
+      });
+    },
+    [postMessageToParent]
+  );
+
+  const subscribePosthogConnectionStatus = useCallback(
+    (cb: (event: DashboardPosthogConnectionStatus) => void) => {
+      posthogStatusSubscribersRef.current.add(cb);
+      return () => {
+        posthogStatusSubscribersRef.current.delete(cb);
+      };
+    },
+    []
+  );
+
   return {
     projectInfo,
     getAuthorizationCode,
@@ -1112,5 +1158,7 @@ export function useCloudHosting() {
     requestAdvisorLatest,
     requestAdvisorIssues,
     triggerAdvisorScan,
+    connectPosthog,
+    subscribePosthogConnectionStatus,
   };
 }

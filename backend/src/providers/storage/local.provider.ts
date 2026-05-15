@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
 import { UploadStrategyResponse, DownloadStrategyResponse } from '@insforge/shared-schemas';
@@ -40,10 +41,17 @@ export class LocalStorageProvider implements StorageProvider {
     return this.getValidatedPath(bucket, key);
   }
 
-  async putObject(bucket: string, key: string, file: Express.Multer.File): Promise<void> {
+  async putObject(
+    bucket: string,
+    key: string,
+    file: Express.Multer.File
+  ): Promise<{ etag: string }> {
     const filePath = this.getFilePath(bucket, key);
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.writeFile(filePath, file.buffer);
+    // Match S3 single-part etag semantics so downstream URL cache-busting
+    // works identically across providers: same bytes → same etag → same URL.
+    return { etag: crypto.createHash('md5').update(file.buffer).digest('hex') };
   }
 
   async getObject(bucket: string, key: string): Promise<Buffer | null> {
@@ -112,25 +120,34 @@ export class LocalStorageProvider implements StorageProvider {
     bucket: string,
     key: string,
     _expiresIn?: number,
-    _isPublic?: boolean
+    _isPublic?: boolean,
+    version?: string | null
   ): Promise<DownloadStrategyResponse> {
-    // For local storage, return direct download URL with absolute URL
+    // Direct URL points at our own API — safe to append the cache-bust stamp.
     const baseUrl = getApiBaseUrl();
+    const base = `${baseUrl}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(key)}`;
+    const url = version ? `${base}?v=${encodeURIComponent(version)}` : base;
     return Promise.resolve({
       method: 'direct',
-      url: `${baseUrl}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(key)}`,
+      url,
     });
   }
 
   async verifyObjectExists(
     bucket: string,
     key: string
-  ): Promise<{ exists: boolean; size?: number }> {
-    // For local storage, check if file exists on disk and get its size
+  ): Promise<{ exists: boolean; size?: number; etag?: string }> {
+    // For local storage, check if file exists on disk and get its size.
+    // We also compute the MD5 etag here so confirmUpload (called by the
+    // presigned-style flow on local backends) can persist it the same way
+    // the direct PUT path does — keeping the URL cache-bust contract
+    // consistent across upload paths.
     try {
       const filePath = this.getFilePath(bucket, key);
       const stat = await fs.stat(filePath);
-      return { exists: true, size: stat.size };
+      const buf = await fs.readFile(filePath);
+      const etag = crypto.createHash('md5').update(buf).digest('hex');
+      return { exists: true, size: stat.size, etag };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         return { exists: false };
