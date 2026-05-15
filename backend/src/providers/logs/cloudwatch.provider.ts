@@ -630,8 +630,7 @@ export class CloudWatchProvider extends BaseLogProvider {
       // reads `info - some message`, matching Vector's
       // `join!([req.level, req.message], " - ")`. Leaves `error`/`stack` as
       // top-level keys in the body for the detail panel.
-      const eventMessage =
-        level !== undefined && msgField ? `${level} - ${msgField}` : msgField;
+      const eventMessage = level !== undefined && msgField ? `${level} - ${msgField}` : msgField;
 
       return {
         ...rest,
