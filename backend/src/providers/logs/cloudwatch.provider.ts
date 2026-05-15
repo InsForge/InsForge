@@ -258,24 +258,20 @@ export class CloudWatchProvider extends BaseLogProvider {
     // Keep CloudWatch's default order (oldest first, newest last)
     const logs: LogSchema[] = events.map((e) => {
       const message = e.message || '';
-      let parsed: Record<string, unknown> = {};
-      try {
-        parsed = JSON.parse(message);
-      } catch {
-        parsed = { message };
-      }
+      const body = this.normalizeBody(message, sourceName);
+      const eventMessage =
+        typeof body.event_message === 'string'
+          ? body.event_message
+          : typeof message === 'string'
+            ? message.slice(0, 500)
+            : String(message);
 
       return {
         id: e.eventId || `${e.logStreamName || ''}-${e.timestamp || ''}`,
         // CloudWatch timestamp is in milliseconds
         timestamp: e.timestamp ? new Date(e.timestamp).toISOString() : new Date().toISOString(),
-        eventMessage:
-          typeof parsed === 'object' && parsed && (parsed as Record<string, unknown>).msg
-            ? String((parsed as Record<string, unknown>).msg)
-            : typeof message === 'string'
-              ? message.slice(0, 500)
-              : String(message),
-        body: parsed as Record<string, unknown>,
+        eventMessage,
+        body,
       };
     });
 
@@ -488,12 +484,6 @@ export class CloudWatchProvider extends BaseLogProvider {
     const mapped: (LogSchema & { source: string })[] = rows.map((r) => {
       const o = toObj(r);
       const msg = o['@message'] || '';
-      let parsed: Record<string, unknown> = {};
-      try {
-        parsed = JSON.parse(msg);
-      } catch {
-        parsed = { message: msg };
-      }
 
       const logStream: string = o['@logStream'] || '';
       const source: string = logStream.includes('postgrest')
@@ -504,19 +494,22 @@ export class CloudWatchProvider extends BaseLogProvider {
             ? 'function.logs'
             : 'insforge.logs';
 
+      const body = this.normalizeBody(msg, source);
+      const eventMessage =
+        typeof body.event_message === 'string'
+          ? body.event_message
+          : typeof msg === 'string'
+            ? msg.slice(0, 500)
+            : String(msg);
+
       return {
         id: `${o['@logStream']}-${o['@timestamp']}`,
         // CloudWatch Insights returns timestamp as string in milliseconds
         timestamp: o['@timestamp']
           ? new Date(parseInt(o['@timestamp'])).toISOString()
           : new Date().toISOString(),
-        eventMessage:
-          typeof parsed === 'object' && (parsed as Record<string, unknown>).msg
-            ? String((parsed as Record<string, unknown>).msg)
-            : typeof msg === 'string'
-              ? msg.slice(0, 500)
-              : String(msg),
-        body: parsed as Record<string, unknown>,
+        eventMessage,
+        body,
         source,
       };
     });
@@ -529,5 +522,137 @@ export class CloudWatchProvider extends BaseLogProvider {
 
   async close(): Promise<void> {
     // CloudWatch client doesn't need explicit closing
+  }
+
+  // Reshape a CloudWatch log line into the Vector-style body the dashboard
+  // historically consumed: { event_message, metadata: { level, ... }, ... }.
+  // The dashboard derives the severity badge from body.metadata.level, so any
+  // structured `level` field must be lifted into that nested location.
+  private normalizeBody(rawMessage: string, sourceName: string): Record<string, unknown> {
+    const message = rawMessage || '';
+
+    let parsed: unknown = null;
+    try {
+      parsed = JSON.parse(message);
+    } catch {
+      parsed = null;
+    }
+
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const obj = parsed as Record<string, unknown>;
+
+      // Already in Vector shape (has event_message + metadata.level or appname).
+      const meta = obj.metadata as Record<string, unknown> | undefined;
+      if (
+        typeof obj.event_message === 'string' &&
+        meta &&
+        typeof meta === 'object' &&
+        typeof (meta as Record<string, unknown>).level === 'string'
+      ) {
+        return obj;
+      }
+      if (typeof obj.appname === 'string') {
+        return obj;
+      }
+
+      // Winston-style structured log from the insforge backend:
+      // {"level":"error","message":"...","timestamp":"...","metadata":{...},"stack":"..."}
+      const level = typeof obj.level === 'string' ? obj.level : undefined;
+      const msgField =
+        typeof obj.message === 'string'
+          ? obj.message
+          : typeof obj.msg === 'string'
+            ? (obj.msg as string)
+            : '';
+
+      const existingMeta =
+        meta && typeof meta === 'object' && !Array.isArray(meta)
+          ? { ...(meta as Record<string, unknown>) }
+          : {};
+      if (level !== undefined) {
+        existingMeta.level = level;
+      }
+
+      let eventMessage = msgField;
+      if (level && level.toLowerCase() === 'error') {
+        if (typeof obj.error === 'string' && obj.error) {
+          eventMessage = `${eventMessage}\n\nError: ${obj.error as string}`;
+        }
+        if (typeof obj.stack === 'string' && obj.stack) {
+          eventMessage = `${eventMessage}\n\nStack Trace:\n${obj.stack as string}`;
+        }
+      }
+
+      const { message: _m, level: _l, metadata: _meta, ...rest } = obj;
+      void _m;
+      void _l;
+      void _meta;
+
+      return {
+        ...rest,
+        event_message: eventMessage || message,
+        metadata: existingMeta,
+      };
+    }
+
+    // Raw text line (no JSON). Apply per-source parsing that mirrors the
+    // original Vector remap rules so the dashboard's severity inference still
+    // works for postgres/postgREST stdout lines.
+    return this.parseRawLine(message, sourceName);
+  }
+
+  private parseRawLine(message: string, sourceName: string): Record<string, unknown> {
+    const metadata: Record<string, unknown> = {};
+
+    // Strip the [backend] prefix that the insforge container historically wrote.
+    const stripped = message.replace(/^\[backend\]\s*/, '');
+
+    if (sourceName === 'postgres.logs') {
+      const m = stripped.match(
+        /^(?<time>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}) (?<tz>\w+) \[(?<pid>\d+)\] (?<level>LOG|ERROR|WARNING|INFO|NOTICE|FATAL|PANIC|STATEMENT|DETAIL): (?<msg>.*)$/s
+      );
+      if (m && m.groups) {
+        let level = m.groups.level.toUpperCase();
+        if (level === 'STATEMENT' || level === 'DETAIL') {
+          level = 'INFO';
+        }
+        metadata.level = level;
+        metadata.parsed = { pid: m.groups.pid };
+        return { event_message: m.groups.msg, metadata };
+      }
+      metadata.level = 'LOG';
+      return { event_message: stripped, metadata };
+    }
+
+    if (sourceName === 'postgREST.logs') {
+      const m = stripped.match(
+        /^(?<time>\d{2}\/\w{3}\/\d{4}:\d{2}:\d{2}:\d{2} [+-]\d{4}): (?<msg>.*)$/s
+      );
+      if (m && m.groups) {
+        metadata.level = 'info';
+        return { event_message: m.groups.msg, metadata };
+      }
+      metadata.level = 'info';
+      return { event_message: stripped, metadata };
+    }
+
+    if (sourceName === 'function.logs') {
+      const m = stripped.match(/^(?<time>\d+:\d+:\d+\.\d+) \[(?<level>\w+)\] (?<msg>.*)$/s);
+      if (m && m.groups) {
+        metadata.level = m.groups.level.toUpperCase();
+        return { event_message: m.groups.msg, metadata };
+      }
+    }
+
+    // Conservative severity inference for anything else.
+    const lower = stripped.toLowerCase();
+    if (/\b(error|exception|fatal|panic)\b/.test(lower)) {
+      metadata.level = 'error';
+    } else if (/\b(warn|warning)\b/.test(lower)) {
+      metadata.level = 'warn';
+    } else {
+      metadata.level = 'info';
+    }
+    return { event_message: stripped, metadata };
   }
 }
