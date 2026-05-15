@@ -2,7 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { DeploymentService } from '@/services/deployments/deployment.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
-import { writeEndpointLimiter } from '@/api/middlewares/rate-limiters.js';
+import { deploymentsWriteLimiter } from '@/api/middlewares/rate-limiters.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
@@ -32,7 +32,7 @@ router.use('/env-vars', envVarsRouter);
 router.post(
   '/',
   verifyAdmin,
-  writeEndpointLimiter,
+  deploymentsWriteLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const response = await deploymentService.createDeployment();
@@ -60,7 +60,7 @@ router.post(
 router.post(
   '/direct',
   verifyAdmin,
-  writeEndpointLimiter,
+  deploymentsWriteLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const validationResult = createDirectDeploymentRequestSchema.safeParse(req.body);
@@ -94,7 +94,7 @@ router.post(
  * PUT /api/deployments/:id/files/:fileId/content
  */
 // Intentionally NOT rate-limited: this is the per-file content sub-step of a
-// direct deploy. The parent POST /direct already consumes a writeEndpointLimiter
+// direct deploy. The parent POST /direct already consumes a deploymentsWriteLimiter
 // token; capping each chunk separately would break legit deploys with >3 files.
 router.put(
   '/:id/files/:fileId/content',
@@ -156,7 +156,7 @@ router.put(
 router.post(
   '/:id/start',
   verifyAdmin,
-  writeEndpointLimiter,
+  deploymentsWriteLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
@@ -234,7 +234,7 @@ router.get(
 router.put(
   '/slug',
   verifyAdmin,
-  writeEndpointLimiter,
+  deploymentsWriteLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const validationResult = updateSlugRequestSchema.safeParse(req.body);
@@ -292,7 +292,7 @@ router.get(
 router.post(
   '/domains',
   verifyAdmin,
-  writeEndpointLimiter,
+  deploymentsWriteLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const validationResult = addCustomDomainRequestSchema.safeParse(req.body);
@@ -328,7 +328,7 @@ router.post(
 router.post(
   '/domains/:domain/verify',
   verifyAdmin,
-  writeEndpointLimiter,
+  deploymentsWriteLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const validationResult = domainParamSchema.safeParse(req.params.domain);
@@ -355,7 +355,7 @@ router.post(
 router.delete(
   '/domains/:domain',
   verifyAdmin,
-  writeEndpointLimiter,
+  deploymentsWriteLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const validationResult = domainParamSchema.safeParse(req.params.domain);
@@ -411,7 +411,7 @@ router.get('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: Ne
  */
 // Intentionally NOT rate-limited: this route triggers a Vercel GET
 // (vercelProvider.getDeployment) — a read, not a write. The
-// writeEndpointLimiter is reserved for endpoints that consume Vercel's
+// deploymentsWriteLimiter is reserved for endpoints that consume Vercel's
 // write quotas (deployment creation, env-var writes, domain CRUD).
 router.post(
   '/:id/sync',
@@ -440,7 +440,7 @@ router.post(
 router.post(
   '/:id/cancel',
   verifyAdmin,
-  writeEndpointLimiter,
+  deploymentsWriteLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;

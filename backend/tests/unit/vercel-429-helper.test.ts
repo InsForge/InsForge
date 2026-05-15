@@ -60,7 +60,9 @@ describe('withVercelRateLimitRetry', () => {
       throw err;
     });
 
-    await expect(withVercelRateLimitRetry(op, { maxRetries: 3, baseDelayMs: 1, maxDelayMs: 1, jitterMaxMs: 1 })).rejects.toThrow('boom');
+    await expect(
+      withVercelRateLimitRetry(op, { maxRetries: 3, baseDelayMs: 1, maxDelayMs: 1, jitterMaxMs: 1 })
+    ).rejects.toThrow('boom');
     expect(op).toHaveBeenCalledTimes(1);
   });
 
@@ -73,7 +75,9 @@ describe('withVercelRateLimitRetry', () => {
       throw err;
     });
 
-    await expect(withVercelRateLimitRetry(op, { maxRetries: 2, baseDelayMs: 1, maxDelayMs: 1, jitterMaxMs: 1 })).rejects.toThrow('429');
+    await expect(
+      withVercelRateLimitRetry(op, { maxRetries: 2, baseDelayMs: 1, maxDelayMs: 1, jitterMaxMs: 1 })
+    ).rejects.toThrow('429');
     expect(op).toHaveBeenCalledTimes(3); // initial + 2 retries
   });
 });

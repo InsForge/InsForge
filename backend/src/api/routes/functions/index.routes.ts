@@ -1,6 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
-import { writeEndpointLimiter } from '@/api/middlewares/rate-limiters.js';
+import { functionsWriteLimiter } from '@/api/middlewares/rate-limiters.js';
 import { FunctionService } from '@/services/functions/function.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/api/middlewares/error.js';
@@ -55,7 +55,7 @@ router.get('/:slug', verifyAdmin, async (req: AuthRequest, res: Response, next: 
 router.post(
   '/',
   verifyAdmin,
-  writeEndpointLimiter,
+  functionsWriteLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const validation = uploadFunctionRequestSchema.safeParse(req.body);
@@ -112,7 +112,7 @@ router.post(
 router.put(
   '/:slug',
   verifyAdmin,
-  writeEndpointLimiter,
+  functionsWriteLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { slug } = req.params;
@@ -167,7 +167,7 @@ router.put(
 router.delete(
   '/:slug',
   verifyAdmin,
-  writeEndpointLimiter,
+  functionsWriteLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { slug } = req.params;

@@ -168,37 +168,58 @@ export const sendEmailOTPLimiter = [
 export const verifyOTPLimiter = [verifyOTPRateLimiter];
 
 /**
- * Per-IP rate limiter for "write" endpoints that ultimately drive an external
- * provider call (Deno Subhosting deploy, Vercel deploy, Fly machine
- * create/update/destroy).
+ * Per-IP rate limiters for "write" endpoints that ultimately drive an external
+ * provider call.
  *
  * Goal: stop a single admin's runaway script from monopolising the platform's
- * shared Vercel `Token creation 32/hr`, Vercel `Deployments per 5min: 120`,
- * Fly `app deletions: 100/min`, or Deno `Deployments per hour: 60` quotas.
- * 3 writes / 5min / IP is generous for human-driven deploy/CRUD; CI loops are
+ * shared upstream provider quotas — Vercel `Token creation 32/hr`, Vercel
+ * `Deployments per 5min: 120`, Fly `app deletions: 100/min`, Deno
+ * `Deployments per hour: 60`, etc.
+ *
+ * Each provider category gets its own bucket so a noisy compute deploy loop
+ * cannot starve a legitimate function update (and vice versa). 3 writes /
+ * 5min / IP per category is generous for human-driven CRUD; CI loops are
  * expected to deploy once per commit and stay well below this.
  *
  * Counts ALL requests (skipFailedRequests: false) so a buggy script that
  * loops on a 4xx response can't bypass the cap.
  *
- * The budget is shared across ALL wired endpoints regardless of which route
- * file imports this export — a deploy create + an env-var write + a domain
- * add all count toward the same 3/5min per-IP total.
+ * Within a category, the budget is shared across every wired endpoint — e.g.
+ * a deploy create + an env-var write + a domain add all count toward the
+ * same per-IP `deployments` budget.
+ *
+ * E2E suites that exercise many write endpoints from one IP can opt out by
+ * setting `INSFORGE_DISABLE_WRITE_RATE_LIMIT=1`. The check is deliberately
+ * an explicit named flag (not `NODE_ENV`) so unit tests still exercise the
+ * limiter and prod can never accidentally bypass via test envs.
  */
-export const writeEndpointLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000, // 5 minutes
-  max: 3,
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (_req: Request, _res: Response, next: NextFunction) => {
-    next(
-      new AppError(
-        'Too many write requests. Please wait a few minutes and try again.',
-        429,
-        ERROR_CODES.TOO_MANY_REQUESTS
-      )
-    );
-  },
-  skipSuccessfulRequests: false,
-  skipFailedRequests: false,
-});
+export type WriteLimiterCategory = 'functions' | 'deployments' | 'compute';
+
+function isWriteRateLimitDisabled(): boolean {
+  return process.env.INSFORGE_DISABLE_WRITE_RATE_LIMIT === '1';
+}
+
+function createWriteEndpointLimiter(category: WriteLimiterCategory) {
+  return rateLimit({
+    windowMs: 5 * 60 * 1000, // 5 minutes
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: () => isWriteRateLimitDisabled(),
+    handler: (_req: Request, _res: Response, next: NextFunction) => {
+      next(
+        new AppError(
+          `Too many ${category} write requests. Please wait a few minutes and try again.`,
+          429,
+          ERROR_CODES.TOO_MANY_REQUESTS
+        )
+      );
+    },
+    skipSuccessfulRequests: false,
+    skipFailedRequests: false,
+  });
+}
+
+export const functionsWriteLimiter = createWriteEndpointLimiter('functions');
+export const deploymentsWriteLimiter = createWriteEndpointLimiter('deployments');
+export const computeWriteLimiter = createWriteEndpointLimiter('compute');

@@ -1,6 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
-import { writeEndpointLimiter } from '@/api/middlewares/rate-limiters.js';
+import { computeWriteLimiter } from '@/api/middlewares/rate-limiters.js';
 import { ComputeServicesService } from '@/services/compute/services.service.js';
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/api/middlewares/error.js';
@@ -71,7 +71,7 @@ router.get('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: Ne
 router.post(
   '/',
   verifyAdmin,
-  writeEndpointLimiter,
+  computeWriteLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const validation = createServiceSchema.safeParse(req.body);
@@ -108,7 +108,7 @@ router.post(
 router.post(
   '/deploy',
   verifyAdmin,
-  writeEndpointLimiter,
+  computeWriteLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const validation = createServiceSchema.safeParse(req.body);
@@ -146,7 +146,7 @@ router.post(
 router.post(
   '/:id/deploy-token',
   verifyAdmin,
-  writeEndpointLimiter,
+  computeWriteLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const svc = ComputeServicesService.getInstance();
@@ -168,7 +168,7 @@ router.post(
 router.patch(
   '/:id',
   verifyAdmin,
-  writeEndpointLimiter,
+  computeWriteLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const validation = updateServiceSchema.safeParse(req.body);
@@ -227,7 +227,7 @@ router.patch(
 router.delete(
   '/:id',
   verifyAdmin,
-  writeEndpointLimiter,
+  computeWriteLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const svc = ComputeServicesService.getInstance();
@@ -267,7 +267,7 @@ router.delete(
 router.post(
   '/:id/stop',
   verifyAdmin,
-  writeEndpointLimiter,
+  computeWriteLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const svc = ComputeServicesService.getInstance();
@@ -299,7 +299,7 @@ router.post(
 router.post(
   '/:id/start',
   verifyAdmin,
-  writeEndpointLimiter,
+  computeWriteLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const svc = ComputeServicesService.getInstance();

@@ -25,6 +25,7 @@ jobs:
           ADMIN_EMAIL=admin@example.com
           ADMIN_PASSWORD=test-admin-password-for-ci
           TEST_API_BASE=http://localhost:7130/api
+          INSFORGE_DISABLE_WRITE_RATE_LIMIT=1
           EOF
 
       - name: Start Docker Compose services
