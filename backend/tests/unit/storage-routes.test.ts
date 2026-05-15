@@ -36,7 +36,9 @@ const post = (port: number, path: string): Promise<{ statusCode: number; body: s
     request.end();
   });
 
-const routeErrorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
+const routeErrorHandler: ErrorRequestHandler = (error, _req, res, next) => {
+  void next;
+
   const statusCode =
     error instanceof Error && 'statusCode' in error && typeof error.statusCode === 'number'
       ? error.statusCode
