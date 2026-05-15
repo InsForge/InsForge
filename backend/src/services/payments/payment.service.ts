@@ -33,7 +33,7 @@ import {
   normalizeProductRow,
 } from '@/services/payments/helpers.js';
 import logger from '@/utils/logger.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import {
   STRIPE_ENVIRONMENTS,
   type StripeCheckoutSession,
@@ -415,7 +415,7 @@ export class PaymentService {
         throw new AppError(
           'No Stripe customer is mapped to this billing subject',
           404,
-          ERROR_CODES.NOT_FOUND
+          ERROR_CODES.PAYMENT_NOT_FOUND
         );
       }
 

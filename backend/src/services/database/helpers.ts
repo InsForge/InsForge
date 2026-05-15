@@ -1,5 +1,5 @@
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { validateIdentifier, validateSchemaName, validateTableName } from '@/utils/validations.js';
 
 export const DEFAULT_DATABASE_SCHEMA = 'public' as const;

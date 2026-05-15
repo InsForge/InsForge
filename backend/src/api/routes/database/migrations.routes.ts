@@ -10,7 +10,7 @@ import { DatabaseMigrationService } from '@/services/database/database-migration
 import { AuditService } from '@/services/logs/audit.service.js';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { successResponse } from '@/utils/response.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import { type DatabaseResourceUpdate } from '@/utils/sql-parser.js';
 

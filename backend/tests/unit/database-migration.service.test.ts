@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ERROR_CODES } from '../../src/types/error-constants';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 
 const {
   connectMock,

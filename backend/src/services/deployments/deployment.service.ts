@@ -10,7 +10,7 @@ import {
 } from '@/providers/deployments/vercel.provider.js';
 import { S3StorageProvider } from '@/providers/storage/s3.provider.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import {
   DeploymentStatus,
@@ -356,7 +356,7 @@ export class DeploymentService {
       const deployment = await this.getDeploymentById(id);
 
       if (!deployment) {
-        throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
       }
 
       if (
@@ -366,21 +366,21 @@ export class DeploymentService {
         throw new AppError(
           `Deployment files can only be uploaded while status is WAITING or UPLOADING. Current status: ${deployment.status}`,
           400,
-          ERROR_CODES.INVALID_INPUT
+          ERROR_CODES.DEPLOYMENT_INVALID_FILE
         );
       }
 
       const file = await this.getDeploymentFileById(id, fileId);
 
       if (!file) {
-        throw new AppError(`Deployment file not found: ${fileId}`, 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError(`Deployment file not found: ${fileId}`, 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
       }
 
       if (this.getUploadMode(deployment, 1) !== 'direct') {
         throw new AppError(
           'Deployment files can only be uploaded for direct deployments.',
           400,
-          ERROR_CODES.INVALID_INPUT
+          ERROR_CODES.DEPLOYMENT_INVALID_FILE
         );
       }
 
@@ -458,7 +458,7 @@ export class DeploymentService {
       const deployment = await this.getDeploymentById(id);
 
       if (!deployment) {
-        throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
       }
 
       if (
@@ -587,7 +587,7 @@ export class DeploymentService {
       await this.updateDeploymentStatus(id, DeploymentStatus.ERROR, {
         error: 'No files found in source zip.',
       });
-      throw new AppError('No files found in source zip.', 400, ERROR_CODES.INVALID_INPUT);
+      throw new AppError('No files found in source zip.', 400, ERROR_CODES.DEPLOYMENT_INVALID_FILE);
     }
 
     if (input.envVars && input.envVars.length > 0) {
@@ -753,7 +753,7 @@ export class DeploymentService {
       );
     }
     if (filePath.startsWith('/')) {
-      throw new AppError('Deployment file path must be relative.', 400, ERROR_CODES.INVALID_INPUT);
+      throw new AppError('Deployment file path must be relative.', 400, ERROR_CODES.DEPLOYMENT_INVALID_FILE);
     }
 
     const parts = filePath.split('/');
@@ -1164,7 +1164,7 @@ export class DeploymentService {
       const deployment = await this.getDeploymentById(id);
 
       if (!deployment) {
-        throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
       }
 
       // If deployment has a Vercel ID, cancel it on Vercel
@@ -1350,7 +1350,7 @@ export class DeploymentService {
         throw new AppError(
           errorData.error || 'Slug is already taken',
           409,
-          ERROR_CODES.ALREADY_EXISTS
+          ERROR_CODES.DEPLOYMENT_ALREADY_EXISTS
         );
       }
 

@@ -17,7 +17,7 @@ import {
   normalizeDatabaseSchemaName,
 } from '@/services/database/helpers.js';
 import { paginatedResponse, successResponse } from '@/utils/response.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import type { DatabaseResourceUpdate } from '@/utils/sql-parser.js';

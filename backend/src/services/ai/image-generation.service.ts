@@ -5,7 +5,7 @@ import type { ImageGenerationRequest, ImageGenerationResponse } from '@insforge/
 import logger from '@/utils/logger.js';
 import { OpenRouterImageMessage } from '@/types/ai.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 
 export class ImageGenerationService {
   private static openRouterProvider = OpenRouterProvider.getInstance();

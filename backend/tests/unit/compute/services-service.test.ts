@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 
 // --- Mocks ---
 
@@ -242,7 +243,7 @@ describe('ComputeServicesService', () => {
       // catching it and re-throwing as generic
       // "Compute service operation failed" 502 — losing the actual reason.
       const { AppError } = await import('@/api/middlewares/error.js');
-      const { ERROR_CODES } = await import('@/types/error-constants.js');
+      const { ERROR_CODES } = await import('@insforge/shared-schemas');
 
       const serviceId = 'svc-quota-test';
       mockQuery.mockResolvedValueOnce({
@@ -271,9 +272,12 @@ describe('ComputeServicesService', () => {
       // an AppError; replicate that shape — JSON string in `message`, status
       // code = HTTP status from cloud.
       const cloudQuotaError = new AppError(
-        '{"code":"COMPUTE_QUOTA_EXCEEDED","error":"Project e8a6b768 has reached 5 active services"}',
+        JSON.stringify({
+          code: ERROR_CODES.COMPUTE_QUOTA_EXCEEDED,
+          error: 'Project e8a6b768 has reached 5 active services',
+        }),
         403,
-        (ERROR_CODES as { COMPUTE_PROVIDER_ERROR: string }).COMPUTE_PROVIDER_ERROR
+        ERROR_CODES.COMPUTE_PROVIDER_ERROR
       );
       mockCreateApp.mockRejectedValue(cloudQuotaError);
 
@@ -290,7 +294,7 @@ describe('ComputeServicesService', () => {
       // Real bug: this used to be 502/COMPUTE_SERVICE_DEPLOY_FAILED. Should be
       // the cloud's actual code + message + status.
       expect(thrown!.statusCode).toBe(403);
-      expect(thrown!.code).toBe('COMPUTE_QUOTA_EXCEEDED');
+      expect(thrown!.code).toBe(ERROR_CODES.COMPUTE_QUOTA_EXCEEDED);
       expect(thrown!.message).toMatch(/has reached 5 active services/);
     });
   });
@@ -857,17 +861,17 @@ describe('ComputeServicesService', () => {
       // it back out and surface code/message/nextActions.
       const { AppError } = await import('@/api/middlewares/error.js');
       const cloudBody = JSON.stringify({
-        code: 'COMPUTE_QUOTA_EXCEEDED',
+        code: ERROR_CODES.COMPUTE_QUOTA_EXCEEDED,
         error: 'Project compute quota exceeded',
         nextActions: ['upgrade plan', 'delete unused services'],
       });
-      mockLaunchMachine.mockRejectedValue(new AppError(cloudBody, 403, 'COMPUTE_QUOTA_EXCEEDED'));
+      mockLaunchMachine.mockRejectedValue(new AppError(cloudBody, 403, ERROR_CODES.COMPUTE_QUOTA_EXCEEDED));
 
       await expect(
         service.updateService('svc-pa-1', { imageUrl: 'registry.fly.io/x:y' })
       ).rejects.toMatchObject({
         statusCode: 403,
-        code: 'COMPUTE_QUOTA_EXCEEDED',
+        code: ERROR_CODES.COMPUTE_QUOTA_EXCEEDED,
         message: 'Project compute quota exceeded',
       });
 

@@ -27,3 +27,5 @@ export * from './payments.schema.js';
 export * from './payments-api.schema.js';
 export * from './compute-services.schema.js';
 export * from './compute-services-api.schema.js';
+export * from './error-codes.js';
+export * from './error-contants';

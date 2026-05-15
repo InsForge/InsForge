@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { DatabaseError } from 'pg';
 import type { Request, Response } from 'express';
 import { errorMiddleware, AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 
 vi.mock('@/utils/logger.js', () => ({
   default: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },

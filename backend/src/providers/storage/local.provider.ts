@@ -4,7 +4,7 @@ import { UploadStrategyResponse, DownloadStrategyResponse } from '@insforge/shar
 import { StorageProvider, ObjectMetadata, GetObjectResult } from './base.provider.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 
 /**
  * Local filesystem storage implementation

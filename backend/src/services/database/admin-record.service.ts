@@ -1,6 +1,6 @@
 import { AppError } from '@/api/middlewares/error.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import type { DatabaseRecord } from '@/types/database.js';
 import { escapeSqlLikePattern, validateTableName } from '@/utils/validations.js';
 import { assertWritableDatabaseSchema, quoteIdentifier, quoteQualifiedName } from './helpers.js';

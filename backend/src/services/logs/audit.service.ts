@@ -2,7 +2,7 @@ import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import logger from '@/utils/logger.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import type { AuditLogEntry, AuditLogQuery } from '@/types/logs.js';
 import { AuditLogSchema, GetAuditLogStatsResponse } from '@insforge/shared-schemas';
 
