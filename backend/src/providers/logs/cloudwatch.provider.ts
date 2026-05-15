@@ -541,23 +541,21 @@ export class CloudWatchProvider extends BaseLogProvider {
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
       const obj = parsed as Record<string, unknown>;
 
-      // Already in Vector shape (has event_message + metadata.level or appname).
-      const meta = obj.metadata as Record<string, unknown> | undefined;
-      if (
-        typeof obj.event_message === 'string' &&
-        meta &&
-        typeof meta === 'object' &&
-        typeof (meta as Record<string, unknown>).level === 'string'
-      ) {
-        return obj;
-      }
-      if (typeof obj.appname === 'string') {
+      // Already in Vector shape: requires event_message + metadata.level (or
+      // an appname plus metadata.level) so the dashboard's severity badge
+      // works without further reshaping.
+      const meta =
+        obj.metadata && typeof obj.metadata === 'object' && !Array.isArray(obj.metadata)
+          ? (obj.metadata as Record<string, unknown>)
+          : undefined;
+      const metaLevel = meta && typeof meta.level === 'string' ? meta.level : undefined;
+      if (metaLevel && (typeof obj.event_message === 'string' || typeof obj.appname === 'string')) {
         return obj;
       }
 
       // Winston-style structured log from the insforge backend:
       // {"level":"error","message":"...","timestamp":"...","metadata":{...},"stack":"..."}
-      const level = typeof obj.level === 'string' ? obj.level : undefined;
+      const level = typeof obj.level === 'string' ? obj.level.toLowerCase() : undefined;
       const msgField =
         typeof obj.message === 'string'
           ? obj.message
@@ -565,16 +563,13 @@ export class CloudWatchProvider extends BaseLogProvider {
             ? (obj.msg as string)
             : '';
 
-      const existingMeta =
-        meta && typeof meta === 'object' && !Array.isArray(meta)
-          ? { ...(meta as Record<string, unknown>) }
-          : {};
+      const existingMeta = meta ? { ...meta } : {};
       if (level !== undefined) {
         existingMeta.level = level;
       }
 
       let eventMessage = msgField;
-      if (level && level.toLowerCase() === 'error') {
+      if (level === 'error') {
         if (typeof obj.error === 'string' && obj.error) {
           eventMessage = `${eventMessage}\n\nError: ${obj.error as string}`;
         }
@@ -583,10 +578,7 @@ export class CloudWatchProvider extends BaseLogProvider {
         }
       }
 
-      const { message: _m, level: _l, metadata: _meta, ...rest } = obj;
-      void _m;
-      void _l;
-      void _meta;
+      const { message: _m, msg: _msg, level: _l, metadata: _meta, ...rest } = obj;
 
       return {
         ...rest,
@@ -612,15 +604,23 @@ export class CloudWatchProvider extends BaseLogProvider {
         /^(?<time>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}) (?<tz>\w+) \[(?<pid>\d+)\] (?<level>LOG|ERROR|WARNING|INFO|NOTICE|FATAL|PANIC|STATEMENT|DETAIL): (?<msg>.*)$/s
       );
       if (m && m.groups) {
-        let level = m.groups.level.toUpperCase();
-        if (level === 'STATEMENT' || level === 'DETAIL') {
-          level = 'INFO';
+        // FATAL/PANIC are higher severity than ERROR in postgres but the
+        // dashboard only knows error/warn/info — promote them to error so
+        // they don't silently render as informational. STATEMENT/DETAIL are
+        // continuation lines for a preceding ERROR; treat them as info.
+        let level = m.groups.level.toLowerCase();
+        if (level === 'statement' || level === 'detail') {
+          level = 'info';
+        } else if (level === 'fatal' || level === 'panic') {
+          level = 'error';
+        } else if (level === 'warning') {
+          level = 'warn';
         }
         metadata.level = level;
         metadata.parsed = { pid: m.groups.pid };
         return { event_message: m.groups.msg, metadata };
       }
-      metadata.level = 'LOG';
+      metadata.level = 'log';
       return { event_message: stripped, metadata };
     }
 
@@ -639,7 +639,7 @@ export class CloudWatchProvider extends BaseLogProvider {
     if (sourceName === 'function.logs') {
       const m = stripped.match(/^(?<time>\d+:\d+:\d+\.\d+) \[(?<level>\w+)\] (?<msg>.*)$/s);
       if (m && m.groups) {
-        metadata.level = m.groups.level.toUpperCase();
+        metadata.level = m.groups.level.toLowerCase();
         return { event_message: m.groups.msg, metadata };
       }
     }
