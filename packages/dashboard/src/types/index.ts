@@ -66,6 +66,8 @@ export type DashboardMetricName =
   | 'cpu_usage'
   | 'memory_usage'
   | 'disk_usage'
+  | 'disk_used'
+  | 'disk_total'
   | 'network_in'
   | 'network_out';
 
