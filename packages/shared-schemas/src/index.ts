@@ -30,4 +30,4 @@ export * from './compute-services-api.schema.js';
 export * from './posthog.schema.js';
 export * from './posthog-api.schema.js';
 export * from './error-codes.js';
-export * from './error-contants.js';
+export * from './error-constants.js';
