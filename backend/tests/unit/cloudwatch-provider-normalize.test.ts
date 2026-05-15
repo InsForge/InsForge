@@ -19,9 +19,9 @@ const provider = new CloudWatchProvider();
 const normalizeBody: NormalizeFn = (
   provider as unknown as { normalizeBody: NormalizeFn }
 ).normalizeBody.bind(provider);
-const parseRawLine: ParseFn = (
-  provider as unknown as { parseRawLine: ParseFn }
-).parseRawLine.bind(provider);
+const parseRawLine: ParseFn = (provider as unknown as { parseRawLine: ParseFn }).parseRawLine.bind(
+  provider
+);
 
 describe('CloudWatchProvider.normalizeBody', () => {
   it('passes already-Vector-shaped payloads through unchanged', () => {
@@ -315,9 +315,9 @@ describe('CloudWatchProvider.parseRawLine - keyword fallback', () => {
   });
 
   it('defaults to info for benign text', () => {
-    expect(
-      (parseRawLine('routine message', 'unknown').metadata as { level: string }).level
-    ).toBe('info');
+    expect((parseRawLine('routine message', 'unknown').metadata as { level: string }).level).toBe(
+      'info'
+    );
   });
 
   it('strips the [backend] prefix before inferring level', () => {
