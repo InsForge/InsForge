@@ -91,6 +91,10 @@ curl "https://your-app.insforge.app/api/ai/models" \
   -H "Authorization: Bearer <INSFORGE_API_KEY>"
 ```
 
+<Warning>
+`GET /api/ai/models` now returns a flat array of model objects. Older AI proxy docs described a categorized object such as `{ "text": [...], "image": [...] }`; update existing callers that read category properties to filter by `inputModality` or `outputModality` instead.
+</Warning>
+
 Returns the normalized OpenRouter model catalog as an array:
 
 ```json
@@ -102,7 +106,9 @@ Returns the normalized OpenRouter model catalog as an array:
     "inputModality": ["text", "image"],
     "outputModality": ["text"],
     "inputPrice": 2.5,
-    "outputPrice": 10
+    "outputPrice": 10,
+    "inputPriceLabel": "$2.50 / 1M tokens",
+    "outputPriceLabel": "$10.00 / 1M tokens"
   }
 ]
 ```

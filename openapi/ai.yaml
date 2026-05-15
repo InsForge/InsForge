@@ -15,7 +15,7 @@ paths:
         - bearerAuth: []
       responses:
         '200':
-          description: List of available models categorized by type
+          description: Flat array of available models from the OpenRouter catalog
           content:
             application/json:
               schema:
@@ -190,10 +190,6 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-    apiKey:
-      type: apiKey
-      in: header
-      name: x-api-key
 
   schemas:
     ChatMessage:
@@ -500,71 +496,6 @@ components:
             url:
               type: string
               description: Can be a direct URL or data:image base64 URL
-
-    OpenRouterModel:
-      type: object
-      properties:
-        id:
-          type: string
-        name:
-          type: string
-        created:
-          type: integer
-        description:
-          type: string
-        architecture:
-          type: object
-          properties:
-            input_modalities:
-              type: array
-              items:
-                type: string
-            output_modalities:
-              type: array
-              items:
-                type: string
-            tokenizer:
-              type: string
-            instruct_type:
-              type: string
-        topProvider:
-          type: object
-          properties:
-            is_moderated:
-              type: boolean
-            context_length:
-              type: integer
-            max_completion_tokens:
-              type: integer
-        pricing:
-          type: object
-          properties:
-            prompt:
-              type: string
-            completion:
-              type: string
-            image:
-              type: string
-            request:
-              type: string
-            web_search:
-              type: string
-            internal_reasoning:
-              type: string
-            input_cache_read:
-              type: string
-            input_cache_write:
-              type: string
-        context_length:
-          type: integer
-        max_completion_tokens:
-          type: integer
-        per_request_limits:
-          type: object
-        supported_parameters:
-          type: array
-          items:
-            type: string
 
     ListModelsResponse:
       type: array
