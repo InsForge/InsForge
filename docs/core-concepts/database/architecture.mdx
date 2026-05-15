@@ -120,7 +120,7 @@ Tables are organized into dedicated schemas for better organization and security
 | **public** | User-created tables | PostgREST (auto-generated APIs) |
 | **auth** | Authentication & user data | Internal APIs only |
 | **storage** | File storage metadata | Internal APIs only |
-| **ai** | AI configuration & usage | Internal APIs only |
+| **ai** | Deprecated AI configuration & usage tables from older deployments | Internal migrations only |
 | **functions** | Edge function definitions | Internal APIs only |
 | **realtime** | Real-time pub/sub channels | Internal APIs only |
 | **system** | Core system data | Internal APIs only |
@@ -144,12 +144,12 @@ Tables are organized into dedicated schemas for better organization and security
 | `buckets` | Storage bucket configuration |
 | `objects` | File metadata and references |
 
-#### `ai` Schema (AI Integration)
+#### `ai` Schema (Deprecated AI Proxy)
 
 | Table | Purpose |
 |-------|---------|
-| `configs` | AI model configurations per project |
-| `usage` | AI token usage tracking |
+| `configs` | Deprecated model configuration table; dropped by current migrations when present |
+| `usage` | Deprecated token usage table; dropped by current migrations when present |
 
 #### `functions` Schema (Edge Functions)
 

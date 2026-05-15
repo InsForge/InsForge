@@ -1,455 +1,181 @@
 ---
 title: AI Architecture
-description: OpenRouter integration for chat completions and image generation
+description: OpenRouter key provisioning and direct model integration
 ---
 
 ## Overview
 
-InsForge provides unified AI capabilities through OpenRouter, giving you access to multiple LLM providers with a single API and consistent pricing model.
+InsForge Model Gateway provisions an OpenRouter API key and model catalog so developers can build AI features directly against OpenRouter. Application code should use OpenRouter's OpenAI-compatible API with the OpenAI SDK, not the deprecated InsForge AI proxy endpoints.
 
-## Technology Stack
+This gives applications the full OpenRouter feature surface: provider routing, model-specific parameters, multimodal inputs and outputs, embeddings, web search, image generation, video generation, and any new capabilities OpenRouter adds.
+
+## Architecture
 
 ```mermaid
 graph TB
-    Client[Client Application] --> SDK[InsForge SDK]
-    SDK --> AIAPI[AI API]
+    Dashboard[InsForge Dashboard] --> Key[Active OpenRouter Key]
+    Dashboard --> Catalog[OpenRouter Model Catalog]
+    Dashboard --> Metrics[OpenRouter Usage Overview]
 
-    AIAPI --> OpenRouter[OpenRouter API]
-    AIAPI --> DB[(PostgreSQL)]
+    App[Application Backend or Server Route] --> SDK[OpenAI SDK]
+    SDK --> OpenRouter[OpenRouter API]
 
     OpenRouter --> OpenAI[OpenAI]
     OpenRouter --> Anthropic[Anthropic]
     OpenRouter --> Google[Google]
-    OpenRouter --> More[& more]
+    OpenRouter --> More[Other Providers]
 
-    DB --> Config[AI Configurations]
-    DB --> Usage[Usage Tracking]
-
-    AIAPI --> Stream[SSE Streaming]
-
-    style Client fill:#1e293b,stroke:#475569,color:#e2e8f0
+    style Dashboard fill:#1e293b,stroke:#475569,color:#e2e8f0
+    style App fill:#166534,stroke:#22c55e,color:#dcfce7
     style SDK fill:#1e40af,stroke:#3b82f6,color:#dbeafe
-    style AIAPI fill:#166534,stroke:#22c55e,color:#dcfce7
     style OpenRouter fill:#c2410c,stroke:#fb923c,color:#fed7aa
-    style DB fill:#0e7490,stroke:#06b6d4,color:#cffafe
-    style OpenAI fill:#be185d,stroke:#ec4899,color:#fce7f3
-    style Anthropic fill:#6b21a8,stroke:#a855f7,color:#f3e8ff
-    style Google fill:#a16207,stroke:#facc15,color:#fef3c7
-    style More fill:#475569,stroke:#94a3b8,color:#e2e8f0
-    style Config fill:#0e7490,stroke:#22d3ee,color:#cffafe
-    style Usage fill:#0e7490,stroke:#22d3ee,color:#cffafe
-    style Stream fill:#166534,stroke:#4ade80,color:#dcfce7
 ```
 
-## Core Components
+## Model Gateway Role
 
-| Component | Technology | Purpose |
-|-----------|------------|---------|
-| **AI Gateway** | OpenRouter | Unified access to multiple AI providers |
-| **Chat Service** | Node.js + SSE | Handle chat completions with streaming |
-| **Image Service** | Async processing | Generate images via AI models |
-| **Configuration** | PostgreSQL | Store system prompts per project |
-| **Usage Tracking** | PostgreSQL | Monitor token usage |
-| **Response Format** | JSON/SSE | Standard and streaming responses |
+| Component | Purpose |
+|-----------|---------|
+| **Dashboard Quick Start** | Shows the active OpenRouter key and copyable OpenAI SDK examples |
+| **`GET /api/ai/openrouter/api-key`** | Returns the active OpenRouter key for admin copy workflows |
+| **`GET /api/ai/models`** | Returns the live OpenRouter model catalog, filtered with `output_modalities=all` |
+| **`GET /api/ai/overview`** | Returns key-level OpenRouter usage and activity charts when available |
+| **Application code** | Calls `https://openrouter.ai/api/v1` directly with the OpenAI SDK or HTTP |
 
-## Supported Models
+## OpenRouter Key Resolution
 
-InsForge provides access to models from multiple AI providers through our unified gateway. Use the format `provider/model` when specifying a model in SDK calls.
+InsForge resolves the active OpenRouter key from the deployment environment:
 
-| Provider | Models |
-|----------|--------|
-| **OpenAI** | `openai/gpt-5.2`, `openai/gpt-5`, `openai/gpt-5-mini`, `openai/gpt-4o`, `openai/gpt-4o-mini` |
-| **Anthropic** | `anthropic/claude-opus-4.5`, `anthropic/claude-sonnet-4.6`, `anthropic/claude-haiku-4.5`, `anthropic/claude-opus-4.1`, `anthropic/claude-sonnet-4.5`, `anthropic/claude-sonnet-4`, `anthropic/claude-3.5-haiku` |
-| **Google** | `google/gemini-2.0-flash-001`, `google/gemini-2.5-flash-lite`, `google/gemini-2.5-flash-image-preview`, `google/gemini-2.5-pro`, `google/gemini-3-pro-image-preview`, `google/gemini-3-flash-preview` |
-| **X-AI** | `x-ai/grok-4`, `x-ai/grok-4-fast`, `x-ai/grok-4.1-fast` |
-| **DeepSeek** | `deepseek/deepseek-v3.2`, `deepseek/deepseek-v3.2-exp`, `deepseek/deepseek-chat`, `deepseek/deepseek-r1` |
-| **Minimax** | `minimax/minimax-m2.1` |
-| **Z-AI** | `z-ai/glm-4.7`, `z-ai/glm-4.6` |
-| **Kimi** | `moonshotai/kimi-k2.5` |
+| Environment | Source |
+|-------------|--------|
+| **InsForge Cloud** | Cloud-managed OpenRouter credential fetched for the project |
+| **Self-hosted** | `OPENROUTER_API_KEY` from the backend environment |
+
+The dashboard exposes the active key to admins so they can copy it into their application server environment. Keep this key private and use it only from trusted backend code, server routes, functions, or local development scripts.
+
+## Direct OpenRouter Integration
+
+Install the OpenAI SDK:
+
+```bash
+npm install openai
+```
+
+Create a client that points at OpenRouter:
+
+```typescript
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  baseURL: 'https://openrouter.ai/api/v1',
+  apiKey: process.env.OPENROUTER_API_KEY,
+  defaultHeaders: {
+    'HTTP-Referer': 'https://your-app.example',
+    'X-Title': 'Your App',
+  },
+});
+
+const completion = await openai.chat.completions.create({
+  model: 'openai/gpt-4o',
+  messages: [{ role: 'user', content: 'Say this is a test.' }],
+});
+
+console.log(completion.choices[0]?.message?.content);
+```
 
 <Note>
-Model availability may vary. Use the `GET /api/ai/models` endpoint or `get-backend-metadata` MCP tool to get the current list of available models for your backend.
+OpenRouter documents the OpenAI SDK integration with `baseURL: "https://openrouter.ai/api/v1"` and bearer-token authentication. Use OpenRouter's docs for the latest model parameters and provider-specific capabilities.
+</Note>
+
+## Model Discovery
+
+The dashboard and `GET /api/ai/models` read the public OpenRouter model catalog directly. Model IDs use OpenRouter's `provider/model` format, such as:
+
+| Provider | Example model IDs |
+|----------|-------------------|
+| **OpenAI** | `openai/gpt-4o`, `openai/gpt-4o-mini` |
+| **Anthropic** | `anthropic/claude-sonnet-4.5`, `anthropic/claude-3.5-haiku` |
+| **Google** | `google/gemini-2.5-pro`, `google/gemini-2.5-flash-image` |
+| **xAI** | `x-ai/grok-4` |
+| **DeepSeek** | `deepseek/deepseek-chat`, `deepseek/deepseek-r1` |
+
+<Note>
+Model availability changes over time. Use the dashboard, `GET /api/ai/models`, or OpenRouter's model catalog for the current list.
 </Note>
 
 ## Capabilities
 
-| Capability | Description |
+Because app code calls OpenRouter directly, supported capabilities are determined by OpenRouter and the selected model:
+
+| Capability | Integration path |
+|------------|------------------|
+| **Chat completions** | OpenAI SDK `chat.completions.create()` with OpenRouter `baseURL` |
+| **Streaming** | OpenAI SDK streaming support |
+| **Reasoning** | OpenRouter `reasoning` parameters for supported models, including effort and reasoning-token controls |
+| **Tool calling** | OpenRouter/OpenAI-compatible tool definitions |
+| **Web search** | OpenRouter plugins or model-native web search parameters |
+| **Image inputs** | Multimodal message content for models that support vision |
+| **Image outputs** | Models that support `modalities: ['image', 'text']` |
+| **Embeddings** | OpenAI SDK `embeddings.create()` with an OpenRouter embedding model |
+| **Video generation** | OpenRouter video endpoints via HTTP |
+
+## Deprecated SDK and Proxy Surface
+
+The previous InsForge-hosted AI proxy remains available for existing apps, but it is deprecated. New integrations should not use these InsForge SDK methods:
+
+| SDK method | Replacement |
 |------------|-------------|
-| **Chat Completions** | Multi-turn conversations with streaming support |
-| **Tool Calling** | Let the AI invoke custom functions (e.g., database lookups, API calls) |
-| **Web Search** | Augment responses with real-time web results and citations |
-| **PDF/File Parsing** | Process PDFs and documents directly in chat (pdf-text, mistral-ocr, native engines) |
-| **Image Vision** | Analyze and describe images in conversations |
-| **Embeddings** | Generate vector embeddings for semantic search |
-| **Image Generation** | Create images from text prompts |
+| `insforge.ai.chat.completions.create()` | OpenAI SDK `chat.completions.create()` with `baseURL: "https://openrouter.ai/api/v1"` |
+| `insforge.ai.images.generate()` | OpenRouter image-capable models and multimodal output parameters |
+| `insforge.ai.embeddings.create()` | OpenAI SDK `embeddings.create()` with the OpenRouter `baseURL` |
 
-See SDK references for implementation details: [TypeScript](/sdks/typescript/ai) | [Swift](/sdks/swift/ai) | [Kotlin](/sdks/kotlin/ai)
+The matching backend proxy endpoints are also deprecated:
 
-## OpenRouter Integration
+| Method | Endpoint | Auth | Status |
+|--------|----------|------|--------|
+| POST | `/api/ai/chat/completion` | User | Deprecated compatibility proxy |
+| POST | `/api/ai/image/generation` | User | Deprecated compatibility proxy |
+| POST | `/api/ai/embeddings` | User | Deprecated compatibility proxy |
 
-### Why OpenRouter?
+Avoid adding new examples or new application code that depends on these routes. They hide OpenRouter-specific functionality and require InsForge to keep adapting request/response shapes as OpenRouter evolves.
 
-- **Single API**: One integration for multiple providers
-- **Unified Billing**: Consistent pricing across models
-- **Automatic Failover**: Fallback to alternative models
-- **Rate Limiting**: Built-in rate limit handling
+## Admin Helper Endpoints
 
-### Request Flow
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/api/ai/models` | Admin | List live OpenRouter models |
+| GET | `/api/ai/overview` | Admin | Show key-level usage and activity when available |
+| GET | `/api/ai/openrouter/api-key` | Admin | Return the active key and a masked display value |
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant InsForge
-    participant OpenRouter
-    participant Provider
-    
-    Client->>InsForge: Chat/Image Request
-    InsForge->>InsForge: Add system prompt
-    InsForge->>OpenRouter: Forward with API key
-    OpenRouter->>Provider: Route to model
-    Provider-->>OpenRouter: Model response
-    OpenRouter-->>InsForge: Unified response
-    InsForge->>InsForge: Track usage
-    InsForge-->>Client: Formatted response
-```
-
-## Chat Completions
-
-### Request Processing
-
-1. **Authentication**: Verify JWT token
-2. **Configuration**: Load project AI settings
-3. **System Prompt**: Prepend configured prompt
-4. **Model Selection**: Use specified or default model
-5. **OpenRouter Call**: Forward to OpenRouter
-6. **Response Handling**: Stream or batch response
-7. **Usage Tracking**: Record token usage
-
-### Streaming Architecture
-
-```javascript
-// Server-Sent Events (SSE) for streaming
-async function* streamChat(messages, options) {
-  const stream = await openRouter.chat.completions.create({
-    model: options.model,
-    messages: messages,
-    stream: true,
-    temperature: options.temperature,
-    max_tokens: options.maxTokens
-  });
-
-  for await (const chunk of stream) {
-    if (chunk.choices[0]?.delta?.content) {
-      yield { chunk: chunk.choices[0].delta.content };
-    }
-  }
-  
-  yield { done: true, tokenUsage: {...} };
-}
-```
-
-### Tool Calling
-
-Tool calling (function calling) lets the AI model invoke custom functions you define. The client sends tool definitions, the model decides when to call them, and the client executes the function and sends the result back.
-
-```mermaid
-sequenceDiagram
-    participant Client
-    participant InsForge
-    participant OpenRouter
-
-    Client->>InsForge: Chat request with tools[]
-    InsForge->>OpenRouter: Forward with tool definitions
-    OpenRouter-->>InsForge: Response with tool_calls
-    InsForge-->>Client: Return tool_calls
-
-    Client->>Client: Execute tool function
-    Client->>InsForge: Send tool result (role: "tool")
-    InsForge->>OpenRouter: Forward conversation
-    OpenRouter-->>InsForge: Final text response
-    InsForge-->>Client: Return response
-```
-
-### Response Formats
-
-**Non-streaming Response:**
-```json
-{
-  "response": "AI generated response text",
-  "model": "anthropic/claude-3.5-haiku",
-  "usage": {
-    "promptTokens": 150,
-    "completionTokens": 200,
-    "totalTokens": 350
-  }
-}
-```
-
-**Streaming Response (SSE):**
-```
-data: {"chunk": "The "}
-data: {"chunk": "answer "}
-data: {"chunk": "is..."}
-data: {"done": true, "tokenUsage": {...}}
-```
-
-## Image Generation
-
-### Generation Flow
-
-1. **Prompt Processing**: Validate and enhance prompt
-2. **Model Selection**: Choose appropriate image model
-3. **Size Configuration**: Set dimensions and quality
-4. **OpenRouter Request**: Send generation request
-5. **URL Generation**: Receive image URLs
-6. **Storage Integration**: Optional save to storage
-7. **Response Delivery**: Return URLs to client
-
-### Image Parameters
-
-| Parameter | Options | Description |
-|-----------|---------|-------------|
-| `model` | Model IDs | AI model to use |
-| `prompt` | String | Text description |
-| `size` | `512x512`, `1024x1024`, etc. | Image dimensions |
-| `quality` | `standard`, `hd` | Image quality |
-| `numImages` | 1-4 | Number of variations |
-| `style` | `vivid`, `natural` | Style preference |
-
-## Configuration Management
-
-### Database Schema
-
-```sql
-CREATE TABLE _ai_configs (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  modality VARCHAR(255) NOT NULL,     -- 'text' or 'image'
-  provider VARCHAR(255) NOT NULL,      -- 'openrouter'
-  model_id VARCHAR(255) UNIQUE NOT NULL,
-  system_prompt TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
-
-### System Prompts
-
-- Configured per project
-- Applied to all chat requests
-- Cannot be overridden by client
-- Support for multiple configurations
-
-## Usage Tracking
-
-### Metrics Collected
-
-```sql
-CREATE TABLE _ai_usage (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  config_id UUID NOT NULL,
-  input_tokens INT,
-  output_tokens INT,
-  image_count INT,
-  image_resolution TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  FOREIGN KEY (config_id) REFERENCES _ai_configs(id) ON DELETE NO ACTION
-);
-```
-
-## Security & Rate Limiting
+## Security Practices
 
 <CardGroup cols={2}>
-  <Card title="API Key Security" icon="key">
-    OpenRouter key stored server-side only
+  <Card title="Keep Keys Server-Side" icon="key">
+    Store `OPENROUTER_API_KEY` in server-only environment variables.
   </Card>
-  
-  <Card title="Request Validation" icon="shield-check">
-    Input sanitization and size limits
+
+  <Card title="Use Backend Routes" icon="shield-check">
+    Browser apps should call your own backend route, not OpenRouter directly with a public key.
   </Card>
-  
-  <Card title="Rate Limiting" icon="gauge">
-    Per-user and per-project limits
+
+  <Card title="Protect Project Credits" icon="gauge">
+    Gate AI routes with app-level auth, authorization, and input validation before spending provisioned credits.
   </Card>
-  
-  <Card title="Usage Quotas" icon="chart-pie">
-    Configurable token limits
-  </Card>
-  
-  <Card title="Content Filtering" icon="filter">
-    Optional content moderation
-  </Card>
-  
-  <Card title="Audit Logging" icon="file-lines">
-    Track all AI operations
+
+  <Card title="Use Current Model Docs" icon="book">
+    Check OpenRouter's model docs for supported parameters before relying on a capability.
   </Card>
 </CardGroup>
-
-## Error Handling
-
-### Error Types
-
-| Error | Code | Description |
-|-------|------|-------------|
-| **Model Not Found** | 400 | Invalid model ID |
-| **Rate Limited** | 429 | Too many requests |
-| **Token Limit** | 400 | Exceeds max tokens |
-| **OpenRouter Error** | 502 | Upstream provider issue |
-| **Quota Exceeded** | 402 | Usage limit reached |
-| **Invalid Input** | 400 | Malformed request |
-
-### Retry Strategy
-
-```javascript
-async function retryableRequest(fn, maxRetries = 3) {
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      return await fn();
-    } catch (error) {
-      if (error.status === 429) { // Rate limited
-        await sleep(Math.pow(2, i) * 1000); // Exponential backoff
-        continue;
-      }
-      throw error;
-    }
-  }
-}
-```
-
-## Performance Optimizations
-
-### Streaming Optimizations
-
-- **Server-Sent Events**: Real-time response streaming
-- **Chunked Transfer**: Efficient data streaming
-- **Keep-Alive**: Persistent connections for SSE
-- **Low Latency**: Direct OpenRouter integration
-
-### Future Optimizations
-
-- **Response Caching**: Cache for identical requests (coming soon)
-- **Batch Processing**: Multiple requests in parallel (coming soon)
-- **Embeddings Cache**: Store computed embeddings (coming soon)
-
-## API Endpoints
-
-### Chat Endpoints
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| POST | `/api/ai/chat/completion` | User | Send chat messages, supports streaming |
-
-### Image Endpoints
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| POST | `/api/ai/image/generation` | User | Generate images from text prompts |
-
-### Configuration Endpoints
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| GET | `/api/ai/models` | Admin | List available models |
-| GET | `/api/ai/configurations` | Admin | List AI configurations |
-| POST | `/api/ai/configurations` | Admin | Create AI configuration |
-| PATCH | `/api/ai/configurations/:id` | Admin | Update AI configuration |
-| DELETE | `/api/ai/configurations/:id` | Admin | Delete AI configuration |
-
-### Usage Tracking Endpoints
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| GET | `/api/ai/usage` | Admin | Get usage records with pagination |
-| GET | `/api/ai/usage/summary` | Admin | Get usage summary statistics |
-| GET | `/api/ai/usage/config/:configId` | Admin | Get usage by configuration |
-
-## Gateway Credentials & BYOK
-
-InsForge resolves the OpenRouter API key using the following priority order:
-
-| Priority | Source | Description |
-|----------|--------|-------------|
-| 1 | **BYOK (Bring Your Own Key)** | Developer-provided key, configured from the dashboard. Stored encrypted in the database. |
-| 2 | **Cloud-managed** | Automatically fetched from InsForge Cloud (cloud projects only). |
-| 3 | **Environment variable** | `OPENROUTER_API_KEY` from the server environment (self-hosted fallback). |
-
-The first available source wins. For example, if a BYOK key is configured, it is always used regardless of whether a cloud-managed or environment key is also available.
-
-### Managing BYOK Keys
-
-Admins can set, replace, or remove a BYOK key from the **AI** page in the dashboard under **Gateway Credentials**. The key is validated against OpenRouter before being saved. Removing a BYOK key reverts to the next available source (cloud-managed or environment variable).
-
-### Usage Tracking
-
-Usage (token counts, image counts, model usage) is tracked regardless of which credential source is active. This gives admins a unified view of AI usage across all key sources. Note that when a BYOK key is active, billing goes directly to the developer's OpenRouter account.
-
-### API Endpoints
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| GET | `/api/ai/gateway/config` | Admin | Get current credential source and masked key status |
-| POST | `/api/ai/gateway/config` | Admin | Set or replace the BYOK OpenRouter key |
-| DELETE | `/api/ai/gateway/config` | Admin | Remove the BYOK key, reverting to the default source |
-
-## Environment Variables
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `OPENROUTER_API_KEY` | OpenRouter API key (self-hosted fallback) | Only if no BYOK or cloud-managed key |
-
-**Note**:
-- In cloud environments, the API key is fetched dynamically from the cloud API unless a BYOK key is configured
-- A BYOK key configured from the dashboard always takes precedence over other sources
-- Model configuration is stored in the database (`_ai_configs` table)
-- No other AI-related environment variables are used
-
-## Best Practices
-
-<CardGroup cols={2}>
-  <Card title="Model Selection" icon="brain">
-    Choose models based on speed vs quality needs
-  </Card>
-  
-  <Card title="Prompt Engineering" icon="pencil">
-    Craft clear, specific prompts for better results
-  </Card>
-  
-  <Card title="Token Management" icon="coins">
-    Monitor token usage
-  </Card>
-  
-  <Card title="Streaming UX" icon="stream">
-    Use streaming for better perceived performance
-  </Card>
-  
-  <Card title="Error Recovery" icon="rotate">
-    Implement retry logic for transient failures
-  </Card>
-  
-  <Card title="Context Windows" icon="window">
-    Manage conversation history within limits
-  </Card>
-</CardGroup>
-
-## Comparison with Direct Integration
-
-| Aspect | InsForge + OpenRouter | Direct Provider APIs |
-|--------|----------------------|---------------------|
-| **Integration Effort** | Single API | Multiple integrations |
-| **Billing** | Unified through OpenRouter | Separate per provider |
-| **Model Access** | 100+ models | Limited to one provider |
-| **Failover** | Automatic | Manual implementation |
-| **Rate Limiting** | Handled by OpenRouter | Per-provider limits |
 
 ## SDK References
 
-Choose the AI SDK guide for your platform:
+Choose the AI integration guide for your platform:
 
 <CardGroup cols={2}>
   <Card title="TypeScript" icon="js" href="/sdks/typescript/ai">
-    Web and Node.js applications with streaming chat and image generation
+    OpenAI SDK setup for Node.js, Next.js, and server-side TypeScript apps
   </Card>
 
-  <Card title="Swift" icon="swift" href="/sdks/swift/ai">
-    iOS, macOS, tvOS, and watchOS with async/await streaming support
-  </Card>
-
-  <Card title="Kotlin" icon="android" href="/sdks/kotlin/ai">
-    Android applications with Flow-based streaming responses
+  <Card title="REST" icon="code" href="/sdks/rest/ai">
+    Direct HTTP examples for OpenRouter plus InsForge admin helper endpoints
   </Card>
 </CardGroup>

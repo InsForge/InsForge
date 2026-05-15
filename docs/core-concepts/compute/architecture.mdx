@@ -183,8 +183,8 @@ All endpoints require admin auth (`Authorization: Bearer <jwt>` or `x-api-key: i
     The current API only models long-running services. Scheduled tasks and one-shot jobs are not in the current release.
   </Card>
 
-  <Card title="No BYOK in the dashboard" icon="key">
-    `FLY_API_TOKEN` is read from the environment only. There's no in-dashboard token entry form (unlike Model Gateway BYOK). If you want to swap tokens, edit `.env` and restart.
+  <Card title="No token entry in the dashboard" icon="key">
+    `FLY_API_TOKEN` is read from the environment only. If you want to swap tokens, edit `.env` and restart.
   </Card>
 </CardGroup>
 

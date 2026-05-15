@@ -2,13 +2,13 @@ openapi: 3.0.3
 info:
   title: Insforge AI API
   version: 1.0.0
-  description: AI services for chat and image generation with OpenRouter integration
+  description: Model Gateway helper APIs for OpenRouter key provisioning, model discovery, and deprecated compatibility proxy routes
 
 paths:
   /api/ai/models:
     get:
       summary: Get all available AI models
-      description: Returns list of all available text and image models from OpenRouter
+      description: Returns the normalized OpenRouter model catalog fetched from OpenRouter with output_modalities=all.
       tags:
         - Admin
       security:
@@ -27,7 +27,7 @@ paths:
 
   /api/ai/overview:
     get:
-      summary: Get AI Gateway overview
+      summary: Get Model Gateway overview
       description: Returns key-level OpenRouter usage and activity time series when the key has activity access.
       tags:
         - Admin
@@ -45,31 +45,23 @@ paths:
         '500':
           description: Failed to fetch overview
 
-  /api/ai/{provider}/api-key:
+  /api/ai/openrouter/api-key:
     get:
-      summary: Get active provider API key
-      description: Returns the active API key details for the specified Model Gateway provider.
+      summary: Get active OpenRouter API key
+      description: Returns the active OpenRouter API key details for admin copy workflows.
       tags:
         - Admin
       security:
         - bearerAuth: []
-      parameters:
-        - in: path
-          name: provider
-          required: true
-          schema:
-            type: string
-            enum: [openrouter]
-          description: AI provider identifier.
       responses:
         '200':
-          description: Active provider API key details
+          description: Active OpenRouter API key details
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/OpenRouterKeyResponse'
         '400':
-          description: Unsupported provider or missing API key
+          description: Missing OpenRouter API key
         '401':
           description: Unauthorized
         '500':
@@ -77,8 +69,9 @@ paths:
 
   /api/ai/chat/completion:
     post:
-      summary: Generate chat completion
-      description: Send a chat message to any supported model with optional streaming
+      summary: Generate chat completion (deprecated)
+      deprecated: true
+      description: Deprecated compatibility proxy. New integrations should call https://openrouter.ai/api/v1/chat/completions directly with the provisioned OpenRouter key.
       tags:
         - Client
       security:
@@ -109,8 +102,9 @@ paths:
 
   /api/ai/image/generation:
     post:
-      summary: Generate images
-      description: Generate images using specified model and prompt
+      summary: Generate images (deprecated)
+      deprecated: true
+      description: Deprecated compatibility proxy. New integrations should use OpenRouter image-capable models directly with the provisioned OpenRouter key.
       tags:
         - Client
       security:
@@ -163,8 +157,9 @@ paths:
 
   /api/ai/embeddings:
     post:
-      summary: Generate embeddings
-      description: Generate vector embeddings for text input using specified embedding model
+      summary: Generate embeddings (deprecated)
+      deprecated: true
+      description: Deprecated compatibility proxy. New integrations should call https://openrouter.ai/api/v1/embeddings directly with the provisioned OpenRouter key.
       tags:
         - Client
       security:
@@ -227,6 +222,7 @@ components:
       type: object
       required:
         - model
+        - messages
       properties:
         model:
           type: string
@@ -254,9 +250,6 @@ components:
           minimum: 0
           maximum: 1
           description: Nucleus sampling parameter
-        systemPrompt:
-          type: string
-          description: System prompt to guide model behavior
         webSearch:
           $ref: '#/components/schemas/WebSearchPlugin'
         fileParser:
@@ -574,36 +567,45 @@ components:
             type: string
 
     ListModelsResponse:
+      type: array
+      description: Normalized OpenRouter model catalog returned by GET /api/ai/models.
+      items:
+        $ref: '#/components/schemas/AIModel'
+
+    AIModel:
       type: object
       properties:
-        text:
+        id:
+          type: string
+          example: openai/gpt-4o
+        created:
+          type: integer
+        inputModality:
           type: array
           items:
-            type: object
-            properties:
-              provider:
-                type: string
-                example: openrouter
-              configured:
-                type: boolean
-              models:
-                type: array
-                items:
-                  $ref: '#/components/schemas/OpenRouterModel'
-        image:
+            type: string
+          example: [text, image]
+        outputModality:
           type: array
           items:
-            type: object
-            properties:
-              provider:
-                type: string
-                example: openrouter
-              configured:
-                type: boolean
-              models:
-                type: array
-                items:
-                  $ref: '#/components/schemas/OpenRouterModel'
+            type: string
+          example: [text]
+        provider:
+          type: string
+          example: openrouter
+        modelId:
+          type: string
+          example: openai/gpt-4o
+        inputPrice:
+          type: number
+          description: Input price per million tokens in USD when token pricing is available.
+        outputPrice:
+          type: number
+          description: Output price per million tokens in USD when token pricing is available.
+        inputPriceLabel:
+          type: string
+        outputPriceLabel:
+          type: string
 
     OpenRouterKeyResponse:
       type: object
