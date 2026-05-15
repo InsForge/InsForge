@@ -2,67 +2,48 @@ import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import type { PosthogProvider } from './base.provider.js';
 
-export class LocalPosthogProvider implements PosthogProvider {
-  private throwUnsupported(): never {
-    throw new AppError(
+function unsupported(): Promise<never> {
+  return Promise.reject(
+    new AppError(
       'PostHog integration is only available on Insforge Cloud, not in self-hosted mode.',
       501,
       ERROR_CODES.NOT_IMPLEMENTED
-    );
-  }
+    )
+  );
+}
 
-  async getConnection() {
-    await Promise.resolve();
-    return this.throwUnsupported();
+export class LocalPosthogProvider implements PosthogProvider {
+  getConnection() {
+    return unsupported();
   }
-
-  async getDashboards() {
-    await Promise.resolve();
-    return this.throwUnsupported();
+  getDashboards() {
+    return unsupported();
   }
-
-  async getSummary() {
-    await Promise.resolve();
-    return this.throwUnsupported();
+  getSummary() {
+    return unsupported();
   }
-
-  async getRecentEvents() {
-    await Promise.resolve();
-    return this.throwUnsupported();
+  getRecentEvents() {
+    return unsupported();
   }
-
-  async disconnect() {
-    await Promise.resolve();
-    return this.throwUnsupported();
+  disconnect() {
+    return unsupported();
   }
-
-  async getWebOverview() {
-    await Promise.resolve();
-    return this.throwUnsupported();
+  getWebOverview() {
+    return unsupported();
   }
-
-  async getWebStats() {
-    await Promise.resolve();
-    return this.throwUnsupported();
+  getWebStats() {
+    return unsupported();
   }
-
-  async getTrends() {
-    await Promise.resolve();
-    return this.throwUnsupported();
+  getTrends() {
+    return unsupported();
   }
-
-  async getRetention() {
-    await Promise.resolve();
-    return this.throwUnsupported();
+  getRetention() {
+    return unsupported();
   }
-
-  async getRecordings() {
-    await Promise.resolve();
-    return this.throwUnsupported();
+  getRecordings() {
+    return unsupported();
   }
-
-  async createRecordingShare() {
-    await Promise.resolve();
-    return this.throwUnsupported();
+  createRecordingShare() {
+    return unsupported();
   }
 }

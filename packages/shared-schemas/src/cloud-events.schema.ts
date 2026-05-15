@@ -125,7 +125,7 @@ export const posthogConnectionStatusEventSchema = z.object({
 
 export const posthogConnectRequestEventSchema = z.object({
   type: z.literal('POSTHOG_CONNECT_REQUEST'),
-  projectId: z.string(),
+  projectId: z.string().uuid(),
   timestamp: z.number(),
 });
 

@@ -1,6 +1,6 @@
 /** ISO-2 country code → flag emoji (Unicode regional-indicator math). */
 export function flagEmoji(iso: string): string {
-  if (!iso || iso.length !== 2) {
+  if (!iso || !/^[A-Za-z]{2}$/.test(iso)) {
     return '';
   }
   const upper = iso.toUpperCase();

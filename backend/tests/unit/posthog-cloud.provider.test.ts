@@ -21,6 +21,7 @@ interface MockAxiosError extends Error {
 // Axios mock factory — must be hoisted
 const axiosGetMock = vi.fn();
 const axiosDeleteMock = vi.fn();
+const axiosPostMock = vi.fn();
 const axiosIsAxiosError = vi.fn((err: unknown) => {
   return (err as { __isAxiosError?: boolean })?.__isAxiosError === true;
 });
@@ -30,6 +31,7 @@ vi.mock('axios', () => {
     default: {
       get: axiosGetMock,
       delete: axiosDeleteMock,
+      post: axiosPostMock,
       isAxiosError: axiosIsAxiosError,
     },
   };
@@ -218,6 +220,235 @@ describe('CloudPosthogProvider', () => {
       axiosDeleteMock.mockRejectedValueOnce(makeAxiosError(500));
 
       await expect(CloudPosthogProvider.getInstance().disconnect()).rejects.toMatchObject({
+        statusCode: 502,
+        code: ERROR_CODES.UPSTREAM_FAILURE,
+      });
+    });
+  });
+
+  describe('getWebOverview', () => {
+    it('forwards timeframe and parses response', async () => {
+      axiosGetMock.mockResolvedValueOnce({
+        data: {
+          items: [
+            {
+              key: 'visitors',
+              value: 100,
+              previous: 80,
+              changeFromPreviousPct: 25,
+              isIncreaseBad: false,
+            },
+          ],
+        },
+      });
+
+      const out = await CloudPosthogProvider.getInstance().getWebOverview('7d');
+      expect(out.items).toHaveLength(1);
+      expect(out.items[0].key).toEqual('visitors');
+
+      const call = axiosGetMock.mock.calls[0];
+      expect(call[0]).toEqual(`${apiHost}/projects/v1/${projectId}/posthog/web-overview`);
+      expect(call[1].params.timeframe).toEqual('7d');
+    });
+
+    it('throws AppError with NOT_FOUND on 404', async () => {
+      axiosGetMock.mockRejectedValueOnce(makeAxiosError(404));
+      await expect(
+        CloudPosthogProvider.getInstance().getWebOverview('7d')
+      ).rejects.toMatchObject({
+        statusCode: 404,
+        code: ERROR_CODES.NOT_FOUND,
+      });
+    });
+
+    it('throws AppError with UPSTREAM_FAILURE on network error', async () => {
+      axiosGetMock.mockRejectedValueOnce(new Error('Network Error'));
+      await expect(
+        CloudPosthogProvider.getInstance().getWebOverview('7d')
+      ).rejects.toMatchObject({
+        statusCode: 502,
+        code: ERROR_CODES.UPSTREAM_FAILURE,
+      });
+    });
+  });
+
+  describe('getWebStats', () => {
+    it('forwards breakdown and timeframe and parses response', async () => {
+      axiosGetMock.mockResolvedValueOnce({
+        data: {
+          rows: [
+            { breakdownValue: '/home', visitors: 50, views: 100, uiFillFraction: 1.0 },
+          ],
+        },
+      });
+
+      const out = await CloudPosthogProvider.getInstance().getWebStats('Page', '7d');
+      expect(out.rows).toHaveLength(1);
+      expect(out.rows[0].breakdownValue).toEqual('/home');
+
+      const call = axiosGetMock.mock.calls[0];
+      expect(call[0]).toEqual(`${apiHost}/projects/v1/${projectId}/posthog/web-stats`);
+      expect(call[1].params).toEqual({ breakdown: 'Page', timeframe: '7d' });
+    });
+
+    it('throws AppError with UPSTREAM_FAILURE on network error', async () => {
+      axiosGetMock.mockRejectedValueOnce(new Error('Network Error'));
+      await expect(
+        CloudPosthogProvider.getInstance().getWebStats('Page', '7d')
+      ).rejects.toMatchObject({
+        statusCode: 502,
+        code: ERROR_CODES.UPSTREAM_FAILURE,
+      });
+    });
+  });
+
+  describe('getTrends', () => {
+    it('forwards metric and timeframe and parses response', async () => {
+      axiosGetMock.mockResolvedValueOnce({
+        data: {
+          series: [
+            { date: '2026-05-01', count: 10 },
+            { date: '2026-05-02', count: 12 },
+          ],
+        },
+      });
+
+      const out = await CloudPosthogProvider.getInstance().getTrends('visitors', '7d');
+      expect(out.series).toHaveLength(2);
+
+      const call = axiosGetMock.mock.calls[0];
+      expect(call[0]).toEqual(`${apiHost}/projects/v1/${projectId}/posthog/trends`);
+      expect(call[1].params).toEqual({ metric: 'visitors', timeframe: '7d' });
+    });
+
+    it('throws AppError with NOT_FOUND on 404', async () => {
+      axiosGetMock.mockRejectedValueOnce(makeAxiosError(404));
+      await expect(
+        CloudPosthogProvider.getInstance().getTrends('visitors', '7d')
+      ).rejects.toMatchObject({
+        statusCode: 404,
+        code: ERROR_CODES.NOT_FOUND,
+      });
+    });
+  });
+
+  describe('getRetention', () => {
+    it('parses retention response', async () => {
+      axiosGetMock.mockResolvedValueOnce({
+        data: {
+          rows: [
+            {
+              date: '2026-04-29',
+              label: 'Week 0',
+              values: [{ count: 100 }, { count: 50 }, { count: null }],
+            },
+          ],
+        },
+      });
+
+      const out = await CloudPosthogProvider.getInstance().getRetention();
+      expect(out.rows).toHaveLength(1);
+      expect(out.rows[0].values).toHaveLength(3);
+
+      const call = axiosGetMock.mock.calls[0];
+      expect(call[0]).toEqual(`${apiHost}/projects/v1/${projectId}/posthog/retention`);
+    });
+
+    it('throws AppError with UPSTREAM_FAILURE on network error', async () => {
+      axiosGetMock.mockRejectedValueOnce(new Error('Network Error'));
+      await expect(CloudPosthogProvider.getInstance().getRetention()).rejects.toMatchObject({
+        statusCode: 502,
+        code: ERROR_CODES.UPSTREAM_FAILURE,
+      });
+    });
+  });
+
+  describe('getRecordings', () => {
+    it('forwards limit and parses response', async () => {
+      axiosGetMock.mockResolvedValueOnce({
+        data: {
+          items: [
+            {
+              id: 'r1',
+              distinctId: 'u1',
+              durationSeconds: 60,
+              startTime: '2026-05-01T00:00:00Z',
+              endTime: '2026-05-01T00:01:00Z',
+              startUrl: '/home',
+              clickCount: 3,
+              consoleErrorCount: 0,
+            },
+          ],
+        },
+      });
+
+      const out = await CloudPosthogProvider.getInstance().getRecordings(20);
+      expect(out.items).toHaveLength(1);
+
+      const call = axiosGetMock.mock.calls[0];
+      expect(call[0]).toEqual(`${apiHost}/projects/v1/${projectId}/posthog/recordings`);
+      expect(call[1].params.limit).toEqual(20);
+    });
+
+    it('default limit is 10', async () => {
+      axiosGetMock.mockResolvedValueOnce({ data: { items: [] } });
+      await CloudPosthogProvider.getInstance().getRecordings();
+      const call = axiosGetMock.mock.calls[0];
+      expect(call[1].params.limit).toEqual(10);
+    });
+
+    it('throws AppError with NOT_FOUND on 404', async () => {
+      axiosGetMock.mockRejectedValueOnce(makeAxiosError(404));
+      await expect(CloudPosthogProvider.getInstance().getRecordings()).rejects.toMatchObject({
+        statusCode: 404,
+        code: ERROR_CODES.NOT_FOUND,
+      });
+    });
+  });
+
+  describe('createRecordingShare', () => {
+    it('POSTs to the correct URL with URL-encoded id and parses response', async () => {
+      axiosPostMock.mockResolvedValueOnce({
+        data: { embedUrl: 'https://us.posthog.com/embedded/abc' },
+      });
+
+      const out = await CloudPosthogProvider.getInstance().createRecordingShare('rec id/1');
+      expect(out.embedUrl).toEqual('https://us.posthog.com/embedded/abc');
+
+      const call = axiosPostMock.mock.calls[0];
+      expect(call[0]).toEqual(
+        `${apiHost}/projects/v1/${projectId}/posthog/recordings/rec%20id%2F1/share`
+      );
+    });
+
+    it('rejects non-posthog.com embedUrl as schema violation (502)', async () => {
+      axiosPostMock.mockResolvedValueOnce({
+        data: { embedUrl: 'https://evil.example.com/embedded/abc' },
+      });
+
+      await expect(
+        CloudPosthogProvider.getInstance().createRecordingShare('rec1')
+      ).rejects.toMatchObject({
+        statusCode: 502,
+        code: ERROR_CODES.UPSTREAM_FAILURE,
+      });
+    });
+
+    it('throws AppError with NOT_FOUND on 404', async () => {
+      axiosPostMock.mockRejectedValueOnce(makeAxiosError(404));
+      await expect(
+        CloudPosthogProvider.getInstance().createRecordingShare('rec1')
+      ).rejects.toMatchObject({
+        statusCode: 404,
+        code: ERROR_CODES.NOT_FOUND,
+      });
+    });
+
+    it('throws AppError with UPSTREAM_FAILURE on network error', async () => {
+      axiosPostMock.mockRejectedValueOnce(new Error('Network Error'));
+      await expect(
+        CloudPosthogProvider.getInstance().createRecordingShare('rec1')
+      ).rejects.toMatchObject({
         statusCode: 502,
         code: ERROR_CODES.UPSTREAM_FAILURE,
       });

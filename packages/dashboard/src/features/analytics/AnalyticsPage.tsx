@@ -85,7 +85,6 @@ export function AnalyticsPage() {
   }
 
   const c = conn.data;
-  const hasConnection = true;
 
   return (
     <TimeRangeProvider>
@@ -126,14 +125,14 @@ export function AnalyticsPage() {
             to appear here.
           </p>
         </div>
-        <KpiSectionWithTrend enabled={hasConnection} />
+        <KpiSectionWithTrend enabled />
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          <BreakdownPanel breakdown="Page" enabled={hasConnection} />
-          <BreakdownPanel breakdown="Country" enabled={hasConnection} />
-          <BreakdownPanel breakdown="DeviceType" enabled={hasConnection} />
+          <BreakdownPanel breakdown="Page" enabled />
+          <BreakdownPanel breakdown="Country" enabled />
+          <BreakdownPanel breakdown="DeviceType" enabled />
         </div>
-        <RetentionCard enabled={hasConnection} />
-        <RecentReplaysCard enabled={hasConnection} />
+        <RetentionCard enabled />
+        <RecentReplaysCard enabled />
         <DisconnectDialog open={disconnecting} onClose={() => setDisconnecting(false)} />
       </div>
     </TimeRangeProvider>

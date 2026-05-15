@@ -56,11 +56,13 @@ import VisualizerLayout from '#features/visualizer/components/VisualizerLayout';
 import VisualizerPage from '#features/visualizer/pages/VisualizerPage';
 import AppLayout from '#layout/AppLayout';
 import { getFeatureFlag } from '#lib/analytics/posthog';
+import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
 
 function AuthenticatedRoutes() {
   const dashboardVariant = getFeatureFlag('dashboard-v4-experiment');
   const isDTest = dashboardVariant === 'd_test';
   const DashboardHomePage = isDTest ? DTestDashboardPage : DashboardPage;
+  const isCloudHosting = useIsCloudHostingMode();
 
   return (
     <AppLayout>
@@ -140,7 +142,7 @@ function AuthenticatedRoutes() {
           <Route path="domains" element={<DeploymentDomainsPage />} />
         </Route>
         <Route path="/dashboard/compute" element={<ComputePage />} />
-        <Route path="/dashboard/analytics" element={<AnalyticsPage />} />
+        {isCloudHosting && <Route path="/dashboard/analytics" element={<AnalyticsPage />} />}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </AppLayout>

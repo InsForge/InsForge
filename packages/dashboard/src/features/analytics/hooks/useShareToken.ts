@@ -21,8 +21,10 @@ export function useShareToken(recordingId: string | null, enabled: boolean) {
       return posthogApi.createRecordingShare(recordingId);
     },
     enabled: enabled && !!recordingId,
-    staleTime: 5 * 60_000,
-    gcTime: 5 * 60_000,
+    // PostHog share tokens persist server-side; keep the cached token for
+    // 30min so reopening a modal doesn't mint a fresh one every 5min.
+    staleTime: 30 * 60_000,
+    gcTime: 30 * 60_000,
     retry: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,

@@ -1,9 +1,26 @@
 import { Router, Response, NextFunction } from 'express';
+import {
+  posthogTimeframeSchema,
+  posthogBreakdownSchema,
+  posthogMetricSchema,
+} from '@insforge/shared-schemas';
 import { verifyUser, verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
+import { AppError } from '@/api/middlewares/error.js';
+import { ERROR_CODES } from '@/types/error-constants.js';
 import { PosthogService } from '@/services/posthog/posthog.service.js';
 
 export const posthogRouter = Router();
 const service = new PosthogService();
+
+const MAX_LIMIT = 100;
+
+function parseLimit(raw: unknown): number {
+  const n = parseInt(String(raw ?? '10'), 10);
+  if (!Number.isFinite(n) || n <= 0) {
+    return 10;
+  }
+  return Math.min(n, MAX_LIMIT);
+}
 
 // GET /api/integrations/posthog/connection
 posthogRouter.get(
@@ -57,8 +74,7 @@ posthogRouter.get(
   verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const limit = parseInt(String(req.query.limit ?? '10'), 10) || 10;
-      const data = await service.getRecentEvents(limit);
+      const data = await service.getRecentEvents(parseLimit(req.query.limit));
       res.json(data);
     } catch (err) {
       next(err);
@@ -90,8 +106,11 @@ posthogRouter.get(
   verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const timeframe = String(req.query.timeframe || '7d');
-      const data = await service.getWebOverview(timeframe);
+      const timeframe = posthogTimeframeSchema.safeParse(req.query.timeframe ?? '7d');
+      if (!timeframe.success) {
+        throw new AppError('Invalid timeframe', 400, ERROR_CODES.INVALID_INPUT);
+      }
+      const data = await service.getWebOverview(timeframe.data);
       res.json(data);
     } catch (err) {
       next(err);
@@ -105,9 +124,15 @@ posthogRouter.get(
   verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const breakdown = String(req.query.breakdown || '');
-      const timeframe = String(req.query.timeframe || '7d');
-      const data = await service.getWebStats(breakdown, timeframe);
+      const breakdown = posthogBreakdownSchema.safeParse(req.query.breakdown);
+      if (!breakdown.success) {
+        throw new AppError('Invalid breakdown', 400, ERROR_CODES.INVALID_INPUT);
+      }
+      const timeframe = posthogTimeframeSchema.safeParse(req.query.timeframe ?? '7d');
+      if (!timeframe.success) {
+        throw new AppError('Invalid timeframe', 400, ERROR_CODES.INVALID_INPUT);
+      }
+      const data = await service.getWebStats(breakdown.data, timeframe.data);
       res.json(data);
     } catch (err) {
       next(err);
@@ -121,9 +146,15 @@ posthogRouter.get(
   verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const metric = String(req.query.metric || '');
-      const timeframe = String(req.query.timeframe || '7d');
-      const data = await service.getTrends(metric, timeframe);
+      const metric = posthogMetricSchema.safeParse(req.query.metric);
+      if (!metric.success) {
+        throw new AppError('Invalid metric', 400, ERROR_CODES.INVALID_INPUT);
+      }
+      const timeframe = posthogTimeframeSchema.safeParse(req.query.timeframe ?? '7d');
+      if (!timeframe.success) {
+        throw new AppError('Invalid timeframe', 400, ERROR_CODES.INVALID_INPUT);
+      }
+      const data = await service.getTrends(metric.data, timeframe.data);
       res.json(data);
     } catch (err) {
       next(err);
@@ -152,8 +183,7 @@ posthogRouter.get(
   verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const limit = parseInt(String(req.query.limit ?? '10'), 10) || 10;
-      const data = await service.getRecordings(limit);
+      const data = await service.getRecordings(parseLimit(req.query.limit));
       res.json(data);
     } catch (err) {
       next(err);

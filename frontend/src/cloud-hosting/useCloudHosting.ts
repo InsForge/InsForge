@@ -878,7 +878,8 @@ export function useCloudHosting() {
             if (status !== 'connected' && status !== 'error' && status !== 'cancelled') {
               return;
             }
-            const reason = typeof message.reason === 'string' ? message.reason : undefined;
+            const rawReason = typeof message.reason === 'string' ? message.reason : undefined;
+            const reason = rawReason ? rawReason.slice(0, 200) : undefined;
             const timestamp =
               typeof message.timestamp === 'number' ? message.timestamp : Date.now();
             const event: DashboardPosthogConnectionStatus = { status, reason, timestamp };

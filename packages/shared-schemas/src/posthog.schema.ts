@@ -58,6 +58,12 @@ export type PosthogEventsResponse = z.infer<typeof posthogEventsResponseSchema>;
 export const posthogTimeframeSchema = z.enum(['24h', '7d', '30d', '3m']);
 export type PosthogTimeframe = z.infer<typeof posthogTimeframeSchema>;
 
+export const posthogBreakdownSchema = z.enum(['Page', 'Country', 'DeviceType']);
+export type PosthogBreakdown = z.infer<typeof posthogBreakdownSchema>;
+
+export const posthogMetricSchema = z.enum(['visitors', 'views', 'bounce_rate']);
+export type PosthogMetric = z.infer<typeof posthogMetricSchema>;
+
 export const posthogWebOverviewItemSchema = z.object({
   key: z.string(),
   value: z.number().nullable(),
@@ -125,7 +131,16 @@ export const posthogRecordingsResponseSchema = z.object({
 });
 export type PosthogRecordingsResponse = z.infer<typeof posthogRecordingsResponseSchema>;
 
+// `z.string().url()` only checks syntactic validity. We render this URL inside
+// an iframe with `allow-same-origin`, so restrict the origin to PostHog hosts.
+// Regex (vs `new URL`) because shared-schemas builds without DOM lib globals.
+const posthogUrlPattern = /^https:\/\/([a-z0-9-]+\.)*posthog\.com(?::\d+)?(\/|$)/i;
 export const posthogShareTokenResponseSchema = z.object({
-  embedUrl: z.string().url(),
+  embedUrl: z
+    .string()
+    .url()
+    .refine((u) => posthogUrlPattern.test(u), {
+      message: 'embedUrl must be an https://*.posthog.com URL',
+    }),
 });
 export type PosthogShareTokenResponse = z.infer<typeof posthogShareTokenResponseSchema>;
