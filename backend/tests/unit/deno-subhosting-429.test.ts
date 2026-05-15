@@ -98,4 +98,81 @@ describe('Deno Subhosting 429 backoff', () => {
     // initial + 3 retries from DEFAULT_RATE_LIMIT_BACKOFF_MS = 4 attempts
     expect(attempts).toBeGreaterThanOrEqual(4);
   }, 30_000);
+
+  it('caps Retry-After at 30s even when upstream asks for much longer', async () => {
+    // Spy on setTimeout to capture every requested delay without actually
+    // waiting. The provider also uses setTimeout for its initial fetch
+    // timeout; we only care that NO requested delay exceeds the 30s cap.
+    const recordedDelays: number[] = [];
+    const realSetTimeout = global.setTimeout;
+    vi.spyOn(global, 'setTimeout').mockImplementation(((
+      cb: (...args: unknown[]) => void,
+      ms?: number
+    ) => {
+      recordedDelays.push(ms ?? 0);
+      // Run the callback async so abort flows still work, but immediately.
+      return realSetTimeout(cb, 0);
+    }) as unknown as typeof setTimeout);
+
+    let attempts = 0;
+    vi.doMock('node-fetch', () => ({
+      __esModule: true,
+      default: vi.fn(async () => {
+        attempts++;
+        if (attempts === 1) {
+          // 600 seconds — way beyond the 30s cap.
+          return new Response('', { status: 429, headers: { 'retry-after': '600' } });
+        }
+        return jsonResponse({
+          id: 'dep-cap',
+          projectId: 'proj-1',
+          status: 'success',
+          domains: [],
+          createdAt: new Date().toISOString(),
+        });
+      }),
+      Response,
+    }));
+
+    const mod = await import('@/providers/functions/deno-subhosting.provider.js');
+    const provider = mod.DenoSubhostingProvider.getInstance();
+    await provider.getDeployment('dep-cap');
+
+    // No delay (timeout or backoff) should ever exceed the 30s cap.
+    const MAX_RETRY_AFTER_MS = 30_000;
+    for (const d of recordedDelays) {
+      expect(d).toBeLessThanOrEqual(MAX_RETRY_AFTER_MS);
+    }
+  }, 30_000);
+});
+
+describe('parseRetryAfterMs', () => {
+  it('parses integer seconds into ms', async () => {
+    const { parseRetryAfterMs } = await import('@/providers/functions/deno-subhosting.provider.js');
+    expect(parseRetryAfterMs('5')).toBe(5000);
+    expect(parseRetryAfterMs(' 12 ')).toBe(12_000);
+    expect(parseRetryAfterMs('0')).toBe(0);
+  });
+
+  it('parses HTTP-date as delta from now', async () => {
+    const { parseRetryAfterMs } = await import('@/providers/functions/deno-subhosting.provider.js');
+    const future = new Date(Date.now() + 5000).toUTCString();
+    const delta = parseRetryAfterMs(future);
+    // Allow some slop for clock movement during the test.
+    expect(delta).toBeGreaterThanOrEqual(4000);
+    expect(delta).toBeLessThanOrEqual(6000);
+  });
+
+  it('clamps a past HTTP-date at 0', async () => {
+    const { parseRetryAfterMs } = await import('@/providers/functions/deno-subhosting.provider.js');
+    const past = new Date(Date.now() - 60_000).toUTCString();
+    expect(parseRetryAfterMs(past)).toBe(0);
+  });
+
+  it('returns NaN for null, empty, or unparseable input', async () => {
+    const { parseRetryAfterMs } = await import('@/providers/functions/deno-subhosting.provider.js');
+    expect(parseRetryAfterMs(null)).toBeNaN();
+    expect(parseRetryAfterMs('')).toBeNaN();
+    expect(parseRetryAfterMs('not-a-date')).toBeNaN();
+  });
 });

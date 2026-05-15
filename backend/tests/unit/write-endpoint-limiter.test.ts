@@ -78,6 +78,31 @@ describe('per-category buckets are independent', () => {
   });
 });
 
+describe('within a category the bucket is shared across routes', () => {
+  beforeEach(() => {
+    resetLimiter(deploymentsWriteLimiter);
+  });
+
+  it('two routes mounting the same limiter share one budget', async () => {
+    // Mirrors how index.routes.ts and env-vars.routes.ts both mount
+    // deploymentsWriteLimiter — calls to either route count toward the
+    // same per-IP budget.
+    const app = express();
+    app.use(express.json());
+    app.post('/a', deploymentsWriteLimiter, (_req, res) => res.json({ ok: true }));
+    app.post('/b', deploymentsWriteLimiter, (_req, res) => res.json({ ok: true }));
+
+    // Spread the budget across the two routes.
+    for (let i = 0; i < PER_CATEGORY_LIMIT; i++) {
+      const path = i % 2 === 0 ? '/a' : '/b';
+      await request(app).post(path).send({}).expect(200);
+    }
+    // The next call to either route is rejected.
+    await request(app).post('/a').send({}).expect(429);
+    await request(app).post('/b').send({}).expect(429);
+  });
+});
+
 describe('INSFORGE_DISABLE_WRITE_RATE_LIMIT bypass', () => {
   const ORIGINAL = process.env.INSFORGE_DISABLE_WRITE_RATE_LIMIT;
 

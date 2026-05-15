@@ -21,6 +21,34 @@ const DEFAULT_TIMEOUT_MS = 10000;
 // header value and the scheduled backoff), plus a small jitter.
 const DEFAULT_RATE_LIMIT_BACKOFF_MS = [1000, 2000, 4000];
 
+// Cap on a single 429 retry wait so a misbehaving upstream that returns
+// `Retry-After: 600` cannot park a worker for 10 minutes. Mirrors the
+// Vercel helper's `maxDelayMs` default.
+const MAX_RETRY_AFTER_MS = 30_000;
+
+/**
+ * Parse the HTTP `Retry-After` header per RFC 7231 §7.1.3:
+ * - non-negative integer → seconds (multiply by 1000)
+ * - HTTP-date → ms until that absolute time, never negative
+ * Anything else returns NaN so the caller can fall back to its own schedule.
+ *
+ * Exported only for unit tests.
+ */
+export function parseRetryAfterMs(header: string | null): number {
+  if (!header) {
+    return NaN;
+  }
+  const trimmed = header.trim();
+  if (/^\d+$/.test(trimmed)) {
+    return parseInt(trimmed, 10) * 1000;
+  }
+  const dateMs = Date.parse(trimmed);
+  if (Number.isNaN(dateMs)) {
+    return NaN;
+  }
+  return Math.max(0, dateMs - Date.now());
+}
+
 // ============================================
 // Helper functions
 // ============================================
@@ -79,11 +107,11 @@ async function fetchWithTimeout(
             currentResponse.body.resume();
           }
           const retryAfter = currentResponse.headers.get('retry-after');
-          const retryAfterMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : NaN;
+          const retryAfterMs = parseRetryAfterMs(retryAfter);
           const baseMs = !isNaN(retryAfterMs)
-            ? Math.max(retryAfterMs, rateLimitBackoffMs[r])
+            ? Math.min(Math.max(retryAfterMs, rateLimitBackoffMs[r]), MAX_RETRY_AFTER_MS)
             : rateLimitBackoffMs[r];
-          const delay = baseMs + Math.floor(Math.random() * 250);
+          const delay = Math.min(baseMs + Math.floor(Math.random() * 250), MAX_RETRY_AFTER_MS);
           logger.warn('Deno Subhosting 429 — retrying', {
             url,
             attempt: r + 1,

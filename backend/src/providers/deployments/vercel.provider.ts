@@ -120,7 +120,14 @@ export interface VercelRateLimitRetryOptions {
  * Wrap any Vercel API call so HTTP 429 responses trigger an exponential-backoff
  * retry. Vercel returns `X-RateLimit-Reset` as a Unix epoch (seconds); when
  * present we wait until that instant (capped at `maxDelayMs`). Otherwise we
- * fall back to `2^attempt * baseDelayMs + jitter`.
+ * fall back to `2^attempt * baseDelayMs + jitter`. The final delay (base +
+ * jitter) is clamped to `maxDelayMs` so jitter cannot push the wait past the
+ * intended cap.
+ *
+ * On 429 retry exhaustion the helper throws `AppError(429, RATE_LIMITED)`
+ * rather than the raw axios error, so callers can rethrow it as-is and have
+ * the rate-limit semantics surface to the client instead of being flattened
+ * to a generic 500 INTERNAL_ERROR.
  *
  * Used by these write endpoints: createDeployment, cancelDeployment,
  * upsertEnvironmentVariables, addCustomDomain, removeCustomDomain,
@@ -138,8 +145,15 @@ export async function withVercelRateLimitRetry<T>(
     } catch (error: unknown) {
       const isAxios429 = axios.isAxiosError(error) && error.response?.status === 429;
 
-      if (!isAxios429 || attempt >= opts.maxRetries) {
+      if (!isAxios429) {
         throw error;
+      }
+      if (attempt >= opts.maxRetries) {
+        throw new AppError(
+          'Vercel rate limit exceeded after retries. Please retry shortly.',
+          429,
+          ERROR_CODES.RATE_LIMITED
+        );
       }
 
       const headers = error.response?.headers ?? {};
@@ -152,7 +166,10 @@ export async function withVercelRateLimitRetry<T>(
       } else {
         baseDelay = Math.min(2 ** attempt * opts.baseDelayMs, opts.maxDelayMs);
       }
-      const delay = baseDelay + Math.floor(Math.random() * opts.jitterMaxMs);
+      const delay = Math.min(
+        baseDelay + Math.floor(Math.random() * opts.jitterMaxMs),
+        opts.maxDelayMs
+      );
       logger.warn('Vercel rate limit hit — retrying', {
         attempt: attempt + 1,
         maxRetries: opts.maxRetries,
@@ -416,6 +433,9 @@ export class VercelProvider {
         createdAt: new Date(deployment.createdAt),
       };
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       logger.error('Failed to create Vercel deployment', {
         error: error instanceof Error ? error.message : String(error),
       });
@@ -482,6 +502,9 @@ export class VercelProvider {
       );
       logger.info('Vercel deployment cancelled', { deploymentId });
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       logger.error('Failed to cancel Vercel deployment', {
         error: error instanceof Error ? error.message : String(error),
         deploymentId,
@@ -519,6 +542,9 @@ export class VercelProvider {
         keys: envVars.map((e) => e.key),
       });
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       logger.error('Failed to upsert environment variables', {
         error: error instanceof Error ? error.message : String(error),
       });
@@ -668,6 +694,9 @@ export class VercelProvider {
 
       logger.info('Environment variable deleted', { envId });
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       if (axios.isAxiosError(error) && error.response?.status === 404) {
         throw new AppError(`Environment variable not found: ${envId}`, 404, ERROR_CODES.NOT_FOUND);
       }
@@ -855,6 +884,9 @@ export class VercelProvider {
       logger.info('Custom domain added to Vercel project', { domain });
       return response.data;
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       if (axios.isAxiosError(error)) {
         const status = error.response?.status;
         const msg = (error.response?.data as { error?: { message?: string } })?.error?.message;
@@ -896,6 +928,9 @@ export class VercelProvider {
 
       logger.info('Custom domain removed from Vercel project', { domain });
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       if (axios.isAxiosError(error) && error.response?.status === 404) {
         // Domain not found on Vercel side – treat as already removed
         return;
@@ -937,6 +972,9 @@ export class VercelProvider {
       logger.info('Custom domain verification result', { domain, verified: data.verified });
       return data;
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       if (axios.isAxiosError(error) && error.response?.status === 404) {
         throw new AppError(`Domain not found on Vercel: ${domain}`, 404, ERROR_CODES.NOT_FOUND);
       }
