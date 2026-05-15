@@ -10,7 +10,10 @@ import { posthogApi } from '#features/analytics/services/posthog.api';
  */
 export function useShareToken(recordingId: string | null, enabled: boolean) {
   return useQuery({
-    queryKey: ['posthog', 'share-token', recordingId],
+    // Top-level key sits outside the `['posthog', ...]` namespace so the
+    // broad `invalidateQueries({ queryKey: ['posthog'] })` calls on
+    // connect / disconnect don't re-fire this POST and mint duplicate tokens.
+    queryKey: ['posthog-share-token', recordingId],
     queryFn: () => {
       if (!recordingId) {
         throw new Error('recordingId is required');
