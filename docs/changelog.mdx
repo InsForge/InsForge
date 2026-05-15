@@ -3,6 +3,20 @@ title: "Changelog"
 description: "New features, improvements, and fixes shipped to InsForge."
 ---
 
+<Update label="May 15, 2026" tags={["CLI"]}>
+  ## CLI Config Telemetry
+
+  The `insforge config apply`, `config plan`, and `config export` commands now report anonymous usage events to PostHog (event name `cli_config_invoked`). We capture the subcommand, outcome (`success` / `aborted` / `dry_run` / `error` / ...), flag shape, change counts, and the TOML schema sections that were touched (e.g. `auth.smtp`, `deployments.subdomain`). We never send SQL, TOML contents, credentials, or env() values.
+
+  Opt out at any time:
+
+  ```bash
+  export INSFORGE_TELEMETRY=0
+  ```
+
+  See the new [CLI Telemetry](/cli-telemetry) page for the full property list and what we do not collect.
+</Update>
+
 <Update label="May 11, 2026" tags={["Auth"]}>
   ## Disable New User Signups Toggle
 
