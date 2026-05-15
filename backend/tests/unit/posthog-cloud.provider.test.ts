@@ -253,9 +253,7 @@ describe('CloudPosthogProvider', () => {
 
     it('throws AppError with NOT_FOUND on 404', async () => {
       axiosGetMock.mockRejectedValueOnce(makeAxiosError(404));
-      await expect(
-        CloudPosthogProvider.getInstance().getWebOverview('7d')
-      ).rejects.toMatchObject({
+      await expect(CloudPosthogProvider.getInstance().getWebOverview('7d')).rejects.toMatchObject({
         statusCode: 404,
         code: ERROR_CODES.NOT_FOUND,
       });
@@ -263,9 +261,7 @@ describe('CloudPosthogProvider', () => {
 
     it('throws AppError with UPSTREAM_FAILURE on network error', async () => {
       axiosGetMock.mockRejectedValueOnce(new Error('Network Error'));
-      await expect(
-        CloudPosthogProvider.getInstance().getWebOverview('7d')
-      ).rejects.toMatchObject({
+      await expect(CloudPosthogProvider.getInstance().getWebOverview('7d')).rejects.toMatchObject({
         statusCode: 502,
         code: ERROR_CODES.UPSTREAM_FAILURE,
       });
@@ -276,9 +272,7 @@ describe('CloudPosthogProvider', () => {
     it('forwards breakdown and timeframe and parses response', async () => {
       axiosGetMock.mockResolvedValueOnce({
         data: {
-          rows: [
-            { breakdownValue: '/home', visitors: 50, views: 100, uiFillFraction: 1.0 },
-          ],
+          rows: [{ breakdownValue: '/home', visitors: 50, views: 100, uiFillFraction: 1.0 }],
         },
       });
 
