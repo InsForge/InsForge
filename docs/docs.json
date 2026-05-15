@@ -106,15 +106,24 @@
             ]
           },
           {
-            "group": "CLI",
+            "group": "Guides",
             "pages": [
-              "config-as-code"
-            ]
-          },
-          {
-            "group": "Self-Hosting",
-            "pages": [
-              "deployment/deployment-security-guide"
+              {
+                "group": "Deployment",
+                "pages": [
+                  "deployment/config-as-code"
+                ]
+              },
+              {
+                "group": "Self-Hosting",
+                "pages": [
+                  "deployment/deployment-security-guide",
+                  "deployment/deploy-to-aws-ec2",
+                  "deployment/deploy-to-azure-virtual-machines",
+                  "deployment/deploy-to-google-cloud-compute-engine",
+                  "deployment/deploy-to-render"
+                ]
+              }
             ]
           },
           {
