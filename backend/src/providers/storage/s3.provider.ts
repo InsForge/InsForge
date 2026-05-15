@@ -366,7 +366,14 @@ export class S3StorageProvider implements StorageProvider {
               .split('/')
               .map((segment) => encodeURIComponent(segment))
               .join('/');
-            const cloudFrontObjectUrl = `${cloudFrontUrl.replace(/\/$/, '')}/${encodedS3Key}`;
+            const baseUrl = `${cloudFrontUrl.replace(/\/$/, '')}/${encodedS3Key}`;
+            // Canned-policy signatures cover the full Resource URL minus the
+            // three CF params (Expires / Signature / Key-Pair-Id). CloudFront
+            // reconstructs Resource by stripping those three from the request
+            // URL, so any *other* query — including our `?v=<version>` cache
+            // stamp — must be in the URL *before* signing or verification
+            // fails with 403. Append v first, then sign.
+            const urlToSign = version ? `${baseUrl}?v=${encodeURIComponent(version)}` : baseUrl;
 
             // Convert escaped newlines to actual newlines in the private key
             const formattedPrivateKey = cloudFrontPrivateKey.replace(/\\n/g, '\n');
@@ -375,7 +382,7 @@ export class S3StorageProvider implements StorageProvider {
             const dateLessThan = new Date(Date.now() + actualExpiresIn * 1000);
 
             const signedUrl = getCloudFrontSignedUrl({
-              url: cloudFrontObjectUrl,
+              url: urlToSign,
               keyPairId: cloudFrontKeyPairId,
               privateKey: formattedPrivateKey,
               dateLessThan,
@@ -383,17 +390,9 @@ export class S3StorageProvider implements StorageProvider {
 
             logger.info('CloudFront signed URL generated successfully.');
 
-            // CloudFront's canned-policy signature covers only `Expires`,
-            // `Signature`, and `Key-Pair-Id` — appending `?v=<version>` after
-            // signing is safe and gives CDN cache entries a deterministic
-            // version key so overwrites are picked up immediately.
-            const finalUrl = version
-              ? `${signedUrl}${signedUrl.includes('?') ? '&' : '?'}v=${encodeURIComponent(version)}`
-              : signedUrl;
-
             return {
               method: 'presigned',
-              url: finalUrl,
+              url: signedUrl,
               expiresAt: dateLessThan,
             };
           } catch (cfError) {
