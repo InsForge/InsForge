@@ -2,7 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import { AuthRequest, verifyUser } from '@/api/middlewares/auth.js';
 import { EmailService } from '@/services/email/email.service.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { sendRawEmailRequestSchema } from '@insforge/shared-schemas';
 import { successResponse } from '@/utils/response.js';
 

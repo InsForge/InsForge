@@ -3,7 +3,7 @@ import axios from 'axios';
 import { z } from 'zod';
 import { config } from '@/infra/config/app.config.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { DatabaseProvider, DatabaseConnectionInfo, DatabasePasswordInfo } from './base.provider.js';
 
 /**

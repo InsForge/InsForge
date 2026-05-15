@@ -5,7 +5,7 @@ import { StorageService } from '@/services/storage/storage.service.js';
 import { StorageConfigService } from '@/services/storage/storage-config.service.js';
 import { successResponse } from '@/utils/response.js';
 import { dynamicUploadSingle, handleUploadError } from '@/api/middlewares/upload.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import {
   createBucketRequestSchema,
   updateBucketRequestSchema,

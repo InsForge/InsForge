@@ -4,7 +4,7 @@ import { functionsWriteLimiter } from '@/api/middlewares/rate-limiters.js';
 import { FunctionService } from '@/services/functions/function.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import { uploadFunctionRequestSchema, updateFunctionRequestSchema } from '@insforge/shared-schemas';
 import { SocketManager } from '@/infra/socket/socket.manager.js';

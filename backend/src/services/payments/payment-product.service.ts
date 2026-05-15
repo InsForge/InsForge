@@ -1,7 +1,7 @@
 import type { Pool } from 'pg';
 import { AppError } from '@/api/middlewares/error.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import type {
   StripeEnvironment,
   StripePriceRow,

@@ -22,7 +22,7 @@ import {
 import { withPaymentSessionAdvisoryLock } from '@/services/payments/payments-advisory-lock.js';
 import logger from '@/utils/logger.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import {
   STRIPE_ENVIRONMENTS,
   type StripeAccount,
@@ -106,7 +106,7 @@ export class PaymentConfigService {
       throw new AppError(
         `STRIPE_${environment.toUpperCase()}_SECRET_KEY is not configured`,
         400,
-        ERROR_CODES.INVALID_INPUT
+        ERROR_CODES.PAYMENT_CONFIG_INVALID
       );
     }
 

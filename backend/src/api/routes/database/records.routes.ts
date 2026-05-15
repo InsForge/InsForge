@@ -3,7 +3,7 @@ import axios from 'axios';
 import { AuthRequest, extractApiKey, verifyUser } from '@/api/middlewares/auth.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { validateTableName } from '@/utils/validations.js';
 import { DatabaseRecord } from '@/types/database.js';
 import { successResponse } from '@/utils/response.js';

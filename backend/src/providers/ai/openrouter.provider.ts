@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { createHash } from 'crypto';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import type { AIOverview } from '@insforge/shared-schemas';
 

@@ -5,7 +5,7 @@ import { ImageGenerationService } from '@/services/ai/image-generation.service.j
 import { EmbeddingService } from '@/services/ai/embedding.service.js';
 import { AIModelService } from '@/services/ai/ai-model.service.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { errorResponse, successResponse } from '@/utils/response.js';
 import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
 import logger from '@/utils/logger.js';

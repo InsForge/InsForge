@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import type { Readable } from 'stream';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import logger from '@/utils/logger.js';
 
@@ -473,7 +473,7 @@ export class VercelProvider {
       };
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 404) {
-        throw new AppError(`Deployment not found: ${deploymentId}`, 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError(`Deployment not found: ${deploymentId}`, 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
       }
       logger.error('Failed to get Vercel deployment', {
         error: error instanceof Error ? error.message : String(error),
@@ -666,7 +666,7 @@ export class VercelProvider {
       };
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 404) {
-        throw new AppError(`Environment variable not found: ${envId}`, 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError(`Environment variable not found: ${envId}`, 404, ERROR_CODES.ENVIRONMENT_VARIABLE_NOT_FOUND);
       }
       logger.error('Failed to get environment variable', {
         error: error instanceof Error ? error.message : String(error),
@@ -698,7 +698,7 @@ export class VercelProvider {
         throw error;
       }
       if (axios.isAxiosError(error) && error.response?.status === 404) {
-        throw new AppError(`Environment variable not found: ${envId}`, 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError(`Environment variable not found: ${envId}`, 404, ERROR_CODES.ENVIRONMENT_VARIABLE_NOT_FOUND);
       }
       logger.error('Failed to delete environment variable', {
         error: error instanceof Error ? error.message : String(error),
@@ -842,7 +842,7 @@ export class VercelProvider {
       return response.data as VercelProjectDomain;
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 404) {
-        throw new AppError(`Domain not found on Vercel: ${domain}`, 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError(`Domain not found on Vercel: ${domain}`, 404, ERROR_CODES.DOMAIN_NOT_FOUND);
       }
       logger.error('Failed to fetch custom domain from Vercel', {
         error: error instanceof Error ? error.message : String(error),
@@ -894,11 +894,11 @@ export class VercelProvider {
           throw new AppError(
             msg || `Domain ${domain} is already added to this project`,
             409,
-            ERROR_CODES.ALREADY_EXISTS
+            ERROR_CODES.DOMAIN_ALREADY_EXISTS
           );
         }
         if (status === 400) {
-          throw new AppError(msg || `Invalid domain: ${domain}`, 400, ERROR_CODES.INVALID_INPUT);
+          throw new AppError(msg || `Invalid domain: ${domain}`, 400, ERROR_CODES.DOMAIN_INVALID);
         }
       }
       logger.error('Failed to add custom domain to Vercel', {
@@ -976,7 +976,7 @@ export class VercelProvider {
         throw error;
       }
       if (axios.isAxiosError(error) && error.response?.status === 404) {
-        throw new AppError(`Domain not found on Vercel: ${domain}`, 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError(`Domain not found on Vercel: ${domain}`, 404, ERROR_CODES.DOMAIN_NOT_FOUND);
       }
       logger.error('Failed to verify custom domain', {
         error: error instanceof Error ? error.message : String(error),
@@ -1154,12 +1154,12 @@ export class VercelProvider {
         throw new AppError(
           'Uploaded file content does not match the registered deployment file.',
           400,
-          ERROR_CODES.INVALID_INPUT
+          ERROR_CODES.DEPLOYMENT_INVALID_FILE
         );
       }
 
       if (axios.isAxiosError(error) && error.code === 'ERR_CANCELED') {
-        throw new AppError('Vercel file upload was interrupted.', 499, ERROR_CODES.INVALID_INPUT);
+        throw new AppError('Vercel file upload was interrupted.', 499, ERROR_CODES.DEPLOYMENT_INVALID_FILE);
       }
 
       logger.error('Failed to stream file to Vercel', {

@@ -5,7 +5,7 @@ import { FunctionService } from '@/services/functions/function.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { successResponse } from '@/utils/response.js';
 
 const RotateApiKeySchema = z.object({
@@ -47,7 +47,7 @@ router.get('/:key', verifyAdmin, async (req: AuthRequest, res: Response, next: N
     const value = await secretService.getSecretByKey(key);
 
     if (value === null) {
-      throw new AppError(`Secret not found: ${key}`, 404, ERROR_CODES.NOT_FOUND);
+      throw new AppError(`Secret not found: ${key}`, 404, ERROR_CODES.SECRET_NOT_FOUND);
     }
 
     // Log audit
@@ -94,7 +94,7 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
     let result: { id: string };
 
     if (secret && secret?.isActive) {
-      throw new AppError(`Secret already exists: ${key}`, 409, ERROR_CODES.INVALID_INPUT);
+      throw new AppError(`Secret already exists: ${key}`, 409, ERROR_CODES.SECRET_ALREADY_EXISTS);
     } else if (secret && !secret?.isActive && secret?.id) {
       const success = await secretService.updateSecret(secret?.id, {
         value,
@@ -155,7 +155,7 @@ router.put('/:key', verifyAdmin, async (req: AuthRequest, res: Response, next: N
     const secret = secrets.find((s) => s.key === key);
 
     if (!secret) {
-      throw new AppError(`Secret not found: ${key}`, 404, ERROR_CODES.NOT_FOUND);
+      throw new AppError(`Secret not found: ${key}`, 404, ERROR_CODES.SECRET_NOT_FOUND);
     }
 
     const success = await secretService.updateSecret(secret.id, {
@@ -250,7 +250,7 @@ router.delete('/:key', verifyAdmin, async (req: AuthRequest, res: Response, next
     const secret = secrets.find((s) => s.key === key);
 
     if (!secret) {
-      throw new AppError(`Secret not found: ${key}`, 404, ERROR_CODES.NOT_FOUND);
+      throw new AppError(`Secret not found: ${key}`, 404, ERROR_CODES.SECRET_NOT_FOUND);
     }
 
     // Check if secret is reserved

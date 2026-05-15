@@ -35,7 +35,7 @@
 |------|--------|
 | `shared-schemas/src/auth.schema.ts` | Add `smtpConfigSchema`, `emailTemplateSchema` |
 | `shared-schemas/src/auth-api.schema.ts` | Add request/response schemas + type exports |
-| `backend/src/types/error-constants.ts` | Add SMTP error codes |
+| `packages/shared-schemas/src/error-codes.ts` | Add SMTP error codes |
 | `backend/src/services/email/email.service.ts` | Route sends through SMTP when configured |
 | `backend/src/api/routes/auth/index.routes.ts` | Add SMTP config + template CRUD routes |
 | `frontend/src/features/auth/components/AuthSettingsMenuDialog.tsx` | Add "Email" tab with SMTP + template cards |
@@ -310,9 +310,9 @@ git commit -m "feat(schemas): add SMTP config and email template Zod schemas"
 ## Task 4: Backend — Error constants and email type updates
 
 **Files:**
-- Modify: `backend/src/types/error-constants.ts`
+- Modify: `packages/shared-schemas/src/error-codes.ts`
 
-- [ ] **Step 1: Add SMTP error codes to `error-constants.ts`**
+- [ ] **Step 1: Add SMTP error codes to `packages/shared-schemas/src/error-codes.ts`**
 
 Add these entries inside the `ERROR_CODES` enum:
 
@@ -326,7 +326,7 @@ Add these entries inside the `ERROR_CODES` enum:
 
 ```bash
 cd /Users/gary/projects/insforge-repo/InsForge
-git add backend/src/types/error-constants.ts
+git add packages/shared-schemas/src/error-codes.ts
 git commit -m "feat(types): add SMTP error codes and email template record type"
 ```
 
@@ -345,7 +345,7 @@ import nodemailer from 'nodemailer';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import type { SmtpConfigSchema, UpsertSmtpConfigRequest } from '@insforge/shared-schemas';
 
@@ -647,7 +647,7 @@ git commit -m "feat(email): add SMTP config service with encrypted password stor
 import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import type { EmailTemplate } from '@/types/email.js';
 import type { EmailTemplateSchema, UpdateEmailTemplateRequest } from '@insforge/shared-schemas';
@@ -803,7 +803,7 @@ import { EmailProvider } from './base.provider.js';
 import { SmtpConfigService } from '@/services/email/smtp-config.service.js';
 import { EmailTemplateService } from '@/services/email/email-template.service.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import type { EmailTemplate } from '@/types/email.js';
 import type { SendRawEmailRequest } from '@insforge/shared-schemas';

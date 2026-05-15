@@ -13,7 +13,7 @@ import type {
   PresenceMember,
 } from '@insforge/shared-schemas';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
+import { ERROR_CODES, NEXT_ACTION } from '@insforge/shared-schemas';
 import { RealtimeAuthService } from '@/services/realtime/realtime-auth.service.js';
 import { RealtimeMessageService } from '@/services/realtime/realtime-message.service.js';
 import { RealtimePresenceService } from '@/services/realtime/realtime-presence.service.js';

@@ -2,7 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import axios from 'axios';
 import { AuthRequest, extractApiKey, verifyUser } from '@/api/middlewares/auth.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { validateFunctionName } from '@/utils/validations.js';
 import { successResponse } from '@/utils/response.js';
 import { PostgrestProxyService } from '@/services/database/postgrest-proxy.service.js';

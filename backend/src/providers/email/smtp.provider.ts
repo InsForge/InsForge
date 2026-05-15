@@ -1,7 +1,7 @@
 import nodemailer from 'nodemailer';
 import type Mail from 'nodemailer/lib/mailer';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { EmailTemplate } from '@/types/email.js';
 import { SmtpConfigService, RawSmtpConfig } from '@/services/email/smtp-config.service.js';
 import { EmailTemplateService } from '@/services/email/email-template.service.js';

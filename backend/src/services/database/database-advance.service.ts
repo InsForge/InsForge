@@ -8,7 +8,7 @@ import {
   type BulkUpsertResponse,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { hasPgErrorCode } from '@/utils/errors.js';
 import {
   parseSQLStatements,

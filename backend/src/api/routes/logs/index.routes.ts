@@ -5,7 +5,7 @@ import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
 import { successResponse, paginatedResponse } from '@/utils/response.js';
 import { GetLogsResponse } from '@insforge/shared-schemas';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 
 const router = Router();
 

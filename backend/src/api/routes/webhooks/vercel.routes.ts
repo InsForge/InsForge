@@ -3,7 +3,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { DeploymentService } from '@/services/deployments/deployment.service.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import {
   VERCEL_EVENT_TO_STATUS,
   type VercelWebhookPayload,
