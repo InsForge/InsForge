@@ -1,9 +1,9 @@
 ---
 title: "CLI Telemetry"
-description: "What the InsForge CLI sends to PostHog, why, and how to turn it off."
+description: "What the InsForge CLI sends to PostHog and why."
 ---
 
-The InsForge CLI (`@insforge/cli`) reports anonymous usage events to [PostHog](https://posthog.com). The goal is straightforward: we want to know which commands users actually run so we can prioritize where to invest. This page documents exactly what gets sent and how to opt out.
+The InsForge CLI (`@insforge/cli`) reports anonymous usage events to [PostHog](https://posthog.com). The goal is straightforward: we want to know which commands users actually run so we can prioritize where to invest. This page documents exactly what gets sent.
 
 ## What we collect
 
@@ -38,18 +38,6 @@ We do not capture:
 - Environment variable values.
 
 The full property allowlist is defined in [`src/lib/analytics.ts`](https://github.com/InsForge/CLI/blob/main/src/lib/analytics.ts) and reviewed in code review for every new event helper.
-
-## How to turn it off
-
-Set `INSFORGE_TELEMETRY=0` in your shell or CI environment:
-
-```bash
-export INSFORGE_TELEMETRY=0
-```
-
-The variable also accepts `false` and `no` (case-insensitive). With the variable set, the CLI never constructs the PostHog client and never opens a network connection for analytics. There is no graceful degradation to worry about and no "but it still pings home for X" caveat. The opt-out is a hard early return.
-
-To make the opt-out permanent for your environment, add the export to your shell profile (`~/.zshrc`, `~/.bashrc`, etc.) or your CI's secret/variable configuration.
 
 ## Building from source
 
