@@ -3,7 +3,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Info } from 'lucide-react';
 import { Button, CopyButton } from '@insforge/ui';
 import { usePosthogConnection } from './hooks/usePosthogConnection';
-import { onPosthogConnectionStatus } from './lib/postMessage';
 import { EmptyConnectPanel } from './components/posthog/EmptyConnectPanel';
 import { ConnectStatusBar } from './components/posthog/ConnectStatusBar';
 import { ApiKeyCard } from './components/posthog/ApiKeyCard';
@@ -16,6 +15,7 @@ import { RetentionCard } from './components/posthog/RetentionCard';
 import { RecentReplaysCard } from './components/posthog/RecentReplaysCard';
 import { useProjectId } from '#lib/hooks/useMetadata';
 import { useToast } from '#lib/hooks/useToast';
+import { useDashboardHost } from '#lib/config/DashboardHostContext';
 
 const ANALYTICS_SETUP_PROMPT =
   "I'm using InsForge as my backend platform. I want to add product analytics to this project. Read the current directory and use the InsForge skill to set up PostHog analytics for me.";
@@ -25,10 +25,14 @@ export function AnalyticsPage() {
   const qc = useQueryClient();
   const conn = usePosthogConnection();
   const { showToast } = useToast();
+  const { subscribePosthogConnectionStatus } = useDashboardHost();
   const [disconnecting, setDisconnecting] = useState(false);
 
   useEffect(() => {
-    return onPosthogConnectionStatus((e) => {
+    if (!subscribePosthogConnectionStatus) {
+      return;
+    }
+    return subscribePosthogConnectionStatus((e) => {
       if (e.status === 'connected') {
         void qc.invalidateQueries({ queryKey: ['posthog'] });
         return;
@@ -46,7 +50,7 @@ export function AnalyticsPage() {
         showToast('PostHog connection cancelled.', 'info');
       }
     });
-  }, [qc, showToast]);
+  }, [qc, showToast, subscribePosthogConnectionStatus]);
 
   if (conn.isLoading) {
     return <div className="p-6">Loading…</div>;
