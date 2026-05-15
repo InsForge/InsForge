@@ -121,12 +121,6 @@ export const dashboardStaticMenuItems: DashboardPrimaryMenuItem[] = [
     href: '/dashboard/logs',
     icon: ChartLine,
   },
-  {
-    id: 'analytics',
-    label: 'Analytics',
-    href: '/dashboard/analytics',
-    icon: BarChart3,
-  },
 ];
 
 export const dashboardSettingsMenuItem: DashboardPrimaryMenuItem = {
@@ -141,6 +135,13 @@ export const dashboardDeploymentsMenuItem: DashboardPrimaryMenuItem = {
   label: 'Deployments',
   href: '/dashboard/deployments',
   icon: Rocket,
+};
+
+export const dashboardAnalyticsMenuItem: DashboardPrimaryMenuItem = {
+  id: 'analytics',
+  label: 'Analytics',
+  href: '/dashboard/analytics',
+  icon: BarChart3,
 };
 
 // d_test + cloud-hosting only: navigates to the Install InsForge route.

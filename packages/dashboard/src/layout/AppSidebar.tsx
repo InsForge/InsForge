@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
+  dashboardAnalyticsMenuItem,
   dashboardDeploymentsMenuItem,
   dashboardDTestDocMenuItem,
   dashboardDTestInstallMenuItem,
@@ -29,11 +30,9 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
   const isDTest = getFeatureFlag('dashboard-v4-experiment') === 'd_test';
   const isDTestCloud = isDTest && host.mode === 'cloud-hosting';
 
-  // Insert deployments into the feature section for cloud projects.
+  // Cloud-only additions: Deployments inserted after AI, Analytics appended at end.
   const mainMenuItems = useMemo(() => {
-    const items = dashboardStaticMenuItems
-      .filter((item) => isCloud || item.id !== 'analytics')
-      .map((item) => ({ ...item }));
+    const items = dashboardStaticMenuItems.map((item) => ({ ...item }));
 
     if (isCloud) {
       const aiItemIndex = items.findIndex((item) => item.id === 'ai');
@@ -41,10 +40,11 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
 
       if (aiItemIndex >= 0) {
         items.splice(aiItemIndex + 1, 0, deploymentsItem);
-        return items;
+      } else {
+        items.push(deploymentsItem);
       }
 
-      return [...items, deploymentsItem];
+      items.push({ ...dashboardAnalyticsMenuItem });
     }
 
     return items;
