@@ -4,7 +4,7 @@ import { DatabaseTableService } from '@/services/database/database-table.service
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { createTableRequestSchema, updateTableSchemaRequestSchema } from '@insforge/shared-schemas';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { normalizeDatabaseSchemaName } from '@/services/database/helpers.js';

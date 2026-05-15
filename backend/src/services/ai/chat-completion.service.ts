@@ -9,7 +9,7 @@ import type {
 import logger from '@/utils/logger.js';
 import { ChatCompletionOptions } from '@/types/ai.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 
 // OpenRouter plugin type for web search
 interface OpenRouterWebPlugin {

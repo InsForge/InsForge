@@ -2,7 +2,7 @@ import { Pool } from 'pg';
 import picomatch from 'picomatch';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import type { AuthConfigSchema, UpdateAuthConfigRequest } from '@insforge/shared-schemas';
 import { URL } from 'url';

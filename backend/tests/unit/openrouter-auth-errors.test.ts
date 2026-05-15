@@ -16,7 +16,7 @@ vi.mock('../../src/utils/logger.js', () => ({
 }));
 
 import { OpenRouterProvider } from '../../src/providers/ai/openrouter.provider.js';
-import { ERROR_CODES } from '../../src/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 
 function createAPIError(status: number, message: string): OpenAI.APIError {
   return new OpenAI.APIError(status, { message }, message, new Headers());

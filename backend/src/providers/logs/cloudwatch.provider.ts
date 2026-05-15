@@ -10,7 +10,7 @@ import {
 import logger from '@/utils/logger.js';
 import { BaseLogProvider } from './base.provider.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { LogSchema, LogSourceSchema, LogStatsSchema } from '@insforge/shared-schemas';
 
 export class CloudWatchProvider extends BaseLogProvider {

@@ -3,7 +3,7 @@ import { CloudEmailProvider } from '@/providers/email/cloud.provider.js';
 import { SmtpEmailProvider } from '@/providers/email/smtp.provider.js';
 import { SmtpConfigService, RawSmtpConfig } from '@/services/email/smtp-config.service.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { EmailTemplate } from '@/types/email.js';
 import { SendRawEmailRequest } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';

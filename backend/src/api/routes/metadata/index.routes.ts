@@ -7,7 +7,7 @@ import { RealtimeChannelService } from '@/services/realtime/realtime-channel.ser
 import { DeploymentService } from '@/services/deployments/deployment.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { successResponse } from '@/utils/response.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { AppError } from '@/api/middlewares/error.js';
 import type { AppMetadataSchema, ProjectIdResponse } from '@insforge/shared-schemas';
 import { SecretService } from '@/services/secrets/secret.service.js';

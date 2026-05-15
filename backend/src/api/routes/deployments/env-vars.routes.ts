@@ -4,7 +4,7 @@ import { VercelProvider } from '@/providers/deployments/vercel.provider.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { successResponse } from '@/utils/response.js';
 import { upsertEnvVarsRequestSchema } from '@insforge/shared-schemas';
 
