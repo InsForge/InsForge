@@ -1,0 +1,149 @@
+---
+title: Database Branching
+description: Spin up an isolated copy of your project to test schema, auth, and config changes, then merge or reset without touching production
+---
+
+## Overview
+
+A **branch** is an isolated, full copy of your project — its own database, auth config, storage buckets, edge functions, email templates, realtime channels, and schedules. You can change anything on the branch without touching the parent. When you're happy with the result, merge it back. When you're not, reset it and try again.
+
+Branching is available on InsForge OSS **2.1.0+**, from the dashboard and from `@insforge/cli`.
+
+<Note>
+Although this page lives under Database, a branch captures more than just the database. The schema and migrations are usually the reason you reach for a branch, but auth providers, storage buckets, edge functions, email templates, realtime channels, and schedules all branch with it.
+</Note>
+
+## What a Branch Captures
+
+A branch is a real child project — its own EC2 instance, its own Postgres, its own state. Writes against the branch are tracked separately from the parent.
+
+**Branched state:**
+
+- Database **schema** — DDL, RLS policies, triggers, functions, indexes, sequences, enum types, extensions
+- **Auth** config and OAuth providers
+- **Storage** buckets and bucket config
+- **Edge function** source
+- **Email** config and templates
+- **Realtime** config and channels
+- **Schedules** (cron jobs)
+
+Row-level inserts in your application tables are isolated to the branch like everything else. The branch shares the parent's `JWT_SECRET`, so users authenticated against the parent are still authenticated on the branch with the same tokens — but it gets its own `API_KEY` / `ANON_KEY`.
+
+Website and Vercel deployments, plus Fly.io compute services, are **not** branched. If you need them for a branch, redeploy against the branch's `API_KEY`.
+
+## When To Use a Branch
+
+Reach for a branch when the change is risky enough that a failed attempt on production would hurt — and when re-creating the change as one clean migration after the fact is preferable to leaving partial state behind.
+
+Good fits:
+
+- **Schema migrations you're unsure about.** Try the migration on a copy of real data, watch what breaks, iterate, then merge the final version.
+- **RLS policy rewrites.** Validate that policies still permit your golden-path queries before they touch production traffic.
+- **Auth config changes.** Add a new OAuth provider, change redirect URIs, or rotate email templates with a real test user account, not a guess.
+- **Edge function rewrites.** Refactor a function and run it end-to-end against branched data.
+- **Backend upgrade rehearsals.** Verify a migration sequence on production-shaped data before a maintenance window.
+- **Per-feature sandboxes.** Long-lived feature branches that accumulate schema and config changes alongside an application branch.
+
+Skip a branch for:
+
+- **Data backfills.** Branches are for schema and configuration changes. User-data inserts on a branch are not auto-merged — write a one-off migration instead.
+- **Trivial changes you're confident in.** A new nullable column with a default doesn't need a branch.
+- **Anything outside the branched scope.** Compute services and frontend deployments don't branch.
+
+## Full vs. Schema-Only
+
+When you create a branch you choose how much state comes along:
+
+- **`full`** (entire schema and data) — copies the parent's complete database (schema + data) at the moment of branch creation. Best when you need realistic data to test against.
+- **`schema-only`** — copies the schema and the platform's mergeable config (auth providers, storage buckets, edge function definitions, …) but leaves user-data tables empty. Faster, lighter, and avoids bringing production rows into a sandbox.
+
+Both modes restore the parent's state once at create time. After that the branch runs on its own infrastructure with no live coupling — drift between parent and branch is what `merge` later resolves.
+
+## Branch Lifecycle
+
+A branch moves through a small number of states:
+
+| State | Meaning |
+| --- | --- |
+| `creating` | Parent is being dumped and restored onto the branch. |
+| `ready` | The branch is usable — edit anything, run code against it. |
+| `merging` | A merge is in flight; branch edits are paused. |
+| `merged` | A merge completed; the branch is read-only but still around. |
+| `paused` | Branch inherited the parent's paused state; resume it explicitly when you need it again. |
+| `deleted` | Tombstoned, EC2 and S3 cleaned up. |
+
+`ready` is where you do nearly all of your work. `merged` lets you keep iterating with `reset` if you want another round after a successful merge. `delete` is always explicit — a successful merge does **not** auto-delete the branch.
+
+## Managing Branches
+
+You can manage branches from the dashboard or the CLI. The two surfaces do the same thing — pick whichever fits your workflow.
+
+### From the Dashboard
+
+Open a project, then use the **Branches** panel to:
+
+- **Create** a new branch from the current project, choosing `full` or `schema-only`.
+- **Switch into** an existing branch — its own dashboard view with all the project's features.
+- **Merge** a branch back to the parent. You'll see the merge diff as a SQL preview before anything is applied; conflicts are surfaced inline.
+- **Reset** a branch to the snapshot taken when it was created.
+- **Delete** a branch when you're done.
+
+### From the CLI
+
+```bash
+# Create a branch from the currently linked project.
+npx @insforge/cli branch create feat-billing --mode full
+
+# List branches of the linked parent.
+npx @insforge/cli branch list
+
+# Preview the merge as SQL — nothing applied yet.
+npx @insforge/cli branch merge feat-billing --dry-run --save-sql ./preview.sql
+
+# Apply the merge.
+npx @insforge/cli branch merge feat-billing
+
+# Roll the branch back to the moment it was created.
+npx @insforge/cli branch reset feat-billing
+
+# Tear down the branch.
+npx @insforge/cli branch delete feat-billing
+```
+
+See the `npx @insforge/cli branch --help` for the full set of flags.
+
+## How Merge Works
+
+`branch merge` doesn't just replay your branch's writes on top of the parent. It computes a three-way diff between:
+
+1. **Parent at T0** — the parent's state when the branch was created (captured in branch metadata).
+2. **Parent now** — the parent's live state.
+3. **Branch now** — the branch's live state.
+
+For each object (table, RLS policy, function, mergeable config row), the diff decides:
+
+- Branch changed, parent unchanged → apply the branch's version.
+- Parent changed, branch unchanged → no-op; parent's version stays.
+- Both changed to the **same** result → no-op.
+- Both changed to **different** results → **conflict**; merge is blocked.
+
+When a merge is blocked, you get a structured report of which object diverged and why. Resolve on the branch (or `reset` and start over), then merge again. The merge SQL is rendered as a single migration-style script with `[DDL]` / `[DATA]` / `[MIGRATION]` sections so you can review it before applying.
+
+Platform config tables (auth providers, storage buckets, email templates, edge function definitions, schedules) merge by stable key. User-data rows on the branch are **not** auto-merged — branches are for schema and configuration, not data backfills.
+
+## Quotas and Limits
+
+<Warning>
+  These limits have not been finalized and may change in the future.
+</Warning>
+
+- Up to **3** parent projects per organization can have at least one active branch.
+- Up to **2** active branches per parent project.
+- Nested branches (a branch of a branch) are **not** supported.
+- When the parent is paused, its branches pause too. Resuming the parent does not auto-resume branches — resume each one explicitly when you need it.
+- When the parent is deleted, all of its branches are deleted with it.
+
+## Related
+
+- [Database Migrations](/core-concepts/database/migrations) — the forward-only SQL files you'll typically iterate on inside a branch before merging.
+- [Database Architecture](/core-concepts/database/architecture) — what's running under each branch's Postgres + PostgREST stack.
