@@ -34,14 +34,18 @@ describe('CloudWatchProvider.normalizeBody', () => {
     expect(out).toEqual(input);
   });
 
-  it('passes appname-only Vector payloads through when metadata.level is present', () => {
+  it('normalizes appname-only Vector payloads so they still expose event_message', () => {
+    // Passthrough now requires event_message as well as metadata.level — an
+    // appname-only payload would otherwise leak through with no message column.
     const input = {
       appname: 'insforge',
       metadata: { level: 'info' },
       foo: 'bar',
     };
     const out = normalizeBody(JSON.stringify(input), 'insforge.logs');
-    expect(out).toEqual(input);
+    expect(out).toMatchObject({ appname: 'insforge', foo: 'bar' });
+    expect(typeof out.event_message).toBe('string');
+    expect((out.metadata as { level: string }).level).toBe('info');
   });
 
   it('does not pass through when appname exists but metadata.level is missing', () => {
@@ -152,11 +156,11 @@ describe('CloudWatchProvider.normalizeBody', () => {
     expect(out.metadata).toBeDefined();
   });
 
-  it('handles JSON without a level field', () => {
+  it('defaults metadata.level to info when JSON has no level field', () => {
     const input = { message: 'no level here', foo: 'bar' };
     const out = normalizeBody(JSON.stringify(input), 'insforge.logs');
     expect(out.event_message).toBe('no level here');
-    expect(out.metadata).toEqual({});
+    expect((out.metadata as { level: string }).level).toBe('info');
     expect(out.foo).toBe('bar');
   });
 

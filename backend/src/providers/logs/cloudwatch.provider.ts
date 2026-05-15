@@ -546,15 +546,16 @@ export class CloudWatchProvider extends BaseLogProvider {
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
       const obj = parsed as Record<string, unknown>;
 
-      // Already in Vector shape: requires event_message + metadata.level (or
-      // an appname plus metadata.level) so the dashboard's severity badge
-      // works without further reshaping.
+      // Already in Vector shape: must carry both metadata.level (drives the
+      // severity badge) and event_message (the dashboard's primary text
+      // column). Letting an appname-only payload through here would leak rows
+      // with no event_message and the dashboard would render the raw JSON.
       const meta =
         obj.metadata && typeof obj.metadata === 'object' && !Array.isArray(obj.metadata)
           ? (obj.metadata as Record<string, unknown>)
           : undefined;
       const metaLevel = meta && typeof meta.level === 'string' ? meta.level : undefined;
-      if (metaLevel && (typeof obj.event_message === 'string' || typeof obj.appname === 'string')) {
+      if (metaLevel && typeof obj.event_message === 'string') {
         return obj;
       }
 
@@ -571,6 +572,10 @@ export class CloudWatchProvider extends BaseLogProvider {
       const existingMeta = meta ? { ...meta } : {};
       if (level !== undefined) {
         existingMeta.level = level;
+      } else if (typeof existingMeta.level !== 'string') {
+        // Default to info so the dashboard's severity getter has a value
+        // instead of falling through to "informational" by chance.
+        existingMeta.level = 'info';
       }
 
       const { message: _m, msg: _msg, level: _l, metadata: _meta, ...rest } = obj;
