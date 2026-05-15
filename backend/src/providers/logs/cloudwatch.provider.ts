@@ -20,7 +20,12 @@ export class CloudWatchProvider extends BaseLogProvider {
 
   async initialize(): Promise<void> {
     this.cwRegion = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-2';
-    this.cwLogGroup = process.env.CLOUDWATCH_LOG_GROUP || '/insforge/local';
+    // Mirrors the old Vector group_name: /insforge/${PROJECT_ID}. An explicit
+    // CLOUDWATCH_LOG_GROUP still wins so operators can point at a custom group.
+    const projectId = process.env.PROJECT_ID?.trim();
+    this.cwLogGroup =
+      process.env.CLOUDWATCH_LOG_GROUP ||
+      (projectId ? `/insforge/${projectId}` : '/insforge/local');
 
     const cloudwatchOpts: {
       region: string;
@@ -568,17 +573,65 @@ export class CloudWatchProvider extends BaseLogProvider {
         existingMeta.level = level;
       }
 
-      let eventMessage = msgField;
-      if (level === 'error') {
-        if (typeof obj.error === 'string' && obj.error) {
-          eventMessage = `${eventMessage}\n\nError: ${obj.error as string}`;
-        }
-        if (typeof obj.stack === 'string' && obj.stack) {
-          eventMessage = `${eventMessage}\n\nStack Trace:\n${obj.stack as string}`;
-        }
+      const { message: _m, msg: _msg, level: _l, metadata: _meta, ...rest } = obj;
+
+      // Request logs: backend HTTP middleware tags every line with a `duration`
+      // field. Mirror Vector's request branch — flatten the request fields and
+      // synthesize the nginx-style access line so the dashboard column shows
+      // method/path/status instead of raw JSON.
+      if (obj.duration !== undefined && obj.duration !== null) {
+        const method = typeof obj.method === 'string' ? obj.method : '';
+        const path = typeof obj.path === 'string' ? obj.path : '';
+        const status = obj.status;
+        const size = obj.size;
+        const duration = obj.duration;
+        const ip = typeof obj.ip === 'string' ? obj.ip : '';
+        const userAgent = typeof obj.userAgent === 'string' ? obj.userAgent : '';
+
+        const fmt = (v: unknown) => (v === undefined || v === null ? '' : String(v));
+        const requestLine = [
+          method,
+          path,
+          fmt(status),
+          fmt(size),
+          fmt(duration),
+          '-',
+          ip,
+          '-',
+          userAgent,
+        ].join(' ');
+
+        const {
+          method: _mh,
+          path: _ph,
+          status: _st,
+          size: _sz,
+          duration: _du,
+          ip: _ip,
+          userAgent: _ua,
+          ...restNoReq
+        } = rest;
+
+        return {
+          ...restNoReq,
+          method,
+          path,
+          status_code: status,
+          size,
+          duration,
+          ip,
+          user_agent: userAgent,
+          event_message: requestLine,
+          metadata: existingMeta,
+        };
       }
 
-      const { message: _m, msg: _msg, level: _l, metadata: _meta, ...rest } = obj;
+      // Application logs: prefix the level so the dashboard message column
+      // reads `info - some message`, matching Vector's
+      // `join!([req.level, req.message], " - ")`. Leaves `error`/`stack` as
+      // top-level keys in the body for the detail panel.
+      const eventMessage =
+        level !== undefined && msgField ? `${level} - ${msgField}` : msgField;
 
       return {
         ...rest,
@@ -625,15 +678,16 @@ export class CloudWatchProvider extends BaseLogProvider {
     }
 
     if (sourceName === 'postgREST.logs') {
+      // PostgREST prefixes *every* line (access logs AND operational errors
+      // like "Failed to load the schema cache", upstream FATAL forwards, etc.)
+      // with the same `DD/Mon/YYYY:HH:MM:SS +ZZZZ: ` timestamp. Strip the
+      // prefix for display, then keyword-infer the severity from the payload
+      // so errors don't all collapse to info.
       const m = stripped.match(
         /^(?<time>\d{2}\/\w{3}\/\d{4}:\d{2}:\d{2}:\d{2} [+-]\d{4}): (?<msg>.*)$/s
       );
-      if (m && m.groups) {
-        metadata.level = 'info';
-        return { event_message: m.groups.msg, metadata };
-      }
-      metadata.level = 'info';
-      return { event_message: stripped, metadata };
+      const payload = m && m.groups ? m.groups.msg : stripped;
+      return this.inferLevelFromText(payload);
     }
 
     if (sourceName === 'function.logs') {
@@ -645,14 +699,19 @@ export class CloudWatchProvider extends BaseLogProvider {
     }
 
     // Conservative severity inference for anything else.
-    const lower = stripped.toLowerCase();
+    return this.inferLevelFromText(stripped);
+  }
+
+  private inferLevelFromText(text: string): Record<string, unknown> {
+    const lower = text.toLowerCase();
+    let level: string;
     if (/\b(error|exception|fatal|panic)\b/.test(lower)) {
-      metadata.level = 'error';
+      level = 'error';
     } else if (/\b(warn|warning)\b/.test(lower)) {
-      metadata.level = 'warn';
+      level = 'warn';
     } else {
-      metadata.level = 'info';
+      level = 'info';
     }
-    return { event_message: stripped, metadata };
+    return { event_message: text, metadata: { level } };
   }
 }

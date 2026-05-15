@@ -54,10 +54,10 @@ describe('CloudWatchProvider.normalizeBody', () => {
     };
     const out = normalizeBody(JSON.stringify(input), 'insforge.logs');
     expect((out.metadata as { level: string }).level).toBe('error');
-    expect(out.event_message).toBe('boom');
+    expect(out.event_message).toBe('error - boom');
   });
 
-  it('lifts Winston level + message into Vector shape', () => {
+  it('lifts Winston level + message into Vector shape with "level - message" prefix', () => {
     const input = {
       level: 'info',
       message: 'started',
@@ -65,14 +65,14 @@ describe('CloudWatchProvider.normalizeBody', () => {
       metadata: { requestId: 'abc' },
     };
     const out = normalizeBody(JSON.stringify(input), 'insforge.logs');
-    expect(out.event_message).toBe('started');
+    expect(out.event_message).toBe('info - started');
     expect(out.metadata).toEqual({ requestId: 'abc', level: 'info' });
     expect(out.timestamp).toBe('2024-01-01T00:00:00Z');
     expect(out).not.toHaveProperty('level');
     expect(out).not.toHaveProperty('message');
   });
 
-  it('appends error and stack to event_message for Winston error logs', () => {
+  it('keeps Winston error/stack as top-level body keys without inlining into event_message', () => {
     const input = {
       level: 'error',
       message: 'request failed',
@@ -80,24 +80,64 @@ describe('CloudWatchProvider.normalizeBody', () => {
       stack: 'at foo (file.ts:1)\nat bar (file.ts:2)',
     };
     const out = normalizeBody(JSON.stringify(input), 'insforge.logs');
-    expect(out.event_message).toBe(
-      'request failed\n\nError: TypeError: x is undefined\n\nStack Trace:\nat foo (file.ts:1)\nat bar (file.ts:2)'
-    );
+    expect(out.event_message).toBe('error - request failed');
     expect((out.metadata as { level: string }).level).toBe('error');
+    expect(out.error).toBe('TypeError: x is undefined');
+    expect(out.stack).toBe('at foo (file.ts:1)\nat bar (file.ts:2)');
   });
 
   it('lowercases the Winston level field', () => {
     const input = { level: 'ERROR', message: 'oops' };
     const out = normalizeBody(JSON.stringify(input), 'insforge.logs');
     expect((out.metadata as { level: string }).level).toBe('error');
+    expect(out.event_message).toBe('error - oops');
   });
 
-  it('strips the msg key (pino-style) from the rest spread', () => {
+  it('strips the msg key (pino-style) and prefixes level on the rest spread', () => {
     const input = { level: 'info', msg: 'hello', extra: 1 };
     const out = normalizeBody(JSON.stringify(input), 'insforge.logs');
-    expect(out.event_message).toBe('hello');
+    expect(out.event_message).toBe('info - hello');
     expect(out).not.toHaveProperty('msg');
     expect(out.extra).toBe(1);
+  });
+
+  it('flattens Winston request logs into snake_case fields and an nginx-style event_message', () => {
+    const input = {
+      level: 'info',
+      message: 'HTTP request',
+      method: 'GET',
+      path: '/rest/v1/users',
+      status: 200,
+      size: 1234,
+      duration: '12.3ms',
+      ip: '127.0.0.1',
+      userAgent: 'curl/8.0',
+      timestamp: '2024-01-01T00:00:00Z',
+    };
+    const out = normalizeBody(JSON.stringify(input), 'insforge.logs');
+    expect(out.event_message).toBe('GET /rest/v1/users 200 1234 12.3ms - 127.0.0.1 - curl/8.0');
+    expect(out.method).toBe('GET');
+    expect(out.path).toBe('/rest/v1/users');
+    expect(out.status_code).toBe(200);
+    expect(out.size).toBe(1234);
+    expect(out.duration).toBe('12.3ms');
+    expect(out.ip).toBe('127.0.0.1');
+    expect(out.user_agent).toBe('curl/8.0');
+    expect((out.metadata as { level: string }).level).toBe('info');
+    // camelCase source keys are dropped in favor of the snake_case re-emits
+    expect(out).not.toHaveProperty('userAgent');
+    expect(out).not.toHaveProperty('status');
+    // Non-request keys still pass through
+    expect(out.timestamp).toBe('2024-01-01T00:00:00Z');
+  });
+
+  it('treats logs without duration as application logs even when they have method/path', () => {
+    // Edge case: a non-request log that happens to mention a method/path. The
+    // request branch is keyed strictly on `duration` to match Vector's check.
+    const input = { level: 'info', message: 'routing', method: 'GET', path: '/foo' };
+    const out = normalizeBody(JSON.stringify(input), 'insforge.logs');
+    expect(out.event_message).toBe('info - routing');
+    expect(out).not.toHaveProperty('status_code');
   });
 
   it('falls back to raw text parsing on malformed JSON', () => {
@@ -197,6 +237,42 @@ describe('CloudWatchProvider.parseRawLine - postgREST.logs', () => {
     );
     expect((out.metadata as { level: string }).level).toBe('info');
     expect(out.event_message).toBe('127.0.0.1 - GET /rest/v1/users 200');
+  });
+
+  it('infers error from schema-cache failure lines', () => {
+    // PostgREST surfaces startup/schema-cache problems without the access-log
+    // prefix; "Database connection error" should drive the error badge.
+    const out = parseRawLine(
+      'Failed to load the schema cache. {"code":"PGRST000","message":"Database connection error. Retrying the connection."}',
+      'postgREST.logs'
+    );
+    expect((out.metadata as { level: string }).level).toBe('error');
+  });
+
+  it('strips timestamp prefix and still infers error for schema-cache failures', () => {
+    // Real PostgREST output prefixes *every* line — access AND error — with
+    // the same timestamp. Strip the prefix, but keep keyword inference active.
+    const out = parseRawLine(
+      '15/Jan/2024:12:34:56 +0000: Failed to load the schema cache. {"code":"PGRST000","message":"Database connection error. Retrying."}',
+      'postgREST.logs'
+    );
+    expect((out.metadata as { level: string }).level).toBe('error');
+    expect(out.event_message).toBe(
+      'Failed to load the schema cache. {"code":"PGRST000","message":"Database connection error. Retrying."}'
+    );
+  });
+
+  it('infers error from upstream FATAL lines forwarded by postgREST', () => {
+    const out = parseRawLine(
+      'FATAL:  terminating connection due to administrator command',
+      'postgREST.logs'
+    );
+    expect((out.metadata as { level: string }).level).toBe('error');
+  });
+
+  it('infers warn from postgREST warning lines', () => {
+    const out = parseRawLine('Warning: deprecated configuration option', 'postgREST.logs');
+    expect((out.metadata as { level: string }).level).toBe('warn');
   });
 
   it('falls back to info for unrecognized postgREST lines', () => {
