@@ -66,12 +66,13 @@ export class CloudPosthogProvider implements PosthogProvider {
   }
 
   async getConnection(): Promise<PosthogConnection | null> {
+    let data: unknown;
     try {
-      const { data } = await axios.get(this.url('/posthog/connection'), {
+      const response = await axios.get(this.url('/posthog/connection'), {
         headers: this.headers(),
         timeout: 10000,
       });
-      return posthogConnectionSchema.parse(data);
+      data = response.data;
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 404) {
         return null;
@@ -83,15 +84,25 @@ export class CloudPosthogProvider implements PosthogProvider {
         ERROR_CODES.UPSTREAM_FAILURE
       );
     }
+    const parsed = posthogConnectionSchema.safeParse(data);
+    if (!parsed.success) {
+      throw new AppError(
+        `Invalid PostHog connection response: ${parsed.error.message}`,
+        502,
+        ERROR_CODES.UPSTREAM_FAILURE
+      );
+    }
+    return parsed.data;
   }
 
   async getDashboards(): Promise<PosthogDashboardsResponse> {
+    let data: unknown;
     try {
-      const { data } = await axios.get(this.url('/posthog/dashboards'), {
+      const response = await axios.get(this.url('/posthog/dashboards'), {
         headers: this.headers(),
         timeout: 10000,
       });
-      return posthogDashboardsResponseSchema.parse(data);
+      data = response.data;
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 404) {
         throw new AppError('PostHog not connected', 404, ERROR_CODES.NOT_FOUND);
@@ -103,15 +114,25 @@ export class CloudPosthogProvider implements PosthogProvider {
         ERROR_CODES.UPSTREAM_FAILURE
       );
     }
+    const parsed = posthogDashboardsResponseSchema.safeParse(data);
+    if (!parsed.success) {
+      throw new AppError(
+        `Invalid PostHog dashboards response: ${parsed.error.message}`,
+        502,
+        ERROR_CODES.UPSTREAM_FAILURE
+      );
+    }
+    return parsed.data;
   }
 
   async getSummary(): Promise<PosthogSummary> {
+    let data: unknown;
     try {
-      const { data } = await axios.get(this.url('/posthog/summary'), {
+      const response = await axios.get(this.url('/posthog/summary'), {
         headers: this.headers(),
         timeout: 10000,
       });
-      return posthogSummarySchema.parse(data);
+      data = response.data;
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 404) {
         throw new AppError('PostHog not connected', 404, ERROR_CODES.NOT_FOUND);
@@ -123,16 +144,26 @@ export class CloudPosthogProvider implements PosthogProvider {
         ERROR_CODES.UPSTREAM_FAILURE
       );
     }
+    const parsed = posthogSummarySchema.safeParse(data);
+    if (!parsed.success) {
+      throw new AppError(
+        `Invalid PostHog summary response: ${parsed.error.message}`,
+        502,
+        ERROR_CODES.UPSTREAM_FAILURE
+      );
+    }
+    return parsed.data;
   }
 
   async getRecentEvents(limit = 10): Promise<PosthogEventsResponse> {
+    let data: unknown;
     try {
-      const { data } = await axios.get(this.url('/posthog/events'), {
+      const response = await axios.get(this.url('/posthog/events'), {
         headers: this.headers(),
         timeout: 10000,
         params: { limit },
       });
-      return posthogEventsResponseSchema.parse(data);
+      data = response.data;
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 404) {
         throw new AppError('PostHog not connected', 404, ERROR_CODES.NOT_FOUND);
@@ -144,6 +175,15 @@ export class CloudPosthogProvider implements PosthogProvider {
         ERROR_CODES.UPSTREAM_FAILURE
       );
     }
+    const parsed = posthogEventsResponseSchema.safeParse(data);
+    if (!parsed.success) {
+      throw new AppError(
+        `Invalid PostHog events response: ${parsed.error.message}`,
+        502,
+        ERROR_CODES.UPSTREAM_FAILURE
+      );
+    }
+    return parsed.data;
   }
 
   async disconnect(): Promise<void> {
@@ -159,13 +199,14 @@ export class CloudPosthogProvider implements PosthogProvider {
   }
 
   async getWebOverview(timeframe: string): Promise<PosthogWebOverviewResponse> {
+    let data: unknown;
     try {
-      const { data } = await axios.get(this.url('/posthog/web-overview'), {
+      const response = await axios.get(this.url('/posthog/web-overview'), {
         headers: this.headers(),
         timeout: 15000,
         params: { timeframe },
       });
-      return posthogWebOverviewResponseSchema.parse(data);
+      data = response.data;
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 404) {
         throw new AppError('PostHog not connected', 404, ERROR_CODES.NOT_FOUND);
@@ -177,16 +218,26 @@ export class CloudPosthogProvider implements PosthogProvider {
         ERROR_CODES.UPSTREAM_FAILURE
       );
     }
+    const parsed = posthogWebOverviewResponseSchema.safeParse(data);
+    if (!parsed.success) {
+      throw new AppError(
+        `Invalid PostHog web overview response: ${parsed.error.message}`,
+        502,
+        ERROR_CODES.UPSTREAM_FAILURE
+      );
+    }
+    return parsed.data;
   }
 
   async getWebStats(breakdown: string, timeframe: string): Promise<PosthogWebStatsResponse> {
+    let data: unknown;
     try {
-      const { data } = await axios.get(this.url('/posthog/web-stats'), {
+      const response = await axios.get(this.url('/posthog/web-stats'), {
         headers: this.headers(),
         timeout: 15000,
         params: { breakdown, timeframe },
       });
-      return posthogWebStatsResponseSchema.parse(data);
+      data = response.data;
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 404) {
         throw new AppError('PostHog not connected', 404, ERROR_CODES.NOT_FOUND);
@@ -198,16 +249,26 @@ export class CloudPosthogProvider implements PosthogProvider {
         ERROR_CODES.UPSTREAM_FAILURE
       );
     }
+    const parsed = posthogWebStatsResponseSchema.safeParse(data);
+    if (!parsed.success) {
+      throw new AppError(
+        `Invalid PostHog web stats response: ${parsed.error.message}`,
+        502,
+        ERROR_CODES.UPSTREAM_FAILURE
+      );
+    }
+    return parsed.data;
   }
 
   async getTrends(metric: string, timeframe: string): Promise<PosthogTrendsResponse> {
+    let data: unknown;
     try {
-      const { data } = await axios.get(this.url('/posthog/trends'), {
+      const response = await axios.get(this.url('/posthog/trends'), {
         headers: this.headers(),
         timeout: 15000,
         params: { metric, timeframe },
       });
-      return posthogTrendsResponseSchema.parse(data);
+      data = response.data;
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 404) {
         throw new AppError('PostHog not connected', 404, ERROR_CODES.NOT_FOUND);
@@ -219,15 +280,25 @@ export class CloudPosthogProvider implements PosthogProvider {
         ERROR_CODES.UPSTREAM_FAILURE
       );
     }
+    const parsed = posthogTrendsResponseSchema.safeParse(data);
+    if (!parsed.success) {
+      throw new AppError(
+        `Invalid PostHog trends response: ${parsed.error.message}`,
+        502,
+        ERROR_CODES.UPSTREAM_FAILURE
+      );
+    }
+    return parsed.data;
   }
 
   async getRetention(): Promise<PosthogRetentionResponse> {
+    let data: unknown;
     try {
-      const { data } = await axios.get(this.url('/posthog/retention'), {
+      const response = await axios.get(this.url('/posthog/retention'), {
         headers: this.headers(),
         timeout: 15000,
       });
-      return posthogRetentionResponseSchema.parse(data);
+      data = response.data;
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 404) {
         throw new AppError('PostHog not connected', 404, ERROR_CODES.NOT_FOUND);
@@ -239,16 +310,26 @@ export class CloudPosthogProvider implements PosthogProvider {
         ERROR_CODES.UPSTREAM_FAILURE
       );
     }
+    const parsed = posthogRetentionResponseSchema.safeParse(data);
+    if (!parsed.success) {
+      throw new AppError(
+        `Invalid PostHog retention response: ${parsed.error.message}`,
+        502,
+        ERROR_CODES.UPSTREAM_FAILURE
+      );
+    }
+    return parsed.data;
   }
 
   async getRecordings(limit = 10): Promise<PosthogRecordingsResponse> {
+    let data: unknown;
     try {
-      const { data } = await axios.get(this.url('/posthog/recordings'), {
+      const response = await axios.get(this.url('/posthog/recordings'), {
         headers: this.headers(),
         timeout: 15000,
         params: { limit },
       });
-      return posthogRecordingsResponseSchema.parse(data);
+      data = response.data;
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 404) {
         throw new AppError('PostHog not connected', 404, ERROR_CODES.NOT_FOUND);
@@ -260,16 +341,26 @@ export class CloudPosthogProvider implements PosthogProvider {
         ERROR_CODES.UPSTREAM_FAILURE
       );
     }
+    const parsed = posthogRecordingsResponseSchema.safeParse(data);
+    if (!parsed.success) {
+      throw new AppError(
+        `Invalid PostHog recordings response: ${parsed.error.message}`,
+        502,
+        ERROR_CODES.UPSTREAM_FAILURE
+      );
+    }
+    return parsed.data;
   }
 
   async createRecordingShare(recordingId: string): Promise<PosthogShareTokenResponse> {
+    let data: unknown;
     try {
-      const { data } = await axios.post(
+      const response = await axios.post(
         this.url(`/posthog/recordings/${encodeURIComponent(recordingId)}/share`),
         {},
         { headers: this.headers(), timeout: 15000 }
       );
-      return posthogShareTokenResponseSchema.parse(data);
+      data = response.data;
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 404) {
         throw new AppError('PostHog not connected', 404, ERROR_CODES.NOT_FOUND);
@@ -281,5 +372,14 @@ export class CloudPosthogProvider implements PosthogProvider {
         ERROR_CODES.UPSTREAM_FAILURE
       );
     }
+    const parsed = posthogShareTokenResponseSchema.safeParse(data);
+    if (!parsed.success) {
+      throw new AppError(
+        `Invalid PostHog recording share response: ${parsed.error.message}`,
+        502,
+        ERROR_CODES.UPSTREAM_FAILURE
+      );
+    }
+    return parsed.data;
   }
 }

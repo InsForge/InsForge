@@ -10,14 +10,19 @@ import {
   DialogTitle,
 } from '@insforge/ui';
 import { posthogApi } from '#features/analytics/services/posthog.api';
+import { useToast } from '#lib/hooks/useToast';
 
 export function DisconnectDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const qc = useQueryClient();
+  const { showToast } = useToast();
   const m = useMutation({
     mutationFn: () => posthogApi.disconnect(),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['posthog'] });
       onClose();
+    },
+    onError: () => {
+      showToast('Failed to disconnect PostHog. Please try again.', 'error');
     },
   });
 

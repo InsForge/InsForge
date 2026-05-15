@@ -77,8 +77,16 @@ export function RetentionCard({ enabled }: { enabled: boolean }) {
     if (!m) {
       return iso;
     }
-    const start = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-    if (Number.isNaN(start.getTime())) {
+    const year = Number(m[1]);
+    const month = Number(m[2]);
+    const day = Number(m[3]);
+    const start = new Date(year, month - 1, day);
+    if (
+      Number.isNaN(start.getTime()) ||
+      start.getFullYear() !== year ||
+      start.getMonth() !== month - 1 ||
+      start.getDate() !== day
+    ) {
       return iso;
     }
     const end = new Date(start.getTime() + 6 * 86_400_000);

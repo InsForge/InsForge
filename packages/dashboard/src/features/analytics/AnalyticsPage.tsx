@@ -21,7 +21,7 @@ const ANALYTICS_SETUP_PROMPT =
   "I'm using InsForge as my backend platform. I want to add product analytics to this project. Read the current directory and use the InsForge skill to set up PostHog analytics for me.";
 
 export function AnalyticsPage() {
-  const { projectId } = useProjectId();
+  const { projectId, isLoading: projectIdLoading, error: projectIdError } = useProjectId();
   const qc = useQueryClient();
   const conn = usePosthogConnection();
   const { showToast } = useToast();
@@ -67,7 +67,15 @@ export function AnalyticsPage() {
     return (
       <div className="p-6">
         <h1 className="mb-4 text-2xl font-bold text-foreground">Analytics</h1>
-        {projectId ? <EmptyConnectPanel projectId={projectId} /> : <div>Loading…</div>}
+        {projectIdError ? (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+            Failed to load project ID. Please refresh.
+          </div>
+        ) : projectIdLoading || !projectId ? (
+          <div>Loading…</div>
+        ) : (
+          <EmptyConnectPanel projectId={projectId} />
+        )}
       </div>
     );
   }
