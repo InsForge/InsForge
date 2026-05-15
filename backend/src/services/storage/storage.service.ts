@@ -85,6 +85,33 @@ export class StorageService {
   }
 
   /**
+   * Build the canonical download URL with a cache-busting `?v=<version>`
+   * query param. CDNs (CloudFront, Cloudflare, etc.) key cache entries by
+   * full URL — same key + same URL would serve stale bytes after an
+   * overwrite. The version stamp changes on every upload (etag if known,
+   * otherwise an epoch-ms uploaded_at), so each new upload yields a fresh
+   * URL and a guaranteed cache miss without any invalidation API call.
+   *
+   * The CDN itself must be configured to include `v` in its cache key for
+   * this to take effect (CloudFront default is to ignore query strings).
+   */
+  private buildObjectUrl(bucket: string, key: string, version?: string | Date | null): string {
+    const base = `${getApiBaseUrl()}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(key)}`;
+    const stamp = this.toVersionStamp(version);
+    return stamp ? `${base}?v=${encodeURIComponent(stamp)}` : base;
+  }
+
+  private toVersionStamp(version: string | Date | null | undefined): string {
+    if (!version) {
+      return '';
+    }
+    if (version instanceof Date) {
+      return version.getTime().toString();
+    }
+    return version;
+  }
+
+  /**
    * Generate a unique object key with timestamp and random string
    * @param originalFilename - The original filename from the upload
    * @returns Generated unique key
@@ -175,7 +202,7 @@ export class StorageService {
     // Admin-pool dedup (sees all rows; avoids silent cross-user blob overwrite).
     const finalKey = await this.generateNextAvailableKey(bucket, originalKey, this.getPool());
 
-    return withUserContext(this.getPool(), ctx, async (db) => {
+    const { etag, uploadedAt } = await withUserContext(this.getPool(), ctx, async (db) => {
       // INSERT before provider write so UNIQUE (bucket, key) catches any
       // race-window collision before any blob is touched. Provider write
       // stays inside the transaction — a provider failure throws, the tx
@@ -193,17 +220,42 @@ export class StorageService {
         throw new Error(`Failed to retrieve upload timestamp for ${bucket}/${finalKey}`);
       }
 
-      await this.provider.putObject(bucket, finalKey, file);
-
-      return {
-        bucket,
-        key: finalKey,
-        size: file.size,
-        mimeType: file.mimetype,
-        uploadedAt: result.rows[0].uploadedAt,
-        url: `${getApiBaseUrl()}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(finalKey)}`,
-      };
+      const { etag: providerEtag } = await this.provider.putObject(bucket, finalKey, file);
+      return { etag: providerEtag, uploadedAt: result.rows[0].uploadedAt };
     });
+
+    // Persist the etag as a best-effort step OUTSIDE the user-context
+    // transaction. If we ran this inside the tx and the UPDATE failed, the
+    // INSERT would roll back but the provider blob would already be written
+    // — leaving an orphan in S3. Done out here, an UPDATE failure only
+    // degrades CDN cache-busting precision (URLs fall back to uploaded_at as
+    // the version stamp) instead of permanently leaking storage.
+    if (etag) {
+      try {
+        await this.getPool().query(
+          'UPDATE storage.objects SET etag = $1 WHERE bucket = $2 AND key = $3',
+          [etag, bucket, finalKey]
+        );
+      } catch (err) {
+        logger.warn(
+          'Failed to persist object etag; CDN cache-busting will fall back to uploaded_at',
+          {
+            bucket,
+            key: finalKey,
+            error: err instanceof Error ? err.message : String(err),
+          }
+        );
+      }
+    }
+
+    return {
+      bucket,
+      key: finalKey,
+      size: file.size,
+      mimeType: file.mimetype,
+      uploadedAt,
+      url: this.buildObjectUrl(bucket, finalKey, etag || uploadedAt),
+    };
   }
 
   async getObject(
@@ -240,7 +292,7 @@ export class StorageService {
         size: metadata.size,
         mimeType: metadata.mime_type,
         uploadedAt: metadata.uploaded_at,
-        url: `${getApiBaseUrl()}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(key)}`,
+        url: this.buildObjectUrl(bucket, key, metadata.etag || metadata.uploaded_at),
       },
     };
   }
@@ -316,7 +368,7 @@ export class StorageService {
           ...obj,
           mimeType: obj.mime_type,
           uploadedAt: obj.uploaded_at,
-          url: `${getApiBaseUrl()}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(obj.key)}`,
+          url: this.buildObjectUrl(bucket, obj.key, obj.etag || obj.uploaded_at),
         })),
         total: parseInt(totalResult.rows[0].count, 10),
       };
@@ -467,7 +519,24 @@ export class StorageService {
     // Auto-calculate expiry based on bucket visibility if not provided
     const expiresIn = isPublic ? PUBLIC_BUCKET_EXPIRY : PRIVATE_BUCKET_EXPIRY;
 
-    return this.provider.getDownloadStrategy(bucket, key, expiresIn, isPublic);
+    // Fetch the version stamp (etag preferred, uploaded_at fallback) and pass
+    // it to the provider, which knows whether its URL flavor tolerates an
+    // extra `?v=` query param. CloudFront and local direct URLs do; raw S3
+    // SigV4 presigned URLs do NOT (signature covers every query param), so
+    // appending after signing would yield SignatureDoesNotMatch 403s. The DB
+    // read is admin-pooled because public-bucket callers reach here without
+    // a user context, and the visibility check has already gated access.
+    const versionRow = await this.getPool().query(
+      'SELECT etag, uploaded_at FROM storage.objects WHERE bucket = $1 AND key = $2',
+      [bucket, key]
+    );
+    const version = this.toVersionStamp(
+      (versionRow.rows[0]?.etag as string | null) ??
+        (versionRow.rows[0]?.uploaded_at as Date | null) ??
+        null
+    );
+
+    return this.provider.getDownloadStrategy(bucket, key, expiresIn, isPublic, version || null);
   }
 
   /**
@@ -504,11 +573,21 @@ export class StorageService {
     this.validateBucketName(bucket);
     this.validateKey(key);
 
-    // Verify the file exists in storage and get its actual size
-    const { exists, size: actualSize } = await this.provider.verifyObjectExists(bucket, key);
+    // Verify the file exists in storage and get its actual size + etag.
+    // The server-side etag overrides whatever the client passed: browsers
+    // don't expose the S3 `ETag` response header on cross-origin PUTs unless
+    // the bucket CORS allowlists it, so client-supplied etag is unreliable.
+    // Trusting the HEAD result guarantees the row has a real digest the
+    // download URL can version on.
+    const {
+      exists,
+      size: actualSize,
+      etag: serverEtag,
+    } = await this.provider.verifyObjectExists(bucket, key);
     if (!exists) {
       throw new Error(`Upload not found for key "${key}" in bucket "${bucket}"`);
     }
+    const finalEtag = serverEtag || metadata.etag || null;
 
     // Defense-in-depth: reject if the actual size exceeds the configured limit
     const fileSize = actualSize ?? metadata.size;
@@ -540,10 +619,10 @@ export class StorageService {
     // postgres role.
     const result = await withUserContext(this.getPool(), ctx, (db) =>
       db.query(
-        `INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by, uploaded_via)
-         VALUES ($1, $2, $3, $4, $5, 'rest')
+        `INSERT INTO storage.objects (bucket, key, size, mime_type, etag, uploaded_by, uploaded_via)
+         VALUES ($1, $2, $3, $4, $5, $6, 'rest')
          RETURNING uploaded_at as "uploadedAt"`,
-        [bucket, key, fileSize, metadata.contentType || null, ctx.userId || null]
+        [bucket, key, fileSize, metadata.contentType || null, finalEtag, ctx.userId || null]
       )
     );
 
@@ -557,7 +636,7 @@ export class StorageService {
       size: fileSize,
       mimeType: metadata.contentType,
       uploadedAt: result.rows[0].uploadedAt,
-      url: `${getApiBaseUrl()}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(key)}`,
+      url: this.buildObjectUrl(bucket, key, finalEtag || result.rows[0].uploadedAt),
     };
   }
 
