@@ -9,6 +9,7 @@ import {
   Server,
   Sparkles,
   ChartLine,
+  BarChart3,
   Settings,
   Rocket,
   SquarePen,
@@ -134,6 +135,13 @@ export const dashboardDeploymentsMenuItem: DashboardPrimaryMenuItem = {
   label: 'Deployments',
   href: '/dashboard/deployments',
   icon: Rocket,
+};
+
+export const dashboardAnalyticsMenuItem: DashboardPrimaryMenuItem = {
+  id: 'analytics',
+  label: 'Analytics',
+  href: '/dashboard/analytics',
+  icon: BarChart3,
 };
 
 // d_test + cloud-hosting only: navigates to the Install InsForge route.

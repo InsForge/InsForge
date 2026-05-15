@@ -4,6 +4,7 @@ import AILayout from '#features/ai/components/AILayout';
 import AIOverviewPage from '#features/ai/pages/AIOverviewPage';
 import AIQuickStartPage from '#features/ai/pages/AIQuickStartPage';
 import AIModelsPage from '#features/ai/pages/AIModelsPage';
+import { AnalyticsPage } from '#features/analytics';
 import AuthenticationLayout from '#features/auth/components/AuthenticationLayout';
 import AuthMethodsPage from '#features/auth/pages/AuthMethodsPage';
 import EmailPage from '#features/auth/pages/EmailPage';
@@ -55,11 +56,13 @@ import VisualizerLayout from '#features/visualizer/components/VisualizerLayout';
 import VisualizerPage from '#features/visualizer/pages/VisualizerPage';
 import AppLayout from '#layout/AppLayout';
 import { getFeatureFlag } from '#lib/analytics/posthog';
+import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
 
 function AuthenticatedRoutes() {
   const dashboardVariant = getFeatureFlag('dashboard-v4-experiment');
   const isDTest = dashboardVariant === 'd_test';
   const DashboardHomePage = isDTest ? DTestDashboardPage : DashboardPage;
+  const isCloudHosting = useIsCloudHostingMode();
 
   return (
     <AppLayout>
@@ -139,6 +142,7 @@ function AuthenticatedRoutes() {
           <Route path="domains" element={<DeploymentDomainsPage />} />
         </Route>
         <Route path="/dashboard/compute" element={<ComputePage />} />
+        {isCloudHosting && <Route path="/dashboard/analytics" element={<AnalyticsPage />} />}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </AppLayout>
