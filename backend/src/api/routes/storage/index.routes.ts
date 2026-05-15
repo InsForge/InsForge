@@ -20,29 +20,30 @@ const auditService = AuditService.getInstance();
 const storageConfigService = StorageConfigService.getInstance();
 
 // Middleware to conditionally apply authentication based on bucket visibility
-const conditionalAuth = async (req: Request, res: Response, next: NextFunction) => {
-  const isObjectDownload = req.method === 'GET' || req.method === 'HEAD';
-  const isDownloadStrategy =
-    req.method === 'POST' && req.originalUrl.split('?')[0].endsWith('/download-strategy');
+const conditionalAuth =
+  (options: { allowPublicPost?: boolean } = {}) =>
+  async (req: Request, res: Response, next: NextFunction) => {
+    const isObjectDownload = req.method === 'GET' || req.method === 'HEAD';
+    const isAllowedPublicPost = req.method === 'POST' && options.allowPublicPost;
 
-  // For object download requests, check if bucket is public
-  if ((isObjectDownload || isDownloadStrategy) && req.params.bucketName) {
-    try {
-      const storageService = StorageService.getInstance();
-      const isPublic = await storageService.isBucketPublic(req.params.bucketName);
+    // For object download requests, check if bucket is public
+    if ((isObjectDownload || isAllowedPublicPost) && req.params.bucketName) {
+      try {
+        const storageService = StorageService.getInstance();
+        const isPublic = await storageService.isBucketPublic(req.params.bucketName);
 
-      if (isPublic) {
-        // Public bucket - skip authentication
-        return next();
+        if (isPublic) {
+          // Public bucket - skip authentication
+          return next();
+        }
+      } catch {
+        // If error checking bucket, continue with auth requirement
       }
-    } catch {
-      // If error checking bucket, continue with auth requirement
     }
-  }
 
-  // All other cases require authentication
-  return verifyUser(req, res, next);
-};
+    // All other cases require authentication
+    return verifyUser(req, res, next);
+  };
 
 // GET /api/storage/config - Get storage configuration (requires admin)
 router.get('/config', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -390,7 +391,7 @@ router.post(
 // GET /api/storage/buckets/:bucketName/objects/:objectKey - Download object from bucket (conditional auth)
 router.get(
   '/buckets/:bucketName/objects/*',
-  conditionalAuth,
+  conditionalAuth(),
   async (req: AuthRequest | Request, res: Response, next: NextFunction) => {
     try {
       const { bucketName } = req.params;
@@ -605,7 +606,7 @@ router.post(
 // POST /api/storage/buckets/:bucketName/objects/:objectKey/download-strategy - Get download URL (presigned or direct)
 router.post(
   '/buckets/:bucketName/objects/*/download-strategy',
-  conditionalAuth,
+  conditionalAuth({ allowPublicPost: true }),
   async (req: AuthRequest | Request, res: Response, next: NextFunction) => {
     try {
       const { bucketName } = req.params;
