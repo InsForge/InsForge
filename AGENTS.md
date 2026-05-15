@@ -68,6 +68,8 @@ Available documentation types:
 - `"ai-integration-sdk"` - AI integration with the provisioned OpenRouter key and OpenAI SDK
 - `"real-time"` - Real-time pub/sub (database + client events) via WebSockets
 
+For InsForge Cloud projects, InsForge provisions the OpenRouter key and admins can copy the active key from Model Gateway into a server-only `OPENROUTER_API_KEY`. For self-hosted projects, configure `OPENROUTER_API_KEY` in the backend environment.
+
 ## When to Use SDK vs MCP Tools
 
 ### Always SDK for Application Logic:
@@ -75,7 +77,7 @@ Available documentation types:
 - Authentication (register, login, logout, profiles)
 - Database CRUD (select, insert, update, delete)
 - Storage operations (upload, download files)
-- AI application logic should use the provisioned OpenRouter key directly with the OpenAI SDK or OpenRouter HTTP API
+- AI integration via the provisioned OpenRouter key with the OpenAI SDK or OpenRouter HTTP API
 - Serverless function invocation
 
 ### Use MCP Tools for Infrastructure:

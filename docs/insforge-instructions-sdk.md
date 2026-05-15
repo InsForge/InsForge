@@ -88,7 +88,7 @@ Available feature types:
 - storage - File storage operations
 - functions - Serverless functions invocation
 - auth - User authentication
-- ai - AI integration with OpenRouter and the OpenAI SDK
+- ai - AI integration with the provisioned OpenRouter key and OpenAI SDK
 - realtime - Real-time pub/sub (database + client events) via WebSockets
 
 Available languages:
@@ -104,7 +104,7 @@ Available languages:
 - Authentication (register, login, logout, profiles)
 - Database CRUD (select, insert, update, delete)
 - Storage operations (upload, download files)
-- AI application logic should use the provisioned OpenRouter key directly with the OpenAI SDK or OpenRouter HTTP API
+- AI integration via the provisioned OpenRouter key with the OpenAI SDK or OpenRouter HTTP API
 - Serverless function invocation
 
 ### Use MCP Tools for Infrastructure:

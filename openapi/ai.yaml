@@ -35,7 +35,7 @@ paths:
         - bearerAuth: []
       responses:
         '200':
-          description: AI Gateway overview
+          description: Model Gateway overview
           content:
             application/json:
               schema:
@@ -604,8 +604,10 @@ components:
           description: Output price per million tokens in USD when token pricing is available.
         inputPriceLabel:
           type: string
+          description: Human-readable input pricing label, such as "$2.50 / 1M tokens" or "Free", when available.
         outputPriceLabel:
           type: string
+          description: Human-readable output pricing label, such as "$10.00 / 1M tokens" or "Free", when available.
 
     OpenRouterKeyResponse:
       type: object

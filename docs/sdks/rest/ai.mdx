@@ -21,7 +21,7 @@ Content-Type: application/json
 ### Chat Completion
 
 ```bash
-curl https://openrouter.ai/api/v1/chat/completions \
+curl -X POST https://openrouter.ai/api/v1/chat/completions \
   -H "Authorization: Bearer $OPENROUTER_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -35,7 +35,7 @@ curl https://openrouter.ai/api/v1/chat/completions \
 ### Streaming
 
 ```bash
-curl https://openrouter.ai/api/v1/chat/completions \
+curl -X POST https://openrouter.ai/api/v1/chat/completions \
   -H "Authorization: Bearer $OPENROUTER_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -50,7 +50,7 @@ curl https://openrouter.ai/api/v1/chat/completions \
 ### Embeddings
 
 ```bash
-curl https://openrouter.ai/api/v1/embeddings \
+curl -X POST https://openrouter.ai/api/v1/embeddings \
   -H "Authorization: Bearer $OPENROUTER_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -73,6 +73,8 @@ OpenRouter owns the current request and response shape for AI model calls. Check
 
 These endpoints help the dashboard display the active Model Gateway key, model catalog, and usage overview. They require admin authentication.
 
+Use either an admin JWT bearer token or an InsForge API key bearer token in the `Authorization` header.
+
 ### Get Available Models
 
 ```
@@ -81,7 +83,12 @@ GET /api/ai/models
 
 ```bash
 curl "https://your-app.insforge.app/api/ai/models" \
-  -H "Authorization: Bearer admin-jwt-token-or-api-key"
+  -H "Authorization: Bearer <ADMIN_JWT_TOKEN>"
+```
+
+```bash
+curl "https://your-app.insforge.app/api/ai/models" \
+  -H "Authorization: Bearer <INSFORGE_API_KEY>"
 ```
 
 Returns the normalized OpenRouter model catalog as an array:
@@ -108,7 +115,12 @@ GET /api/ai/openrouter/api-key
 
 ```bash
 curl "https://your-app.insforge.app/api/ai/openrouter/api-key" \
-  -H "Authorization: Bearer admin-jwt-token-or-api-key"
+  -H "Authorization: Bearer <ADMIN_JWT_TOKEN>"
+```
+
+```bash
+curl "https://your-app.insforge.app/api/ai/openrouter/api-key" \
+  -H "Authorization: Bearer <INSFORGE_API_KEY>"
 ```
 
 ```json
@@ -118,6 +130,10 @@ curl "https://your-app.insforge.app/api/ai/openrouter/api-key" \
 }
 ```
 
+<Warning>
+`apiKey` is a raw secret. Do not log it, commit it, store it in browser storage, or return it from public endpoints. Only `maskedKey` is safe to display in client UI.
+</Warning>
+
 ### Get Usage Overview
 
 ```
@@ -126,7 +142,12 @@ GET /api/ai/overview
 
 ```bash
 curl "https://your-app.insforge.app/api/ai/overview" \
-  -H "Authorization: Bearer admin-jwt-token-or-api-key"
+  -H "Authorization: Bearer <ADMIN_JWT_TOKEN>"
+```
+
+```bash
+curl "https://your-app.insforge.app/api/ai/overview" \
+  -H "Authorization: Bearer <INSFORGE_API_KEY>"
 ```
 
 Returns key-level OpenRouter usage and activity time series when the active key has activity access.

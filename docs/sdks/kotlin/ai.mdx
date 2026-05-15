@@ -47,6 +47,7 @@ const completion = await openai.chat.completions.create({
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
@@ -66,13 +67,16 @@ val http = HttpClient {
     }
 }
 
-suspend fun sendPrompt(prompt: String): ChatResponse {
+suspend fun sendPrompt(prompt: String, sessionToken: String): ChatResponse {
     return http.post("https://your-app.example/api/chat") {
+        header("Authorization", "Bearer $sessionToken")
         contentType(ContentType.Application.Json)
         setBody(ChatRequest(prompt))
     }.body()
 }
 ```
+
+Use an app session token or another user-scoped credential for your backend route. Never send the OpenRouter key from a Kotlin client.
 
 ## Legacy InsForge AI Methods
 
