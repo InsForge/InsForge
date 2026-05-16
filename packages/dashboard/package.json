@@ -41,6 +41,8 @@
   "scripts": {
     "build": "vite build && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:ui": "playwright test -c playwright.config.ts",
     "prepublishOnly": "npm run build",
     "lint": "eslint ."
   },
@@ -77,6 +79,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/vite": "^4.1.11",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
@@ -85,6 +88,7 @@
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^5.8.3",
     "vite": "^7.0.5",
+    "vitest": "^3.2.4",
     "vite-plugin-svgr": "^4.3.0"
   },
   "peerDependencies": {
