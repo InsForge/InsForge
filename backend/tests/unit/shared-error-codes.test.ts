@@ -9,5 +9,7 @@ describe('shared error codes', () => {
     expect(sharedErrorCodes.SECRET_NOT_FOUND).toBe('SECRET_NOT_FOUND');
     expect(sharedErrorCodes.DEPLOYMENT_ALREADY_EXISTS).toBe('DEPLOYMENT_ALREADY_EXISTS');
     expect(sharedErrorCodes.PAYMENT_METHOD_DECLINED).toBe('PAYMENT_METHOD_DECLINED');
+    expect(sharedErrorCodes.NOT_FOUND).toBe('NOT_FOUND');
+    expect(sharedErrorCodes.INTERNAL_ERROR).toBe('INTERNAL_ERROR');
   });
 });
