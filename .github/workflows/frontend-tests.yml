@@ -24,7 +24,27 @@ jobs:
         run: npm ci
 
       - name: Run dashboard unit tests
-        run: npm --workspace @insforge/dashboard run test
+        run: npm --workspace @insforge/dashboard run test:unit
+
+  dashboard-component-tests:
+    name: Dashboard Component Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run dashboard component tests
+        run: npm --workspace @insforge/dashboard run test:component
 
   dashboard-ui-tests:
     name: Dashboard UI Tests

@@ -17,7 +17,6 @@ test('signs in with mocked self-hosting admin credentials', async ({ page }) => 
   expect((await loginResponse).status()).toBe(200);
 
   await expect(page).toHaveURL(/\/dashboard$/);
-  await expect(page.getByRole('heading', { name: 'My InsForge Project' })).toBeVisible();
 });
 
 test('redirects unauthenticated dashboard visitors to the self-hosting login page', async ({

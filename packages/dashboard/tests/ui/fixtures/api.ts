@@ -46,28 +46,32 @@ async function fulfillJson(route: Route, status: number, body: unknown) {
   });
 }
 
+async function fulfillLoggedOutSession(route: Route) {
+  return fulfillJson(route, 401, {
+    error: 'UNAUTHORIZED',
+    message: 'Authentication required',
+  });
+}
+
+async function fulfillLoggedInSession(route: Route) {
+  return fulfillJson(route, 200, {
+    user: adminUser,
+  });
+}
+
 export async function mockLoggedOutApi(page: Page) {
-  await page.route('**/api/auth/sessions/current', (route) =>
-    fulfillJson(route, 401, {
-      error: 'UNAUTHORIZED',
-      message: 'Authentication required',
-    })
-  );
+  await page.route('**/api/auth/sessions/current', fulfillLoggedOutSession);
 }
 
 export async function mockSelfHostingDashboardApi(page: Page) {
   let isLoggedIn = false;
-  const pendingCurrentSessionRoutes: Route[] = [];
 
   await page.route('**/api/auth/sessions/current', (route) => {
     if (!isLoggedIn) {
-      pendingCurrentSessionRoutes.push(route);
-      return;
+      return fulfillLoggedOutSession(route);
     }
 
-    return fulfillJson(route, 200, {
-      user: adminUser,
-    });
+    return fulfillLoggedInSession(route);
   });
 
   await page.route('https://api.github.com/repos/InsForge/InsForge', (route) =>
@@ -82,11 +86,6 @@ export async function mockSelfHostingDashboardApi(page: Page) {
     }
 
     isLoggedIn = true;
-    for (const pendingRoute of pendingCurrentSessionRoutes.splice(0)) {
-      void fulfillJson(pendingRoute, 200, {
-        user: adminUser,
-      });
-    }
     return fulfillJson(route, 200, {
       user: adminUser,
       accessToken: 'test-access-token',

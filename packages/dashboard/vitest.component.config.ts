@@ -6,7 +6,7 @@ export default mergeConfig(
   sharedConfig,
   defineConfig({
     test: {
-      include: ['src/**/*.test.{ts,tsx}'],
+      include: ['src/**/*.test.tsx'],
     },
   })
 );
