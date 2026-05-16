@@ -1,13 +1,13 @@
 import { parseSync } from 'libpg-query';
-import type {
-  CreateMigrationRequest,
-  CreateMigrationResponse,
-  DatabaseMigrationsResponse,
-  Migration,
+import {
+  ERROR_CODES,
+  type CreateMigrationRequest,
+  type CreateMigrationResponse,
+  type DatabaseMigrationsResponse,
+  type Migration,
 } from '@insforge/shared-schemas';
 import { AppError } from '@/api/middlewares/error.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
 import { isPgErrorLike } from '@/utils/errors.js';
 import {
   analyzeQuery,

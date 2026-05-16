@@ -3,8 +3,8 @@ import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
 import { ScheduleService } from '@/services/schedules/schedule.service.js';
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
 import {
+  ERROR_CODES,
   createScheduleRequestSchema,
   updateScheduleRequestSchema,
   getSchedulesConfigResponseSchema,

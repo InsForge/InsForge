@@ -22,7 +22,6 @@ import {
 import { withPaymentSessionAdvisoryLock } from '@/services/payments/payments-advisory-lock.js';
 import logger from '@/utils/logger.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
 import {
   STRIPE_ENVIRONMENTS,
   type StripeAccount,
@@ -33,10 +32,11 @@ import {
   type StripeSyncSnapshot,
   type StripeWebhookEndpoint,
 } from '@/types/payments.js';
-import type {
-  GetPaymentsConfigResponse,
-  GetPaymentsStatusResponse,
-  StripeConnection,
+import {
+  ERROR_CODES,
+  type GetPaymentsConfigResponse,
+  type GetPaymentsStatusResponse,
+  type StripeConnection,
 } from '@insforge/shared-schemas';
 
 export interface ManagedStripeWebhookSetup {

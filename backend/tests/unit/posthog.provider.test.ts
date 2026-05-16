@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import jwt from 'jsonwebtoken';
-import { ERROR_CODES } from '../../src/types/error-constants';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 
 const apiHost = 'https://cloud.test.insforge.dev';
 const projectId = '77777777-7777-7777-7777-777777777777';

@@ -3,7 +3,7 @@ import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import logger from '@/utils/logger.js';
-import { type CustomOAuthConfigSchema , ERROR_CODES } from '@insforge/shared-schemas';
+import { ERROR_CODES, type CustomOAuthConfigSchema } from '@insforge/shared-schemas';
 
 interface CustomOAuthConfigRow {
   id: string;

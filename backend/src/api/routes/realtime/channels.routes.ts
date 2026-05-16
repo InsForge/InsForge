@@ -3,8 +3,11 @@ import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { RealtimeChannelService } from '@/services/realtime/realtime-channel.service.js';
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
-import { createChannelRequestSchema, updateChannelRequestSchema } from '@insforge/shared-schemas';
+import {
+  createChannelRequestSchema,
+  updateChannelRequestSchema,
+  ERROR_CODES,
+} from '@insforge/shared-schemas';
 
 const router = Router();
 const channelService = RealtimeChannelService.getInstance();

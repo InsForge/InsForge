@@ -1,15 +1,15 @@
 import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
-import type {
-  RealtimeChannel,
-  CreateChannelRequest,
-  UpdateChannelRequest,
-  RealtimeMetadataSchema,
-  RlsPolicy,
-  RealtimePermissionsResponse,
+import {
+  ERROR_CODES,
+  type RealtimeChannel,
+  type CreateChannelRequest,
+  type UpdateChannelRequest,
+  type RealtimeMetadataSchema,
+  type RlsPolicy,
+  type RealtimePermissionsResponse,
 } from '@insforge/shared-schemas';
 
 const SYSTEM_POLICIES = ['project_admin_policy'];

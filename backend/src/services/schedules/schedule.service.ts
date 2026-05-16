@@ -1,9 +1,9 @@
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import logger from '@/utils/logger.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
 import { AppError } from '@/api/middlewares/error.js';
 import {
+  ERROR_CODES,
   type CreateScheduleRequest,
   type UpdateScheduleRequest,
   type ScheduleSchema,
@@ -177,7 +177,7 @@ export class ScheduleService {
             throw new AppError(
               `Secret with key "${secretKey}" not found for schedule header "${key}".`,
               404,
-              ERROR_CODES.SCHEDULE_NOT_FOUND
+              ERROR_CODES.SECRET_NOT_FOUND
             );
           }
         }

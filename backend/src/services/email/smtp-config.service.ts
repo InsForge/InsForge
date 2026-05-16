@@ -5,10 +5,12 @@ import nodemailer from 'nodemailer';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
+import {
+  ERROR_CODES,
+  type SmtpConfigSchema,
+  type UpsertSmtpConfigRequest,
+} from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
-import type { SmtpConfigSchema, UpsertSmtpConfigRequest } from '@insforge/shared-schemas';
-
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------

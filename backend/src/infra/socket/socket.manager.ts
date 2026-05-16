@@ -3,17 +3,18 @@ import { Server as SocketIOServer, Socket } from 'socket.io';
 import logger from '@/utils/logger.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { ServerEvents, ClientEvents, SocketMetadata, NotificationPayload } from '@/types/socket.js';
-import type {
-  SubscribeChannelPayload,
-  PublishEventPayload,
-  SocketMessage,
-  SocketMessageMeta,
-  SubscribeResponse,
-  UnsubscribeChannelPayload,
-  PresenceMember,
+import {
+  ERROR_CODES,
+  NEXT_ACTION,
+  type SubscribeChannelPayload,
+  type PublishEventPayload,
+  type SocketMessage,
+  type SocketMessageMeta,
+  type SubscribeResponse,
+  type UnsubscribeChannelPayload,
+  type PresenceMember,
 } from '@insforge/shared-schemas';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES, NEXT_ACTION } from '@insforge/shared-schemas';
 import { RealtimeAuthService } from '@/services/realtime/realtime-auth.service.js';
 import { RealtimeMessageService } from '@/services/realtime/realtime-message.service.js';
 import { RealtimePresenceService } from '@/services/realtime/realtime-presence.service.js';

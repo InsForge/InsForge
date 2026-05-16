@@ -3,9 +3,8 @@ import { LogService } from '@/services/logs/log.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
 import { successResponse, paginatedResponse } from '@/utils/response.js';
-import { GetLogsResponse } from '@insforge/shared-schemas';
+import { GetLogsResponse, ERROR_CODES } from '@insforge/shared-schemas';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
 
 const router = Router();
 

@@ -1,5 +1,6 @@
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import {
+  ERROR_CODES,
   EdgeFunctionMetadataSchema,
   UploadFunctionRequest,
   UpdateFunctionRequest,
@@ -11,7 +12,6 @@ import logger from '@/utils/logger.js';
 import { Pool } from 'pg';
 import fetch from 'node-fetch';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
 import { hasPgErrorCode } from '@/utils/errors.js';
 import { DenoSubhostingProvider } from '@/providers/functions/deno-subhosting.provider.js';
 import { SecretService } from '@/services/secrets/secret.service.js';

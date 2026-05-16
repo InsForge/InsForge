@@ -6,10 +6,9 @@ import { FlyProvider } from '@/providers/compute/fly.provider.js';
 import { CloudComputeProvider } from '@/providers/compute/cloud.provider.js';
 import type { ComputeProvider } from '@/providers/compute/compute.provider.js';
 import { config } from '@/infra/config/app.config.js';
-import { ERROR_CODES, NEXT_ACTION } from '@insforge/shared-schemas';
 import { AppError } from '@/api/middlewares/error.js';
 import logger from '@/utils/logger.js';
-import type { ServiceSchema } from '@insforge/shared-schemas';
+import { ERROR_CODES, NEXT_ACTION, type ServiceSchema } from '@insforge/shared-schemas';
 
 export interface CreateServiceInput {
   projectId: string;

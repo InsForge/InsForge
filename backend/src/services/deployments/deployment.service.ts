@@ -10,7 +10,6 @@ import {
 } from '@/providers/deployments/vercel.provider.js';
 import { S3StorageProvider } from '@/providers/storage/s3.provider.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import {
   DeploymentStatus,
@@ -18,20 +17,21 @@ import {
   type DeploymentStatusType,
 } from '@/types/deployments.js';
 import logger from '@/utils/logger.js';
-import type {
-  CreateDeploymentResponse,
-  CreateDirectDeploymentRequest,
-  CreateDirectDeploymentResponse,
-  DeploymentManifestFile,
-  UploadDeploymentFileResponse,
-  StartDeploymentRequest,
-  UpdateSlugResponse,
-  DeploymentMetadataResponse,
-  CustomDomain,
-  ListCustomDomainsResponse,
-  AddCustomDomainResponse,
-  VerifyCustomDomainResponse,
-  DeploymentsMetadataSchema,
+import {
+  ERROR_CODES,
+  type CreateDeploymentResponse,
+  type CreateDirectDeploymentRequest,
+  type CreateDirectDeploymentResponse,
+  type DeploymentManifestFile,
+  type UploadDeploymentFileResponse,
+  type StartDeploymentRequest,
+  type UpdateSlugResponse,
+  type DeploymentMetadataResponse,
+  type CustomDomain,
+  type ListCustomDomainsResponse,
+  type AddCustomDomainResponse,
+  type VerifyCustomDomainResponse,
+  type DeploymentsMetadataSchema,
 } from '@insforge/shared-schemas';
 
 export type {
@@ -373,7 +373,11 @@ export class DeploymentService {
       const file = await this.getDeploymentFileById(id, fileId);
 
       if (!file) {
-        throw new AppError(`Deployment file not found: ${fileId}`, 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
+        throw new AppError(
+          `Deployment file not found: ${fileId}`,
+          404,
+          ERROR_CODES.DEPLOYMENT_NOT_FOUND
+        );
       }
 
       if (this.getUploadMode(deployment, 1) !== 'direct') {
@@ -753,7 +757,11 @@ export class DeploymentService {
       );
     }
     if (filePath.startsWith('/')) {
-      throw new AppError('Deployment file path must be relative.', 400, ERROR_CODES.DEPLOYMENT_INVALID_FILE);
+      throw new AppError(
+        'Deployment file path must be relative.',
+        400,
+        ERROR_CODES.DEPLOYMENT_INVALID_FILE
+      );
     }
 
     const parts = filePath.split('/');
