@@ -865,7 +865,9 @@ describe('ComputeServicesService', () => {
         error: 'Project compute quota exceeded',
         nextActions: ['upgrade plan', 'delete unused services'],
       });
-      mockLaunchMachine.mockRejectedValue(new AppError(cloudBody, 403, ERROR_CODES.COMPUTE_QUOTA_EXCEEDED));
+      mockLaunchMachine.mockRejectedValue(
+        new AppError(cloudBody, 403, ERROR_CODES.COMPUTE_QUOTA_EXCEEDED)
+      );
 
       await expect(
         service.updateService('svc-pa-1', { imageUrl: 'registry.fly.io/x:y' })
