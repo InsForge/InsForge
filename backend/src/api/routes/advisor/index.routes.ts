@@ -1,16 +1,18 @@
 import { Router, Response, NextFunction } from 'express';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
+import { AdvisorService } from '@/services/advisor/advisor.service.js';
 import { successResponse } from '@/utils/response.js';
 
-export const advisorRouter = Router();
+const router = Router();
+const advisorService = AdvisorService.getInstance();
 
-advisorRouter.post('/scan', verifyAdmin, (_req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/scan', verifyAdmin, async (_req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    successResponse(res, {
-      status: 'not_implemented',
-      message: 'Advisor scan endpoint is registered. Scan logic is not implemented yet.',
-    });
+    const scanResult = await advisorService.runScan();
+    successResponse(res, scanResult);
   } catch (error: unknown) {
     next(error);
   }
 });
+
+export { router as advisorRouter };
