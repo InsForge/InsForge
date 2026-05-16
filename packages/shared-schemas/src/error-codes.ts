@@ -105,6 +105,7 @@ export const ERROR_CODES = {
   FORBIDDEN: 'FORBIDDEN',
   RATE_LIMITED: 'RATE_LIMITED',
   NOT_IMPLEMENTED: 'NOT_IMPLEMENTED',
+  UPSTREAM_FAILURE: 'UPSTREAM_FAILURE',
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];
