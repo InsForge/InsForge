@@ -174,7 +174,7 @@ async function handleQuery(sqlInput: string) {
   const sql = String(sqlInput);
   executedSql.push(sql);
 
-  if (sql.includes('SELECT to_regclass($1) IS NOT NULL')) {
+  if (sql.includes('FROM pg_extension')) {
     return { rows: [{ exists: pgStatStatementsExists }], rowCount: 1 };
   }
 
@@ -279,7 +279,9 @@ describe('AdvisorService', () => {
 
     await service.scan();
 
+    const extensionSql = executedSql.find((sql) => sql.includes('FROM pg_extension')) ?? '';
     const slowQuerySql = executedSql.find((sql) => sql.includes('advisor:slow-query')) ?? '';
+    expect(extensionSql).toContain('WHERE extname = $1');
     expect(slowQuerySql).toContain(
       'dbid = (SELECT oid FROM pg_database WHERE datname = current_database())'
     );

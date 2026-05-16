@@ -112,11 +112,17 @@ async function queryRows<T extends QueryResultRow>(
   return result.rows;
 }
 
-async function relationExists(db: Pool | PoolClient, relationName: string): Promise<boolean> {
+async function extensionExists(db: Pool | PoolClient, extensionName: string): Promise<boolean> {
   const rows = await queryRows<{ exists: boolean }>(
     db,
-    'SELECT to_regclass($1) IS NOT NULL AS "exists"',
-    [relationName]
+    `
+      SELECT EXISTS (
+        SELECT 1
+        FROM pg_extension
+        WHERE extname = $1
+      ) AS "exists"
+    `,
+    [extensionName]
   );
   return rows[0]?.exists === true;
 }
@@ -432,7 +438,7 @@ async function scanUnusedIndex(ctx: AdvisorContext): Promise<AdvisorFinding[]> {
 }
 
 async function scanSlowQuery(ctx: AdvisorContext): Promise<AdvisorFinding[]> {
-  if (!(await relationExists(ctx.db, 'pg_stat_statements'))) {
+  if (!(await extensionExists(ctx.db, 'pg_stat_statements'))) {
     return [];
   }
 
