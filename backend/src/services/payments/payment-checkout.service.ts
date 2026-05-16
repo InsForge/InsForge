@@ -3,7 +3,6 @@ import type { Pool, PoolClient } from 'pg';
 import { AppError } from '@/api/middlewares/error.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { getStripeObjectId, toISOString } from '@/services/payments/helpers.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
 import type {
   CheckoutSessionPaymentStatus,
   CheckoutSessionRow,
@@ -11,10 +10,11 @@ import type {
   StripeCheckoutSession,
   StripeEnvironment,
 } from '@/types/payments.js';
-import type {
-  CheckoutSession,
-  CreateCheckoutSessionRequest,
-  RoleSchema,
+import {
+  ERROR_CODES,
+  type CheckoutSession,
+  type CreateCheckoutSessionRequest,
+  type RoleSchema,
 } from '@insforge/shared-schemas';
 
 const CHECKOUT_SESSION_COLUMNS = `

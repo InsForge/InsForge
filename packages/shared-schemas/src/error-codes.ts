@@ -104,6 +104,7 @@ export const ERROR_CODES = {
   TOO_MANY_REQUESTS: 'TOO_MANY_REQUESTS',
   FORBIDDEN: 'FORBIDDEN',
   RATE_LIMITED: 'RATE_LIMITED',
+  NOT_IMPLEMENTED: 'NOT_IMPLEMENTED',
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];

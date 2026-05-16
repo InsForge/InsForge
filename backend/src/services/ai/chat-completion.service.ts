@@ -1,15 +1,15 @@
 import OpenAI from 'openai';
 import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
-import type {
-  ChatCompletionResponse,
-  ChatMessageSchema,
-  ToolCall,
-  UrlCitationAnnotation,
+import {
+  ERROR_CODES,
+  type ChatCompletionResponse,
+  type ChatMessageSchema,
+  type ToolCall,
+  type UrlCitationAnnotation,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import { ChatCompletionOptions } from '@/types/ai.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
 
 // OpenRouter plugin type for web search
 interface OpenRouterWebPlugin {

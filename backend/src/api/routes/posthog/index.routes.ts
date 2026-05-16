@@ -1,12 +1,12 @@
 import { Router, Response, NextFunction } from 'express';
 import {
+  ERROR_CODES,
   posthogTimeframeSchema,
   posthogBreakdownSchema,
   posthogMetricSchema,
 } from '@insforge/shared-schemas';
 import { verifyUser, verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
 import { PosthogService } from '@/services/posthog/posthog.service.js';
 
 export const posthogRouter = Router();

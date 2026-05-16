@@ -2,8 +2,8 @@ import jwt from 'jsonwebtoken';
 import axios from 'axios';
 import { config } from '@/infra/config/app.config.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
 import {
+  ERROR_CODES,
   posthogConnectionSchema,
   posthogDashboardsResponseSchema,
   posthogSummarySchema,

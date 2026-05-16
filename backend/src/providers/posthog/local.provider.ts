@@ -1,5 +1,5 @@
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import type { PosthogProvider } from './base.provider.js';
 
 function unsupported(): Promise<never> {

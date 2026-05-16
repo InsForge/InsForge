@@ -1,5 +1,9 @@
 import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
-import { type EmbeddingsRequest, type EmbeddingsResponse, ERROR_CODES } from '@insforge/shared-schemas';
+import {
+  ERROR_CODES,
+  type EmbeddingsRequest,
+  type EmbeddingsResponse,
+} from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import { AppError } from '@/api/middlewares/error.js';
 

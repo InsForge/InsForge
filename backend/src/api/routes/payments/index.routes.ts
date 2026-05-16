@@ -2,12 +2,12 @@ import { Router, Response, NextFunction } from 'express';
 import { AuthRequest, verifyAdmin, verifyUser } from '@/api/middlewares/auth.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { StripeKeyValidationError } from '@/providers/payments/stripe.provider.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
 import { PaymentService } from '@/services/payments/payment.service.js';
 import { successResponse } from '@/utils/response.js';
 import { catalogRouter } from './catalog.routes.js';
 import { configRouter } from './config.routes.js';
 import {
+  ERROR_CODES,
   createCheckoutSessionBodySchema,
   createCustomerPortalSessionBodySchema,
   listPaymentCustomersQuerySchema,

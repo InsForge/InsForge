@@ -260,6 +260,12 @@ export default defineConfig(
           selector: 'enumMember',
           format: ['UPPER_CASE'],
         },
+        // Variables, properties, and methods - allow UPPER_CASE for constants
+        {
+          selector: ['variable', 'property', 'objectLiteralMethod', 'method'],
+          format: ['camelCase', 'UPPER_CASE', 'PascalCase'],
+          leadingUnderscore: 'allow',
+        },
         // Default for everything else - camelCase
         {
           selector: 'default',

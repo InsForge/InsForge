@@ -4,17 +4,6 @@ import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import logger from '@/utils/logger.js';
-import type {
-  UserSchema,
-  CreateUserResponse,
-  CreateSessionResponse,
-  VerifyEmailResponse,
-  ResetPasswordResponse,
-  CreateAdminSessionResponse,
-  AuthMetadataSchema,
-  OAuthProvidersSchema,
-  GetPublicAuthConfigResponse,
-} from '@insforge/shared-schemas';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { CustomOAuthConfigService } from '@/services/auth/custom-oauth-config.service.js';
 import { AuthConfigService } from './auth-config.service.js';
@@ -42,11 +31,22 @@ import {
 } from '@/types/auth.js';
 import { ADMIN_ID } from '@/utils/constants.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
 import { EmailService } from '@/services/email/email.service.js';
 import { XOAuthProvider } from '@/providers/oauth/x.provider.js';
 import { AppleOAuthProvider } from '@/providers/oauth/apple.provider.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
+import {
+  ERROR_CODES,
+  type AuthMetadataSchema,
+  type CreateAdminSessionResponse,
+  type CreateSessionResponse,
+  type CreateUserResponse,
+  type GetPublicAuthConfigResponse,
+  type OAuthProvidersSchema,
+  type ResetPasswordResponse,
+  type UserSchema,
+  type VerifyEmailResponse,
+} from '@insforge/shared-schemas';
 
 /**
  * Simplified JWT-based auth service
