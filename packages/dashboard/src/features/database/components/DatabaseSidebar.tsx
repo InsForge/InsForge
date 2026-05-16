@@ -43,6 +43,11 @@ const DATABASE_STUDIO_SIDEBAR_BASE_ITEMS: Array<{
     sectionEnd: true,
   },
   {
+    id: 'advisors',
+    label: 'Advisors',
+    href: '/dashboard/database/advisors',
+  },
+  {
     id: 'migrations',
     label: 'Migrations',
     href: '/dashboard/database/migrations',

@@ -17,6 +17,7 @@ import DTestInstallPage from '#features/dashboard/pages/DTestInstallPage';
 import DatabaseLayout from '#features/database/components/DatabaseLayout';
 import SQLEditorLayout from '#features/database/components/SQLEditorLayout';
 import BackupsPage from '#features/database/pages/BackupsPage';
+import AdvisorsPage from '#features/database/pages/AdvisorsPage';
 import DatabaseFunctionsPage from '#features/database/pages/FunctionsPage';
 import IndexesPage from '#features/database/pages/IndexesPage';
 import MigrationsPage from '#features/database/pages/MigrationsPage';
@@ -92,6 +93,7 @@ function AuthenticatedRoutes() {
           <Route path="templates" element={<TemplatesPage />} />
           <Route path="migrations" element={<MigrationsPage />} />
           <Route path="backups" element={<BackupsPage />} />
+          <Route path="advisors" element={<AdvisorsPage />} />
         </Route>
         <Route path="/dashboard/sql-editor" element={<SQLEditorLayout />}>
           <Route index element={<SQLEditorPage />} />
