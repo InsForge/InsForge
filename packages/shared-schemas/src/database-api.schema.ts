@@ -403,6 +403,69 @@ export const databaseMigrationsResponseSchema = z.object({
   migrations: z.array(migrationSchema),
 });
 
+export const advisorRuleIdSchema = z.enum([
+  'rls-disabled',
+  'rls-permissive',
+  'rls-no-policy',
+  'dangerous-function',
+  'rls-select-only',
+  'missing-fk-index',
+  'unused-index',
+  'slow-query',
+  'connection-high',
+  'connection-critical',
+  'idle-in-transaction',
+  'low-cache-hit-ratio',
+  'long-running-query',
+  'rls-policy-perf',
+  'missing-rls-index',
+  'dead-tuples',
+  'stale-statistics',
+  'sequence-exhaustion',
+  'autovacuum-blocked',
+]);
+
+export const advisorCategorySchema = z.enum(['security', 'performance', 'health']);
+export const advisorSeveritySchema = z.enum(['critical', 'warning', 'info']);
+
+export const advisorFindingSchema = z.object({
+  id: z.string(),
+  ruleId: advisorRuleIdSchema,
+  category: advisorCategorySchema,
+  severity: advisorSeveritySchema,
+  title: z.string(),
+  message: z.string(),
+  schemaName: z.string().optional(),
+  tableName: z.string().optional(),
+  objectName: z.string().optional(),
+  detail: z.record(z.string(), z.unknown()).optional(),
+  remediation: z.string(),
+});
+
+export const advisorRuleSummarySchema = z.object({
+  ruleId: advisorRuleIdSchema,
+  category: advisorCategorySchema,
+  severity: advisorSeveritySchema,
+  title: z.string(),
+  description: z.string(),
+});
+
+export const advisorScanResponseSchema = z.object({
+  scannedAt: z.string(),
+  durationMs: z.number().int().min(0),
+  findingCount: z.number().int().min(0),
+  summary: z.object({
+    security: z.number().int().min(0),
+    performance: z.number().int().min(0),
+    health: z.number().int().min(0),
+    critical: z.number().int().min(0),
+    warning: z.number().int().min(0),
+    info: z.number().int().min(0),
+  }),
+  rules: z.array(advisorRuleSummarySchema),
+  findings: z.array(advisorFindingSchema),
+});
+
 // Database Metadata Response Types
 export type DatabaseFunctionsResponse = z.infer<typeof databaseFunctionsResponseSchema>;
 export type DatabaseSchemasResponse = z.infer<typeof databaseSchemasResponseSchema>;
@@ -410,3 +473,9 @@ export type DatabaseIndexesResponse = z.infer<typeof databaseIndexesResponseSche
 export type DatabasePoliciesResponse = z.infer<typeof databasePoliciesResponseSchema>;
 export type DatabaseTriggersResponse = z.infer<typeof databaseTriggersResponseSchema>;
 export type DatabaseMigrationsResponse = z.infer<typeof databaseMigrationsResponseSchema>;
+export type AdvisorRuleId = z.infer<typeof advisorRuleIdSchema>;
+export type AdvisorCategory = z.infer<typeof advisorCategorySchema>;
+export type AdvisorSeverity = z.infer<typeof advisorSeveritySchema>;
+export type AdvisorFinding = z.infer<typeof advisorFindingSchema>;
+export type AdvisorRuleSummary = z.infer<typeof advisorRuleSummarySchema>;
+export type AdvisorScanResponse = z.infer<typeof advisorScanResponseSchema>;

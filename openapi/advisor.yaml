@@ -1,0 +1,207 @@
+openapi: 3.0.3
+info:
+  title: Insforge Advisor API
+  version: 1.0.0
+
+paths:
+  /api/advisor/scan:
+    post:
+      summary: Run Database Advisor scan
+      description: Runs read-only security, performance, and health advisor rules against the project PostgreSQL database.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      responses:
+        '200':
+          description: Advisor scan completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdvisorScanResponse'
+        '401':
+          description: Missing or invalid admin credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: A scan is already running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: ADVISOR_SCAN_IN_PROGRESS
+                message: An advisor scan is already running. Wait for it to finish and try again.
+                statusCode: 409
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    AdvisorScanResponse:
+      type: object
+      required:
+        - scannedAt
+        - durationMs
+        - findingCount
+        - summary
+        - rules
+        - findings
+      properties:
+        scannedAt:
+          type: string
+          format: date-time
+        durationMs:
+          type: integer
+          minimum: 0
+        findingCount:
+          type: integer
+          minimum: 0
+        summary:
+          type: object
+          required:
+            - security
+            - performance
+            - health
+            - critical
+            - warning
+            - info
+          properties:
+            security:
+              type: integer
+              minimum: 0
+            performance:
+              type: integer
+              minimum: 0
+            health:
+              type: integer
+              minimum: 0
+            critical:
+              type: integer
+              minimum: 0
+            warning:
+              type: integer
+              minimum: 0
+            info:
+              type: integer
+              minimum: 0
+        rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdvisorRule'
+        findings:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdvisorFinding'
+
+    AdvisorRule:
+      type: object
+      required:
+        - ruleId
+        - category
+        - severity
+        - title
+        - description
+      properties:
+        ruleId:
+          $ref: '#/components/schemas/AdvisorRuleId'
+        category:
+          $ref: '#/components/schemas/AdvisorCategory'
+        severity:
+          $ref: '#/components/schemas/AdvisorSeverity'
+        title:
+          type: string
+        description:
+          type: string
+
+    AdvisorFinding:
+      type: object
+      required:
+        - id
+        - ruleId
+        - category
+        - severity
+        - title
+        - message
+        - remediation
+      properties:
+        id:
+          type: string
+        ruleId:
+          $ref: '#/components/schemas/AdvisorRuleId'
+        category:
+          $ref: '#/components/schemas/AdvisorCategory'
+        severity:
+          $ref: '#/components/schemas/AdvisorSeverity'
+        title:
+          type: string
+        message:
+          type: string
+        schemaName:
+          type: string
+        tableName:
+          type: string
+        objectName:
+          type: string
+        detail:
+          type: object
+          additionalProperties: true
+        remediation:
+          type: string
+
+    AdvisorRuleId:
+      type: string
+      enum:
+        - rls-disabled
+        - rls-permissive
+        - rls-no-policy
+        - dangerous-function
+        - rls-select-only
+        - missing-fk-index
+        - unused-index
+        - slow-query
+        - connection-high
+        - connection-critical
+        - idle-in-transaction
+        - low-cache-hit-ratio
+        - long-running-query
+        - rls-policy-perf
+        - missing-rls-index
+        - dead-tuples
+        - stale-statistics
+        - sequence-exhaustion
+        - autovacuum-blocked
+
+    AdvisorCategory:
+      type: string
+      enum: [security, performance, health]
+
+    AdvisorSeverity:
+      type: string
+      enum: [critical, warning, info]
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+        - statusCode
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        statusCode:
+          type: integer
+        nextActions:
+          type: string

@@ -40,6 +40,7 @@ import packageJson from '../../package.json';
 import { schedulesRouter } from '@/api/routes/schedules/index.routes.js';
 import { servicesRouter } from '@/api/routes/compute/services.routes.js';
 import { posthogRouter } from '@/api/routes/posthog/index.routes.js';
+import { advisorRouter } from '@/api/routes/advisor/index.routes.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -219,6 +220,7 @@ export async function createApp() {
   apiRouter.use('/payments', paymentsRouter);
   apiRouter.use('/compute/services', servicesRouter);
   apiRouter.use('/integrations/posthog', posthogRouter);
+  apiRouter.use('/advisor', advisorRouter);
 
   // Mount all API routes under /api prefix
   app.use('/api', apiRouter);

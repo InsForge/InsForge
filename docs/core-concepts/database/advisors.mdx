@@ -1,0 +1,91 @@
+---
+title: Database Advisors
+description: Security, performance, and health checks for self-hosted Postgres projects
+---
+
+## Overview
+
+Database Advisors scan the project's PostgreSQL database and return read-only findings for common security, performance, and health risks. The scan is on-demand and stateless: InsForge does not store advisor history or dismissals in the open-source version.
+
+Use the dashboard page at **Database -> Advisors** or call the admin API directly:
+
+```bash
+curl -X POST http://localhost:7130/api/advisor/scan \
+  -H "Authorization: Bearer <admin-token>"
+```
+
+Only one scan can run at a time in a backend process. If a scan is already running, the API returns `409`.
+
+## Response
+
+The scan returns the rules that were evaluated, summary counts, and findings:
+
+```json
+{
+  "scannedAt": "2026-05-16T08:15:00.000Z",
+  "durationMs": 124,
+  "findingCount": 1,
+  "summary": {
+    "security": 1,
+    "performance": 0,
+    "health": 0,
+    "critical": 1,
+    "warning": 0,
+    "info": 0
+  },
+  "rules": [],
+  "findings": [
+    {
+      "id": "rls-disabled:public:profiles:public.profiles does not have row-level security enabled.",
+      "ruleId": "rls-disabled",
+      "category": "security",
+      "severity": "critical",
+      "title": "RLS is disabled",
+      "message": "public.profiles does not have row-level security enabled.",
+      "schemaName": "public",
+      "tableName": "profiles",
+      "remediation": "Enable RLS and add policies that match the expected application access paths."
+    }
+  ]
+}
+```
+
+## Security rules
+
+| Rule | Severity | What it checks |
+| --- | --- | --- |
+| `rls-disabled` | Critical | User tables where row-level security is disabled. |
+| `rls-permissive` | Warning | Permissive RLS policies that may broaden access when combined with other policies. |
+| `rls-no-policy` | Critical | RLS-enabled tables that do not have any policies. |
+| `dangerous-function` | Critical | `SECURITY DEFINER` functions executable by `anon` or `authenticated`. |
+| `rls-select-only` | Warning | RLS-enabled tables with SELECT policies but no INSERT, UPDATE, or DELETE policies. |
+
+## Performance rules
+
+| Rule | Severity | What it checks |
+| --- | --- | --- |
+| `missing-fk-index` | Warning | Foreign keys whose referencing columns are not covered by a leading index. |
+| `unused-index` | Info | Non-primary, non-unique indexes with zero scans since Postgres statistics were reset. |
+| `slow-query` | Warning | `pg_stat_statements` queries with mean execution time greater than one second. If `pg_stat_statements` is unavailable, this rule returns no findings. |
+| `connection-high` | Warning | Connection usage at or above 80 percent and below 95 percent of `max_connections`. |
+| `connection-critical` | Critical | Connection usage at or above 95 percent of `max_connections`. |
+| `idle-in-transaction` | Warning | Sessions idle in transaction for more than five minutes. |
+| `low-cache-hit-ratio` | Warning | Current database cache hit ratio below 99 percent. |
+| `long-running-query` | Warning | Active queries running for more than five minutes. |
+| `rls-policy-perf` | Info | RLS policies that call `auth.uid()` directly instead of wrapping it as `(select auth.uid())`. |
+| `missing-rls-index` | Warning | RLS policy predicates that compare `auth.uid()` against unindexed table columns. |
+
+## Health rules
+
+| Rule | Severity | What it checks |
+| --- | --- | --- |
+| `dead-tuples` | Warning | User tables with more than 1,000 dead tuples and a dead tuple ratio above 20 percent. |
+| `stale-statistics` | Warning | User tables with more than 1,000 changes since an analyze older than seven days. |
+| `sequence-exhaustion` | Warning or critical | Sequences that have used at least 80 percent of their range. Findings become critical at 95 percent. |
+| `autovacuum-blocked` | Critical | Autovacuum workers waiting on locks. |
+
+## Notes
+
+The open-source advisor intentionally excludes cloud host metrics such as CPU, disk, and memory because self-hosted deployments do not have a shared CloudWatch source.
+
+The MCP server source is not part of this repository. Agents can still call `POST /api/advisor/scan` with admin credentials until the external `@insforge/mcp` package exposes an `advisor.scan` tool.

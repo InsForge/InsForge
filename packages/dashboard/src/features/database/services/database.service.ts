@@ -6,6 +6,7 @@ import type {
   DatabasePoliciesResponse,
   DatabaseSchemasResponse,
   DatabaseTriggersResponse,
+  AdvisorScanResponse,
 } from '@insforge/shared-schemas';
 
 export class DatabaseService {
@@ -62,6 +63,17 @@ export class DatabaseService {
   ): Promise<DatabaseTriggersResponse> {
     return apiClient.request(`/database/triggers${buildDatabaseSchemaSearch(schemaName)}`, {
       method: 'GET',
+      headers: apiClient.withAccessToken({}),
+    });
+  }
+
+  /**
+   * Run the database advisor scan.
+   * Requires admin privileges.
+   */
+  async runAdvisorScan(): Promise<AdvisorScanResponse> {
+    return apiClient.request('/advisor/scan', {
+      method: 'POST',
       headers: apiClient.withAccessToken({}),
     });
   }
