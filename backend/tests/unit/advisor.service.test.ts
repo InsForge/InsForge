@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import type { AdvisorRuleId } from '@insforge/shared-schemas';
 
 vi.mock('@/infra/database/database.manager.js', () => ({
@@ -9,9 +9,11 @@ vi.mock('@/infra/database/database.manager.js', () => ({
 }));
 
 let mockPool: Pool;
+let mockClient: PoolClient;
 let rowsByRule: Partial<Record<AdvisorRuleId, unknown[]>>;
 let pgStatStatementsExists = false;
 let holdRlsDisabledQuery: (() => void) | null = null;
+let executedSql: string[];
 
 const expectedRuleIds: AdvisorRuleId[] = [
   'rls-disabled',
@@ -55,9 +57,7 @@ const sampleRowsByRule: Record<AdvisorRuleId, unknown[]> = {
       callable_roles: ['authenticated'],
     },
   ],
-  'rls-select-only': [
-    { schema_name: 'public', table_name: 'messages', select_policy_count: 1 },
-  ],
+  'rls-select-only': [{ schema_name: 'public', table_name: 'messages', select_policy_count: 1 }],
   'missing-fk-index': [
     {
       schema_name: 'public',
@@ -85,9 +85,7 @@ const sampleRowsByRule: Record<AdvisorRuleId, unknown[]> = {
     },
   ],
   'connection-high': [{ used_connections: '80', max_connections: '100', usage_ratio: '0.8' }],
-  'connection-critical': [
-    { used_connections: '96', max_connections: '100', usage_ratio: '0.96' },
-  ],
+  'connection-critical': [{ used_connections: '96', max_connections: '100', usage_ratio: '0.96' }],
   'idle-in-transaction': [
     {
       object_name: '101',
@@ -146,7 +144,10 @@ const sampleRowsByRule: Record<AdvisorRuleId, unknown[]> = {
       schema_name: 'public',
       object_name: 'events_id_seq',
       last_value: '90',
+      start_value: '1',
+      min_value: '1',
       max_value: '100',
+      increment_by: '1',
       percent_used: '0.9',
     },
   ],
@@ -169,29 +170,40 @@ function findRuleMarker(sql: string): AdvisorRuleId | null {
   return null;
 }
 
+async function handleQuery(sqlInput: string) {
+  const sql = String(sqlInput);
+  executedSql.push(sql);
+
+  if (sql.includes('SELECT to_regclass($1) IS NOT NULL')) {
+    return { rows: [{ exists: pgStatStatementsExists }], rowCount: 1 };
+  }
+
+  const ruleId = findRuleMarker(sql);
+  if (ruleId === 'rls-disabled' && holdRlsDisabledQuery) {
+    await new Promise<void>((resolve) => {
+      holdRlsDisabledQuery = resolve;
+    });
+  }
+
+  if (!ruleId) {
+    return { rows: [], rowCount: 0 };
+  }
+
+  const rows = rowsByRule[ruleId] ?? [];
+  return { rows, rowCount: rows.length };
+}
+
+function makeMockClient(): PoolClient {
+  return {
+    query: vi.fn(handleQuery),
+    release: vi.fn(),
+  } as unknown as PoolClient;
+}
+
 function makeMockPool(): Pool {
   return {
-    query: vi.fn(async (sqlInput: string) => {
-      const sql = String(sqlInput);
-
-      if (sql.includes('SELECT to_regclass($1) IS NOT NULL')) {
-        return { rows: [{ exists: pgStatStatementsExists }], rowCount: 1 };
-      }
-
-      const ruleId = findRuleMarker(sql);
-      if (ruleId === 'rls-disabled' && holdRlsDisabledQuery) {
-        await new Promise<void>((resolve) => {
-          holdRlsDisabledQuery = resolve;
-        });
-      }
-
-      if (!ruleId) {
-        return { rows: [], rowCount: 0 };
-      }
-
-      const rows = rowsByRule[ruleId] ?? [];
-      return { rows, rowCount: rows.length };
-    }),
+    connect: vi.fn(async () => mockClient),
+    query: vi.fn(handleQuery),
   } as unknown as Pool;
 }
 
@@ -206,6 +218,8 @@ describe('AdvisorService', () => {
     rowsByRule = {};
     pgStatStatementsExists = false;
     holdRlsDisabledQuery = null;
+    executedSql = [];
+    mockClient = makeMockClient();
     mockPool = makeMockPool();
   });
 
@@ -214,17 +228,20 @@ describe('AdvisorService', () => {
     expect(ADVISOR_RULES.map((rule) => rule.ruleId)).toEqual(expectedRuleIds);
   });
 
-  it.each(expectedRuleIds)('returns a finding for %s when the catalog query matches', async (ruleId) => {
-    rowsByRule = { [ruleId]: sampleRowsByRule[ruleId] };
-    pgStatStatementsExists = ruleId === 'slow-query';
-    const service = await loadService();
+  it.each(expectedRuleIds)(
+    'returns a finding for %s when the catalog query matches',
+    async (ruleId) => {
+      rowsByRule = { [ruleId]: sampleRowsByRule[ruleId] };
+      pgStatStatementsExists = ruleId === 'slow-query';
+      const service = await loadService();
 
-    const result = await service.scan();
+      const result = await service.scan();
 
-    expect(result.findings.map((finding) => finding.ruleId)).toEqual([ruleId]);
-    expect(result.findingCount).toBe(1);
-    expect(result.rules).toHaveLength(19);
-  });
+      expect(result.findings.map((finding) => finding.ruleId)).toEqual([ruleId]);
+      expect(result.findingCount).toBe(1);
+      expect(result.rules).toHaveLength(19);
+    }
+  );
 
   it('returns an empty scan when no rules match', async () => {
     const service = await loadService();
@@ -253,5 +270,83 @@ describe('AdvisorService', () => {
 
     holdRlsDisabledQuery?.();
     await expect(firstScan).resolves.toMatchObject({ findingCount: 1 });
+  });
+
+  it('scopes slow-query to the current database', async () => {
+    rowsByRule = { 'slow-query': sampleRowsByRule['slow-query'] };
+    pgStatStatementsExists = true;
+    const service = await loadService();
+
+    await service.scan();
+
+    const slowQuerySql = executedSql.find((sql) => sql.includes('advisor:slow-query')) ?? '';
+    expect(slowQuerySql).toContain(
+      'dbid = (SELECT oid FROM pg_database WHERE datname = current_database())'
+    );
+  });
+
+  it('counts only other client backends for connection pressure rules', async () => {
+    rowsByRule = {
+      'connection-high': sampleRowsByRule['connection-high'],
+      'connection-critical': sampleRowsByRule['connection-critical'],
+    };
+    const service = await loadService();
+
+    await service.scan();
+
+    for (const ruleId of ['connection-high', 'connection-critical']) {
+      const sql = executedSql.find((query) => query.includes(`advisor:${ruleId}`)) ?? '';
+      expect(sql).toContain("backend_type = 'client backend'");
+      expect(sql).toContain('pid <> pg_backend_pid()');
+    }
+  });
+
+  it('uses whole-identifier matching for missing RLS index detection', async () => {
+    rowsByRule = { 'missing-rls-index': sampleRowsByRule['missing-rls-index'] };
+    const service = await loadService();
+
+    await service.scan();
+
+    const sql = executedSql.find((query) => query.includes('advisor:missing-rls-index')) ?? '';
+    expect(sql).toContain("~* ('\\m' || a.attname || '\\M')");
+    expect(sql).not.toContain("ILIKE '%' || a.attname || '%'");
+  });
+
+  it('gives overloaded dangerous functions distinct finding IDs', async () => {
+    rowsByRule = {
+      'dangerous-function': [
+        sampleRowsByRule['dangerous-function'][0],
+        {
+          schema_name: 'public',
+          object_name: 'admin_escalate',
+          argument_types: 'email text',
+          callable_roles: ['authenticated'],
+        },
+      ],
+    };
+    const service = await loadService();
+
+    const result = await service.scan();
+
+    expect(new Set(result.findings.map((finding) => finding.id)).size).toBe(2);
+  });
+
+  it('uses sequence bounds and increment direction for sequence exhaustion', async () => {
+    rowsByRule = { 'sequence-exhaustion': sampleRowsByRule['sequence-exhaustion'] };
+    const service = await loadService();
+
+    const result = await service.scan();
+
+    const sql = executedSql.find((query) => query.includes('advisor:sequence-exhaustion')) ?? '';
+    expect(sql).toContain('increment_by > 0');
+    expect(sql).toContain('max_value::numeric - start_value::numeric');
+    expect(sql).toContain('start_value::numeric - min_value::numeric');
+    expect(result.findings[0]?.detail).toMatchObject({
+      startValue: 1,
+      minValue: 1,
+      maxValue: 100,
+      incrementBy: 1,
+      percentUsed: 0.9,
+    });
   });
 });

@@ -1,4 +1,4 @@
-import type { Pool, QueryResultRow } from 'pg';
+import type { Pool, PoolClient, QueryResultRow } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
 import type {
@@ -11,7 +11,7 @@ import type {
 } from '@insforge/shared-schemas';
 
 interface AdvisorContext {
-  pool: Pool;
+  db: Pool | PoolClient;
 }
 
 interface AdvisorRule extends AdvisorRuleSummary {
@@ -27,6 +27,7 @@ interface BaseFindingInput {
   schemaName?: string;
   tableName?: string;
   objectName?: string;
+  stableIdPart?: string;
   detail?: Record<string, unknown>;
   remediation: string;
 }
@@ -83,27 +84,37 @@ function makeFinding(input: BaseFindingInput): AdvisorFinding {
     input.schemaName,
     input.tableName,
     input.objectName,
+    input.stableIdPart,
     input.message,
   ].filter(Boolean);
 
   return {
     id: stableParts.join(':'),
-    ...input,
+    ruleId: input.ruleId,
+    category: input.category,
+    severity: input.severity,
+    title: input.title,
+    message: input.message,
+    schemaName: input.schemaName,
+    tableName: input.tableName,
+    objectName: input.objectName,
+    detail: input.detail,
+    remediation: input.remediation,
   };
 }
 
 async function queryRows<T extends QueryResultRow>(
-  pool: Pool,
+  db: Pool | PoolClient,
   sql: string,
   params: unknown[] = []
 ): Promise<T[]> {
-  const result = await pool.query<T>(sql, params);
+  const result = await db.query<T>(sql, params);
   return result.rows;
 }
 
-async function relationExists(pool: Pool, relationName: string): Promise<boolean> {
+async function relationExists(db: Pool | PoolClient, relationName: string): Promise<boolean> {
   const rows = await queryRows<{ exists: boolean }>(
-    pool,
+    db,
     'SELECT to_regclass($1) IS NOT NULL AS "exists"',
     [relationName]
   );
@@ -112,7 +123,7 @@ async function relationExists(pool: Pool, relationName: string): Promise<boolean
 
 async function scanRlsDisabled(ctx: AdvisorContext): Promise<AdvisorFinding[]> {
   const rows = await queryRows<NamedObjectRow & { table_name: string }>(
-    ctx.pool,
+    ctx.db,
     `
       /* advisor:rls-disabled */
       SELECT n.nspname AS schema_name, c.relname AS table_name
@@ -145,7 +156,7 @@ async function scanRlsPermissive(ctx: AdvisorContext): Promise<AdvisorFinding[]>
   const rows = await queryRows<
     NamedObjectRow & { table_name: string; object_name: string; cmd: string; roles: string[] }
   >(
-    ctx.pool,
+    ctx.db,
     `
       /* advisor:rls-permissive */
       SELECT
@@ -189,7 +200,7 @@ async function scanRlsPermissive(ctx: AdvisorContext): Promise<AdvisorFinding[]>
 
 async function scanRlsNoPolicy(ctx: AdvisorContext): Promise<AdvisorFinding[]> {
   const rows = await queryRows<NamedObjectRow & { table_name: string }>(
-    ctx.pool,
+    ctx.db,
     `
       /* advisor:rls-no-policy */
       SELECT n.nspname AS schema_name, c.relname AS table_name
@@ -223,7 +234,7 @@ async function scanDangerousFunction(ctx: AdvisorContext): Promise<AdvisorFindin
   const rows = await queryRows<
     NamedObjectRow & { object_name: string; argument_types: string; callable_roles: string[] }
   >(
-    ctx.pool,
+    ctx.db,
     `
       /* advisor:dangerous-function */
       WITH callable_roles AS (
@@ -256,6 +267,7 @@ async function scanDangerousFunction(ctx: AdvisorContext): Promise<AdvisorFindin
       message: `${row.schema_name}.${row.object_name} is SECURITY DEFINER and executable by ${safeStringArray(row.callable_roles).join(', ')}.`,
       schemaName: row.schema_name,
       objectName: row.object_name,
+      stableIdPart: row.argument_types,
       detail: {
         arguments: row.argument_types,
         roles: safeStringArray(row.callable_roles),
@@ -270,7 +282,7 @@ async function scanRlsSelectOnly(ctx: AdvisorContext): Promise<AdvisorFinding[]>
   const rows = await queryRows<
     NamedObjectRow & { table_name: string; select_policy_count: number }
   >(
-    ctx.pool,
+    ctx.db,
     `
       /* advisor:rls-select-only */
       SELECT
@@ -316,7 +328,7 @@ async function scanMissingFkIndex(ctx: AdvisorContext): Promise<AdvisorFinding[]
       referenced_table: string;
     }
   >(
-    ctx.pool,
+    ctx.db,
     `
       /* advisor:missing-fk-index */
       SELECT
@@ -379,7 +391,7 @@ async function scanUnusedIndex(ctx: AdvisorContext): Promise<AdvisorFinding[]> {
       idx_scan: string;
     }
   >(
-    ctx.pool,
+    ctx.db,
     `
       /* advisor:unused-index */
       SELECT
@@ -420,14 +432,14 @@ async function scanUnusedIndex(ctx: AdvisorContext): Promise<AdvisorFinding[]> {
 }
 
 async function scanSlowQuery(ctx: AdvisorContext): Promise<AdvisorFinding[]> {
-  if (!(await relationExists(ctx.pool, 'pg_stat_statements'))) {
+  if (!(await relationExists(ctx.db, 'pg_stat_statements'))) {
     return [];
   }
 
   const rows = await queryRows<
     QueryResultRow & { object_name: string; mean_exec_time: string; calls: string; query: string }
   >(
-    ctx.pool,
+    ctx.db,
     `
       /* advisor:slow-query */
       SELECT
@@ -438,6 +450,7 @@ async function scanSlowQuery(ctx: AdvisorContext): Promise<AdvisorFinding[]> {
       FROM pg_stat_statements
       WHERE mean_exec_time > 1000
         AND calls > 0
+        AND dbid = (SELECT oid FROM pg_database WHERE datname = current_database())
       ORDER BY mean_exec_time DESC
       LIMIT 50
     `
@@ -465,7 +478,7 @@ async function scanConnectionHigh(ctx: AdvisorContext): Promise<AdvisorFinding[]
   const rows = await queryRows<
     QueryResultRow & { used_connections: string; max_connections: string; usage_ratio: string }
   >(
-    ctx.pool,
+    ctx.db,
     `
       /* advisor:connection-high */
       WITH limits AS (
@@ -476,6 +489,8 @@ async function scanConnectionHigh(ctx: AdvisorContext): Promise<AdvisorFinding[]
       used AS (
         SELECT count(*)::numeric AS used_connections
         FROM pg_stat_activity
+        WHERE backend_type = 'client backend'
+          AND pid <> pg_backend_pid()
       )
       SELECT
         used_connections::text,
@@ -509,7 +524,7 @@ async function scanConnectionCritical(ctx: AdvisorContext): Promise<AdvisorFindi
   const rows = await queryRows<
     QueryResultRow & { used_connections: string; max_connections: string; usage_ratio: string }
   >(
-    ctx.pool,
+    ctx.db,
     `
       /* advisor:connection-critical */
       WITH limits AS (
@@ -520,6 +535,8 @@ async function scanConnectionCritical(ctx: AdvisorContext): Promise<AdvisorFindi
       used AS (
         SELECT count(*)::numeric AS used_connections
         FROM pg_stat_activity
+        WHERE backend_type = 'client backend'
+          AND pid <> pg_backend_pid()
       )
       SELECT
         used_connections::text,
@@ -557,7 +574,7 @@ async function scanIdleInTransaction(ctx: AdvisorContext): Promise<AdvisorFindin
       query: string;
     }
   >(
-    ctx.pool,
+    ctx.db,
     `
       /* advisor:idle-in-transaction */
       SELECT
@@ -601,7 +618,7 @@ async function scanLowCacheHitRatio(ctx: AdvisorContext): Promise<AdvisorFinding
       blks_hit: string;
     }
   >(
-    ctx.pool,
+    ctx.db,
     `
       /* advisor:low-cache-hit-ratio */
       SELECT
@@ -644,7 +661,7 @@ async function scanLongRunningQuery(ctx: AdvisorContext): Promise<AdvisorFinding
       query: string;
     }
   >(
-    ctx.pool,
+    ctx.db,
     `
       /* advisor:long-running-query */
       SELECT
@@ -683,7 +700,7 @@ async function scanRlsPolicyPerf(ctx: AdvisorContext): Promise<AdvisorFinding[]>
   const rows = await queryRows<
     NamedObjectRow & { table_name: string; object_name: string; expression: string }
   >(
-    ctx.pool,
+    ctx.db,
     `
       /* advisor:rls-policy-perf */
       SELECT
@@ -723,7 +740,7 @@ async function scanMissingRlsIndex(ctx: AdvisorContext): Promise<AdvisorFinding[
   const rows = await queryRows<
     NamedObjectRow & { table_name: string; object_name: string; expression: string }
   >(
-    ctx.pool,
+    ctx.db,
     `
       /* advisor:missing-rls-index */
       WITH policy_columns AS (
@@ -743,7 +760,7 @@ async function scanMissingRlsIndex(ctx: AdvisorContext): Promise<AdvisorFinding[
           AND a.attnum > 0
           AND a.attisdropped = false
           AND concat_ws(' ', pg_get_expr(p.polqual, p.polrelid), pg_get_expr(p.polwithcheck, p.polrelid)) ~* 'auth\\.uid\\s*\\(\\s*\\)'
-          AND concat_ws(' ', pg_get_expr(p.polqual, p.polrelid), pg_get_expr(p.polwithcheck, p.polrelid)) ILIKE '%' || a.attname || '%'
+          AND concat_ws(' ', pg_get_expr(p.polqual, p.polrelid), pg_get_expr(p.polwithcheck, p.polrelid)) ~* ('\\m' || a.attname || '\\M')
       )
       SELECT schema_name, table_name, object_name, expression
       FROM policy_columns pc
@@ -784,7 +801,7 @@ async function scanDeadTuples(ctx: AdvisorContext): Promise<AdvisorFinding[]> {
       dead_tuple_ratio: string;
     }
   >(
-    ctx.pool,
+    ctx.db,
     `
       /* advisor:dead-tuples */
       SELECT
@@ -830,7 +847,7 @@ async function scanStaleStatistics(ctx: AdvisorContext): Promise<AdvisorFinding[
       last_autoanalyze: string | null;
     }
   >(
-    ctx.pool,
+    ctx.db,
     `
       /* advisor:stale-statistics */
       SELECT
@@ -874,25 +891,54 @@ async function scanSequenceExhaustion(ctx: AdvisorContext): Promise<AdvisorFindi
     NamedObjectRow & {
       object_name: string;
       last_value: string;
+      start_value: string;
+      min_value: string;
       max_value: string;
+      increment_by: string;
       percent_used: string;
     }
   >(
-    ctx.pool,
+    ctx.db,
     `
       /* advisor:sequence-exhaustion */
       SELECT
         schemaname AS schema_name,
         sequencename AS object_name,
         last_value::text,
+        start_value::text,
+        min_value::text,
         max_value::text,
-        (last_value::numeric / NULLIF(max_value::numeric, 0))::text AS percent_used
+        increment_by::text,
+        CASE
+          WHEN increment_by > 0 THEN
+            (last_value::numeric - start_value::numeric)
+              / NULLIF(max_value::numeric - start_value::numeric, 0)
+          ELSE
+            (start_value::numeric - last_value::numeric)
+              / NULLIF(start_value::numeric - min_value::numeric, 0)
+        END::text AS percent_used
       FROM pg_sequences
       WHERE schemaname <> ALL($1::text[])
         AND last_value IS NOT NULL
-        AND max_value IS NOT NULL
-        AND last_value::numeric / NULLIF(max_value::numeric, 0) >= 0.80
-      ORDER BY last_value::numeric / NULLIF(max_value::numeric, 0) DESC
+        AND (
+          CASE
+            WHEN increment_by > 0 THEN
+              (last_value::numeric - start_value::numeric)
+                / NULLIF(max_value::numeric - start_value::numeric, 0)
+            ELSE
+              (start_value::numeric - last_value::numeric)
+                / NULLIF(start_value::numeric - min_value::numeric, 0)
+          END
+        ) >= 0.80
+      ORDER BY
+        CASE
+          WHEN increment_by > 0 THEN
+            (last_value::numeric - start_value::numeric)
+              / NULLIF(max_value::numeric - start_value::numeric, 0)
+          ELSE
+            (start_value::numeric - last_value::numeric)
+              / NULLIF(start_value::numeric - min_value::numeric, 0)
+        END DESC
     `,
     [INTERNAL_SCHEMAS]
   );
@@ -908,7 +954,10 @@ async function scanSequenceExhaustion(ctx: AdvisorContext): Promise<AdvisorFindi
       objectName: row.object_name,
       detail: {
         lastValue: safeNumber(row.last_value),
+        startValue: safeNumber(row.start_value),
+        minValue: safeNumber(row.min_value),
         maxValue: safeNumber(row.max_value),
+        incrementBy: safeNumber(row.increment_by),
         percentUsed: safeNumber(row.percent_used),
       },
       remediation:
@@ -926,7 +975,7 @@ async function scanAutovacuumBlocked(ctx: AdvisorContext): Promise<AdvisorFindin
       query: string;
     }
   >(
-    ctx.pool,
+    ctx.db,
     `
       /* advisor:autovacuum-blocked */
       SELECT
@@ -1162,24 +1211,35 @@ export class AdvisorService {
     const scannedAt = new Date().toISOString();
 
     try {
-      const ctx: AdvisorContext = { pool: this.dbManager.getPool() };
-      const findingsByRule = await Promise.all(ADVISOR_RULES.map((rule) => rule.run(ctx)));
-      const findings = findingsByRule.flat();
+      const client = await this.dbManager.getPool().connect();
 
-      return {
-        scannedAt,
-        durationMs: Date.now() - startedAt,
-        findingCount: findings.length,
-        summary: summarize(findings),
-        rules: ADVISOR_RULES.map(({ ruleId, category, severity, title, description }) => ({
-          ruleId,
-          category,
-          severity,
-          title,
-          description,
-        })),
-        findings,
-      };
+      try {
+        const ctx: AdvisorContext = { db: client };
+        const findingsByRule: AdvisorFinding[][] = [];
+
+        for (const rule of ADVISOR_RULES) {
+          findingsByRule.push(await rule.run(ctx));
+        }
+
+        const findings = findingsByRule.flat();
+
+        return {
+          scannedAt,
+          durationMs: Date.now() - startedAt,
+          findingCount: findings.length,
+          summary: summarize(findings),
+          rules: ADVISOR_RULES.map(({ ruleId, category, severity, title, description }) => ({
+            ruleId,
+            category,
+            severity,
+            title,
+            description,
+          })),
+          findings,
+        };
+      } finally {
+        client.release();
+      }
     } finally {
       this.scanInProgress = false;
     }

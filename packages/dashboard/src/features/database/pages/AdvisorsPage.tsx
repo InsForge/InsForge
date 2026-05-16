@@ -122,13 +122,14 @@ function AdvisorContent({
 
   return (
     <div className="min-h-0 flex-1 overflow-auto">
-      <div className="grid grid-cols-2 gap-3 border-b border-[var(--alpha-8)] bg-[rgb(var(--semantic-1))] p-4 md:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 border-b border-[var(--alpha-8)] bg-[rgb(var(--semantic-1))] p-4 md:grid-cols-4 xl:grid-cols-7">
         <SummaryTile label="Findings" value={result.findingCount} tone="default" />
         <SummaryTile label="Critical" value={result.summary.critical} tone="critical" />
         <SummaryTile label="Warnings" value={result.summary.warning} tone="warning" />
         <SummaryTile label="Info" value={result.summary.info} tone="info" />
         <SummaryTile label="Security" value={result.summary.security} tone="default" />
         <SummaryTile label="Performance" value={result.summary.performance} tone="default" />
+        <SummaryTile label="Health" value={result.summary.health} tone="default" />
       </div>
 
       <div className="flex flex-wrap items-center gap-2 border-b border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))] px-4 py-3">
