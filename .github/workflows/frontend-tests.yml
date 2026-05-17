@@ -68,3 +68,13 @@ jobs:
 
       - name: Run dashboard UI tests
         run: npm --workspace @insforge/dashboard run test:ui
+
+      - name: Upload Playwright artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-playwright-results
+          path: |
+            packages/dashboard/playwright-report/
+            packages/dashboard/test-results/
+          retention-days: 7

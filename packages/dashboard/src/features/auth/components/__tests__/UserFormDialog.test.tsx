@@ -49,9 +49,9 @@ describe('UserFormDialog', () => {
         password: 'correct-horse-battery-staple',
         autoConfirm: undefined,
       });
+      expect(hookMocks.refetch).toHaveBeenCalledOnce();
+      expect(onOpenChange).toHaveBeenCalledWith(false);
+      expect(hookMocks.showToast).toHaveBeenCalledWith('User created successfully', 'success');
     });
-    expect(hookMocks.refetch).toHaveBeenCalledOnce();
-    expect(onOpenChange).toHaveBeenCalledWith(false);
-    expect(hookMocks.showToast).toHaveBeenCalledWith('User created successfully', 'success');
   });
 });
