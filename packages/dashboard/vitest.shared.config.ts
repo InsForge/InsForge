@@ -21,8 +21,4 @@ export default defineConfig({
       '@insforge/ui': path.resolve(currentDir, '../ui/src'),
     },
   },
-  test: {
-    environment: 'jsdom',
-    setupFiles: ['./src/test/setup.ts'],
-  },
 });
