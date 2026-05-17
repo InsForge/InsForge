@@ -32,9 +32,11 @@ import {
 import { ADMIN_ID } from '@/utils/constants.js';
 import { AppError } from '@/utils/errors.js';
 import { EmailService } from '@/services/email/email.service.js';
+import { JobQueue } from '@/services/job-queue.service.js';
 import { XOAuthProvider } from '@/providers/oauth/x.provider.js';
 import { AppleOAuthProvider } from '@/providers/oauth/apple.provider.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
+import type { EmailTemplate } from '@/types/email.js';
 import {
   ERROR_CODES,
   type AuthMetadataSchema,
@@ -118,6 +120,40 @@ export class AuthService {
     const url = new URL(pathname, getApiBaseUrl());
     url.searchParams.set('token', token);
     return url.toString();
+  }
+
+  /**
+   * Queue provider delivery after the OTP/token has been created.
+   *
+   * Keeping token generation synchronous preserves existing auth semantics and
+   * user-enumeration protections, while moving the slow SMTP/provider call off
+   * the request path with retries.
+   */
+  private enqueueEmailTemplateDelivery(
+    email: string,
+    name: string,
+    template: EmailTemplate,
+    variables: Record<string, string>
+  ): void {
+    const jobId = JobQueue.getInstance().enqueue(
+      'email',
+      { email, template },
+      async () => {
+        const emailService = EmailService.getInstance();
+        await emailService.sendWithTemplate(email, name, template, variables);
+      },
+      {
+        priority: 'high',
+        maxAttempts: 3,
+        retryDelayMs: 1_000,
+      }
+    );
+
+    logger.info('Queued auth email delivery', {
+      jobId,
+      email,
+      template,
+    });
   }
 
   /**
@@ -325,10 +361,8 @@ export class AuthService {
       OTPType.NUMERIC_CODE
     );
 
-    // Send email with verification code
-    const emailService = EmailService.getInstance();
     const userName = dbUser.profile?.name || 'User';
-    await emailService.sendWithTemplate(email, userName, 'email-verification-code', {
+    this.enqueueEmailTemplateDelivery(email, userName, 'email-verification-code', {
       token: code,
     });
   }
@@ -361,10 +395,8 @@ export class AuthService {
 
     const linkUrl = this.buildEmailLink('/api/auth/email/verify-link', token);
 
-    // Send email with verification link
-    const emailService = EmailService.getInstance();
     const userName = dbUser.profile?.name || 'User';
-    await emailService.sendWithTemplate(email, userName, 'email-verification-link', {
+    this.enqueueEmailTemplateDelivery(email, userName, 'email-verification-link', {
       link: linkUrl,
     });
   }
@@ -514,10 +546,8 @@ export class AuthService {
       OTPType.NUMERIC_CODE
     );
 
-    // Send email with reset password code
-    const emailService = EmailService.getInstance();
     const userName = dbUser.profile?.name || 'User';
-    await emailService.sendWithTemplate(email, userName, 'reset-password-code', {
+    this.enqueueEmailTemplateDelivery(email, userName, 'reset-password-code', {
       token: code,
     });
   }
@@ -549,10 +579,8 @@ export class AuthService {
 
     const linkUrl = this.buildEmailLink('/api/auth/email/reset-password-link', token);
 
-    // Send email with password reset link
-    const emailService = EmailService.getInstance();
     const userName = dbUser.profile?.name || 'User';
-    await emailService.sendWithTemplate(email, userName, 'reset-password-link', {
+    this.enqueueEmailTemplateDelivery(email, userName, 'reset-password-link', {
       link: linkUrl,
     });
   }
