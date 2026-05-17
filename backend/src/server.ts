@@ -16,6 +16,7 @@ import functionsRouter from '@/api/routes/functions/index.routes.js';
 import secretsRouter from '@/api/routes/secrets/index.routes.js';
 import { usageRouter } from '@/api/routes/usage/index.routes.js';
 import { aiRouter } from '@/api/routes/ai/index.routes.js';
+import { vectorRouter } from '@/api/routes/vector/index.routes.js';
 import { realtimeRouter } from '@/api/routes/realtime/index.routes.js';
 import { emailRouter } from '@/api/routes/email/index.routes.js';
 import { deploymentsRouter } from '@/api/routes/deployments/index.routes.js';
@@ -212,6 +213,7 @@ export async function createApp() {
   apiRouter.use('/secrets', secretsRouter);
   apiRouter.use('/usage', usageRouter);
   apiRouter.use('/ai', aiRouter);
+  apiRouter.use('/vector', vectorRouter);
   apiRouter.use('/realtime', realtimeRouter);
   apiRouter.use('/email', emailRouter);
   apiRouter.use('/deployments', deploymentsRouter);

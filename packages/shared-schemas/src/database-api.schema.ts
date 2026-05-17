@@ -248,6 +248,37 @@ export const bulkUpsertResponseSchema = z.object({
   filename: z.string(),
 });
 
+// Vector Search Schemas
+export const vectorSearchMetricSchema = z.enum(['cosine', 'l2', 'inner_product']);
+
+export const vectorSearchRequestSchema = z.object({
+  schema: z.string().trim().min(1).optional(),
+  table: z.string().trim().min(1, 'Table name is required'),
+  column: z.string().trim().min(1, 'Vector column is required'),
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  query_vector: z
+    .array(z.number().finite())
+    .min(1, 'query_vector must contain at least one dimension')
+    .max(8192, 'query_vector cannot exceed 8192 dimensions'),
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  top_k: z.number().int().min(1).max(100).default(5),
+  metric: vectorSearchMetricSchema.default('cosine'),
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  include_vector: z.boolean().default(false),
+});
+
+export const vectorSearchMatchSchema = z.object({
+  row: z.record(z.string(), z.unknown()),
+  distance: z.number(),
+  similarity: z.number().optional(),
+});
+
+export const vectorSearchResponseSchema = z.object({
+  matches: z.array(vectorSearchMatchSchema),
+  count: z.number().int().min(0),
+  metric: vectorSearchMetricSchema,
+});
+
 export const adminTableRecordSchema = z.record(z.string(), z.unknown());
 
 export const adminTableRecordsSortClauseSchema = z.object({
@@ -362,6 +393,10 @@ export type ImportDatabaseResponse = z.infer<typeof importResponseSchema>;
 // Bulk Upsert Types
 export type BulkUpsertRequest = z.infer<typeof bulkUpsertRequestSchema>;
 export type BulkUpsertResponse = z.infer<typeof bulkUpsertResponseSchema>;
+export type VectorSearchMetric = z.infer<typeof vectorSearchMetricSchema>;
+export type VectorSearchRequest = z.infer<typeof vectorSearchRequestSchema>;
+export type VectorSearchMatch = z.infer<typeof vectorSearchMatchSchema>;
+export type VectorSearchResponse = z.infer<typeof vectorSearchResponseSchema>;
 export type AdminTableRecord = z.infer<typeof adminTableRecordSchema>;
 export type AdminTableRecordsSortClause = z.infer<typeof adminTableRecordsSortClauseSchema>;
 export type AdminTableRecordsListQuery = z.infer<typeof adminTableRecordsListQuerySchema>;
