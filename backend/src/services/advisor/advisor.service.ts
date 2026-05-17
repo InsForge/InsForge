@@ -2,13 +2,20 @@ import { randomUUID } from 'crypto';
 import { AppError } from '@/api/middlewares/error.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { advisorRules } from '@/lib/advisor/rules/index.js';
-import type { AdvisorFinding, AdvisorScanResult, AdvisorScanSummary } from '@/lib/advisor/types.js';
+import type {
+  AdvisorFinding,
+  AdvisorIssuesQuery,
+  AdvisorIssuesResponse,
+  AdvisorScanResult,
+  AdvisorScanSummary,
+} from '@/lib/advisor/types.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import logger from '@/utils/logger.js';
 
 export class AdvisorService {
   private static instance: AdvisorService;
   private isScanRunning = false;
+  private latestScanResult: AdvisorScanResult | null = null;
 
   static getInstance(): AdvisorService {
     if (!AdvisorService.instance) {
@@ -47,7 +54,7 @@ export class AdvisorService {
         }
       }
 
-      return {
+      const result: AdvisorScanResult = {
         scanId,
         status: errors.length > 0 ? 'completed_with_errors' : 'completed',
         scanType: 'manual',
@@ -56,9 +63,34 @@ export class AdvisorService {
         findings,
         errors,
       };
+
+      this.latestScanResult = result;
+      return result;
     } finally {
       this.isScanRunning = false;
     }
+  }
+
+  getLatestScan(): AdvisorScanResult | null {
+    return this.latestScanResult;
+  }
+
+  listIssues(query: AdvisorIssuesQuery): AdvisorIssuesResponse {
+    const findings = this.latestScanResult?.findings ?? [];
+    const filtered = findings.filter((finding) => {
+      if (query.category && finding.category !== query.category) {
+        return false;
+      }
+      if (query.severity && finding.severity !== query.severity) {
+        return false;
+      }
+      return true;
+    });
+
+    return {
+      issues: filtered.slice(query.offset, query.offset + query.limit),
+      total: filtered.length,
+    };
   }
 
   private buildSummary(findings: AdvisorFinding[]): AdvisorScanSummary {

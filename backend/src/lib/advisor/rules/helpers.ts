@@ -7,7 +7,8 @@ import type {
 } from '@/lib/advisor/types.js';
 
 export function mapRuleRows(rule: AdvisorRule, rows: AdvisorRuleResultRow[]): AdvisorFinding[] {
-  return rows.map((row) => ({
+  return rows.map((row, index) => ({
+    id: `${rule.id}:${row.affected_object}:${index}`,
     ruleId: rule.id,
     category: rule.category,
     severity: rule.severity,

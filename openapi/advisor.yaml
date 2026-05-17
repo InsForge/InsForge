@@ -1,0 +1,251 @@
+openapi: 3.0.3
+info:
+  title: Insforge Advisor API
+  version: 1.0.0
+
+paths:
+  /api/advisor/scan:
+    post:
+      summary: Run database advisor scan
+      description: Runs all database advisor rules. Only one scan can run at a time in the current backend process.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Advisor scan result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdvisorScanResult'
+        '401':
+          description: Missing or invalid admin token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Advisor scan already running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/advisor/latest:
+    get:
+      summary: Get latest advisor scan
+      description: Returns the latest in-memory advisor scan result, or null before the first scan.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Latest advisor scan result
+          content:
+            application/json:
+              schema:
+                nullable: true
+                allOf:
+                  - $ref: '#/components/schemas/AdvisorScanResult'
+        '401':
+          description: Missing or invalid admin token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/advisor/issues:
+    get:
+      summary: List latest advisor findings
+      description: Returns findings from the latest advisor scan with optional category and severity filters.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: category
+          in: query
+          schema:
+            $ref: '#/components/schemas/AdvisorCategory'
+        - name: severity
+          in: query
+          schema:
+            $ref: '#/components/schemas/AdvisorSeverity'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Advisor findings from the latest scan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdvisorIssuesResponse'
+        '400':
+          description: Invalid filter or pagination value
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid admin token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    AdvisorCategory:
+      type: string
+      enum: [security, performance, health]
+
+    AdvisorSeverity:
+      type: string
+      enum: [critical, warning, info]
+
+    AdvisorScanSummary:
+      type: object
+      required:
+        - total
+        - critical
+        - warning
+        - info
+      properties:
+        total:
+          type: integer
+        critical:
+          type: integer
+        warning:
+          type: integer
+        info:
+          type: integer
+
+    AdvisorFinding:
+      type: object
+      required:
+        - id
+        - ruleId
+        - category
+        - severity
+        - title
+        - description
+        - detail
+        - recommendation
+        - affectedObject
+        - metadata
+      properties:
+        id:
+          type: string
+        ruleId:
+          type: string
+        category:
+          $ref: '#/components/schemas/AdvisorCategory'
+        severity:
+          $ref: '#/components/schemas/AdvisorSeverity'
+        title:
+          type: string
+        description:
+          type: string
+        detail:
+          type: string
+        recommendation:
+          type: string
+        affectedObject:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+
+    AdvisorScanRuleError:
+      type: object
+      required:
+        - ruleId
+        - message
+      properties:
+        ruleId:
+          type: string
+        message:
+          type: string
+
+    AdvisorScanResult:
+      type: object
+      required:
+        - scanId
+        - status
+        - scanType
+        - scannedAt
+        - summary
+        - findings
+        - errors
+      properties:
+        scanId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [completed, completed_with_errors]
+        scanType:
+          type: string
+          enum: [manual]
+        scannedAt:
+          type: string
+          format: date-time
+        summary:
+          $ref: '#/components/schemas/AdvisorScanSummary'
+        findings:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdvisorFinding'
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdvisorScanRuleError'
+
+    AdvisorIssuesResponse:
+      type: object
+      required:
+        - issues
+        - total
+      properties:
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdvisorFinding'
+        total:
+          type: integer
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+        - statusCode
+      properties:
+        error:
+          type: string
+          example: INVALID_INPUT
+        message:
+          type: string
+        statusCode:
+          type: integer
+        nextActions:
+          type: string

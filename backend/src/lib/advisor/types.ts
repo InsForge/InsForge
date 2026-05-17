@@ -12,6 +12,7 @@ export interface AdvisorQueryExecutor {
 }
 
 export interface AdvisorFinding {
+  id: string;
   ruleId: string;
   category: AdvisorCategory;
   severity: AdvisorSeverity;
@@ -59,4 +60,16 @@ export interface AdvisorScanResult {
   summary: AdvisorScanSummary;
   findings: AdvisorFinding[];
   errors: AdvisorScanRuleError[];
+}
+
+export interface AdvisorIssuesQuery {
+  category?: AdvisorCategory;
+  severity?: AdvisorSeverity;
+  limit: number;
+  offset: number;
+}
+
+export interface AdvisorIssuesResponse {
+  issues: AdvisorFinding[];
+  total: number;
 }

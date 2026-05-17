@@ -38,6 +38,34 @@ export interface AdvisorScanResult {
 }
 
 class AdvisorService {
+  getLatestScan(): Promise<AdvisorScanResult | null> {
+    return apiClient.request('/advisor/latest');
+  }
+
+  listIssues(params: {
+    category?: AdvisorCategory;
+    severity?: AdvisorSeverity;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ issues: AdvisorFinding[]; total: number }> {
+    const searchParams = new URLSearchParams();
+    if (params.category) {
+      searchParams.set('category', params.category);
+    }
+    if (params.severity) {
+      searchParams.set('severity', params.severity);
+    }
+    if (params.limit !== undefined) {
+      searchParams.set('limit', String(params.limit));
+    }
+    if (params.offset !== undefined) {
+      searchParams.set('offset', String(params.offset));
+    }
+
+    const query = searchParams.toString();
+    return apiClient.request(`/advisor/issues${query ? `?${query}` : ''}`);
+  }
+
   runScan(): Promise<AdvisorScanResult> {
     return apiClient.request('/advisor/scan', {
       method: 'POST',

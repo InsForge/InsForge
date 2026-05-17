@@ -48,6 +48,7 @@ export const docTypeSchema = z
     'ai-integration-sdk',
     'real-time',
     'deployment',
+    'advisor',
   ])
   .describe(
     `
@@ -59,7 +60,8 @@ export const docTypeSchema = z
       "auth-sdk" (direct SDK methods for custom auth flows),
       "ai-integration-sdk" (AI features),
       "real-time" (real-time pub/sub through WebSockets),
-      "deployment" (deploy frontend applications via MCP tool)
+      "deployment" (deploy frontend applications via MCP tool),
+      "advisor" (run database advisor scans after migrations)
     `
   );
 

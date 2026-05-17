@@ -1,0 +1,108 @@
+---
+title: Database Advisors
+description: Scan Postgres for security, performance, and health findings
+---
+
+## Overview
+
+Database Advisors run read-only checks against the project Postgres database and return actionable findings for security, performance, and health. Self-hosted projects can run the scan on demand from the dashboard or by calling the admin API.
+
+## Run A Scan
+
+The dashboard exposes Advisors under **Database**. Click **Run scan now** to execute the rules and render the latest result.
+
+Admins can also call the API directly:
+
+```bash
+curl -X POST "$INSFORGE_URL/api/advisor/scan" \
+  -H "Authorization: Bearer $ADMIN_TOKEN"
+```
+
+The endpoint allows one scan at a time in the current backend process. If another scan is already running, the API returns `409`.
+
+## API Surface
+
+| Endpoint | Purpose |
+| --- | --- |
+| `POST /api/advisor/scan` | Runs all advisor rules and returns the scan result. |
+| `GET /api/advisor/latest` | Returns the latest in-memory scan result, or `null` before the first scan. |
+| `GET /api/advisor/issues` | Returns findings from the latest scan, filtered by `category`, `severity`, `limit`, and `offset`. |
+
+All advisor endpoints require admin authentication.
+
+## Result Shape
+
+```json
+{
+  "scanId": "7f8f0d9a-7d46-4b50-9896-3c28f64de612",
+  "status": "completed",
+  "scanType": "manual",
+  "scannedAt": "2026-05-17T08:00:00.000Z",
+  "summary": {
+    "total": 2,
+    "critical": 1,
+    "warning": 1,
+    "info": 0
+  },
+  "findings": [
+    {
+      "id": "rls-disabled:public.customers:0",
+      "ruleId": "rls-disabled",
+      "category": "security",
+      "severity": "critical",
+      "title": "RLS Disabled",
+      "description": "Tables in the public schema should have row level security enabled.",
+      "detail": "Table public.customers is in the public schema but row level security is not enabled.",
+      "recommendation": "Enable row level security and add policies that match the intended access model.",
+      "affectedObject": "public.customers",
+      "metadata": {
+        "schema": "public",
+        "table": "customers"
+      }
+    }
+  ],
+  "errors": []
+}
+```
+
+If one rule fails, the scan continues and returns `completed_with_errors` with the failed rule IDs in `errors`.
+
+## Rules
+
+### Security
+
+| Rule | What it checks |
+| --- | --- |
+| `rls-disabled` | Tables in the `public` schema where row level security is not enabled. |
+| `rls-permissive` | Multiple permissive RLS policies for the same table, role, and command. |
+| `rls-no-policy` | Tables with RLS enabled but no policies. |
+| `dangerous-function` | Functions in `public` that do not pin `search_path`. |
+| `rls-select-only` | Tables with RLS policies defined while RLS is not enabled. |
+
+### Performance
+
+| Rule | What it checks |
+| --- | --- |
+| `missing-fk-index` | Foreign keys without a covering index on the referencing columns. |
+| `unused-index` | Non-primary, non-unique indexes that have never been scanned. |
+| `slow-query` | `pg_stat_statements` queries with mean execution time greater than one second. |
+| `connection-high` | Postgres connection usage above 80 percent. |
+| `connection-critical` | Postgres connection usage above 95 percent. |
+| `idle-in-transaction` | Sessions stuck in `idle in transaction`. |
+| `low-cache-hit-ratio` | Buffer cache hit ratio below 90 percent. |
+| `long-running-query` | Active queries running longer than five minutes. |
+| `rls-policy-perf` | RLS policies that call `auth.uid()` per row instead of using a `select` wrapper. |
+| `missing-rls-index` | RLS policy filter columns without an index. |
+
+### Health
+
+| Rule | What it checks |
+| --- | --- |
+| `dead-tuples` | Tables with a high dead tuple ratio and enough dead rows to need vacuum attention. |
+| `stale-statistics` | Tables that have not been analyzed in more than seven days. |
+| `sequence-exhaustion` | Non-cycling public sequences that have used more than 90 percent of their range. |
+| `autovacuum-blocked` | Autovacuum workers blocked by another session. |
+
+## Cloud-Only Host Metrics
+
+Cloud-only CPU, disk, and memory advisor rules depend on host metrics from CloudWatch. Self-hosted projects do not have a common host-metric source, so those rules are not included in the OSS advisor scan.

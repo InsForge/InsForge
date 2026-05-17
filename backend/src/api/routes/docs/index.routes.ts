@@ -103,6 +103,7 @@ const LEGACY_DOCS_MAP: Record<DocTypeSchema, string> = {
   'ai-integration-sdk': 'sdks/typescript/ai.mdx',
   'real-time': 'agent-docs/real-time.md',
   deployment: 'agent-docs/deployment.md',
+  advisor: 'agent-docs/advisor.md',
 };
 
 // SDK documentation map for GET /api/docs/:docFeature/:docLanguage endpoint

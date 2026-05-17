@@ -40,6 +40,7 @@
                 "group": "Database",
                 "pages": [
                   "core-concepts/database/architecture",
+                  "core-concepts/database/advisors",
                   "core-concepts/database/migrations",
                   "core-concepts/database/branching",
                   "core-concepts/database/pgvector"
@@ -244,6 +245,10 @@
           {
             "group": "Metadata",
             "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/metadata.yaml"
+          },
+          {
+            "group": "Advisor",
+            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/advisor.yaml"
           },
           {
             "group": "Health",

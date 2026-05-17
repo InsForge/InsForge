@@ -76,6 +76,7 @@ Available documentation types:
 - `"ai-integration-sdk"` - AI integration with the provisioned OpenRouter key and OpenAI SDK
 - `"real-time"` - Real-time pub/sub (database + client events) via WebSockets
 - `"deployment"` - Deploy frontend applications via MCP tool
+- `"advisor"` - Run database advisor scans after migrations
 
 These documentations are mostly for TypeScript SDK. For other languages, you can also use `fetch-sdk-docs` mcp tool to get specific documentation.
 
@@ -114,6 +115,7 @@ Available languages:
 - Database schema management (`run-raw-sql`, `get-table-schema`)
 - Storage bucket creation (`create-bucket`, `list-buckets`, `delete-bucket`)
 - Serverless function deployment (`create-function`, `update-function`, `delete-function`)
+- Database advisor scan (`advisor.scan`) - Run security, performance, and health checks after schema changes
 - Frontend deployment (`create-deployment`) - Deploy frontend apps to InsForge hosting
 
 ## Important Notes
