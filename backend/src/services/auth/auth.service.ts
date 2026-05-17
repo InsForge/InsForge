@@ -149,9 +149,8 @@ export class AuthService {
       }
     );
 
-    logger.info('Queued auth email delivery', {
+    logger.debug('Queued auth email delivery', {
       jobId,
-      email,
       template,
     });
   }

@@ -14,7 +14,7 @@ export interface EnqueueJobOptions {
 export interface JobSnapshot<TPayload = unknown> {
   id: string;
   type: string;
-  payload: TPayload;
+  payload?: TPayload;
   priority: JobPriority;
   status: JobStatus;
   attempts: number;
@@ -28,6 +28,7 @@ export interface JobSnapshot<TPayload = unknown> {
 type JobHandler = () => Promise<void> | void;
 
 interface QueuedJob<TPayload = unknown> extends JobSnapshot<TPayload> {
+  payload: TPayload;
   handler: JobHandler;
   retryDelayMs: number;
   retryBackoffMultiplier: number;
@@ -54,11 +55,14 @@ export class JobQueue {
   private running = 0;
   private sequence = 0;
   private processScheduled = false;
+  private delayedProcessTimer: NodeJS.Timeout | undefined;
+  private delayedProcessAt: number | undefined;
 
-  private constructor(
-    concurrency = readPositiveInteger(process.env.JOB_QUEUE_CONCURRENCY, DEFAULT_CONCURRENCY)
-  ) {
-    this.concurrency = concurrency;
+  private constructor(concurrency?: number) {
+    this.concurrency =
+      concurrency === undefined
+        ? readPositiveInteger(process.env.JOB_QUEUE_CONCURRENCY, DEFAULT_CONCURRENCY)
+        : normalizePositiveInteger(concurrency, DEFAULT_CONCURRENCY);
   }
 
   public static getInstance(options?: { concurrency?: number }): JobQueue {
@@ -71,6 +75,12 @@ export class JobQueue {
   public static resetForTests(): void {
     JobQueue.instance?.clear();
     JobQueue.instance = undefined;
+  }
+
+  public static async drainExisting(timeoutMs = 5_000): Promise<void> {
+    if (JobQueue.instance) {
+      await JobQueue.instance.drain(timeoutMs);
+    }
   }
 
   public enqueue<TPayload>(
@@ -133,7 +143,12 @@ export class JobQueue {
   public async drain(timeoutMs = 5_000): Promise<void> {
     const start = Date.now();
 
-    while (this.queue.length > 0 || this.running > 0 || this.processScheduled) {
+    while (
+      this.queue.length > 0 ||
+      this.running > 0 ||
+      this.processScheduled ||
+      this.delayedProcessTimer
+    ) {
       if (Date.now() - start > timeoutMs) {
         throw new Error('Timed out waiting for background job queue to drain');
       }
@@ -142,9 +157,14 @@ export class JobQueue {
   }
 
   public clear(): void {
+    if (this.delayedProcessTimer) {
+      clearTimeout(this.delayedProcessTimer);
+      this.delayedProcessTimer = undefined;
+      this.delayedProcessAt = undefined;
+    }
+
     this.queue = [];
     this.history = [];
-    this.running = 0;
     this.sequence = 0;
     this.processScheduled = false;
   }
@@ -163,8 +183,22 @@ export class JobQueue {
       return;
     }
 
-    const timer = setTimeout(() => this.process(), delayMs);
-    timer.unref?.();
+    const runAt = Date.now() + delayMs;
+    if (this.delayedProcessAt !== undefined && this.delayedProcessAt <= runAt) {
+      return;
+    }
+
+    if (this.delayedProcessTimer) {
+      clearTimeout(this.delayedProcessTimer);
+    }
+
+    this.delayedProcessAt = runAt;
+    this.delayedProcessTimer = setTimeout(() => {
+      this.delayedProcessTimer = undefined;
+      this.delayedProcessAt = undefined;
+      this.process();
+    }, delayMs);
+    this.delayedProcessTimer.unref?.();
   }
 
   private process(): void {
@@ -267,6 +301,7 @@ export class JobQueue {
       retryDelayMs: _retryDelayMs,
       retryBackoffMultiplier: _retryBackoffMultiplier,
       sequence: _sequence,
+      payload: _payload,
       ...snapshot
     } = job;
     this.history.push(snapshot);
@@ -305,5 +340,9 @@ function readPositiveInteger(rawValue: string | undefined, fallback: number): nu
   }
 
   const parsed = Number(rawValue);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+  return normalizePositiveInteger(parsed, fallback);
+}
+
+function normalizePositiveInteger(value: number, fallback: number): number {
+  return Number.isInteger(value) && value > 0 ? value : fallback;
 }

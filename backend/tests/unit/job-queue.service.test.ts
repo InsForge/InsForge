@@ -107,4 +107,27 @@ describe('JobQueue', () => {
       failed: 1,
     });
   });
+
+  it('falls back to default concurrency when an explicit value is invalid', async () => {
+    const queue = JobQueue.getInstance({ concurrency: 0 });
+    const calls: string[] = [];
+
+    queue.enqueue('email', {}, () => calls.push('sent'));
+
+    await queue.drain();
+
+    expect(calls).toEqual(['sent']);
+  });
+
+  it('does not retain job payloads in completed history', async () => {
+    const queue = JobQueue.getInstance({ concurrency: 1 });
+
+    queue.enqueue('email', { email: 'user@example.com', token: '123456' }, () => undefined);
+
+    await queue.drain();
+
+    const history = (queue as unknown as { history: Array<{ payload?: unknown }> }).history;
+    expect(history).toHaveLength(1);
+    expect(history[0].payload).toBeUndefined();
+  });
 });

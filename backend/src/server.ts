@@ -36,6 +36,7 @@ import { seedBackend } from '@/utils/seed.js';
 import logger from '@/utils/logger.js';
 import { initSqlParser } from '@/utils/sql-parser.js';
 import { FunctionService } from '@/services/functions/function.service.js';
+import { JobQueue } from '@/services/job-queue.service.js';
 import packageJson from '../../package.json';
 import { schedulesRouter } from '@/api/routes/schedules/index.routes.js';
 import { servicesRouter } from '@/api/routes/compute/services.routes.js';
@@ -356,6 +357,14 @@ void initializeServer();
 
 async function cleanup() {
   logger.info('Shutting down gracefully...');
+
+  try {
+    await JobQueue.drainExisting(5_000);
+  } catch (error) {
+    logger.error('Error draining JobQueue', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   try {
     const realtimeManager = RealtimeManager.getInstance();
