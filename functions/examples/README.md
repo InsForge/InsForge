@@ -6,6 +6,7 @@ This folder contains **example serverless (edge) functions** you can deploy to I
 
 - `demo-hello-world.js`: public function (GET/POST) with CORS + secret example (`HELLO_PREFIX`)
 - `demo-whoami.js`: authenticated function (GET) that returns the current user
+- `demo-zod-esm.ts`: Deno-native `export default` function with a top-level `npm:zod` import
 
 ## Deploy
 

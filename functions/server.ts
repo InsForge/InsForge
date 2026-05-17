@@ -175,7 +175,8 @@ async function executeInWorker(code: string, request: Request): Promise<Response
           run: false,
           ffi: false,
           sys: false,
-          import: false,
+          // Deno-native functions may import npm:, jsr:, data:, or remote modules.
+          import: true,
           hrtime: false,
         },
       },

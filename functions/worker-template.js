@@ -60,6 +60,78 @@ const { createClient } = await import('npm:@insforge/sdk');
 const { encodeBase64, decodeBase64 } =
   await import('https://deno.land/std@0.224.0/encoding/base64.ts');
 
+const MODULE_CONTEXT_KEY = '__INSFORGE_FUNCTION_CONTEXT__';
+
+function isModuleSource(code) {
+  return /^\s*(import|export)\s/m.test(code);
+}
+
+function toDataModuleUrl(source) {
+  const bytes = new TextEncoder().encode(source);
+  return `data:application/typescript;base64,${encodeBase64(bytes)}`;
+}
+
+async function loadEsmFunction(code, context) {
+  const previousContext = globalThis[MODULE_CONTEXT_KEY];
+  globalThis[MODULE_CONTEXT_KEY] = context;
+
+  try {
+    const moduleSource = `const { createClient, Deno, encodeBase64, decodeBase64 } = globalThis.${MODULE_CONTEXT_KEY};\n${code}`;
+    const userModule = await import(toDataModuleUrl(moduleSource));
+    const functionHandler = userModule.default ?? userModule.handler;
+
+    if (typeof functionHandler !== 'function') {
+      throw new Error('No function exported. Expected: export default async function(req) { ... }');
+    }
+
+    return functionHandler;
+  } finally {
+    if (previousContext === undefined) {
+      delete globalThis[MODULE_CONTEXT_KEY];
+    } else {
+      globalThis[MODULE_CONTEXT_KEY] = previousContext;
+    }
+  }
+}
+
+function loadScriptFunction(code, context) {
+  /**
+   * FUNCTION WRAPPING:
+   * Injecting mocks into the user function execution scope.
+   * We pass mockDeno instead of the real Deno global.
+   */
+  const wrapper = new Function(
+    'exports',
+    'module',
+    'createClient',
+    'Deno',
+    'encodeBase64',
+    'decodeBase64',
+    code
+  );
+  const exports = {};
+  const module = { exports };
+
+  // Execute the wrapper, passing mockDeno as the Deno global
+  wrapper(
+    exports,
+    module,
+    context.createClient,
+    context.Deno,
+    context.encodeBase64,
+    context.decodeBase64
+  );
+
+  // Get the exported function
+  const functionHandler = module.exports || exports.default || exports;
+
+  if (typeof functionHandler !== 'function') {
+    throw new Error('No function exported. Expected: module.exports = async function(req) { ... }');
+  }
+
+  return functionHandler;
+}
+
 // Handle the single message with code, request data, and secrets
 self.onmessage = async (e) => {
   const { code, requestData, secrets = {} } = e.data;
@@ -90,34 +162,16 @@ self.onmessage = async (e) => {
       },
     };
 
-    /**
-     * FUNCTION WRAPPING:
-     * Injecting mocks into the user function execution scope.
-     * We pass mockDeno instead of the real Deno global.
-     */
-    const wrapper = new Function(
-      'exports',
-      'module',
-      'createClient',
-      'Deno',
-      'encodeBase64',
-      'decodeBase64',
-      code
-    );
-    const exports = {};
-    const module = { exports };
+    const context = {
+      createClient,
+      Deno: mockDeno,
+      encodeBase64,
+      decodeBase64,
+    };
 
-    // Execute the wrapper, passing mockDeno as the Deno global
-    wrapper(exports, module, createClient, mockDeno, encodeBase64, decodeBase64);
-
-    // Get the exported function
-    const functionHandler = module.exports || exports.default || exports;
-
-    if (typeof functionHandler !== 'function') {
-      throw new Error(
-        'No function exported. Expected: module.exports = async function(req) { ... }'
-      );
-    }
+    const functionHandler = isModuleSource(code)
+      ? await loadEsmFunction(code, context)
+      : loadScriptFunction(code, context);
 
     // Create Request object from data
     const request = new Request(requestData.url, {
