@@ -54,7 +54,7 @@ export class VectorSearchService {
     return withUserContext(pool, ctx, async (client) => {
       await client.query('SET statement_timeout = 30000');
       try {
-        await this.assertVectorColumn(client, target);
+        await this.assertVectorColumn(client, target, input.query_vector.length);
         return this.executeVectorSearch(client, input, target);
       } finally {
         await client.query('SET statement_timeout = 0').catch(() => {});
@@ -64,7 +64,8 @@ export class VectorSearchService {
 
   private async assertVectorColumn(
     client: PoolClient,
-    target: ResolvedVectorTarget
+    target: ResolvedVectorTarget,
+    queryVectorDimensions: number
   ): Promise<void> {
     const result = await client.query<{ dataType: string }>(
       `
@@ -98,6 +99,20 @@ export class VectorSearchService {
         ERROR_CODES.INVALID_INPUT
       );
     }
+
+    const constrainedDimensions = /^vector\((\d+)\)$/.exec(dataType);
+    if (!constrainedDimensions) {
+      return;
+    }
+
+    const expectedDimensions = Number(constrainedDimensions[1]);
+    if (queryVectorDimensions !== expectedDimensions) {
+      throw new AppError(
+        `query_vector dimensions (${queryVectorDimensions}) must match ${target.schemaName}.${target.tableName}.${target.columnName} (${expectedDimensions})`,
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
   }
 
   private async executeVectorSearch(
@@ -115,10 +130,13 @@ export class VectorSearchService {
       `
         SELECT
           row_to_json(vector_source) AS row,
-          (${distanceExpression})::float8 AS distance
+          vector_distance.distance
         FROM ${tableReference} AS vector_source
+        CROSS JOIN LATERAL (
+          SELECT (${distanceExpression})::float8 AS distance
+        ) AS vector_distance
         WHERE ${vectorColumn} IS NOT NULL
-        ORDER BY ${distanceExpression}
+        ORDER BY vector_distance.distance
         LIMIT $2
       `,
       [vectorLiteral, input.top_k]

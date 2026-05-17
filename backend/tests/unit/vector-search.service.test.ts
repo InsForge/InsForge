@@ -78,6 +78,8 @@ describe('VectorSearchService', () => {
       ([query]) => typeof query === 'string' && query.includes('row_to_json')
     );
     expect(searchCall?.[0]).toContain('FROM "public"."documents" AS vector_source');
+    expect(searchCall?.[0]).toContain('CROSS JOIN LATERAL');
+    expect(searchCall?.[0]).toContain('ORDER BY vector_distance.distance');
     expect(searchCall?.[0]).toContain('vector_source."embedding" <=> $1::vector');
     expect(searchCall?.[1]).toEqual(['[0.1,0.2,0.3]', 5]);
   });
@@ -133,6 +135,35 @@ describe('VectorSearchService', () => {
         { isAdmin: true, role: 'authenticated' }
       )
     ).rejects.toThrow(AppError);
+  });
+
+  it('rejects query vectors that do not match constrained column dimensions', async () => {
+    mockClient.query.mockImplementation((query: string) => {
+      if (query.includes('format_type')) {
+        return Promise.resolve({ rows: [{ dataType: 'vector(3)' }] });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    await expect(
+      service.search(
+        {
+          table: 'documents',
+          column: 'embedding',
+          query_vector: [0.1, 0.2],
+          top_k: 1,
+          metric: 'cosine',
+          include_vector: false,
+        },
+        { isAdmin: true, role: 'authenticated' }
+      )
+    ).rejects.toThrow('query_vector dimensions (2) must match public.documents.embedding (3)');
+
+    expect(
+      mockClient.query.mock.calls.some(
+        ([query]) => typeof query === 'string' && query.includes('row_to_json')
+      )
+    ).toBe(false);
   });
 
   it('blocks protected InsForge schemas', async () => {
