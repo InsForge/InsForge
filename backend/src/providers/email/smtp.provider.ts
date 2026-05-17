@@ -32,11 +32,16 @@ export class SmtpEmailProvider implements EmailProvider {
   }
 
   private createTransporter(config: RawSmtpConfig) {
+    const auth =
+      config.username || config.password
+        ? { user: config.username, pass: config.password }
+        : undefined;
+
     return nodemailer.createTransport({
       host: config.host,
       port: config.port,
       secure: config.port === 465,
-      auth: { user: config.username, pass: config.password },
+      auth,
       connectionTimeout: 10000,
     });
   }

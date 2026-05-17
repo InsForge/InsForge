@@ -21,6 +21,7 @@
     "test": "turbo run test",
     "test:backend": "cd backend && npm test",
     "test:e2e": "cd backend && npm run test:e2e",
+    "db:reset": "./scripts/db-reset.sh",
     "lint": "turbo run lint",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
