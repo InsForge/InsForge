@@ -118,7 +118,7 @@ Edit a template's HTML directly in the **Email Templates** card. The dashboard s
 
 The **min interval (seconds)** field caps how often a single recipient address can receive email. Sends within the cooldown return HTTP `429` with a `retryAfter` hint. Set to `0` to disable.
 
-This limit is enforced only when SMTP is enabled — the cloud provider has its own per-plan limits documented in [Email Architecture](/core-concepts/email/architecture#rate-limits).
+This limit is enforced only when SMTP is enabled. The cloud provider has its own per-plan limits documented in [Architecture](/core-concepts/messaging/architecture#rate-limits).
 
 ## API Reference
 

@@ -1,0 +1,87 @@
+---
+title: "Products"
+description: "Every InsForge product in one place. Click any card to dive in."
+---
+
+InsForge ships seven core products and three private-preview modules. Every
+one is exposed through the same REST surface, the same JWT auth, the same
+MCP server, and the same SDKs.
+
+## Core products
+
+<CardGroup cols={2}>
+  <Card title="Database" icon="database" href="/core-concepts/database/overview">
+    Postgres for every project. Migrations, branching, pgvector, S3-backed backups.
+    Every table becomes a typed REST and SDK surface.
+  </Card>
+
+  <Card title="Authentication" icon="shield" href="/core-concepts/authentication/overview">
+    Email and password, passwordless, OAuth, and mobile logins through one
+    API. JWT sessions, row-level security, OAuth-server mode.
+  </Card>
+
+  <Card title="Storage" icon="folder" href="/core-concepts/storage/overview">
+    S3-compatible object storage with signed URLs and row-level policies.
+    Works with rclone, the AWS CLI, Terraform.
+  </Card>
+
+  <Card title="Realtime" icon="tower-broadcast" href="/core-concepts/realtime/overview">
+    Postgres changes, broadcast, and presence over one WebSocket connection.
+    Subscriptions enforce the same RLS as REST queries.
+  </Card>
+
+  <Card title="Edge Functions" icon="bolt" href="/core-concepts/functions/overview">
+    Deno-powered serverless TypeScript with first-class schedules. Invoke
+    on-demand, chain from DB triggers, or run on cron.
+  </Card>
+
+  <Card title="Model Gateway" icon="sparkles" href="/core-concepts/ai/overview">
+    OpenRouter-backed chat, streaming, and embeddings through one
+    InsForge-managed key. Per-project quotas and usage tracking.
+  </Card>
+
+  <Card title="Deployments" icon="rocket" href="/core-concepts/deployments/architecture">
+    Deploy frontends to InsForge-managed hosting and link them to your project
+    backend automatically.
+  </Card>
+</CardGroup>
+
+## Private preview
+
+These modules are functional but the API may change before general availability.
+Reach out if you want early access.
+
+<CardGroup cols={3}>
+  <Card title="Messaging" icon="envelope" href="/core-concepts/messaging/overview">
+    Transactional email today; SMS and push on the roadmap. One API.
+  </Card>
+
+  <Card title="Payments" icon="credit-card" href="/core-concepts/payments/architecture">
+    Stripe checkout, subscriptions, and customer portal flows.
+  </Card>
+
+  <Card title="Compute" icon="server" href="/core-concepts/compute/architecture">
+    Long-running services beyond the edge-function model.
+  </Card>
+</CardGroup>
+
+## How they fit together
+
+Every product shares the same auth identity, the same row-level security
+policies, and the same MCP surface for AI agents. A user signed in through
+**Auth** gets a JWT that the **Database**, **Storage**, **Realtime**, and
+**Edge Functions** layers all use to enforce the same access rules.
+
+<CardGroup cols={3}>
+  <Card title="MCP server" icon="plug" href="/mcp-setup">
+    Connect agents to read schemas, run queries, and deploy code.
+  </Card>
+
+  <Card title="SDKs" icon="code" href="/sdks/typescript/overview">
+    TypeScript, Swift, Kotlin, and a plain REST API.
+  </Card>
+
+  <Card title="Self-hosting" icon="server" href="/deployment/deploy-to-aws-ec2">
+    Run the whole stack on your own infrastructure.
+  </Card>
+</CardGroup>

@@ -11,9 +11,14 @@ Learn how to create an InsForge project and build a Vue app using AI tools like 
 
 Create a new InsForge project at [insforge.dev](https://insforge.dev).
 
-## 2. Connect InsForge MCP
+## 2. Connect InsForge
 
-Follow the [quickstart guide](/quickstart) to connect your AI assistant to your InsForge backend. This allows AI tools like Claude and Cursor to directly interact with your database, storage, and other InsForge services.
+Two pieces:
+
+- **CLI link** — see the [Quickstart](/quickstart) to run `npx @insforge/cli link --project-id` so the agent can read your project ID and keys.
+- **MCP setup** — see [MCP Setup](/mcp-setup) for the per-editor config (Cursor, Claude Code, Windsurf, Codex, VS Code).
+
+With both wired up the agent can read schemas, run queries, and deploy code from your editor.
 
 ## 3. Build your app with one prompt
 

@@ -1,0 +1,55 @@
+---
+title: "Compute"
+sidebarTitle: "Overview"
+description: "Run long-lived containers next to your InsForge project."
+---
+
+import AgentPrereq from '/snippets/agent-prereq.mdx';
+
+<AgentPrereq />
+
+Use InsForge Compute to run long-lived containers next to your project: queue workers, background processors, AI inference loops, websocket servers, scrapers, anything that needs to stay up. Containers attach to your project's database, storage, and auth with the same credentials a function would use.
+
+<Note>
+  **Just need to handle a request?** Use [Edge Functions](/core-concepts/functions/overview) for request/response work and short jobs. Compute is for processes that need to run continuously.
+</Note>
+
+<Note>
+  Compute is currently in private preview. The API may change before general availability. Reach out if you want early access.
+</Note>
+
+## Features
+
+### Container deploys
+
+Push any Docker image to InsForge and it runs. Use a `Dockerfile` from your repo or point at a pre-built image on a registry. No proprietary build pipeline to learn.
+
+### Project-linked credentials
+
+Containers receive the InsForge project URL, service-role JWT, and S3 storage credentials as environment variables. Connect to Postgres, call the SDK, and read objects without provisioning anything.
+
+### Scaling
+
+Run one instance for a singleton worker, or scale horizontally for stateless workloads. Memory, CPU, and replica count are configurable per service.
+
+### Logs
+
+Structured logs per container, queryable by service and time range. Tail in the dashboard, CLI, or MCP without `kubectl exec`-ing into anything.
+
+### Secrets and env vars
+
+Set environment variables and secrets per service, separately from your edge-function secrets. Rotate without redeploying.
+
+## Concepts
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="diagram-project" href="/core-concepts/compute/architecture">
+    How container deploys, lifecycle, and project linking work.
+  </Card>
+</CardGroup>
+
+## Next steps
+
+- Read the [InsForge Quickstart](/quickstart) to link the CLI to your project.
+- Set up [MCP](/mcp-setup) so your agent can deploy and tail container logs.
+- See [Edge Functions](/core-concepts/functions/overview) if request/response is all you need.
