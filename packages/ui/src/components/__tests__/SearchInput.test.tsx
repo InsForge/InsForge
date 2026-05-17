@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { SearchInput } from '../SearchInput';
+import { SearchInput } from '@insforge/ui';
 
 describe('SearchInput', () => {
   it('emits immediate and committed changes when debounce is disabled', async () => {

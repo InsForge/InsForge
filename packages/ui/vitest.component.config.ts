@@ -1,10 +1,15 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig, mergeConfig } from 'vitest/config';
 
-export default defineConfig({
-  test: {
-    name: 'component',
-    environment: 'jsdom',
-    include: ['src/**/*.test.tsx'],
-    setupFiles: ['./src/test/setup.ts'],
-  },
-});
+import sharedConfig from './vitest.shared.config';
+
+export default mergeConfig(
+  sharedConfig,
+  defineConfig({
+    test: {
+      name: 'component',
+      environment: 'jsdom',
+      include: ['src/**/*.test.tsx'],
+      setupFiles: ['./src/test/setup.ts'],
+    },
+  })
+);

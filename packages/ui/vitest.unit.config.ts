@@ -1,9 +1,14 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig, mergeConfig } from 'vitest/config';
 
-export default defineConfig({
-  test: {
-    name: 'unit',
-    environment: 'node',
-    include: ['src/**/*.test.ts'],
-  },
-});
+import sharedConfig from './vitest.shared.config';
+
+export default mergeConfig(
+  sharedConfig,
+  defineConfig({
+    test: {
+      name: 'unit',
+      environment: 'node',
+      include: ['src/**/*.test.ts'],
+    },
+  })
+);

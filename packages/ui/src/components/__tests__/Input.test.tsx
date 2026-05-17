@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { Input } from '../Input';
+import { Input } from '@insforge/ui';
 
 describe('Input', () => {
   it('forwards input props and change events', async () => {

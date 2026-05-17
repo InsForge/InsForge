@@ -89,9 +89,14 @@ jobs:
       - name: Run UI component tests
         run: npm --workspace @insforge/ui run test:component
 
-  dashboard-ui-tests:
-    name: Dashboard UI Tests
+  dashboard-e2e-tests:
+    name: Dashboard E2E Tests
     runs-on: ubuntu-latest
+    needs:
+      - dashboard-unit-tests
+      - dashboard-component-tests
+      - ui-unit-tests
+      - ui-component-tests
 
     steps:
       - name: Checkout code
@@ -109,7 +114,7 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Run dashboard UI tests
+      - name: Run dashboard E2E tests
         run: npm --workspace @insforge/dashboard run test:ui
 
       - name: Upload Playwright artifacts
