@@ -36,14 +36,14 @@ describe('compareVersions', () => {
 
 describe('formatTime', () => {
   it('formats valid ISO timestamps and preserves invalid input', () => {
-    expect(formatTime('2026-05-17T12:30:00.000Z')).toMatch(/May 17, 2026/);
+    expect(formatTime('2026-05-17T12:30:00')).toBe('May 17, 2026, 12:30 PM');
     expect(formatTime('not-a-date')).toBe('not-a-date');
   });
 });
 
 describe('formatDate', () => {
   it('formats valid ISO dates and preserves invalid input', () => {
-    expect(formatDate('2026-05-17T12:30:00.000Z')).toBe('May 17, 2026');
+    expect(formatDate('2026-05-17T12:30:00')).toBe('May 17, 2026');
     expect(formatDate('not-a-date')).toBe('not-a-date');
   });
 });

@@ -1,14 +1,7 @@
-import { defineConfig, mergeConfig } from 'vitest/config';
+import { defineConfig } from 'vitest/config';
 
-import sharedConfig from './vitest.shared.config';
-
-export default mergeConfig(
-  sharedConfig,
-  defineConfig({
-    test: {
-      environment: 'jsdom',
-      include: ['src/**/*.test.{ts,tsx}'],
-      setupFiles: ['./src/test/setup.ts'],
-    },
-  })
-);
+export default defineConfig({
+  test: {
+    projects: ['./vitest.unit.config.ts', './vitest.component.config.ts'],
+  },
+});

@@ -6,6 +6,7 @@ export default mergeConfig(
   sharedConfig,
   defineConfig({
     test: {
+      name: 'unit',
       environment: 'node',
       include: ['src/**/*.test.ts'],
     },
