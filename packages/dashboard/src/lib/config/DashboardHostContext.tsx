@@ -4,6 +4,7 @@ import type {
   DashboardInstanceInfo,
   DashboardModelCreditUsage,
   DashboardMode,
+  DashboardPosthogConnectionStatus,
   DashboardProjectInfo,
   DashboardUserInfo,
   DashboardMetricsRange,
@@ -42,6 +43,10 @@ interface DashboardHostContextValue {
     query: DashboardAdvisorIssuesQuery
   ) => Promise<DashboardAdvisorIssuesResponse>;
   onTriggerAdvisorScan?: () => Promise<void>;
+  onConnectPosthog?: (projectId: string) => void;
+  subscribePosthogConnectionStatus?: (
+    cb: (event: DashboardPosthogConnectionStatus) => void
+  ) => () => void;
 }
 
 const DashboardHostContext = createContext<DashboardHostContextValue | null>(null);

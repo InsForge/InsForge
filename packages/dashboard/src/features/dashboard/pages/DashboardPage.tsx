@@ -30,7 +30,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useApiKey, useMetadata } from '#lib/hooks/useMetadata';
-import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
+import { useDashboardProject, useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
 import { useCloudProjectInfo } from '#lib/hooks/useCloudProjectInfo';
 import { useMcpUsage } from '#features/logs/hooks/useMcpUsage';
 import { getBackendUrl, isInsForgeCloudProject } from '#lib/utils/utils';
@@ -378,14 +378,18 @@ export default function DashboardPage() {
   } = useMetadata();
   const { apiKey, isLoading: isApiKeyLoading } = useApiKey({ enabled: !canShowCliGettingStarted });
   const { projectInfo, isLoading: isProjectInfoLoading } = useCloudProjectInfo();
+  const project = useDashboardProject();
   const { totalUsers } = useUsers();
   const { hasCompletedOnboarding, recordsCount, isLoading: isMcpUsageLoading } = useMcpUsage();
+  const isBranch = project?.isBranch === true;
   const [previewFitVersion, setPreviewFitVersion] = useState(0);
   const previewContainerRef = useRef<HTMLDivElement | null>(null);
   const appUrl = getBackendUrl();
 
   const tableCount = tables?.length ?? 0;
-  const agentConnected = hasCompletedOnboarding;
+  // Branches inherit data from the parent, so treat them as already-connected
+  // to skip the "Getting Started / install" block on the dashboard.
+  const agentConnected = hasCompletedOnboarding || isBranch;
   const shouldShowLoadingState =
     isMetadataLoading || isMcpUsageLoading || (isCloudProject && isProjectInfoLoading);
   const projectName = isCloudProject ? projectInfo.name : 'My InsForge Project';

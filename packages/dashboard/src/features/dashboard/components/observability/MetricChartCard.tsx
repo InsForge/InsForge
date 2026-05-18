@@ -9,7 +9,12 @@ export interface MetricChartCardProps {
   rangeSeconds: number;
   formatValue: (value: number) => string;
   isLoading?: boolean;
+  /** Value (in data units) at which the threshold dashed line is drawn. */
   threshold?: number;
+  /** Fixed y-axis domain [min, max]. Defaults to [0, 100] when threshold is set, else auto-fits to data. */
+  fixedDomain?: [number, number];
+  /** Formatter for axis labels (threshold + zero). Defaults to `${v}%`. */
+  formatAxisLabel?: (value: number) => string;
 }
 
 const SPARKLINE_WIDTH = 434;
@@ -100,16 +105,15 @@ export function MetricChartCard({
   formatValue,
   isLoading,
   threshold,
+  fixedDomain,
+  formatAxisLabel,
 }: MetricChartCardProps) {
+  const effectiveDomain =
+    fixedDomain ?? (threshold !== undefined ? FIXED_PERCENT_DOMAIN : undefined);
   const aggregates = useMemo(() => aggregateMetricSeries(data), [data]);
   const sparkline = useMemo(
-    () =>
-      buildSparkline(
-        data,
-        rangeSeconds,
-        threshold !== undefined ? FIXED_PERCENT_DOMAIN : undefined
-      ),
-    [data, rangeSeconds, threshold]
+    () => buildSparkline(data, rangeSeconds, effectiveDomain),
+    [data, rangeSeconds, effectiveDomain]
   );
   const gradientId = useId();
   const xAxisTicks = useMemo(() => {
@@ -154,7 +158,12 @@ export function MetricChartCard({
   const hoverTopPct = hover ? (hover.y / SPARKLINE_HEIGHT) * 100 : 0;
   const tooltipTranslateX = hoverLeftPct < 15 ? '0%' : hoverLeftPct > 85 ? '-100%' : '-50%';
 
-  const thresholdOffsetPct = threshold !== undefined ? 100 - threshold : 0;
+  const [domainMin, domainMax] = effectiveDomain ?? [0, 100];
+  const domainRange = domainMax - domainMin || 1;
+  const thresholdOffsetPct =
+    threshold !== undefined ? 100 - ((threshold - domainMin) / domainRange) * 100 : 0;
+  const renderAxisLabel = (value: number) =>
+    formatAxisLabel ? formatAxisLabel(value) : `${value}%`;
   const gradientTransitionHalfWidth = 8;
   const gradientTransitionStart = Math.max(
     0,
@@ -263,10 +272,10 @@ export function MetricChartCard({
                       className="pointer-events-none absolute left-0 -translate-y-1/2 text-xs leading-4 text-muted-foreground"
                       style={{ top: `${thresholdOffsetPct}%` }}
                     >
-                      {threshold}%
+                      {renderAxisLabel(threshold)}
                     </span>
                     <span className="pointer-events-none absolute bottom-0 left-0 text-xs leading-4 text-muted-foreground">
-                      0%
+                      {renderAxisLabel(domainMin)}
                     </span>
                   </>
                 )}

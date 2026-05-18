@@ -13,7 +13,7 @@ Backend-as-a-service (BaaS) platform providing:
 - **Database**: PostgreSQL with PostgREST API
 - **Authentication**: Email/password + OAuth (Google, GitHub)
 - **Storage**: File upload/download
-- **AI**: Chat completions and image generation (OpenAI-compatible)
+- **AI**: OpenRouter key provisioning and model catalog for direct OpenAI-compatible integrations
 - **Functions**: Serverless function deployment
 
 ## Installation
@@ -65,8 +65,10 @@ Available documentation types:
   - `"auth-components-nextjs"` - Pre-built auth UI for Nextjs (SSR App)
 - `"storage-sdk"` - File storage operations
 - `"functions-sdk"` - Serverless functions invocation
-- `"ai-integration-sdk"` - AI chat and image generation
+- `"ai-integration-sdk"` - AI integration with the provisioned OpenRouter key and OpenAI SDK
 - `"real-time"` - Real-time pub/sub (database + client events) via WebSockets
+
+For InsForge Cloud projects, InsForge provisions the OpenRouter key and admins can copy the active key from Model Gateway into a server-only `OPENROUTER_API_KEY`. For self-hosted projects, configure `OPENROUTER_API_KEY` in the backend environment.
 
 ## When to Use SDK vs MCP Tools
 
@@ -75,7 +77,7 @@ Available documentation types:
 - Authentication (register, login, logout, profiles)
 - Database CRUD (select, insert, update, delete)
 - Storage operations (upload, download files)
-- AI operations (chat, image generation)
+- AI integration via the provisioned OpenRouter key with the OpenAI SDK or OpenRouter HTTP API
 - Serverless function invocation
 
 ### Use MCP Tools for Infrastructure:
@@ -93,5 +95,5 @@ Available documentation types:
 - Database inserts require array format: `[{...}]`
 - Serverless functions have single endpoint (no subpaths)
 - Storage: Upload files to buckets, store URLs in database
-- AI operations are OpenAI-compatible
+- AI integrations should call OpenRouter directly with `baseURL: "https://openrouter.ai/api/v1"` and a server-side `OPENROUTER_API_KEY`
 - **EXTRA IMPORTANT**: Use Tailwind CSS 3.4 (do not upgrade to v4). Lock these dependencies in `package.json`

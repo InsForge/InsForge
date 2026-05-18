@@ -1,133 +1,123 @@
 ---
-title: AI SDK Reference
-description: AI chat completions, web search, file parsing, and image generation with the InsForge TypeScript SDK
+title: AI Integration
+description: Build AI features with the OpenAI SDK and the OpenRouter key provisioned by InsForge
 ---
+
+## Overview
+
+InsForge provisions an OpenRouter API key for Model Gateway projects. For new AI features, use that key directly with OpenRouter's OpenAI-compatible API instead of the deprecated InsForge AI proxy methods.
+
+Use the InsForge dashboard to copy the active OpenRouter key, store it in `OPENROUTER_API_KEY`, and call OpenRouter from trusted server-side code.
+
+<Warning>
+Do not expose `OPENROUTER_API_KEY` in browser bundles. In React, Next.js, Vue, Svelte, and similar apps, put OpenRouter calls behind a backend route, server action, function, or other server-only boundary.
+</Warning>
 
 ## Installation
 
-import Installation from '/snippets/sdk-installation.mdx';
-
-<Installation />
-
-## chat.completions.create()
-
-Create AI chat completions with streaming support, web search, file parsing, and extended reasoning.
-
-### Parameters
-
-- `model` (string, required) - AI model (e.g., 'anthropic/claude-3.5-haiku', 'openai/gpt-4')
-- `messages` (array, required) - Array of message objects with text, images, or files
-- `temperature` (number, optional) - Sampling temperature 0-2
-- `maxTokens` (number, optional) - Max tokens to generate
-- `topP` (number, optional) - Top-p sampling 0-1
-- `stream` (boolean, optional) - Enable streaming mode
-- `webSearch` (object, optional) - Enable web search capabilities
-  - `enabled` (boolean) - Enable web search
-  - `maxResults` (number, optional) - Maximum number of search results to include
-- `fileParser` (object, optional) - Enable file/PDF parsing
-  - `enabled` (boolean) - Enable file parsing
-  - `pdf` (object, optional) - PDF processing options
-    - `engine` ('pdf-text' | 'mistral-ocr' | 'native', optional) - Processing engine. Defaults to native if supported, otherwise mistral-ocr
-- `tools` (array, optional) - Array of tool definitions for function calling
-  - `type` ('function') - Tool type
-  - `function` (object) - Function definition
-    - `name` (string) - Function name
-    - `description` (string, optional) - Description of what the function does
-    - `parameters` (object, optional) - JSON Schema of the function parameters
-- `toolChoice` (string | object, optional) - Controls tool usage: `'auto'`, `'none'`, `'required'`, or `{ type: 'function', function: { name: string } }`
-- `parallelToolCalls` (boolean, optional) - Allow the model to call multiple tools in parallel
-
-<Note>
-File URLs must be publicly accessible. Storage buckets must be public, or use base64 for private files.
-</Note>
-
-### Returns (non-streaming)
-
-```typescript
-{
-  id: string,
-  object: 'chat.completion',
-  created: number,
-  model: string,
-  choices: [{
-    index: number,
-    message: {
-      role: "assistant",
-      content: string,
-      tool_calls?: ToolCall[],                // Present when the model invokes tools
-      annotations?: UrlCitationAnnotation[]   // Present when web search is used
-    },
-    finish_reason: string
-  }],
-  usage: { prompt_tokens: number, completion_tokens: number, total_tokens: number }
-}
-
-// ToolCall type
-interface ToolCall {
-  id: string;
-  type: 'function';
-  function: { name: string; arguments: string };
-}
-
-// UrlCitationAnnotation type
-interface UrlCitationAnnotation {
-  type: 'url_citation';
-  urlCitation: {
-    url: string;
-    title?: string;
-    content?: string;
-    startIndex?: number;
-    endIndex?: number;
-  };
-}
+```bash
+npm install openai
 ```
 
-### Returns (streaming)
+For local scripts, you may also want:
 
-```typescript
-AsyncIterableIterator<{
-  id: string;
-  object: 'chat.completion.chunk';
-  choices: [
-    {
-      delta: {
-        content: string;
-        tool_calls?: ToolCall[];   // Present in the final chunk when tools are used
-      };
-      finish_reason: string | null;
-    },
-  ];
-}>;
+```bash
+npm install dotenv
 ```
 
-### Example (Basic)
+## Environment
+
+```bash
+OPENROUTER_API_KEY=<your-openrouter-api-key>
+```
+
+## Create a Client
 
 ```typescript
-const completion = await insforge.ai.chat.completions.create({
-  model: 'anthropic/claude-3.5-haiku',
+import OpenAI from 'openai';
+
+export const openai = new OpenAI({
+  baseURL: 'https://openrouter.ai/api/v1',
+  apiKey: process.env.OPENROUTER_API_KEY,
+  defaultHeaders: {
+    'HTTP-Referer': 'https://your-app.example',
+    'X-Title': 'Your App',
+  },
+});
+```
+
+The `HTTP-Referer` and `X-Title` headers are optional OpenRouter metadata headers. Keep them if you want OpenRouter attribution and rankings for your app.
+
+## Chat Completion
+
+```typescript
+const completion = await openai.chat.completions.create({
+  model: 'openai/gpt-4o',
   messages: [
-    { role: 'user', content: 'What is the capital of France?' }
+    { role: 'system', content: 'You are a concise assistant.' },
+    { role: 'user', content: 'What is the capital of France?' },
   ],
 });
 
-console.log(completion.choices[0].message.content);
-// "The capital of France is Paris."
+console.log(completion.choices[0]?.message?.content);
 ```
 
-### Example (With Images)
+## Streaming
 
 ```typescript
-const completion = await insforge.ai.chat.completions.create({
+const stream = await openai.chat.completions.create({
   model: 'anthropic/claude-3.5-haiku',
+  messages: [{ role: 'user', content: 'Write a short product update.' }],
+  stream: true,
+});
+
+for await (const chunk of stream) {
+  const text = chunk.choices[0]?.delta?.content;
+  if (text) process.stdout.write(text);
+}
+```
+
+## Tool Calling
+
+```typescript
+const completion = await openai.chat.completions.create({
+  model: 'openai/gpt-4o-mini',
+  messages: [{ role: 'user', content: 'Look up order 123 and summarize it.' }],
+  tools: [
+    {
+      type: 'function',
+      function: {
+        name: 'get_order',
+        description: 'Fetch an order by ID',
+        parameters: {
+          type: 'object',
+          properties: {
+            orderId: { type: 'string' },
+          },
+          required: ['orderId'],
+        },
+      },
+    },
+  ],
+});
+
+console.log(completion.choices[0]?.message?.tool_calls);
+```
+
+## Image Input
+
+```typescript
+const completion = await openai.chat.completions.create({
+  model: 'openai/gpt-4o',
   messages: [
     {
       role: 'user',
       content: [
-        { type: 'text', text: 'What do you see in this image?' },
+        { type: 'text', text: 'Describe this image.' },
         {
           type: 'image_url',
           image_url: {
-            url: 'https://example.com/photo.jpg', // or base64: 'data:image/jpeg;base64,...'
+            url: 'https://example.com/photo.jpg',
           },
         },
       ],
@@ -135,205 +125,174 @@ const completion = await insforge.ai.chat.completions.create({
   ],
 });
 
-console.log(completion.choices[0].message.content);
+console.log(completion.choices[0]?.message?.content);
 ```
 
-### Example (Combined Features)
+## Image Generation
+
+Use a model that supports image output and request image modality. OpenRouter supports fields that may not be in the OpenAI SDK type surface yet, so extend the request and response types locally.
 
 ```typescript
-const completion = await insforge.ai.chat.completions.create({
-  model: 'anthropic/claude-sonnet-4.5',
+type OpenRouterImageRequest =
+  OpenAI.Chat.ChatCompletionCreateParamsNonStreaming & {
+    modalities?: Array<'image' | 'text'>;
+  };
+
+type OpenRouterImage = {
+  type: 'image_url';
+  image_url: {
+    url: string;
+  };
+};
+
+type OpenRouterImageMessage = OpenAI.Chat.ChatCompletionMessage & {
+  images?: OpenRouterImage[];
+};
+
+const request: OpenRouterImageRequest = {
+  model: 'google/gemini-2.5-flash-image',
+  modalities: ['image', 'text'],
+  messages: [
+    { role: 'user', content: 'Generate a clean product mockup on a white background.' },
+  ],
+};
+
+const completion = await openai.chat.completions.create(request);
+
+const message = completion.choices[0]?.message as OpenRouterImageMessage | undefined;
+console.log(message?.content);
+console.log(message?.images?.[0]?.image_url?.url);
+```
+
+## Embeddings
+
+```typescript
+const response = await openai.embeddings.create({
+  model: 'openai/text-embedding-3-small',
+  input: 'Your text here',
+});
+
+console.log(response.data[0].embedding);
+```
+
+## Video Generation
+
+OpenRouter video generation uses OpenRouter HTTP endpoints directly.
+
+```typescript
+const response = await fetch('https://openrouter.ai/api/v1/videos', {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    model: 'google/veo-3.1',
+    prompt: 'A golden retriever playing fetch on a sunny beach.',
+  }),
+});
+
+if (!response.ok) {
+  const body = await response.text();
+  throw new Error(`OpenRouter video request failed: ${response.status} ${body}`);
+}
+
+const job = await response.json();
+console.log(job);
+```
+
+## Next.js Route Example
+
+Replace `verifySessionToken` with your app's auth provider or session verifier.
+
+```typescript
+// app/api/chat/route.ts
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  baseURL: 'https://openrouter.ai/api/v1',
+  apiKey: process.env.OPENROUTER_API_KEY,
+});
+
+declare function verifySessionToken(token: string): Promise<boolean>;
+
+export async function POST(request: Request) {
+  const authorization = request.headers.get('Authorization');
+  const sessionToken = authorization?.startsWith('Bearer ')
+    ? authorization.slice('Bearer '.length)
+    : undefined;
+
+  if (!sessionToken || !(await verifySessionToken(sessionToken))) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const body = await request.json().catch(() => ({}));
+  const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
+
+  if (!prompt || prompt.length > 4000) {
+    return Response.json(
+      { error: 'Prompt must be between 1 and 4000 characters.' },
+      { status: 400 }
+    );
+  }
+
+  const completion = await openai.chat.completions.create({
+    model: 'openai/gpt-4o-mini',
+    messages: [{ role: 'user', content: prompt }],
+  });
+
+  return Response.json({
+    text: completion.choices[0]?.message?.content ?? '',
+  });
+}
+```
+
+## Using InsForge Data with AI
+
+Use the InsForge SDK for database, auth, storage, functions, and realtime. Use OpenRouter directly for model calls.
+
+```typescript
+import { createClient } from '@insforge/sdk';
+import OpenAI from 'openai';
+
+const insforge = createClient({
+  baseUrl: process.env.INSFORGE_BASE_URL!,
+  anonKey: process.env.INSFORGE_ANON_KEY!,
+});
+
+const openai = new OpenAI({
+  baseURL: 'https://openrouter.ai/api/v1',
+  apiKey: process.env.OPENROUTER_API_KEY,
+});
+
+const { data: documents } = await insforge.database
+  .from('documents')
+  .select()
+  .limit(5);
+
+const completion = await openai.chat.completions.create({
+  model: 'openai/gpt-4o-mini',
   messages: [
     {
       role: 'user',
-      content: [
-        { type: 'text', text: 'Analyze this research paper and find related recent news' },
-        {
-          type: 'file',
-          file: {
-            filename: 'research-paper.pdf',
-            file_data: 'https://example.com/research-paper.pdf'  // or base64: 'data:application/pdf;base64,...'
-          }
-        }
-      ]
-    }
+      content: `Summarize these records:\n${JSON.stringify(documents)}`,
+    },
   ],
-  fileParser: { enabled: true },
-  webSearch: { enabled: true, maxResults: 5 }
 });
 
-console.log(completion.choices[0].message.content);
-
-// Access web search citations
-completion.choices[0].message.annotations?.forEach(annotation => {
-  console.log(`- ${annotation.urlCitation.title}: ${annotation.urlCitation.url}`);
-});
+console.log(completion.choices[0]?.message?.content);
 ```
 
-### Example (Streaming)
+## Legacy InsForge AI Proxy
 
-```typescript
-const stream = await insforge.ai.chat.completions.create({
-  model: 'openai/gpt-4',
-  messages: [{ role: 'user', content: 'Tell me a story' }],
-  stream: true,
-});
+The previous InsForge AI SDK methods are deprecated:
 
-for await (const chunk of stream) {
-  if (chunk.choices[0]?.delta?.content) {
-    process.stdout.write(chunk.choices[0].delta.content);
-  }
-}
-```
+- `insforge.ai.chat.completions.create()`
+- `insforge.ai.images.generate()`
+- `insforge.ai.embeddings.create()`
 
-### Example (Tool Calling)
+They map to backend proxy routes that still exist for compatibility, but new integrations should use OpenRouter directly. The direct path gives access to OpenRouter's complete and evolving API surface without waiting for InsForge SDK wrapper updates.
 
-```typescript
-const completion = await insforge.ai.chat.completions.create({
-  model: 'openai/gpt-4o-mini',
-  messages: [{ role: 'user', content: 'Your prompt here' }],
-  tools: [{
-    type: 'function',
-    function: {
-      name: 'your_function_name',
-      description: 'Describe what your function does',
-      parameters: {
-        type: 'object',
-        properties: {
-          param1: { type: 'string', description: 'First parameter' }
-        },
-        required: ['param1']
-      }
-    }
-  }],
-});
+## Model Catalog
 
-```
-
----
-
-## embeddings.create()
-
-Generate vector embeddings for text input using AI models.
-
-### Parameters
-
-- `model` (string, required) - Embedding model (e.g., 'openai/text-embedding-3-small')
-- `input` (string | string[], required) - Text input(s) to embed
-- `encoding_format` ('float' | 'base64', optional) - Output format (default: 'float')
-- `dimensions` (number, optional) - Number of dimensions for the output embeddings
-
-### Returns
-
-```typescript
-{
-  object: 'list',
-  data: EmbeddingObject[],
-  metadata?: {
-    model: string,
-    usage?: {
-      promptTokens?: number,
-      totalTokens?: number
-    }
-  }
-}
-
-// EmbeddingObject type
-interface EmbeddingObject {
-  object: 'embedding',
-  embedding: number[] | string,  // number[] for float, string for base64
-  index: number
-}
-```
-
-### Example
-
-```typescript
-const response = await insforge.ai.embeddings.create({
-  model: 'openai/text-embedding-3-small',
-  input: 'Hello world'
-});
-
-console.log(response.data[0].embedding);  // number[]
-console.log(`Dimensions: ${response.data[0].embedding.length}`);
-console.log(`Model: ${response.metadata?.model}`);
-```
-
-### Example (Store Embeddings in Database)
-
-```typescript
-// Generate and store embeddings for content
-const content = 'This is an important document about AI.';
-
-const response = await insforge.ai.embeddings.create({
-  model: 'openai/text-embedding-3-small',
-  input: content
-});
-
-// Store in database with pgvector
-await insforge.database.from('documents').insert([{
-  content,
-  embedding: response.data[0].embedding,  // Store as vector
-  created_at: new Date().toISOString()
-}]);
-```
-
----
-
-## images.generate()
-
-Generate images using AI models.
-
-### Parameters
-
-- `model` (string, required) - Image model (e.g., 'google/gemini-3-pro-image-preview')
-- `prompt` (string, required) - Text description of image
-- `images` (array, optional) - Input images for image-to-image (url or base64)
-- `width` (number, optional) - Image width in pixels
-- `height` (number, optional) - Image height in pixels
-- `size` (string, optional) - Predefined size ('1024x1024', '512x512')
-- `numImages` (number, optional) - Number of images to generate
-- `quality` (string, optional) - Image quality: "standard" or "hd"
-- `style` (string, optional) - Image style: "vivid" or "natural"
-
-### Returns
-
-```typescript
-{
-  created: number,
-  data: ImageData[],
-  usage?: TokenUsage
-}
-
-// ImageData type
-interface ImageData {
-  b64_json?: string,  // Base64 encoded image
-  content?: string    // Text response from model
-}
-```
-
-### Example
-
-```typescript
-const response = await insforge.ai.images.generate({
-  model: 'google/gemini-3-pro-image-preview',
-  prompt: 'A serene mountain landscape at sunset',
-  size: '1024x1024',
-});
-
-// Get base64 image and upload to storage
-const base64Image = response.data[0].b64_json;
-const buffer = Buffer.from(base64Image, 'base64');
-const blob = new Blob([buffer], { type: 'image/png' });
-
-const { data: uploadData } = await insforge.storage.from('ai-images').uploadAuto(blob);
-
-// Save URL to database
-await insforge.database.from('generated_images').insert([
-  {
-    prompt: 'A serene mountain landscape',
-    image_url: uploadData.url,
-  },
-]);
-```
-
+Use the InsForge dashboard or OpenRouter model catalog to choose a model. Model IDs use the `provider/model` format, such as `openai/gpt-4o`, `anthropic/claude-3.5-haiku`, and `google/gemini-2.5-flash-image`.
