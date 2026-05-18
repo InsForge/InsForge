@@ -5,6 +5,10 @@ import {
   functionsWriteLimiter,
   deploymentsWriteLimiter,
   computeWriteLimiter,
+  DEFAULT_WRITE_ENDPOINT_LIMITS,
+  applyWriteEndpointLimits,
+  resetWriteEndpointLimitsToDefaults,
+  type WriteLimiterCategory,
 } from '@/api/middlewares/rate-limiters.js';
 
 // express-rate-limit keeps in-memory state PER LIMITER INSTANCE. Since each
@@ -26,31 +30,30 @@ function buildApp(limiter: RequestHandler) {
   return app;
 }
 
-const limiters: Array<[name: string, limiter: RequestHandler]> = [
-  ['functionsWriteLimiter', functionsWriteLimiter],
-  ['deploymentsWriteLimiter', deploymentsWriteLimiter],
-  ['computeWriteLimiter', computeWriteLimiter],
+const limiters: Array<[name: string, category: WriteLimiterCategory, limiter: RequestHandler]> = [
+  ['functionsWriteLimiter', 'functions', functionsWriteLimiter],
+  ['deploymentsWriteLimiter', 'deployments', deploymentsWriteLimiter],
+  ['computeWriteLimiter', 'compute', computeWriteLimiter],
 ];
 
-// Mirrors the `max:` value in createWriteEndpointLimiter. Update both
-// together if the budget changes.
-const PER_CATEGORY_LIMIT = 10;
+describe.each(limiters)('%s', (_name, category, limiter) => {
+  const budget = DEFAULT_WRITE_ENDPOINT_LIMITS[category];
 
-describe.each(limiters)('%s', (_name, limiter) => {
   beforeEach(() => {
+    resetWriteEndpointLimitsToDefaults();
     resetLimiter(limiter);
   });
 
-  it(`allows up to ${PER_CATEGORY_LIMIT} POSTs in 5min from a single IP`, async () => {
+  it(`allows up to ${budget} POSTs in 5min from a single IP`, async () => {
     const app = buildApp(limiter);
-    for (let i = 0; i < PER_CATEGORY_LIMIT; i++) {
+    for (let i = 0; i < budget; i++) {
       await request(app).post('/x').send({}).expect(200);
     }
   });
 
-  it(`rejects POST #${PER_CATEGORY_LIMIT + 1} with 429`, async () => {
+  it(`rejects POST #${budget + 1} with 429`, async () => {
     const app = buildApp(limiter);
-    for (let i = 0; i < PER_CATEGORY_LIMIT; i++) {
+    for (let i = 0; i < budget; i++) {
       await request(app).post('/x').send({}).expect(200);
     }
     const r = await request(app).post('/x').send({});
@@ -60,6 +63,7 @@ describe.each(limiters)('%s', (_name, limiter) => {
 
 describe('per-category buckets are independent', () => {
   beforeEach(() => {
+    resetWriteEndpointLimitsToDefaults();
     resetLimiter(functionsWriteLimiter);
     resetLimiter(deploymentsWriteLimiter);
     resetLimiter(computeWriteLimiter);
@@ -67,7 +71,7 @@ describe('per-category buckets are independent', () => {
 
   it('exhausting functions does not affect deployments or compute', async () => {
     const fnApp = buildApp(functionsWriteLimiter);
-    for (let i = 0; i < PER_CATEGORY_LIMIT; i++) {
+    for (let i = 0; i < DEFAULT_WRITE_ENDPOINT_LIMITS.functions; i++) {
       await request(fnApp).post('/x').send({}).expect(200);
     }
     await request(fnApp).post('/x').send({}).expect(429);
@@ -79,7 +83,10 @@ describe('per-category buckets are independent', () => {
 });
 
 describe('within a category the bucket is shared across routes', () => {
+  const budget = DEFAULT_WRITE_ENDPOINT_LIMITS.deployments;
+
   beforeEach(() => {
+    resetWriteEndpointLimitsToDefaults();
     resetLimiter(deploymentsWriteLimiter);
   });
 
@@ -93,7 +100,7 @@ describe('within a category the bucket is shared across routes', () => {
     app.post('/b', deploymentsWriteLimiter, (_req, res) => res.json({ ok: true }));
 
     // Spread the budget across the two routes.
-    for (let i = 0; i < PER_CATEGORY_LIMIT; i++) {
+    for (let i = 0; i < budget; i++) {
       const path = i % 2 === 0 ? '/a' : '/b';
       await request(app).post(path).send({}).expect(200);
     }
@@ -105,8 +112,10 @@ describe('within a category the bucket is shared across routes', () => {
 
 describe('INSFORGE_DISABLE_WRITE_RATE_LIMIT bypass', () => {
   const ORIGINAL = process.env.INSFORGE_DISABLE_WRITE_RATE_LIMIT;
+  const budget = DEFAULT_WRITE_ENDPOINT_LIMITS.functions;
 
   beforeEach(() => {
+    resetWriteEndpointLimitsToDefaults();
     resetLimiter(functionsWriteLimiter);
   });
 
@@ -122,7 +131,7 @@ describe('INSFORGE_DISABLE_WRITE_RATE_LIMIT bypass', () => {
     process.env.INSFORGE_DISABLE_WRITE_RATE_LIMIT = '1';
     const app = buildApp(functionsWriteLimiter);
     // Well past the per-category cap; would normally 429 long before this.
-    for (let i = 0; i < PER_CATEGORY_LIMIT * 3; i++) {
+    for (let i = 0; i < budget * 3; i++) {
       await request(app).post('/x').send({}).expect(200);
     }
   });
@@ -130,9 +139,55 @@ describe('INSFORGE_DISABLE_WRITE_RATE_LIMIT bypass', () => {
   it('does not bypass for other truthy values like "true"', async () => {
     process.env.INSFORGE_DISABLE_WRITE_RATE_LIMIT = 'true';
     const app = buildApp(functionsWriteLimiter);
-    for (let i = 0; i < PER_CATEGORY_LIMIT; i++) {
+    for (let i = 0; i < budget; i++) {
       await request(app).post('/x').send({}).expect(200);
     }
     await request(app).post('/x').send({}).expect(429);
+  });
+});
+
+describe('applyWriteEndpointLimits override', () => {
+  beforeEach(() => {
+    resetWriteEndpointLimitsToDefaults();
+    resetLimiter(functionsWriteLimiter);
+    resetLimiter(deploymentsWriteLimiter);
+  });
+
+  afterEach(() => {
+    resetWriteEndpointLimitsToDefaults();
+    resetLimiter(functionsWriteLimiter);
+    resetLimiter(deploymentsWriteLimiter);
+  });
+
+  it('takes effect on the next request without rebuilding the limiter', async () => {
+    applyWriteEndpointLimits({ functions: 2 });
+    const app = buildApp(functionsWriteLimiter);
+    await request(app).post('/x').send({}).expect(200);
+    await request(app).post('/x').send({}).expect(200);
+    await request(app).post('/x').send({}).expect(429);
+  });
+
+  it('only overrides the categories present in the partial config', async () => {
+    applyWriteEndpointLimits({ functions: 3 });
+    // deployments retained its default 25-request budget.
+    const depApp = buildApp(deploymentsWriteLimiter);
+    for (let i = 0; i < DEFAULT_WRITE_ENDPOINT_LIMITS.deployments; i++) {
+      await request(depApp).post('/x').send({}).expect(200);
+    }
+    await request(depApp).post('/x').send({}).expect(429);
+  });
+
+  it('ignores invalid values and keeps the previous (or default) budget', async () => {
+    applyWriteEndpointLimits({
+      functions: -1 as unknown as number,
+      compute: 'lots' as unknown as number,
+      deployments: 1.5 as unknown as number,
+    });
+    // None of the malformed values should have stuck — defaults remain.
+    const fnApp = buildApp(functionsWriteLimiter);
+    for (let i = 0; i < DEFAULT_WRITE_ENDPOINT_LIMITS.functions; i++) {
+      await request(fnApp).post('/x').send({}).expect(200);
+    }
+    await request(fnApp).post('/x').send({}).expect(429);
   });
 });

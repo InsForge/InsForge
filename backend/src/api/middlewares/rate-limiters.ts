@@ -2,6 +2,7 @@ import rateLimit from 'express-rate-limit';
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from './error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
+import logger from '@/utils/logger.js';
 
 /**
  * Store for tracking per-email cooldowns
@@ -177,9 +178,17 @@ export const verifyOTPLimiter = [verifyOTPRateLimiter];
  * `Deployments per hour: 60`, etc.
  *
  * Each provider category gets its own bucket so a noisy compute deploy loop
- * cannot starve a legitimate function update (and vice versa). 3 writes /
- * 5min / IP per category is generous for human-driven CRUD; CI loops are
- * expected to deploy once per commit and stay well below this.
+ * cannot starve a legitimate function update (and vice versa). The defaults
+ * (see DEFAULT_WRITE_ENDPOINT_LIMITS) are generous for human-driven CRUD;
+ * CI loops are expected to deploy once per commit and stay well below them.
+ *
+ * Operators can override per-category budgets at runtime by uploading a JSON
+ * file to the AWS_CONFIG_BUCKET at key `write-endpoint-rate-limits.json`:
+ *   { "functions": 20, "deployments": 40, "compute": 15 }
+ * The file is fetched on startup and refreshed on a periodic timer
+ * (default 1 hour; tune via INSFORGE_WRITE_RATE_LIMIT_REFRESH_MS, set to 0
+ * for startup-only). Any missing or invalid (non-positive-integer) field
+ * falls back to the built-in default.
  *
  * Counts ALL requests (skipFailedRequests: false) so a buggy script that
  * loops on a 4xx response can't bypass the cap.
@@ -199,10 +208,200 @@ function isWriteRateLimitDisabled(): boolean {
   return process.env.INSFORGE_DISABLE_WRITE_RATE_LIMIT === '1';
 }
 
+/**
+ * Per-category default budgets used when no S3 override is loaded. These are
+ * the values the limiter uses out-of-the-box and the fallback whenever the
+ * S3 config file is absent, unreadable, or missing a category.
+ */
+export const DEFAULT_WRITE_ENDPOINT_LIMITS: Readonly<Record<WriteLimiterCategory, number>> =
+  Object.freeze({
+    functions: 15,
+    deployments: 25,
+    compute: 10,
+  });
+
+/**
+ * Mutable copy of the active per-category budgets. Reads happen on every
+ * request via `getWriteEndpointLimit`; writes happen on startup and during
+ * the periodic S3 refresh.
+ */
+const currentWriteEndpointLimits: Record<WriteLimiterCategory, number> = {
+  ...DEFAULT_WRITE_ENDPOINT_LIMITS,
+};
+
+/**
+ * Public URL of the live override file. Expected shape:
+ * `{ "functions"?: number, "deployments"?: number, "compute"?: number }`.
+ * Any missing or invalid (non-positive-integer) field falls back to the default.
+ *
+ * Self-hosters can pin their own config by setting
+ * INSFORGE_WRITE_RATE_LIMIT_CONFIG_URL. Plain HTTPS is used instead of the
+ * AWS SDK so the fetch works on instances without AWS credentials and never
+ * gets rejected because the runtime's signing identity lacks read access to
+ * a public bucket.
+ */
+const DEFAULT_WRITE_ENDPOINT_LIMITS_URL =
+  'https://config.insforge.dev/resource-rate-limits.json';
+
+function getWriteEndpointLimitsUrl(): string {
+  return process.env.INSFORGE_WRITE_RATE_LIMIT_CONFIG_URL || DEFAULT_WRITE_ENDPOINT_LIMITS_URL;
+}
+
+const WRITE_ENDPOINT_LIMITS_FETCH_TIMEOUT_MS = 5_000;
+
+export function getWriteEndpointLimit(category: WriteLimiterCategory): number {
+  return currentWriteEndpointLimits[category];
+}
+
+/**
+ * Pure merge step: validate the partial config and update the live map.
+ * Exported for tests so they can simulate an S3-driven override without
+ * actually touching S3.
+ */
+export function applyWriteEndpointLimits(
+  partial: Partial<Record<WriteLimiterCategory, unknown>>
+): void {
+  for (const category of Object.keys(DEFAULT_WRITE_ENDPOINT_LIMITS) as WriteLimiterCategory[]) {
+    const raw = partial[category];
+    if (raw === undefined) {
+      continue;
+    }
+    if (typeof raw === 'number' && Number.isInteger(raw) && raw > 0) {
+      currentWriteEndpointLimits[category] = raw;
+    } else {
+      logger.warn(
+        `Ignoring invalid write-endpoint rate limit for "${category}": expected positive integer, got ${JSON.stringify(raw)}`
+      );
+    }
+  }
+}
+
+/**
+ * Reset all categories back to defaults. Used by the refresh loop so a
+ * previously-set override that is later removed from S3 reverts cleanly,
+ * and by tests for isolation.
+ */
+export function resetWriteEndpointLimitsToDefaults(): void {
+  Object.assign(currentWriteEndpointLimits, DEFAULT_WRITE_ENDPOINT_LIMITS);
+}
+
+async function fetchWriteEndpointLimitsConfig(): Promise<Partial<
+  Record<WriteLimiterCategory, unknown>
+> | null> {
+  const url = getWriteEndpointLimitsUrl();
+  try {
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(WRITE_ENDPOINT_LIMITS_FETCH_TIMEOUT_MS),
+    });
+    if (!response.ok) {
+      // 404 is the "no override published" case and is expected; anything
+      // else is worth surfacing so operators notice misconfigured policies.
+      if (response.status !== 404) {
+        logger.warn(
+          `Failed to fetch write-endpoint rate-limit config from ${url}: HTTP ${response.status}`
+        );
+      }
+      return null;
+    }
+    return (await response.json()) as Partial<Record<WriteLimiterCategory, unknown>>;
+  } catch (error) {
+    logger.warn(`Failed to fetch write-endpoint rate-limit config from ${url}`, {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
+async function loadWriteEndpointLimitsFromS3(): Promise<void> {
+  const config = await fetchWriteEndpointLimitsConfig();
+  // Always reset first so a category dropped from the file reverts to its
+  // default rather than sticking at the last fetched value.
+  resetWriteEndpointLimitsToDefaults();
+  if (config && typeof config === 'object') {
+    applyWriteEndpointLimits(config);
+  }
+}
+
+/**
+ * Default cadence at which each backend instance refetches the override
+ * file. Rate-limit policy changes don't need sub-minute propagation, and a
+ * lower cadence keeps the per-bucket request volume modest when many
+ * self-hosted instances are running.
+ *
+ * Override via INSFORGE_WRITE_RATE_LIMIT_REFRESH_MS (e.g. `300000` for the
+ * old 5-minute cadence, or `0` to disable periodic refresh and only fetch
+ * once at startup).
+ */
+const DEFAULT_WRITE_ENDPOINT_LIMITS_REFRESH_MS = 60 * 60 * 1000; // 1 hour
+
+function getWriteEndpointLimitsRefreshMs(): number {
+  const raw = process.env.INSFORGE_WRITE_RATE_LIMIT_REFRESH_MS;
+  if (raw === undefined) {
+    return DEFAULT_WRITE_ENDPOINT_LIMITS_REFRESH_MS;
+  }
+  const parsed = Number.parseInt(raw, 10);
+  if (Number.isFinite(parsed) && parsed >= 0) {
+    return parsed;
+  }
+  logger.warn(
+    `Ignoring invalid INSFORGE_WRITE_RATE_LIMIT_REFRESH_MS=${JSON.stringify(raw)} ` +
+      `(expected non-negative integer); using default ${DEFAULT_WRITE_ENDPOINT_LIMITS_REFRESH_MS}ms`
+  );
+  return DEFAULT_WRITE_ENDPOINT_LIMITS_REFRESH_MS;
+}
+
+let writeLimitsRefreshTimeout: NodeJS.Timeout | null = null;
+
+/**
+ * Kick off the initial S3 fetch and start the periodic refresh. Safe to call
+ * more than once — subsequent calls are no-ops while a refresh is already
+ * scheduled. Uses recursive setTimeout (rather than setInterval) so each
+ * cycle re-reads the env-configurable cadence and adds a small jitter,
+ * preventing a fleet of co-deployed instances from stampeding the bucket
+ * on the same schedule.
+ */
+export function startWriteEndpointLimitsRefresh(): void {
+  if (writeLimitsRefreshTimeout) {
+    return;
+  }
+  // Fire-and-forget initial load: defaults remain in effect until it resolves.
+  void loadWriteEndpointLimitsFromS3();
+  const scheduleNext = () => {
+    const base = getWriteEndpointLimitsRefreshMs();
+    if (base === 0) {
+      // Operator opted out of periodic refresh — startup fetch only.
+      return;
+    }
+    const jitter = Math.floor(Math.random() * base * 0.1);
+    writeLimitsRefreshTimeout = setTimeout(() => {
+      void loadWriteEndpointLimitsFromS3();
+      scheduleNext();
+    }, base + jitter);
+    // Don't keep the event loop alive just for config polling.
+    writeLimitsRefreshTimeout.unref?.();
+  };
+  scheduleNext();
+}
+
+export function destroyWriteEndpointLimitsRefresh(): void {
+  if (writeLimitsRefreshTimeout) {
+    clearTimeout(writeLimitsRefreshTimeout);
+    writeLimitsRefreshTimeout = null;
+  }
+}
+
+// Skip the live S3 refresh under vitest so unit tests get deterministic
+// defaults and don't fire network calls on import.
+if (process.env.NODE_ENV !== 'test') {
+  startWriteEndpointLimitsRefresh();
+}
+
 function createWriteEndpointLimiter(category: WriteLimiterCategory) {
   return rateLimit({
     windowMs: 5 * 60 * 1000, // 5 minutes
-    max: 10,
+    // Function form so the limiter picks up the latest S3-driven value on
+    // every request without needing to rebuild the middleware.
+    max: () => getWriteEndpointLimit(category),
     standardHeaders: true,
     legacyHeaders: false,
     skip: () => isWriteRateLimitDisabled(),
