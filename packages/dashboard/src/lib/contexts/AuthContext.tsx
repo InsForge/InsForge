@@ -124,8 +124,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // ONLY when identity actually changes. Same-user token refresh (cloud
       // authorization-code re-exchange after a 401) must NOT wipe the cache,
       // otherwise the dashboard flashes empty/skeleton state on every refresh.
-      const previousUserId = previousUserIdRef.current;
-      if (previousUserId !== null && previousUserId !== nextUser.id) {
+      // First login from a fresh session has previousUserIdRef.current === null,
+      // so `null !== nextUser.id` and the wipe runs — but the cache is already
+      // empty, so it's a harmless no-op.
+      if (previousUserIdRef.current !== nextUser.id) {
         removeAuthScopedQueries();
       }
       previousUserIdRef.current = nextUser.id;
@@ -219,9 +221,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       const currentUser = await loginService.getCurrentUser();
       if (currentUser) {
-        await performPostHogIdentify();
-        setUser(currentUser);
-        setIsAuthenticated(true);
+        // Route through applyAuthenticatedUser so previousUserIdRef stays in
+        // sync. Otherwise a session hydrated here as user A, followed later
+        // by an auth-code re-exchange that switches to user B, would skip the
+        // cache wipe (ref still null) and leak A's tenant-scoped queries to B.
+        await applyAuthenticatedUser(currentUser);
         return currentUser;
       }
 
@@ -243,7 +247,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [authenticateCloudSession, performPostHogIdentify, shouldAttemptCloudAuthentication]);
+  }, [applyAuthenticatedUser, authenticateCloudSession, shouldAttemptCloudAuthentication]);
 
   const logout = useCallback(async () => {
     await loginService.logout();
