@@ -85,6 +85,12 @@ export class LoginService {
       return false;
     }
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(
+      () => controller.abort(new DOMException('Refresh timed out', 'TimeoutError')),
+      30_000
+    );
+
     try {
       const response = await fetch('/api/auth/refresh', {
         method: 'POST',
@@ -93,6 +99,7 @@ export class LoginService {
           'X-CSRF-Token': csrfToken,
         },
         credentials: 'include',
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -112,6 +119,8 @@ export class LoginService {
       return false;
     } catch {
       return false;
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 

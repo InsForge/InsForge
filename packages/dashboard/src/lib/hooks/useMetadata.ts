@@ -16,6 +16,9 @@ export function useMetadata(options?: UseMetadataOptions) {
     queryKey: ['metadata', 'full'],
     queryFn: () => metadataService.getFullMetadata(),
     staleTime: options?.staleTime ?? 5 * 60 * 1000, // Cache for 5 minutes by default
+    gcTime: Infinity, // Never garbage-collect: cached metadata survives navigation
+    // away from /dashboard so returning to it doesn't trigger a cold skeleton/
+    // empty-metric-card render while the fetch is in flight.
     enabled: options?.enabled ?? true,
   });
 

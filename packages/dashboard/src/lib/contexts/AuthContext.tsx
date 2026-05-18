@@ -223,7 +223,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     await checkAuthStatus();
   }, [checkAuthStatus]);
 
+  // Run the initial auth check exactly once on mount. We intentionally do NOT
+  // re-run when `checkAuthStatus` changes identity: host callback refs from
+  // cloud-hosting parents flip on every parent render, which would otherwise
+  // re-fire this effect, flipping `isLoading` true and unmounting the entire
+  // authenticated subtree (and along with it the React Query observers that
+  // keep dashboard caches alive).
+  const initialCheckRanRef = useRef(false);
   useEffect(() => {
+    if (initialCheckRanRef.current) {
+      return;
+    }
+    initialCheckRanRef.current = true;
     void checkAuthStatus();
   }, [checkAuthStatus]);
 
