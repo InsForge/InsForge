@@ -24,7 +24,8 @@ export function useColumnOrder(storageKey: string, defaultKeys: string[]) {
         const to = next.indexOf(targetKey);
         if (from === -1 || to === -1) return prev;
         next.splice(from, 1);
-        next.splice(to, 0, sourceKey);
+        const adjustedTo = from < to ? to - 1 : to;
+        next.splice(adjustedTo, 0, sourceKey);
         try {
           localStorage.setItem(storageKey, JSON.stringify(next));
         } catch (_) {}
