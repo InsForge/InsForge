@@ -1,4 +1,4 @@
-import { apiClient } from '#lib/api/client';
+import { apiClient, REQUEST_TIMEOUT_MS } from '#lib/api/client';
 import type { UserSchema } from '@insforge/shared-schemas';
 
 interface LoginResult {
@@ -93,7 +93,7 @@ export class LoginService {
           'X-CSRF-Token': csrfToken,
         },
         credentials: 'include',
-        signal: AbortSignal.timeout(30_000),
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
 
       if (!response.ok) {

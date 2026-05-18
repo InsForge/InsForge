@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import { loginService } from '#features/login/services/login.service';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
@@ -49,22 +49,42 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isCloudHosting && host.useAuthorizationCodeRefresh === true;
 
   // Drop all user-scoped query data. Called whenever the authenticated user
-  // changes (login / logout / auth error) so the next user never sees the
-  // previous user's cached tables, api keys, users, or mcp-usage records.
-  // Critical now that `useMetadata` uses `gcTime: Infinity` — without explicit
-  // removal, stale tenant-scoped data could persist across sessions in the
-  // same browser tab.
+  // identity actually changes (login / logout / auth error) so the next user
+  // never sees the previous user's cached tables, api keys, users, or
+  // mcp-usage records. Critical now that `useMetadata` uses `gcTime: Infinity`
+  // — without explicit removal, stale tenant-scoped data could persist across
+  // sessions in the same browser tab.
+  //
+  // `cancelQueries` is called before `removeQueries` so any in-flight requests
+  // (issued under the previous identity's auth token) are aborted via the
+  // AbortSignal each queryFn forwards. Without the cancel, an in-flight fetch
+  // could resolve after removal and have its response race against the new
+  // user's freshly-mounted query.
   const removeAuthScopedQueries = useCallback(() => {
-    queryClient.removeQueries({ queryKey: ['apiKey'] });
-    queryClient.removeQueries({ queryKey: ['metadata'] });
-    queryClient.removeQueries({ queryKey: ['users'] });
-    queryClient.removeQueries({ queryKey: ['database', 'tables'] });
-    queryClient.removeQueries({ queryKey: ['mcp-usage'] });
+    const keys: QueryKey[] = [
+      ['apiKey'],
+      ['metadata'],
+      ['users'],
+      ['database', 'tables'],
+      ['mcp-usage'],
+    ];
+    for (const queryKey of keys) {
+      void queryClient.cancelQueries({ queryKey });
+      queryClient.removeQueries({ queryKey });
+    }
   }, [queryClient]);
+
+  // Tracks the currently authenticated user id so `applyAuthenticatedUser`
+  // can tell a same-user token refresh apart from a real identity switch and
+  // only drop cached data in the latter case. Initial value `null` means
+  // "no prior session"; first login transitions null → userId without
+  // wiping (the cache is already empty).
+  const previousUserIdRef = useRef<string | null>(null);
 
   const handleAuthError = useCallback(() => {
     setUser(null);
     setIsAuthenticated(false);
+    previousUserIdRef.current = null;
     removeAuthScopedQueries();
   }, [removeAuthScopedQueries]);
 
@@ -100,9 +120,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const applyAuthenticatedUser = useCallback(
     async (nextUser: UserSchema): Promise<void> => {
       await performPostHogIdentify();
-      // Drop the previous user's cached data BEFORE switching identity so
-      // components mount against an empty cache and fetch fresh for nextUser.
-      removeAuthScopedQueries();
+      // Drop the previous user's cached data BEFORE switching identity, but
+      // ONLY when identity actually changes. Same-user token refresh (cloud
+      // authorization-code re-exchange after a 401) must NOT wipe the cache,
+      // otherwise the dashboard flashes empty/skeleton state on every refresh.
+      const previousUserId = previousUserIdRef.current;
+      if (previousUserId !== null && previousUserId !== nextUser.id) {
+        removeAuthScopedQueries();
+      }
+      previousUserIdRef.current = nextUser.id;
       setUser(nextUser);
       setIsAuthenticated(true);
     },
@@ -224,6 +250,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(null);
     setIsAuthenticated(false);
     setError(null);
+    previousUserIdRef.current = null;
     removeAuthScopedQueries();
   }, [removeAuthScopedQueries]);
 
