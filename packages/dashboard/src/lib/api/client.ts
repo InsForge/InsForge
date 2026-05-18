@@ -74,25 +74,19 @@ export class ApiClient {
         headers['Content-Type'] = headers['Content-Type'] || 'application/json';
       }
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(
-        () => controller.abort(new DOMException('Request timed out', 'TimeoutError')),
-        REQUEST_TIMEOUT_MS
-      );
+      const timeoutSignal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+      const signal = fetchOptions.signal
+        ? AbortSignal.any([fetchOptions.signal, timeoutSignal])
+        : timeoutSignal;
 
       const config: RequestInit = {
         ...fetchOptions,
         headers,
         credentials: 'include',
-        signal: controller.signal,
+        signal,
       };
 
-      let response: Response;
-      try {
-        response = await fetch(url, config);
-      } finally {
-        clearTimeout(timeoutId);
-      }
+      const response = await fetch(url, config);
 
       if (!response.ok) {
         let errorData;

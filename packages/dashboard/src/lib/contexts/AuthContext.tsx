@@ -48,10 +48,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const shouldUseAuthorizationCodeRefresh =
     isCloudHosting && host.useAuthorizationCodeRefresh === true;
 
+  // Drop all user-scoped query data. Called whenever the authenticated user
+  // changes (login / logout / auth error) so the next user never sees the
+  // previous user's cached tables, api keys, users, or mcp-usage records.
+  // Critical now that `useMetadata` uses `gcTime: Infinity` — without explicit
+  // removal, stale tenant-scoped data could persist across sessions in the
+  // same browser tab.
+  const removeAuthScopedQueries = useCallback(() => {
+    queryClient.removeQueries({ queryKey: ['apiKey'] });
+    queryClient.removeQueries({ queryKey: ['metadata'] });
+    queryClient.removeQueries({ queryKey: ['users'] });
+    queryClient.removeQueries({ queryKey: ['database', 'tables'] });
+    queryClient.removeQueries({ queryKey: ['mcp-usage'] });
+  }, [queryClient]);
+
   const handleAuthError = useCallback(() => {
     setUser(null);
     setIsAuthenticated(false);
-  }, []);
+    removeAuthScopedQueries();
+  }, [removeAuthScopedQueries]);
 
   useEffect(() => {
     loginService.setAuthErrorHandler(handleAuthError);
@@ -59,16 +74,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       loginService.setAuthErrorHandler(undefined);
     };
   }, [handleAuthError]);
-
-  const invalidateAuthQueries = useCallback(async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['apiKey'] }),
-      queryClient.invalidateQueries({ queryKey: ['metadata'] }),
-      queryClient.invalidateQueries({ queryKey: ['users'] }),
-      queryClient.invalidateQueries({ queryKey: ['database', 'tables'] }),
-      queryClient.invalidateQueries({ queryKey: ['mcp-usage'] }),
-    ]);
-  }, [queryClient]);
 
   const performPostHogIdentify = useCallback(async (): Promise<void> => {
     if (!onRequestUserInfo) {
@@ -95,11 +100,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const applyAuthenticatedUser = useCallback(
     async (nextUser: UserSchema): Promise<void> => {
       await performPostHogIdentify();
+      // Drop the previous user's cached data BEFORE switching identity so
+      // components mount against an empty cache and fetch fresh for nextUser.
+      removeAuthScopedQueries();
       setUser(nextUser);
       setIsAuthenticated(true);
-      await invalidateAuthQueries();
     },
-    [invalidateAuthQueries, performPostHogIdentify]
+    [performPostHogIdentify, removeAuthScopedQueries]
   );
 
   const exchangeAuthorizationCode = useCallback(
@@ -217,7 +224,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(null);
     setIsAuthenticated(false);
     setError(null);
-  }, []);
+    removeAuthScopedQueries();
+  }, [removeAuthScopedQueries]);
 
   const refreshAuth = useCallback(async () => {
     await checkAuthStatus();
