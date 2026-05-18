@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState, useCallback } from 'react';
 
 export function useColumnOrder(storageKey: string, defaultKeys: string[]) {
