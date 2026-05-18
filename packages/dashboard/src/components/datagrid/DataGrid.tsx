@@ -14,8 +14,8 @@ import { Checkbox } from '@insforge/ui';
 import { useTheme } from '#lib/contexts/ThemeContext';
 import type { DataGridColumn, DataGridRow, DataGridRowType } from './datagridTypes';
 import SortableHeaderRenderer from './SortableHeader';
+import { useColumnOrder } from './useColumnOrder';
 
-// Custom selection cell renderer props
 export interface SelectionCellProps<TRow extends DataGridRowType = DataGridRow> {
   row: TRow;
   isSelected: boolean;
@@ -23,7 +23,6 @@ export interface SelectionCellProps<TRow extends DataGridRowType = DataGridRow> 
   tabIndex: number;
 }
 
-// Generic DataGrid props
 export interface DataGridProps<TRow extends DataGridRowType = DataGridRow> {
   data: TRow[];
   columns: DataGridColumn<TRow>[];
@@ -65,9 +64,9 @@ export interface DataGridProps<TRow extends DataGridRowType = DataGridRow> {
   rowClass?: (row: TRow) => string | undefined;
   rightPanel?: React.ReactNode;
   onColumnResize?: (columnKey: string, width: number) => void;
+  storageKey?: string;
 }
 
-// Main DataGrid component
 export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
   data,
   columns,
@@ -105,16 +104,34 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
   rowClass,
   rightPanel,
   onColumnResize,
+  storageKey,
 }: DataGridProps<TRow>) {
   const { resolvedTheme } = useTheme();
 
   const defaultRowKeyGetter = useCallback((row: TRow) => row.id || Math.random().toString(), []);
   const keyGetter = rowKeyGetter || defaultRowKeyGetter;
-  // Convert columns to react-data-grid format
+
+  const defaultColumnKeys = useMemo(
+    () => columns.map((c) => c.key),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [columns.map((c) => c.key).join(',')]
+  );
+
+  const { columnKeys, reorderColumns } = useColumnOrder(
+    storageKey ?? '',
+    defaultColumnKeys
+  );
+
+  const orderedColumns = useMemo(() => {
+    if (!storageKey) return columns;
+    return columnKeys
+      .map((key) => columns.find((c) => c.key === key))
+      .filter(Boolean) as DataGridColumn<TRow>[];
+  }, [columnKeys, columns, storageKey]);
+
   const gridColumns = useMemo(() => {
     const cols: Column<TRow>[] = [];
 
-    // Add selection column if enabled and not hidden
     if (showSelection && selectedRows !== undefined && onSelectedRowsChange) {
       const colWidth = selectionColumnWidth ?? 45;
       cols.push({
@@ -136,11 +153,9 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
             }
             onSelectedRowsChange(newSelectedRows);
           };
-
           if (renderSelectionCell) {
             return renderSelectionCell({ row, isSelected, onToggle: handleToggle, tabIndex });
           }
-
           return (
             <div className="flex h-full w-full items-center">
               <Checkbox checked={isSelected} onCheckedChange={handleToggle} tabIndex={tabIndex} />
@@ -155,23 +170,15 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
           const handleSelectionToggle = (checked: boolean | 'indeterminate') => {
             const newSelectedRows = new Set(selectedRows);
             if (checked === true || checked === 'indeterminate') {
-              // Select all
               data.forEach((row) => newSelectedRows.add(keyGetter(row)));
             } else {
-              // Unselect all
               data.forEach((row) => newSelectedRows.delete(keyGetter(row)));
             }
             onSelectedRowsChange(newSelectedRows);
           };
-
           if (renderSelectionHeaderCell) {
-            return renderSelectionHeaderCell({
-              isAllSelected,
-              isPartiallySelected,
-              onToggle: handleSelectionToggle,
-            });
+            return renderSelectionHeaderCell({ isAllSelected, isPartiallySelected, onToggle: handleSelectionToggle });
           }
-
           return (
             <div className="flex h-full w-full items-center gap-2">
               <Checkbox
@@ -189,11 +196,9 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
       });
     }
 
-    // Add data columns
-    columns.forEach((col) => {
+    orderedColumns.forEach((col) => {
       const currentSort = sortColumns?.find((sort) => sort.columnKey === col.key);
       const sortDirection = currentSort?.direction;
-
       const gridColumn: Column<TRow> = {
         ...col,
         key: col.key,
@@ -230,13 +235,12 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
             />
           )),
       };
-
       cols.push(gridColumn);
     });
 
     return cols;
   }, [
-    columns,
+    orderedColumns,
     selectedRows,
     onSelectedRowsChange,
     data,
@@ -252,26 +256,16 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
 
   const handleColumnResize = useCallback(
     (columnIndex: number, width: number) => {
-      if (!onColumnResize) {
-        return;
-      }
-
+      if (!onColumnResize) return;
       const resizedColumn = gridColumns[columnIndex];
-      if (!resizedColumn) {
-        return;
-      }
-
+      if (!resizedColumn) return;
       const columnKey = String(resizedColumn.key);
-      if (columnKey === SELECT_COLUMN_KEY) {
-        return;
-      }
-
+      if (columnKey === SELECT_COLUMN_KEY) return;
       onColumnResize(columnKey, width);
     },
     [gridColumns, onColumnResize]
   );
 
-  // Loading state - only show full loading screen if not sorting
   if (loading && !isSorting) {
     return (
       <div className="flex h-full items-center justify-center bg-[rgb(var(--semantic-1))]">
@@ -281,12 +275,7 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
   }
 
   return (
-    <div
-      className={cn(
-        'min-w-0 h-full flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]',
-        className
-      )}
-    >
+    <div className={cn('min-w-0 h-full flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]', className)}>
       <div className={cn('flex min-h-0 min-w-0 flex-1 overflow-hidden', !noPadding && 'px-3')}>
         <div
           className={cn(
@@ -308,6 +297,7 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
             onSortColumnsChange={onSortColumnsChange}
             onCellClick={onCellClick}
             onColumnResize={onColumnResize ? handleColumnResize : undefined}
+            onColumnsReorder={storageKey ? reorderColumns : undefined}
             rowClass={rowClass}
             className={cn(
               `h-full fill-grid insforge-rdg ${resolvedTheme === 'dark' ? 'rdg-dark' : 'rdg-light'}`,
@@ -318,29 +308,18 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
             enableVirtualization={true}
             renderers={{
               noRowsFallback: emptyState ? (
-                <div
-                  className="absolute inset-x-0 bottom-0 flex items-start justify-center bg-semantic-1"
-                  style={{ top: headerRowHeight }}
-                >
+                <div className="absolute inset-x-0 bottom-0 flex items-start justify-center bg-semantic-1" style={{ top: headerRowHeight }}>
                   {emptyState}
                 </div>
               ) : (
-                <div
-                  className="absolute inset-x-0 bottom-0 flex items-center justify-center bg-semantic-1"
-                  style={{ top: headerRowHeight }}
-                >
+                <div className="absolute inset-x-0 bottom-0 flex items-center justify-center bg-semantic-1" style={{ top: headerRowHeight }}>
                   <div className="text-sm text-muted-foreground">No data to display</div>
                 </div>
               ),
             }}
           />
-
-          {/* Loading mask overlay */}
           {isRefreshing && (
-            <div
-              className="absolute inset-x-0 bottom-0 z-50 flex items-center justify-center bg-semantic-1"
-              style={{ top: headerRowHeight }}
-            >
+            <div className="absolute inset-x-0 bottom-0 z-50 flex items-center justify-center bg-semantic-1" style={{ top: headerRowHeight }}>
               <div className="flex items-center gap-1">
                 <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--alpha-12)] border-t-transparent" />
                 <span className="text-sm text-muted-foreground">Loading</span>
