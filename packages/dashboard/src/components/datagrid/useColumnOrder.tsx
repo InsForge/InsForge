@@ -10,8 +10,8 @@ export function useColumnOrder(storageKey: string, defaultKeys: string[]) {
         const missing = defaultKeys.filter((k) => !parsed.includes(k));
         return [...valid, ...missing];
       }
-    } catch {
-      // fall through
+    } catch (error) {
+      console.debug('Failed to read column order from storage', error);
     }
     return defaultKeys;
   });
@@ -22,13 +22,17 @@ export function useColumnOrder(storageKey: string, defaultKeys: string[]) {
         const next = [...prev];
         const from = next.indexOf(sourceKey);
         const to = next.indexOf(targetKey);
-        if (from === -1 || to === -1) return prev;
+        if (from === -1 || to === -1) {
+          return prev;
+        }
         next.splice(from, 1);
         const adjustedTo = from < to ? to - 1 : to;
         next.splice(adjustedTo, 0, sourceKey);
         try {
           localStorage.setItem(storageKey, JSON.stringify(next));
-        } catch (_) {}
+        } catch (error) {
+          console.debug('Failed to persist column order', error);
+        }
         return next;
       });
     },
