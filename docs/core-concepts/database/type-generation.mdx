@@ -94,14 +94,19 @@ diff it against a fresh run to catch un-regenerated schema changes.
 
 | Postgres | TypeScript |
 | -------- | ---------- |
-| `int2/4/8`, `numeric`, `float4/8`, `money` | `number` |
+| `int2/4/8`, `numeric`, `float4/8` | `number` |
 | `bool` | `boolean` |
-| `text`, `varchar`, `uuid`, `timestamp*`, `date`, `time` | `string` |
+| `text`, `varchar`, `uuid`, `timestamp*`, `date`, `time`, `money` | `string` |
 | `json`, `jsonb` | `Json` |
 | enum | string-literal union |
 | array | `T[]` |
 | composite type | nested interface under `CompositeTypes` |
 | anything else | `string` |
+
+<Note>
+`money` is typed `string` — PostgREST serializes it via Postgres's locale text
+output function (e.g. `"$1,234.56"`), so it arrives as a string, not a number.
+</Note>
 
 <Note>
 `int8` / `numeric` values outside JavaScript's safe integer range are still

@@ -6,12 +6,13 @@ const SCALAR_MAP: Record<string, string> = {
   numeric: 'number',
   float4: 'number',
   float8: 'number',
-  money: 'number',
   oid: 'number',
   bool: 'boolean',
   json: 'Json',
   jsonb: 'Json',
   void: 'undefined',
+  // `money` intentionally absent: PostgREST serializes it via the locale text
+  // output function ("$1,234.56"), so it arrives as a string, not a number.
 };
 
 function ref(schema: string, group: string, name: string): string {
