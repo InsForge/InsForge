@@ -45,6 +45,10 @@ export class AuthConfigService {
           require_special_char as "requireSpecialChar",
           verify_email_method as "verifyEmailMethod",
           reset_password_method as "resetPasswordMethod",
+          verify_email_code_expiry_minutes as "verifyEmailCodeExpiryMinutes",
+          verify_email_link_expiry_hours as "verifyEmailLinkExpiryHours",
+          reset_password_code_expiry_minutes as "resetPasswordCodeExpiryMinutes",
+          reset_password_link_expiry_hours as "resetPasswordLinkExpiryHours",
           disable_signup as "disableSignup"
          FROM auth.config
          LIMIT 1`
@@ -62,6 +66,10 @@ export class AuthConfigService {
           requireSpecialChar: false,
           verifyEmailMethod: 'code' as const,
           resetPasswordMethod: 'code' as const,
+          verifyEmailCodeExpiryMinutes: 15,
+          verifyEmailLinkExpiryHours: 24,
+          resetPasswordCodeExpiryMinutes: 10,
+          resetPasswordLinkExpiryHours: 1,
           disableSignup: false,
         };
       }
@@ -94,6 +102,10 @@ export class AuthConfigService {
           require_special_char as "requireSpecialChar",
           verify_email_method as "verifyEmailMethod",
           reset_password_method as "resetPasswordMethod",
+          verify_email_code_expiry_minutes as "verifyEmailCodeExpiryMinutes",
+          verify_email_link_expiry_hours as "verifyEmailLinkExpiryHours",
+          reset_password_code_expiry_minutes as "resetPasswordCodeExpiryMinutes",
+          reset_password_link_expiry_hours as "resetPasswordLinkExpiryHours",
           allowed_redirect_urls as "allowedRedirectUrls",
           disable_signup as "disableSignup",
           created_at as "createdAt",
@@ -116,6 +128,10 @@ export class AuthConfigService {
           requireSpecialChar: false,
           verifyEmailMethod: 'code' as const,
           resetPasswordMethod: 'code' as const,
+          verifyEmailCodeExpiryMinutes: 15,
+          verifyEmailLinkExpiryHours: 24,
+          resetPasswordCodeExpiryMinutes: 10,
+          resetPasswordLinkExpiryHours: 1,
           allowedRedirectUrls: [],
           disableSignup: false,
           createdAt: new Date().toISOString(),
@@ -205,6 +221,26 @@ export class AuthConfigService {
         values.push(input.resetPasswordMethod);
       }
 
+      if (input.verifyEmailCodeExpiryMinutes !== undefined) {
+        updates.push(`verify_email_code_expiry_minutes = $${paramCount++}`);
+        values.push(input.verifyEmailCodeExpiryMinutes);
+      }
+
+      if (input.verifyEmailLinkExpiryHours !== undefined) {
+        updates.push(`verify_email_link_expiry_hours = $${paramCount++}`);
+        values.push(input.verifyEmailLinkExpiryHours);
+      }
+
+      if (input.resetPasswordCodeExpiryMinutes !== undefined) {
+        updates.push(`reset_password_code_expiry_minutes = $${paramCount++}`);
+        values.push(input.resetPasswordCodeExpiryMinutes);
+      }
+
+      if (input.resetPasswordLinkExpiryHours !== undefined) {
+        updates.push(`reset_password_link_expiry_hours = $${paramCount++}`);
+        values.push(input.resetPasswordLinkExpiryHours);
+      }
+
       if (input.allowedRedirectUrls !== undefined) {
         updates.push(`allowed_redirect_urls = $${paramCount++}::TEXT[]`);
         values.push(input.allowedRedirectUrls);
@@ -237,6 +273,10 @@ export class AuthConfigService {
            require_special_char as "requireSpecialChar",
            verify_email_method as "verifyEmailMethod",
            reset_password_method as "resetPasswordMethod",
+           verify_email_code_expiry_minutes as "verifyEmailCodeExpiryMinutes",
+           verify_email_link_expiry_hours as "verifyEmailLinkExpiryHours",
+           reset_password_code_expiry_minutes as "resetPasswordCodeExpiryMinutes",
+           reset_password_link_expiry_hours as "resetPasswordLinkExpiryHours",
            allowed_redirect_urls as "allowedRedirectUrls",
            disable_signup as "disableSignup",
            created_at as "createdAt",

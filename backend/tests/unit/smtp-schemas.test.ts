@@ -246,6 +246,10 @@ describe('SMTP in admin/public metadata response', () => {
     requireSpecialChar: false,
     verifyEmailMethod: 'code' as const,
     resetPasswordMethod: 'code' as const,
+    verifyEmailCodeExpiryMinutes: 15,
+    verifyEmailLinkExpiryHours: 24,
+    resetPasswordCodeExpiryMinutes: 10,
+    resetPasswordLinkExpiryHours: 1,
     allowedRedirectUrls: [],
     disableSignup: false,
   };

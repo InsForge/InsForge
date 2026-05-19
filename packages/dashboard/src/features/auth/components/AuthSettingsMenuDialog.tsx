@@ -28,6 +28,7 @@ import {
   Switch,
 } from '@insforge/ui';
 import {
+  AUTH_TOKEN_EXPIRY_LIMITS,
   updateAuthConfigRequestSchema,
   type AuthConfigSchema,
   type UpdateAuthConfigRequest,
@@ -52,6 +53,10 @@ const defaultValues: UpdateAuthConfigRequest = {
   requireSpecialChar: false,
   verifyEmailMethod: 'code',
   resetPasswordMethod: 'code',
+  verifyEmailCodeExpiryMinutes: 15,
+  verifyEmailLinkExpiryHours: 24,
+  resetPasswordCodeExpiryMinutes: 10,
+  resetPasswordLinkExpiryHours: 1,
   allowedRedirectUrls: [],
   disableSignup: false,
 };
@@ -70,6 +75,10 @@ const toFormValues = (config?: AuthConfigSchema): UpdateAuthConfigRequest => {
     requireSpecialChar: config.requireSpecialChar,
     verifyEmailMethod: config.verifyEmailMethod,
     resetPasswordMethod: config.resetPasswordMethod,
+    verifyEmailCodeExpiryMinutes: config.verifyEmailCodeExpiryMinutes,
+    verifyEmailLinkExpiryHours: config.verifyEmailLinkExpiryHours,
+    resetPasswordCodeExpiryMinutes: config.resetPasswordCodeExpiryMinutes,
+    resetPasswordLinkExpiryHours: config.resetPasswordLinkExpiryHours,
     allowedRedirectUrls: config.allowedRedirectUrls ?? [],
     disableSignup: config.disableSignup,
   };
@@ -393,6 +402,58 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                             />
                           </SettingRow>
                         )}
+
+                        <SettingRow
+                          label="Verification Code Expiry"
+                          description={`How long a 6-digit verification code remains valid. Range: ${AUTH_TOKEN_EXPIRY_LIMITS.codeMinutes.min}-${AUTH_TOKEN_EXPIRY_LIMITS.codeMinutes.max} minutes.`}
+                        >
+                          <div className="max-w-[180px]">
+                            <Input
+                              type="number"
+                              min={AUTH_TOKEN_EXPIRY_LIMITS.codeMinutes.min.toString()}
+                              max={AUTH_TOKEN_EXPIRY_LIMITS.codeMinutes.max.toString()}
+                              {...form.register('verifyEmailCodeExpiryMinutes', {
+                                valueAsNumber: true,
+                              })}
+                              className={
+                                form.formState.errors.verifyEmailCodeExpiryMinutes
+                                  ? 'border-destructive'
+                                  : ''
+                              }
+                            />
+                            {form.formState.errors.verifyEmailCodeExpiryMinutes && (
+                              <p className="pt-1 text-xs text-destructive">
+                                {form.formState.errors.verifyEmailCodeExpiryMinutes.message}
+                              </p>
+                            )}
+                          </div>
+                        </SettingRow>
+
+                        <SettingRow
+                          label="Verification Link Expiry"
+                          description={`How long a verification link remains valid. Range: ${AUTH_TOKEN_EXPIRY_LIMITS.linkHours.min}-${AUTH_TOKEN_EXPIRY_LIMITS.linkHours.max} hours.`}
+                        >
+                          <div className="max-w-[180px]">
+                            <Input
+                              type="number"
+                              min={AUTH_TOKEN_EXPIRY_LIMITS.linkHours.min.toString()}
+                              max={AUTH_TOKEN_EXPIRY_LIMITS.linkHours.max.toString()}
+                              {...form.register('verifyEmailLinkExpiryHours', {
+                                valueAsNumber: true,
+                              })}
+                              className={
+                                form.formState.errors.verifyEmailLinkExpiryHours
+                                  ? 'border-destructive'
+                                  : ''
+                              }
+                            />
+                            {form.formState.errors.verifyEmailLinkExpiryHours && (
+                              <p className="pt-1 text-xs text-destructive">
+                                {form.formState.errors.verifyEmailLinkExpiryHours.message}
+                              </p>
+                            )}
+                          </div>
+                        </SettingRow>
                       </>
                     )}
                   </>
@@ -518,6 +579,58 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                         />
                       </SettingRow>
                     )}
+
+                    <SettingRow
+                      label="Reset Code Expiry"
+                      description={`How long a 6-digit password reset code remains valid. Range: ${AUTH_TOKEN_EXPIRY_LIMITS.codeMinutes.min}-${AUTH_TOKEN_EXPIRY_LIMITS.codeMinutes.max} minutes.`}
+                    >
+                      <div className="max-w-[180px]">
+                        <Input
+                          type="number"
+                          min={AUTH_TOKEN_EXPIRY_LIMITS.codeMinutes.min.toString()}
+                          max={AUTH_TOKEN_EXPIRY_LIMITS.codeMinutes.max.toString()}
+                          {...form.register('resetPasswordCodeExpiryMinutes', {
+                            valueAsNumber: true,
+                          })}
+                          className={
+                            form.formState.errors.resetPasswordCodeExpiryMinutes
+                              ? 'border-destructive'
+                              : ''
+                          }
+                        />
+                        {form.formState.errors.resetPasswordCodeExpiryMinutes && (
+                          <p className="pt-1 text-xs text-destructive">
+                            {form.formState.errors.resetPasswordCodeExpiryMinutes.message}
+                          </p>
+                        )}
+                      </div>
+                    </SettingRow>
+
+                    <SettingRow
+                      label="Reset Link Expiry"
+                      description={`How long a password reset link remains valid. Range: ${AUTH_TOKEN_EXPIRY_LIMITS.linkHours.min}-${AUTH_TOKEN_EXPIRY_LIMITS.linkHours.max} hours.`}
+                    >
+                      <div className="max-w-[180px]">
+                        <Input
+                          type="number"
+                          min={AUTH_TOKEN_EXPIRY_LIMITS.linkHours.min.toString()}
+                          max={AUTH_TOKEN_EXPIRY_LIMITS.linkHours.max.toString()}
+                          {...form.register('resetPasswordLinkExpiryHours', {
+                            valueAsNumber: true,
+                          })}
+                          className={
+                            form.formState.errors.resetPasswordLinkExpiryHours
+                              ? 'border-destructive'
+                              : ''
+                          }
+                        />
+                        {form.formState.errors.resetPasswordLinkExpiryHours && (
+                          <p className="pt-1 text-xs text-destructive">
+                            {form.formState.errors.resetPasswordLinkExpiryHours.message}
+                          </p>
+                        )}
+                      </div>
+                    </SettingRow>
                   </>
                 )}
               </MenuDialogBody>

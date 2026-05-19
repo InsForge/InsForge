@@ -980,6 +980,10 @@ export class AuthService {
       requireSpecialChar: authConfig.requireSpecialChar,
       verifyEmailMethod: authConfig.verifyEmailMethod,
       resetPasswordMethod: authConfig.resetPasswordMethod,
+      verifyEmailCodeExpiryMinutes: authConfig.verifyEmailCodeExpiryMinutes,
+      verifyEmailLinkExpiryHours: authConfig.verifyEmailLinkExpiryHours,
+      resetPasswordCodeExpiryMinutes: authConfig.resetPasswordCodeExpiryMinutes,
+      resetPasswordLinkExpiryHours: authConfig.resetPasswordLinkExpiryHours,
       allowedRedirectUrls: authConfig.allowedRedirectUrls ?? [],
       disableSignup: authConfig.disableSignup,
     };
