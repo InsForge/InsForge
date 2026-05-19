@@ -126,10 +126,13 @@ export default function BucketsPage() {
     try {
       setSelectedFiles(new Set());
       setSearchValue('');
-      await Promise.all([
-        refetchBuckets(),
-        queryClient.invalidateQueries({ queryKey: ['storage'] }),
-      ]);
+      const invalidateStorageQueries = [
+        queryClient.invalidateQueries({
+          queryKey: selectedBucket ? ['storage', 'objects', selectedBucket] : ['storage', 'objects'],
+        }),
+        queryClient.invalidateQueries({ queryKey: ['storage', 'bucket-stats'] }),
+      ];
+      await Promise.all([refetchBuckets(), ...invalidateStorageQueries]);
     } finally {
       setIsRefreshing(false);
     }

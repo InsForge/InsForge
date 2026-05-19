@@ -1,14 +1,29 @@
 # @insforge/dashboard
 
-Scaffold for the shared InsForge dashboard package.
+Shared InsForge dashboard package.
 
-This package is intended to become the single source of truth for the project dashboard used by:
+This package is the source of truth for dashboard UI and feature behavior used by:
 
 - the self-hosting dashboard app inside `frontend/` in this repo
 - the `insforge-cloud` repo
 
-It is wired into the root workspace and is the shared source of truth for dashboard code used by
-the self-hosting app in this repo.
+## Package role
 
-See [../../docs/dashboard-package-rfc.md](../../docs/dashboard-package-rfc.md) for the current API
-and migration plan.
+- `packages/dashboard/`: shared dashboard routes, features, host contract types, and styling
+- `frontend/`: local host shell that mounts this package in self-hosting mode
+
+## Entry points
+
+- Package exports: `src/index.ts`
+- Dashboard app root: `src/app/InsforgeDashboard.tsx`
+- Main route tree: `src/router/AppRoutes.tsx`
+
+## Validation
+
+Run package-level checks when editing this package:
+
+```bash
+npm --workspace @insforge/dashboard run typecheck
+npm --workspace @insforge/dashboard run test:unit
+npm --workspace @insforge/dashboard run test:component
+```

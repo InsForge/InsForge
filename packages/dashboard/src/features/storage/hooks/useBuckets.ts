@@ -17,10 +17,14 @@ export function useBuckets() {
     queryFn: () => storageService.listBuckets(),
   });
 
+  const bucketStatsKey = (buckets || []).map(
+    (bucket) => `${bucket.name}:${bucket.public ? 'public' : 'private'}:${bucket.createdAt ?? ''}`
+  );
+
   // Query to fetch bucket statistics
   const useBucketStats = (enabled = true) => {
     return useQuery({
-      queryKey: ['storage', 'bucket-stats', buckets],
+      queryKey: ['storage', 'bucket-stats', bucketStatsKey],
       queryFn: async () => {
         const stats: Record<string, { fileCount: number; public: boolean; createdAt?: string }> =
           {};

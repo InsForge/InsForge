@@ -6,6 +6,11 @@ export function useStorageObjects() {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
+  const invalidateBucketStorageQueries = (bucketName: string) => {
+    void queryClient.invalidateQueries({ queryKey: ['storage', 'objects', bucketName] });
+    void queryClient.invalidateQueries({ queryKey: ['storage', 'bucket-stats'] });
+  };
+
   // Hook to fetch objects in a bucket
   const useListObjects = (
     bucketName: string,
@@ -32,8 +37,8 @@ export function useStorageObjects() {
       objectKey: string;
       file: File;
     }) => storageService.uploadObject(bucket, objectKey, file),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['storage'] });
+    onSuccess: (_, variables) => {
+      invalidateBucketStorageQueries(variables.bucket);
     },
   });
 
@@ -41,7 +46,7 @@ export function useStorageObjects() {
   const deleteObjectsMutation = useMutation({
     mutationFn: ({ bucket, keys }: { bucket: string; keys: string[] }) =>
       storageService.deleteObjects(bucket, keys),
-    onSuccess: (result) => {
+    onSuccess: (result, variables) => {
       const { success, failures } = result;
       const successCount = success.length;
       const failureCount = failures.length;
@@ -62,7 +67,7 @@ export function useStorageObjects() {
         );
       }
 
-      void queryClient.invalidateQueries({ queryKey: ['storage'] });
+      invalidateBucketStorageQueries(variables.bucket);
     },
     onError: (error: Error) => {
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete file';
