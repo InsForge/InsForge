@@ -395,22 +395,14 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
       const tokenManager = TokenManager.getInstance();
       if (clientType === 'web') {
         // Web clients: use httpOnly cookie + CSRF token
-        const refreshToken = tokenManager.generateRefreshToken(
+        const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
           result.user.id,
-          'user',
-          tokenManager.generateCsrfNonce()
-        );
-        const csrfToken = tokenManager.generateCsrfToken(
-          tokenManager.verifyRefreshToken(refreshToken)
+          'user'
         );
         setRefreshTokenCookie(res, refreshToken);
         result.csrfToken = csrfToken;
       } else {
-        const refreshToken = tokenManager.generateRefreshToken(
-          result.user.id,
-          'user',
-          tokenManager.generateCsrfNonce()
-        );
+        const refreshToken = tokenManager.generateRefreshToken(result.user.id, 'user');
         // Non-web clients (mobile, desktop, server): return refresh token in response body.
         // Server clients cannot rely on browser cookies, so they follow the native-app flow.
         result.refreshToken = refreshToken;
@@ -453,22 +445,14 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
     const tokenManager = TokenManager.getInstance();
     if (clientType === 'web') {
       // Web clients: use httpOnly cookie + CSRF token
-      const refreshToken = tokenManager.generateRefreshToken(
+      const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
         result.user.id,
-        'user',
-        tokenManager.generateCsrfNonce()
-      );
-      const csrfToken = tokenManager.generateCsrfToken(
-        tokenManager.verifyRefreshToken(refreshToken)
+        'user'
       );
       setRefreshTokenCookie(res, refreshToken);
       result.csrfToken = csrfToken;
     } else {
-      const refreshToken = tokenManager.generateRefreshToken(
-        result.user.id,
-        'user',
-        tokenManager.generateCsrfNonce()
-      );
+      const refreshToken = tokenManager.generateRefreshToken(result.user.id, 'user');
       // Non-web clients (mobile, desktop, server): return refresh token in response body.
       // Server clients cannot rely on browser cookies, so they follow the native-app flow.
       result.refreshToken = refreshToken;
@@ -512,22 +496,14 @@ router.post('/id-token', async (req: Request, res: Response, next: NextFunction)
     const tokenManager = TokenManager.getInstance();
     if (clientType === 'web') {
       // Web clients: use httpOnly cookie + CSRF token
-      const refreshToken = tokenManager.generateRefreshToken(
+      const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
         result.user.id,
-        'user',
-        tokenManager.generateCsrfNonce()
-      );
-      const csrfToken = tokenManager.generateCsrfToken(
-        tokenManager.verifyRefreshToken(refreshToken)
+        'user'
       );
       setRefreshTokenCookie(res, refreshToken);
       result.csrfToken = csrfToken;
     } else {
-      const refreshToken = tokenManager.generateRefreshToken(
-        result.user.id,
-        'user',
-        tokenManager.generateCsrfNonce()
-      );
+      const refreshToken = tokenManager.generateRefreshToken(result.user.id, 'user');
       // Non-web clients (mobile, desktop, server): return refresh token in response body.
       // Server clients cannot rely on browser cookies, so they follow the native-app flow.
       result.refreshToken = refreshToken;
@@ -612,14 +588,12 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
     });
 
     // Generate new refresh token (token rotation for security)
-    const newRefreshToken = tokenManager.generateRefreshToken(user.id, 'user', payload.csrfNonce);
+    const { refreshToken: newRefreshToken, csrfToken: newCsrfToken } =
+      tokenManager.generateRefreshTokenWithCsrf(user.id, 'user', payload.csrfNonce);
 
     if (clientType === 'web') {
       // Web clients: set cookie + return CSRF token
       setRefreshTokenCookie(res, newRefreshToken);
-      const newCsrfToken = tokenManager.generateCsrfToken(
-        tokenManager.verifyRefreshToken(newRefreshToken)
-      );
 
       successResponse(res, {
         accessToken: newAccessToken,
@@ -906,22 +880,14 @@ router.post(
       const tokenManager = TokenManager.getInstance();
       if (clientType === 'web') {
         // Web clients: use httpOnly cookie + CSRF token
-        const refreshToken = tokenManager.generateRefreshToken(
+        const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
           result.user.id,
-          'user',
-          tokenManager.generateCsrfNonce()
-        );
-        const csrfToken = tokenManager.generateCsrfToken(
-          tokenManager.verifyRefreshToken(refreshToken)
+          'user'
         );
         setRefreshTokenCookie(res, refreshToken);
         result.csrfToken = csrfToken;
       } else {
-        const refreshToken = tokenManager.generateRefreshToken(
-          result.user.id,
-          'user',
-          tokenManager.generateCsrfNonce()
-        );
+        const refreshToken = tokenManager.generateRefreshToken(result.user.id, 'user');
         // Non-web clients (mobile, desktop, server): return refresh token in response body.
         // Server clients cannot rely on browser cookies, so they follow the native-app flow.
         result.refreshToken = refreshToken;

@@ -22,11 +22,11 @@ export class ApiClient {
 
   setCsrfToken(csrfToken: string) {
     const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toUTCString();
-    document.cookie = `${CSRF_COOKIE_NAME}=${encodeURIComponent(csrfToken)}; expires=${expires}; path=/; SameSite=Lax`;
+    document.cookie = `${CSRF_COOKIE_NAME}=${encodeURIComponent(csrfToken)}; expires=${expires}; path=/; SameSite=Lax; Secure`;
   }
 
   clearCsrfToken() {
-    document.cookie = `${CSRF_COOKIE_NAME}=; max-age=0; path=/; SameSite=Lax`;
+    document.cookie = `${CSRF_COOKIE_NAME}=; max-age=0; path=/; SameSite=Lax; Secure`;
   }
 
   clearTokens() {
@@ -55,19 +55,18 @@ export class ApiClient {
     endpoint: string,
     options: RequestInit & {
       returnFullResponse?: boolean;
-      skipAuth?: boolean;
       skipRefresh?: boolean;
     } = {}
   ) {
     const url = `${getDashboardApiBaseUrl()}${endpoint}`;
-    const { skipAuth, skipRefresh, ...fetchOptions } = options;
+    const { skipRefresh, ...fetchOptions } = options;
 
     const makeRequest = async (isRetry = false) => {
       // Spread order: fetchOptions.headers first, then this.accessToken LAST
       // This ensures retry uses the fresh token, not the stale one from original headers
       const headers: Record<string, string> = {
         ...((fetchOptions.headers as Record<string, string>) || {}),
-        ...(!skipAuth && this.accessToken && { Authorization: `Bearer ${this.accessToken}` }),
+        ...(this.accessToken && { Authorization: `Bearer ${this.accessToken}` }),
       };
 
       if (fetchOptions.body && typeof fetchOptions.body === 'string') {
@@ -98,7 +97,7 @@ export class ApiClient {
           throw error;
         }
 
-        if (response.status === 401 && !skipAuth && !skipRefresh && !isRetry) {
+        if (response.status === 401 && !skipRefresh && !isRetry) {
           // Queue behind existing refresh or start a new one
           if (!this.refreshPromise && this.onRefreshAccessToken) {
             this.refreshPromise = this.onRefreshAccessToken().finally(() => {

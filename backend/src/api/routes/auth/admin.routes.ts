@@ -37,12 +37,10 @@ router.post('/sessions/exchange', async (req: Request, res: Response, next: Next
 
     // Set refresh token as httpOnly cookie + CSRF token for web clients
     const tokenManager = TokenManager.getInstance();
-    const refreshToken = tokenManager.generateRefreshToken(
+    const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
       result.user.id,
-      'admin',
-      tokenManager.generateCsrfNonce()
+      'admin'
     );
-    const csrfToken = tokenManager.generateCsrfToken(tokenManager.verifyRefreshToken(refreshToken));
     setAdminRefreshTokenCookie(res, refreshToken);
 
     successResponse(res, { ...result, csrfToken });
@@ -50,14 +48,8 @@ router.post('/sessions/exchange', async (req: Request, res: Response, next: Next
     if (error instanceof AppError) {
       next(error);
     } else {
-      // Convert other errors (like JWT verification errors) to 400
-      next(
-        new AppError(
-          'Failed to exchange admin session' + (error instanceof Error ? `: ${error.message}` : ''),
-          400,
-          ERROR_CODES.INVALID_INPUT
-        )
-      );
+      logger.error('[Auth:AdminSessionExchange] Failed to exchange admin session', { error });
+      next(new AppError('Failed to exchange admin session', 500, ERROR_CODES.INTERNAL_ERROR));
     }
   }
 });
@@ -79,12 +71,10 @@ router.post('/sessions', (req: Request, res: Response, next: NextFunction) => {
 
     // Set refresh token as httpOnly cookie + CSRF token for web clients
     const tokenManager = TokenManager.getInstance();
-    const refreshToken = tokenManager.generateRefreshToken(
+    const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
       result.user.id,
-      'admin',
-      tokenManager.generateCsrfNonce()
+      'admin'
     );
-    const csrfToken = tokenManager.generateCsrfToken(tokenManager.verifyRefreshToken(refreshToken));
     setAdminRefreshTokenCookie(res, refreshToken);
 
     successResponse(res, { ...result, csrfToken });
@@ -130,10 +120,8 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
       email: user.email,
       role: 'project_admin',
     });
-    const newRefreshToken = tokenManager.generateRefreshToken(user.id, 'admin', payload.csrfNonce);
-    const newCsrfToken = tokenManager.generateCsrfToken(
-      tokenManager.verifyRefreshToken(newRefreshToken)
-    );
+    const { refreshToken: newRefreshToken, csrfToken: newCsrfToken } =
+      tokenManager.generateRefreshTokenWithCsrf(user.id, 'admin', payload.csrfNonce);
     setAdminRefreshTokenCookie(res, newRefreshToken);
 
     successResponse(res, {
@@ -142,9 +130,7 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
       csrfToken: newCsrfToken,
     });
   } catch (error) {
-    // Preserve the admin refresh cookie on CSRF rejection; a transient missing
-    // header should not destroy the dashboard session.
-    if (!(error instanceof AppError && error.statusCode === 403)) {
+    if (error instanceof AppError && error.statusCode === 401) {
       clearAdminRefreshTokenCookie(res);
     }
     next(error);

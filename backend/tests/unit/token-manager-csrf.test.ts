@@ -20,11 +20,7 @@ describe('TokenManager refresh CSRF tokens', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-19T12:00:00.000Z'));
 
-    const initialRefreshToken = tokenManager.generateRefreshToken(
-      userId,
-      'user',
-      tokenManager.generateCsrfNonce()
-    );
+    const initialRefreshToken = tokenManager.generateRefreshToken(userId, 'user');
     const initialPayload = tokenManager.verifyRefreshToken(initialRefreshToken);
     const initialCsrfToken = tokenManager.generateCsrfToken(initialPayload);
 
@@ -46,16 +42,8 @@ describe('TokenManager refresh CSRF tokens', () => {
   });
 
   it('rejects CSRF tokens from another refresh-token family', () => {
-    const firstRefreshToken = tokenManager.generateRefreshToken(
-      userId,
-      'user',
-      tokenManager.generateCsrfNonce()
-    );
-    const secondRefreshToken = tokenManager.generateRefreshToken(
-      userId,
-      'user',
-      tokenManager.generateCsrfNonce()
-    );
+    const firstRefreshToken = tokenManager.generateRefreshToken(userId, 'user');
+    const secondRefreshToken = tokenManager.generateRefreshToken(userId, 'user');
     const firstCsrfToken = tokenManager.generateCsrfToken(
       tokenManager.verifyRefreshToken(firstRefreshToken)
     );
@@ -65,19 +53,20 @@ describe('TokenManager refresh CSRF tokens', () => {
   });
 
   it('separates user and admin refresh token session types', () => {
-    const userRefreshToken = tokenManager.generateRefreshToken(
-      userId,
-      'user',
-      tokenManager.generateCsrfNonce()
-    );
-    const adminRefreshToken = tokenManager.generateRefreshToken(
-      userId,
-      'admin',
-      tokenManager.generateCsrfNonce()
-    );
+    const userRefreshToken = tokenManager.generateRefreshToken(userId, 'user');
+    const adminRefreshToken = tokenManager.generateRefreshToken(userId, 'admin');
 
     expect(tokenManager.verifyRefreshToken(userRefreshToken).sessionType).toBe('user');
     expect(tokenManager.verifyRefreshToken(adminRefreshToken).sessionType).toBe('admin');
+  });
+
+  it('generates a matching refresh token and CSRF token together', () => {
+    const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(userId, 'user');
+    const payload = tokenManager.verifyRefreshToken(refreshToken);
+
+    expect(payload.sub).toBe(userId);
+    expect(payload.sessionType).toBe('user');
+    expect(tokenManager.verifyCsrfToken(csrfToken, payload)).toBe(true);
   });
 
   it('includes refresh session type in CSRF derivation', () => {

@@ -570,13 +570,9 @@ router.post('/exchange', async (req: Request, res: Response, next: NextFunction)
     );
 
     if (clientType === 'web') {
-      const refreshToken = tokenManager.generateRefreshToken(
+      const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
         result.user.id,
-        'user',
-        tokenManager.generateCsrfNonce()
-      );
-      const csrfToken = tokenManager.generateCsrfToken(
-        tokenManager.verifyRefreshToken(refreshToken)
+        'user'
       );
       setRefreshTokenCookie(res, refreshToken);
 
@@ -586,11 +582,7 @@ router.post('/exchange', async (req: Request, res: Response, next: NextFunction)
         csrfToken,
       });
     } else {
-      const refreshToken = tokenManager.generateRefreshToken(
-        result.user.id,
-        'user',
-        tokenManager.generateCsrfNonce()
-      );
+      const refreshToken = tokenManager.generateRefreshToken(result.user.id, 'user');
       successResponse(res, {
         accessToken: result.accessToken,
         user: result.user,

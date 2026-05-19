@@ -22,6 +22,11 @@ export interface RefreshTokenPayload {
   sessionType: RefreshSessionType;
 }
 
+export interface RefreshTokenWithCsrf {
+  refreshToken: string;
+  csrfToken: string;
+}
+
 /**
  * Create JWKS instance with caching and timeout configuration
  * The instance will automatically cache keys and handle refetching
@@ -82,18 +87,31 @@ export class TokenManager {
   /**
    * Generate refresh token for secure session management
    */
-  generateRefreshToken(userId: string, sessionType: RefreshSessionType, csrfNonce: string): string {
-    const refreshPayload: RefreshTokenPayload = {
-      sub: userId,
-      type: 'refresh',
-      iss: 'insforge',
-      csrfNonce,
-      sessionType,
-    };
+  generateRefreshToken(
+    userId: string,
+    sessionType: RefreshSessionType,
+    csrfNonce = this.generateCsrfNonce()
+  ): string {
+    const refreshPayload = this.createRefreshTokenPayload(userId, sessionType, csrfNonce);
     return jwt.sign(refreshPayload, JWT_SECRET, {
       algorithm: 'HS256',
       expiresIn: REFRESH_TOKEN_EXPIRES_IN,
     });
+  }
+
+  generateRefreshTokenWithCsrf(
+    userId: string,
+    sessionType: RefreshSessionType,
+    csrfNonce = this.generateCsrfNonce()
+  ): RefreshTokenWithCsrf {
+    const refreshPayload = this.createRefreshTokenPayload(userId, sessionType, csrfNonce);
+    return {
+      refreshToken: jwt.sign(refreshPayload, JWT_SECRET, {
+        algorithm: 'HS256',
+        expiresIn: REFRESH_TOKEN_EXPIRES_IN,
+      }),
+      csrfToken: this.generateCsrfToken(refreshPayload),
+    };
   }
 
   /**
@@ -231,5 +249,19 @@ export class TokenManager {
 
   generateCsrfNonce(): string {
     return crypto.randomBytes(32).toString('base64url');
+  }
+
+  private createRefreshTokenPayload(
+    userId: string,
+    sessionType: RefreshSessionType,
+    csrfNonce: string
+  ): RefreshTokenPayload {
+    return {
+      sub: userId,
+      type: 'refresh',
+      iss: 'insforge',
+      csrfNonce,
+      sessionType,
+    };
   }
 }
