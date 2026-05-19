@@ -120,7 +120,9 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
   const { columnKeys, reorderColumns } = useColumnOrder(storageKey ?? '', defaultColumnKeys);
 
   const orderedColumns = useMemo(() => {
-    if (!storageKey) return columns;
+    if (!storageKey) {
+      return columns;
+    }
     return columnKeys
       .map((key) => columns.find((c) => c.key === key))
       .filter(Boolean) as DataGridColumn<TRow>[];

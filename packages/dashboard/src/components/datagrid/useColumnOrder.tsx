@@ -1,7 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 export function useColumnOrder(storageKey: string, defaultKeys: string[]) {
-  const [columnKeys, setColumnKeys] = useState<string[]>(() => {
+  const buildOrder = useCallback((): string[] => {
     try {
       const saved = localStorage.getItem(storageKey);
       if (saved) {
@@ -11,10 +11,16 @@ export function useColumnOrder(storageKey: string, defaultKeys: string[]) {
         return [...valid, ...missing];
       }
     } catch (error) {
-      console.debug('Failed to read column order from storage', error);
+      console.warn('Failed to read column order from storage', error);
     }
     return defaultKeys;
-  });
+  }, [storageKey, defaultKeys]);
+
+  const [columnKeys, setColumnKeys] = useState<string[]>(buildOrder);
+
+  useEffect(() => {
+    setColumnKeys(buildOrder());
+  }, [buildOrder]);
 
   const reorderColumns = useCallback(
     (sourceKey: string, targetKey: string) => {
@@ -31,7 +37,7 @@ export function useColumnOrder(storageKey: string, defaultKeys: string[]) {
         try {
           localStorage.setItem(storageKey, JSON.stringify(next));
         } catch (error) {
-          console.debug('Failed to persist column order', error);
+          console.warn('Failed to persist column order', error);
         }
         return next;
       });
