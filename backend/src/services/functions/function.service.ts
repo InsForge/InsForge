@@ -15,6 +15,7 @@ import { ERROR_CODES } from '@/types/error-constants.js';
 import { hasPgErrorCode } from '@/utils/errors.js';
 import { DenoSubhostingProvider } from '@/providers/functions/deno-subhosting.provider.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
+import { isCloudEnvironment } from '@/utils/environment.js';
 
 export class FunctionService {
   private static instance: FunctionService;
@@ -794,8 +795,8 @@ export class FunctionService {
 
   /**
    * Get all active secrets for function injection
-   * Note: INSFORGE_INTERNAL_URL is replaced with INSFORGE_BASE_URL value
-   * since internal URLs don't work from Deno Subhosting
+   * In cloud deployments, INSFORGE_INTERNAL_URL is replaced with INSFORGE_BASE_URL
+   * because the internal container URL is not reachable from Deno Subhosting.
    */
   private async getFunctionSecrets(): Promise<Record<string, string>> {
     try {
@@ -816,9 +817,8 @@ export class FunctionService {
         }
       }
 
-      // Replace INSFORGE_INTERNAL_URL with INSFORGE_BASE_URL value
-      // so existing functions using internal URL still work
-      if (baseUrlValue && secretMap['INSFORGE_INTERNAL_URL']) {
+      // Preserve OSS container-to-container routing while keeping cloud compatibility.
+      if (isCloudEnvironment() && baseUrlValue && secretMap['INSFORGE_INTERNAL_URL']) {
         secretMap['INSFORGE_INTERNAL_URL'] = baseUrlValue;
       }
 
