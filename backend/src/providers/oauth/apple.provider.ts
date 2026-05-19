@@ -186,7 +186,7 @@ export class AppleOAuthProvider implements OAuthProvider {
   /**
    * Verify Apple ID token and extract user info
    */
-  async verifyIdToken(idToken: string): Promise<AppleUserInfo> {
+  async verifyIdToken(idToken: string, audience?: string): Promise<AppleUserInfo> {
     const oAuthConfigService = OAuthConfigService.getInstance();
     const config = await oAuthConfigService.getConfigByProvider('apple');
 
@@ -200,7 +200,7 @@ export class AppleOAuthProvider implements OAuthProvider {
 
       const { payload } = await jwtVerify(idToken, JWKS, {
         issuer: 'https://appleid.apple.com',
-        audience: config.clientId,
+        audience: audience || config.clientId,
       });
 
       return {

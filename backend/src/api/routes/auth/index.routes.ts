@@ -465,16 +465,16 @@ router.post('/id-token', async (req: Request, res: Response, next: NextFunction)
   try {
     const clientType = parseClientType(req.query.client_type);
 
-    const { provider, token } = req.body;
+    const { provider, token, audience } = req.body;
 
     // Validate input
     if (!provider || typeof provider !== 'string') {
       throw new AppError('Provider is required', 400, ERROR_CODES.INVALID_INPUT);
     }
 
-    if (provider !== 'google') {
+    if (provider !== 'google' && provider !== 'apple') {
       throw new AppError(
-        `Provider ${provider} is not supported for ID token sign-in. Supported: google`,
+        `Provider ${provider} is not supported for ID token sign-in. Supported: google, apple`,
         400,
         ERROR_CODES.INVALID_INPUT
       );
@@ -484,8 +484,16 @@ router.post('/id-token', async (req: Request, res: Response, next: NextFunction)
       throw new AppError('Token is required', 400, ERROR_CODES.INVALID_INPUT);
     }
 
+    if (audience !== undefined && typeof audience !== 'string') {
+      throw new AppError('Audience must be a string', 400, ERROR_CODES.INVALID_INPUT);
+    }
+
     // Sign in with ID token
-    const result: CreateSessionResponse = await authService.signInWithIdToken(provider, token);
+    const result: CreateSessionResponse = await authService.signInWithIdToken(
+      provider,
+      token,
+      audience
+    );
 
     // Set refresh token based on client type
     const tokenManager = TokenManager.getInstance();
