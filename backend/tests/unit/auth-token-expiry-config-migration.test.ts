@@ -25,16 +25,16 @@ describe('044_add-auth-token-expiry-config migration', () => {
 
   it('guards check constraints behind existence checks', () => {
     expect(sql).toMatch(
-      /conname = 'auth_config_verify_email_code_expiry_minutes_check'[\s\S]*?CHECK \(verify_email_code_expiry_minutes BETWEEN 1 AND 10080\)/i
+      /conname = 'auth_config_verify_email_code_expiry_minutes_check'[\s\S]*?conrelid = 'auth\.config'::regclass[\s\S]*?CHECK \(verify_email_code_expiry_minutes BETWEEN 1 AND 10080\)/i
     );
     expect(sql).toMatch(
-      /conname = 'auth_config_verify_email_link_expiry_hours_check'[\s\S]*?CHECK \(verify_email_link_expiry_hours BETWEEN 1 AND 168\)/i
+      /conname = 'auth_config_verify_email_link_expiry_hours_check'[\s\S]*?conrelid = 'auth\.config'::regclass[\s\S]*?CHECK \(verify_email_link_expiry_hours BETWEEN 1 AND 168\)/i
     );
     expect(sql).toMatch(
-      /conname = 'auth_config_reset_password_code_expiry_minutes_check'[\s\S]*?CHECK \(reset_password_code_expiry_minutes BETWEEN 1 AND 10080\)/i
+      /conname = 'auth_config_reset_password_code_expiry_minutes_check'[\s\S]*?conrelid = 'auth\.config'::regclass[\s\S]*?CHECK \(reset_password_code_expiry_minutes BETWEEN 1 AND 10080\)/i
     );
     expect(sql).toMatch(
-      /conname = 'auth_config_reset_password_link_expiry_hours_check'[\s\S]*?CHECK \(reset_password_link_expiry_hours BETWEEN 1 AND 168\)/i
+      /conname = 'auth_config_reset_password_link_expiry_hours_check'[\s\S]*?conrelid = 'auth\.config'::regclass[\s\S]*?CHECK \(reset_password_link_expiry_hours BETWEEN 1 AND 168\)/i
     );
   });
 });

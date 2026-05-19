@@ -14,6 +14,7 @@ BEGIN
     SELECT 1
     FROM pg_constraint
     WHERE conname = 'auth_config_verify_email_code_expiry_minutes_check'
+      AND conrelid = 'auth.config'::regclass
   ) THEN
     ALTER TABLE auth.config
     ADD CONSTRAINT auth_config_verify_email_code_expiry_minutes_check
@@ -24,6 +25,7 @@ BEGIN
     SELECT 1
     FROM pg_constraint
     WHERE conname = 'auth_config_verify_email_link_expiry_hours_check'
+      AND conrelid = 'auth.config'::regclass
   ) THEN
     ALTER TABLE auth.config
     ADD CONSTRAINT auth_config_verify_email_link_expiry_hours_check
@@ -34,6 +36,7 @@ BEGIN
     SELECT 1
     FROM pg_constraint
     WHERE conname = 'auth_config_reset_password_code_expiry_minutes_check'
+      AND conrelid = 'auth.config'::regclass
   ) THEN
     ALTER TABLE auth.config
     ADD CONSTRAINT auth_config_reset_password_code_expiry_minutes_check
@@ -44,6 +47,7 @@ BEGIN
     SELECT 1
     FROM pg_constraint
     WHERE conname = 'auth_config_reset_password_link_expiry_hours_check'
+      AND conrelid = 'auth.config'::regclass
   ) THEN
     ALTER TABLE auth.config
     ADD CONSTRAINT auth_config_reset_password_link_expiry_hours_check
