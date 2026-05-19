@@ -1,5 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useStorageObjects } from '#features/storage/hooks/useStorageObjects';
 import { storageService } from '#features/storage/services/storage.service';
@@ -25,7 +26,7 @@ vi.mock('#features/storage/services/storage.service', () => ({
 }));
 
 function createWrapper(queryClient: QueryClient) {
-  return ({ children }: { children: React.ReactNode }) => (
+  return ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
 }
@@ -88,9 +89,8 @@ describe('useStorageObjects', () => {
 
     await waitFor(() => {
       expect(storageService.deleteObjects).toHaveBeenCalledWith('logs', ['events.txt']);
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['storage', 'objects', 'logs'] });
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['storage', 'bucket-stats'] });
     });
-
-    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['storage', 'objects', 'logs'] });
-    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['storage', 'bucket-stats'] });
   });
 });

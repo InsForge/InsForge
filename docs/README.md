@@ -30,5 +30,5 @@ View your local preview at `http://localhost:3000`.
 ## Contributor notes
 
 - Keep `docs.json` navigation and file paths in sync.
-- If API request or response shapes change, update the matching OpenAPI spec under `openapi/`.
-- If backend docs endpoints change, update `backend/src/api/routes/docs/index.routes.ts` mappings.
+- If API request or response shapes change, update the matching OpenAPI spec under `../openapi/`.
+- If backend docs endpoints change, update `../backend/src/api/routes/docs/index.routes.ts` mappings.

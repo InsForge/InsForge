@@ -128,7 +128,9 @@ export default function BucketsPage() {
       setSearchValue('');
       const invalidateStorageQueries = [
         queryClient.invalidateQueries({
-          queryKey: selectedBucket ? ['storage', 'objects', selectedBucket] : ['storage', 'objects'],
+          queryKey: selectedBucket
+            ? ['storage', 'objects', selectedBucket]
+            : ['storage', 'objects'],
         }),
         queryClient.invalidateQueries({ queryKey: ['storage', 'bucket-stats'] }),
       ];
