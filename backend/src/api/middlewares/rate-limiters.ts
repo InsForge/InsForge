@@ -240,8 +240,7 @@ const currentWriteEndpointLimits: Record<WriteLimiterCategory, number> = {
  * gets rejected because the runtime's signing identity lacks read access to
  * a public bucket.
  */
-const DEFAULT_WRITE_ENDPOINT_LIMITS_URL =
-  'https://config.insforge.dev/resource-rate-limits.json';
+const DEFAULT_WRITE_ENDPOINT_LIMITS_URL = 'https://config.insforge.dev/resource-rate-limits.json';
 
 function getWriteEndpointLimitsUrl(): string {
   return process.env.INSFORGE_WRITE_RATE_LIMIT_CONFIG_URL || DEFAULT_WRITE_ENDPOINT_LIMITS_URL;
