@@ -4,6 +4,7 @@
     { "path": "./frontend" },
     { "path": "./backend" },
     { "path": "./packages/shared-schemas" },
+    { "path": "./packages/gen-types" },
     { "path": "./packages/ui" },
     { "path": "./packages/dashboard" }
   ]
