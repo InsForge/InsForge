@@ -323,6 +323,85 @@ export class StorageService {
     return true;
   }
 
+  async renameObject(
+    ctx: UserContext,
+    bucket: string,
+    key: string,
+    newKey: string
+  ): Promise<StorageFileSchema | null> {
+    this.validateBucketName(bucket);
+    this.validateKey(key);
+    this.validateKey(newKey);
+
+    if (key === newKey) {
+      const existing = await this.getObject(ctx, bucket, key);
+      return existing?.metadata ?? null;
+    }
+
+    let providerRenamed = false;
+
+    return withUserContext(this.getPool(), ctx, async (db) => {
+      const existingResult = await db.query(
+        `
+          SELECT key, bucket, size, mime_type, uploaded_at, etag
+          FROM storage.objects
+          WHERE bucket = $1 AND key = $2
+          FOR UPDATE
+        `,
+        [bucket, key]
+      );
+
+      const existing = existingResult.rows[0] as StorageRecord | undefined;
+      if (!existing) {
+        return null;
+      }
+
+      const renamedObject = await this.provider.renameObject(bucket, key, bucket, newKey);
+      providerRenamed = true;
+
+      try {
+        const updateResult = await db.query(
+          `
+            UPDATE storage.objects
+            SET key = $3, etag = $4
+            WHERE bucket = $1 AND key = $2
+            RETURNING key, bucket, size, mime_type, uploaded_at, etag
+          `,
+          [bucket, key, newKey, renamedObject.etag]
+        );
+
+        const updated = updateResult.rows[0] as StorageRecord | undefined;
+        if (!updated) {
+          throw new Error('Failed to update storage metadata after renaming object');
+        }
+
+        return {
+          key: updated.key,
+          bucket: updated.bucket,
+          size: updated.size,
+          mimeType: updated.mime_type,
+          uploadedAt: updated.uploaded_at,
+          url: this.buildObjectUrl(bucket, updated.key, updated.etag || updated.uploaded_at),
+        };
+      } catch (error) {
+        if (providerRenamed) {
+          try {
+            await this.provider.renameObject(bucket, newKey, bucket, key);
+          } catch (rollbackError) {
+            logger.warn('Failed to roll back storage rename after metadata update error', {
+              bucket,
+              key,
+              newKey,
+              error: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+            });
+          }
+        }
+
+        throw error;
+      }
+    });
+  }
+
   async listObjects(
     ctx: UserContext,
     bucket: string,

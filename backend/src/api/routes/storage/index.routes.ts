@@ -16,6 +16,7 @@ import {
   updateBucketRequestSchema,
   updateStorageConfigRequestSchema,
   createS3AccessKeyRequestSchema,
+  renameObjectRequestSchema,
 } from '@insforge/shared-schemas';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
@@ -450,6 +451,74 @@ router.get(
       res.send(file);
     } catch (error) {
       if (error instanceof Error && error.message.includes('Invalid')) {
+        next(new AppError(error.message, 400, ERROR_CODES.STORAGE_INVALID_PARAMETER));
+      } else {
+        next(error);
+      }
+    }
+  }
+);
+
+// PATCH /api/storage/buckets/:bucketName/objects/:objectKey - Rename object in bucket (requires auth)
+router.patch(
+  '/buckets/:bucketName/objects/*',
+  verifyUser,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { bucketName } = req.params;
+      const objectKey = req.params[0];
+
+      if (!objectKey) {
+        throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
+      }
+
+      const validation = renameObjectRequestSchema.safeParse(req.body);
+      if (!validation.success) {
+        throw new AppError(
+          validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.STORAGE_INVALID_PARAMETER
+        );
+      }
+
+      const renamedFile = await StorageService.getInstance().renameObject(
+        getUserContextFromReq(req),
+        bucketName,
+        objectKey,
+        validation.data.newKey
+      );
+
+      if (!renamedFile) {
+        throw new AppError('Object not found', 404, ERROR_CODES.NOT_FOUND);
+      }
+
+      try {
+        const socket = SocketManager.getInstance();
+        socket.broadcastToRoom(
+          'role:project_admin',
+          ServerEvents.DATA_UPDATE,
+          { resource: DataUpdateResourceType.BUCKETS, data: { bucketName } },
+          'system'
+        );
+      } catch {
+        // Best-effort notification; do not fail completed storage mutation
+      }
+
+      successResponse(res, renamedFile);
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        ((error as { code?: string }).code === '23505' ||
+          error.message.toLowerCase().includes('duplicate'))
+      ) {
+        next(
+          new AppError(
+            'A file with that name already exists in this bucket',
+            409,
+            ERROR_CODES.ALREADY_EXISTS
+          )
+        );
+      } else if (error instanceof Error && error.message.includes('Invalid')) {
         next(new AppError(error.message, 400, ERROR_CODES.STORAGE_INVALID_PARAMETER));
       } else {
         next(error);

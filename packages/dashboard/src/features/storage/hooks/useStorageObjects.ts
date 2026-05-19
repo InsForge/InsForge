@@ -70,14 +70,29 @@ export function useStorageObjects() {
     },
   });
 
+  const renameObjectMutation = useMutation({
+    mutationFn: ({ bucket, key, newKey }: { bucket: string; key: string; newKey: string }) =>
+      storageService.renameObject(bucket, key, newKey),
+    onSuccess: () => {
+      showToast('File renamed successfully.', 'success');
+      void queryClient.invalidateQueries({ queryKey: ['storage'] });
+    },
+    onError: (error: Error) => {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to rename file';
+      showToast(errorMessage, 'error');
+    },
+  });
+
   return {
     // Loading states
     isUploadingObject: uploadObjectMutation.isPending,
     isDeletingObject: deleteObjectsMutation.isPending,
+    isRenamingObject: renameObjectMutation.isPending,
 
     // Actions
     uploadObject: uploadObjectMutation.mutateAsync,
     deleteObjects: deleteObjectsMutation.mutate,
+    renameObject: renameObjectMutation.mutateAsync,
 
     // Helpers
     useListObjects,

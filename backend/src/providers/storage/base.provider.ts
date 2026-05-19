@@ -27,6 +27,12 @@ export interface StorageProvider {
   putObject(bucket: string, key: string, file: Express.Multer.File): Promise<{ etag: string }>;
   getObject(bucket: string, key: string): Promise<Buffer | null>;
   deleteObject(bucket: string, key: string): Promise<void>;
+  renameObject(
+    srcBucket: string,
+    srcKey: string,
+    dstBucket: string,
+    dstKey: string
+  ): Promise<{ etag: string; lastModified: Date }>;
   createBucket(bucket: string): Promise<void>;
   deleteBucket(bucket: string): Promise<void>;
 

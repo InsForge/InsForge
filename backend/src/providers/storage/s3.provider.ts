@@ -217,6 +217,34 @@ export class S3StorageProvider implements StorageProvider {
     await this.s3Client.send(command);
   }
 
+  async renameObject(
+    srcBucket: string,
+    srcKey: string,
+    dstBucket: string,
+    dstKey: string
+  ): Promise<{ etag: string; lastModified: Date }> {
+    const copied = await this.copyObject(srcBucket, srcKey, dstBucket, dstKey);
+
+    try {
+      await this.deleteObject(srcBucket, srcKey);
+      return copied;
+    } catch (error) {
+      try {
+        await this.deleteObject(dstBucket, dstKey);
+      } catch (cleanupError) {
+        logger.warn('Failed to roll back copied S3 object after rename delete failure', {
+          srcBucket,
+          srcKey,
+          dstBucket,
+          dstKey,
+          error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+        });
+      }
+
+      throw error;
+    }
+  }
+
   async createBucket(_bucket: string): Promise<void> {
     // In S3 with multi-tenant, we don't create actual buckets
     // We just use folders under the app key
