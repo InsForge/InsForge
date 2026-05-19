@@ -33,22 +33,31 @@ function parseArgs(argv: string[]): ParsedArgs {
   const args: ParsedArgs = { local: false, schemas: ['public'], help: false };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
+    // Consume and validate the value token for a flag that takes one.
+    const value = (): string => {
+      const next = argv[i + 1];
+      if (next === undefined || next.startsWith('-')) {
+        throw new Error(`Missing value for ${arg}`);
+      }
+      i++;
+      return next;
+    };
     switch (arg) {
       case '--postgres-url':
-        args.postgresUrl = argv[++i];
+        args.postgresUrl = value();
         break;
       case '--local':
         args.local = true;
         break;
       case '--schema':
-        args.schemas = (argv[++i] ?? '')
+        args.schemas = value()
           .split(',')
           .map((s) => s.trim())
           .filter(Boolean);
         break;
       case '-o':
       case '--output':
-        args.output = argv[++i];
+        args.output = value();
         break;
       case '-h':
       case '--help':

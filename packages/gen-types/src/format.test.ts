@@ -12,7 +12,8 @@ function fixture(): SchemaIR[] {
         {
           name: 'posts',
           isView: false,
-          writable: true,
+          insertable: true,
+          updatable: true,
           columns: [
             { name: 'id', tsType: 'number', nullable: false, hasDefault: true },
             { name: 'title', tsType: 'string', nullable: false, hasDefault: false },
@@ -38,7 +39,8 @@ function fixture(): SchemaIR[] {
         {
           name: 'active_posts',
           isView: true,
-          writable: false,
+          insertable: false,
+          updatable: false,
           columns: [{ name: 'id', tsType: 'number', nullable: true, hasDefault: false }],
           relationships: [],
         },

@@ -38,24 +38,29 @@ CREATE FUNCTION ${SCHEMA}.post_count(author uuid) RETURNS bigint
   LANGUAGE sql AS $$ SELECT count(*) FROM ${SCHEMA}.posts WHERE author_id = author $$;
 `;
 
+/** Run a statement on a fresh client, always closing it. */
+async function withClient(sql: string): Promise<void> {
+  const client = new Client({ connectionString: CONN });
+  await client.connect();
+  try {
+    await client.query(sql);
+  } finally {
+    await client.end();
+  }
+}
+
 before(async () => {
   if (!CONN) {
     return;
   }
-  const client = new Client({ connectionString: CONN });
-  await client.connect();
-  await client.query(SEED);
-  await client.end();
+  await withClient(SEED);
 });
 
 after(async () => {
   if (!CONN) {
     return;
   }
-  const client = new Client({ connectionString: CONN });
-  await client.connect();
-  await client.query(`DROP SCHEMA IF EXISTS ${SCHEMA} CASCADE`);
-  await client.end();
+  await withClient(`DROP SCHEMA IF EXISTS ${SCHEMA} CASCADE`);
 });
 
 test('introspects every supported construct against a live database', { skip: !CONN }, async () => {

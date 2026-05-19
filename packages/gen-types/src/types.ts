@@ -19,8 +19,10 @@ export interface RelationshipIR {
 export interface TableIR {
   name: string;
   isView: boolean;
-  /** Views only: whether rows can be inserted/updated. Always true for base tables. */
-  writable: boolean;
+  /** Whether rows can be inserted. Always true for base tables; varies for views. */
+  insertable: boolean;
+  /** Whether rows can be updated. Always true for base tables; varies for views. */
+  updatable: boolean;
   columns: ColumnIR[];
   relationships: RelationshipIR[];
 }

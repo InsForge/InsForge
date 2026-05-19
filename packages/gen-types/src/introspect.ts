@@ -46,6 +46,7 @@ interface FunctionRow {
   proargmodes: string[] | null;
   argtypes: number[] | null;
   rettypename: string;
+  retschema: string;
   proretset: boolean;
 }
 
@@ -103,35 +104,45 @@ async function introspectSchema(client: Client, schema: string): Promise<SchemaI
     });
   }
 
-  // --- which views accept inserts ---
-  const viewRes = await client.query<{ table_name: string; is_insertable_into: string }>(
-    `SELECT table_name, is_insertable_into
+  // --- view writability (insertable and updatable are independent) ---
+  const viewRes = await client.query<{
+    table_name: string;
+    is_insertable_into: string;
+    is_updatable: string;
+  }>(
+    `SELECT table_name, is_insertable_into, is_updatable
        FROM information_schema.views
       WHERE table_schema = $1`,
     [schema]
   );
-  const viewWritable = new Map<string, boolean>();
+  const viewInsertable = new Map<string, boolean>();
+  const viewUpdatable = new Map<string, boolean>();
   for (const row of viewRes.rows) {
-    viewWritable.set(row.table_name, row.is_insertable_into === 'YES');
+    viewInsertable.set(row.table_name, row.is_insertable_into === 'YES');
+    viewUpdatable.set(row.table_name, row.is_updatable === 'YES');
   }
 
   // --- foreign keys ---
+  // pg_constraint + unnest(conkey) WITH ORDINALITY keeps composite-key columns
+  // paired with their referenced columns in declaration order (information_schema's
+  // key/constraint_column_usage join would cross-product multi-column keys).
   const fkRes = await client.query<FkRow>(
-    `SELECT tc.constraint_name,
-            tc.table_name,
-            kcu.column_name,
-            ccu.table_name AS foreign_table_name,
-            ccu.column_name AS foreign_column_name
-       FROM information_schema.table_constraints tc
-       JOIN information_schema.key_column_usage kcu
-         ON kcu.constraint_name = tc.constraint_name
-        AND kcu.table_schema = tc.table_schema
-       JOIN information_schema.constraint_column_usage ccu
-         ON ccu.constraint_name = tc.constraint_name
-        AND ccu.table_schema = tc.table_schema
-      WHERE tc.constraint_type = 'FOREIGN KEY'
-        AND tc.table_schema = $1
-      ORDER BY tc.constraint_name`,
+    `SELECT con.conname  AS constraint_name,
+            cl.relname   AS table_name,
+            att.attname  AS column_name,
+            fcl.relname  AS foreign_table_name,
+            fatt.attname AS foreign_column_name
+       FROM pg_constraint con
+       JOIN pg_namespace n ON n.oid = con.connamespace
+       JOIN pg_class cl ON cl.oid = con.conrelid
+       JOIN pg_class fcl ON fcl.oid = con.confrelid
+       JOIN LATERAL unnest(con.conkey) WITH ORDINALITY AS k(attnum, ord) ON true
+       JOIN pg_attribute att
+         ON att.attrelid = con.conrelid AND att.attnum = k.attnum
+       JOIN pg_attribute fatt
+         ON fatt.attrelid = con.confrelid AND fatt.attnum = con.confkey[k.ord::int]
+      WHERE con.contype = 'f' AND n.nspname = $1
+      ORDER BY con.conname, k.ord`,
     [schema]
   );
   // Group FK columns by (table, constraint) so multi-column keys collapse to one entry.
@@ -174,7 +185,8 @@ async function introspectSchema(client: Client, schema: string): Promise<SchemaI
     const table = tableMap.get(row.table_name) ?? {
       name: row.table_name,
       isView,
-      writable: isView ? (viewWritable.get(row.table_name) ?? false) : true,
+      insertable: isView ? (viewInsertable.get(row.table_name) ?? false) : true,
+      updatable: isView ? (viewUpdatable.get(row.table_name) ?? false) : true,
       columns: [],
       relationships: [...(fkByTable.get(row.table_name)?.values() ?? [])],
     };
@@ -194,11 +206,13 @@ async function introspectSchema(client: Client, schema: string): Promise<SchemaI
   // A function returning a table/view rowtype maps to that relation's `Row`.
   const tableNames = new Set([...tableMap.values()].filter((t) => !t.isView).map((t) => t.name));
   const viewNames = new Set([...tableMap.values()].filter((t) => t.isView).map((t) => t.name));
-  const resolveReturn = (typeName: string): string => {
-    if (tableNames.has(typeName)) {
+  // A rowtype only resolves to a relation when it belongs to the schema being
+  // introspected — an unqualified name can collide across schemas.
+  const resolveReturn = (typeName: string, retSchema: string): string => {
+    if (retSchema === schema && tableNames.has(typeName)) {
       return `Database[${JSON.stringify(schema)}]["Tables"][${JSON.stringify(typeName)}]["Row"]`;
     }
-    if (viewNames.has(typeName)) {
+    if (retSchema === schema && viewNames.has(typeName)) {
       return `Database[${JSON.stringify(schema)}]["Views"][${JSON.stringify(typeName)}]["Row"]`;
     }
     if (typeName === 'record') {
@@ -209,6 +223,7 @@ async function introspectSchema(client: Client, schema: string): Promise<SchemaI
 
   const funcRes = await client.query<FunctionRow>(
     `SELECT p.proname,
+            p.oid,
             p.proargnames,
             p.proargmodes::text[] AS proargmodes,
             COALESCE(
@@ -216,19 +231,21 @@ async function introspectSchema(client: Client, schema: string): Promise<SchemaI
               string_to_array(NULLIF(p.proargtypes::text, ''), ' ')::oid[]
             ) AS argtypes,
             rt.typname AS rettypename,
+            rtn.nspname AS retschema,
             p.proretset
        FROM pg_proc p
        JOIN pg_namespace n ON n.oid = p.pronamespace
        JOIN pg_type rt ON rt.oid = p.prorettype
+       JOIN pg_namespace rtn ON rtn.oid = rt.typnamespace
       WHERE n.nspname = $1
         AND p.prokind = 'f'
         AND NOT EXISTS (
           SELECT 1 FROM pg_depend d WHERE d.objid = p.oid AND d.deptype = 'e'
         )
-      ORDER BY p.proname`,
+      ORDER BY p.proname, p.oid`,
     [schema]
   );
-  // De-dupe overloaded names deterministically (sorted query -> last wins).
+  // De-dupe overloaded names deterministically (ORDER BY proname, oid -> last wins).
   const functionMap = new Map<string, FunctionIR>();
   for (const row of funcRes.rows) {
     if (row.rettypename === 'trigger') {
@@ -238,8 +255,9 @@ async function introspectSchema(client: Client, schema: string): Promise<SchemaI
     const argtypes = row.argtypes ?? [];
     for (let i = 0; i < argtypes.length; i++) {
       const mode = row.proargmodes?.[i];
-      if (mode && mode !== 'i' && mode !== 'b') {
-        continue; // skip OUT / TABLE / VARIADIC-out params
+      // Keep input modes: 'i' IN, 'b' INOUT, 'v' VARIADIC. Skip 'o'/'t' (OUT/TABLE).
+      if (mode && mode !== 'i' && mode !== 'b' && mode !== 'v') {
+        continue;
       }
       const typeName = oidToType.get(argtypes[i]) ?? 'text';
       args.push({
@@ -247,7 +265,7 @@ async function introspectSchema(client: Client, schema: string): Promise<SchemaI
         tsType: mapType(typeName),
       });
     }
-    let returns = resolveReturn(row.rettypename);
+    let returns = resolveReturn(row.rettypename, row.retschema);
     if (row.proretset) {
       returns = `${returns}[]`;
     }

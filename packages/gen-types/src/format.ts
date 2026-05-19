@@ -51,9 +51,12 @@ function tableBlock(table: TableIR, indent: string): string {
   const block = (label: string, render: (c: ColumnIR) => string) =>
     `${i}${label}: {\n${cols.map((c) => `${i}  ${render(c)}`).join('\n')}\n${i}}`;
   const parts = [block('Row', rowField)];
-  // Non-writable views expose a Row only; Insert/Update would be invalid.
-  if (table.writable) {
-    parts.push(block('Insert', insertField), block('Update', updateField));
+  // Non-insertable / non-updatable views omit the matching block.
+  if (table.insertable) {
+    parts.push(block('Insert', insertField));
+  }
+  if (table.updatable) {
+    parts.push(block('Update', updateField));
   }
   parts.push(relationships(table, i));
   return `${indent}${key(table.name)}: {\n${parts.join('\n')}\n${indent}}`;
