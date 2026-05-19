@@ -60,7 +60,7 @@ export class LoginService {
 
   async logout(): Promise<void> {
     try {
-      await apiClient.request('/auth/logout', {
+      await apiClient.request('/auth/admin/logout', {
         method: 'POST',
         skipRefresh: true,
       });
@@ -86,7 +86,7 @@ export class LoginService {
     }
 
     try {
-      const response = await fetch('/api/auth/refresh', {
+      const response = await fetch('/api/auth/admin/refresh', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

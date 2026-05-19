@@ -561,8 +561,6 @@ router.post('/exchange', async (req: Request, res: Response, next: NextFunction)
     const result = await oAuthPKCEService.exchangeCode(code, code_verifier);
 
     const tokenManager = TokenManager.getInstance();
-    const refreshToken = tokenManager.generateRefreshToken(result.user.id);
-
     const socket = SocketManager.getInstance();
     socket.broadcastToRoom(
       'role:project_admin',
@@ -572,8 +570,15 @@ router.post('/exchange', async (req: Request, res: Response, next: NextFunction)
     );
 
     if (clientType === 'web') {
+      const refreshToken = tokenManager.generateRefreshToken(
+        result.user.id,
+        'user',
+        tokenManager.generateCsrfNonce()
+      );
+      const csrfToken = tokenManager.generateCsrfToken(
+        tokenManager.verifyRefreshToken(refreshToken)
+      );
       setRefreshTokenCookie(res, refreshToken);
-      const csrfToken = tokenManager.generateCsrfToken(refreshToken);
 
       successResponse(res, {
         accessToken: result.accessToken,
@@ -581,6 +586,11 @@ router.post('/exchange', async (req: Request, res: Response, next: NextFunction)
         csrfToken,
       });
     } else {
+      const refreshToken = tokenManager.generateRefreshToken(
+        result.user.id,
+        'user',
+        tokenManager.generateCsrfNonce()
+      );
       successResponse(res, {
         accessToken: result.accessToken,
         user: result.user,

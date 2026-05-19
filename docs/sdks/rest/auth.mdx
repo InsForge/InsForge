@@ -985,8 +985,31 @@ curl -X POST "https://your-app.insforge.app/api/auth/admin/sessions/exchange" \
     "email": "admin@example.com",
     "role": "project_admin"
   },
-  "accessToken": "eyJhbGciOiJIUzI1NiIs..."
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "csrfToken": "abc123..."
 }
+```
+
+### Refresh Admin Session
+
+Refresh a dashboard admin access token. This endpoint uses the dashboard-only
+`insforge_admin_refresh_token` httpOnly cookie and does not share the app/user
+refresh cookie.
+
+```
+POST /api/auth/admin/refresh
+```
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/admin/refresh" \
+  -H "X-CSRF-Token: abc123..." \
+  --cookie "insforge_admin_refresh_token=..."
+```
+
+### Logout Admin Session
+
+```
+POST /api/auth/admin/logout
 ```
 
 ---

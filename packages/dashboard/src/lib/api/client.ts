@@ -1,6 +1,6 @@
 import { getDashboardApiBaseUrl } from '#lib/config/runtime';
 
-const CSRF_COOKIE_NAME = 'insforge_csrf';
+const CSRF_COOKIE_NAME = 'insforge_admin_csrf_token';
 export const REQUEST_TIMEOUT_MS = 30_000;
 
 interface ApiError extends Error {
