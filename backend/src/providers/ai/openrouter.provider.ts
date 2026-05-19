@@ -60,6 +60,32 @@ interface ResolvedApiKey {
   source: ApiKeySource;
 }
 
+// Maximum number of retries on a 429 (rate-limited) response from OpenRouter
+// before we give up and surface the error to the caller.
+const OPENROUTER_RATE_LIMIT_MAX_RETRIES = 3;
+
+// Cap on a single 429 retry wait so a misbehaving upstream that returns
+// `Retry-After: 600` cannot park the request for 10 minutes. Mirrors the
+// Deno Subhosting helper's cap.
+const OPENROUTER_RATE_LIMIT_MAX_RETRY_DELAY_MS = 30_000;
+
+/**
+ * Parse the `Retry-After` header for the integer-seconds form per RFC 7231
+ * §7.1.3. Returns the delay in ms, or `NaN` if the header is missing or not
+ * a non-negative integer. We intentionally do NOT parse the HTTP-date form
+ * here; callers fall back to exponential backoff for anything we can't parse.
+ */
+function parseRetryAfterSecondsMs(header: string | null | undefined): number {
+  if (!header) {
+    return NaN;
+  }
+  const trimmed = String(header).trim();
+  if (!/^\d+$/.test(trimmed)) {
+    return NaN;
+  }
+  return parseInt(trimmed, 10) * 1000;
+}
+
 const EMPTY_AI_OVERVIEW: AIOverview = {
   key: {
     limit: null,
@@ -638,6 +664,60 @@ export class OpenRouterProvider {
         }
       }
 
+      // Retry on 429 (rate limited) with exponential backoff, honouring
+      // Retry-After when present. This sits BEFORE the generic APIError
+      // mapping so a transient 429 doesn't get flattened into AppError on
+      // first sight.
+      if (error instanceof OpenAI.APIError && error.status === 429) {
+        const maxRetries = OPENROUTER_RATE_LIMIT_MAX_RETRIES;
+        let lastRateLimitError: OpenAI.APIError = error;
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          // Headers can be a Headers instance or undefined depending on how
+          // the error was produced. Both `.get('retry-after')` and
+          // `.get('Retry-After')` are valid (Headers is case-insensitive),
+          // but we use the lowercase form for consistency.
+          const retryAfterHeader =
+            typeof lastRateLimitError.headers?.get === 'function'
+              ? lastRateLimitError.headers.get('retry-after')
+              : null;
+          const retryAfterMs = parseRetryAfterSecondsMs(retryAfterHeader);
+          const honouredRetryAfter = Number.isFinite(retryAfterMs) && retryAfterMs >= 0;
+          const delayMs = honouredRetryAfter
+            ? Math.min(retryAfterMs, OPENROUTER_RATE_LIMIT_MAX_RETRY_DELAY_MS)
+            : Math.pow(2, attempt - 1) * 1000;
+
+          logger.info(
+            `OpenRouter 429 rate-limited, retrying (attempt ${attempt}/${maxRetries}) after ${delayMs}ms${
+              honouredRetryAfter ? ' (Retry-After honoured)' : ' (exponential backoff)'
+            }`
+          );
+
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+
+          try {
+            const result = await request(client);
+            logger.info(`OpenRouter request succeeded after ${attempt} retry attempt(s) on 429`);
+            return { result, source };
+          } catch (retryError) {
+            if (retryError instanceof OpenAI.APIError && retryError.status === 429) {
+              lastRateLimitError = retryError;
+              continue;
+            }
+            // A different error surfaced during the retry — fall through to
+            // the standard handling by re-throwing into the outer flow.
+            throw retryError;
+          }
+        }
+
+        throw new AppError(
+          `AI provider rate limit exceeded after ${maxRetries} retries.`,
+          429,
+          ERROR_CODES.RATE_LIMITED,
+          'Wait a moment and retry, or check your API key rate limits.'
+        );
+      }
+
       // Convert upstream API errors to actionable responses
       if (error instanceof OpenAI.APIError) {
         if (error.status === 401 || error.status === 403) {
@@ -648,14 +728,6 @@ export class OpenRouterProvider {
             source === 'cloud'
               ? 'Check the cloud-managed OpenRouter credential.'
               : 'Set a valid OPENROUTER_API_KEY in the backend environment.'
-          );
-        }
-        if (error.status === 429) {
-          throw new AppError(
-            'AI provider rate limit exceeded. Please wait before retrying.',
-            429,
-            ERROR_CODES.RATE_LIMITED,
-            'Wait a moment and retry, or check your API key rate limits.'
           );
         }
       }
