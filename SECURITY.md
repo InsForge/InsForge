@@ -1,3 +1,5 @@
+# Security Policy
+
 Contact: https://github.com/InsForge/InsForge/security/advisories/new
 Contact: mailto:security@insforge.dev
 
@@ -44,7 +46,7 @@ Here is a brief list of some common out-of-scope vulnerabilities:
 
 - File a private report through GitHub Security Advisories:
   https://github.com/InsForge/InsForge/security/advisories/new
-- Or email `security@insforge.dev`. If you do not receive a reply within 3 business days, please follow up via GitHub Security Advisories so the report does not get lost.
+- Or email `security@insforge.dev`. If you do not receive a reply within 5 business days, please follow up via GitHub Security Advisories so the report does not get lost.
 
 Provide enough information to reproduce the problem so we can resolve it quickly. Helpful details include:
 
