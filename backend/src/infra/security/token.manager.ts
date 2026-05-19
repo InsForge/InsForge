@@ -247,7 +247,7 @@ export class TokenManager {
     }
   }
 
-  generateCsrfNonce(): string {
+  private generateCsrfNonce(): string {
     return crypto.randomBytes(32).toString('base64url');
   }
 

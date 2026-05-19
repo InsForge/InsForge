@@ -587,11 +587,10 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
       role,
     });
 
-    // Generate new refresh token (token rotation for security)
-    const { refreshToken: newRefreshToken, csrfToken: newCsrfToken } =
-      tokenManager.generateRefreshTokenWithCsrf(user.id, 'user', payload.csrfNonce);
-
     if (clientType === 'web') {
+      const { refreshToken: newRefreshToken, csrfToken: newCsrfToken } =
+        tokenManager.generateRefreshTokenWithCsrf(user.id, 'user', payload.csrfNonce);
+
       // Web clients: set cookie + return CSRF token
       setRefreshTokenCookie(res, newRefreshToken);
 
@@ -601,6 +600,8 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
         csrfToken: newCsrfToken,
       });
     } else {
+      const newRefreshToken = tokenManager.generateRefreshToken(user.id, 'user', payload.csrfNonce);
+
       // Non-web clients (mobile, desktop, server): return refresh token in body.
       // Server callers are expected to persist the rotated token between requests.
       successResponse(res, {
@@ -610,9 +611,8 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
       });
     }
   } catch (error) {
-    // Clear invalid cookies for web clients, but keep the refresh cookie on CSRF
-    // rejection so a transient missing/header mismatch does not destroy sessions.
-    if (clientType === 'web' && !(error instanceof AppError && error.statusCode === 403)) {
+    // Clear cookies only when the refresh token itself is no longer trustworthy.
+    if (clientType === 'web' && error instanceof AppError && error.statusCode === 401) {
       clearRefreshTokenCookie(res);
     }
     next(error);
