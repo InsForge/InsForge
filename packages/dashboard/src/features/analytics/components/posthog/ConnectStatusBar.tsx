@@ -1,6 +1,7 @@
 import type { PosthogConnection } from '@insforge/shared-schemas';
 import { Button } from '@insforge/ui';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
+import { useToast } from '#lib/hooks/useToast';
 
 export function ConnectStatusBar({
   connection,
@@ -11,6 +12,7 @@ export function ConnectStatusBar({
 }) {
   const directUrl = `${connection.host}/project/${connection.posthogProjectId}`;
   const { onOpenPosthog } = useDashboardHost();
+  const { showToast } = useToast();
 
   // Standalone OSS (no cloud parent) keeps today's direct link: account_requests
   // requires a CIMD-partner-signed call that only cloud-backend can issue.
@@ -43,21 +45,25 @@ export function ConnectStatusBar({
     try {
       newTab.opener = null;
     } catch {
-      // Some browsers throw on the setter for an about:blank window across
-      // certain configurations — harmless; we still navigate cross-origin
-      // below which severs the relationship in practice.
+      // Fail closed: if we can't sever the opener relationship, don't navigate
+      // — cross-origin navigation usually severs it but it's not spec-guaranteed,
+      // so opening the PostHog URL with a live opener would risk reverse-tabnabbing.
+      newTab.close();
+      return;
     }
     onOpenPosthog(projectId)
-      .then(({ url, error }) => {
-        if (url) {
-          newTab.location.href = url;
+      .then((result) => {
+        if (result.url) {
+          newTab.location.href = result.url;
         } else {
           newTab.close();
-          console.error('Open in PostHog failed', error);
+          showToast('Could not open PostHog. Please try again.', 'error');
+          console.error('Open in PostHog failed', result.error);
         }
       })
       .catch((err) => {
         newTab.close();
+        showToast('Could not open PostHog. Please try again.', 'error');
         console.error('Open in PostHog threw', err);
       });
   };

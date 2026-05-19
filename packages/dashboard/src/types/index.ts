@@ -132,7 +132,9 @@ export interface DashboardPosthogConnectionStatus {
 }
 
 /** Resolution of an `onOpenPosthog` call — exactly one of `url` or `error` is set. */
-export type DashboardPosthogOpenResult = { url?: string; error?: string };
+export type DashboardPosthogOpenResult =
+  | { url: string; error?: never }
+  | { url?: never; error: string };
 
 export interface DashboardProps {
   backendUrl?: string;

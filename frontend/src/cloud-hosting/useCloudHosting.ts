@@ -1158,7 +1158,11 @@ export function useCloudHosting() {
           cleanup();
           const url = typeof ev.data.url === 'string' ? ev.data.url : undefined;
           const error = typeof ev.data.error === 'string' ? ev.data.error : undefined;
-          resolve({ url, error });
+          if (url) {
+            resolve({ url });
+          } else {
+            resolve({ error: error ?? 'missing_url' });
+          }
         };
 
         const timeoutId = window.setTimeout(() => {
