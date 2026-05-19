@@ -183,7 +183,7 @@ export const verifyOTPLimiter = [verifyOTPRateLimiter];
  * CI loops are expected to deploy once per commit and stay well below them.
  *
  * Operators can override per-category budgets at runtime by uploading a JSON
- * file to the AWS_CONFIG_BUCKET at key `write-endpoint-rate-limits.json`:
+ * file to the AWS_CONFIG_BUCKET at key `resource-rate-limits.json`:
  *   { "functions": 20, "deployments": 40, "compute": 15 }
  * The file is fetched on startup and refreshed on a periodic timer
  * (default 1 hour; tune via INSFORGE_WRITE_RATE_LIMIT_REFRESH_MS, set to 0
