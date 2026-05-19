@@ -26,6 +26,7 @@ export function CloudHostingDashboard() {
     requestAdvisorIssues,
     triggerAdvisorScan,
     connectPosthog,
+    openPosthog,
     subscribePosthogConnectionStatus,
   } = useCloudHosting();
 
@@ -56,6 +57,7 @@ export function CloudHostingDashboard() {
       onRequestAdvisorIssues={requestAdvisorIssues}
       onTriggerAdvisorScan={triggerAdvisorScan}
       onConnectPosthog={connectPosthog}
+      onOpenPosthog={openPosthog}
       subscribePosthogConnectionStatus={subscribePosthogConnectionStatus}
     />
   );

@@ -47,6 +47,7 @@ interface DashboardHostContextValue {
   subscribePosthogConnectionStatus?: (
     cb: (event: DashboardPosthogConnectionStatus) => void
   ) => () => void;
+  onOpenPosthog?: (projectId: string) => Promise<{ url?: string; error?: string }>;
 }
 
 const DashboardHostContext = createContext<DashboardHostContextValue | null>(null);

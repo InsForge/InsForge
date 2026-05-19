@@ -164,6 +164,7 @@ export interface DashboardProps {
   subscribePosthogConnectionStatus?: (
     cb: (event: DashboardPosthogConnectionStatus) => void
   ) => () => void;
+  onOpenPosthog?: (projectId: string) => Promise<{ url?: string; error?: string }>;
 }
 
 export interface SelfHostingDashboardProps extends DashboardProps {

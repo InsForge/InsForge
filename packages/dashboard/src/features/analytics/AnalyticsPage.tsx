@@ -84,6 +84,13 @@ export function AnalyticsPage() {
     );
   }
 
+  // Connection row exists, so a project must too — but TS can't see that.
+  // Hold the connected view until useProjectId() resolves to keep the
+  // "Open in PostHog" deep-link wired to a concrete projectId.
+  if (projectIdLoading || !projectId) {
+    return <div className="p-6">Loading…</div>;
+  }
+
   const c = conn.data;
 
   return (
@@ -98,7 +105,7 @@ export function AnalyticsPage() {
             </Button>
           </div>
         </div>
-        <ConnectStatusBar connection={c} />
+        <ConnectStatusBar connection={c} projectId={projectId} />
         <section className="flex flex-col gap-3 rounded border border-[var(--alpha-8)] bg-card p-6">
           <div className="flex flex-col gap-1">
             <p className="text-base font-medium leading-7 text-foreground">Setup with Prompt</p>
