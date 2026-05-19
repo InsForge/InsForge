@@ -217,7 +217,7 @@ export const DEFAULT_WRITE_ENDPOINT_LIMITS: Readonly<Record<WriteLimiterCategory
   Object.freeze({
     functions: 15,
     deployments: 25,
-    compute: 10,
+    compute: 15,
   });
 
 /**
