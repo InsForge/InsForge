@@ -1,6 +1,7 @@
 import { getDashboardApiBaseUrl } from '#lib/config/runtime';
 
 const CSRF_COOKIE_NAME = 'insforge_csrf';
+export const REQUEST_TIMEOUT_MS = 30_000;
 
 interface ApiError extends Error {
   response?: {
@@ -73,10 +74,16 @@ export class ApiClient {
         headers['Content-Type'] = headers['Content-Type'] || 'application/json';
       }
 
+      const timeoutSignal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+      const signal = fetchOptions.signal
+        ? AbortSignal.any([fetchOptions.signal, timeoutSignal])
+        : timeoutSignal;
+
       const config: RequestInit = {
         ...fetchOptions,
         headers,
         credentials: 'include',
+        signal,
       };
 
       const response = await fetch(url, config);

@@ -9,20 +9,26 @@ import {
 } from '@insforge/shared-schemas';
 
 export class TableService {
-  async listTables(schemaName: string = DEFAULT_DATABASE_SCHEMA): Promise<string[]> {
+  async listTables(
+    schemaName: string = DEFAULT_DATABASE_SCHEMA,
+    signal?: AbortSignal
+  ): Promise<string[]> {
     return await apiClient.request(`/database/tables${buildDatabaseSchemaSearch(schemaName)}`, {
       headers: apiClient.withAccessToken(),
+      signal,
     });
   }
 
   getTableSchema(
     tableName: string,
-    schemaName: string = DEFAULT_DATABASE_SCHEMA
+    schemaName: string = DEFAULT_DATABASE_SCHEMA,
+    signal?: AbortSignal
   ): Promise<GetTableSchemaResponse> {
     return apiClient.request(
       `/database/tables/${tableName}/schema${buildDatabaseSchemaSearch(schemaName)}`,
       {
         headers: apiClient.withAccessToken(),
+        signal,
       }
     );
   }
