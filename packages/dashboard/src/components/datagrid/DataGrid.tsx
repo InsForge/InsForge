@@ -111,11 +111,7 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
   const defaultRowKeyGetter = useCallback((row: TRow) => row.id || Math.random().toString(), []);
   const keyGetter = rowKeyGetter || defaultRowKeyGetter;
 
-  const defaultColumnKeys = useMemo(
-    () => columns.map((c) => c.key),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [columns.map((c) => c.key).join(',')]
-  );
+  const defaultColumnKeys = useMemo(() => columns.map((c) => c.key), [columns]);
 
   const { columnKeys, reorderColumns } = useColumnOrder(storageKey ?? '', defaultColumnKeys);
 
@@ -210,6 +206,7 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
         minWidth: col.minWidth || 80,
         maxWidth: col.maxWidth,
         resizable: col.resizable !== false,
+        draggable: storageKey ? true : col.draggable,
         sortable: col.sortable !== false,
         sortDescendingFirst: col.sortDescendingFirst ?? true,
         editable: col.editable && !col.isPrimaryKey,

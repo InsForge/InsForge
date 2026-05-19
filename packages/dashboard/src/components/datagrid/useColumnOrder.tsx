@@ -32,8 +32,7 @@ export function useColumnOrder(storageKey: string, defaultKeys: string[]) {
           return prev;
         }
         next.splice(from, 1);
-        const adjustedTo = from < to ? to - 1 : to;
-        next.splice(adjustedTo, 0, sourceKey);
+        next.splice(to, 0, sourceKey);
         try {
           localStorage.setItem(storageKey, JSON.stringify(next));
         } catch (error) {
