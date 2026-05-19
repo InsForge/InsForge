@@ -1,10 +1,12 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { useRawSQL } from '#features/database/hooks/useRawSQL';
+import { useExplainSQL } from '#features/database/hooks/useExplainSQL';
 import { useSQLEditorContext } from '#features/database/contexts/SQLEditorContext';
 import { Button, Tabs, Tab } from '@insforge/ui';
 import { CodeEditor, DataGrid, type DataGridColumn, type DataGridRow } from '#components';
 import { X, Plus } from 'lucide-react';
 import { cn } from '#lib/utils/utils';
+import type { ExplainPlanNode, ExplainSQLResponse } from '@insforge/shared-schemas';
 
 interface ResultsViewerProps {
   data: unknown;
@@ -103,6 +105,103 @@ function ErrorViewer({ error }: ErrorViewerProps) {
   );
 }
 
+interface ExplainPlanViewerProps {
+  explain: ExplainSQLResponse;
+}
+
+function formatMetric(value: number | null | undefined, digits = 2): string {
+  return typeof value === 'number' ? value.toFixed(digits) : 'N/A';
+}
+
+function ExplainPlanCard({ node, depth = 0 }: { node: ExplainPlanNode; depth?: number }) {
+  const detailRows = [
+    node.relationName ? ['Relation', node.relationName] : null,
+    node.indexName ? ['Index', node.indexName] : null,
+    node.joinType ? ['Join Type', node.joinType] : null,
+    node.operation ? ['Operation', node.operation] : null,
+    node.filter ? ['Filter', node.filter] : null,
+    node.indexCond ? ['Index Cond', node.indexCond] : null,
+    node.hashCond ? ['Hash Cond', node.hashCond] : null,
+    node.mergeCond ? ['Merge Cond', node.mergeCond] : null,
+    node.recheckCond ? ['Recheck Cond', node.recheckCond] : null,
+  ].filter((row): row is [string, string] => row !== null);
+
+  return (
+    <div
+      className="rounded-lg border border-[var(--alpha-8)] bg-[var(--alpha-4)] p-3"
+      style={{ marginLeft: depth * 20 }}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-foreground">{node.nodeType}</p>
+          <p className="text-xs text-muted-foreground">
+            Cost {formatMetric(node.startupCost)} to {formatMetric(node.totalCost)} • Est. rows{' '}
+            {node.planRows ?? 'N/A'}
+          </p>
+        </div>
+        <div className="text-right text-xs text-muted-foreground">
+          <p>
+            Actual time {formatMetric(node.actualStartupTime)} to{' '}
+            {formatMetric(node.actualTotalTime)} ms
+          </p>
+          <p>
+            Actual rows {node.actualRows ?? 'N/A'}
+            {typeof node.actualLoops === 'number' ? ` • Loops ${node.actualLoops}` : ''}
+          </p>
+        </div>
+      </div>
+
+      {detailRows.length > 0 ? (
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          {detailRows.map(([label, value]) => (
+            <div key={`${label}-${value}`} className="rounded bg-[var(--alpha-3)] px-2 py-1.5">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+              <p className="font-mono text-xs text-foreground break-words">{value}</p>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {node.plans && node.plans.length > 0 ? (
+        <div className="mt-3 space-y-3 border-l border-[var(--alpha-8)] pl-3">
+          {node.plans.map((child, index) => (
+            <ExplainPlanCard key={`${child.nodeType}-${index}`} node={child} depth={depth + 1} />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ExplainPlanViewer({ explain }: ExplainPlanViewerProps) {
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-lg bg-[var(--alpha-4)] p-3">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Planning</p>
+          <p className="mt-1 font-mono text-lg text-foreground">
+            {formatMetric(explain.planningTime)} ms
+          </p>
+        </div>
+        <div className="rounded-lg bg-[var(--alpha-4)] p-3">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Execution</p>
+          <p className="mt-1 font-mono text-lg text-foreground">
+            {formatMetric(explain.executionTime)} ms
+          </p>
+        </div>
+        <div className="rounded-lg bg-[var(--alpha-4)] p-3">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Total Query Time</p>
+          <p className="mt-1 font-mono text-lg text-foreground">
+            {formatMetric(explain.totalTime)} ms
+          </p>
+        </div>
+      </div>
+
+      <ExplainPlanCard node={explain.plan} />
+    </div>
+  );
+}
+
 export default function SQLEditorPage() {
   const {
     tabs,
@@ -117,12 +216,29 @@ export default function SQLEditorPage() {
 
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [editingTabName, setEditingTabName] = useState('');
-  const [resultView, setResultView] = useState<'result' | 'chart'>('result');
+  const [resultView, setResultView] = useState<'result' | 'chart' | 'explain'>('result');
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const { executeSQL, isPending, data, isSuccess, error, isError } = useRawSQL({
+  const {
+    executeSQL,
+    isPending: isRunningQuery,
+    data,
+    isSuccess,
+    error,
+    isError,
+  } = useRawSQL({
     showSuccessToast: true,
     showErrorToast: false, // Don't show toast, we'll display in results
+  });
+  const {
+    explainSQL,
+    isPending: isExplainingQuery,
+    data: explainData,
+    isSuccess: isExplainSuccess,
+    error: explainError,
+    isError: isExplainError,
+  } = useExplainSQL({
+    showErrorToast: false,
   });
 
   useEffect(() => {
@@ -132,12 +248,24 @@ export default function SQLEditorPage() {
     }
   }, [editingTabId]);
 
+  const isBusy = isRunningQuery || isExplainingQuery;
+
   const handleExecuteQuery = () => {
-    if (!activeTab?.query.trim() || isPending) {
+    if (!activeTab?.query.trim() || isBusy) {
       return;
     }
 
+    setResultView('result');
     executeSQL({ query: activeTab.query, params: [] });
+  };
+
+  const handleExplainQuery = () => {
+    if (!activeTab?.query.trim() || isBusy) {
+      return;
+    }
+
+    setResultView('explain');
+    explainSQL({ query: activeTab.query, params: [] });
   };
 
   const handleQueryChange = (newQuery: string) => {
@@ -317,21 +445,42 @@ export default function SQLEditorPage() {
                 )}
               </Tab>
               <Tab value="chart">Chart</Tab>
+              <Tab value="explain">Explain</Tab>
             </Tabs>
-            {/* Run Button */}
-            <Button onClick={handleExecuteQuery} disabled={isPending || !activeTab?.query.trim()}>
-              Run
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                onClick={handleExplainQuery}
+                disabled={isBusy || !activeTab?.query.trim()}
+              >
+                {isExplainingQuery ? 'Explaining...' : 'Explain'}
+              </Button>
+              <Button onClick={handleExecuteQuery} disabled={isBusy || !activeTab?.query.trim()}>
+                {isRunningQuery ? 'Running...' : 'Run'}
+              </Button>
+            </div>
           </div>
 
           {/* Results Content */}
           <div
             className={cn(
               'flex-1 min-h-0 w-full overflow-auto bg-[rgb(var(--semantic-0))]',
-              resultView === 'result' && 'px-4 py-3'
+              resultView !== 'chart' && 'px-4 py-3'
             )}
           >
-            {isError && error ? (
+            {resultView === 'explain' ? (
+              isExplainError && explainError ? (
+                <ErrorViewer error={explainError} />
+              ) : isExplainSuccess && explainData ? (
+                <ExplainPlanViewer explain={explainData} />
+              ) : (
+                <p className="font-mono text-sm leading-5 text-foreground">
+                  {isExplainingQuery
+                    ? 'Generating query plan...'
+                    : 'Click Explain to inspect the execution plan'}
+                </p>
+              )
+            ) : isError && error ? (
               <div className={resultView !== 'result' ? 'px-4 py-3' : ''}>
                 <ErrorViewer error={error} />
               </div>
@@ -345,10 +494,10 @@ export default function SQLEditorPage() {
               <p
                 className={cn(
                   'font-mono text-sm leading-5 text-foreground',
-                  resultView !== 'result' && 'px-4 py-3'
+                  resultView !== 'result' && resultView !== 'explain' && 'px-4 py-3'
                 )}
               >
-                {isPending ? 'Executing query...' : 'Click Run to execute your query'}
+                {isRunningQuery ? 'Executing query...' : 'Click Run to execute your query'}
               </p>
             )}
           </div>

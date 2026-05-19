@@ -95,6 +95,56 @@ export const rawSQLRequestSchema = z.object({
   params: z.array(z.unknown()).optional(),
 });
 
+const explainPlanNodeSchema: z.ZodType<{
+  nodeType: string;
+  startupCost?: number;
+  totalCost?: number;
+  planRows?: number;
+  actualStartupTime?: number;
+  actualTotalTime?: number;
+  actualRows?: number;
+  actualLoops?: number;
+  relationName?: string;
+  alias?: string;
+  joinType?: string;
+  operation?: string;
+  strategy?: string;
+  indexName?: string;
+  filter?: string;
+  indexCond?: string;
+  hashCond?: string;
+  mergeCond?: string;
+  recheckCond?: string;
+  sortKey?: string[];
+  groupKey?: string[];
+  plans?: Array<unknown>;
+}> = z.lazy(() =>
+  z.object({
+    nodeType: z.string(),
+    startupCost: z.number().optional(),
+    totalCost: z.number().optional(),
+    planRows: z.number().optional(),
+    actualStartupTime: z.number().optional(),
+    actualTotalTime: z.number().optional(),
+    actualRows: z.number().optional(),
+    actualLoops: z.number().optional(),
+    relationName: z.string().optional(),
+    alias: z.string().optional(),
+    joinType: z.string().optional(),
+    operation: z.string().optional(),
+    strategy: z.string().optional(),
+    indexName: z.string().optional(),
+    filter: z.string().optional(),
+    indexCond: z.string().optional(),
+    hashCond: z.string().optional(),
+    mergeCond: z.string().optional(),
+    recheckCond: z.string().optional(),
+    sortKey: z.array(z.string()).optional(),
+    groupKey: z.array(z.string()).optional(),
+    plans: z.array(explainPlanNodeSchema).optional(),
+  })
+);
+
 export const rawSQLResponseSchema = z.object({
   rows: z.array(z.record(z.string(), z.unknown())),
   rowCount: z.number().nullable(),
@@ -106,6 +156,15 @@ export const rawSQLResponseSchema = z.object({
       })
     )
     .optional(),
+});
+
+export const explainSQLRequestSchema = rawSQLRequestSchema;
+
+export const explainSQLResponseSchema = z.object({
+  plan: explainPlanNodeSchema,
+  planningTime: z.number().nullable(),
+  executionTime: z.number().nullable(),
+  totalTime: z.number().nullable(),
 });
 
 // Export Schemas
@@ -349,6 +408,9 @@ export type DeleteTableResponse = z.infer<typeof deleteTableResponse>;
 // Raw SQL Types
 export type RawSQLRequest = z.infer<typeof rawSQLRequestSchema>;
 export type RawSQLResponse = z.infer<typeof rawSQLResponseSchema>;
+export type ExplainSQLRequest = z.infer<typeof explainSQLRequestSchema>;
+export type ExplainPlanNode = z.infer<typeof explainPlanNodeSchema>;
+export type ExplainSQLResponse = z.infer<typeof explainSQLResponseSchema>;
 
 // Export Types
 export type ExportDatabaseRequest = z.infer<typeof exportRequestSchema>;

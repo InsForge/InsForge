@@ -8,6 +8,7 @@ import { ERROR_CODES } from '@/types/error-constants.js';
 import { upload, handleUploadError } from '@/api/middlewares/upload.js';
 import {
   rawSQLRequestSchema,
+  explainSQLRequestSchema,
   exportRequestSchema,
   importRequestSchema,
   bulkUpsertRequestSchema,
@@ -161,6 +162,48 @@ router.post('/rawsql', verifyAdmin, async (req: AuthRequest, res: Response, next
     next(error);
   }
 });
+
+/**
+ * Explain raw SQL query with ANALYZE/BUFFERS enabled.
+ * Runs inside a rollback-only transaction so mutating statements are safe to inspect.
+ * POST /api/database/advance/rawsql/explain
+ */
+router.post(
+  '/rawsql/explain',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validation = explainSQLRequestSchema.safeParse(req.body);
+      if (!validation.success) {
+        throw new AppError(
+          validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const { query, params = [] } = validation.data;
+      const sanitizedQuery = dbAdvanceService.sanitizeQuery(query, 'strict');
+      const response = await dbAdvanceService.explainRawSQL(sanitizedQuery, params);
+
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'EXPLAIN_RAW_SQL',
+        module: 'DATABASE',
+        details: {
+          query: query.substring(0, 300),
+          paramCount: params.length,
+        },
+        ip_address: req.ip,
+      });
+
+      successResponse(res, response);
+    } catch (error: unknown) {
+      logger.warn('Raw SQL explain error:', error);
+      next(error);
+    }
+  }
+);
 
 /**
  * Export database data

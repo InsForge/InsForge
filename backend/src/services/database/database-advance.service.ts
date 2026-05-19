@@ -2,6 +2,8 @@ import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
 import {
   type RawSQLResponse,
+  type ExplainSQLResponse,
+  type ExplainPlanNode,
   type ExportDatabaseResponse,
   type ExportDatabaseJsonData,
   type ImportDatabaseResponse,
@@ -21,6 +23,59 @@ import pgFormat from 'pg-format';
 import { parse } from 'csv-parse/sync';
 import { type PoolClient } from 'pg';
 import { assertWritableDatabaseSchema } from './helpers.js';
+import { parseSync } from 'libpg-query';
+
+type ExplainPlanRecord = Record<string, unknown>;
+
+const EXPLAIN_ALLOWED_STATEMENTS = new Set([
+  'SelectStmt',
+  'InsertStmt',
+  'UpdateStmt',
+  'DeleteStmt',
+  'MergeStmt',
+  'ValuesStmt',
+]);
+
+function asNullableNumber(value: unknown): number | undefined {
+  return typeof value === 'number' ? value : undefined;
+}
+
+function asStringArray(value: unknown): string[] | undefined {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string')
+    : undefined;
+}
+
+function normalizeExplainPlan(plan: ExplainPlanRecord): ExplainPlanNode {
+  return {
+    nodeType: String(plan['Node Type'] ?? 'Unknown'),
+    startupCost: asNullableNumber(plan['Startup Cost']),
+    totalCost: asNullableNumber(plan['Total Cost']),
+    planRows: asNullableNumber(plan['Plan Rows']),
+    actualStartupTime: asNullableNumber(plan['Actual Startup Time']),
+    actualTotalTime: asNullableNumber(plan['Actual Total Time']),
+    actualRows: asNullableNumber(plan['Actual Rows']),
+    actualLoops: asNullableNumber(plan['Actual Loops']),
+    relationName: typeof plan['Relation Name'] === 'string' ? plan['Relation Name'] : undefined,
+    alias: typeof plan.Alias === 'string' ? plan.Alias : undefined,
+    joinType: typeof plan['Join Type'] === 'string' ? plan['Join Type'] : undefined,
+    operation: typeof plan.Operation === 'string' ? plan.Operation : undefined,
+    strategy: typeof plan.Strategy === 'string' ? plan.Strategy : undefined,
+    indexName: typeof plan['Index Name'] === 'string' ? plan['Index Name'] : undefined,
+    filter: typeof plan.Filter === 'string' ? plan.Filter : undefined,
+    indexCond: typeof plan['Index Cond'] === 'string' ? plan['Index Cond'] : undefined,
+    hashCond: typeof plan['Hash Cond'] === 'string' ? plan['Hash Cond'] : undefined,
+    mergeCond: typeof plan['Merge Cond'] === 'string' ? plan['Merge Cond'] : undefined,
+    recheckCond: typeof plan['Recheck Cond'] === 'string' ? plan['Recheck Cond'] : undefined,
+    sortKey: asStringArray(plan['Sort Key']),
+    groupKey: asStringArray(plan['Group Key']),
+    plans: Array.isArray(plan.Plans)
+      ? plan.Plans.filter(
+          (child): child is ExplainPlanRecord => typeof child === 'object' && child !== null
+        ).map((child) => normalizeExplainPlan(child))
+      : undefined,
+  };
+}
 
 export class DatabaseAdvanceService {
   private static instance: DatabaseAdvanceService;
@@ -163,6 +218,113 @@ export class DatabaseAdvanceService {
       throw error;
     } finally {
       // Reset timeout to default before releasing client back to pool
+      await client.query('SET statement_timeout = 0');
+      client.release();
+    }
+  }
+
+  private validateExplainableQuery(query: string): void {
+    let statements: string[];
+
+    try {
+      statements = parseSQLStatements(query);
+    } catch (error) {
+      throw new AppError(
+        error instanceof Error ? error.message : 'Invalid SQL format',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    if (statements.length !== 1) {
+      throw new AppError(
+        'Explain supports a single SQL statement at a time',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    try {
+      const parsed = parseSync(statements[0]);
+      const stmt = parsed.stmts[0]?.stmt as Record<string, unknown> | undefined;
+      const stmtType = stmt ? Object.keys(stmt)[0] : null;
+
+      if (!stmtType || !EXPLAIN_ALLOWED_STATEMENTS.has(stmtType)) {
+        throw new AppError(
+          'Explain supports SELECT, INSERT, UPDATE, DELETE, MERGE, and VALUES statements only',
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      throw new AppError(
+        'Explain could not parse this SQL statement',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+  }
+
+  async explainRawSQL(query: string, params: unknown[] = []): Promise<ExplainSQLResponse> {
+    this.validateExplainableQuery(query);
+
+    const pool = this.dbManager.getPool();
+    const client = await pool.connect();
+    let beganTransaction = false;
+
+    try {
+      await client.query('SET statement_timeout = 30000');
+      await client.query('BEGIN');
+      beganTransaction = true;
+
+      const result = await client.query(`EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) ${query}`, params);
+
+      const explainPayload = result.rows[0]?.['QUERY PLAN'];
+      const explainEntry =
+        Array.isArray(explainPayload) && explainPayload[0] && typeof explainPayload[0] === 'object'
+          ? (explainPayload[0] as ExplainPlanRecord)
+          : null;
+
+      if (!explainEntry || typeof explainEntry.Plan !== 'object' || explainEntry.Plan === null) {
+        throw new Error('Unexpected EXPLAIN response format');
+      }
+
+      await client.query('ROLLBACK');
+      beganTransaction = false;
+
+      const planningTime =
+        typeof explainEntry['Planning Time'] === 'number' ? explainEntry['Planning Time'] : null;
+      const executionTime =
+        typeof explainEntry['Execution Time'] === 'number' ? explainEntry['Execution Time'] : null;
+
+      return {
+        plan: normalizeExplainPlan(explainEntry.Plan as ExplainPlanRecord),
+        planningTime,
+        executionTime,
+        totalTime:
+          planningTime !== null && executionTime !== null ? planningTime + executionTime : null,
+      };
+    } catch (error) {
+      if (hasPgErrorCode(error, '57014')) {
+        throw new Error('Explain timeout: The query took longer than 30 seconds to execute');
+      }
+
+      throw error;
+    } finally {
+      if (beganTransaction) {
+        try {
+          await client.query('ROLLBACK');
+        } catch (rollbackError) {
+          logger.warn('Failed to roll back EXPLAIN transaction', {
+            error: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+          });
+        }
+      }
+
       await client.query('SET statement_timeout = 0');
       client.release();
     }

@@ -1,5 +1,10 @@
 import { apiClient } from '#lib/api/client';
-import { RawSQLRequest, RawSQLResponse } from '@insforge/shared-schemas';
+import {
+  RawSQLRequest,
+  RawSQLResponse,
+  ExplainSQLRequest,
+  ExplainSQLResponse,
+} from '@insforge/shared-schemas';
 
 export class AdvanceService {
   /**
@@ -14,6 +19,18 @@ export class AdvanceService {
     const body: RawSQLRequest = { query, params };
 
     return apiClient.request('/database/advance/rawsql', {
+      method: 'POST',
+      headers: apiClient.withAccessToken({
+        'Content-Type': 'application/json',
+      }),
+      body: JSON.stringify(body),
+    });
+  }
+
+  async explainRawSQL(query: string, params: unknown[] = []): Promise<ExplainSQLResponse> {
+    const body: ExplainSQLRequest = { query, params };
+
+    return apiClient.request('/database/advance/rawsql/explain', {
       method: 'POST',
       headers: apiClient.withAccessToken({
         'Content-Type': 'application/json',
