@@ -135,6 +135,10 @@ export default function BucketsPage() {
         queryClient.invalidateQueries({ queryKey: ['storage', 'bucket-stats'] }),
       ];
       await Promise.all([refetchBuckets(), ...invalidateStorageQueries]);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to refresh storage data';
+      showToast(errorMessage, 'error');
     } finally {
       setIsRefreshing(false);
     }
