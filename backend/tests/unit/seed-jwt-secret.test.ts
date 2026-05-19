@@ -21,4 +21,10 @@ describe('seedBackend JWT_SECRET initialization', () => {
     expect(seedSource).toContain("getSecretByKey('JWT_SECRET')");
     expect(seedSource).toMatch(/existingJwtSecret\s*===\s*null/);
   });
+
+  it('only seeds INSFORGE_INTERNAL_URL outside cloud environments', () => {
+    expect(seedSource).toMatch(
+      /if\s*\(!isCloudEnvironment\(\)\)\s*\{[\s\S]*getSecretByKey\('INSFORGE_INTERNAL_URL'\)/
+    );
+  });
 });
