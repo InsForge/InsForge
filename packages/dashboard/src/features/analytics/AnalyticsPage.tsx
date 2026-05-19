@@ -86,7 +86,19 @@ export function AnalyticsPage() {
 
   // Connection row exists, so a project must too — but TS can't see that.
   // Hold the connected view until useProjectId() resolves to keep the
-  // "Open in PostHog" deep-link wired to a concrete projectId.
+  // "Open in PostHog" deep-link wired to a concrete projectId. Surface the
+  // error case explicitly so a failed projectId fetch can't get stuck on
+  // a spinner forever.
+  if (projectIdError) {
+    return (
+      <div className="p-6">
+        <h1 className="mb-4 text-2xl font-bold text-foreground">Analytics</h1>
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+          Failed to load project ID. Please refresh.
+        </div>
+      </div>
+    );
+  }
   if (projectIdLoading || !projectId) {
     return <div className="p-6">Loading…</div>;
   }

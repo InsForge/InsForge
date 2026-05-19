@@ -5,6 +5,7 @@ import type {
   DashboardInstanceInfo,
   DashboardModelCreditUsage,
   DashboardPosthogConnectionStatus,
+  DashboardPosthogOpenResult,
   DashboardProjectInfo,
   DashboardUserInfo,
   DashboardMetricName,
@@ -1131,7 +1132,7 @@ export function useCloudHosting() {
   // listener (rather than the PendingRequest singleton machinery) so concurrent
   // clicks across multiple projects don't collide.
   const openPosthog = useCallback(
-    (projectId: string): Promise<{ url?: string; error?: string }> => {
+    (projectId: string): Promise<DashboardPosthogOpenResult> => {
       return new Promise((resolve) => {
         const requestId =
           typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
@@ -1166,11 +1167,25 @@ export function useCloudHosting() {
         }, DEFAULT_TIMEOUT_MS);
 
         window.addEventListener('message', handleResponse);
-        void postMessageToParent({
+        // Don't wait the full timeout if delivery to the parent fails
+        // (untrusted origin / no parent window / sync throw) — resolve right
+        // away so the caller can close its placeholder tab.
+        postMessageToParent({
           type: 'POSTHOG_OPEN_REQUEST',
           projectId,
           requestId,
-        });
+        }).then(
+          (delivered) => {
+            if (!delivered) {
+              cleanup();
+              resolve({ error: 'no_parent_window' });
+            }
+          },
+          (err) => {
+            cleanup();
+            resolve({ error: err instanceof Error ? err.message : 'post_failed' });
+          }
+        );
       });
     },
     [postMessageToParent]

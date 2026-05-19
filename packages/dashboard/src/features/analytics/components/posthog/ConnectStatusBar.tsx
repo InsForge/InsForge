@@ -30,10 +30,22 @@ export function ConnectStatusBar({
   // the InsForge user's email against the browser PostHog session. Open the new
   // tab synchronously (blank), await the resolved URL, then set its location —
   // popup blockers cancel any window.open() that happens after an `await`.
+  //
+  // We can't pass `noopener` in the features string: it forces window.open() to
+  // return null, which kills our ability to set `location.href` later. Instead,
+  // detach `opener` manually on the about:blank document (same-origin with us)
+  // before navigating, so the cross-origin PostHog page can't reach back.
   const handleClick = () => {
     const newTab = window.open('about:blank', '_blank');
     if (!newTab) {
       return;
+    }
+    try {
+      newTab.opener = null;
+    } catch {
+      // Some browsers throw on the setter for an about:blank window across
+      // certain configurations — harmless; we still navigate cross-origin
+      // below which severs the relationship in practice.
     }
     onOpenPosthog(projectId)
       .then(({ url, error }) => {
