@@ -10,13 +10,14 @@ const migrationPath = path.resolve(
 );
 
 describe('044_add-auth-token-expiry-config migration', () => {
-  const sql = fs.readFileSync(migrationPath, 'utf8');
+  const readMigration = () => fs.readFileSync(migrationPath, 'utf8');
 
   it('migration file exists', () => {
     expect(fs.existsSync(migrationPath)).toBe(true);
   });
 
   it('adds the four expiry columns with defaults', () => {
+    const sql = readMigration();
     expect(sql).toMatch(/verify_email_code_expiry_minutes INTEGER DEFAULT 15 NOT NULL/i);
     expect(sql).toMatch(/verify_email_link_expiry_hours INTEGER DEFAULT 24 NOT NULL/i);
     expect(sql).toMatch(/reset_password_code_expiry_minutes INTEGER DEFAULT 10 NOT NULL/i);
@@ -24,6 +25,7 @@ describe('044_add-auth-token-expiry-config migration', () => {
   });
 
   it('guards check constraints behind existence checks', () => {
+    const sql = readMigration();
     expect(sql).toMatch(
       /conname = 'auth_config_verify_email_code_expiry_minutes_check'[\s\S]*?conrelid = 'auth\.config'::regclass[\s\S]*?CHECK \(verify_email_code_expiry_minutes BETWEEN 1 AND 10080\)/i
     );

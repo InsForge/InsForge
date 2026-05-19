@@ -28,7 +28,7 @@ import {
   Switch,
 } from '@insforge/ui';
 import {
-  AUTH_TOKEN_EXPIRY_LIMITS,
+  authTokenExpiryLimits,
   updateAuthConfigRequestSchema,
   type AuthConfigSchema,
   type UpdateAuthConfigRequest,
@@ -405,13 +405,13 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
 
                         <SettingRow
                           label="Verification Code Expiry"
-                          description={`How long a 6-digit verification code remains valid. Range: ${AUTH_TOKEN_EXPIRY_LIMITS.codeMinutes.min}-${AUTH_TOKEN_EXPIRY_LIMITS.codeMinutes.max} minutes.`}
+                          description={`How long a 6-digit verification code remains valid. Range: ${authTokenExpiryLimits.codeMinutes.min}-${authTokenExpiryLimits.codeMinutes.max} minutes.`}
                         >
                           <div className="max-w-[180px]">
                             <Input
                               type="number"
-                              min={AUTH_TOKEN_EXPIRY_LIMITS.codeMinutes.min.toString()}
-                              max={AUTH_TOKEN_EXPIRY_LIMITS.codeMinutes.max.toString()}
+                              min={authTokenExpiryLimits.codeMinutes.min.toString()}
+                              max={authTokenExpiryLimits.codeMinutes.max.toString()}
                               {...form.register('verifyEmailCodeExpiryMinutes', {
                                 valueAsNumber: true,
                               })}
@@ -431,13 +431,13 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
 
                         <SettingRow
                           label="Verification Link Expiry"
-                          description={`How long a verification link remains valid. Range: ${AUTH_TOKEN_EXPIRY_LIMITS.linkHours.min}-${AUTH_TOKEN_EXPIRY_LIMITS.linkHours.max} hours.`}
+                          description={`How long a verification link remains valid. Range: ${authTokenExpiryLimits.linkHours.min}-${authTokenExpiryLimits.linkHours.max} hours.`}
                         >
                           <div className="max-w-[180px]">
                             <Input
                               type="number"
-                              min={AUTH_TOKEN_EXPIRY_LIMITS.linkHours.min.toString()}
-                              max={AUTH_TOKEN_EXPIRY_LIMITS.linkHours.max.toString()}
+                              min={authTokenExpiryLimits.linkHours.min.toString()}
+                              max={authTokenExpiryLimits.linkHours.max.toString()}
                               {...form.register('verifyEmailLinkExpiryHours', {
                                 valueAsNumber: true,
                               })}
@@ -582,13 +582,13 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
 
                     <SettingRow
                       label="Reset Code Expiry"
-                      description={`How long a 6-digit password reset code remains valid. Range: ${AUTH_TOKEN_EXPIRY_LIMITS.codeMinutes.min}-${AUTH_TOKEN_EXPIRY_LIMITS.codeMinutes.max} minutes.`}
+                      description={`How long a 6-digit password reset code remains valid. Range: ${authTokenExpiryLimits.codeMinutes.min}-${authTokenExpiryLimits.codeMinutes.max} minutes.`}
                     >
                       <div className="max-w-[180px]">
                         <Input
                           type="number"
-                          min={AUTH_TOKEN_EXPIRY_LIMITS.codeMinutes.min.toString()}
-                          max={AUTH_TOKEN_EXPIRY_LIMITS.codeMinutes.max.toString()}
+                          min={authTokenExpiryLimits.codeMinutes.min.toString()}
+                          max={authTokenExpiryLimits.codeMinutes.max.toString()}
                           {...form.register('resetPasswordCodeExpiryMinutes', {
                             valueAsNumber: true,
                           })}
@@ -608,13 +608,13 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
 
                     <SettingRow
                       label="Reset Link Expiry"
-                      description={`How long a password reset link remains valid. Range: ${AUTH_TOKEN_EXPIRY_LIMITS.linkHours.min}-${AUTH_TOKEN_EXPIRY_LIMITS.linkHours.max} hours.`}
+                      description={`How long a password reset link remains valid. Range: ${authTokenExpiryLimits.linkHours.min}-${authTokenExpiryLimits.linkHours.max} hours.`}
                     >
                       <div className="max-w-[180px]">
                         <Input
                           type="number"
-                          min={AUTH_TOKEN_EXPIRY_LIMITS.linkHours.min.toString()}
-                          max={AUTH_TOKEN_EXPIRY_LIMITS.linkHours.max.toString()}
+                          min={authTokenExpiryLimits.linkHours.min.toString()}
+                          max={authTokenExpiryLimits.linkHours.max.toString()}
                           {...form.register('resetPasswordLinkExpiryHours', {
                             valueAsNumber: true,
                           })}

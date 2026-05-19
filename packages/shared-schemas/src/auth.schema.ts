@@ -25,7 +25,7 @@ export const roleSchema = z.enum(['anon', 'authenticated', 'project_admin']);
 
 export const verificationMethodSchema = z.enum(['code', 'link']);
 
-export const AUTH_TOKEN_EXPIRY_LIMITS = {
+export const authTokenExpiryLimits = {
   codeMinutes: {
     min: 1,
     max: 7 * 24 * 60,
@@ -35,6 +35,30 @@ export const AUTH_TOKEN_EXPIRY_LIMITS = {
     max: 7 * 24,
   },
 } as const;
+
+export const codeExpiryMinutesSchema = z
+  .number()
+  .int()
+  .min(
+    authTokenExpiryLimits.codeMinutes.min,
+    `Must be at least ${authTokenExpiryLimits.codeMinutes.min} minute`
+  )
+  .max(
+    authTokenExpiryLimits.codeMinutes.max,
+    `Must be at most ${authTokenExpiryLimits.codeMinutes.max} minutes`
+  );
+
+export const linkExpiryHoursSchema = z
+  .number()
+  .int()
+  .min(
+    authTokenExpiryLimits.linkHours.min,
+    `Must be at least ${authTokenExpiryLimits.linkHours.min} hour`
+  )
+  .max(
+    authTokenExpiryLimits.linkHours.max,
+    `Must be at most ${authTokenExpiryLimits.linkHours.max} hours`
+  );
 
 /**
  * User profile schema with default fields and passthrough for custom fields
@@ -133,50 +157,10 @@ export const authConfigSchema = z.object({
   requireSpecialChar: z.boolean(),
   verifyEmailMethod: verificationMethodSchema,
   resetPasswordMethod: verificationMethodSchema,
-  verifyEmailCodeExpiryMinutes: z
-    .number()
-    .int()
-    .min(
-      AUTH_TOKEN_EXPIRY_LIMITS.codeMinutes.min,
-      `Must be at least ${AUTH_TOKEN_EXPIRY_LIMITS.codeMinutes.min} minute`
-    )
-    .max(
-      AUTH_TOKEN_EXPIRY_LIMITS.codeMinutes.max,
-      `Must be at most ${AUTH_TOKEN_EXPIRY_LIMITS.codeMinutes.max} minutes`
-    ),
-  verifyEmailLinkExpiryHours: z
-    .number()
-    .int()
-    .min(
-      AUTH_TOKEN_EXPIRY_LIMITS.linkHours.min,
-      `Must be at least ${AUTH_TOKEN_EXPIRY_LIMITS.linkHours.min} hour`
-    )
-    .max(
-      AUTH_TOKEN_EXPIRY_LIMITS.linkHours.max,
-      `Must be at most ${AUTH_TOKEN_EXPIRY_LIMITS.linkHours.max} hours`
-    ),
-  resetPasswordCodeExpiryMinutes: z
-    .number()
-    .int()
-    .min(
-      AUTH_TOKEN_EXPIRY_LIMITS.codeMinutes.min,
-      `Must be at least ${AUTH_TOKEN_EXPIRY_LIMITS.codeMinutes.min} minute`
-    )
-    .max(
-      AUTH_TOKEN_EXPIRY_LIMITS.codeMinutes.max,
-      `Must be at most ${AUTH_TOKEN_EXPIRY_LIMITS.codeMinutes.max} minutes`
-    ),
-  resetPasswordLinkExpiryHours: z
-    .number()
-    .int()
-    .min(
-      AUTH_TOKEN_EXPIRY_LIMITS.linkHours.min,
-      `Must be at least ${AUTH_TOKEN_EXPIRY_LIMITS.linkHours.min} hour`
-    )
-    .max(
-      AUTH_TOKEN_EXPIRY_LIMITS.linkHours.max,
-      `Must be at most ${AUTH_TOKEN_EXPIRY_LIMITS.linkHours.max} hours`
-    ),
+  verifyEmailCodeExpiryMinutes: codeExpiryMinutesSchema,
+  verifyEmailLinkExpiryHours: linkExpiryHoursSchema,
+  resetPasswordCodeExpiryMinutes: codeExpiryMinutesSchema,
+  resetPasswordLinkExpiryHours: linkExpiryHoursSchema,
   allowedRedirectUrls: z
     .array(z.string().regex(allowedRedirectUrlsRegex, { message: 'Invalid URL or wildcard URL' }))
     .optional()

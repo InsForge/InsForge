@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from 'vitest';
-import { S3StorageProvider } from '../../src/providers/storage/s3.provider.ts';
+import { S3StorageProvider } from '../../src/providers/storage/s3.provider';
 import { CopyObjectCommand, GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { Readable } from 'stream';
 import crypto from 'crypto';

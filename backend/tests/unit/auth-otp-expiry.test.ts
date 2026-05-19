@@ -48,7 +48,7 @@ vi.mock('../../src/utils/logger.js', () => ({
   },
 }));
 
-import { AuthOTPService, OTPPurpose, OTPType } from '../../src/services/auth/auth-otp.service.ts';
+import { AuthOTPService, OTPPurpose, OTPType } from '../../src/services/auth/auth-otp.service';
 
 describe('AuthOTPService token expiry config', () => {
   beforeEach(() => {
@@ -56,10 +56,10 @@ describe('AuthOTPService token expiry config', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-20T00:00:00.000Z'));
     mockGetAuthConfig.mockResolvedValue({
-      verifyEmailCodeExpiryMinutes: 15,
-      verifyEmailLinkExpiryHours: 24,
-      resetPasswordCodeExpiryMinutes: 10,
-      resetPasswordLinkExpiryHours: 1,
+      verifyEmailCodeExpiryMinutes: 17,
+      verifyEmailLinkExpiryHours: 36,
+      resetPasswordCodeExpiryMinutes: 3,
+      resetPasswordLinkExpiryHours: 5,
     });
     mockGenerateNumericCode.mockReturnValue('123456');
     mockGenerateSecureToken.mockReturnValue('abcdef0123456789');
@@ -78,7 +78,7 @@ describe('AuthOTPService token expiry config', () => {
       OTPType.NUMERIC_CODE
     );
 
-    expect(result.expiresAt.toISOString()).toBe('2026-05-20T00:10:00.000Z');
+    expect(result.expiresAt.toISOString()).toBe('2026-05-20T00:03:00.000Z');
     expect(mockPool.query).toHaveBeenCalledWith(expect.any(String), [
       'user@example.com',
       OTPPurpose.RESET_PASSWORD,
@@ -112,7 +112,7 @@ describe('AuthOTPService token expiry config', () => {
       '123456',
       mockClient
     );
-    expect(result.expiresAt.toISOString()).toBe('2026-05-20T01:00:00.000Z');
+    expect(result.expiresAt.toISOString()).toBe('2026-05-20T05:00:00.000Z');
     expect(mockClient.query).toHaveBeenCalledWith(expect.any(String), [
       'user@example.com',
       OTPPurpose.RESET_PASSWORD,

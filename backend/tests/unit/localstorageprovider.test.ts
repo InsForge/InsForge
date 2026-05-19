@@ -1,4 +1,4 @@
-import { LocalStorageProvider } from '../../src/providers/storage/local.provider.ts';
+import { LocalStorageProvider } from '../../src/providers/storage/local.provider';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'fs/promises';
 import * as path from 'path';
