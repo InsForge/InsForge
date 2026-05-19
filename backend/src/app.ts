@@ -39,6 +39,7 @@ import { posthogRouter } from '@/api/routes/posthog/index.routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+let envLoaded = false;
 
 function shouldSkipGlobalRateLimit(req: Request): boolean {
   if (req.path === '/api/health') {
@@ -50,16 +51,28 @@ function shouldSkipGlobalRateLimit(req: Request): boolean {
   );
 }
 
-// Load .env file from the root directory (parent of backend)
-const envPath = path.resolve(__dirname, '../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath });
-} else {
-  // Fallback to default behavior (looks in current working directory)
-  dotenv.config();
+function loadEnvironment() {
+  if (envLoaded) {
+    return;
+  }
+
+  const envPath = path.resolve(__dirname, '../../.env');
+  if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath });
+  } else {
+    dotenv.config();
+  }
+
+  envLoaded = true;
+}
+
+function shouldSkipRequestLog(pathname: string) {
+  return pathname === '/api/logs' || pathname.startsWith('/api/logs/');
 }
 
 export async function createApp() {
+  loadEnvironment();
+
   // Initialize database first
   const dbManager = DatabaseManager.getInstance();
   await dbManager.initialize(); // create data/app.db
@@ -146,7 +159,7 @@ export async function createApp() {
     // Log after response is finished
     res.on('finish', () => {
       // Skip logging for logs endpoints to avoid infinite loops
-      if (req.path.includes('/logs/')) {
+      if (shouldSkipRequestLog(req.path)) {
         return;
       }
 
@@ -238,19 +251,34 @@ export async function createApp() {
       const targetUrl = new URL(`/${slug}`, baseUrl);
       targetUrl.search = new URL(req.url, `http://${req.headers.host}`).search;
 
+      const hasBody = !['GET', 'HEAD'].includes(req.method) && req.body !== undefined;
+
       // Build headers, filtering out non-string values and overriding host
       const headers: Record<string, string> = {};
       for (const [key, value] of Object.entries(req.headers)) {
+        const lowerKey = key.toLowerCase();
+        if (
+          ['host', 'content-length', 'transfer-encoding'].includes(lowerKey) ||
+          (hasBody && lowerKey === 'content-type')
+        ) {
+          continue;
+        }
+
         if (typeof value === 'string') {
           headers[key] = value;
         }
       }
       headers.host = targetUrl.host;
 
+      const body = hasBody ? JSON.stringify(req.body) : undefined;
+      if (body !== undefined) {
+        headers['content-type'] = 'application/json';
+      }
+
       const response = await fetch(targetUrl, {
         method: req.method,
         headers,
-        body: ['GET', 'HEAD'].includes(req.method) ? undefined : JSON.stringify(req.body),
+        body,
       });
 
       // Read response as raw bytes to preserve binary data (images, PDFs, etc.)

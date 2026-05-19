@@ -12,6 +12,8 @@ describe('server entrypoint', () => {
   });
 
   it('stays idle when imported by another module', async () => {
+    vi.resetModules();
+
     const processOnSpy = vi.spyOn(process, 'on');
 
     await import('../../src/server.js');
