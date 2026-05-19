@@ -80,7 +80,11 @@ describe('Deno Subhosting 429 backoff', () => {
     expect(elapsed).toBeGreaterThanOrEqual(900);
   }, 30_000);
 
-  it('throws after exhausting retries', async () => {
+  it('throws AppError(429, RATE_LIMITED) after exhausting retries', async () => {
+    // Pin Math.random so the inner jitter is deterministic — keeps the test
+    // free of flakes around timing of the 4 attempts.
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
     let attempts = 0;
     vi.doMock('node-fetch', () => ({
       __esModule: true,
@@ -92,9 +96,17 @@ describe('Deno Subhosting 429 backoff', () => {
     }));
 
     const mod = await import('@/providers/functions/deno-subhosting.provider.js');
+    const { AppError } = await import('@/api/middlewares/error.js');
+    const { ERROR_CODES } = await import('@/types/error-constants.js');
     const provider = mod.DenoSubhostingProvider.getInstance();
 
-    await expect(provider.getDeployment('dep-3')).rejects.toThrow();
+    // Exhausted retries must surface as 429 RATE_LIMITED, not the generic 500
+    // INTERNAL_ERROR that callers would otherwise raise from `!response.ok`.
+    await expect(provider.getDeployment('dep-3')).rejects.toMatchObject({
+      constructor: AppError,
+      statusCode: 429,
+      code: ERROR_CODES.RATE_LIMITED,
+    });
     // initial + 3 retries from DEFAULT_RATE_LIMIT_BACKOFF_MS = 4 attempts
     expect(attempts).toBeGreaterThanOrEqual(4);
   }, 30_000);

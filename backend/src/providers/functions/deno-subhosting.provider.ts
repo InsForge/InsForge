@@ -61,8 +61,10 @@ export function parseRetryAfterMs(header: string | null): number {
  * The 429 retries sit INSIDE each network-attempt: if a fetch succeeds
  * network-wise but returns 429, we retry with backoff according to
  * `rateLimitBackoffMs`. If retries are exhausted while the response is still
- * 429, we return that final 429 response and let the caller's error handling
- * deal with it (we do not throw on 429 exhaustion).
+ * 429, we throw `AppError(429, RATE_LIMITED)` so the rate-limit signal
+ * surfaces to the client (the generic `!response.ok` paths in the callers
+ * would otherwise flatten it to `500 INTERNAL_ERROR`). Mirrors the Vercel
+ * helper's behaviour.
  */
 async function fetchWithTimeout(
   url: string,
@@ -132,6 +134,20 @@ async function fetchWithTimeout(
           } finally {
             clearTimeout(retryTimeoutId);
           }
+        }
+
+        // If we exhausted every retry and still hold a 429, surface the
+        // rate-limit signal to the caller. Otherwise their generic
+        // `if (!response.ok)` branch would re-package it as 500.
+        if (currentResponse.status === 429) {
+          if (currentResponse.body) {
+            currentResponse.body.resume();
+          }
+          throw new AppError(
+            'Deno Subhosting rate limit exceeded after retries. Please retry shortly.',
+            429,
+            ERROR_CODES.RATE_LIMITED
+          );
         }
       }
 
