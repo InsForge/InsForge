@@ -106,6 +106,88 @@ export interface VercelProjectDomain {
   verification?: Array<{ type: string; domain: string; value: string; reason: string }>;
 }
 
+export interface VercelRateLimitRetryOptions {
+  maxRetries: number;
+  /** Base delay for exponential schedule when X-RateLimit-Reset is missing. */
+  baseDelayMs: number;
+  /** Cap on the computed delay so a wildly-future reset header doesn't stall the worker. */
+  maxDelayMs: number;
+  /** Max jitter (ms) added on top of the base. */
+  jitterMaxMs: number;
+}
+
+/**
+ * Wrap any Vercel API call so HTTP 429 responses trigger an exponential-backoff
+ * retry. Vercel returns `X-RateLimit-Reset` as a Unix epoch (seconds); when
+ * present we wait until that instant (capped at `maxDelayMs`). Otherwise we
+ * fall back to `2^attempt * baseDelayMs + jitter`. The final delay (base +
+ * jitter) is clamped to `maxDelayMs` so jitter cannot push the wait past the
+ * intended cap.
+ *
+ * On 429 retry exhaustion the helper throws `AppError(429, RATE_LIMITED)`
+ * rather than the raw axios error, so callers can rethrow it as-is and have
+ * the rate-limit semantics surface to the client instead of being flattened
+ * to a generic 500 INTERNAL_ERROR.
+ *
+ * Used by these write endpoints: createDeployment, cancelDeployment,
+ * upsertEnvironmentVariables, addCustomDomain, removeCustomDomain,
+ * verifyCustomDomain. uploadFile keeps its own bespoke streaming-aware
+ * retry loop and is intentionally NOT wrapped by this helper.
+ */
+export async function withVercelRateLimitRetry<T>(
+  op: () => Promise<T>,
+  opts: VercelRateLimitRetryOptions
+): Promise<T> {
+  let attempt = 0;
+  while (true) {
+    try {
+      return await op();
+    } catch (error: unknown) {
+      const isAxios429 = axios.isAxiosError(error) && error.response?.status === 429;
+
+      if (!isAxios429) {
+        throw error;
+      }
+      if (attempt >= opts.maxRetries) {
+        throw new AppError(
+          'Vercel rate limit exceeded after retries. Please retry shortly.',
+          429,
+          ERROR_CODES.RATE_LIMITED
+        );
+      }
+
+      const headers = error.response?.headers ?? {};
+      const reset = headers['x-ratelimit-reset'];
+      const parsedReset = reset !== undefined && reset !== null ? parseInt(String(reset), 10) : NaN;
+      let baseDelay: number;
+      if (!isNaN(parsedReset)) {
+        const resetMs = parsedReset * 1000;
+        baseDelay = Math.min(Math.max(resetMs - Date.now(), opts.baseDelayMs), opts.maxDelayMs);
+      } else {
+        baseDelay = Math.min(2 ** attempt * opts.baseDelayMs, opts.maxDelayMs);
+      }
+      const delay = Math.min(
+        baseDelay + Math.floor(Math.random() * opts.jitterMaxMs),
+        opts.maxDelayMs
+      );
+      logger.warn('Vercel rate limit hit — retrying', {
+        attempt: attempt + 1,
+        maxRetries: opts.maxRetries,
+        delayMs: Math.round(delay),
+      });
+      await new Promise((res) => setTimeout(res, delay));
+      attempt++;
+    }
+  }
+}
+
+export const DEFAULT_VERCEL_RATE_LIMIT_OPTS: VercelRateLimitRetryOptions = {
+  maxRetries: 3,
+  baseDelayMs: 1000,
+  maxDelayMs: 30_000,
+  jitterMaxMs: 250,
+};
+
 export class VercelProvider {
   private static instance: VercelProvider;
   private cloudCredentials: VercelCredentials | undefined;
@@ -317,17 +399,21 @@ export class VercelProvider {
     const credentials = await this.getCredentials();
 
     try {
-      const response = await axios.post(
-        `https://api.vercel.com/v13/deployments?teamId=${credentials.teamId}&skipAutoDetectionConfirmation=1`,
-        {
-          name: options.name || 'deployment',
-          target: 'production',
-          project: credentials.projectId,
-          files: options.files,
-          projectSettings: options.projectSettings,
-          meta: options.meta,
-        },
-        { headers: { Authorization: `Bearer ${credentials.token}` } }
+      const response = await withVercelRateLimitRetry(
+        () =>
+          axios.post(
+            `https://api.vercel.com/v13/deployments?teamId=${credentials.teamId}&skipAutoDetectionConfirmation=1`,
+            {
+              name: options.name || 'deployment',
+              target: 'production',
+              project: credentials.projectId,
+              files: options.files,
+              projectSettings: options.projectSettings,
+              meta: options.meta,
+            },
+            { headers: { Authorization: `Bearer ${credentials.token}` } }
+          ),
+        DEFAULT_VERCEL_RATE_LIMIT_OPTS
       );
 
       const deployment = response.data;
@@ -347,6 +433,9 @@ export class VercelProvider {
         createdAt: new Date(deployment.createdAt),
       };
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       logger.error('Failed to create Vercel deployment', {
         error: error instanceof Error ? error.message : String(error),
       });
@@ -402,13 +491,20 @@ export class VercelProvider {
     const credentials = await this.getCredentials();
 
     try {
-      await axios.patch(
-        `https://api.vercel.com/v12/deployments/${deploymentId}/cancel?teamId=${credentials.teamId}`,
-        {},
-        { headers: { Authorization: `Bearer ${credentials.token}` } }
+      await withVercelRateLimitRetry(
+        () =>
+          axios.patch(
+            `https://api.vercel.com/v12/deployments/${deploymentId}/cancel?teamId=${credentials.teamId}`,
+            {},
+            { headers: { Authorization: `Bearer ${credentials.token}` } }
+          ),
+        DEFAULT_VERCEL_RATE_LIMIT_OPTS
       );
       logger.info('Vercel deployment cancelled', { deploymentId });
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       logger.error('Failed to cancel Vercel deployment', {
         error: error instanceof Error ? error.message : String(error),
         deploymentId,
@@ -431,10 +527,14 @@ export class VercelProvider {
         target: ['production', 'preview', 'development'],
       }));
 
-      await axios.post(
-        `https://api.vercel.com/v10/projects/${credentials.projectId}/env?teamId=${credentials.teamId}&upsert=true`,
-        payload,
-        { headers: { Authorization: `Bearer ${credentials.token}` } }
+      await withVercelRateLimitRetry(
+        () =>
+          axios.post(
+            `https://api.vercel.com/v10/projects/${credentials.projectId}/env?teamId=${credentials.teamId}&upsert=true`,
+            payload,
+            { headers: { Authorization: `Bearer ${credentials.token}` } }
+          ),
+        DEFAULT_VERCEL_RATE_LIMIT_OPTS
       );
 
       logger.info('Environment variables upserted', {
@@ -442,6 +542,9 @@ export class VercelProvider {
         keys: envVars.map((e) => e.key),
       });
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       logger.error('Failed to upsert environment variables', {
         error: error instanceof Error ? error.message : String(error),
       });
@@ -580,13 +683,20 @@ export class VercelProvider {
     const credentials = await this.getCredentials();
 
     try {
-      await axios.delete(
-        `https://api.vercel.com/v10/projects/${credentials.projectId}/env/${envId}?teamId=${credentials.teamId}`,
-        { headers: { Authorization: `Bearer ${credentials.token}` } }
+      await withVercelRateLimitRetry(
+        () =>
+          axios.delete(
+            `https://api.vercel.com/v10/projects/${credentials.projectId}/env/${envId}?teamId=${credentials.teamId}`,
+            { headers: { Authorization: `Bearer ${credentials.token}` } }
+          ),
+        DEFAULT_VERCEL_RATE_LIMIT_OPTS
       );
 
       logger.info('Environment variable deleted', { envId });
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       if (axios.isAxiosError(error) && error.response?.status === 404) {
         throw new AppError(`Environment variable not found: ${envId}`, 404, ERROR_CODES.NOT_FOUND);
       }
@@ -761,15 +871,22 @@ export class VercelProvider {
     const credentials = await this.getCredentials();
 
     try {
-      const response = await axios.post(
-        `https://api.vercel.com/v10/projects/${credentials.projectId}/domains?teamId=${credentials.teamId}`,
-        { name: domain },
-        { headers: { Authorization: `Bearer ${credentials.token}` } }
+      const response = await withVercelRateLimitRetry(
+        () =>
+          axios.post(
+            `https://api.vercel.com/v10/projects/${credentials.projectId}/domains?teamId=${credentials.teamId}`,
+            { name: domain },
+            { headers: { Authorization: `Bearer ${credentials.token}` } }
+          ),
+        DEFAULT_VERCEL_RATE_LIMIT_OPTS
       );
 
       logger.info('Custom domain added to Vercel project', { domain });
       return response.data;
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       if (axios.isAxiosError(error)) {
         const status = error.response?.status;
         const msg = (error.response?.data as { error?: { message?: string } })?.error?.message;
@@ -800,13 +917,20 @@ export class VercelProvider {
     const credentials = await this.getCredentials();
 
     try {
-      await axios.delete(
-        `https://api.vercel.com/v9/projects/${credentials.projectId}/domains/${domain}?teamId=${credentials.teamId}`,
-        { headers: { Authorization: `Bearer ${credentials.token}` } }
+      await withVercelRateLimitRetry(
+        () =>
+          axios.delete(
+            `https://api.vercel.com/v9/projects/${credentials.projectId}/domains/${domain}?teamId=${credentials.teamId}`,
+            { headers: { Authorization: `Bearer ${credentials.token}` } }
+          ),
+        DEFAULT_VERCEL_RATE_LIMIT_OPTS
       );
 
       logger.info('Custom domain removed from Vercel project', { domain });
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       if (axios.isAxiosError(error) && error.response?.status === 404) {
         // Domain not found on Vercel side – treat as already removed
         return;
@@ -830,10 +954,14 @@ export class VercelProvider {
     const credentials = await this.getCredentials();
 
     try {
-      const response = await axios.post(
-        `https://api.vercel.com/v9/projects/${credentials.projectId}/domains/${domain}/verify?teamId=${credentials.teamId}`,
-        {},
-        { headers: { Authorization: `Bearer ${credentials.token}` } }
+      const response = await withVercelRateLimitRetry(
+        () =>
+          axios.post(
+            `https://api.vercel.com/v9/projects/${credentials.projectId}/domains/${domain}/verify?teamId=${credentials.teamId}`,
+            {},
+            { headers: { Authorization: `Bearer ${credentials.token}` } }
+          ),
+        DEFAULT_VERCEL_RATE_LIMIT_OPTS
       );
 
       const data = response.data as {
@@ -844,6 +972,9 @@ export class VercelProvider {
       logger.info('Custom domain verification result', { domain, verified: data.verified });
       return data;
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       if (axios.isAxiosError(error) && error.response?.status === 404) {
         throw new AppError(`Domain not found on Vercel: ${domain}`, 404, ERROR_CODES.NOT_FOUND);
       }

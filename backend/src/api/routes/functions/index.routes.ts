@@ -1,5 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
+import { functionsWriteLimiter } from '@/api/middlewares/rate-limiters.js';
 import { FunctionService } from '@/services/functions/function.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/api/middlewares/error.js';
@@ -51,103 +52,113 @@ router.get('/:slug', verifyAdmin, async (req: AuthRequest, res: Response, next: 
  * POST /api/functions
  * Create a new function
  */
-router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const validation = uploadFunctionRequestSchema.safeParse(req.body);
-    if (!validation.success) {
-      throw new AppError(JSON.stringify(validation.error.issues), 400, ERROR_CODES.INVALID_INPUT);
+router.post(
+  '/',
+  verifyAdmin,
+  functionsWriteLimiter,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validation = uploadFunctionRequestSchema.safeParse(req.body);
+      if (!validation.success) {
+        throw new AppError(JSON.stringify(validation.error.issues), 400, ERROR_CODES.INVALID_INPUT);
+      }
+
+      const result = await functionService.createFunction(validation.data);
+
+      // Log audit event
+      logger.info(
+        `Function ${result.function.name} (${result.function.slug}) created by ${req.user?.email}`
+      );
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'CREATE_FUNCTION',
+        module: 'FUNCTIONS',
+        details: {
+          functionId: result.function.id,
+          slug: result.function.slug,
+          name: result.function.name,
+          status: result.function.status,
+        },
+        ip_address: req.ip,
+      });
+
+      const socket = SocketManager.getInstance();
+      socket.broadcastToRoom(
+        'role:project_admin',
+        ServerEvents.DATA_UPDATE,
+        { resource: DataUpdateResourceType.FUNCTIONS },
+        'system'
+      );
+
+      successResponse(
+        res,
+        {
+          success: !result.deployment || result.deployment.status === 'success',
+          function: result.function,
+          deployment: result.deployment,
+        },
+        201
+      );
+    } catch (error) {
+      next(error);
     }
-
-    const result = await functionService.createFunction(validation.data);
-
-    // Log audit event
-    logger.info(
-      `Function ${result.function.name} (${result.function.slug}) created by ${req.user?.email}`
-    );
-    await auditService.log({
-      actor: req.user?.email || 'api-key',
-      action: 'CREATE_FUNCTION',
-      module: 'FUNCTIONS',
-      details: {
-        functionId: result.function.id,
-        slug: result.function.slug,
-        name: result.function.name,
-        status: result.function.status,
-      },
-      ip_address: req.ip,
-    });
-
-    const socket = SocketManager.getInstance();
-    socket.broadcastToRoom(
-      'role:project_admin',
-      ServerEvents.DATA_UPDATE,
-      { resource: DataUpdateResourceType.FUNCTIONS },
-      'system'
-    );
-
-    successResponse(
-      res,
-      {
-        success: !result.deployment || result.deployment.status === 'success',
-        function: result.function,
-        deployment: result.deployment,
-      },
-      201
-    );
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 /**
  * PUT /api/functions/:slug
  * Update an existing function
  */
-router.put('/:slug', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const { slug } = req.params;
-    const validation = updateFunctionRequestSchema.safeParse(req.body);
+router.put(
+  '/:slug',
+  verifyAdmin,
+  functionsWriteLimiter,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { slug } = req.params;
+      const validation = updateFunctionRequestSchema.safeParse(req.body);
 
-    if (!validation.success) {
-      throw new AppError(JSON.stringify(validation.error.issues), 400, ERROR_CODES.INVALID_INPUT);
+      if (!validation.success) {
+        throw new AppError(JSON.stringify(validation.error.issues), 400, ERROR_CODES.INVALID_INPUT);
+      }
+
+      const result = await functionService.updateFunction(slug, validation.data);
+
+      if (!result) {
+        throw new AppError('Function not found', 404, ERROR_CODES.NOT_FOUND);
+      }
+
+      // Log audit event
+      logger.info(`Function ${slug} updated by ${req.user?.email}`);
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'UPDATE_FUNCTION',
+        module: 'FUNCTIONS',
+        details: {
+          slug,
+          changes: validation.data,
+        },
+        ip_address: req.ip,
+      });
+
+      const socket = SocketManager.getInstance();
+      socket.broadcastToRoom(
+        'role:project_admin',
+        ServerEvents.DATA_UPDATE,
+        { resource: DataUpdateResourceType.FUNCTIONS, data: { slug } },
+        'system'
+      );
+
+      successResponse(res, {
+        success: !result.deployment || result.deployment.status === 'success',
+        function: result.function,
+        deployment: result.deployment,
+      });
+    } catch (error) {
+      next(error);
     }
-
-    const result = await functionService.updateFunction(slug, validation.data);
-
-    if (!result) {
-      throw new AppError('Function not found', 404, ERROR_CODES.NOT_FOUND);
-    }
-
-    // Log audit event
-    logger.info(`Function ${slug} updated by ${req.user?.email}`);
-    await auditService.log({
-      actor: req.user?.email || 'api-key',
-      action: 'UPDATE_FUNCTION',
-      module: 'FUNCTIONS',
-      details: {
-        slug,
-        changes: validation.data,
-      },
-      ip_address: req.ip,
-    });
-
-    const socket = SocketManager.getInstance();
-    socket.broadcastToRoom(
-      'role:project_admin',
-      ServerEvents.DATA_UPDATE,
-      { resource: DataUpdateResourceType.FUNCTIONS, data: { slug } },
-      'system'
-    );
-
-    successResponse(res, {
-      success: !result.deployment || result.deployment.status === 'success',
-      function: result.function,
-      deployment: result.deployment,
-    });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 /**
  * DELETE /api/functions/:slug
@@ -156,6 +167,7 @@ router.put('/:slug', verifyAdmin, async (req: AuthRequest, res: Response, next: 
 router.delete(
   '/:slug',
   verifyAdmin,
+  functionsWriteLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { slug } = req.params;
