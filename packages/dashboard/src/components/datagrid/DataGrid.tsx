@@ -259,11 +259,17 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
 
   const handleColumnResize = useCallback(
     (columnIndex: number, width: number) => {
-      if (!onColumnResize) return;
+      if (!onColumnResize) {
+        return;
+      }
       const resizedColumn = gridColumns[columnIndex];
-      if (!resizedColumn) return;
+      if (!resizedColumn) {
+        return;
+      }
       const columnKey = String(resizedColumn.key);
-      if (columnKey === SELECT_COLUMN_KEY) return;
+      if (columnKey === SELECT_COLUMN_KEY) {
+        return;
+      }
       onColumnResize(columnKey, width);
     },
     [gridColumns, onColumnResize]
