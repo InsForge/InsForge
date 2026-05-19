@@ -9,6 +9,8 @@ const JWT_SECRET = process.env.JWT_SECRET ?? '';
 const ACCESS_TOKEN_EXPIRES_IN = '15m';
 const REFRESH_TOKEN_EXPIRES_IN = '7d';
 
+export type RefreshSessionType = 'user' | 'admin';
+
 /**
  * Refresh token payload interface
  */
@@ -16,6 +18,13 @@ export interface RefreshTokenPayload {
   sub: string;
   type: 'refresh';
   iss: string;
+  csrfNonce: string;
+  sessionType: RefreshSessionType;
+}
+
+export interface RefreshTokenWithCsrf {
+  refreshToken: string;
+  csrfToken: string;
 }
 
 /**
@@ -78,16 +87,31 @@ export class TokenManager {
   /**
    * Generate refresh token for secure session management
    */
-  generateRefreshToken(userId: string): string {
-    const refreshPayload: RefreshTokenPayload = {
-      sub: userId,
-      type: 'refresh',
-      iss: 'insforge',
-    };
+  generateRefreshToken(
+    userId: string,
+    sessionType: RefreshSessionType,
+    csrfNonce = this.generateCsrfNonce()
+  ): string {
+    const refreshPayload = this.createRefreshTokenPayload(userId, sessionType, csrfNonce);
     return jwt.sign(refreshPayload, JWT_SECRET, {
       algorithm: 'HS256',
       expiresIn: REFRESH_TOKEN_EXPIRES_IN,
     });
+  }
+
+  generateRefreshTokenWithCsrf(
+    userId: string,
+    sessionType: RefreshSessionType,
+    csrfNonce = this.generateCsrfNonce()
+  ): RefreshTokenWithCsrf {
+    const refreshPayload = this.createRefreshTokenPayload(userId, sessionType, csrfNonce);
+    return {
+      refreshToken: jwt.sign(refreshPayload, JWT_SECRET, {
+        algorithm: 'HS256',
+        expiresIn: REFRESH_TOKEN_EXPIRES_IN,
+      }),
+      csrfToken: this.generateCsrfToken(refreshPayload),
+    };
   }
 
   /**
@@ -102,7 +126,13 @@ export class TokenManager {
       }) as RefreshTokenPayload;
 
       // Ensure this is a refresh token, not an access token
-      if (decoded.type !== 'refresh' || !decoded.sub) {
+      if (
+        decoded.type !== 'refresh' ||
+        !decoded.sub ||
+        typeof decoded.csrfNonce !== 'string' ||
+        decoded.csrfNonce.length === 0 ||
+        (decoded.sessionType !== 'user' && decoded.sessionType !== 'admin')
+      ) {
         throw new AppError('Invalid refresh token type', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
       }
 
@@ -191,25 +221,47 @@ export class TokenManager {
   }
 
   /**
-   * Generate CSRF token derived from refresh token using HMAC
+   * Generate CSRF token derived from refresh-session claims using HMAC.
    */
-  generateCsrfToken(refreshToken: string): string {
-    return crypto.createHmac('sha256', JWT_SECRET).update(refreshToken).digest('hex');
+  generateCsrfToken(payload: RefreshTokenPayload): string {
+    return crypto
+      .createHmac('sha256', JWT_SECRET)
+      .update(`insforge:csrf:v1:${payload.sessionType}:${payload.sub}:${payload.csrfNonce}`)
+      .digest('hex');
   }
 
   /**
-   * Verify CSRF token by re-computing from refresh token
+   * Verify CSRF token by re-computing from refresh-session claims.
    * Uses timing-safe comparison to prevent timing attacks
    */
-  verifyCsrfToken(csrfHeader: string | undefined, refreshToken: string): boolean {
-    if (!csrfHeader || !refreshToken) {
+  verifyCsrfToken(csrfHeader: string | undefined, payload: RefreshTokenPayload): boolean {
+    if (!csrfHeader) {
       return false;
     }
-    const expectedCsrf = this.generateCsrfToken(refreshToken);
+
     try {
+      const expectedCsrf = this.generateCsrfToken(payload);
       return crypto.timingSafeEqual(Buffer.from(csrfHeader), Buffer.from(expectedCsrf));
     } catch {
       return false;
     }
+  }
+
+  private generateCsrfNonce(): string {
+    return crypto.randomBytes(32).toString('base64url');
+  }
+
+  private createRefreshTokenPayload(
+    userId: string,
+    sessionType: RefreshSessionType,
+    csrfNonce: string
+  ): RefreshTokenPayload {
+    return {
+      sub: userId,
+      type: 'refresh',
+      iss: 'insforge',
+      csrfNonce,
+      sessionType,
+    };
   }
 }

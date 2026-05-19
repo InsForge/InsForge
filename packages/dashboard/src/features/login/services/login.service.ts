@@ -1,4 +1,4 @@
-import { apiClient, REQUEST_TIMEOUT_MS } from '#lib/api/client';
+import { apiClient } from '#lib/api/client';
 import type { UserSchema } from '@insforge/shared-schemas';
 
 interface LoginResult {
@@ -60,7 +60,7 @@ export class LoginService {
 
   async logout(): Promise<void> {
     try {
-      await apiClient.request('/auth/logout', {
+      await apiClient.request('/auth/admin/logout', {
         method: 'POST',
         skipRefresh: true,
       });
@@ -86,25 +86,19 @@ export class LoginService {
     }
 
     try {
-      const response = await fetch('/api/auth/refresh', {
+      const response = await apiClient.request('/auth/admin/refresh', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-CSRF-Token': csrfToken,
         },
-        credentials: 'include',
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        skipRefresh: true,
       });
 
-      if (!response.ok) {
-        return false;
-      }
-
-      const data = await response.json();
-      if (data.accessToken) {
-        apiClient.setAccessToken(data.accessToken);
-        if (data.csrfToken) {
-          apiClient.setCsrfToken(data.csrfToken);
+      if (response.accessToken) {
+        apiClient.setAccessToken(response.accessToken);
+        if (response.csrfToken) {
+          apiClient.setCsrfToken(response.csrfToken);
         } else {
           apiClient.clearCsrfToken();
         }

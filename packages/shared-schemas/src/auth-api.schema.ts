@@ -53,7 +53,8 @@ export const createSessionRequestSchema = z.object({
 export const createAdminSessionRequestSchema = createSessionRequestSchema;
 
 /**
- * POST /api/auth/refresh - Refresh session
+ * POST /api/auth/refresh - Refresh user session
+ * POST /api/auth/admin/refresh - Refresh dashboard admin session
  * Non-web clients send refreshToken in the request body
  */
 export const refreshSessionRequestSchema = z.object({
