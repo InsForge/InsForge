@@ -20,61 +20,200 @@ import { isCloudEnvironment } from '@/utils/environment.js';
 interface DangerousCodeRule {
   id: string;
   pattern: RegExp;
-  nextAction: string;
+  nextActions: string;
 }
 
 const dangerousCodeRules: DangerousCodeRule[] = [
   {
     id: 'globalThis access',
     pattern: /\bglobalThis\s*(?:\.|\[)/i,
-    nextAction: 'Avoid accessing globalThis from serverless functions.',
+    nextActions: 'Avoid accessing globalThis from serverless functions.',
   },
   {
     id: 'self access',
     pattern: /\bself\s*(?:\.|\[)/i,
-    nextAction: 'Avoid accessing self from serverless functions.',
+    nextActions: 'Avoid accessing self from serverless functions.',
   },
   {
     id: 'process access',
     pattern: /\bprocess\s*(?:\.|\[)/i,
-    nextAction: 'Avoid accessing process from serverless functions.',
+    nextActions: 'Avoid accessing process from serverless functions.',
   },
   {
     id: 'privileged Deno API',
     pattern: /\bDeno\s*\.\s*(run|spawn|Command|makeTemp|remove|write|chmod|chown)\b/i,
-    nextAction: 'Remove privileged Deno runtime API usage.',
+    nextActions: 'Remove privileged Deno runtime API usage.',
   },
   {
     id: 'dynamic import',
-    pattern: /\bimport\b[^;]*\(/i,
-    nextAction: 'Use static imports instead of dynamic import().',
+    // Dynamic import is exactly import(...); scanning until ";" false-positives on semicolon-free static imports.
+    pattern: /\bimport\s*\(/i,
+    nextActions: 'Use static imports instead of dynamic import().',
   },
   {
     id: 'CommonJS require call',
     pattern: /\brequire\s*\(/i,
-    nextAction: 'Use ESM imports instead of require().',
+    nextActions: 'Use ESM imports instead of require().',
   },
   {
     id: 'eval call',
     pattern: /\beval\s*\(/i,
-    nextAction: 'Remove eval() usage.',
+    nextActions: 'Remove eval() usage.',
   },
   {
     id: 'Function constructor',
     pattern: /\bFunction\s*\(/,
-    nextAction: 'Remove dynamic Function constructor usage.',
+    nextActions: 'Remove dynamic Function constructor usage.',
   },
   {
     id: 'prototype chain access',
     pattern: /\.\s*constructor\b|__proto__/i,
-    nextAction: 'Avoid constructor/prototype-chain access.',
+    nextActions: 'Avoid constructor/prototype-chain access.',
   },
   {
-    id: 'sensitive global bracket access',
-    pattern: /\b(Deno|process|globalThis)\s*\[/i,
-    nextAction: 'Avoid bracket access on sensitive globals.',
+    id: 'Deno bracket access',
+    pattern: /\bDeno\s*\[/i,
+    nextActions: 'Avoid bracket access on sensitive Deno runtime APIs.',
   },
 ];
+
+type SanitizerState =
+  | 'code'
+  | 'singleQuote'
+  | 'doubleQuote'
+  | 'template'
+  | 'lineComment'
+  | 'blockComment';
+
+const isLineBreak = (char: string): boolean => char === '\n' || char === '\r';
+
+const blankCodeChar = (char: string): string => (isLineBreak(char) ? char : ' ');
+
+// Keep executable structure while removing comments and literal text from the convenience regex scan.
+const sanitizeCodeForPatternScan = (code: string): string => {
+  let sanitized = '';
+  let state: SanitizerState = 'code';
+  const templateExpressionDepths: number[] = [];
+
+  const appendBlank = (char: string): void => {
+    sanitized += blankCodeChar(char);
+  };
+
+  for (let i = 0; i < code.length; i++) {
+    const char = code[i];
+    const next = code[i + 1];
+
+    switch (state) {
+      case 'lineComment':
+        appendBlank(char);
+        if (isLineBreak(char)) {
+          state = 'code';
+        }
+        continue;
+
+      case 'blockComment':
+        appendBlank(char);
+        if (char === '*' && next === '/') {
+          appendBlank(next);
+          i++;
+          state = 'code';
+        }
+        continue;
+
+      case 'singleQuote':
+        appendBlank(char);
+        if (char === '\\' && next !== undefined) {
+          appendBlank(next);
+          i++;
+        } else if (char === "'") {
+          state = 'code';
+        }
+        continue;
+
+      case 'doubleQuote':
+        appendBlank(char);
+        if (char === '\\' && next !== undefined) {
+          appendBlank(next);
+          i++;
+        } else if (char === '"') {
+          state = 'code';
+        }
+        continue;
+
+      case 'template':
+        if (char === '\\' && next !== undefined) {
+          appendBlank(char);
+          appendBlank(next);
+          i++;
+        } else if (char === '`') {
+          appendBlank(char);
+          state = 'code';
+        } else if (char === '$' && next === '{') {
+          appendBlank(char);
+          appendBlank(next);
+          i++;
+          templateExpressionDepths.push(1);
+          state = 'code';
+        } else {
+          appendBlank(char);
+        }
+        continue;
+
+      case 'code':
+        if (char === '/' && next === '/') {
+          appendBlank(char);
+          appendBlank(next);
+          i++;
+          state = 'lineComment';
+          continue;
+        }
+
+        if (char === '/' && next === '*') {
+          appendBlank(char);
+          appendBlank(next);
+          i++;
+          state = 'blockComment';
+          continue;
+        }
+
+        if (char === "'") {
+          appendBlank(char);
+          state = 'singleQuote';
+          continue;
+        }
+
+        if (char === '"') {
+          appendBlank(char);
+          state = 'doubleQuote';
+          continue;
+        }
+
+        if (char === '`') {
+          appendBlank(char);
+          state = 'template';
+          continue;
+        }
+
+        if (templateExpressionDepths.length > 0) {
+          const lastIndex = templateExpressionDepths.length - 1;
+          if (char === '{') {
+            templateExpressionDepths[lastIndex]++;
+          } else if (char === '}') {
+            templateExpressionDepths[lastIndex]--;
+            if (templateExpressionDepths[lastIndex] === 0) {
+              templateExpressionDepths.pop();
+              state = 'template';
+            }
+          }
+        }
+
+        sanitized += char;
+        continue;
+    }
+  }
+
+  return sanitized;
+};
 
 export class FunctionService {
   private static instance: FunctionService;
@@ -413,7 +552,9 @@ export class FunctionService {
    * Validate function code for dangerous patterns
    */
   private validateCode(code: string): void {
-    if (/Deno\.serve\s*\(/.test(code)) {
+    const codeForPatternScan = sanitizeCodeForPatternScan(code);
+
+    if (/Deno\.serve\s*\(/.test(codeForPatternScan)) {
       throw new AppError(
         'Functions should use "export default async function(req: Request)" instead of "Deno.serve()". The router handles serving automatically.',
         400,
@@ -428,7 +569,7 @@ export class FunctionService {
      * (permissions: false) which blocks the underlying syscalls.
      */
     for (const rule of dangerousCodeRules) {
-      if (rule.pattern.test(code)) {
+      if (rule.pattern.test(codeForPatternScan)) {
         logger.warn('Dangerous code pattern blocked', {
           rule: rule.id,
           pattern: rule.pattern.toString(),
@@ -438,7 +579,7 @@ export class FunctionService {
           `Code contains a potentially dangerous pattern: ${rule.id}.`,
           400,
           ERROR_CODES.INVALID_INPUT,
-          rule.nextAction
+          rule.nextActions
         );
       }
     }

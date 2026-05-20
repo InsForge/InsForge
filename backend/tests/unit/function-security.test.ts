@@ -122,11 +122,40 @@ describe('FunctionService Security Validation (Public API)', () => {
       const code = `
         // Require authenticated user to invoke this function.
         /*
-         * Mentioning process, eval, globalThis, and require in docs should
-         * not block deployment unless they are used as code-shaped calls/access.
+         * Documentation can mention process, eval, globalThis, and require
+         * without turning the comment into executable code.
          */
         export default async function(req: Request) {
           return new Response('ok');
+        }
+      `;
+      mockClient.query.mockResolvedValueOnce({});
+      mockClient.query.mockResolvedValueOnce({});
+      mockClient.query.mockResolvedValueOnce({ rows: [{ id: '1' }] });
+      await expect(createTestFunction(code)).resolves.toBeDefined();
+    });
+
+    it('should allow code-shaped dangerous examples inside comments', async () => {
+      const code = `
+        // Example only: const fs = require("fs")
+        /*
+         * Do not use process.env.API_KEY in functions.
+         * Avoid eval("x"), globalThis["Deno"], and Deno.serve(() => {}).
+         */
+        export default async function(req: Request) {
+          return new Response('ok');
+        }
+      `;
+      mockClient.query.mockResolvedValueOnce({});
+      mockClient.query.mockResolvedValueOnce({});
+      mockClient.query.mockResolvedValueOnce({ rows: [{ id: '1' }] });
+      await expect(createTestFunction(code)).resolves.toBeDefined();
+    });
+
+    it('should allow dangerous-looking snippets inside string literals', async () => {
+      const code = `
+        export default async function(req: Request) {
+          return new Response("Do not use require('fs') or process.env here.");
         }
       `;
       mockClient.query.mockResolvedValueOnce({});
@@ -142,6 +171,19 @@ describe('FunctionService Security Validation (Public API)', () => {
 
     it('should allow static import statements', async () => {
       const code = "import { createClient } from 'npm:@insforge/sdk'; return new Response('ok');";
+      mockClient.query.mockResolvedValueOnce({});
+      mockClient.query.mockResolvedValueOnce({});
+      mockClient.query.mockResolvedValueOnce({ rows: [{ id: '1' }] });
+      await expect(createTestFunction(code)).resolves.toBeDefined();
+    });
+
+    it('should allow semicolon-free static import statements', async () => {
+      const code = `
+        import { createClient } from 'npm:@insforge/sdk'
+        export default async function(req: Request) {
+          return new Response('ok')
+        }
+      `;
       mockClient.query.mockResolvedValueOnce({});
       mockClient.query.mockResolvedValueOnce({});
       mockClient.query.mockResolvedValueOnce({ rows: [{ id: '1' }] });
@@ -173,6 +215,21 @@ describe('FunctionService Security Validation (Public API)', () => {
 
     it('should block bracket notation bypass (Deno)', async () => {
       const code = 'const d = globalThis["Deno"];';
+      await expect(createTestFunction(code)).rejects.toThrow(GENERIC_ERROR);
+    });
+
+    it('should block process bracket access', async () => {
+      const code = 'const env = process["env"];';
+      await expect(createTestFunction(code)).rejects.toThrow(GENERIC_ERROR);
+    });
+
+    it('should block self bracket access', async () => {
+      const code = 'const fetcher = self["fetch"];';
+      await expect(createTestFunction(code)).rejects.toThrow(GENERIC_ERROR);
+    });
+
+    it('should block Deno bracket access', async () => {
+      const code = 'const runner = Deno["run"];';
       await expect(createTestFunction(code)).rejects.toThrow(GENERIC_ERROR);
     });
 
