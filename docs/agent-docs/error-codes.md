@@ -21,10 +21,20 @@ The backend may keep a thin compatibility wrapper for local imports, but it shou
 
 ## Adding A Code
 
-1. Add the code to `packages/shared-schemas/src/error-codes.ts`.
-2. Export it through `packages/shared-schemas/src/index.ts`.
+1. Add the code to `packages/shared-schemas/src/error-codes.schema.ts`.
+2. Export it from the package root in `packages/shared-schemas/src/index.ts` using `export * from "./error-codes.schema.js";`.
 3. Update backend or tooling call sites to use the shared constant instead of a raw string.
 4. Add or update a test that locks the string value.
+
+## Error Codes vs. Next Actions
+
+While canonical `ERROR_CODES` are shared globally, `NEXT_ACTION` guidance constants and templates must remain **backend-local** (defined in `backend/src/types/error-constants.ts`) instead of being exported from `@insforge/shared-schemas`.
+
+### Rationale
+
+- **Stable Contract vs. Guidance Hints:** Error codes serve as the stable cross-package contract that SDKs, CLIs, tooling, and frontends need to programmatically match on. `nextAction`s, conversely, represent dynamic backend response hints and user-facing guidance.
+- **Contract Surface Reduction:** External consumers can read the concrete string values from the response payload without needing a shared, strongly typed export. Keeping `NEXT_ACTION` out of `shared-schemas` prevents expanding the public contract surface unnecessarily.
+- **Maintainability:** Keeping these messaging hints backend-local allows the backend team to evolve, update, and refactor user guidance strings dynamically without needing to coordinate library releases across the SDK, CLI, or frontend.
 
 ## When To Specialize
 

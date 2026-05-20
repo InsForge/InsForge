@@ -5,7 +5,6 @@ import { TokenManager } from '@/infra/security/token.manager.js';
 import { ServerEvents, ClientEvents, SocketMetadata, NotificationPayload } from '@/types/socket.js';
 import {
   ERROR_CODES,
-  NEXT_ACTION,
   type SubscribeChannelPayload,
   type PublishEventPayload,
   type SocketMessage,
@@ -14,6 +13,7 @@ import {
   type UnsubscribeChannelPayload,
   type PresenceMember,
 } from '@insforge/shared-schemas';
+import { NEXT_ACTION } from '../../types/error-constants.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { RealtimeAuthService } from '@/services/realtime/realtime-auth.service.js';
 import { RealtimeMessageService } from '@/services/realtime/realtime-message.service.js';

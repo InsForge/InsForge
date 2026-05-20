@@ -2,7 +2,8 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { createRemoteJWKSet, JWTPayload, jwtVerify } from 'jose';
 import { AppError } from '@/api/middlewares/error.js';
-import { type TokenPayloadSchema, ERROR_CODES, NEXT_ACTION } from '@insforge/shared-schemas';
+import { type TokenPayloadSchema, ERROR_CODES } from '@insforge/shared-schemas';
+import { NEXT_ACTION } from '../../types/error-constants.js';
 
 const JWT_SECRET = process.env.JWT_SECRET ?? '';
 const ACCESS_TOKEN_EXPIRES_IN = '15m';

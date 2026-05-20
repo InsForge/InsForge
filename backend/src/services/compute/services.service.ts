@@ -8,7 +8,8 @@ import type { ComputeProvider } from '@/providers/compute/compute.provider.js';
 import { config } from '@/infra/config/app.config.js';
 import { AppError } from '@/api/middlewares/error.js';
 import logger from '@/utils/logger.js';
-import { ERROR_CODES, NEXT_ACTION, type ServiceSchema } from '@insforge/shared-schemas';
+import { ERROR_CODES, type ServiceSchema } from '@insforge/shared-schemas';
+import { NEXT_ACTION } from '../../types/error-constants.js';
 
 export interface CreateServiceInput {
   projectId: string;
