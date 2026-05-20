@@ -68,9 +68,12 @@ export class PaymentCheckoutService {
     const id = randomUUID();
 
     try {
-      return await withUserContext(this.getPool(), this.getSafeUserContext(user), async (client) => {
-        const result = await client.query(
-          `INSERT INTO payments.checkout_sessions (
+      return await withUserContext(
+        this.getPool(),
+        this.getSafeUserContext(user),
+        async (client) => {
+          const result = await client.query(
+            `INSERT INTO payments.checkout_sessions (
              id,
              environment,
              mode,
@@ -88,32 +91,33 @@ export class PaymentCheckoutService {
            ON CONFLICT (environment, idempotency_key)
              WHERE idempotency_key IS NOT NULL
            DO NOTHING`,
-          [
-            id,
-            input.environment,
-            input.mode,
-            input.subject?.type ?? null,
-            input.subject?.id ?? null,
-            input.customerEmail ?? null,
-            JSON.stringify(input.lineItems),
-            input.successUrl,
-            input.cancelUrl,
-            input.idempotencyKey ?? null,
-            JSON.stringify(metadata),
-          ]
-        );
+            [
+              id,
+              input.environment,
+              input.mode,
+              input.subject?.type ?? null,
+              input.subject?.id ?? null,
+              input.customerEmail ?? null,
+              JSON.stringify(input.lineItems),
+              input.successUrl,
+              input.cancelUrl,
+              input.idempotencyKey ?? null,
+              JSON.stringify(metadata),
+            ]
+          );
 
-        if (result.rowCount !== 0) {
-          return { id, existingCheckoutSession: null };
+          if (result.rowCount !== 0) {
+            return { id, existingCheckoutSession: null };
+          }
+
+          const existingCheckoutSession = await this.findMatchingIdempotentCheckoutSession(
+            client,
+            input,
+            metadata
+          );
+          return { id: existingCheckoutSession.id, existingCheckoutSession };
         }
-
-        const existingCheckoutSession = await this.findMatchingIdempotentCheckoutSession(
-          client,
-          input,
-          metadata
-        );
-        return { id: existingCheckoutSession.id, existingCheckoutSession };
-      });
+      );
     } catch (error) {
       throw this.normalizeCheckoutInsertError(error);
     }
