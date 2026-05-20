@@ -3,10 +3,7 @@ import { AppError } from '@/api/middlewares/error.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { StripeProvider } from '@/providers/payments/stripe.provider.js';
 import { PaymentConfigService } from '@/services/payments/payment-config.service.js';
-import {
-  PaymentCheckoutService,
-  type CheckoutUserContext,
-} from '@/services/payments/payment-checkout.service.js';
+import { PaymentCheckoutService } from '@/services/payments/payment-checkout.service.js';
 import { PaymentCustomerService } from '@/services/payments/payment-customer.service.js';
 import { PaymentCustomerPortalService } from '@/services/payments/payment-customer-portal.service.js';
 import { PaymentHistoryService } from '@/services/payments/payment-history.service.js';
@@ -34,6 +31,7 @@ import {
 } from '@/services/payments/helpers.js';
 import logger from '@/utils/logger.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
+import type { UserContext } from '@/api/middlewares/auth.js';
 import {
   STRIPE_ENVIRONMENTS,
   type StripeCheckoutSession,
@@ -315,7 +313,7 @@ export class PaymentService {
 
   async createCheckoutSession(
     input: CreateCheckoutSessionRequest,
-    user: CheckoutUserContext
+    user: UserContext
   ): Promise<CreateCheckoutSessionResponse> {
     if (input.mode === 'subscription' && !input.subject) {
       throw new AppError(
@@ -394,7 +392,7 @@ export class PaymentService {
 
   async createCustomerPortalSession(
     input: CreateCustomerPortalSessionRequest,
-    user: CheckoutUserContext
+    user: UserContext
   ): Promise<CreateCustomerPortalSessionResponse> {
     if (user.role === 'anon') {
       throw new AppError(

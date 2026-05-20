@@ -284,11 +284,10 @@ export class SocketManager {
     const authService = RealtimeAuthService.getInstance();
     const { channel } = payload;
     const userId = socket.data.user?.id;
-    const userRole = socket.data.user?.role;
 
     try {
       // Check subscribe permission via RLS SELECT policy
-      const canSubscribe = await authService.checkSubscribePermission(channel, userId, userRole);
+      const canSubscribe = await authService.checkSubscribePermission(channel, socket.data.user);
 
       if (!canSubscribe) {
         ack?.({
@@ -385,8 +384,6 @@ export class SocketManager {
    */
   private async handleRealtimePublish(socket: Socket, payload: PublishEventPayload): Promise<void> {
     const { channel, event, payload: eventPayload } = payload;
-    const userId = socket.data.user?.id;
-    const userRole = socket.data.user?.role;
 
     // Check if client has subscribed to this channel
     const roomName = `realtime:${channel}`;
@@ -407,8 +404,7 @@ export class SocketManager {
         channel,
         event,
         eventPayload,
-        userId,
-        userRole
+        socket.data.user
       );
 
       if (!result) {

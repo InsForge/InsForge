@@ -3,17 +3,18 @@ import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from './error.js';
 import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
-import { UserContext } from '@/services/db/user-context.service.js';
-import { RoleSchema } from '@insforge/shared-schemas';
+import type { RoleSchema } from '@insforge/shared-schemas';
+
+export type UserContext = {
+  id?: string;
+  email?: string;
+  role: RoleSchema;
+};
 
 export interface AuthRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-    role: RoleSchema;
-  };
+  user?: UserContext;
   authenticated?: boolean;
-  apiKey?: string;
+  hasApiKey?: boolean;
   projectId?: string;
 }
 
@@ -42,19 +43,6 @@ export function extractApiKey(req: AuthRequest): string | null {
   }
 
   return null;
-}
-
-// Build a UserContext from an authenticated request. Admin = API key or
-// project_admin role; everyone else runs as `authenticated` with their
-// `sub` claim plumbed through to RLS. Anonymous → role=anon.
-export function getUserContextFromReq(req: AuthRequest): UserContext {
-  if (req.apiKey || req.user?.role === 'project_admin') {
-    return { isAdmin: true, role: 'authenticated' };
-  }
-  if (req.user) {
-    return { userId: req.user.id, email: req.user.email, role: 'authenticated' };
-  }
-  return { role: 'anon' };
 }
 
 // Helper function to set user on request
@@ -160,7 +148,7 @@ export async function verifyApiKey(req: AuthRequest, _res: Response, next: NextF
       );
     }
     req.authenticated = true;
-    req.apiKey = apiKey;
+    req.hasApiKey = true;
     next();
   } catch (error) {
     next(error);
