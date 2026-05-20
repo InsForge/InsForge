@@ -81,22 +81,20 @@ describe('FunctionService Code Validation (Public API)', () => {
     it('should block Deno.serve because the platform router handles serving', async () => {
       const code = 'Deno.serve((req) => new Response("hi"));';
 
-      await expect(createTestFunction(code)).rejects.toThrow(
-        /should use "export default async function/i
-      );
+      await expect(createTestFunction(code)).rejects.toThrow(/cannot contain Deno\.serve-style/i);
     });
 
     it.each([
       'Deno["serve"]((req) => new Response("hi"));',
       "Deno['serve']((req) => new Response('hi'));",
       'Deno . serve ((req) => new Response("hi"));',
-    ])('should block Deno.serve bracket and spaced forms', async (code) => {
-      await expect(createTestFunction(code)).rejects.toThrow(
-        /should use "export default async function/i
-      );
+      'Deno /* comment */ . /* another */ serve ((req) => new Response("hi"));',
+      'Deno /* comment */ [ /* another */ "serve" /* end */ ] ((req) => new Response("hi"));',
+    ])('should block Deno.serve bracket, spaced, and comment-separated forms', async (code) => {
+      await expect(createTestFunction(code)).rejects.toThrow(/cannot contain Deno\.serve-style/i);
     });
 
-    it('should not reject Deno.serve examples inside comments or strings', async () => {
+    it('should clearly reject Deno.serve examples anywhere in source', async () => {
       const code = `
         // Standalone Deno apps often use Deno.serve(() => {}).
         /*
@@ -109,8 +107,7 @@ describe('FunctionService Code Validation (Public API)', () => {
         }
       `;
 
-      mockSuccessfulCreate();
-      await expect(createTestFunction(code)).resolves.toBeDefined();
+      await expect(createTestFunction(code)).rejects.toThrow(/cannot contain Deno\.serve-style/i);
     });
 
     it('should block Deno.serve inside template expressions', async () => {
@@ -120,9 +117,7 @@ describe('FunctionService Code Validation (Public API)', () => {
         }
       `;
 
-      await expect(createTestFunction(code)).rejects.toThrow(
-        /should use "export default async function/i
-      );
+      await expect(createTestFunction(code)).rejects.toThrow(/cannot contain Deno\.serve-style/i);
     });
   });
 
