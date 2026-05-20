@@ -287,9 +287,7 @@ describe('PostHogProvider', () => {
 
     it('throws AppError with UPSTREAM_FAILURE on network error', async () => {
       axiosGetMock.mockRejectedValueOnce(new Error('Network Error'));
-      await expect(
-        PostHogProvider.getInstance().getWebStats('Page', '7d')
-      ).rejects.toMatchObject({
+      await expect(PostHogProvider.getInstance().getWebStats('Page', '7d')).rejects.toMatchObject({
         statusCode: 502,
         code: ERROR_CODES.UPSTREAM_FAILURE,
       });
@@ -317,12 +315,12 @@ describe('PostHogProvider', () => {
 
     it('throws AppError with NOT_FOUND on 404', async () => {
       axiosGetMock.mockRejectedValueOnce(makeAxiosError(404));
-      await expect(
-        PostHogProvider.getInstance().getTrends('visitors', '7d')
-      ).rejects.toMatchObject({
-        statusCode: 404,
-        code: ERROR_CODES.NOT_FOUND,
-      });
+      await expect(PostHogProvider.getInstance().getTrends('visitors', '7d')).rejects.toMatchObject(
+        {
+          statusCode: 404,
+          code: ERROR_CODES.NOT_FOUND,
+        }
+      );
     });
   });
 
