@@ -6,6 +6,7 @@ import {
   calculateTokenPrices,
   getProviderOrder,
 } from '../../src/services/ai/helpers';
+import type { RawOpenRouterModel } from '../../src/types/ai';
 
 describe('sortModalities', () => {
   it('sorts known modalities by predefined order', () => {
@@ -73,7 +74,9 @@ describe('calculatePricePerMillion', () => {
   });
 
   it('returns empty object when pricing is undefined', () => {
-    const result = calculatePricePerMillion(undefined as any);
+    const result = calculatePricePerMillion(
+      undefined as unknown as RawOpenRouterModel['pricing']
+    );
     expect(result).toEqual({});
   });
 
@@ -152,7 +155,11 @@ describe('calculateTokenPrices', () => {
   });
 
   it('returns empty object when pricing is undefined', () => {
-    const result = calculateTokenPrices(undefined as any, ['text'], ['text']);
+    const result = calculateTokenPrices(
+      undefined as unknown as RawOpenRouterModel['pricing'],
+      ['text'],
+      ['text']
+    );
     expect(result).toEqual({});
   });
 
