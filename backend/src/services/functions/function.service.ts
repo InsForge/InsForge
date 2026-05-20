@@ -17,204 +17,6 @@ import { DenoSubhostingProvider } from '@/providers/functions/deno-subhosting.pr
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 
-interface DangerousCodeRule {
-  id: string;
-  pattern: RegExp;
-  nextActions: string;
-}
-
-const dangerousCodeRules: DangerousCodeRule[] = [
-  {
-    id: 'globalThis access',
-    pattern: /\bglobalThis\s*(?:\.|\[)/i,
-    nextActions: 'Avoid accessing globalThis from serverless functions.',
-  },
-  {
-    id: 'self access',
-    pattern: /\bself\s*(?:\.|\[)/i,
-    nextActions: 'Avoid accessing self from serverless functions.',
-  },
-  {
-    id: 'process access',
-    pattern: /\bprocess\s*(?:\.|\[)/i,
-    nextActions: 'Avoid accessing process from serverless functions.',
-  },
-  {
-    id: 'privileged Deno API',
-    pattern: /\bDeno\s*\.\s*(run|spawn|Command|makeTemp|remove|write|chmod|chown)\b/i,
-    nextActions: 'Remove privileged Deno runtime API usage.',
-  },
-  {
-    id: 'dynamic import',
-    // Dynamic import is exactly import(...); scanning until ";" false-positives on semicolon-free static imports.
-    pattern: /\bimport\s*\(/i,
-    nextActions: 'Use static imports instead of dynamic import().',
-  },
-  {
-    id: 'CommonJS require call',
-    pattern: /\brequire\s*\(/i,
-    nextActions: 'Use ESM imports instead of require().',
-  },
-  {
-    id: 'eval call',
-    pattern: /\beval\s*\(/i,
-    nextActions: 'Remove eval() usage.',
-  },
-  {
-    id: 'Function constructor',
-    pattern: /\bFunction\s*\(/,
-    nextActions: 'Remove dynamic Function constructor usage.',
-  },
-  {
-    id: 'prototype chain access',
-    pattern: /\.\s*constructor\b|__proto__/i,
-    nextActions: 'Avoid constructor/prototype-chain access.',
-  },
-  {
-    id: 'Deno bracket access',
-    pattern: /\bDeno\s*\[/i,
-    nextActions: 'Avoid bracket access on sensitive Deno runtime APIs.',
-  },
-];
-
-type SanitizerState =
-  | 'code'
-  | 'singleQuote'
-  | 'doubleQuote'
-  | 'template'
-  | 'lineComment'
-  | 'blockComment';
-
-const isLineBreak = (char: string): boolean => char === '\n' || char === '\r';
-
-const blankCodeChar = (char: string): string => (isLineBreak(char) ? char : ' ');
-
-// Keep executable structure while removing comments and literal text from the convenience regex scan.
-const sanitizeCodeForPatternScan = (code: string): string => {
-  let sanitized = '';
-  let state: SanitizerState = 'code';
-  const templateExpressionDepths: number[] = [];
-
-  const appendBlank = (char: string): void => {
-    sanitized += blankCodeChar(char);
-  };
-
-  for (let i = 0; i < code.length; i++) {
-    const char = code[i];
-    const next = code[i + 1];
-
-    switch (state) {
-      case 'lineComment':
-        appendBlank(char);
-        if (isLineBreak(char)) {
-          state = 'code';
-        }
-        continue;
-
-      case 'blockComment':
-        appendBlank(char);
-        if (char === '*' && next === '/') {
-          appendBlank(next);
-          i++;
-          state = 'code';
-        }
-        continue;
-
-      case 'singleQuote':
-        appendBlank(char);
-        if (char === '\\' && next !== undefined) {
-          appendBlank(next);
-          i++;
-        } else if (char === "'") {
-          state = 'code';
-        }
-        continue;
-
-      case 'doubleQuote':
-        appendBlank(char);
-        if (char === '\\' && next !== undefined) {
-          appendBlank(next);
-          i++;
-        } else if (char === '"') {
-          state = 'code';
-        }
-        continue;
-
-      case 'template':
-        if (char === '\\' && next !== undefined) {
-          appendBlank(char);
-          appendBlank(next);
-          i++;
-        } else if (char === '`') {
-          appendBlank(char);
-          state = 'code';
-        } else if (char === '$' && next === '{') {
-          appendBlank(char);
-          appendBlank(next);
-          i++;
-          templateExpressionDepths.push(1);
-          state = 'code';
-        } else {
-          appendBlank(char);
-        }
-        continue;
-
-      case 'code':
-        if (char === '/' && next === '/') {
-          appendBlank(char);
-          appendBlank(next);
-          i++;
-          state = 'lineComment';
-          continue;
-        }
-
-        if (char === '/' && next === '*') {
-          appendBlank(char);
-          appendBlank(next);
-          i++;
-          state = 'blockComment';
-          continue;
-        }
-
-        if (char === "'") {
-          appendBlank(char);
-          state = 'singleQuote';
-          continue;
-        }
-
-        if (char === '"') {
-          appendBlank(char);
-          state = 'doubleQuote';
-          continue;
-        }
-
-        if (char === '`') {
-          appendBlank(char);
-          state = 'template';
-          continue;
-        }
-
-        if (templateExpressionDepths.length > 0) {
-          const lastIndex = templateExpressionDepths.length - 1;
-          if (char === '{') {
-            templateExpressionDepths[lastIndex]++;
-          } else if (char === '}') {
-            templateExpressionDepths[lastIndex]--;
-            if (templateExpressionDepths[lastIndex] === 0) {
-              templateExpressionDepths.pop();
-              state = 'template';
-            }
-          }
-        }
-
-        sanitized += char;
-        continue;
-    }
-  }
-
-  return sanitized;
-};
-
 export class FunctionService {
   private static instance: FunctionService;
   private pool: Pool | null = null;
@@ -346,7 +148,7 @@ export class FunctionService {
     const { name, code, description, status } = data;
     const slug = data.slug || name.toLowerCase().replace(/\s+/g, '-');
 
-    // Validate code with regex checks
+    // Validate only platform contract constraints; runtime security is enforced by the runtime/provider.
     this.validateCode(code);
 
     // Save to DB (release client before deployment polling)
@@ -549,39 +351,15 @@ export class FunctionService {
   }
 
   /**
-   * Validate function code for dangerous patterns
+   * Validate function code for platform contract compatibility.
    */
   private validateCode(code: string): void {
-    const codeForPatternScan = sanitizeCodeForPatternScan(code);
-
-    if (/Deno\.serve\s*\(/.test(codeForPatternScan)) {
+    if (/Deno\.serve\s*\(/.test(code)) {
       throw new AppError(
         'Functions should use "export default async function(req: Request)" instead of "Deno.serve()". The router handles serving automatically.',
         400,
         ERROR_CODES.INVALID_INPUT
       );
-    }
-
-    /**
-     * TIER 1 VALIDATION (Convenience Filter):
-     * This regex suite is a high-level filter designed to reject obvious malicious patterns
-     * at the API layer. The ACTUAL enforcement boundary is the Tier 2 native Deno sandbox
-     * (permissions: false) which blocks the underlying syscalls.
-     */
-    for (const rule of dangerousCodeRules) {
-      if (rule.pattern.test(codeForPatternScan)) {
-        logger.warn('Dangerous code pattern blocked', {
-          rule: rule.id,
-          pattern: rule.pattern.toString(),
-          codeLength: code.length,
-        });
-        throw new AppError(
-          `Code contains a potentially dangerous pattern: ${rule.id}.`,
-          400,
-          ERROR_CODES.INVALID_INPUT,
-          rule.nextActions
-        );
-      }
     }
   }
 

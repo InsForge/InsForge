@@ -42,7 +42,7 @@ vi.mock('../../src/utils/logger.js', () => ({
   },
 }));
 
-describe('FunctionService Security Validation (Public API)', () => {
+describe('FunctionService Code Validation (Public API)', () => {
   let service: FunctionService;
 
   beforeEach(() => {
@@ -59,9 +59,13 @@ describe('FunctionService Security Validation (Public API)', () => {
     });
   };
 
-  describe('Security Patterns', () => {
-    const GENERIC_ERROR = /Code contains a potentially dangerous pattern/i;
+  const mockSuccessfulCreate = () => {
+    mockClient.query.mockResolvedValueOnce({});
+    mockClient.query.mockResolvedValueOnce({});
+    mockClient.query.mockResolvedValueOnce({ rows: [{ id: '1' }] });
+  };
 
+  describe('Platform contract validation', () => {
     it('should allow valid function code', async () => {
       const validCode = `
         export default async function(req: Request) {
@@ -69,111 +73,76 @@ describe('FunctionService Security Validation (Public API)', () => {
           return new Response(JSON.stringify({ hello: 'world' }));
         }
       `;
-      mockClient.query.mockResolvedValueOnce({}); // Insert
-      mockClient.query.mockResolvedValueOnce({}); // Update
-      mockClient.query.mockResolvedValueOnce({ rows: [{ id: '1' }] }); // Select
+
+      mockSuccessfulCreate();
       await expect(createTestFunction(validCode)).resolves.toBeDefined();
     });
 
-    it('should allow identifiers containing "self" (Regression Fix)', async () => {
-      const code = 'const myself = { name: "test" }; return myself;';
-      mockClient.query.mockResolvedValueOnce({});
-      mockClient.query.mockResolvedValueOnce({});
-      mockClient.query.mockResolvedValueOnce({ rows: [{ id: '1' }] });
-      await expect(createTestFunction(code)).resolves.toBeDefined();
-    });
-
-    it('should block self access (Word Boundary)', async () => {
-      const code = 'const x = self.postMessage;';
-      await expect(createTestFunction(code)).rejects.toThrow(GENERIC_ERROR);
-    });
-
-    it('should block process.exit (Word Boundary)', async () => {
-      const code = 'process.exit(1);';
-      await expect(createTestFunction(code)).rejects.toThrow(GENERIC_ERROR);
-    });
-
-    it('should block identifiers ending in process (Regression Fix)', async () => {
-      const code = 'const subprocess = "not a threat"; return subprocess;';
-      mockClient.query.mockResolvedValueOnce({});
-      mockClient.query.mockResolvedValueOnce({});
-      mockClient.query.mockResolvedValueOnce({ rows: [{ id: '1' }] });
-      await expect(createTestFunction(code)).resolves.toBeDefined();
-    });
-
-    it('should block prototype chain abuse via bracket notation', async () => {
-      const code = "const proto = obj.constructor['prototype'];";
-      await expect(createTestFunction(code)).rejects.toThrow(GENERIC_ERROR);
-    });
-
-    it('should block __proto__ access', async () => {
-      const code = 'const p = obj.__proto__;';
-      await expect(createTestFunction(code)).rejects.toThrow(GENERIC_ERROR);
-    });
-
-    it('should block Deno.serve', async () => {
+    it('should block Deno.serve because the platform router handles serving', async () => {
       const code = 'Deno.serve((req) => new Response("hi"));';
+
       await expect(createTestFunction(code)).rejects.toThrow(
         /should use "export default async function/i
       );
     });
+  });
 
-    it('should allow dangerous words inside comments', async () => {
+  describe('Runtime responsibility boundaries', () => {
+    it('should not reject dangerous-looking words inside comments', async () => {
       const code = `
         // Require authenticated user to invoke this function.
         /*
-         * Documentation can mention process, eval, globalThis, and require
-         * without turning the comment into executable code.
+         * Documentation can mention process, eval, globalThis, require,
+         * Deno.spawn, and Deno.Command without turning prose into code.
          */
         export default async function(req: Request) {
           return new Response('ok');
         }
       `;
-      mockClient.query.mockResolvedValueOnce({});
-      mockClient.query.mockResolvedValueOnce({});
-      mockClient.query.mockResolvedValueOnce({ rows: [{ id: '1' }] });
+
+      mockSuccessfulCreate();
       await expect(createTestFunction(code)).resolves.toBeDefined();
     });
 
-    it('should allow code-shaped dangerous examples inside comments', async () => {
+    it('should not reject code-shaped examples inside comments', async () => {
       const code = `
         // Example only: const fs = require("fs")
         /*
-         * Do not use process.env.API_KEY in functions.
-         * Avoid eval("x"), globalThis["Deno"], and Deno.serve(() => {}).
+         * Avoid process.env.API_KEY, eval("x"), and Deno.spawn("cmd")
+         * unless the runtime/provider explicitly supports that behavior.
          */
         export default async function(req: Request) {
           return new Response('ok');
         }
       `;
-      mockClient.query.mockResolvedValueOnce({});
-      mockClient.query.mockResolvedValueOnce({});
-      mockClient.query.mockResolvedValueOnce({ rows: [{ id: '1' }] });
+
+      mockSuccessfulCreate();
       await expect(createTestFunction(code)).resolves.toBeDefined();
     });
 
-    it('should allow dangerous-looking snippets inside string literals', async () => {
+    it('should not reject runtime-sensitive APIs at the API validation layer', async () => {
       const code = `
         export default async function(req: Request) {
-          return new Response("Do not use require('fs') or process.env here.");
+          const name = new URL(req.url).searchParams.get('name') ?? 'world';
+          const rendered = eval('"hello " + name');
+          return new Response(String(rendered));
         }
       `;
-      mockClient.query.mockResolvedValueOnce({});
-      mockClient.query.mockResolvedValueOnce({});
-      mockClient.query.mockResolvedValueOnce({ rows: [{ id: '1' }] });
+
+      mockSuccessfulCreate();
       await expect(createTestFunction(code)).resolves.toBeDefined();
     });
 
-    it('should block RCE via Deno.spawn', async () => {
-      const code = 'const proc = Deno.spawn("rm", { args: ["-rf", "/"] });';
-      await expect(createTestFunction(code)).rejects.toThrow(GENERIC_ERROR);
-    });
+    it('should not reject dynamic imports or CommonJS-shaped code at the API layer', async () => {
+      const code = `
+        export default async function(req: Request) {
+          const dependency = await import('npm:@insforge/sdk');
+          const maybeRequire = 'require("fs") appears only as text here';
+          return new Response(JSON.stringify({ dependency: !!dependency, maybeRequire }));
+        }
+      `;
 
-    it('should allow static import statements', async () => {
-      const code = "import { createClient } from 'npm:@insforge/sdk'; return new Response('ok');";
-      mockClient.query.mockResolvedValueOnce({});
-      mockClient.query.mockResolvedValueOnce({});
-      mockClient.query.mockResolvedValueOnce({ rows: [{ id: '1' }] });
+      mockSuccessfulCreate();
       await expect(createTestFunction(code)).resolves.toBeDefined();
     });
 
@@ -181,77 +150,11 @@ describe('FunctionService Security Validation (Public API)', () => {
       const code = `
         import { createClient } from 'npm:@insforge/sdk'
         export default async function(req: Request) {
-          return new Response('ok')
+          return new Response(String(Boolean(createClient)))
         }
       `;
-      mockClient.query.mockResolvedValueOnce({});
-      mockClient.query.mockResolvedValueOnce({});
-      mockClient.query.mockResolvedValueOnce({ rows: [{ id: '1' }] });
-      await expect(createTestFunction(code)).resolves.toBeDefined();
-    });
 
-    it('should block dynamic import() calls', async () => {
-      const code = 'import("http://malicious.com/payload.js")';
-      await expect(createTestFunction(code)).rejects.toThrow(GENERIC_ERROR);
-    });
-
-    it('should block require keyword', async () => {
-      const code = 'const fs = require("fs")';
-      await expect(createTestFunction(code)).rejects.toThrow(GENERIC_ERROR);
-    });
-
-    it('should report the blocked dangerous pattern', async () => {
-      const code = 'const fs = require("fs")';
-      await expect(createTestFunction(code)).rejects.toMatchObject({
-        message: expect.stringContaining('CommonJS require call'),
-        nextActions: expect.stringContaining('Use ESM imports'),
-      });
-    });
-
-    it('should block dynamic Function constructor', async () => {
-      const code = 'const f = new Function("return 1");';
-      await expect(createTestFunction(code)).rejects.toThrow(GENERIC_ERROR);
-    });
-
-    it('should block bracket notation bypass (Deno)', async () => {
-      const code = 'const d = globalThis["Deno"];';
-      await expect(createTestFunction(code)).rejects.toThrow(GENERIC_ERROR);
-    });
-
-    it('should block process bracket access', async () => {
-      const code = 'const env = process["env"];';
-      await expect(createTestFunction(code)).rejects.toThrow(GENERIC_ERROR);
-    });
-
-    it('should block self bracket access', async () => {
-      const code = 'const fetcher = self["fetch"];';
-      await expect(createTestFunction(code)).rejects.toThrow(GENERIC_ERROR);
-    });
-
-    it('should block Deno bracket access', async () => {
-      const code = 'const runner = Deno["run"];';
-      await expect(createTestFunction(code)).rejects.toThrow(GENERIC_ERROR);
-    });
-
-    it('should block eval', async () => {
-      const code = 'eval("console.log(1)");';
-      await expect(createTestFunction(code)).rejects.toThrow(GENERIC_ERROR);
-    });
-
-    it('should allow valid class syntax (Regression Fix)', async () => {
-      const code = `
-        class MyHelper {
-          constructor(name) { this.name = name; }
-          greet() { return 'hi ' + this.name; }
-        }
-        export default async function(req) {
-          const h = new MyHelper('test');
-          return new Response(h.greet());
-        }
-      `;
-      mockClient.query.mockResolvedValueOnce({});
-      mockClient.query.mockResolvedValueOnce({});
-      mockClient.query.mockResolvedValueOnce({ rows: [{ id: '1' }] });
+      mockSuccessfulCreate();
       await expect(createTestFunction(code)).resolves.toBeDefined();
     });
   });
