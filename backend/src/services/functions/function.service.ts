@@ -17,6 +17,199 @@ import { DenoSubhostingProvider } from '@/providers/functions/deno-subhosting.pr
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 
+type CodeScanState =
+  | 'code'
+  | 'singleQuote'
+  | 'doubleQuote'
+  | 'template'
+  | 'lineComment'
+  | 'blockComment';
+
+const isIdentifierChar = (char: string | undefined): boolean =>
+  char !== undefined && /[A-Za-z0-9_$]/.test(char);
+
+const isWhitespace = (char: string | undefined): boolean => char !== undefined && /\s/.test(char);
+
+const skipWhitespace = (code: string, index: number): number => {
+  let cursor = index;
+  while (isWhitespace(code[cursor])) {
+    cursor++;
+  }
+  return cursor;
+};
+
+const readExactStringLiteral = (
+  code: string,
+  index: number,
+  quote: "'" | '"',
+  expected: string
+): number | null => {
+  let cursor = index + 1;
+  let value = '';
+
+  while (cursor < code.length) {
+    const char = code[cursor];
+    if (char === '\\') {
+      return null;
+    }
+
+    if (char === quote) {
+      return value === expected ? cursor + 1 : null;
+    }
+
+    value += char;
+    cursor++;
+  }
+
+  return null;
+};
+
+const isDenoServeCallAt = (code: string, index: number): boolean => {
+  if (
+    !code.startsWith('Deno', index) ||
+    isIdentifierChar(code[index - 1]) ||
+    isIdentifierChar(code[index + 4])
+  ) {
+    return false;
+  }
+
+  let cursor = skipWhitespace(code, index + 4);
+
+  if (code[cursor] === '.') {
+    cursor = skipWhitespace(code, cursor + 1);
+    if (!code.startsWith('serve', cursor) || isIdentifierChar(code[cursor + 5])) {
+      return false;
+    }
+
+    cursor = skipWhitespace(code, cursor + 5);
+    return code[cursor] === '(';
+  }
+
+  if (code[cursor] === '[') {
+    cursor = skipWhitespace(code, cursor + 1);
+    const quote = code[cursor];
+    if (quote !== "'" && quote !== '"') {
+      return false;
+    }
+
+    const literalEnd = readExactStringLiteral(code, cursor, quote, 'serve');
+    if (literalEnd === null) {
+      return false;
+    }
+
+    cursor = skipWhitespace(code, literalEnd);
+    if (code[cursor] !== ']') {
+      return false;
+    }
+
+    cursor = skipWhitespace(code, cursor + 1);
+    return code[cursor] === '(';
+  }
+
+  return false;
+};
+
+const containsDenoServeCall = (code: string): boolean => {
+  let state: CodeScanState = 'code';
+  const templateExpressionDepths: number[] = [];
+
+  for (let i = 0; i < code.length; i++) {
+    const char = code[i];
+    const next = code[i + 1];
+
+    switch (state) {
+      case 'lineComment':
+        if (char === '\n' || char === '\r') {
+          state = 'code';
+        }
+        continue;
+
+      case 'blockComment':
+        if (char === '*' && next === '/') {
+          i++;
+          state = 'code';
+        }
+        continue;
+
+      case 'singleQuote':
+        if (char === '\\' && next !== undefined) {
+          i++;
+        } else if (char === "'") {
+          state = 'code';
+        }
+        continue;
+
+      case 'doubleQuote':
+        if (char === '\\' && next !== undefined) {
+          i++;
+        } else if (char === '"') {
+          state = 'code';
+        }
+        continue;
+
+      case 'template':
+        if (char === '\\' && next !== undefined) {
+          i++;
+        } else if (char === '`') {
+          state = 'code';
+        } else if (char === '$' && next === '{') {
+          i++;
+          templateExpressionDepths.push(1);
+          state = 'code';
+        }
+        continue;
+
+      case 'code':
+        if (isDenoServeCallAt(code, i)) {
+          return true;
+        }
+
+        if (char === '/' && next === '/') {
+          i++;
+          state = 'lineComment';
+          continue;
+        }
+
+        if (char === '/' && next === '*') {
+          i++;
+          state = 'blockComment';
+          continue;
+        }
+
+        if (char === "'") {
+          state = 'singleQuote';
+          continue;
+        }
+
+        if (char === '"') {
+          state = 'doubleQuote';
+          continue;
+        }
+
+        if (char === '`') {
+          state = 'template';
+          continue;
+        }
+
+        if (templateExpressionDepths.length > 0) {
+          const lastIndex = templateExpressionDepths.length - 1;
+          if (char === '{') {
+            templateExpressionDepths[lastIndex]++;
+          } else if (char === '}') {
+            templateExpressionDepths[lastIndex]--;
+            if (templateExpressionDepths[lastIndex] === 0) {
+              templateExpressionDepths.pop();
+              state = 'template';
+            }
+          }
+        }
+        continue;
+    }
+  }
+
+  return false;
+};
+
 export class FunctionService {
   private static instance: FunctionService;
   private pool: Pool | null = null;
@@ -354,7 +547,7 @@ export class FunctionService {
    * Validate function code for platform contract compatibility.
    */
   private validateCode(code: string): void {
-    if (/Deno\.serve\s*\(/.test(code)) {
+    if (containsDenoServeCall(code)) {
       throw new AppError(
         'Functions should use "export default async function(req: Request)" instead of "Deno.serve()". The router handles serving automatically.',
         400,

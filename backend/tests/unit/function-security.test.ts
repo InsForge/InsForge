@@ -85,6 +85,45 @@ describe('FunctionService Code Validation (Public API)', () => {
         /should use "export default async function/i
       );
     });
+
+    it.each([
+      'Deno["serve"]((req) => new Response("hi"));',
+      "Deno['serve']((req) => new Response('hi'));",
+      'Deno . serve ((req) => new Response("hi"));',
+    ])('should block Deno.serve bracket and spaced forms', async (code) => {
+      await expect(createTestFunction(code)).rejects.toThrow(
+        /should use "export default async function/i
+      );
+    });
+
+    it('should not reject Deno.serve examples inside comments or strings', async () => {
+      const code = `
+        // Standalone Deno apps often use Deno.serve(() => {}).
+        /*
+         * Example only: Deno["serve"](() => new Response("ok"))
+         */
+        export default async function(req: Request) {
+          const docs = "Deno.serve(() => {}) is not used by InsForge functions";
+          const templateDocs = \`Deno['serve'](() => {}) appears only as text\`;
+          return new Response(docs + templateDocs);
+        }
+      `;
+
+      mockSuccessfulCreate();
+      await expect(createTestFunction(code)).resolves.toBeDefined();
+    });
+
+    it('should block Deno.serve inside template expressions', async () => {
+      const code = `
+        export default async function(req: Request) {
+          return new Response(\`\${Deno.serve(() => new Response("hi"))}\`);
+        }
+      `;
+
+      await expect(createTestFunction(code)).rejects.toThrow(
+        /should use "export default async function/i
+      );
+    });
   });
 
   describe('Runtime responsibility boundaries', () => {
