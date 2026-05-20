@@ -83,12 +83,9 @@ export const posthogApi = {
   },
 
   async createRecordingShare(recordingId: string): Promise<PosthogShareTokenResponse> {
-    return apiClient.request(
-      `/analytics/recordings/${encodeURIComponent(recordingId)}/share`,
-      {
-        method: 'POST',
-        headers: apiClient.withAccessToken({}),
-      }
-    ) as Promise<PosthogShareTokenResponse>;
+    return apiClient.request(`/analytics/recordings/${encodeURIComponent(recordingId)}/share`, {
+      method: 'POST',
+      headers: apiClient.withAccessToken({}),
+    }) as Promise<PosthogShareTokenResponse>;
   },
 };

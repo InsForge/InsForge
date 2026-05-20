@@ -77,7 +77,9 @@ export class PostHogProvider {
   }
 
   async getConnection(): Promise<PosthogConnection | null> {
-    if (!this.isEnabled()) this.throwUnsupported();
+    if (!this.isEnabled()) {
+      this.throwUnsupported();
+    }
     let data: unknown;
     try {
       const response = await axios.get(this.url('/posthog/connection'), {
@@ -108,7 +110,9 @@ export class PostHogProvider {
   }
 
   async getDashboards(): Promise<PosthogDashboardsResponse> {
-    if (!this.isEnabled()) this.throwUnsupported();
+    if (!this.isEnabled()) {
+      this.throwUnsupported();
+    }
     let data: unknown;
     try {
       const response = await axios.get(this.url('/posthog/dashboards'), {
@@ -139,7 +143,9 @@ export class PostHogProvider {
   }
 
   async getSummary(): Promise<PosthogSummary> {
-    if (!this.isEnabled()) this.throwUnsupported();
+    if (!this.isEnabled()) {
+      this.throwUnsupported();
+    }
     let data: unknown;
     try {
       const response = await axios.get(this.url('/posthog/summary'), {
@@ -170,7 +176,9 @@ export class PostHogProvider {
   }
 
   async getRecentEvents(limit = 10): Promise<PosthogEventsResponse> {
-    if (!this.isEnabled()) this.throwUnsupported();
+    if (!this.isEnabled()) {
+      this.throwUnsupported();
+    }
     let data: unknown;
     try {
       const response = await axios.get(this.url('/posthog/events'), {
@@ -202,7 +210,9 @@ export class PostHogProvider {
   }
 
   async disconnect(): Promise<void> {
-    if (!this.isEnabled()) this.throwUnsupported();
+    if (!this.isEnabled()) {
+      this.throwUnsupported();
+    }
     try {
       await axios.delete(this.url('/posthog/connection'), {
         headers: this.headers(),
@@ -215,7 +225,9 @@ export class PostHogProvider {
   }
 
   async getWebOverview(timeframe: string): Promise<PosthogWebOverviewResponse> {
-    if (!this.isEnabled()) this.throwUnsupported();
+    if (!this.isEnabled()) {
+      this.throwUnsupported();
+    }
     let data: unknown;
     try {
       const response = await axios.get(this.url('/posthog/web-overview'), {
@@ -247,7 +259,9 @@ export class PostHogProvider {
   }
 
   async getWebStats(breakdown: string, timeframe: string): Promise<PosthogWebStatsResponse> {
-    if (!this.isEnabled()) this.throwUnsupported();
+    if (!this.isEnabled()) {
+      this.throwUnsupported();
+    }
     let data: unknown;
     try {
       const response = await axios.get(this.url('/posthog/web-stats'), {
@@ -279,7 +293,9 @@ export class PostHogProvider {
   }
 
   async getTrends(metric: string, timeframe: string): Promise<PosthogTrendsResponse> {
-    if (!this.isEnabled()) this.throwUnsupported();
+    if (!this.isEnabled()) {
+      this.throwUnsupported();
+    }
     let data: unknown;
     try {
       const response = await axios.get(this.url('/posthog/trends'), {
@@ -311,7 +327,9 @@ export class PostHogProvider {
   }
 
   async getRetention(): Promise<PosthogRetentionResponse> {
-    if (!this.isEnabled()) this.throwUnsupported();
+    if (!this.isEnabled()) {
+      this.throwUnsupported();
+    }
     let data: unknown;
     try {
       const response = await axios.get(this.url('/posthog/retention'), {
@@ -342,7 +360,9 @@ export class PostHogProvider {
   }
 
   async getRecordings(limit = 10): Promise<PosthogRecordingsResponse> {
-    if (!this.isEnabled()) this.throwUnsupported();
+    if (!this.isEnabled()) {
+      this.throwUnsupported();
+    }
     let data: unknown;
     try {
       const response = await axios.get(this.url('/posthog/recordings'), {
@@ -374,7 +394,9 @@ export class PostHogProvider {
   }
 
   async createRecordingShare(recordingId: string): Promise<PosthogShareTokenResponse> {
-    if (!this.isEnabled()) this.throwUnsupported();
+    if (!this.isEnabled()) {
+      this.throwUnsupported();
+    }
     let data: unknown;
     try {
       const response = await axios.post(
