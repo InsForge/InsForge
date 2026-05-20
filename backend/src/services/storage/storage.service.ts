@@ -441,12 +441,7 @@ export class StorageService {
   async updateBucketVisibility(bucket: string, isPublic: boolean): Promise<void> {
     const client = await this.getPool().connect();
     try {
-      // Check if bucket exists
-      const bucketResult = await client.query('SELECT name FROM storage.buckets WHERE name = $1', [
-        bucket,
-      ]);
-
-      if (!bucketResult.rows[0]) {
+      if (!(await this.bucketExists(bucket, client))) {
         throw new Error(`Bucket "${bucket}" does not exist`);
       }
 
@@ -477,12 +472,7 @@ export class StorageService {
 
     const client = await this.getPool().connect();
     try {
-      // Check if bucket already exists
-      const existing = await client.query('SELECT name FROM storage.buckets WHERE name = $1', [
-        bucket,
-      ]);
-
-      if (existing.rows[0]) {
+      if (await this.bucketExists(bucket, client)) {
         throw new Error(`Bucket "${bucket}" already exists`);
       }
 
@@ -508,12 +498,7 @@ export class StorageService {
 
     const client = await this.getPool().connect();
     try {
-      // Check if bucket exists
-      const bucketResult = await client.query('SELECT name FROM storage.buckets WHERE name = $1', [
-        bucket,
-      ]);
-
-      if (!bucketResult.rows[0]) {
+      if (!(await this.bucketExists(bucket, client))) {
         return false;
       }
 
@@ -547,29 +532,33 @@ export class StorageService {
   ) {
     this.validateBucketName(bucket);
 
-    const createUploadStrategy = async (client: PoolClient) => {
-      // Check if bucket exists
-      const bucketResult = await client.query('SELECT name FROM storage.buckets WHERE name = $1', [
-        bucket,
-      ]);
+    if (!(await this.bucketExists(bucket))) {
+      throw new Error(`Bucket "${bucket}" does not exist`);
+    }
 
-      if (!bucketResult.rows[0]) {
-        throw new Error(`Bucket "${bucket}" does not exist`);
-      }
-
-      // Generate next available key using (1), (2), (3) pattern. RLS scopes
-      // the dedup query so users don't conflict on filenames they can't see.
-      const key = await this.generateNextAvailableKey(bucket, metadata.filename, client);
-      const maxFileSizeBytes = await StorageConfigService.getInstance().getMaxFileSizeBytes();
-      return this.provider.getUploadStrategy(bucket, key, metadata, maxFileSizeBytes);
-    };
+    const key = await this.generateNextAvailableKey(bucket, metadata.filename, this.getPool());
+    const maxFileSizeBytes = await StorageConfigService.getInstance().getMaxFileSizeBytes();
     if (hasApiKey) {
-      return runWithRootAccess(this.getPool(), createUploadStrategy);
+      return this.provider.getUploadStrategy(bucket, key, metadata, maxFileSizeBytes);
     }
     if (!ctx) {
       throw new AppError('Forbidden', 403, ERROR_CODES.STORAGE_PERMISSION_DENIED);
     }
-    return withUserContext(this.getPool(), ctx, createUploadStrategy);
+    const userId = ctx.id ?? null;
+    await withUserContext(this.getPool(), ctx, async (client) => {
+      await client.query('SAVEPOINT upload_strategy_rls_probe');
+      try {
+        await client.query(
+          `INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by, uploaded_via)
+           VALUES ($1, $2, 0, $3, $4, 'rest')`,
+          [bucket, key, metadata.contentType || null, userId]
+        );
+      } finally {
+        await client.query('ROLLBACK TO SAVEPOINT upload_strategy_rls_probe');
+        await client.query('RELEASE SAVEPOINT upload_strategy_rls_probe');
+      }
+    });
+    return this.provider.getUploadStrategy(bucket, key, metadata, maxFileSizeBytes);
   }
 
   async getDownloadStrategy(bucket: string, key: string) {
@@ -895,11 +884,9 @@ export class StorageService {
     );
   }
 
-  async bucketExists(bucket: string): Promise<boolean> {
-    const r = await this.getPool().query('SELECT 1 FROM storage.buckets WHERE name=$1 LIMIT 1', [
-      bucket,
-    ]);
-    return (r.rowCount ?? 0) === 1;
+  async bucketExists(bucket: string, db: Pool | PoolClient = this.getPool()): Promise<boolean> {
+    const r = await db.query('SELECT 1 FROM storage.buckets WHERE name = $1 LIMIT 1', [bucket]);
+    return (r.rowCount ?? 0) > 0;
   }
 
   async bucketIsEmpty(bucket: string): Promise<boolean> {

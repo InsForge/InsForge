@@ -87,6 +87,16 @@ describe('044_prefer-request-jwt-claims migration', () => {
     expect(sql).not.toMatch(/CREATE OR REPLACE FUNCTION public\./i);
   });
 
+  it('grants only missing storage runtime roles required before RLS can evaluate', () => {
+    expect(sql).toMatch(
+      /GRANT\s+USAGE\s+ON\s+SCHEMA\s+storage\s+TO\s+anon,\s*project_admin/i
+    );
+    expect(sql).toMatch(
+      /GRANT\s+SELECT,\s*INSERT,\s*UPDATE,\s*DELETE\s+ON\s+storage\.objects\s+TO\s+anon,\s*project_admin/i
+    );
+    expect(sql).not.toMatch(/GRANT\s+SELECT\s+ON\s+storage\.buckets/i);
+  });
+
   it('runs after migration 043', () => {
     const migrations = fs
       .readdirSync(migrationDir)

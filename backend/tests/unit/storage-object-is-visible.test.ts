@@ -182,6 +182,56 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     ).rejects.toBeInstanceOf(AppError);
   });
 
+  it('checks upload-strategy bucket existence outside the user-context transaction', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      getUploadStrategy: vi.fn(async () => ({
+        method: 'direct' as const,
+        uploadUrl: '/upload',
+        key: 'note.txt',
+        confirmRequired: false,
+      })),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [
+      { rows: [{ name: 'photos' }], rowCount: 1 }, // root bucket existence check
+      { rows: [], rowCount: 0 }, // root object dedup query
+      { rows: [{ maxFileSizeMb: 50 }], rowCount: 1 }, // storage config
+      { rows: [], rowCount: 0 }, // BEGIN
+      { rows: [], rowCount: 0 }, // SET LOCAL ROLE authenticated
+      { rows: [], rowCount: 0 }, // set_config(claims)
+      { rows: [], rowCount: 0 }, // SAVEPOINT
+      { rows: [], rowCount: 1 }, // RLS INSERT probe
+      { rows: [], rowCount: 0 }, // ROLLBACK TO SAVEPOINT
+      { rows: [], rowCount: 0 }, // RELEASE SAVEPOINT
+      { rows: [], rowCount: 0 }, // COMMIT
+      { rows: [], rowCount: 0 }, // RESET ROLE
+    ];
+
+    const strategy = await svc.getUploadStrategy(
+      { id: 'alice-sub', email: 'alice@example.com', role: 'authenticated' },
+      'photos',
+      { filename: 'note.txt', contentType: 'text/plain', size: 8 }
+    );
+
+    expect(strategy).toMatchObject({ method: 'direct', key: 'note.txt' });
+    expect(calls[0]).toEqual({
+      sql: 'SELECT 1 FROM storage.buckets WHERE name = $1 LIMIT 1',
+      params: ['photos'],
+    });
+    expect(calls[1].sql).toContain('SELECT key FROM storage.objects');
+    expect(calls[3].sql).toBe('BEGIN');
+    expect(calls[4].sql).toBe('SET LOCAL ROLE authenticated');
+    expect(calls.map((c) => c.sql).slice(1)).not.toContain(
+      'SELECT 1 FROM storage.buckets WHERE name = $1 LIMIT 1'
+    );
+    expect(calls.map((c) => c.sql)).toContain('SAVEPOINT upload_strategy_rls_probe');
+    expect(calls.map((c) => c.sql)).toContain('ROLLBACK TO SAVEPOINT upload_strategy_rls_probe');
+    expect(calls.some((c) => c.sql.includes('INSERT INTO storage.objects'))).toBe(true);
+  });
+
   it('returns true for public bucket objects without requiring user context', async () => {
     const { StorageService } = await import('@/services/storage/storage.service.js');
     const svc = StorageService.getInstance();

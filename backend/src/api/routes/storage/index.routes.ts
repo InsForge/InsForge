@@ -23,10 +23,11 @@ const auditService = AuditService.getInstance();
 const storageConfigService = StorageConfigService.getInstance();
 const s3AccessKeyService = S3AccessKeyService.getInstance();
 
-// Middleware to conditionally apply authentication based on bucket visibility
-const conditionalAuth = async (req: Request, res: Response, next: NextFunction) => {
-  // For GET and HEAD requests to download objects, check if bucket is public
-  if ((req.method === 'GET' || req.method === 'HEAD') && req.params.bucketName) {
+// Middleware to conditionally apply authentication based on bucket visibility.
+// This is only attached to object download hand-offs: GET object bytes and POST
+// download-strategy. The strategy endpoint is POST, but it is still a read path.
+const conditionalDownloadAuth = async (req: Request, res: Response, next: NextFunction) => {
+  if (req.params.bucketName) {
     try {
       const storageService = StorageService.getInstance();
       const isPublic = await storageService.isBucketPublic(req.params.bucketName);
@@ -395,7 +396,7 @@ router.post(
 // GET /api/storage/buckets/:bucketName/objects/:objectKey - Download object from bucket (conditional auth)
 router.get(
   '/buckets/:bucketName/objects/*',
-  conditionalAuth,
+  conditionalDownloadAuth,
   async (req: AuthRequest | Request, res: Response, next: NextFunction) => {
     try {
       const { bucketName } = req.params;
@@ -623,7 +624,7 @@ router.post(
 // POST /api/storage/buckets/:bucketName/objects/:objectKey/download-strategy - Get download URL (presigned or direct)
 router.post(
   '/buckets/:bucketName/objects/:objectKey/download-strategy',
-  conditionalAuth,
+  conditionalDownloadAuth,
   async (req: AuthRequest | Request, res: Response, next: NextFunction) => {
     try {
       const { bucketName, objectKey } = req.params;
