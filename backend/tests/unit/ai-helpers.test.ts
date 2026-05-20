@@ -38,9 +38,14 @@ describe('sortModalities', () => {
   });
 
   it('handles all known modalities in the correct canonical order', () => {
-    expect(
-      sortModalities(['embeddings', 'file', 'video', 'audio', 'image', 'text'])
-    ).toEqual(['text', 'image', 'audio', 'video', 'file', 'embeddings']);
+    expect(sortModalities(['embeddings', 'file', 'video', 'audio', 'image', 'text'])).toEqual([
+      'text',
+      'image',
+      'audio',
+      'video',
+      'file',
+      'embeddings',
+    ]);
   });
 
   it('handles a single modality', () => {
@@ -74,9 +79,7 @@ describe('calculatePricePerMillion', () => {
   });
 
   it('returns empty object when pricing is undefined', () => {
-    const result = calculatePricePerMillion(
-      undefined as unknown as RawOpenRouterModel['pricing']
-    );
+    const result = calculatePricePerMillion(undefined as unknown as RawOpenRouterModel['pricing']);
     expect(result).toEqual({});
   });
 
@@ -145,11 +148,7 @@ describe('calculateTokenPrices', () => {
   });
 
   it('returns "Free" label when price is zero', () => {
-    const result = calculateTokenPrices(
-      { prompt: '0', completion: '0' },
-      ['text'],
-      ['text']
-    );
+    const result = calculateTokenPrices({ prompt: '0', completion: '0' }, ['text'], ['text']);
     expect(result.inputPriceLabel).toBe('Free');
     expect(result.outputPriceLabel).toBe('Free');
   });
@@ -184,11 +183,7 @@ describe('calculateTokenPrices', () => {
   });
 
   it('formats large prices with 1 decimal place', () => {
-    const result = calculateTokenPrices(
-      { prompt: '0.00006', completion: '0' },
-      ['text'],
-      ['text']
-    );
+    const result = calculateTokenPrices({ prompt: '0.00006', completion: '0' }, ['text'], ['text']);
     // 0.00006 * 1_000_000 = 60
     expect(result.inputPriceLabel).toBe('$60.0 / M tokens');
   });
