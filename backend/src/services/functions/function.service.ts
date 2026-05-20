@@ -148,7 +148,7 @@ export class FunctionService {
     const { name, code, description, status } = data;
     const slug = data.slug || name.toLowerCase().replace(/\s+/g, '-');
 
-    // Validate code with regex checks
+    // Validate only platform contract constraints; runtime security is enforced by the runtime/provider.
     this.validateCode(code);
 
     // Save to DB (release client before deployment polling)
@@ -351,49 +351,15 @@ export class FunctionService {
   }
 
   /**
-   * Validate function code for dangerous patterns
+   * Validate function code for platform contract compatibility.
    */
   private validateCode(code: string): void {
     if (/Deno\.serve\s*\(/.test(code)) {
       throw new AppError(
-        'Functions should use "export default async function(req: Request)" instead of "Deno.serve()". The router handles serving automatically.',
+        'Function source cannot contain Deno.serve(). Use "export default async function(req: Request)" instead; the router handles serving automatically.',
         400,
         ERROR_CODES.INVALID_INPUT
       );
-    }
-
-    const dangerousPatterns = [
-      /globalThis/i,
-      /\bself\b/i,
-      /\bprocess\b/i,
-      /Deno\.(run|spawn|Command|makeTemp|remove|write|chmod|chown)/i,
-      /\bimport\b[^;]*\(/i, // Block dynamic imports even with comments (e.g., import /* */ ('...'))
-      /require\b/i,
-      /eval\b/i,
-      /\bFunction\s*\(/, // Case-sensitive: Block constructor but allow 'function' keyword
-
-      /\.constructor\b|__proto__/i, // Block property-based constructor access; allow class constructor() declarations
-      /\bDeno\s*\[|\bprocess\s*\[|\bglobalThis\s*\[/i, // Block bracket notation property access like obj['Deno']
-    ];
-
-    /**
-     * TIER 1 VALIDATION (Convenience Filter):
-     * This regex suite is a high-level filter designed to reject obvious malicious patterns
-     * at the API layer. The ACTUAL enforcement boundary is the Tier 2 native Deno sandbox
-     * (permissions: false) which blocks the underlying syscalls.
-     */
-    for (const pattern of dangerousPatterns) {
-      if (pattern.test(code)) {
-        logger.warn('Dangerous code pattern blocked', {
-          pattern: pattern.toString(),
-          codeLength: code.length,
-        });
-        throw new AppError(
-          'Code contains a potentially dangerous pattern.',
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
-      }
     }
   }
 
