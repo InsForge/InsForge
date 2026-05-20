@@ -81,43 +81,31 @@ describe('FunctionService Code Validation (Public API)', () => {
     it('should block Deno.serve because the platform router handles serving', async () => {
       const code = 'Deno.serve((req) => new Response("hi"));';
 
-      await expect(createTestFunction(code)).rejects.toThrow(/cannot contain Deno\.serve-style/i);
+      await expect(createTestFunction(code)).rejects.toThrow(/cannot contain Deno\.serve\(\)/i);
     });
 
-    it.each([
-      'Deno["serve"]((req) => new Response("hi"));',
-      "Deno['serve']((req) => new Response('hi'));",
-      'Deno . serve ((req) => new Response("hi"));',
-      'Deno /* comment */ . /* another */ serve ((req) => new Response("hi"));',
-      'Deno /* comment */ [ /* another */ "serve" /* end */ ] ((req) => new Response("hi"));',
-    ])('should block Deno.serve bracket, spaced, and comment-separated forms', async (code) => {
-      await expect(createTestFunction(code)).rejects.toThrow(/cannot contain Deno\.serve-style/i);
-    });
-
-    it('should clearly reject Deno.serve examples anywhere in source', async () => {
+    it('should reject simple Deno.serve examples anywhere in source', async () => {
       const code = `
         // Standalone Deno apps often use Deno.serve(() => {}).
-        /*
-         * Example only: Deno["serve"](() => new Response("ok"))
-         */
         export default async function(req: Request) {
           const docs = "Deno.serve(() => {}) is not used by InsForge functions";
-          const templateDocs = \`Deno['serve'](() => {}) appears only as text\`;
-          return new Response(docs + templateDocs);
+          return new Response(docs);
         }
       `;
 
-      await expect(createTestFunction(code)).rejects.toThrow(/cannot contain Deno\.serve-style/i);
+      await expect(createTestFunction(code)).rejects.toThrow(/cannot contain Deno\.serve\(\)/i);
     });
 
-    it('should block Deno.serve inside template expressions', async () => {
+    it('should not treat bracket access as an API-layer security boundary', async () => {
       const code = `
         export default async function(req: Request) {
-          return new Response(\`\${Deno.serve(() => new Response("hi"))}\`);
+          Deno["serve"](() => new Response("hi"));
+          return new Response("ok");
         }
       `;
 
-      await expect(createTestFunction(code)).rejects.toThrow(/cannot contain Deno\.serve-style/i);
+      mockSuccessfulCreate();
+      await expect(createTestFunction(code)).resolves.toBeDefined();
     });
   });
 

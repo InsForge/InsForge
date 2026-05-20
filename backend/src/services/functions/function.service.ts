@@ -17,11 +17,6 @@ import { DenoSubhostingProvider } from '@/providers/functions/deno-subhosting.pr
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 
-const CODE_TRIVIA = String.raw`(?:\s|//[^\r\n]*(?:\r?\n|$)|/\*[\s\S]*?\*/)*`;
-const DENO_SERVE_PATTERN = new RegExp(
-  String.raw`\bDeno${CODE_TRIVIA}(?:\.${CODE_TRIVIA}serve|\[${CODE_TRIVIA}['"]serve['"]${CODE_TRIVIA}\])${CODE_TRIVIA}\(`
-);
-
 export class FunctionService {
   private static instance: FunctionService;
   private pool: Pool | null = null;
@@ -359,9 +354,9 @@ export class FunctionService {
    * Validate function code for platform contract compatibility.
    */
   private validateCode(code: string): void {
-    if (DENO_SERVE_PATTERN.test(code)) {
+    if (/Deno\.serve\s*\(/.test(code)) {
       throw new AppError(
-        'Function source cannot contain Deno.serve-style calls, including Deno["serve"](). Use "export default async function(req: Request)" instead; the router handles serving automatically.',
+        'Function source cannot contain Deno.serve(). Use "export default async function(req: Request)" instead; the router handles serving automatically.',
         400,
         ERROR_CODES.INVALID_INPUT
       );
