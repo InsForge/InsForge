@@ -396,7 +396,7 @@ async uploadFileStream(input: {
       );
     }
     if (axios.isAxiosError(error) && error.code === 'ERR_CANCELED') {
-      throw new AppError('Vercel file upload was interrupted.', 499, ERROR_CODES.INVALID_INPUT);
+      throw new AppError('Vercel file upload was interrupted.', 499, ERROR_CODES.UNKNOWN_ERROR);
     }
     throw new AppError('Failed to upload file to Vercel', 500, ERROR_CODES.INTERNAL_ERROR);
   }

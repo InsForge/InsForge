@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { DatabaseError } from 'pg';
 import { errorResponse } from '@/utils/response.js';
-import { ERROR_CODES, NEXT_ACTION } from '@insforge/shared-schemas';
+import { ERROR_CODES } from '@insforge/shared-schemas';
+import { NEXT_ACTION } from '../../types/error-constants.js';
 import logger from '@/utils/logger.js';
 
 export class AppError extends Error {

@@ -260,10 +260,23 @@ export default defineConfig(
           selector: 'enumMember',
           format: ['UPPER_CASE'],
         },
-        // Variables, properties, and methods - allow UPPER_CASE for constants
+        // Allow UPPER_CASE only for global const variables (constants like ERROR_CODES)
+        {
+          selector: 'variable',
+          modifiers: ['const', 'global'],
+          format: ['camelCase', 'UPPER_CASE', 'PascalCase'],
+          leadingUnderscore: 'allow',
+        },
+        // Allow UPPER_CASE for object literal properties (e.g. ERROR_CODES keys)
+        {
+          selector: 'objectLiteralProperty',
+          format: ['camelCase', 'UPPER_CASE', 'PascalCase'],
+          leadingUnderscore: 'allow',
+        },
+        // Variables, properties, and methods - camelCase or PascalCase
         {
           selector: ['variable', 'property', 'objectLiteralMethod', 'method'],
-          format: ['camelCase', 'UPPER_CASE', 'PascalCase'],
+          format: ['camelCase', 'PascalCase'],
           leadingUnderscore: 'allow',
         },
         // Default for everything else - camelCase

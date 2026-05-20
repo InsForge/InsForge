@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from './error.js';
-import { ERROR_CODES, NEXT_ACTION, type RoleSchema } from '@insforge/shared-schemas';
+import { ERROR_CODES, type RoleSchema } from '@insforge/shared-schemas';
+import { NEXT_ACTION } from '../../types/error-constants.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 
 export type UserContext = {
