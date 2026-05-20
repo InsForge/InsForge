@@ -367,7 +367,7 @@ export class FunctionService {
       /\bself\b/i,
       /\bprocess\b/i,
       /Deno\.(run|spawn|Command|makeTemp|remove|write|chmod|chown)/i,
-      /\bimport\b[^;]*\(/i, // Block dynamic imports even with comments (e.g., import /* */ ('...'))
+      /\bimport\s*(?:\/\*[^]*?\*\/\s*)?\(/i, // Block dynamic import(...) / import /* */ (...). Anchored on whitespace/comment only — the old /\bimport\b[^;]*\(/ spanned newlines (semicolon-less static imports) to a later '(' like function(req), falsely rejecting valid `import x from '...'`.
       /require\b/i,
       /eval\b/i,
       /\bFunction\s*\(/, // Case-sensitive: Block constructor but allow 'function' keyword

