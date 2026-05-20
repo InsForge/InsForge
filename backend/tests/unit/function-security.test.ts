@@ -118,6 +118,23 @@ describe('FunctionService Security Validation (Public API)', () => {
       );
     });
 
+    it('should allow dangerous words inside comments', async () => {
+      const code = `
+        // Require authenticated user to invoke this function.
+        /*
+         * Mentioning process, eval, globalThis, and require in docs should
+         * not block deployment unless they are used as code-shaped calls/access.
+         */
+        export default async function(req: Request) {
+          return new Response('ok');
+        }
+      `;
+      mockClient.query.mockResolvedValueOnce({});
+      mockClient.query.mockResolvedValueOnce({});
+      mockClient.query.mockResolvedValueOnce({ rows: [{ id: '1' }] });
+      await expect(createTestFunction(code)).resolves.toBeDefined();
+    });
+
     it('should block RCE via Deno.spawn', async () => {
       const code = 'const proc = Deno.spawn("rm", { args: ["-rf", "/"] });';
       await expect(createTestFunction(code)).rejects.toThrow(GENERIC_ERROR);
@@ -139,6 +156,14 @@ describe('FunctionService Security Validation (Public API)', () => {
     it('should block require keyword', async () => {
       const code = 'const fs = require("fs")';
       await expect(createTestFunction(code)).rejects.toThrow(GENERIC_ERROR);
+    });
+
+    it('should report the blocked dangerous pattern', async () => {
+      const code = 'const fs = require("fs")';
+      await expect(createTestFunction(code)).rejects.toMatchObject({
+        message: expect.stringContaining('CommonJS require call'),
+        nextActions: expect.stringContaining('Use ESM imports'),
+      });
     });
 
     it('should block dynamic Function constructor', async () => {

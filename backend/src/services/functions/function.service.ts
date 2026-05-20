@@ -17,6 +17,65 @@ import { DenoSubhostingProvider } from '@/providers/functions/deno-subhosting.pr
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 
+interface DangerousCodeRule {
+  id: string;
+  pattern: RegExp;
+  nextAction: string;
+}
+
+const dangerousCodeRules: DangerousCodeRule[] = [
+  {
+    id: 'globalThis access',
+    pattern: /\bglobalThis\s*(?:\.|\[)/i,
+    nextAction: 'Avoid accessing globalThis from serverless functions.',
+  },
+  {
+    id: 'self access',
+    pattern: /\bself\s*(?:\.|\[)/i,
+    nextAction: 'Avoid accessing self from serverless functions.',
+  },
+  {
+    id: 'process access',
+    pattern: /\bprocess\s*(?:\.|\[)/i,
+    nextAction: 'Avoid accessing process from serverless functions.',
+  },
+  {
+    id: 'privileged Deno API',
+    pattern: /\bDeno\s*\.\s*(run|spawn|Command|makeTemp|remove|write|chmod|chown)\b/i,
+    nextAction: 'Remove privileged Deno runtime API usage.',
+  },
+  {
+    id: 'dynamic import',
+    pattern: /\bimport\b[^;]*\(/i,
+    nextAction: 'Use static imports instead of dynamic import().',
+  },
+  {
+    id: 'CommonJS require call',
+    pattern: /\brequire\s*\(/i,
+    nextAction: 'Use ESM imports instead of require().',
+  },
+  {
+    id: 'eval call',
+    pattern: /\beval\s*\(/i,
+    nextAction: 'Remove eval() usage.',
+  },
+  {
+    id: 'Function constructor',
+    pattern: /\bFunction\s*\(/,
+    nextAction: 'Remove dynamic Function constructor usage.',
+  },
+  {
+    id: 'prototype chain access',
+    pattern: /\.\s*constructor\b|__proto__/i,
+    nextAction: 'Avoid constructor/prototype-chain access.',
+  },
+  {
+    id: 'sensitive global bracket access',
+    pattern: /\b(Deno|process|globalThis)\s*\[/i,
+    nextAction: 'Avoid bracket access on sensitive globals.',
+  },
+];
+
 export class FunctionService {
   private static instance: FunctionService;
   private pool: Pool | null = null;
@@ -362,36 +421,24 @@ export class FunctionService {
       );
     }
 
-    const dangerousPatterns = [
-      /globalThis/i,
-      /\bself\b/i,
-      /\bprocess\b/i,
-      /Deno\.(run|spawn|Command|makeTemp|remove|write|chmod|chown)/i,
-      /\bimport\b[^;]*\(/i, // Block dynamic imports even with comments (e.g., import /* */ ('...'))
-      /require\b/i,
-      /eval\b/i,
-      /\bFunction\s*\(/, // Case-sensitive: Block constructor but allow 'function' keyword
-
-      /\.constructor\b|__proto__/i, // Block property-based constructor access; allow class constructor() declarations
-      /\bDeno\s*\[|\bprocess\s*\[|\bglobalThis\s*\[/i, // Block bracket notation property access like obj['Deno']
-    ];
-
     /**
      * TIER 1 VALIDATION (Convenience Filter):
      * This regex suite is a high-level filter designed to reject obvious malicious patterns
      * at the API layer. The ACTUAL enforcement boundary is the Tier 2 native Deno sandbox
      * (permissions: false) which blocks the underlying syscalls.
      */
-    for (const pattern of dangerousPatterns) {
-      if (pattern.test(code)) {
+    for (const rule of dangerousCodeRules) {
+      if (rule.pattern.test(code)) {
         logger.warn('Dangerous code pattern blocked', {
-          pattern: pattern.toString(),
+          rule: rule.id,
+          pattern: rule.pattern.toString(),
           codeLength: code.length,
         });
         throw new AppError(
-          'Code contains a potentially dangerous pattern.',
+          `Code contains a potentially dangerous pattern: ${rule.id}.`,
           400,
-          ERROR_CODES.INVALID_INPUT
+          ERROR_CODES.INVALID_INPUT,
+          rule.nextAction
         );
       }
     }
