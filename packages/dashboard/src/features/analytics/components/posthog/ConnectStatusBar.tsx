@@ -40,6 +40,7 @@ export function ConnectStatusBar({
   const handleClick = () => {
     const newTab = window.open('about:blank', '_blank');
     if (!newTab) {
+      showToast('Could not open PostHog. Please allow popups and try again.', 'error');
       return;
     }
     try {

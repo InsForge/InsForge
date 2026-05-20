@@ -89,7 +89,10 @@ export function AnalyticsPage() {
   // "Open in PostHog" deep-link wired to a concrete projectId. Surface the
   // error case explicitly so a failed projectId fetch can't get stuck on
   // a spinner forever.
-  if (projectIdError) {
+  if (projectIdLoading) {
+    return <div className="p-6">Loading…</div>;
+  }
+  if (projectIdError || !projectId) {
     return (
       <div className="p-6">
         <h1 className="mb-4 text-2xl font-bold text-foreground">Analytics</h1>
@@ -98,9 +101,6 @@ export function AnalyticsPage() {
         </div>
       </div>
     );
-  }
-  if (projectIdLoading || !projectId) {
-    return <div className="p-6">Loading…</div>;
   }
 
   const c = conn.data;
