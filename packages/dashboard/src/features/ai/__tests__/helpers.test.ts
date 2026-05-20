@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { AIModelSchema } from '@insforge/shared-schemas';
+import type { AIModelSchema, ModalitySchema } from '@insforge/shared-schemas';
 import {
   getProviderIdFromModelId,
   getProviderDisplayName,
@@ -152,7 +152,13 @@ describe('filterModelsByModalities', () => {
   });
 
   it('returns empty array for null/undefined model list', () => {
-    expect(filterModelsByModalities(null as any, ['text'], ['text'])).toEqual([]);
+    expect(
+      filterModelsByModalities(
+        null as unknown as AIModelSchema[],
+        ['text'] as ModalitySchema[],
+        ['text'] as ModalitySchema[]
+      )
+    ).toEqual([]);
   });
 });
 
@@ -317,6 +323,6 @@ describe('formatReleasedDate', () => {
   });
 
   it('returns dash for null', () => {
-    expect(formatReleasedDate(null as any)).toBe('-');
+    expect(formatReleasedDate(null as unknown as number)).toBe('-');
   });
 });
