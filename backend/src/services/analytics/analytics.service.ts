@@ -1,9 +1,9 @@
-import { getPosthogProvider, type PosthogProvider } from '@/providers/posthog/index.js';
+import { PostHogProvider } from '@/providers/analytics/posthog.provider.js';
 
-export class PosthogService {
-  private provider: PosthogProvider;
+export class AnalyticsService {
+  private provider: PostHogProvider;
 
-  constructor(provider: PosthogProvider = getPosthogProvider()) {
+  constructor(provider: PostHogProvider = PostHogProvider.getInstance()) {
     this.provider = provider;
   }
 

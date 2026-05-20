@@ -17,7 +17,7 @@ export type TrendMetric = 'visitors' | 'views' | 'bounce_rate';
 export const posthogApi = {
   async getConnection(): Promise<GetPosthogConnectionResponse | null> {
     try {
-      const res = await apiClient.request('/integrations/posthog/connection', {
+      const res = await apiClient.request('/analytics/connection', {
         headers: apiClient.withAccessToken({}),
       });
       return (res?.connection ?? null) as GetPosthogConnectionResponse | null;
@@ -30,13 +30,13 @@ export const posthogApi = {
   },
 
   async getDashboards(): Promise<GetPosthogDashboardsResponse> {
-    return apiClient.request('/integrations/posthog/dashboards', {
+    return apiClient.request('/analytics/dashboards', {
       headers: apiClient.withAccessToken({}),
     }) as Promise<GetPosthogDashboardsResponse>;
   },
 
   async disconnect(): Promise<void> {
-    await apiClient.request('/integrations/posthog/connection', {
+    await apiClient.request('/analytics/connection', {
       method: 'DELETE',
       headers: apiClient.withAccessToken({}),
     });
@@ -46,7 +46,7 @@ export const posthogApi = {
 
   async getWebOverview(timeframe: PosthogTimeframe): Promise<PosthogWebOverviewResponse> {
     const params = new URLSearchParams({ timeframe });
-    return apiClient.request(`/integrations/posthog/web-overview?${params.toString()}`, {
+    return apiClient.request(`/analytics/web-overview?${params.toString()}`, {
       headers: apiClient.withAccessToken({}),
     }) as Promise<PosthogWebOverviewResponse>;
   },
@@ -56,35 +56,35 @@ export const posthogApi = {
     timeframe: PosthogTimeframe
   ): Promise<PosthogWebStatsResponse> {
     const params = new URLSearchParams({ breakdown, timeframe });
-    return apiClient.request(`/integrations/posthog/web-stats?${params.toString()}`, {
+    return apiClient.request(`/analytics/web-stats?${params.toString()}`, {
       headers: apiClient.withAccessToken({}),
     }) as Promise<PosthogWebStatsResponse>;
   },
 
   async getTrend(metric: TrendMetric, timeframe: PosthogTimeframe): Promise<PosthogTrendsResponse> {
     const params = new URLSearchParams({ metric, timeframe });
-    return apiClient.request(`/integrations/posthog/trends?${params.toString()}`, {
+    return apiClient.request(`/analytics/trends?${params.toString()}`, {
       headers: apiClient.withAccessToken({}),
     }) as Promise<PosthogTrendsResponse>;
   },
 
   async getRetention(): Promise<PosthogRetentionResponse> {
     // Decoupled from page timeframe — backend hardcodes weekly cohorts.
-    return apiClient.request(`/integrations/posthog/retention`, {
+    return apiClient.request(`/analytics/retention`, {
       headers: apiClient.withAccessToken({}),
     }) as Promise<PosthogRetentionResponse>;
   },
 
   async getRecordings(limit = 10): Promise<PosthogRecordingsResponse> {
     const params = new URLSearchParams({ limit: String(limit) });
-    return apiClient.request(`/integrations/posthog/recordings?${params.toString()}`, {
+    return apiClient.request(`/analytics/recordings?${params.toString()}`, {
       headers: apiClient.withAccessToken({}),
     }) as Promise<PosthogRecordingsResponse>;
   },
 
   async createRecordingShare(recordingId: string): Promise<PosthogShareTokenResponse> {
     return apiClient.request(
-      `/integrations/posthog/recordings/${encodeURIComponent(recordingId)}/share`,
+      `/analytics/recordings/${encodeURIComponent(recordingId)}/share`,
       {
         method: 'POST',
         headers: apiClient.withAccessToken({}),

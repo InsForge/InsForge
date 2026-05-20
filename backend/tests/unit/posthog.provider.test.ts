@@ -45,14 +45,14 @@ function makeAxiosError(status: number): MockAxiosError {
 }
 
 // Import after mocks are set up
-const { CloudPosthogProvider } = await import('../../src/providers/posthog/cloud.provider');
+const { PostHogProvider } = await import('../../src/providers/analytics/posthog.provider');
 
-describe('CloudPosthogProvider', () => {
+describe('PostHogProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Reset singleton for each test
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (CloudPosthogProvider as any).instance = undefined;
+    (PostHogProvider as any).instance = undefined;
   });
 
   describe('getConnection', () => {
@@ -70,7 +70,7 @@ describe('CloudPosthogProvider', () => {
 
       axiosGetMock.mockResolvedValueOnce({ data: responseData });
 
-      const out = await CloudPosthogProvider.getInstance().getConnection();
+      const out = await PostHogProvider.getInstance().getConnection();
       expect(out).not.toBeNull();
       expect(out!.posthogProjectId).toEqual('12345');
       expect(out!.apiKey).toEqual('phc_pub');
@@ -87,14 +87,14 @@ describe('CloudPosthogProvider', () => {
     it('returns null on 404', async () => {
       axiosGetMock.mockRejectedValueOnce(makeAxiosError(404));
 
-      const out = await CloudPosthogProvider.getInstance().getConnection();
+      const out = await PostHogProvider.getInstance().getConnection();
       expect(out).toBeNull();
     });
 
     it('throws AppError with UPSTREAM_FAILURE on 502', async () => {
       axiosGetMock.mockRejectedValueOnce(makeAxiosError(502));
 
-      await expect(CloudPosthogProvider.getInstance().getConnection()).rejects.toMatchObject({
+      await expect(PostHogProvider.getInstance().getConnection()).rejects.toMatchObject({
         statusCode: 502,
         code: ERROR_CODES.UPSTREAM_FAILURE,
       });
@@ -105,7 +105,7 @@ describe('CloudPosthogProvider', () => {
     it('throws AppError with NOT_FOUND on 404', async () => {
       axiosGetMock.mockRejectedValueOnce(makeAxiosError(404));
 
-      await expect(CloudPosthogProvider.getInstance().getDashboards()).rejects.toMatchObject({
+      await expect(PostHogProvider.getInstance().getDashboards()).rejects.toMatchObject({
         statusCode: 404,
         code: ERROR_CODES.NOT_FOUND,
       });
@@ -114,7 +114,7 @@ describe('CloudPosthogProvider', () => {
     it('throws AppError with UPSTREAM_FAILURE on network error', async () => {
       axiosGetMock.mockRejectedValueOnce(new Error('Network Error'));
 
-      await expect(CloudPosthogProvider.getInstance().getDashboards()).rejects.toMatchObject({
+      await expect(PostHogProvider.getInstance().getDashboards()).rejects.toMatchObject({
         statusCode: 502,
         code: ERROR_CODES.UPSTREAM_FAILURE,
       });
@@ -133,7 +133,7 @@ describe('CloudPosthogProvider', () => {
       };
       axiosGetMock.mockResolvedValueOnce({ data: responseData });
 
-      const out = await CloudPosthogProvider.getInstance().getDashboards();
+      const out = await PostHogProvider.getInstance().getDashboards();
       expect(out.count).toEqual(1);
       expect(out.dashboards).toHaveLength(1);
       expect(out.dashboards[0].name).toEqual('Main Dashboard');
@@ -150,14 +150,14 @@ describe('CloudPosthogProvider', () => {
           topEvents: [{ event: 'pageview', count: 500 }],
         },
       });
-      const out = await CloudPosthogProvider.getInstance().getSummary();
+      const out = await PostHogProvider.getInstance().getSummary();
       expect(out.todayEvents).toEqual(1234);
       expect(out.topEvents[0].event).toEqual('pageview');
     });
 
     it('throws AppError with NOT_FOUND on 404', async () => {
       axiosGetMock.mockRejectedValueOnce(makeAxiosError(404));
-      await expect(CloudPosthogProvider.getInstance().getSummary()).rejects.toMatchObject({
+      await expect(PostHogProvider.getInstance().getSummary()).rejects.toMatchObject({
         statusCode: 404,
         code: ERROR_CODES.NOT_FOUND,
       });
@@ -165,7 +165,7 @@ describe('CloudPosthogProvider', () => {
 
     it('throws AppError with UPSTREAM_FAILURE on network error', async () => {
       axiosGetMock.mockRejectedValueOnce(new Error('Network Error'));
-      await expect(CloudPosthogProvider.getInstance().getSummary()).rejects.toMatchObject({
+      await expect(PostHogProvider.getInstance().getSummary()).rejects.toMatchObject({
         statusCode: 502,
         code: ERROR_CODES.UPSTREAM_FAILURE,
       });
@@ -182,7 +182,7 @@ describe('CloudPosthogProvider', () => {
           ],
         },
       });
-      const out = await CloudPosthogProvider.getInstance().getRecentEvents(5);
+      const out = await PostHogProvider.getInstance().getRecentEvents(5);
       expect(out.events).toHaveLength(1);
       expect(out.events[0].event).toEqual('pageview');
       const call = axiosGetMock.mock.calls[0];
@@ -191,14 +191,14 @@ describe('CloudPosthogProvider', () => {
 
     it('default limit is 10', async () => {
       axiosGetMock.mockResolvedValueOnce({ data: { next: null, events: [] } });
-      await CloudPosthogProvider.getInstance().getRecentEvents();
+      await PostHogProvider.getInstance().getRecentEvents();
       const call = axiosGetMock.mock.calls[0];
       expect(call[1].params.limit).toEqual(10);
     });
 
     it('throws AppError with NOT_FOUND on 404', async () => {
       axiosGetMock.mockRejectedValueOnce(makeAxiosError(404));
-      await expect(CloudPosthogProvider.getInstance().getRecentEvents()).rejects.toMatchObject({
+      await expect(PostHogProvider.getInstance().getRecentEvents()).rejects.toMatchObject({
         statusCode: 404,
         code: ERROR_CODES.NOT_FOUND,
       });
@@ -209,7 +209,7 @@ describe('CloudPosthogProvider', () => {
     it('issues DELETE to the correct URL', async () => {
       axiosDeleteMock.mockResolvedValueOnce({ status: 204 });
 
-      await CloudPosthogProvider.getInstance().disconnect();
+      await PostHogProvider.getInstance().disconnect();
 
       expect(axiosDeleteMock).toHaveBeenCalledOnce();
       const callArgs = axiosDeleteMock.mock.calls[0];
@@ -219,7 +219,7 @@ describe('CloudPosthogProvider', () => {
     it('throws AppError with UPSTREAM_FAILURE on error', async () => {
       axiosDeleteMock.mockRejectedValueOnce(makeAxiosError(500));
 
-      await expect(CloudPosthogProvider.getInstance().disconnect()).rejects.toMatchObject({
+      await expect(PostHogProvider.getInstance().disconnect()).rejects.toMatchObject({
         statusCode: 502,
         code: ERROR_CODES.UPSTREAM_FAILURE,
       });
@@ -242,7 +242,7 @@ describe('CloudPosthogProvider', () => {
         },
       });
 
-      const out = await CloudPosthogProvider.getInstance().getWebOverview('7d');
+      const out = await PostHogProvider.getInstance().getWebOverview('7d');
       expect(out.items).toHaveLength(1);
       expect(out.items[0].key).toEqual('visitors');
 
@@ -253,7 +253,7 @@ describe('CloudPosthogProvider', () => {
 
     it('throws AppError with NOT_FOUND on 404', async () => {
       axiosGetMock.mockRejectedValueOnce(makeAxiosError(404));
-      await expect(CloudPosthogProvider.getInstance().getWebOverview('7d')).rejects.toMatchObject({
+      await expect(PostHogProvider.getInstance().getWebOverview('7d')).rejects.toMatchObject({
         statusCode: 404,
         code: ERROR_CODES.NOT_FOUND,
       });
@@ -261,7 +261,7 @@ describe('CloudPosthogProvider', () => {
 
     it('throws AppError with UPSTREAM_FAILURE on network error', async () => {
       axiosGetMock.mockRejectedValueOnce(new Error('Network Error'));
-      await expect(CloudPosthogProvider.getInstance().getWebOverview('7d')).rejects.toMatchObject({
+      await expect(PostHogProvider.getInstance().getWebOverview('7d')).rejects.toMatchObject({
         statusCode: 502,
         code: ERROR_CODES.UPSTREAM_FAILURE,
       });
@@ -276,7 +276,7 @@ describe('CloudPosthogProvider', () => {
         },
       });
 
-      const out = await CloudPosthogProvider.getInstance().getWebStats('Page', '7d');
+      const out = await PostHogProvider.getInstance().getWebStats('Page', '7d');
       expect(out.rows).toHaveLength(1);
       expect(out.rows[0].breakdownValue).toEqual('/home');
 
@@ -288,7 +288,7 @@ describe('CloudPosthogProvider', () => {
     it('throws AppError with UPSTREAM_FAILURE on network error', async () => {
       axiosGetMock.mockRejectedValueOnce(new Error('Network Error'));
       await expect(
-        CloudPosthogProvider.getInstance().getWebStats('Page', '7d')
+        PostHogProvider.getInstance().getWebStats('Page', '7d')
       ).rejects.toMatchObject({
         statusCode: 502,
         code: ERROR_CODES.UPSTREAM_FAILURE,
@@ -307,7 +307,7 @@ describe('CloudPosthogProvider', () => {
         },
       });
 
-      const out = await CloudPosthogProvider.getInstance().getTrends('visitors', '7d');
+      const out = await PostHogProvider.getInstance().getTrends('visitors', '7d');
       expect(out.series).toHaveLength(2);
 
       const call = axiosGetMock.mock.calls[0];
@@ -318,7 +318,7 @@ describe('CloudPosthogProvider', () => {
     it('throws AppError with NOT_FOUND on 404', async () => {
       axiosGetMock.mockRejectedValueOnce(makeAxiosError(404));
       await expect(
-        CloudPosthogProvider.getInstance().getTrends('visitors', '7d')
+        PostHogProvider.getInstance().getTrends('visitors', '7d')
       ).rejects.toMatchObject({
         statusCode: 404,
         code: ERROR_CODES.NOT_FOUND,
@@ -340,7 +340,7 @@ describe('CloudPosthogProvider', () => {
         },
       });
 
-      const out = await CloudPosthogProvider.getInstance().getRetention();
+      const out = await PostHogProvider.getInstance().getRetention();
       expect(out.rows).toHaveLength(1);
       expect(out.rows[0].values).toHaveLength(3);
 
@@ -350,7 +350,7 @@ describe('CloudPosthogProvider', () => {
 
     it('throws AppError with UPSTREAM_FAILURE on network error', async () => {
       axiosGetMock.mockRejectedValueOnce(new Error('Network Error'));
-      await expect(CloudPosthogProvider.getInstance().getRetention()).rejects.toMatchObject({
+      await expect(PostHogProvider.getInstance().getRetention()).rejects.toMatchObject({
         statusCode: 502,
         code: ERROR_CODES.UPSTREAM_FAILURE,
       });
@@ -376,7 +376,7 @@ describe('CloudPosthogProvider', () => {
         },
       });
 
-      const out = await CloudPosthogProvider.getInstance().getRecordings(20);
+      const out = await PostHogProvider.getInstance().getRecordings(20);
       expect(out.items).toHaveLength(1);
 
       const call = axiosGetMock.mock.calls[0];
@@ -386,14 +386,14 @@ describe('CloudPosthogProvider', () => {
 
     it('default limit is 10', async () => {
       axiosGetMock.mockResolvedValueOnce({ data: { items: [] } });
-      await CloudPosthogProvider.getInstance().getRecordings();
+      await PostHogProvider.getInstance().getRecordings();
       const call = axiosGetMock.mock.calls[0];
       expect(call[1].params.limit).toEqual(10);
     });
 
     it('throws AppError with NOT_FOUND on 404', async () => {
       axiosGetMock.mockRejectedValueOnce(makeAxiosError(404));
-      await expect(CloudPosthogProvider.getInstance().getRecordings()).rejects.toMatchObject({
+      await expect(PostHogProvider.getInstance().getRecordings()).rejects.toMatchObject({
         statusCode: 404,
         code: ERROR_CODES.NOT_FOUND,
       });
@@ -406,7 +406,7 @@ describe('CloudPosthogProvider', () => {
         data: { embedUrl: 'https://us.posthog.com/embedded/abc' },
       });
 
-      const out = await CloudPosthogProvider.getInstance().createRecordingShare('rec id/1');
+      const out = await PostHogProvider.getInstance().createRecordingShare('rec id/1');
       expect(out.embedUrl).toEqual('https://us.posthog.com/embedded/abc');
 
       const call = axiosPostMock.mock.calls[0];
@@ -421,7 +421,7 @@ describe('CloudPosthogProvider', () => {
       });
 
       await expect(
-        CloudPosthogProvider.getInstance().createRecordingShare('rec1')
+        PostHogProvider.getInstance().createRecordingShare('rec1')
       ).rejects.toMatchObject({
         statusCode: 502,
         code: ERROR_CODES.UPSTREAM_FAILURE,
@@ -431,7 +431,7 @@ describe('CloudPosthogProvider', () => {
     it('throws AppError with NOT_FOUND on 404', async () => {
       axiosPostMock.mockRejectedValueOnce(makeAxiosError(404));
       await expect(
-        CloudPosthogProvider.getInstance().createRecordingShare('rec1')
+        PostHogProvider.getInstance().createRecordingShare('rec1')
       ).rejects.toMatchObject({
         statusCode: 404,
         code: ERROR_CODES.NOT_FOUND,
@@ -441,7 +441,7 @@ describe('CloudPosthogProvider', () => {
     it('throws AppError with UPSTREAM_FAILURE on network error', async () => {
       axiosPostMock.mockRejectedValueOnce(new Error('Network Error'));
       await expect(
-        CloudPosthogProvider.getInstance().createRecordingShare('rec1')
+        PostHogProvider.getInstance().createRecordingShare('rec1')
       ).rejects.toMatchObject({
         statusCode: 502,
         code: ERROR_CODES.UPSTREAM_FAILURE,
