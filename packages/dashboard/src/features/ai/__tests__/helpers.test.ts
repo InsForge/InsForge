@@ -21,7 +21,6 @@ import {
 function model(overrides: Partial<AIModelSchema> & { modelId: string }): AIModelSchema {
   return {
     id: overrides.modelId,
-    modelId: overrides.modelId,
     provider: 'openrouter',
     created: 1700000000,
     inputModality: ['text'],
