@@ -36,7 +36,7 @@ describe('PaymentCheckoutService', () => {
         sql === 'ROLLBACK' ||
         sql === 'RESET ROLE' ||
         sql.startsWith('SET LOCAL ROLE') ||
-        sql.startsWith("SELECT set_config('request.jwt.claim.")
+        sql === 'SELECT set_config($1, $2, true)'
       ) {
         return { rows: [], rowCount: 0 };
       }

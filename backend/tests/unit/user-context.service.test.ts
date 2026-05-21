@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { withUserContext } from '../../src/services/db/user-context.service';
+import { withUserContext } from '../../src/services/database/user-context.service';
 import type { Pool, PoolClient } from 'pg';
 
 /**
@@ -28,25 +28,6 @@ describe('withUserContext', () => {
     vi.clearAllMocks();
   });
 
-  it('admin path skips role/JWT setup and runs fn with the raw connection', async () => {
-    const { client, calls } = makeMockClient();
-    const pool = makeMockPool(client);
-
-    const result = await withUserContext(
-      pool,
-      { isAdmin: true, role: 'authenticated' },
-      async (db) => {
-        await db.query('SELECT 1');
-        return 42;
-      }
-    );
-
-    expect(result).toBe(42);
-    // Admin path does NOT call BEGIN/SET ROLE/set_config — only the inner fn's query.
-    expect(calls.map((c) => c.sql)).toEqual(['SELECT 1']);
-    expect(client.release).toHaveBeenCalledOnce();
-  });
-
   it('authenticated path sets role + jwt claims inside a transaction and commits', async () => {
     const { client, calls } = makeMockClient();
     const pool = makeMockPool(client);
@@ -54,7 +35,7 @@ describe('withUserContext', () => {
     const result = await withUserContext(
       pool,
       {
-        userId: 'ZVP5j6raUC9cuBIWzDGjdNdelMFjWNc5',
+        id: 'ZVP5j6raUC9cuBIWzDGjdNdelMFjWNc5',
         role: 'authenticated',
         email: 'alice@example.com',
       },
@@ -69,36 +50,129 @@ describe('withUserContext', () => {
     expect(sequence).toEqual([
       'BEGIN',
       'SET LOCAL ROLE authenticated',
-      "SELECT set_config('request.jwt.claims', $1, true)",
-      "SELECT set_config('request.jwt.claim.sub', $1, true)",
-      "SELECT set_config('request.jwt.claim.role', $1, true)",
-      "SELECT set_config('request.jwt.claim.email', $1, true)",
+      'SELECT set_config($1, $2, true)',
       'SELECT 1',
       'COMMIT',
       'RESET ROLE',
     ]);
 
-    expect(JSON.parse(calls[2].params![0] as string)).toEqual({
+    expect(calls[2].params?.[0]).toBe('request.jwt.claims');
+    expect(JSON.parse(calls[2].params![1] as string)).toEqual({
       role: 'authenticated',
       sub: 'ZVP5j6raUC9cuBIWzDGjdNdelMFjWNc5',
       email: 'alice@example.com',
     });
-    expect(calls[3].params).toEqual(['ZVP5j6raUC9cuBIWzDGjdNdelMFjWNc5']);
-    expect(calls[4].params).toEqual(['authenticated']);
-    expect(calls[5].params).toEqual(['alice@example.com']);
     expect(client.release).toHaveBeenCalledOnce();
   });
 
-  it('passes empty string as sub when userId is undefined (anon-like fallback)', async () => {
+  it('sets anon role in the canonical claims object when id is undefined', async () => {
     const { client, calls } = makeMockClient();
     const pool = makeMockPool(client);
 
     await withUserContext(pool, { role: 'anon' }, async () => {});
 
-    const setSub = calls.find((c) => c.sql.includes("set_config('request.jwt.claim.sub'"));
-    expect(setSub?.params).toEqual(['']);
+    expect(calls[2].params?.[0]).toBe('request.jwt.claims');
+    expect(JSON.parse(calls[2].params![1] as string)).toEqual({ role: 'anon' });
     const setLocalRole = calls.find((c) => c.sql.startsWith('SET LOCAL ROLE'));
     expect(setLocalRole?.sql).toBe('SET LOCAL ROLE anon');
+  });
+
+  it('can run as project_admin when the caller wants database policies to decide', async () => {
+    const { client, calls } = makeMockClient();
+    const pool = makeMockPool(client);
+
+    await withUserContext(
+      pool,
+      {
+        id: 'admin-sub',
+        role: 'project_admin',
+        email: 'admin@example.com',
+      },
+      async () => {}
+    );
+
+    expect(calls.map((c) => c.sql)).toContain('SET LOCAL ROLE project_admin');
+    expect(calls[2].params?.[0]).toBe('request.jwt.claims');
+    expect(JSON.parse(calls[2].params![1] as string)).toEqual({
+      role: 'project_admin',
+      sub: 'admin-sub',
+      email: 'admin@example.com',
+    });
+  });
+
+  it('sets extra runtime GUCs inside the same transaction', async () => {
+    const { client, calls } = makeMockClient();
+    const pool = makeMockPool(client);
+
+    await withUserContext(
+      pool,
+      { id: 'u1', email: 'u1@example.com', role: 'authenticated' },
+      async (db) => {
+        await db.query('SELECT 1');
+      },
+      {
+        'realtime.channel_name': 'chat:lobby',
+        ignored: undefined,
+      }
+    );
+
+    expect(calls.map((c) => c.sql)).toEqual([
+      'BEGIN',
+      'SET LOCAL ROLE authenticated',
+      'SELECT set_config($1, $2, true)',
+      'SELECT set_config($1, $2, true)',
+      'SELECT 1',
+      'COMMIT',
+      'RESET ROLE',
+    ]);
+    expect(calls[2].params?.[0]).toBe('request.jwt.claims');
+    expect(calls[3].params).toEqual(['realtime.channel_name', 'chat:lobby']);
+  });
+
+  it('rejects attempts to override centralized JWT settings', async () => {
+    const { client, calls } = makeMockClient();
+    const pool = makeMockPool(client);
+
+    await expect(
+      withUserContext(
+        pool,
+        { id: 'u1', email: 'u1@example.com', role: 'authenticated' },
+        async () => {},
+        { 'request.jwt.foo': 'evil' }
+      )
+    ).rejects.toThrow(/must not override request\.jwt\.\*/);
+
+    expect(calls.map((c) => c.sql)).toEqual([
+      'BEGIN',
+      'SET LOCAL ROLE authenticated',
+      'SELECT set_config($1, $2, true)',
+      'ROLLBACK',
+      'RESET ROLE',
+    ]);
+    expect(client.release).toHaveBeenCalledOnce();
+  });
+
+  it('rejects mixed-case attempts to override centralized JWT settings', async () => {
+    const { client, calls } = makeMockClient();
+    const pool = makeMockPool(client);
+
+    await expect(
+      withUserContext(
+        pool,
+        { id: 'u1', email: 'u1@example.com', role: 'authenticated' },
+        async () => {},
+        { 'Request.Jwt.Claims': '{"sub":"evil"}' }
+      )
+    ).rejects.toThrow(/must not override request\.jwt\.\*/);
+
+    expect(calls.map((c) => c.sql)).toEqual([
+      'BEGIN',
+      'SET LOCAL ROLE authenticated',
+      'SELECT set_config($1, $2, true)',
+      'ROLLBACK',
+      'RESET ROLE',
+    ]);
+    expect(client.release).toHaveBeenCalledOnce();
   });
 
   it('rolls back and resets role if fn throws', async () => {
@@ -106,9 +180,13 @@ describe('withUserContext', () => {
     const pool = makeMockPool(client);
 
     await expect(
-      withUserContext(pool, { userId: 'u1', role: 'authenticated' }, async () => {
-        throw new Error('boom');
-      })
+      withUserContext(
+        pool,
+        { id: 'u1', email: 'u1@example.com', role: 'authenticated' },
+        async () => {
+          throw new Error('boom');
+        }
+      )
     ).rejects.toThrow('boom');
 
     // Pin the exact sequence — flipping order or skipping RESET ROLE
@@ -116,9 +194,7 @@ describe('withUserContext', () => {
     expect(calls.map((c) => c.sql)).toEqual([
       'BEGIN',
       'SET LOCAL ROLE authenticated',
-      "SELECT set_config('request.jwt.claims', $1, true)",
-      "SELECT set_config('request.jwt.claim.sub', $1, true)",
-      "SELECT set_config('request.jwt.claim.role', $1, true)",
+      'SELECT set_config($1, $2, true)',
       'ROLLBACK',
       'RESET ROLE',
     ]);
@@ -140,7 +216,11 @@ describe('withUserContext', () => {
       }
     );
 
-    await withUserContext(pool, { userId: 'u1', role: 'authenticated' }, async () => {});
+    await withUserContext(
+      pool,
+      { id: 'u1', email: 'u1@example.com', role: 'authenticated' },
+      async () => {}
+    );
 
     expect(calls.map((c) => c.sql)).toContain('RESET ROLE');
     expect(client.release).toHaveBeenCalledOnce();

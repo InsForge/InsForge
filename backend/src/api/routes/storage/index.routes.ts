@@ -1,10 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import {
-  verifyAdmin,
-  AuthRequest,
-  verifyUser,
-  getUserContextFromReq,
-} from '@/api/middlewares/auth.js';
+import { verifyAdmin, AuthRequest, verifyUser } from '@/api/middlewares/auth.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { StorageService } from '@/services/storage/storage.service.js';
 import { StorageConfigService } from '@/services/storage/storage-config.service.js';
@@ -22,17 +17,17 @@ import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { S3AccessKeyService } from '@/services/storage/s3-access-key.service.js';
 import { s3AccessKeyManagementRateLimiter } from '@/api/middlewares/rate-limiters.js';
-import { UserContext } from '@/services/db/user-context.service.js';
 
 const router = Router();
 const auditService = AuditService.getInstance();
 const storageConfigService = StorageConfigService.getInstance();
 const s3AccessKeyService = S3AccessKeyService.getInstance();
 
-// Middleware to conditionally apply authentication based on bucket visibility
-const conditionalAuth = async (req: Request, res: Response, next: NextFunction) => {
-  // For GET and HEAD requests to download objects, check if bucket is public
-  if ((req.method === 'GET' || req.method === 'HEAD') && req.params.bucketName) {
+// Middleware to conditionally apply authentication based on bucket visibility.
+// This is only attached to object download hand-offs: GET object bytes and POST
+// download-strategy. The strategy endpoint is POST, but it is still a read path.
+const conditionalDownloadAuth = async (req: Request, res: Response, next: NextFunction) => {
+  if (req.params.bucketName) {
     try {
       const storageService = StorageService.getInstance();
       const isPublic = await storageService.isBucketPublic(req.params.bucketName);
@@ -243,9 +238,9 @@ router.patch(
 );
 
 // GET /api/storage/buckets/:bucketName/objects - List objects in bucket.
-// Visibility is decided by RLS on storage.objects: admin (apiKey /
-// project_admin) bypasses, authenticated callers see only rows their
-// policies allow.
+// Visibility is decided by RLS on storage.objects for JWT callers. API-key
+// callers use the backend pool because they are machine credentials,
+// not a user identity.
 router.get(
   '/buckets/:bucketName/objects',
   verifyUser,
@@ -258,12 +253,13 @@ router.get(
       const offset = Math.max(0, parseInt(req.query.offset as string) || 0);
 
       const result = await StorageService.getInstance().listObjects(
-        getUserContextFromReq(req),
+        req.user,
         bucketName,
         prefix,
         limit,
         offset,
-        searchQuery
+        searchQuery,
+        !!req.hasApiKey
       );
 
       successResponse(
@@ -306,10 +302,11 @@ router.put(
       }
 
       const storedFile = await StorageService.getInstance().putObject(
-        getUserContextFromReq(req),
+        req.user,
         bucketName,
         objectKey,
-        req.file
+        req.file,
+        !!req.hasApiKey
       );
 
       try {
@@ -357,10 +354,11 @@ router.post(
       const objectKey = storageService.generateObjectKey(req.file.originalname);
 
       const storedFile = await storageService.putObject(
-        getUserContextFromReq(req),
+        req.user,
         bucketName,
         objectKey,
-        req.file
+        req.file,
+        !!req.hasApiKey
       );
 
       try {
@@ -398,7 +396,7 @@ router.post(
 // GET /api/storage/buckets/:bucketName/objects/:objectKey - Download object from bucket (conditional auth)
 router.get(
   '/buckets/:bucketName/objects/*',
-  conditionalAuth,
+  conditionalDownloadAuth,
   async (req: AuthRequest | Request, res: Response, next: NextFunction) => {
     try {
       const { bucketName } = req.params;
@@ -409,33 +407,28 @@ router.get(
       }
 
       const storageService = StorageService.getInstance();
-
-      // Public-bucket reads bypass RLS: conditionalAuth has already confirmed
-      // public=true before letting an unauthed request through, so the bypass
-      // only triggers in that case. Authed callers always go through RLS.
       const authReq = req as AuthRequest;
-      const ctx: UserContext =
-        !authReq.user && !authReq.apiKey
-          ? { isAdmin: true, role: 'authenticated' }
-          : getUserContextFromReq(authReq);
+      const visible = await storageService.objectIsVisible(
+        authReq.user,
+        bucketName,
+        objectKey,
+        !!authReq.hasApiKey
+      );
+      if (!visible) {
+        throw new AppError('Object not found', 404, ERROR_CODES.NOT_FOUND);
+      }
 
-      // Get download strategy (service auto-calculates expiry based on bucket visibility)
       const strategy = await storageService.getDownloadStrategy(bucketName, objectKey);
-
       if (strategy.method === 'presigned') {
-        // Presigned URLs bypass the backend, so RLS doesn't fire when the
-        // client redeems them. Gate the redirect on an RLS-scoped existence
-        // check — without this, an authenticated non-owner could redeem any
-        // known key in a private bucket. Admin/anon-public-bucket contexts
-        // bypass RLS at the DB level and always return true.
-        const visible = await storageService.objectIsVisible(ctx, bucketName, objectKey);
-        if (!visible) {
-          throw new AppError('Object not found', 404, ERROR_CODES.NOT_FOUND);
-        }
         return res.redirect(strategy.url);
       }
 
-      const result = await storageService.getObject(ctx, bucketName, objectKey);
+      const result = await storageService.getObject(
+        authReq.user,
+        bucketName,
+        objectKey,
+        !!authReq.hasApiKey
+      );
       if (!result) {
         throw new AppError('Object not found', 404, ERROR_CODES.NOT_FOUND);
       }
@@ -520,9 +513,10 @@ router.delete(
       }
 
       const deleted = await StorageService.getInstance().deleteObject(
-        getUserContextFromReq(req),
+        req.user,
         bucketName,
-        objectKey
+        objectKey,
+        !!req.hasApiKey
       );
 
       if (!deleted) {
@@ -554,9 +548,10 @@ router.post(
       }
 
       const strategy = await StorageService.getInstance().getUploadStrategy(
-        getUserContextFromReq(req),
+        req.user,
         bucketName,
-        { filename, contentType, size }
+        { filename, contentType, size },
+        !!req.hasApiKey
       );
 
       successResponse(res, strategy);
@@ -585,14 +580,15 @@ router.post(
 
       const storageService = StorageService.getInstance();
       const fileInfo = await storageService.confirmUpload(
-        getUserContextFromReq(req),
+        req.user,
         bucketName,
         objectKey,
         {
           size,
           contentType,
           etag,
-        }
+        },
+        !!req.hasApiKey
       );
 
       try {
@@ -628,7 +624,7 @@ router.post(
 // POST /api/storage/buckets/:bucketName/objects/:objectKey/download-strategy - Get download URL (presigned or direct)
 router.post(
   '/buckets/:bucketName/objects/:objectKey/download-strategy',
-  conditionalAuth,
+  conditionalDownloadAuth,
   async (req: AuthRequest | Request, res: Response, next: NextFunction) => {
     try {
       const { bucketName, objectKey } = req.params;
@@ -637,14 +633,14 @@ router.post(
 
       // RLS-gate the strategy hand-off, same as GET /objects/*. A presigned
       // URL bypasses RLS at redeem time, so we must verify ownership before
-      // issuing one. Public-bucket unauthed callers bypass via isAdmin: true
-      // because conditionalAuth has already confirmed public=true.
+      // issuing one.
       const authReq = req as AuthRequest;
-      const ctx: UserContext =
-        !authReq.user && !authReq.apiKey
-          ? { isAdmin: true, role: 'authenticated' }
-          : getUserContextFromReq(authReq);
-      const visible = await storageService.objectIsVisible(ctx, bucketName, objectKey);
+      const visible = await storageService.objectIsVisible(
+        authReq.user,
+        bucketName,
+        objectKey,
+        !!authReq.hasApiKey
+      );
       if (!visible) {
         throw new AppError('Object not found', 404, ERROR_CODES.NOT_FOUND);
       }

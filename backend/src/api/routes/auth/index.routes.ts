@@ -242,7 +242,7 @@ router.patch(
   verifyToken,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      if (!req.user) {
+      if (!req.user?.id) {
         throw new AppError('User not authenticated', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
       }
 
@@ -648,7 +648,7 @@ router.get(
   verifyToken,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      if (!req.user) {
+      if (!req.user?.id) {
         throw new AppError('User not authenticated', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
       }
 
