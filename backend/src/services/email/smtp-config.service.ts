@@ -129,6 +129,10 @@ function hasStoredSmtpConfig(row: Record<string, unknown>): boolean {
   );
 }
 
+function shouldUseEnvironmentSmtpConfig(row: Record<string, unknown>): boolean {
+  return !row.enabled && !hasStoredSmtpConfig(row);
+}
+
 const EMPTY_CONFIG: SmtpConfigSchema = {
   id: '00000000-0000-0000-0000-000000000000',
   enabled: false,
@@ -236,7 +240,7 @@ export class SmtpConfigService {
       }
 
       const row = result.rows[0];
-      if (!row.enabled && !hasStoredSmtpConfig(row)) {
+      if (shouldUseEnvironmentSmtpConfig(row)) {
         const envConfig = this.getEnvironmentSmtpConfig();
         if (envConfig) {
           return toSmtpConfigSchemaFromRaw(envConfig);
@@ -269,7 +273,10 @@ export class SmtpConfigService {
 
       const row = result.rows[0];
       if (!row.enabled) {
-        return hasStoredSmtpConfig(row) ? null : this.getEnvironmentSmtpConfig();
+        // Delivery is intentionally stricter than settings reads: if a user
+        // explicitly disabled a stored SMTP config, do not silently send via the
+        // environment fallback. Only empty bootstrap rows may fall back to env.
+        return shouldUseEnvironmentSmtpConfig(row) ? this.getEnvironmentSmtpConfig() : null;
       }
 
       const password = this.getDecryptedPassword(row.password_encrypted);

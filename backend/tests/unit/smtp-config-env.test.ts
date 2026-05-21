@@ -115,4 +115,23 @@ describe('SmtpConfigService environment fallback', () => {
 
     await expect(SmtpConfigService.getInstance().getRawSmtpConfig()).resolves.toBeNull();
   });
+
+  it('still shows a user-disabled stored config in settings reads', async () => {
+    process.env.SMTP_HOST = 'mailpit';
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          ...emptyConfigRow,
+          host: 'smtp.example.com',
+          senderEmail: 'noreply@example.com',
+        },
+      ],
+    });
+
+    await expect(SmtpConfigService.getInstance().getSmtpConfig()).resolves.toMatchObject({
+      enabled: false,
+      host: 'smtp.example.com',
+      senderEmail: 'noreply@example.com',
+    });
+  });
 });
