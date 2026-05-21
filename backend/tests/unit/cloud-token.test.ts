@@ -1,5 +1,5 @@
 import { TokenManager } from '../../src/infra/security/token.manager';
-import { jwtVerify } from 'jose';
+import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { AppError } from '../../src/utils/errors';
 import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
 
@@ -38,6 +38,14 @@ describe('TokenManager.verifyCloudToken', () => {
     const result = await tokenManager.verifyCloudToken('valid-token');
     expect(result.projectId).toBe('project_123');
     expect(result.payload.user).toBe('testUser');
+    expect(createRemoteJWKSet).toHaveBeenCalledWith(
+      new URL('https://mock-api.dev/.well-known/jwks.json'),
+      expect.objectContaining({
+        timeoutDuration: 10000,
+        cooldownDuration: 30000,
+        cacheMaxAge: 600000,
+      })
+    );
   });
 
   it('throws AppError if project ID mismatch or missing', async () => {
