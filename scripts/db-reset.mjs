@@ -1,3 +1,4 @@
+/* global process, setTimeout, console */
 import { spawnSync } from 'node:child_process';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
