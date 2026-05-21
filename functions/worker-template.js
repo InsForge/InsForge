@@ -11,14 +11,19 @@
 // We polyfill Deno.env and process.env BEFORE any imports using Top-Level Await.
 // This prevents libraries (like 'debug') from triggering 'NotCapable' errors
 // when using a strict native whitelist (env: false).
+const MODULE_CONTEXT_KEY = '__INSFORGE_FUNCTION_CONTEXT__';
 const sterileEnv = {
   NODE_ENV: 'production',
 };
 
+function getActiveFunctionContext() {
+  return globalThis[MODULE_CONTEXT_KEY];
+}
+
 try {
   // Shadow Deno.env with a pure JS implementation
   const mockDenoEnv = {
-    get: (key) => sterileEnv[key] ?? undefined,
+    get: (key) => getActiveFunctionContext()?.secrets?.[key] ?? sterileEnv[key] ?? undefined,
     set: () => {
       throw new Error('Deno.env.set is disabled');
     },
@@ -26,7 +31,7 @@ try {
       throw new Error('Deno.env.delete is disabled');
     },
     toObject: () => ({ ...sterileEnv }),
-    has: (key) => key in sterileEnv,
+    has: (key) => key in sterileEnv || key in (getActiveFunctionContext()?.secrets ?? {}),
   };
 
   // Replace global Deno.env
@@ -60,8 +65,6 @@ const { createClient } = await import('npm:@insforge/sdk');
 const { encodeBase64, decodeBase64 } =
   await import('https://deno.land/std@0.224.0/encoding/base64.ts');
 
-const MODULE_CONTEXT_KEY = '__INSFORGE_FUNCTION_CONTEXT__';
-
 function isModuleSource(code) {
   return /^\s*(import|export)\s/m.test(code);
 }
@@ -71,26 +74,68 @@ function toDataModuleUrl(source) {
   return `data:application/typescript;base64,${encodeBase64(bytes)}`;
 }
 
-async function loadEsmFunction(code, context) {
+function installModuleGlobals(context) {
+  const names = ['createClient', 'encodeBase64', 'decodeBase64'];
+  const previousDescriptors = new Map(
+    names.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)])
+  );
+
+  for (const name of names) {
+    Object.defineProperty(globalThis, name, {
+      value: context[name],
+      configurable: true,
+      writable: true,
+    });
+  }
+
+  return () => {
+    for (const name of names) {
+      const previousDescriptor = previousDescriptors.get(name);
+      if (previousDescriptor) {
+        Object.defineProperty(globalThis, name, previousDescriptor);
+      } else {
+        delete globalThis[name];
+      }
+    }
+  };
+}
+
+function installModuleContext(context) {
   const previousContext = globalThis[MODULE_CONTEXT_KEY];
   globalThis[MODULE_CONTEXT_KEY] = context;
+  const restoreModuleGlobals = installModuleGlobals(context);
+
+  return () => {
+    restoreModuleGlobals();
+    if (previousContext === undefined) {
+      delete globalThis[MODULE_CONTEXT_KEY];
+    } else {
+      globalThis[MODULE_CONTEXT_KEY] = previousContext;
+    }
+  };
+}
+
+async function loadEsmFunction(code, context) {
+  const restoreModuleContext = installModuleContext(context);
 
   try {
-    const moduleSource = `const { createClient, Deno, encodeBase64, decodeBase64 } = globalThis.${MODULE_CONTEXT_KEY};\n${code}`;
-    const userModule = await import(toDataModuleUrl(moduleSource));
+    const userModule = await import(toDataModuleUrl(code));
     const functionHandler = userModule.default ?? userModule.handler;
 
     if (typeof functionHandler !== 'function') {
       throw new Error('No function exported. Expected: export default async function(req) { ... }');
     }
 
-    return functionHandler;
+    return async (...args) => {
+      const restoreExecutionContext = installModuleContext(context);
+      try {
+        return await functionHandler(...args);
+      } finally {
+        restoreExecutionContext();
+      }
+    };
   } finally {
-    if (previousContext === undefined) {
-      delete globalThis[MODULE_CONTEXT_KEY];
-    } else {
-      globalThis[MODULE_CONTEXT_KEY] = previousContext;
-    }
+    restoreModuleContext();
   }
 }
 
@@ -167,6 +212,7 @@ self.onmessage = async (e) => {
       Deno: mockDeno,
       encodeBase64,
       decodeBase64,
+      secrets,
     };
 
     const functionHandler = isModuleSource(code)
