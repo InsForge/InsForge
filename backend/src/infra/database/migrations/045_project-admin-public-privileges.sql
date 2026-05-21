@@ -1,0 +1,49 @@
+-- Migration: 045 - Replace per-table project_admin RLS policies with role-level access
+--
+-- `project_admin` remains the HTTP/API-key admin role name for compatibility,
+-- but database-level admin access should not require injecting a policy into
+-- every RLS-enabled table. BYPASSRLS gives the role service-key behavior while
+-- regular grants still define which objects it can touch.
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'project_admin') THEN
+    EXECUTE 'ALTER ROLE project_admin BYPASSRLS';
+
+    EXECUTE 'GRANT ALL ON SCHEMA public TO project_admin';
+    EXECUTE 'GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO project_admin';
+    EXECUTE 'GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO project_admin';
+    EXECUTE 'GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO project_admin';
+
+    EXECUTE 'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO project_admin';
+    EXECUTE 'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES TO project_admin';
+    EXECUTE 'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO project_admin';
+  END IF;
+END $$;
+
+DROP EVENT TRIGGER IF EXISTS create_policies_on_table_create;
+DROP EVENT TRIGGER IF EXISTS create_policies_on_rls_enable;
+
+DROP FUNCTION IF EXISTS system.create_default_policies() CASCADE;
+DROP FUNCTION IF EXISTS system.create_policies_after_rls() CASCADE;
+DROP FUNCTION IF EXISTS public.create_default_policies() CASCADE;
+DROP FUNCTION IF EXISTS public.create_policies_after_rls() CASCADE;
+
+DO $$
+DECLARE
+  policy_record record;
+BEGIN
+  FOR policy_record IN
+    SELECT schemaname, tablename, policyname
+    FROM pg_policies
+    WHERE policyname = 'project_admin_policy'
+      AND 'project_admin' = ANY(roles)
+  LOOP
+    EXECUTE format(
+      'DROP POLICY IF EXISTS %I ON %I.%I',
+      policy_record.policyname,
+      policy_record.schemaname,
+      policy_record.tablename
+    );
+  END LOOP;
+END $$;
