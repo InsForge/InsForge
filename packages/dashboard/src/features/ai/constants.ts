@@ -5,9 +5,47 @@ import GeminiIcon from '#assets/logos/gemini.svg?react';
 export type CodeTab = 'sdk' | 'python' | 'http';
 export type QuickStartMode = 'text' | 'image' | 'video' | 'embedding';
 export type ModelModalityFilter = string;
+type OverviewQuickStartKind = 'chat' | 'embedding';
+
+export const OVERVIEW_QUICK_START_MODELS = [
+  {
+    id: 'openai/gpt-5.5',
+    label: 'OpenAI',
+    icon: OpenAIIcon,
+    kind: 'chat',
+  },
+  {
+    id: 'anthropic/claude-sonnet-4.6',
+    label: 'Anthropic',
+    icon: ClaudeIcon,
+    kind: 'chat',
+  },
+  {
+    id: 'google/gemini-2.5-pro',
+    label: 'Gemini',
+    icon: GeminiIcon,
+    kind: 'chat',
+  },
+  {
+    id: 'openai/text-embedding-3-small',
+    label: 'Embeddings',
+    icon: OpenAIIcon,
+    kind: 'embedding',
+  },
+] as const;
+
+function getOverviewQuickStartKind(modelId: string): OverviewQuickStartKind {
+  return OVERVIEW_QUICK_START_MODELS.find((model) => model.id === modelId)?.kind ?? 'chat';
+}
+
+export function getOverviewQuickStartMode(
+  modelId: string
+): Extract<QuickStartMode, 'text' | 'embedding'> {
+  return getOverviewQuickStartKind(modelId) === 'embedding' ? 'embedding' : 'text';
+}
 
 export function getOverviewCodeSnippets(modelId: string): Record<CodeTab, string> {
-  if (modelId.includes('embedding')) {
+  if (getOverviewQuickStartKind(modelId) === 'embedding') {
     return {
       sdk: `import OpenAI from 'openai';
 
@@ -94,29 +132,6 @@ export const CODE_TAB_LANGUAGE: Record<CodeTab, 'javascript' | 'python'> = {
   http: 'python',
 };
 
-export const OVERVIEW_QUICK_START_MODELS = [
-  {
-    id: 'openai/gpt-5.5',
-    label: 'OpenAI',
-    icon: OpenAIIcon,
-  },
-  {
-    id: 'anthropic/claude-sonnet-4.6',
-    label: 'Anthropic',
-    icon: ClaudeIcon,
-  },
-  {
-    id: 'google/gemini-2.5-pro',
-    label: 'Gemini',
-    icon: GeminiIcon,
-  },
-  {
-    id: 'openai/text-embedding-3-small',
-    label: 'Embeddings',
-    icon: OpenAIIcon,
-  },
-] as const;
-
 export const MODEL_MODALITY_FILTERS: { id: ModelModalityFilter; label: string }[] = [
   { id: 'all', label: 'All' },
   { id: 'text', label: 'Text' },
@@ -132,6 +147,12 @@ export const QUICK_START_MODES: { value: QuickStartMode; label: string }[] = [
   { value: 'video', label: 'Video Generation' },
   { value: 'embedding', label: 'Embeddings' },
 ];
+
+const QUICK_START_MODE_VALUES = new Set<string>(QUICK_START_MODES.map(({ value }) => value));
+
+export function isQuickStartMode(value: string | null): value is QuickStartMode {
+  return value !== null && QUICK_START_MODE_VALUES.has(value);
+}
 
 export const PROMPT_CARD_COPY: Record<QuickStartMode, string> = {
   text: 'Copy this prompt for your agent to generate text through the OpenRouter model gateway.',
