@@ -38,12 +38,7 @@ describe('project admin public privileges migration', () => {
     expect(sql).toMatch(/GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO project_admin/i);
     expect(sql).toMatch(/GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO project_admin/i);
     expect(sql).toMatch(/GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO project_admin/i);
-    expect(sql).toMatch(
-      /GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO anon, authenticated/i
-    );
-    expect(sql).toMatch(
-      /GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated/i
-    );
+    expect(sql).not.toMatch(/TO anon, authenticated/i);
   });
 
   it('sets default privileges for future public objects', () => {
@@ -57,18 +52,6 @@ describe('project admin public privileges migration', () => {
     );
     expect(sql).toMatch(
       /ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO project_admin/i
-    );
-    expect(sql).toMatch(
-      /ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO anon, authenticated/i
-    );
-    expect(sql).toMatch(
-      /ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO anon, authenticated/i
-    );
-    expect(sql).toMatch(
-      /ALTER DEFAULT PRIVILEGES FOR ROLE project_admin IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO anon, authenticated/i
-    );
-    expect(sql).toMatch(
-      /ALTER DEFAULT PRIVILEGES FOR ROLE project_admin IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO anon, authenticated/i
     );
     expect(sql).toMatch(
       /ALTER DEFAULT PRIVILEGES FOR ROLE project_admin IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO project_admin/i
