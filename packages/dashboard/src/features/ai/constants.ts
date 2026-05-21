@@ -234,16 +234,21 @@ const openai = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
 });
 
-const response = await openai.embeddings.create({
-  model: '${model}',
-  input: [
-    'InsForge gives coding agents database, auth, storage, and functions.',
-    'Use embeddings to power semantic search over product documentation.',
-  ],
-});
+try {
+  const response = await openai.embeddings.create({
+    model: '${model}',
+    input: [
+      'InsForge gives coding agents database, auth, storage, and functions.',
+      'Use embeddings to power semantic search over product documentation.',
+    ],
+  });
 
-for (const item of response.data) {
-  console.log({ index: item.index, dimensions: item.embedding.length });
+  for (const item of response.data) {
+    console.log({ index: item.index, dimensions: item.embedding.length });
+  }
+} catch (error) {
+  console.error('Failed to generate embeddings:', error);
+  process.exitCode = 1;
 }`;
   }
 
