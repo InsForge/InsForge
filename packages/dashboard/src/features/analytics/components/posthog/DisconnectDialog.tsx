@@ -9,14 +9,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@insforge/ui';
-import { posthogApi } from '#features/analytics/services/posthog.api';
+import { analyticsService } from '#features/analytics/services/analytics.service';
 import { useToast } from '#lib/hooks/useToast';
 
 export function DisconnectDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const qc = useQueryClient();
   const { showToast } = useToast();
   const m = useMutation({
-    mutationFn: () => posthogApi.disconnect(),
+    mutationFn: () => analyticsService.disconnect(),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['posthog'] });
       onClose();

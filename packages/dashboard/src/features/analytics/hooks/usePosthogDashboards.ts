@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { posthogApi } from '#features/analytics/services/posthog.api';
+import { analyticsService } from '#features/analytics/services/analytics.service';
 
 export function usePosthogDashboards(enabled: boolean) {
   return useQuery({
     queryKey: ['posthog', 'dashboards'],
-    queryFn: () => posthogApi.getDashboards(),
+    queryFn: () => analyticsService.getDashboards(),
     enabled,
     staleTime: 60_000,
   });

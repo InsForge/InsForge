@@ -14,7 +14,7 @@ import { apiClient } from '#lib/api/client';
 export type Breakdown = 'Page' | 'Country' | 'DeviceType';
 export type TrendMetric = 'visitors' | 'views' | 'bounce_rate';
 
-export const posthogApi = {
+export const analyticsService = {
   async getConnection(): Promise<GetPosthogConnectionResponse | null> {
     try {
       const res = await apiClient.request('/analytics/connection', {

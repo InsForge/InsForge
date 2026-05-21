@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { posthogApi } from '#features/analytics/services/posthog.api';
+import { analyticsService } from '#features/analytics/services/analytics.service';
 
 /**
  * Lazy: only fetches when `enabled` flips true (e.g. modal opens).
  *
- * `posthogApi.createRecordingShare` is a POST that mints a new token, so we
+ * `analyticsService.createRecordingShare` is a POST that mints a new token, so we
  * disable retries / refocus / reconnect refetches to avoid creating duplicate
  * tokens on transient errors or tab focus changes.
  */
@@ -18,7 +18,7 @@ export function useShareToken(recordingId: string | null, enabled: boolean) {
       if (!recordingId) {
         throw new Error('recordingId is required');
       }
-      return posthogApi.createRecordingShare(recordingId);
+      return analyticsService.createRecordingShare(recordingId);
     },
     enabled: enabled && !!recordingId,
     // PostHog share tokens persist server-side; keep the cached token for
