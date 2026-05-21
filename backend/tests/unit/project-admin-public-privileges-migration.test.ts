@@ -24,9 +24,12 @@ describe('project admin public privileges migration', () => {
       .filter((file) => file.endsWith('.sql'))
       .sort();
 
-    expect(migrations.indexOf(migrationFile)).toBeGreaterThan(
-      migrations.indexOf('044_prefer-request-jwt-claims.sql')
-    );
+    const migrationIndex = migrations.indexOf(migrationFile);
+    const predecessorIndex = migrations.indexOf('044_prefer-request-jwt-claims.sql');
+
+    expect(predecessorIndex).not.toBe(-1);
+    expect(migrationIndex).not.toBe(-1);
+    expect(migrationIndex).toBeGreaterThan(predecessorIndex);
   });
 
   it('grants project_admin public access and RLS bypass without assuming the role exists', () => {
@@ -38,6 +41,12 @@ describe('project admin public privileges migration', () => {
     expect(sql).toMatch(/GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO project_admin/i);
     expect(sql).toMatch(/GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO project_admin/i);
     expect(sql).toMatch(/GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO project_admin/i);
+    expect(sql).toMatch(
+      /GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO anon, authenticated/i
+    );
+    expect(sql).toMatch(
+      /GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated/i
+    );
   });
 
   it('sets default privileges for future public objects', () => {
@@ -51,6 +60,27 @@ describe('project admin public privileges migration', () => {
     );
     expect(sql).toMatch(
       /ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO project_admin/i
+    );
+    expect(sql).toMatch(
+      /ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO anon, authenticated/i
+    );
+    expect(sql).toMatch(
+      /ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO anon, authenticated/i
+    );
+    expect(sql).toMatch(
+      /ALTER DEFAULT PRIVILEGES FOR ROLE project_admin IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO anon, authenticated/i
+    );
+    expect(sql).toMatch(
+      /ALTER DEFAULT PRIVILEGES FOR ROLE project_admin IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO anon, authenticated/i
+    );
+    expect(sql).toMatch(
+      /ALTER DEFAULT PRIVILEGES FOR ROLE project_admin IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO project_admin/i
+    );
+    expect(sql).toMatch(
+      /ALTER DEFAULT PRIVILEGES FOR ROLE project_admin IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES TO project_admin/i
+    );
+    expect(sql).toMatch(
+      /ALTER DEFAULT PRIVILEGES FOR ROLE project_admin IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO project_admin/i
     );
   });
 
@@ -73,6 +103,10 @@ describe('project admin public privileges migration', () => {
 
     expect(sql).toMatch(/CREATE ROLE project_admin NOLOGIN BYPASSRLS/i);
     expect(sql).toMatch(/GRANT ALL ON SCHEMA public TO project_admin/i);
+    expect(sql).toMatch(
+      /ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO anon, authenticated/i
+    );
+    expect(sql).toMatch(/ALTER DEFAULT PRIVILEGES FOR ROLE project_admin IN SCHEMA public/i);
     expect(sql).not.toMatch(/create_policies_on_table_create/i);
     expect(sql).not.toMatch(/create_policies_on_rls_enable/i);
     expect(sql).not.toMatch(/project_admin_policy/i);
@@ -83,6 +117,10 @@ describe('project admin public privileges migration', () => {
 
     expect(template).toMatch(/CREATE ROLE project_admin NOLOGIN BYPASSRLS/i);
     expect(template).toMatch(/GRANT ALL ON SCHEMA public TO project_admin/i);
+    expect(template).toMatch(
+      /ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO anon, authenticated/i
+    );
+    expect(template).toMatch(/ALTER DEFAULT PRIVILEGES FOR ROLE project_admin IN SCHEMA public/i);
     expect(template).not.toMatch(/create_policies_on_table_create/i);
     expect(template).not.toMatch(/create_policies_on_rls_enable/i);
     expect(template).not.toMatch(/project_admin_policy/i);

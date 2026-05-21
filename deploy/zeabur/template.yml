@@ -189,9 +189,16 @@ spec:
                     GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO project_admin;
 
                     ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO anon, authenticated;
+                    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO anon, authenticated;
                     ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO project_admin;
                     ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES TO project_admin;
                     ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO project_admin;
+
+                    ALTER DEFAULT PRIVILEGES FOR ROLE project_admin IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO anon, authenticated;
+                    ALTER DEFAULT PRIVILEGES FOR ROLE project_admin IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO anon, authenticated;
+                    ALTER DEFAULT PRIVILEGES FOR ROLE project_admin IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO project_admin;
+                    ALTER DEFAULT PRIVILEGES FOR ROLE project_admin IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES TO project_admin;
+                    ALTER DEFAULT PRIVILEGES FOR ROLE project_admin IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO project_admin;
                 - path: /docker-entrypoint-initdb.d/02-jwt.sql
                   template: |
                     \set jwt_secret `echo "$JWT_SECRET"`
