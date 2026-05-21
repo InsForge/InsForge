@@ -26,7 +26,7 @@ npx @insforge/cli payments catalog --environment test
 ```
 
 <Note>
-  See [Payments Architecture](/core-concepts/payments/architecture) for setup, Stripe key management, webhook projections, and fulfillment patterns.
+  See [Payments overview](/core-concepts/payments/overview) for setup, Stripe key management, webhook projections, and fulfillment patterns.
 </Note>
 
 ## createCheckoutSession()
@@ -223,7 +223,7 @@ For user-facing billing state, create app-owned tables with RLS and populate the
 - `public.user_entitlements`
 - `public.team_billing_status`
 
-Populate those tables from webhook-projected payment state. See [Payments Architecture](/core-concepts/payments/architecture#custom-fulfillment-logic) for examples.
+Populate those tables from webhook-projected payment state. See [Payments overview](/core-concepts/payments/overview) for examples.
 
 <Warning>
   Do not mark an order paid, grant credits, or activate a subscription from the success URL alone. Stripe recommends webhooks for reliable fulfillment because customers might complete payment without returning to your app.

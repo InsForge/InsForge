@@ -4,10 +4,6 @@ sidebarTitle: "Overview"
 description: "Send transactional messages from your project. Email today, SMS and push on the roadmap."
 ---
 
-import AgentPrereq from '/snippets/agent-prereq.mdx';
-
-<AgentPrereq />
-
 InsForge Messaging sends transactional notifications from your project: receipts, digests, password-reset codes, notification roll-ups, anything you would otherwise wire SendGrid, Postmark, or Twilio in for. Email is the first channel; SMS and push are on the roadmap and will share the same API surface.
 
 <Note>
@@ -18,18 +14,41 @@ InsForge Messaging sends transactional notifications from your project: receipts
   Messaging is currently in private preview. Only the email channel is live today. The API may change before general availability. Reach out if you want early access.
 </Note>
 
+```mermaid
+graph TB
+    Client[Client Application] --> SDK[InsForge SDK]
+    SDK --> API[Email API]
+    API --> Service[EmailService]
+    Service --> Decision{SMTP enabled?}
+    Decision -->|No| Cloud[InsForge Cloud]
+    Cloud --> SES[AWS SES]
+    Decision -->|Yes| SMTP[Your SMTP server]
+    SES --> Inbox[Recipient Inbox]
+    SMTP --> Inbox
+
+    style Client fill:#1e293b,stroke:#475569,color:#e2e8f0
+    style SDK fill:#1e40af,stroke:#3b82f6,color:#dbeafe
+    style API fill:#166534,stroke:#22c55e,color:#dcfce7
+    style Service fill:#166534,stroke:#22c55e,color:#dcfce7
+    style Decision fill:#7c3aed,stroke:#a78bfa,color:#ede9fe
+    style Cloud fill:#7c3aed,stroke:#a78bfa,color:#ede9fe
+    style SES fill:#ea580c,stroke:#f97316,color:#fed7aa
+    style SMTP fill:#0e7490,stroke:#06b6d4,color:#cffafe
+    style Inbox fill:#0e7490,stroke:#06b6d4,color:#cffafe
+```
+
 ## Channels
 
 <CardGroup cols={3}>
-  <Card title="Email" icon="envelope" href="/core-concepts/messaging/architecture">
+  <Card title="Email" icon="envelope" href="/core-concepts/messaging/custom-smtp">
     Managed SMTP or bring your own provider. Templates, delivery tracking, and webhook events.
   </Card>
 
-  <Card title="SMS" icon="message" href="#">
+  <Card title="SMS" icon="message">
     Coming soon. Same API, Twilio or Sinch on the back.
   </Card>
 
-  <Card title="Push" icon="bell" href="#">
+  <Card title="Push" icon="bell">
     Coming soon. APNs and FCM via a single endpoint.
   </Card>
 </CardGroup>
@@ -59,10 +78,6 @@ Per-project and per-plan limits keep stray loops from melting deliverability. Co
 ## Concepts
 
 <CardGroup cols={2}>
-  <Card title="Architecture" icon="diagram-project" href="/core-concepts/messaging/architecture">
-    How sending, templates, and delivery tracking fit together.
-  </Card>
-
   <Card title="Custom SMTP" icon="envelope" href="/core-concepts/messaging/custom-smtp">
     Bring your own SMTP provider (SendGrid, Postmark, AWS SES, etc.).
   </Card>
@@ -82,6 +97,5 @@ Per-project and per-plan limits keep stray loops from melting deliverability. Co
 
 ## Next steps
 
-- Read the [InsForge Quickstart](/quickstart) to link the CLI to your project.
-- Set up [MCP](/mcp-setup) so your agent can configure templates and providers.
+- Set up the [CLI](/quickstart) to link your project (the recommended path).
 - Browse the [TypeScript SDK reference](/sdks/typescript/email) for send patterns.

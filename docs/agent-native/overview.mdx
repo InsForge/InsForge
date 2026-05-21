@@ -1,0 +1,50 @@
+---
+title: "Agent-Native Initiatives"
+sidebarTitle: "Overview"
+description: "The primitives that let a coding agent operate your backend, not just a human clicking a dashboard."
+---
+
+Most backends assume a human in a dashboard. InsForge assumes a coding agent at a terminal. The products (Database, Auth, Storage, and the rest) are the building blocks; the primitives on this page are how an agent operates them: as files it can edit, branches it can test on, and a backend it can diagnose and fix on its own.
+
+<Note>
+  New here? Start with [Connect via CLI](/quickstart) to link your project. This section is about how an agent *works* with the backend once it is connected.
+</Note>
+
+## The primitives
+
+<CardGroup cols={2}>
+  <Card title="CLI harness" icon="terminal" href="/agent-native/cli-harness">
+    The agent's hands. One terminal interface for login, schema, deploys, config, and diagnostics.
+  </Card>
+  <Card title="Diagnostics & advisor" icon="stethoscope" href="/agent-native/diagnostics">
+    Pull advisor findings, DB health, metrics, and error logs the agent can read and fix.
+  </Card>
+  <Card title="Config as code" icon="file-code" href="/agent-native/config-as-code">
+    Auth, SMTP, and deployment settings live in `insforge.toml`. Plan and apply like infrastructure.
+  </Card>
+  <Card title="Branching" icon="code-branch" href="/agent-native/branching">
+    Clone the whole backend into an isolated branch to test risky changes, then merge or reset.
+  </Card>
+</CardGroup>
+
+## Why it matters
+
+A person and an agent want different things from a backend. A person wants a UI to click. An agent wants a stable text interface it can drive, read back, and reason about. That shows up everywhere in InsForge.
+
+Schema changes are [migrations](/core-concepts/database/migrations) in your repo, and project config is an [`insforge.toml`](/agent-native/config-as-code) file, so the agent edits text, commits it, and reviews it in a PR instead of clicking through forms. When it wants to try something risky, it spins up a [backend branch](/agent-native/branching), runs the change against a copy, and throws the branch away if it goes wrong. When something looks off, it fetches [diagnostics and advisor findings](/agent-native/diagnostics) directly with `npx @insforge/cli diagnose`, no dashboard in the loop, and applies the fix itself. That last part is also how the backend gets more secure: the agent reads a security finding like a permissive RLS policy and remediates it on its own, instead of waiting for a human to remember to check. And it reads current schemas, logs, and metadata straight from the backend with `npx @insforge/cli metadata`, so it works from real state rather than guessing.
+
+## The loop
+
+These chain together. A session usually goes:
+
+1. Read the current state with `npx @insforge/cli metadata`.
+2. Branch the backend, write a [migration](/core-concepts/database/migrations) or edit `insforge.toml`, then run `npx @insforge/cli config plan` to see the diff.
+3. Apply it with `npx @insforge/cli db migrations up` or `config apply`, against the branch first, then the parent.
+4. Run `npx @insforge/cli diagnose` to check advisor findings and error logs, and ask `diagnose --ai` to interpret them.
+5. Apply the remediation, re-run diagnose, and merge the branch.
+
+## Next steps
+
+- Read the [CLI harness](/agent-native/cli-harness) to see the full command surface an agent drives.
+- Set up [config as code](/agent-native/config-as-code) so auth and SMTP live in version control.
+- Use [diagnostics](/agent-native/diagnostics) to let the agent find and fix backend issues.

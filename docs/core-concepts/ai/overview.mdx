@@ -4,15 +4,35 @@ sidebarTitle: "Overview"
 description: "Call any LLM through one InsForge-managed key, with per-project quotas."
 ---
 
-import AgentPrereq from '/snippets/agent-prereq.mdx';
-
-<AgentPrereq />
-
 Use the Model Gateway to call chat, streaming, and embedding models through one OpenAI-compatible endpoint. InsForge holds the provider keys, tracks usage per project, and routes traffic through [OpenRouter](https://openrouter.ai), so your application code never sees Anthropic, OpenAI, or Mistral credentials directly.
+
+<Frame caption="One OpenAI-compatible endpoint with per-provider access, ready-to-copy code, and usage tracking.">
+  <img src="/images/model-gateway-overview.png" alt="InsForge dashboard Model Gateway overview showing code samples, provider chips, and usage charts" />
+</Frame>
 
 <Note>
   **Want to run AI code, not call a model?** Use [Edge Functions](/core-concepts/functions/overview) to orchestrate prompts, retrieval, and tools. The Model Gateway is the call; functions are the program around it.
 </Note>
+
+```mermaid
+graph TB
+    Dashboard[InsForge Dashboard] --> Key[Active OpenRouter Key]
+    Dashboard --> Catalog[OpenRouter Model Catalog]
+    Dashboard --> Metrics[OpenRouter Usage Overview]
+
+    App[Application Backend or Server Route] --> SDK[OpenAI SDK]
+    SDK --> OpenRouter[OpenRouter API]
+
+    OpenRouter --> OpenAI[OpenAI]
+    OpenRouter --> Anthropic[Anthropic]
+    OpenRouter --> Google[Google]
+    OpenRouter --> More[Other Providers]
+
+    style Dashboard fill:#1e293b,stroke:#475569,color:#e2e8f0
+    style App fill:#166534,stroke:#22c55e,color:#dcfce7
+    style SDK fill:#1e40af,stroke:#3b82f6,color:#dbeafe
+    style OpenRouter fill:#c2410c,stroke:#fb923c,color:#fed7aa
+```
 
 ## Features
 
@@ -40,14 +60,6 @@ Every request is logged with model, token count, and cost. Query usage from the 
 
 Switch between Anthropic, OpenAI, Mistral, Llama, Gemini, and dozens more by changing the model name in the request. Application code does not change.
 
-## Concepts
-
-<CardGroup cols={2}>
-  <Card title="Architecture" icon="diagram-project" href="/core-concepts/ai/architecture">
-    How requests flow from your app through InsForge to OpenRouter.
-  </Card>
-</CardGroup>
-
 ## Build with it
 
 <CardGroup cols={2}>
@@ -70,6 +82,5 @@ Switch between Anthropic, OpenAI, Mistral, Llama, Gemini, and dozens more by cha
 
 ## Next steps
 
-- Read the [InsForge Quickstart](/quickstart) to link the CLI to your project.
-- Set up [MCP](/mcp-setup) so your agent can call models on your behalf.
+- Set up the [CLI](/quickstart) to link your project (the recommended path).
 - Browse the [TypeScript SDK reference](/sdks/typescript/ai) for chat and embedding patterns.

@@ -36,13 +36,7 @@
               {
                 "group": "Quickstart",
                 "expanded": true,
-                "pages": [
-                  {
-                    "page": "quickstart",
-                    "tag": "Recommended"
-                  },
-                  "mcp-setup"
-                ]
+                "pages": ["quickstart", "mcp-setup"]
               }
             ]
           },
@@ -54,61 +48,52 @@
                 "group": "Database",
                 "pages": [
                   "core-concepts/database/overview",
-                  "core-concepts/database/architecture",
                   "core-concepts/database/migrations",
-                  "core-concepts/database/branching",
                   "core-concepts/database/pgvector"
                 ]
               },
               {
                 "group": "Authentication",
                 "pages": [
-                  "core-concepts/authentication/overview",
-                  "core-concepts/authentication/architecture"
+                  "core-concepts/authentication/overview"
                 ]
               },
               {
                 "group": "Storage",
                 "pages": [
                   "core-concepts/storage/overview",
-                  "core-concepts/storage/architecture",
                   "core-concepts/storage/s3-compatibility"
                 ]
               },
               {
                 "group": "Realtime",
                 "pages": [
-                  "core-concepts/realtime/overview",
-                  "core-concepts/realtime/architecture"
+                  "core-concepts/realtime/overview"
                 ]
               },
               {
                 "group": "Edge Functions",
                 "pages": [
                   "core-concepts/functions/overview",
-                  "core-concepts/functions/architecture",
                   "core-concepts/functions/schedules"
                 ]
               },
               {
                 "group": "Model Gateway",
                 "pages": [
-                  "core-concepts/ai/overview",
-                  "core-concepts/ai/architecture"
+                  "core-concepts/ai/overview"
                 ]
               },
               {
                 "group": "Deployments",
                 "pages": [
-                  "core-concepts/deployments/overview",
-                  "core-concepts/deployments/architecture"
+                  "core-concepts/deployments/overview"
                 ]
               },
               {
                 "group": "Messaging (Private Preview)",
                 "pages": [
                   "core-concepts/messaging/overview",
-                  "core-concepts/messaging/architecture",
                   "core-concepts/messaging/custom-smtp"
                 ]
               },
@@ -116,17 +101,25 @@
                 "group": "Payments (Private Preview)",
                 "pages": [
                   "core-concepts/payments/overview",
-                  "core-concepts/payments/architecture",
                   "core-concepts/payments/cli"
                 ]
               },
               {
                 "group": "Compute (Private Preview)",
                 "pages": [
-                  "core-concepts/compute/overview",
-                  "core-concepts/compute/architecture"
+                  "core-concepts/compute/overview"
                 ]
               }
+            ]
+          },
+          {
+            "group": "Agent-Native Initiatives",
+            "pages": [
+              "agent-native/overview",
+              "agent-native/cli-harness",
+              "agent-native/diagnostics",
+              "agent-native/config-as-code",
+              "agent-native/branching"
             ]
           },
           {
@@ -143,15 +136,13 @@
               "deployment/deploy-to-aws-ec2",
               "deployment/deploy-to-azure-virtual-machines",
               "deployment/deploy-to-google-cloud-compute-engine",
-              "deployment/deploy-to-render",
-              "configuration/config-as-code"
+              "deployment/deploy-to-render"
             ]
           },
           {
             "group": "Resources",
             "pages": [
-              "showcase",
-              "changelog"
+              "showcase"
             ]
           }
         ]
@@ -312,6 +303,10 @@
       ]
     }
   },
+  "redirects": [
+    { "source": "/core-concepts/database/branching", "destination": "/agent-native/branching" },
+    { "source": "/configuration/config-as-code", "destination": "/agent-native/config-as-code" }
+  ],
   "logo": {
     "light": "/logo/light.svg",
     "dark": "/logo/dark.svg",

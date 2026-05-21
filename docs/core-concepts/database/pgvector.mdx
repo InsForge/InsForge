@@ -1,280 +1,74 @@
 ---
-title: PGVector
-description: Store embeddings and perform similarity search with pgvector
+title: "pgvector"
+description: "Store embeddings and run similarity search inside Postgres"
 ---
 
-## Overview
+[pgvector](https://github.com/pgvector/pgvector) ships on every InsForge project. Use it for semantic search, recommendations, and [RAG](https://www.pinecone.io/learn/retrieval-augmented-generation/).
 
-InsForge supports **pgvector**, a PostgreSQL extension for vector similarity search. Use it to build semantic search, recommendations, RAG pipelines, or anything that needs "find similar items" functionality.
+## Prompt your agent
 
-For embedding generation, use the OpenRouter key provisioned by InsForge with the OpenAI SDK. Store the resulting vectors in InsForge Postgres with pgvector.
+> Add pgvector to my project. Create a `documents` table with `content` and a 1536-dim `embedding` column, plus an HNSW cosine index. When I insert content, embed it with OpenRouter's `text-embedding-3-small` from a server-side route. Expose a `match_documents(query, count, threshold)` RPC that returns top similarity matches.
 
-## Enabling the Extension
+## Concepts
 
-Enable pgvector via SQL:
+A vector is a list of numbers representing an item. Two vectors are similar if they sit close in vector space. Store the vector next to its row, embed the user query the same way, and pgvector ranks by distance.
+
+## Usage
+
+Enable the extension and create a vector column. Match the dimension to your model (`text-embedding-3-small` is 1536).
 
 ```sql
 create extension if not exists vector;
-```
 
-<Note>
-The extension is named `vector` in PostgreSQL, though the package is commonly called "pgvector".
-</Note>
-
-## Creating Vector Columns
-
-Create a table with a vector column. The dimension must match your embedding model:
-
-```sql
 create table documents (
   id bigserial primary key,
   content text,
-  embedding vector(1536),
-  created_at timestamptz default now()
+  embedding vector(1536)
 );
 ```
 
-## Generating Embeddings with OpenRouter
-
-Use OpenRouter directly from trusted server-side code. Do not expose `OPENROUTER_API_KEY` in the browser.
+Generate an embedding server-side and insert it.
 
 ```typescript
 import OpenAI from 'openai';
+import { createClient } from '@insforge/sdk';
 
 const openai = new OpenAI({
   baseURL: 'https://openrouter.ai/api/v1',
   apiKey: process.env.OPENROUTER_API_KEY,
 });
+const insforge = createClient({ projectId: process.env.INSFORGE_PROJECT_ID });
 
-const response = await openai.embeddings.create({
+const { data } = await openai.embeddings.create({
   model: 'openai/text-embedding-3-small',
-  input: 'Your text here',
+  input: 'hello world',
 });
 
-console.log(response.data[0].embedding);
+await insforge.database.from('documents').insert({
+  content: 'hello world',
+  embedding: data[0].embedding,
+});
 ```
 
-The method accepts a single string or an array of strings.
-
-**Parameters:**
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `model` | string | Yes | Embedding model identifier |
-| `input` | string or string[] | Yes | Text to embed |
-| `encoding_format` | string | No | `float` (default) or `base64` |
-| `dimensions` | number | No | Output dimensionality override |
-
-### Available Embedding Models
-
-| Model | Dimensions |
-|-------|------------|
-| openai/text-embedding-3-small | 1536 |
-| openai/text-embedding-3-large | 3072 |
-| openai/text-embedding-ada-002 | 1536 |
-| google/gemini-embedding-001 | 3072 |
-
-## Storing Embeddings
-
-Generate an embedding and insert it in one step:
-
-```typescript
-async function storeDocument(content: string) {
-  const response = await openai.embeddings.create({
-    model: 'openai/text-embedding-3-small',
-    input: content,
-  });
-
-  const { data, error } = await insforge.database
-    .from('documents')
-    .insert([{
-      content,
-      embedding: response.data[0].embedding,
-    }])
-    .select();
-
-  return { data, error };
-}
-```
-
-## Querying Vectors
-
-Use distance operators to find similar vectors:
+Query by cosine distance (`<=>`). L2 (`<->`) and inner product (`<#>`) are also available.
 
 ```sql
-select * from documents
-order by embedding <=> '[0.1, 0.2, ...]'
+select id, content
+from documents
+order by embedding <=> $1
 limit 5;
 ```
 
-## Distance Operators
+## Specific usage cases
 
-| Operator | Description |
-|----------|-------------|
-| `<->` | L2 distance |
-| `<#>` | Inner product (negative) |
-| `<=>` | Cosine distance |
-
-<Tip>
-For normalized embeddings (like OpenAI's), use cosine distance `<=>`. Similarity = `1 - distance`.
-</Tip>
-
-## Similarity Search with RPC
-
-For production use, create a Postgres function that handles similarity search server-side. This avoids round trips and keeps the logic close to the data.
+Wrap search in a Postgres function and call it via `rpc()` to keep math server-side. Past ~10k rows, add an HNSW index.
 
 ```sql
-create or replace function match_documents(
-  query_embedding vector(1536),
-  match_count int default 5,
-  match_threshold float default 0.78
-)
-returns table (
-  id bigint,
-  content text,
-  similarity float
-)
-language sql stable
-as $$
-  select
-    id,
-    content,
-    1 - (embedding <=> query_embedding) as similarity
-  from documents
-  where 1 - (embedding <=> query_embedding) > match_threshold
-  order by embedding <=> query_embedding
-  limit match_count;
-$$;
+create index on documents using hnsw (embedding vector_cosine_ops);
 ```
 
-Call it from the SDK:
+## More resources
 
-```typescript
-const queryResponse = await openai.embeddings.create({
-  model: 'openai/text-embedding-3-small',
-  input: 'What is machine learning?',
-});
-
-const { data, error } = await insforge.database.rpc('match_documents', {
-  query_embedding: queryResponse.data[0].embedding,
-  match_count: 5,
-  match_threshold: 0.78,
-});
-```
-
-<Note>
-Adjust `match_threshold` based on your use case. Higher values return fewer but more relevant results. Start with 0.78 and tune from there.
-</Note>
-
-## Building a RAG Pipeline
-
-InsForge provides the Postgres and pgvector primitives for retrieval-augmented generation. Use OpenRouter directly for embeddings and chat completions.
-
-### Basic RAG Flow
-
-```typescript
-async function askQuestion(question: string) {
-  // 1. Embed the question
-  const embeddingResponse = await openai.embeddings.create({
-    model: 'openai/text-embedding-3-small',
-    input: question,
-  });
-
-  // 2. Retrieve relevant documents
-  const { data: documents } = await insforge.database.rpc('match_documents', {
-    query_embedding: embeddingResponse.data[0].embedding,
-    match_count: 5,
-    match_threshold: 0.78,
-  });
-
-  // 3. Build context from retrieved documents
-  const context = documents
-    .map((doc: any) => doc.content)
-    .join('\n\n');
-
-  // 4. Generate a response with context
-  const response = await openai.chat.completions.create({
-    model: 'openai/gpt-4o-mini',
-    messages: [
-      {
-        role: 'system',
-        content: `Answer the question based on the following context:\n\n${context}`,
-      },
-      {
-        role: 'user',
-        content: question,
-      },
-    ],
-  });
-
-  return response;
-}
-```
-
-### Production RAG
-
-The basic flow above works for prototypes. For production systems, you will likely need:
-
-- **Chunking strategies** -- split documents by semantic boundaries, not fixed token counts
-- **Query rewriting** -- rephrase user questions to improve retrieval recall
-- **Re-ranking** -- score retrieved chunks with a cross-encoder before passing them to the LLM
-- **Context assembly** -- format and truncate retrieved chunks to fit the model's context window
-- **Evaluation** -- measure retrieval precision, answer faithfulness, and hallucination rates
-
-We recommend pairing InsForge with an orchestration framework for production RAG:
-
-| Framework | Language | Best For |
-|-----------|----------|----------|
-| [LangChain](https://github.com/langchain-ai/langchain) | Python / TypeScript | Full pipeline orchestration, extensive integrations |
-| [LlamaIndex](https://github.com/run-llama/llama_index) | Python / TypeScript | Document indexing, structured retrieval, query engines |
-| [Haystack](https://github.com/deepset-ai/haystack) | Python | Modular pipelines, evaluation, production components |
-| [Vercel AI SDK](https://github.com/vercel/ai) | TypeScript | Streaming UI, React/Next.js integration |
-
-These frameworks integrate with any Postgres-backed vector store. Point them at your InsForge database and use OpenRouter through the OpenAI SDK for embedding generation and the generation step.
-
-## Indexing
-
-Without an index, pgvector does exact nearest neighbor search -- accurate but slow on large datasets. Add an index for faster approximate search.
-
-### HNSW (Recommended)
-
-Faster queries, uses more memory:
-
-```sql
-create index on documents
-using hnsw (embedding vector_cosine_ops);
-```
-
-### IVFFlat
-
-Lower memory, but create it after inserting data:
-
-```sql
-create index on documents
-using ivfflat (embedding vector_cosine_ops)
-with (lists = 100);
-```
-
-### Operator Classes
-
-Match your distance operator:
-
-| Distance | Operator Class |
-|----------|---------------|
-| L2 | `vector_l2_ops` |
-| Inner product | `vector_ip_ops` |
-| Cosine | `vector_cosine_ops` |
-
-<Warning>
-Create IVFFlat indexes **after** inserting initial data. IVFFlat needs representative data to build effective clusters. HNSW can be created on an empty table.
-</Warning>
-
-## Best Practices
-
-- **Match dimensions** -- vector dimensions must match your embedding model
-- **Keep AI keys server-side** -- generate embeddings from backend code with `OPENROUTER_API_KEY`, never from browser-exposed code
-- **Use RPC functions for search** -- keep similarity logic in Postgres rather than computing distances client-side
-- **Normalize embeddings** -- use cosine distance for scores between 0 and 1
-- **Index at scale** -- add indexes when you have ~10k+ vectors
-- **Batch inserts** -- generate and insert embeddings in batches to respect rate limits
-- **Use an orchestration framework for production RAG** -- raw retrieval works for prototypes, but production systems need chunking, re-ranking, and evaluation
+- [pgvector on GitHub](https://github.com/pgvector/pgvector) for operators and indexes.
+- [OpenRouter embeddings](https://openrouter.ai/docs/features/multimodal/embeddings) for the model catalog.
+- [Model Gateway overview](/core-concepts/ai/overview) for the InsForge side of OpenRouter.

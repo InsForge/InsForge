@@ -23,14 +23,14 @@ InsForge gives your coding agent Database, Authentication, Storage, Realtime, Ed
 
 ## Connect first
 
-Required setup. Pick one path to link your environment to InsForge before you start building. Use MCP if your editor speaks it (Claude Code, Cursor, Windsurf, Codex); use the CLI otherwise. You can run both side by side.
+Required setup. Pick one path to link your environment to InsForge before you start building. Start with the CLI for a universal terminal-based setup; add MCP if your editor speaks it (Claude Code, Cursor, Windsurf, Codex). You can run both side by side.
 
 <CardGroup cols={2}>
-  <Card title="Connect via MCP" icon="plug" href="/mcp-setup">
-    Wire your editor's MCP client so the agent gets live schemas, logs, and project context.
-  </Card>
   <Card title="Connect via CLI" icon="terminal" href="/quickstart">
     `npx @insforge/cli login` and link a project. Works in any terminal, MCP not required.
+  </Card>
+  <Card title="Connect via MCP" icon="plug" href="/mcp-setup">
+    Wire your editor's MCP client so the agent gets live schemas, logs, and project context.
   </Card>
 </CardGroup>
 
@@ -76,5 +76,7 @@ Looking for instructions for a specific tool? Browse the [agent directory](https
     Long-running containers.
   </Card>
 </CardGroup>
+
+Track new features and fixes in the [changelog](https://insforge.dev/changelogs).
 
 

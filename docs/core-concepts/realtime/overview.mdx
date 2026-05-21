@@ -4,15 +4,33 @@ sidebarTitle: "Overview"
 description: "Stream Postgres changes and broadcast messages over one WebSocket."
 ---
 
-import AgentPrereq from '/snippets/agent-prereq.mdx';
-
-<AgentPrereq />
-
 Use InsForge Realtime to stream Postgres row changes, broadcast messages between clients, and track presence on one WebSocket connection. Subscriptions enforce the same row-level security policies as REST queries, so a client only sees the changes its session is allowed to read.
 
 <Note>
   **Need to react to changes on the server?** Use [Edge Functions](/core-concepts/functions/overview) with database triggers. Realtime is for clients that want to watch; Edge Functions are for code that responds.
 </Note>
+
+```mermaid
+graph TB
+    Changes[Postgres Changes] --> RT[Realtime Service]
+    Broadcast[Broadcast Messages] --> RT
+    Presence[Presence] --> RT
+
+    RLS[RLS Policies] -.->|scopes access| RT
+
+    RT --> WS[Single WebSocket]
+    WS --> SDK[InsForge SDK]
+    SDK --> App[Client Application]
+
+    style Changes fill:#0e7490,stroke:#06b6d4,color:#cffafe
+    style Broadcast fill:#166534,stroke:#22c55e,color:#dcfce7
+    style Presence fill:#166534,stroke:#22c55e,color:#dcfce7
+    style RLS fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
+    style RT fill:#c2410c,stroke:#fb923c,color:#fed7aa
+    style WS fill:#c2410c,stroke:#fb923c,color:#fed7aa
+    style SDK fill:#1e40af,stroke:#3b82f6,color:#dbeafe
+    style App fill:#1e293b,stroke:#475569,color:#e2e8f0
+```
 
 ## Features
 
@@ -30,19 +48,11 @@ Track which clients are currently online in a channel and what state they hold (
 
 ### Row-level security
 
-Channel access reads the same JWT as REST and storage requests. The same RLS policy that scopes a `SELECT` scopes the stream. No second permission system.
+Channel access reads the same JWT as REST and storage requests. The same RLS policy that scopes a `SELECT` scopes the stream, so a channel needs no permission rules of its own.
 
 ### One connection
 
 Database changes, broadcast, and presence all multiplex over a single WebSocket. Open one connection per session, subscribe to as many channels as you need.
-
-## Concepts
-
-<CardGroup cols={2}>
-  <Card title="Architecture" icon="diagram-project" href="/core-concepts/realtime/architecture">
-    How database changes, broadcast, and presence fit together on one connection.
-  </Card>
-</CardGroup>
 
 ## Build with it
 
@@ -66,6 +76,5 @@ Database changes, broadcast, and presence all multiplex over a single WebSocket.
 
 ## Next steps
 
-- Read the [InsForge Quickstart](/quickstart) to link the CLI to your project.
-- Set up [MCP](/mcp-setup) so your agent can configure channels and policies.
+- Set up the [CLI](/quickstart) to link your project (the recommended path).
 - Browse the [TypeScript SDK reference](/sdks/typescript/realtime) for subscription patterns.

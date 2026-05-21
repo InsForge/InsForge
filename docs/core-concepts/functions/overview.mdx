@@ -4,15 +4,32 @@ sidebarTitle: "Overview"
 description: "Deno-powered serverless TypeScript with first-class schedules."
 ---
 
-import AgentPrereq from '/snippets/agent-prereq.mdx';
-
-<AgentPrereq />
-
 Use InsForge edge functions to run TypeScript on [Deno](https://deno.com), deployed close to your users for low latency. Functions can be invoked on-demand from any client, chained from database triggers, or scheduled to run on a cron expression. The runtime ships standard fetch, streaming responses, and ESM imports out of the box.
 
 <Note>
   **Need a process that stays up?** Use [Compute](/core-concepts/compute/overview) for queue workers, AI inference loops, and anything stateful. Edge Functions are for request/response and short-lived jobs.
 </Note>
+
+```mermaid
+graph TB
+    HTTP[HTTP Request] --> Fn[Edge Function on Deno]
+    Schedule[Cron Schedule] --> Fn
+    Trigger[Database Trigger] --> Fn
+
+    Fn --> SDK[InsForge SDK]
+    SDK --> DB[(Database)]
+    SDK --> Storage[Storage]
+    SDK --> Gateway[Model Gateway]
+
+    style HTTP fill:#1e293b,stroke:#475569,color:#e2e8f0
+    style Schedule fill:#1e293b,stroke:#475569,color:#e2e8f0
+    style Trigger fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
+    style Fn fill:#c2410c,stroke:#fb923c,color:#fed7aa
+    style SDK fill:#1e40af,stroke:#3b82f6,color:#dbeafe
+    style DB fill:#0e7490,stroke:#06b6d4,color:#cffafe
+    style Storage fill:#166534,stroke:#22c55e,color:#dcfce7
+    style Gateway fill:#166534,stroke:#22c55e,color:#dcfce7
+```
 
 ## Features
 
@@ -38,15 +55,11 @@ Structured logs are captured per invocation, queryable by status, duration, and 
 
 ### Deno standard library
 
-Use the [Deno standard library](https://jsr.io/@std) and any ESM module from `jsr.io`, `esm.sh`, or `npm:` specifiers. No bundler step, no `node_modules` to ship.
+Use the [Deno standard library](https://jsr.io/@std) and any ESM module from `jsr.io`, `esm.sh`, or `npm:` specifiers. You don't run a bundler, and there's no `node_modules` directory to ship.
 
 ## Concepts
 
 <CardGroup cols={2}>
-  <Card title="Architecture" icon="diagram-project" href="/core-concepts/functions/architecture">
-    How deploy, invoke, environment, and logs fit together.
-  </Card>
-
   <Card title="Schedules" icon="clock" href="/core-concepts/functions/schedules">
     Run a function on a cron expression instead of in response to a request.
   </Card>
@@ -74,6 +87,5 @@ Use the [Deno standard library](https://jsr.io/@std) and any ESM module from `js
 
 ## Next steps
 
-- Read the [InsForge Quickstart](/quickstart) to link the CLI to your project.
-- Set up [MCP](/mcp-setup) so your agent can deploy and tail logs for you.
+- Set up the [CLI](/quickstart) to link your project (the recommended path).
 - Browse the [TypeScript SDK reference](/sdks/typescript/functions) for invocation patterns.
