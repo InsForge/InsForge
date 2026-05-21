@@ -59,7 +59,7 @@ describe('VectorSearchService', () => {
         metric: 'cosine',
         include_vector: false,
       },
-      { isAdmin: true, role: 'authenticated' }
+      { role: 'project_admin' }
     );
 
     expect(result).toEqual({
@@ -104,7 +104,7 @@ describe('VectorSearchService', () => {
         metric: 'l2',
         include_vector: true,
       },
-      { userId: 'user-1', email: 'user@example.com', role: 'authenticated' }
+      { id: 'user-1', email: 'user@example.com', role: 'authenticated' }
     );
 
     const executedStatements = mockClient.query.mock.calls.map(([query]) => String(query));
@@ -132,7 +132,7 @@ describe('VectorSearchService', () => {
           metric: 'cosine',
           include_vector: false,
         },
-        { isAdmin: true, role: 'authenticated' }
+        { role: 'project_admin' }
       )
     ).rejects.toThrow(AppError);
   });
@@ -155,7 +155,7 @@ describe('VectorSearchService', () => {
           metric: 'cosine',
           include_vector: false,
         },
-        { isAdmin: true, role: 'authenticated' }
+        { role: 'project_admin' }
       )
     ).rejects.toThrow('query_vector dimensions (2) must match public.documents.embedding (3)');
 
@@ -178,7 +178,7 @@ describe('VectorSearchService', () => {
           metric: 'cosine',
           include_vector: false,
         },
-        { isAdmin: true, role: 'authenticated' }
+        { role: 'project_admin' }
       )
     ).rejects.toThrow(AppError);
 

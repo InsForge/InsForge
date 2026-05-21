@@ -8,8 +8,9 @@ import {
   quoteQualifiedName,
   splitQualifiedTableReference,
 } from '@/services/database/helpers.js';
-import { UserContext, withUserContext } from '@/services/db/user-context.service.js';
+import { withUserContext } from '@/services/database/user-context.service.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
+import type { UserContext } from '@/api/middlewares/auth.js';
 import type {
   VectorSearchMetric,
   VectorSearchRequest,
@@ -51,7 +52,7 @@ export class VectorSearchService {
     const target = resolveVectorTarget(input);
     const pool = this.dbManager.getPool();
 
-    return withUserContext(pool, ctx, async (client) => {
+    const result = await withUserContext(pool, ctx, async (client) => {
       await client.query('SET statement_timeout = 30000');
       try {
         await this.assertVectorColumn(client, target, input.query_vector.length);
@@ -60,6 +61,7 @@ export class VectorSearchService {
         await client.query('SET statement_timeout = 0').catch(() => {});
       }
     });
+    return result;
   }
 
   private async assertVectorColumn(

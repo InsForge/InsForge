@@ -1,5 +1,5 @@
 import { Router, Response, NextFunction } from 'express';
-import { getUserContextFromReq, AuthRequest, verifyUser } from '@/api/middlewares/auth.js';
+import { AuthRequest, verifyUser, type UserContext } from '@/api/middlewares/auth.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { VectorSearchService } from '@/services/database/vector-search.service.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
@@ -8,6 +8,14 @@ import { vectorSearchRequestSchema } from '@insforge/shared-schemas';
 
 const router = Router();
 const vectorSearchService = VectorSearchService.getInstance();
+
+function getVectorSearchUserContext(req: AuthRequest): UserContext {
+  if (req.hasApiKey) {
+    return { role: 'project_admin' };
+  }
+
+  return req.user ?? { role: 'anon' };
+}
 
 /**
  * POST /api/vector/search
@@ -26,7 +34,7 @@ router.post('/search', verifyUser, async (req: AuthRequest, res: Response, next:
 
     const result = await vectorSearchService.search(
       validationResult.data,
-      getUserContextFromReq(req)
+      getVectorSearchUserContext(req)
     );
     successResponse(res, result);
   } catch (error) {

@@ -1,19 +1,13 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { NextFunction, Response } from 'express';
 
-const { searchMock, verifyUserMock, getUserContextFromReqMock } = vi.hoisted(() => ({
+const { searchMock, verifyUserMock } = vi.hoisted(() => ({
   searchMock: vi.fn(),
   verifyUserMock: vi.fn((_req, _res, next) => next()),
-  getUserContextFromReqMock: vi.fn(() => ({
-    userId: 'user-1',
-    email: 'user@example.com',
-    role: 'authenticated',
-  })),
 }));
 
 vi.mock('../../src/api/middlewares/auth', () => ({
   verifyUser: verifyUserMock,
-  getUserContextFromReq: getUserContextFromReqMock,
 }));
 
 vi.mock('../../src/services/database/vector-search.service', () => ({
@@ -67,7 +61,10 @@ function createResponse() {
 
 async function invokeSearchRoute(body: unknown) {
   const [authHandler, routeHandler] = getSearchHandlers();
-  const req = { body };
+  const req = {
+    body,
+    user: { id: 'user-1', email: 'user@example.com', role: 'authenticated' },
+  };
   const res = createResponse();
   const next = vi.fn() as unknown as NextFunction;
 
@@ -81,11 +78,6 @@ describe('vector search routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     verifyUserMock.mockImplementation((_req, _res, next) => next());
-    getUserContextFromReqMock.mockReturnValue({
-      userId: 'user-1',
-      email: 'user@example.com',
-      role: 'authenticated',
-    });
   });
 
   it('registers auth before the POST /search handler', () => {
@@ -122,7 +114,7 @@ describe('vector search routes', () => {
         include_vector: false,
       },
       {
-        userId: 'user-1',
+        id: 'user-1',
         email: 'user@example.com',
         role: 'authenticated',
       }
