@@ -15,6 +15,7 @@ describe('TokenManager.verifyCloudToken', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    (TokenManager as unknown as { instance?: TokenManager }).instance = undefined;
     process.env = {
       ...oldEnv,
       PROJECT_ID: 'project_123',
@@ -26,6 +27,7 @@ describe('TokenManager.verifyCloudToken', () => {
 
   afterAll(() => {
     process.env = oldEnv;
+    (TokenManager as unknown as { instance?: TokenManager }).instance = undefined;
   });
 
   it('returns payload and projectId if valid', async () => {

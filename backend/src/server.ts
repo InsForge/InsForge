@@ -36,6 +36,7 @@ import { seedBackend } from '@/utils/seed.js';
 import logger from '@/utils/logger.js';
 import { initSqlParser } from '@/utils/sql-parser.js';
 import { FunctionService } from '@/services/functions/function.service.js';
+import { TokenManager } from '@/infra/security/token.manager.js';
 import packageJson from '../../package.json';
 import { schedulesRouter } from '@/api/routes/schedules/index.routes.js';
 import { servicesRouter } from '@/api/routes/compute/services.routes.js';
@@ -78,6 +79,7 @@ export async function createApp() {
 
   // Initialize SQL parser WASM module
   await initSqlParser();
+  await TokenManager.getInstance().initialize();
 
   const app = express();
 
@@ -224,6 +226,11 @@ export async function createApp() {
 
   // Mount all API routes under /api prefix
   app.use('/api', apiRouter);
+
+  app.get('/.well-known/jwks.json', (_req: Request, res: Response) => {
+    res.set('Cache-Control', 'public, max-age=300');
+    res.json(TokenManager.getInstance().getPublicJwks());
+  });
 
   // Proxy function execution to Deno Subhosting or local runtime
   // this logic is used for backward compatibility, we will let the sdk directly call the edge function

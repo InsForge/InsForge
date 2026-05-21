@@ -92,9 +92,10 @@ export class SecretService {
   /**
    * Get a decrypted secret by key
    */
-  async getSecretByKey(key: string): Promise<string | null> {
+  async getSecretByKey(key: string, client?: PoolClient): Promise<string | null> {
     try {
-      const result = await this.getPool().query(
+      const executor = client ?? this.getPool();
+      const result = await executor.query(
         `UPDATE system.secrets
          SET last_used_at = NOW()
          WHERE key = $1 AND is_active = true
