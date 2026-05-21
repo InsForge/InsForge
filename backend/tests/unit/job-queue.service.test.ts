@@ -94,7 +94,7 @@ describe('JobQueue', () => {
       },
       {
         maxAttempts: 2,
-        retryDelayMs: 1,
+        retryDelayMs: 0,
       }
     );
 
