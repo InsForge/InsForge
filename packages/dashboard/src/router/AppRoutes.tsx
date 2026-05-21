@@ -15,6 +15,7 @@ import DashboardPage from '#features/dashboard/pages/DashboardPage';
 import DTestDashboardPage from '#features/dashboard/pages/DTestDashboardPage';
 import DTestInstallPage from '#features/dashboard/pages/DTestInstallPage';
 import DatabaseLayout from '#features/database/components/DatabaseLayout';
+import AdvisorsPage from '#features/database/pages/AdvisorsPage';
 import SQLEditorLayout from '#features/database/components/SQLEditorLayout';
 import BackupsPage from '#features/database/pages/BackupsPage';
 import DatabaseFunctionsPage from '#features/database/pages/FunctionsPage';
@@ -88,6 +89,7 @@ function AuthenticatedRoutes() {
           <Route path="functions" element={<DatabaseFunctionsPage />} />
           <Route path="triggers" element={<TriggersPage />} />
           <Route path="policies" element={<PoliciesPage />} />
+          <Route path="advisors" element={<AdvisorsPage />} />
           <Route path="sql-editor" element={<Navigate to="/dashboard/sql-editor" replace />} />
           <Route path="templates" element={<TemplatesPage />} />
           <Route path="migrations" element={<MigrationsPage />} />

@@ -41,6 +41,7 @@
                 "pages": [
                   "core-concepts/database/architecture",
                   "core-concepts/database/migrations",
+                  "core-concepts/database/advisors",
                   "core-concepts/database/branching",
                   "core-concepts/database/pgvector"
                 ]
@@ -208,6 +209,10 @@
           {
             "group": "Records",
             "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/records.yaml"
+          },
+          {
+            "group": "Advisor",
+            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/advisor.yaml"
           },
           {
             "group": "Storage",
