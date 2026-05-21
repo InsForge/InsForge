@@ -7,10 +7,10 @@ import {
 import { verifyUser, verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
-import { PosthogService } from '@/services/posthog/posthog.service.js';
+import { AnalyticsService } from '@/services/analytics/analytics.service.js';
 
-export const posthogRouter = Router();
-const service = new PosthogService();
+export const analyticsRouter = Router();
+const service = new AnalyticsService();
 
 const MAX_LIMIT = 100;
 
@@ -22,8 +22,8 @@ function parseLimit(raw: unknown): number {
   return Math.min(n, MAX_LIMIT);
 }
 
-// GET /api/integrations/posthog/connection
-posthogRouter.get(
+// GET /api/analytics/connection
+analyticsRouter.get(
   '/connection',
   verifyUser,
   async (_req: AuthRequest, res: Response, next: NextFunction) => {
@@ -40,8 +40,8 @@ posthogRouter.get(
   }
 );
 
-// GET /api/integrations/posthog/dashboards
-posthogRouter.get(
+// GET /api/analytics/dashboards
+analyticsRouter.get(
   '/dashboards',
   verifyUser,
   async (_req: AuthRequest, res: Response, next: NextFunction) => {
@@ -54,8 +54,8 @@ posthogRouter.get(
   }
 );
 
-// GET /api/integrations/posthog/summary
-posthogRouter.get(
+// GET /api/analytics/summary
+analyticsRouter.get(
   '/summary',
   verifyUser,
   async (_req: AuthRequest, res: Response, next: NextFunction) => {
@@ -68,8 +68,8 @@ posthogRouter.get(
   }
 );
 
-// GET /api/integrations/posthog/events
-posthogRouter.get(
+// GET /api/analytics/events
+analyticsRouter.get(
   '/events',
   verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -82,8 +82,8 @@ posthogRouter.get(
   }
 );
 
-// DELETE /api/integrations/posthog/connection
-posthogRouter.delete(
+// DELETE /api/analytics/connection
+analyticsRouter.delete(
   '/connection',
   verifyAdmin,
   async (_req: AuthRequest, res: Response, next: NextFunction) => {
@@ -98,10 +98,10 @@ posthogRouter.delete(
 
 // v2.5 analytics dashboard endpoints — proxy to cloud-backend, which talks to
 // PostHog. Auth/auth checks remain on this side via verifyUser; project
-// authority comes from the project JWT signed by CloudPosthogProvider.
+// authority comes from the project JWT signed by PostHogProvider.
 
-// GET /api/integrations/posthog/web-overview?timeframe=7d
-posthogRouter.get(
+// GET /api/analytics/web-overview?timeframe=7d
+analyticsRouter.get(
   '/web-overview',
   verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -118,8 +118,8 @@ posthogRouter.get(
   }
 );
 
-// GET /api/integrations/posthog/web-stats?breakdown=Page&timeframe=7d
-posthogRouter.get(
+// GET /api/analytics/web-stats?breakdown=Page&timeframe=7d
+analyticsRouter.get(
   '/web-stats',
   verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -140,8 +140,8 @@ posthogRouter.get(
   }
 );
 
-// GET /api/integrations/posthog/trends?metric=views&timeframe=7d
-posthogRouter.get(
+// GET /api/analytics/trends?metric=views&timeframe=7d
+analyticsRouter.get(
   '/trends',
   verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -162,9 +162,9 @@ posthogRouter.get(
   }
 );
 
-// GET /api/integrations/posthog/retention
+// GET /api/analytics/retention
 // Decoupled from page-level timeframe per design — always Week/8.
-posthogRouter.get(
+analyticsRouter.get(
   '/retention',
   verifyUser,
   async (_req: AuthRequest, res: Response, next: NextFunction) => {
@@ -177,8 +177,8 @@ posthogRouter.get(
   }
 );
 
-// GET /api/integrations/posthog/recordings?limit=10
-posthogRouter.get(
+// GET /api/analytics/recordings?limit=10
+analyticsRouter.get(
   '/recordings',
   verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -191,8 +191,8 @@ posthogRouter.get(
   }
 );
 
-// POST /api/integrations/posthog/recordings/:id/share
-posthogRouter.post(
+// POST /api/analytics/recordings/:id/share
+analyticsRouter.post(
   '/recordings/:id/share',
   verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {

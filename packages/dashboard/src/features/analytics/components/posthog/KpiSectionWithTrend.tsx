@@ -12,7 +12,7 @@ import type { PosthogWebOverviewItem } from '@insforge/shared-schemas';
 import { useTimeframe } from '#features/analytics/context/TimeRangeContext';
 import { useWebOverview } from '#features/analytics/hooks/useWebOverview';
 import { useTrend } from '#features/analytics/hooks/useTrend';
-import type { TrendMetric } from '#features/analytics/services/posthog.api';
+import type { TrendMetric } from '#features/analytics/services/analytics.service';
 import {
   formatNumber,
   formatPercent,

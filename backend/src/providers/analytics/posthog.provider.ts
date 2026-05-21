@@ -25,16 +25,27 @@ import {
   type PosthogRecordingsResponse,
   type PosthogShareTokenResponse,
 } from '@insforge/shared-schemas';
-import type { PosthogProvider } from './base.provider.js';
 
-export class CloudPosthogProvider implements PosthogProvider {
-  private static instance: CloudPosthogProvider;
+export class PostHogProvider {
+  private static instance: PostHogProvider;
   private constructor() {}
-  static getInstance(): CloudPosthogProvider {
-    if (!CloudPosthogProvider.instance) {
-      CloudPosthogProvider.instance = new CloudPosthogProvider();
+  static getInstance(): PostHogProvider {
+    if (!PostHogProvider.instance) {
+      PostHogProvider.instance = new PostHogProvider();
     }
-    return CloudPosthogProvider.instance;
+    return PostHogProvider.instance;
+  }
+
+  private isEnabled(): boolean {
+    return !!config.cloud.projectId && config.cloud.projectId !== 'local';
+  }
+
+  private throwUnsupported(): never {
+    throw new AppError(
+      'PostHog integration is only available on Insforge Cloud, not in self-hosted mode.',
+      501,
+      ERROR_CODES.NOT_IMPLEMENTED
+    );
   }
 
   private signToken(): string {
@@ -66,6 +77,9 @@ export class CloudPosthogProvider implements PosthogProvider {
   }
 
   async getConnection(): Promise<PosthogConnection | null> {
+    if (!this.isEnabled()) {
+      this.throwUnsupported();
+    }
     let data: unknown;
     try {
       const response = await axios.get(this.url('/posthog/connection'), {
@@ -96,6 +110,9 @@ export class CloudPosthogProvider implements PosthogProvider {
   }
 
   async getDashboards(): Promise<PosthogDashboardsResponse> {
+    if (!this.isEnabled()) {
+      this.throwUnsupported();
+    }
     let data: unknown;
     try {
       const response = await axios.get(this.url('/posthog/dashboards'), {
@@ -126,6 +143,9 @@ export class CloudPosthogProvider implements PosthogProvider {
   }
 
   async getSummary(): Promise<PosthogSummary> {
+    if (!this.isEnabled()) {
+      this.throwUnsupported();
+    }
     let data: unknown;
     try {
       const response = await axios.get(this.url('/posthog/summary'), {
@@ -156,6 +176,9 @@ export class CloudPosthogProvider implements PosthogProvider {
   }
 
   async getRecentEvents(limit = 10): Promise<PosthogEventsResponse> {
+    if (!this.isEnabled()) {
+      this.throwUnsupported();
+    }
     let data: unknown;
     try {
       const response = await axios.get(this.url('/posthog/events'), {
@@ -187,6 +210,9 @@ export class CloudPosthogProvider implements PosthogProvider {
   }
 
   async disconnect(): Promise<void> {
+    if (!this.isEnabled()) {
+      this.throwUnsupported();
+    }
     try {
       await axios.delete(this.url('/posthog/connection'), {
         headers: this.headers(),
@@ -199,6 +225,9 @@ export class CloudPosthogProvider implements PosthogProvider {
   }
 
   async getWebOverview(timeframe: string): Promise<PosthogWebOverviewResponse> {
+    if (!this.isEnabled()) {
+      this.throwUnsupported();
+    }
     let data: unknown;
     try {
       const response = await axios.get(this.url('/posthog/web-overview'), {
@@ -230,6 +259,9 @@ export class CloudPosthogProvider implements PosthogProvider {
   }
 
   async getWebStats(breakdown: string, timeframe: string): Promise<PosthogWebStatsResponse> {
+    if (!this.isEnabled()) {
+      this.throwUnsupported();
+    }
     let data: unknown;
     try {
       const response = await axios.get(this.url('/posthog/web-stats'), {
@@ -261,6 +293,9 @@ export class CloudPosthogProvider implements PosthogProvider {
   }
 
   async getTrends(metric: string, timeframe: string): Promise<PosthogTrendsResponse> {
+    if (!this.isEnabled()) {
+      this.throwUnsupported();
+    }
     let data: unknown;
     try {
       const response = await axios.get(this.url('/posthog/trends'), {
@@ -292,6 +327,9 @@ export class CloudPosthogProvider implements PosthogProvider {
   }
 
   async getRetention(): Promise<PosthogRetentionResponse> {
+    if (!this.isEnabled()) {
+      this.throwUnsupported();
+    }
     let data: unknown;
     try {
       const response = await axios.get(this.url('/posthog/retention'), {
@@ -322,6 +360,9 @@ export class CloudPosthogProvider implements PosthogProvider {
   }
 
   async getRecordings(limit = 10): Promise<PosthogRecordingsResponse> {
+    if (!this.isEnabled()) {
+      this.throwUnsupported();
+    }
     let data: unknown;
     try {
       const response = await axios.get(this.url('/posthog/recordings'), {
@@ -353,6 +394,9 @@ export class CloudPosthogProvider implements PosthogProvider {
   }
 
   async createRecordingShare(recordingId: string): Promise<PosthogShareTokenResponse> {
+    if (!this.isEnabled()) {
+      this.throwUnsupported();
+    }
     let data: unknown;
     try {
       const response = await axios.post(

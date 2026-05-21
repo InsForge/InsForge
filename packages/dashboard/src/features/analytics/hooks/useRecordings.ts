@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { posthogApi } from '#features/analytics/services/posthog.api';
+import { analyticsService } from '#features/analytics/services/analytics.service';
 
 export function useRecordings(limit: number, enabled: boolean) {
   return useQuery({
     queryKey: ['posthog', 'recordings', limit],
-    queryFn: () => posthogApi.getRecordings(limit),
+    queryFn: () => analyticsService.getRecordings(limit),
     enabled,
     staleTime: 60_000,
   });

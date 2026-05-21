@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { posthogApi } from '#features/analytics/services/posthog.api';
+import { analyticsService } from '#features/analytics/services/analytics.service';
 
 export function usePosthogConnection() {
   return useQuery({
     queryKey: ['posthog', 'connection'],
-    queryFn: () => posthogApi.getConnection(),
+    queryFn: () => analyticsService.getConnection(),
     staleTime: 30_000,
   });
 }
