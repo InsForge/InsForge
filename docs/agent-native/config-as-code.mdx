@@ -30,7 +30,7 @@ This works the same way on InsForge Cloud projects and on self-hosted OSS deploy
 | `config export` | Pull live config and write `insforge.toml` |
 | `config export --force` | Overwrite an existing `insforge.toml` without confirmation |
 
-All three commands accept `--file <path>` / `--out <path>` if your TOML lives somewhere other than `./insforge.toml`.
+`config plan` and `config apply` read `insforge.toml`; pass `--file <path>` if it lives somewhere other than `./insforge.toml`. `config export` writes the file; pass `--out <path>` to write it to a custom location.
 
 ## Recommended workflow
 
@@ -195,7 +195,7 @@ This is what lets one `insforge.toml` apply cleanly to multiple environments: th
 
 **`Refusing to apply in --json mode without --auto-approve or --yes`.** The CLI never silently applies changes in non-interactive runs. Pass `--auto-approve` (or `-y`) explicitly.
 
-**`your backend doesn't expose <section>`.** The linked backend is on a version that doesn't have the relevant API yet. The rest of your changes still applied, upgrade the backend (or wait for the next release) to apply that section.
+**`your backend doesn't expose <section>`.** The linked backend is on a version that doesn't have the relevant API yet. The rest of your changes still applied. Upgrade the backend (or wait for the next release) to apply that section.
 
 **`env(...)` reference resolves to nothing.** The CLI aborts before any API call when a referenced env var is missing. Set the variable in your shell or your CI's secret store and re-run.
 

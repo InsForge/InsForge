@@ -61,7 +61,26 @@ limit 5;
 
 ## Specific usage cases
 
-Wrap search in a Postgres function and call it via `rpc()` to keep math server-side. Past ~10k rows, add an HNSW index.
+Wrap search in a Postgres function and call it via `rpc()` to keep the math server-side:
+
+```sql
+create or replace function match_documents(
+  query_embedding vector(1536),
+  match_count int default 5,
+  match_threshold float default 0
+)
+returns table (id bigint, content text, similarity float)
+language sql stable
+as $$
+  select id, content, 1 - (embedding <=> query_embedding) as similarity
+  from documents
+  where 1 - (embedding <=> query_embedding) > match_threshold
+  order by embedding <=> query_embedding
+  limit match_count;
+$$;
+```
+
+Past ~10k rows, add an HNSW index:
 
 ```sql
 create index on documents using hnsw (embedding vector_cosine_ops);

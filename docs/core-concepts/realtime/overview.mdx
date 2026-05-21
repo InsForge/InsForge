@@ -4,7 +4,7 @@ sidebarTitle: "Overview"
 description: "Stream Postgres changes and broadcast messages over one WebSocket."
 ---
 
-Use InsForge Realtime to stream Postgres row changes, broadcast messages between clients, and track presence on one WebSocket connection. Subscriptions enforce the same row-level security policies as REST queries, so a client only sees the changes its session is allowed to read.
+Use InsForge Realtime to stream Postgres row changes, broadcast messages between clients, and track presence on one WebSocket connection. Clients subscribe to named channels like `orders:123` or `chat:room-1`; row changes reach those channels through database triggers that publish onto them.
 
 <Note>
   **Need to react to changes on the server?** Use [Edge Functions](/core-concepts/functions/overview) with database triggers. Realtime is for clients that want to watch; Edge Functions are for code that responds.
@@ -12,11 +12,11 @@ Use InsForge Realtime to stream Postgres row changes, broadcast messages between
 
 ```mermaid
 graph TB
-    Changes[Postgres Changes] --> RT[Realtime Service]
+    Changes[DB Triggers] -->|realtime.publish| RT[Realtime Service]
     Broadcast[Broadcast Messages] --> RT
     Presence[Presence] --> RT
 
-    RLS[RLS Policies] -.->|scopes access| RT
+    RLS["RLS on channels and messages"] -.->|gates access| RT
 
     RT --> WS[Single WebSocket]
     WS --> SDK[InsForge SDK]
@@ -36,7 +36,7 @@ graph TB
 
 ### Postgres changes
 
-Subscribe to `INSERT`, `UPDATE`, and `DELETE` events on any table the user is allowed to read. Row-level filters and column selection happen server-side; payloads only contain rows the session is authorized to see.
+Mirror table writes to clients with a database trigger that calls `realtime.publish(channel, event, payload)`. The trigger decides which channel each `INSERT`, `UPDATE`, or `DELETE` lands on and what the payload carries, so a row change arrives as an event on a channel your clients already subscribe to.
 
 ### Broadcast
 
@@ -48,7 +48,7 @@ Track which clients are currently online in a channel and what state they hold (
 
 ### Row-level security
 
-Channel access reads the same JWT as REST and storage requests. The same RLS policy that scopes a `SELECT` scopes the stream, so a channel needs no permission rules of its own.
+By default any client can subscribe to any channel. Enable RLS on `realtime.channels` to gate who can subscribe (a `SELECT` policy) and on `realtime.messages` to gate who can publish (an `INSERT` policy). Both read the same JWT as REST and storage requests.
 
 ### One connection
 
