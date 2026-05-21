@@ -10,7 +10,7 @@ vi.mock('../../src/api/middlewares/auth', () => ({
   verifyUser: verifyUserMock,
 }));
 
-vi.mock('../../src/services/database/vector-search.service', () => ({
+vi.mock('../../src/services/database/vectorSearch.service', () => ({
   VectorSearchService: {
     getInstance: () => ({
       search: searchMock,
@@ -59,11 +59,13 @@ function createResponse() {
   return response;
 }
 
-async function invokeSearchRoute(body: unknown) {
+async function invokeSearchRoute(body: unknown, requestOverrides: Record<string, unknown> = {}) {
   const [authHandler, routeHandler] = getSearchHandlers();
   const req = {
     body,
     user: { id: 'user-1', email: 'user@example.com', role: 'authenticated' },
+    hasApiKey: false,
+    ...requestOverrides,
   };
   const res = createResponse();
   const next = vi.fn() as unknown as NextFunction;
@@ -121,6 +123,40 @@ describe('vector search routes', () => {
     );
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith(serviceResult);
+    expect(next).not.toHaveBeenCalledWith(expect.any(Error));
+  });
+
+  it('uses project admin context when authenticated by API key', async () => {
+    const serviceResult = {
+      matches: [],
+      count: 0,
+      metric: 'cosine' as const,
+    };
+    searchMock.mockResolvedValueOnce(serviceResult);
+
+    const { next } = await invokeSearchRoute(
+      {
+        table: 'documents',
+        column: 'embedding',
+        query_vector: [0.1, 0.2, 0.3],
+        top_k: 3,
+        metric: 'cosine',
+        include_vector: false,
+      },
+      {
+        hasApiKey: true,
+        user: undefined,
+      }
+    );
+
+    expect(searchMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        table: 'documents',
+        column: 'embedding',
+        query_vector: [0.1, 0.2, 0.3],
+      }),
+      { role: 'project_admin' }
+    );
     expect(next).not.toHaveBeenCalledWith(expect.any(Error));
   });
 
