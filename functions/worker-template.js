@@ -11,19 +11,60 @@
 // We polyfill Deno.env and process.env BEFORE any imports using Top-Level Await.
 // This prevents libraries (like 'debug') from triggering 'NotCapable' errors
 // when using a strict native whitelist (env: false).
-const MODULE_CONTEXT_KEY = '__INSFORGE_FUNCTION_CONTEXT__';
 const sterileEnv = {
   NODE_ENV: 'production',
 };
+let activeSecretAccessors;
 
-function getActiveFunctionContext() {
-  return globalThis[MODULE_CONTEXT_KEY];
+function getActiveSecret(key) {
+  return activeSecretAccessors?.get(key);
+}
+
+function hasActiveSecret(key) {
+  return activeSecretAccessors?.has(key) ?? false;
+}
+
+function createProcessEnv(secretAccessors) {
+  return new Proxy(
+    {},
+    {
+      get: (_target, key) => {
+        if (typeof key !== 'string') {
+          return undefined;
+        }
+        return secretAccessors.get(key) ?? sterileEnv[key];
+      },
+      has: (_target, key) =>
+        typeof key === 'string' && (key in sterileEnv || secretAccessors.has(key)),
+      ownKeys: () => Reflect.ownKeys(sterileEnv),
+      getOwnPropertyDescriptor: (_target, key) => {
+        if (typeof key !== 'string') {
+          return undefined;
+        }
+        const value = key in sterileEnv ? sterileEnv[key] : secretAccessors.get(key);
+        return value === undefined
+          ? undefined
+          : {
+              configurable: true,
+              enumerable: key in sterileEnv,
+              value,
+              writable: false,
+            };
+      },
+      set: () => {
+        throw new Error('process.env mutation is disabled');
+      },
+      deleteProperty: () => {
+        throw new Error('process.env deletion is disabled');
+      },
+    }
+  );
 }
 
 try {
   // Shadow Deno.env with a pure JS implementation
   const mockDenoEnv = {
-    get: (key) => getActiveFunctionContext()?.secrets?.[key] ?? sterileEnv[key] ?? undefined,
+    get: (key) => getActiveSecret(key) ?? sterileEnv[key] ?? undefined,
     set: () => {
       throw new Error('Deno.env.set is disabled');
     },
@@ -31,7 +72,7 @@ try {
       throw new Error('Deno.env.delete is disabled');
     },
     toObject: () => ({ ...sterileEnv }),
-    has: (key) => key in sterileEnv || key in (getActiveFunctionContext()?.secrets ?? {}),
+    has: (key) => key in sterileEnv || hasActiveSecret(key),
   };
 
   // Replace global Deno.env
@@ -101,17 +142,20 @@ function installModuleGlobals(context) {
 }
 
 function installModuleContext(context) {
-  const previousContext = globalThis[MODULE_CONTEXT_KEY];
-  globalThis[MODULE_CONTEXT_KEY] = context;
-  const restoreModuleGlobals = installModuleGlobals(context);
+  const { secretAccessors, ...publicContext } = context;
+  const previousSecretAccessors = activeSecretAccessors;
+  const previousProcessEnv = globalThis.process?.env;
+
+  activeSecretAccessors = secretAccessors;
+  if (!globalThis.process) globalThis.process = {};
+  globalThis.process.env = createProcessEnv(secretAccessors);
+
+  const restoreModuleGlobals = installModuleGlobals(publicContext);
 
   return () => {
     restoreModuleGlobals();
-    if (previousContext === undefined) {
-      delete globalThis[MODULE_CONTEXT_KEY];
-    } else {
-      globalThis[MODULE_CONTEXT_KEY] = previousContext;
-    }
+    activeSecretAccessors = previousSecretAccessors;
+    globalThis.process.env = previousProcessEnv ?? { ...sterileEnv };
   };
 }
 
@@ -140,41 +184,56 @@ async function loadEsmFunction(code, context) {
 }
 
 function loadScriptFunction(code, context) {
+  const restoreLoadContext = installModuleContext(context);
+
   /**
    * FUNCTION WRAPPING:
    * Injecting mocks into the user function execution scope.
    * We pass mockDeno instead of the real Deno global.
    */
-  const wrapper = new Function(
-    'exports',
-    'module',
-    'createClient',
-    'Deno',
-    'encodeBase64',
-    'decodeBase64',
-    code
-  );
-  const exports = {};
-  const module = { exports };
+  try {
+    const wrapper = new Function(
+      'exports',
+      'module',
+      'createClient',
+      'Deno',
+      'encodeBase64',
+      'decodeBase64',
+      code
+    );
+    const exports = {};
+    const module = { exports };
 
-  // Execute the wrapper, passing mockDeno as the Deno global
-  wrapper(
-    exports,
-    module,
-    context.createClient,
-    context.Deno,
-    context.encodeBase64,
-    context.decodeBase64
-  );
+    // Execute the wrapper, passing mockDeno as the Deno global
+    wrapper(
+      exports,
+      module,
+      context.createClient,
+      context.Deno,
+      context.encodeBase64,
+      context.decodeBase64
+    );
 
-  // Get the exported function
-  const functionHandler = module.exports || exports.default || exports;
+    // Get the exported function
+    const functionHandler = module.exports || exports.default || exports;
 
-  if (typeof functionHandler !== 'function') {
-    throw new Error('No function exported. Expected: module.exports = async function(req) { ... }');
+    if (typeof functionHandler !== 'function') {
+      throw new Error(
+        'No function exported. Expected: module.exports = async function(req) { ... }'
+      );
+    }
+
+    return async (...args) => {
+      const restoreExecutionContext = installModuleContext(context);
+      try {
+        return await functionHandler(...args);
+      } finally {
+        restoreExecutionContext();
+      }
+    };
+  } finally {
+    restoreLoadContext();
   }
-
-  return functionHandler;
 }
 
 // Handle the single message with code, request data, and secrets
@@ -206,13 +265,17 @@ self.onmessage = async (e) => {
         throw new Error('Deno.Command is natively disabled');
       },
     };
+    const secretAccessors = {
+      get: (key) => secrets[key] ?? undefined,
+      has: (key) => Object.prototype.hasOwnProperty.call(secrets, key),
+    };
 
     const context = {
       createClient,
       Deno: mockDeno,
       encodeBase64,
       decodeBase64,
-      secrets,
+      secretAccessors,
     };
 
     const functionHandler = isModuleSource(code)
