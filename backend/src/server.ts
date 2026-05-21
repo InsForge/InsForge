@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import type { Server } from 'http';
 import authRouter from '@/api/routes/auth/index.routes.js';
 import databaseRouter from '@/api/routes/database/index.routes.js';
 import { storageRouter } from '@/api/routes/storage/index.routes.js';
@@ -43,6 +44,7 @@ import { servicesRouter } from '@/api/routes/compute/services.routes.js';
 import { analyticsRouter } from '@/api/routes/analytics/index.routes.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+let httpServer: Server | undefined;
 
 function shouldSkipGlobalRateLimit(req: Request): boolean {
   if (req.path === '/api/health') {
@@ -328,6 +330,7 @@ async function initializeServer() {
     const server = app.listen(PORT, () => {
       logger.info(`Backend API service listening on port ${PORT}`);
     });
+    httpServer = server;
 
     // Initialize Socket.IO service
     const socketService = SocketManager.getInstance();
@@ -355,8 +358,41 @@ async function initializeServer() {
 
 void initializeServer();
 
+function closeServer(server: Server): Promise<void> {
+  return new Promise((resolve, reject) => {
+    server.close((error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
 async function cleanup() {
   logger.info('Shutting down gracefully...');
+
+  try {
+    const socketService = SocketManager.getInstance();
+    socketService.close();
+  } catch (error) {
+    logger.error('Error closing SocketManager', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  try {
+    if (httpServer) {
+      logger.info('Stopping HTTP server before draining background jobs...');
+      await closeServer(httpServer);
+      httpServer = undefined;
+    }
+  } catch (error) {
+    logger.error('Error closing HTTP server', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   try {
     await JobQueue.drainExisting(5_000);
@@ -371,15 +407,6 @@ async function cleanup() {
     await realtimeManager.close();
   } catch (error) {
     logger.error('Error closing RealtimeManager', {
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-
-  try {
-    const socketService = SocketManager.getInstance();
-    socketService.close();
-  } catch (error) {
-    logger.error('Error closing SocketManager', {
       error: error instanceof Error ? error.message : String(error),
     });
   }
