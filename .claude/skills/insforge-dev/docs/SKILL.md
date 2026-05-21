@@ -27,6 +27,7 @@ The documentation in this repo is primarily product documentation for InsForge u
 
 2. Match the writing style to the audience.
    - Public docs should be human-friendly and explain the implementation clearly.
+   - Keep public docs human-sounding: avoid AI-writing tells such as em dashes, rule-of-three lists, "not just X but Y" parallelism, inflated significance, vague attribution, and AI vocabulary (delve, leverage, underscore, seamless, robust). See the `doc-author` skill's `INSFORGE.md` overlay, "Sound human, not AI-generated".
    - `architecture.md` pages in `docs/core-concepts/` should explain how the feature works in detail.
    - Agent docs in `docs/agent-docs/` should be instruction-first and execution-oriented.
    - Agent docs should avoid explanatory filler and focus on the exact steps an agent should follow to complete the work.
