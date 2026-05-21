@@ -9,6 +9,7 @@ export interface EnqueueJobOptions {
   maxAttempts?: number;
   retryDelayMs?: number;
   retryBackoffMultiplier?: number;
+  onPermanentFailure?: (error: Error) => Promise<void> | void;
 }
 
 export interface JobSnapshot<TPayload = unknown> {
@@ -32,6 +33,7 @@ interface QueuedJob<TPayload = unknown> extends JobSnapshot<TPayload> {
   handler: JobHandler;
   retryDelayMs: number;
   retryBackoffMultiplier: number;
+  onPermanentFailure?: (error: Error) => Promise<void> | void;
   sequence: number;
 }
 
@@ -101,6 +103,7 @@ export class JobQueue {
       maxAttempts: Math.max(1, options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS),
       retryDelayMs: Math.max(0, options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS),
       retryBackoffMultiplier: Math.max(1, options.retryBackoffMultiplier ?? 2),
+      onPermanentFailure: options.onPermanentFailure,
       createdAt: now,
       updatedAt: now,
       runAt: now,
@@ -280,6 +283,18 @@ export class JobQueue {
           error: message,
         });
       } else {
+        if (job.onPermanentFailure) {
+          try {
+            await job.onPermanentFailure(error instanceof Error ? error : new Error(message));
+          } catch (cleanupError) {
+            logger.error('Background job permanent-failure cleanup failed', {
+              jobId: job.id,
+              type: job.type,
+              error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+            });
+          }
+        }
+
         job.status = 'failed';
         this.recordHistory(job);
         logger.error('Background job failed permanently', {
@@ -300,6 +315,7 @@ export class JobQueue {
       handler: _handler,
       retryDelayMs: _retryDelayMs,
       retryBackoffMultiplier: _retryBackoffMultiplier,
+      onPermanentFailure: _onPermanentFailure,
       sequence: _sequence,
       payload: _payload,
       ...snapshot

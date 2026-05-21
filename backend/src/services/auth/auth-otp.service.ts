@@ -160,6 +160,33 @@ export class AuthOTPService {
   }
 
   /**
+   * Delete an active email OTP for a purpose.
+   *
+   * Background auth-email jobs use this when delivery permanently fails so the
+   * database does not retain a code or link token that was never successfully
+   * delivered to the user.
+   */
+  async deleteEmailOTP(email: string, purpose: OTPPurpose, expiresAt?: Date): Promise<void> {
+    try {
+      if (expiresAt) {
+        await this.getPool().query(
+          'DELETE FROM auth.email_otps WHERE email = $1 AND purpose = $2 AND expires_at = $3',
+          [email, purpose, expiresAt]
+        );
+      } else {
+        await this.getPool().query(
+          'DELETE FROM auth.email_otps WHERE email = $1 AND purpose = $2',
+          [email, purpose]
+        );
+      }
+      logger.info('Deleted undelivered email verification token', { purpose });
+    } catch (error) {
+      logger.error('Failed to delete email verification token', { error, purpose });
+      throw new AppError('Failed to delete verification token', 500, ERROR_CODES.INTERNAL_ERROR);
+    }
+  }
+
+  /**
    * Verify a numeric OTP code (6 digits)
    * Looks up by email and verifies the bcrypt-hashed code
    *

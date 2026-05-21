@@ -50,6 +50,13 @@ import {
   type VerifyEmailResponse,
 } from '@insforge/shared-schemas';
 
+interface AuthEmailTemplateVariables {
+  variables: Record<string, string>;
+  expiresAt: Date;
+}
+
+type AuthEmailTemplateVariablesFactory = () => Promise<AuthEmailTemplateVariables>;
+
 /**
  * Simplified JWT-based auth service
  * Handles all authentication operations including OAuth
@@ -123,29 +130,44 @@ export class AuthService {
   }
 
   /**
-   * Queue provider delivery after the OTP/token has been created.
+   * Queue auth email delivery and create the OTP/token inside the job.
    *
-   * Keeping token generation synchronous preserves existing auth semantics and
-   * user-enumeration protections, while moving the slow SMTP/provider call off
-   * the request path with retries.
+   * This avoids creating an active auth token before a non-durable in-memory job
+   * is accepted for execution. If delivery permanently fails after retries, the
+   * job cleanup deletes the current token for that email/purpose so users are
+   * not left with an undelivered code or link.
    */
   private enqueueEmailTemplateDelivery(
     email: string,
     name: string,
     template: EmailTemplate,
-    variables: Record<string, string>
+    purpose: OTPPurpose,
+    createVariables: AuthEmailTemplateVariablesFactory
   ): void {
+    let preparedVariables: Record<string, string> | undefined;
+    let preparedExpiresAt: Date | undefined;
+
     const jobId = JobQueue.getInstance().enqueue(
       'email',
-      { email, template },
+      { email, template, purpose },
       async () => {
         const emailService = EmailService.getInstance();
-        await emailService.sendWithTemplate(email, name, template, variables);
+        if (!preparedVariables) {
+          const prepared = await createVariables();
+          preparedVariables = prepared.variables;
+          preparedExpiresAt = prepared.expiresAt;
+        }
+        await emailService.sendWithTemplate(email, name, template, preparedVariables);
       },
       {
         priority: 'high',
         maxAttempts: 3,
         retryDelayMs: 1_000,
+        onPermanentFailure: async () => {
+          if (preparedExpiresAt) {
+            await AuthOTPService.getInstance().deleteEmailOTP(email, purpose, preparedExpiresAt);
+          }
+        },
       }
     );
 
@@ -352,18 +374,21 @@ export class AuthService {
       return;
     }
 
-    // Create numeric OTP code using the OTP service
-    const otpService = AuthOTPService.getInstance();
-    const { otp: code } = await otpService.createEmailOTP(
-      email,
-      OTPPurpose.VERIFY_EMAIL,
-      OTPType.NUMERIC_CODE
-    );
-
     const userName = dbUser.profile?.name || 'User';
-    this.enqueueEmailTemplateDelivery(email, userName, 'email-verification-code', {
-      token: code,
-    });
+    this.enqueueEmailTemplateDelivery(
+      email,
+      userName,
+      'email-verification-code',
+      OTPPurpose.VERIFY_EMAIL,
+      async () => {
+        const { otp: code, expiresAt } = await AuthOTPService.getInstance().createEmailOTP(
+          email,
+          OTPPurpose.VERIFY_EMAIL,
+          OTPType.NUMERIC_CODE
+        );
+        return { variables: { token: code }, expiresAt };
+      }
+    );
   }
 
   /**
@@ -383,21 +408,26 @@ export class AuthService {
       return;
     }
 
-    // Create long cryptographic token for clickable verification link
-    const otpService = AuthOTPService.getInstance();
-    const { otp: token } = await otpService.createEmailOTP(
-      email,
-      OTPPurpose.VERIFY_EMAIL,
-      OTPType.HASH_TOKEN,
-      { redirectTo }
-    );
-
-    const linkUrl = this.buildEmailLink('/api/auth/email/verify-link', token);
-
     const userName = dbUser.profile?.name || 'User';
-    this.enqueueEmailTemplateDelivery(email, userName, 'email-verification-link', {
-      link: linkUrl,
-    });
+    this.enqueueEmailTemplateDelivery(
+      email,
+      userName,
+      'email-verification-link',
+      OTPPurpose.VERIFY_EMAIL,
+      async () => {
+        const { otp: token, expiresAt } = await AuthOTPService.getInstance().createEmailOTP(
+          email,
+          OTPPurpose.VERIFY_EMAIL,
+          OTPType.HASH_TOKEN,
+          { redirectTo }
+        );
+
+        return {
+          variables: { link: this.buildEmailLink('/api/auth/email/verify-link', token) },
+          expiresAt,
+        };
+      }
+    );
   }
 
   /**
@@ -537,18 +567,21 @@ export class AuthService {
       return;
     }
 
-    // Create numeric OTP code using the OTP service
-    const otpService = AuthOTPService.getInstance();
-    const { otp: code } = await otpService.createEmailOTP(
-      email,
-      OTPPurpose.RESET_PASSWORD,
-      OTPType.NUMERIC_CODE
-    );
-
     const userName = dbUser.profile?.name || 'User';
-    this.enqueueEmailTemplateDelivery(email, userName, 'reset-password-code', {
-      token: code,
-    });
+    this.enqueueEmailTemplateDelivery(
+      email,
+      userName,
+      'reset-password-code',
+      OTPPurpose.RESET_PASSWORD,
+      async () => {
+        const { otp: code, expiresAt } = await AuthOTPService.getInstance().createEmailOTP(
+          email,
+          OTPPurpose.RESET_PASSWORD,
+          OTPType.NUMERIC_CODE
+        );
+        return { variables: { token: code }, expiresAt };
+      }
+    );
   }
 
   /**
@@ -567,21 +600,26 @@ export class AuthService {
       return;
     }
 
-    // Create long cryptographic token for clickable reset link
-    const otpService = AuthOTPService.getInstance();
-    const { otp: token } = await otpService.createEmailOTP(
-      email,
-      OTPPurpose.RESET_PASSWORD,
-      OTPType.HASH_TOKEN,
-      { redirectTo }
-    );
-
-    const linkUrl = this.buildEmailLink('/api/auth/email/reset-password-link', token);
-
     const userName = dbUser.profile?.name || 'User';
-    this.enqueueEmailTemplateDelivery(email, userName, 'reset-password-link', {
-      link: linkUrl,
-    });
+    this.enqueueEmailTemplateDelivery(
+      email,
+      userName,
+      'reset-password-link',
+      OTPPurpose.RESET_PASSWORD,
+      async () => {
+        const { otp: token, expiresAt } = await AuthOTPService.getInstance().createEmailOTP(
+          email,
+          OTPPurpose.RESET_PASSWORD,
+          OTPType.HASH_TOKEN,
+          { redirectTo }
+        );
+
+        return {
+          variables: { link: this.buildEmailLink('/api/auth/email/reset-password-link', token) },
+          expiresAt,
+        };
+      }
+    );
   }
 
   /**

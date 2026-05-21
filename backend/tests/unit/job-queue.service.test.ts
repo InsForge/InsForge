@@ -108,6 +108,36 @@ describe('JobQueue', () => {
     });
   });
 
+  it('runs permanent-failure cleanup after retry attempts are exhausted', async () => {
+    const queue = JobQueue.getInstance({ concurrency: 1 });
+    const cleanup = vi.fn();
+
+    queue.enqueue(
+      'email',
+      { email: 'user@example.com' },
+      () => {
+        throw new Error('SMTP down');
+      },
+      {
+        maxAttempts: 2,
+        retryDelayMs: 0,
+        onPermanentFailure: cleanup,
+      }
+    );
+
+    await queue.drain();
+
+    expect(cleanup).toHaveBeenCalledOnce();
+    expect(cleanup.mock.calls[0][0]).toBeInstanceOf(Error);
+    expect(cleanup.mock.calls[0][0]).toMatchObject({ message: 'SMTP down' });
+    expect(queue.getStats()).toMatchObject({
+      queued: 0,
+      running: 0,
+      completed: 0,
+      failed: 1,
+    });
+  });
+
   it('falls back to default concurrency when an explicit value is invalid', async () => {
     const queue = JobQueue.getInstance({ concurrency: 0 });
     const calls: string[] = [];
