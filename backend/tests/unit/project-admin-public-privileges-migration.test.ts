@@ -91,7 +91,12 @@ describe('project admin public privileges migration', () => {
     expect(sql).toMatch(/DROP FUNCTION IF EXISTS public\.create_default_policies\(\) CASCADE/i);
     expect(sql).toMatch(/DROP FUNCTION IF EXISTS public\.create_policies_after_rls\(\) CASCADE/i);
     expect(sql).toMatch(/WHERE policyname = 'project_admin_policy'/i);
-    expect(sql).toMatch(/'project_admin' = ANY\(roles\)/i);
+    expect(sql).not.toMatch(/'project_admin' = ANY\(roles\)/i);
+    expect(sql).toMatch(/AND cmd = 'ALL'/i);
+    expect(sql).toMatch(/AND permissive = 'PERMISSIVE'/i);
+    expect(sql).toMatch(/AND roles = ARRAY\['project_admin'\]::name\[\]/i);
+    expect(sql).toMatch(/AND qual IN \('true', '\(true\)'\)/i);
+    expect(sql).toMatch(/AND with_check IN \('true', '\(true\)'\)/i);
     expect(sql).toMatch(/DROP POLICY IF EXISTS %I ON %I\.%I/i);
   });
 });
