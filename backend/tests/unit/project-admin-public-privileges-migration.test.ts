@@ -35,12 +35,8 @@ describe('project admin public privileges migration', () => {
     expect(sql).toMatch(/IF EXISTS \(SELECT 1 FROM pg_roles WHERE rolname = 'project_admin'\)/i);
     expect(sql).toMatch(/ALTER ROLE project_admin BYPASSRLS/i);
     expect(sql).toMatch(/GRANT ALL ON SCHEMA public TO project_admin/i);
-    expect(sql).toMatch(
-      /GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO project_admin/i
-    );
-    expect(sql).toMatch(
-      /GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO project_admin/i
-    );
+    expect(sql).toMatch(/GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO project_admin/i);
+    expect(sql).toMatch(/GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO project_admin/i);
     expect(sql).toMatch(/GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO project_admin/i);
   });
 
