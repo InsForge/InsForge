@@ -54,3 +54,5 @@ writing"):
 - **AI vocabulary**: delve, leverage, utilize, underscore, foster, realm, landscape, tapestry, seamless, robust, pivotal. Use the plain word.
 
 Read it back. If it sounds like a press release or a term paper, flatten it.
+
+When you're not sure the draft is clean, run the full `humanizer` skill for a deeper pass (or see [blader/humanizer](https://github.com/blader/humanizer)). The rules above are the quick version.
