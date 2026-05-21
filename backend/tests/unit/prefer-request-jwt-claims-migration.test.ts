@@ -58,14 +58,17 @@ function readRepoFiles(
   });
 }
 
-describe('044_prefer-request-jwt-claims migration', () => {
-  const sql = fs.readFileSync(migrationPath, 'utf8');
+function readSql(): string {
+  return fs.readFileSync(migrationPath, 'utf8');
+}
 
+describe('044_prefer-request-jwt-claims migration', () => {
   it('migration file exists', () => {
     expect(fs.existsSync(migrationPath)).toBe(true);
   });
 
   it.each(['uid', 'role', 'email'])('redefines auth.%s with CREATE OR REPLACE', (fnName) => {
+    const sql = readSql();
     expect(sql).toMatch(new RegExp(`CREATE OR REPLACE FUNCTION auth\\.${fnName}\\(\\)`, 'i'));
   });
 
@@ -74,20 +77,24 @@ describe('044_prefer-request-jwt-claims migration', () => {
     ['role', 'role'],
     ['email', 'email'],
   ])('auth.%s reads only canonical auth.jwt() claim %s', (_fnName, claimName) => {
+    const sql = readSql();
     expect(sql).toMatch(
       new RegExp(`SELECT nullif\\(auth\\.jwt\\(\\)\\s*->>\\s*'${claimName}',\\s*''\\)::`, 'i')
     );
   });
 
   it('does not keep legacy dotted claim fallback', () => {
+    const sql = readSql();
     expect(sql).not.toMatch(/request\.jwt\.claim\./i);
   });
 
   it('does not add or replace public helper functions', () => {
+    const sql = readSql();
     expect(sql).not.toMatch(/CREATE OR REPLACE FUNCTION public\./i);
   });
 
   it('grants only missing storage runtime roles required before RLS can evaluate', () => {
+    const sql = readSql();
     expect(sql).toMatch(/GRANT\s+USAGE\s+ON\s+SCHEMA\s+storage\s+TO\s+anon,\s*project_admin/i);
     expect(sql).toMatch(
       /GRANT\s+SELECT,\s*INSERT,\s*UPDATE,\s*DELETE\s+ON\s+storage\.objects\s+TO\s+anon,\s*project_admin/i

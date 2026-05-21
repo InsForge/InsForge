@@ -152,6 +152,29 @@ describe('withUserContext', () => {
     expect(client.release).toHaveBeenCalledOnce();
   });
 
+  it('rejects mixed-case attempts to override centralized JWT settings', async () => {
+    const { client, calls } = makeMockClient();
+    const pool = makeMockPool(client);
+
+    await expect(
+      withUserContext(
+        pool,
+        { id: 'u1', email: 'u1@example.com', role: 'authenticated' },
+        async () => {},
+        { 'Request.Jwt.Claims': '{"sub":"evil"}' }
+      )
+    ).rejects.toThrow(/must not override request\.jwt\.\*/);
+
+    expect(calls.map((c) => c.sql)).toEqual([
+      'BEGIN',
+      'SET LOCAL ROLE authenticated',
+      'SELECT set_config($1, $2, true)',
+      'ROLLBACK',
+      'RESET ROLE',
+    ]);
+    expect(client.release).toHaveBeenCalledOnce();
+  });
+
   it('rolls back and resets role if fn throws', async () => {
     const { client, calls } = makeMockClient();
     const pool = makeMockPool(client);

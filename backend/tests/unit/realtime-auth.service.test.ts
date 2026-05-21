@@ -62,13 +62,20 @@ describe('RealtimeAuthService', () => {
       'COMMIT',
       'RESET ROLE',
     ]);
-    expect(mockClient.query).toHaveBeenCalledWith(
+    const claimsConfigCall = mockClient.query.mock.calls[2];
+    expect(claimsConfigCall).toEqual([
       'SELECT set_config($1, $2, true)',
-      expect.arrayContaining(['request.jwt.claims', expect.any(String)])
-    );
-    expect(mockClient.query).toHaveBeenCalledWith('SELECT set_config($1, $2, true)', [
-      'realtime.channel_name',
-      'chat:lobby',
+      ['request.jwt.claims', expect.any(String)],
+    ]);
+    const claimsConfigParams = claimsConfigCall[1] as [string, string];
+    expect(JSON.parse(claimsConfigParams[1])).toEqual({
+      role: 'authenticated',
+      sub: 'user-1',
+      email: 'user@example.com',
+    });
+    expect(mockClient.query.mock.calls[3]).toEqual([
+      'SELECT set_config($1, $2, true)',
+      ['realtime.channel_name', 'chat:lobby'],
     ]);
     expect(mockClient.release).toHaveBeenCalledOnce();
   });

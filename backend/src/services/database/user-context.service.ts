@@ -55,7 +55,7 @@ export async function withUserContext<T>(
     await setTransactionLocalConfig(client, REQUEST_JWT_CLAIMS_SETTING, JSON.stringify(claims));
     for (const [setting, value] of Object.entries(settings)) {
       if (value !== undefined) {
-        if (setting.startsWith(REQUEST_JWT_SETTING_PREFIX)) {
+        if (setting.toLowerCase().startsWith(REQUEST_JWT_SETTING_PREFIX)) {
           throw new Error(
             `withUserContext: settings must not override ${REQUEST_JWT_SETTING_PREFIX}*`
           );

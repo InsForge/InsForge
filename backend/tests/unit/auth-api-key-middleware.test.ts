@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NextFunction, Response } from 'express';
 import type { AuthRequest } from '../../src/api/middlewares/auth';
 
@@ -23,6 +23,10 @@ describe('verifyApiKey', () => {
   beforeEach(() => {
     vi.resetModules();
     mockVerifyApiKey.mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('sets hasApiKey only after the API key is verified', async () => {
