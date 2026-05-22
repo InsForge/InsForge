@@ -61,7 +61,7 @@ backend/src/providers/storage/local.provider.ts  (new methods throw NOT_IMPLEMEN
 backend/src/services/storage/storage.service.ts  (S3 protocol metadata helpers)
 backend/src/api/routes/storage/index.routes.ts   (add /s3/access-keys CRUD)
 backend/src/server.ts                            (mount order + new route)
-backend/src/types/error-constants.ts             (new codes)
+packages/shared-schemas/src/error-codes.schema.ts      (new codes)
 packages/shared-schemas/src/index.ts             (export new schema)
 ```
 
@@ -264,17 +264,16 @@ git commit -m "feat(s3-gateway): shared schemas for S3 access keys"
 ### Task 4: Add new error codes
 
 **Files:**
-- Modify: `backend/src/types/error-constants.ts`
+- Modify: `packages/shared-schemas/src/error-codes.schema.ts`
 
 - [ ] **Step 1: Add S3 gateway error codes under the STORAGE module section**
 
-Add to the `STORAGE module` block in the enum (see lines 27-32 for existing shape):
+Add to the storage list that feeds `errorCodeSchema`:
 
 ```ts
-  // STORAGE module — S3 gateway
-  S3_ACCESS_KEY_LIMIT_EXCEEDED = 'S3_ACCESS_KEY_LIMIT_EXCEEDED',
-  S3_ACCESS_KEY_NOT_FOUND = 'S3_ACCESS_KEY_NOT_FOUND',
-  S3_PROTOCOL_UNAVAILABLE = 'S3_PROTOCOL_UNAVAILABLE',
+  'S3_ACCESS_KEY_LIMIT_EXCEEDED',
+  'S3_ACCESS_KEY_NOT_FOUND',
+  'S3_PROTOCOL_UNAVAILABLE',
 ```
 
 - [ ] **Step 2: Typecheck**
@@ -288,7 +287,7 @@ Expected: no errors.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add backend/src/types/error-constants.ts
+git add packages/shared-schemas/src/error-codes.schema.ts
 git commit -m "feat(s3-gateway): add S3 gateway error codes"
 ```
 
@@ -384,12 +383,12 @@ import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
 import logger from '@/utils/logger.js';
-import type {
-  S3AccessKeySchema,
-  S3AccessKeyWithSecretSchema,
-  CreateS3AccessKeyRequest,
+import {
+  ERROR_CODES,
+  type S3AccessKeySchema,
+  type S3AccessKeyWithSecretSchema,
+  type CreateS3AccessKeyRequest,
 } from '@insforge/shared-schemas';
 
 const ACCESS_KEY_ID_CHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -1552,7 +1551,7 @@ At the bottom of the `LocalStorageProvider` class, add:
 ```ts
 import { Readable } from 'stream';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { ObjectMetadata, GetObjectResult } from './base.provider.js';
 
   private notImplemented(op: string): never {

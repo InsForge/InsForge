@@ -2,9 +2,9 @@ import { Router, Response, NextFunction } from 'express';
 import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
 import { ScheduleService } from '@/services/schedules/schedule.service.js';
 import { successResponse } from '@/utils/response.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
 import {
+  ERROR_CODES,
   createScheduleRequestSchema,
   updateScheduleRequestSchema,
   getSchedulesConfigResponseSchema,
@@ -77,7 +77,7 @@ router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) =
     const { id } = req.params;
     const schedule = await scheduleService.getScheduleById(id);
     if (!schedule) {
-      throw new AppError('Schedule not found.', 404, ERROR_CODES.NOT_FOUND);
+      throw new AppError('Schedule not found.', 404, ERROR_CODES.SCHEDULE_NOT_FOUND);
     }
     successResponse(res, schedule);
   } catch (error) {

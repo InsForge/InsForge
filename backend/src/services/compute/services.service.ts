@@ -6,10 +6,15 @@ import { FlyProvider } from '@/providers/compute/fly.provider.js';
 import { CloudComputeProvider } from '@/providers/compute/cloud.provider.js';
 import type { ComputeProvider } from '@/providers/compute/compute.provider.js';
 import { config } from '@/infra/config/app.config.js';
-import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
-import type { ServiceSchema } from '@insforge/shared-schemas';
+import {
+  ERROR_CODES,
+  errorCodeSchema,
+  type ErrorCode,
+  type ServiceSchema,
+} from '@insforge/shared-schemas';
+import { NEXT_ACTIONS } from '../../utils/next-actions.js';
 
 export interface CreateServiceInput {
   projectId: string;
@@ -172,12 +177,16 @@ function rewrapCloudError(error: unknown, defaultMessage: string): AppError {
     } catch {
       parsed = undefined;
     }
+    const parsedCode = errorCodeSchema.safeParse(parsed?.code);
+    const fallbackCode = errorCodeSchema.safeParse(error.code);
+    const code: ErrorCode =
+      (parsedCode.success ? parsedCode.data : undefined) ??
+      (fallbackCode.success ? fallbackCode.data : undefined) ??
+      ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED;
     return new AppError(
       parsed?.error ?? error.message,
       error.statusCode,
-      (parsed?.code as keyof typeof ERROR_CODES & string) ??
-        error.code ??
-        ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED,
+      code,
       parsed?.nextActions?.join('; ')
     );
   }
@@ -260,7 +269,7 @@ export class ComputeServicesService {
         'Service not found',
         404,
         ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
-        NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS
+        NEXT_ACTIONS.CHECK_COMPUTE_SERVICE_EXISTS
       );
     }
     return mapRowToSchema(result.rows[0]);
@@ -301,7 +310,7 @@ export class ComputeServicesService {
         'Compute services are not enabled on this project.',
         503,
         ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED,
-        NEXT_ACTION.ENABLE_COMPUTE
+        NEXT_ACTIONS.ENABLE_COMPUTE
       );
     }
 
@@ -419,7 +428,7 @@ export class ComputeServicesService {
         'Compute services are not enabled on this project.',
         503,
         ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED,
-        NEXT_ACTION.ENABLE_COMPUTE
+        NEXT_ACTIONS.ENABLE_COMPUTE
       );
     }
 
@@ -687,7 +696,7 @@ export class ComputeServicesService {
         'Service not found',
         404,
         ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
-        NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS
+        NEXT_ACTIONS.CHECK_COMPUTE_SERVICE_EXISTS
       );
     }
 
@@ -708,7 +717,7 @@ export class ComputeServicesService {
         'Service not found',
         404,
         ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
-        NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS
+        NEXT_ACTIONS.CHECK_COMPUTE_SERVICE_EXISTS
       );
     }
     const row = result.rows[0];
@@ -790,7 +799,7 @@ export class ComputeServicesService {
         'Service not found',
         404,
         ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
-        NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS
+        NEXT_ACTIONS.CHECK_COMPUTE_SERVICE_EXISTS
       );
     }
 
@@ -815,7 +824,7 @@ export class ComputeServicesService {
         'Service not found',
         404,
         ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
-        NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS
+        NEXT_ACTIONS.CHECK_COMPUTE_SERVICE_EXISTS
       );
     }
 
@@ -831,7 +840,7 @@ export class ComputeServicesService {
         'Service not found',
         404,
         ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
-        NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS
+        NEXT_ACTIONS.CHECK_COMPUTE_SERVICE_EXISTS
       );
     }
 
@@ -856,7 +865,7 @@ export class ComputeServicesService {
         'Service not found',
         404,
         ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
-        NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS
+        NEXT_ACTIONS.CHECK_COMPUTE_SERVICE_EXISTS
       );
     }
 
@@ -875,7 +884,7 @@ export class ComputeServicesService {
         'Service not found',
         404,
         ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
-        NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS
+        NEXT_ACTIONS.CHECK_COMPUTE_SERVICE_EXISTS
       );
     }
 

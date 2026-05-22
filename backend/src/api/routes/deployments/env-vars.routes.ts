@@ -4,10 +4,9 @@ import { VercelProvider } from '@/providers/deployments/vercel.provider.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { deploymentsWriteLimiter } from '@/api/middlewares/rate-limiters.js';
 import { AuditService } from '@/services/logs/audit.service.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
 import { successResponse } from '@/utils/response.js';
-import { upsertEnvVarsRequestSchema } from '@insforge/shared-schemas';
+import { ERROR_CODES, upsertEnvVarsRequestSchema } from '@insforge/shared-schemas';
 
 const router = Router();
 const deploymentService = DeploymentService.getInstance();

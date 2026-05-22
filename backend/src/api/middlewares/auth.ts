@@ -1,9 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { TokenManager } from '@/infra/security/token.manager.js';
-import { AppError } from './error.js';
-import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
+import { ERROR_CODES, type RoleSchema } from '@insforge/shared-schemas';
+import { NEXT_ACTIONS } from '../../utils/next-actions.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
-import type { RoleSchema } from '@insforge/shared-schemas';
 
 export type UserContext = {
   id?: string;
@@ -86,7 +86,7 @@ export async function verifyAdmin(req: AuthRequest, res: Response, next: NextFun
         'No admin token provided',
         401,
         ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-        NEXT_ACTION.CHECK_TOKEN
+        NEXT_ACTIONS.CHECK_TOKEN
       );
     }
 
@@ -98,7 +98,7 @@ export async function verifyAdmin(req: AuthRequest, res: Response, next: NextFun
         'Admin access required',
         403,
         ERROR_CODES.AUTH_UNAUTHORIZED,
-        NEXT_ACTION.CHECK_ADMIN_TOKEN
+        NEXT_ACTIONS.CHECK_ADMIN_TOKEN
       );
     }
 
@@ -113,7 +113,7 @@ export async function verifyAdmin(req: AuthRequest, res: Response, next: NextFun
           'Invalid admin token',
           401,
           ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-          NEXT_ACTION.CHECK_ADMIN_TOKEN
+          NEXT_ACTIONS.CHECK_ADMIN_TOKEN
         )
       );
     }
@@ -134,7 +134,7 @@ export async function verifyApiKey(req: AuthRequest, _res: Response, next: NextF
         'No API key provided',
         401,
         ERROR_CODES.AUTH_INVALID_API_KEY,
-        NEXT_ACTION.CHECK_API_KEY
+        NEXT_ACTIONS.CHECK_API_KEY
       );
     }
 
@@ -144,7 +144,7 @@ export async function verifyApiKey(req: AuthRequest, _res: Response, next: NextF
         'Invalid API key',
         401,
         ERROR_CODES.AUTH_INVALID_API_KEY,
-        NEXT_ACTION.CHECK_API_KEY
+        NEXT_ACTIONS.CHECK_API_KEY
       );
     }
     req.authenticated = true;
@@ -167,7 +167,7 @@ export function verifyToken(req: AuthRequest, _res: Response, next: NextFunction
         'No token provided',
         401,
         ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-        NEXT_ACTION.CHECK_TOKEN
+        NEXT_ACTIONS.CHECK_TOKEN
       );
     }
 
@@ -180,7 +180,7 @@ export function verifyToken(req: AuthRequest, _res: Response, next: NextFunction
         'Invalid token: missing role',
         401,
         ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-        NEXT_ACTION.CHECK_TOKEN
+        NEXT_ACTIONS.CHECK_TOKEN
       );
     }
 
@@ -197,7 +197,7 @@ export function verifyToken(req: AuthRequest, _res: Response, next: NextFunction
           'Invalid token',
           401,
           ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-          NEXT_ACTION.CHECK_TOKEN
+          NEXT_ACTIONS.CHECK_TOKEN
         )
       );
     }
@@ -216,7 +216,7 @@ export async function verifyCloudBackend(req: AuthRequest, _res: Response, next:
         'No authorization token provided',
         401,
         ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-        NEXT_ACTION.CHECK_TOKEN
+        NEXT_ACTIONS.CHECK_TOKEN
       );
     }
 
@@ -237,7 +237,7 @@ export async function verifyCloudBackend(req: AuthRequest, _res: Response, next:
           'Invalid cloud backend token',
           401,
           ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-          NEXT_ACTION.CHECK_TOKEN
+          NEXT_ACTIONS.CHECK_TOKEN
         )
       );
     }

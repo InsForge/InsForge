@@ -1,16 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import type { UserContext } from '@/api/middlewares/auth.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { toISOString } from '@/services/payments/helpers.js';
 import { withUserContext } from '@/services/database/user-context.service.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
 import type { CustomerPortalSessionRow, StripeCustomerPortalSession } from '@/types/payments.js';
-import type {
-  CreateCustomerPortalSessionRequest,
-  CustomerPortalSession,
-  RoleSchema,
+import {
+  ERROR_CODES,
+  type CreateCustomerPortalSessionRequest,
+  type CustomerPortalSession,
+  type RoleSchema,
 } from '@insforge/shared-schemas';
 
 const CUSTOMER_PORTAL_SESSION_COLUMNS = `

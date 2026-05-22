@@ -1,12 +1,12 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { verifyAdmin, AuthRequest, verifyUser } from '@/api/middlewares/auth.js';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import { StorageService } from '@/services/storage/storage.service.js';
 import { StorageConfigService } from '@/services/storage/storage-config.service.js';
 import { successResponse } from '@/utils/response.js';
 import { dynamicUploadSingle, handleUploadError } from '@/api/middlewares/upload.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
 import {
+  ERROR_CODES,
   createBucketRequestSchema,
   updateBucketRequestSchema,
   updateStorageConfigRequestSchema,
@@ -63,7 +63,7 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
       throw new AppError(
         validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
-        ERROR_CODES.INVALID_INPUT
+        ERROR_CODES.STORAGE_INVALID_PARAMETER
       );
     }
 
@@ -151,7 +151,7 @@ router.post(
       );
     } catch (error) {
       if (error instanceof Error && error.message.includes('already exists')) {
-        next(new AppError(error.message, 409, ERROR_CODES.ALREADY_EXISTS));
+        next(new AppError(error.message, 409, ERROR_CODES.STORAGE_ALREADY_EXISTS));
       } else if (error instanceof Error && error.message.includes('Invalid bucket name')) {
         next(
           new AppError(
@@ -229,7 +229,7 @@ router.patch(
       );
     } catch (error) {
       if (error instanceof Error && error.message.includes('does not exist')) {
-        next(new AppError(error.message, 404, ERROR_CODES.NOT_FOUND));
+        next(new AppError(error.message, 404, ERROR_CODES.STORAGE_NOT_FOUND));
       } else {
         next(error);
       }
@@ -324,7 +324,7 @@ router.put(
       successResponse(res, storedFile, 201);
     } catch (error) {
       if (error instanceof Error && error.message.includes('already exists')) {
-        next(new AppError(error.message, 409, ERROR_CODES.ALREADY_EXISTS));
+        next(new AppError(error.message, 409, ERROR_CODES.STORAGE_ALREADY_EXISTS));
       } else if (error instanceof Error && error.message.includes('Invalid')) {
         next(new AppError(error.message, 400, ERROR_CODES.STORAGE_INVALID_PARAMETER));
       } else {
@@ -380,7 +380,7 @@ router.post(
           new AppError(
             'Bucket does not exist',
             404,
-            ERROR_CODES.NOT_FOUND,
+            ERROR_CODES.STORAGE_NOT_FOUND,
             'Create the bucket first using POST /api/storage/buckets'
           )
         );
@@ -415,7 +415,7 @@ router.get(
         !!authReq.hasApiKey
       );
       if (!visible) {
-        throw new AppError('Object not found', 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError('Object not found', 404, ERROR_CODES.STORAGE_NOT_FOUND);
       }
 
       const strategy = await storageService.getDownloadStrategy(bucketName, objectKey);
@@ -430,7 +430,7 @@ router.get(
         !!authReq.hasApiKey
       );
       if (!result) {
-        throw new AppError('Object not found', 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError('Object not found', 404, ERROR_CODES.STORAGE_NOT_FOUND);
       }
 
       const { file, metadata } = result;
@@ -462,7 +462,7 @@ router.delete(
       const deleted = await storageService.deleteBucket(bucketName);
 
       if (!deleted) {
-        throw new AppError('Bucket not found or already empty', 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError('Bucket not found or already empty', 404, ERROR_CODES.STORAGE_NOT_FOUND);
       }
 
       // Log audit for bucket deletion
@@ -520,7 +520,7 @@ router.delete(
       );
 
       if (!deleted) {
-        throw new AppError('Object not found', 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError('Object not found', 404, ERROR_CODES.STORAGE_NOT_FOUND);
       }
 
       successResponse(res, { message: 'Object deleted successfully' });
@@ -557,7 +557,7 @@ router.post(
       successResponse(res, strategy);
     } catch (error) {
       if (error instanceof Error && error.message.includes('does not exist')) {
-        next(new AppError(error.message, 404, ERROR_CODES.NOT_FOUND));
+        next(new AppError(error.message, 404, ERROR_CODES.STORAGE_NOT_FOUND));
       } else {
         next(error);
       }
@@ -606,9 +606,9 @@ router.post(
       successResponse(res, fileInfo, 201);
     } catch (error) {
       if (error instanceof Error && error.message.includes('not found')) {
-        next(new AppError(error.message, 404, ERROR_CODES.NOT_FOUND));
+        next(new AppError(error.message, 404, ERROR_CODES.STORAGE_NOT_FOUND));
       } else if (error instanceof Error && error.message.includes('already confirmed')) {
-        next(new AppError(error.message, 409, ERROR_CODES.ALREADY_EXISTS));
+        next(new AppError(error.message, 409, ERROR_CODES.STORAGE_ALREADY_EXISTS));
       } else if (
         error instanceof Error &&
         error.message.includes('exceeds the configured maximum')
@@ -642,7 +642,7 @@ router.post(
         !!authReq.hasApiKey
       );
       if (!visible) {
-        throw new AppError('Object not found', 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError('Object not found', 404, ERROR_CODES.STORAGE_NOT_FOUND);
       }
 
       const strategy = await storageService.getDownloadStrategy(bucketName, objectKey);

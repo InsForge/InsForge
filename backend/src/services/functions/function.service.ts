@@ -1,5 +1,6 @@
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import {
+  ERROR_CODES,
   EdgeFunctionMetadataSchema,
   UploadFunctionRequest,
   UpdateFunctionRequest,
@@ -10,9 +11,7 @@ import {
 import logger from '@/utils/logger.js';
 import { Pool } from 'pg';
 import fetch from 'node-fetch';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
-import { hasPgErrorCode } from '@/utils/errors.js';
+import { AppError, hasPgErrorCode } from '@/utils/errors.js';
 import { DenoSubhostingProvider } from '@/providers/functions/deno-subhosting.provider.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
@@ -191,7 +190,7 @@ export class FunctionService {
         throw new AppError(
           'Function with this slug already exists',
           409,
-          ERROR_CODES.ALREADY_EXISTS
+          ERROR_CODES.FUNCTION_ALREADY_EXISTS
         );
       }
 

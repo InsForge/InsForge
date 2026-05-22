@@ -1,6 +1,6 @@
 import { TokenManager } from '../../src/infra/security/token.manager';
 import { jwtVerify } from 'jose';
-import { AppError } from '../../src/api/middlewares/error';
+import { AppError } from '../../src/utils/errors';
 import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
 
 // Mock jose.jwtVerify

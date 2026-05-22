@@ -1,11 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import type { UserContext } from '@/api/middlewares/auth.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { getStripeObjectId, toISOString } from '@/services/payments/helpers.js';
 import { withUserContext } from '@/services/database/user-context.service.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
 import type {
   CheckoutSessionPaymentStatus,
   CheckoutSessionRow,
@@ -13,10 +12,11 @@ import type {
   StripeCheckoutSession,
   StripeEnvironment,
 } from '@/types/payments.js';
-import type {
-  CheckoutSession,
-  CreateCheckoutSessionRequest,
-  RoleSchema,
+import {
+  ERROR_CODES,
+  type CheckoutSession,
+  type CreateCheckoutSessionRequest,
+  type RoleSchema,
 } from '@insforge/shared-schemas';
 
 const CHECKOUT_SESSION_COLUMNS = `
@@ -275,7 +275,7 @@ export class PaymentCheckoutService {
       throw new AppError(
         'Idempotency key is already used for another checkout request',
         409,
-        ERROR_CODES.ALREADY_EXISTS
+        ERROR_CODES.PAYMENT_CHECKOUT_ALREADY_EXISTS
       );
     }
 

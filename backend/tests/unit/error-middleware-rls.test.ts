@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { DatabaseError } from 'pg';
 import type { Request, Response } from 'express';
-import { errorMiddleware, AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { errorMiddleware } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 
 vi.mock('@/utils/logger.js', () => ({
   default: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
@@ -33,7 +34,7 @@ function makePgError(code: string, message: string): DatabaseError {
   return err;
 }
 
-describe('errorMiddleware — RLS / 42501 mapping', () => {
+describe('errorMiddleware', () => {
   it('translates Postgres 42501 (RLS WITH CHECK denial) into 403 with FORBIDDEN', () => {
     const err = makePgError(
       '42501',
@@ -76,6 +77,19 @@ describe('errorMiddleware — RLS / 42501 mapping', () => {
     expect(res.statusCode).toBe(400);
     const body = res.body as { error: string };
     expect(body.error).toBe(ERROR_CODES.INVALID_INPUT);
+  });
+
+  it('falls back to 500 for unknown errors even when they carry a 4xx status', () => {
+    const req = {} as Request;
+    const res = makeMockRes();
+    const next = vi.fn();
+
+    errorMiddleware({ status: 404, message: 'not found from an unknown source' }, req, res, next);
+
+    expect(res.statusCode).toBe(500);
+    const body = res.body as { error: string; message: string };
+    expect(body.error).toBe(ERROR_CODES.INTERNAL_ERROR);
+    expect(body.message).toBe('not found from an unknown source');
   });
 
   it('falls back to 500 for unrecognized pg codes', () => {

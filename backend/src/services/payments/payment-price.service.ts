@@ -1,7 +1,6 @@
 import type { Pool } from 'pg';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
 import type { StripeEnvironment, StripePrice, StripePriceRow } from '@/types/payments.js';
 import {
   buildStripeIdempotencyKey,
@@ -12,14 +11,15 @@ import {
 } from '@/services/payments/helpers.js';
 import { withPaymentSessionAdvisoryLock } from '@/services/payments/payments-advisory-lock.js';
 import { PaymentConfigService } from '@/services/payments/payment-config.service.js';
-import type {
-  ArchivePaymentPriceResponse,
-  CreatePaymentPriceRequest,
-  GetPaymentPriceResponse,
-  ListPaymentPricesRequest,
-  ListPaymentPricesResponse,
-  MutatePaymentPriceResponse,
-  UpdatePaymentPriceRequest,
+import {
+  ERROR_CODES,
+  type ArchivePaymentPriceResponse,
+  type CreatePaymentPriceRequest,
+  type GetPaymentPriceResponse,
+  type ListPaymentPricesRequest,
+  type ListPaymentPricesResponse,
+  type MutatePaymentPriceResponse,
+  type UpdatePaymentPriceRequest,
 } from '@insforge/shared-schemas';
 
 export class PaymentPriceService {
@@ -119,7 +119,7 @@ export class PaymentPriceService {
       throw new AppError(
         `Stripe ${environment} price not found: ${stripePriceId}`,
         404,
-        ERROR_CODES.NOT_FOUND
+        ERROR_CODES.PAYMENT_PRICE_NOT_FOUND
       );
     }
 

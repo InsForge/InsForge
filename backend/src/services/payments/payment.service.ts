@@ -1,5 +1,5 @@
 import type { Pool } from 'pg';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { StripeProvider } from '@/providers/payments/stripe.provider.js';
 import { PaymentConfigService } from '@/services/payments/payment-config.service.js';
@@ -30,7 +30,6 @@ import {
   normalizeProductRow,
 } from '@/services/payments/helpers.js';
 import logger from '@/utils/logger.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
 import type { UserContext } from '@/api/middlewares/auth.js';
 import {
   STRIPE_ENVIRONMENTS,
@@ -45,43 +44,44 @@ import {
   type StripeRefund,
   type StripeSubscription,
 } from '@/types/payments.js';
-import type {
-  ArchivePaymentPriceResponse,
-  ConfigurePaymentWebhookResponse,
-  CreatePaymentPriceRequest,
-  GetPaymentsStatusResponse,
-  GetPaymentPriceResponse,
-  ListPaymentCatalogResponse,
-  ListPaymentCustomersRequest,
-  ListPaymentCustomersResponse,
-  ListPaymentPricesRequest,
-  ListPaymentPricesResponse,
-  ListPaymentProductsRequest,
-  StripeConnection,
-  GetPaymentsConfigResponse,
-  CreatePaymentProductRequest,
-  DeletePaymentProductResponse,
-  GetPaymentProductResponse,
-  ListPaymentProductsResponse,
-  MutatePaymentPriceResponse,
-  MutatePaymentProductResponse,
-  UpdatePaymentPriceRequest,
-  UpdatePaymentProductRequest,
-  CreateCheckoutSessionRequest,
-  CreateCheckoutSessionResponse,
-  CreateCustomerPortalSessionRequest,
-  CreateCustomerPortalSessionResponse,
-  CheckoutSession,
-  BillingSubject,
-  StripeWebhookResponse,
-  ListPaymentHistoryRequest,
-  ListPaymentHistoryResponse,
-  ListSubscriptionsRequest,
-  ListSubscriptionsResponse,
-  SyncPaymentsRequest,
-  SyncPaymentsResponse,
-  SyncPaymentsEnvironmentResult,
-  SyncPaymentsSubscriptionsSummary,
+import {
+  ERROR_CODES,
+  type ArchivePaymentPriceResponse,
+  type ConfigurePaymentWebhookResponse,
+  type CreatePaymentPriceRequest,
+  type GetPaymentsStatusResponse,
+  type GetPaymentPriceResponse,
+  type ListPaymentCatalogResponse,
+  type ListPaymentCustomersRequest,
+  type ListPaymentCustomersResponse,
+  type ListPaymentPricesRequest,
+  type ListPaymentPricesResponse,
+  type ListPaymentProductsRequest,
+  type StripeConnection,
+  type GetPaymentsConfigResponse,
+  type CreatePaymentProductRequest,
+  type DeletePaymentProductResponse,
+  type GetPaymentProductResponse,
+  type ListPaymentProductsResponse,
+  type MutatePaymentPriceResponse,
+  type MutatePaymentProductResponse,
+  type UpdatePaymentPriceRequest,
+  type UpdatePaymentProductRequest,
+  type CreateCheckoutSessionRequest,
+  type CreateCheckoutSessionResponse,
+  type CreateCustomerPortalSessionRequest,
+  type CreateCustomerPortalSessionResponse,
+  type CheckoutSession,
+  type BillingSubject,
+  type StripeWebhookResponse,
+  type ListPaymentHistoryRequest,
+  type ListPaymentHistoryResponse,
+  type ListSubscriptionsRequest,
+  type ListSubscriptionsResponse,
+  type SyncPaymentsRequest,
+  type SyncPaymentsResponse,
+  type SyncPaymentsEnvironmentResult,
+  type SyncPaymentsSubscriptionsSummary,
 } from '@insforge/shared-schemas';
 
 export class PaymentService {
@@ -413,7 +413,7 @@ export class PaymentService {
         throw new AppError(
           'No Stripe customer is mapped to this billing subject',
           404,
-          ERROR_CODES.NOT_FOUND
+          ERROR_CODES.PAYMENT_NOT_FOUND
         );
       }
 

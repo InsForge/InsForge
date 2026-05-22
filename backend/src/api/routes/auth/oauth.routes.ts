@@ -5,8 +5,7 @@ import { AuthConfigService } from '@/services/auth/auth-config.service.js';
 import { OAuthPKCEService } from '@/services/auth/oauth-pkce.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
 import { successResponse } from '@/utils/response.js';
 import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
 import { setRefreshTokenCookie } from '@/utils/cookies.js';
@@ -17,6 +16,7 @@ import logger from '@/utils/logger.js';
 import jwt from 'jsonwebtoken';
 
 import {
+  ERROR_CODES,
   createOAuthConfigRequestSchema,
   updateOAuthConfigRequestSchema,
   oAuthInitRequestSchema,
@@ -76,7 +76,7 @@ router.get(
         throw new AppError(
           `OAuth configuration for ${provider} not found`,
           404,
-          ERROR_CODES.NOT_FOUND
+          ERROR_CODES.AUTH_OAUTH_CONFIG_NOT_FOUND
         );
       }
 
@@ -212,7 +212,7 @@ router.delete(
         throw new AppError(
           `OAuth configuration for ${provider} not found`,
           404,
-          ERROR_CODES.NOT_FOUND
+          ERROR_CODES.AUTH_OAUTH_CONFIG_NOT_FOUND
         );
       }
 

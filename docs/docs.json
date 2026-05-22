@@ -109,6 +109,12 @@
                 "pages": [
                   "core-concepts/compute/overview"
                 ]
+              },
+              {
+                "group": "Developer Guides",
+                "pages": [
+                  "agent-docs/error-codes"
+                ]
               }
             ]
           },

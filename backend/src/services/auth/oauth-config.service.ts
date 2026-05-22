@@ -1,10 +1,9 @@
 import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
-import { OAuthConfigSchema, OAuthProvidersSchema } from '@insforge/shared-schemas';
+import { ERROR_CODES, OAuthConfigSchema, OAuthProvidersSchema } from '@insforge/shared-schemas';
 
 export interface CreateOAuthConfigInput {
   provider: OAuthProvidersSchema;
@@ -175,7 +174,7 @@ export class OAuthConfigService {
         throw new AppError(
           `OAuth configuration for ${input.provider} already exists`,
           409,
-          ERROR_CODES.ALREADY_EXISTS
+          ERROR_CODES.AUTH_OAUTH_CONFIG_ALREADY_EXISTS
         );
       }
 
@@ -290,7 +289,11 @@ export class OAuthConfigService {
       );
 
       if (!existingResult.rows.length) {
-        throw new AppError('OAuth configuration not found', 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError(
+          'OAuth configuration not found',
+          404,
+          ERROR_CODES.AUTH_OAUTH_CONFIG_NOT_FOUND
+        );
       }
 
       const existingConfig = existingResult.rows[0];

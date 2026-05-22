@@ -5,8 +5,7 @@ import { AuthConfigService } from '@/services/auth/auth-config.service.js';
 import { AuthOTPService, OTPPurpose } from '@/services/auth/auth-otp.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
 import { successResponse } from '@/utils/response.js';
 import {
   AuthRequest,
@@ -25,6 +24,7 @@ import {
 } from '@/utils/cookies.js';
 import { parseClientType } from '@/utils/utils.js';
 import {
+  ERROR_CODES,
   userIdSchema,
   createUserRequestSchema,
   createSessionRequestSchema,
@@ -279,7 +279,7 @@ router.get('/profiles/:userId', async (req: Request, res: Response, next: NextFu
     const userProfile = await authService.getProfileById(userId);
 
     if (!userProfile) {
-      throw new AppError('User not found', 404, ERROR_CODES.NOT_FOUND);
+      throw new AppError('User not found', 404, ERROR_CODES.AUTH_USER_NOT_FOUND);
     }
 
     const response: GetProfileResponse = userProfile;
@@ -715,7 +715,7 @@ router.get(
       const user = await authService.getUserSchemaById(userId);
 
       if (!user) {
-        throw new AppError('User does not exist', 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError('User does not exist', 404, ERROR_CODES.AUTH_USER_NOT_FOUND);
       }
 
       successResponse(res, user);

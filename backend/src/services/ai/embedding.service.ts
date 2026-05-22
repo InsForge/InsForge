@@ -1,8 +1,11 @@
 import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
-import type { EmbeddingsRequest, EmbeddingsResponse } from '@insforge/shared-schemas';
+import {
+  ERROR_CODES,
+  type EmbeddingsRequest,
+  type EmbeddingsResponse,
+} from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
 
 export class EmbeddingService {
   private static instance: EmbeddingService;

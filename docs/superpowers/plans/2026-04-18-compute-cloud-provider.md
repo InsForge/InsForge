@@ -54,7 +54,7 @@ Do cloud first (Tasks 1–8), OSS second (Tasks 9–12). The OSS provider's test
 | `backend/src/services/compute/services.service.ts` (modify) | Add `selectComputeProvider()` factory |
 | `backend/tests/unit/compute/services-service.test.ts` (modify) | Factory tests covering all three branches |
 | `backend/src/infra/config/app.config.ts` (modify) | Add `cloud.computeEnabled` |
-| `backend/src/types/error-constants.ts` (modify) | Add `COMPUTE_NOT_CONFIGURED`, `COMPUTE_CLOUD_UNAVAILABLE` |
+| `packages/shared-schemas/src/error-codes.schema.ts` (modify) | Add `COMPUTE_NOT_CONFIGURED`, `COMPUTE_CLOUD_UNAVAILABLE` |
 | `.env.example` (modify) | Document `CLOUD_COMPUTE_ENABLED` |
 
 ---
@@ -1414,7 +1414,7 @@ Create `backend/src/providers/compute/cloud.provider.ts`:
 import jwt from 'jsonwebtoken';
 import { config } from '@/infra/config/app.config.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import type {
   ComputeProvider,
   LaunchMachineParams,
@@ -1601,7 +1601,7 @@ existing nextActions UX continues to work."
 
 **Files:**
 - Modify: `backend/src/infra/config/app.config.ts`
-- Modify: `backend/src/types/error-constants.ts`
+- Modify: `packages/shared-schemas/src/error-codes.schema.ts`
 - Modify: `.env.example`
 
 - [ ] **Step 1: Add `cloud.computeEnabled` to AppConfig**
@@ -1620,12 +1620,12 @@ In the `config.cloud` literal (alphabetical):
 
 - [ ] **Step 2: Add error codes**
 
-In `backend/src/types/error-constants.ts`, find the `ERROR_CODES` const. Add (alphabetical within the COMPUTE_ section):
+In `packages/shared-schemas/src/error-codes.schema.ts`, add the codes to `errorCodeSchema` (alphabetical within the COMPUTE_ section):
 
 ```typescript
-  COMPUTE_NOT_CONFIGURED: 'COMPUTE_NOT_CONFIGURED',
-  COMPUTE_CLOUD_UNAVAILABLE: 'COMPUTE_CLOUD_UNAVAILABLE',
-  COMPUTE_PROVIDER_ERROR: 'COMPUTE_PROVIDER_ERROR',
+  'COMPUTE_NOT_CONFIGURED',
+  'COMPUTE_CLOUD_UNAVAILABLE',
+  'COMPUTE_PROVIDER_ERROR',
 ```
 
 (Skip any that already exist — check first.)
@@ -1650,7 +1650,7 @@ Expected: no errors.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/src/infra/config/app.config.ts backend/src/types/error-constants.ts .env.example
+git add backend/src/infra/config/app.config.ts packages/shared-schemas/src/error-codes.schema.ts .env.example
 git commit -m "feat(compute): add CLOUD_COMPUTE_ENABLED config + error codes"
 ```
 
@@ -1727,7 +1727,7 @@ In `backend/src/services/compute/services.service.ts`:
 import { CloudComputeProvider } from '@/providers/compute/cloud.provider.js';
 import type { ComputeProvider } from '@/providers/compute/compute.provider.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 ```
 
 (b) Add the exported factory above the class:

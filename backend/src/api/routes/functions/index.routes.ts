@@ -3,10 +3,13 @@ import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
 import { functionsWriteLimiter } from '@/api/middlewares/rate-limiters.js';
 import { FunctionService } from '@/services/functions/function.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
-import { uploadFunctionRequestSchema, updateFunctionRequestSchema } from '@insforge/shared-schemas';
+import {
+  ERROR_CODES,
+  uploadFunctionRequestSchema,
+  updateFunctionRequestSchema,
+} from '@insforge/shared-schemas';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import { successResponse } from '@/utils/response.js';
@@ -39,7 +42,7 @@ router.get('/:slug', verifyAdmin, async (req: AuthRequest, res: Response, next: 
     const func = await functionService.getFunction(slug);
 
     if (!func) {
-      throw new AppError('Function not found', 404, ERROR_CODES.NOT_FOUND);
+      throw new AppError('Function not found', 404, ERROR_CODES.FUNCTION_NOT_FOUND);
     }
 
     successResponse(res, func);
@@ -125,7 +128,7 @@ router.put(
       const result = await functionService.updateFunction(slug, validation.data);
 
       if (!result) {
-        throw new AppError('Function not found', 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError('Function not found', 404, ERROR_CODES.FUNCTION_NOT_FOUND);
       }
 
       // Log audit event
@@ -174,7 +177,7 @@ router.delete(
       const deleted = await functionService.deleteFunction(slug);
 
       if (!deleted) {
-        throw new AppError('Function not found', 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError('Function not found', 404, ERROR_CODES.FUNCTION_NOT_FOUND);
       }
 
       // Log audit event

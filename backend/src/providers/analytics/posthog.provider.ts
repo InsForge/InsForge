@@ -1,9 +1,9 @@
 import jwt from 'jsonwebtoken';
 import axios from 'axios';
 import { config } from '@/infra/config/app.config.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
 import {
+  ERROR_CODES,
   posthogConnectionSchema,
   posthogDashboardsResponseSchema,
   posthogSummarySchema,
@@ -44,7 +44,7 @@ export class PostHogProvider {
     throw new AppError(
       'PostHog integration is only available on Insforge Cloud, not in self-hosted mode.',
       501,
-      ERROR_CODES.NOT_IMPLEMENTED
+      ERROR_CODES.ANALYTICS_UNAVAILABLE
     );
   }
 
@@ -122,7 +122,7 @@ export class PostHogProvider {
       data = response.data;
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 404) {
-        throw new AppError('PostHog not connected', 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError('PostHog not connected', 404, ERROR_CODES.ANALYTICS_NOT_CONNECTED);
       }
       const msg = err instanceof Error ? err.message : 'unknown';
       throw new AppError(
@@ -155,7 +155,7 @@ export class PostHogProvider {
       data = response.data;
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 404) {
-        throw new AppError('PostHog not connected', 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError('PostHog not connected', 404, ERROR_CODES.ANALYTICS_NOT_CONNECTED);
       }
       const msg = err instanceof Error ? err.message : 'unknown';
       throw new AppError(
@@ -189,7 +189,7 @@ export class PostHogProvider {
       data = response.data;
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 404) {
-        throw new AppError('PostHog not connected', 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError('PostHog not connected', 404, ERROR_CODES.ANALYTICS_NOT_CONNECTED);
       }
       const msg = err instanceof Error ? err.message : 'unknown';
       throw new AppError(
@@ -238,7 +238,7 @@ export class PostHogProvider {
       data = response.data;
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 404) {
-        throw new AppError('PostHog not connected', 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError('PostHog not connected', 404, ERROR_CODES.ANALYTICS_NOT_CONNECTED);
       }
       const msg = err instanceof Error ? err.message : 'unknown';
       throw new AppError(
@@ -272,7 +272,7 @@ export class PostHogProvider {
       data = response.data;
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 404) {
-        throw new AppError('PostHog not connected', 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError('PostHog not connected', 404, ERROR_CODES.ANALYTICS_NOT_CONNECTED);
       }
       const msg = err instanceof Error ? err.message : 'unknown';
       throw new AppError(
@@ -306,7 +306,7 @@ export class PostHogProvider {
       data = response.data;
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 404) {
-        throw new AppError('PostHog not connected', 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError('PostHog not connected', 404, ERROR_CODES.ANALYTICS_NOT_CONNECTED);
       }
       const msg = err instanceof Error ? err.message : 'unknown';
       throw new AppError(
@@ -339,7 +339,7 @@ export class PostHogProvider {
       data = response.data;
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 404) {
-        throw new AppError('PostHog not connected', 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError('PostHog not connected', 404, ERROR_CODES.ANALYTICS_NOT_CONNECTED);
       }
       const msg = err instanceof Error ? err.message : 'unknown';
       throw new AppError(
@@ -373,7 +373,7 @@ export class PostHogProvider {
       data = response.data;
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 404) {
-        throw new AppError('PostHog not connected', 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError('PostHog not connected', 404, ERROR_CODES.ANALYTICS_NOT_CONNECTED);
       }
       const msg = err instanceof Error ? err.message : 'unknown';
       throw new AppError(
@@ -407,7 +407,7 @@ export class PostHogProvider {
       data = response.data;
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 404) {
-        throw new AppError('PostHog not connected', 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError('PostHog not connected', 404, ERROR_CODES.ANALYTICS_NOT_CONNECTED);
       }
       const msg = err instanceof Error ? err.message : 'unknown';
       throw new AppError(

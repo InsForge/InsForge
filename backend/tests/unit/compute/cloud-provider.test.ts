@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi, type MockInstance } from 'vitest';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import jwt from 'jsonwebtoken';
 
 vi.mock('@/infra/config/app.config.js', () => ({
@@ -94,11 +95,15 @@ describe('CloudComputeProvider', () => {
     fetchMock.mockResolvedValue({
       ok: false,
       status: 403,
-      text: async () => '{"code":"COMPUTE_QUOTA_EXCEEDED","error":"limit reached"}',
+      text: async () =>
+        JSON.stringify({
+          code: ERROR_CODES.COMPUTE_QUOTA_EXCEEDED,
+          error: 'limit reached',
+        }),
     } as Response);
     const provider = CloudComputeProvider.getInstance();
     await expect(provider.createApp({ name: 't', network: 't', org: 'o' })).rejects.toThrow(
-      /limit reached|COMPUTE_QUOTA_EXCEEDED/
+      new RegExp(`limit reached|${ERROR_CODES.COMPUTE_QUOTA_EXCEEDED}`)
     );
   });
 
@@ -146,18 +151,16 @@ describe('CloudComputeProvider', () => {
   });
 
   it('surfaces COMPUTE_NOT_CONFIGURED when config is missing (not masked as CLOUD_UNAVAILABLE)', async () => {
-    const { AppError } = await import('@/api/middlewares/error.js');
-    const { ERROR_CODES } = await import('@/types/error-constants.js');
+    const { AppError } = await import('@/utils/errors.js');
     const provider = CloudComputeProvider.getInstance();
 
     // Force signToken to throw COMPUTE_NOT_CONFIGURED, as it would when isConfigured() is false
-    const errorCodes = ERROR_CODES as unknown as Record<string, string>;
     vi.spyOn(provider as unknown as { signToken: () => string }, 'signToken').mockImplementation(
       () => {
         throw new AppError(
           'Cloud compute not configured (need PROJECT_ID, CLOUD_API_HOST, JWT_SECRET)',
           500,
-          errorCodes.COMPUTE_NOT_CONFIGURED ?? ERROR_CODES.INTERNAL_ERROR
+          ERROR_CODES.COMPUTE_NOT_CONFIGURED
         );
       }
     );

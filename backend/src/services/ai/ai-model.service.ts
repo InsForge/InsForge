@@ -1,8 +1,7 @@
 import type { RawOpenRouterModel } from '@/types/ai.js';
-import type { AIModelSchema } from '@insforge/shared-schemas';
+import { ERROR_CODES, type AIModelSchema } from '@insforge/shared-schemas';
 import { calculateTokenPrices, normalizeModalities, getProviderOrder } from './helpers.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
 
 const MODELS_CACHE_TTL_MS = 60 * 60 * 1000;
 const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models?output_modalities=all';

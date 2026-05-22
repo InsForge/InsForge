@@ -1,14 +1,13 @@
 import { parseSync } from 'libpg-query';
-import type {
-  CreateMigrationRequest,
-  CreateMigrationResponse,
-  DatabaseMigrationsResponse,
-  Migration,
+import {
+  ERROR_CODES,
+  type CreateMigrationRequest,
+  type CreateMigrationResponse,
+  type DatabaseMigrationsResponse,
+  type Migration,
 } from '@insforge/shared-schemas';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError, isPgErrorLike } from '@/utils/errors.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
-import { isPgErrorLike } from '@/utils/errors.js';
 import {
   analyzeQuery,
   checkAuthSchemaOperations,
@@ -132,7 +131,7 @@ export class DatabaseMigrationService {
         throw new AppError(
           'Migration version must be newer than the latest applied migration.',
           409,
-          ERROR_CODES.ALREADY_EXISTS
+          ERROR_CODES.DATABASE_MIGRATION_ALREADY_EXISTS
         );
       }
 
@@ -174,7 +173,11 @@ export class DatabaseMigrationService {
         error.code === '23505' &&
         error.constraint === 'custom_migrations_pkey'
       ) {
-        throw new AppError('Migration version already exists.', 409, ERROR_CODES.ALREADY_EXISTS);
+        throw new AppError(
+          'Migration version already exists.',
+          409,
+          ERROR_CODES.DATABASE_MIGRATION_ALREADY_EXISTS
+        );
       }
 
       throw error;

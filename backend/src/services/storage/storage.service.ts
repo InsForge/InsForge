@@ -1,11 +1,12 @@
 import path from 'path';
 import { Pool, PoolClient } from 'pg';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import type { UserContext } from '@/api/middlewares/auth.js';
 import { withUserContext } from '@/services/database/user-context.service.js';
 import { StorageRecord } from '@/types/storage.js';
 import {
+  ERROR_CODES,
   StorageBucketSchema,
   StorageFileSchema,
   StorageMetadataSchema,
@@ -17,7 +18,6 @@ import { StorageConfigService } from '@/services/storage/storage-config.service.
 import logger from '@/utils/logger.js';
 import { escapeSqlLikePattern, escapeRegexPattern } from '@/utils/validations.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
 
 const DEFAULT_LIST_LIMIT = 100;
 const GIGABYTE_IN_BYTES = 1024 * 1024 * 1024;

@@ -1,5 +1,6 @@
 import { Readable } from 'stream';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { VercelProvider } from '../../src/providers/deployments/vercel.provider';
 import axios, { AxiosError, AxiosHeaders } from 'axios';
 
@@ -19,14 +20,18 @@ vi.mock('../../src/services/secrets/secret.service.js', () => ({
 /**
  * Helper to create a mock Axios error with a given status code and optional headers
  */
-function makeAxiosError(status: number, headers: Record<string, string> = {}): AxiosError {
+function makeAxiosError(
+  status: number,
+  headers: Record<string, string> = {},
+  data: unknown = {}
+): AxiosError {
   const error = new Error(`Request failed with status code ${status}`) as AxiosError;
   error.isAxiosError = true;
   error.response = {
     status,
     statusText: status === 429 ? 'Too Many Requests' : 'Request Failed',
     headers,
-    data: {},
+    data,
     config: { headers: new AxiosHeaders() },
   };
   error.config = { headers: new AxiosHeaders() };
@@ -206,7 +211,7 @@ describe('VercelProvider.uploadFileStream', () => {
       })
     ).rejects.toMatchObject({
       statusCode: 504,
-      code: 'INTERNAL_ERROR',
+      code: ERROR_CODES.UPSTREAM_FAILURE,
       message: `Vercel file upload timed out after ${VERCEL_UPLOAD_TIMEOUT_MS}ms. Retry the file upload.`,
     });
 
@@ -241,14 +246,14 @@ describe('VercelProvider.uploadFileStream', () => {
       })
     ).rejects.toMatchObject({
       statusCode: 429,
-      code: 'RATE_LIMITED',
+      code: ERROR_CODES.RATE_LIMITED,
     });
 
     expect(axiosPostSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('maps Vercel digest rejection to invalid input', async () => {
-    axiosPostSpy.mockRejectedValueOnce(makeAxiosError(400));
+  it('surfaces Vercel 400 responses as upstream failures', async () => {
+    axiosPostSpy.mockRejectedValueOnce(makeAxiosError(400, {}, 'digest does not match content'));
 
     await expect(
       provider.uploadFileStream({
@@ -258,7 +263,25 @@ describe('VercelProvider.uploadFileStream', () => {
       })
     ).rejects.toMatchObject({
       statusCode: 400,
-      code: 'INVALID_INPUT',
+      code: ERROR_CODES.UPSTREAM_FAILURE,
+      message: 'digest does not match content',
+    });
+  });
+
+  it('maps caller-cancelled streamed uploads to a deployment upload cancellation code', async () => {
+    const cancelledError = new AxiosError('canceled', 'ERR_CANCELED');
+    cancelledError.config = { headers: new AxiosHeaders() };
+    axiosPostSpy.mockRejectedValueOnce(cancelledError);
+
+    await expect(
+      provider.uploadFileStream({
+        content: Readable.from([Buffer.from('hello')]),
+        sha: 'f'.repeat(40),
+        size: 5,
+      })
+    ).rejects.toMatchObject({
+      statusCode: 499,
+      code: ERROR_CODES.DEPLOYMENT_UPLOAD_CANCELED,
     });
   });
 });
@@ -349,7 +372,7 @@ describe('VercelProvider.uploadFile retry logic', () => {
     await expect(provider.uploadFile(Buffer.from('test-content'))).rejects.toMatchObject({
       message: expect.stringContaining('rate limit'),
       statusCode: 429,
-      code: 'RATE_LIMITED',
+      code: ERROR_CODES.RATE_LIMITED,
     });
 
     expect(axiosPostSpy).toHaveBeenCalledTimes(4);
@@ -362,6 +385,7 @@ describe('VercelProvider.uploadFile retry logic', () => {
 
     await expect(provider.uploadFile(Buffer.from('test-content'))).rejects.toMatchObject({
       statusCode: 500,
+      code: ERROR_CODES.UPSTREAM_FAILURE,
     });
 
     expect(axiosPostSpy).toHaveBeenCalledTimes(1);

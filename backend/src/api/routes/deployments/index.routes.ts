@@ -4,10 +4,10 @@ import { DeploymentService } from '@/services/deployments/deployment.service.js'
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { deploymentsWriteLimiter } from '@/api/middlewares/rate-limiters.js';
 import { AuditService } from '@/services/logs/audit.service.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
 import { successResponse, paginatedResponse } from '@/utils/response.js';
 import {
+  ERROR_CODES,
   createDirectDeploymentRequestSchema,
   startDeploymentRequestSchema,
   updateSlugRequestSchema,
@@ -396,7 +396,7 @@ router.get('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: Ne
     const deployment = await deploymentService.getDeploymentById(id);
 
     if (!deployment) {
-      throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.NOT_FOUND);
+      throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
     }
 
     successResponse(res, deployment);
@@ -423,7 +423,7 @@ router.post(
       const deployment = await deploymentService.syncDeploymentById(id);
 
       if (!deployment) {
-        throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
       }
 
       successResponse(res, deployment);

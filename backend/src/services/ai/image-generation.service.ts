@@ -1,11 +1,14 @@
 import OpenAI from 'openai';
 
 import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
-import type { ImageGenerationRequest, ImageGenerationResponse } from '@insforge/shared-schemas';
+import {
+  ERROR_CODES,
+  type ImageGenerationRequest,
+  type ImageGenerationResponse,
+} from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import { OpenRouterImageMessage } from '@/types/ai.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
 
 export class ImageGenerationService {
   private static openRouterProvider = OpenRouterProvider.getInstance();
