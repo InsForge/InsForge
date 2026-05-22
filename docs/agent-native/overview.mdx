@@ -38,8 +38,8 @@ Schema changes are [migrations](/core-concepts/database/migrations) in your repo
 These chain together. A session usually goes:
 
 1. Read the current state with `npx @insforge/cli metadata`.
-2. Branch the backend, write a [migration](/core-concepts/database/migrations) or edit `insforge.toml`, then run `npx @insforge/cli config plan` to see the diff.
-3. Apply it with `npx @insforge/cli db migrations up` or `config apply`, against the branch first, then the parent.
+2. Branch the backend, write a [migration](/core-concepts/database/migrations) and check what is pending with `npx @insforge/cli db migrations list`, or edit `insforge.toml` and preview the config diff with `npx @insforge/cli config plan`.
+3. Apply it with `npx @insforge/cli db migrations up --all` or `config apply`, against the branch first, then the parent.
 4. Run `npx @insforge/cli diagnose` to check advisor findings and error logs, and ask `diagnose --ai` to interpret them.
 5. Apply the remediation, re-run diagnose, and merge the branch.
 
