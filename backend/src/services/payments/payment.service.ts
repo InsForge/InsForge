@@ -45,7 +45,7 @@ import {
   type StripeSubscription,
 } from '@/types/payments.js';
 import {
-  ERROR_CODES,
+  errorCodesSchema,
   type ArchivePaymentPriceResponse,
   type ConfigurePaymentWebhookResponse,
   type CreatePaymentPriceRequest,
@@ -319,7 +319,7 @@ export class PaymentService {
       throw new AppError(
         'Subscription checkout requires a billing subject',
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
 
@@ -398,7 +398,7 @@ export class PaymentService {
       throw new AppError(
         'Customer portal sessions require an authenticated user',
         401,
-        ERROR_CODES.AUTH_INVALID_CREDENTIALS
+        errorCodesSchema.enum.AUTH_INVALID_CREDENTIALS
       );
     }
 
@@ -413,7 +413,7 @@ export class PaymentService {
         throw new AppError(
           'No Stripe customer is mapped to this billing subject',
           404,
-          ERROR_CODES.PAYMENT_NOT_FOUND
+          errorCodesSchema.enum.PAYMENT_NOT_FOUND
         );
       }
 
@@ -428,7 +428,7 @@ export class PaymentService {
         throw new AppError(
           'Stripe did not return a customer portal URL',
           500,
-          ERROR_CODES.INTERNAL_ERROR
+          errorCodesSchema.enum.INTERNAL_ERROR
         );
       }
 
@@ -468,7 +468,7 @@ export class PaymentService {
       throw new AppError(
         `${WEBHOOK_SECRET_BY_ENVIRONMENT[environment]} is not configured`,
         500,
-        ERROR_CODES.INTERNAL_ERROR
+        errorCodesSchema.enum.INTERNAL_ERROR
       );
     }
 
@@ -717,7 +717,7 @@ export class PaymentService {
       throw new AppError(
         `Metadata key ${reservedKey} is reserved for InsForge`,
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
 

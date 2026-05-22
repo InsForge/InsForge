@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES, stripeWebhookParamsSchema } from '@insforge/shared-schemas';
+import { errorCodesSchema, stripeWebhookParamsSchema } from '@insforge/shared-schemas';
 import { PaymentService } from '@/services/payments/payment.service.js';
 
 const router = Router();
@@ -8,7 +8,7 @@ const paymentService = PaymentService.getInstance();
 
 export function normalizeStripeWebhookError(error: unknown) {
   if (error instanceof Error && error.name === 'StripeSignatureVerificationError') {
-    return new AppError(error.message, 400, ERROR_CODES.INVALID_INPUT);
+    return new AppError(error.message, 400, errorCodesSchema.enum.INVALID_INPUT);
   }
 
   return error;
@@ -25,19 +25,23 @@ router.post('/:environment', async (req: Request, res: Response, next: NextFunct
   try {
     const paramsValidation = stripeWebhookParamsSchema.safeParse(req.params);
     if (!paramsValidation.success) {
-      throw new AppError('Invalid Stripe environment', 400, ERROR_CODES.INVALID_INPUT);
+      throw new AppError('Invalid Stripe environment', 400, errorCodesSchema.enum.INVALID_INPUT);
     }
 
     const signature = req.headers['stripe-signature'];
     if (typeof signature !== 'string') {
-      throw new AppError('Missing stripe-signature header', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+      throw new AppError(
+        'Missing stripe-signature header',
+        401,
+        errorCodesSchema.enum.AUTH_UNAUTHORIZED
+      );
     }
 
     if (!Buffer.isBuffer(req.body)) {
       throw new AppError(
         'Stripe webhook requires raw request body',
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
 

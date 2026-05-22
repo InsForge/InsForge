@@ -22,7 +22,7 @@ import {
   oAuthCodeExchangeRequestSchema,
   type ListOAuthConfigsResponse,
   oAuthProvidersSchema,
-  ERROR_CODES,
+  errorCodesSchema,
 } from '@insforge/shared-schemas';
 import { isOAuthSharedKeysAvailable } from '@/utils/environment.js';
 
@@ -40,7 +40,7 @@ const validateJwtSecret = (): string => {
     throw new AppError(
       'JWT_SECRET environment variable is not configured.',
       500,
-      ERROR_CODES.INTERNAL_ERROR
+      errorCodesSchema.enum.INTERNAL_ERROR
     );
   }
   return jwtSecret;
@@ -76,7 +76,7 @@ router.get(
         throw new AppError(
           `OAuth configuration for ${provider} not found`,
           404,
-          ERROR_CODES.AUTH_OAUTH_CONFIG_NOT_FOUND
+          errorCodesSchema.enum.AUTH_OAUTH_CONFIG_NOT_FOUND
         );
       }
 
@@ -105,7 +105,7 @@ router.post(
         throw new AppError(
           validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
 
@@ -116,7 +116,7 @@ router.post(
         throw new AppError(
           'Shared OAuth keys are not enabled in this environment',
           400,
-          ERROR_CODES.AUTH_OAUTH_CONFIG_ERROR
+          errorCodesSchema.enum.AUTH_OAUTH_CONFIG_ERROR
         );
       }
 
@@ -149,7 +149,7 @@ router.put(
     try {
       const provider = req.params.provider;
       if (!provider || provider.length === 0 || provider.length > 50) {
-        throw new AppError('Invalid provider name', 400, ERROR_CODES.INVALID_INPUT);
+        throw new AppError('Invalid provider name', 400, errorCodesSchema.enum.INVALID_INPUT);
       }
 
       const validationResult = updateOAuthConfigRequestSchema.safeParse(req.body);
@@ -157,7 +157,7 @@ router.put(
         throw new AppError(
           validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
 
@@ -168,7 +168,7 @@ router.put(
         throw new AppError(
           'Shared OAuth keys are not enabled in this environment',
           400,
-          ERROR_CODES.AUTH_OAUTH_CONFIG_ERROR
+          errorCodesSchema.enum.AUTH_OAUTH_CONFIG_ERROR
         );
       }
 
@@ -204,7 +204,7 @@ router.delete(
     try {
       const provider = req.params.provider;
       if (!provider || provider.length === 0 || provider.length > 50) {
-        throw new AppError('Invalid provider name', 400, ERROR_CODES.INVALID_INPUT);
+        throw new AppError('Invalid provider name', 400, errorCodesSchema.enum.INVALID_INPUT);
       }
       const deleted = await oAuthConfigService.deleteConfig(provider);
 
@@ -212,7 +212,7 @@ router.delete(
         throw new AppError(
           `OAuth configuration for ${provider} not found`,
           404,
-          ERROR_CODES.AUTH_OAUTH_CONFIG_NOT_FOUND
+          errorCodesSchema.enum.AUTH_OAUTH_CONFIG_NOT_FOUND
         );
       }
 
@@ -250,7 +250,7 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
       throw new AppError(
         `Unsupported OAuth provider: ${provider}. Supported providers: ${oAuthProvidersSchema.options.join(', ')}`,
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
 
@@ -260,7 +260,7 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
       throw new AppError(
         queryValidation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
 
@@ -269,14 +269,14 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
     const redirectUri = redirect_uri;
 
     if (!redirectUri) {
-      throw new AppError('Redirect URI is required', 400, ERROR_CODES.INVALID_INPUT);
+      throw new AppError('Redirect URI is required', 400, errorCodesSchema.enum.INVALID_INPUT);
     }
 
     if (!(await authConfigService.validateRedirectUrl(redirectUri))) {
       throw new AppError(
         `${redirectUri} is not in the allowed redirect URLs`,
         400,
-        ERROR_CODES.INVALID_INPUT,
+        errorCodesSchema.enum.INVALID_INPUT,
         'Please add this URL to the allowed redirect URLs in the authentication configuration.'
       );
     }
@@ -309,7 +309,7 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
       new AppError(
         `${req.params.provider} OAuth is not properly configured. Please check your oauth configurations.`,
         500,
-        ERROR_CODES.AUTH_OAUTH_CONFIG_ERROR
+        errorCodesSchema.enum.AUTH_OAUTH_CONFIG_ERROR
       )
     );
   }
@@ -325,7 +325,7 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
 
     if (!state) {
       logger.warn('Shared OAuth callback called without state parameter');
-      throw new AppError('State parameter is required', 400, ERROR_CODES.INVALID_INPUT);
+      throw new AppError('State parameter is required', 400, errorCodesSchema.enum.INVALID_INPUT);
     }
 
     let provider: string;
@@ -342,7 +342,7 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
       codeChallenge = decodedState.codeChallenge || '';
     } catch {
       logger.warn('Invalid state parameter', { state });
-      throw new AppError('Invalid state parameter', 400, ERROR_CODES.INVALID_INPUT);
+      throw new AppError('Invalid state parameter', 400, errorCodesSchema.enum.INVALID_INPUT);
     }
 
     // Validate provider using OAuthProvidersSchema
@@ -352,12 +352,12 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
       throw new AppError(
         `Invalid provider in state: ${provider}. Supported providers: ${oAuthProvidersSchema.options.join(', ')}`,
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
     const validatedProvider = providerValidation.data;
     if (!redirectUri) {
-      throw new AppError('redirectUri is required', 400, ERROR_CODES.INVALID_INPUT);
+      throw new AppError('redirectUri is required', 400, errorCodesSchema.enum.INVALID_INPUT);
     }
 
     if (redirectUri && !(await authConfigService.validateRedirectUrl(redirectUri))) {
@@ -367,13 +367,17 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
       throw new AppError(
         `${redirectUri} is not in the allowed redirect URLs`,
         400,
-        ERROR_CODES.INVALID_INPUT,
+        errorCodesSchema.enum.INVALID_INPUT,
         'Please add this URL to the allowed redirect URLs in the authentication configuration.'
       );
     }
 
     if (!codeChallenge) {
-      throw new AppError('code_challenge is required in state', 400, ERROR_CODES.INVALID_INPUT);
+      throw new AppError(
+        'code_challenge is required in state',
+        400,
+        errorCodesSchema.enum.INVALID_INPUT
+      );
     }
 
     if (success !== 'true') {
@@ -386,7 +390,11 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
 
     try {
       if (!payload) {
-        throw new AppError('No payload provided in callback', 400, ERROR_CODES.INVALID_INPUT);
+        throw new AppError(
+          'No payload provided in callback',
+          400,
+          errorCodesSchema.enum.INVALID_INPUT
+        );
       }
 
       const payloadData = JSON.parse(
@@ -442,7 +450,7 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
 
     if (!state) {
       logger.warn('OAuth callback called without state parameter');
-      throw new AppError('State parameter is required', 400, ERROR_CODES.INVALID_INPUT);
+      throw new AppError('State parameter is required', 400, errorCodesSchema.enum.INVALID_INPUT);
     }
 
     // Decode state data (needed for both success and error paths)
@@ -461,11 +469,11 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
     } catch {
       // Invalid state
       logger.warn('Invalid state in provider callback', { state });
-      throw new AppError('Invalid state parameter', 400, ERROR_CODES.INVALID_INPUT);
+      throw new AppError('Invalid state parameter', 400, errorCodesSchema.enum.INVALID_INPUT);
     }
 
     if (!redirectUri) {
-      throw new AppError('redirectUri is required', 400, ERROR_CODES.INVALID_INPUT);
+      throw new AppError('redirectUri is required', 400, errorCodesSchema.enum.INVALID_INPUT);
     }
 
     if (!(await authConfigService.validateRedirectUrl(redirectUri))) {
@@ -473,13 +481,17 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
       throw new AppError(
         `${redirectUri} is not in the allowed redirect URLs`,
         400,
-        ERROR_CODES.INVALID_INPUT,
+        errorCodesSchema.enum.INVALID_INPUT,
         'Please add this URL to the allowed redirect URLs in the authentication configuration.'
       );
     }
 
     if (!codeChallenge) {
-      throw new AppError('code_challenge is required in state', 400, ERROR_CODES.INVALID_INPUT);
+      throw new AppError(
+        'code_challenge is required in state',
+        400,
+        errorCodesSchema.enum.INVALID_INPUT
+      );
     }
 
     try {
@@ -489,7 +501,7 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
         throw new AppError(
           `Unsupported OAuth provider: ${provider}. Supported providers: ${oAuthProvidersSchema.options.join(', ')}`,
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
 
@@ -553,7 +565,7 @@ router.post('/exchange', async (req: Request, res: Response, next: NextFunction)
       throw new AppError(
         validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
 

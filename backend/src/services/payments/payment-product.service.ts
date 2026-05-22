@@ -17,7 +17,7 @@ import {
 import { withPaymentSessionAdvisoryLock } from '@/services/payments/payments-advisory-lock.js';
 import { PaymentConfigService } from '@/services/payments/payment-config.service.js';
 import {
-  ERROR_CODES,
+  errorCodesSchema,
   type CreatePaymentProductRequest,
   type DeletePaymentProductResponse,
   type GetPaymentProductResponse,
@@ -129,7 +129,7 @@ export class PaymentProductService {
       throw new AppError(
         `Stripe ${environment} product not found: ${stripeProductId}`,
         404,
-        ERROR_CODES.PAYMENT_PRODUCT_NOT_FOUND
+        errorCodesSchema.enum.PAYMENT_PRODUCT_NOT_FOUND
       );
     }
 

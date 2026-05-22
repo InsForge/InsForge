@@ -1,5 +1,5 @@
 import type { RawOpenRouterModel } from '@/types/ai.js';
-import { type AIModelSchema, ERROR_CODES } from '@insforge/shared-schemas';
+import { type AIModelSchema, errorCodesSchema } from '@insforge/shared-schemas';
 import { calculateTokenPrices, normalizeModalities, getProviderOrder } from './helpers.js';
 import { AppError } from '@/api/middlewares/error.js';
 
@@ -31,7 +31,7 @@ export class AIModelService {
       throw new AppError(
         `Failed to fetch models: ${response.statusText}`,
         500,
-        ERROR_CODES.AI_UPSTREAM_UNAVAILABLE
+        errorCodesSchema.enum.AI_UPSTREAM_UNAVAILABLE
       );
     }
 

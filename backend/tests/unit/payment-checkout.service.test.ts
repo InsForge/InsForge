@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ERROR_CODES } from '@insforge/shared-schemas';
+import { errorCodesSchema } from '@insforge/shared-schemas';
 
 const { mockClient, mockPool } = vi.hoisted(() => ({
   mockClient: {
@@ -75,7 +75,7 @@ describe('PaymentCheckoutService', () => {
       )
     ).rejects.toMatchObject({
       statusCode: 409,
-      code: ERROR_CODES.PAYMENT_CHECKOUT_ALREADY_EXISTS,
+      code: errorCodesSchema.enum.PAYMENT_CHECKOUT_ALREADY_EXISTS,
     });
 
     expect(

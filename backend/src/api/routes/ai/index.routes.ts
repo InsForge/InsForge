@@ -12,7 +12,7 @@ import {
   chatCompletionRequestSchema,
   embeddingsRequestSchema,
   imageGenerationRequestSchema,
-  ERROR_CODES,
+  errorCodesSchema,
 } from '@insforge/shared-schemas';
 
 const router = Router();
@@ -64,10 +64,10 @@ router.get(
       const key = await getProviderApiKey(provider, openRouterProvider);
       successResponse(res, key);
     } catch (error) {
-      if (error instanceof AppError && error.code === ERROR_CODES.AI_INVALID_API_KEY) {
+      if (error instanceof AppError && error.code === errorCodesSchema.enum.AI_INVALID_API_KEY) {
         errorResponse(
           res,
-          ERROR_CODES.AI_INVALID_API_KEY,
+          errorCodesSchema.enum.AI_INVALID_API_KEY,
           'OpenRouter API key is not configured.',
           400,
           'Set OPENROUTER_API_KEY in the backend environment.'
@@ -87,7 +87,7 @@ function parseAIProvider(value: string | undefined): AIProvider {
   throw new AppError(
     `Unsupported AI provider: ${value || 'unknown'}`,
     400,
-    ERROR_CODES.INVALID_INPUT
+    errorCodesSchema.enum.INVALID_INPUT
   );
 }
 
@@ -100,7 +100,7 @@ function getProviderApiKey(provider: AIProvider, openRouterProvider: OpenRouterP
       throw new AppError(
         `Unsupported AI provider: ${exhaustiveProvider}`,
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
   }
@@ -120,7 +120,7 @@ router.post(
         throw new AppError(
           `Validation error: ${validationResult.error.errors.map((e) => e.message).join(', ')}`,
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
 
@@ -180,7 +180,7 @@ router.post(
           new AppError(
             error instanceof Error ? error.message : 'Failed to generate chat',
             500,
-            ERROR_CODES.INTERNAL_ERROR
+            errorCodesSchema.enum.INTERNAL_ERROR
           )
         );
       }
@@ -202,7 +202,7 @@ router.post(
         throw new AppError(
           `Validation error: ${validationResult.error.errors.map((e) => e.message).join(', ')}`,
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
 
@@ -217,7 +217,7 @@ router.post(
           new AppError(
             error instanceof Error ? error.message : 'Failed to generate image',
             500,
-            ERROR_CODES.INTERNAL_ERROR
+            errorCodesSchema.enum.INTERNAL_ERROR
           )
         );
       }
@@ -239,7 +239,7 @@ router.post(
         throw new AppError(
           `Validation error: ${validationResult.error.errors.map((e) => e.message).join(', ')}`,
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
 
@@ -255,7 +255,7 @@ router.post(
           new AppError(
             error instanceof Error ? error.message : 'Failed to generate embeddings',
             500,
-            ERROR_CODES.INTERNAL_ERROR
+            errorCodesSchema.enum.INTERNAL_ERROR
           )
         );
       }

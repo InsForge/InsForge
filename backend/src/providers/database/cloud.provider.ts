@@ -3,7 +3,7 @@ import axios from 'axios';
 import { z } from 'zod';
 import { config } from '@/infra/config/app.config.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
+import { errorCodesSchema } from '@insforge/shared-schemas';
 import { DatabaseProvider, DatabaseConnectionInfo, DatabasePasswordInfo } from './base.provider.js';
 
 /**
@@ -54,7 +54,7 @@ export class CloudDatabaseProvider implements DatabaseProvider {
       throw new AppError(
         'PROJECT_ID is not configured. Cannot access cloud API without cloud project setup.',
         500,
-        ERROR_CODES.INTERNAL_ERROR
+        errorCodesSchema.enum.INTERNAL_ERROR
       );
     }
 
@@ -62,7 +62,7 @@ export class CloudDatabaseProvider implements DatabaseProvider {
       throw new AppError(
         'JWT_SECRET is not configured. Cannot generate sign token.',
         500,
-        ERROR_CODES.INTERNAL_ERROR
+        errorCodesSchema.enum.INTERNAL_ERROR
       );
     }
 
@@ -87,7 +87,7 @@ export class CloudDatabaseProvider implements DatabaseProvider {
         throw new AppError(
           `Invalid database connection info response: ${parsed.error.message}`,
           500,
-          ERROR_CODES.INTERNAL_ERROR
+          errorCodesSchema.enum.INTERNAL_ERROR
         );
       }
 
@@ -102,13 +102,13 @@ export class CloudDatabaseProvider implements DatabaseProvider {
         throw new AppError(
           `Failed to fetch database connection string: ${message}`,
           status,
-          ERROR_CODES.INTERNAL_ERROR
+          errorCodesSchema.enum.INTERNAL_ERROR
         );
       }
       throw new AppError(
         `Unexpected error fetching database connection string: ${error instanceof Error ? error.message : 'Unknown error'}`,
         500,
-        ERROR_CODES.INTERNAL_ERROR
+        errorCodesSchema.enum.INTERNAL_ERROR
       );
     }
   }
@@ -131,7 +131,7 @@ export class CloudDatabaseProvider implements DatabaseProvider {
         throw new AppError(
           `Invalid database password response: ${parsed.error.message}`,
           500,
-          ERROR_CODES.INTERNAL_ERROR
+          errorCodesSchema.enum.INTERNAL_ERROR
         );
       }
 
@@ -146,13 +146,13 @@ export class CloudDatabaseProvider implements DatabaseProvider {
         throw new AppError(
           `Failed to fetch database password: ${message}`,
           status,
-          ERROR_CODES.INTERNAL_ERROR
+          errorCodesSchema.enum.INTERNAL_ERROR
         );
       }
       throw new AppError(
         `Unexpected error fetching database password: ${error instanceof Error ? error.message : 'Unknown error'}`,
         500,
-        ERROR_CODES.INTERNAL_ERROR
+        errorCodesSchema.enum.INTERNAL_ERROR
       );
     }
   }

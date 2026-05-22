@@ -18,7 +18,7 @@ import {
 } from '@/types/deployments.js';
 import logger from '@/utils/logger.js';
 import {
-  ERROR_CODES,
+  errorCodesSchema,
   type CreateDeploymentResponse,
   type CreateDirectDeploymentRequest,
   type CreateDirectDeploymentResponse,
@@ -198,7 +198,7 @@ export class DeploymentService {
       throw new AppError(
         'Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID environment variables.',
         503,
-        ERROR_CODES.INTERNAL_ERROR
+        errorCodesSchema.enum.INTERNAL_ERROR
       );
     }
   }
@@ -214,7 +214,7 @@ export class DeploymentService {
       throw new AppError(
         'S3 storage is required for legacy deployments. Please configure AWS_S3_BUCKET.',
         503,
-        ERROR_CODES.INTERNAL_ERROR
+        errorCodesSchema.enum.INTERNAL_ERROR
       );
     }
 
@@ -263,7 +263,7 @@ export class DeploymentService {
       logger.error('Failed to create deployment', {
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new AppError('Failed to create deployment', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError('Failed to create deployment', 500, errorCodesSchema.enum.INTERNAL_ERROR);
     }
   }
 
@@ -337,7 +337,11 @@ export class DeploymentService {
       logger.error('Failed to create direct deployment', {
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new AppError('Failed to create direct deployment', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError(
+        'Failed to create direct deployment',
+        500,
+        errorCodesSchema.enum.INTERNAL_ERROR
+      );
     }
   }
 
@@ -356,7 +360,11 @@ export class DeploymentService {
       const deployment = await this.getDeploymentById(id);
 
       if (!deployment) {
-        throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
+        throw new AppError(
+          `Deployment not found: ${id}`,
+          404,
+          errorCodesSchema.enum.DEPLOYMENT_NOT_FOUND
+        );
       }
 
       if (
@@ -366,7 +374,7 @@ export class DeploymentService {
         throw new AppError(
           `Deployment files can only be uploaded while status is WAITING or UPLOADING. Current status: ${deployment.status}`,
           400,
-          ERROR_CODES.DEPLOYMENT_INVALID_FILE
+          errorCodesSchema.enum.DEPLOYMENT_INVALID_FILE
         );
       }
 
@@ -376,7 +384,7 @@ export class DeploymentService {
         throw new AppError(
           `Deployment file not found: ${fileId}`,
           404,
-          ERROR_CODES.DEPLOYMENT_NOT_FOUND
+          errorCodesSchema.enum.DEPLOYMENT_NOT_FOUND
         );
       }
 
@@ -384,7 +392,7 @@ export class DeploymentService {
         throw new AppError(
           'Deployment files can only be uploaded for direct deployments.',
           400,
-          ERROR_CODES.DEPLOYMENT_INVALID_FILE
+          errorCodesSchema.enum.DEPLOYMENT_INVALID_FILE
         );
       }
 
@@ -418,7 +426,7 @@ export class DeploymentService {
         throw new AppError(
           'Failed to mark deployment file as uploaded',
           500,
-          ERROR_CODES.INTERNAL_ERROR
+          errorCodesSchema.enum.INTERNAL_ERROR
         );
       }
 
@@ -448,7 +456,11 @@ export class DeploymentService {
         id,
         fileId,
       });
-      throw new AppError('Failed to upload deployment file', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError(
+        'Failed to upload deployment file',
+        500,
+        errorCodesSchema.enum.INTERNAL_ERROR
+      );
     }
   }
 
@@ -462,7 +474,11 @@ export class DeploymentService {
       const deployment = await this.getDeploymentById(id);
 
       if (!deployment) {
-        throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
+        throw new AppError(
+          `Deployment not found: ${id}`,
+          404,
+          errorCodesSchema.enum.DEPLOYMENT_NOT_FOUND
+        );
       }
 
       if (
@@ -472,7 +488,7 @@ export class DeploymentService {
         throw new AppError(
           `Deployment is not ready to start. Current status: ${deployment.status}`,
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
 
@@ -496,7 +512,7 @@ export class DeploymentService {
       await this.updateDeploymentStatus(id, DeploymentStatus.ERROR, {
         error: error instanceof Error ? error.message : 'Unknown error',
       }).catch(() => {});
-      throw new AppError('Failed to start deployment', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError('Failed to start deployment', 500, errorCodesSchema.enum.INTERNAL_ERROR);
     }
   }
 
@@ -521,7 +537,7 @@ export class DeploymentService {
       throw new AppError(
         'Deployment files have not been registered.',
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
 
@@ -530,7 +546,7 @@ export class DeploymentService {
       throw new AppError(
         `Deployment has ${missingFiles.length} file(s) that have not been uploaded yet.`,
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
 
@@ -557,7 +573,7 @@ export class DeploymentService {
       throw new AppError(
         'S3 storage is required for legacy deployments. Please configure AWS_S3_BUCKET.',
         503,
-        ERROR_CODES.INTERNAL_ERROR
+        errorCodesSchema.enum.INTERNAL_ERROR
       );
     }
 
@@ -574,7 +590,7 @@ export class DeploymentService {
       throw new AppError(
         'Source zip file not found. Please upload the source files first.',
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
 
@@ -583,7 +599,11 @@ export class DeploymentService {
       await this.updateDeploymentStatus(id, DeploymentStatus.ERROR, {
         error: 'Failed to download source zip file.',
       });
-      throw new AppError('Failed to download source zip file.', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError(
+        'Failed to download source zip file.',
+        500,
+        errorCodesSchema.enum.INTERNAL_ERROR
+      );
     }
 
     const files = this.extractFilesFromZip(zipBuffer);
@@ -591,7 +611,11 @@ export class DeploymentService {
       await this.updateDeploymentStatus(id, DeploymentStatus.ERROR, {
         error: 'No files found in source zip.',
       });
-      throw new AppError('No files found in source zip.', 400, ERROR_CODES.DEPLOYMENT_INVALID_FILE);
+      throw new AppError(
+        'No files found in source zip.',
+        400,
+        errorCodesSchema.enum.DEPLOYMENT_INVALID_FILE
+      );
     }
 
     if (input.envVars && input.envVars.length > 0) {
@@ -746,21 +770,21 @@ export class DeploymentService {
       throw new AppError(
         'Deployment file path cannot contain null bytes.',
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
     if (filePath.includes('\\')) {
       throw new AppError(
         'Deployment file path must use forward slashes.',
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
     if (filePath.startsWith('/')) {
       throw new AppError(
         'Deployment file path must be relative.',
         400,
-        ERROR_CODES.DEPLOYMENT_INVALID_FILE
+        errorCodesSchema.enum.DEPLOYMENT_INVALID_FILE
       );
     }
 
@@ -769,7 +793,7 @@ export class DeploymentService {
       throw new AppError(
         'Deployment file path cannot contain empty, current, or parent directory segments.',
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
 
@@ -787,7 +811,7 @@ export class DeploymentService {
       throw new AppError(
         `Deployment files exceed the maximum of ${maxFiles} files.`,
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
 
@@ -801,7 +825,7 @@ export class DeploymentService {
         throw new AppError(
           `Duplicate deployment file path: ${normalizedPath}`,
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
       seenPaths.add(normalizedPath);
@@ -810,7 +834,7 @@ export class DeploymentService {
         throw new AppError(
           `Deployment file ${normalizedPath} exceeds the maximum size of ${maxFileBytes} bytes.`,
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
 
@@ -819,7 +843,7 @@ export class DeploymentService {
         throw new AppError(
           `Deployment files exceed the maximum total size of ${maxTotalBytes} bytes.`,
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
 
@@ -881,7 +905,7 @@ export class DeploymentService {
             new AppError(
               'Uploaded file is larger than the registered deployment file size.',
               400,
-              ERROR_CODES.INVALID_INPUT
+              errorCodesSchema.enum.INVALID_INPUT
             )
           );
           return;
@@ -896,7 +920,7 @@ export class DeploymentService {
             new AppError(
               'Uploaded file size does not match the registered deployment file.',
               400,
-              ERROR_CODES.INVALID_INPUT
+              errorCodesSchema.enum.INVALID_INPUT
             )
           );
           return;
@@ -908,7 +932,7 @@ export class DeploymentService {
             new AppError(
               'Uploaded file content does not match the registered deployment file.',
               400,
-              ERROR_CODES.INVALID_INPUT
+              errorCodesSchema.enum.INVALID_INPUT
             )
           );
           return;
@@ -1016,7 +1040,7 @@ export class DeploymentService {
         error: error instanceof Error ? error.message : String(error),
         id,
       });
-      throw new AppError('Failed to get deployment', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError('Failed to get deployment', 500, errorCodesSchema.enum.INTERNAL_ERROR);
     }
   }
 
@@ -1050,7 +1074,7 @@ export class DeploymentService {
         error: error instanceof Error ? error.message : String(error),
         vercelDeploymentId,
       });
-      throw new AppError('Failed to get deployment', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError('Failed to get deployment', 500, errorCodesSchema.enum.INTERNAL_ERROR);
     }
   }
 
@@ -1069,7 +1093,7 @@ export class DeploymentService {
         throw new AppError(
           'Cannot sync deployment: no provider deployment ID yet. Deployment may still be in WAITING status.',
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
 
@@ -1121,7 +1145,7 @@ export class DeploymentService {
         error: error instanceof Error ? error.message : String(error),
         id,
       });
-      throw new AppError('Failed to sync deployment', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError('Failed to sync deployment', 500, errorCodesSchema.enum.INTERNAL_ERROR);
     }
   }
 
@@ -1160,7 +1184,7 @@ export class DeploymentService {
       logger.error('Failed to list deployments', {
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new AppError('Failed to list deployments', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError('Failed to list deployments', 500, errorCodesSchema.enum.INTERNAL_ERROR);
     }
   }
 
@@ -1172,7 +1196,11 @@ export class DeploymentService {
       const deployment = await this.getDeploymentById(id);
 
       if (!deployment) {
-        throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
+        throw new AppError(
+          `Deployment not found: ${id}`,
+          404,
+          errorCodesSchema.enum.DEPLOYMENT_NOT_FOUND
+        );
       }
 
       // If deployment has a Vercel ID, cancel it on Vercel
@@ -1214,7 +1242,7 @@ export class DeploymentService {
         error: error instanceof Error ? error.message : String(error),
         id,
       });
-      throw new AppError('Failed to cancel deployment', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError('Failed to cancel deployment', 500, errorCodesSchema.enum.INTERNAL_ERROR);
     }
   }
 
@@ -1302,7 +1330,7 @@ export class DeploymentService {
       throw new AppError(
         'Failed to update deployment from webhook',
         500,
-        ERROR_CODES.INTERNAL_ERROR
+        errorCodesSchema.enum.INTERNAL_ERROR
       );
     }
   }
@@ -1316,7 +1344,7 @@ export class DeploymentService {
       throw new AppError(
         'Custom slugs are only available in cloud environment.',
         503,
-        ERROR_CODES.INTERNAL_ERROR
+        errorCodesSchema.enum.INTERNAL_ERROR
       );
     }
 
@@ -1325,7 +1353,7 @@ export class DeploymentService {
       throw new AppError(
         'PROJECT_ID not found in environment variables',
         500,
-        ERROR_CODES.INTERNAL_ERROR
+        errorCodesSchema.enum.INTERNAL_ERROR
       );
     }
 
@@ -1334,7 +1362,7 @@ export class DeploymentService {
       throw new AppError(
         'JWT_SECRET not found in environment variables',
         500,
-        ERROR_CODES.INTERNAL_ERROR
+        errorCodesSchema.enum.INTERNAL_ERROR
       );
     }
 
@@ -1358,7 +1386,7 @@ export class DeploymentService {
         throw new AppError(
           errorData.error || 'Slug is already taken',
           409,
-          ERROR_CODES.DEPLOYMENT_ALREADY_EXISTS
+          errorCodesSchema.enum.DEPLOYMENT_ALREADY_EXISTS
         );
       }
 
@@ -1367,7 +1395,7 @@ export class DeploymentService {
         throw new AppError(
           `Failed to update slug: ${response.statusText} - ${errorText}`,
           response.status,
-          ERROR_CODES.INTERNAL_ERROR
+          errorCodesSchema.enum.INTERNAL_ERROR
         );
       }
 
@@ -1390,7 +1418,7 @@ export class DeploymentService {
       logger.error('Failed to update slug', {
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new AppError('Failed to update slug', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError('Failed to update slug', 500, errorCodesSchema.enum.INTERNAL_ERROR);
     }
   }
 
@@ -1442,7 +1470,11 @@ export class DeploymentService {
       logger.error('Failed to list custom domains', {
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new AppError('Failed to list custom domains', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError(
+        'Failed to list custom domains',
+        500,
+        errorCodesSchema.enum.INTERNAL_ERROR
+      );
     }
   }
 
@@ -1490,7 +1522,11 @@ export class DeploymentService {
         error: error instanceof Error ? error.message : String(error),
         domain,
       });
-      throw new AppError('Failed to verify custom domain', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError(
+        'Failed to verify custom domain',
+        500,
+        errorCodesSchema.enum.INTERNAL_ERROR
+      );
     }
   }
 
@@ -1529,7 +1565,11 @@ export class DeploymentService {
       logger.error('Failed to get deployment metadata', {
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new AppError('Failed to get deployment metadata', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError(
+        'Failed to get deployment metadata',
+        500,
+        errorCodesSchema.enum.INTERNAL_ERROR
+      );
     }
   }
 }

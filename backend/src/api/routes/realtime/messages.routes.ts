@@ -6,7 +6,7 @@ import { AppError } from '@/api/middlewares/error.js';
 import {
   listMessagesRequestSchema,
   messageStatsRequestSchema,
-  ERROR_CODES,
+  errorCodesSchema,
 } from '@insforge/shared-schemas';
 
 const router = Router();
@@ -20,7 +20,7 @@ router.get('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextF
       throw new AppError(
         validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
     const messages = await messageService.list(validation.data);
@@ -38,7 +38,7 @@ router.get('/stats', verifyAdmin, async (req: AuthRequest, res: Response, next: 
       throw new AppError(
         validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
     const stats = await messageService.getStats(validation.data);

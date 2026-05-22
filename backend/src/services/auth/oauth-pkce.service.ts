@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { type CreateSessionResponse, ERROR_CODES } from '@insforge/shared-schemas';
+import { type CreateSessionResponse, errorCodesSchema } from '@insforge/shared-schemas';
 import { AppError } from '@/api/middlewares/error.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import logger from '@/utils/logger.js';
@@ -85,7 +85,7 @@ export class OAuthPKCEService {
 
     if (!data) {
       logger.warn('OAuth PKCE code not found or already used');
-      throw new AppError('Invalid or expired code', 400, ERROR_CODES.INVALID_INPUT);
+      throw new AppError('Invalid or expired code', 400, errorCodesSchema.enum.INVALID_INPUT);
     }
 
     // Delete immediately to make the code one-time use.
@@ -93,14 +93,14 @@ export class OAuthPKCEService {
 
     if (new Date() > data.expiresAt) {
       logger.warn('OAuth PKCE code expired', { provider: data.provider });
-      throw new AppError('Invalid or expired code', 400, ERROR_CODES.INVALID_INPUT);
+      throw new AppError('Invalid or expired code', 400, errorCodesSchema.enum.INVALID_INPUT);
     }
 
     // Validate PKCE: SHA256(code_verifier) must equal the stored code_challenge.
     const computedChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
     if (computedChallenge !== data.codeChallenge) {
       logger.warn('PKCE validation failed', { provider: data.provider });
-      throw new AppError('PKCE verification failed', 400, ERROR_CODES.AUTH_UNAUTHORIZED);
+      throw new AppError('PKCE verification failed', 400, errorCodesSchema.enum.AUTH_UNAUTHORIZED);
     }
 
     const authService = AuthService.getInstance();
@@ -109,7 +109,7 @@ export class OAuthPKCEService {
     const user = await authService.getUserSchemaById(data.userId);
     if (!user) {
       logger.error('User not found during PKCE exchange', { userId: data.userId });
-      throw new AppError('User not found', 404, ERROR_CODES.AUTH_USER_NOT_FOUND);
+      throw new AppError('User not found', 404, errorCodesSchema.enum.AUTH_USER_NOT_FOUND);
     }
 
     const accessToken = tokenManager.generateAccessToken({

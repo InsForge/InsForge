@@ -4,7 +4,7 @@ import logger from '@/utils/logger.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { ServerEvents, ClientEvents, SocketMetadata, NotificationPayload } from '@/types/socket.js';
 import {
-  ERROR_CODES,
+  errorCodesSchema,
   type SubscribeChannelPayload,
   type PublishEventPayload,
   type SocketMessage,
@@ -93,7 +93,7 @@ export class SocketManager {
           throw new AppError(
             'Invalid API key',
             401,
-            ERROR_CODES.AUTH_INVALID_API_KEY,
+            errorCodesSchema.enum.AUTH_INVALID_API_KEY,
             NEXT_ACTIONS.CHECK_API_KEY
           );
         }
@@ -103,7 +103,7 @@ export class SocketManager {
           throw new AppError(
             'No authentication provided',
             401,
-            ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+            errorCodesSchema.enum.AUTH_INVALID_CREDENTIALS,
             NEXT_ACTIONS.CHECK_TOKEN
           );
         }
@@ -113,7 +113,7 @@ export class SocketManager {
           throw new AppError(
             'Invalid token: missing role',
             401,
-            ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+            errorCodesSchema.enum.AUTH_INVALID_CREDENTIALS,
             NEXT_ACTIONS.CHECK_TOKEN
           );
         }
@@ -133,7 +133,7 @@ export class SocketManager {
             new AppError(
               'Invalid authentication',
               401,
-              ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+              errorCodesSchema.enum.AUTH_INVALID_CREDENTIALS,
               NEXT_ACTIONS.CHECK_TOKEN
             )
           );

@@ -6,7 +6,7 @@ import type { UserContext } from '@/api/middlewares/auth.js';
 import { withUserContext } from '@/services/database/user-context.service.js';
 import { StorageRecord } from '@/types/storage.js';
 import {
-  ERROR_CODES,
+  errorCodesSchema,
   StorageBucketSchema,
   StorageFileSchema,
   StorageMetadataSchema,
@@ -238,7 +238,7 @@ export class StorageService {
       uploadedObject = await runWithRootAccess(this.getPool(), insertObject);
     } else {
       if (!ctx) {
-        throw new AppError('Forbidden', 403, ERROR_CODES.STORAGE_PERMISSION_DENIED);
+        throw new AppError('Forbidden', 403, errorCodesSchema.enum.STORAGE_PERMISSION_DENIED);
       }
       uploadedObject = await withUserContext(this.getPool(), ctx, insertObject);
     }
@@ -357,7 +357,7 @@ export class StorageService {
       deleted = await runWithRootAccess(this.getPool(), deleteObjectRow);
     } else {
       if (!ctx) {
-        throw new AppError('Forbidden', 403, ERROR_CODES.STORAGE_PERMISSION_DENIED);
+        throw new AppError('Forbidden', 403, errorCodesSchema.enum.STORAGE_PERMISSION_DENIED);
       }
       deleted = await withUserContext(this.getPool(), ctx, deleteObjectRow);
     }
@@ -425,7 +425,7 @@ export class StorageService {
       return runWithRootAccess(this.getPool(), listVisibleObjects);
     }
     if (!ctx) {
-      throw new AppError('Forbidden', 403, ERROR_CODES.STORAGE_PERMISSION_DENIED);
+      throw new AppError('Forbidden', 403, errorCodesSchema.enum.STORAGE_PERMISSION_DENIED);
     }
     return withUserContext(this.getPool(), ctx, listVisibleObjects);
   }
@@ -542,7 +542,7 @@ export class StorageService {
       return this.provider.getUploadStrategy(bucket, key, metadata, maxFileSizeBytes);
     }
     if (!ctx) {
-      throw new AppError('Forbidden', 403, ERROR_CODES.STORAGE_PERMISSION_DENIED);
+      throw new AppError('Forbidden', 403, errorCodesSchema.enum.STORAGE_PERMISSION_DENIED);
     }
     const userId = ctx.id ?? null;
     await withUserContext(this.getPool(), ctx, async (client) => {
@@ -693,7 +693,7 @@ export class StorageService {
       result = await runWithRootAccess(this.getPool(), insertObjectRow);
     } else {
       if (!ctx) {
-        throw new AppError('Forbidden', 403, ERROR_CODES.STORAGE_PERMISSION_DENIED);
+        throw new AppError('Forbidden', 403, errorCodesSchema.enum.STORAGE_PERMISSION_DENIED);
       }
       result = await withUserContext(this.getPool(), ctx, insertObjectRow);
     }

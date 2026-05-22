@@ -50,7 +50,7 @@ import {
   updateAuthConfigRequestSchema,
   upsertSmtpConfigRequestSchema,
   updateEmailTemplateRequestSchema,
-  ERROR_CODES,
+  errorCodesSchema,
 } from '@insforge/shared-schemas';
 import { SmtpConfigService } from '@/services/email/smtp-config.service.js';
 import { EmailTemplateService } from '@/services/email/email-template.service.js';
@@ -96,7 +96,7 @@ router.get('/email/verify-link', async (req: Request, res: Response, next: NextF
       throw new AppError(
         validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
 
@@ -108,7 +108,7 @@ router.get('/email/verify-link', async (req: Request, res: Response, next: NextF
       throw new AppError(
         'No redirect target configured for this verification link',
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
 
@@ -116,7 +116,7 @@ router.get('/email/verify-link', async (req: Request, res: Response, next: NextF
       throw new AppError(
         `${redirectTo} is not in the allowed redirect URLs`,
         400,
-        ERROR_CODES.INVALID_INPUT,
+        errorCodesSchema.enum.INVALID_INPUT,
         'Please add this URL to the allowed redirect URLs in the authentication configuration.'
       );
     }
@@ -166,7 +166,7 @@ router.get(
         throw new AppError(
           validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
 
@@ -181,7 +181,7 @@ router.get(
         throw new AppError(
           'No redirect target configured for this reset link',
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
 
@@ -189,7 +189,7 @@ router.get(
         throw new AppError(
           `${redirectTo} is not in the allowed redirect URLs`,
           400,
-          ERROR_CODES.INVALID_INPUT,
+          errorCodesSchema.enum.INVALID_INPUT,
           'Please add this URL to the allowed redirect URLs in the authentication configuration.'
         );
       }
@@ -243,7 +243,11 @@ router.patch(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       if (!req.user?.id) {
-        throw new AppError('User not authenticated', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
+        throw new AppError(
+          'User not authenticated',
+          401,
+          errorCodesSchema.enum.AUTH_INVALID_CREDENTIALS
+        );
       }
 
       const validationResult = updateProfileRequestSchema.safeParse(req.body);
@@ -251,7 +255,7 @@ router.patch(
         throw new AppError(
           validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
 
@@ -272,14 +276,14 @@ router.get('/profiles/:userId', async (req: Request, res: Response, next: NextFu
   try {
     const userIdValidation = userIdSchema.safeParse(req.params.userId);
     if (!userIdValidation.success) {
-      throw new AppError('Invalid user ID format', 400, ERROR_CODES.INVALID_INPUT);
+      throw new AppError('Invalid user ID format', 400, errorCodesSchema.enum.INVALID_INPUT);
     }
 
     const userId = userIdValidation.data;
     const userProfile = await authService.getProfileById(userId);
 
     if (!userProfile) {
-      throw new AppError('User not found', 404, ERROR_CODES.AUTH_USER_NOT_FOUND);
+      throw new AppError('User not found', 404, errorCodesSchema.enum.AUTH_USER_NOT_FOUND);
     }
 
     const response: GetProfileResponse = userProfile;
@@ -309,7 +313,7 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
       throw new AppError(
         validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
 
@@ -359,7 +363,7 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
       throw new AppError(
         validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
 
@@ -369,7 +373,7 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
         throw new AppError(
           'User signups are disabled for this project.',
           403,
-          ERROR_CODES.AUTH_SIGNUP_DISABLED
+          errorCodesSchema.enum.AUTH_SIGNUP_DISABLED
         );
       }
     }
@@ -434,7 +438,7 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
       throw new AppError(
         validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
 
@@ -474,19 +478,19 @@ router.post('/id-token', async (req: Request, res: Response, next: NextFunction)
 
     // Validate input
     if (!provider || typeof provider !== 'string') {
-      throw new AppError('Provider is required', 400, ERROR_CODES.INVALID_INPUT);
+      throw new AppError('Provider is required', 400, errorCodesSchema.enum.INVALID_INPUT);
     }
 
     if (provider !== 'google') {
       throw new AppError(
         `Provider ${provider} is not supported for ID token sign-in. Supported: google`,
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
 
     if (!token || typeof token !== 'string') {
-      throw new AppError('Token is required', 400, ERROR_CODES.INVALID_INPUT);
+      throw new AppError('Token is required', 400, errorCodesSchema.enum.INVALID_INPUT);
     }
 
     // Sign in with ID token
@@ -532,7 +536,11 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
       refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE_NAME];
 
       if (!refreshToken) {
-        throw new AppError('No refresh token provided', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+        throw new AppError(
+          'No refresh token provided',
+          401,
+          errorCodesSchema.enum.AUTH_UNAUTHORIZED
+        );
       }
     } else {
       // Non-web clients (mobile, desktop, server): get refresh token from request body.
@@ -546,7 +554,7 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
         throw new AppError(
           validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
 
@@ -555,14 +563,18 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
 
     const payload = tokenManager.verifyRefreshToken(refreshToken);
     if (payload.sessionType !== 'user') {
-      throw new AppError('Invalid refresh session type', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+      throw new AppError(
+        'Invalid refresh session type',
+        401,
+        errorCodesSchema.enum.AUTH_UNAUTHORIZED
+      );
     }
 
     if (clientType === 'web') {
       const csrfHeader = req.headers['x-csrf-token'] as string | undefined;
       if (!tokenManager.verifyCsrfToken(csrfHeader, payload)) {
         logger.warn('[Auth:Refresh] CSRF token validation failed');
-        throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
+        throw new AppError('Invalid CSRF token', 403, errorCodesSchema.enum.AUTH_UNAUTHORIZED);
       }
     }
 
@@ -574,7 +586,7 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
       if (clientType === 'web') {
         clearRefreshTokenCookie(res);
       }
-      throw new AppError('User not found', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+      throw new AppError('User not found', 401, errorCodesSchema.enum.AUTH_UNAUTHORIZED);
     }
 
     const user = authService.transformUserRecordToSchema(dbUser);
@@ -649,12 +661,16 @@ router.get(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       if (!req.user?.id) {
-        throw new AppError('User not authenticated', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
+        throw new AppError(
+          'User not authenticated',
+          401,
+          errorCodesSchema.enum.AUTH_INVALID_CREDENTIALS
+        );
       }
 
       const user = await authService.getUserSchemaById(req.user.id);
       if (!user) {
-        throw new AppError('User not found', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
+        throw new AppError('User not found', 401, errorCodesSchema.enum.AUTH_INVALID_CREDENTIALS);
       }
 
       const response: GetCurrentSessionResponse = {
@@ -708,14 +724,14 @@ router.get(
       // Validate userId path parameter directly
       const userIdValidation = userIdSchema.safeParse(req.params.userId);
       if (!userIdValidation.success) {
-        throw new AppError('Invalid user ID format', 400, ERROR_CODES.INVALID_INPUT);
+        throw new AppError('Invalid user ID format', 400, errorCodesSchema.enum.INVALID_INPUT);
       }
 
       const userId = userIdValidation.data;
       const user = await authService.getUserSchemaById(userId);
 
       if (!user) {
-        throw new AppError('User does not exist', 404, ERROR_CODES.AUTH_USER_NOT_FOUND);
+        throw new AppError('User does not exist', 404, errorCodesSchema.enum.AUTH_USER_NOT_FOUND);
       }
 
       successResponse(res, user);
@@ -736,7 +752,7 @@ router.delete(
         throw new AppError(
           validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
 
@@ -794,7 +810,7 @@ router.post(
         throw new AppError(
           validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
 
@@ -811,7 +827,7 @@ router.post(
           throw new AppError(
             'redirectTo is required when link-based email verification is enabled',
             400,
-            ERROR_CODES.INVALID_INPUT
+            errorCodesSchema.enum.INVALID_INPUT
           );
         }
 
@@ -822,7 +838,7 @@ router.post(
           throw new AppError(
             `${redirectTo} is not in the allowed redirect URLs`,
             400,
-            ERROR_CODES.INVALID_INPUT,
+            errorCodesSchema.enum.INVALID_INPUT,
             'Please add this URL to the allowed redirect URLs in the authentication configuration.'
           );
         }
@@ -868,7 +884,7 @@ router.post(
         throw new AppError(
           validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
 
@@ -911,7 +927,7 @@ router.post(
         throw new AppError(
           validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
 
@@ -928,7 +944,7 @@ router.post(
           throw new AppError(
             'redirectTo is required when link-based password reset is enabled',
             400,
-            ERROR_CODES.INVALID_INPUT
+            errorCodesSchema.enum.INVALID_INPUT
           );
         }
 
@@ -939,7 +955,7 @@ router.post(
           throw new AppError(
             `${redirectTo} is not in the allowed redirect URLs`,
             400,
-            ERROR_CODES.INVALID_INPUT,
+            errorCodesSchema.enum.INVALID_INPUT,
             'Please add this URL to the allowed redirect URLs in the authentication configuration.'
           );
         }
@@ -982,7 +998,7 @@ router.post(
         throw new AppError(
           validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
 
@@ -1018,7 +1034,7 @@ router.post(
         throw new AppError(
           validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
 
@@ -1063,7 +1079,7 @@ router.put(
         throw new AppError(
           validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
 
@@ -1113,7 +1129,7 @@ router.put(
         throw new AppError(
           `Invalid template type. Must be one of: ${EMAIL_TEMPLATE_TYPES.join(', ')}`,
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
 
@@ -1122,7 +1138,7 @@ router.put(
         throw new AppError(
           validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
 

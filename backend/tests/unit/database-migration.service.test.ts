@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ERROR_CODES } from '@insforge/shared-schemas';
+import { errorCodesSchema } from '@insforge/shared-schemas';
 
 const {
   connectMock,
@@ -67,7 +67,7 @@ describe('DatabaseMigrationService', () => {
       })
     ).rejects.toMatchObject({
       statusCode: 403,
-      code: ERROR_CODES.FORBIDDEN,
+      code: errorCodesSchema.enum.FORBIDDEN,
     });
 
     expect(checkManagedSchemaWriteOperationsMock).toHaveBeenCalledWith(

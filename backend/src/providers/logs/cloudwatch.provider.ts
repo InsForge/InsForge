@@ -10,7 +10,12 @@ import {
 import logger from '@/utils/logger.js';
 import { BaseLogProvider } from './base.provider.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { LogSchema, LogSourceSchema, LogStatsSchema, ERROR_CODES } from '@insforge/shared-schemas';
+import {
+  LogSchema,
+  LogSourceSchema,
+  LogStatsSchema,
+  errorCodesSchema,
+} from '@insforge/shared-schemas';
 
 export class CloudWatchProvider extends BaseLogProvider {
   private cwClient: CloudWatchLogsClient | null = null;
@@ -66,7 +71,7 @@ export class CloudWatchProvider extends BaseLogProvider {
       throw new AppError(
         'AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY not found in environment variables',
         500,
-        ERROR_CODES.LOGS_AWS_NOT_CONFIGURED
+        errorCodesSchema.enum.LOGS_AWS_NOT_CONFIGURED
       );
     }
     const logGroup = this.cwLogGroup;
@@ -103,7 +108,7 @@ export class CloudWatchProvider extends BaseLogProvider {
       throw new AppError(
         'AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY not found in environment variables',
         500,
-        ERROR_CODES.LOGS_AWS_NOT_CONFIGURED
+        errorCodesSchema.enum.LOGS_AWS_NOT_CONFIGURED
       );
     }
     const client = this.cwClient;
@@ -291,7 +296,7 @@ export class CloudWatchProvider extends BaseLogProvider {
       throw new AppError(
         'AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY not found in environment variables',
         500,
-        ERROR_CODES.LOGS_AWS_NOT_CONFIGURED
+        errorCodesSchema.enum.LOGS_AWS_NOT_CONFIGURED
       );
     }
     const client = this.cwClient;
@@ -435,7 +440,7 @@ export class CloudWatchProvider extends BaseLogProvider {
       throw new AppError(
         'AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY not found in environment variables',
         500,
-        ERROR_CODES.LOGS_AWS_NOT_CONFIGURED
+        errorCodesSchema.enum.LOGS_AWS_NOT_CONFIGURED
       );
     }
     const client = this.cwClient;

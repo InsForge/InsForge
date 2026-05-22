@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import jwt from 'jsonwebtoken';
-import { ERROR_CODES } from '@insforge/shared-schemas';
+import { errorCodesSchema } from '@insforge/shared-schemas';
 
 const apiHost = 'https://cloud.test.insforge.dev';
 const projectId = '77777777-7777-7777-7777-777777777777';
@@ -96,7 +96,7 @@ describe('PostHogProvider', () => {
 
       await expect(PostHogProvider.getInstance().getConnection()).rejects.toMatchObject({
         statusCode: 502,
-        code: ERROR_CODES.UPSTREAM_FAILURE,
+        code: errorCodesSchema.enum.UPSTREAM_FAILURE,
       });
     });
   });
@@ -107,7 +107,7 @@ describe('PostHogProvider', () => {
 
       await expect(PostHogProvider.getInstance().getDashboards()).rejects.toMatchObject({
         statusCode: 404,
-        code: ERROR_CODES.ANALYTICS_NOT_CONNECTED,
+        code: errorCodesSchema.enum.ANALYTICS_NOT_CONNECTED,
       });
     });
 
@@ -116,7 +116,7 @@ describe('PostHogProvider', () => {
 
       await expect(PostHogProvider.getInstance().getDashboards()).rejects.toMatchObject({
         statusCode: 502,
-        code: ERROR_CODES.UPSTREAM_FAILURE,
+        code: errorCodesSchema.enum.UPSTREAM_FAILURE,
       });
     });
 
@@ -159,7 +159,7 @@ describe('PostHogProvider', () => {
       axiosGetMock.mockRejectedValueOnce(makeAxiosError(404));
       await expect(PostHogProvider.getInstance().getSummary()).rejects.toMatchObject({
         statusCode: 404,
-        code: ERROR_CODES.ANALYTICS_NOT_CONNECTED,
+        code: errorCodesSchema.enum.ANALYTICS_NOT_CONNECTED,
       });
     });
 
@@ -167,7 +167,7 @@ describe('PostHogProvider', () => {
       axiosGetMock.mockRejectedValueOnce(new Error('Network Error'));
       await expect(PostHogProvider.getInstance().getSummary()).rejects.toMatchObject({
         statusCode: 502,
-        code: ERROR_CODES.UPSTREAM_FAILURE,
+        code: errorCodesSchema.enum.UPSTREAM_FAILURE,
       });
     });
   });
@@ -200,7 +200,7 @@ describe('PostHogProvider', () => {
       axiosGetMock.mockRejectedValueOnce(makeAxiosError(404));
       await expect(PostHogProvider.getInstance().getRecentEvents()).rejects.toMatchObject({
         statusCode: 404,
-        code: ERROR_CODES.ANALYTICS_NOT_CONNECTED,
+        code: errorCodesSchema.enum.ANALYTICS_NOT_CONNECTED,
       });
     });
   });
@@ -221,7 +221,7 @@ describe('PostHogProvider', () => {
 
       await expect(PostHogProvider.getInstance().disconnect()).rejects.toMatchObject({
         statusCode: 502,
-        code: ERROR_CODES.UPSTREAM_FAILURE,
+        code: errorCodesSchema.enum.UPSTREAM_FAILURE,
       });
     });
   });
@@ -255,7 +255,7 @@ describe('PostHogProvider', () => {
       axiosGetMock.mockRejectedValueOnce(makeAxiosError(404));
       await expect(PostHogProvider.getInstance().getWebOverview('7d')).rejects.toMatchObject({
         statusCode: 404,
-        code: ERROR_CODES.ANALYTICS_NOT_CONNECTED,
+        code: errorCodesSchema.enum.ANALYTICS_NOT_CONNECTED,
       });
     });
 
@@ -263,7 +263,7 @@ describe('PostHogProvider', () => {
       axiosGetMock.mockRejectedValueOnce(new Error('Network Error'));
       await expect(PostHogProvider.getInstance().getWebOverview('7d')).rejects.toMatchObject({
         statusCode: 502,
-        code: ERROR_CODES.UPSTREAM_FAILURE,
+        code: errorCodesSchema.enum.UPSTREAM_FAILURE,
       });
     });
   });
@@ -289,7 +289,7 @@ describe('PostHogProvider', () => {
       axiosGetMock.mockRejectedValueOnce(new Error('Network Error'));
       await expect(PostHogProvider.getInstance().getWebStats('Page', '7d')).rejects.toMatchObject({
         statusCode: 502,
-        code: ERROR_CODES.UPSTREAM_FAILURE,
+        code: errorCodesSchema.enum.UPSTREAM_FAILURE,
       });
     });
   });
@@ -318,7 +318,7 @@ describe('PostHogProvider', () => {
       await expect(PostHogProvider.getInstance().getTrends('visitors', '7d')).rejects.toMatchObject(
         {
           statusCode: 404,
-          code: ERROR_CODES.ANALYTICS_NOT_CONNECTED,
+          code: errorCodesSchema.enum.ANALYTICS_NOT_CONNECTED,
         }
       );
     });
@@ -350,7 +350,7 @@ describe('PostHogProvider', () => {
       axiosGetMock.mockRejectedValueOnce(new Error('Network Error'));
       await expect(PostHogProvider.getInstance().getRetention()).rejects.toMatchObject({
         statusCode: 502,
-        code: ERROR_CODES.UPSTREAM_FAILURE,
+        code: errorCodesSchema.enum.UPSTREAM_FAILURE,
       });
     });
   });
@@ -393,7 +393,7 @@ describe('PostHogProvider', () => {
       axiosGetMock.mockRejectedValueOnce(makeAxiosError(404));
       await expect(PostHogProvider.getInstance().getRecordings()).rejects.toMatchObject({
         statusCode: 404,
-        code: ERROR_CODES.ANALYTICS_NOT_CONNECTED,
+        code: errorCodesSchema.enum.ANALYTICS_NOT_CONNECTED,
       });
     });
   });
@@ -422,7 +422,7 @@ describe('PostHogProvider', () => {
         PostHogProvider.getInstance().createRecordingShare('rec1')
       ).rejects.toMatchObject({
         statusCode: 502,
-        code: ERROR_CODES.UPSTREAM_FAILURE,
+        code: errorCodesSchema.enum.UPSTREAM_FAILURE,
       });
     });
 
@@ -432,7 +432,7 @@ describe('PostHogProvider', () => {
         PostHogProvider.getInstance().createRecordingShare('rec1')
       ).rejects.toMatchObject({
         statusCode: 404,
-        code: ERROR_CODES.ANALYTICS_NOT_CONNECTED,
+        code: errorCodesSchema.enum.ANALYTICS_NOT_CONNECTED,
       });
     });
 
@@ -442,7 +442,7 @@ describe('PostHogProvider', () => {
         PostHogProvider.getInstance().createRecordingShare('rec1')
       ).rejects.toMatchObject({
         statusCode: 502,
-        code: ERROR_CODES.UPSTREAM_FAILURE,
+        code: errorCodesSchema.enum.UPSTREAM_FAILURE,
       });
     });
   });

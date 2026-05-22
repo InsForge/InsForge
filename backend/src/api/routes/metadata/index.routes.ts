@@ -11,7 +11,7 @@ import { AppError } from '@/api/middlewares/error.js';
 import {
   type AppMetadataSchema,
   type ProjectIdResponse,
-  ERROR_CODES,
+  errorCodesSchema,
 } from '@insforge/shared-schemas';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
@@ -170,7 +170,7 @@ router.get('/:tableName', async (req: AuthRequest, res: Response, next: NextFunc
   try {
     const { tableName } = req.params;
     if (!tableName) {
-      throw new AppError('Table name is required', 400, ERROR_CODES.INVALID_INPUT);
+      throw new AppError('Table name is required', 400, errorCodesSchema.enum.INVALID_INPUT);
     }
 
     const includeData = false;

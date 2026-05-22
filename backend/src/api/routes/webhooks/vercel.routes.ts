@@ -3,7 +3,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { DeploymentService } from '@/services/deployments/deployment.service.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
+import { errorCodesSchema } from '@insforge/shared-schemas';
 import {
   VERCEL_EVENT_TO_STATUS,
   type VercelWebhookPayload,
@@ -29,7 +29,11 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
     const signature = req.headers['x-vercel-signature'] as string | undefined;
 
     if (!signature) {
-      throw new AppError('Missing x-vercel-signature header', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+      throw new AppError(
+        'Missing x-vercel-signature header',
+        401,
+        errorCodesSchema.enum.AUTH_UNAUTHORIZED
+      );
     }
 
     // Get the webhook secret from secrets service
@@ -37,7 +41,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
 
     if (!webhookSecret) {
       logger.error('VERCEL_WEBHOOK_SECRET not found in secrets');
-      throw new AppError('Webhook not configured', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError('Webhook not configured', 500, errorCodesSchema.enum.INTERNAL_ERROR);
     }
 
     // req.body is raw Buffer (express.raw middleware applied in server.ts)
@@ -58,7 +62,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       !crypto.timingSafeEqual(signatureBuffer, expectedBuffer)
     ) {
       logger.warn('Invalid Vercel webhook signature');
-      throw new AppError('Invalid signature', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+      throw new AppError('Invalid signature', 401, errorCodesSchema.enum.AUTH_UNAUTHORIZED);
     }
 
     // Parse the webhook payload after signature verification

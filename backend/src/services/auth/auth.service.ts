@@ -36,7 +36,7 @@ import { XOAuthProvider } from '@/providers/oauth/x.provider.js';
 import { AppleOAuthProvider } from '@/providers/oauth/apple.provider.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
 import {
-  ERROR_CODES,
+  errorCodesSchema,
   type AuthMetadataSchema,
   type CreateAdminSessionResponse,
   type CreateSessionResponse,
@@ -147,7 +147,7 @@ export class AuthService {
       throw new AppError(
         getPasswordRequirementsMessage(emailAuthConfig),
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
 
@@ -156,7 +156,7 @@ export class AuthService {
         throw new AppError(
           'redirectTo is required when link-based email verification is enabled',
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
 
@@ -164,7 +164,7 @@ export class AuthService {
         throw new AppError(
           `${redirectTo} is not in the allowed redirect URLs`,
           400,
-          ERROR_CODES.INVALID_INPUT,
+          errorCodesSchema.enum.INVALID_INPUT,
           'Please add this URL to the allowed redirect URLs in the authentication configuration.'
         );
       }
@@ -199,7 +199,7 @@ export class AuthService {
       await client.query('ROLLBACK');
       // Postgres unique_violation
       if (e && typeof e === 'object' && 'code' in e && e.code === '23505') {
-        throw new AppError('User already exists', 409, ERROR_CODES.AUTH_EMAIL_EXISTS);
+        throw new AppError('User already exists', 409, errorCodesSchema.enum.AUTH_EMAIL_EXISTS);
       }
       throw e;
     } finally {
@@ -266,12 +266,12 @@ export class AuthService {
     const dbUser = await this.getUserByEmail(email);
 
     if (!dbUser || !dbUser.password) {
-      throw new AppError('Invalid credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+      throw new AppError('Invalid credentials', 401, errorCodesSchema.enum.AUTH_UNAUTHORIZED);
     }
 
     const validPassword = await bcrypt.compare(password, dbUser.password);
     if (!validPassword) {
-      throw new AppError('Invalid credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+      throw new AppError('Invalid credentials', 401, errorCodesSchema.enum.AUTH_UNAUTHORIZED);
     }
 
     // Check if email verification is required
@@ -282,7 +282,7 @@ export class AuthService {
       throw new AppError(
         'Email verification required',
         403,
-        ERROR_CODES.FORBIDDEN,
+        errorCodesSchema.enum.FORBIDDEN,
         'Please verify your email address before logging in'
       );
     }
@@ -598,7 +598,7 @@ export class AuthService {
       throw new AppError(
         getPasswordRequirementsMessage(emailAuthConfig),
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
 
@@ -657,7 +657,7 @@ export class AuthService {
   adminLogin(email: string, password: string): CreateAdminSessionResponse {
     // Simply validate against environment variables
     if (email !== this.adminEmail || password !== this.adminPassword) {
-      throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+      throw new AppError('Invalid admin credentials', 401, errorCodesSchema.enum.AUTH_UNAUTHORIZED);
     }
 
     // Use a fixed admin ID for the system administrator
@@ -715,7 +715,7 @@ export class AuthService {
       };
     } catch (error) {
       logger.error('Admin token verification failed:', error);
-      throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+      throw new AppError('Invalid admin credentials', 401, errorCodesSchema.enum.AUTH_UNAUTHORIZED);
     }
   }
 
@@ -827,7 +827,7 @@ export class AuthService {
       throw new AppError(
         'User signups are disabled for this project.',
         403,
-        ERROR_CODES.AUTH_SIGNUP_DISABLED
+        errorCodesSchema.enum.AUTH_SIGNUP_DISABLED
       );
     }
 
@@ -1121,7 +1121,11 @@ export class AuthService {
           googleUserInfo = await this.googleOAuthProvider.verifyToken(idToken);
         } catch (error) {
           logger.error('Failed to verify Google ID token:', error);
-          throw new AppError('Failed to verify Google ID token', 400, ERROR_CODES.INVALID_INPUT);
+          throw new AppError(
+            'Failed to verify Google ID token',
+            400,
+            errorCodesSchema.enum.INVALID_INPUT
+          );
         }
 
         // Validate required claims (sub is always present, email may be empty if scope wasn't granted)
@@ -1129,14 +1133,14 @@ export class AuthService {
           throw new AppError(
             'Invalid Google ID token: missing sub claim',
             400,
-            ERROR_CODES.INVALID_INPUT
+            errorCodesSchema.enum.INVALID_INPUT
           );
         }
         if (!googleUserInfo.email) {
           throw new AppError(
             'Invalid Google ID token: missing email claim',
             400,
-            ERROR_CODES.INVALID_INPUT
+            errorCodesSchema.enum.INVALID_INPUT
           );
         }
 
@@ -1156,7 +1160,7 @@ export class AuthService {
         throw new AppError(
           `Provider ${provider} is not supported for ID token sign-in. Supported: google`,
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
     }
 
@@ -1388,7 +1392,7 @@ export class AuthService {
     );
 
     if (result.rows.length === 0) {
-      throw new AppError('User not found', 404, ERROR_CODES.AUTH_USER_NOT_FOUND);
+      throw new AppError('User not found', 404, errorCodesSchema.enum.AUTH_USER_NOT_FOUND);
     }
 
     return {

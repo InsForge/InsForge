@@ -345,7 +345,7 @@ import nodemailer from 'nodemailer';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
+import { errorCodesSchema } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import type { SmtpConfigSchema, UpsertSmtpConfigRequest } from '@insforge/shared-schemas';
 
@@ -412,7 +412,7 @@ export class SmtpConfigService {
       return result.rows[0];
     } catch (error) {
       logger.error('Failed to get SMTP config', { error });
-      throw new AppError('Failed to get SMTP configuration', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError('Failed to get SMTP configuration', 500, errorCodesSchema.enum.INTERNAL_ERROR);
     }
   }
 
@@ -510,7 +510,7 @@ export class SmtpConfigService {
           throw new AppError(
             `SMTP connection failed: ${verifyError instanceof Error ? verifyError.message : 'Unknown error'}`,
             400,
-            ERROR_CODES.EMAIL_SMTP_CONNECTION_FAILED
+            errorCodesSchema.enum.EMAIL_SMTP_CONNECTION_FAILED
           );
         }
       }
@@ -609,7 +609,7 @@ export class SmtpConfigService {
       await client.query('ROLLBACK');
       logger.error('Failed to upsert SMTP config', { error });
       if (error instanceof AppError) throw error;
-      throw new AppError('Failed to update SMTP configuration', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError('Failed to update SMTP configuration', 500, errorCodesSchema.enum.INTERNAL_ERROR);
     } finally {
       client.release();
     }
@@ -647,7 +647,7 @@ git commit -m "feat(email): add SMTP config service with encrypted password stor
 import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
+import { errorCodesSchema } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import type { EmailTemplate } from '@/types/email.js';
 import type { EmailTemplateSchema, UpdateEmailTemplateRequest } from '@insforge/shared-schemas';
@@ -693,7 +693,7 @@ export class EmailTemplateService {
       return result.rows;
     } catch (error) {
       logger.error('Failed to get email templates', { error });
-      throw new AppError('Failed to get email templates', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError('Failed to get email templates', 500, errorCodesSchema.enum.INTERNAL_ERROR);
     }
   }
 
@@ -719,7 +719,7 @@ export class EmailTemplateService {
         throw new AppError(
           `Email template not found: ${templateType}`,
           404,
-          ERROR_CODES.EMAIL_TEMPLATE_NOT_FOUND
+          errorCodesSchema.enum.EMAIL_TEMPLATE_NOT_FOUND
         );
       }
 
@@ -727,7 +727,7 @@ export class EmailTemplateService {
     } catch (error) {
       if (error instanceof AppError) throw error;
       logger.error('Failed to get email template', { templateType, error });
-      throw new AppError('Failed to get email template', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError('Failed to get email template', 500, errorCodesSchema.enum.INTERNAL_ERROR);
     }
   }
 
@@ -757,7 +757,7 @@ export class EmailTemplateService {
         throw new AppError(
           `Email template not found: ${templateType}`,
           404,
-          ERROR_CODES.EMAIL_TEMPLATE_NOT_FOUND
+          errorCodesSchema.enum.EMAIL_TEMPLATE_NOT_FOUND
         );
       }
 
@@ -766,7 +766,7 @@ export class EmailTemplateService {
     } catch (error) {
       if (error instanceof AppError) throw error;
       logger.error('Failed to update email template', { templateType, error });
-      throw new AppError('Failed to update email template', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError('Failed to update email template', 500, errorCodesSchema.enum.INTERNAL_ERROR);
     }
   }
 }
@@ -803,7 +803,7 @@ import { EmailProvider } from './base.provider.js';
 import { SmtpConfigService } from '@/services/email/smtp-config.service.js';
 import { EmailTemplateService } from '@/services/email/email-template.service.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
+import { errorCodesSchema } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import type { EmailTemplate } from '@/types/email.js';
 import type { SendRawEmailRequest } from '@insforge/shared-schemas';
@@ -841,7 +841,7 @@ export class SmtpEmailProvider implements EmailProvider {
       throw new AppError(
         'SMTP is not configured or not enabled',
         500,
-        ERROR_CODES.EMAIL_SMTP_CONNECTION_FAILED
+        errorCodesSchema.enum.EMAIL_SMTP_CONNECTION_FAILED
       );
     }
 
@@ -915,7 +915,7 @@ export class SmtpEmailProvider implements EmailProvider {
       throw new AppError(
         `Failed to send email via SMTP: ${error instanceof Error ? error.message : 'Unknown error'}`,
         500,
-        ERROR_CODES.EMAIL_SMTP_SEND_FAILED
+        errorCodesSchema.enum.EMAIL_SMTP_SEND_FAILED
       );
     }
   }
@@ -944,7 +944,7 @@ export class SmtpEmailProvider implements EmailProvider {
       throw new AppError(
         `Failed to send email via SMTP: ${error instanceof Error ? error.message : 'Unknown error'}`,
         500,
-        ERROR_CODES.EMAIL_SMTP_SEND_FAILED
+        errorCodesSchema.enum.EMAIL_SMTP_SEND_FAILED
       );
     }
   }
@@ -1127,7 +1127,7 @@ router.put('/smtp-config', verifyAdmin, async (req: AuthRequest, res: Response, 
       throw new AppError(
         validationResult.error.issues.map(e => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
 
@@ -1177,7 +1177,7 @@ router.put('/email-templates/:type', verifyAdmin, async (req: AuthRequest, res: 
       throw new AppError(
         `Invalid template type: ${templateType}`,
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
 
@@ -1186,7 +1186,7 @@ router.put('/email-templates/:type', verifyAdmin, async (req: AuthRequest, res: 
       throw new AppError(
         validationResult.error.issues.map(e => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
 

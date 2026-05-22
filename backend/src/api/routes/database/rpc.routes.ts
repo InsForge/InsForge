@@ -2,7 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import axios from 'axios';
 import { AuthRequest, extractApiKey, verifyUser } from '@/api/middlewares/auth.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
+import { errorCodesSchema } from '@insforge/shared-schemas';
 import { validateFunctionName } from '@/utils/validations.js';
 import { successResponse } from '@/utils/response.js';
 import { PostgrestProxyService } from '@/services/database/postgrest-proxy.service.js';
@@ -35,7 +35,11 @@ const forwardRpcToPostgrest = async (req: AuthRequest, res: Response, next: Next
       if (error instanceof AppError) {
         throw error;
       }
-      throw new AppError(`Invalid function name: ${functionName}`, 400, ERROR_CODES.INVALID_INPUT);
+      throw new AppError(
+        `Invalid function name: ${functionName}`,
+        400,
+        errorCodesSchema.enum.INVALID_INPUT
+      );
     }
 
     const result = await proxyService.forward({

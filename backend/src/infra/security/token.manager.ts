@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { createRemoteJWKSet, JWTPayload, jwtVerify } from 'jose';
 import { AppError } from '@/api/middlewares/error.js';
-import { type TokenPayloadSchema, ERROR_CODES } from '@insforge/shared-schemas';
+import { type TokenPayloadSchema, errorCodesSchema } from '@insforge/shared-schemas';
 import { NEXT_ACTIONS } from '../../utils/next-actions.js';
 
 const JWT_SECRET = process.env.JWT_SECRET ?? '';
@@ -133,7 +133,11 @@ export class TokenManager {
         decoded.csrfNonce.length === 0 ||
         (decoded.sessionType !== 'user' && decoded.sessionType !== 'admin')
       ) {
-        throw new AppError('Invalid refresh token type', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+        throw new AppError(
+          'Invalid refresh token type',
+          401,
+          errorCodesSchema.enum.AUTH_UNAUTHORIZED
+        );
       }
 
       return decoded;
@@ -141,7 +145,11 @@ export class TokenManager {
       if (error instanceof AppError) {
         throw error;
       }
-      throw new AppError('Invalid or expired refresh token', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+      throw new AppError(
+        'Invalid or expired refresh token',
+        401,
+        errorCodesSchema.enum.AUTH_UNAUTHORIZED
+      );
     }
   }
 
@@ -172,7 +180,7 @@ export class TokenManager {
         role: decoded.role || 'authenticated',
       };
     } catch {
-      throw new AppError('Invalid token', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+      throw new AppError('Invalid token', 401, errorCodesSchema.enum.AUTH_UNAUTHORIZED);
     }
   }
 
@@ -195,7 +203,7 @@ export class TokenManager {
         throw new AppError(
           'Project ID mismatch',
           403,
-          ERROR_CODES.AUTH_UNAUTHORIZED,
+          errorCodesSchema.enum.AUTH_UNAUTHORIZED,
           NEXT_ACTIONS.CHECK_TOKEN
         );
       }
@@ -214,7 +222,7 @@ export class TokenManager {
       throw new AppError(
         `Invalid cloud authorization code: ${error instanceof Error ? error.message : 'Unknown error'}`,
         401,
-        ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+        errorCodesSchema.enum.AUTH_INVALID_CREDENTIALS,
         NEXT_ACTIONS.CHECK_TOKEN
       );
     }

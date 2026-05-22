@@ -7,7 +7,7 @@ import { AppError } from '@/api/middlewares/error.js';
 import {
   createTableRequestSchema,
   updateTableSchemaRequestSchema,
-  ERROR_CODES,
+  errorCodesSchema,
 } from '@insforge/shared-schemas';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { normalizeDatabaseSchemaName } from '@/services/database/helpers.js';
@@ -38,7 +38,7 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
       throw new AppError(
         validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
-        ERROR_CODES.INVALID_INPUT,
+        errorCodesSchema.enum.INVALID_INPUT,
         'Please check the request body, it must conform with the CreateTableRequest schema.'
       );
     }
@@ -99,7 +99,7 @@ router.patch(
         throw new AppError(
           validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
           400,
-          ERROR_CODES.INVALID_INPUT,
+          errorCodesSchema.enum.INVALID_INPUT,
           'Please check the request body, it must conform with the UpdateTableRequest schema.'
         );
       }

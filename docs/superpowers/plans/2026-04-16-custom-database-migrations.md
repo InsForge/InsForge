@@ -219,7 +219,7 @@ private assertPublicSchemaOnly(statements: string[]): void {
       throw new AppError(
         'Custom migrations may only target the public schema.',
         400,
-        ERROR_CODES.DATABASE_FORBIDDEN
+        errorCodesSchema.enum.DATABASE_FORBIDDEN
       );
     }
 
@@ -227,7 +227,7 @@ private assertPublicSchemaOnly(statements: string[]): void {
       throw new AppError(
         'Custom migrations cannot modify schema routing or manage their own transactions.',
         400,
-        ERROR_CODES.DATABASE_FORBIDDEN
+        errorCodesSchema.enum.DATABASE_FORBIDDEN
       );
     }
   }
@@ -327,7 +327,7 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res, next) => {
   try {
     const validation = createMigrationRequestSchema.safeParse(req.body);
     if (!validation.success) {
-      throw new AppError('Invalid migration payload', 400, ERROR_CODES.INVALID_INPUT);
+      throw new AppError('Invalid migration payload', 400, errorCodesSchema.enum.INVALID_INPUT);
     }
 
     const result = await migrationService.createMigration({

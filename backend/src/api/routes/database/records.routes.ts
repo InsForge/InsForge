@@ -3,7 +3,7 @@ import axios from 'axios';
 import { AuthRequest, extractApiKey, verifyUser } from '@/api/middlewares/auth.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
+import { errorCodesSchema } from '@insforge/shared-schemas';
 import { validateTableName } from '@/utils/validations.js';
 import { DatabaseRecord } from '@/types/database.js';
 import { successResponse } from '@/utils/response.js';
@@ -41,7 +41,7 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
       if (error instanceof AppError) {
         throw error;
       }
-      throw new AppError('Invalid table name', 400, ERROR_CODES.INVALID_INPUT);
+      throw new AppError('Invalid table name', 400, errorCodesSchema.enum.INVALID_INPUT);
     }
 
     // Process request body for POST/PATCH/PUT (filter empty values based on column types)

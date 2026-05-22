@@ -5,7 +5,7 @@ import { StorageProvider, ObjectMetadata, GetObjectResult } from './base.provide
 import { getApiBaseUrl } from '@/utils/environment.js';
 import { AppError } from '@/api/middlewares/error.js';
 import {
-  ERROR_CODES,
+  errorCodesSchema,
   DownloadStrategyResponse,
   UploadStrategyResponse,
 } from '@insforge/shared-schemas';
@@ -169,7 +169,7 @@ export class LocalStorageProvider implements StorageProvider {
       `S3 protocol operation '${op}' requires an S3 storage backend. ` +
         `Set AWS_S3_BUCKET (and optionally S3_ENDPOINT_URL for MinIO).`,
       501,
-      ERROR_CODES.S3_PROTOCOL_UNAVAILABLE
+      errorCodesSchema.enum.S3_PROTOCOL_UNAVAILABLE
     );
   }
 

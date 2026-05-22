@@ -7,7 +7,7 @@ import { successResponse } from '@/utils/response.js';
 import { catalogRouter } from './catalog.routes.js';
 import { configRouter } from './config.routes.js';
 import {
-  ERROR_CODES,
+  errorCodesSchema,
   createCheckoutSessionBodySchema,
   createCustomerPortalSessionBodySchema,
   listPaymentCustomersQuerySchema,
@@ -27,12 +27,12 @@ function formatValidationIssues(error: {
 }
 
 function invalidInputFromZod(error: { issues: Array<{ path: PropertyKey[]; message: string }> }) {
-  return new AppError(formatValidationIssues(error), 400, ERROR_CODES.INVALID_INPUT);
+  return new AppError(formatValidationIssues(error), 400, errorCodesSchema.enum.INVALID_INPUT);
 }
 
 function normalizeStripeConfigError(error: unknown) {
   if (error instanceof StripeKeyValidationError) {
-    return new AppError(error.message, 400, ERROR_CODES.INVALID_INPUT);
+    return new AppError(error.message, 400, errorCodesSchema.enum.INVALID_INPUT);
   }
 
   return error;
@@ -93,7 +93,7 @@ environmentRouter.post(
         throw new AppError(
           'Checkout session creation requires a user token',
           401,
-          ERROR_CODES.AUTH_INVALID_CREDENTIALS
+          errorCodesSchema.enum.AUTH_INVALID_CREDENTIALS
         );
       }
 
@@ -126,7 +126,7 @@ environmentRouter.post(
         throw new AppError(
           'Customer portal session creation requires a user token',
           401,
-          ERROR_CODES.AUTH_INVALID_CREDENTIALS
+          errorCodesSchema.enum.AUTH_INVALID_CREDENTIALS
         );
       }
 

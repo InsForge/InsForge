@@ -1414,7 +1414,7 @@ Create `backend/src/providers/compute/cloud.provider.ts`:
 import jwt from 'jsonwebtoken';
 import { config } from '@/infra/config/app.config.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
+import { errorCodesSchema } from '@insforge/shared-schemas';
 import type {
   ComputeProvider,
   LaunchMachineParams,
@@ -1447,7 +1447,7 @@ export class CloudComputeProvider implements ComputeProvider {
       throw new AppError(
         'Cloud compute not configured (need PROJECT_ID, JWT_SECRET, CLOUD_COMPUTE_ENABLED)',
         500,
-        ERROR_CODES.COMPUTE_NOT_CONFIGURED,
+        errorCodesSchema.enum.COMPUTE_NOT_CONFIGURED,
       );
     }
     return jwt.sign({ sub: config.cloud.projectId }, config.app.jwtSecret, {
@@ -1478,7 +1478,7 @@ export class CloudComputeProvider implements ComputeProvider {
       throw new AppError(
         `COMPUTE_CLOUD_UNAVAILABLE: ${(err as Error).message}`,
         503,
-        ERROR_CODES.COMPUTE_CLOUD_UNAVAILABLE,
+        errorCodesSchema.enum.COMPUTE_CLOUD_UNAVAILABLE,
         {
           nextActions: [
             'Check CLOUD_API_HOST is reachable',
@@ -1492,7 +1492,7 @@ export class CloudComputeProvider implements ComputeProvider {
       throw new AppError(
         text || `Cloud compute error (${response.status})`,
         response.status,
-        ERROR_CODES.COMPUTE_PROVIDER_ERROR
+        errorCodesSchema.enum.COMPUTE_PROVIDER_ERROR
       );
     }
     return text ? (JSON.parse(text) as T) : undefined;
@@ -1570,7 +1570,7 @@ export class CloudComputeProvider implements ComputeProvider {
     throw new AppError(
       `Machine ${machineId} did not reach ${targetStates.join('|')} within ${timeoutMs}ms`,
       504,
-      ERROR_CODES.COMPUTE_PROVIDER_ERROR
+      errorCodesSchema.enum.COMPUTE_PROVIDER_ERROR
     );
   }
 }
@@ -1727,7 +1727,7 @@ In `backend/src/services/compute/services.service.ts`:
 import { CloudComputeProvider } from '@/providers/compute/cloud.provider.js';
 import type { ComputeProvider } from '@/providers/compute/compute.provider.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
+import { errorCodesSchema } from '@insforge/shared-schemas';
 ```
 
 (b) Add the exported factory above the class:
@@ -1743,7 +1743,7 @@ export function selectComputeProvider(): ComputeProvider {
     'Compute services not configured. Set FLY_API_TOKEN for self-host, ' +
       'or enable CLOUD_COMPUTE_ENABLED to use cloud-managed compute.',
     503,
-    ERROR_CODES.COMPUTE_NOT_CONFIGURED,
+    errorCodesSchema.enum.COMPUTE_NOT_CONFIGURED,
     {
       nextActions: [
         'Self-hosted: set FLY_API_TOKEN in .env (see .env.example)',

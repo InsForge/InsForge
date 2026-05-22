@@ -1,7 +1,7 @@
 import { describe, test, expect } from 'vitest';
 import { DatabaseAdvanceService } from '../../src/services/database/database-advance.service';
 import { AppError } from '../../src/api/middlewares/error';
-import { ERROR_CODES } from '@insforge/shared-schemas';
+import { errorCodesSchema } from '@insforge/shared-schemas';
 
 describe('DatabaseAdvanceService - sanitizeQuery', () => {
   const service = DatabaseAdvanceService.getInstance();
@@ -207,7 +207,7 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
         expect(error).toBeInstanceOf(AppError);
         if (error instanceof AppError) {
           expect(error.statusCode).toBe(403);
-          expect(error.code).toBe(ERROR_CODES.FORBIDDEN);
+          expect(error.code).toBe(errorCodesSchema.enum.FORBIDDEN);
           expect(error.message).toContain('auth schema');
         }
       }
@@ -411,7 +411,7 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
         expect(error).toBeInstanceOf(AppError);
         if (error instanceof AppError) {
           expect(error.statusCode).toBe(403);
-          expect(error.code).toBe(ERROR_CODES.FORBIDDEN);
+          expect(error.code).toBe(errorCodesSchema.enum.FORBIDDEN);
         }
       }
     });

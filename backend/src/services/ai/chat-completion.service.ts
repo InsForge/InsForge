@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
 import {
-  ERROR_CODES,
+  errorCodesSchema,
   type ChatCompletionResponse,
   type ChatMessageSchema,
   type ToolCall,
@@ -94,7 +94,7 @@ export class ChatCompletionService {
           throw new AppError(
             'Tool message is missing required tool_call_id',
             400,
-            ERROR_CODES.INVALID_INPUT
+            errorCodesSchema.enum.INVALID_INPUT
           );
         }
         formattedMessages.push({
@@ -331,7 +331,7 @@ export class ChatCompletionService {
       throw new AppError(
         `Failed to get response: ${error instanceof Error ? error.message : String(error)}`,
         500,
-        ERROR_CODES.AI_UPSTREAM_UNAVAILABLE
+        errorCodesSchema.enum.AI_UPSTREAM_UNAVAILABLE
       );
     }
   }
@@ -462,7 +462,7 @@ export class ChatCompletionService {
       throw new AppError(
         `Failed to stream response: ${error instanceof Error ? error.message : String(error)}`,
         500,
-        ERROR_CODES.AI_UPSTREAM_UNAVAILABLE
+        errorCodesSchema.enum.AI_UPSTREAM_UNAVAILABLE
       );
     }
   }

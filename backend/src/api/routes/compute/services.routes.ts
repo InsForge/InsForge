@@ -4,7 +4,11 @@ import { computeWriteLimiter } from '@/api/middlewares/rate-limiters.js';
 import { ComputeServicesService } from '@/services/compute/services.service.js';
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { createServiceSchema, updateServiceSchema, ERROR_CODES } from '@insforge/shared-schemas';
+import {
+  createServiceSchema,
+  updateServiceSchema,
+  errorCodesSchema,
+} from '@insforge/shared-schemas';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
@@ -57,7 +61,7 @@ router.get('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: Ne
     const service = await svc.getService(req.params.id);
 
     if (service.projectId !== getProjectId(req)) {
-      throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
+      throw new AppError('Service not found', 404, errorCodesSchema.enum.COMPUTE_SERVICE_NOT_FOUND);
     }
 
     successResponse(res, service);
@@ -78,7 +82,7 @@ router.post(
         throw new AppError(
           validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
           400,
-          ERROR_CODES.INVALID_INPUT,
+          errorCodesSchema.enum.INVALID_INPUT,
           'Please check the request body, it must conform with the CreateServiceRequest schema.'
         );
       }
@@ -115,7 +119,7 @@ router.post(
         throw new AppError(
           validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
           400,
-          ERROR_CODES.INVALID_INPUT,
+          errorCodesSchema.enum.INVALID_INPUT,
           'Please check the request body, it must conform with the CreateServiceRequest schema.'
         );
       }
@@ -152,7 +156,11 @@ router.post(
       const existing = await svc.getService(req.params.id);
 
       if (existing.projectId !== getProjectId(req)) {
-        throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
+        throw new AppError(
+          'Service not found',
+          404,
+          errorCodesSchema.enum.COMPUTE_SERVICE_NOT_FOUND
+        );
       }
 
       const tokenResult = await svc.issueDeployTokenForService(req.params.id);
@@ -175,7 +183,7 @@ router.patch(
         throw new AppError(
           validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
           400,
-          ERROR_CODES.INVALID_INPUT,
+          errorCodesSchema.enum.INVALID_INPUT,
           'Please check the request body, it must conform with the UpdateServiceRequest schema.'
         );
       }
@@ -184,7 +192,11 @@ router.patch(
       const existing = await svc.getService(req.params.id);
 
       if (existing.projectId !== getProjectId(req)) {
-        throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
+        throw new AppError(
+          'Service not found',
+          404,
+          errorCodesSchema.enum.COMPUTE_SERVICE_NOT_FOUND
+        );
       }
 
       const service = await svc.updateService(req.params.id, validation.data);
@@ -233,7 +245,11 @@ router.delete(
       const existing = await svc.getService(req.params.id);
 
       if (existing.projectId !== getProjectId(req)) {
-        throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
+        throw new AppError(
+          'Service not found',
+          404,
+          errorCodesSchema.enum.COMPUTE_SERVICE_NOT_FOUND
+        );
       }
 
       // Returns a snapshot of the deleted row (incl. encrypted env blob) so the
@@ -273,7 +289,11 @@ router.post(
       const existing = await svc.getService(req.params.id);
 
       if (existing.projectId !== getProjectId(req)) {
-        throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
+        throw new AppError(
+          'Service not found',
+          404,
+          errorCodesSchema.enum.COMPUTE_SERVICE_NOT_FOUND
+        );
       }
 
       const service = await svc.stopService(req.params.id);
@@ -305,7 +325,11 @@ router.post(
       const existing = await svc.getService(req.params.id);
 
       if (existing.projectId !== getProjectId(req)) {
-        throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
+        throw new AppError(
+          'Service not found',
+          404,
+          errorCodesSchema.enum.COMPUTE_SERVICE_NOT_FOUND
+        );
       }
 
       const service = await svc.startService(req.params.id);
@@ -338,7 +362,11 @@ router.get(
       const existing = await svc.getService(req.params.id);
 
       if (existing.projectId !== getProjectId(req)) {
-        throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
+        throw new AppError(
+          'Service not found',
+          404,
+          errorCodesSchema.enum.COMPUTE_SERVICE_NOT_FOUND
+        );
       }
 
       const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 1000);

@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import type { Readable } from 'stream';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
+import { errorCodesSchema } from '@insforge/shared-schemas';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import logger from '@/utils/logger.js';
 
@@ -152,7 +152,7 @@ export async function withVercelRateLimitRetry<T>(
         throw new AppError(
           'Vercel rate limit exceeded after retries. Please retry shortly.',
           429,
-          ERROR_CODES.RATE_LIMITED
+          errorCodesSchema.enum.RATE_LIMITED
         );
       }
 
@@ -258,21 +258,21 @@ export class VercelProvider {
       throw new AppError(
         'VERCEL_TOKEN not found in environment variables',
         500,
-        ERROR_CODES.INTERNAL_ERROR
+        errorCodesSchema.enum.INTERNAL_ERROR
       );
     }
     if (!teamId) {
       throw new AppError(
         'VERCEL_TEAM_ID not found in environment variables',
         500,
-        ERROR_CODES.INTERNAL_ERROR
+        errorCodesSchema.enum.INTERNAL_ERROR
       );
     }
     if (!projectId) {
       throw new AppError(
         'VERCEL_PROJECT_ID not found in environment variables',
         500,
-        ERROR_CODES.INTERNAL_ERROR
+        errorCodesSchema.enum.INTERNAL_ERROR
       );
     }
 
@@ -439,7 +439,11 @@ export class VercelProvider {
       logger.error('Failed to create Vercel deployment', {
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new AppError('Failed to create Vercel deployment', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError(
+        'Failed to create Vercel deployment',
+        500,
+        errorCodesSchema.enum.INTERNAL_ERROR
+      );
     }
   }
 
@@ -476,14 +480,18 @@ export class VercelProvider {
         throw new AppError(
           `Deployment not found: ${deploymentId}`,
           404,
-          ERROR_CODES.DEPLOYMENT_NOT_FOUND
+          errorCodesSchema.enum.DEPLOYMENT_NOT_FOUND
         );
       }
       logger.error('Failed to get Vercel deployment', {
         error: error instanceof Error ? error.message : String(error),
         deploymentId,
       });
-      throw new AppError('Failed to get Vercel deployment', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError(
+        'Failed to get Vercel deployment',
+        500,
+        errorCodesSchema.enum.INTERNAL_ERROR
+      );
     }
   }
 
@@ -513,7 +521,11 @@ export class VercelProvider {
         error: error instanceof Error ? error.message : String(error),
         deploymentId,
       });
-      throw new AppError('Failed to cancel Vercel deployment', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError(
+        'Failed to cancel Vercel deployment',
+        500,
+        errorCodesSchema.enum.INTERNAL_ERROR
+      );
     }
   }
 
@@ -552,7 +564,11 @@ export class VercelProvider {
       logger.error('Failed to upsert environment variables', {
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new AppError('Failed to upsert environment variables', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError(
+        'Failed to upsert environment variables',
+        500,
+        errorCodesSchema.enum.INTERNAL_ERROR
+      );
     }
   }
 
@@ -624,7 +640,11 @@ export class VercelProvider {
       logger.error('Failed to list environment variables', {
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new AppError('Failed to list environment variables', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError(
+        'Failed to list environment variables',
+        500,
+        errorCodesSchema.enum.INTERNAL_ERROR
+      );
     }
   }
 
@@ -673,14 +693,18 @@ export class VercelProvider {
         throw new AppError(
           `Environment variable not found: ${envId}`,
           404,
-          ERROR_CODES.ENVIRONMENT_VARIABLE_NOT_FOUND
+          errorCodesSchema.enum.ENVIRONMENT_VARIABLE_NOT_FOUND
         );
       }
       logger.error('Failed to get environment variable', {
         error: error instanceof Error ? error.message : String(error),
         envId,
       });
-      throw new AppError('Failed to get environment variable', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError(
+        'Failed to get environment variable',
+        500,
+        errorCodesSchema.enum.INTERNAL_ERROR
+      );
     }
   }
 
@@ -709,14 +733,18 @@ export class VercelProvider {
         throw new AppError(
           `Environment variable not found: ${envId}`,
           404,
-          ERROR_CODES.ENVIRONMENT_VARIABLE_NOT_FOUND
+          errorCodesSchema.enum.ENVIRONMENT_VARIABLE_NOT_FOUND
         );
       }
       logger.error('Failed to delete environment variable', {
         error: error instanceof Error ? error.message : String(error),
         envId,
       });
-      throw new AppError('Failed to delete environment variable', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError(
+        'Failed to delete environment variable',
+        500,
+        errorCodesSchema.enum.INTERNAL_ERROR
+      );
     }
   }
 
@@ -799,7 +827,11 @@ export class VercelProvider {
       logger.error('Failed to list custom domains from Vercel', {
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new AppError('Failed to list custom domains', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError(
+        'Failed to list custom domains',
+        500,
+        errorCodesSchema.enum.INTERNAL_ERROR
+      );
     }
   }
 
@@ -828,7 +860,11 @@ export class VercelProvider {
         error: error instanceof Error ? error.message : String(error),
         domain,
       });
-      throw new AppError('Failed to get custom domain config', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError(
+        'Failed to get custom domain config',
+        500,
+        errorCodesSchema.enum.INTERNAL_ERROR
+      );
     }
   }
 
@@ -857,14 +893,14 @@ export class VercelProvider {
         throw new AppError(
           `Domain not found on Vercel: ${domain}`,
           404,
-          ERROR_CODES.DOMAIN_NOT_FOUND
+          errorCodesSchema.enum.DOMAIN_NOT_FOUND
         );
       }
       logger.error('Failed to fetch custom domain from Vercel', {
         error: error instanceof Error ? error.message : String(error),
         domain,
       });
-      throw new AppError('Failed to get custom domain', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError('Failed to get custom domain', 500, errorCodesSchema.enum.INTERNAL_ERROR);
     }
   }
 
@@ -910,18 +946,22 @@ export class VercelProvider {
           throw new AppError(
             msg || `Domain ${domain} is already added to this project`,
             409,
-            ERROR_CODES.DOMAIN_ALREADY_EXISTS
+            errorCodesSchema.enum.DOMAIN_ALREADY_EXISTS
           );
         }
         if (status === 400) {
-          throw new AppError(msg || `Invalid domain: ${domain}`, 400, ERROR_CODES.DOMAIN_INVALID);
+          throw new AppError(
+            msg || `Invalid domain: ${domain}`,
+            400,
+            errorCodesSchema.enum.DOMAIN_INVALID
+          );
         }
       }
       logger.error('Failed to add custom domain to Vercel', {
         error: error instanceof Error ? error.message : String(error),
         domain,
       });
-      throw new AppError('Failed to add custom domain', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError('Failed to add custom domain', 500, errorCodesSchema.enum.INTERNAL_ERROR);
     }
   }
 
@@ -955,7 +995,11 @@ export class VercelProvider {
         error: error instanceof Error ? error.message : String(error),
         domain,
       });
-      throw new AppError('Failed to remove custom domain', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError(
+        'Failed to remove custom domain',
+        500,
+        errorCodesSchema.enum.INTERNAL_ERROR
+      );
     }
   }
 
@@ -995,14 +1039,18 @@ export class VercelProvider {
         throw new AppError(
           `Domain not found on Vercel: ${domain}`,
           404,
-          ERROR_CODES.DOMAIN_NOT_FOUND
+          errorCodesSchema.enum.DOMAIN_NOT_FOUND
         );
       }
       logger.error('Failed to verify custom domain', {
         error: error instanceof Error ? error.message : String(error),
         domain,
       });
-      throw new AppError('Failed to verify custom domain', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError(
+        'Failed to verify custom domain',
+        500,
+        errorCodesSchema.enum.INTERNAL_ERROR
+      );
     }
   }
 
@@ -1074,19 +1122,27 @@ export class VercelProvider {
           throw new AppError(
             'Vercel rate limit exceeded for file upload. Wait a moment and retry the deployment.',
             429,
-            ERROR_CODES.RATE_LIMITED
+            errorCodesSchema.enum.RATE_LIMITED
           );
         }
 
         logger.error('Failed to upload file to Vercel', {
           error: error instanceof Error ? error.message : String(error),
         });
-        throw new AppError('Failed to upload file to Vercel', 500, ERROR_CODES.INTERNAL_ERROR);
+        throw new AppError(
+          'Failed to upload file to Vercel',
+          500,
+          errorCodesSchema.enum.INTERNAL_ERROR
+        );
       }
     }
 
     // Unreachable, but TypeScript needs a return
-    throw new AppError('Failed to upload file to Vercel', 500, ERROR_CODES.INTERNAL_ERROR);
+    throw new AppError(
+      'Failed to upload file to Vercel',
+      500,
+      errorCodesSchema.enum.INTERNAL_ERROR
+    );
   }
 
   /**
@@ -1145,7 +1201,7 @@ export class VercelProvider {
         throw new AppError(
           `Vercel file upload timed out after ${VERCEL_UPLOAD_TIMEOUT_MS}ms. Retry the file upload.`,
           504,
-          ERROR_CODES.INTERNAL_ERROR
+          errorCodesSchema.enum.INTERNAL_ERROR
         );
       }
 
@@ -1162,7 +1218,7 @@ export class VercelProvider {
         throw new AppError(
           'Vercel rate limit exceeded for file upload. Wait a moment and retry the file upload.',
           429,
-          ERROR_CODES.RATE_LIMITED
+          errorCodesSchema.enum.RATE_LIMITED
         );
       }
 
@@ -1174,18 +1230,26 @@ export class VercelProvider {
         throw new AppError(
           'Uploaded file content does not match the registered deployment file.',
           400,
-          ERROR_CODES.DEPLOYMENT_INVALID_FILE
+          errorCodesSchema.enum.DEPLOYMENT_INVALID_FILE
         );
       }
 
       if (axios.isAxiosError(error) && error.code === 'ERR_CANCELED') {
-        throw new AppError('Vercel file upload was interrupted.', 499, ERROR_CODES.UNKNOWN_ERROR);
+        throw new AppError(
+          'Vercel file upload was interrupted.',
+          499,
+          errorCodesSchema.enum.UNKNOWN_ERROR
+        );
       }
 
       logger.error('Failed to stream file to Vercel', {
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new AppError('Failed to upload file to Vercel', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError(
+        'Failed to upload file to Vercel',
+        500,
+        errorCodesSchema.enum.INTERNAL_ERROR
+      );
     } finally {
       cleanup();
     }
@@ -1270,7 +1334,11 @@ export class VercelProvider {
         error: error instanceof Error ? error.message : String(error),
         fileCount: files.length,
       });
-      throw new AppError('Failed to create Vercel deployment', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError(
+        'Failed to create Vercel deployment',
+        500,
+        errorCodesSchema.enum.INTERNAL_ERROR
+      );
     }
   }
 }

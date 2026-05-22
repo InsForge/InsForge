@@ -1,6 +1,6 @@
 import { Readable } from 'stream';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ERROR_CODES } from '@insforge/shared-schemas';
+import { errorCodesSchema } from '@insforge/shared-schemas';
 import { VercelProvider } from '../../src/providers/deployments/vercel.provider';
 import axios, { AxiosError, AxiosHeaders } from 'axios';
 
@@ -259,7 +259,7 @@ describe('VercelProvider.uploadFileStream', () => {
       })
     ).rejects.toMatchObject({
       statusCode: 400,
-      code: ERROR_CODES.DEPLOYMENT_INVALID_FILE,
+      code: errorCodesSchema.enum.DEPLOYMENT_INVALID_FILE,
     });
   });
 });

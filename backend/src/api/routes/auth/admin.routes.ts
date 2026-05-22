@@ -9,7 +9,7 @@ import {
   clearAdminRefreshTokenCookie,
 } from '@/utils/cookies.js';
 import {
-  ERROR_CODES,
+  errorCodesSchema,
   createAdminSessionRequestSchema,
   exchangeAdminSessionRequestSchema,
   type CreateAdminSessionResponse,
@@ -27,7 +27,7 @@ router.post('/sessions/exchange', async (req: Request, res: Response, next: Next
       throw new AppError(
         validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
 
@@ -49,7 +49,9 @@ router.post('/sessions/exchange', async (req: Request, res: Response, next: Next
       next(error);
     } else {
       logger.error('[Auth:AdminSessionExchange] Failed to exchange admin session', { error });
-      next(new AppError('Failed to exchange admin session', 500, ERROR_CODES.INTERNAL_ERROR));
+      next(
+        new AppError('Failed to exchange admin session', 500, errorCodesSchema.enum.INTERNAL_ERROR)
+      );
     }
   }
 });
@@ -62,7 +64,7 @@ router.post('/sessions', (req: Request, res: Response, next: NextFunction) => {
       throw new AppError(
         validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
 
@@ -91,18 +93,26 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
     const refreshToken = req.cookies?.[ADMIN_REFRESH_TOKEN_COOKIE_NAME];
 
     if (!refreshToken) {
-      throw new AppError('No admin refresh token provided', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+      throw new AppError(
+        'No admin refresh token provided',
+        401,
+        errorCodesSchema.enum.AUTH_UNAUTHORIZED
+      );
     }
 
     const payload = tokenManager.verifyRefreshToken(refreshToken);
     if (payload.sessionType !== 'admin') {
-      throw new AppError('Invalid admin refresh session type', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+      throw new AppError(
+        'Invalid admin refresh session type',
+        401,
+        errorCodesSchema.enum.AUTH_UNAUTHORIZED
+      );
     }
 
     const csrfHeader = req.headers['x-csrf-token'] as string | undefined;
     if (!tokenManager.verifyCsrfToken(csrfHeader, payload)) {
       logger.warn('[Auth:AdminRefresh] CSRF token validation failed');
-      throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
+      throw new AppError('Invalid CSRF token', 403, errorCodesSchema.enum.AUTH_UNAUTHORIZED);
     }
 
     const dbUser = await authService.getUserById(payload.sub);
@@ -111,7 +121,7 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
         userId: payload.sub,
       });
       clearAdminRefreshTokenCookie(res);
-      throw new AppError('Project admin not found', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+      throw new AppError('Project admin not found', 401, errorCodesSchema.enum.AUTH_UNAUTHORIZED);
     }
 
     const user = authService.transformUserRecordToSchema(dbUser);

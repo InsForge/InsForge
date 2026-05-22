@@ -5,7 +5,7 @@ import { StripeKeyValidationError } from '@/providers/payments/stripe.provider.j
 import { PaymentService } from '@/services/payments/payment.service.js';
 import { successResponse } from '@/utils/response.js';
 import {
-  ERROR_CODES,
+  errorCodesSchema,
   createPaymentPriceBodySchema,
   createPaymentProductBodySchema,
   listPaymentPricesQuerySchema,
@@ -26,12 +26,12 @@ function formatValidationIssues(error: {
 }
 
 function invalidInputFromZod(error: { issues: Array<{ path: PropertyKey[]; message: string }> }) {
-  return new AppError(formatValidationIssues(error), 400, ERROR_CODES.INVALID_INPUT);
+  return new AppError(formatValidationIssues(error), 400, errorCodesSchema.enum.INVALID_INPUT);
 }
 
 function normalizeStripeConfigError(error: unknown) {
   if (error instanceof StripeKeyValidationError) {
-    return new AppError(error.message, 400, ERROR_CODES.INVALID_INPUT);
+    return new AppError(error.message, 400, errorCodesSchema.enum.INVALID_INPUT);
   }
 
   return error;
@@ -44,7 +44,11 @@ function getEnvironment(params: unknown) {
       : params;
   const validation = paymentEnvironmentParamsSchema.safeParse(environment);
   if (!validation.success) {
-    throw new AppError(formatValidationIssues(validation.error), 400, ERROR_CODES.INVALID_INPUT);
+    throw new AppError(
+      formatValidationIssues(validation.error),
+      400,
+      errorCodesSchema.enum.INVALID_INPUT
+    );
   }
 
   return validation.data.environment;

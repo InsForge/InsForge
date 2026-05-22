@@ -385,7 +385,7 @@ import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
 import logger from '@/utils/logger.js';
 import {
-  ERROR_CODES
+  errorCodesSchema
   type S3AccessKeySchema,
   type S3AccessKeyWithSecretSchema,
   type CreateS3AccessKeyRequest,
@@ -430,7 +430,7 @@ export class S3AccessKeyService {
       throw new AppError(
         `S3 access key limit reached (${MAX_KEYS_PER_PROJECT}). Delete an existing key first.`,
         400,
-        ERROR_CODES.S3_ACCESS_KEY_LIMIT_EXCEEDED
+        errorCodesSchema.enum.S3_ACCESS_KEY_LIMIT_EXCEEDED
       );
     }
 
@@ -479,7 +479,7 @@ export class S3AccessKeyService {
       [id]
     );
     if (result.rowCount === 0) {
-      throw new AppError('S3 access key not found', 404, ERROR_CODES.S3_ACCESS_KEY_NOT_FOUND);
+      throw new AppError('S3 access key not found', 404, errorCodesSchema.enum.S3_ACCESS_KEY_NOT_FOUND);
     }
     logger.info('S3 access key deleted', { accessKeyId: result.rows[0].access_key_id });
   }
@@ -630,7 +630,7 @@ Modify `delete` to invalidate:
       [id]
     );
     if (result.rowCount === 0) {
-      throw new AppError('S3 access key not found', 404, ERROR_CODES.S3_ACCESS_KEY_NOT_FOUND);
+      throw new AppError('S3 access key not found', 404, errorCodesSchema.enum.S3_ACCESS_KEY_NOT_FOUND);
     }
     this.cache.delete(result.rows[0].access_key_id);
     logger.info('S3 access key deleted', { accessKeyId: result.rows[0].access_key_id });
@@ -680,7 +680,7 @@ router.post(
         throw new AppError(
           validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
           400,
-          ERROR_CODES.STORAGE_INVALID_PARAMETER
+          errorCodesSchema.enum.STORAGE_INVALID_PARAMETER
         );
       }
       const result = await s3AccessKeyService.create(validation.data);
@@ -1551,14 +1551,14 @@ At the bottom of the `LocalStorageProvider` class, add:
 ```ts
 import { Readable } from 'stream';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
+import { errorCodesSchema } from '@insforge/shared-schemas';
 import { ObjectMetadata, GetObjectResult } from './base.provider.js';
 
   private notImplemented(op: string): never {
     throw new AppError(
       `S3 protocol operation '${op}' requires an S3 storage backend. Set AWS_S3_BUCKET (and optionally S3_ENDPOINT_URL for MinIO).`,
       501,
-      ERROR_CODES.S3_PROTOCOL_UNAVAILABLE
+      errorCodesSchema.enum.S3_PROTOCOL_UNAVAILABLE
     );
   }
 

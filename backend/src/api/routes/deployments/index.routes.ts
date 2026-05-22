@@ -7,7 +7,7 @@ import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { successResponse, paginatedResponse } from '@/utils/response.js';
 import {
-  ERROR_CODES,
+  errorCodesSchema,
   createDirectDeploymentRequestSchema,
   startDeploymentRequestSchema,
   updateSlugRequestSchema,
@@ -68,7 +68,7 @@ router.post(
         throw new AppError(
           validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
 
@@ -103,12 +103,12 @@ router.put(
     try {
       const idValidation = uuidParamSchema.safeParse(req.params.id);
       if (!idValidation.success) {
-        throw new AppError('Invalid deployment ID', 400, ERROR_CODES.INVALID_INPUT);
+        throw new AppError('Invalid deployment ID', 400, errorCodesSchema.enum.INVALID_INPUT);
       }
 
       const fileIdValidation = uuidParamSchema.safeParse(req.params.fileId);
       if (!fileIdValidation.success) {
-        throw new AppError('Invalid deployment file ID', 400, ERROR_CODES.INVALID_INPUT);
+        throw new AppError('Invalid deployment file ID', 400, errorCodesSchema.enum.INVALID_INPUT);
       }
 
       const contentTypeHeader = req.headers['content-type'];
@@ -121,7 +121,7 @@ router.put(
         throw new AppError(
           'Deployment file content must be uploaded as application/octet-stream.',
           415,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
 
@@ -166,7 +166,7 @@ router.post(
         throw new AppError(
           validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
 
@@ -242,7 +242,7 @@ router.put(
         throw new AppError(
           validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
 
@@ -300,7 +300,7 @@ router.post(
         throw new AppError(
           validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
 
@@ -336,7 +336,7 @@ router.post(
         throw new AppError(
           validationResult.error.issues.map((issue) => issue.message).join(', '),
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
 
@@ -363,7 +363,7 @@ router.delete(
         throw new AppError(
           validationResult.error.issues.map((issue) => issue.message).join(', '),
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
 
@@ -396,7 +396,11 @@ router.get('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: Ne
     const deployment = await deploymentService.getDeploymentById(id);
 
     if (!deployment) {
-      throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
+      throw new AppError(
+        `Deployment not found: ${id}`,
+        404,
+        errorCodesSchema.enum.DEPLOYMENT_NOT_FOUND
+      );
     }
 
     successResponse(res, deployment);
@@ -423,7 +427,11 @@ router.post(
       const deployment = await deploymentService.syncDeploymentById(id);
 
       if (!deployment) {
-        throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
+        throw new AppError(
+          `Deployment not found: ${id}`,
+          404,
+          errorCodesSchema.enum.DEPLOYMENT_NOT_FOUND
+        );
       }
 
       successResponse(res, deployment);

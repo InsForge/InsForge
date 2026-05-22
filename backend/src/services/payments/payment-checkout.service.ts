@@ -13,7 +13,7 @@ import type {
   StripeEnvironment,
 } from '@/types/payments.js';
 import {
-  ERROR_CODES,
+  errorCodesSchema,
   type CheckoutSession,
   type CreateCheckoutSessionRequest,
   type RoleSchema,
@@ -239,7 +239,11 @@ export class PaymentCheckoutService {
     metadata: Record<string, string>
   ): Promise<CheckoutSession> {
     if (!input.idempotencyKey) {
-      throw new AppError('Checkout session was not created', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError(
+        'Checkout session was not created',
+        500,
+        errorCodesSchema.enum.INTERNAL_ERROR
+      );
     }
 
     const result = await client.query(
@@ -275,7 +279,7 @@ export class PaymentCheckoutService {
       throw new AppError(
         'Idempotency key is already used for another checkout request',
         409,
-        ERROR_CODES.PAYMENT_CHECKOUT_ALREADY_EXISTS
+        errorCodesSchema.enum.PAYMENT_CHECKOUT_ALREADY_EXISTS
       );
     }
 
@@ -292,7 +296,7 @@ export class PaymentCheckoutService {
 
   private getSafeRole(role: RoleSchema): RoleSchema {
     if (!CHECKOUT_INSERT_ROLES.has(role)) {
-      throw new AppError('Unsupported checkout role', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
+      throw new AppError('Unsupported checkout role', 403, errorCodesSchema.enum.AUTH_UNAUTHORIZED);
     }
 
     return role;
@@ -303,7 +307,7 @@ export class PaymentCheckoutService {
       return new AppError(
         'Checkout session creation is not allowed by payments.checkout_sessions RLS policies',
         403,
-        ERROR_CODES.AUTH_UNAUTHORIZED
+        errorCodesSchema.enum.AUTH_UNAUTHORIZED
       );
     }
 
@@ -350,7 +354,11 @@ export class PaymentCheckoutService {
 
   private requireRow(row: unknown): CheckoutSessionRow {
     if (!row) {
-      throw new AppError('Checkout session row was not found', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError(
+        'Checkout session row was not found',
+        500,
+        errorCodesSchema.enum.INTERNAL_ERROR
+      );
     }
 
     return row as CheckoutSessionRow;

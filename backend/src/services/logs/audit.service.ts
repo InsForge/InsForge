@@ -3,7 +3,11 @@ import { DatabaseManager } from '@/infra/database/database.manager.js';
 import logger from '@/utils/logger.js';
 import { AppError } from '@/api/middlewares/error.js';
 import type { AuditLogEntry, AuditLogQuery } from '@/types/logs.js';
-import { ERROR_CODES, AuditLogSchema, GetAuditLogStatsResponse } from '@insforge/shared-schemas';
+import {
+  errorCodesSchema,
+  AuditLogSchema,
+  GetAuditLogStatsResponse,
+} from '@insforge/shared-schemas';
 
 export class AuditService {
   private static instance: AuditService;
@@ -66,7 +70,7 @@ export class AuditService {
       };
     } catch (error) {
       logger.error('Failed to create audit log', error);
-      throw new AppError('Failed to create audit log', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError('Failed to create audit log', 500, errorCodesSchema.enum.INTERNAL_ERROR);
     }
   }
 
@@ -143,7 +147,7 @@ export class AuditService {
       };
     } catch (error) {
       logger.error('Failed to query audit logs', error);
-      throw new AppError('Failed to query audit logs', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError('Failed to query audit logs', 500, errorCodesSchema.enum.INTERNAL_ERROR);
     }
   }
 
@@ -171,7 +175,7 @@ export class AuditService {
         : null;
     } catch (error) {
       logger.error('Failed to get audit log by ID', error);
-      throw new AppError('Failed to get audit log', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError('Failed to get audit log', 500, errorCodesSchema.enum.INTERNAL_ERROR);
     }
   }
 
@@ -238,7 +242,11 @@ export class AuditService {
       };
     } catch (error) {
       logger.error('Failed to get audit log statistics', error);
-      throw new AppError('Failed to get audit statistics', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError(
+        'Failed to get audit statistics',
+        500,
+        errorCodesSchema.enum.INTERNAL_ERROR
+      );
     }
   }
 
@@ -265,7 +273,7 @@ export class AuditService {
       return deletedCount;
     } catch (error) {
       logger.error('Failed to cleanup audit logs', error);
-      throw new AppError('Failed to cleanup audit logs', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError('Failed to cleanup audit logs', 500, errorCodesSchema.enum.INTERNAL_ERROR);
     }
   }
 }

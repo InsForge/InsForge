@@ -2,7 +2,7 @@ import OpenAI from 'openai';
 
 import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
 import {
-  ERROR_CODES,
+  errorCodesSchema,
   type ImageGenerationRequest,
   type ImageGenerationResponse,
 } from '@insforge/shared-schemas';
@@ -108,7 +108,7 @@ export class ImageGenerationService {
       throw new AppError(
         `Failed to generate image: ${error instanceof Error ? error.message : String(error)}`,
         500,
-        ERROR_CODES.AI_UPSTREAM_UNAVAILABLE
+        errorCodesSchema.enum.AI_UPSTREAM_UNAVAILABLE
       );
     }
   }

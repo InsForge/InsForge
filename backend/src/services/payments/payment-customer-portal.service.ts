@@ -7,7 +7,7 @@ import { toISOString } from '@/services/payments/helpers.js';
 import { withUserContext } from '@/services/database/user-context.service.js';
 import type { CustomerPortalSessionRow, StripeCustomerPortalSession } from '@/types/payments.js';
 import {
-  ERROR_CODES,
+  errorCodesSchema,
   type CreateCustomerPortalSessionRequest,
   type CustomerPortalSession,
   type RoleSchema,
@@ -136,7 +136,11 @@ export class PaymentCustomerPortalService {
 
   private getSafeRole(role: RoleSchema): RoleSchema {
     if (!CUSTOMER_PORTAL_INSERT_ROLES.has(role)) {
-      throw new AppError('Unsupported customer portal role', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
+      throw new AppError(
+        'Unsupported customer portal role',
+        403,
+        errorCodesSchema.enum.AUTH_UNAUTHORIZED
+      );
     }
 
     return role;
@@ -147,7 +151,7 @@ export class PaymentCustomerPortalService {
       return new AppError(
         'Customer portal session creation is not allowed by payments.customer_portal_sessions RLS policies',
         403,
-        ERROR_CODES.AUTH_UNAUTHORIZED
+        errorCodesSchema.enum.AUTH_UNAUTHORIZED
       );
     }
 
@@ -185,7 +189,7 @@ export class PaymentCustomerPortalService {
       throw new AppError(
         'Customer portal session row was not found',
         500,
-        ERROR_CODES.INTERNAL_ERROR
+        errorCodesSchema.enum.INTERNAL_ERROR
       );
     }
 

@@ -5,7 +5,7 @@ import { StripeKeyValidationError } from '@/providers/payments/stripe.provider.j
 import { PaymentService } from '@/services/payments/payment.service.js';
 import { successResponse } from '@/utils/response.js';
 import {
-  ERROR_CODES,
+  errorCodesSchema,
   paymentEnvironmentParamsSchema,
   upsertPaymentsConfigBodySchema,
 } from '@insforge/shared-schemas';
@@ -20,12 +20,12 @@ function formatValidationIssues(error: {
 }
 
 function invalidInputFromZod(error: { issues: Array<{ path: PropertyKey[]; message: string }> }) {
-  return new AppError(formatValidationIssues(error), 400, ERROR_CODES.INVALID_INPUT);
+  return new AppError(formatValidationIssues(error), 400, errorCodesSchema.enum.INVALID_INPUT);
 }
 
 function normalizeStripeConfigError(error: unknown) {
   if (error instanceof StripeKeyValidationError) {
-    return new AppError(error.message, 400, ERROR_CODES.INVALID_INPUT);
+    return new AppError(error.message, 400, errorCodesSchema.enum.INVALID_INPUT);
   }
 
   return error;
@@ -66,7 +66,11 @@ router.delete('/config', async (req: AuthRequest, res: Response, next: NextFunct
     const environment = getEnvironment(req.params);
     const removed = await paymentService.removeStripeSecretKey(environment);
     if (!removed) {
-      throw new AppError('No Stripe key configured', 404, ERROR_CODES.PAYMENT_CONFIG_NOT_FOUND);
+      throw new AppError(
+        'No Stripe key configured',
+        404,
+        errorCodesSchema.enum.PAYMENT_CONFIG_NOT_FOUND
+      );
     }
 
     const config = await paymentService.getConfig();

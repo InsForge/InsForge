@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { createHash } from 'crypto';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES, type AIOverview } from '@insforge/shared-schemas';
+import { errorCodesSchema, type AIOverview } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 
 interface CloudCredentialsResponse {
@@ -132,7 +132,7 @@ export class OpenRouterProvider {
       throw new AppError(
         'OpenRouter API key not configured. Set OPENROUTER_API_KEY in the backend environment.',
         500,
-        ERROR_CODES.AI_INVALID_API_KEY
+        errorCodesSchema.enum.AI_INVALID_API_KEY
       );
     }
     return { apiKey, source: 'env' };
@@ -194,7 +194,7 @@ export class OpenRouterProvider {
     try {
       resolved = await this.getApiKeyWithSource();
     } catch (error) {
-      if (error instanceof AppError && error.code === ERROR_CODES.AI_INVALID_API_KEY) {
+      if (error instanceof AppError && error.code === errorCodesSchema.enum.AI_INVALID_API_KEY) {
         return EMPTY_AI_OVERVIEW;
       }
       throw error;
@@ -239,7 +239,7 @@ export class OpenRouterProvider {
       throw new AppError(
         'Invalid OpenRouter API Key',
         500,
-        ERROR_CODES.AI_INVALID_API_KEY,
+        errorCodesSchema.enum.AI_INVALID_API_KEY,
         'Check your OpenRouter key and try again.'
       );
     }
@@ -643,7 +643,7 @@ export class OpenRouterProvider {
           throw new AppError(
             'AI provider authentication failed. Check your API key configuration.',
             401,
-            ERROR_CODES.AI_INVALID_API_KEY,
+            errorCodesSchema.enum.AI_INVALID_API_KEY,
             source === 'cloud'
               ? 'Check the cloud-managed OpenRouter credential.'
               : 'Set a valid OPENROUTER_API_KEY in the backend environment.'
@@ -653,7 +653,7 @@ export class OpenRouterProvider {
           throw new AppError(
             'AI provider rate limit exceeded. Please wait before retrying.',
             429,
-            ERROR_CODES.RATE_LIMITED,
+            errorCodesSchema.enum.RATE_LIMITED,
             'Wait a moment and retry, or check your API key rate limits.'
           );
         }

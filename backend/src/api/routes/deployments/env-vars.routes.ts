@@ -6,7 +6,7 @@ import { deploymentsWriteLimiter } from '@/api/middlewares/rate-limiters.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { successResponse } from '@/utils/response.js';
-import { upsertEnvVarsRequestSchema, ERROR_CODES } from '@insforge/shared-schemas';
+import { upsertEnvVarsRequestSchema, errorCodesSchema } from '@insforge/shared-schemas';
 
 const router = Router();
 const deploymentService = DeploymentService.getInstance();
@@ -23,7 +23,7 @@ router.get('/', verifyAdmin, async (_req: AuthRequest, res: Response, next: Next
       throw new AppError(
         'Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID environment variables.',
         503,
-        ERROR_CODES.INTERNAL_ERROR
+        errorCodesSchema.enum.INTERNAL_ERROR
       );
     }
 
@@ -48,7 +48,7 @@ router.post(
         throw new AppError(
           'Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID environment variables.',
           503,
-          ERROR_CODES.INTERNAL_ERROR
+          errorCodesSchema.enum.INTERNAL_ERROR
         );
       }
 
@@ -57,7 +57,7 @@ router.post(
         throw new AppError(
           validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
 
@@ -98,7 +98,7 @@ router.get('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: Ne
       throw new AppError(
         'Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID environment variables.',
         503,
-        ERROR_CODES.INTERNAL_ERROR
+        errorCodesSchema.enum.INTERNAL_ERROR
       );
     }
 
@@ -126,7 +126,7 @@ router.delete(
         throw new AppError(
           'Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID environment variables.',
           503,
-          ERROR_CODES.INTERNAL_ERROR
+          errorCodesSchema.enum.INTERNAL_ERROR
         );
       }
 

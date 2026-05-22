@@ -33,7 +33,7 @@ import {
   type StripeWebhookEndpoint,
 } from '@/types/payments.js';
 import {
-  ERROR_CODES,
+  errorCodesSchema,
   type GetPaymentsConfigResponse,
   type GetPaymentsStatusResponse,
   type StripeConnection,
@@ -106,7 +106,7 @@ export class PaymentConfigService {
       throw new AppError(
         `STRIPE_${environment.toUpperCase()}_SECRET_KEY is not configured`,
         400,
-        ERROR_CODES.PAYMENT_CONFIG_INVALID
+        errorCodesSchema.enum.PAYMENT_CONFIG_INVALID
       );
     }
 
@@ -650,7 +650,7 @@ export class PaymentConfigService {
       throw new AppError(
         'Stripe did not return a webhook signing secret for the managed endpoint',
         500,
-        ERROR_CODES.INTERNAL_ERROR
+        errorCodesSchema.enum.INTERNAL_ERROR
       );
     }
 

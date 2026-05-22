@@ -2,7 +2,7 @@ import rateLimit from 'express-rate-limit';
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from './error.js';
 import logger from '@/utils/logger.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
+import { errorCodesSchema } from '@insforge/shared-schemas';
 
 /**
  * Store for tracking per-email cooldowns
@@ -60,7 +60,7 @@ export const sendEmailOTPRateLimiter = rateLimit({
       new AppError(
         'Too many send email verification requests from this IP. Please try again in 15 minutes.',
         429,
-        ERROR_CODES.TOO_MANY_REQUESTS
+        errorCodesSchema.enum.TOO_MANY_REQUESTS
       )
     );
   },
@@ -86,7 +86,7 @@ export const s3AccessKeyManagementRateLimiter = rateLimit({
       new AppError(
         'Too many S3 access key management requests from this IP. Please try again in 15 minutes.',
         429,
-        ERROR_CODES.TOO_MANY_REQUESTS
+        errorCodesSchema.enum.TOO_MANY_REQUESTS
       )
     );
   },
@@ -110,7 +110,7 @@ export const verifyOTPRateLimiter = rateLimit({
       new AppError(
         'Too many verification attempts from this IP. Please try again in 15 minutes.',
         429,
-        ERROR_CODES.TOO_MANY_REQUESTS
+        errorCodesSchema.enum.TOO_MANY_REQUESTS
       )
     );
   },
@@ -143,7 +143,7 @@ export const perEmailCooldown = (cooldownMs: number = 60000) => {
       throw new AppError(
         `Please wait ${remainingSec} seconds before requesting another code for this email`,
         429,
-        ERROR_CODES.TOO_MANY_REQUESTS
+        errorCodesSchema.enum.TOO_MANY_REQUESTS
       );
     }
 
@@ -409,7 +409,7 @@ function createWriteEndpointLimiter(category: WriteLimiterCategory) {
         new AppError(
           `Too many ${category} write requests. Please wait a few minutes and try again.`,
           429,
-          ERROR_CODES.TOO_MANY_REQUESTS
+          errorCodesSchema.enum.TOO_MANY_REQUESTS
         )
       );
     },

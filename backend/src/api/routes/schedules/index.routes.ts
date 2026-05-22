@@ -4,7 +4,7 @@ import { ScheduleService } from '@/services/schedules/schedule.service.js';
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/api/middlewares/error.js';
 import {
-  ERROR_CODES,
+  errorCodesSchema,
   createScheduleRequestSchema,
   updateScheduleRequestSchema,
   getSchedulesConfigResponseSchema,
@@ -56,7 +56,7 @@ router.patch('/config', async (req: AuthRequest, res: Response, next: NextFuncti
       throw new AppError(
         validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
 
@@ -77,7 +77,7 @@ router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) =
     const { id } = req.params;
     const schedule = await scheduleService.getScheduleById(id);
     if (!schedule) {
-      throw new AppError('Schedule not found.', 404, ERROR_CODES.SCHEDULE_NOT_FOUND);
+      throw new AppError('Schedule not found.', 404, errorCodesSchema.enum.SCHEDULE_NOT_FOUND);
     }
     successResponse(res, schedule);
   } catch (error) {
@@ -132,7 +132,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
       throw new AppError(
         validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
 
@@ -164,7 +164,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction)
       throw new AppError(
         validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
 

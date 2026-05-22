@@ -151,7 +151,3 @@ const errorCodeValues = [
 export const errorCodesSchema = z.enum(errorCodeValues);
 
 export type ErrorCode = z.infer<typeof errorCodesSchema>;
-
-export const ERROR_CODES = Object.freeze(
-  Object.fromEntries(errorCodesSchema.options.map((code) => [code, code]))
-) as { readonly [Code in ErrorCode]: Code };

@@ -3,7 +3,7 @@ import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import logger from '@/utils/logger.js';
-import { ERROR_CODES, type CustomOAuthConfigSchema } from '@insforge/shared-schemas';
+import { errorCodesSchema, type CustomOAuthConfigSchema } from '@insforge/shared-schemas';
 
 interface CustomOAuthConfigRow {
   id: string;
@@ -90,7 +90,7 @@ export class CustomOAuthConfigService {
       throw new AppError(
         'Failed to list custom OAuth configurations',
         500,
-        ERROR_CODES.INTERNAL_ERROR
+        errorCodesSchema.enum.INTERNAL_ERROR
       );
     }
   }
@@ -118,7 +118,7 @@ export class CustomOAuthConfigService {
       throw new AppError(
         'Failed to get custom OAuth configuration',
         500,
-        ERROR_CODES.INTERNAL_ERROR
+        errorCodesSchema.enum.INTERNAL_ERROR
       );
     }
   }
@@ -142,7 +142,7 @@ export class CustomOAuthConfigService {
       throw new AppError(
         'Failed to get custom OAuth client secret',
         500,
-        ERROR_CODES.INTERNAL_ERROR
+        errorCodesSchema.enum.INTERNAL_ERROR
       );
     }
   }
@@ -189,14 +189,14 @@ export class CustomOAuthConfigService {
         throw new AppError(
           `Custom OAuth config ${keyLower} already exists`,
           409,
-          ERROR_CODES.AUTH_OAUTH_CONFIG_ALREADY_EXISTS
+          errorCodesSchema.enum.AUTH_OAUTH_CONFIG_ALREADY_EXISTS
         );
       }
       logger.error('Failed to create custom OAuth config', { error, key: input.key });
       throw new AppError(
         'Failed to create custom OAuth configuration',
         500,
-        ERROR_CODES.INTERNAL_ERROR
+        errorCodesSchema.enum.INTERNAL_ERROR
       );
     } finally {
       client.release();
@@ -222,7 +222,7 @@ export class CustomOAuthConfigService {
         throw new AppError(
           `Custom OAuth configuration for ${key} not found`,
           404,
-          ERROR_CODES.AUTH_OAUTH_CONFIG_NOT_FOUND
+          errorCodesSchema.enum.AUTH_OAUTH_CONFIG_NOT_FOUND
         );
       }
 
@@ -239,7 +239,7 @@ export class CustomOAuthConfigService {
           throw new AppError(
             `Failed to update secret for ${keyLower}`,
             500,
-            ERROR_CODES.INTERNAL_ERROR
+            errorCodesSchema.enum.INTERNAL_ERROR
           );
         }
       }
@@ -270,7 +270,7 @@ export class CustomOAuthConfigService {
           throw new AppError(
             `Custom OAuth configuration for ${key} not found`,
             404,
-            ERROR_CODES.AUTH_OAUTH_CONFIG_NOT_FOUND
+            errorCodesSchema.enum.AUTH_OAUTH_CONFIG_NOT_FOUND
           );
         }
         return config;
@@ -296,7 +296,7 @@ export class CustomOAuthConfigService {
         throw new AppError(
           `Custom OAuth configuration for ${key} not found`,
           404,
-          ERROR_CODES.AUTH_OAUTH_CONFIG_NOT_FOUND
+          errorCodesSchema.enum.AUTH_OAUTH_CONFIG_NOT_FOUND
         );
       }
 
@@ -311,7 +311,7 @@ export class CustomOAuthConfigService {
       throw new AppError(
         'Failed to update custom OAuth configuration',
         500,
-        ERROR_CODES.INTERNAL_ERROR
+        errorCodesSchema.enum.INTERNAL_ERROR
       );
     } finally {
       client.release();
@@ -344,7 +344,7 @@ export class CustomOAuthConfigService {
         throw new AppError(
           `Failed to delete secret for ${keyLower}`,
           500,
-          ERROR_CODES.INTERNAL_ERROR
+          errorCodesSchema.enum.INTERNAL_ERROR
         );
       }
       await client.query('COMMIT');
@@ -356,7 +356,7 @@ export class CustomOAuthConfigService {
       throw new AppError(
         'Failed to delete custom OAuth configuration',
         500,
-        ERROR_CODES.INTERNAL_ERROR
+        errorCodesSchema.enum.INTERNAL_ERROR
       );
     } finally {
       client.release();

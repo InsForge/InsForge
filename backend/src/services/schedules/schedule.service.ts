@@ -3,7 +3,7 @@ import logger from '@/utils/logger.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import {
-  ERROR_CODES,
+  errorCodesSchema,
   type CreateScheduleRequest,
   type UpdateScheduleRequest,
   type ScheduleSchema,
@@ -63,7 +63,7 @@ export class ScheduleService {
         throw new AppError(
           'Interval form is only for sub-minute cadence. Use 1–59 seconds (e.g., "30 seconds"); for ≥ 1 minute use 5-field cron (e.g., "*/5 * * * *").',
           400,
-          ERROR_CODES.SCHEDULE_INVALID_CRON
+          errorCodesSchema.enum.SCHEDULE_INVALID_CRON
         );
       }
       return;
@@ -74,7 +74,7 @@ export class ScheduleService {
       throw new AppError(
         `Cron expression must be exactly 5 fields (minute, hour, day, month, day-of-week) or a sub-minute interval like "30 seconds". Got ${fields.length} fields. Examples: "*/5 * * * *" for every 5 minutes, "30 seconds" for every 30 seconds.`,
         400,
-        ERROR_CODES.SCHEDULE_INVALID_CRON
+        errorCodesSchema.enum.SCHEDULE_INVALID_CRON
       );
     }
 
@@ -82,7 +82,11 @@ export class ScheduleService {
       CronExpressionParser.parse(trimmed, { strict: false });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      throw new AppError(`Invalid cron expression: ${msg}`, 400, ERROR_CODES.SCHEDULE_INVALID_CRON);
+      throw new AppError(
+        `Invalid cron expression: ${msg}`,
+        400,
+        errorCodesSchema.enum.SCHEDULE_INVALID_CRON
+      );
     }
   }
 
@@ -177,7 +181,7 @@ export class ScheduleService {
             throw new AppError(
               `Secret with key "${secretKey}" not found for schedule header "${key}".`,
               404,
-              ERROR_CODES.SECRET_NOT_FOUND
+              errorCodesSchema.enum.SECRET_NOT_FOUND
             );
           }
         }
@@ -291,7 +295,7 @@ export class ScheduleService {
         throw new AppError(
           jobResult?.message || 'Database operation failed',
           500,
-          ERROR_CODES.DATABASE_INTERNAL_ERROR
+          errorCodesSchema.enum.DATABASE_INTERNAL_ERROR
         );
       }
 
@@ -310,7 +314,7 @@ export class ScheduleService {
     try {
       const existingSchedule = await this.getScheduleById(id);
       if (!existingSchedule) {
-        throw new AppError('Schedule not found', 404, ERROR_CODES.SCHEDULE_NOT_FOUND);
+        throw new AppError('Schedule not found', 404, errorCodesSchema.enum.SCHEDULE_NOT_FOUND);
       }
 
       // Check if we need to update schedule fields (not just isActive toggle)
@@ -362,7 +366,7 @@ export class ScheduleService {
           throw new AppError(
             jobResult?.message || 'Database operation failed',
             500,
-            ERROR_CODES.DATABASE_INTERNAL_ERROR
+            errorCodesSchema.enum.DATABASE_INTERNAL_ERROR
           );
         }
         cronJobId = jobResult.cron_job_id;
@@ -403,7 +407,7 @@ export class ScheduleService {
         throw new AppError(
           deleteResult?.message || 'Database operation failed',
           500,
-          ERROR_CODES.DATABASE_INTERNAL_ERROR
+          errorCodesSchema.enum.DATABASE_INTERNAL_ERROR
         );
       }
 

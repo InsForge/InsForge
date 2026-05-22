@@ -6,7 +6,7 @@ import { StorageConfigService } from '@/services/storage/storage-config.service.
 import { successResponse } from '@/utils/response.js';
 import { dynamicUploadSingle, handleUploadError } from '@/api/middlewares/upload.js';
 import {
-  ERROR_CODES,
+  errorCodesSchema,
   createBucketRequestSchema,
   updateBucketRequestSchema,
   updateStorageConfigRequestSchema,
@@ -63,7 +63,7 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
       throw new AppError(
         validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
 
@@ -106,7 +106,7 @@ router.post(
         throw new AppError(
           validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
           400,
-          ERROR_CODES.STORAGE_INVALID_PARAMETER,
+          errorCodesSchema.enum.STORAGE_INVALID_PARAMETER,
           'Please check the request body, it must conform with the CreateBucketRequest schema.'
         );
       }
@@ -151,13 +151,13 @@ router.post(
       );
     } catch (error) {
       if (error instanceof Error && error.message.includes('already exists')) {
-        next(new AppError(error.message, 409, ERROR_CODES.STORAGE_ALREADY_EXISTS));
+        next(new AppError(error.message, 409, errorCodesSchema.enum.STORAGE_ALREADY_EXISTS));
       } else if (error instanceof Error && error.message.includes('Invalid bucket name')) {
         next(
           new AppError(
             error.message,
             400,
-            ERROR_CODES.STORAGE_INVALID_PARAMETER,
+            errorCodesSchema.enum.STORAGE_INVALID_PARAMETER,
             'Please check the bucket name, it must be a valid bucket name'
           )
         );
@@ -180,7 +180,7 @@ router.patch(
         throw new AppError(
           validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
           400,
-          ERROR_CODES.STORAGE_INVALID_PARAMETER,
+          errorCodesSchema.enum.STORAGE_INVALID_PARAMETER,
           'Please check the request body, it must conform with the UpdateBucketRequest schema.'
         );
       }
@@ -229,7 +229,7 @@ router.patch(
       );
     } catch (error) {
       if (error instanceof Error && error.message.includes('does not exist')) {
-        next(new AppError(error.message, 404, ERROR_CODES.STORAGE_NOT_FOUND));
+        next(new AppError(error.message, 404, errorCodesSchema.enum.STORAGE_NOT_FOUND));
       } else {
         next(error);
       }
@@ -294,11 +294,19 @@ router.put(
       const objectKey = req.params[0]; // Everything after objects
 
       if (!objectKey) {
-        throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
+        throw new AppError(
+          'Object key is required',
+          400,
+          errorCodesSchema.enum.STORAGE_INVALID_PARAMETER
+        );
       }
 
       if (!req.file) {
-        throw new AppError('File is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
+        throw new AppError(
+          'File is required',
+          400,
+          errorCodesSchema.enum.STORAGE_INVALID_PARAMETER
+        );
       }
 
       const storedFile = await StorageService.getInstance().putObject(
@@ -324,9 +332,9 @@ router.put(
       successResponse(res, storedFile, 201);
     } catch (error) {
       if (error instanceof Error && error.message.includes('already exists')) {
-        next(new AppError(error.message, 409, ERROR_CODES.STORAGE_ALREADY_EXISTS));
+        next(new AppError(error.message, 409, errorCodesSchema.enum.STORAGE_ALREADY_EXISTS));
       } else if (error instanceof Error && error.message.includes('Invalid')) {
-        next(new AppError(error.message, 400, ERROR_CODES.STORAGE_INVALID_PARAMETER));
+        next(new AppError(error.message, 400, errorCodesSchema.enum.STORAGE_INVALID_PARAMETER));
       } else {
         next(error);
       }
@@ -345,7 +353,11 @@ router.post(
       const { bucketName } = req.params;
 
       if (!req.file) {
-        throw new AppError('File is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
+        throw new AppError(
+          'File is required',
+          400,
+          errorCodesSchema.enum.STORAGE_INVALID_PARAMETER
+        );
       }
 
       const storageService = StorageService.getInstance();
@@ -380,12 +392,12 @@ router.post(
           new AppError(
             'Bucket does not exist',
             404,
-            ERROR_CODES.STORAGE_NOT_FOUND,
+            errorCodesSchema.enum.STORAGE_NOT_FOUND,
             'Create the bucket first using POST /api/storage/buckets'
           )
         );
       } else if (error instanceof Error && error.message.includes('Invalid')) {
-        next(new AppError(error.message, 400, ERROR_CODES.STORAGE_INVALID_PARAMETER));
+        next(new AppError(error.message, 400, errorCodesSchema.enum.STORAGE_INVALID_PARAMETER));
       } else {
         next(error);
       }
@@ -403,7 +415,11 @@ router.get(
       const objectKey = req.params[0]; // Everything after objects
 
       if (!objectKey) {
-        throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
+        throw new AppError(
+          'Object key is required',
+          400,
+          errorCodesSchema.enum.STORAGE_INVALID_PARAMETER
+        );
       }
 
       const storageService = StorageService.getInstance();
@@ -415,7 +431,7 @@ router.get(
         !!authReq.hasApiKey
       );
       if (!visible) {
-        throw new AppError('Object not found', 404, ERROR_CODES.STORAGE_NOT_FOUND);
+        throw new AppError('Object not found', 404, errorCodesSchema.enum.STORAGE_NOT_FOUND);
       }
 
       const strategy = await storageService.getDownloadStrategy(bucketName, objectKey);
@@ -430,7 +446,7 @@ router.get(
         !!authReq.hasApiKey
       );
       if (!result) {
-        throw new AppError('Object not found', 404, ERROR_CODES.STORAGE_NOT_FOUND);
+        throw new AppError('Object not found', 404, errorCodesSchema.enum.STORAGE_NOT_FOUND);
       }
 
       const { file, metadata } = result;
@@ -443,7 +459,7 @@ router.get(
       res.send(file);
     } catch (error) {
       if (error instanceof Error && error.message.includes('Invalid')) {
-        next(new AppError(error.message, 400, ERROR_CODES.STORAGE_INVALID_PARAMETER));
+        next(new AppError(error.message, 400, errorCodesSchema.enum.STORAGE_INVALID_PARAMETER));
       } else {
         next(error);
       }
@@ -462,7 +478,11 @@ router.delete(
       const deleted = await storageService.deleteBucket(bucketName);
 
       if (!deleted) {
-        throw new AppError('Bucket not found or already empty', 404, ERROR_CODES.STORAGE_NOT_FOUND);
+        throw new AppError(
+          'Bucket not found or already empty',
+          404,
+          errorCodesSchema.enum.STORAGE_NOT_FOUND
+        );
       }
 
       // Log audit for bucket deletion
@@ -509,7 +529,11 @@ router.delete(
       const objectKey = req.params[0]; // Everything after objects
 
       if (!objectKey) {
-        throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
+        throw new AppError(
+          'Object key is required',
+          400,
+          errorCodesSchema.enum.STORAGE_INVALID_PARAMETER
+        );
       }
 
       const deleted = await StorageService.getInstance().deleteObject(
@@ -520,13 +544,13 @@ router.delete(
       );
 
       if (!deleted) {
-        throw new AppError('Object not found', 404, ERROR_CODES.STORAGE_NOT_FOUND);
+        throw new AppError('Object not found', 404, errorCodesSchema.enum.STORAGE_NOT_FOUND);
       }
 
       successResponse(res, { message: 'Object deleted successfully' });
     } catch (error) {
       if (error instanceof Error && error.message.includes('Invalid')) {
-        next(new AppError(error.message, 400, ERROR_CODES.STORAGE_INVALID_PARAMETER));
+        next(new AppError(error.message, 400, errorCodesSchema.enum.STORAGE_INVALID_PARAMETER));
       } else {
         next(error);
       }
@@ -544,7 +568,11 @@ router.post(
       const { filename, contentType, size } = req.body;
 
       if (!filename) {
-        throw new AppError('Filename is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
+        throw new AppError(
+          'Filename is required',
+          400,
+          errorCodesSchema.enum.STORAGE_INVALID_PARAMETER
+        );
       }
 
       const strategy = await StorageService.getInstance().getUploadStrategy(
@@ -557,7 +585,7 @@ router.post(
       successResponse(res, strategy);
     } catch (error) {
       if (error instanceof Error && error.message.includes('does not exist')) {
-        next(new AppError(error.message, 404, ERROR_CODES.STORAGE_NOT_FOUND));
+        next(new AppError(error.message, 404, errorCodesSchema.enum.STORAGE_NOT_FOUND));
       } else {
         next(error);
       }
@@ -575,7 +603,11 @@ router.post(
       const { size, contentType, etag } = req.body;
 
       if (!size) {
-        throw new AppError('Size is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
+        throw new AppError(
+          'Size is required',
+          400,
+          errorCodesSchema.enum.STORAGE_INVALID_PARAMETER
+        );
       }
 
       const storageService = StorageService.getInstance();
@@ -606,14 +638,14 @@ router.post(
       successResponse(res, fileInfo, 201);
     } catch (error) {
       if (error instanceof Error && error.message.includes('not found')) {
-        next(new AppError(error.message, 404, ERROR_CODES.STORAGE_NOT_FOUND));
+        next(new AppError(error.message, 404, errorCodesSchema.enum.STORAGE_NOT_FOUND));
       } else if (error instanceof Error && error.message.includes('already confirmed')) {
-        next(new AppError(error.message, 409, ERROR_CODES.STORAGE_ALREADY_EXISTS));
+        next(new AppError(error.message, 409, errorCodesSchema.enum.STORAGE_ALREADY_EXISTS));
       } else if (
         error instanceof Error &&
         error.message.includes('exceeds the configured maximum')
       ) {
-        next(new AppError(error.message, 413, ERROR_CODES.STORAGE_INVALID_PARAMETER));
+        next(new AppError(error.message, 413, errorCodesSchema.enum.STORAGE_INVALID_PARAMETER));
       } else {
         next(error);
       }
@@ -642,7 +674,7 @@ router.post(
         !!authReq.hasApiKey
       );
       if (!visible) {
-        throw new AppError('Object not found', 404, ERROR_CODES.STORAGE_NOT_FOUND);
+        throw new AppError('Object not found', 404, errorCodesSchema.enum.STORAGE_NOT_FOUND);
       }
 
       const strategy = await storageService.getDownloadStrategy(bucketName, objectKey);
@@ -650,7 +682,7 @@ router.post(
       successResponse(res, strategy);
     } catch (error) {
       if (error instanceof Error && error.message.includes('Invalid')) {
-        next(new AppError(error.message, 400, ERROR_CODES.STORAGE_INVALID_PARAMETER));
+        next(new AppError(error.message, 400, errorCodesSchema.enum.STORAGE_INVALID_PARAMETER));
       } else {
         next(error);
       }
@@ -692,7 +724,7 @@ router.post(
         throw new AppError(
           validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
           400,
-          ERROR_CODES.STORAGE_INVALID_PARAMETER
+          errorCodesSchema.enum.STORAGE_INVALID_PARAMETER
         );
       }
       const result = await s3AccessKeyService.create(validation.data);

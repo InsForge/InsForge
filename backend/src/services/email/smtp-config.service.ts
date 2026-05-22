@@ -6,7 +6,7 @@ import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
 import {
-  ERROR_CODES,
+  errorCodesSchema,
   type SmtpConfigSchema,
   type UpsertSmtpConfigRequest,
 } from '@insforge/shared-schemas';
@@ -172,7 +172,11 @@ export class SmtpConfigService {
       return toSmtpConfigSchema(result.rows[0]);
     } catch (error) {
       logger.error('Failed to get SMTP config', { error });
-      throw new AppError('Failed to get SMTP configuration', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError(
+        'Failed to get SMTP configuration',
+        500,
+        errorCodesSchema.enum.INTERNAL_ERROR
+      );
     }
   }
 
@@ -272,7 +276,11 @@ export class SmtpConfigService {
       if (error instanceof AppError) {
         throw error;
       }
-      throw new AppError('Failed to update SMTP configuration', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError(
+        'Failed to update SMTP configuration',
+        500,
+        errorCodesSchema.enum.INTERNAL_ERROR
+      );
     } finally {
       client.release();
     }
@@ -311,7 +319,7 @@ export class SmtpConfigService {
       throw new AppError(
         'Failed to initialize SMTP configuration',
         500,
-        ERROR_CODES.INTERNAL_ERROR
+        errorCodesSchema.enum.INTERNAL_ERROR
       );
     }
 
@@ -324,7 +332,7 @@ export class SmtpConfigService {
       throw new AppError(
         `Invalid SMTP port: ${port}. Allowed ports: ${ALLOWED_SMTP_PORTS.join(', ')}`,
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
 
@@ -334,7 +342,7 @@ export class SmtpConfigService {
         throw new AppError(
           'SMTP host is a private or loopback address, which is not allowed',
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
       return;
@@ -350,7 +358,7 @@ export class SmtpConfigService {
         throw new AppError(
           'SMTP host resolves to a private or loopback address, which is not allowed',
           400,
-          ERROR_CODES.INVALID_INPUT
+          errorCodesSchema.enum.INVALID_INPUT
         );
       }
     } catch (error) {
@@ -372,7 +380,7 @@ export class SmtpConfigService {
       throw new AppError(
         'SMTP password is required when enabling SMTP',
         400,
-        ERROR_CODES.INVALID_INPUT
+        errorCodesSchema.enum.INVALID_INPUT
       );
     }
 
@@ -396,7 +404,7 @@ export class SmtpConfigService {
       throw new AppError(
         `SMTP connection failed: ${message}`,
         400,
-        ERROR_CODES.EMAIL_SMTP_CONNECTION_FAILED
+        errorCodesSchema.enum.EMAIL_SMTP_CONNECTION_FAILED
       );
     }
   }

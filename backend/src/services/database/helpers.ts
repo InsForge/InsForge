@@ -1,5 +1,5 @@
 import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
+import { errorCodesSchema } from '@insforge/shared-schemas';
 import { validateIdentifier, validateSchemaName, validateTableName } from '@/utils/validations.js';
 
 export const DEFAULT_DATABASE_SCHEMA = 'public' as const;
@@ -41,7 +41,7 @@ export function normalizeDatabaseSchemaName(schemaName: unknown): string {
     throw new AppError(
       `Schema "${normalizedSchemaName}" is not available in the dashboard.`,
       400,
-      ERROR_CODES.INVALID_INPUT,
+      errorCodesSchema.enum.INVALID_INPUT,
       'Internal PostgreSQL and platform schemas cannot be queried from the dashboard.'
     );
   }
@@ -54,7 +54,7 @@ export function assertWritableDatabaseSchema(schemaName: string): void {
     throw new AppError(
       `Schema "${schemaName}" is protected in the dashboard`,
       403,
-      ERROR_CODES.DATABASE_FORBIDDEN,
+      errorCodesSchema.enum.DATABASE_FORBIDDEN,
       'Switch to public to create or modify tables and records.'
     );
   }
@@ -93,7 +93,7 @@ export function splitQualifiedTableReference(
     throw new AppError(
       `Invalid table reference "${tableReference}"`,
       400,
-      ERROR_CODES.INVALID_INPUT,
+      errorCodesSchema.enum.INVALID_INPUT,
       'Use either "table" or "schema.table" when referencing a table.'
     );
   }

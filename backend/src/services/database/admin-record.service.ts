@@ -1,6 +1,6 @@
 import { AppError } from '@/api/middlewares/error.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
+import { errorCodesSchema } from '@insforge/shared-schemas';
 import type { DatabaseRecord } from '@/types/database.js';
 import { escapeSqlLikePattern, validateTableName } from '@/utils/validations.js';
 import { assertWritableDatabaseSchema, quoteIdentifier, quoteQualifiedName } from './helpers.js';
@@ -167,7 +167,7 @@ export class AdminRecordService {
       throw new AppError(
         'No valid fields to update.',
         400,
-        ERROR_CODES.INVALID_INPUT,
+        errorCodesSchema.enum.INVALID_INPUT,
         'Provide at least one editable field with a non-empty value.'
       );
     }
@@ -191,7 +191,7 @@ export class AdminRecordService {
       throw new AppError(
         'Record not found.',
         404,
-        ERROR_CODES.DATABASE_NOT_FOUND,
+        errorCodesSchema.enum.DATABASE_NOT_FOUND,
         'Check the record identifier and try again.'
       );
     }
@@ -251,7 +251,7 @@ export class AdminRecordService {
       throw new AppError(
         'Table not found.',
         404,
-        ERROR_CODES.DATABASE_NOT_FOUND,
+        errorCodesSchema.enum.DATABASE_NOT_FOUND,
         'Check the table name and schema, then try again.'
       );
     }
@@ -374,7 +374,7 @@ export class AdminRecordService {
         throw new AppError(
           `Column "${columnName}" cannot be blank.`,
           400,
-          ERROR_CODES.INVALID_INPUT,
+          errorCodesSchema.enum.INVALID_INPUT,
           'Provide a value for required fields or clear only nullable non-text fields.'
         );
       }
@@ -390,7 +390,7 @@ export class AdminRecordService {
       throw new AppError(
         `Unknown column "${columnName}".`,
         400,
-        ERROR_CODES.INVALID_INPUT,
+        errorCodesSchema.enum.INVALID_INPUT,
         'Check the table schema and try again.'
       );
     }

@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { ERROR_CODES as sharedErrorCodes, errorCodesSchema } from '@insforge/shared-schemas';
+import { errorCodesSchema } from '@insforge/shared-schemas';
+
+const sharedErrorCodes = errorCodesSchema.enum;
 
 describe('shared error codes', () => {
   /**
-   * Full snapshot of the entire ERROR_CODES object.
+   * Full snapshot of the entire errorCodesSchema enum object.
    *
    * This snapshot pins every key/value pair so that accidental renames,
    * additions, or removals are caught immediately by CI. Update the snapshot
