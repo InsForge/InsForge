@@ -1440,7 +1440,11 @@ export class AuthService {
       await client.query('COMMIT');
       return result.rowCount || 0;
     } catch (error) {
-      await client.query('ROLLBACK');
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        // Preserve the original error if rollback fails.
+      }
       throw error;
     } finally {
       client.release();

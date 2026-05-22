@@ -191,6 +191,29 @@ describe('AuthService.deleteUsers', () => {
     );
   });
 
+  it('rolls back and releases the client when deleting users fails, preserving the original error', async () => {
+    const originalError = new Error('select failed');
+    const rollbackError = new Error('rollback failed');
+
+    mockClient.query
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(originalError)
+      .mockRejectedValueOnce(rollbackError);
+
+    await expect(authService.deleteUsers(['user-1'])).rejects.toBe(originalError);
+
+    expect(mockClient.query).toHaveBeenNthCalledWith(1, 'BEGIN');
+    expect(mockClient.query).toHaveBeenNthCalledWith(
+      2,
+      `SELECT email
+         FROM auth.users
+         WHERE id IN ($1)`,
+      ['user-1']
+    );
+    expect(mockClient.query).toHaveBeenNthCalledWith(3, 'ROLLBACK');
+    expect(mockClient.release).toHaveBeenCalledTimes(1);
+  });
+
   it('does nothing when only the admin account is provided', async () => {
     const deleted = await authService.deleteUsers([ADMIN_ID]);
 
