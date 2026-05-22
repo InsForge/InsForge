@@ -224,10 +224,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
       'SELECT * FROM storage.objects WHERE bucket = $1 ORDER BY key LIMIT $2 OFFSET $3',
       'SELECT COUNT(*) as count FROM storage.objects WHERE bucket = $1',
     ]);
-    expect(calls.map((c) => c.params)).toEqual([
-      ['photos', 10, 0],
-      ['photos'],
-    ]);
+    expect(calls.map((c) => c.params)).toEqual([['photos', 10, 0], ['photos']]);
   });
 
   it('returns false for private bucket objects without a user context', async () => {
