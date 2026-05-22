@@ -1,0 +1,91 @@
+---
+title: "Edge Functions"
+sidebarTitle: "Overview"
+description: "Deno-powered serverless TypeScript with first-class schedules."
+---
+
+Use InsForge edge functions to run TypeScript on [Deno](https://deno.com), deployed close to your users for low latency. Functions can be invoked on-demand from any client, chained from database triggers, or scheduled to run on a cron expression. The runtime ships standard fetch, streaming responses, and ESM imports out of the box.
+
+<Note>
+  **Need a process that stays up?** Use [Compute](/core-concepts/compute/overview) for queue workers, AI inference loops, and anything stateful. Edge Functions are for request/response and short-lived jobs.
+</Note>
+
+```mermaid
+graph TB
+    HTTP[HTTP Request] --> Fn[Edge Function on Deno]
+    Schedule[Cron Schedule] --> Fn
+    Trigger[Database Trigger] --> Fn
+
+    Fn --> SDK[InsForge SDK]
+    SDK --> DB[(Database)]
+    SDK --> Storage[Storage]
+    SDK --> Gateway[Model Gateway]
+
+    style HTTP fill:#1e293b,stroke:#475569,color:#e2e8f0
+    style Schedule fill:#1e293b,stroke:#475569,color:#e2e8f0
+    style Trigger fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
+    style Fn fill:#c2410c,stroke:#fb923c,color:#fed7aa
+    style SDK fill:#1e40af,stroke:#3b82f6,color:#dbeafe
+    style DB fill:#0e7490,stroke:#06b6d4,color:#cffafe
+    style Storage fill:#166534,stroke:#22c55e,color:#dcfce7
+    style Gateway fill:#166534,stroke:#22c55e,color:#dcfce7
+```
+
+## Features
+
+### HTTP triggers
+
+Every function is reachable at `https://<project>.insforge.dev/functions/<name>`. Standard fetch in, standard `Response` out. Streaming, JSON, redirects, and websockets all work.
+
+### Schedules
+
+Attach a cron expression to a function and InsForge invokes it on time, with retry on failure. See [Schedules](/core-concepts/functions/schedules) for the cron syntax and execution model.
+
+### Database triggers
+
+Wire a function to fire on `INSERT`, `UPDATE`, or `DELETE` against a table. The function receives the row payload and runs with a service-role JWT so it can perform privileged follow-up writes.
+
+### Secrets and environment variables
+
+Set env vars and secrets per function. The dashboard, CLI, and MCP all read and write the same store; secrets never round-trip through your repo.
+
+### Logs
+
+Structured logs are captured per invocation, queryable by status, duration, and function name. The InsForge MCP `get-function-logs` tool lets your agent diagnose failures without leaving the editor.
+
+### Deno standard library
+
+Use the [Deno standard library](https://jsr.io/@std) and any ESM module from `jsr.io`, `esm.sh`, or `npm:` specifiers. You don't run a bundler, and there's no `node_modules` directory to ship.
+
+## Concepts
+
+<CardGroup cols={2}>
+  <Card title="Schedules" icon="clock" href="/core-concepts/functions/schedules">
+    Run a function on a cron expression instead of in response to a request.
+  </Card>
+</CardGroup>
+
+## Build with it
+
+<CardGroup cols={2}>
+  <Card title="TypeScript SDK" icon="js" href="/sdks/typescript/functions">
+    Invoke and stream functions from Node, browser, and edge.
+  </Card>
+
+  <Card title="Swift SDK" icon="swift" href="/sdks/swift/functions">
+    Invoke functions from iOS and macOS apps.
+  </Card>
+
+  <Card title="Kotlin SDK" icon="android" href="/sdks/kotlin/functions">
+    Invoke functions from Android and JVM apps.
+  </Card>
+
+  <Card title="REST API" icon="code" href="/sdks/rest/functions">
+    Plain HTTP function endpoints, callable from any language.
+  </Card>
+</CardGroup>
+
+## Next steps
+
+- Set up the [CLI](/quickstart) to link your project (the recommended path).
+- Browse the [TypeScript SDK reference](/sdks/typescript/functions) for invocation patterns.

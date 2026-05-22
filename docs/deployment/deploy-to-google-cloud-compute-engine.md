@@ -2,6 +2,10 @@
 
 This guide will walk you through deploying InsForge on Google Cloud Compute Engine using Docker Compose.
 
+<Note>
+  This cloud walkthrough is community-maintained and can lag the latest InsForge release. The canonical, always-current setup is the `deploy/docker-compose/` directory in the [InsForge repo](https://github.com/InsForge/InsForge).
+</Note>
+
 ## 📋 Prerequisites
 
 - Google Cloud Account with billing enabled
@@ -60,8 +64,7 @@ This guide will walk you through deploying InsForge on Google Cloud Compute Engi
 | insforge-ssh | Ingress | insforge-server | tcp:22 | Your IP address |
 | insforge-http | Ingress | insforge-server | tcp:80 | 0.0.0.0/0 |
 | insforge-https | Ingress | insforge-server | tcp:443 | 0.0.0.0/0 |
-| insforge-backend | Ingress | insforge-server | tcp:7130 | 0.0.0.0/0 |
-| insforge-frontend | Ingress | insforge-server | tcp:7131 | 0.0.0.0/0 |
+| insforge-app | Ingress | insforge-server | tcp:7130 | 0.0.0.0/0 |
 | insforge-deno | Ingress | insforge-server | tcp:7133 | 0.0.0.0/0 |
 | insforge-postgrest | Ingress | insforge-server | tcp:5430 | 0.0.0.0/0 |
 | insforge-postgres | Ingress | insforge-server | tcp:5432 | 0.0.0.0/0 (only if needed externally) |
@@ -154,78 +157,51 @@ Create your `.env` file with production settings:
 nano .env
 ```
 
-Add the following configuration (customize the values):
+The repo ships a template at `deploy/docker-compose/.env.example`. Copy it and edit the values:
+
+```bash
+cp .env.example .env
+nano .env
+```
+
+At a minimum, set these values:
 
 ```env
-# ============================================
-# Server Configuration
-# ============================================
-PORT=7130
-
-# ============================================
-# Database Configuration
-# ============================================
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=your-secure-postgres-password
-POSTGRES_DB=insforge
-
-# ============================================
-# Security & Authentication
-# ============================================
-# IMPORTANT: Generate a strong random secret for production
+# Authentication (required)
+# IMPORTANT: Generate a strong random secret for production (32+ characters)
 JWT_SECRET=your-secret-key-here-must-be-32-char-or-above
-ENCRYPTION_KEY=your-32-char-encryption-key-here
 
-# Admin Account (used for initial setup)
+# Admin account (used for initial setup)
 ADMIN_EMAIL=admin@example.com
 ADMIN_PASSWORD=change-this-password
 
-# ============================================
-# API Configuration
-# ============================================
-# Replace with your Compute Engine external IP or domain
-API_BASE_URL=http://your-external-ip:7130
-VITE_API_BASE_URL=http://your-external-ip:7130
+# Database (required)
+POSTGRES_PASSWORD=your-secure-postgres-password
+```
 
-# ============================================
-# OAuth Providers (Optional)
-# ============================================
-# Google OAuth
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
+Optional values you may want to set:
 
-# GitHub OAuth
-GITHUB_CLIENT_ID=
-GITHUB_CLIENT_SECRET=
+```env
+# Encryption key for secrets and database encryption.
+# Falls back to JWT_SECRET if left empty.
+ENCRYPTION_KEY=
 
-# ============================================
-# AWS Storage Configuration (Optional)
-# ============================================
-# For S3 file storage
-AWS_S3_BUCKET=
-AWS_REGION=
-AWS_ACCESS_KEY_ID=
-AWS_SECRET_ACCESS_KEY=
-
-# ============================================
-# AI/LLM Configuration (Optional)
-# ============================================
+# AI/LLM (get a key from https://openrouter.ai/keys)
 OPENROUTER_API_KEY=
 
-# ============================================
-# Multi-tenant Cloud Configuration (Optional)
-# ============================================
-DEPLOYMENT_ID=
-PROJECT_ID=
-APP_KEY=
-ACCESS_API_KEY=
+# Site deployments and custom domains
+VERCEL_TOKEN=
+VERCEL_TEAM_ID=
+VERCEL_PROJECT_ID=
 
-# ============================================
-# Advanced Configuration
-# ============================================
-DENO_ENV=production
-WORKER_TIMEOUT_MS=30000
+# OAuth providers (Google, GitHub, etc.)
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
 ```
+
+See `deploy/docker-compose/.env.example` for the full list of supported variables.
 
 **Generate Secure Secrets:**
 
@@ -233,7 +209,7 @@ WORKER_TIMEOUT_MS=30000
 # Generate JWT_SECRET (32+ characters)
 openssl rand -base64 32
 
-# Generate ENCRYPTION_KEY (must be exactly 32 characters)
+# Generate ENCRYPTION_KEY (32 characters)
 openssl rand -base64 24
 ```
 
@@ -257,12 +233,11 @@ Press `Ctrl+C` to exit log view.
 # Check running containers
 docker compose ps
 
-# You should see 5 running services:
-# - insforge-postgres
-# - insforge-postgrest
+# You should see 4 running services:
+# - postgres
+# - postgrest
 # - insforge
-# - insforge-deno
-# - insforge-vector
+# - deno
 ```
 
 ### 5. Access Your InsForge Instance
@@ -277,7 +252,7 @@ Expected response:
 ```json
 {
   "status": "ok",
-  "version": "1.0.0",
+  "version": "2.1.7",
   "service": "Insforge OSS Backend",
   "timestamp": "2025-10-17T..."
 }
@@ -288,43 +263,6 @@ Expected response:
 Open your browser and navigate to:
 ```text
 http://your-external-ip:7130
-```
-
-#### 5.3 ⚠️ Important: Custom Admin Credentials Configuration
-
-> **🚧 Active Development Notice**: InsForge is currently in active development and testing. The credential management system is being developed. The following is a temporary workaround that will be replaced with a secure implementation in future releases.
-
-**If you customize admin credentials** in your `.env` file (which is recommended), you must **also update the frontend login page** to match. This is a temporary requirement during our development phase.
-
-**Step 1: Update `.env` file**
-
-```env
-# In your .env file
-ADMIN_EMAIL=your-custom-admin@example.com
-ADMIN_PASSWORD=your-secure-password-here
-
-```
-
-After updating your `.env` file, manually edit the login page:
-
-```bash
-nano ~/insforge/frontend/src/features/login/page/LoginPage.tsx
-```
-
-Find this section (around line 38-41):
-```typescript
-defaultValues: {
-  email: 'admin@example.com',
-  password: 'change-this-password',
-},
-```
-
-Update the default values to match your `.env` file:
-```typescript
-defaultValues: {
-  email: 'your-custom-admin@example.com',  // Update to match your ADMIN_EMAIL
-  password: 'your-secure-password-here',   // Update to match your ADMIN_PASSWORD
-},
 ```
 
 ### 6. Configure Domain (Optional but Recommended)
@@ -379,13 +317,13 @@ server {
     }
 }
 
-# Frontend Dashboard
+# Dashboard
 server {
     listen 80;
     server_name app.yourdomain.com;
 
     location / {
-        proxy_pass http://localhost:7131;
+        proxy_pass http://localhost:7130;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -421,7 +359,7 @@ sudo certbot --nginx -d api.yourdomain.com -d app.yourdomain.com
 Update your `.env` file with HTTPS URLs:
 
 ```bash
-cd ~/insforge
+cd ~/insforge/deploy/docker-compose
 nano .env
 ```
 
@@ -467,17 +405,16 @@ docker compose restart
 ### Update InsForge
 
 ```bash
-cd ~/insforge
+cd ~/insforge/deploy/docker-compose
 git pull origin main
-docker compose down
-docker compose up -d --build
+docker compose pull && docker compose up -d
 ```
 
 ### Backup Database
 
 ```bash
-# Create backup
-docker exec insforge-postgres pg_dump -U postgres insforge > backup_$(date +%Y%m%d_%H%M%S).sql
+# Create backup (run from deploy/docker-compose/)
+docker compose exec postgres pg_dump -U postgres insforge > backup_$(date +%Y%m%d_%H%M%S).sql
 
 # Store backup in Google Cloud Storage (optional)
 # First, install Google Cloud CLI and authenticate

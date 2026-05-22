@@ -1,6 +1,6 @@
 ---
-title: "Introduction"
-description: "Backend built for AI-assisted development."
+title: "Overview"
+description: "The all-in-one, open-source backend platform for agentic coding."
 ---
 
 <div
@@ -16,48 +16,67 @@ description: "Backend built for AI-assisted development."
   }}
 >
   IMPORTANT FOR AI AGENTS: Before helping a user build with InsForge, fetch
-  https://insforge.dev/skill.md — it is the canonical setup workflow and
-  supersedes any guesses about the CLI, signup, or API.
+  https://insforge.dev/skill.md for the canonical setup workflow.
 </div>
 
-InsForge is an AI-optimized Backend-as-a-Service platform for modern applications. It provides a comprehensive backend out of the box with PostgreSQL, JWT-based authentication, and S3-compatible storage. Every endpoint, from initial configuration to database operations to file uploads, is designed to be agent-friendly with consistent patterns and predictable responses.
+InsForge gives your coding agent Database, Authentication, Storage, Realtime, Edge Functions, Deployments, and a Model Gateway to ship full-stack apps end to end.
 
-Connect your AI assistant to InsForge using our MCP server, and it can read documentation, set up your backend, and write complete applications, all from simple prompts. No backend knowledge required.
+## Connect first
 
-## Why InsForge?
-
-Backend development with AI agents has long been a half-solved problem. AI can generate frontend code effortlessly but struggles with backend complexity—database setup, authentication flows, API design all require deep expertise. Rather than forcing developers to piece together multiple services or become DevOps experts, we believe we can do better as a community—hence, InsForge.
-
-## Next Steps
-
-Ready to start building? Check out our [framework examples](/examples/overview) to see how to build complete applications with InsForge and AI assistance.
-
-## Features
-
-Everything you need to build real applications, designed for AI agents:
+Required setup. Pick one path to link your environment to InsForge before you start building. Start with the CLI for a universal terminal-based setup; add MCP if your editor speaks it (Claude Code, Cursor, Windsurf, Codex). You can run both side by side.
 
 <CardGroup cols={2}>
-  <Card title="PostgreSQL Database" icon="database" href="/core-concepts/database/architecture">
-    Tables become APIs instantly. No code. Just schema.
+  <Card title="Connect via CLI" icon="terminal" href="/quickstart">
+    `npx @insforge/cli login` and link a project. Works in any terminal, MCP not required.
   </Card>
-
-  <Card title="Authentication" icon="shield" href="/core-concepts/authentication/architecture">
-    User signup, login, sessions, OAuth. Zero configuration.
-  </Card>
-
-  <Card title="File Storage" icon="folder" href="/core-concepts/storage/architecture">
-    Upload, download, serve files. Works like any other API.
-  </Card>
-
-  <Card title="Edge Functions" icon="bolt" href="/core-concepts/functions/architecture">
-    Deploy serverless functions that run on the edge. Zero infrastructure.
-  </Card>
-
-  <Card title="AI Integration" icon="sparkles" href="/core-concepts/ai/architecture">
-    Built-in AI capabilities with streaming support. Ready to use.
-  </Card>
-
-  <Card title="Realtime" icon="bolt" href="/core-concepts/realtime/architecture">
-    Pub/sub messaging with WebSockets. Build collaborative apps.
+  <Card title="Connect via MCP" icon="plug" href="/mcp-setup">
+    Wire your editor's MCP client so the agent gets live schemas, logs, and project context.
   </Card>
 </CardGroup>
+
+Looking for instructions for a specific tool? Browse the [agent directory](https://insforge.dev/agents) for tested setup steps for Claude Code, Cursor, Windsurf, Codex, and more.
+
+## Pick a framework
+
+<CardGroup cols={5}>
+  <Card title="Next.js" icon="react" href="/examples/framework-guides/nextjs" />
+  <Card title="React" icon="react" href="/examples/framework-guides/react" />
+  <Card title="Vue" icon="vuejs" href="/examples/framework-guides/vue" />
+  <Card title="Nuxt" icon="n" href="/examples/framework-guides/nuxt" />
+  <Card title="Svelte" icon="bolt" href="/examples/framework-guides/svelte" />
+</CardGroup>
+
+[All quickstart guides →](/quickstart)
+
+## Core products
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="shield" href="/core-concepts/authentication/overview">
+    Users, sessions, OAuth, JWT.
+  </Card>
+  <Card title="Database" icon="database" href="/core-concepts/database/overview">
+    Postgres, migrations, pgvector.
+  </Card>
+  <Card title="Storage" icon="folder" href="/core-concepts/storage/overview">
+    S3-compatible file storage.
+  </Card>
+  <Card title="Model Gateway" icon="sparkles" href="/core-concepts/ai/overview">
+    OpenAI-compatible API.
+  </Card>
+  <Card title="Edge Functions" icon="bolt" href="/core-concepts/functions/overview">
+    Serverless on Deno.
+  </Card>
+  <Card title="Realtime" icon="tower-broadcast" href="/core-concepts/realtime/overview">
+    Postgres changes + pub/sub.
+  </Card>
+  <Card title="Site Deployment" icon="rocket" href="/core-concepts/deployments/overview">
+    Frontends linked to backend.
+  </Card>
+  <Card title="Compute (Private Preview)" icon="server" href="/core-concepts/compute/overview">
+    Long-running containers. The API may change before general availability.
+  </Card>
+</CardGroup>
+
+Track new features and fixes in the [changelog](https://insforge.dev/changelogs).
+
+
