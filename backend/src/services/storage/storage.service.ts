@@ -234,7 +234,7 @@ export class StorageService {
       return { etag: providerEtag, uploadedAt: result.rows[0].uploadedAt };
     };
     let uploadedObject: Awaited<ReturnType<typeof insertObject>>;
-    if (hasApiKey) {
+    if (hasApiKey || ctx?.role === 'project_admin') {
       uploadedObject = await runWithRootAccess(this.getPool(), insertObject);
     } else {
       if (!ctx) {
@@ -296,7 +296,7 @@ export class StorageService {
     };
 
     let metadata: StorageRecord | undefined;
-    if (hasApiKey || (await this.isBucketPublic(bucket))) {
+    if (hasApiKey || ctx?.role === 'project_admin' || (await this.isBucketPublic(bucket))) {
       metadata = await runWithRootAccess(this.getPool(), selectObjectMetadata);
     } else if (!ctx) {
       return null;
@@ -353,7 +353,7 @@ export class StorageService {
       return (result.rowCount ?? 0) > 0;
     };
     let deleted: boolean;
-    if (hasApiKey) {
+    if (hasApiKey || ctx?.role === 'project_admin') {
       deleted = await runWithRootAccess(this.getPool(), deleteObjectRow);
     } else {
       if (!ctx) {
@@ -405,8 +405,8 @@ export class StorageService {
     query += ` ORDER BY key LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
     const queryParams = [...params, limit, offset];
 
-    // RLS scopes both queries for JWT callers. API-key callers explicitly
-    // use the backend pool because API keys do not carry a user identity.
+    // RLS scopes both queries for end-user JWT callers. Admin/API-key callers
+    // use the backend pool because they can manage every object through the API.
     const listVisibleObjects = async (db: PoolClient) => {
       const objectsResult = await db.query(query, queryParams);
       const totalResult = await db.query(countQuery, params);
@@ -421,7 +421,7 @@ export class StorageService {
         total: parseInt(totalResult.rows[0].count, 10),
       };
     };
-    if (hasApiKey) {
+    if (hasApiKey || ctx?.role === 'project_admin') {
       return runWithRootAccess(this.getPool(), listVisibleObjects);
     }
     if (!ctx) {
@@ -538,7 +538,7 @@ export class StorageService {
 
     const key = await this.generateNextAvailableKey(bucket, metadata.filename, this.getPool());
     const maxFileSizeBytes = await StorageConfigService.getInstance().getMaxFileSizeBytes();
-    if (hasApiKey) {
+    if (hasApiKey || ctx?.role === 'project_admin') {
       return this.provider.getUploadStrategy(bucket, key, metadata, maxFileSizeBytes);
     }
     if (!ctx) {
@@ -595,8 +595,8 @@ export class StorageService {
    * RLS-gated existence check. Returns true iff the caller is allowed by
    * `storage.objects` RLS policies to see this row. Public bucket rows are
    * visible by definition, but missing rows still return false.
-   * API-key callers pass `hasApiKey = true`; project_admin JWT callers
-   * still run through RLS as the `project_admin` database role.
+   * Admin/API-key callers bypass RLS here because they can manage every object
+   * through the storage API; end-user callers are scoped by storage.objects RLS.
    */
   async objectIsVisible(
     ctx: UserContext | undefined,
@@ -615,7 +615,7 @@ export class StorageService {
       return (result.rowCount ?? 0) > 0;
     };
 
-    if (hasApiKey || (await this.isBucketPublic(bucket))) {
+    if (hasApiKey || ctx?.role === 'project_admin' || (await this.isBucketPublic(bucket))) {
       return runWithRootAccess(this.getPool(), checkVisibleObject);
     }
     if (!ctx) {
@@ -679,7 +679,7 @@ export class StorageService {
 
     // INSERT runs through withUserContext for end-user callers, so the RLS
     // WITH CHECK on storage_objects_owner_insert verifies uploaded_by =
-    // jwt.sub. API-key callers use the backend pool.
+    // jwt.sub. Admin/API-key callers use the backend pool.
     const userId = ctx?.id ?? null;
     const insertObjectRow = (db: PoolClient) =>
       db.query(
@@ -689,7 +689,7 @@ export class StorageService {
         [bucket, key, fileSize, metadata.contentType || null, finalEtag, userId]
       );
     let result: Awaited<ReturnType<typeof insertObjectRow>>;
-    if (hasApiKey) {
+    if (hasApiKey || ctx?.role === 'project_admin') {
       result = await runWithRootAccess(this.getPool(), insertObjectRow);
     } else {
       if (!ctx) {

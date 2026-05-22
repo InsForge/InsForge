@@ -118,19 +118,11 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     ]);
   });
 
-  it('runs project_admin JWT callers through withUserContext instead of API-key access', async () => {
+  it('runs project_admin JWT callers through root access like API-key callers', async () => {
     const { StorageService } = await import('@/services/storage/storage.service.js');
     const svc = StorageService.getInstance();
 
-    queryResults = [
-      { rows: [{ public: false }], rowCount: 1 }, // public bucket check
-      { rows: [], rowCount: 0 }, // BEGIN
-      { rows: [], rowCount: 0 }, // SET LOCAL ROLE project_admin
-      { rows: [], rowCount: 0 }, // set_config(claims)
-      { rows: [{ '?column?': 1 }], rowCount: 1 }, // row visible
-      { rows: [], rowCount: 0 }, // COMMIT
-      { rows: [], rowCount: 0 }, // RESET ROLE
-    ];
+    queryResults = [{ rows: [{ '?column?': 1 }], rowCount: 1 }];
 
     const visible = await svc.objectIsVisible(
       { id: 'admin-sub', email: 'admin@example.com', role: 'project_admin' },
@@ -139,15 +131,100 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     );
 
     expect(visible).toBe(true);
-    expect(calls.map((c) => c.sql)).toContain('SET LOCAL ROLE project_admin');
-    expect(calls[3].params).toEqual([
-      'request.jwt.claims',
-      JSON.stringify({
-        role: 'project_admin',
-        sub: 'admin-sub',
-        email: 'admin@example.com',
-      }),
+    expect(calls.map((c) => c.sql)).toEqual([
+      'SELECT 1 FROM storage.objects WHERE bucket = $1 AND key = $2',
     ]);
+  });
+
+  it('reads objects for project_admin JWT callers through root access', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const uploadedAt = new Date('2026-01-01T00:00:00.000Z');
+    const provider = {
+      getObject: vi.fn(async () => Buffer.from('hello')),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [
+      {
+        rows: [
+          {
+            bucket: 'photos',
+            key: 'alice/cat.jpg',
+            size: 42,
+            mime_type: 'image/jpeg',
+            uploaded_at: uploadedAt,
+            etag: 'etag-admin',
+          },
+        ],
+        rowCount: 1,
+      },
+    ];
+
+    const result = await svc.getObject(
+      { id: 'admin-sub', email: 'admin@example.com', role: 'project_admin' },
+      'photos',
+      'alice/cat.jpg'
+    );
+
+    expect(result?.file.toString()).toBe('hello');
+    expect(result?.metadata).toMatchObject({
+      bucket: 'photos',
+      key: 'alice/cat.jpg',
+      size: 42,
+      mimeType: 'image/jpeg',
+      uploadedAt,
+    });
+    expect(provider.getObject).toHaveBeenCalledWith('photos', 'alice/cat.jpg');
+    expect(calls.map((c) => c.sql)).toEqual([
+      'SELECT * FROM storage.objects WHERE bucket = $1 AND key = $2',
+    ]);
+  });
+
+  it('lists objects for project_admin JWT callers through root access', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const uploadedAt = new Date('2026-01-01T00:00:00.000Z');
+
+    queryResults = [
+      {
+        rows: [
+          {
+            bucket: 'photos',
+            key: 'alice/cat.jpg',
+            size: 42,
+            mime_type: 'image/jpeg',
+            uploaded_at: uploadedAt,
+            etag: 'etag-admin',
+          },
+        ],
+        rowCount: 1,
+      },
+      { rows: [{ count: '1' }], rowCount: 1 },
+    ];
+
+    const result = await svc.listObjects(
+      { id: 'admin-sub', email: 'admin@example.com', role: 'project_admin' },
+      'photos',
+      undefined,
+      10,
+      0,
+      undefined
+    );
+
+    expect(result.total).toBe(1);
+    expect(result.objects[0]).toMatchObject({
+      bucket: 'photos',
+      key: 'alice/cat.jpg',
+      size: 42,
+      mimeType: 'image/jpeg',
+      uploadedAt,
+    });
+    expect(calls.map((c) => c.sql)).toEqual([
+      'SELECT * FROM storage.objects WHERE bucket = $1 ORDER BY key LIMIT $2 OFFSET $3',
+      'SELECT COUNT(*) as count FROM storage.objects WHERE bucket = $1',
+    ]);
+    expect(calls.map((c) => c.params)).toEqual([['photos', 10, 0], ['photos']]);
   });
 
   it('returns false for private bucket objects without a user context', async () => {
@@ -230,6 +307,133 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     expect(calls.map((c) => c.sql)).toContain('SAVEPOINT upload_strategy_rls_probe');
     expect(calls.map((c) => c.sql)).toContain('ROLLBACK TO SAVEPOINT upload_strategy_rls_probe');
     expect(calls.some((c) => c.sql.includes('INSERT INTO storage.objects'))).toBe(true);
+  });
+
+  it('skips the upload-strategy RLS insert probe for project_admin JWT callers', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      getUploadStrategy: vi.fn(async () => ({
+        method: 'direct' as const,
+        uploadUrl: '/upload',
+        key: 'note.txt',
+        confirmRequired: false,
+      })),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [
+      { rows: [{ name: 'photos' }], rowCount: 1 }, // root bucket existence check
+      { rows: [], rowCount: 0 }, // root object dedup query
+      { rows: [{ maxFileSizeMb: 50 }], rowCount: 1 }, // storage config
+    ];
+
+    const strategy = await svc.getUploadStrategy(
+      { id: 'admin-sub', email: 'admin@example.com', role: 'project_admin' },
+      'photos',
+      { filename: 'note.txt', contentType: 'text/plain', size: 8 }
+    );
+
+    expect(strategy).toMatchObject({ method: 'direct', key: 'note.txt' });
+    expect(calls.map((c) => c.sql)).not.toContain('BEGIN');
+    expect(calls.map((c) => c.sql)).not.toContain('SET LOCAL ROLE project_admin');
+    expect(calls.some((c) => c.sql.includes('INSERT INTO storage.objects'))).toBe(false);
+  });
+
+  it('uploads objects for project_admin JWT callers through root access', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const uploadedAt = new Date('2026-01-01T00:00:00.000Z');
+    const provider = {
+      putObject: vi.fn(async () => ({ etag: 'etag-admin-upload' })),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [
+      { rows: [], rowCount: 0 }, // root object dedup query
+      { rows: [{ uploadedAt }], rowCount: 1 }, // root insert
+      { rows: [], rowCount: 1 }, // root etag update
+    ];
+
+    const result = await svc.putObject(
+      { id: 'admin-sub', email: 'admin@example.com', role: 'project_admin' },
+      'photos',
+      'note.txt',
+      { size: 8, mimetype: 'text/plain' } as Express.Multer.File
+    );
+
+    expect(result).toMatchObject({
+      bucket: 'photos',
+      key: 'note.txt',
+      size: 8,
+      mimeType: 'text/plain',
+      uploadedAt,
+    });
+    expect(provider.putObject).toHaveBeenCalledOnce();
+    expect(calls.map((c) => c.sql)).not.toContain('BEGIN');
+    expect(calls.map((c) => c.sql)).not.toContain('SET LOCAL ROLE project_admin');
+    expect(calls.some((c) => c.sql.includes('INSERT INTO storage.objects'))).toBe(true);
+  });
+
+  it('confirms presigned uploads for project_admin JWT callers through root access', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const uploadedAt = new Date('2026-01-01T00:00:00.000Z');
+    const provider = {
+      verifyObjectExists: vi.fn(async () => ({
+        exists: true,
+        size: 8,
+        etag: 'etag-confirmed',
+      })),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [
+      { rows: [{ maxFileSizeMb: 50 }], rowCount: 1 }, // storage config
+      { rows: [], rowCount: 0 }, // already-confirmed check
+      { rows: [{ uploadedAt }], rowCount: 1 }, // root insert
+    ];
+
+    const result = await svc.confirmUpload(
+      { id: 'admin-sub', email: 'admin@example.com', role: 'project_admin' },
+      'photos',
+      'note.txt',
+      { size: 8, contentType: 'text/plain' }
+    );
+
+    expect(result).toMatchObject({
+      bucket: 'photos',
+      key: 'note.txt',
+      size: 8,
+      mimeType: 'text/plain',
+      uploadedAt,
+    });
+    expect(calls.map((c) => c.sql)).not.toContain('BEGIN');
+    expect(calls.map((c) => c.sql)).not.toContain('SET LOCAL ROLE project_admin');
+    expect(calls.some((c) => c.sql.includes('INSERT INTO storage.objects'))).toBe(true);
+  });
+
+  it('deletes objects for project_admin JWT callers through root access', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const provider = {
+      deleteObject: vi.fn(async () => {}),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [{ rows: [], rowCount: 1 }];
+
+    const deleted = await svc.deleteObject(
+      { id: 'admin-sub', email: 'admin@example.com', role: 'project_admin' },
+      'photos',
+      'note.txt'
+    );
+
+    expect(deleted).toBe(true);
+    expect(provider.deleteObject).toHaveBeenCalledWith('photos', 'note.txt');
+    expect(calls.map((c) => c.sql)).toEqual([
+      'DELETE FROM storage.objects WHERE bucket = $1 AND key = $2',
+    ]);
   });
 
   it('returns true for public bucket objects without requiring user context', async () => {
