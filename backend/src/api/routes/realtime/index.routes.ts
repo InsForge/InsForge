@@ -7,7 +7,7 @@ import { RealtimeMessageService } from '@/services/realtime/realtime-message.ser
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/api/middlewares/error.js';
 import {
-  errorCodesSchema,
+  ERROR_CODES,
   getRealtimeConfigResponseSchema,
   updateRealtimeConfigRequestSchema,
 } from '@insforge/shared-schemas';
@@ -42,7 +42,7 @@ router.patch(
         throw new AppError(
           validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
           400,
-          errorCodesSchema.enum.INVALID_INPUT
+          ERROR_CODES.INVALID_INPUT
         );
       }
 

@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { DatabaseError } from 'pg';
 import { errorResponse } from '@/utils/response.js';
-import { errorCodesSchema } from '@insforge/shared-schemas';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { NEXT_ACTIONS } from '../../utils/next-actions.js';
 import logger from '@/utils/logger.js';
 
@@ -34,7 +34,7 @@ const POSTGRES_ERROR_HANDLERS: Record<
     const fieldMatch = detail.match(/Key \(([\w_]+)\)=/);
     const fieldName = fieldMatch ? fieldMatch[1] : 'field';
     return {
-      code: errorCodesSchema.enum.DATABASE_DUPLICATE,
+      code: ERROR_CODES.DATABASE_DUPLICATE,
       message: err.message,
       statusCode: 409,
       nextActions: NEXT_ACTIONS.CHECK_UNIQUE_FIELD(fieldName),
@@ -43,7 +43,7 @@ const POSTGRES_ERROR_HANDLERS: Record<
   '23503': (err) => {
     // foreign_key_violation
     return {
-      code: errorCodesSchema.enum.DATABASE_CONSTRAINT_VIOLATION,
+      code: ERROR_CODES.DATABASE_CONSTRAINT_VIOLATION,
       message: err.message,
       statusCode: 400,
       nextActions: NEXT_ACTIONS.CHECK_REFERENCE_EXISTS,
@@ -53,7 +53,7 @@ const POSTGRES_ERROR_HANDLERS: Record<
     // not_null_violation
     const column = err.column || '';
     return {
-      code: errorCodesSchema.enum.MISSING_FIELD,
+      code: ERROR_CODES.MISSING_FIELD,
       message: err.message,
       statusCode: 400,
       nextActions: NEXT_ACTIONS.FILL_REQUIRED_FIELD(column),
@@ -61,7 +61,7 @@ const POSTGRES_ERROR_HANDLERS: Record<
   },
   '42P01': (err) => ({
     // undefined_table
-    code: errorCodesSchema.enum.DATABASE_VALIDATION_ERROR,
+    code: ERROR_CODES.DATABASE_VALIDATION_ERROR,
     message: err.message,
     statusCode: 400,
     nextActions: NEXT_ACTIONS.CHECK_TABLE_EXISTS,
@@ -72,7 +72,7 @@ const POSTGRES_ERROR_HANDLERS: Record<
     const columnMatch = message.match(/column "([^"]+)"/);
     const columnName = columnMatch ? columnMatch[1] : '';
     return {
-      code: errorCodesSchema.enum.DATABASE_VALIDATION_ERROR,
+      code: ERROR_CODES.DATABASE_VALIDATION_ERROR,
       message: err.message,
       statusCode: 400,
       nextActions: NEXT_ACTIONS.REMOVE_DUPLICATE_COLUMN(columnName),
@@ -80,21 +80,21 @@ const POSTGRES_ERROR_HANDLERS: Record<
   },
   '42703': (err) => ({
     // undefined_column
-    code: errorCodesSchema.enum.DATABASE_VALIDATION_ERROR,
+    code: ERROR_CODES.DATABASE_VALIDATION_ERROR,
     message: err.message,
     statusCode: 400,
     nextActions: NEXT_ACTIONS.CHECK_COLUMN_EXISTS,
   }),
   '42830': (err) => ({
     // invalid_foreign_key
-    code: errorCodesSchema.enum.DATABASE_VALIDATION_ERROR,
+    code: ERROR_CODES.DATABASE_VALIDATION_ERROR,
     message: err.message,
     statusCode: 400,
     nextActions: NEXT_ACTIONS.CHECK_UNIQUE_CONSTRAINT,
   }),
   '42804': (err) => ({
     // datatype_mismatch
-    code: errorCodesSchema.enum.DATABASE_VALIDATION_ERROR,
+    code: ERROR_CODES.DATABASE_VALIDATION_ERROR,
     message: err.message,
     statusCode: 400,
     nextActions: NEXT_ACTIONS.CHECK_DATATYPE_MATCH,
@@ -102,7 +102,7 @@ const POSTGRES_ERROR_HANDLERS: Record<
   '42501': (err) => ({
     // insufficient_privilege — fired by RLS WITH CHECK on INSERT/UPDATE,
     // or by GRANT-level denials. Same shape Supabase returns.
-    code: errorCodesSchema.enum.FORBIDDEN,
+    code: ERROR_CODES.FORBIDDEN,
     message: err.message,
     statusCode: 403,
     nextActions: NEXT_ACTIONS.CHECK_RLS_POLICY,
@@ -169,7 +169,7 @@ export function errorMiddleware(err: unknown, _req: Request, res: Response, _nex
   if (err instanceof SyntaxError && err.message.includes('JSON')) {
     return errorResponse(
       res,
-      errorCodesSchema.enum.INVALID_INPUT,
+      ERROR_CODES.INVALID_INPUT,
       err.message,
       400,
       'Please ensure your request body contains valid JSON'
@@ -192,14 +192,14 @@ export function errorMiddleware(err: unknown, _req: Request, res: Response, _nex
 
   // For all other errors, check if it's an object we can work with
   if (!isErrorObject(err)) {
-    return errorResponse(res, errorCodesSchema.enum.INTERNAL_ERROR, 'Internal server error', 500);
+    return errorResponse(res, ERROR_CODES.INTERNAL_ERROR, 'Internal server error', 500);
   }
 
   // Handle JSON parsing errors from body-parser
   if (err.type === 'entity.parse.failed' && err.status === 400) {
     return errorResponse(
       res,
-      errorCodesSchema.enum.INVALID_INPUT,
+      ERROR_CODES.INVALID_INPUT,
       err.message || 'Invalid JSON in request body',
       400,
       'Please ensure your request body contains valid JSON'
@@ -218,23 +218,23 @@ export function errorMiddleware(err: unknown, _req: Request, res: Response, _nex
 
   // Default internal error with optional message
   const message = err.message || 'Internal server error';
-  return errorResponse(res, errorCodesSchema.enum.INTERNAL_ERROR, message, 500);
+  return errorResponse(res, ERROR_CODES.INTERNAL_ERROR, message, 500);
 }
 
 // Helper to map status codes to error codes
 function getErrorCode(statusCode: number): string {
   switch (statusCode) {
     case 400:
-      return errorCodesSchema.enum.INVALID_INPUT;
+      return ERROR_CODES.INVALID_INPUT;
     case 401:
-      return errorCodesSchema.enum.AUTH_UNAUTHORIZED;
+      return ERROR_CODES.AUTH_UNAUTHORIZED;
     case 403:
-      return errorCodesSchema.enum.FORBIDDEN;
+      return ERROR_CODES.FORBIDDEN;
     case 404:
-      return errorCodesSchema.enum.NOT_FOUND;
+      return ERROR_CODES.NOT_FOUND;
     case 409:
-      return errorCodesSchema.enum.ALREADY_EXISTS;
+      return ERROR_CODES.ALREADY_EXISTS;
     default:
-      return errorCodesSchema.enum.INTERNAL_ERROR;
+      return ERROR_CODES.INTERNAL_ERROR;
   }
 }

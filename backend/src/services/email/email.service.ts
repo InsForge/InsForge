@@ -5,7 +5,7 @@ import { SmtpConfigService, RawSmtpConfig } from '@/services/email/smtp-config.s
 import { AppError } from '@/api/middlewares/error.js';
 import { EmailTemplate } from '@/types/email.js';
 import logger from '@/utils/logger.js';
-import { errorCodesSchema, SendRawEmailRequest } from '@insforge/shared-schemas';
+import { ERROR_CODES, SendRawEmailRequest } from '@insforge/shared-schemas';
 
 /**
  * Email service — resolves provider per-call so SMTP config changes take effect without restart
@@ -58,7 +58,7 @@ export class EmailService {
       throw new AppError(
         `Too many emails to this address. Retry after ${retryAfter}s.`,
         429,
-        errorCodesSchema.enum.RATE_LIMITED
+        ERROR_CODES.RATE_LIMITED
       );
     }
   }

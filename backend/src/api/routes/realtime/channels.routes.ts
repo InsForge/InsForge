@@ -4,9 +4,9 @@ import { RealtimeChannelService } from '@/services/realtime/realtime-channel.ser
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/api/middlewares/error.js';
 import {
+  ERROR_CODES,
   createChannelRequestSchema,
   updateChannelRequestSchema,
-  errorCodesSchema,
 } from '@insforge/shared-schemas';
 
 const router = Router();
@@ -27,11 +27,7 @@ router.get('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: Ne
   try {
     const channel = await channelService.getById(req.params.id);
     if (!channel) {
-      throw new AppError(
-        'Channel not found',
-        404,
-        errorCodesSchema.enum.REALTIME_CHANNEL_NOT_FOUND
-      );
+      throw new AppError('Channel not found', 404, ERROR_CODES.REALTIME_CHANNEL_NOT_FOUND);
     }
     successResponse(res, channel);
   } catch (error) {
@@ -47,7 +43,7 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
       throw new AppError(
         validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
-        errorCodesSchema.enum.REALTIME_INVALID_CHANNEL_REQUEST
+        ERROR_CODES.REALTIME_INVALID_CHANNEL_REQUEST
       );
     }
     const channel = await channelService.create(validation.data);
@@ -65,7 +61,7 @@ router.put('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: Ne
       throw new AppError(
         validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
-        errorCodesSchema.enum.REALTIME_INVALID_CHANNEL_REQUEST
+        ERROR_CODES.REALTIME_INVALID_CHANNEL_REQUEST
       );
     }
     const channel = await channelService.update(req.params.id, validation.data);

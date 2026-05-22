@@ -3,7 +3,7 @@ import { LogService } from '@/services/logs/log.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
 import { successResponse, paginatedResponse } from '@/utils/response.js';
-import { GetLogsResponse, errorCodesSchema } from '@insforge/shared-schemas';
+import { ERROR_CODES, GetLogsResponse } from '@insforge/shared-schemas';
 import { AppError } from '@/api/middlewares/error.js';
 
 const router = Router();
@@ -106,7 +106,7 @@ router.get('/functions/build-logs', async (req: AuthRequest, res: Response, next
       throw new AppError(
         'Build logs not available. Deno Subhosting may not be configured or no deployments found.',
         404,
-        errorCodesSchema.enum.LOG_NOT_FOUND
+        ERROR_CODES.LOG_NOT_FOUND
       );
     }
 
@@ -122,11 +122,7 @@ router.get('/search', async (req: AuthRequest, res: Response, next: NextFunction
     const { q, source, limit = 100, offset = 0 } = req.query;
 
     if (!q || typeof q !== 'string') {
-      throw new AppError(
-        'Search query parameter (q) is required',
-        400,
-        errorCodesSchema.enum.INVALID_INPUT
-      );
+      throw new AppError('Search query parameter (q) is required', 400, ERROR_CODES.INVALID_INPUT);
     }
 
     const logService = LogService.getInstance();

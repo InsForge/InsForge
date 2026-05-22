@@ -1,5 +1,5 @@
 import { AppError } from '@/api/middlewares/error.js';
-import { errorCodesSchema } from '@insforge/shared-schemas';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { config } from '@/infra/config/app.config.js';
 import logger from '@/utils/logger.js';
 import { z } from 'zod';
@@ -146,7 +146,7 @@ async function fetchWithTimeout(
           throw new AppError(
             'Deno Subhosting rate limit exceeded after retries. Please retry shortly.',
             429,
-            errorCodesSchema.enum.RATE_LIMITED
+            ERROR_CODES.RATE_LIMITED
           );
         }
       }
@@ -296,18 +296,10 @@ export class DenoSubhostingProvider {
     const { token, organizationId } = config.denoSubhosting;
 
     if (!token) {
-      throw new AppError(
-        'DENO_SUBHOSTING_TOKEN not configured',
-        500,
-        errorCodesSchema.enum.INTERNAL_ERROR
-      );
+      throw new AppError('DENO_SUBHOSTING_TOKEN not configured', 500, ERROR_CODES.INTERNAL_ERROR);
     }
     if (!organizationId) {
-      throw new AppError(
-        'DENO_SUBHOSTING_ORG_ID not configured',
-        500,
-        errorCodesSchema.enum.INTERNAL_ERROR
-      );
+      throw new AppError('DENO_SUBHOSTING_ORG_ID not configured', 500, ERROR_CODES.INTERNAL_ERROR);
     }
 
     return { token, organizationId };
@@ -335,7 +327,7 @@ export class DenoSubhostingProvider {
       throw new AppError(
         `Failed to check project: ${checkResponse.statusText}`,
         500,
-        errorCodesSchema.enum.INTERNAL_ERROR
+        ERROR_CODES.INTERNAL_ERROR
       );
     }
 
@@ -356,11 +348,7 @@ export class DenoSubhostingProvider {
 
     if (!createResponse.ok) {
       const errorText = await createResponse.text();
-      throw new AppError(
-        `Failed to create project: ${errorText}`,
-        500,
-        errorCodesSchema.enum.INTERNAL_ERROR
-      );
+      throw new AppError(`Failed to create project: ${errorText}`, 500, ERROR_CODES.INTERNAL_ERROR);
     }
 
     logger.info('Deno Subhosting project created', { projectId });
@@ -403,7 +391,7 @@ export class DenoSubhostingProvider {
         throw new AppError(
           `Function code failed type check:\n${output}`,
           400,
-          errorCodesSchema.enum.INVALID_INPUT
+          ERROR_CODES.INVALID_INPUT
         );
       }
 
@@ -417,7 +405,7 @@ export class DenoSubhostingProvider {
       throw new AppError(
         `Deno type check failed unexpectedly: ${error instanceof Error ? error.message : String(error)}`,
         500,
-        errorCodesSchema.enum.INTERNAL_ERROR
+        ERROR_CODES.INTERNAL_ERROR
       );
     } finally {
       await rm(tempDir, { recursive: true, force: true }).catch(() => {});
@@ -458,7 +446,7 @@ export class DenoSubhostingProvider {
           throw new AppError(
             `Invalid function slug: "${func.slug}" - must be alphanumeric with hyphens or underscores only`,
             400,
-            errorCodesSchema.enum.INVALID_INPUT
+            ERROR_CODES.INVALID_INPUT
           );
         }
         assets[`functions/${func.slug}.ts`] = {
@@ -507,7 +495,7 @@ export class DenoSubhostingProvider {
         throw new AppError(
           `Deno Subhosting failed: ${response.status} - ${errorText}`,
           500,
-          errorCodesSchema.enum.INTERNAL_ERROR
+          ERROR_CODES.INTERNAL_ERROR
         );
       }
 
@@ -539,11 +527,7 @@ export class DenoSubhostingProvider {
         error: error instanceof Error ? error.message : String(error),
         projectId,
       });
-      throw new AppError(
-        'Failed to deploy to Deno Subhosting',
-        500,
-        errorCodesSchema.enum.INTERNAL_ERROR
-      );
+      throw new AppError('Failed to deploy to Deno Subhosting', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
 
@@ -568,13 +552,13 @@ export class DenoSubhostingProvider {
           throw new AppError(
             `Deployment not found: ${deploymentId}`,
             404,
-            errorCodesSchema.enum.FUNCTION_DEPLOYMENT_NOT_FOUND
+            ERROR_CODES.FUNCTION_DEPLOYMENT_NOT_FOUND
           );
         }
         throw new AppError(
           `Failed to get deployment: ${response.statusText}`,
           500,
-          errorCodesSchema.enum.INTERNAL_ERROR
+          ERROR_CODES.INTERNAL_ERROR
         );
       }
 
@@ -599,7 +583,7 @@ export class DenoSubhostingProvider {
       throw new AppError(
         'Failed to get Deno Subhosting deployment',
         500,
-        errorCodesSchema.enum.INTERNAL_ERROR
+        ERROR_CODES.INTERNAL_ERROR
       );
     }
   }
@@ -663,14 +647,14 @@ export class DenoSubhostingProvider {
           throw new AppError(
             `Deployment not found: ${deploymentId}`,
             404,
-            errorCodesSchema.enum.FUNCTION_DEPLOYMENT_NOT_FOUND
+            ERROR_CODES.FUNCTION_DEPLOYMENT_NOT_FOUND
           );
         }
         const errorText = await response.text();
         throw new AppError(
           `Failed to get app logs: ${response.status} - ${errorText}`,
           500,
-          errorCodesSchema.enum.INTERNAL_ERROR
+          ERROR_CODES.INTERNAL_ERROR
         );
       }
 
@@ -698,11 +682,7 @@ export class DenoSubhostingProvider {
         error: error instanceof Error ? error.message : String(error),
         deploymentId,
       });
-      throw new AppError(
-        'Failed to get deployment app logs',
-        500,
-        errorCodesSchema.enum.INTERNAL_ERROR
-      );
+      throw new AppError('Failed to get deployment app logs', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
 
@@ -894,7 +874,7 @@ Deno.serve(dispatch);
 
     return `
 // Auto-generated router
-import { AsyncLocalStorage } from "node:async_hooks";
+import { AsyncLocalStorage } from 'node:async_hooks';
 ${imports}
 
 const routes: Record<string, (req: Request) => Promise<Response>> = {

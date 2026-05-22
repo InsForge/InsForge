@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/api/middlewares/error.js';
 import {
-  errorCodesSchema,
+  ERROR_CODES,
   DocTypeSchema,
   SdkFeatureSchema,
   SdkLanguageSchema,
@@ -154,7 +154,7 @@ router.get('/:docType', async (req: Request, res: Response, next: NextFunction) 
     // Validate doc type using Zod enum
     const parsed = docTypeSchema.safeParse(docType);
     if (!parsed.success) {
-      throw new AppError('Documentation not found', 404, errorCodesSchema.enum.DOCS_NOT_FOUND);
+      throw new AppError('Documentation not found', 404, ERROR_CODES.DOCS_NOT_FOUND);
     }
 
     const docFileName = LEGACY_DOCS_MAP[parsed.data];
@@ -189,7 +189,7 @@ router.get('/:docFeature/:docLanguage', async (req: Request, res: Response, next
     const parsedLanguage = sdkLanguageSchema.safeParse(docLanguage);
 
     if (!parsedFeature.success || !parsedLanguage.success) {
-      throw new AppError('Documentation not found', 404, errorCodesSchema.enum.DOCS_NOT_FOUND);
+      throw new AppError('Documentation not found', 404, ERROR_CODES.DOCS_NOT_FOUND);
     }
 
     // Look up the documentation file from SDK_DOCS_MAP
@@ -197,7 +197,7 @@ router.get('/:docFeature/:docLanguage', async (req: Request, res: Response, next
     const docFileName = featureDocs[parsedLanguage.data];
 
     if (!docFileName) {
-      throw new AppError('Documentation not found', 404, errorCodesSchema.enum.DOCS_NOT_FOUND);
+      throw new AppError('Documentation not found', 404, ERROR_CODES.DOCS_NOT_FOUND);
     }
 
     // Construct docType for response

@@ -1,3 +1,4 @@
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Response } from 'node-fetch';
 
@@ -97,7 +98,6 @@ describe('Deno Subhosting 429 backoff', () => {
 
     const mod = await import('@/providers/functions/deno-subhosting.provider.js');
     const { AppError } = await import('@/api/middlewares/error.js');
-    const { errorCodesSchema } = await import('@insforge/shared-schemas');
     const provider = mod.DenoSubhostingProvider.getInstance();
 
     // Exhausted retries must surface as 429 RATE_LIMITED, not the generic 500
@@ -105,7 +105,7 @@ describe('Deno Subhosting 429 backoff', () => {
     await expect(provider.getDeployment('dep-3')).rejects.toMatchObject({
       constructor: AppError,
       statusCode: 429,
-      code: errorCodesSchema.enum.RATE_LIMITED,
+      code: ERROR_CODES.RATE_LIMITED,
     });
     // initial + 3 retries from DEFAULT_RATE_LIMIT_BACKOFF_MS = 4 attempts
     expect(attempts).toBeGreaterThanOrEqual(4);

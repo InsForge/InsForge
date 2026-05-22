@@ -1,5 +1,5 @@
 import { AppError } from '@/api/middlewares/error.js';
-import { errorCodesSchema, type AuthConfigSchema } from '@insforge/shared-schemas';
+import { ERROR_CODES, type AuthConfigSchema } from '@insforge/shared-schemas';
 
 export function validateEmail(email: string) {
   return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email);
@@ -64,7 +64,7 @@ export function validateIdentifier(identifier: string, type: string = 'identifie
     throw new AppError(
       `Invalid ${type} name: cannot be empty`,
       400,
-      errorCodesSchema.enum.DATABASE_VALIDATION_ERROR,
+      ERROR_CODES.DATABASE_VALIDATION_ERROR,
       `Please provide a valid ${type} name`
     );
   }
@@ -73,7 +73,7 @@ export function validateIdentifier(identifier: string, type: string = 'identifie
     throw new AppError(
       `Invalid ${type} name: cannot contain quotes or control characters`,
       400,
-      errorCodesSchema.enum.DATABASE_VALIDATION_ERROR,
+      ERROR_CODES.DATABASE_VALIDATION_ERROR,
       `The ${type} name cannot contain double quotes or control characters (tabs, newlines, etc.)`
     );
   }

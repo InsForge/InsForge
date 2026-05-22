@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { errorCodesSchema } from '@insforge/shared-schemas';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import { generateNumericCode, generateSecureToken } from '@/utils/utils.js';
 
@@ -155,11 +155,7 @@ export class AuthOTPService {
       };
     } catch (error) {
       logger.error('Failed to create email verification token', { error, purpose, otpType });
-      throw new AppError(
-        'Failed to create verification token',
-        500,
-        errorCodesSchema.enum.INTERNAL_ERROR
-      );
+      throw new AppError('Failed to create verification token', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
 
@@ -201,33 +197,21 @@ export class AuthOTPService {
 
       // Check if OTP record exists
       if (result.rows.length === 0) {
-        throw new AppError(
-          'Invalid or expired verification code',
-          400,
-          errorCodesSchema.enum.INVALID_INPUT
-        );
+        throw new AppError('Invalid or expired verification code', 400, ERROR_CODES.INVALID_INPUT);
       }
 
       const otpRecord = result.rows[0];
 
       // Validate OTP record is still usable
       if (new Date() > new Date(otpRecord.expires_at) || otpRecord.consumed_at !== null) {
-        throw new AppError(
-          'Invalid or expired verification code',
-          400,
-          errorCodesSchema.enum.INVALID_INPUT
-        );
+        throw new AppError('Invalid or expired verification code', 400, ERROR_CODES.INVALID_INPUT);
       }
 
       // Verify bcrypt hash
       const isValid = await bcrypt.compare(code, otpRecord.otp_hash);
 
       if (!isValid) {
-        throw new AppError(
-          'Invalid or expired verification code',
-          400,
-          errorCodesSchema.enum.INVALID_INPUT
-        );
+        throw new AppError('Invalid or expired verification code', 400, ERROR_CODES.INVALID_INPUT);
       }
 
       // Mark OTP as consumed atomically
@@ -239,11 +223,7 @@ export class AuthOTPService {
       );
 
       if (consume.rowCount !== 1) {
-        throw new AppError(
-          'Invalid or expired verification code',
-          400,
-          errorCodesSchema.enum.INVALID_INPUT
-        );
+        throw new AppError('Invalid or expired verification code', 400, ERROR_CODES.INVALID_INPUT);
       }
 
       if (shouldManageTransaction) {
@@ -268,7 +248,7 @@ export class AuthOTPService {
       }
 
       logger.error('Failed to verify numeric OTP code', { error, purpose });
-      throw new AppError('Failed to verify code', 500, errorCodesSchema.enum.INTERNAL_ERROR);
+      throw new AppError('Failed to verify code', 500, ERROR_CODES.INTERNAL_ERROR);
     } finally {
       if (shouldManageTransaction) {
         client.release();
@@ -316,11 +296,7 @@ export class AuthOTPService {
 
       // Check if token exists and is valid
       if (result.rows.length === 0) {
-        throw new AppError(
-          'Invalid or expired verification token',
-          400,
-          errorCodesSchema.enum.INVALID_INPUT
-        );
+        throw new AppError('Invalid or expired verification token', 400, ERROR_CODES.INVALID_INPUT);
       }
 
       const otpRecord = result.rows[0];
@@ -334,11 +310,7 @@ export class AuthOTPService {
       );
 
       if (consume.rowCount !== 1) {
-        throw new AppError(
-          'Invalid or expired verification token',
-          400,
-          errorCodesSchema.enum.INVALID_INPUT
-        );
+        throw new AppError('Invalid or expired verification token', 400, ERROR_CODES.INVALID_INPUT);
       }
 
       if (shouldManageTransaction) {
@@ -363,7 +335,7 @@ export class AuthOTPService {
       }
 
       logger.error('Failed to verify hash token', { error, purpose });
-      throw new AppError('Failed to verify token', 500, errorCodesSchema.enum.INTERNAL_ERROR);
+      throw new AppError('Failed to verify token', 500, ERROR_CODES.INTERNAL_ERROR);
     } finally {
       if (shouldManageTransaction) {
         client.release();
@@ -450,11 +422,7 @@ export class AuthOTPService {
       }
 
       logger.error('Failed to exchange code for token', { error, email, purpose });
-      throw new AppError(
-        'Failed to exchange verification code',
-        500,
-        errorCodesSchema.enum.INTERNAL_ERROR
-      );
+      throw new AppError('Failed to exchange verification code', 500, ERROR_CODES.INTERNAL_ERROR);
     } finally {
       if (shouldManageTransaction) {
         client.release();
@@ -480,11 +448,7 @@ export class AuthOTPService {
       );
 
       if (result.rows.length === 0) {
-        throw new AppError(
-          'Invalid or expired verification token',
-          400,
-          errorCodesSchema.enum.INVALID_INPUT
-        );
+        throw new AppError('Invalid or expired verification token', 400, ERROR_CODES.INVALID_INPUT);
       }
 
       return {
@@ -499,11 +463,7 @@ export class AuthOTPService {
       }
 
       logger.error('Failed to resolve hash token context', { error, purpose });
-      throw new AppError(
-        'Failed to resolve verification token',
-        500,
-        errorCodesSchema.enum.INTERNAL_ERROR
-      );
+      throw new AppError('Failed to resolve verification token', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
 }

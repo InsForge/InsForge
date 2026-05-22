@@ -1,6 +1,6 @@
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import {
-  errorCodesSchema,
+  ERROR_CODES,
   EdgeFunctionMetadataSchema,
   UploadFunctionRequest,
   UpdateFunctionRequest,
@@ -191,7 +191,7 @@ export class FunctionService {
         throw new AppError(
           'Function with this slug already exists',
           409,
-          errorCodesSchema.enum.FUNCTION_ALREADY_EXISTS
+          ERROR_CODES.FUNCTION_ALREADY_EXISTS
         );
       }
 
@@ -358,7 +358,7 @@ export class FunctionService {
       throw new AppError(
         'Function source cannot contain Deno.serve(). Use "export default async function(req: Request)" instead; the router handles serving automatically.',
         400,
-        errorCodesSchema.enum.INVALID_INPUT
+        ERROR_CODES.INVALID_INPUT
       );
     }
   }

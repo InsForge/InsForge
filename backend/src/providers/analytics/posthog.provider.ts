@@ -3,7 +3,7 @@ import axios from 'axios';
 import { config } from '@/infra/config/app.config.js';
 import { AppError } from '@/api/middlewares/error.js';
 import {
-  errorCodesSchema,
+  ERROR_CODES,
   posthogConnectionSchema,
   posthogDashboardsResponseSchema,
   posthogSummarySchema,
@@ -44,7 +44,7 @@ export class PostHogProvider {
     throw new AppError(
       'PostHog integration is only available on Insforge Cloud, not in self-hosted mode.',
       501,
-      errorCodesSchema.enum.ANALYTICS_UNAVAILABLE
+      ERROR_CODES.ANALYTICS_UNAVAILABLE
     );
   }
 
@@ -55,14 +55,14 @@ export class PostHogProvider {
       throw new AppError(
         'PROJECT_ID not configured; cannot reach cloud backend.',
         500,
-        errorCodesSchema.enum.INTERNAL_ERROR
+        ERROR_CODES.INTERNAL_ERROR
       );
     }
     if (!secret) {
       throw new AppError(
         'JWT_SECRET not configured; cannot sign cloud token.',
         500,
-        errorCodesSchema.enum.INTERNAL_ERROR
+        ERROR_CODES.INTERNAL_ERROR
       );
     }
     return jwt.sign({ sub: projectId }, secret, { expiresIn: '10m' });
@@ -95,7 +95,7 @@ export class PostHogProvider {
       throw new AppError(
         `Failed to fetch PostHog connection: ${msg}`,
         502,
-        errorCodesSchema.enum.UPSTREAM_FAILURE
+        ERROR_CODES.UPSTREAM_FAILURE
       );
     }
     const parsed = posthogConnectionSchema.safeParse(data);
@@ -103,7 +103,7 @@ export class PostHogProvider {
       throw new AppError(
         `Invalid PostHog connection response: ${parsed.error.message}`,
         502,
-        errorCodesSchema.enum.UPSTREAM_FAILURE
+        ERROR_CODES.UPSTREAM_FAILURE
       );
     }
     return parsed.data;
@@ -122,17 +122,13 @@ export class PostHogProvider {
       data = response.data;
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 404) {
-        throw new AppError(
-          'PostHog not connected',
-          404,
-          errorCodesSchema.enum.ANALYTICS_NOT_CONNECTED
-        );
+        throw new AppError('PostHog not connected', 404, ERROR_CODES.ANALYTICS_NOT_CONNECTED);
       }
       const msg = err instanceof Error ? err.message : 'unknown';
       throw new AppError(
         `Failed to fetch PostHog dashboards: ${msg}`,
         502,
-        errorCodesSchema.enum.UPSTREAM_FAILURE
+        ERROR_CODES.UPSTREAM_FAILURE
       );
     }
     const parsed = posthogDashboardsResponseSchema.safeParse(data);
@@ -140,7 +136,7 @@ export class PostHogProvider {
       throw new AppError(
         `Invalid PostHog dashboards response: ${parsed.error.message}`,
         502,
-        errorCodesSchema.enum.UPSTREAM_FAILURE
+        ERROR_CODES.UPSTREAM_FAILURE
       );
     }
     return parsed.data;
@@ -159,17 +155,13 @@ export class PostHogProvider {
       data = response.data;
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 404) {
-        throw new AppError(
-          'PostHog not connected',
-          404,
-          errorCodesSchema.enum.ANALYTICS_NOT_CONNECTED
-        );
+        throw new AppError('PostHog not connected', 404, ERROR_CODES.ANALYTICS_NOT_CONNECTED);
       }
       const msg = err instanceof Error ? err.message : 'unknown';
       throw new AppError(
         `Failed to fetch PostHog summary: ${msg}`,
         502,
-        errorCodesSchema.enum.UPSTREAM_FAILURE
+        ERROR_CODES.UPSTREAM_FAILURE
       );
     }
     const parsed = posthogSummarySchema.safeParse(data);
@@ -177,7 +169,7 @@ export class PostHogProvider {
       throw new AppError(
         `Invalid PostHog summary response: ${parsed.error.message}`,
         502,
-        errorCodesSchema.enum.UPSTREAM_FAILURE
+        ERROR_CODES.UPSTREAM_FAILURE
       );
     }
     return parsed.data;
@@ -197,17 +189,13 @@ export class PostHogProvider {
       data = response.data;
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 404) {
-        throw new AppError(
-          'PostHog not connected',
-          404,
-          errorCodesSchema.enum.ANALYTICS_NOT_CONNECTED
-        );
+        throw new AppError('PostHog not connected', 404, ERROR_CODES.ANALYTICS_NOT_CONNECTED);
       }
       const msg = err instanceof Error ? err.message : 'unknown';
       throw new AppError(
         `Failed to fetch PostHog events: ${msg}`,
         502,
-        errorCodesSchema.enum.UPSTREAM_FAILURE
+        ERROR_CODES.UPSTREAM_FAILURE
       );
     }
     const parsed = posthogEventsResponseSchema.safeParse(data);
@@ -215,7 +203,7 @@ export class PostHogProvider {
       throw new AppError(
         `Invalid PostHog events response: ${parsed.error.message}`,
         502,
-        errorCodesSchema.enum.UPSTREAM_FAILURE
+        ERROR_CODES.UPSTREAM_FAILURE
       );
     }
     return parsed.data;
@@ -232,11 +220,7 @@ export class PostHogProvider {
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'unknown';
-      throw new AppError(
-        `Failed to disconnect PostHog: ${msg}`,
-        502,
-        errorCodesSchema.enum.UPSTREAM_FAILURE
-      );
+      throw new AppError(`Failed to disconnect PostHog: ${msg}`, 502, ERROR_CODES.UPSTREAM_FAILURE);
     }
   }
 
@@ -254,17 +238,13 @@ export class PostHogProvider {
       data = response.data;
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 404) {
-        throw new AppError(
-          'PostHog not connected',
-          404,
-          errorCodesSchema.enum.ANALYTICS_NOT_CONNECTED
-        );
+        throw new AppError('PostHog not connected', 404, ERROR_CODES.ANALYTICS_NOT_CONNECTED);
       }
       const msg = err instanceof Error ? err.message : 'unknown';
       throw new AppError(
         `Failed to fetch PostHog web overview: ${msg}`,
         502,
-        errorCodesSchema.enum.UPSTREAM_FAILURE
+        ERROR_CODES.UPSTREAM_FAILURE
       );
     }
     const parsed = posthogWebOverviewResponseSchema.safeParse(data);
@@ -272,7 +252,7 @@ export class PostHogProvider {
       throw new AppError(
         `Invalid PostHog web overview response: ${parsed.error.message}`,
         502,
-        errorCodesSchema.enum.UPSTREAM_FAILURE
+        ERROR_CODES.UPSTREAM_FAILURE
       );
     }
     return parsed.data;
@@ -292,17 +272,13 @@ export class PostHogProvider {
       data = response.data;
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 404) {
-        throw new AppError(
-          'PostHog not connected',
-          404,
-          errorCodesSchema.enum.ANALYTICS_NOT_CONNECTED
-        );
+        throw new AppError('PostHog not connected', 404, ERROR_CODES.ANALYTICS_NOT_CONNECTED);
       }
       const msg = err instanceof Error ? err.message : 'unknown';
       throw new AppError(
         `Failed to fetch PostHog web stats: ${msg}`,
         502,
-        errorCodesSchema.enum.UPSTREAM_FAILURE
+        ERROR_CODES.UPSTREAM_FAILURE
       );
     }
     const parsed = posthogWebStatsResponseSchema.safeParse(data);
@@ -310,7 +286,7 @@ export class PostHogProvider {
       throw new AppError(
         `Invalid PostHog web stats response: ${parsed.error.message}`,
         502,
-        errorCodesSchema.enum.UPSTREAM_FAILURE
+        ERROR_CODES.UPSTREAM_FAILURE
       );
     }
     return parsed.data;
@@ -330,17 +306,13 @@ export class PostHogProvider {
       data = response.data;
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 404) {
-        throw new AppError(
-          'PostHog not connected',
-          404,
-          errorCodesSchema.enum.ANALYTICS_NOT_CONNECTED
-        );
+        throw new AppError('PostHog not connected', 404, ERROR_CODES.ANALYTICS_NOT_CONNECTED);
       }
       const msg = err instanceof Error ? err.message : 'unknown';
       throw new AppError(
         `Failed to fetch PostHog trends: ${msg}`,
         502,
-        errorCodesSchema.enum.UPSTREAM_FAILURE
+        ERROR_CODES.UPSTREAM_FAILURE
       );
     }
     const parsed = posthogTrendsResponseSchema.safeParse(data);
@@ -348,7 +320,7 @@ export class PostHogProvider {
       throw new AppError(
         `Invalid PostHog trends response: ${parsed.error.message}`,
         502,
-        errorCodesSchema.enum.UPSTREAM_FAILURE
+        ERROR_CODES.UPSTREAM_FAILURE
       );
     }
     return parsed.data;
@@ -367,17 +339,13 @@ export class PostHogProvider {
       data = response.data;
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 404) {
-        throw new AppError(
-          'PostHog not connected',
-          404,
-          errorCodesSchema.enum.ANALYTICS_NOT_CONNECTED
-        );
+        throw new AppError('PostHog not connected', 404, ERROR_CODES.ANALYTICS_NOT_CONNECTED);
       }
       const msg = err instanceof Error ? err.message : 'unknown';
       throw new AppError(
         `Failed to fetch PostHog retention: ${msg}`,
         502,
-        errorCodesSchema.enum.UPSTREAM_FAILURE
+        ERROR_CODES.UPSTREAM_FAILURE
       );
     }
     const parsed = posthogRetentionResponseSchema.safeParse(data);
@@ -385,7 +353,7 @@ export class PostHogProvider {
       throw new AppError(
         `Invalid PostHog retention response: ${parsed.error.message}`,
         502,
-        errorCodesSchema.enum.UPSTREAM_FAILURE
+        ERROR_CODES.UPSTREAM_FAILURE
       );
     }
     return parsed.data;
@@ -405,17 +373,13 @@ export class PostHogProvider {
       data = response.data;
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 404) {
-        throw new AppError(
-          'PostHog not connected',
-          404,
-          errorCodesSchema.enum.ANALYTICS_NOT_CONNECTED
-        );
+        throw new AppError('PostHog not connected', 404, ERROR_CODES.ANALYTICS_NOT_CONNECTED);
       }
       const msg = err instanceof Error ? err.message : 'unknown';
       throw new AppError(
         `Failed to fetch PostHog recordings: ${msg}`,
         502,
-        errorCodesSchema.enum.UPSTREAM_FAILURE
+        ERROR_CODES.UPSTREAM_FAILURE
       );
     }
     const parsed = posthogRecordingsResponseSchema.safeParse(data);
@@ -423,7 +387,7 @@ export class PostHogProvider {
       throw new AppError(
         `Invalid PostHog recordings response: ${parsed.error.message}`,
         502,
-        errorCodesSchema.enum.UPSTREAM_FAILURE
+        ERROR_CODES.UPSTREAM_FAILURE
       );
     }
     return parsed.data;
@@ -443,17 +407,13 @@ export class PostHogProvider {
       data = response.data;
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 404) {
-        throw new AppError(
-          'PostHog not connected',
-          404,
-          errorCodesSchema.enum.ANALYTICS_NOT_CONNECTED
-        );
+        throw new AppError('PostHog not connected', 404, ERROR_CODES.ANALYTICS_NOT_CONNECTED);
       }
       const msg = err instanceof Error ? err.message : 'unknown';
       throw new AppError(
         `Failed to create PostHog recording share: ${msg}`,
         502,
-        errorCodesSchema.enum.UPSTREAM_FAILURE
+        ERROR_CODES.UPSTREAM_FAILURE
       );
     }
     const parsed = posthogShareTokenResponseSchema.safeParse(data);
@@ -461,7 +421,7 @@ export class PostHogProvider {
       throw new AppError(
         `Invalid PostHog recording share response: ${parsed.error.message}`,
         502,
-        errorCodesSchema.enum.UPSTREAM_FAILURE
+        ERROR_CODES.UPSTREAM_FAILURE
       );
     }
     return parsed.data;

@@ -6,7 +6,7 @@ import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
 import logger from '@/utils/logger.js';
 import {
-  errorCodesSchema,
+  ERROR_CODES,
   type S3AccessKeySchema,
   type S3AccessKeyWithSecretSchema,
   type CreateS3AccessKeyRequest,
@@ -80,7 +80,7 @@ export class S3AccessKeyService {
         throw new AppError(
           `S3 access key limit reached (${MAX_KEYS_PER_PROJECT}). Delete an existing key first.`,
           400,
-          errorCodesSchema.enum.S3_ACCESS_KEY_LIMIT_EXCEEDED
+          ERROR_CODES.S3_ACCESS_KEY_LIMIT_EXCEEDED
         );
       }
 
@@ -136,11 +136,7 @@ export class S3AccessKeyService {
       [id]
     );
     if (result.rowCount === 0) {
-      throw new AppError(
-        'S3 access key not found',
-        404,
-        errorCodesSchema.enum.S3_ACCESS_KEY_NOT_FOUND
-      );
+      throw new AppError('S3 access key not found', 404, ERROR_CODES.S3_ACCESS_KEY_NOT_FOUND);
     }
     this.cache.delete(result.rows[0].access_key_id);
     logger.info('S3 access key deleted', { accessKeyId: result.rows[0].access_key_id });

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { DatabaseError } from 'pg';
 import type { Request, Response } from 'express';
 import { errorMiddleware, AppError } from '@/api/middlewares/error.js';
-import { errorCodesSchema } from '@insforge/shared-schemas';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 
 vi.mock('@/utils/logger.js', () => ({
   default: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
@@ -47,7 +47,7 @@ describe('errorMiddleware — RLS / 42501 mapping', () => {
 
     expect(res.statusCode).toBe(403);
     const body = res.body as { error: string; message: string; nextActions?: string };
-    expect(body.error).toBe(errorCodesSchema.enum.FORBIDDEN);
+    expect(body.error).toBe(ERROR_CODES.FORBIDDEN);
     expect(body.message).toContain('row-level security');
     // The hint should mention RLS so a developer can self-diagnose.
     expect(body.nextActions).toMatch(/row-level security|RLS|policy/i);
@@ -66,7 +66,7 @@ describe('errorMiddleware — RLS / 42501 mapping', () => {
   });
 
   it('passes AppError through with its declared status', () => {
-    const err = new AppError('bad input', 400, errorCodesSchema.enum.INVALID_INPUT);
+    const err = new AppError('bad input', 400, ERROR_CODES.INVALID_INPUT);
     const req = {} as Request;
     const res = makeMockRes();
     const next = vi.fn();
@@ -75,7 +75,7 @@ describe('errorMiddleware — RLS / 42501 mapping', () => {
 
     expect(res.statusCode).toBe(400);
     const body = res.body as { error: string };
-    expect(body.error).toBe(errorCodesSchema.enum.INVALID_INPUT);
+    expect(body.error).toBe(ERROR_CODES.INVALID_INPUT);
   });
 
   it('falls back to 500 for unrecognized pg codes', () => {

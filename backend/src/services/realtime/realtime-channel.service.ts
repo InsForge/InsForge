@@ -3,7 +3,7 @@ import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
 import logger from '@/utils/logger.js';
 import {
-  errorCodesSchema,
+  ERROR_CODES,
   type RealtimeChannel,
   type CreateChannelRequest,
   type UpdateChannelRequest,
@@ -117,11 +117,7 @@ export class RealtimeChannelService {
   async update(id: string, input: UpdateChannelRequest): Promise<RealtimeChannel> {
     const existing = await this.getById(id);
     if (!existing) {
-      throw new AppError(
-        'Channel not found',
-        404,
-        errorCodesSchema.enum.REALTIME_CHANNEL_NOT_FOUND
-      );
+      throw new AppError('Channel not found', 404, ERROR_CODES.REALTIME_CHANNEL_NOT_FOUND);
     }
 
     if (input.pattern) {
@@ -154,11 +150,7 @@ export class RealtimeChannelService {
   async delete(id: string): Promise<void> {
     const existing = await this.getById(id);
     if (!existing) {
-      throw new AppError(
-        'Channel not found',
-        404,
-        errorCodesSchema.enum.REALTIME_CHANNEL_NOT_FOUND
-      );
+      throw new AppError('Channel not found', 404, ERROR_CODES.REALTIME_CHANNEL_NOT_FOUND);
     }
 
     await this.getPool().query('DELETE FROM realtime.channels WHERE id = $1', [id]);
@@ -238,7 +230,7 @@ export class RealtimeChannelService {
       throw new AppError(
         'Invalid channel pattern. Use alphanumeric characters, colons, hyphens, and % for wildcards.',
         400,
-        errorCodesSchema.enum.REALTIME_INVALID_CHANNEL_PATTERN
+        ERROR_CODES.REALTIME_INVALID_CHANNEL_PATTERN
       );
     }
   }

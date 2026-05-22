@@ -9,7 +9,7 @@ import {
   ForeignKeyInfo,
 } from '@/types/database.js';
 import {
-  errorCodesSchema,
+  ERROR_CODES,
   ColumnSchema,
   ColumnType,
   CreateTableResponse,
@@ -161,7 +161,7 @@ export class DatabaseTableService {
       throw new AppError(
         'Table must have at least one user-defined column',
         400,
-        errorCodesSchema.enum.DATABASE_VALIDATION_ERROR,
+        ERROR_CODES.DATABASE_VALIDATION_ERROR,
         'Please add at least one custom column (not id, created_at, or updated_at) to the table.'
       );
     }
@@ -207,7 +207,7 @@ export class DatabaseTableService {
         throw new AppError(
           `table ${table_name} already exists`,
           400,
-          errorCodesSchema.enum.DATABASE_DUPLICATE,
+          ERROR_CODES.DATABASE_DUPLICATE,
           `table ${table_name} already exists. Please check the table name, it must be a unique table name.`
         );
       }
@@ -364,7 +364,7 @@ export class DatabaseTableService {
         throw new AppError(
           'table not found',
           404,
-          errorCodesSchema.enum.DATABASE_NOT_FOUND,
+          ERROR_CODES.DATABASE_NOT_FOUND,
           'table not found. Please check the table name, it must be a valid table name, or you can create a new table with the POST /api/database/tables endpoint'
         );
       }
@@ -478,7 +478,7 @@ export class DatabaseTableService {
         throw new AppError(
           'table not found',
           404,
-          errorCodesSchema.enum.DATABASE_NOT_FOUND,
+          ERROR_CODES.DATABASE_NOT_FOUND,
           'Please check the table name, it must be a valid table name, or you can create a new table with the POST /api/database/tables endpoint'
         );
       }
@@ -501,7 +501,7 @@ export class DatabaseTableService {
         throw new AppError(
           'Table must have at least one user-defined column after update',
           400,
-          errorCodesSchema.enum.DATABASE_VALIDATION_ERROR,
+          ERROR_CODES.DATABASE_VALIDATION_ERROR,
           'The update would leave the table with no custom columns. Please add columns or avoid dropping all user-defined columns.'
         );
       }
@@ -535,7 +535,7 @@ export class DatabaseTableService {
             throw new AppError(
               'cannot drop system columns',
               404,
-              errorCodesSchema.enum.DATABASE_FORBIDDEN,
+              ERROR_CODES.DATABASE_FORBIDDEN,
               `You cannot drop the system column '${col}'`
             );
           }
@@ -557,7 +557,7 @@ export class DatabaseTableService {
             throw new AppError(
               'cannot update system columns',
               404,
-              errorCodesSchema.enum.DATABASE_FORBIDDEN,
+              ERROR_CODES.DATABASE_FORBIDDEN,
               `You cannot update the system column '${column.columnName}'`
             );
           }
@@ -634,7 +634,7 @@ export class DatabaseTableService {
             throw new AppError(
               'cannot add foreign key on system columns',
               404,
-              errorCodesSchema.enum.DATABASE_FORBIDDEN,
+              ERROR_CODES.DATABASE_FORBIDDEN,
               `You cannot add foreign key on the system column '${col.columnName}'`
             );
           }
@@ -750,7 +750,7 @@ export class DatabaseTableService {
           throw new AppError(
             `Column '${col.columnName}' is a reserved field that requires type '${reservedType}', but got '${col.type}'`,
             400,
-            errorCodesSchema.enum.DATABASE_VALIDATION_ERROR,
+            ERROR_CODES.DATABASE_VALIDATION_ERROR,
             'Please check the column name and type, id/created_at/updated_at are reserved fields and cannot be used as column names'
           );
         }

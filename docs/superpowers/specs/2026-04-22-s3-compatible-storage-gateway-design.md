@@ -361,7 +361,7 @@ All new methods throw:
 ```ts
 throw new AppError(
   'S3 protocol requires an S3 storage backend. Set AWS_S3_BUCKET (and optionally S3_ENDPOINT_URL for MinIO).',
-  501, errorCodesSchema.enum.NOT_IMPLEMENTED
+  501, ERROR_CODES.NOT_IMPLEMENTED
 );
 ```
 

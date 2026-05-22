@@ -16,7 +16,7 @@ vi.mock('../../src/utils/logger.js', () => ({
 }));
 
 import { OpenRouterProvider } from '../../src/providers/ai/openrouter.provider.js';
-import { errorCodesSchema } from '@insforge/shared-schemas';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 
 function createAPIError(status: number, message: string): OpenAI.APIError {
   return new OpenAI.APIError(status, { message }, message, new Headers());
@@ -46,7 +46,7 @@ describe('OpenRouterProvider authentication error handling', () => {
       })
     ).rejects.toMatchObject({
       statusCode: 401,
-      code: errorCodesSchema.enum.AI_INVALID_API_KEY,
+      code: ERROR_CODES.AI_INVALID_API_KEY,
       message: expect.stringContaining('authentication failed'),
     });
   });
@@ -60,7 +60,7 @@ describe('OpenRouterProvider authentication error handling', () => {
       })
     ).rejects.toMatchObject({
       statusCode: 401,
-      code: errorCodesSchema.enum.AI_INVALID_API_KEY,
+      code: ERROR_CODES.AI_INVALID_API_KEY,
       nextActions: expect.stringContaining('OPENROUTER_API_KEY'),
     });
   });
@@ -74,7 +74,7 @@ describe('OpenRouterProvider authentication error handling', () => {
       })
     ).rejects.toMatchObject({
       statusCode: 429,
-      code: errorCodesSchema.enum.RATE_LIMITED,
+      code: ERROR_CODES.RATE_LIMITED,
       message: expect.stringContaining('rate limit exceeded'),
     });
   });

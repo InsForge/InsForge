@@ -8,7 +8,12 @@ import type { ComputeProvider } from '@/providers/compute/compute.provider.js';
 import { config } from '@/infra/config/app.config.js';
 import { AppError } from '@/api/middlewares/error.js';
 import logger from '@/utils/logger.js';
-import { errorCodesSchema, type ErrorCode, type ServiceSchema } from '@insforge/shared-schemas';
+import {
+  ERROR_CODES,
+  errorCodeSchema,
+  type ErrorCode,
+  type ServiceSchema,
+} from '@insforge/shared-schemas';
 import { NEXT_ACTIONS } from '../../utils/next-actions.js';
 
 export interface CreateServiceInput {
@@ -118,7 +123,7 @@ function makeFlyAppName(name: string, projectId: string): string {
     throw new AppError(
       `projectId is too long to produce a valid Fly app name (max ~51 chars, got ${projectId.length})`,
       400,
-      errorCodesSchema.enum.INVALID_INPUT
+      ERROR_CODES.INVALID_INPUT
     );
   }
   if (name.length <= maxBase) {
@@ -142,7 +147,7 @@ function makeNetwork(): string {
     throw new AppError(
       'APP_KEY environment variable is required for compute network isolation',
       500,
-      errorCodesSchema.enum.COMPUTE_SERVICE_NOT_CONFIGURED
+      ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED
     );
   }
   return `n-${process.env.APP_KEY}`;
@@ -172,12 +177,12 @@ function rewrapCloudError(error: unknown, defaultMessage: string): AppError {
     } catch {
       parsed = undefined;
     }
-    const parsedCode = errorCodesSchema.safeParse(parsed?.code);
-    const fallbackCode = errorCodesSchema.safeParse(error.code);
+    const parsedCode = errorCodeSchema.safeParse(parsed?.code);
+    const fallbackCode = errorCodeSchema.safeParse(error.code);
     const code: ErrorCode =
       (parsedCode.success ? parsedCode.data : undefined) ??
       (fallbackCode.success ? fallbackCode.data : undefined) ??
-      errorCodesSchema.enum.COMPUTE_SERVICE_DEPLOY_FAILED;
+      ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED;
     return new AppError(
       parsed?.error ?? error.message,
       error.statusCode,
@@ -188,7 +193,7 @@ function rewrapCloudError(error: unknown, defaultMessage: string): AppError {
   return new AppError(
     error instanceof Error ? error.message : defaultMessage,
     502,
-    errorCodesSchema.enum.COMPUTE_SERVICE_DEPLOY_FAILED
+    ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED
   );
 }
 
@@ -218,7 +223,7 @@ export function selectComputeProvider(): ComputeProvider {
   throw new AppError(
     'Compute services not configured.',
     503,
-    errorCodesSchema.enum.COMPUTE_NOT_CONFIGURED,
+    ERROR_CODES.COMPUTE_NOT_CONFIGURED,
     'Set FLY_API_TOKEN and FLY_ORG in your .env, then restart the container. ' +
       'See https://docs.insforge.dev/core-concepts/compute/architecture for setup details.'
   );
@@ -263,7 +268,7 @@ export class ComputeServicesService {
       throw new AppError(
         'Service not found',
         404,
-        errorCodesSchema.enum.COMPUTE_SERVICE_NOT_FOUND,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
         NEXT_ACTIONS.CHECK_COMPUTE_SERVICE_EXISTS
       );
     }
@@ -283,7 +288,7 @@ export class ComputeServicesService {
         'Deploy-token issuance is only supported in cloud-managed mode. ' +
           'Self-hosters with FLY_API_TOKEN set already have a token and do not need this endpoint.',
         400,
-        errorCodesSchema.enum.COMPUTE_SERVICE_NOT_CONFIGURED
+        ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED
       );
     }
     const service = await this.getService(serviceId);
@@ -291,7 +296,7 @@ export class ComputeServicesService {
       throw new AppError(
         `Service ${serviceId} has no Fly app yet — call /api/compute/services/deploy first to create the app.`,
         400,
-        errorCodesSchema.enum.COMPUTE_SERVICE_NOT_CONFIGURED
+        ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED
       );
     }
     return fly.issueDeployToken(service.flyAppId);
@@ -304,7 +309,7 @@ export class ComputeServicesService {
       throw new AppError(
         'Compute services are not enabled on this project.',
         503,
-        errorCodesSchema.enum.COMPUTE_SERVICE_NOT_CONFIGURED,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED,
         NEXT_ACTIONS.ENABLE_COMPUTE
       );
     }
@@ -312,11 +317,7 @@ export class ComputeServicesService {
     // createService is the image-mode immediate-launch path; imageUrl is required.
     // (Source mode goes through prepareForDeploy → CLI flyctl → PATCH-launches-machine.)
     if (!input.imageUrl) {
-      throw new AppError(
-        'imageUrl is required for createService.',
-        400,
-        errorCodesSchema.enum.INVALID_INPUT
-      );
+      throw new AppError('imageUrl is required for createService.', 400, ERROR_CODES.INVALID_INPUT);
     }
     const recordedImageUrl = input.imageUrl;
 
@@ -347,7 +348,7 @@ export class ComputeServicesService {
         throw new AppError(
           'A service with this name already exists',
           409,
-          errorCodesSchema.enum.COMPUTE_SERVICE_ALREADY_EXISTS
+          ERROR_CODES.COMPUTE_SERVICE_ALREADY_EXISTS
         );
       }
       throw error;
@@ -426,7 +427,7 @@ export class ComputeServicesService {
       throw new AppError(
         'Compute services are not enabled on this project.',
         503,
-        errorCodesSchema.enum.COMPUTE_SERVICE_NOT_CONFIGURED,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED,
         NEXT_ACTIONS.ENABLE_COMPUTE
       );
     }
@@ -464,7 +465,7 @@ export class ComputeServicesService {
         throw new AppError(
           'A service with this name already exists',
           409,
-          errorCodesSchema.enum.COMPUTE_SERVICE_ALREADY_EXISTS
+          ERROR_CODES.COMPUTE_SERVICE_ALREADY_EXISTS
         );
       }
       throw error;
@@ -516,7 +517,7 @@ export class ComputeServicesService {
       throw new AppError(
         'envVars and envVarsPatch are mutually exclusive',
         400,
-        errorCodesSchema.enum.INVALID_INPUT
+        ERROR_CODES.INVALID_INPUT
       );
     }
 
@@ -569,7 +570,7 @@ export class ComputeServicesService {
         throw new AppError(
           `Cannot change region for a deployed service. Delete and redeploy in region "${data.region}" instead.`,
           400,
-          errorCodesSchema.enum.COMPUTE_REGION_CHANGE_NOT_SUPPORTED
+          ERROR_CODES.COMPUTE_REGION_CHANGE_NOT_SUPPORTED
         );
       }
       updates.push(`region = $${paramIdx++}`);
@@ -694,7 +695,7 @@ export class ComputeServicesService {
       throw new AppError(
         'Service not found',
         404,
-        errorCodesSchema.enum.COMPUTE_SERVICE_NOT_FOUND,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
         NEXT_ACTIONS.CHECK_COMPUTE_SERVICE_EXISTS
       );
     }
@@ -715,7 +716,7 @@ export class ComputeServicesService {
       throw new AppError(
         'Service not found',
         404,
-        errorCodesSchema.enum.COMPUTE_SERVICE_NOT_FOUND,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
         NEXT_ACTIONS.CHECK_COMPUTE_SERVICE_EXISTS
       );
     }
@@ -742,7 +743,7 @@ export class ComputeServicesService {
           throw new AppError(
             'Failed to delete compute service',
             502,
-            errorCodesSchema.enum.COMPUTE_SERVICE_DELETE_FAILED
+            ERROR_CODES.COMPUTE_SERVICE_DELETE_FAILED
           );
         }
         logger.info('Fly machine already destroyed (404), continuing delete', { id });
@@ -763,7 +764,7 @@ export class ComputeServicesService {
           throw new AppError(
             'Failed to delete compute service',
             502,
-            errorCodesSchema.enum.COMPUTE_SERVICE_DELETE_FAILED
+            ERROR_CODES.COMPUTE_SERVICE_DELETE_FAILED
           );
         }
         logger.info('Fly app already destroyed (404), continuing delete', { id });
@@ -797,7 +798,7 @@ export class ComputeServicesService {
       throw new AppError(
         'Service not found',
         404,
-        errorCodesSchema.enum.COMPUTE_SERVICE_NOT_FOUND,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
         NEXT_ACTIONS.CHECK_COMPUTE_SERVICE_EXISTS
       );
     }
@@ -809,7 +810,7 @@ export class ComputeServicesService {
       throw new AppError(
         'Failed to stop compute service',
         502,
-        errorCodesSchema.enum.COMPUTE_SERVICE_STOP_FAILED
+        ERROR_CODES.COMPUTE_SERVICE_STOP_FAILED
       );
     }
 
@@ -822,7 +823,7 @@ export class ComputeServicesService {
       throw new AppError(
         'Service not found',
         404,
-        errorCodesSchema.enum.COMPUTE_SERVICE_NOT_FOUND,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
         NEXT_ACTIONS.CHECK_COMPUTE_SERVICE_EXISTS
       );
     }
@@ -838,7 +839,7 @@ export class ComputeServicesService {
       throw new AppError(
         'Service not found',
         404,
-        errorCodesSchema.enum.COMPUTE_SERVICE_NOT_FOUND,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
         NEXT_ACTIONS.CHECK_COMPUTE_SERVICE_EXISTS
       );
     }
@@ -850,7 +851,7 @@ export class ComputeServicesService {
       throw new AppError(
         'Failed to start compute service',
         502,
-        errorCodesSchema.enum.COMPUTE_SERVICE_START_FAILED
+        ERROR_CODES.COMPUTE_SERVICE_START_FAILED
       );
     }
 
@@ -863,7 +864,7 @@ export class ComputeServicesService {
       throw new AppError(
         'Service not found',
         404,
-        errorCodesSchema.enum.COMPUTE_SERVICE_NOT_FOUND,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
         NEXT_ACTIONS.CHECK_COMPUTE_SERVICE_EXISTS
       );
     }
@@ -882,7 +883,7 @@ export class ComputeServicesService {
       throw new AppError(
         'Service not found',
         404,
-        errorCodesSchema.enum.COMPUTE_SERVICE_NOT_FOUND,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
         NEXT_ACTIONS.CHECK_COMPUTE_SERVICE_EXISTS
       );
     }
@@ -903,7 +904,7 @@ export class ComputeServicesService {
       throw new AppError(
         'Failed to decrypt service environment variables',
         500,
-        errorCodesSchema.enum.COMPUTE_SERVICE_DEPLOY_FAILED
+        ERROR_CODES.COMPUTE_SERVICE_DEPLOY_FAILED
       );
     }
   }

@@ -6,9 +6,9 @@ import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import logger from '@/utils/logger.js';
 import {
+  ERROR_CODES,
   uploadFunctionRequestSchema,
   updateFunctionRequestSchema,
-  errorCodesSchema,
 } from '@insforge/shared-schemas';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
@@ -28,7 +28,7 @@ router.get('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextF
     successResponse(res, result);
   } catch (error) {
     logger.error('Failed to list functions', { error });
-    next(new AppError('Failed to list functions', 500, errorCodesSchema.enum.INTERNAL_ERROR));
+    next(new AppError('Failed to list functions', 500, ERROR_CODES.INTERNAL_ERROR));
   }
 });
 
@@ -42,7 +42,7 @@ router.get('/:slug', verifyAdmin, async (req: AuthRequest, res: Response, next: 
     const func = await functionService.getFunction(slug);
 
     if (!func) {
-      throw new AppError('Function not found', 404, errorCodesSchema.enum.FUNCTION_NOT_FOUND);
+      throw new AppError('Function not found', 404, ERROR_CODES.FUNCTION_NOT_FOUND);
     }
 
     successResponse(res, func);
@@ -63,11 +63,7 @@ router.post(
     try {
       const validation = uploadFunctionRequestSchema.safeParse(req.body);
       if (!validation.success) {
-        throw new AppError(
-          JSON.stringify(validation.error.issues),
-          400,
-          errorCodesSchema.enum.INVALID_INPUT
-        );
+        throw new AppError(JSON.stringify(validation.error.issues), 400, ERROR_CODES.INVALID_INPUT);
       }
 
       const result = await functionService.createFunction(validation.data);
@@ -126,17 +122,13 @@ router.put(
       const validation = updateFunctionRequestSchema.safeParse(req.body);
 
       if (!validation.success) {
-        throw new AppError(
-          JSON.stringify(validation.error.issues),
-          400,
-          errorCodesSchema.enum.INVALID_INPUT
-        );
+        throw new AppError(JSON.stringify(validation.error.issues), 400, ERROR_CODES.INVALID_INPUT);
       }
 
       const result = await functionService.updateFunction(slug, validation.data);
 
       if (!result) {
-        throw new AppError('Function not found', 404, errorCodesSchema.enum.FUNCTION_NOT_FOUND);
+        throw new AppError('Function not found', 404, ERROR_CODES.FUNCTION_NOT_FOUND);
       }
 
       // Log audit event
@@ -185,7 +177,7 @@ router.delete(
       const deleted = await functionService.deleteFunction(slug);
 
       if (!deleted) {
-        throw new AppError('Function not found', 404, errorCodesSchema.enum.FUNCTION_NOT_FOUND);
+        throw new AppError('Function not found', 404, ERROR_CODES.FUNCTION_NOT_FOUND);
       }
 
       // Log audit event

@@ -1,7 +1,7 @@
 import multer from 'multer';
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from './error.js';
-import { errorCodesSchema } from '@insforge/shared-schemas';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { ProcessedFormData } from '@/types/storage.js';
 import { StorageConfigService } from '@/services/storage/storage-config.service.js';
 import logger from '@/utils/logger.js';
@@ -74,7 +74,7 @@ export const handleUploadError = (
       const message = limitMb
         ? `File too large. Maximum upload size is ${limitMb} MB.`
         : 'File too large. Please check the configured upload size limit.';
-      return next(new AppError(message, 413, errorCodesSchema.enum.STORAGE_INVALID_PARAMETER));
+      return next(new AppError(message, 413, ERROR_CODES.STORAGE_INVALID_PARAMETER));
     }
 
     const errorMap: Record<string, { status: number; message: string }> = {
@@ -82,13 +82,11 @@ export const handleUploadError = (
     };
 
     const error = errorMap[err.code] || { status: 400, message: err.message };
-    return next(
-      new AppError(error.message, error.status, errorCodesSchema.enum.STORAGE_INVALID_PARAMETER)
-    );
+    return next(new AppError(error.message, error.status, ERROR_CODES.STORAGE_INVALID_PARAMETER));
   }
 
   if (err) {
-    return next(new AppError(err.message, 500, errorCodesSchema.enum.INTERNAL_ERROR));
+    return next(new AppError(err.message, 500, ERROR_CODES.INTERNAL_ERROR));
   }
 
   next();

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, type MockInstance } from 'vitest';
-import { errorCodesSchema } from '@insforge/shared-schemas';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import jwt from 'jsonwebtoken';
 
 vi.mock('@/infra/config/app.config.js', () => ({
@@ -97,13 +97,13 @@ describe('CloudComputeProvider', () => {
       status: 403,
       text: async () =>
         JSON.stringify({
-          code: errorCodesSchema.enum.COMPUTE_QUOTA_EXCEEDED,
+          code: ERROR_CODES.COMPUTE_QUOTA_EXCEEDED,
           error: 'limit reached',
         }),
     } as Response);
     const provider = CloudComputeProvider.getInstance();
     await expect(provider.createApp({ name: 't', network: 't', org: 'o' })).rejects.toThrow(
-      new RegExp(`limit reached|${errorCodesSchema.enum.COMPUTE_QUOTA_EXCEEDED}`)
+      new RegExp(`limit reached|${ERROR_CODES.COMPUTE_QUOTA_EXCEEDED}`)
     );
   });
 
@@ -152,7 +152,6 @@ describe('CloudComputeProvider', () => {
 
   it('surfaces COMPUTE_NOT_CONFIGURED when config is missing (not masked as CLOUD_UNAVAILABLE)', async () => {
     const { AppError } = await import('@/api/middlewares/error.js');
-    const { errorCodesSchema } = await import('@insforge/shared-schemas');
     const provider = CloudComputeProvider.getInstance();
 
     // Force signToken to throw COMPUTE_NOT_CONFIGURED, as it would when isConfigured() is false
@@ -161,7 +160,7 @@ describe('CloudComputeProvider', () => {
         throw new AppError(
           'Cloud compute not configured (need PROJECT_ID, CLOUD_API_HOST, JWT_SECRET)',
           500,
-          errorCodesSchema.enum.COMPUTE_NOT_CONFIGURED
+          ERROR_CODES.COMPUTE_NOT_CONFIGURED
         );
       }
     );

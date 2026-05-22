@@ -1,6 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import {
-  errorCodesSchema,
+  ERROR_CODES,
   posthogTimeframeSchema,
   posthogBreakdownSchema,
   posthogMetricSchema,
@@ -108,7 +108,7 @@ analyticsRouter.get(
     try {
       const timeframe = posthogTimeframeSchema.safeParse(req.query.timeframe ?? '7d');
       if (!timeframe.success) {
-        throw new AppError('Invalid timeframe', 400, errorCodesSchema.enum.INVALID_INPUT);
+        throw new AppError('Invalid timeframe', 400, ERROR_CODES.INVALID_INPUT);
       }
       const data = await service.getWebOverview(timeframe.data);
       res.json(data);
@@ -126,11 +126,11 @@ analyticsRouter.get(
     try {
       const breakdown = posthogBreakdownSchema.safeParse(req.query.breakdown);
       if (!breakdown.success) {
-        throw new AppError('Invalid breakdown', 400, errorCodesSchema.enum.INVALID_INPUT);
+        throw new AppError('Invalid breakdown', 400, ERROR_CODES.INVALID_INPUT);
       }
       const timeframe = posthogTimeframeSchema.safeParse(req.query.timeframe ?? '7d');
       if (!timeframe.success) {
-        throw new AppError('Invalid timeframe', 400, errorCodesSchema.enum.INVALID_INPUT);
+        throw new AppError('Invalid timeframe', 400, ERROR_CODES.INVALID_INPUT);
       }
       const data = await service.getWebStats(breakdown.data, timeframe.data);
       res.json(data);
@@ -148,11 +148,11 @@ analyticsRouter.get(
     try {
       const metric = posthogMetricSchema.safeParse(req.query.metric);
       if (!metric.success) {
-        throw new AppError('Invalid metric', 400, errorCodesSchema.enum.INVALID_INPUT);
+        throw new AppError('Invalid metric', 400, ERROR_CODES.INVALID_INPUT);
       }
       const timeframe = posthogTimeframeSchema.safeParse(req.query.timeframe ?? '7d');
       if (!timeframe.success) {
-        throw new AppError('Invalid timeframe', 400, errorCodesSchema.enum.INVALID_INPUT);
+        throw new AppError('Invalid timeframe', 400, ERROR_CODES.INVALID_INPUT);
       }
       const data = await service.getTrends(metric.data, timeframe.data);
       res.json(data);

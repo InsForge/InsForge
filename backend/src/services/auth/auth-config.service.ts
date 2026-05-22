@@ -4,7 +4,7 @@ import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
 import logger from '@/utils/logger.js';
 import {
-  errorCodesSchema,
+  ERROR_CODES,
   type AuthConfigSchema,
   type UpdateAuthConfigRequest,
 } from '@insforge/shared-schemas';
@@ -75,7 +75,7 @@ export class AuthConfigService {
       throw new AppError(
         'Failed to get authentication configuration',
         500,
-        errorCodesSchema.enum.INTERNAL_ERROR
+        ERROR_CODES.INTERNAL_ERROR
       );
     }
   }
@@ -132,7 +132,7 @@ export class AuthConfigService {
       throw new AppError(
         'Failed to get authentication configuration',
         500,
-        errorCodesSchema.enum.INTERNAL_ERROR
+        ERROR_CODES.INTERNAL_ERROR
       );
     }
   }
@@ -159,7 +159,7 @@ export class AuthConfigService {
         throw new AppError(
           'Authentication configuration not found.',
           500,
-          errorCodesSchema.enum.INTERNAL_ERROR
+          ERROR_CODES.INTERNAL_ERROR
         );
       }
 
@@ -259,7 +259,7 @@ export class AuthConfigService {
       throw new AppError(
         'Failed to update authentication configuration',
         500,
-        errorCodesSchema.enum.INTERNAL_ERROR
+        ERROR_CODES.INTERNAL_ERROR
       );
     } finally {
       client.release();

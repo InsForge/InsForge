@@ -50,6 +50,7 @@ const realtimeErrorCodes = [
   'REALTIME_INVALID_CHANNEL_REQUEST',
   'REALTIME_INVALID_CHANNEL_PATTERN',
   'REALTIME_INVALID_EVENT',
+  'REALTIME_NOT_SUBSCRIBED',
   'REALTIME_UNAUTHORIZED',
 ] as const;
 
@@ -148,6 +149,8 @@ const errorCodeValues = [
   ...generalErrorCodes,
 ] as const;
 
-export const errorCodesSchema = z.enum(errorCodeValues);
+export const errorCodeSchema = z.enum(errorCodeValues);
 
-export type ErrorCode = z.infer<typeof errorCodesSchema>;
+export type ErrorCode = z.infer<typeof errorCodeSchema>;
+
+export const ERROR_CODES = errorCodeSchema.enum;

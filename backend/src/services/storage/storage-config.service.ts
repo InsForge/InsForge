@@ -3,9 +3,9 @@ import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
 import logger from '@/utils/logger.js';
 import {
+  ERROR_CODES,
   type StorageConfigSchema,
   type UpdateStorageConfigRequest,
-  errorCodesSchema,
 } from '@insforge/shared-schemas';
 
 const DEFAULT_MAX_FILE_SIZE_MB = 50;
@@ -159,11 +159,7 @@ export class StorageConfigService {
       if (error instanceof AppError) {
         throw error;
       }
-      throw new AppError(
-        'Failed to update storage configuration',
-        500,
-        errorCodesSchema.enum.INTERNAL_ERROR
-      );
+      throw new AppError('Failed to update storage configuration', 500, ERROR_CODES.INTERNAL_ERROR);
     } finally {
       client.release();
     }

@@ -4,7 +4,7 @@ import logger from '@/utils/logger.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { ServerEvents, ClientEvents, SocketMetadata, NotificationPayload } from '@/types/socket.js';
 import {
-  errorCodesSchema,
+  ERROR_CODES,
   type SubscribeChannelPayload,
   type PublishEventPayload,
   type SocketMessage,
@@ -93,7 +93,7 @@ export class SocketManager {
           throw new AppError(
             'Invalid API key',
             401,
-            errorCodesSchema.enum.AUTH_INVALID_API_KEY,
+            ERROR_CODES.AUTH_INVALID_API_KEY,
             NEXT_ACTIONS.CHECK_API_KEY
           );
         }
@@ -103,7 +103,7 @@ export class SocketManager {
           throw new AppError(
             'No authentication provided',
             401,
-            errorCodesSchema.enum.AUTH_INVALID_CREDENTIALS,
+            ERROR_CODES.AUTH_INVALID_CREDENTIALS,
             NEXT_ACTIONS.CHECK_TOKEN
           );
         }
@@ -113,7 +113,7 @@ export class SocketManager {
           throw new AppError(
             'Invalid token: missing role',
             401,
-            errorCodesSchema.enum.AUTH_INVALID_CREDENTIALS,
+            ERROR_CODES.AUTH_INVALID_CREDENTIALS,
             NEXT_ACTIONS.CHECK_TOKEN
           );
         }
@@ -133,7 +133,7 @@ export class SocketManager {
             new AppError(
               'Invalid authentication',
               401,
-              errorCodesSchema.enum.AUTH_INVALID_CREDENTIALS,
+              ERROR_CODES.AUTH_INVALID_CREDENTIALS,
               NEXT_ACTIONS.CHECK_TOKEN
             )
           );
@@ -294,7 +294,10 @@ export class SocketManager {
         ack?.({
           ok: false,
           channel,
-          error: { code: 'UNAUTHORIZED', message: 'Not authorized to subscribe to this channel' },
+          error: {
+            code: ERROR_CODES.REALTIME_UNAUTHORIZED,
+            message: 'Not authorized to subscribe to this channel',
+          },
         });
         return;
       }
@@ -346,7 +349,7 @@ export class SocketManager {
       ack?.({
         ok: false,
         channel,
-        error: { code: 'INTERNAL_ERROR', message: 'Failed to subscribe to channel' },
+        error: { code: ERROR_CODES.INTERNAL_ERROR, message: 'Failed to subscribe to channel' },
       });
     }
   }
@@ -392,7 +395,7 @@ export class SocketManager {
     if (!metadata?.subscriptions.has(roomName)) {
       socket.emit(ServerEvents.REALTIME_ERROR, {
         channel,
-        code: 'NOT_SUBSCRIBED',
+        code: ERROR_CODES.REALTIME_NOT_SUBSCRIBED,
         message: 'Must subscribe to channel before publishing messages',
       });
       return;
@@ -411,7 +414,7 @@ export class SocketManager {
       if (!result) {
         socket.emit(ServerEvents.REALTIME_ERROR, {
           channel,
-          code: 'UNAUTHORIZED',
+          code: ERROR_CODES.REALTIME_UNAUTHORIZED,
           message: 'Not authorized to publish to this channel',
         });
         return;
@@ -426,7 +429,7 @@ export class SocketManager {
       logger.error('Error handling realtime publish', { error, channel });
       socket.emit(ServerEvents.REALTIME_ERROR, {
         channel,
-        code: 'INTERNAL_ERROR',
+        code: ERROR_CODES.INTERNAL_ERROR,
         message: 'Failed to publish message',
       });
     }

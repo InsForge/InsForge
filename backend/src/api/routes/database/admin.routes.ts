@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { AppError } from '@/api/middlewares/error.js';
 import {
-  errorCodesSchema,
+  ERROR_CODES,
   adminTableRecordUpdateQuerySchema,
   adminTableRecordUpdateRequestSchema,
   adminTableRecordLookupQuerySchema,
@@ -43,7 +43,7 @@ function parseSort(sort: string | undefined): AdminTableRecordsSortClause[] {
         throw new AppError(
           `Invalid sort clause "${clause}".`,
           400,
-          errorCodesSchema.enum.INVALID_INPUT,
+          ERROR_CODES.INVALID_INPUT,
           'Use sort values like "created_at:desc,name:asc".'
         );
       }
@@ -53,7 +53,7 @@ function parseSort(sort: string | undefined): AdminTableRecordsSortClause[] {
         throw new AppError(
           `Invalid sort direction "${direction}".`,
           400,
-          errorCodesSchema.enum.INVALID_INPUT,
+          ERROR_CODES.INVALID_INPUT,
           'Use either "asc" or "desc" for sort direction.'
         );
       }
@@ -94,11 +94,7 @@ router.get(
       const schemaName = normalizeDatabaseSchemaName(req.query.schema);
       const validation = adminTableRecordsListQuerySchema.safeParse(req.query);
       if (!validation.success) {
-        throw new AppError(
-          getValidationMessage(validation.error),
-          400,
-          errorCodesSchema.enum.INVALID_INPUT
-        );
+        throw new AppError(getValidationMessage(validation.error), 400, ERROR_CODES.INVALID_INPUT);
       }
 
       const { limit, offset, search, sort, filterColumn, filterValue } = validation.data;
@@ -125,11 +121,7 @@ router.get(
       const schemaName = normalizeDatabaseSchemaName(req.query.schema);
       const validation = adminTableRecordLookupQuerySchema.safeParse(req.query);
       if (!validation.success) {
-        throw new AppError(
-          getValidationMessage(validation.error),
-          400,
-          errorCodesSchema.enum.INVALID_INPUT
-        );
+        throw new AppError(getValidationMessage(validation.error), 400, ERROR_CODES.INVALID_INPUT);
       }
 
       const record = await recordsService.lookupRecord(
@@ -153,11 +145,7 @@ router.post(
       const schemaName = normalizeDatabaseSchemaName(req.query.schema);
       const validation = adminTableRecordsCreateRequestSchema.safeParse(req.body);
       if (!validation.success) {
-        throw new AppError(
-          getValidationMessage(validation.error),
-          400,
-          errorCodesSchema.enum.INVALID_INPUT
-        );
+        throw new AppError(getValidationMessage(validation.error), 400, ERROR_CODES.INVALID_INPUT);
       }
 
       const createdRecords = await recordsService.createRecords(
@@ -184,7 +172,7 @@ router.patch(
         throw new AppError(
           getValidationMessage(queryValidation.error),
           400,
-          errorCodesSchema.enum.INVALID_INPUT
+          ERROR_CODES.INVALID_INPUT
         );
       }
 
@@ -193,7 +181,7 @@ router.patch(
         throw new AppError(
           getValidationMessage(bodyValidation.error),
           400,
-          errorCodesSchema.enum.INVALID_INPUT
+          ERROR_CODES.INVALID_INPUT
         );
       }
 
@@ -220,11 +208,7 @@ router.delete(
       const schemaName = normalizeDatabaseSchemaName(req.query.schema);
       const validation = adminTableRecordsDeleteQuerySchema.safeParse(req.query);
       if (!validation.success) {
-        throw new AppError(
-          getValidationMessage(validation.error),
-          400,
-          errorCodesSchema.enum.INVALID_INPUT
-        );
+        throw new AppError(getValidationMessage(validation.error), 400, ERROR_CODES.INVALID_INPUT);
       }
 
       const pkValues = validation.data.pkValues
@@ -236,7 +220,7 @@ router.delete(
         throw new AppError(
           'pkValues must include at least one primary key value.',
           400,
-          errorCodesSchema.enum.INVALID_INPUT,
+          ERROR_CODES.INVALID_INPUT,
           'Provide at least one non-empty primary key value.'
         );
       }

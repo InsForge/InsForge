@@ -10,7 +10,7 @@ import { ServerEvents } from '@/types/socket.js';
 import { UsageService } from '@/services/usage/usage.service.js';
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { errorCodesSchema } from '@insforge/shared-schemas';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 
 export const usageRouter = Router();
 const usageService = UsageService.getInstance();
@@ -24,7 +24,7 @@ usageRouter.post(
       const { tool_name, success = true } = req.body;
 
       if (!tool_name) {
-        throw new AppError('tool_name is required', 400, errorCodesSchema.enum.INVALID_INPUT);
+        throw new AppError('tool_name is required', 400, ERROR_CODES.INVALID_INPUT);
       }
 
       // Create MCP usage record via service
@@ -74,11 +74,7 @@ usageRouter.get(
       const { start_date, end_date } = req.query;
 
       if (!start_date || !end_date) {
-        throw new AppError(
-          'start_date and end_date are required',
-          400,
-          errorCodesSchema.enum.INVALID_INPUT
-        );
+        throw new AppError('start_date and end_date are required', 400, ERROR_CODES.INVALID_INPUT);
       }
 
       // Get usage statistics via service

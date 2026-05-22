@@ -7,10 +7,10 @@ Canonical API error codes live in `@insforge/shared-schemas` and are exported fr
 Import them like this:
 
 ```ts
-import { errorCodesSchema, type ErrorCode } from '@insforge/shared-schemas';
+import { ERROR_CODES, errorCodeSchema, type ErrorCode } from '@insforge/shared-schemas';
 ```
 
-The backend imports these shared constants directly; do not define a backend-local canonical error-code list.
+Backend code should use `ERROR_CODES.X`; runtime validation code should use `errorCodeSchema`. Do not define a backend-local canonical error-code list.
 
 ## Naming Rules
 
@@ -21,14 +21,14 @@ The backend imports these shared constants directly; do not define a backend-loc
 
 ## Adding A Code
 
-1. Add the string literal to the relevant list that feeds `errorCodesSchema` in `packages/shared-schemas/src/error-codes.schema.ts`.
+1. Add the string literal to the relevant list that feeds `errorCodeSchema` in `packages/shared-schemas/src/error-codes.schema.ts`.
 2. Export it from the package root in `packages/shared-schemas/src/index.ts` using `export * from "./error-codes.schema.js";`.
 3. Update backend or tooling call sites to use the shared constant instead of a raw string.
 4. Add or update a test that locks the string value.
 
 ## Error Codes vs. Next Actions
 
-While canonical error codes are shared globally through `errorCodesSchema`, `NEXT_ACTIONS` guidance constants and templates must remain **backend-local** (defined in `backend/src/utils/next-actions.ts`) instead of being exported from `@insforge/shared-schemas`.
+While canonical error codes are shared globally through `errorCodeSchema`, `NEXT_ACTIONS` guidance constants and templates must remain **backend-local** (defined in `backend/src/utils/next-actions.ts`) instead of being exported from `@insforge/shared-schemas`.
 
 ### Rationale
 

@@ -6,11 +6,11 @@ import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { upload, handleUploadError } from '@/api/middlewares/upload.js';
 import {
+  ERROR_CODES,
   rawSQLRequestSchema,
   exportRequestSchema,
   importRequestSchema,
   bulkUpsertRequestSchema,
-  errorCodesSchema,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
@@ -57,7 +57,7 @@ router.post(
         throw new AppError(
           validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
           400,
-          errorCodesSchema.enum.INVALID_INPUT
+          ERROR_CODES.INVALID_INPUT
         );
       }
 
@@ -116,7 +116,7 @@ router.post('/rawsql', verifyAdmin, async (req: AuthRequest, res: Response, next
       throw new AppError(
         validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
-        errorCodesSchema.enum.INVALID_INPUT
+        ERROR_CODES.INVALID_INPUT
       );
     }
 
@@ -174,7 +174,7 @@ router.post('/export', verifyAdmin, async (req: AuthRequest, res: Response, next
       throw new AppError(
         validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
-        errorCodesSchema.enum.INVALID_INPUT
+        ERROR_CODES.INVALID_INPUT
       );
     }
 
@@ -231,7 +231,7 @@ router.post(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       if (!req.file) {
-        throw new AppError('File is required', 400, errorCodesSchema.enum.INVALID_INPUT);
+        throw new AppError('File is required', 400, ERROR_CODES.INVALID_INPUT);
       }
 
       // Validate request body
@@ -240,7 +240,7 @@ router.post(
         throw new AppError(
           validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
           400,
-          errorCodesSchema.enum.INVALID_INPUT
+          ERROR_CODES.INVALID_INPUT
         );
       }
 
@@ -313,14 +313,14 @@ router.post(
         throw new AppError(
           validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
           400,
-          errorCodesSchema.enum.INVALID_INPUT
+          ERROR_CODES.INVALID_INPUT
         );
       }
 
       const { truncate } = validation.data;
 
       if (!req.file) {
-        throw new AppError('SQL file is required', 400, errorCodesSchema.enum.INVALID_INPUT);
+        throw new AppError('SQL file is required', 400, ERROR_CODES.INVALID_INPUT);
       }
 
       const response = await dbAdvanceService.importDatabase(

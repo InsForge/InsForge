@@ -1,6 +1,6 @@
 import { parseSync } from 'libpg-query';
 import {
-  errorCodesSchema,
+  ERROR_CODES,
   type CreateMigrationRequest,
   type CreateMigrationResponse,
   type DatabaseMigrationsResponse,
@@ -38,7 +38,7 @@ export function assertMigrationDoesNotManageTransactions(statement: string): voi
       throw new AppError(
         'Custom migrations cannot manage their own transactions.',
         400,
-        errorCodesSchema.enum.DATABASE_FORBIDDEN
+        ERROR_CODES.DATABASE_FORBIDDEN
       );
     }
   }
@@ -47,17 +47,17 @@ export function assertMigrationDoesNotManageTransactions(statement: string): voi
 export function assertMigrationStatementIsAllowed(statement: string): void {
   const managedSchemaError = checkManagedSchemaWriteOperations(statement);
   if (managedSchemaError) {
-    throw new AppError(managedSchemaError, 403, errorCodesSchema.enum.FORBIDDEN);
+    throw new AppError(managedSchemaError, 403, ERROR_CODES.FORBIDDEN);
   }
 
   const authSchemaError = checkAuthSchemaOperations(statement);
   if (authSchemaError) {
-    throw new AppError(authSchemaError, 403, errorCodesSchema.enum.FORBIDDEN);
+    throw new AppError(authSchemaError, 403, ERROR_CODES.FORBIDDEN);
   }
 
   const systemSchemaError = checkSystemSchemaOperations(statement);
   if (systemSchemaError) {
-    throw new AppError(systemSchemaError, 403, errorCodesSchema.enum.FORBIDDEN);
+    throw new AppError(systemSchemaError, 403, ERROR_CODES.FORBIDDEN);
   }
 }
 
@@ -96,7 +96,7 @@ export class DatabaseMigrationService {
       throw new AppError(
         'Migration SQL must contain at least one statement.',
         400,
-        errorCodesSchema.enum.INVALID_INPUT
+        ERROR_CODES.INVALID_INPUT
       );
     }
 
@@ -132,7 +132,7 @@ export class DatabaseMigrationService {
         throw new AppError(
           'Migration version must be newer than the latest applied migration.',
           409,
-          errorCodesSchema.enum.DATABASE_MIGRATION_ALREADY_EXISTS
+          ERROR_CODES.DATABASE_MIGRATION_ALREADY_EXISTS
         );
       }
 
@@ -177,7 +177,7 @@ export class DatabaseMigrationService {
         throw new AppError(
           'Migration version already exists.',
           409,
-          errorCodesSchema.enum.DATABASE_MIGRATION_ALREADY_EXISTS
+          ERROR_CODES.DATABASE_MIGRATION_ALREADY_EXISTS
         );
       }
 

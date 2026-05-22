@@ -1,7 +1,7 @@
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
 import {
-  errorCodesSchema,
+  ERROR_CODES,
   type RawSQLResponse,
   type ExportDatabaseResponse,
   type ExportDatabaseJsonData,
@@ -94,11 +94,7 @@ export class DatabaseAdvanceService {
 
     for (const pattern of dangerousPatterns) {
       if (pattern.test(query)) {
-        throw new AppError(
-          'Query contains restricted operations',
-          403,
-          errorCodesSchema.enum.FORBIDDEN
-        );
+        throw new AppError('Query contains restricted operations', 403, ERROR_CODES.FORBIDDEN);
       }
     }
 
@@ -107,7 +103,7 @@ export class DatabaseAdvanceService {
       logger.warn('Blocked operation on protected schema', {
         query: query.substring(0, 100),
       });
-      throw new AppError(managedSchemaError, 403, errorCodesSchema.enum.FORBIDDEN);
+      throw new AppError(managedSchemaError, 403, ERROR_CODES.FORBIDDEN);
     }
 
     // Use parser-based check for auth schema operations
@@ -116,7 +112,7 @@ export class DatabaseAdvanceService {
       logger.warn('Blocked operation on auth schema', {
         query: query.substring(0, 100),
       });
-      throw new AppError(authError, 403, errorCodesSchema.enum.FORBIDDEN);
+      throw new AppError(authError, 403, ERROR_CODES.FORBIDDEN);
     }
 
     // Block DDL/DML on system schema
@@ -125,7 +121,7 @@ export class DatabaseAdvanceService {
       logger.warn('Blocked operation on system schema', {
         query: query.substring(0, 100),
       });
-      throw new AppError(systemError, 403, errorCodesSchema.enum.FORBIDDEN);
+      throw new AppError(systemError, 403, ERROR_CODES.FORBIDDEN);
     }
 
     return query;
@@ -770,11 +766,7 @@ export class DatabaseAdvanceService {
     const fileExtension = filename.toLowerCase().substring(filename.lastIndexOf('.'));
 
     if (!allowedExtensions.includes(fileExtension)) {
-      throw new AppError(
-        'Only .sql/.txt files are allowed',
-        400,
-        errorCodesSchema.enum.INVALID_INPUT
-      );
+      throw new AppError('Only .sql/.txt files are allowed', 400, ERROR_CODES.INVALID_INPUT);
     }
 
     // Convert buffer to string
@@ -818,7 +810,7 @@ export class DatabaseAdvanceService {
         throw new AppError(
           'Invalid SQL file format. Please ensure the file contains valid SQL statements.',
           400,
-          errorCodesSchema.enum.INVALID_INPUT
+          ERROR_CODES.INVALID_INPUT
         );
       }
 
@@ -855,7 +847,7 @@ export class DatabaseAdvanceService {
           throw new AppError(
             `Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
             400,
-            errorCodesSchema.enum.INVALID_INPUT
+            ERROR_CODES.INVALID_INPUT
           );
         }
       }
@@ -910,7 +902,7 @@ export class DatabaseAdvanceService {
         throw new AppError(
           'Unsupported file type. Use .csv or .json',
           400,
-          errorCodesSchema.enum.INVALID_INPUT
+          ERROR_CODES.INVALID_INPUT
         );
       }
     } catch (parseError) {
@@ -920,12 +912,12 @@ export class DatabaseAdvanceService {
       throw new AppError(
         `Failed to parse ${fileExtension} file: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`,
         400,
-        errorCodesSchema.enum.INVALID_INPUT
+        ERROR_CODES.INVALID_INPUT
       );
     }
 
     if (!records || !records.length) {
-      throw new AppError('No records found in file', 400, errorCodesSchema.enum.INVALID_INPUT);
+      throw new AppError('No records found in file', 400, ERROR_CODES.INVALID_INPUT);
     }
 
     // Perform the bulk insert
@@ -948,7 +940,7 @@ export class DatabaseAdvanceService {
     upsertKey?: string
   ): Promise<{ rowCount: number; rows?: unknown[] }> {
     if (!records || !records.length) {
-      throw new AppError('No records to insert', 400, errorCodesSchema.enum.INVALID_INPUT);
+      throw new AppError('No records to insert', 400, ERROR_CODES.INVALID_INPUT);
     }
 
     const pool = this.dbManager.getPool();
@@ -975,7 +967,7 @@ export class DatabaseAdvanceService {
           throw new AppError(
             `Upsert key '${upsertKey}' not found in record columns`,
             400,
-            errorCodesSchema.enum.INVALID_INPUT
+            ERROR_CODES.INVALID_INPUT
           );
         }
 
@@ -1033,7 +1025,7 @@ export class DatabaseAdvanceService {
       }
 
       const message = error instanceof Error ? error.message : 'Bulk insert failed';
-      throw new AppError(message, 400, errorCodesSchema.enum.INVALID_INPUT);
+      throw new AppError(message, 400, ERROR_CODES.INVALID_INPUT);
     }
   }
 }

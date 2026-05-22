@@ -5,7 +5,7 @@ import logger from '@/utils/logger.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { EmailTemplate } from '@/types/email.js';
 import { EmailProvider } from './base.provider.js';
-import { errorCodesSchema, SendRawEmailRequest } from '@insforge/shared-schemas';
+import { ERROR_CODES, SendRawEmailRequest } from '@insforge/shared-schemas';
 
 /**
  * Cloud email provider for sending emails via Insforge cloud backend
@@ -23,7 +23,7 @@ export class CloudEmailProvider implements EmailProvider {
       throw new AppError(
         'PROJECT_ID is not configured. Cannot send emails without cloud project setup.',
         500,
-        errorCodesSchema.enum.INTERNAL_ERROR
+        ERROR_CODES.INTERNAL_ERROR
       );
     }
 
@@ -31,7 +31,7 @@ export class CloudEmailProvider implements EmailProvider {
       throw new AppError(
         'JWT_SECRET is not configured. Cannot generate sign token.',
         500,
-        errorCodesSchema.enum.INTERNAL_ERROR
+        ERROR_CODES.INTERNAL_ERROR
       );
     }
 
@@ -75,7 +75,7 @@ export class CloudEmailProvider implements EmailProvider {
         throw new AppError(
           'Missing required parameters for sending email',
           400,
-          errorCodesSchema.enum.INVALID_INPUT
+          ERROR_CODES.INVALID_INPUT
         );
       }
 
@@ -89,7 +89,7 @@ export class CloudEmailProvider implements EmailProvider {
         throw new AppError(
           `Invalid template type: ${template}. Must be one of: ${validTemplates.join(', ')}`,
           400,
-          errorCodesSchema.enum.INVALID_INPUT
+          ERROR_CODES.INVALID_INPUT
         );
       }
 
@@ -120,7 +120,7 @@ export class CloudEmailProvider implements EmailProvider {
         throw new AppError(
           'Email service returned unsuccessful response',
           500,
-          errorCodesSchema.enum.INTERNAL_ERROR
+          ERROR_CODES.INTERNAL_ERROR
         );
       }
     } catch (error) {
@@ -142,25 +142,25 @@ export class CloudEmailProvider implements EmailProvider {
           throw new AppError(
             'Authentication failed with cloud email service. Check PROJECT_ID and JWT_SECRET.',
             status,
-            errorCodesSchema.enum.AUTH_UNAUTHORIZED
+            ERROR_CODES.AUTH_UNAUTHORIZED
           );
         } else if (status === 429) {
           throw new AppError(
             'Email rate limit exceeded. Free plans are limited to 3000 emails per month.',
             status,
-            errorCodesSchema.enum.RATE_LIMITED
+            ERROR_CODES.RATE_LIMITED
           );
         } else if (status === 400) {
           throw new AppError(
             `Invalid email request: ${message}`,
             status,
-            errorCodesSchema.enum.INVALID_INPUT
+            ERROR_CODES.INVALID_INPUT
           );
         } else {
           throw new AppError(
             `Failed to send email: ${message}`,
             status || 500,
-            errorCodesSchema.enum.INTERNAL_ERROR
+            ERROR_CODES.INTERNAL_ERROR
           );
         }
       }
@@ -180,7 +180,7 @@ export class CloudEmailProvider implements EmailProvider {
       throw new AppError(
         `Failed to send email: ${error instanceof Error ? error.message : 'Unknown error'}`,
         500,
-        errorCodesSchema.enum.INTERNAL_ERROR
+        ERROR_CODES.INTERNAL_ERROR
       );
     }
   }
@@ -209,7 +209,7 @@ export class CloudEmailProvider implements EmailProvider {
         throw new AppError(
           'Email service returned unsuccessful response',
           500,
-          errorCodesSchema.enum.INTERNAL_ERROR
+          ERROR_CODES.INTERNAL_ERROR
         );
       }
     } catch (error) {
@@ -227,31 +227,31 @@ export class CloudEmailProvider implements EmailProvider {
           throw new AppError(
             'Authentication failed with cloud email service.',
             status,
-            errorCodesSchema.enum.AUTH_UNAUTHORIZED
+            ERROR_CODES.AUTH_UNAUTHORIZED
           );
         } else if (status === 403) {
           throw new AppError(
             'Custom email service is not available for free plan. Please upgrade to use this feature.',
             status,
-            errorCodesSchema.enum.FORBIDDEN
+            ERROR_CODES.FORBIDDEN
           );
         } else if (status === 429) {
           throw new AppError(
             'Email rate limit exceeded. Starter plan is limited 10 emails per hour, and Pro plan is limited 50 emails per hour',
             status,
-            errorCodesSchema.enum.RATE_LIMITED
+            ERROR_CODES.RATE_LIMITED
           );
         } else if (status === 400) {
           throw new AppError(
             `Invalid email request: ${message}`,
             status,
-            errorCodesSchema.enum.INVALID_INPUT
+            ERROR_CODES.INVALID_INPUT
           );
         } else {
           throw new AppError(
             `Failed to send email: ${message}`,
             status || 500,
-            errorCodesSchema.enum.INTERNAL_ERROR
+            ERROR_CODES.INTERNAL_ERROR
           );
         }
       }
@@ -263,7 +263,7 @@ export class CloudEmailProvider implements EmailProvider {
       throw new AppError(
         `Failed to send email: ${error instanceof Error ? error.message : 'Unknown error'}`,
         500,
-        errorCodesSchema.enum.INTERNAL_ERROR
+        ERROR_CODES.INTERNAL_ERROR
       );
     }
   }

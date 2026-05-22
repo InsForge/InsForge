@@ -11,12 +11,12 @@ import { CustomOAuthConfigService } from '@/services/auth/custom-oauth-config.se
 import { AuditService } from '@/services/logs/audit.service.js';
 import { CustomOAuthProvider } from '@/providers/oauth/custom.provider.js';
 import {
+  ERROR_CODES,
   createCustomOAuthConfigRequestSchema,
   updateCustomOAuthConfigRequestSchema,
   listCustomOAuthConfigsResponseSchema,
   oAuthInitRequestSchema,
   customOAuthKeySchema,
-  errorCodesSchema,
 } from '@insforge/shared-schemas';
 
 const router = Router();
@@ -33,7 +33,7 @@ const validateJwtSecret = (): string => {
     throw new AppError(
       'JWT_SECRET environment variable is not configured.',
       500,
-      errorCodesSchema.enum.INTERNAL_ERROR
+      ERROR_CODES.INTERNAL_ERROR
     );
   }
   return jwtSecret;
@@ -60,7 +60,7 @@ router.get(
     try {
       const keyValidation = customOAuthKeySchema.safeParse(req.params.key);
       if (!keyValidation.success) {
-        throw new AppError('Invalid custom OAuth key', 400, errorCodesSchema.enum.INVALID_INPUT);
+        throw new AppError('Invalid custom OAuth key', 400, ERROR_CODES.INVALID_INPUT);
       }
       const key = keyValidation.data;
 
@@ -69,7 +69,7 @@ router.get(
         throw new AppError(
           `Custom OAuth configuration for ${key} not found`,
           404,
-          errorCodesSchema.enum.AUTH_OAUTH_CONFIG_NOT_FOUND
+          ERROR_CODES.AUTH_OAUTH_CONFIG_NOT_FOUND
         );
       }
       const clientSecret = await customOAuthConfigService.getClientSecretByKey(key);
@@ -99,7 +99,7 @@ router.post(
             )
             .join(', '),
           400,
-          errorCodesSchema.enum.INVALID_INPUT
+          ERROR_CODES.INVALID_INPUT
         );
       }
 
@@ -129,7 +129,7 @@ router.put(
     try {
       const keyValidation = customOAuthKeySchema.safeParse(req.params.key);
       if (!keyValidation.success) {
-        throw new AppError('Invalid custom OAuth key', 400, errorCodesSchema.enum.INVALID_INPUT);
+        throw new AppError('Invalid custom OAuth key', 400, ERROR_CODES.INVALID_INPUT);
       }
       const key = keyValidation.data;
 
@@ -143,7 +143,7 @@ router.put(
             )
             .join(', '),
           400,
-          errorCodesSchema.enum.INVALID_INPUT
+          ERROR_CODES.INVALID_INPUT
         );
       }
 
@@ -173,14 +173,14 @@ router.delete(
     try {
       const keyValidation = customOAuthKeySchema.safeParse(req.params.key);
       if (!keyValidation.success) {
-        throw new AppError('Invalid custom OAuth key', 400, errorCodesSchema.enum.INVALID_INPUT);
+        throw new AppError('Invalid custom OAuth key', 400, ERROR_CODES.INVALID_INPUT);
       }
       const deleted = await customOAuthConfigService.deleteConfig(keyValidation.data);
       if (!deleted) {
         throw new AppError(
           `Custom OAuth configuration for ${req.params.key} not found`,
           404,
-          errorCodesSchema.enum.AUTH_OAUTH_CONFIG_NOT_FOUND
+          ERROR_CODES.AUTH_OAUTH_CONFIG_NOT_FOUND
         );
       }
       await auditService.log({
@@ -209,7 +209,7 @@ router.get('/:key', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const keyValidation = customOAuthKeySchema.safeParse(req.params.key);
     if (!keyValidation.success) {
-      throw new AppError('Invalid custom OAuth key', 400, errorCodesSchema.enum.INVALID_INPUT);
+      throw new AppError('Invalid custom OAuth key', 400, ERROR_CODES.INVALID_INPUT);
     }
     const key = keyValidation.data;
 
@@ -223,21 +223,21 @@ router.get('/:key', async (req: Request, res: Response, next: NextFunction) => {
           )
           .join(', '),
         400,
-        errorCodesSchema.enum.INVALID_INPUT
+        ERROR_CODES.INVALID_INPUT
       );
     }
 
     const { redirect_uri, code_challenge } = queryValidation.data;
     const redirectUri = redirect_uri;
     if (!redirectUri) {
-      throw new AppError('Redirect URI is required', 400, errorCodesSchema.enum.INVALID_INPUT);
+      throw new AppError('Redirect URI is required', 400, ERROR_CODES.INVALID_INPUT);
     }
 
     if (!(await authConfigService.validateRedirectUrl(redirectUri))) {
       throw new AppError(
         `${redirectUri} is not in the allowed redirect URLs`,
         400,
-        errorCodesSchema.enum.INVALID_INPUT,
+        ERROR_CODES.INVALID_INPUT,
         'Please add this URL to the allowed redirect URLs in the authentication configuration.'
       );
     }
@@ -265,13 +265,13 @@ router.get('/:key/callback', async (req: Request, res: Response, next: NextFunct
   try {
     const keyValidation = customOAuthKeySchema.safeParse(req.params.key);
     if (!keyValidation.success) {
-      throw new AppError('Invalid custom OAuth key', 400, errorCodesSchema.enum.INVALID_INPUT);
+      throw new AppError('Invalid custom OAuth key', 400, ERROR_CODES.INVALID_INPUT);
     }
     const key = keyValidation.data;
     const code = req.query.code as string | undefined;
     const state = req.query.state as string | undefined;
     if (!code || !state) {
-      throw new AppError('code and state are required', 400, errorCodesSchema.enum.INVALID_INPUT);
+      throw new AppError('code and state are required', 400, ERROR_CODES.INVALID_INPUT);
     }
 
     const stateData = jwt.verify(state, validateJwtSecret()) as {
@@ -283,31 +283,23 @@ router.get('/:key/callback', async (req: Request, res: Response, next: NextFunct
       throw new AppError(
         'Provider mismatch between callback path and state',
         400,
-        errorCodesSchema.enum.INVALID_INPUT
+        ERROR_CODES.INVALID_INPUT
       );
     }
     if (!stateData.redirectUri) {
-      throw new AppError(
-        'redirectUri is required in state',
-        400,
-        errorCodesSchema.enum.INVALID_INPUT
-      );
+      throw new AppError('redirectUri is required in state', 400, ERROR_CODES.INVALID_INPUT);
     }
 
     if (!(await authConfigService.validateRedirectUrl(stateData.redirectUri))) {
       throw new AppError(
         `${stateData.redirectUri} is not in the allowed redirect URLs`,
         400,
-        errorCodesSchema.enum.INVALID_INPUT,
+        ERROR_CODES.INVALID_INPUT,
         'Please add this URL to the allowed redirect URLs in the authentication configuration.'
       );
     }
     if (!stateData.codeChallenge) {
-      throw new AppError(
-        'code_challenge is required in state',
-        400,
-        errorCodesSchema.enum.INVALID_INPUT
-      );
+      throw new AppError('code_challenge is required in state', 400, ERROR_CODES.INVALID_INPUT);
     }
 
     const oauthUser = await customOAuthProvider.handleCallback(key, code, state);

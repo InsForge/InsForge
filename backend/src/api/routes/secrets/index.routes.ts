@@ -5,7 +5,7 @@ import { FunctionService } from '@/services/functions/function.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { errorCodesSchema } from '@insforge/shared-schemas';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { successResponse } from '@/utils/response.js';
 
 const RotateApiKeySchema = z.object({
@@ -47,7 +47,7 @@ router.get('/:key', verifyAdmin, async (req: AuthRequest, res: Response, next: N
     const value = await secretService.getSecretByKey(key);
 
     if (value === null) {
-      throw new AppError(`Secret not found: ${key}`, 404, errorCodesSchema.enum.SECRET_NOT_FOUND);
+      throw new AppError(`Secret not found: ${key}`, 404, ERROR_CODES.SECRET_NOT_FOUND);
     }
 
     // Log audit
@@ -75,11 +75,7 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
 
     // Validate input
     if (!key || !value) {
-      throw new AppError(
-        'Both key and value are required',
-        400,
-        errorCodesSchema.enum.INVALID_INPUT
-      );
+      throw new AppError('Both key and value are required', 400, ERROR_CODES.INVALID_INPUT);
     }
 
     // Validate key format (uppercase alphanumeric with underscores only)
@@ -87,7 +83,7 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
       throw new AppError(
         'Invalid key format. Use uppercase letters, numbers, and underscores only (e.g., STRIPE_API_KEY)',
         400,
-        errorCodesSchema.enum.INVALID_INPUT
+        ERROR_CODES.INVALID_INPUT
       );
     }
 
@@ -98,11 +94,7 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
     let result: { id: string };
 
     if (secret && secret?.isActive) {
-      throw new AppError(
-        `Secret already exists: ${key}`,
-        409,
-        errorCodesSchema.enum.SECRET_ALREADY_EXISTS
-      );
+      throw new AppError(`Secret already exists: ${key}`, 409, ERROR_CODES.SECRET_ALREADY_EXISTS);
     } else if (secret && !secret?.isActive && secret?.id) {
       const success = await secretService.updateSecret(secret?.id, {
         value,
@@ -111,11 +103,7 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
         expiresAt: expiresAt ? new Date(expiresAt) : undefined,
       });
       if (!success) {
-        throw new AppError(
-          `Failed to create secret: ${key}`,
-          500,
-          errorCodesSchema.enum.INTERNAL_ERROR
-        );
+        throw new AppError(`Failed to create secret: ${key}`, 500, ERROR_CODES.INTERNAL_ERROR);
       }
       result = { id: secret.id };
     } else {
@@ -167,7 +155,7 @@ router.put('/:key', verifyAdmin, async (req: AuthRequest, res: Response, next: N
     const secret = secrets.find((s) => s.key === key);
 
     if (!secret) {
-      throw new AppError(`Secret not found: ${key}`, 404, errorCodesSchema.enum.SECRET_NOT_FOUND);
+      throw new AppError(`Secret not found: ${key}`, 404, ERROR_CODES.SECRET_NOT_FOUND);
     }
 
     const success = await secretService.updateSecret(secret.id, {
@@ -178,11 +166,7 @@ router.put('/:key', verifyAdmin, async (req: AuthRequest, res: Response, next: N
     });
 
     if (!success) {
-      throw new AppError(
-        `Failed to update secret: ${key}`,
-        500,
-        errorCodesSchema.enum.INTERNAL_ERROR
-      );
+      throw new AppError(`Failed to update secret: ${key}`, 500, ERROR_CODES.INTERNAL_ERROR);
     }
 
     // Log audit
@@ -222,7 +206,7 @@ router.post(
         throw new AppError(
           `Invalid request: ${parseResult.error.errors.map((e) => e.message).join(', ')}`,
           400,
-          errorCodesSchema.enum.INVALID_INPUT
+          ERROR_CODES.INVALID_INPUT
         );
       }
 
@@ -266,27 +250,19 @@ router.delete('/:key', verifyAdmin, async (req: AuthRequest, res: Response, next
     const secret = secrets.find((s) => s.key === key);
 
     if (!secret) {
-      throw new AppError(`Secret not found: ${key}`, 404, errorCodesSchema.enum.SECRET_NOT_FOUND);
+      throw new AppError(`Secret not found: ${key}`, 404, ERROR_CODES.SECRET_NOT_FOUND);
     }
 
     // Check if secret is reserved
     if (secret.isReserved) {
-      throw new AppError(
-        `Cannot delete reserved secret: ${key}`,
-        403,
-        errorCodesSchema.enum.FORBIDDEN
-      );
+      throw new AppError(`Cannot delete reserved secret: ${key}`, 403, ERROR_CODES.FORBIDDEN);
     }
 
     // Mark as inactive instead of hard delete
     const success = await secretService.updateSecret(secret.id, { isActive: false });
 
     if (!success) {
-      throw new AppError(
-        `Failed to delete secret: ${key}`,
-        500,
-        errorCodesSchema.enum.INTERNAL_ERROR
-      );
+      throw new AppError(`Failed to delete secret: ${key}`, 500, ERROR_CODES.INTERNAL_ERROR);
     }
 
     // Log audit

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AppError } from '../../src/api/middlewares/error';
-import { errorCodesSchema } from '@insforge/shared-schemas';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { normalizeStripeWebhookError } from '../../src/api/routes/webhooks/stripe.routes';
 
 describe('normalizeStripeWebhookError', () => {
@@ -14,7 +14,7 @@ describe('normalizeStripeWebhookError', () => {
     expect(normalized).toMatchObject({
       message: 'Webhook signature verification failed',
       statusCode: 400,
-      code: errorCodesSchema.enum.INVALID_INPUT,
+      code: ERROR_CODES.INVALID_INPUT,
     });
   });
 

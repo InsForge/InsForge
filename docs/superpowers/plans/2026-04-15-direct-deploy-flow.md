@@ -240,7 +240,7 @@ router.post('/direct', verifyAdmin, async (req, res, next) => {
       throw new AppError(
         validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
-        errorCodesSchema.enum.INVALID_INPUT
+        ERROR_CODES.INVALID_INPUT
       );
     }
 
@@ -392,13 +392,13 @@ async uploadFileStream(input: {
       throw new AppError(
         'Vercel rate limit exceeded for file upload. Wait a moment and retry the file upload.',
         429,
-        errorCodesSchema.enum.RATE_LIMITED
+        ERROR_CODES.RATE_LIMITED
       );
     }
     if (axios.isAxiosError(error) && error.code === 'ERR_CANCELED') {
-      throw new AppError('Vercel file upload was interrupted.', 499, errorCodesSchema.enum.UNKNOWN_ERROR);
+      throw new AppError('Vercel file upload was interrupted.', 499, ERROR_CODES.UNKNOWN_ERROR);
     }
-    throw new AppError('Failed to upload file to Vercel', 500, errorCodesSchema.enum.INTERNAL_ERROR);
+    throw new AppError('Failed to upload file to Vercel', 500, ERROR_CODES.INTERNAL_ERROR);
   }
 }
 ```

@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { errorCodesSchema } from '@insforge/shared-schemas';
+import { ERROR_CODES, errorCodeSchema } from '@insforge/shared-schemas';
 
-const sharedErrorCodes = errorCodesSchema.enum;
+const sharedErrorCodes = ERROR_CODES;
 
 describe('shared error codes', () => {
   /**
-   * Full snapshot of the entire errorCodesSchema enum object.
+   * Full snapshot of the entire ERROR_CODES map.
    *
    * This snapshot pins every key/value pair so that accidental renames,
    * additions, or removals are caught immediately by CI. Update the snapshot
@@ -30,12 +30,12 @@ describe('shared error codes', () => {
 
   it('validates every exported error code through the Zod schema', () => {
     for (const value of Object.values(sharedErrorCodes)) {
-      expect(errorCodesSchema.parse(value)).toBe(value);
+      expect(errorCodeSchema.parse(value)).toBe(value);
     }
   });
 
   it('rejects unknown error codes', () => {
-    expect(errorCodesSchema.safeParse('NOT_A_REAL_ERROR_CODE').success).toBe(false);
+    expect(errorCodeSchema.safeParse('NOT_A_REAL_ERROR_CODE').success).toBe(false);
   });
 
   /**
@@ -137,6 +137,9 @@ describe('shared error codes', () => {
     // Realtime module — replaced generic channel errors
     it('REALTIME_CHANNEL_NOT_FOUND is stable', () => {
       expect(sharedErrorCodes.REALTIME_CHANNEL_NOT_FOUND).toBe('REALTIME_CHANNEL_NOT_FOUND');
+    });
+    it('REALTIME_NOT_SUBSCRIBED is stable', () => {
+      expect(sharedErrorCodes.REALTIME_NOT_SUBSCRIBED).toBe('REALTIME_NOT_SUBSCRIBED');
     });
 
     // Analytics module — replaced generic not-connected errors

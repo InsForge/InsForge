@@ -4,7 +4,7 @@ import { AppError } from '@/api/middlewares/error.js';
 import { EmailTemplate } from '@/types/email.js';
 import { SmtpConfigService, RawSmtpConfig } from '@/services/email/smtp-config.service.js';
 import { EmailTemplateService } from '@/services/email/email-template.service.js';
-import { SendRawEmailRequest, errorCodesSchema } from '@insforge/shared-schemas';
+import { ERROR_CODES, SendRawEmailRequest } from '@insforge/shared-schemas';
 import { EmailProvider } from './base.provider.js';
 import logger from '@/utils/logger.js';
 
@@ -66,7 +66,7 @@ export class SmtpEmailProvider implements EmailProvider {
       throw new AppError(
         'SMTP is not configured or not enabled',
         500,
-        errorCodesSchema.enum.EMAIL_SMTP_CONNECTION_FAILED
+        ERROR_CODES.EMAIL_SMTP_CONNECTION_FAILED
       );
     }
     return config;
@@ -93,7 +93,7 @@ export class SmtpEmailProvider implements EmailProvider {
       throw new AppError(
         `Failed to send email via SMTP: ${message}`,
         500,
-        errorCodesSchema.enum.EMAIL_SMTP_SEND_FAILED
+        ERROR_CODES.EMAIL_SMTP_SEND_FAILED
       );
     } finally {
       transporter.close();

@@ -1,6 +1,6 @@
 import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
 import {
-  errorCodesSchema,
+  ERROR_CODES,
   type EmbeddingsRequest,
   type EmbeddingsResponse,
 } from '@insforge/shared-schemas';
@@ -77,7 +77,7 @@ export class EmbeddingService {
       throw new AppError(
         `Failed to generate embeddings: ${error instanceof Error ? error.message : String(error)}`,
         500,
-        errorCodesSchema.enum.AI_UPSTREAM_UNAVAILABLE
+        ERROR_CODES.AI_UPSTREAM_UNAVAILABLE
       );
     }
   }

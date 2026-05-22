@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from './error.js';
-import { errorCodesSchema, type RoleSchema } from '@insforge/shared-schemas';
+import { ERROR_CODES, type RoleSchema } from '@insforge/shared-schemas';
 import { NEXT_ACTIONS } from '../../utils/next-actions.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 
@@ -85,7 +85,7 @@ export async function verifyAdmin(req: AuthRequest, res: Response, next: NextFun
       throw new AppError(
         'No admin token provided',
         401,
-        errorCodesSchema.enum.AUTH_INVALID_CREDENTIALS,
+        ERROR_CODES.AUTH_INVALID_CREDENTIALS,
         NEXT_ACTIONS.CHECK_TOKEN
       );
     }
@@ -97,7 +97,7 @@ export async function verifyAdmin(req: AuthRequest, res: Response, next: NextFun
       throw new AppError(
         'Admin access required',
         403,
-        errorCodesSchema.enum.AUTH_UNAUTHORIZED,
+        ERROR_CODES.AUTH_UNAUTHORIZED,
         NEXT_ACTIONS.CHECK_ADMIN_TOKEN
       );
     }
@@ -112,7 +112,7 @@ export async function verifyAdmin(req: AuthRequest, res: Response, next: NextFun
         new AppError(
           'Invalid admin token',
           401,
-          errorCodesSchema.enum.AUTH_INVALID_CREDENTIALS,
+          ERROR_CODES.AUTH_INVALID_CREDENTIALS,
           NEXT_ACTIONS.CHECK_ADMIN_TOKEN
         )
       );
@@ -133,7 +133,7 @@ export async function verifyApiKey(req: AuthRequest, _res: Response, next: NextF
       throw new AppError(
         'No API key provided',
         401,
-        errorCodesSchema.enum.AUTH_INVALID_API_KEY,
+        ERROR_CODES.AUTH_INVALID_API_KEY,
         NEXT_ACTIONS.CHECK_API_KEY
       );
     }
@@ -143,7 +143,7 @@ export async function verifyApiKey(req: AuthRequest, _res: Response, next: NextF
       throw new AppError(
         'Invalid API key',
         401,
-        errorCodesSchema.enum.AUTH_INVALID_API_KEY,
+        ERROR_CODES.AUTH_INVALID_API_KEY,
         NEXT_ACTIONS.CHECK_API_KEY
       );
     }
@@ -166,7 +166,7 @@ export function verifyToken(req: AuthRequest, _res: Response, next: NextFunction
       throw new AppError(
         'No token provided',
         401,
-        errorCodesSchema.enum.AUTH_INVALID_CREDENTIALS,
+        ERROR_CODES.AUTH_INVALID_CREDENTIALS,
         NEXT_ACTIONS.CHECK_TOKEN
       );
     }
@@ -179,7 +179,7 @@ export function verifyToken(req: AuthRequest, _res: Response, next: NextFunction
       throw new AppError(
         'Invalid token: missing role',
         401,
-        errorCodesSchema.enum.AUTH_INVALID_CREDENTIALS,
+        ERROR_CODES.AUTH_INVALID_CREDENTIALS,
         NEXT_ACTIONS.CHECK_TOKEN
       );
     }
@@ -196,7 +196,7 @@ export function verifyToken(req: AuthRequest, _res: Response, next: NextFunction
         new AppError(
           'Invalid token',
           401,
-          errorCodesSchema.enum.AUTH_INVALID_CREDENTIALS,
+          ERROR_CODES.AUTH_INVALID_CREDENTIALS,
           NEXT_ACTIONS.CHECK_TOKEN
         )
       );
@@ -215,7 +215,7 @@ export async function verifyCloudBackend(req: AuthRequest, _res: Response, next:
       throw new AppError(
         'No authorization token provided',
         401,
-        errorCodesSchema.enum.AUTH_INVALID_CREDENTIALS,
+        ERROR_CODES.AUTH_INVALID_CREDENTIALS,
         NEXT_ACTIONS.CHECK_TOKEN
       );
     }
@@ -236,7 +236,7 @@ export async function verifyCloudBackend(req: AuthRequest, _res: Response, next:
         new AppError(
           'Invalid cloud backend token',
           401,
-          errorCodesSchema.enum.AUTH_INVALID_CREDENTIALS,
+          ERROR_CODES.AUTH_INVALID_CREDENTIALS,
           NEXT_ACTIONS.CHECK_TOKEN
         )
       );

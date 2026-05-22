@@ -1,6 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import {
-  errorCodesSchema,
+  ERROR_CODES,
   createMigrationRequestSchema,
   type CreateMigrationResponse,
   type DatabaseMigrationsResponse,
@@ -44,7 +44,7 @@ router.post(
             ? issues[0]?.message || 'Invalid migration request.'
             : issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join(', '),
           400,
-          errorCodesSchema.enum.INVALID_INPUT
+          ERROR_CODES.INVALID_INPUT
         );
       }
 

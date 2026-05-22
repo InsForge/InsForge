@@ -3,11 +3,7 @@ import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import logger from '@/utils/logger.js';
-import {
-  OAuthConfigSchema,
-  OAuthProvidersSchema,
-  errorCodesSchema,
-} from '@insforge/shared-schemas';
+import { ERROR_CODES, OAuthConfigSchema, OAuthProvidersSchema } from '@insforge/shared-schemas';
 
 export interface CreateOAuthConfigInput {
   provider: OAuthProvidersSchema;
@@ -72,11 +68,7 @@ export class OAuthConfigService {
       return result.rows;
     } catch (error) {
       logger.error('Failed to get OAuth configs', { error });
-      throw new AppError(
-        'Failed to get OAuth configurations',
-        500,
-        errorCodesSchema.enum.INTERNAL_ERROR
-      );
+      throw new AppError('Failed to get OAuth configurations', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
 
@@ -96,11 +88,7 @@ export class OAuthConfigService {
       return result.rows.map((row) => row.provider);
     } catch (error) {
       logger.error('Failed to get public OAuth providers', { error });
-      throw new AppError(
-        'Failed to get OAuth providers',
-        500,
-        errorCodesSchema.enum.INTERNAL_ERROR
-      );
+      throw new AppError('Failed to get OAuth providers', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
 
@@ -132,11 +120,7 @@ export class OAuthConfigService {
       return result.rows[0];
     } catch (error) {
       logger.error('Failed to get OAuth config by provider', { error, provider });
-      throw new AppError(
-        'Failed to get OAuth configuration',
-        500,
-        errorCodesSchema.enum.INTERNAL_ERROR
-      );
+      throw new AppError('Failed to get OAuth configuration', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
 
@@ -168,11 +152,7 @@ export class OAuthConfigService {
       return clientSecret;
     } catch (error) {
       logger.error('Failed to get OAuth config with secret', { error, provider });
-      throw new AppError(
-        'Failed to get OAuth configuration',
-        500,
-        errorCodesSchema.enum.INTERNAL_ERROR
-      );
+      throw new AppError('Failed to get OAuth configuration', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
 
@@ -194,7 +174,7 @@ export class OAuthConfigService {
         throw new AppError(
           `OAuth configuration for ${input.provider} already exists`,
           409,
-          errorCodesSchema.enum.AUTH_OAUTH_CONFIG_ALREADY_EXISTS
+          ERROR_CODES.AUTH_OAUTH_CONFIG_ALREADY_EXISTS
         );
       }
 
@@ -288,11 +268,7 @@ export class OAuthConfigService {
       if (error instanceof AppError) {
         throw error;
       }
-      throw new AppError(
-        'Failed to create OAuth configuration',
-        500,
-        errorCodesSchema.enum.INTERNAL_ERROR
-      );
+      throw new AppError('Failed to create OAuth configuration', 500, ERROR_CODES.INTERNAL_ERROR);
     } finally {
       client.release();
     }
@@ -316,7 +292,7 @@ export class OAuthConfigService {
         throw new AppError(
           'OAuth configuration not found',
           404,
-          errorCodesSchema.enum.AUTH_OAUTH_CONFIG_NOT_FOUND
+          ERROR_CODES.AUTH_OAUTH_CONFIG_NOT_FOUND
         );
       }
 
@@ -380,11 +356,7 @@ export class OAuthConfigService {
         // Return the config in the correct format
         const config = await this.getConfigByProvider(provider);
         if (!config) {
-          throw new AppError(
-            'Failed to retrieve configuration',
-            500,
-            errorCodesSchema.enum.INTERNAL_ERROR
-          );
+          throw new AppError('Failed to retrieve configuration', 500, ERROR_CODES.INTERNAL_ERROR);
         }
         return config;
       }
@@ -421,7 +393,7 @@ export class OAuthConfigService {
         throw new AppError(
           'Failed to retrieve updated configuration',
           500,
-          errorCodesSchema.enum.INTERNAL_ERROR
+          ERROR_CODES.INTERNAL_ERROR
         );
       }
       return updatedConfig;
@@ -431,11 +403,7 @@ export class OAuthConfigService {
       if (error instanceof AppError) {
         throw error;
       }
-      throw new AppError(
-        'Failed to update OAuth configuration',
-        500,
-        errorCodesSchema.enum.INTERNAL_ERROR
-      );
+      throw new AppError('Failed to update OAuth configuration', 500, ERROR_CODES.INTERNAL_ERROR);
     } finally {
       client.release();
     }
@@ -499,11 +467,7 @@ export class OAuthConfigService {
     } catch (error) {
       await client.query('ROLLBACK');
       logger.error('Failed to delete OAuth config', { error, provider });
-      throw new AppError(
-        'Failed to delete OAuth configuration',
-        500,
-        errorCodesSchema.enum.INTERNAL_ERROR
-      );
+      throw new AppError('Failed to delete OAuth configuration', 500, ERROR_CODES.INTERNAL_ERROR);
     } finally {
       client.release();
     }
