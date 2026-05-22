@@ -22,6 +22,9 @@
     "@insforge/shared-schemas#build": {
       "outputs": ["dist/**"]
     },
+    "@insforge/gen-types#build": {
+      "outputs": ["dist/**"]
+    },
     "typecheck": {
       "dependsOn": ["^build"],
       "outputs": [],

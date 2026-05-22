@@ -1,0 +1,38 @@
+{
+  "name": "@insforge/gen-types",
+  "version": "0.1.0",
+  "author": "Insforge",
+  "description": "Generate TypeScript types from a live InsForge/Postgres schema",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "insforge-gen-types": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "tsc -p tsconfig.test.json && node --test \"dist/**/*.test.js\"",
+    "typecheck": "tsc --noEmit",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run build",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.10",
+    "typescript": "^5.8.3"
+  }
+}

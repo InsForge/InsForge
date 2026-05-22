@@ -1,0 +1,114 @@
+---
+title: "Type Generation"
+description: "Generate TypeScript types from your live Postgres schema"
+---
+
+`insforge-gen-types` introspects a live Postgres database and emits a single
+TypeScript module typing every table, view, enum, function (RPC) and composite
+type. Point your typed client at it and the schema becomes the single source of
+truth — no more hand-written `Database` types drifting from the dashboard.
+
+## Install
+
+```bash
+npm install --save-dev @insforge/gen-types
+```
+
+## Quickstart
+
+```bash
+# Introspect any Postgres reachable by URL
+npx insforge-gen-types \
+  --postgres-url postgres://user:pass@host:5432/db \
+  --schema public \
+  -o types/database.ts
+
+# Or the local Docker stack ($DATABASE_URL, falling back to localhost)
+npx insforge-gen-types --local --schema public -o types/database.ts
+```
+
+Then wire the generated `Database` type into your client:
+
+```ts
+import { createClient } from '@insforge/sdk';
+import type { Database } from './types/database';
+
+const client = createClient<Database>({ baseUrl: '...' });
+// .from('posts').select(...) is now fully typed
+```
+
+## Options
+
+| Flag | Description |
+| ---- | ----------- |
+| `--postgres-url <url>` | Postgres connection string to introspect |
+| `--local` | Use the local Docker stack (`$DATABASE_URL` or `postgres://postgres:postgres@localhost:5432/postgres`) |
+| `--schema <list>` | Comma-separated schemas to emit (default: `public`) |
+| `-o, --output <file>` | Write to a file instead of stdout |
+| `-h, --help` | Show help |
+
+## Output shape
+
+A single `Database` interface, one block per schema:
+
+```ts
+export interface Database {
+  public: {
+    Tables: {
+      posts: {
+        Row:    { id: number; title: string; author_id: string | null };
+        Insert: { id?: number; title: string; author_id?: string | null };
+        Update: { id?: number; title?: string; author_id?: string | null };
+        Relationships: [
+          {
+            foreignKeyName: "posts_author_id_fkey";
+            columns: ["author_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+    };
+    Views: { /* ... */ };
+    Functions: { /* RPCs with Args + Returns */ };
+    Enums: { /* string unions */ };
+    CompositeTypes: { /* ... */ };
+  };
+}
+```
+
+- **`Row`** — a `SELECT`ed row. Nullable columns get `| null`.
+- **`Insert`** — columns with a default, identity, or generated value are
+  optional; everything else is required.
+- **`Update`** — every column is optional.
+- **`Relationships`** — foreign keys, mirroring Supabase's shape for SDK
+  compatibility.
+
+## Determinism
+
+Output is sorted alphabetically, so re-running against an unchanged schema
+produces a byte-identical file. Commit `types/database.ts` and a CI check can
+diff it against a fresh run to catch un-regenerated schema changes.
+
+## Type mapping
+
+| Postgres | TypeScript |
+| -------- | ---------- |
+| `int2/4/8`, `numeric`, `float4/8` | `number` |
+| `bool` | `boolean` |
+| `text`, `varchar`, `uuid`, `timestamp*`, `date`, `time`, `money` | `string` |
+| `json`, `jsonb` | `Json` |
+| enum | string-literal union |
+| array | `T[]` |
+| composite type | nested interface under `CompositeTypes` |
+| anything else | `string` |
+
+<Note>
+`money` is typed `string` — PostgREST serializes it via Postgres's locale text
+output function (e.g. `"$1,234.56"`), so it arrives as a string, not a number.
+</Note>
+
+<Note>
+`int8` / `numeric` values outside JavaScript's safe integer range are still
+typed `number` — handle large values as strings at the application layer.
+</Note>

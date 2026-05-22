@@ -42,7 +42,8 @@
                   "core-concepts/database/architecture",
                   "core-concepts/database/migrations",
                   "core-concepts/database/branching",
-                  "core-concepts/database/pgvector"
+                  "core-concepts/database/pgvector",
+                  "core-concepts/database/type-generation"
                 ]
               },
               {
