@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import { createRemoteJWKSet, JWTPayload, jwtVerify } from 'jose';
 import { AppError } from '@/api/middlewares/error.js';
 import { type TokenPayloadSchema, ERROR_CODES } from '@insforge/shared-schemas';
-import { NEXT_ACTION } from '../../types/error-constants.js';
+import { NEXT_ACTIONS } from '../../utils/next-actions.js';
 
 const JWT_SECRET = process.env.JWT_SECRET ?? '';
 const ACCESS_TOKEN_EXPIRES_IN = '15m';
@@ -196,7 +196,7 @@ export class TokenManager {
           'Project ID mismatch',
           403,
           ERROR_CODES.AUTH_UNAUTHORIZED,
-          NEXT_ACTION.CHECK_TOKEN
+          NEXT_ACTIONS.CHECK_TOKEN
         );
       }
 
@@ -215,7 +215,7 @@ export class TokenManager {
         `Invalid cloud authorization code: ${error instanceof Error ? error.message : 'Unknown error'}`,
         401,
         ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-        NEXT_ACTION.CHECK_TOKEN
+        NEXT_ACTIONS.CHECK_TOKEN
       );
     }
   }

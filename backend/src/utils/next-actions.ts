@@ -1,5 +1,5 @@
-// Next actions - what the user should do
-export const NEXT_ACTION = {
+// Backend-local remediation guidance returned with selected API errors.
+export const NEXT_ACTIONS = {
   // Authentication next actions
   CHECK_TOKEN: 'Check the token is valid or login to get a new token.',
   CHECK_ADMIN_TOKEN: 'Check the admin token is valid or login as admin to get a new token.',
@@ -40,8 +40,6 @@ export const NEXT_ACTION = {
     'Compute service deployment failed. Check the Fly.io region has capacity, or try a different region.',
   RETRY_COMPUTE_OPERATION:
     'The operation failed due to a transient error. Wait a moment and try again.',
-
-  // Add more next actions as needed
 } as const;
 
-export type NextActionKey = keyof typeof NEXT_ACTION;
+export type NextActionKey = keyof typeof NEXT_ACTIONS;

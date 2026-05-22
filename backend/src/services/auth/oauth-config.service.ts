@@ -174,7 +174,7 @@ export class OAuthConfigService {
         throw new AppError(
           `OAuth configuration for ${input.provider} already exists`,
           409,
-          ERROR_CODES.ALREADY_EXISTS
+          ERROR_CODES.AUTH_OAUTH_CONFIG_ALREADY_EXISTS
         );
       }
 
@@ -289,7 +289,11 @@ export class OAuthConfigService {
       );
 
       if (!existingResult.rows.length) {
-        throw new AppError('OAuth configuration not found', 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError(
+          'OAuth configuration not found',
+          404,
+          ERROR_CODES.AUTH_OAUTH_CONFIG_NOT_FOUND
+        );
       }
 
       const existingConfig = existingResult.rows[0];

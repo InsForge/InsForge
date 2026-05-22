@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { ERROR_CODES as sharedErrorCodes } from '@insforge/shared-schemas';
+import { ERROR_CODES as sharedErrorCodes, errorCodesSchema } from '@insforge/shared-schemas';
 
 describe('shared error codes', () => {
   /**
@@ -24,6 +24,16 @@ describe('shared error codes', () => {
     for (const [key, value] of Object.entries(sharedErrorCodes)) {
       expect(value).toBe(key);
     }
+  });
+
+  it('validates every exported error code through the Zod schema', () => {
+    for (const value of Object.values(sharedErrorCodes)) {
+      expect(errorCodesSchema.parse(value)).toBe(value);
+    }
+  });
+
+  it('rejects unknown error codes', () => {
+    expect(errorCodesSchema.safeParse('NOT_A_REAL_ERROR_CODE').success).toBe(false);
   });
 
   /**
@@ -72,12 +82,69 @@ describe('shared error codes', () => {
       expect(sharedErrorCodes.SCHEDULE_NOT_FOUND).toBe('SCHEDULE_NOT_FOUND');
     });
 
-    // Payments module — replaced INVALID_INPUT / NOT_FOUND
+    // Payments module — replaced INVALID_INPUT / NOT_FOUND / ALREADY_EXISTS
     it('PAYMENT_CONFIG_INVALID is stable', () => {
       expect(sharedErrorCodes.PAYMENT_CONFIG_INVALID).toBe('PAYMENT_CONFIG_INVALID');
     });
     it('PAYMENT_NOT_FOUND is stable', () => {
       expect(sharedErrorCodes.PAYMENT_NOT_FOUND).toBe('PAYMENT_NOT_FOUND');
+    });
+    it('PAYMENT_CONFIG_NOT_FOUND is stable', () => {
+      expect(sharedErrorCodes.PAYMENT_CONFIG_NOT_FOUND).toBe('PAYMENT_CONFIG_NOT_FOUND');
+    });
+    it('PAYMENT_PRICE_NOT_FOUND is stable', () => {
+      expect(sharedErrorCodes.PAYMENT_PRICE_NOT_FOUND).toBe('PAYMENT_PRICE_NOT_FOUND');
+    });
+    it('PAYMENT_PRODUCT_NOT_FOUND is stable', () => {
+      expect(sharedErrorCodes.PAYMENT_PRODUCT_NOT_FOUND).toBe('PAYMENT_PRODUCT_NOT_FOUND');
+    });
+    it('PAYMENT_CHECKOUT_ALREADY_EXISTS is stable', () => {
+      expect(sharedErrorCodes.PAYMENT_CHECKOUT_ALREADY_EXISTS).toBe(
+        'PAYMENT_CHECKOUT_ALREADY_EXISTS'
+      );
+    });
+
+    // Auth module — replaced user and OAuth config generic errors
+    it('AUTH_USER_NOT_FOUND is stable', () => {
+      expect(sharedErrorCodes.AUTH_USER_NOT_FOUND).toBe('AUTH_USER_NOT_FOUND');
+    });
+    it('AUTH_OAUTH_CONFIG_NOT_FOUND is stable', () => {
+      expect(sharedErrorCodes.AUTH_OAUTH_CONFIG_NOT_FOUND).toBe('AUTH_OAUTH_CONFIG_NOT_FOUND');
+    });
+    it('AUTH_OAUTH_CONFIG_ALREADY_EXISTS is stable', () => {
+      expect(sharedErrorCodes.AUTH_OAUTH_CONFIG_ALREADY_EXISTS).toBe(
+        'AUTH_OAUTH_CONFIG_ALREADY_EXISTS'
+      );
+    });
+
+    // Database module — replaced generic migration duplicate errors
+    it('DATABASE_MIGRATION_ALREADY_EXISTS is stable', () => {
+      expect(sharedErrorCodes.DATABASE_MIGRATION_ALREADY_EXISTS).toBe(
+        'DATABASE_MIGRATION_ALREADY_EXISTS'
+      );
+    });
+
+    // Functions module — replaced generic NOT_FOUND / ALREADY_EXISTS
+    it('FUNCTION_NOT_FOUND is stable', () => {
+      expect(sharedErrorCodes.FUNCTION_NOT_FOUND).toBe('FUNCTION_NOT_FOUND');
+    });
+    it('FUNCTION_ALREADY_EXISTS is stable', () => {
+      expect(sharedErrorCodes.FUNCTION_ALREADY_EXISTS).toBe('FUNCTION_ALREADY_EXISTS');
+    });
+
+    // Realtime module — replaced generic channel errors
+    it('REALTIME_CHANNEL_NOT_FOUND is stable', () => {
+      expect(sharedErrorCodes.REALTIME_CHANNEL_NOT_FOUND).toBe('REALTIME_CHANNEL_NOT_FOUND');
+    });
+
+    // Analytics module — replaced generic not-connected errors
+    it('ANALYTICS_NOT_CONNECTED is stable', () => {
+      expect(sharedErrorCodes.ANALYTICS_NOT_CONNECTED).toBe('ANALYTICS_NOT_CONNECTED');
+    });
+
+    // Docs module — replaced generic documentation lookup errors
+    it('DOCS_NOT_FOUND is stable', () => {
+      expect(sharedErrorCodes.DOCS_NOT_FOUND).toBe('DOCS_NOT_FOUND');
     });
 
     // General codes that remain in the schema for backward compatibility

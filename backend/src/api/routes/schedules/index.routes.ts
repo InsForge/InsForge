@@ -77,7 +77,7 @@ router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) =
     const { id } = req.params;
     const schedule = await scheduleService.getScheduleById(id);
     if (!schedule) {
-      throw new AppError('Schedule not found.', 404, ERROR_CODES.NOT_FOUND);
+      throw new AppError('Schedule not found.', 404, ERROR_CODES.SCHEDULE_NOT_FOUND);
     }
     successResponse(res, schedule);
   } catch (error) {

@@ -396,7 +396,7 @@ router.get('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: Ne
     const deployment = await deploymentService.getDeploymentById(id);
 
     if (!deployment) {
-      throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.NOT_FOUND);
+      throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
     }
 
     successResponse(res, deployment);
@@ -423,7 +423,7 @@ router.post(
       const deployment = await deploymentService.syncDeploymentById(id);
 
       if (!deployment) {
-        throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
       }
 
       successResponse(res, deployment);

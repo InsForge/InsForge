@@ -76,7 +76,7 @@ router.get(
         throw new AppError(
           `OAuth configuration for ${provider} not found`,
           404,
-          ERROR_CODES.NOT_FOUND
+          ERROR_CODES.AUTH_OAUTH_CONFIG_NOT_FOUND
         );
       }
 
@@ -212,7 +212,7 @@ router.delete(
         throw new AppError(
           `OAuth configuration for ${provider} not found`,
           404,
-          ERROR_CODES.NOT_FOUND
+          ERROR_CODES.AUTH_OAUTH_CONFIG_NOT_FOUND
         );
       }
 

@@ -106,7 +106,7 @@ router.get('/functions/build-logs', async (req: AuthRequest, res: Response, next
       throw new AppError(
         'Build logs not available. Deno Subhosting may not be configured or no deployments found.',
         404,
-        ERROR_CODES.NOT_FOUND
+        ERROR_CODES.LOG_NOT_FOUND
       );
     }
 

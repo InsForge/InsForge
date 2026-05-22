@@ -75,7 +75,7 @@ describe('PaymentCheckoutService', () => {
       )
     ).rejects.toMatchObject({
       statusCode: 409,
-      code: ERROR_CODES.ALREADY_EXISTS,
+      code: ERROR_CODES.PAYMENT_CHECKOUT_ALREADY_EXISTS,
     });
 
     expect(

@@ -13,7 +13,7 @@ import {
   type UnsubscribeChannelPayload,
   type PresenceMember,
 } from '@insforge/shared-schemas';
-import { NEXT_ACTION } from '../../types/error-constants.js';
+import { NEXT_ACTIONS } from '../../utils/next-actions.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { RealtimeAuthService } from '@/services/realtime/realtime-auth.service.js';
 import { RealtimeMessageService } from '@/services/realtime/realtime-message.service.js';
@@ -94,7 +94,7 @@ export class SocketManager {
             'Invalid API key',
             401,
             ERROR_CODES.AUTH_INVALID_API_KEY,
-            NEXT_ACTION.CHECK_API_KEY
+            NEXT_ACTIONS.CHECK_API_KEY
           );
         }
 
@@ -104,7 +104,7 @@ export class SocketManager {
             'No authentication provided',
             401,
             ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-            NEXT_ACTION.CHECK_TOKEN
+            NEXT_ACTIONS.CHECK_TOKEN
           );
         }
 
@@ -114,7 +114,7 @@ export class SocketManager {
             'Invalid token: missing role',
             401,
             ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-            NEXT_ACTION.CHECK_TOKEN
+            NEXT_ACTIONS.CHECK_TOKEN
           );
         }
         socket.data.user = {
@@ -134,7 +134,7 @@ export class SocketManager {
               'Invalid authentication',
               401,
               ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-              NEXT_ACTION.CHECK_TOKEN
+              NEXT_ACTIONS.CHECK_TOKEN
             )
           );
         }

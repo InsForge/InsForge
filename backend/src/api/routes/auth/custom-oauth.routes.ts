@@ -69,7 +69,7 @@ router.get(
         throw new AppError(
           `Custom OAuth configuration for ${key} not found`,
           404,
-          ERROR_CODES.NOT_FOUND
+          ERROR_CODES.AUTH_OAUTH_CONFIG_NOT_FOUND
         );
       }
       const clientSecret = await customOAuthConfigService.getClientSecretByKey(key);
@@ -180,7 +180,7 @@ router.delete(
         throw new AppError(
           `Custom OAuth configuration for ${req.params.key} not found`,
           404,
-          ERROR_CODES.NOT_FOUND
+          ERROR_CODES.AUTH_OAUTH_CONFIG_NOT_FOUND
         );
       }
       await auditService.log({

@@ -279,7 +279,7 @@ router.get('/profiles/:userId', async (req: Request, res: Response, next: NextFu
     const userProfile = await authService.getProfileById(userId);
 
     if (!userProfile) {
-      throw new AppError('User not found', 404, ERROR_CODES.NOT_FOUND);
+      throw new AppError('User not found', 404, ERROR_CODES.AUTH_USER_NOT_FOUND);
     }
 
     const response: GetProfileResponse = userProfile;
@@ -715,7 +715,7 @@ router.get(
       const user = await authService.getUserSchemaById(userId);
 
       if (!user) {
-        throw new AppError('User does not exist', 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError('User does not exist', 404, ERROR_CODES.AUTH_USER_NOT_FOUND);
       }
 
       successResponse(res, user);

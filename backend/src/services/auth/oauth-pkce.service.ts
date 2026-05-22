@@ -109,7 +109,7 @@ export class OAuthPKCEService {
     const user = await authService.getUserSchemaById(data.userId);
     if (!user) {
       logger.error('User not found during PKCE exchange', { userId: data.userId });
-      throw new AppError('User not found', 404, ERROR_CODES.NOT_FOUND);
+      throw new AppError('User not found', 404, ERROR_CODES.AUTH_USER_NOT_FOUND);
     }
 
     const accessToken = tokenManager.generateAccessToken({

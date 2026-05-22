@@ -42,7 +42,7 @@ router.get('/:slug', verifyAdmin, async (req: AuthRequest, res: Response, next: 
     const func = await functionService.getFunction(slug);
 
     if (!func) {
-      throw new AppError('Function not found', 404, ERROR_CODES.NOT_FOUND);
+      throw new AppError('Function not found', 404, ERROR_CODES.FUNCTION_NOT_FOUND);
     }
 
     successResponse(res, func);
@@ -128,7 +128,7 @@ router.put(
       const result = await functionService.updateFunction(slug, validation.data);
 
       if (!result) {
-        throw new AppError('Function not found', 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError('Function not found', 404, ERROR_CODES.FUNCTION_NOT_FOUND);
       }
 
       // Log audit event
@@ -177,7 +177,7 @@ router.delete(
       const deleted = await functionService.deleteFunction(slug);
 
       if (!deleted) {
-        throw new AppError('Function not found', 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError('Function not found', 404, ERROR_CODES.FUNCTION_NOT_FOUND);
       }
 
       // Log audit event

@@ -191,7 +191,7 @@ export class FunctionService {
         throw new AppError(
           'Function with this slug already exists',
           409,
-          ERROR_CODES.ALREADY_EXISTS
+          ERROR_CODES.FUNCTION_ALREADY_EXISTS
         );
       }
 

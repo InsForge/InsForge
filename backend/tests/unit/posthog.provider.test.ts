@@ -102,12 +102,12 @@ describe('PostHogProvider', () => {
   });
 
   describe('getDashboards', () => {
-    it('throws AppError with NOT_FOUND on 404', async () => {
+    it('throws AppError with ANALYTICS_NOT_CONNECTED on 404', async () => {
       axiosGetMock.mockRejectedValueOnce(makeAxiosError(404));
 
       await expect(PostHogProvider.getInstance().getDashboards()).rejects.toMatchObject({
         statusCode: 404,
-        code: ERROR_CODES.NOT_FOUND,
+        code: ERROR_CODES.ANALYTICS_NOT_CONNECTED,
       });
     });
 
@@ -155,11 +155,11 @@ describe('PostHogProvider', () => {
       expect(out.topEvents[0].event).toEqual('pageview');
     });
 
-    it('throws AppError with NOT_FOUND on 404', async () => {
+    it('throws AppError with ANALYTICS_NOT_CONNECTED on 404', async () => {
       axiosGetMock.mockRejectedValueOnce(makeAxiosError(404));
       await expect(PostHogProvider.getInstance().getSummary()).rejects.toMatchObject({
         statusCode: 404,
-        code: ERROR_CODES.NOT_FOUND,
+        code: ERROR_CODES.ANALYTICS_NOT_CONNECTED,
       });
     });
 
@@ -196,11 +196,11 @@ describe('PostHogProvider', () => {
       expect(call[1].params.limit).toEqual(10);
     });
 
-    it('throws AppError with NOT_FOUND on 404', async () => {
+    it('throws AppError with ANALYTICS_NOT_CONNECTED on 404', async () => {
       axiosGetMock.mockRejectedValueOnce(makeAxiosError(404));
       await expect(PostHogProvider.getInstance().getRecentEvents()).rejects.toMatchObject({
         statusCode: 404,
-        code: ERROR_CODES.NOT_FOUND,
+        code: ERROR_CODES.ANALYTICS_NOT_CONNECTED,
       });
     });
   });
@@ -251,11 +251,11 @@ describe('PostHogProvider', () => {
       expect(call[1].params.timeframe).toEqual('7d');
     });
 
-    it('throws AppError with NOT_FOUND on 404', async () => {
+    it('throws AppError with ANALYTICS_NOT_CONNECTED on 404', async () => {
       axiosGetMock.mockRejectedValueOnce(makeAxiosError(404));
       await expect(PostHogProvider.getInstance().getWebOverview('7d')).rejects.toMatchObject({
         statusCode: 404,
-        code: ERROR_CODES.NOT_FOUND,
+        code: ERROR_CODES.ANALYTICS_NOT_CONNECTED,
       });
     });
 
@@ -313,12 +313,12 @@ describe('PostHogProvider', () => {
       expect(call[1].params).toEqual({ metric: 'visitors', timeframe: '7d' });
     });
 
-    it('throws AppError with NOT_FOUND on 404', async () => {
+    it('throws AppError with ANALYTICS_NOT_CONNECTED on 404', async () => {
       axiosGetMock.mockRejectedValueOnce(makeAxiosError(404));
       await expect(PostHogProvider.getInstance().getTrends('visitors', '7d')).rejects.toMatchObject(
         {
           statusCode: 404,
-          code: ERROR_CODES.NOT_FOUND,
+          code: ERROR_CODES.ANALYTICS_NOT_CONNECTED,
         }
       );
     });
@@ -389,11 +389,11 @@ describe('PostHogProvider', () => {
       expect(call[1].params.limit).toEqual(10);
     });
 
-    it('throws AppError with NOT_FOUND on 404', async () => {
+    it('throws AppError with ANALYTICS_NOT_CONNECTED on 404', async () => {
       axiosGetMock.mockRejectedValueOnce(makeAxiosError(404));
       await expect(PostHogProvider.getInstance().getRecordings()).rejects.toMatchObject({
         statusCode: 404,
-        code: ERROR_CODES.NOT_FOUND,
+        code: ERROR_CODES.ANALYTICS_NOT_CONNECTED,
       });
     });
   });
@@ -426,13 +426,13 @@ describe('PostHogProvider', () => {
       });
     });
 
-    it('throws AppError with NOT_FOUND on 404', async () => {
+    it('throws AppError with ANALYTICS_NOT_CONNECTED on 404', async () => {
       axiosPostMock.mockRejectedValueOnce(makeAxiosError(404));
       await expect(
         PostHogProvider.getInstance().createRecordingShare('rec1')
       ).rejects.toMatchObject({
         statusCode: 404,
-        code: ERROR_CODES.NOT_FOUND,
+        code: ERROR_CODES.ANALYTICS_NOT_CONNECTED,
       });
     });
 

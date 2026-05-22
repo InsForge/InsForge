@@ -66,7 +66,7 @@ router.delete('/config', async (req: AuthRequest, res: Response, next: NextFunct
     const environment = getEnvironment(req.params);
     const removed = await paymentService.removeStripeSecretKey(environment);
     if (!removed) {
-      throw new AppError('No Stripe key configured', 404, ERROR_CODES.NOT_FOUND);
+      throw new AppError('No Stripe key configured', 404, ERROR_CODES.PAYMENT_CONFIG_NOT_FOUND);
     }
 
     const config = await paymentService.getConfig();

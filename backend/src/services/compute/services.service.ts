@@ -9,7 +9,7 @@ import { config } from '@/infra/config/app.config.js';
 import { AppError } from '@/api/middlewares/error.js';
 import logger from '@/utils/logger.js';
 import { ERROR_CODES, type ServiceSchema } from '@insforge/shared-schemas';
-import { NEXT_ACTION } from '../../types/error-constants.js';
+import { NEXT_ACTIONS } from '../../utils/next-actions.js';
 
 export interface CreateServiceInput {
   projectId: string;
@@ -260,7 +260,7 @@ export class ComputeServicesService {
         'Service not found',
         404,
         ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
-        NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS
+        NEXT_ACTIONS.CHECK_COMPUTE_SERVICE_EXISTS
       );
     }
     return mapRowToSchema(result.rows[0]);
@@ -301,7 +301,7 @@ export class ComputeServicesService {
         'Compute services are not enabled on this project.',
         503,
         ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED,
-        NEXT_ACTION.ENABLE_COMPUTE
+        NEXT_ACTIONS.ENABLE_COMPUTE
       );
     }
 
@@ -419,7 +419,7 @@ export class ComputeServicesService {
         'Compute services are not enabled on this project.',
         503,
         ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED,
-        NEXT_ACTION.ENABLE_COMPUTE
+        NEXT_ACTIONS.ENABLE_COMPUTE
       );
     }
 
@@ -687,7 +687,7 @@ export class ComputeServicesService {
         'Service not found',
         404,
         ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
-        NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS
+        NEXT_ACTIONS.CHECK_COMPUTE_SERVICE_EXISTS
       );
     }
 
@@ -708,7 +708,7 @@ export class ComputeServicesService {
         'Service not found',
         404,
         ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
-        NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS
+        NEXT_ACTIONS.CHECK_COMPUTE_SERVICE_EXISTS
       );
     }
     const row = result.rows[0];
@@ -790,7 +790,7 @@ export class ComputeServicesService {
         'Service not found',
         404,
         ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
-        NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS
+        NEXT_ACTIONS.CHECK_COMPUTE_SERVICE_EXISTS
       );
     }
 
@@ -815,7 +815,7 @@ export class ComputeServicesService {
         'Service not found',
         404,
         ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
-        NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS
+        NEXT_ACTIONS.CHECK_COMPUTE_SERVICE_EXISTS
       );
     }
 
@@ -831,7 +831,7 @@ export class ComputeServicesService {
         'Service not found',
         404,
         ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
-        NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS
+        NEXT_ACTIONS.CHECK_COMPUTE_SERVICE_EXISTS
       );
     }
 
@@ -856,7 +856,7 @@ export class ComputeServicesService {
         'Service not found',
         404,
         ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
-        NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS
+        NEXT_ACTIONS.CHECK_COMPUTE_SERVICE_EXISTS
       );
     }
 
@@ -875,7 +875,7 @@ export class ComputeServicesService {
         'Service not found',
         404,
         ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
-        NEXT_ACTION.CHECK_COMPUTE_SERVICE_EXISTS
+        NEXT_ACTIONS.CHECK_COMPUTE_SERVICE_EXISTS
       );
     }
 

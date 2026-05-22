@@ -119,7 +119,7 @@ export class PaymentPriceService {
       throw new AppError(
         `Stripe ${environment} price not found: ${stripePriceId}`,
         404,
-        ERROR_CODES.NOT_FOUND
+        ERROR_CODES.PAYMENT_PRICE_NOT_FOUND
       );
     }
 

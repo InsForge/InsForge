@@ -275,7 +275,7 @@ export class PaymentCheckoutService {
       throw new AppError(
         'Idempotency key is already used for another checkout request',
         409,
-        ERROR_CODES.ALREADY_EXISTS
+        ERROR_CODES.PAYMENT_CHECKOUT_ALREADY_EXISTS
       );
     }
 

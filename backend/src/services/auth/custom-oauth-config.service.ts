@@ -189,7 +189,7 @@ export class CustomOAuthConfigService {
         throw new AppError(
           `Custom OAuth config ${keyLower} already exists`,
           409,
-          ERROR_CODES.ALREADY_EXISTS
+          ERROR_CODES.AUTH_OAUTH_CONFIG_ALREADY_EXISTS
         );
       }
       logger.error('Failed to create custom OAuth config', { error, key: input.key });
@@ -222,7 +222,7 @@ export class CustomOAuthConfigService {
         throw new AppError(
           `Custom OAuth configuration for ${key} not found`,
           404,
-          ERROR_CODES.NOT_FOUND
+          ERROR_CODES.AUTH_OAUTH_CONFIG_NOT_FOUND
         );
       }
 
@@ -270,7 +270,7 @@ export class CustomOAuthConfigService {
           throw new AppError(
             `Custom OAuth configuration for ${key} not found`,
             404,
-            ERROR_CODES.NOT_FOUND
+            ERROR_CODES.AUTH_OAUTH_CONFIG_NOT_FOUND
           );
         }
         return config;
@@ -296,7 +296,7 @@ export class CustomOAuthConfigService {
         throw new AppError(
           `Custom OAuth configuration for ${key} not found`,
           404,
-          ERROR_CODES.NOT_FOUND
+          ERROR_CODES.AUTH_OAUTH_CONFIG_NOT_FOUND
         );
       }
 

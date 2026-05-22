@@ -35,7 +35,7 @@
 |------|--------|
 | `shared-schemas/src/auth.schema.ts` | Add `smtpConfigSchema`, `emailTemplateSchema` |
 | `shared-schemas/src/auth-api.schema.ts` | Add request/response schemas + type exports |
-| `packages/shared-schemas/src/error-codes.ts` | Add SMTP error codes |
+| `packages/shared-schemas/src/error-codes.schema.ts` | Add SMTP error codes |
 | `backend/src/services/email/email.service.ts` | Route sends through SMTP when configured |
 | `backend/src/api/routes/auth/index.routes.ts` | Add SMTP config + template CRUD routes |
 | `frontend/src/features/auth/components/AuthSettingsMenuDialog.tsx` | Add "Email" tab with SMTP + template cards |
@@ -310,23 +310,23 @@ git commit -m "feat(schemas): add SMTP config and email template Zod schemas"
 ## Task 4: Backend — Error constants and email type updates
 
 **Files:**
-- Modify: `packages/shared-schemas/src/error-codes.ts`
+- Modify: `packages/shared-schemas/src/error-codes.schema.ts`
 
-- [ ] **Step 1: Add SMTP error codes to `packages/shared-schemas/src/error-codes.ts`**
+- [ ] **Step 1: Add SMTP error codes to `packages/shared-schemas/src/error-codes.schema.ts`**
 
-Add these entries inside the `ERROR_CODES` enum:
+Add these string literals to the email list that feeds `errorCodesSchema`:
 
 ```typescript
-  EMAIL_SMTP_CONNECTION_FAILED = 'EMAIL_SMTP_CONNECTION_FAILED',
-  EMAIL_SMTP_SEND_FAILED = 'EMAIL_SMTP_SEND_FAILED',
-  EMAIL_TEMPLATE_NOT_FOUND = 'EMAIL_TEMPLATE_NOT_FOUND',
+  'EMAIL_SMTP_CONNECTION_FAILED',
+  'EMAIL_SMTP_SEND_FAILED',
+  'EMAIL_TEMPLATE_NOT_FOUND',
 ```
 
 - [ ] **Step 2: Commit**
 
 ```bash
 cd /Users/gary/projects/insforge-repo/InsForge
-git add packages/shared-schemas/src/error-codes.ts
+git add packages/shared-schemas/src/error-codes.schema.ts
 git commit -m "feat(types): add SMTP error codes and email template record type"
 ```
 

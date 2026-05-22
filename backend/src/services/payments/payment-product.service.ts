@@ -129,7 +129,7 @@ export class PaymentProductService {
       throw new AppError(
         `Stripe ${environment} product not found: ${stripeProductId}`,
         404,
-        ERROR_CODES.NOT_FOUND
+        ERROR_CODES.PAYMENT_PRODUCT_NOT_FOUND
       );
     }
 

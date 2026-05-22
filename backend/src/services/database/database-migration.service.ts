@@ -132,7 +132,7 @@ export class DatabaseMigrationService {
         throw new AppError(
           'Migration version must be newer than the latest applied migration.',
           409,
-          ERROR_CODES.ALREADY_EXISTS
+          ERROR_CODES.DATABASE_MIGRATION_ALREADY_EXISTS
         );
       }
 
@@ -174,7 +174,11 @@ export class DatabaseMigrationService {
         error.code === '23505' &&
         error.constraint === 'custom_migrations_pkey'
       ) {
-        throw new AppError('Migration version already exists.', 409, ERROR_CODES.ALREADY_EXISTS);
+        throw new AppError(
+          'Migration version already exists.',
+          409,
+          ERROR_CODES.DATABASE_MIGRATION_ALREADY_EXISTS
+        );
       }
 
       throw error;

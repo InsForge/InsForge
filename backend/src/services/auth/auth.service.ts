@@ -199,7 +199,7 @@ export class AuthService {
       await client.query('ROLLBACK');
       // Postgres unique_violation
       if (e && typeof e === 'object' && 'code' in e && e.code === '23505') {
-        throw new AppError('User already exists', 409, ERROR_CODES.ALREADY_EXISTS);
+        throw new AppError('User already exists', 409, ERROR_CODES.AUTH_EMAIL_EXISTS);
       }
       throw e;
     } finally {
@@ -1388,7 +1388,7 @@ export class AuthService {
     );
 
     if (result.rows.length === 0) {
-      throw new AppError('User not found', 404, ERROR_CODES.NOT_FOUND);
+      throw new AppError('User not found', 404, ERROR_CODES.AUTH_USER_NOT_FOUND);
     }
 
     return {

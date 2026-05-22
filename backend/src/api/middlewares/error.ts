@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { DatabaseError } from 'pg';
 import { errorResponse } from '@/utils/response.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
-import { NEXT_ACTION } from '../../types/error-constants.js';
+import { NEXT_ACTIONS } from '../../utils/next-actions.js';
 import logger from '@/utils/logger.js';
 
 export class AppError extends Error {
@@ -34,10 +34,10 @@ const POSTGRES_ERROR_HANDLERS: Record<
     const fieldMatch = detail.match(/Key \(([\w_]+)\)=/);
     const fieldName = fieldMatch ? fieldMatch[1] : 'field';
     return {
-      code: ERROR_CODES.ALREADY_EXISTS,
+      code: ERROR_CODES.DATABASE_DUPLICATE,
       message: err.message,
       statusCode: 409,
-      nextActions: NEXT_ACTION.CHECK_UNIQUE_FIELD(fieldName),
+      nextActions: NEXT_ACTIONS.CHECK_UNIQUE_FIELD(fieldName),
     };
   },
   '23503': (err) => {
@@ -46,7 +46,7 @@ const POSTGRES_ERROR_HANDLERS: Record<
       code: ERROR_CODES.DATABASE_CONSTRAINT_VIOLATION,
       message: err.message,
       statusCode: 400,
-      nextActions: NEXT_ACTION.CHECK_REFERENCE_EXISTS,
+      nextActions: NEXT_ACTIONS.CHECK_REFERENCE_EXISTS,
     };
   },
   '23502': (err) => {
@@ -56,7 +56,7 @@ const POSTGRES_ERROR_HANDLERS: Record<
       code: ERROR_CODES.MISSING_FIELD,
       message: err.message,
       statusCode: 400,
-      nextActions: NEXT_ACTION.FILL_REQUIRED_FIELD(column),
+      nextActions: NEXT_ACTIONS.FILL_REQUIRED_FIELD(column),
     };
   },
   '42P01': (err) => ({
@@ -64,7 +64,7 @@ const POSTGRES_ERROR_HANDLERS: Record<
     code: ERROR_CODES.DATABASE_VALIDATION_ERROR,
     message: err.message,
     statusCode: 400,
-    nextActions: NEXT_ACTION.CHECK_TABLE_EXISTS,
+    nextActions: NEXT_ACTIONS.CHECK_TABLE_EXISTS,
   }),
   '42701': (err) => {
     // duplicate_column
@@ -75,7 +75,7 @@ const POSTGRES_ERROR_HANDLERS: Record<
       code: ERROR_CODES.DATABASE_VALIDATION_ERROR,
       message: err.message,
       statusCode: 400,
-      nextActions: NEXT_ACTION.REMOVE_DUPLICATE_COLUMN(columnName),
+      nextActions: NEXT_ACTIONS.REMOVE_DUPLICATE_COLUMN(columnName),
     };
   },
   '42703': (err) => ({
@@ -83,21 +83,21 @@ const POSTGRES_ERROR_HANDLERS: Record<
     code: ERROR_CODES.DATABASE_VALIDATION_ERROR,
     message: err.message,
     statusCode: 400,
-    nextActions: NEXT_ACTION.CHECK_COLUMN_EXISTS,
+    nextActions: NEXT_ACTIONS.CHECK_COLUMN_EXISTS,
   }),
   '42830': (err) => ({
     // invalid_foreign_key
     code: ERROR_CODES.DATABASE_VALIDATION_ERROR,
     message: err.message,
     statusCode: 400,
-    nextActions: NEXT_ACTION.CHECK_UNIQUE_CONSTRAINT,
+    nextActions: NEXT_ACTIONS.CHECK_UNIQUE_CONSTRAINT,
   }),
   '42804': (err) => ({
     // datatype_mismatch
     code: ERROR_CODES.DATABASE_VALIDATION_ERROR,
     message: err.message,
     statusCode: 400,
-    nextActions: NEXT_ACTION.CHECK_DATATYPE_MATCH,
+    nextActions: NEXT_ACTIONS.CHECK_DATATYPE_MATCH,
   }),
   '42501': (err) => ({
     // insufficient_privilege — fired by RLS WITH CHECK on INSERT/UPDATE,
@@ -105,7 +105,7 @@ const POSTGRES_ERROR_HANDLERS: Record<
     code: ERROR_CODES.FORBIDDEN,
     message: err.message,
     statusCode: 403,
-    nextActions: NEXT_ACTION.CHECK_RLS_POLICY,
+    nextActions: NEXT_ACTIONS.CHECK_RLS_POLICY,
   }),
 };
 

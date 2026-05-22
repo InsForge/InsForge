@@ -549,7 +549,11 @@ export class DenoSubhostingProvider {
 
       if (!response.ok) {
         if (response.status === 404) {
-          throw new AppError(`Deployment not found: ${deploymentId}`, 404, ERROR_CODES.NOT_FOUND);
+          throw new AppError(
+            `Deployment not found: ${deploymentId}`,
+            404,
+            ERROR_CODES.FUNCTION_DEPLOYMENT_NOT_FOUND
+          );
         }
         throw new AppError(
           `Failed to get deployment: ${response.statusText}`,
@@ -640,7 +644,11 @@ export class DenoSubhostingProvider {
 
       if (!response.ok) {
         if (response.status === 404) {
-          throw new AppError(`Deployment not found: ${deploymentId}`, 404, ERROR_CODES.NOT_FOUND);
+          throw new AppError(
+            `Deployment not found: ${deploymentId}`,
+            404,
+            ERROR_CODES.FUNCTION_DEPLOYMENT_NOT_FOUND
+          );
         }
         const errorText = await response.text();
         throw new AppError(
