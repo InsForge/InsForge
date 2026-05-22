@@ -10,10 +10,10 @@ metadata:
 ---
 
 <!--
-  Vendored from https://github.com/mintlify/docs (commit 76726a20ee6c)
+  Vendored from https://github.com/mintlify/docs (commit 877f90193ea1)
   Upstream path: .claude/skills/doc-author/SKILL.md
   Upstream license: MIT (see LICENSE block in upstream repo)
-  Vendored: 2026-05-16 by scripts/update-mintlify-skill.sh
+  Vendored: 2026-04-18 by scripts/update-mintlify-skill.sh
 
   This file is a VERBATIM copy of Mintlify's doc-author skill body.
   Do not edit the prose below — local conventions go in ./INSFORGE.md
