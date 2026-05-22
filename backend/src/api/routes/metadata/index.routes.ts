@@ -7,7 +7,7 @@ import { RealtimeChannelService } from '@/services/realtime/realtime-channel.ser
 import { DeploymentService } from '@/services/deployments/deployment.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { successResponse } from '@/utils/response.js';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import {
   ERROR_CODES,
   type AppMetadataSchema,

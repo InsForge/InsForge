@@ -6,7 +6,7 @@ import {
   posthogMetricSchema,
 } from '@insforge/shared-schemas';
 import { verifyUser, verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import { AnalyticsService } from '@/services/analytics/analytics.service.js';
 
 export const analyticsRouter = Router();

@@ -6,7 +6,7 @@ import { FlyProvider } from '@/providers/compute/fly.provider.js';
 import { CloudComputeProvider } from '@/providers/compute/cloud.provider.js';
 import type { ComputeProvider } from '@/providers/compute/compute.provider.js';
 import { config } from '@/infra/config/app.config.js';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
 import {
   ERROR_CODES,

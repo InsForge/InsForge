@@ -8,7 +8,7 @@ import {
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import { OpenRouterImageMessage } from '@/types/ai.js';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 
 export class ImageGenerationService {
   private static openRouterProvider = OpenRouterProvider.getInstance();

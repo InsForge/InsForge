@@ -5,7 +5,7 @@ import {
   type EmbeddingsResponse,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 
 export class EmbeddingService {
   private static instance: EmbeddingService;

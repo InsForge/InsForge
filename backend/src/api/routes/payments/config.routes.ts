@@ -1,9 +1,9 @@
 import { Router, Response, NextFunction } from 'express';
 import { AuthRequest } from '@/api/middlewares/auth.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { StripeKeyValidationError } from '@/providers/payments/stripe.provider.js';
+import { AppError } from '@/utils/errors.js';
 import { PaymentService } from '@/services/payments/payment.service.js';
 import { successResponse } from '@/utils/response.js';
+import { normalizeStripeError } from '@/providers/payments/stripe-errors.js';
 import {
   ERROR_CODES,
   paymentEnvironmentParamsSchema,
@@ -21,14 +21,6 @@ function formatValidationIssues(error: {
 
 function invalidInputFromZod(error: { issues: Array<{ path: PropertyKey[]; message: string }> }) {
   return new AppError(formatValidationIssues(error), 400, ERROR_CODES.INVALID_INPUT);
-}
-
-function normalizeStripeConfigError(error: unknown) {
-  if (error instanceof StripeKeyValidationError) {
-    return new AppError(error.message, 400, ERROR_CODES.INVALID_INPUT);
-  }
-
-  return error;
 }
 
 function getEnvironment(params: unknown) {
@@ -57,7 +49,7 @@ router.put('/config', async (req: AuthRequest, res: Response, next: NextFunction
     const config = await paymentService.getConfig();
     successResponse(res, config);
   } catch (error) {
-    next(normalizeStripeConfigError(error));
+    next(normalizeStripeError(error));
   }
 });
 
@@ -72,7 +64,7 @@ router.delete('/config', async (req: AuthRequest, res: Response, next: NextFunct
     const config = await paymentService.getConfig();
     successResponse(res, config);
   } catch (error) {
-    next(normalizeStripeConfigError(error));
+    next(normalizeStripeError(error));
   }
 });
 
@@ -82,7 +74,7 @@ router.post('/sync', async (req: AuthRequest, res: Response, next: NextFunction)
     const result = await paymentService.syncPayments({ environment });
     successResponse(res, result);
   } catch (error) {
-    next(normalizeStripeConfigError(error));
+    next(normalizeStripeError(error));
   }
 });
 
@@ -92,7 +84,7 @@ router.post('/webhook', async (req: AuthRequest, res: Response, next: NextFuncti
     const result = await paymentService.configureWebhook(environment);
     successResponse(res, result);
   } catch (error) {
-    next(normalizeStripeConfigError(error));
+    next(normalizeStripeError(error));
   }
 });
 

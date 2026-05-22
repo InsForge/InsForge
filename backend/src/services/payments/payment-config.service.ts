@@ -1,7 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import {
   maskStripeKey,
   StripeProvider,

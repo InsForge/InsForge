@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { config } from '@/infra/config/app.config.js';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import type {
   ComputeProvider,

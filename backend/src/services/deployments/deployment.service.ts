@@ -9,7 +9,7 @@ import {
   type VercelDomainConfig,
 } from '@/providers/deployments/vercel.provider.js';
 import { S3StorageProvider } from '@/providers/storage/s3.provider.js';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import {
   DeploymentStatus,

@@ -1,5 +1,5 @@
 import { EmailService } from '../../src/services/email/email.service';
-import { AppError } from '../../src/api/middlewares/error';
+import { AppError } from '../../src/utils/errors';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import axios from 'axios';
 import jwt from 'jsonwebtoken';

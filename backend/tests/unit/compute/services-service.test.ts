@@ -242,7 +242,7 @@ describe('ComputeServicesService', () => {
       // message ("Project X has reached 5 active services"), the OSS was
       // catching it and re-throwing as generic
       // "Compute service operation failed" 502 — losing the actual reason.
-      const { AppError } = await import('@/api/middlewares/error.js');
+      const { AppError } = await import('@/utils/errors.js');
 
       const serviceId = 'svc-quota-test';
       mockQuery.mockResolvedValueOnce({
@@ -858,7 +858,7 @@ describe('ComputeServicesService', () => {
       // CloudComputeProvider wraps the cloud's JSON body verbatim into an
       // AppError whose .message is the raw body. The catch block must parse
       // it back out and surface code/message/nextActions.
-      const { AppError } = await import('@/api/middlewares/error.js');
+      const { AppError } = await import('@/utils/errors.js');
       const cloudBody = JSON.stringify({
         code: ERROR_CODES.COMPUTE_QUOTA_EXCEEDED,
         error: 'Project compute quota exceeded',

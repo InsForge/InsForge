@@ -30,7 +30,7 @@ import {
   OAuthUserData,
 } from '@/types/auth.js';
 import { ADMIN_ID } from '@/utils/constants.js';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import { EmailService } from '@/services/email/email.service.js';
 import { XOAuthProvider } from '@/providers/oauth/x.provider.js';
 import { AppleOAuthProvider } from '@/providers/oauth/apple.provider.js';

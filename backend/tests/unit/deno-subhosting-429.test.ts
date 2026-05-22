@@ -97,7 +97,7 @@ describe('Deno Subhosting 429 backoff', () => {
     }));
 
     const mod = await import('@/providers/functions/deno-subhosting.provider.js');
-    const { AppError } = await import('@/api/middlewares/error.js');
+    const { AppError } = await import('@/utils/errors.js');
     const provider = mod.DenoSubhostingProvider.getInstance();
 
     // Exhausted retries must surface as 429 RATE_LIMITED, not the generic 500

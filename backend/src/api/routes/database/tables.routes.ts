@@ -3,7 +3,7 @@ import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { DatabaseTableService } from '@/services/database/database-table.service.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { successResponse } from '@/utils/response.js';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import {
   ERROR_CODES,
   createTableRequestSchema,

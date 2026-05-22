@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES, stripeWebhookParamsSchema } from '@insforge/shared-schemas';
 import { PaymentService } from '@/services/payments/payment.service.js';
 

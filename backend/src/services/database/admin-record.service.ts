@@ -1,4 +1,4 @@
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import type { DatabaseRecord } from '@/types/database.js';

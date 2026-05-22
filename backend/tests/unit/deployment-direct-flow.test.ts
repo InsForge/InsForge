@@ -44,6 +44,7 @@ vi.mock('../../src/providers/storage/s3.provider.js', () => ({
 
 import { DeploymentService } from '../../src/services/deployments/deployment.service';
 import { DeploymentStatus } from '../../src/types/deployments';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 
 describe('DeploymentService direct deployment flow', () => {
   beforeEach(() => {
@@ -225,7 +226,7 @@ describe('DeploymentService direct deployment flow', () => {
       )
     ).rejects.toMatchObject({
       statusCode: 404,
-      code: 'DEPLOYMENT_NOT_FOUND',
+      code: ERROR_CODES.DEPLOYMENT_NOT_FOUND,
     });
   });
 
@@ -259,7 +260,7 @@ describe('DeploymentService direct deployment flow', () => {
       )
     ).rejects.toMatchObject({
       statusCode: 404,
-      code: 'DEPLOYMENT_NOT_FOUND',
+      code: ERROR_CODES.DEPLOYMENT_NOT_FOUND,
     });
   });
 

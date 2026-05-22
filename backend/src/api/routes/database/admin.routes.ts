@@ -1,7 +1,7 @@
 import { Router, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import {
   ERROR_CODES,
   adminTableRecordUpdateQuerySchema,

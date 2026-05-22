@@ -3,7 +3,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { StorageProvider, ObjectMetadata, GetObjectResult } from './base.provider.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import {
   ERROR_CODES,
   DownloadStrategyResponse,

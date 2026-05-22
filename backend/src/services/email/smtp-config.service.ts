@@ -4,7 +4,7 @@ import dns from 'dns/promises';
 import nodemailer from 'nodemailer';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import {
   ERROR_CODES,
   type SmtpConfigSchema,

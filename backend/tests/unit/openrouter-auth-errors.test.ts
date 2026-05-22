@@ -79,7 +79,7 @@ describe('OpenRouterProvider authentication error handling', () => {
     });
   });
 
-  it('still throws raw error for non-API errors', async () => {
+  it('maps non-API provider errors to AI_UPSTREAM_UNAVAILABLE', async () => {
     mockGetApiKeyWithSource.mockResolvedValue({ apiKey: 'env-key', source: 'env' });
 
     const networkError = new Error('ECONNREFUSED');
@@ -88,16 +88,24 @@ describe('OpenRouterProvider authentication error handling', () => {
       provider.sendRequest(() => {
         throw networkError;
       })
-    ).rejects.toBe(networkError);
+    ).rejects.toMatchObject({
+      statusCode: 502,
+      code: ERROR_CODES.AI_UPSTREAM_UNAVAILABLE,
+      message: 'ECONNREFUSED',
+    });
   });
 
-  it('still throws raw error for 500 API errors', async () => {
+  it('maps 500 API errors to AI_UPSTREAM_UNAVAILABLE', async () => {
     mockGetApiKeyWithSource.mockResolvedValue({ apiKey: 'env-key', source: 'env' });
 
     await expect(
       provider.sendRequest(() => {
         throw createAPIError(500, 'Internal Server Error');
       })
-    ).rejects.toBeInstanceOf(OpenAI.APIError);
+    ).rejects.toMatchObject({
+      statusCode: 500,
+      code: ERROR_CODES.AI_UPSTREAM_UNAVAILABLE,
+      message: expect.stringContaining('Internal Server Error'),
+    });
   });
 });

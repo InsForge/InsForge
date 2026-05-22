@@ -1,9 +1,9 @@
 import { Router, Response, NextFunction } from 'express';
 import { AuthRequest } from '@/api/middlewares/auth.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { StripeKeyValidationError } from '@/providers/payments/stripe.provider.js';
+import { AppError } from '@/utils/errors.js';
 import { PaymentService } from '@/services/payments/payment.service.js';
 import { successResponse } from '@/utils/response.js';
+import { normalizeStripeError } from '@/providers/payments/stripe-errors.js';
 import {
   ERROR_CODES,
   createPaymentPriceBodySchema,
@@ -27,14 +27,6 @@ function formatValidationIssues(error: {
 
 function invalidInputFromZod(error: { issues: Array<{ path: PropertyKey[]; message: string }> }) {
   return new AppError(formatValidationIssues(error), 400, ERROR_CODES.INVALID_INPUT);
-}
-
-function normalizeStripeConfigError(error: unknown) {
-  if (error instanceof StripeKeyValidationError) {
-    return new AppError(error.message, 400, ERROR_CODES.INVALID_INPUT);
-  }
-
-  return error;
 }
 
 function getEnvironment(params: unknown) {
@@ -99,7 +91,7 @@ router.post('/products', async (req: AuthRequest, res: Response, next: NextFunct
     });
     successResponse(res, product, 201);
   } catch (error) {
-    next(normalizeStripeConfigError(error));
+    next(normalizeStripeError(error));
   }
 });
 
@@ -124,7 +116,7 @@ router.patch(
       });
       successResponse(res, product);
     } catch (error) {
-      next(normalizeStripeConfigError(error));
+      next(normalizeStripeError(error));
     }
   }
 );
@@ -142,7 +134,7 @@ router.delete(
       const product = await paymentService.deleteProduct(environment, validation.data.productId);
       successResponse(res, product);
     } catch (error) {
-      next(normalizeStripeConfigError(error));
+      next(normalizeStripeError(error));
     }
   }
 );
@@ -194,7 +186,7 @@ router.post('/prices', async (req: AuthRequest, res: Response, next: NextFunctio
     });
     successResponse(res, price, 201);
   } catch (error) {
-    next(normalizeStripeConfigError(error));
+    next(normalizeStripeError(error));
   }
 });
 
@@ -217,7 +209,7 @@ router.patch('/prices/:priceId', async (req: AuthRequest, res: Response, next: N
     });
     successResponse(res, price);
   } catch (error) {
-    next(normalizeStripeConfigError(error));
+    next(normalizeStripeError(error));
   }
 });
 
@@ -232,7 +224,7 @@ router.delete('/prices/:priceId', async (req: AuthRequest, res: Response, next: 
     const price = await paymentService.archivePrice(environment, validation.data.priceId);
     successResponse(res, price);
   } catch (error) {
-    next(normalizeStripeConfigError(error));
+    next(normalizeStripeError(error));
   }
 });
 

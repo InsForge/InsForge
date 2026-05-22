@@ -2,7 +2,7 @@ import OpenAI from 'openai';
 import jwt from 'jsonwebtoken';
 import { createHash } from 'crypto';
 import { isCloudEnvironment } from '@/utils/environment.js';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError, UpstreamError } from '@/utils/errors.js';
 import { ERROR_CODES, type AIOverview } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 
@@ -236,12 +236,23 @@ export class OpenRouterProvider {
     });
 
     if (!response.ok) {
-      throw new AppError(
-        'Invalid OpenRouter API Key',
-        500,
-        ERROR_CODES.AI_INVALID_API_KEY,
-        'Check your OpenRouter key and try again.'
-      );
+      if (response.status === 401 || response.status === 403) {
+        throw new AppError(
+          'Invalid OpenRouter API Key',
+          401,
+          ERROR_CODES.AI_INVALID_API_KEY,
+          'Check your OpenRouter key and try again.'
+        );
+      }
+      if (response.status === 429) {
+        throw new AppError(
+          'OpenRouter rate limit exceeded. Please wait before retrying.',
+          429,
+          ERROR_CODES.RATE_LIMITED
+        );
+      }
+      const message = (await response.text()) || response.statusText || 'OpenRouter request failed';
+      throw new AppError(message, response.status, ERROR_CODES.AI_UPSTREAM_UNAVAILABLE);
     }
 
     return (await response.json()) as OpenRouterKeyInfo;
@@ -657,9 +668,18 @@ export class OpenRouterProvider {
             'Wait a moment and retry, or check your API key rate limits.'
           );
         }
+        throw new UpstreamError(
+          error,
+          'AI provider request failed.',
+          ERROR_CODES.AI_UPSTREAM_UNAVAILABLE
+        );
       }
 
-      throw error;
+      throw new UpstreamError(
+        error,
+        'AI provider request failed.',
+        ERROR_CODES.AI_UPSTREAM_UNAVAILABLE
+      );
     }
   }
 }

@@ -1,4 +1,4 @@
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import { validateIdentifier, validateSchemaName, validateTableName } from '@/utils/validations.js';
 

@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { verifyAdmin, AuthRequest, verifyUser } from '@/api/middlewares/auth.js';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import { StorageService } from '@/services/storage/storage.service.js';
 import { StorageConfigService } from '@/services/storage/storage-config.service.js';
 import { successResponse } from '@/utils/response.js';
@@ -63,7 +63,7 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
       throw new AppError(
         validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
-        ERROR_CODES.INVALID_INPUT
+        ERROR_CODES.STORAGE_INVALID_PARAMETER
       );
     }
 

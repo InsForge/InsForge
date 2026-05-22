@@ -9,7 +9,7 @@ import {
 } from '@aws-sdk/client-cloudwatch-logs';
 import logger from '@/utils/logger.js';
 import { BaseLogProvider } from './base.provider.js';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES, LogSchema, LogSourceSchema, LogStatsSchema } from '@insforge/shared-schemas';
 
 export class CloudWatchProvider extends BaseLogProvider {

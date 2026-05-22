@@ -1,5 +1,5 @@
 import { DatabaseManager } from '@/infra/database/database.manager.js';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError, hasPgErrorCode } from '@/utils/errors.js';
 import {
   ERROR_CODES,
   type RawSQLResponse,
@@ -9,7 +9,6 @@ import {
   type BulkUpsertResponse,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
-import { hasPgErrorCode } from '@/utils/errors.js';
 import {
   parseSQLStatements,
   checkManagedSchemaWriteOperations,

@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'vitest';
 import { DatabaseAdvanceService } from '../../src/services/database/database-advance.service';
-import { AppError } from '../../src/api/middlewares/error';
+import { AppError } from '../../src/utils/errors';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 
 describe('DatabaseAdvanceService - sanitizeQuery', () => {

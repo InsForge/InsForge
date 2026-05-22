@@ -151,7 +151,7 @@ describe('CloudComputeProvider', () => {
   });
 
   it('surfaces COMPUTE_NOT_CONFIGURED when config is missing (not masked as CLOUD_UNAVAILABLE)', async () => {
-    const { AppError } = await import('@/api/middlewares/error.js');
+    const { AppError } = await import('@/utils/errors.js');
     const provider = CloudComputeProvider.getInstance();
 
     // Force signToken to throw COMPUTE_NOT_CONFIGURED, as it would when isConfigured() is false

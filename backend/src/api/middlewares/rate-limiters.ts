@@ -1,6 +1,6 @@
 import rateLimit from 'express-rate-limit';
 import { Request, Response, NextFunction } from 'express';
-import { AppError } from './error.js';
+import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 

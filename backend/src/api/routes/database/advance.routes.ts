@@ -3,7 +3,7 @@ import { DatabaseAdvanceService } from '@/services/database/database-advance.ser
 import { AuditService } from '@/services/logs/audit.service.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import { upload, handleUploadError } from '@/api/middlewares/upload.js';
 import {
   ERROR_CODES,

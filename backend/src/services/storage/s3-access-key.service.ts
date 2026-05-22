@@ -3,7 +3,7 @@ import { Pool } from 'pg';
 import { LRUCache } from 'lru-cache';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
 import {
   ERROR_CODES,

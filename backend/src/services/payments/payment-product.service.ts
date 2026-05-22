@@ -1,5 +1,5 @@
 import type { Pool } from 'pg';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import type {
   StripeEnvironment,

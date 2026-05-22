@@ -11,8 +11,7 @@ import {
 import logger from '@/utils/logger.js';
 import { Pool } from 'pg';
 import fetch from 'node-fetch';
-import { AppError } from '@/api/middlewares/error.js';
-import { hasPgErrorCode } from '@/utils/errors.js';
+import { AppError, hasPgErrorCode } from '@/utils/errors.js';
 import { DenoSubhostingProvider } from '@/providers/functions/deno-subhosting.provider.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { isCloudEnvironment } from '@/utils/environment.js';

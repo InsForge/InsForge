@@ -5,7 +5,7 @@ vi.hoisted(() => {
   process.env.JWT_SECRET = 'test-secret-long-enough-for-signing-32chars';
 });
 
-import { AppError } from '../../src/api/middlewares/error';
+import { AppError } from '../../src/utils/errors';
 import { TokenManager } from '../../src/infra/security/token.manager';
 
 describe('TokenManager refresh CSRF tokens', () => {

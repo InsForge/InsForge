@@ -244,7 +244,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
 
   it('returns a generic 403 for write-like operations without user context', async () => {
     const { StorageService } = await import('@/services/storage/storage.service.js');
-    const { AppError } = await import('@/api/middlewares/error.js');
+    const { AppError } = await import('@/utils/errors.js');
     const svc = StorageService.getInstance();
 
     await expect(

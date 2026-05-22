@@ -3,7 +3,7 @@ import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
 import { functionsWriteLimiter } from '@/api/middlewares/rate-limiters.js';
 import { FunctionService } from '@/services/functions/function.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
 import {
   ERROR_CODES,

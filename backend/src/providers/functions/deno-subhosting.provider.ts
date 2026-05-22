@@ -1,4 +1,4 @@
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError, UpstreamError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import { config } from '@/infra/config/app.config.js';
 import logger from '@/utils/logger.js';
@@ -26,14 +26,6 @@ const DEFAULT_RATE_LIMIT_BACKOFF_MS = [1000, 2000, 4000];
 // Vercel helper's `maxDelayMs` default.
 const MAX_RETRY_AFTER_MS = 30_000;
 
-/**
- * Parse the HTTP `Retry-After` header per RFC 7231 §7.1.3:
- * - non-negative integer → seconds (multiply by 1000)
- * - HTTP-date → ms until that absolute time, never negative
- * Anything else returns NaN so the caller can fall back to its own schedule.
- *
- * Exported only for unit tests.
- */
 export function parseRetryAfterMs(header: string | null): number {
   if (!header) {
     return NaN;
@@ -48,10 +40,6 @@ export function parseRetryAfterMs(header: string | null): number {
   }
   return Math.max(0, dateMs - Date.now());
 }
-
-// ============================================
-// Helper functions
-// ============================================
 
 /**
  * Fetch with timeout, retry for transient network errors (DNS/socket), and
@@ -324,10 +312,15 @@ export class DenoSubhostingProvider {
     }
 
     if (checkResponse.status !== 404) {
-      throw new AppError(
-        `Failed to check project: ${checkResponse.statusText}`,
-        500,
-        ERROR_CODES.INTERNAL_ERROR
+      throw new UpstreamError(
+        {
+          response: {
+            status: checkResponse.status,
+            statusText: checkResponse.statusText,
+            data: await checkResponse.text(),
+          },
+        },
+        'Failed to check project'
       );
     }
 
@@ -347,8 +340,16 @@ export class DenoSubhostingProvider {
     );
 
     if (!createResponse.ok) {
-      const errorText = await createResponse.text();
-      throw new AppError(`Failed to create project: ${errorText}`, 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(
+        {
+          response: {
+            status: createResponse.status,
+            statusText: createResponse.statusText,
+            data: await createResponse.text(),
+          },
+        },
+        'Failed to create project'
+      );
     }
 
     logger.info('Deno Subhosting project created', { projectId });
@@ -486,16 +487,20 @@ export class DenoSubhostingProvider {
       );
 
       if (!response.ok) {
-        const errorText = await response.text();
         logger.error('Deno Subhosting API error', {
           status: response.status,
-          error: errorText,
+          statusText: response.statusText,
           projectId,
         });
-        throw new AppError(
-          `Deno Subhosting failed: ${response.status} - ${errorText}`,
-          500,
-          ERROR_CODES.INTERNAL_ERROR
+        throw new UpstreamError(
+          {
+            response: {
+              status: response.status,
+              statusText: response.statusText,
+              data: await response.text(),
+            },
+          },
+          'Deno Subhosting failed'
         );
       }
 
@@ -527,7 +532,7 @@ export class DenoSubhostingProvider {
         error: error instanceof Error ? error.message : String(error),
         projectId,
       });
-      throw new AppError('Failed to deploy to Deno Subhosting', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to deploy to Deno Subhosting');
     }
   }
 
@@ -555,10 +560,15 @@ export class DenoSubhostingProvider {
             ERROR_CODES.FUNCTION_DEPLOYMENT_NOT_FOUND
           );
         }
-        throw new AppError(
-          `Failed to get deployment: ${response.statusText}`,
-          500,
-          ERROR_CODES.INTERNAL_ERROR
+        throw new UpstreamError(
+          {
+            response: {
+              status: response.status,
+              statusText: response.statusText,
+              data: await response.text(),
+            },
+          },
+          'Failed to get deployment'
         );
       }
 
@@ -580,11 +590,7 @@ export class DenoSubhostingProvider {
         error: error instanceof Error ? error.message : String(error),
         deploymentId,
       });
-      throw new AppError(
-        'Failed to get Deno Subhosting deployment',
-        500,
-        ERROR_CODES.INTERNAL_ERROR
-      );
+      throw new UpstreamError(error, 'Failed to get Deno Subhosting deployment');
     }
   }
 
@@ -650,11 +656,15 @@ export class DenoSubhostingProvider {
             ERROR_CODES.FUNCTION_DEPLOYMENT_NOT_FOUND
           );
         }
-        const errorText = await response.text();
-        throw new AppError(
-          `Failed to get app logs: ${response.status} - ${errorText}`,
-          500,
-          ERROR_CODES.INTERNAL_ERROR
+        throw new UpstreamError(
+          {
+            response: {
+              status: response.status,
+              statusText: response.statusText,
+              data: await response.text(),
+            },
+          },
+          'Failed to get app logs'
         );
       }
 
@@ -682,7 +692,7 @@ export class DenoSubhostingProvider {
         error: error instanceof Error ? error.message : String(error),
         deploymentId,
       });
-      throw new AppError('Failed to get deployment app logs', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to get deployment app logs');
     }
   }
 

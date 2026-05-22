@@ -6,9 +6,8 @@ import {
   type DatabaseMigrationsResponse,
   type Migration,
 } from '@insforge/shared-schemas';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError, isPgErrorLike } from '@/utils/errors.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
-import { isPgErrorLike } from '@/utils/errors.js';
 import {
   analyzeQuery,
   checkAuthSchemaOperations,
