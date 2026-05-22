@@ -89,8 +89,7 @@ BEGIN
     -- metadata relations; object mutations must go through the storage API.
     EXECUTE 'GRANT USAGE ON SCHEMA storage TO project_admin';
     EXECUTE 'REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA storage FROM project_admin';
-    EXECUTE 'GRANT SELECT ON TABLE storage.buckets, storage.objects, storage.config TO project_admin';
-    EXECUTE 'GRANT SELECT ON TABLE storage.s3_access_keys TO project_admin';
+    EXECUTE 'GRANT SELECT ON ALL TABLES IN SCHEMA storage TO project_admin';
     EXECUTE 'GRANT REFERENCES (bucket, key) ON TABLE storage.objects TO project_admin';
 
     -- System tables are read-only from project_admin/raw SQL. Mutations must go

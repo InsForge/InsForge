@@ -49,6 +49,12 @@ describe('project admin public privileges migration', () => {
     );
   });
 
+  it('grants project_admin read access across storage tables', () => {
+    const sql = readMigration();
+
+    expect(sql).toMatch(/GRANT SELECT ON ALL TABLES IN SCHEMA storage TO project_admin/i);
+  });
+
   it('removes the automatic project_admin_policy machinery and existing generated policies', () => {
     const sql = readMigration();
 

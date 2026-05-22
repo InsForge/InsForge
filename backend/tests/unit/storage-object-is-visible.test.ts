@@ -136,6 +136,100 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     ]);
   });
 
+  it('reads objects for project_admin JWT callers through root access', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const uploadedAt = new Date('2026-01-01T00:00:00.000Z');
+    const provider = {
+      getObject: vi.fn(async () => Buffer.from('hello')),
+    };
+    (svc as unknown as { provider: typeof provider }).provider = provider;
+
+    queryResults = [
+      {
+        rows: [
+          {
+            bucket: 'photos',
+            key: 'alice/cat.jpg',
+            size: 42,
+            mime_type: 'image/jpeg',
+            uploaded_at: uploadedAt,
+            etag: 'etag-admin',
+          },
+        ],
+        rowCount: 1,
+      },
+    ];
+
+    const result = await svc.getObject(
+      { id: 'admin-sub', email: 'admin@example.com', role: 'project_admin' },
+      'photos',
+      'alice/cat.jpg'
+    );
+
+    expect(result?.file.toString()).toBe('hello');
+    expect(result?.metadata).toMatchObject({
+      bucket: 'photos',
+      key: 'alice/cat.jpg',
+      size: 42,
+      mimeType: 'image/jpeg',
+      uploadedAt,
+    });
+    expect(provider.getObject).toHaveBeenCalledWith('photos', 'alice/cat.jpg');
+    expect(calls.map((c) => c.sql)).toEqual([
+      'SELECT * FROM storage.objects WHERE bucket = $1 AND key = $2',
+    ]);
+  });
+
+  it('lists objects for project_admin JWT callers through root access', async () => {
+    const { StorageService } = await import('@/services/storage/storage.service.js');
+    const svc = StorageService.getInstance();
+    const uploadedAt = new Date('2026-01-01T00:00:00.000Z');
+
+    queryResults = [
+      {
+        rows: [
+          {
+            bucket: 'photos',
+            key: 'alice/cat.jpg',
+            size: 42,
+            mime_type: 'image/jpeg',
+            uploaded_at: uploadedAt,
+            etag: 'etag-admin',
+          },
+        ],
+        rowCount: 1,
+      },
+      { rows: [{ count: '1' }], rowCount: 1 },
+    ];
+
+    const result = await svc.listObjects(
+      { id: 'admin-sub', email: 'admin@example.com', role: 'project_admin' },
+      'photos',
+      undefined,
+      10,
+      0,
+      undefined
+    );
+
+    expect(result.total).toBe(1);
+    expect(result.objects[0]).toMatchObject({
+      bucket: 'photos',
+      key: 'alice/cat.jpg',
+      size: 42,
+      mimeType: 'image/jpeg',
+      uploadedAt,
+    });
+    expect(calls.map((c) => c.sql)).toEqual([
+      'SELECT * FROM storage.objects WHERE bucket = $1 ORDER BY key LIMIT $2 OFFSET $3',
+      'SELECT COUNT(*) as count FROM storage.objects WHERE bucket = $1',
+    ]);
+    expect(calls.map((c) => c.params)).toEqual([
+      ['photos', 10, 0],
+      ['photos'],
+    ]);
+  });
+
   it('returns false for private bucket objects without a user context', async () => {
     const { StorageService } = await import('@/services/storage/storage.service.js');
     const svc = StorageService.getInstance();
