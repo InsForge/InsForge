@@ -66,7 +66,7 @@ InsForge consists of **4 services** that run together:
 |---------------|------------------------------------|---------------|
 | **PostgreSQL**| Primary database                   | 5432          |
 | **PostgREST** | Auto-generated REST API layer      | 3000 (mapped to 5430) |
-| **InsForge**  | Node.js backend + dashboard        | 7130, 7131    |
+| **InsForge**  | Node.js backend + dashboard        | 7130          |
 | **Deno**      | Serverless functions runtime       | 7133          |
 
 ---
@@ -274,6 +274,8 @@ DENO_PORT=7133
 #### 5.4 Required for Deployments
 
 These variables are only needed if you plan to use InsForge's **deployment features** (deploying projects via the dashboard). If you don't need deployments, skip this section.
+
+> ⚠️ **Note**: These variables (`AWS_S3_BUCKET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `PROJECT_ID`, `MAX_FILE_SIZE`) come from the root `.env.example` setup. They are **not** present in `deploy/docker-compose/.env.example`, and the `deploy/docker-compose/docker-compose.yml` does **not** pass them through to the `insforge` container, so setting them in your `.env` has no effect on that production compose. To use them, add each one to the `insforge` service's `environment` block in your `docker-compose.yml`.
 
 ```env
 # ── Deployments ──────────────────────────────────────────────
@@ -524,8 +526,8 @@ These ports are used **only** for internal Docker service-to-service communicati
 |-------|-------------|--------------------------------------------------|
 | 5432  | PostgreSQL  | Direct DB access — use `docker exec` instead     |
 | 5430  | PostgREST   | Internal REST layer — proxied through InsForge   |
-| 7130  | InsForge    | Accessed via reverse proxy on 443, not directly  |
-| 7131  | Auth        | Internal auth service                            |
+| 7130  | InsForge    | API + dashboard, accessed via reverse proxy on 443, not directly |
+| 7131  | (unused)    | Published by compose (`AUTH_PORT`), but no process listens on it |
 | 7133  | Deno        | Internal serverless runtime                      |
 
 > ⚠️ **Critical**: The default `docker-compose.yml` binds ports to `0.0.0.0` (all interfaces), **not** `127.0.0.1`. This means Docker will expose services directly to the internet, **bypassing UFW entirely** (Docker manipulates iptables directly). You **MUST** add the `127.0.0.1:` prefix to every published port in your `docker-compose.yml`:
@@ -534,8 +536,8 @@ These ports are used **only** for internal Docker service-to-service communicati
 > ports:
 >   - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"     # PostgreSQL
 >   - "127.0.0.1:${POSTGREST_PORT:-5430}:3000"     # PostgREST
->   - "127.0.0.1:${APP_PORT:-7130}:7130"            # InsForge
->   - "127.0.0.1:${AUTH_PORT:-7131}:7131"           # Auth
+>   - "127.0.0.1:${APP_PORT:-7130}:7130"            # InsForge (API + dashboard)
+>   - "127.0.0.1:${AUTH_PORT:-7131}:7131"           # AUTH_PORT (published by compose, unused)
 >   - "127.0.0.1:${DENO_PORT:-7133}:7133"           # Deno
 > ```
 >
@@ -765,6 +767,10 @@ tmpfs:
 
 > ⚠️ This requires testing — some services need writable directories for caches or temporary files.
 
+#### 12.4 Restrict CORS Origins
+
+By default the backend allows all origins. It reflects the request's `Origin` header back in the response and, for function proxy responses, sets `Access-Control-Allow-Origin: *`. This is convenient for local development but too permissive for production. For a production deployment, restrict the allowed origins to the domains you actually serve (for example your dashboard and app domains), so other sites cannot make credentialed cross-origin requests to your API.
+
 ---
 
 ### 13. Secrets Management
@@ -912,9 +918,11 @@ mv docker-compose.yml.old docker-compose.yml
 Edit `docker-compose.yml` and replace `latest` tags with the previous version:
 
 ```yaml
-# Example: pin to a known-good version
-image: ghcr.io/insforge/insforge-oss:v1.4.0
+# Example: pin to a known-good version (replace with your previous tag)
+image: ghcr.io/insforge/insforge-oss:v1.5.0
 ```
+
+> Note: the current `deploy/docker-compose` pins `v1.5.0`, and the project is now on the 2.x line. Pin to whatever version you were running before the update.
 
 #### 16.4 Restore the Database (If Needed)
 
