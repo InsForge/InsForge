@@ -33,7 +33,7 @@ function isStripeError(error: unknown): error is StripeErrorLike {
 
 export function normalizeStripeError(error: unknown): unknown {
   if (error instanceof StripeKeyValidationError) {
-    return new AppError(error.message, 400, ERROR_CODES.INVALID_INPUT);
+    return new AppError(error.message, 400, ERROR_CODES.PAYMENT_CONFIG_INVALID);
   }
   if (error instanceof AppError || !isStripeError(error)) {
     return error;

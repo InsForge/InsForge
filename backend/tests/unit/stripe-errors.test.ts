@@ -5,12 +5,12 @@ import { StripeKeyValidationError } from '../../src/providers/payments/stripe.pr
 import { normalizeStripeError } from '../../src/providers/payments/stripe-errors';
 
 describe('normalizeStripeError', () => {
-  it('maps local Stripe key validation errors to invalid input', () => {
+  it('maps local Stripe key validation errors to payment config errors', () => {
     const normalized = normalizeStripeError(new StripeKeyValidationError('bad key'));
 
     expect(normalized).toMatchObject({
       statusCode: 400,
-      code: ERROR_CODES.INVALID_INPUT,
+      code: ERROR_CODES.PAYMENT_CONFIG_INVALID,
       message: 'bad key',
     });
   });

@@ -3,13 +3,7 @@ import { DatabaseError } from 'pg';
 import { errorResponse } from '@/utils/response.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
-import {
-  AppError,
-  getDatabaseErrorDetails,
-  getErrorCode,
-  getErrorStatus,
-  isErrorObject,
-} from '@/utils/errors.js';
+import { AppError, getDatabaseErrorDetails, isErrorObject } from '@/utils/errors.js';
 
 export function errorMiddleware(err: unknown, _req: Request, res: Response, _next: NextFunction) {
   // Only log non-authentication errors or unexpected errors
@@ -22,8 +16,7 @@ export function errorMiddleware(err: unknown, _req: Request, res: Response, _nex
 
   // Handle known AppError instances
   if (err instanceof AppError) {
-    const errorCode = err.code || getErrorCode(err.statusCode);
-    return errorResponse(res, errorCode, err.message, err.statusCode, err.nextActions);
+    return errorResponse(res, err.code, err.message, err.statusCode, err.nextActions);
   }
 
   // Handle SyntaxError from JSON.parse
@@ -65,16 +58,6 @@ export function errorMiddleware(err: unknown, _req: Request, res: Response, _nex
       400,
       'Please ensure your request body contains valid JSON'
     );
-  }
-
-  // Get the status code from either status or statusCode property
-  const status = getErrorStatus(err);
-  // Handle client errors (4xx)
-  if (status && status >= 400 && status < 500) {
-    const errorCode = getErrorCode(status);
-    const message = err.message || 'Client error';
-    const body = err.expose ? err.body : undefined;
-    return errorResponse(res, errorCode, message, status, body as string | undefined);
   }
 
   // Default internal error with optional message

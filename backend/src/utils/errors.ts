@@ -208,20 +208,3 @@ export class UpstreamError extends AppError {
     this.name = 'UpstreamError';
   }
 }
-
-export function getErrorCode(statusCode: number): string {
-  switch (statusCode) {
-    case 400:
-      return ERROR_CODES.INVALID_INPUT;
-    case 401:
-      return ERROR_CODES.AUTH_UNAUTHORIZED;
-    case 403:
-      return ERROR_CODES.FORBIDDEN;
-    case 404:
-      return ERROR_CODES.NOT_FOUND;
-    case 409:
-      return ERROR_CODES.ALREADY_EXISTS;
-    default:
-      return ERROR_CODES.INTERNAL_ERROR;
-  }
-}
