@@ -5,6 +5,7 @@ import type {
   DashboardInstanceInfo,
   DashboardModelCreditUsage,
   DashboardPosthogConnectionStatus,
+  DashboardPosthogOpenResult,
   DashboardProjectInfo,
   DashboardUserInfo,
   DashboardMetricName,
@@ -1126,6 +1127,74 @@ export function useCloudHosting() {
     [postMessageToParent]
   );
 
+  // Deep-link "Open in PostHog". Cloud calls /integrations/posthog/v1/open and
+  // posts the resolved URL back as POSTHOG_OPEN_RESPONSE. Self-contained one-off
+  // listener (rather than the PendingRequest singleton machinery) so concurrent
+  // clicks across multiple projects don't collide.
+  const openPosthog = useCallback(
+    (projectId: string): Promise<DashboardPosthogOpenResult> => {
+      return new Promise((resolve) => {
+        const requestId =
+          typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+            ? crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+        const cleanup = () => {
+          window.clearTimeout(timeoutId);
+          window.removeEventListener('message', handleResponse);
+        };
+
+        const handleResponse = (ev: MessageEvent<CloudHostingMessage>) => {
+          if (ev.source !== getParentWindow()) {
+            return;
+          }
+          const expectedOrigin = parentOriginRef.current;
+          if (!expectedOrigin || ev.origin !== expectedOrigin) {
+            return;
+          }
+          if (ev.data?.type !== 'POSTHOG_OPEN_RESPONSE' || ev.data.requestId !== requestId) {
+            return;
+          }
+          cleanup();
+          const url = typeof ev.data.url === 'string' ? ev.data.url : undefined;
+          const error = typeof ev.data.error === 'string' ? ev.data.error : undefined;
+          if (url) {
+            resolve({ url });
+          } else {
+            resolve({ error: error ?? 'missing_url' });
+          }
+        };
+
+        const timeoutId = window.setTimeout(() => {
+          cleanup();
+          resolve({ error: 'timeout' });
+        }, DEFAULT_TIMEOUT_MS);
+
+        window.addEventListener('message', handleResponse);
+        // Don't wait the full timeout if delivery to the parent fails
+        // (untrusted origin / no parent window / sync throw) — resolve right
+        // away so the caller can close its placeholder tab.
+        postMessageToParent({
+          type: 'POSTHOG_OPEN_REQUEST',
+          projectId,
+          requestId,
+        }).then(
+          (delivered) => {
+            if (!delivered) {
+              cleanup();
+              resolve({ error: 'no_parent_window' });
+            }
+          },
+          (err) => {
+            cleanup();
+            resolve({ error: err instanceof Error ? err.message : 'post_failed' });
+          }
+        );
+      });
+    },
+    [postMessageToParent]
+  );
+
   const subscribePosthogConnectionStatus = useCallback(
     (cb: (event: DashboardPosthogConnectionStatus) => void) => {
       posthogStatusSubscribersRef.current.add(cb);
@@ -1159,6 +1228,7 @@ export function useCloudHosting() {
     requestAdvisorIssues,
     triggerAdvisorScan,
     connectPosthog,
+    openPosthog,
     subscribePosthogConnectionStatus,
   };
 }

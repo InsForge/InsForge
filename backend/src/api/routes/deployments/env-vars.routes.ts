@@ -2,6 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import { DeploymentService } from '@/services/deployments/deployment.service.js';
 import { VercelProvider } from '@/providers/deployments/vercel.provider.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
+import { deploymentsWriteLimiter } from '@/api/middlewares/rate-limiters.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
@@ -38,50 +39,55 @@ router.get('/', verifyAdmin, async (_req: AuthRequest, res: Response, next: Next
  * Create or update environment variables
  * POST /api/deployments/env-vars
  */
-router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    if (!deploymentService.isConfigured()) {
-      throw new AppError(
-        'Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID environment variables.',
-        503,
-        ERROR_CODES.INTERNAL_ERROR
+router.post(
+  '/',
+  verifyAdmin,
+  deploymentsWriteLimiter,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      if (!deploymentService.isConfigured()) {
+        throw new AppError(
+          'Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID environment variables.',
+          503,
+          ERROR_CODES.INTERNAL_ERROR
+        );
+      }
+
+      const validationResult = upsertEnvVarsRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        throw new AppError(
+          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const { envVars } = validationResult.data;
+
+      await vercelProvider.upsertEnvironmentVariables(envVars);
+
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'UPSERT_ENV_VARS',
+        module: 'DEPLOYMENTS',
+        details: { count: envVars.length, keys: envVars.map((envVar) => envVar.key) },
+        ip_address: req.ip,
+      });
+
+      successResponse(
+        res,
+        {
+          success: true,
+          message: `${envVars.length} environment variables have been saved successfully`,
+          count: envVars.length,
+        },
+        201
       );
+    } catch (error) {
+      next(error);
     }
-
-    const validationResult = upsertEnvVarsRequestSchema.safeParse(req.body);
-    if (!validationResult.success) {
-      throw new AppError(
-        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
-    }
-
-    const { envVars } = validationResult.data;
-
-    await vercelProvider.upsertEnvironmentVariables(envVars);
-
-    await auditService.log({
-      actor: req.user?.email || 'api-key',
-      action: 'UPSERT_ENV_VARS',
-      module: 'DEPLOYMENTS',
-      details: { count: envVars.length, keys: envVars.map((envVar) => envVar.key) },
-      ip_address: req.ip,
-    });
-
-    successResponse(
-      res,
-      {
-        success: true,
-        message: `${envVars.length} environment variables have been saved successfully`,
-        count: envVars.length,
-      },
-      201
-    );
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 /**
  * Get a single environment variable with decrypted value
@@ -111,36 +117,41 @@ router.get('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: Ne
  * Delete an environment variable
  * DELETE /api/deployments/env-vars/:id
  */
-router.delete('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    if (!deploymentService.isConfigured()) {
-      throw new AppError(
-        'Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID environment variables.',
-        503,
-        ERROR_CODES.INTERNAL_ERROR
-      );
+router.delete(
+  '/:id',
+  verifyAdmin,
+  deploymentsWriteLimiter,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      if (!deploymentService.isConfigured()) {
+        throw new AppError(
+          'Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID environment variables.',
+          503,
+          ERROR_CODES.INTERNAL_ERROR
+        );
+      }
+
+      const { id } = req.params;
+
+      await vercelProvider.deleteEnvironmentVariable(id);
+
+      // Log audit
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'DELETE_ENV_VAR',
+        module: 'DEPLOYMENTS',
+        details: { envId: id },
+        ip_address: req.ip,
+      });
+
+      successResponse(res, {
+        success: true,
+        message: 'Environment variable has been deleted successfully',
+      });
+    } catch (error) {
+      next(error);
     }
-
-    const { id } = req.params;
-
-    await vercelProvider.deleteEnvironmentVariable(id);
-
-    // Log audit
-    await auditService.log({
-      actor: req.user?.email || 'api-key',
-      action: 'DELETE_ENV_VAR',
-      module: 'DEPLOYMENTS',
-      details: { envId: id },
-      ip_address: req.ip,
-    });
-
-    successResponse(res, {
-      success: true,
-      message: 'Environment variable has been deleted successfully',
-    });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 export { router as envVarsRouter };

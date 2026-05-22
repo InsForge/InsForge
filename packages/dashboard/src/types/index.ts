@@ -131,6 +131,11 @@ export interface DashboardPosthogConnectionStatus {
   timestamp: number;
 }
 
+/** Resolution of an `onOpenPosthog` call — exactly one of `url` or `error` is set. */
+export type DashboardPosthogOpenResult =
+  | { url: string; error?: never }
+  | { url?: never; error: string };
+
 export interface DashboardProps {
   backendUrl?: string;
   showNavbar?: boolean;
@@ -164,6 +169,7 @@ export interface DashboardProps {
   subscribePosthogConnectionStatus?: (
     cb: (event: DashboardPosthogConnectionStatus) => void
   ) => () => void;
+  onOpenPosthog?: (projectId: string) => Promise<DashboardPosthogOpenResult>;
 }
 
 export interface SelfHostingDashboardProps extends DashboardProps {

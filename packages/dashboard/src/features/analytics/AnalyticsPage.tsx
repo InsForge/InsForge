@@ -84,6 +84,25 @@ export function AnalyticsPage() {
     );
   }
 
+  // Connection row exists, so a project must too — but TS can't see that.
+  // Hold the connected view until useProjectId() resolves to keep the
+  // "Open in PostHog" deep-link wired to a concrete projectId. Surface the
+  // error case explicitly so a failed projectId fetch can't get stuck on
+  // a spinner forever.
+  if (projectIdLoading) {
+    return <div className="p-6">Loading…</div>;
+  }
+  if (projectIdError || !projectId) {
+    return (
+      <div className="p-6">
+        <h1 className="mb-4 text-2xl font-bold text-foreground">Analytics</h1>
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+          Failed to load project ID. Please refresh.
+        </div>
+      </div>
+    );
+  }
+
   const c = conn.data;
 
   return (
@@ -98,7 +117,7 @@ export function AnalyticsPage() {
             </Button>
           </div>
         </div>
-        <ConnectStatusBar connection={c} />
+        <ConnectStatusBar connection={c} projectId={projectId} />
         <section className="flex flex-col gap-3 rounded border border-[var(--alpha-8)] bg-card p-6">
           <div className="flex flex-col gap-1">
             <p className="text-base font-medium leading-7 text-foreground">Setup with Prompt</p>

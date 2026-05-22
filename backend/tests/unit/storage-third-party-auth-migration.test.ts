@@ -61,7 +61,7 @@ describe('036_storage-third-party-auth-support migration', () => {
   });
 
   it('auth.jwt() does NOT read the never-set request.jwt.claim singular form', () => {
-    // withUserContext only sets request.jwt.claims (jsonb) and dotted forms.
+    // withUserContext sets request.jwt.claims (jsonb), not a singular request.jwt.claim object.
     expect(sql).not.toMatch(/current_setting\(\s*'request\.jwt\.claim'\s*,/i);
   });
 

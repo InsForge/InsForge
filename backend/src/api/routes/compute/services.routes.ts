@@ -1,5 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
+import { computeWriteLimiter } from '@/api/middlewares/rate-limiters.js';
 import { ComputeServicesService } from '@/services/compute/services.service.js';
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/api/middlewares/error.js';
@@ -67,67 +68,77 @@ router.get('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: Ne
 });
 
 // Create service
-router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const validation = createServiceSchema.safeParse(req.body);
-    if (!validation.success) {
-      throw new AppError(
-        validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-        400,
-        ERROR_CODES.INVALID_INPUT,
-        'Please check the request body, it must conform with the CreateServiceRequest schema.'
-      );
+router.post(
+  '/',
+  verifyAdmin,
+  computeWriteLimiter,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validation = createServiceSchema.safeParse(req.body);
+      if (!validation.success) {
+        throw new AppError(
+          validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT,
+          'Please check the request body, it must conform with the CreateServiceRequest schema.'
+        );
+      }
+
+      const svc = ComputeServicesService.getInstance();
+      const projectId = getProjectId(req);
+      const service = await svc.createService({ ...validation.data, projectId });
+
+      successResponse(res, service, 201);
+
+      bestEffortAudit({
+        actor: req.user?.email || 'api-key',
+        action: 'CREATE_COMPUTE_SERVICE',
+        module: 'COMPUTE',
+        details: { serviceName: validation.data.name, projectId },
+        ip_address: req.ip,
+      });
+      bestEffortBroadcast();
+    } catch (error) {
+      next(error);
     }
-
-    const svc = ComputeServicesService.getInstance();
-    const projectId = getProjectId(req);
-    const service = await svc.createService({ ...validation.data, projectId });
-
-    successResponse(res, service, 201);
-
-    bestEffortAudit({
-      actor: req.user?.email || 'api-key',
-      action: 'CREATE_COMPUTE_SERVICE',
-      module: 'COMPUTE',
-      details: { serviceName: validation.data.name, projectId },
-      ip_address: req.ip,
-    });
-    bestEffortBroadcast();
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // Prepare for deploy (create DB record + Fly app, no machine)
-router.post('/deploy', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const validation = createServiceSchema.safeParse(req.body);
-    if (!validation.success) {
-      throw new AppError(
-        validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-        400,
-        ERROR_CODES.INVALID_INPUT,
-        'Please check the request body, it must conform with the CreateServiceRequest schema.'
-      );
+router.post(
+  '/deploy',
+  verifyAdmin,
+  computeWriteLimiter,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validation = createServiceSchema.safeParse(req.body);
+      if (!validation.success) {
+        throw new AppError(
+          validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT,
+          'Please check the request body, it must conform with the CreateServiceRequest schema.'
+        );
+      }
+
+      const svc = ComputeServicesService.getInstance();
+      const projectId = getProjectId(req);
+      const service = await svc.prepareForDeploy({ ...validation.data, projectId });
+
+      successResponse(res, service, 201);
+
+      bestEffortAudit({
+        actor: req.user?.email || 'api-key',
+        action: 'PREPARE_COMPUTE_DEPLOY',
+        module: 'COMPUTE',
+        details: { serviceName: validation.data.name, projectId },
+        ip_address: req.ip,
+      });
+    } catch (error) {
+      next(error);
     }
-
-    const svc = ComputeServicesService.getInstance();
-    const projectId = getProjectId(req);
-    const service = await svc.prepareForDeploy({ ...validation.data, projectId });
-
-    successResponse(res, service, 201);
-
-    bestEffortAudit({
-      actor: req.user?.email || 'api-key',
-      action: 'PREPARE_COMPUTE_DEPLOY',
-      module: 'COMPUTE',
-      details: { serviceName: validation.data.name, projectId },
-      ip_address: req.ip,
-    });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // Issue a Fly deploy token for the CLI (cloud-managed mode only).
 // Used so `compute deploy` can run flyctl without the user holding
@@ -135,6 +146,7 @@ router.post('/deploy', verifyAdmin, async (req: AuthRequest, res: Response, next
 router.post(
   '/:id/deploy-token',
   verifyAdmin,
+  computeWriteLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const svc = ComputeServicesService.getInstance();
@@ -153,98 +165,109 @@ router.post(
 );
 
 // Update service
-router.patch('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const validation = updateServiceSchema.safeParse(req.body);
-    if (!validation.success) {
-      throw new AppError(
-        validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-        400,
-        ERROR_CODES.INVALID_INPUT,
-        'Please check the request body, it must conform with the UpdateServiceRequest schema.'
-      );
-    }
+router.patch(
+  '/:id',
+  verifyAdmin,
+  computeWriteLimiter,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validation = updateServiceSchema.safeParse(req.body);
+      if (!validation.success) {
+        throw new AppError(
+          validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT,
+          'Please check the request body, it must conform with the UpdateServiceRequest schema.'
+        );
+      }
 
-    const svc = ComputeServicesService.getInstance();
-    const existing = await svc.getService(req.params.id);
+      const svc = ComputeServicesService.getInstance();
+      const existing = await svc.getService(req.params.id);
 
-    if (existing.projectId !== getProjectId(req)) {
-      throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
-    }
+      if (existing.projectId !== getProjectId(req)) {
+        throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
+      }
 
-    const service = await svc.updateService(req.params.id, validation.data);
+      const service = await svc.updateService(req.params.id, validation.data);
 
-    successResponse(res, service);
+      successResponse(res, service);
 
-    // Redact envVars — only log the key names, never secret values
-    const auditDetails: Record<string, unknown> = {
-      serviceId: req.params.id,
-      changes: Object.keys(validation.data),
-    };
-    if ('envVars' in validation.data) {
-      auditDetails.envVarsUpdated = true;
-    }
-    if ('envVarsPatch' in validation.data && validation.data.envVarsPatch) {
-      // Log only the *keys* touched so an audit reader knows which secrets
-      // rotated, never the values.
-      auditDetails.envVarsPatch = {
-        setKeys: Object.keys(validation.data.envVarsPatch.set ?? {}),
-        unsetKeys: validation.data.envVarsPatch.unset ?? [],
+      // Redact envVars — only log the key names, never secret values
+      const auditDetails: Record<string, unknown> = {
+        serviceId: req.params.id,
+        changes: Object.keys(validation.data),
       };
-    }
+      if ('envVars' in validation.data) {
+        auditDetails.envVarsUpdated = true;
+      }
+      if ('envVarsPatch' in validation.data && validation.data.envVarsPatch) {
+        // Log only the *keys* touched so an audit reader knows which secrets
+        // rotated, never the values.
+        auditDetails.envVarsPatch = {
+          setKeys: Object.keys(validation.data.envVarsPatch.set ?? {}),
+          unsetKeys: validation.data.envVarsPatch.unset ?? [],
+        };
+      }
 
-    bestEffortAudit({
-      actor: req.user?.email || 'api-key',
-      action: 'UPDATE_COMPUTE_SERVICE',
-      module: 'COMPUTE',
-      details: auditDetails,
-      ip_address: req.ip,
-    });
-    bestEffortBroadcast();
-  } catch (error) {
-    next(error);
+      bestEffortAudit({
+        actor: req.user?.email || 'api-key',
+        action: 'UPDATE_COMPUTE_SERVICE',
+        module: 'COMPUTE',
+        details: auditDetails,
+        ip_address: req.ip,
+      });
+      bestEffortBroadcast();
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // Delete service
-router.delete('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const svc = ComputeServicesService.getInstance();
-    const existing = await svc.getService(req.params.id);
+router.delete(
+  '/:id',
+  verifyAdmin,
+  computeWriteLimiter,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const svc = ComputeServicesService.getInstance();
+      const existing = await svc.getService(req.params.id);
 
-    if (existing.projectId !== getProjectId(req)) {
-      throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
+      if (existing.projectId !== getProjectId(req)) {
+        throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
+      }
+
+      // Returns a snapshot of the deleted row (incl. encrypted env blob) so the
+      // audit log retains enough state to reconstruct the service if the delete
+      // turns out to have been a mistake. Today the row + Fly app are gone the
+      // moment this returns; the audit entry is the only paper trail.
+      const snapshot = await svc.deleteService(req.params.id);
+
+      successResponse(res, { message: 'Service deleted' });
+
+      bestEffortAudit({
+        actor: req.user?.email || 'api-key',
+        action: 'DELETE_COMPUTE_SERVICE',
+        module: 'COMPUTE',
+        details: {
+          serviceId: req.params.id,
+          serviceName: existing.name,
+          snapshot,
+        },
+        ip_address: req.ip,
+      });
+      bestEffortBroadcast();
+    } catch (error) {
+      next(error);
     }
-
-    // Returns a snapshot of the deleted row (incl. encrypted env blob) so the
-    // audit log retains enough state to reconstruct the service if the delete
-    // turns out to have been a mistake. Today the row + Fly app are gone the
-    // moment this returns; the audit entry is the only paper trail.
-    const snapshot = await svc.deleteService(req.params.id);
-
-    successResponse(res, { message: 'Service deleted' });
-
-    bestEffortAudit({
-      actor: req.user?.email || 'api-key',
-      action: 'DELETE_COMPUTE_SERVICE',
-      module: 'COMPUTE',
-      details: {
-        serviceId: req.params.id,
-        serviceName: existing.name,
-        snapshot,
-      },
-      ip_address: req.ip,
-    });
-    bestEffortBroadcast();
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // Stop service
 router.post(
   '/:id/stop',
   verifyAdmin,
+  computeWriteLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const svc = ComputeServicesService.getInstance();
@@ -276,6 +299,7 @@ router.post(
 router.post(
   '/:id/start',
   verifyAdmin,
+  computeWriteLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const svc = ComputeServicesService.getInstance();

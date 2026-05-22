@@ -138,6 +138,10 @@ services:
       - FLY_API_TOKEN=${FLY_API_TOKEN:-}
       - FLY_ORG=${FLY_ORG:-}
       - COMPUTE_DOMAIN=${COMPUTE_DOMAIN:-}
+      # Test-only: when "1", bypass the per-IP write rate limiters in
+      # backend/src/api/middlewares/rate-limiters.ts so e2e suites can run
+      # many writes from a single IP without hitting 429. Never set in prod.
+      - INSFORGE_DISABLE_WRITE_RATE_LIMIT=${INSFORGE_DISABLE_WRITE_RATE_LIMIT:-}
       # Logs directory
       - LOGS_DIR=/insforge-logs
       # Storage directory (for local file storage when S3 is not configured)

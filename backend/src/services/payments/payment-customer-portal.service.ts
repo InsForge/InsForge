@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import type { Pool, PoolClient } from 'pg';
+import type { Pool } from 'pg';
 import { AppError } from '@/api/middlewares/error.js';
+import type { UserContext } from '@/api/middlewares/auth.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { toISOString } from '@/services/payments/helpers.js';
+import { withUserContext } from '@/services/database/user-context.service.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import type { CustomerPortalSessionRow, StripeCustomerPortalSession } from '@/types/payments.js';
 import type {
@@ -28,12 +30,6 @@ const CUSTOMER_PORTAL_SESSION_COLUMNS = `
 
 const CUSTOMER_PORTAL_INSERT_ROLES = new Set<RoleSchema>(['authenticated', 'project_admin']);
 
-export interface CustomerPortalUserContext {
-  id: string;
-  email: string;
-  role: RoleSchema;
-}
-
 export class PaymentCustomerPortalService {
   private static instance: PaymentCustomerPortalService;
   private pool: Pool | null = null;
@@ -56,44 +52,37 @@ export class PaymentCustomerPortalService {
 
   async insertInitializedCustomerPortalSession(
     input: CreateCustomerPortalSessionRequest,
-    user: CustomerPortalUserContext
+    user: UserContext
   ): Promise<{ id: string }> {
     const id = randomUUID();
-    const client = await this.getPool().connect();
 
     try {
-      await client.query('BEGIN');
-      await client.query(`SET LOCAL ROLE ${this.getSafeRole(user.role)}`);
-      await this.setRequestContext(client, user);
-      await client.query(
-        `INSERT INTO payments.customer_portal_sessions (
-           id,
-           environment,
-           status,
-           subject_type,
-           subject_id,
-           return_url,
-           configuration_id
-         )
-         VALUES ($1, $2, 'initialized', $3, $4, $5, $6)`,
-        [
-          id,
-          input.environment,
-          input.subject.type,
-          input.subject.id,
-          input.returnUrl ?? null,
-          input.configuration ?? null,
-        ]
-      );
-      await client.query('COMMIT');
+      await withUserContext(this.getPool(), this.getSafeUserContext(user), async (client) => {
+        await client.query(
+          `INSERT INTO payments.customer_portal_sessions (
+             id,
+             environment,
+             status,
+             subject_type,
+             subject_id,
+             return_url,
+             configuration_id
+           )
+           VALUES ($1, $2, 'initialized', $3, $4, $5, $6)`,
+          [
+            id,
+            input.environment,
+            input.subject.type,
+            input.subject.id,
+            input.returnUrl ?? null,
+            input.configuration ?? null,
+          ]
+        );
+      });
 
       return { id };
     } catch (error) {
-      await client.query('ROLLBACK').catch(() => {});
       throw this.normalizeCustomerPortalInsertError(error);
-    } finally {
-      await client.query('RESET ROLE').catch(() => {});
-      client.release();
     }
   }
 
@@ -137,13 +126,12 @@ export class PaymentCustomerPortalService {
     return row ? this.normalizeCustomerPortalSessionRow(row) : null;
   }
 
-  private async setRequestContext(
-    client: PoolClient,
-    user: CustomerPortalUserContext
-  ): Promise<void> {
-    await client.query("SELECT set_config('request.jwt.claim.sub', $1, true)", [user.id]);
-    await client.query("SELECT set_config('request.jwt.claim.role', $1, true)", [user.role]);
-    await client.query("SELECT set_config('request.jwt.claim.email', $1, true)", [user.email]);
+  private getSafeUserContext(user: UserContext): UserContext {
+    return {
+      id: user.id,
+      email: user.email,
+      role: this.getSafeRole(user.role),
+    };
   }
 
   private getSafeRole(role: RoleSchema): RoleSchema {

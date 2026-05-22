@@ -5,6 +5,7 @@ import type {
   DashboardModelCreditUsage,
   DashboardMode,
   DashboardPosthogConnectionStatus,
+  DashboardPosthogOpenResult,
   DashboardProjectInfo,
   DashboardUserInfo,
   DashboardMetricsRange,
@@ -47,6 +48,7 @@ interface DashboardHostContextValue {
   subscribePosthogConnectionStatus?: (
     cb: (event: DashboardPosthogConnectionStatus) => void
   ) => () => void;
+  onOpenPosthog?: (projectId: string) => Promise<DashboardPosthogOpenResult>;
 }
 
 const DashboardHostContext = createContext<DashboardHostContextValue | null>(null);

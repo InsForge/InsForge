@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { posthogApi } from '#features/analytics/services/posthog.api';
+import { analyticsService } from '#features/analytics/services/analytics.service';
 
 /**
  * Retention is decoupled from the page timeframe selector — it always returns
@@ -8,7 +8,7 @@ import { posthogApi } from '#features/analytics/services/posthog.api';
 export function useRetention(enabled: boolean) {
   return useQuery({
     queryKey: ['posthog', 'retention'],
-    queryFn: () => posthogApi.getRetention(),
+    queryFn: () => analyticsService.getRetention(),
     enabled,
     staleTime: 60_000,
   });
