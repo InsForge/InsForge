@@ -72,6 +72,91 @@ describe('useTablePreferences', () => {
     expect(result.current.columnOrder).toEqual(['email', 'id', 'name']);
   });
 
+  it('saves column order updates immediately to the nested schema/table storage object', () => {
+    const { result } = renderHook(() =>
+      useTablePreferences('profiles', 'public', ['id', 'name', 'email'])
+    );
+
+    act(() => {
+      result.current.setColumnOrder(['email', 'name', 'id']);
+    });
+
+    expect(result.current.columnOrder).toEqual(['email', 'name', 'id']);
+    expect(
+      JSON.parse(storage.getItem(LOCAL_STORAGE_KEYS.databaseTablePreferences) ?? '{}')
+    ).toEqual({
+      tables: {
+        public: {
+          profiles: {
+            columnWidths: {},
+            columnOrder: ['email', 'name', 'id'],
+          },
+        },
+      },
+    });
+  });
+
+  it('filters unavailable columns when saving column order updates', () => {
+    const { result } = renderHook(() =>
+      useTablePreferences('profiles', 'public', ['id', 'name', 'email'])
+    );
+
+    act(() => {
+      result.current.setColumnOrder(['deleted_column', 'email', 'id']);
+    });
+
+    expect(result.current.columnOrder).toEqual(['email', 'id', 'name']);
+    expect(
+      JSON.parse(storage.getItem(LOCAL_STORAGE_KEYS.databaseTablePreferences) ?? '{}')
+    ).toEqual({
+      tables: {
+        public: {
+          profiles: {
+            columnWidths: {},
+            columnOrder: ['email', 'id', 'name'],
+          },
+        },
+      },
+    });
+  });
+
+  it('saves reordered columns before the target column', () => {
+    const { result } = renderHook(() =>
+      useTablePreferences('profiles', 'public', ['id', 'name', 'email'])
+    );
+
+    act(() => {
+      result.current.reorderColumns('id', 'email');
+    });
+
+    expect(result.current.columnOrder).toEqual(['name', 'id', 'email']);
+    expect(
+      JSON.parse(storage.getItem(LOCAL_STORAGE_KEYS.databaseTablePreferences) ?? '{}')
+    ).toEqual({
+      tables: {
+        public: {
+          profiles: {
+            columnWidths: {},
+            columnOrder: ['name', 'id', 'email'],
+          },
+        },
+      },
+    });
+  });
+
+  it('ignores reorder requests for unavailable columns', () => {
+    const { result } = renderHook(() =>
+      useTablePreferences('profiles', 'public', ['id', 'name', 'email'])
+    );
+
+    act(() => {
+      result.current.reorderColumns('missing_column', 'email');
+    });
+
+    expect(result.current.columnOrder).toEqual(['id', 'name', 'email']);
+    expect(storage.getItem(LOCAL_STORAGE_KEYS.databaseTablePreferences)).toBeNull();
+  });
+
   it('saves width updates to the nested schema/table storage object', () => {
     vi.useFakeTimers();
 

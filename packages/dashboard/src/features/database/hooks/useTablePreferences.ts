@@ -205,7 +205,7 @@ function reorderColumnKeys(
   }
 
   nextOrder.splice(from, 1);
-  nextOrder.splice(to, 0, sourceKey);
+  nextOrder.splice(from < to ? to - 1 : to, 0, sourceKey);
   return nextOrder;
 }
 
