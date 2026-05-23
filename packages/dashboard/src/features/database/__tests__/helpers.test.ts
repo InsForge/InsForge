@@ -1,7 +1,6 @@
 import { ColumnType, type ColumnSchema } from '@insforge/shared-schemas';
 import { describe, expect, it } from 'vitest';
 import {
-  buildDatabaseTablePreferenceKey,
   DEFAULT_DATABASE_SCHEMA,
   buildDatabaseSchemaSearch,
   buildDynamicSchema,
@@ -31,15 +30,6 @@ describe('database helpers', () => {
   it('builds schema query strings only for non-default schemas', () => {
     expect(buildDatabaseSchemaSearch(DEFAULT_DATABASE_SCHEMA)).toBe('');
     expect(buildDatabaseSchemaSearch('auth')).toBe('?schema=auth');
-  });
-
-  it('builds collision-safe table preference keys', () => {
-    expect(buildDatabaseTablePreferenceKey('app_v1', 'users')).not.toBe(
-      buildDatabaseTablePreferenceKey('app', 'v1_users')
-    );
-    expect(buildDatabaseTablePreferenceKey('public', 'profiles')).toBe(
-      JSON.stringify(['public', 'profiles'])
-    );
   });
 
   it('parses table references with optional schema names', () => {

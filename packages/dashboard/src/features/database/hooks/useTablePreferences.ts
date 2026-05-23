@@ -5,22 +5,31 @@ import {
   removeLocalStorageItem,
   setLocalStorageJSON,
 } from '#lib/utils/local-storage';
-import { buildDatabaseTablePreferenceKey } from '#features/database/helpers';
 
 const STORAGE_SAVE_DEBOUNCE_MS = 300;
 
 export type TableColumnWidths = Record<string, number>;
 export type TableColumnOrder = string[];
 
-interface DatabaseGridPreferences {
-  tableColumnWidths: Record<string, TableColumnWidths>;
-  tableColumnOrders: Record<string, TableColumnOrder>;
+interface StoredTablePreferences {
+  columnWidths: TableColumnWidths;
+  columnOrder: TableColumnOrder;
 }
 
-function createEmptyPreferences(): DatabaseGridPreferences {
+interface StoredDatabasePreferences {
+  tables: Record<string, Record<string, StoredTablePreferences>>;
+}
+
+function createEmptyTablePreferences(): StoredTablePreferences {
   return {
-    tableColumnWidths: {},
-    tableColumnOrders: {},
+    columnWidths: {},
+    columnOrder: [],
+  };
+}
+
+function createEmptyPreferences(): StoredDatabasePreferences {
+  return {
+    tables: {},
   };
 }
 
@@ -43,29 +52,122 @@ function sanitizeColumnWidths(value: unknown): TableColumnWidths {
   return sanitized;
 }
 
-function sanitizePreferences(value: unknown): DatabaseGridPreferences {
+function sanitizeStoredTablePreferences(value: unknown): StoredTablePreferences {
+  if (!isRecord(value)) {
+    return createEmptyTablePreferences();
+  }
+
+  return {
+    columnWidths: sanitizeColumnWidths(value.columnWidths),
+    columnOrder: sanitizeColumnOrder(value.columnOrder),
+  };
+}
+
+function parseLegacyTablePreferenceKey(
+  key: string
+): { schemaName: string; tableName: string } | null {
+  try {
+    const parsed = JSON.parse(key) as unknown;
+    if (
+      Array.isArray(parsed) &&
+      parsed.length === 2 &&
+      typeof parsed[0] === 'string' &&
+      typeof parsed[1] === 'string'
+    ) {
+      return {
+        schemaName: parsed[0],
+        tableName: parsed[1],
+      };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+function setStoredTablePreferences(
+  preferences: StoredDatabasePreferences,
+  schemaName: string,
+  tableName: string,
+  tablePreferences: Partial<StoredTablePreferences>
+): void {
+  const currentSchemaPreferences = preferences.tables[schemaName] ?? {};
+  const currentTablePreferences =
+    currentSchemaPreferences[tableName] ?? createEmptyTablePreferences();
+  preferences.tables[schemaName] = {
+    ...currentSchemaPreferences,
+    [tableName]: {
+      ...currentTablePreferences,
+      ...tablePreferences,
+    },
+  };
+}
+
+function sanitizePreferences(value: unknown): StoredDatabasePreferences {
   if (!isRecord(value)) {
     return createEmptyPreferences();
   }
 
-  const tableColumnWidths: Record<string, TableColumnWidths> = {};
+  const preferences = createEmptyPreferences();
+
   if (isRecord(value.tableColumnWidths)) {
-    Object.entries(value.tableColumnWidths).forEach(([tableName, columnWidths]) => {
-      tableColumnWidths[tableName] = sanitizeColumnWidths(columnWidths);
+    Object.entries(value.tableColumnWidths).forEach(([legacyKey, columnWidths]) => {
+      const tablePreferenceKey = parseLegacyTablePreferenceKey(legacyKey);
+      if (!tablePreferenceKey) {
+        return;
+      }
+
+      setStoredTablePreferences(
+        preferences,
+        tablePreferenceKey.schemaName,
+        tablePreferenceKey.tableName,
+        {
+          columnWidths: sanitizeColumnWidths(columnWidths),
+        }
+      );
     });
   }
 
-  const tableColumnOrders: Record<string, TableColumnOrder> = {};
   if (isRecord(value.tableColumnOrders)) {
-    Object.entries(value.tableColumnOrders).forEach(([tableName, columnOrder]) => {
-      tableColumnOrders[tableName] = sanitizeColumnOrder(columnOrder);
+    Object.entries(value.tableColumnOrders).forEach(([legacyKey, columnOrder]) => {
+      const tablePreferenceKey = parseLegacyTablePreferenceKey(legacyKey);
+      if (!tablePreferenceKey) {
+        return;
+      }
+
+      setStoredTablePreferences(
+        preferences,
+        tablePreferenceKey.schemaName,
+        tablePreferenceKey.tableName,
+        {
+          columnOrder: sanitizeColumnOrder(columnOrder),
+        }
+      );
     });
   }
 
-  return { tableColumnWidths, tableColumnOrders };
+  if (isRecord(value.tables)) {
+    Object.entries(value.tables).forEach(([schemaName, tables]) => {
+      if (!isRecord(tables)) {
+        return;
+      }
+
+      Object.entries(tables).forEach(([tableName, tablePreferences]) => {
+        setStoredTablePreferences(
+          preferences,
+          schemaName,
+          tableName,
+          sanitizeStoredTablePreferences(tablePreferences)
+        );
+      });
+    });
+  }
+
+  return preferences;
 }
 
-function loadPreferences(): DatabaseGridPreferences {
+function loadPreferences(): StoredDatabasePreferences {
   try {
     const parsed = getLocalStorageJSON<unknown>(LOCAL_STORAGE_KEYS.databaseTablePreferences);
     if (!parsed) {
@@ -74,17 +176,17 @@ function loadPreferences(): DatabaseGridPreferences {
 
     return sanitizePreferences(parsed);
   } catch (error) {
-    console.error('Failed to load database grid preferences from localStorage:', error);
+    console.error('Failed to load database table preferences from localStorage:', error);
     removeLocalStorageItem(LOCAL_STORAGE_KEYS.databaseTablePreferences);
     return createEmptyPreferences();
   }
 }
 
-function savePreferences(preferences: DatabaseGridPreferences): void {
+function savePreferences(preferences: StoredDatabasePreferences): void {
   try {
     setLocalStorageJSON(LOCAL_STORAGE_KEYS.databaseTablePreferences, preferences);
   } catch (error) {
-    console.error('Failed to save database grid preferences to localStorage:', error);
+    console.error('Failed to save database table preferences to localStorage:', error);
   }
 }
 
@@ -168,15 +270,23 @@ function reorderColumnKeys(
   return nextOrder;
 }
 
+function getStoredTablePreferences(
+  preferences: StoredDatabasePreferences,
+  schemaName: string,
+  tableName: string
+): StoredTablePreferences {
+  return preferences.tables[schemaName]?.[tableName] ?? createEmptyTablePreferences();
+}
+
 export function useTablePreferences(
   tableName: string | null,
   schemaName: string = 'public',
   availableColumns?: string[]
 ) {
-  const [preferences, setPreferences] = useState<DatabaseGridPreferences>(loadPreferences);
+  const [preferences, setPreferences] = useState<StoredDatabasePreferences>(loadPreferences);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestPreferencesRef = useRef(preferences);
-  const pendingWidthsRef = useRef<Record<string, TableColumnWidths>>({});
+  const pendingWidthsRef = useRef<Record<string, Record<string, TableColumnWidths>>>({});
 
   useEffect(() => {
     latestPreferencesRef.current = preferences;
@@ -184,53 +294,66 @@ export function useTablePreferences(
 
   const flushPendingWidths = useCallback(
     (skipStateUpdate: boolean = false) => {
-      const pendingWidthsByTable = pendingWidthsRef.current;
-      const tableEntries = Object.entries(pendingWidthsByTable);
+      const pendingWidthsBySchema = pendingWidthsRef.current;
+      const schemaEntries = Object.entries(pendingWidthsBySchema);
 
-      if (!tableEntries.length) {
+      if (!schemaEntries.length) {
         return;
       }
 
       pendingWidthsRef.current = {};
 
       let hasChanges = false;
-      let nextTableColumnWidths = latestPreferencesRef.current.tableColumnWidths;
+      let nextTables = latestPreferencesRef.current.tables;
 
-      tableEntries.forEach(([pendingTableName, pendingWidths]) => {
-        if (!Object.keys(pendingWidths).length) {
+      schemaEntries.forEach(([pendingSchemaName, pendingTables]) => {
+        const tableEntries = Object.entries(pendingTables);
+        if (!tableEntries.length) {
           return;
         }
 
-        const currentWidths = nextTableColumnWidths[pendingTableName] ?? {};
-        let tableChanged = false;
-
-        const mergedWidths: TableColumnWidths = { ...currentWidths };
-        Object.entries(pendingWidths).forEach(([columnKey, width]) => {
-          if (mergedWidths[columnKey] !== width) {
-            mergedWidths[columnKey] = width;
-            tableChanged = true;
+        tableEntries.forEach(([pendingTableName, pendingWidths]) => {
+          if (!Object.keys(pendingWidths).length) {
+            return;
           }
+
+          const currentTablePreferences =
+            nextTables[pendingSchemaName]?.[pendingTableName] ?? createEmptyTablePreferences();
+          let tableChanged = false;
+
+          const mergedWidths: TableColumnWidths = { ...currentTablePreferences.columnWidths };
+          Object.entries(pendingWidths).forEach(([columnKey, width]) => {
+            if (mergedWidths[columnKey] !== width) {
+              mergedWidths[columnKey] = width;
+              tableChanged = true;
+            }
+          });
+
+          if (!tableChanged) {
+            return;
+          }
+
+          if (!hasChanges) {
+            nextTables = { ...nextTables };
+            hasChanges = true;
+          }
+
+          nextTables[pendingSchemaName] = {
+            ...(nextTables[pendingSchemaName] ?? {}),
+            [pendingTableName]: {
+              ...currentTablePreferences,
+              columnWidths: mergedWidths,
+            },
+          };
         });
-
-        if (!tableChanged) {
-          return;
-        }
-
-        if (!hasChanges) {
-          nextTableColumnWidths = { ...nextTableColumnWidths };
-          hasChanges = true;
-        }
-
-        nextTableColumnWidths[pendingTableName] = mergedWidths;
       });
 
       if (!hasChanges) {
         return;
       }
 
-      const nextPreferences: DatabaseGridPreferences = {
-        tableColumnWidths: nextTableColumnWidths,
-        tableColumnOrders: latestPreferencesRef.current.tableColumnOrders,
+      const nextPreferences: StoredDatabasePreferences = {
+        tables: nextTables,
       };
       latestPreferencesRef.current = nextPreferences;
       if (!skipStateUpdate) {
@@ -262,35 +385,27 @@ export function useTablePreferences(
     };
   }, [flushPendingWidths]);
 
-  const tableStorageKey = useMemo(() => {
-    if (!tableName) {
-      return null;
-    }
-
-    return buildDatabaseTablePreferenceKey(schemaName, tableName);
-  }, [schemaName, tableName]);
-
   const columnWidths = useMemo(() => {
-    if (!tableStorageKey) {
+    if (!tableName) {
       return {};
     }
 
-    const storedWidths = preferences.tableColumnWidths[tableStorageKey] ?? {};
-    return filterWidthsByColumns(storedWidths, availableColumns);
-  }, [tableStorageKey, availableColumns, preferences]);
+    const storedTablePreferences = getStoredTablePreferences(preferences, schemaName, tableName);
+    return filterWidthsByColumns(storedTablePreferences.columnWidths, availableColumns);
+  }, [schemaName, tableName, availableColumns, preferences]);
 
   const columnOrder = useMemo(() => {
-    if (!tableStorageKey) {
+    if (!tableName) {
       return availableColumns ?? [];
     }
 
-    const storedOrder = preferences.tableColumnOrders[tableStorageKey] ?? [];
-    return filterOrderByColumns(storedOrder, availableColumns);
-  }, [tableStorageKey, availableColumns, preferences]);
+    const storedTablePreferences = getStoredTablePreferences(preferences, schemaName, tableName);
+    return filterOrderByColumns(storedTablePreferences.columnOrder, availableColumns);
+  }, [schemaName, tableName, availableColumns, preferences]);
 
   const setColumnWidth = useCallback(
     (columnKey: string, width: number) => {
-      if (!tableStorageKey || !columnKey || !Number.isFinite(width) || width <= 0) {
+      if (!tableName || !columnKey || !Number.isFinite(width) || width <= 0) {
         return;
       }
 
@@ -299,8 +414,8 @@ export function useTablePreferences(
       }
 
       const committedWidth =
-        latestPreferencesRef.current.tableColumnWidths[tableStorageKey]?.[columnKey];
-      const pendingWidth = pendingWidthsRef.current[tableStorageKey]?.[columnKey];
+        latestPreferencesRef.current.tables[schemaName]?.[tableName]?.columnWidths?.[columnKey];
+      const pendingWidth = pendingWidthsRef.current[schemaName]?.[tableName]?.[columnKey];
 
       if (committedWidth === width && pendingWidth === undefined) {
         return;
@@ -310,28 +425,37 @@ export function useTablePreferences(
         return;
       }
 
-      const tablePendingWidths = pendingWidthsRef.current[tableStorageKey] ?? {};
+      const schemaPendingWidths = pendingWidthsRef.current[schemaName] ?? {};
+      const tablePendingWidths = schemaPendingWidths[tableName] ?? {};
       pendingWidthsRef.current = {
         ...pendingWidthsRef.current,
-        [tableStorageKey]: {
-          ...tablePendingWidths,
-          [columnKey]: width,
+        [schemaName]: {
+          ...schemaPendingWidths,
+          [tableName]: {
+            ...tablePendingWidths,
+            [columnKey]: width,
+          },
         },
       };
 
       scheduleFlushPendingWidths();
     },
-    [tableStorageKey, availableColumns, scheduleFlushPendingWidths]
+    [schemaName, tableName, availableColumns, scheduleFlushPendingWidths]
   );
 
   const setColumnOrder = useCallback(
     (nextOrder: TableColumnOrder) => {
-      if (!tableStorageKey) {
+      if (!tableName) {
         return;
       }
 
       const filteredOrder = filterOrderByColumns(sanitizeColumnOrder(nextOrder), availableColumns);
-      const committedOrder = latestPreferencesRef.current.tableColumnOrders[tableStorageKey] ?? [];
+      const currentTablePreferences = getStoredTablePreferences(
+        latestPreferencesRef.current,
+        schemaName,
+        tableName
+      );
+      const committedOrder = currentTablePreferences.columnOrder;
 
       if (
         areColumnOrdersEqual(filterOrderByColumns(committedOrder, availableColumns), filteredOrder)
@@ -339,11 +463,17 @@ export function useTablePreferences(
         return;
       }
 
-      const nextPreferences: DatabaseGridPreferences = {
+      const nextPreferences: StoredDatabasePreferences = {
         ...latestPreferencesRef.current,
-        tableColumnOrders: {
-          ...latestPreferencesRef.current.tableColumnOrders,
-          [tableStorageKey]: filteredOrder,
+        tables: {
+          ...latestPreferencesRef.current.tables,
+          [schemaName]: {
+            ...(latestPreferencesRef.current.tables[schemaName] ?? {}),
+            [tableName]: {
+              ...currentTablePreferences,
+              columnOrder: filteredOrder,
+            },
+          },
         },
       };
 
@@ -351,22 +481,27 @@ export function useTablePreferences(
       setPreferences(nextPreferences);
       savePreferences(nextPreferences);
     },
-    [availableColumns, tableStorageKey]
+    [availableColumns, schemaName, tableName]
   );
 
   const reorderColumns = useCallback(
     (sourceKey: string, targetKey: string) => {
-      if (!tableStorageKey) {
+      if (!tableName) {
         return;
       }
 
+      const currentTablePreferences = getStoredTablePreferences(
+        latestPreferencesRef.current,
+        schemaName,
+        tableName
+      );
       const currentOrder = filterOrderByColumns(
-        latestPreferencesRef.current.tableColumnOrders[tableStorageKey] ?? availableColumns ?? [],
+        currentTablePreferences.columnOrder,
         availableColumns
       );
       setColumnOrder(reorderColumnKeys(currentOrder, sourceKey, targetKey));
     },
-    [availableColumns, setColumnOrder, tableStorageKey]
+    [availableColumns, schemaName, setColumnOrder, tableName]
   );
 
   return {

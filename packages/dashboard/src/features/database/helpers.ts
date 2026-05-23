@@ -153,10 +153,6 @@ export function buildDatabaseSchemaSearch(schemaName: string): string {
     : `?${new URLSearchParams({ schema: schemaName }).toString()}`;
 }
 
-export function buildDatabaseTablePreferenceKey(schemaName: string, tableName: string): string {
-  return JSON.stringify([schemaName, tableName]);
-}
-
 export function parseDatabaseTableReference(
   tableReference: string,
   defaultSchemaName: string = DEFAULT_DATABASE_SCHEMA
