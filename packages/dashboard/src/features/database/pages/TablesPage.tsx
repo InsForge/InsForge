@@ -638,6 +638,11 @@ export default function TablesPage() {
                   key={dataGridKey}
                   data={tableData?.records || []}
                   schema={tableData?.schema}
+                  storageKey={
+                    tableData?.schema
+                      ? `db_col_order_${tableData.schema.schemaName}_${tableData.schema.tableName}`
+                      : undefined
+                  }
                   columnWidths={columnWidths}
                   loading={isLoadingTable && !tableData}
                   isSorting={isSorting}
