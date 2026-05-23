@@ -35,7 +35,7 @@ import { DatabaseDataGrid } from '#features/database/components/DatabaseDataGrid
 import { SortColumn } from 'react-data-grid';
 import { convertValueForColumn } from '#lib/utils/utils';
 import { useCSVImport } from '#features/database/hooks/useCSVImport';
-import { useTableColumnWidthsPreference } from '#features/database/hooks/useTableColumnWidthsPreference';
+import { useTablePreferences } from '#features/database/hooks/useTablePreferences';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { usePageSize } from '#lib/hooks/usePageSize';
 import { DEFAULT_DATABASE_SCHEMA, getDatabaseSchemaInfo } from '#features/database/helpers';
@@ -197,7 +197,7 @@ export default function TablesPage() {
     () => `${selectedTable ?? 'no-table'}:${availableColumns.join('|')}`,
     [selectedTable, availableColumns]
   );
-  const { columnWidths, setColumnWidth } = useTableColumnWidthsPreference(
+  const { columnOrder, columnWidths, reorderColumns, setColumnWidth } = useTablePreferences(
     selectedTable,
     selectedSchema,
     availableColumns
@@ -638,7 +638,9 @@ export default function TablesPage() {
                   key={dataGridKey}
                   data={tableData?.records || []}
                   schema={tableData?.schema}
+                  columnOrder={columnOrder}
                   columnWidths={columnWidths}
+                  onColumnsReorder={reorderColumns}
                   loading={isLoadingTable && !tableData}
                   isSorting={isSorting}
                   isRefreshing={isRefreshing}
