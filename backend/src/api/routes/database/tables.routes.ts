@@ -1,5 +1,5 @@
-import { Router, Response, NextFunction } from 'express';
-import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
+import { Router, Request, Response, NextFunction } from 'express';
+import { verifyAdmin } from '@/api/middlewares/auth.js';
 import { DatabaseTableService } from '@/services/database/database-table.service.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { successResponse } from '@/utils/response.js';
@@ -20,7 +20,7 @@ const auditService = AuditService.getInstance();
 // router.use(verifyAdmin);
 
 // List all tables
-router.get('/', verifyAdmin, async (_req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/', verifyAdmin, async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const schemaName = normalizeDatabaseSchemaName(_req.query.schema);
     const tables = await tableService.listTables(schemaName);
@@ -31,7 +31,7 @@ router.get('/', verifyAdmin, async (_req: AuthRequest, res: Response, next: Next
 });
 
 // Create a new table
-router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validation = createTableRequestSchema.safeParse(req.body);
     if (!validation.success) {
@@ -73,7 +73,7 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
 router.get(
   '/:tableName/schema',
   verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { tableName } = req.params;
       const schemaName = normalizeDatabaseSchemaName(req.query.schema);
@@ -89,7 +89,7 @@ router.get(
 router.patch(
   '/:tableName/schema',
   verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { tableName } = req.params;
       const schemaName = normalizeDatabaseSchemaName(req.query.schema);
@@ -133,7 +133,7 @@ router.patch(
 router.delete(
   '/:tableName',
   verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { tableName } = req.params;
       const schemaName = normalizeDatabaseSchemaName(req.query.schema);

@@ -1110,7 +1110,7 @@ Add before the `export default router;` line (line 874):
 // ============================================================================
 
 // GET /api/auth/smtp-config - Get SMTP configuration (admin only)
-router.get('/smtp-config', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/smtp-config', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const config = await smtpConfigService.getSmtpConfig();
     successResponse(res, config);
@@ -1120,7 +1120,7 @@ router.get('/smtp-config', verifyAdmin, async (req: AuthRequest, res: Response, 
 });
 
 // PUT /api/auth/smtp-config - Update SMTP configuration (admin only)
-router.put('/smtp-config', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.put('/smtp-config', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validationResult = upsertSmtpConfigRequestSchema.safeParse(req.body);
     if (!validationResult.success) {
@@ -1153,7 +1153,7 @@ router.put('/smtp-config', verifyAdmin, async (req: AuthRequest, res: Response, 
 // ============================================================================
 
 // GET /api/auth/email-templates - Get all email templates (admin only)
-router.get('/email-templates', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/email-templates', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const templates = await emailTemplateService.getTemplates();
     successResponse(res, { data: templates });
@@ -1163,7 +1163,7 @@ router.get('/email-templates', verifyAdmin, async (req: AuthRequest, res: Respon
 });
 
 // PUT /api/auth/email-templates/:type - Update email template (admin only)
-router.put('/email-templates/:type', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.put('/email-templates/:type', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const templateType = req.params.type as EmailTemplate;
     const validTypes: EmailTemplate[] = [

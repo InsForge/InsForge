@@ -5,19 +5,6 @@ import { ERROR_CODES, type RoleSchema } from '@insforge/shared-schemas';
 import { NEXT_ACTIONS } from '../../utils/next-actions.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 
-export type UserContext = {
-  id?: string;
-  email?: string;
-  role: RoleSchema;
-};
-
-export interface AuthRequest extends Request {
-  user?: UserContext;
-  authenticated?: boolean;
-  hasApiKey?: boolean;
-  projectId?: string;
-}
-
 const tokenManager = TokenManager.getInstance();
 const secretService = SecretService.getInstance();
 
@@ -31,7 +18,7 @@ export function extractBearerToken(authHeader: string | undefined): string | nul
 
 // Helper function to extract API key from request
 // Checks both Bearer token (if starts with 'ik_') and x-api-key header
-export function extractApiKey(req: AuthRequest): string | null {
+export function extractApiKey(req: Request): string | null {
   const bearerToken = extractBearerToken(req.headers.authorization);
   if (bearerToken && bearerToken.startsWith('ik_')) {
     return bearerToken;
@@ -46,10 +33,7 @@ export function extractApiKey(req: AuthRequest): string | null {
 }
 
 // Helper function to set user on request
-function setRequestUser(
-  req: AuthRequest,
-  payload: { sub: string; email: string; role: RoleSchema }
-) {
+function setRequestUser(req: Request, payload: { sub: string; email: string; role: RoleSchema }) {
   req.user = {
     id: payload.sub,
     email: payload.email,
@@ -60,7 +44,7 @@ function setRequestUser(
 /**
  * Verifies user authentication (accepts both user and admin tokens)
  */
-export async function verifyUser(req: AuthRequest, res: Response, next: NextFunction) {
+export async function verifyUser(req: Request, res: Response, next: NextFunction) {
   const apiKey = extractApiKey(req);
   if (apiKey) {
     return verifyApiKey(req, res, next);
@@ -73,7 +57,7 @@ export async function verifyUser(req: AuthRequest, res: Response, next: NextFunc
 /**
  * Verifies admin authentication (requires admin token)
  */
-export async function verifyAdmin(req: AuthRequest, res: Response, next: NextFunction) {
+export async function verifyAdmin(req: Request, res: Response, next: NextFunction) {
   const apiKey = extractApiKey(req);
   if (apiKey) {
     return verifyApiKey(req, res, next);
@@ -124,7 +108,7 @@ export async function verifyAdmin(req: AuthRequest, res: Response, next: NextFun
  * Verifies API key authentication
  * Accepts API key via Authorization: Bearer header or x-api-key header (backward compatibility)
  */
-export async function verifyApiKey(req: AuthRequest, _res: Response, next: NextFunction) {
+export async function verifyApiKey(req: Request, _res: Response, next: NextFunction) {
   try {
     // Extract API key from request using helper
     const apiKey = extractApiKey(req);
@@ -159,7 +143,7 @@ export async function verifyApiKey(req: AuthRequest, _res: Response, next: NextF
  * Core token verification middleware that handles JWT tokens
  * Sets req.user with the authenticated user information
  */
-export function verifyToken(req: AuthRequest, _res: Response, next: NextFunction) {
+export function verifyToken(req: Request, _res: Response, next: NextFunction) {
   try {
     const token = extractBearerToken(req.headers.authorization);
     if (!token) {
@@ -208,7 +192,7 @@ export function verifyToken(req: AuthRequest, _res: Response, next: NextFunction
  * Verifies JWT token from cloud backend (api.insforge.dev)
  * Validates signature using JWKS and checks project_id claim
  */
-export async function verifyCloudBackend(req: AuthRequest, _res: Response, next: NextFunction) {
+export async function verifyCloudBackend(req: Request, _res: Response, next: NextFunction) {
   try {
     const token = extractBearerToken(req.headers.authorization);
     if (!token) {

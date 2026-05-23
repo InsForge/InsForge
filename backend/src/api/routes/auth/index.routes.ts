@@ -7,12 +7,7 @@ import { AuditService } from '@/services/logs/audit.service.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from '@/utils/errors.js';
 import { successResponse } from '@/utils/response.js';
-import {
-  AuthRequest,
-  verifyAdmin,
-  verifyToken,
-  extractBearerToken,
-} from '@/api/middlewares/auth.js';
+import { verifyAdmin, verifyToken, extractBearerToken } from '@/api/middlewares/auth.js';
 import adminRouter from './admin.routes.js';
 import oauthRouter from './oauth.routes.js';
 import customOAuthRouter from './custom-oauth.routes.js';
@@ -240,7 +235,7 @@ router.get('/public-config', async (_req: Request, res: Response, next: NextFunc
 router.patch(
   '/profiles/current',
   verifyToken,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.user?.id) {
         throw new AppError('User not authenticated', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
@@ -292,7 +287,7 @@ router.get('/profiles/:userId', async (req: Request, res: Response, next: NextFu
 
 // Email Authentication Configuration Routes
 // GET /api/auth/config - Get authentication configurations (admin only)
-router.get('/config', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/config', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const config: GetAuthConfigResponse = await authConfigService.getAuthConfig();
     successResponse(res, config);
@@ -302,7 +297,7 @@ router.get('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
 });
 
 // PUT /api/auth/config - Update authentication configurations (admin only)
-router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.put('/config', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validationResult = updateAuthConfigRequestSchema.safeParse(req.body);
     if (!validationResult.success) {
@@ -646,7 +641,7 @@ router.post('/logout', (req: Request, res: Response, next: NextFunction) => {
 router.get(
   '/sessions/current',
   verifyToken,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.user?.id) {
         throw new AppError('User not authenticated', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
@@ -726,47 +721,43 @@ router.get(
 );
 
 // DELETE /api/auth/users - Delete users (batch operation, admin only)
-router.delete(
-  '/users',
-  verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const validationResult = deleteUsersRequestSchema.safeParse(req.body);
-      if (!validationResult.success) {
-        throw new AppError(
-          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
-      }
-
-      const { userIds } = validationResult.data;
-
-      const deletedCount = await authService.deleteUsers(userIds);
-
-      // Log audit for user deletion
-      await auditService.log({
-        actor: req.user?.email || 'api-key',
-        action: 'DELETE_USERS',
-        module: 'AUTH',
-        details: {
-          userIds,
-          deletedCount,
-        },
-        ip_address: req.ip,
-      });
-
-      const response: DeleteUsersResponse = {
-        message: 'Users deleted successfully',
-        deletedCount,
-      };
-
-      successResponse(res, response);
-    } catch (error) {
-      next(error);
+router.delete('/users', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const validationResult = deleteUsersRequestSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      throw new AppError(
+        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
     }
+
+    const { userIds } = validationResult.data;
+
+    const deletedCount = await authService.deleteUsers(userIds);
+
+    // Log audit for user deletion
+    await auditService.log({
+      actor: req.user?.email || 'api-key',
+      action: 'DELETE_USERS',
+      module: 'AUTH',
+      details: {
+        userIds,
+        deletedCount,
+      },
+      ip_address: req.ip,
+    });
+
+    const response: DeleteUsersResponse = {
+      message: 'Users deleted successfully',
+      deletedCount,
+    };
+
+    successResponse(res, response);
+  } catch (error) {
+    next(error);
   }
-);
+});
 
 // POST /api/auth/tokens/anon - Generate anonymous JWT token (never expires)
 router.post('/tokens/anon', verifyAdmin, (_req: Request, res: Response, next: NextFunction) => {
@@ -1039,61 +1030,53 @@ router.post(
 
 // SMTP Configuration Routes
 // GET /api/auth/smtp-config - Get SMTP configuration (admin only)
-router.get(
-  '/smtp-config',
-  verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const config = await smtpConfigService.getSmtpConfig();
-      successResponse(res, config);
-    } catch (error) {
-      next(error);
-    }
+router.get('/smtp-config', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const config = await smtpConfigService.getSmtpConfig();
+    successResponse(res, config);
+  } catch (error) {
+    next(error);
   }
-);
+});
 
 // PUT /api/auth/smtp-config - Update SMTP configuration (admin only)
-router.put(
-  '/smtp-config',
-  verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const validationResult = upsertSmtpConfigRequestSchema.safeParse(req.body);
-      if (!validationResult.success) {
-        throw new AppError(
-          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
-      }
-
-      const input = validationResult.data;
-      const config = await smtpConfigService.upsertSmtpConfig(input);
-
-      await auditService.log({
-        actor: req.user?.email || 'api-key',
-        action: 'UPDATE_SMTP_CONFIG',
-        module: 'EMAIL',
-        details: {
-          enabled: input.enabled,
-          host: input.host,
-        },
-        ip_address: req.ip,
-      });
-
-      successResponse(res, config);
-    } catch (error) {
-      next(error);
+router.put('/smtp-config', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const validationResult = upsertSmtpConfigRequestSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      throw new AppError(
+        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
     }
+
+    const input = validationResult.data;
+    const config = await smtpConfigService.upsertSmtpConfig(input);
+
+    await auditService.log({
+      actor: req.user?.email || 'api-key',
+      action: 'UPDATE_SMTP_CONFIG',
+      module: 'EMAIL',
+      details: {
+        enabled: input.enabled,
+        host: input.host,
+      },
+      ip_address: req.ip,
+    });
+
+    successResponse(res, config);
+  } catch (error) {
+    next(error);
   }
-);
+});
 
 // Email Template Routes
 // GET /api/auth/email-templates - Get all email templates (admin only)
 router.get(
   '/email-templates',
   verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const templates = await emailTemplateService.getTemplates();
       successResponse(res, { data: templates });
@@ -1107,7 +1090,7 @@ router.get(
 router.put(
   '/email-templates/:type',
   verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!EMAIL_TEMPLATE_TYPES.includes(req.params.type as EmailTemplate)) {
         throw new AppError(

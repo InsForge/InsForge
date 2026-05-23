@@ -1,7 +1,7 @@
-import { Router, Response, NextFunction } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { DeploymentService } from '@/services/deployments/deployment.service.js';
 import { VercelProvider } from '@/providers/deployments/vercel.provider.js';
-import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
+import { verifyAdmin } from '@/api/middlewares/auth.js';
 import { deploymentsWriteLimiter } from '@/api/middlewares/rate-limiters.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/utils/errors.js';
@@ -17,7 +17,7 @@ const auditService = AuditService.getInstance();
  * List all environment variables
  * GET /api/deployments/env-vars
  */
-router.get('/', verifyAdmin, async (_req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/', verifyAdmin, async (_req: Request, res: Response, next: NextFunction) => {
   try {
     if (!deploymentService.isConfigured()) {
       throw new AppError(
@@ -42,7 +42,7 @@ router.post(
   '/',
   verifyAdmin,
   deploymentsWriteLimiter,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!deploymentService.isConfigured()) {
         throw new AppError(
@@ -92,7 +92,7 @@ router.post(
  * Get a single environment variable with decrypted value
  * GET /api/deployments/env-vars/:id
  */
-router.get('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/:id', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!deploymentService.isConfigured()) {
       throw new AppError(
@@ -120,7 +120,7 @@ router.delete(
   '/:id',
   verifyAdmin,
   deploymentsWriteLimiter,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!deploymentService.isConfigured()) {
         throw new AppError(

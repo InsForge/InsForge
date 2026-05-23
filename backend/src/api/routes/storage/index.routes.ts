@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { verifyAdmin, AuthRequest, verifyUser } from '@/api/middlewares/auth.js';
+import { verifyAdmin, verifyUser } from '@/api/middlewares/auth.js';
 import { AppError } from '@/utils/errors.js';
 import { StorageService } from '@/services/storage/storage.service.js';
 import { StorageConfigService } from '@/services/storage/storage-config.service.js';
@@ -46,7 +46,7 @@ const conditionalDownloadAuth = async (req: Request, res: Response, next: NextFu
 };
 
 // GET /api/storage/config - Get storage configuration (requires admin)
-router.get('/config', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/config', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const config = await storageConfigService.getStorageConfig();
     successResponse(res, config);
@@ -56,7 +56,7 @@ router.get('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
 });
 
 // PUT /api/storage/config - Update storage configuration (requires admin)
-router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.put('/config', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validation = updateStorageConfigRequestSchema.safeParse(req.body);
     if (!validation.success) {
@@ -84,7 +84,7 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
 });
 
 // GET /api/storage/buckets - List all buckets (requires admin)
-router.get('/buckets', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/buckets', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const storageService = StorageService.getInstance();
     const buckets = await storageService.listBuckets();
@@ -96,83 +96,79 @@ router.get('/buckets', verifyAdmin, async (req: AuthRequest, res: Response, next
 });
 
 // POST /api/storage/buckets - Create a new bucket (requires admin)
-router.post(
-  '/buckets',
-  verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const validation = createBucketRequestSchema.safeParse(req.body);
-      if (!validation.success) {
-        throw new AppError(
-          validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+router.post('/buckets', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const validation = createBucketRequestSchema.safeParse(req.body);
+    if (!validation.success) {
+      throw new AppError(
+        validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        400,
+        ERROR_CODES.STORAGE_INVALID_PARAMETER,
+        'Please check the request body, it must conform with the CreateBucketRequest schema.'
+      );
+    }
+    const { bucketName, isPublic } = validation.data;
+
+    const storageService = StorageService.getInstance();
+    await storageService.createBucket(bucketName, isPublic);
+
+    // Log audit for bucket creation
+    await auditService.log({
+      actor: req.user?.email || 'api-key',
+      action: 'CREATE_BUCKET',
+      module: 'STORAGE',
+      details: {
+        bucketName,
+        isPublic,
+      },
+      ip_address: req.ip,
+    });
+
+    const socket = SocketManager.getInstance();
+    socket.broadcastToRoom(
+      'role:project_admin',
+      ServerEvents.DATA_UPDATE,
+      { resource: DataUpdateResourceType.BUCKETS },
+      'system'
+    );
+
+    const accessInfo = isPublic
+      ? 'This is a PUBLIC bucket - objects can be accessed without authentication.'
+      : 'This is a PRIVATE bucket - authentication is required to access objects.';
+
+    successResponse(
+      res,
+      {
+        message: 'Bucket created successfully',
+        bucketName,
+        isPublic: isPublic,
+        nextActions: `${accessInfo} You can use /api/storage/buckets/:bucketName/objects/:objectKey to upload an object to the bucket, and /api/storage/buckets/:bucketName/objects to list the objects in the bucket.`,
+      },
+      201
+    );
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('already exists')) {
+      next(new AppError(error.message, 409, ERROR_CODES.STORAGE_ALREADY_EXISTS));
+    } else if (error instanceof Error && error.message.includes('Invalid bucket name')) {
+      next(
+        new AppError(
+          error.message,
           400,
           ERROR_CODES.STORAGE_INVALID_PARAMETER,
-          'Please check the request body, it must conform with the CreateBucketRequest schema.'
-        );
-      }
-      const { bucketName, isPublic } = validation.data;
-
-      const storageService = StorageService.getInstance();
-      await storageService.createBucket(bucketName, isPublic);
-
-      // Log audit for bucket creation
-      await auditService.log({
-        actor: req.user?.email || 'api-key',
-        action: 'CREATE_BUCKET',
-        module: 'STORAGE',
-        details: {
-          bucketName,
-          isPublic,
-        },
-        ip_address: req.ip,
-      });
-
-      const socket = SocketManager.getInstance();
-      socket.broadcastToRoom(
-        'role:project_admin',
-        ServerEvents.DATA_UPDATE,
-        { resource: DataUpdateResourceType.BUCKETS },
-        'system'
+          'Please check the bucket name, it must be a valid bucket name'
+        )
       );
-
-      const accessInfo = isPublic
-        ? 'This is a PUBLIC bucket - objects can be accessed without authentication.'
-        : 'This is a PRIVATE bucket - authentication is required to access objects.';
-
-      successResponse(
-        res,
-        {
-          message: 'Bucket created successfully',
-          bucketName,
-          isPublic: isPublic,
-          nextActions: `${accessInfo} You can use /api/storage/buckets/:bucketName/objects/:objectKey to upload an object to the bucket, and /api/storage/buckets/:bucketName/objects to list the objects in the bucket.`,
-        },
-        201
-      );
-    } catch (error) {
-      if (error instanceof Error && error.message.includes('already exists')) {
-        next(new AppError(error.message, 409, ERROR_CODES.STORAGE_ALREADY_EXISTS));
-      } else if (error instanceof Error && error.message.includes('Invalid bucket name')) {
-        next(
-          new AppError(
-            error.message,
-            400,
-            ERROR_CODES.STORAGE_INVALID_PARAMETER,
-            'Please check the bucket name, it must be a valid bucket name'
-          )
-        );
-      } else {
-        next(error);
-      }
+    } else {
+      next(error);
     }
   }
-);
+});
 
 // PATCH /api/storage/buckets/:bucketName - Update bucket (requires auth)
 router.patch(
   '/buckets/:bucketName',
   verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { bucketName } = req.params;
       const validation = updateBucketRequestSchema.safeParse(req.body);
@@ -244,7 +240,7 @@ router.patch(
 router.get(
   '/buckets/:bucketName/objects',
   verifyUser,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { bucketName } = req.params;
       const prefix = req.query.prefix as string;
@@ -288,7 +284,7 @@ router.put(
   verifyUser,
   dynamicUploadSingle('file'),
   handleUploadError,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { bucketName } = req.params;
       const objectKey = req.params[0]; // Everything after objects
@@ -340,7 +336,7 @@ router.post(
   verifyUser,
   dynamicUploadSingle('file'),
   handleUploadError,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { bucketName } = req.params;
 
@@ -397,7 +393,7 @@ router.post(
 router.get(
   '/buckets/:bucketName/objects/*',
   conditionalDownloadAuth,
-  async (req: AuthRequest | Request, res: Response, next: NextFunction) => {
+  async (req: Request | Request, res: Response, next: NextFunction) => {
     try {
       const { bucketName } = req.params;
       const objectKey = req.params[0]; // Everything after objects
@@ -407,7 +403,7 @@ router.get(
       }
 
       const storageService = StorageService.getInstance();
-      const authReq = req as AuthRequest;
+      const authReq = req as Request;
       const visible = await storageService.objectIsVisible(
         authReq.user,
         bucketName,
@@ -455,7 +451,7 @@ router.get(
 router.delete(
   '/buckets/:bucketName',
   verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { bucketName } = req.params;
       const storageService = StorageService.getInstance();
@@ -503,7 +499,7 @@ router.delete(
 router.delete(
   '/buckets/:bucketName/objects/*',
   verifyUser,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { bucketName } = req.params;
       const objectKey = req.params[0]; // Everything after objects
@@ -538,7 +534,7 @@ router.delete(
 router.post(
   '/buckets/:bucketName/upload-strategy',
   verifyUser,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { bucketName } = req.params;
       const { filename, contentType, size } = req.body;
@@ -569,7 +565,7 @@ router.post(
 router.post(
   '/buckets/:bucketName/objects/:objectKey/confirm-upload',
   verifyUser,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { bucketName, objectKey } = req.params;
       const { size, contentType, etag } = req.body;
@@ -625,7 +621,7 @@ router.post(
 router.post(
   '/buckets/:bucketName/objects/:objectKey/download-strategy',
   conditionalDownloadAuth,
-  async (req: AuthRequest | Request, res: Response, next: NextFunction) => {
+  async (req: Request | Request, res: Response, next: NextFunction) => {
     try {
       const { bucketName, objectKey } = req.params;
 
@@ -634,7 +630,7 @@ router.post(
       // RLS-gate the strategy hand-off, same as GET /objects/*. A presigned
       // URL bypasses RLS at redeem time, so we must verify ownership before
       // issuing one.
-      const authReq = req as AuthRequest;
+      const authReq = req as Request;
       const visible = await storageService.objectIsVisible(
         authReq.user,
         bucketName,
@@ -668,7 +664,7 @@ router.post(
 // URL clients use for this backend) plus the fixed /storage/v1/s3 path. The
 // signing region is the value the SigV4 middleware validates against; clients
 // must sign with exactly this value.
-router.get('/s3/config', verifyAdmin, (_req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/s3/config', verifyAdmin, (_req: Request, res: Response, next: NextFunction) => {
   try {
     const base = (process.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
     const endpoint = base ? `${base}/storage/v1/s3` : '/storage/v1/s3';
@@ -685,7 +681,7 @@ router.post(
   '/s3/access-keys',
   s3AccessKeyManagementRateLimiter,
   verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const validation = createS3AccessKeyRequestSchema.safeParse(req.body ?? {});
       if (!validation.success) {
@@ -715,7 +711,7 @@ router.get(
   '/s3/access-keys',
   s3AccessKeyManagementRateLimiter,
   verifyAdmin,
-  async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const keys = await s3AccessKeyService.list();
       successResponse(res, keys);
@@ -730,7 +726,7 @@ router.delete(
   '/s3/access-keys/:id',
   s3AccessKeyManagementRateLimiter,
   verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       await s3AccessKeyService.delete(req.params.id);
       await auditService.log({

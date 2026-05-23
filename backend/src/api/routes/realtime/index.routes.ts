@@ -1,8 +1,8 @@
-import { Router, Response, NextFunction } from 'express';
+import { Router, Response, NextFunction, Request } from 'express';
 import { channelsRouter } from './channels.routes.js';
 import { messagesRouter } from './messages.routes.js';
 import { permissionsRouter } from './permissions.routes.js';
-import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
+import { verifyAdmin } from '@/api/middlewares/auth.js';
 import { RealtimeMessageService } from '@/services/realtime/realtime-message.service.js';
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/utils/errors.js';
@@ -20,7 +20,7 @@ router.use('/messages', messagesRouter);
 router.use('/permissions', permissionsRouter);
 
 // Get realtime config
-router.get('/config', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/config', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const config = getRealtimeConfigResponseSchema.parse({
       retentionDays: await messageService.getRetentionDays(),
@@ -32,27 +32,23 @@ router.get('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
 });
 
 // Update realtime config
-router.patch(
-  '/config',
-  verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const validation = updateRealtimeConfigRequestSchema.safeParse(req.body);
-      if (!validation.success) {
-        throw new AppError(
-          validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
-      }
-
-      const { retentionDays } = validation.data;
-      await messageService.updateRetentionDays(retentionDays);
-      successResponse(res, { message: 'Retention config updated successfully' });
-    } catch (error) {
-      next(error);
+router.patch('/config', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const validation = updateRealtimeConfigRequestSchema.safeParse(req.body);
+    if (!validation.success) {
+      throw new AppError(
+        validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
     }
+
+    const { retentionDays } = validation.data;
+    await messageService.updateRetentionDays(retentionDays);
+    successResponse(res, { message: 'Retention config updated successfully' });
+  } catch (error) {
+    next(error);
   }
-);
+});
 
 export { router as realtimeRouter };

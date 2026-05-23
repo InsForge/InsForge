@@ -18,6 +18,10 @@
     "allowSyntheticDefaultImports": true,
     "types": ["node","vitest" ]
   },
-  "include": ["src/**/*", "../packages/shared-schemas/src/**/*"],
+  "include": [
+    "src/**/*",
+    "../packages/shared-schemas/src/**/*",
+    "tests/**/*"
+  ],
   "exclude": ["node_modules", "dist"]
 }

@@ -1,5 +1,5 @@
-import { Router, Response, NextFunction } from 'express';
-import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
+import { Router, Response, NextFunction, Request } from 'express';
+import { verifyAdmin } from '@/api/middlewares/auth.js';
 import { ScheduleService } from '@/services/schedules/schedule.service.js';
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/utils/errors.js';
@@ -21,7 +21,7 @@ router.use(verifyAdmin);
  * GET /api/schedules
  * List all schedules
  */
-router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const schedules = await scheduleService.listSchedules();
     successResponse(res, schedules);
@@ -34,7 +34,7 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
  * GET /api/schedules/config
  * Get schedules config (retention days)
  */
-router.get('/config', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/config', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const config = getSchedulesConfigResponseSchema.parse({
       retentionDays: await scheduleService.getRetentionDays(),
@@ -49,7 +49,7 @@ router.get('/config', async (req: AuthRequest, res: Response, next: NextFunction
  * PATCH /api/schedules/config
  * Update schedules config (retention days)
  */
-router.patch('/config', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.patch('/config', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validation = updateSchedulesConfigRequestSchema.safeParse(req.body);
     if (!validation.success) {
@@ -72,7 +72,7 @@ router.patch('/config', async (req: AuthRequest, res: Response, next: NextFuncti
  * GET /api/schedules/:id
  * Get a single schedule by its ID
  */
-router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
     const schedule = await scheduleService.getScheduleById(id);
@@ -89,7 +89,7 @@ router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) =
  * GET /api/schedules/:id/logs
  * Get execution logs for a schedule
  */
-router.get('/:id/logs', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/:id/logs', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
     const limit = Math.min(Math.max(1, parseInt(req.query.limit as string) || 50), 100);
@@ -111,7 +111,7 @@ router.get('/:id/logs', async (req: AuthRequest, res: Response, next: NextFuncti
  * DELETE /api/schedules/:id
  * Delete a schedule by its ID
  */
-router.delete('/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
     await scheduleService.deleteSchedule(id);
@@ -125,7 +125,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response, next: NextFunction
  * POST /api/schedules
  * Create a new schedule
  */
-router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validation = createScheduleRequestSchema.safeParse(req.body);
     if (!validation.success) {
@@ -155,7 +155,7 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
  * PATCH /api/schedules/:id
  * Update a schedule (partial update, including toggle)
  */
-router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
 

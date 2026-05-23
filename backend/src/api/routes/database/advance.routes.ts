@@ -1,8 +1,8 @@
-import { Router, Response, NextFunction } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { DatabaseAdvanceService } from '@/services/database/database-advance.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
-import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
+import { verifyAdmin } from '@/api/middlewares/auth.js';
 import { AppError } from '@/utils/errors.js';
 import { upload, handleUploadError } from '@/api/middlewares/upload.js';
 import {
@@ -49,7 +49,7 @@ function invalidateColumnTypeCacheFromChanges(changes: DatabaseResourceUpdate[])
 router.post(
   '/rawsql/unrestricted',
   verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Validate request body
       const validation = rawSQLRequestSchema.safeParse(req.body);
@@ -108,7 +108,7 @@ router.post(
  * Execute raw SQL query with strict sanitization
  * POST /api/database/advance/rawsql
  */
-router.post('/rawsql', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/rawsql', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     // Validate request body
     const validation = rawSQLRequestSchema.safeParse(req.body);
@@ -166,7 +166,7 @@ router.post('/rawsql', verifyAdmin, async (req: AuthRequest, res: Response, next
  * Export database data
  * POST /api/database/advance/export
  */
-router.post('/export', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/export', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     // Validate request body
     const validation = exportRequestSchema.safeParse(req.body);
@@ -228,7 +228,7 @@ router.post(
   verifyAdmin,
   upload.single('file'),
   handleUploadError,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.file) {
         throw new AppError('File is required', 400, ERROR_CODES.INVALID_INPUT);
@@ -305,7 +305,7 @@ router.post(
   verifyAdmin,
   upload.single('file'),
   handleUploadError,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Validate request body
       const validation = importRequestSchema.safeParse(req.body);

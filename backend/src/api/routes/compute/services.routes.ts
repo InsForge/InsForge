@@ -1,5 +1,5 @@
-import { Router, Response, NextFunction } from 'express';
-import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
+import { Router, Request, Response, NextFunction } from 'express';
+import { verifyAdmin } from '@/api/middlewares/auth.js';
 import { computeWriteLimiter } from '@/api/middlewares/rate-limiters.js';
 import { ComputeServicesService } from '@/services/compute/services.service.js';
 import { successResponse } from '@/utils/response.js';
@@ -13,7 +13,7 @@ import logger from '@/utils/logger.js';
 const router = Router();
 const auditService = AuditService.getInstance();
 
-function getProjectId(req: AuthRequest): string {
+function getProjectId(req: Request): string {
   // Cloud: projectId is set by verifyCloudBackend from the JWT claim
   // Self-hosted: fall back to the server-level PROJECT_ID env var
   return req.projectId || process.env.PROJECT_ID || 'default';
@@ -40,7 +40,7 @@ function bestEffortBroadcast() {
 }
 
 // List services
-router.get('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const svc = ComputeServicesService.getInstance();
     const services = await svc.listServices(getProjectId(req));
@@ -51,7 +51,7 @@ router.get('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextF
 });
 
 // Get service
-router.get('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/:id', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const svc = ComputeServicesService.getInstance();
     const service = await svc.getService(req.params.id);
@@ -71,7 +71,7 @@ router.post(
   '/',
   verifyAdmin,
   computeWriteLimiter,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const validation = createServiceSchema.safeParse(req.body);
       if (!validation.success) {
@@ -108,7 +108,7 @@ router.post(
   '/deploy',
   verifyAdmin,
   computeWriteLimiter,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const validation = createServiceSchema.safeParse(req.body);
       if (!validation.success) {
@@ -146,7 +146,7 @@ router.post(
   '/:id/deploy-token',
   verifyAdmin,
   computeWriteLimiter,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const svc = ComputeServicesService.getInstance();
       const existing = await svc.getService(req.params.id);
@@ -168,7 +168,7 @@ router.patch(
   '/:id',
   verifyAdmin,
   computeWriteLimiter,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const validation = updateServiceSchema.safeParse(req.body);
       if (!validation.success) {
@@ -227,7 +227,7 @@ router.delete(
   '/:id',
   verifyAdmin,
   computeWriteLimiter,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const svc = ComputeServicesService.getInstance();
       const existing = await svc.getService(req.params.id);
@@ -267,7 +267,7 @@ router.post(
   '/:id/stop',
   verifyAdmin,
   computeWriteLimiter,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const svc = ComputeServicesService.getInstance();
       const existing = await svc.getService(req.params.id);
@@ -299,7 +299,7 @@ router.post(
   '/:id/start',
   verifyAdmin,
   computeWriteLimiter,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const svc = ComputeServicesService.getInstance();
       const existing = await svc.getService(req.params.id);
@@ -329,26 +329,22 @@ router.post(
 // Get service lifecycle events (start/stop/exit/restart from Fly machine events).
 // Not container stdout/stderr — that's separate roadmap work; see spec
 // 2026-04-07-compute-dashboard-ux-design.md for the rationale.
-router.get(
-  '/:id/events',
-  verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const svc = ComputeServicesService.getInstance();
-      const existing = await svc.getService(req.params.id);
+router.get('/:id/events', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const svc = ComputeServicesService.getInstance();
+    const existing = await svc.getService(req.params.id);
 
-      if (existing.projectId !== getProjectId(req)) {
-        throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
-      }
-
-      const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 1000);
-      const events = await svc.getServiceEvents(req.params.id, { limit });
-
-      successResponse(res, events);
-    } catch (error) {
-      next(error);
+    if (existing.projectId !== getProjectId(req)) {
+      throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
     }
+
+    const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 1000);
+    const events = await svc.getServiceEvents(req.params.id, { limit });
+
+    successResponse(res, events);
+  } catch (error) {
+    next(error);
   }
-);
+});
 
 export { router as servicesRouter };

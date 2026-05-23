@@ -1,7 +1,7 @@
-import { Router, Response, NextFunction } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { DeploymentService } from '@/services/deployments/deployment.service.js';
-import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
+import { verifyAdmin } from '@/api/middlewares/auth.js';
 import { deploymentsWriteLimiter } from '@/api/middlewares/rate-limiters.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/utils/errors.js';
@@ -33,7 +33,7 @@ router.post(
   '/',
   verifyAdmin,
   deploymentsWriteLimiter,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const response = await deploymentService.createDeployment();
 
@@ -61,7 +61,7 @@ router.post(
   '/direct',
   verifyAdmin,
   deploymentsWriteLimiter,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const validationResult = createDirectDeploymentRequestSchema.safeParse(req.body);
       if (!validationResult.success) {
@@ -99,7 +99,7 @@ router.post(
 router.put(
   '/:id/files/:fileId/content',
   verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const idValidation = uuidParamSchema.safeParse(req.params.id);
       if (!idValidation.success) {
@@ -157,7 +157,7 @@ router.post(
   '/:id/start',
   verifyAdmin,
   deploymentsWriteLimiter,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
 
@@ -197,7 +197,7 @@ router.post(
  * List all deployments
  * GET /api/deployments
  */
-router.get('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const limit = Math.max(1, parseInt(req.query.limit as string) || 50);
     const offset = Math.max(0, parseInt(req.query.offset as string) || 0);
@@ -214,18 +214,14 @@ router.get('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextF
  * Get deployment metadata (current deployment, domain URLs)
  * GET /api/deployments/metadata
  */
-router.get(
-  '/metadata',
-  verifyAdmin,
-  async (_req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const metadata = await deploymentService.getMetadata();
-      successResponse(res, metadata);
-    } catch (error) {
-      next(error);
-    }
+router.get('/metadata', verifyAdmin, async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const metadata = await deploymentService.getMetadata();
+    successResponse(res, metadata);
+  } catch (error) {
+    next(error);
   }
-);
+});
 
 /**
  * Update custom slug for the project
@@ -235,7 +231,7 @@ router.put(
   '/slug',
   verifyAdmin,
   deploymentsWriteLimiter,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const validationResult = updateSlugRequestSchema.safeParse(req.body);
       if (!validationResult.success) {
@@ -272,18 +268,14 @@ router.put(
  * List all custom domains
  * GET /api/deployments/domains
  */
-router.get(
-  '/domains',
-  verifyAdmin,
-  async (_req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const result = await deploymentService.listCustomDomains();
-      successResponse(res, result);
-    } catch (error) {
-      next(error);
-    }
+router.get('/domains', verifyAdmin, async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await deploymentService.listCustomDomains();
+    successResponse(res, result);
+  } catch (error) {
+    next(error);
   }
-);
+});
 
 /**
  * Add a custom domain
@@ -293,7 +285,7 @@ router.post(
   '/domains',
   verifyAdmin,
   deploymentsWriteLimiter,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const validationResult = addCustomDomainRequestSchema.safeParse(req.body);
       if (!validationResult.success) {
@@ -329,7 +321,7 @@ router.post(
   '/domains/:domain/verify',
   verifyAdmin,
   deploymentsWriteLimiter,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const validationResult = domainParamSchema.safeParse(req.params.domain);
       if (!validationResult.success) {
@@ -356,7 +348,7 @@ router.delete(
   '/domains/:domain',
   verifyAdmin,
   deploymentsWriteLimiter,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const validationResult = domainParamSchema.safeParse(req.params.domain);
       if (!validationResult.success) {
@@ -389,7 +381,7 @@ router.delete(
  * Get deployment by database ID
  * GET /api/deployments/:id
  */
-router.get('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/:id', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
 
@@ -413,25 +405,21 @@ router.get('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: Ne
 // (vercelProvider.getDeployment) — a read, not a write. The
 // deploymentsWriteLimiter is reserved for endpoints that consume Vercel's
 // write quotas (deployment creation, env-var writes, domain CRUD).
-router.post(
-  '/:id/sync',
-  verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const { id } = req.params;
+router.post('/:id/sync', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
 
-      const deployment = await deploymentService.syncDeploymentById(id);
+    const deployment = await deploymentService.syncDeploymentById(id);
 
-      if (!deployment) {
-        throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
-      }
-
-      successResponse(res, deployment);
-    } catch (error) {
-      next(error);
+    if (!deployment) {
+      throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
     }
+
+    successResponse(res, deployment);
+  } catch (error) {
+    next(error);
   }
-);
+});
 
 /**
  * Cancel a deployment
@@ -441,7 +429,7 @@ router.post(
   '/:id/cancel',
   verifyAdmin,
   deploymentsWriteLimiter,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
 

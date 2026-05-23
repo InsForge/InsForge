@@ -1,5 +1,5 @@
-import { Router, Response, NextFunction } from 'express';
-import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
+import { Router, Response, NextFunction, Request } from 'express';
+import { verifyAdmin } from '@/api/middlewares/auth.js';
 import { RealtimeChannelService } from '@/services/realtime/realtime-channel.service.js';
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/utils/errors.js';
@@ -13,7 +13,7 @@ const router = Router();
 const channelService = RealtimeChannelService.getInstance();
 
 // List all channels
-router.get('/', verifyAdmin, async (_req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/', verifyAdmin, async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const channels = await channelService.list();
     successResponse(res, channels);
@@ -23,7 +23,7 @@ router.get('/', verifyAdmin, async (_req: AuthRequest, res: Response, next: Next
 });
 
 // Get channel by ID
-router.get('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/:id', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const channel = await channelService.getById(req.params.id);
     if (!channel) {
@@ -36,7 +36,7 @@ router.get('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: Ne
 });
 
 // Create a channel
-router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validation = createChannelRequestSchema.safeParse(req.body);
     if (!validation.success) {
@@ -54,7 +54,7 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
 });
 
 // Update a channel
-router.put('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.put('/:id', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validation = updateChannelRequestSchema.safeParse(req.body);
     if (!validation.success) {
@@ -72,7 +72,7 @@ router.put('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: Ne
 });
 
 // Delete a channel
-router.delete('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.delete('/:id', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     await channelService.delete(req.params.id);
     successResponse(res, { message: 'Channel deleted' });

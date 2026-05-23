@@ -1,7 +1,7 @@
-import { Router, Response, NextFunction } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { LogService } from '@/services/logs/log.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
-import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
+import { verifyAdmin } from '@/api/middlewares/auth.js';
 import { successResponse, paginatedResponse } from '@/utils/response.js';
 import { ERROR_CODES, type GetLogsResponse } from '@insforge/shared-schemas';
 import { AppError } from '@/utils/errors.js';
@@ -12,7 +12,7 @@ const router = Router();
 router.use(verifyAdmin);
 
 // GET /logs/audits - List audit logs
-router.get('/audits', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/audits', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { limit = 100, offset = 0, actor, action, module, start_date, end_date } = req.query;
 
@@ -39,7 +39,7 @@ router.get('/audits', async (req: AuthRequest, res: Response, next: NextFunction
 });
 
 // GET /logs/audits/stats - Get audit logs statistics
-router.get('/audits/stats', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/audits/stats', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { days = 7 } = req.query;
 
@@ -53,7 +53,7 @@ router.get('/audits/stats', async (req: AuthRequest, res: Response, next: NextFu
 });
 
 // DELETE /logs/audits - Clear audit logs (admin only)
-router.delete('/audits', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.delete('/audits', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { days_to_keep = 90 } = req.query;
 
@@ -71,7 +71,7 @@ router.delete('/audits', async (req: AuthRequest, res: Response, next: NextFunct
 
 // System logs routes
 // GET /logs/sources - List all log sources
-router.get('/sources', async (_req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/sources', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const logService = LogService.getInstance();
     const sources = await logService.getLogSources();
@@ -83,7 +83,7 @@ router.get('/sources', async (_req: AuthRequest, res: Response, next: NextFuncti
 });
 
 // GET /logs/stats - Get statistics for all log sources
-router.get('/stats', async (_req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/stats', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const logService = LogService.getInstance();
     const stats = await logService.getLogSourceStats();
@@ -95,7 +95,7 @@ router.get('/stats', async (_req: AuthRequest, res: Response, next: NextFunction
 });
 
 // GET /logs/functions/build-logs - Get function build logs from Deno Subhosting
-router.get('/functions/build-logs', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/functions/build-logs', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { deployment_id } = req.query;
 
@@ -117,7 +117,7 @@ router.get('/functions/build-logs', async (req: AuthRequest, res: Response, next
 });
 
 // GET /logs/search - Search across all logs or specific source
-router.get('/search', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/search', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { q, source, limit = 100, offset = 0 } = req.query;
 
@@ -140,7 +140,7 @@ router.get('/search', async (req: AuthRequest, res: Response, next: NextFunction
 });
 
 // GET /logs/:source - Get logs from specific source
-router.get('/:source', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/:source', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { source } = req.params;
     const { limit = 100, before_timestamp } = req.query;

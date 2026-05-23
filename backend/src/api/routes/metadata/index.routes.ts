@@ -1,11 +1,11 @@
-import { Router, Response, NextFunction } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { DatabaseAdvanceService } from '@/services/database/database-advance.service.js';
 import { AuthService } from '@/services/auth/auth.service.js';
 import { StorageService } from '@/services/storage/storage.service.js';
 import { FunctionService } from '@/services/functions/function.service.js';
 import { RealtimeChannelService } from '@/services/realtime/realtime-channel.service.js';
 import { DeploymentService } from '@/services/deployments/deployment.service.js';
-import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
+import { verifyAdmin } from '@/api/middlewares/auth.js';
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/utils/errors.js';
 import {
@@ -29,7 +29,7 @@ const deploymentService = DeploymentService.getInstance();
 router.use(verifyAdmin);
 
 // Get full metadata (default endpoint)
-router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     // Gather metadata from all modules
 
@@ -66,7 +66,7 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
 });
 
 // Get auth metadata
-router.get('/auth', async (_req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/auth', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const authMetadata = await authService.getMetadata();
     successResponse(res, authMetadata);
@@ -76,7 +76,7 @@ router.get('/auth', async (_req: AuthRequest, res: Response, next: NextFunction)
 });
 
 // Get database metadata
-router.get('/database', async (_req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/database', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const databaseMetadata = await dbManager.getMetadata();
     successResponse(res, databaseMetadata);
@@ -86,7 +86,7 @@ router.get('/database', async (_req: AuthRequest, res: Response, next: NextFunct
 });
 
 // Get storage metadata
-router.get('/storage', async (_req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/storage', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const storageMetadata = await storageService.getMetadata();
     successResponse(res, storageMetadata);
@@ -96,7 +96,7 @@ router.get('/storage', async (_req: AuthRequest, res: Response, next: NextFuncti
 });
 
 // Get functions metadata
-router.get('/functions', async (_req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/functions', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const functionsMetadata = await functionService.getMetadata();
     successResponse(res, functionsMetadata);
@@ -106,7 +106,7 @@ router.get('/functions', async (_req: AuthRequest, res: Response, next: NextFunc
 });
 
 // Get realtime metadata
-router.get('/realtime', async (_req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/realtime', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const realtimeMetadata = await realtimeChannelService.getMetadata();
     successResponse(res, realtimeMetadata);
@@ -116,7 +116,7 @@ router.get('/realtime', async (_req: AuthRequest, res: Response, next: NextFunct
 });
 
 // Get API key (admin only)
-router.get('/api-key', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/api-key', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const secretService = SecretService.getInstance();
     const apiKey = await secretService.getSecretByKey('API_KEY');
@@ -128,7 +128,7 @@ router.get('/api-key', async (req: AuthRequest, res: Response, next: NextFunctio
 });
 
 // Get backend project id from environment (admin only)
-router.get('/project-id', (_req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/project-id', (_req: Request, res: Response, next: NextFunction) => {
   try {
     const projectIdResponse: ProjectIdResponse = {
       projectId: process.env.PROJECT_ID || null,
@@ -142,7 +142,7 @@ router.get('/project-id', (_req: AuthRequest, res: Response, next: NextFunction)
 // Get database connection string from cloud backend (admin only)
 router.get(
   '/database-connection-string',
-  async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const cloudDbProvider = CloudDatabaseProvider.getInstance();
       const connectionInfo = await cloudDbProvider.getDatabaseConnectionString();
@@ -154,7 +154,7 @@ router.get(
 );
 
 // Get database password from cloud backend (admin only)
-router.get('/database-password', async (_req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/database-password', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const cloudDbProvider = CloudDatabaseProvider.getInstance();
     const passwordInfo = await cloudDbProvider.getDatabasePassword();
@@ -166,7 +166,7 @@ router.get('/database-password', async (_req: AuthRequest, res: Response, next: 
 
 // get metadata for a table.
 // Notice: must be after fixed endpoints like /api-key and /project-id in case of conflict.
-router.get('/:tableName', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/:tableName', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tableName } = req.params;
     if (!tableName) {

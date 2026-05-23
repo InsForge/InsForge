@@ -1,5 +1,5 @@
-import { Router, Response, NextFunction } from 'express';
-import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
+import { Router, Response, NextFunction, Request } from 'express';
+import { verifyAdmin } from '@/api/middlewares/auth.js';
 import { RealtimeMessageService } from '@/services/realtime/realtime-message.service.js';
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/utils/errors.js';
@@ -13,7 +13,7 @@ const router = Router();
 const messageService = RealtimeMessageService.getInstance();
 
 // List messages
-router.get('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validation = listMessagesRequestSchema.safeParse(req.query);
     if (!validation.success) {
@@ -31,7 +31,7 @@ router.get('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextF
 });
 
 // Get message statistics
-router.get('/stats', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/stats', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validation = messageStatsRequestSchema.safeParse(req.query);
     if (!validation.success) {

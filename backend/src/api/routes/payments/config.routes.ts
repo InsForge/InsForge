@@ -1,5 +1,4 @@
-import { Router, Response, NextFunction } from 'express';
-import { AuthRequest } from '@/api/middlewares/auth.js';
+import { Router, Request, Response, NextFunction } from 'express';
 import { AppError } from '@/utils/errors.js';
 import { PaymentService } from '@/services/payments/payment.service.js';
 import { successResponse } from '@/utils/response.js';
@@ -36,7 +35,7 @@ function getEnvironment(params: unknown) {
   return validation.data.environment;
 }
 
-router.put('/config', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.put('/config', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const environment = getEnvironment(req.params);
     const validation = upsertPaymentsConfigBodySchema.safeParse(req.body);
@@ -53,7 +52,7 @@ router.put('/config', async (req: AuthRequest, res: Response, next: NextFunction
   }
 });
 
-router.delete('/config', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.delete('/config', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const environment = getEnvironment(req.params);
     const removed = await paymentService.removeStripeSecretKey(environment);
@@ -68,7 +67,7 @@ router.delete('/config', async (req: AuthRequest, res: Response, next: NextFunct
   }
 });
 
-router.post('/sync', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/sync', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const environment = getEnvironment(req.params);
     const result = await paymentService.syncPayments({ environment });
@@ -78,7 +77,7 @@ router.post('/sync', async (req: AuthRequest, res: Response, next: NextFunction)
   }
 });
 
-router.post('/webhook', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/webhook', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const environment = getEnvironment(req.params);
     const result = await paymentService.configureWebhook(environment);

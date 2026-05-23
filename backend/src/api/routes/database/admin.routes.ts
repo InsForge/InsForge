@@ -1,6 +1,6 @@
-import { Router, Response, NextFunction } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
+import { verifyAdmin } from '@/api/middlewares/auth.js';
 import { AppError } from '@/utils/errors.js';
 import {
   ERROR_CODES,
@@ -89,7 +89,7 @@ router.use(verifyAdmin);
 
 router.get(
   '/tables/:tableName/records',
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const schemaName = normalizeDatabaseSchemaName(req.query.schema);
       const validation = adminTableRecordsListQuerySchema.safeParse(req.query);
@@ -116,7 +116,7 @@ router.get(
 
 router.get(
   '/tables/:tableName/records/lookup',
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const schemaName = normalizeDatabaseSchemaName(req.query.schema);
       const validation = adminTableRecordLookupQuerySchema.safeParse(req.query);
@@ -140,7 +140,7 @@ router.get(
 
 router.post(
   '/tables/:tableName/records',
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const schemaName = normalizeDatabaseSchemaName(req.query.schema);
       const validation = adminTableRecordsCreateRequestSchema.safeParse(req.body);
@@ -164,7 +164,7 @@ router.post(
 
 router.patch(
   '/tables/:tableName/records/:recordId',
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const schemaName = normalizeDatabaseSchemaName(req.query.schema);
       const queryValidation = adminTableRecordUpdateQuerySchema.safeParse(req.query);
@@ -203,7 +203,7 @@ router.patch(
 
 router.delete(
   '/tables/:tableName/records',
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const schemaName = normalizeDatabaseSchemaName(req.query.schema);
       const validation = adminTableRecordsDeleteQuerySchema.safeParse(req.query);

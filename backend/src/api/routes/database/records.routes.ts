@@ -1,6 +1,6 @@
-import { Router, Response, NextFunction } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import axios from 'axios';
-import { AuthRequest, extractApiKey, verifyUser } from '@/api/middlewares/auth.js';
+import { extractApiKey, verifyUser } from '@/api/middlewares/auth.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
@@ -29,7 +29,7 @@ function handleProxyError(error: unknown, res: Response, next: NextFunction) {
 /**
  * Forward database table requests to PostgREST
  */
-const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFunction) => {
+const forwardToPostgrest = async (req: Request, res: Response, next: NextFunction) => {
   const { tableName, path: wildcardPath } = req.params;
   const path = wildcardPath ? `/${tableName}/${wildcardPath}` : `/${tableName}`;
 

@@ -323,7 +323,7 @@ router.get('/', verifyAdmin, async (_req, res, next) => {
 - [ ] **Step 3: Add the create-and-run endpoint**
 
 ```ts
-router.post('/', verifyAdmin, async (req: AuthRequest, res, next) => {
+router.post('/', verifyAdmin, async (req: Request, res, next) => {
   try {
     const validation = createMigrationRequestSchema.safeParse(req.body);
     if (!validation.success) {

@@ -17,7 +17,7 @@ describe('Database Records Route Authentication', () => {
   );
 
   test('imports verifyUser middleware', () => {
-    expect(recordsSource).toContain('import { AuthRequest, extractApiKey, verifyUser }');
+    expect(recordsSource).toContain('import { extractApiKey, verifyUser }');
   });
 
   test('applies verifyUser to /:tableName route', () => {
@@ -44,7 +44,7 @@ describe('Database RPC Route Authentication', () => {
   );
 
   test('imports verifyUser middleware', () => {
-    expect(rpcSource).toContain('import { AuthRequest, extractApiKey, verifyUser }');
+    expect(rpcSource).toContain('import { extractApiKey, verifyUser }');
   });
 
   test('applies verifyUser to /:functionName route', () => {

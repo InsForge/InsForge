@@ -1,6 +1,6 @@
-import { Router, Response, NextFunction } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import axios from 'axios';
-import { AuthRequest, extractApiKey, verifyUser } from '@/api/middlewares/auth.js';
+import { extractApiKey, verifyUser } from '@/api/middlewares/auth.js';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import { validateFunctionName } from '@/utils/validations.js';
@@ -24,7 +24,7 @@ function handleProxyError(error: unknown, res: Response, next: NextFunction) {
 /**
  * Forward RPC calls to PostgREST
  */
-const forwardRpcToPostgrest = async (req: AuthRequest, res: Response, next: NextFunction) => {
+const forwardRpcToPostgrest = async (req: Request, res: Response, next: NextFunction) => {
   const { functionName } = req.params;
 
   try {

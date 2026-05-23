@@ -1,11 +1,11 @@
-import { Router, Response, NextFunction } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import {
   ERROR_CODES,
   createMigrationRequestSchema,
   type CreateMigrationResponse,
   type DatabaseMigrationsResponse,
 } from '@insforge/shared-schemas';
-import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
+import { verifyAdmin } from '@/api/middlewares/auth.js';
 import { AppError } from '@/utils/errors.js';
 import { DatabaseMigrationService } from '@/services/database/database-migration.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
@@ -21,7 +21,7 @@ const auditService = AuditService.getInstance();
 router.get(
   '/',
   verifyAdmin,
-  async (_req: AuthRequest, res: Response<DatabaseMigrationsResponse>, next: NextFunction) => {
+  async (_req: Request, res: Response<DatabaseMigrationsResponse>, next: NextFunction) => {
     try {
       const response = await migrationService.listMigrations();
       successResponse(res, response);
@@ -34,7 +34,7 @@ router.get(
 router.post(
   '/',
   verifyAdmin,
-  async (req: AuthRequest, res: Response<CreateMigrationResponse>, next: NextFunction) => {
+  async (req: Request, res: Response<CreateMigrationResponse>, next: NextFunction) => {
     try {
       const validation = createMigrationRequestSchema.safeParse(req.body);
       if (!validation.success) {

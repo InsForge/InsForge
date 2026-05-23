@@ -673,7 +673,7 @@ const s3AccessKeyService = S3AccessKeyService.getInstance();
 router.post(
   '/s3/access-keys',
   verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const validation = createS3AccessKeyRequestSchema.safeParse(req.body ?? {});
       if (!validation.success) {
@@ -701,7 +701,7 @@ router.post(
 router.get(
   '/s3/access-keys',
   verifyAdmin,
-  async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const keys = await s3AccessKeyService.list();
       successResponse(res, keys);
@@ -714,7 +714,7 @@ router.get(
 router.delete(
   '/s3/access-keys/:id',
   verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       await s3AccessKeyService.delete(req.params.id);
       await auditService.log({

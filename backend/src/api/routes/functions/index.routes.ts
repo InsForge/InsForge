@@ -1,5 +1,5 @@
-import { Router, Response, NextFunction } from 'express';
-import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
+import { Router, Request, Response, NextFunction } from 'express';
+import { verifyAdmin } from '@/api/middlewares/auth.js';
 import { functionsWriteLimiter } from '@/api/middlewares/rate-limiters.js';
 import { FunctionService } from '@/services/functions/function.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
@@ -22,7 +22,7 @@ const auditService = AuditService.getInstance();
  * GET /api/functions
  * List all edge functions
  */
-router.get('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await functionService.listFunctions();
     successResponse(res, result);
@@ -36,7 +36,7 @@ router.get('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextF
  * GET /api/functions/:slug
  * Get specific function details including code
  */
-router.get('/:slug', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/:slug', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { slug } = req.params;
     const func = await functionService.getFunction(slug);
@@ -59,7 +59,7 @@ router.post(
   '/',
   verifyAdmin,
   functionsWriteLimiter,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const validation = uploadFunctionRequestSchema.safeParse(req.body);
       if (!validation.success) {
@@ -116,7 +116,7 @@ router.put(
   '/:slug',
   verifyAdmin,
   functionsWriteLimiter,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { slug } = req.params;
       const validation = updateFunctionRequestSchema.safeParse(req.body);
@@ -171,7 +171,7 @@ router.delete(
   '/:slug',
   verifyAdmin,
   functionsWriteLimiter,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { slug } = req.params;
       const deleted = await functionService.deleteFunction(slug);

@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { NextFunction, Response } from 'express';
-import type { AuthRequest } from '../../src/api/middlewares/auth';
+import type { NextFunction, Request, Response } from 'express';
 
 const { mockVerifyApiKey } = vi.hoisted(() => ({
   mockVerifyApiKey: vi.fn<(apiKey: string) => Promise<boolean>>(),
@@ -36,7 +35,7 @@ describe('verifyApiKey', () => {
       headers: {
         authorization: 'Bearer ik_valid',
       },
-    } as AuthRequest;
+    } as Request;
     const next = vi.fn() as NextFunction;
 
     await verifyApiKey(req, {} as Response, next);
@@ -55,7 +54,7 @@ describe('verifyApiKey', () => {
       headers: {
         'x-api-key': 'ik_invalid',
       },
-    } as unknown as AuthRequest;
+    } as unknown as Request;
     const next = vi.fn() as NextFunction;
 
     await verifyApiKey(req, {} as Response, next);

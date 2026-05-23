@@ -1,5 +1,5 @@
-import { Router, Response, NextFunction } from 'express';
-import { AuthRequest, verifyAdmin, verifyUser } from '@/api/middlewares/auth.js';
+import { Router, Request, Response, NextFunction } from 'express';
+import { verifyAdmin, verifyUser } from '@/api/middlewares/auth.js';
 import { AppError } from '@/utils/errors.js';
 import { PaymentService } from '@/services/payments/payment.service.js';
 import { successResponse } from '@/utils/response.js';
@@ -43,7 +43,7 @@ function getEnvironment(params: unknown) {
   return validation.data.environment;
 }
 
-router.get('/status', verifyAdmin, async (_req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/status', verifyAdmin, async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const status = await paymentService.getStatus();
     successResponse(res, status);
@@ -52,7 +52,7 @@ router.get('/status', verifyAdmin, async (_req: AuthRequest, res: Response, next
   }
 });
 
-router.get('/config', verifyAdmin, async (_req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/config', verifyAdmin, async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const config = await paymentService.getConfig();
     successResponse(res, config);
@@ -61,7 +61,7 @@ router.get('/config', verifyAdmin, async (_req: AuthRequest, res: Response, next
   }
 });
 
-router.post('/sync', verifyAdmin, async (_req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/sync', verifyAdmin, async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await paymentService.syncPayments({ environment: 'all' });
     successResponse(res, result);
@@ -73,7 +73,7 @@ router.post('/sync', verifyAdmin, async (_req: AuthRequest, res: Response, next:
 environmentRouter.post(
   '/checkout-sessions',
   verifyUser,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const environment = getEnvironment(req.params);
       const validation = createCheckoutSessionBodySchema.safeParse(req.body);
@@ -106,7 +106,7 @@ environmentRouter.post(
 environmentRouter.post(
   '/customer-portal-sessions',
   verifyUser,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const environment = getEnvironment(req.params);
       const validation = createCustomerPortalSessionBodySchema.safeParse(req.body);
@@ -142,7 +142,7 @@ environmentRouter.use('/catalog', catalogRouter);
 
 environmentRouter.get(
   '/payment-history',
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const environment = getEnvironment(req.params);
       const validation = listPaymentHistoryQuerySchema.safeParse(req.query);
@@ -161,28 +161,25 @@ environmentRouter.get(
   }
 );
 
-environmentRouter.get(
-  '/subscriptions',
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const environment = getEnvironment(req.params);
-      const validation = listSubscriptionsQuerySchema.safeParse(req.query);
-      if (!validation.success) {
-        throw invalidInputFromZod(validation.error);
-      }
-
-      const subscriptions = await paymentService.listSubscriptions({
-        environment,
-        ...validation.data,
-      });
-      successResponse(res, subscriptions);
-    } catch (error) {
-      next(error);
+environmentRouter.get('/subscriptions', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const environment = getEnvironment(req.params);
+    const validation = listSubscriptionsQuerySchema.safeParse(req.query);
+    if (!validation.success) {
+      throw invalidInputFromZod(validation.error);
     }
-  }
-);
 
-environmentRouter.get('/customers', async (req: AuthRequest, res: Response, next: NextFunction) => {
+    const subscriptions = await paymentService.listSubscriptions({
+      environment,
+      ...validation.data,
+    });
+    successResponse(res, subscriptions);
+  } catch (error) {
+    next(error);
+  }
+});
+
+environmentRouter.get('/customers', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const environment = getEnvironment(req.params);
     const validation = listPaymentCustomersQuerySchema.safeParse(req.query);

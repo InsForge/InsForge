@@ -1,6 +1,6 @@
-import { Router, Response, NextFunction } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { ChatCompletionService } from '@/services/ai/chat-completion.service.js';
-import { AuthRequest, verifyAdmin, verifyUser } from '../../middlewares/auth.js';
+import { verifyAdmin, verifyUser } from '../../middlewares/auth.js';
 import { ImageGenerationService } from '@/services/ai/image-generation.service.js';
 import { EmbeddingService } from '@/services/ai/embedding.service.js';
 import { AIModelService } from '@/services/ai/ai-model.service.js';
@@ -23,7 +23,7 @@ type AIProvider = 'openrouter';
  * GET /api/ai/models
  * Get all available AI models in ListModelsResponse format
  */
-router.get('/models', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/models', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const models = await AIModelService.getModels();
     successResponse(res, models);
@@ -36,19 +36,15 @@ router.get('/models', verifyAdmin, async (req: AuthRequest, res: Response, next:
  * GET /api/ai/overview
  * Get key-level Model Gateway observability from OpenRouter.
  */
-router.get(
-  '/overview',
-  verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const openRouterProvider = OpenRouterProvider.getInstance();
-      const overview = await openRouterProvider.getOverview();
-      successResponse(res, overview);
-    } catch (error) {
-      next(error);
-    }
+router.get('/overview', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const openRouterProvider = OpenRouterProvider.getInstance();
+    const overview = await openRouterProvider.getOverview();
+    successResponse(res, overview);
+  } catch (error) {
+    next(error);
   }
-);
+});
 
 /**
  * GET /api/ai/:provider/api-key
@@ -57,7 +53,7 @@ router.get(
 router.get(
   '/:provider/api-key',
   verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const provider = parseAIProvider(req.params.provider);
       const openRouterProvider = OpenRouterProvider.getInstance();
@@ -113,7 +109,7 @@ function getProviderApiKey(provider: AIProvider, openRouterProvider: OpenRouterP
 router.post(
   '/chat/completion',
   verifyUser,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const validationResult = chatCompletionRequestSchema.safeParse(req.body);
       if (!validationResult.success) {
@@ -195,7 +191,7 @@ router.post(
 router.post(
   '/image/generation',
   verifyUser,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const validationResult = imageGenerationRequestSchema.safeParse(req.body);
       if (!validationResult.success) {
@@ -229,38 +225,34 @@ router.post(
  * POST /api/ai/embeddings
  * Generate embeddings for text input
  */
-router.post(
-  '/embeddings',
-  verifyUser,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const validationResult = embeddingsRequestSchema.safeParse(req.body);
-      if (!validationResult.success) {
-        throw new AppError(
-          `Validation error: ${validationResult.error.errors.map((e) => e.message).join(', ')}`,
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
-      }
+router.post('/embeddings', verifyUser, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const validationResult = embeddingsRequestSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      throw new AppError(
+        `Validation error: ${validationResult.error.errors.map((e) => e.message).join(', ')}`,
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
 
-      const embeddingService = EmbeddingService.getInstance();
-      const result = await embeddingService.createEmbeddings(validationResult.data);
+    const embeddingService = EmbeddingService.getInstance();
+    const result = await embeddingService.createEmbeddings(validationResult.data);
 
-      successResponse(res, result);
-    } catch (error) {
-      if (error instanceof AppError) {
-        next(error);
-      } else {
-        next(
-          new AppError(
-            error instanceof Error ? error.message : 'Failed to generate embeddings',
-            500,
-            ERROR_CODES.INTERNAL_ERROR
-          )
-        );
-      }
+    successResponse(res, result);
+  } catch (error) {
+    if (error instanceof AppError) {
+      next(error);
+    } else {
+      next(
+        new AppError(
+          error instanceof Error ? error.message : 'Failed to generate embeddings',
+          500,
+          ERROR_CODES.INTERNAL_ERROR
+        )
+      );
     }
   }
-);
+});
 
 export { router as aiRouter };

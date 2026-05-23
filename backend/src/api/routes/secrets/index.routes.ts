@@ -1,8 +1,8 @@
-import { Router, Response, NextFunction } from 'express';
+import { Router, Response, NextFunction, Request } from 'express';
 import { z } from 'zod';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { FunctionService } from '@/services/functions/function.service.js';
-import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
+import { verifyAdmin } from '@/api/middlewares/auth.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
@@ -28,7 +28,7 @@ const triggerSecretsRedeployment = () => {
  * List all secrets (metadata only, no values)
  * GET /api/secrets
  */
-router.get('/', verifyAdmin, async (_req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/', verifyAdmin, async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const secrets = await secretService.listSecrets();
     successResponse(res, { secrets });
@@ -41,7 +41,7 @@ router.get('/', verifyAdmin, async (_req: AuthRequest, res: Response, next: Next
  * Get a specific secret value by key
  * GET /api/secrets/:key
  */
-router.get('/:key', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/:key', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { key } = req.params;
     const value = await secretService.getSecretByKey(key);
@@ -69,7 +69,7 @@ router.get('/:key', verifyAdmin, async (req: AuthRequest, res: Response, next: N
  * Create a new secret
  * POST /api/secrets
  */
-router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { key, value, isReserved, expiresAt } = req.body;
 
@@ -145,7 +145,7 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
  * Update an existing secret
  * PUT /api/secrets/:key
  */
-router.put('/:key', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.put('/:key', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { key } = req.params;
     const { value, isActive, isReserved, expiresAt } = req.body;
@@ -199,7 +199,7 @@ router.put('/:key', verifyAdmin, async (req: AuthRequest, res: Response, next: N
 router.post(
   '/api-key/rotate',
   verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const parseResult = RotateApiKeySchema.safeParse(req.body);
       if (!parseResult.success) {
@@ -241,7 +241,7 @@ router.post(
  * Delete a secret (mark as inactive)
  * DELETE /api/secrets/:key
  */
-router.delete('/:key', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.delete('/:key', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { key } = req.params;
 

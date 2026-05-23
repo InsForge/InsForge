@@ -1,11 +1,11 @@
-import { Router, Response, NextFunction } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import {
   ERROR_CODES,
   posthogTimeframeSchema,
   posthogBreakdownSchema,
   posthogMetricSchema,
 } from '@insforge/shared-schemas';
-import { verifyUser, verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
+import { verifyUser, verifyAdmin } from '@/api/middlewares/auth.js';
 import { AppError } from '@/utils/errors.js';
 import { AnalyticsService } from '@/services/analytics/analytics.service.js';
 
@@ -26,7 +26,7 @@ function parseLimit(raw: unknown): number {
 analyticsRouter.get(
   '/connection',
   verifyUser,
-  async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const conn = await service.getConnection();
       if (!conn) {
@@ -44,7 +44,7 @@ analyticsRouter.get(
 analyticsRouter.get(
   '/dashboards',
   verifyUser,
-  async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const data = await service.getDashboards();
       res.json(data);
@@ -58,7 +58,7 @@ analyticsRouter.get(
 analyticsRouter.get(
   '/summary',
   verifyUser,
-  async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const data = await service.getSummary();
       res.json(data);
@@ -72,7 +72,7 @@ analyticsRouter.get(
 analyticsRouter.get(
   '/events',
   verifyUser,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const data = await service.getRecentEvents(parseLimit(req.query.limit));
       res.json(data);
@@ -86,7 +86,7 @@ analyticsRouter.get(
 analyticsRouter.delete(
   '/connection',
   verifyAdmin,
-  async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  async (_req: Request, res: Response, next: NextFunction) => {
     try {
       await service.disconnect();
       res.status(204).send();
@@ -104,7 +104,7 @@ analyticsRouter.delete(
 analyticsRouter.get(
   '/web-overview',
   verifyUser,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const timeframe = posthogTimeframeSchema.safeParse(req.query.timeframe ?? '7d');
       if (!timeframe.success) {
@@ -122,7 +122,7 @@ analyticsRouter.get(
 analyticsRouter.get(
   '/web-stats',
   verifyUser,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const breakdown = posthogBreakdownSchema.safeParse(req.query.breakdown);
       if (!breakdown.success) {
@@ -144,7 +144,7 @@ analyticsRouter.get(
 analyticsRouter.get(
   '/trends',
   verifyUser,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const metric = posthogMetricSchema.safeParse(req.query.metric);
       if (!metric.success) {
@@ -167,7 +167,7 @@ analyticsRouter.get(
 analyticsRouter.get(
   '/retention',
   verifyUser,
-  async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const data = await service.getRetention();
       res.json(data);
@@ -181,7 +181,7 @@ analyticsRouter.get(
 analyticsRouter.get(
   '/recordings',
   verifyUser,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const data = await service.getRecordings(parseLimit(req.query.limit));
       res.json(data);
@@ -195,7 +195,7 @@ analyticsRouter.get(
 analyticsRouter.post(
   '/recordings/:id/share',
   verifyUser,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const recordingId = String(req.params.id || '');
       const data = await service.createRecordingShare(recordingId);

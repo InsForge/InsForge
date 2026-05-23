@@ -1,5 +1,4 @@
-import { Router, Response, NextFunction } from 'express';
-import { AuthRequest } from '@/api/middlewares/auth.js';
+import { Router, Response, NextFunction, Request } from 'express';
 import { AppError } from '@/utils/errors.js';
 import { PaymentService } from '@/services/payments/payment.service.js';
 import { successResponse } from '@/utils/response.js';
@@ -42,7 +41,7 @@ function getEnvironment(params: unknown) {
   return validation.data.environment;
 }
 
-router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const environment = getEnvironment(req.params);
     const catalog = await paymentService.listCatalog(environment);
@@ -52,7 +51,7 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
   }
 });
 
-router.get('/products', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/products', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const environment = getEnvironment(req.params);
     const products = await paymentService.listProducts({ environment });
@@ -62,7 +61,7 @@ router.get('/products', async (req: AuthRequest, res: Response, next: NextFuncti
   }
 });
 
-router.get('/products/:productId', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/products/:productId', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const environment = getEnvironment(req.params);
     const validation = paymentProductParamsSchema.safeParse(req.params);
@@ -77,7 +76,7 @@ router.get('/products/:productId', async (req: AuthRequest, res: Response, next:
   }
 });
 
-router.post('/products', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/products', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const environment = getEnvironment(req.params);
     const validation = createPaymentProductBodySchema.safeParse(req.body);
@@ -95,51 +94,45 @@ router.post('/products', async (req: AuthRequest, res: Response, next: NextFunct
   }
 });
 
-router.patch(
-  '/products/:productId',
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const validation = paymentProductParamsSchema.safeParse(req.params);
-      if (!validation.success) {
-        throw invalidInputFromZod(validation.error);
-      }
-
-      const environment = getEnvironment(req.params);
-      const bodyValidation = updatePaymentProductBodySchema.safeParse(req.body);
-      if (!bodyValidation.success) {
-        throw invalidInputFromZod(bodyValidation.error);
-      }
-
-      const product = await paymentService.updateProduct(validation.data.productId, {
-        environment,
-        ...bodyValidation.data,
-      });
-      successResponse(res, product);
-    } catch (error) {
-      next(normalizeStripeError(error));
+router.patch('/products/:productId', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const validation = paymentProductParamsSchema.safeParse(req.params);
+    if (!validation.success) {
+      throw invalidInputFromZod(validation.error);
     }
-  }
-);
 
-router.delete(
-  '/products/:productId',
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const validation = paymentProductParamsSchema.safeParse(req.params);
-      if (!validation.success) {
-        throw invalidInputFromZod(validation.error);
-      }
-
-      const environment = getEnvironment(req.params);
-      const product = await paymentService.deleteProduct(environment, validation.data.productId);
-      successResponse(res, product);
-    } catch (error) {
-      next(normalizeStripeError(error));
+    const environment = getEnvironment(req.params);
+    const bodyValidation = updatePaymentProductBodySchema.safeParse(req.body);
+    if (!bodyValidation.success) {
+      throw invalidInputFromZod(bodyValidation.error);
     }
-  }
-);
 
-router.get('/prices', async (req: AuthRequest, res: Response, next: NextFunction) => {
+    const product = await paymentService.updateProduct(validation.data.productId, {
+      environment,
+      ...bodyValidation.data,
+    });
+    successResponse(res, product);
+  } catch (error) {
+    next(normalizeStripeError(error));
+  }
+});
+
+router.delete('/products/:productId', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const validation = paymentProductParamsSchema.safeParse(req.params);
+    if (!validation.success) {
+      throw invalidInputFromZod(validation.error);
+    }
+
+    const environment = getEnvironment(req.params);
+    const product = await paymentService.deleteProduct(environment, validation.data.productId);
+    successResponse(res, product);
+  } catch (error) {
+    next(normalizeStripeError(error));
+  }
+});
+
+router.get('/prices', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const queryValidation = listPaymentPricesQuerySchema.safeParse(req.query);
     if (!queryValidation.success) {
@@ -157,7 +150,7 @@ router.get('/prices', async (req: AuthRequest, res: Response, next: NextFunction
   }
 });
 
-router.get('/prices/:priceId', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/prices/:priceId', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validation = paymentPriceParamsSchema.safeParse(req.params);
     if (!validation.success) {
@@ -172,7 +165,7 @@ router.get('/prices/:priceId', async (req: AuthRequest, res: Response, next: Nex
   }
 });
 
-router.post('/prices', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/prices', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validation = createPaymentPriceBodySchema.safeParse(req.body);
     if (!validation.success) {
@@ -190,7 +183,7 @@ router.post('/prices', async (req: AuthRequest, res: Response, next: NextFunctio
   }
 });
 
-router.patch('/prices/:priceId', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.patch('/prices/:priceId', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validation = paymentPriceParamsSchema.safeParse(req.params);
     if (!validation.success) {
@@ -213,7 +206,7 @@ router.patch('/prices/:priceId', async (req: AuthRequest, res: Response, next: N
   }
 });
 
-router.delete('/prices/:priceId', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.delete('/prices/:priceId', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validation = paymentPriceParamsSchema.safeParse(req.params);
     if (!validation.success) {

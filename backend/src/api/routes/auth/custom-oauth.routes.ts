@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { AppError } from '@/utils/errors.js';
 import { successResponse } from '@/utils/response.js';
-import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
+import { verifyAdmin } from '@/api/middlewares/auth.js';
 import logger from '@/utils/logger.js';
 import { AuthService } from '@/services/auth/auth.service.js';
 import { OAuthPKCEService } from '@/services/auth/oauth-pkce.service.js';
@@ -41,7 +41,7 @@ const validateJwtSecret = (): string => {
 
 // ── Admin CRUD ──────────────────────────────────────────────────────────
 
-router.get('/configs', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/configs', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const configs = await customOAuthConfigService.listConfigs();
     const payload = { data: configs, count: configs.length };
@@ -53,123 +53,111 @@ router.get('/configs', verifyAdmin, async (req: AuthRequest, res: Response, next
   }
 });
 
-router.get(
-  '/:key/config',
-  verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const keyValidation = customOAuthKeySchema.safeParse(req.params.key);
-      if (!keyValidation.success) {
-        throw new AppError('Invalid custom OAuth key', 400, ERROR_CODES.INVALID_INPUT);
-      }
-      const key = keyValidation.data;
-
-      const config = await customOAuthConfigService.getConfigByKey(key);
-      if (!config) {
-        throw new AppError(
-          `Custom OAuth configuration for ${key} not found`,
-          404,
-          ERROR_CODES.AUTH_OAUTH_CONFIG_NOT_FOUND
-        );
-      }
-      const clientSecret = await customOAuthConfigService.getClientSecretByKey(key);
-      successResponse(res, {
-        ...config,
-        clientSecret: clientSecret || undefined,
-      });
-    } catch (error) {
-      logger.error('Failed to get custom OAuth config', { error, key: req.params.key });
-      next(error);
+router.get('/:key/config', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const keyValidation = customOAuthKeySchema.safeParse(req.params.key);
+    if (!keyValidation.success) {
+      throw new AppError('Invalid custom OAuth key', 400, ERROR_CODES.INVALID_INPUT);
     }
-  }
-);
+    const key = keyValidation.data;
 
-router.post(
-  '/configs',
-  verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const validationResult = createCustomOAuthConfigRequestSchema.safeParse(req.body);
-      if (!validationResult.success) {
-        throw new AppError(
-          validationResult.error.issues
-            .map(
-              (e: { path: (string | number)[]; message: string }) =>
-                `${e.path.join('.')}: ${e.message}`
-            )
-            .join(', '),
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
-      }
-
-      const config = await customOAuthConfigService.createConfig(validationResult.data);
-      await auditService.log({
-        actor: req.user?.email || 'api-key',
-        action: 'CREATE_CUSTOM_OAUTH_CONFIG',
-        module: 'AUTH',
-        details: {
-          key: config.key,
-          name: config.name,
-        },
-        ip_address: req.ip,
-      });
-      successResponse(res, config);
-    } catch (error) {
-      logger.error('Failed to create custom OAuth config', { error });
-      next(error);
+    const config = await customOAuthConfigService.getConfigByKey(key);
+    if (!config) {
+      throw new AppError(
+        `Custom OAuth configuration for ${key} not found`,
+        404,
+        ERROR_CODES.AUTH_OAUTH_CONFIG_NOT_FOUND
+      );
     }
+    const clientSecret = await customOAuthConfigService.getClientSecretByKey(key);
+    successResponse(res, {
+      ...config,
+      clientSecret: clientSecret || undefined,
+    });
+  } catch (error) {
+    logger.error('Failed to get custom OAuth config', { error, key: req.params.key });
+    next(error);
   }
-);
+});
 
-router.put(
-  '/:key/config',
-  verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const keyValidation = customOAuthKeySchema.safeParse(req.params.key);
-      if (!keyValidation.success) {
-        throw new AppError('Invalid custom OAuth key', 400, ERROR_CODES.INVALID_INPUT);
-      }
-      const key = keyValidation.data;
-
-      const validationResult = updateCustomOAuthConfigRequestSchema.safeParse(req.body);
-      if (!validationResult.success) {
-        throw new AppError(
-          validationResult.error.issues
-            .map(
-              (e: { path: (string | number)[]; message: string }) =>
-                `${e.path.join('.')}: ${e.message}`
-            )
-            .join(', '),
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
-      }
-
-      const config = await customOAuthConfigService.updateConfig(key, validationResult.data);
-      await auditService.log({
-        actor: req.user?.email || 'api-key',
-        action: 'UPDATE_CUSTOM_OAUTH_CONFIG',
-        module: 'AUTH',
-        details: {
-          key,
-          updatedFields: Object.keys(validationResult.data),
-        },
-        ip_address: req.ip,
-      });
-      successResponse(res, config);
-    } catch (error) {
-      logger.error('Failed to update custom OAuth config', { error, key: req.params.key });
-      next(error);
+router.post('/configs', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const validationResult = createCustomOAuthConfigRequestSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      throw new AppError(
+        validationResult.error.issues
+          .map(
+            (e: { path: (string | number)[]; message: string }) =>
+              `${e.path.join('.')}: ${e.message}`
+          )
+          .join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
     }
+
+    const config = await customOAuthConfigService.createConfig(validationResult.data);
+    await auditService.log({
+      actor: req.user?.email || 'api-key',
+      action: 'CREATE_CUSTOM_OAUTH_CONFIG',
+      module: 'AUTH',
+      details: {
+        key: config.key,
+        name: config.name,
+      },
+      ip_address: req.ip,
+    });
+    successResponse(res, config);
+  } catch (error) {
+    logger.error('Failed to create custom OAuth config', { error });
+    next(error);
   }
-);
+});
+
+router.put('/:key/config', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const keyValidation = customOAuthKeySchema.safeParse(req.params.key);
+    if (!keyValidation.success) {
+      throw new AppError('Invalid custom OAuth key', 400, ERROR_CODES.INVALID_INPUT);
+    }
+    const key = keyValidation.data;
+
+    const validationResult = updateCustomOAuthConfigRequestSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      throw new AppError(
+        validationResult.error.issues
+          .map(
+            (e: { path: (string | number)[]; message: string }) =>
+              `${e.path.join('.')}: ${e.message}`
+          )
+          .join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    const config = await customOAuthConfigService.updateConfig(key, validationResult.data);
+    await auditService.log({
+      actor: req.user?.email || 'api-key',
+      action: 'UPDATE_CUSTOM_OAUTH_CONFIG',
+      module: 'AUTH',
+      details: {
+        key,
+        updatedFields: Object.keys(validationResult.data),
+      },
+      ip_address: req.ip,
+    });
+    successResponse(res, config);
+  } catch (error) {
+    logger.error('Failed to update custom OAuth config', { error, key: req.params.key });
+    next(error);
+  }
+});
 
 router.delete(
   '/:key/config',
   verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const keyValidation = customOAuthKeySchema.safeParse(req.params.key);
       if (!keyValidation.success) {

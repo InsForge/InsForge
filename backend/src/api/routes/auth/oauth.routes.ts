@@ -7,7 +7,7 @@ import { AuditService } from '@/services/logs/audit.service.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from '@/utils/errors.js';
 import { successResponse } from '@/utils/response.js';
-import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
+import { verifyAdmin } from '@/api/middlewares/auth.js';
 import { setRefreshTokenCookie } from '@/utils/cookies.js';
 import { parseClientType } from '@/utils/utils.js';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
@@ -48,7 +48,7 @@ const validateJwtSecret = (): string => {
 
 // OAuth Configuration Management Routes (must come before wildcard routes)
 // GET /api/auth/oauth/configs - List all OAuth configurations (admin only)
-router.get('/configs', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/configs', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const configs = await oAuthConfigService.getAllConfigs();
     const response: ListOAuthConfigsResponse = {
@@ -66,7 +66,7 @@ router.get('/configs', verifyAdmin, async (req: AuthRequest, res: Response, next
 router.get(
   '/:provider/config',
   verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { provider } = req.params;
       const config = await oAuthConfigService.getConfigByProvider(provider);
@@ -95,57 +95,53 @@ router.get(
 );
 
 // POST /api/auth/oauth/configs - Create new OAuth configuration (admin only)
-router.post(
-  '/configs',
-  verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const validationResult = createOAuthConfigRequestSchema.safeParse(req.body);
-      if (!validationResult.success) {
-        throw new AppError(
-          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
-      }
-
-      const input = validationResult.data;
-
-      // Check if using shared keys when not allowed
-      if (input.useSharedKey && !isOAuthSharedKeysAvailable()) {
-        throw new AppError(
-          'Shared OAuth keys are not enabled in this environment',
-          400,
-          ERROR_CODES.AUTH_OAUTH_CONFIG_ERROR
-        );
-      }
-
-      const config = await oAuthConfigService.createConfig(input);
-
-      await auditService.log({
-        actor: req.user?.email || 'api-key',
-        action: 'CREATE_OAUTH_CONFIG',
-        module: 'AUTH',
-        details: {
-          provider: input.provider,
-          useSharedKey: input.useSharedKey || false,
-        },
-        ip_address: req.ip,
-      });
-
-      successResponse(res, config);
-    } catch (error) {
-      logger.error('Failed to create OAuth configuration', { error });
-      next(error);
+router.post('/configs', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const validationResult = createOAuthConfigRequestSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      throw new AppError(
+        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
     }
+
+    const input = validationResult.data;
+
+    // Check if using shared keys when not allowed
+    if (input.useSharedKey && !isOAuthSharedKeysAvailable()) {
+      throw new AppError(
+        'Shared OAuth keys are not enabled in this environment',
+        400,
+        ERROR_CODES.AUTH_OAUTH_CONFIG_ERROR
+      );
+    }
+
+    const config = await oAuthConfigService.createConfig(input);
+
+    await auditService.log({
+      actor: req.user?.email || 'api-key',
+      action: 'CREATE_OAUTH_CONFIG',
+      module: 'AUTH',
+      details: {
+        provider: input.provider,
+        useSharedKey: input.useSharedKey || false,
+      },
+      ip_address: req.ip,
+    });
+
+    successResponse(res, config);
+  } catch (error) {
+    logger.error('Failed to create OAuth configuration', { error });
+    next(error);
   }
-);
+});
 
 // PUT /api/auth/oauth/:provider/config - Update OAuth configuration (admin only)
 router.put(
   '/:provider/config',
   verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const provider = req.params.provider;
       if (!provider || provider.length === 0 || provider.length > 50) {
@@ -200,7 +196,7 @@ router.put(
 router.delete(
   '/:provider/config',
   verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const provider = req.params.provider;
       if (!provider || provider.length === 0 || provider.length > 50) {
