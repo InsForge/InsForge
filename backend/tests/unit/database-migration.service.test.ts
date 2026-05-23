@@ -6,21 +6,17 @@ const {
   parseSQLStatementsMock,
   analyzeQueryMock,
   initSqlParserMock,
-  checkManagedSchemaWriteOperationsMock,
-  checkAuthSchemaOperationsMock,
-  checkSystemSchemaOperationsMock,
+  checkSqlExecutionGuardsMock,
 } = vi.hoisted(() => ({
   connectMock: vi.fn(),
   parseSQLStatementsMock: vi.fn((sql: string) => [sql]),
   analyzeQueryMock: vi.fn(() => []),
   initSqlParserMock: vi.fn(async () => {}),
-  checkManagedSchemaWriteOperationsMock: vi.fn((query: string) =>
-    query.includes('auth.users')
-      ? 'Write operations on auth schema are not allowed. InsForge-managed schemas are protected in the dashboard.'
+  checkSqlExecutionGuardsMock: vi.fn((query: string) =>
+    query.includes('RESET ROLE')
+      ? 'Changing SQL execution role or session authorization is not allowed.'
       : null
   ),
-  checkAuthSchemaOperationsMock: vi.fn(() => null),
-  checkSystemSchemaOperationsMock: vi.fn(() => null),
 }));
 
 vi.mock('../../src/infra/database/database.manager', () => ({
@@ -38,15 +34,7 @@ vi.mock('../../src/utils/sql-parser', () => ({
   parseSQLStatements: parseSQLStatementsMock,
   analyzeQuery: analyzeQueryMock,
   initSqlParser: initSqlParserMock,
-  checkManagedSchemaWriteOperations: checkManagedSchemaWriteOperationsMock,
-  checkAuthSchemaOperations: checkAuthSchemaOperationsMock,
-  checkSystemSchemaOperations: checkSystemSchemaOperationsMock,
-}));
-
-vi.mock('libpg-query', () => ({
-  parseSync: vi.fn(() => ({
-    stmts: [{ stmt: { CreateStmt: {} } }],
-  })),
+  checkSqlExecutionGuards: checkSqlExecutionGuardsMock,
 }));
 
 import { DatabaseMigrationService } from '../../src/services/database/database-migration.service';
@@ -56,23 +44,21 @@ describe('DatabaseMigrationService', () => {
     vi.clearAllMocks();
   });
 
-  it('blocks protected schema migrations before opening a database transaction', async () => {
+  it('blocks execution context changes before opening a database transaction', async () => {
     const service = DatabaseMigrationService.getInstance();
 
     await expect(
       service.createMigration({
         version: '202605020001',
-        name: 'protected-write',
-        sql: "INSERT INTO auth.users (email) VALUES ('demo@example.com')",
+        name: 'role-reset',
+        sql: 'RESET ROLE',
       })
     ).rejects.toMatchObject({
       statusCode: 403,
       code: ERROR_CODES.FORBIDDEN,
     });
 
-    expect(checkManagedSchemaWriteOperationsMock).toHaveBeenCalledWith(
-      "INSERT INTO auth.users (email) VALUES ('demo@example.com')"
-    );
+    expect(checkSqlExecutionGuardsMock).toHaveBeenCalledWith('RESET ROLE');
     expect(connectMock).not.toHaveBeenCalled();
   });
 
@@ -83,7 +69,11 @@ describe('DatabaseMigrationService', () => {
       .mockResolvedValueOnce({}) // advisory lock
       .mockResolvedValueOnce({}) // search_path
       .mockResolvedValueOnce({ rows: [] }) // latest version
+      .mockResolvedValueOnce({}) // SET ROLE project_admin
+      .mockResolvedValueOnce({}) // set request.jwt.claims
       .mockResolvedValueOnce({}) // execute migration SQL
+      .mockResolvedValueOnce({}) // RESET ROLE
+      .mockResolvedValueOnce({}) // reset request.jwt.claims
       .mockResolvedValueOnce({
         rows: [
           {
@@ -110,7 +100,10 @@ describe('DatabaseMigrationService', () => {
     });
 
     expect(result.migration.version).toBe('202605020002');
+    expect(queryMock).toHaveBeenCalledWith('SET ROLE project_admin');
+    expect(queryMock).toHaveBeenCalledWith('RESET ROLE');
     expect(queryMock).toHaveBeenCalledWith(`NOTIFY pgrst, 'reload schema';`);
     expect(queryMock).not.toHaveBeenCalledWith(`NOTIFY pgrst, 'reload config';`);
   });
+
 });

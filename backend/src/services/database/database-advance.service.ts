@@ -9,17 +9,13 @@ import {
   type BulkUpsertResponse,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
-import {
-  parseSQLStatements,
-  checkManagedSchemaWriteOperations,
-  checkAuthSchemaOperations,
-  checkSystemSchemaOperations,
-} from '@/utils/sql-parser.js';
+import { checkSqlExecutionGuards, parseSQLStatements } from '@/utils/sql-parser.js';
 import { validateSchemaName, validateTableName } from '@/utils/validations.js';
 import pgFormat from 'pg-format';
 import { parse } from 'csv-parse/sync';
 import { type PoolClient } from 'pg';
 import { assertWritableDatabaseSchema } from './helpers.js';
+import { withAdminContext } from './user-context.service.js';
 
 export class DatabaseAdvanceService {
   private static instance: DatabaseAdvanceService;
@@ -71,62 +67,24 @@ export class DatabaseAdvanceService {
     return { rows, totalRows, wasTruncated };
   }
 
-  /**
-   * Sanitize query with strict or relaxed mode
-   *
-   * Blocks:
-   * - DROP DATABASE, CREATE DATABASE, ALTER DATABASE
-   * - pg_catalog and information_schema access
-   * - Write operations on InsForge-managed schemas
-   *
-   * Allows:
-   * - Read-only queries against InsForge-managed schemas
-   */
-  sanitizeQuery(query: string, _mode: 'strict' | 'relaxed' = 'strict'): string {
-    // Block database-level operations
-    const dangerousPatterns = [
-      /DROP\s+DATABASE/i,
-      /CREATE\s+DATABASE/i,
-      /ALTER\s+DATABASE/i,
-      /pg_catalog/i,
-    ];
-
-    for (const pattern of dangerousPatterns) {
-      if (pattern.test(query)) {
-        throw new AppError('Query contains restricted operations', 403, ERROR_CODES.FORBIDDEN);
-      }
-    }
-
-    const managedSchemaError = checkManagedSchemaWriteOperations(query);
-    if (managedSchemaError) {
-      logger.warn('Blocked operation on protected schema', {
+  sanitizeQuery(query: string): string {
+    const guardError = checkSqlExecutionGuards(query);
+    if (guardError) {
+      logger.warn('Blocked raw SQL operation', {
         query: query.substring(0, 100),
       });
-      throw new AppError(managedSchemaError, 403, ERROR_CODES.FORBIDDEN);
-    }
-
-    // Use parser-based check for auth schema operations
-    const authError = checkAuthSchemaOperations(query);
-    if (authError) {
-      logger.warn('Blocked operation on auth schema', {
-        query: query.substring(0, 100),
-      });
-      throw new AppError(authError, 403, ERROR_CODES.FORBIDDEN);
-    }
-
-    // Block DDL/DML on system schema
-    const systemError = checkSystemSchemaOperations(query);
-    if (systemError) {
-      logger.warn('Blocked operation on system schema', {
-        query: query.substring(0, 100),
-      });
-      throw new AppError(systemError, 403, ERROR_CODES.FORBIDDEN);
+      throw new AppError(guardError, 403, ERROR_CODES.FORBIDDEN);
     }
 
     return query;
   }
 
-  async executeRawSQL(query: string, params: unknown[] = []): Promise<RawSQLResponse> {
+  async executeRawSQL(
+    query: string,
+    params: unknown[] = [],
+    asRoot: boolean = false
+  ): Promise<RawSQLResponse> {
+    const sanitizedQuery = this.sanitizeQuery(query);
     const pool = this.dbManager.getPool();
     const client = await pool.connect();
 
@@ -134,11 +92,14 @@ export class DatabaseAdvanceService {
       // Set statement timeout at session level (30 seconds)
       await client.query('SET statement_timeout = 30000');
 
-      // Execute query - database will enforce the timeout
-      const result = await client.query(query, params);
+      const result = asRoot
+        ? await client.query<Record<string, unknown>>(sanitizedQuery, params)
+        : await withAdminContext(client, () =>
+            client.query<Record<string, unknown>>(sanitizedQuery, params)
+          );
 
       // Refresh schema cache if it was a DDL operation
-      if (/CREATE|ALTER|DROP/i.test(query)) {
+      if (/CREATE|ALTER|DROP/i.test(sanitizedQuery)) {
         await client.query(`NOTIFY pgrst, 'reload schema';`);
         // Metadata is now updated on-demand
       }
@@ -161,8 +122,7 @@ export class DatabaseAdvanceService {
       // Re-throw other errors as-is
       throw error;
     } finally {
-      // Reset timeout to default before releasing client back to pool
-      await client.query('SET statement_timeout = 0');
+      await client.query('SET statement_timeout = 0').catch(() => {});
       client.release();
     }
   }
@@ -864,7 +824,7 @@ export class DatabaseAdvanceService {
         fileSize,
       };
     } catch (error) {
-      await client.query('ROLLBACK');
+      await client.query('ROLLBACK').catch(() => {});
       throw error;
     } finally {
       client.release();

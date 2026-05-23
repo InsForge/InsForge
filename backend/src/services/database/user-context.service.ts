@@ -76,6 +76,24 @@ export async function withUserContext<T>(
   }
 }
 
+export async function withAdminContext<T>(client: PoolClient, fn: () => Promise<T>): Promise<T> {
+  await client.query('SET ROLE project_admin');
+  await client.query('SELECT set_config($1, $2, $3)', [
+    REQUEST_JWT_CLAIMS_SETTING,
+    JSON.stringify({ role: 'project_admin' }),
+    false,
+  ]);
+
+  try {
+    return await fn();
+  } finally {
+    await client.query('RESET ROLE').catch(() => {});
+    await client
+      .query('SELECT set_config($1, $2, $3)', [REQUEST_JWT_CLAIMS_SETTING, '{}', false])
+      .catch(() => {});
+  }
+}
+
 async function setTransactionLocalConfig(
   client: PoolClient,
   setting: string,

@@ -1,0 +1,115 @@
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ERROR_CODES } from '@insforge/shared-schemas';
+
+const { connectMock } = vi.hoisted(() => ({
+  connectMock: vi.fn(),
+}));
+
+vi.mock('../../src/infra/database/database.manager', () => ({
+  DatabaseManager: {
+    getInstance: vi.fn(() => ({
+      getPool: vi.fn(() => ({
+        connect: connectMock,
+      })),
+    })),
+    clearColumnTypeCache: vi.fn(),
+  },
+}));
+
+import { DatabaseAdvanceService } from '../../src/services/database/database-advance.service';
+import { initSqlParser } from '../../src/utils/sql-parser';
+
+describe('DatabaseAdvanceService - executeRawSQL', () => {
+  beforeAll(async () => {
+    await initSqlParser();
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('sanitizes raw SQL before opening a database connection', async () => {
+    const service = DatabaseAdvanceService.getInstance();
+
+    await expect(service.executeRawSQL('RESET ROLE')).rejects.toMatchObject({
+      statusCode: 403,
+      code: ERROR_CODES.FORBIDDEN,
+    });
+    expect(connectMock).not.toHaveBeenCalled();
+  });
+
+  it('executes raw SQL under project_admin and resets the pooled session', async () => {
+    const queryMock = vi
+      .fn()
+      .mockResolvedValueOnce({}) // SET statement_timeout
+      .mockResolvedValueOnce({}) // SET ROLE project_admin
+      .mockResolvedValueOnce({}) // set request.jwt.claims
+      .mockResolvedValueOnce({
+        rows: [{ id: 1 }],
+        rowCount: 1,
+        fields: [{ name: 'id', dataTypeID: 23 }],
+      }) // execute user SQL
+      .mockResolvedValueOnce({}) // RESET ROLE
+      .mockResolvedValueOnce({}) // reset request.jwt.claims
+      .mockResolvedValueOnce({}) // NOTIFY pgrst
+      .mockResolvedValueOnce({}); // reset statement_timeout
+
+    connectMock.mockResolvedValue({
+      query: queryMock,
+      release: vi.fn(),
+    });
+
+    const service = DatabaseAdvanceService.getInstance();
+    const result = await service.executeRawSQL('CREATE TABLE public.products (id integer)', []);
+
+    expect(result).toEqual({
+      rows: [{ id: 1 }],
+      rowCount: 1,
+      fields: [{ name: 'id', dataTypeID: 23 }],
+    });
+    expect(queryMock).toHaveBeenNthCalledWith(1, 'SET statement_timeout = 30000');
+    expect(queryMock).toHaveBeenNthCalledWith(2, 'SET ROLE project_admin');
+    expect(queryMock).toHaveBeenNthCalledWith(3, 'SELECT set_config($1, $2, $3)', [
+      'request.jwt.claims',
+      JSON.stringify({ role: 'project_admin' }),
+      false,
+    ]);
+    expect(queryMock).toHaveBeenNthCalledWith(4, 'CREATE TABLE public.products (id integer)', []);
+    expect(queryMock).toHaveBeenNthCalledWith(5, 'RESET ROLE');
+    expect(queryMock).toHaveBeenNthCalledWith(6, 'SELECT set_config($1, $2, $3)', [
+      'request.jwt.claims',
+      '{}',
+      false,
+    ]);
+    expect(queryMock).toHaveBeenNthCalledWith(7, `NOTIFY pgrst, 'reload schema';`);
+    expect(queryMock).toHaveBeenNthCalledWith(8, 'SET statement_timeout = 0');
+  });
+
+  it('keeps unrestricted raw SQL on the root session', async () => {
+    const queryMock = vi
+      .fn()
+      .mockResolvedValueOnce({}) // SET statement_timeout
+      .mockResolvedValueOnce({
+        rows: [{ current_user: 'postgres' }],
+        rowCount: 1,
+        fields: [{ name: 'current_user', dataTypeID: 19 }],
+      }) // execute user SQL
+      .mockResolvedValueOnce({}); // reset statement_timeout
+
+    connectMock.mockResolvedValue({
+      query: queryMock,
+      release: vi.fn(),
+    });
+
+    const service = DatabaseAdvanceService.getInstance();
+    const result = await service.executeRawSQL('SELECT current_user', [], true);
+
+    expect(result.rows).toEqual([{ current_user: 'postgres' }]);
+    expect(queryMock).toHaveBeenNthCalledWith(1, 'SET statement_timeout = 30000');
+    expect(queryMock).toHaveBeenNthCalledWith(2, 'SELECT current_user', []);
+    expect(queryMock).toHaveBeenNthCalledWith(3, 'SET statement_timeout = 0');
+    expect(queryMock).not.toHaveBeenCalledWith('SET ROLE project_admin');
+    expect(queryMock).not.toHaveBeenCalledWith('RESET ROLE');
+  });
+
+});

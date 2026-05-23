@@ -3,7 +3,7 @@ import { RawSQLRequest, RawSQLResponse } from '@insforge/shared-schemas';
 
 export class AdvanceService {
   /**
-   * Execute raw SQL query with strict sanitization.
+   * Execute raw SQL query with project_admin database privileges.
    * Requires admin privileges.
    *
    * @param query - SQL query to execute
