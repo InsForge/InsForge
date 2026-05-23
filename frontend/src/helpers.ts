@@ -5,7 +5,8 @@ export function isCloudHosting(): boolean {
 
   return (
     window.location.origin.endsWith('.insforge.app') ||
-    window.location.origin.endsWith('.insforge.dev')
+    window.location.origin.endsWith('.insforge.dev') ||
+    window.location.origin === 'https://insforge.dev'
   );
 }
 export function isInIframe(): boolean {
