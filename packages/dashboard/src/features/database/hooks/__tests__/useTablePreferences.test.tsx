@@ -72,29 +72,6 @@ describe('useTablePreferences', () => {
     expect(result.current.columnOrder).toEqual(['email', 'id', 'name']);
   });
 
-  it('migrates legacy flattened table preference keys when reading existing storage', () => {
-    storage.setItem(
-      LOCAL_STORAGE_KEYS.databaseTablePreferences,
-      JSON.stringify({
-        tableColumnWidths: {
-          [JSON.stringify(['public', 'profiles'])]: {
-            name: 240,
-          },
-        },
-        tableColumnOrders: {
-          [JSON.stringify(['public', 'profiles'])]: ['email', 'id'],
-        },
-      })
-    );
-
-    const { result } = renderHook(() =>
-      useTablePreferences('profiles', 'public', ['id', 'name', 'email'])
-    );
-
-    expect(result.current.columnWidths).toEqual({ name: 240 });
-    expect(result.current.columnOrder).toEqual(['email', 'id', 'name']);
-  });
-
   it('saves width updates to the nested schema/table storage object', () => {
     vi.useFakeTimers();
 

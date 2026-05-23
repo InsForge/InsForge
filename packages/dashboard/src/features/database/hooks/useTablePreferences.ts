@@ -63,29 +63,6 @@ function sanitizeStoredTablePreferences(value: unknown): StoredTablePreferences 
   };
 }
 
-function parseLegacyTablePreferenceKey(
-  key: string
-): { schemaName: string; tableName: string } | null {
-  try {
-    const parsed = JSON.parse(key) as unknown;
-    if (
-      Array.isArray(parsed) &&
-      parsed.length === 2 &&
-      typeof parsed[0] === 'string' &&
-      typeof parsed[1] === 'string'
-    ) {
-      return {
-        schemaName: parsed[0],
-        tableName: parsed[1],
-      };
-    }
-  } catch {
-    return null;
-  }
-
-  return null;
-}
-
 function setStoredTablePreferences(
   preferences: StoredDatabasePreferences,
   schemaName: string,
@@ -105,64 +82,26 @@ function setStoredTablePreferences(
 }
 
 function sanitizePreferences(value: unknown): StoredDatabasePreferences {
-  if (!isRecord(value)) {
+  if (!isRecord(value) || !isRecord(value.tables)) {
     return createEmptyPreferences();
   }
 
   const preferences = createEmptyPreferences();
 
-  if (isRecord(value.tableColumnWidths)) {
-    Object.entries(value.tableColumnWidths).forEach(([legacyKey, columnWidths]) => {
-      const tablePreferenceKey = parseLegacyTablePreferenceKey(legacyKey);
-      if (!tablePreferenceKey) {
-        return;
-      }
+  Object.entries(value.tables).forEach(([schemaName, tables]) => {
+    if (!isRecord(tables)) {
+      return;
+    }
 
+    Object.entries(tables).forEach(([tableName, tablePreferences]) => {
       setStoredTablePreferences(
         preferences,
-        tablePreferenceKey.schemaName,
-        tablePreferenceKey.tableName,
-        {
-          columnWidths: sanitizeColumnWidths(columnWidths),
-        }
+        schemaName,
+        tableName,
+        sanitizeStoredTablePreferences(tablePreferences)
       );
     });
-  }
-
-  if (isRecord(value.tableColumnOrders)) {
-    Object.entries(value.tableColumnOrders).forEach(([legacyKey, columnOrder]) => {
-      const tablePreferenceKey = parseLegacyTablePreferenceKey(legacyKey);
-      if (!tablePreferenceKey) {
-        return;
-      }
-
-      setStoredTablePreferences(
-        preferences,
-        tablePreferenceKey.schemaName,
-        tablePreferenceKey.tableName,
-        {
-          columnOrder: sanitizeColumnOrder(columnOrder),
-        }
-      );
-    });
-  }
-
-  if (isRecord(value.tables)) {
-    Object.entries(value.tables).forEach(([schemaName, tables]) => {
-      if (!isRecord(tables)) {
-        return;
-      }
-
-      Object.entries(tables).forEach(([tableName, tablePreferences]) => {
-        setStoredTablePreferences(
-          preferences,
-          schemaName,
-          tableName,
-          sanitizeStoredTablePreferences(tablePreferences)
-        );
-      });
-    });
-  }
+  });
 
   return preferences;
 }
