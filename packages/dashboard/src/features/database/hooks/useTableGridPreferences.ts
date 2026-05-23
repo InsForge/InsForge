@@ -10,14 +10,17 @@ import { buildDatabaseTablePreferenceKey } from '#features/database/helpers';
 const STORAGE_SAVE_DEBOUNCE_MS = 300;
 
 export type TableColumnWidths = Record<string, number>;
+export type TableColumnOrder = string[];
 
 interface DatabaseGridPreferences {
   tableColumnWidths: Record<string, TableColumnWidths>;
+  tableColumnOrders: Record<string, TableColumnOrder>;
 }
 
 function createEmptyPreferences(): DatabaseGridPreferences {
   return {
     tableColumnWidths: {},
+    tableColumnOrders: {},
   };
 }
 
@@ -41,16 +44,25 @@ function sanitizeColumnWidths(value: unknown): TableColumnWidths {
 }
 
 function sanitizePreferences(value: unknown): DatabaseGridPreferences {
-  if (!isRecord(value) || !isRecord(value.tableColumnWidths)) {
+  if (!isRecord(value)) {
     return createEmptyPreferences();
   }
 
   const tableColumnWidths: Record<string, TableColumnWidths> = {};
-  Object.entries(value.tableColumnWidths).forEach(([tableName, columnWidths]) => {
-    tableColumnWidths[tableName] = sanitizeColumnWidths(columnWidths);
-  });
+  if (isRecord(value.tableColumnWidths)) {
+    Object.entries(value.tableColumnWidths).forEach(([tableName, columnWidths]) => {
+      tableColumnWidths[tableName] = sanitizeColumnWidths(columnWidths);
+    });
+  }
 
-  return { tableColumnWidths };
+  const tableColumnOrders: Record<string, TableColumnOrder> = {};
+  if (isRecord(value.tableColumnOrders)) {
+    Object.entries(value.tableColumnOrders).forEach(([tableName, columnOrder]) => {
+      tableColumnOrders[tableName] = sanitizeColumnOrder(columnOrder);
+    });
+  }
+
+  return { tableColumnWidths, tableColumnOrders };
 }
 
 function loadPreferences(): DatabaseGridPreferences {
@@ -96,7 +108,67 @@ function filterWidthsByColumns(
   return filtered;
 }
 
-export function useTableColumnWidthsPreference(
+function sanitizeColumnOrder(value: unknown): TableColumnOrder {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const seenColumnKeys = new Set<string>();
+  const sanitized: TableColumnOrder = [];
+
+  value.forEach((columnKey) => {
+    if (typeof columnKey !== 'string' || seenColumnKeys.has(columnKey)) {
+      return;
+    }
+
+    seenColumnKeys.add(columnKey);
+    sanitized.push(columnKey);
+  });
+
+  return sanitized;
+}
+
+function filterOrderByColumns(
+  order: TableColumnOrder,
+  availableColumns?: string[]
+): TableColumnOrder {
+  if (!availableColumns?.length) {
+    return order;
+  }
+
+  const availableColumnSet = new Set(availableColumns);
+  const filteredOrder = order.filter((columnKey) => availableColumnSet.has(columnKey));
+  const orderedColumnSet = new Set(filteredOrder);
+  const missingColumns = availableColumns.filter((columnKey) => !orderedColumnSet.has(columnKey));
+
+  return [...filteredOrder, ...missingColumns];
+}
+
+function areColumnOrdersEqual(left: TableColumnOrder, right: TableColumnOrder): boolean {
+  return (
+    left.length === right.length && left.every((columnKey, index) => columnKey === right[index])
+  );
+}
+
+function reorderColumnKeys(
+  columnOrder: TableColumnOrder,
+  sourceKey: string,
+  targetKey: string
+): TableColumnOrder {
+  const nextOrder = [...columnOrder];
+  const from = nextOrder.indexOf(sourceKey);
+  const to = nextOrder.indexOf(targetKey);
+
+  if (from === -1 || to === -1) {
+    return columnOrder;
+  }
+
+  nextOrder.splice(from, 1);
+  nextOrder.splice(to, 0, sourceKey);
+  return nextOrder;
+}
+
+export function useTableGridPreferences(
   tableName: string | null,
   schemaName: string = 'public',
   availableColumns?: string[]
@@ -158,6 +230,7 @@ export function useTableColumnWidthsPreference(
 
       const nextPreferences: DatabaseGridPreferences = {
         tableColumnWidths: nextTableColumnWidths,
+        tableColumnOrders: latestPreferencesRef.current.tableColumnOrders,
       };
       latestPreferencesRef.current = nextPreferences;
       if (!skipStateUpdate) {
@@ -206,6 +279,15 @@ export function useTableColumnWidthsPreference(
     return filterWidthsByColumns(storedWidths, availableColumns);
   }, [tableStorageKey, availableColumns, preferences]);
 
+  const columnOrder = useMemo(() => {
+    if (!tableStorageKey) {
+      return availableColumns ?? [];
+    }
+
+    const storedOrder = preferences.tableColumnOrders[tableStorageKey] ?? [];
+    return filterOrderByColumns(storedOrder, availableColumns);
+  }, [tableStorageKey, availableColumns, preferences]);
+
   const setColumnWidth = useCallback(
     (columnKey: string, width: number) => {
       if (!tableStorageKey || !columnKey || !Number.isFinite(width) || width <= 0) {
@@ -242,8 +324,56 @@ export function useTableColumnWidthsPreference(
     [tableStorageKey, availableColumns, scheduleFlushPendingWidths]
   );
 
+  const setColumnOrder = useCallback(
+    (nextOrder: TableColumnOrder) => {
+      if (!tableStorageKey) {
+        return;
+      }
+
+      const filteredOrder = filterOrderByColumns(sanitizeColumnOrder(nextOrder), availableColumns);
+      const committedOrder = latestPreferencesRef.current.tableColumnOrders[tableStorageKey] ?? [];
+
+      if (
+        areColumnOrdersEqual(filterOrderByColumns(committedOrder, availableColumns), filteredOrder)
+      ) {
+        return;
+      }
+
+      const nextPreferences: DatabaseGridPreferences = {
+        ...latestPreferencesRef.current,
+        tableColumnOrders: {
+          ...latestPreferencesRef.current.tableColumnOrders,
+          [tableStorageKey]: filteredOrder,
+        },
+      };
+
+      latestPreferencesRef.current = nextPreferences;
+      setPreferences(nextPreferences);
+      savePreferences(nextPreferences);
+    },
+    [availableColumns, tableStorageKey]
+  );
+
+  const reorderColumns = useCallback(
+    (sourceKey: string, targetKey: string) => {
+      if (!tableStorageKey) {
+        return;
+      }
+
+      const currentOrder = filterOrderByColumns(
+        latestPreferencesRef.current.tableColumnOrders[tableStorageKey] ?? availableColumns ?? [],
+        availableColumns
+      );
+      setColumnOrder(reorderColumnKeys(currentOrder, sourceKey, targetKey));
+    },
+    [availableColumns, setColumnOrder, tableStorageKey]
+  );
+
   return {
     columnWidths,
+    columnOrder,
+    reorderColumns,
     setColumnWidth,
+    setColumnOrder,
   };
 }

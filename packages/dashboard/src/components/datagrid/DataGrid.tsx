@@ -14,7 +14,6 @@ import { Checkbox } from '@insforge/ui';
 import { useTheme } from '#lib/contexts/ThemeContext';
 import type { DataGridColumn, DataGridRow, DataGridRowType } from './datagridTypes';
 import SortableHeaderRenderer from './SortableHeader';
-import { useColumnOrder } from './useColumnOrder';
 
 export interface SelectionCellProps<TRow extends DataGridRowType = DataGridRow> {
   row: TRow;
@@ -64,7 +63,8 @@ export interface DataGridProps<TRow extends DataGridRowType = DataGridRow> {
   rowClass?: (row: TRow) => string | undefined;
   rightPanel?: React.ReactNode;
   onColumnResize?: (columnKey: string, width: number) => void;
-  storageKey?: string;
+  columnOrder?: readonly string[];
+  onColumnsReorder?: (sourceColumnKey: string, targetColumnKey: string) => void;
 }
 
 export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
@@ -104,25 +104,34 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
   rowClass,
   rightPanel,
   onColumnResize,
-  storageKey,
+  columnOrder,
+  onColumnsReorder,
 }: DataGridProps<TRow>) {
   const { resolvedTheme } = useTheme();
 
   const defaultRowKeyGetter = useCallback((row: TRow) => row.id || Math.random().toString(), []);
   const keyGetter = rowKeyGetter || defaultRowKeyGetter;
 
-  const defaultColumnKeys = useMemo(() => columns.map((c) => c.key), [columns]);
-
-  const { columnKeys, reorderColumns } = useColumnOrder(storageKey ?? '', defaultColumnKeys);
-
   const orderedColumns = useMemo(() => {
-    if (!storageKey) {
+    if (!columnOrder) {
       return columns;
     }
-    return columnKeys
-      .map((key) => columns.find((c) => c.key === key))
-      .filter(Boolean) as DataGridColumn<TRow>[];
-  }, [columnKeys, columns, storageKey]);
+
+    const columnsByKey = new Map(columns.map((column) => [column.key, column]));
+    const ordered: DataGridColumn<TRow>[] = [];
+
+    columnOrder.forEach((key) => {
+      const column = columnsByKey.get(key);
+      if (column) {
+        ordered.push(column);
+      }
+    });
+
+    const orderedKeys = new Set(ordered.map((column) => column.key));
+    const missing = columns.filter((column) => !orderedKeys.has(column.key));
+
+    return [...ordered, ...missing];
+  }, [columnOrder, columns]);
 
   const gridColumns = useMemo(() => {
     const cols: Column<TRow>[] = [];
@@ -206,7 +215,7 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
         minWidth: col.minWidth || 80,
         maxWidth: col.maxWidth,
         resizable: col.resizable !== false,
-        draggable: col.draggable ?? Boolean(storageKey),
+        draggable: col.draggable ?? Boolean(onColumnsReorder),
         sortable: col.sortable !== false,
         sortDescendingFirst: col.sortDescendingFirst ?? true,
         editable: col.editable && !col.isPrimaryKey,
@@ -252,7 +261,7 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
     renderSelectionCell,
     renderSelectionHeaderCell,
     selectionHeaderLabel,
-    storageKey,
+    onColumnsReorder,
   ]);
 
   const handleColumnResize = useCallback(
@@ -309,7 +318,7 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
             onSortColumnsChange={onSortColumnsChange}
             onCellClick={onCellClick}
             onColumnResize={onColumnResize ? handleColumnResize : undefined}
-            onColumnsReorder={storageKey ? reorderColumns : undefined}
+            onColumnsReorder={onColumnsReorder}
             rowClass={rowClass}
             className={cn(
               `h-full fill-grid insforge-rdg ${resolvedTheme === 'dark' ? 'rdg-dark' : 'rdg-light'}`,

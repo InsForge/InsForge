@@ -35,15 +35,10 @@ import { DatabaseDataGrid } from '#features/database/components/DatabaseDataGrid
 import { SortColumn } from 'react-data-grid';
 import { convertValueForColumn } from '#lib/utils/utils';
 import { useCSVImport } from '#features/database/hooks/useCSVImport';
-import { useTableColumnWidthsPreference } from '#features/database/hooks/useTableColumnWidthsPreference';
+import { useTableGridPreferences } from '#features/database/hooks/useTableGridPreferences';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { usePageSize } from '#lib/hooks/usePageSize';
-import {
-  buildDatabaseTablePreferenceKey,
-  DEFAULT_DATABASE_SCHEMA,
-  getDatabaseSchemaInfo,
-} from '#features/database/helpers';
-import { LOCAL_STORAGE_KEY_PREFIXES } from '#lib/utils/constants';
+import { DEFAULT_DATABASE_SCHEMA, getDatabaseSchemaInfo } from '#features/database/helpers';
 
 export default function TablesPage() {
   const location = useLocation();
@@ -202,7 +197,7 @@ export default function TablesPage() {
     () => `${selectedTable ?? 'no-table'}:${availableColumns.join('|')}`,
     [selectedTable, availableColumns]
   );
-  const { columnWidths, setColumnWidth } = useTableColumnWidthsPreference(
+  const { columnOrder, columnWidths, reorderColumns, setColumnWidth } = useTableGridPreferences(
     selectedTable,
     selectedSchema,
     availableColumns
@@ -643,15 +638,9 @@ export default function TablesPage() {
                   key={dataGridKey}
                   data={tableData?.records || []}
                   schema={tableData?.schema}
-                  storageKey={
-                    tableData?.schema
-                      ? `${LOCAL_STORAGE_KEY_PREFIXES.databaseTableColumnOrder}-${buildDatabaseTablePreferenceKey(
-                          tableData.schema.schemaName ?? selectedSchema,
-                          tableData.schema.tableName
-                        )}`
-                      : undefined
-                  }
+                  columnOrder={columnOrder}
                   columnWidths={columnWidths}
+                  onColumnsReorder={reorderColumns}
                   loading={isLoadingTable && !tableData}
                   isSorting={isSorting}
                   isRefreshing={isRefreshing}
