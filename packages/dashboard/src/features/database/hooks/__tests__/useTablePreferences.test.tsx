@@ -84,19 +84,19 @@ describe('useTablePreferences', () => {
       vi.advanceTimersByTime(300);
     });
 
-    expect(JSON.parse(storage.getItem(LOCAL_STORAGE_KEYS.databaseTablePreferences) ?? '{}')).toEqual(
-      {
-        tables: {
-          public: {
-            profiles: {
-              columnWidths: {
-                name: 260,
-              },
-              columnOrder: [],
+    expect(
+      JSON.parse(storage.getItem(LOCAL_STORAGE_KEYS.databaseTablePreferences) ?? '{}')
+    ).toEqual({
+      tables: {
+        public: {
+          profiles: {
+            columnWidths: {
+              name: 260,
             },
+            columnOrder: [],
           },
         },
-      }
-    );
+      },
+    });
   });
 });
