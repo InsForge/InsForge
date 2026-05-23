@@ -15,5 +15,6 @@ export const LOCAL_STORAGE_KEYS = {
 } as const;
 
 export const LOCAL_STORAGE_KEY_PREFIXES = {
+  databaseTableColumnOrder: 'insforge-database-table-column-order',
   pageSize: 'insforge-page-size',
 } as const;

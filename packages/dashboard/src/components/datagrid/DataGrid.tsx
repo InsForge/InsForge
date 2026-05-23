@@ -206,7 +206,7 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
         minWidth: col.minWidth || 80,
         maxWidth: col.maxWidth,
         resizable: col.resizable !== false,
-        draggable: storageKey ? (col.draggable ?? true) : col.draggable,
+        draggable: col.draggable ?? Boolean(storageKey),
         sortable: col.sortable !== false,
         sortDescendingFirst: col.sortDescendingFirst ?? true,
         editable: col.editable && !col.isPrimaryKey,

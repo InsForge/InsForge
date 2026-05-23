@@ -38,7 +38,12 @@ import { useCSVImport } from '#features/database/hooks/useCSVImport';
 import { useTableColumnWidthsPreference } from '#features/database/hooks/useTableColumnWidthsPreference';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { usePageSize } from '#lib/hooks/usePageSize';
-import { DEFAULT_DATABASE_SCHEMA, getDatabaseSchemaInfo } from '#features/database/helpers';
+import {
+  buildDatabaseTablePreferenceKey,
+  DEFAULT_DATABASE_SCHEMA,
+  getDatabaseSchemaInfo,
+} from '#features/database/helpers';
+import { LOCAL_STORAGE_KEY_PREFIXES } from '#lib/utils/constants';
 
 export default function TablesPage() {
   const location = useLocation();
@@ -640,10 +645,10 @@ export default function TablesPage() {
                   schema={tableData?.schema}
                   storageKey={
                     tableData?.schema
-                      ? `db_col_order_${JSON.stringify([
-                          tableData.schema.schemaName,
-                          tableData.schema.tableName,
-                        ])}`
+                      ? `${LOCAL_STORAGE_KEY_PREFIXES.databaseTableColumnOrder}-${buildDatabaseTablePreferenceKey(
+                          tableData.schema.schemaName ?? selectedSchema,
+                          tableData.schema.tableName
+                        )}`
                       : undefined
                   }
                   columnWidths={columnWidths}

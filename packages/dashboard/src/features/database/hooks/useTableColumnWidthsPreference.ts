@@ -5,6 +5,7 @@ import {
   removeLocalStorageItem,
   setLocalStorageJSON,
 } from '#lib/utils/local-storage';
+import { buildDatabaseTablePreferenceKey } from '#features/database/helpers';
 
 const STORAGE_SAVE_DEBOUNCE_MS = 300;
 
@@ -93,10 +94,6 @@ function filterWidthsByColumns(
   });
 
   return filtered;
-}
-
-function buildTableStorageKey(schemaName: string, tableName: string): string {
-  return JSON.stringify([schemaName, tableName]);
 }
 
 export function useTableColumnWidthsPreference(
@@ -197,7 +194,7 @@ export function useTableColumnWidthsPreference(
       return null;
     }
 
-    return buildTableStorageKey(schemaName, tableName);
+    return buildDatabaseTablePreferenceKey(schemaName, tableName);
   }, [schemaName, tableName]);
 
   const columnWidths = useMemo(() => {
