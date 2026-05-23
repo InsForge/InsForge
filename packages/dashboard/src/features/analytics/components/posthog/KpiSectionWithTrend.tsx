@@ -69,7 +69,15 @@ function KpiTab({ metric, item, active, onClick }: KpiTabProps) {
 }
 
 function formatXAxis(date: string, timeframe: string): string {
-  const d = new Date(date);
+  // YYYY-MM-DD strings get parsed as UTC midnight by new Date(), then
+  // toLocaleDateString shifts them back by the local timezone offset — in
+  // UTC-N timezones a 2026-05-22 bucket renders as 5/21. Parse date-only
+  // strings as local components instead. Datetimes (24h timeframe) still
+  // fall through to the standard parser so UTC-to-local conversion stays.
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  const d = dateOnly
+    ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+    : new Date(date);
   if (Number.isNaN(d.getTime())) {
     return date;
   }
