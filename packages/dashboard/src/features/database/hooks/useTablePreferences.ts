@@ -168,7 +168,7 @@ function reorderColumnKeys(
   return nextOrder;
 }
 
-export function useTableGridPreferences(
+export function useTablePreferences(
   tableName: string | null,
   schemaName: string = 'public',
   availableColumns?: string[]
