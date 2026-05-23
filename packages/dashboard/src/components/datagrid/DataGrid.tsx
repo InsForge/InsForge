@@ -206,7 +206,7 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
         minWidth: col.minWidth || 80,
         maxWidth: col.maxWidth,
         resizable: col.resizable !== false,
-        draggable: storageKey ? true : col.draggable,
+        draggable: storageKey ? (col.draggable ?? true) : col.draggable,
         sortable: col.sortable !== false,
         sortDescendingFirst: col.sortDescendingFirst ?? true,
         editable: col.editable && !col.isPrimaryKey,
@@ -252,6 +252,7 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
     renderSelectionCell,
     renderSelectionHeaderCell,
     selectionHeaderLabel,
+    storageKey,
   ]);
 
   const handleColumnResize = useCallback(

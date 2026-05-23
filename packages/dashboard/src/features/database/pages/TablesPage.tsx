@@ -640,7 +640,10 @@ export default function TablesPage() {
                   schema={tableData?.schema}
                   storageKey={
                     tableData?.schema
-                      ? `db_col_order_${tableData.schema.schemaName}_${tableData.schema.tableName}`
+                      ? `db_col_order_${JSON.stringify([
+                          tableData.schema.schemaName,
+                          tableData.schema.tableName,
+                        ])}`
                       : undefined
                   }
                   columnWidths={columnWidths}
