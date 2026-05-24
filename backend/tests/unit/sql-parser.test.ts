@@ -92,7 +92,13 @@ describe('SQL execution guards', () => {
     expect(
       checkSqlExecutionGuards("SELECT set_config('ro' || 'le', 'postgres', false)")
     ).not.toBeNull();
-    expect(checkSqlExecutionGuards("SELECT set_config('app.safe', 'value', false)")).toBeNull();
+    expect(
+      checkSqlExecutionGuards("SELECT pg_catalog.set_config('role', 'postgres', false)")
+    ).not.toBeNull();
+    expect(
+      checkSqlExecutionGuards("SELECT pg_catalog.\"set_config\"('role', 'postgres', false)")
+    ).not.toBeNull();
+    expect(checkSqlExecutionGuards("SELECT set_config('app.safe', 'value', false)")).not.toBeNull();
   });
 
   it('blocks role management statements but allows object grants', () => {
@@ -131,6 +137,26 @@ describe('SQL execution guards', () => {
     expect(
       checkSqlExecutionGuards("SELECT set_config('statement_timeout', '0', false)")
     ).not.toBeNull();
+  });
+
+  it('blocks set_config inside DO blocks without blocking ordinary DO blocks', () => {
+    expect(
+      checkSqlExecutionGuards(`
+        DO $$
+        BEGIN
+          PERFORM set_config('role', 'postgres', false);
+        END $$;
+      `)
+    ).not.toBeNull();
+
+    expect(
+      checkSqlExecutionGuards(`
+        DO $$
+        BEGIN
+          RAISE NOTICE 'hello';
+        END $$;
+      `)
+    ).toBeNull();
   });
 
   it('blocks database-level operations without matching comments or strings', () => {
