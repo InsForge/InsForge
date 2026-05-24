@@ -334,7 +334,7 @@ export class OAuthConfigService {
 
       // Build update query
       const updates: string[] = [];
-      const values: (string | string[] | boolean | null)[] = [];
+      const values: (string | string[] | boolean | Record<string, string> | null)[] = [];
       let paramCount = 1;
 
       if (input.clientId !== undefined) {
