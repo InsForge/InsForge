@@ -239,8 +239,7 @@ export class OAuthConfigService {
 
       // Create new OAuth config
       const result = await client.query(
-        `INSERT INTO auth.oauth_configs (provider, client_id, secret_id, redirect_uri, scopes, use_shared_key, extra_authorize_params)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)irect_uri, scopes, use_shared_key)
+        `INSERT INTO auth.oauth_configs (provider, client_id, secret_id, redirect_uri, scopes, use_shared_key)
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING
            id,
