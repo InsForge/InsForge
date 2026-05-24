@@ -12,6 +12,7 @@ export interface CreateOAuthConfigInput {
   redirectUri?: string;
   scopes?: string[];
   useSharedKey?: boolean;
+  extraAuthorizeParams?: Record<string, string>;
 }
 
 export interface UpdateOAuthConfigInput {
@@ -20,6 +21,7 @@ export interface UpdateOAuthConfigInput {
   redirectUri?: string;
   scopes?: string[];
   useSharedKey?: boolean;
+  extraAuthorizeParams?: Record<string, string>;
 }
 
 export class OAuthConfigService {
@@ -59,8 +61,8 @@ export class OAuthConfigService {
           redirect_uri as "redirectUri",
           scopes,
           use_shared_key as "useSharedKey",
-          extra_authorize_params as "extraAuthorizeParams",
           created_at as "createdAt",
+          extra_authorize_params as "extraAuthorizeParams",
           updated_at as "updatedAt"
          FROM auth.oauth_configs
          ORDER BY provider ASC`
@@ -106,8 +108,8 @@ export class OAuthConfigService {
           redirect_uri as "redirectUri",
           scopes,
           use_shared_key as "useSharedKey",
-          extra_authorize_params as "extraAuthorizeParams",
           created_at as "createdAt",
+          extra_authorize_params as "extraAuthorizeParams",
           updated_at as "updatedAt"
          FROM auth.oauth_configs
          WHERE LOWER(provider) = LOWER($1)
@@ -240,8 +242,7 @@ export class OAuthConfigService {
       // Create new OAuth config
       const result = await client.query(
         `INSERT INTO auth.oauth_configs (provider, client_id, secret_id, redirect_uri, scopes, use_shared_key, extra_authorize_params)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)irect_uri, scopes, use_shared_key)
-         VALUES ($1, $2, $3, $4, $5, $6)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING
            id,
            provider,
@@ -259,6 +260,7 @@ export class OAuthConfigService {
           null, // Deprecating redirect_uri
           scopes,
           input.useSharedKey || false,
+          input.extraAuthorizeParams || null,
         ]
       );
 
@@ -380,8 +382,8 @@ export class OAuthConfigService {
              redirect_uri as "redirectUri",
              scopes,
              use_shared_key as "useSharedKey",
-          extra_authorize_params as "extraAuthorizeParams",
              created_at as "createdAt",
+          extra_authorize_params as "extraAuthorizeParams",
              updated_at as "updatedAt"`,
           values
         );
