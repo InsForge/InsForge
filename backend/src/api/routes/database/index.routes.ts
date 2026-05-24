@@ -116,40 +116,44 @@ router.get(
  * the index synchronously. For CONCURRENTLY builds on large tables this
  * request may take several minutes — the client should show a loading state.
  */
-router.post('/indexes', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const schemaName = normalizeDatabaseSchemaName(req.body.schema);
-    const { tableName, indexName, columns, method, unique, concurrently } = req.body as {
-      tableName: string;
-      indexName: string;
-      columns: string[];
-      method?: string;
-      unique?: boolean;
-      concurrently?: boolean;
-    };
+router.post(
+  '/indexes',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const schemaName = normalizeDatabaseSchemaName(req.body.schema);
+      const { tableName, indexName, columns, method, unique, concurrently } = req.body as {
+        tableName: string;
+        indexName: string;
+        columns: string[];
+        method?: string;
+        unique?: boolean;
+        concurrently?: boolean;
+      };
 
-    const resolvedMethod = method ?? 'btree';
+      const resolvedMethod = method ?? 'btree';
 
-    await databaseService.validateIndexCreation(
-      schemaName,
-      tableName,
-      indexName,
-      columns,
-      resolvedMethod
-    );
+      await databaseService.validateIndexCreation(
+        schemaName,
+        tableName,
+        indexName,
+        columns,
+        resolvedMethod
+      );
 
-    const result = await databaseService.createIndex(schemaName, tableName, indexName, columns, {
-      method: resolvedMethod,
-      unique,
-      concurrently,
-    });
+      const result = await databaseService.createIndex(schemaName, tableName, indexName, columns, {
+        method: resolvedMethod,
+        unique,
+        concurrently,
+      });
 
-    successResponse(res, result);
-  } catch (error: unknown) {
-    logger.warn('Create index error:', error);
-    next(error);
+      successResponse(res, result);
+    } catch (error: unknown) {
+      logger.warn('Create index error:', error);
+      next(error);
+    }
   }
-});
+);
 
 /**
  * Drop an index

@@ -53,9 +53,12 @@ import { useToast } from '#lib/hooks/useToast';
 const IDENTIFIER_REGEX = /^[^"\x00-\x1F\x7F]+$/;
 
 function validateIdentifierFE(value: string): string | null {
-  if (!value.trim()) return 'Name cannot be empty.';
-  if (!IDENTIFIER_REGEX.test(value))
+  if (!value.trim()) {
+    return 'Name cannot be empty.';
+  }
+  if (!IDENTIFIER_REGEX.test(value)) {
     return 'Name cannot contain double quotes or control characters.';
+  }
   return null;
 }
 
@@ -71,7 +74,9 @@ interface IndexRow extends DataGridRowType {
 }
 
 function parseIndexesFromResponse(response: DatabaseIndexesResponse | undefined): IndexRow[] {
-  if (!response?.indexes) return [];
+  if (!response?.indexes) {
+    return [];
+  }
   return response.indexes.map((index) => ({
     id: `${index.tableName}_${index.indexName}`,
     tableName: index.tableName,
@@ -162,7 +167,9 @@ function CreateIndexDialog({ open, onOpenChange, schemaName, onCreate }: CreateI
 
   const handleCreate = async () => {
     setIndexNameTouched(true);
-    if (validateIdentifierFE(indexName)) return;
+    if (validateIdentifierFE(indexName)) {
+      return;
+    }
     setIsCreating(true);
     try {
       await onCreate({
@@ -181,7 +188,8 @@ function CreateIndexDialog({ open, onOpenChange, schemaName, onCreate }: CreateI
     }
   };
 
-  const isValid = !!tableName && !!indexName.trim() && selectedColumns.length > 0 && !indexNameError;
+  const isValid =
+    !!tableName && !!indexName.trim() && selectedColumns.length > 0 && !indexNameError;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -214,9 +222,7 @@ function CreateIndexDialog({ open, onOpenChange, schemaName, onCreate }: CreateI
                 </SelectTrigger>
                 <SelectContent>
                   {tables.length === 0 ? (
-                    <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                      No tables found
-                    </div>
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">No tables found</div>
                   ) : (
                     tables.map((t) => (
                       <SelectItem key={t} value={t}>
@@ -332,7 +338,6 @@ function CreateIndexDialog({ open, onOpenChange, schemaName, onCreate }: CreateI
                   : 'The table will be write-locked while the index is built. Only use on small or idle tables.'}
               </p>
             </div>
-
           </div>
 
           <DialogFooter className="gap-2 p-4">
@@ -364,10 +369,22 @@ function CreateIndexDialog({ open, onOpenChange, schemaName, onCreate }: CreateI
 // IndexBuildingDialog
 // ---------------------------------------------------------------------------
 
-function IndexBuildingDialog({ open, indexName, tableName }: { open: boolean; indexName: string; tableName: string }) {
+function IndexBuildingDialog({
+  open,
+  indexName,
+  tableName,
+}: {
+  open: boolean;
+  indexName: string;
+  tableName: string;
+}) {
   return (
     <Dialog open={open} onOpenChange={() => {}}>
-      <DialogContent showCloseButton={false} className="max-w-[420px] p-0" onInteractOutside={(e) => e.preventDefault()}>
+      <DialogContent
+        showCloseButton={false}
+        className="max-w-[420px] p-0"
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <div className="flex flex-col gap-4 p-6">
           <div className="flex items-start gap-4">
             <RefreshIcon className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-primary" />
@@ -404,7 +421,10 @@ export default function IndexesPage() {
   const [sqlModal, setSqlModal] = useState({ open: false, title: '', value: '' });
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [droppingIndexes, setDroppingIndexes] = useState<Set<string>>(new Set());
-  const [buildingIndex, setBuildingIndex] = useState<{ indexName: string; tableName: string } | null>(null);
+  const [buildingIndex, setBuildingIndex] = useState<{
+    indexName: string;
+    tableName: string;
+  } | null>(null);
 
   const { createIndex, dropIndex } = useIndexMutations(selectedSchema);
   const { confirm, confirmDialogProps } = useConfirm();
@@ -467,7 +487,9 @@ export default function IndexesPage() {
         destructive: true,
       });
 
-      if (!confirmed) return;
+      if (!confirmed) {
+        return;
+      }
 
       setDroppingIndexes((prev) => new Set(prev).add(row.indexName));
       try {
@@ -559,7 +581,9 @@ export default function IndexesPage() {
         name: '',
         width: '52px',
         renderCell: ({ row }) => {
-          if (row.isPrimary) return null;
+          if (row.isPrimary) {
+            return null;
+          }
           const isDropping = droppingIndexes.has(row.indexName as string);
           return (
             <TooltipProvider>
@@ -592,7 +616,9 @@ export default function IndexesPage() {
   );
 
   useEffect(() => {
-    if (isLoadingSchemas || schemas.length === 0) return;
+    if (isLoadingSchemas || schemas.length === 0) {
+      return;
+    }
     if (!schemas.some((schema) => schema.name === selectedSchema)) {
       setSelectedSchema(DEFAULT_DATABASE_SCHEMA, { replace: true });
     }

@@ -248,7 +248,7 @@ export class DatabaseService {
       ) {
         throw new Error(
           `An equivalent ${method} index already exists on "${tableName}" ` +
-          `(columns: ${existingCols.join(', ')}). Existing index: "${row.indexName}".`
+            `(columns: ${existingCols.join(', ')}). Existing index: "${row.indexName}".`
         );
       }
     }
