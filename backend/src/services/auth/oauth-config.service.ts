@@ -357,6 +357,11 @@ export class OAuthConfigService {
         values.push(input.useSharedKey);
       }
 
+      if (input.extraAuthorizeParams !== undefined) {
+        updates.push(`extra_authorize_params = $${paramCount++}`);
+        values.push(input.extraAuthorizeParams);
+      }
+
       if (!updates.length && input.clientSecret === undefined) {
         await client.query('COMMIT');
         // Return the config in the correct format
