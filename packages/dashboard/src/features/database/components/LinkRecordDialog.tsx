@@ -10,6 +10,7 @@ import {
 } from '@insforge/ui';
 import {
   DataGrid,
+  DataGridEmptyState,
   TypeBadge,
   type CellMouseEvent,
   type CellClickArgs,
@@ -304,11 +305,11 @@ export function LinkRecordDialog({
               showSelection={false}
               showPagination={true}
               emptyState={
-                <div className="flex flex-col items-center justify-center h-full">
-                  <p className="text-neutral-500 dark:text-neutral-400 select-none">
-                    {searchQuery ? 'No records match your search criteria' : 'No records found'}
-                  </p>
-                </div>
+                <DataGridEmptyState
+                  message={
+                    searchQuery ? 'No records match your search criteria' : 'No records found'
+                  }
+                />
               }
             />
           </div>
