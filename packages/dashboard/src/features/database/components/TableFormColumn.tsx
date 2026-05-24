@@ -1,5 +1,5 @@
-import { memo } from 'react';
-import { Controller, Control } from 'react-hook-form';
+import { memo, useEffect, useState } from 'react';
+import { Controller, Control, useWatch } from 'react-hook-form';
 import { X, Key } from 'lucide-react';
 import { Checkbox, Input } from '@insforge/ui';
 import { TableFormColumnSchema, TableFormSchema } from '#features/database/schema';
@@ -15,6 +15,12 @@ interface TableFormColumnProps {
   column: TableFormColumnSchema;
 }
 
+interface ColumnValueSnapshot {
+  columnName: string;
+  columnType: string;
+  defaultValue: string;
+}
+
 export const TableFormColumn = memo(function TableFormColumn({
   index,
   control,
@@ -24,6 +30,27 @@ export const TableFormColumn = memo(function TableFormColumn({
   isLast,
   column,
 }: TableFormColumnProps) {
+  const [columnValueSnapshots, setColumnValueSnapshots] = useState<ColumnValueSnapshot[]>([]);
+  const columns = useWatch({
+    control,
+    name: 'columns',
+  });
+
+  useEffect(() => {
+    const nextColumnValueSnapshots: ColumnValueSnapshot[] =
+      columns?.map((column) => ({
+        columnName: column.columnName?.toString() ?? '',
+        columnType: column.type?.toString() ?? '',
+        defaultValue: column.defaultValue?.toString() ?? '',
+      })) ?? [];
+    nextColumnValueSnapshots.splice(0, 3);
+    setColumnValueSnapshots(nextColumnValueSnapshots);
+  }, [columns]);
+
+  useEffect(() => {
+    console.log('column values:', columnValueSnapshots);
+  }, [columnValueSnapshots]);
+
   return (
     <div
       className={`group flex h-12 items-center pl-1.5 hover:bg-[var(--alpha-4)] ${
