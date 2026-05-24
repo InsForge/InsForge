@@ -1,5 +1,8 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { withAdminContext, withUserContext } from '../../src/services/database/user-context.service';
+import {
+  withAdminContext,
+  withUserContext,
+} from '../../src/services/database/user-context.service';
 import type { Pool, PoolClient } from 'pg';
 
 /**
