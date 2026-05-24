@@ -15,6 +15,7 @@ import { AppError, hasPgErrorCode } from '@/utils/errors.js';
 import { DenoSubhostingProvider } from '@/providers/functions/deno-subhosting.provider.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
+import { config } from '@/infra/config/app.config.js';
 
 export class FunctionService {
   private static instance: FunctionService;
@@ -72,7 +73,7 @@ export class FunctionService {
         runtimeHealthy = true;
       } else {
         try {
-          const denoUrl = process.env.DENO_RUNTIME_URL || 'http://localhost:7133';
+          const denoUrl = config.functions.denoRuntimeUrl;
           const healthResponse = await fetch(`${denoUrl}/health`, {
             method: 'GET',
             signal: AbortSignal.timeout(2000), // 2 second timeout
@@ -370,7 +371,7 @@ export class FunctionService {
    * Get the Deno Subhosting project ID for this InsForge instance
    */
   private getDenoProjectId(): string {
-    return process.env.APP_KEY || 'local';
+    return config.storage.appKey;
   }
 
   /**

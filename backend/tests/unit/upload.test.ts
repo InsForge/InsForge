@@ -1,4 +1,23 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
+
+vi.mock('@/infra/config/app.config.js', () => ({
+  config: {
+    server: {
+      get maxFileSize() {
+        const val = process.env.MAX_FILE_SIZE;
+        if (!val) return undefined;
+        const parsed = parseInt(val, 10);
+        return isNaN(parsed) ? undefined : parsed;
+      },
+      maxFilesPerField: 10,
+      logsDir: 'logs',
+    },
+    app: {
+      logLevel: 'info',
+    },
+  },
+}));
+
 import { getMaxFileSize } from '../../src/api/middlewares/upload';
 
 const DEFAULT_50MB = 50 * 1024 * 1024;

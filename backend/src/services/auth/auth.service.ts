@@ -35,6 +35,7 @@ import { EmailService } from '@/services/email/email.service.js';
 import { XOAuthProvider } from '@/providers/oauth/x.provider.js';
 import { AppleOAuthProvider } from '@/providers/oauth/apple.provider.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
+import { config } from '@/infra/config/app.config.js';
 import {
   ERROR_CODES,
   type AuthMetadataSchema,
@@ -70,11 +71,13 @@ export class AuthService {
   private appleOAuthProvider: AppleOAuthProvider;
 
   private constructor() {
-    this.adminEmail = process.env.ADMIN_EMAIL ?? '';
-    this.adminPassword = process.env.ADMIN_PASSWORD ?? '';
+    this.adminEmail = config.auth.adminEmail;
+    this.adminPassword = config.auth.adminPassword;
 
     if (!this.adminEmail || !this.adminPassword) {
-      throw new Error('ADMIN_EMAIL and ADMIN_PASSWORD environment variables are required');
+      throw new Error(
+        'config.auth.adminEmail and config.auth.adminPassword configuration values are required'
+      );
     }
 
     // Initialize token manager

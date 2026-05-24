@@ -1,10 +1,11 @@
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import logger from '@/utils/logger.js';
+import { config } from '@/infra/config/app.config.js';
 
-// Config bucket settings - can be configured via environment variables
+// Config bucket settings - sourced from centralised app config.
 // See .env.example for AWS_CONFIG_BUCKET and AWS_CONFIG_REGION
-const CONFIG_BUCKET = process.env.AWS_CONFIG_BUCKET || 'insforge-config';
-const CONFIG_REGION = process.env.AWS_CONFIG_REGION || 'us-east-2';
+const CONFIG_BUCKET = config.storage.awsConfigBucket;
+const CONFIG_REGION = config.storage.awsConfigRegion;
 
 let s3Client: S3Client | null = null;
 
@@ -23,11 +24,11 @@ function getS3Client(): S3Client {
     region: CONFIG_REGION,
   };
 
-  // Use explicit credentials if provided, otherwise IAM role
-  if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
+  // Use explicit credentials if provided, otherwise fall back to IAM role
+  if (config.storage.awsAccessKeyId && config.storage.awsSecretAccessKey) {
     s3Config.credentials = {
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+      accessKeyId: config.storage.awsAccessKeyId,
+      secretAccessKey: config.storage.awsSecretAccessKey,
     };
   }
 

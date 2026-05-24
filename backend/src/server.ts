@@ -2,7 +2,6 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
-import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
@@ -40,7 +39,7 @@ import packageJson from '../../package.json';
 import { schedulesRouter } from '@/api/routes/schedules/index.routes.js';
 import { servicesRouter } from '@/api/routes/compute/services.routes.js';
 import { analyticsRouter } from '@/api/routes/analytics/index.routes.js';
-import { parseTrustProxySetting } from '@/utils/trust-proxy.js';
+import { config } from '@/infra/config/app.config.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -52,15 +51,6 @@ function shouldSkipGlobalRateLimit(req: Request): boolean {
   return (
     req.method === 'PUT' && /^\/api\/deployments\/[^/]+\/files\/[^/]+\/content$/.test(req.path)
   );
-}
-
-// Load .env file from the root directory (parent of backend)
-const envPath = path.resolve(__dirname, '../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath });
-} else {
-  // Fallback to default behavior (looks in current working directory)
-  dotenv.config();
 }
 
 export async function createApp() {
@@ -82,8 +72,7 @@ export async function createApp() {
   const app = express();
 
   // Enable trust proxy setting for rate limiting behind proxies/load balancers.
-  // TRUST_PROXY can be a boolean, hop count, or Express trust proxy string.
-  app.set('trust proxy', parseTrustProxySetting());
+  app.set('trust proxy', config.server.trustProxy);
 
   const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -184,8 +173,8 @@ export async function createApp() {
   // We use high defaults (100mb/10mb) to ensure a smooth "out-of-the-box" experience
   // for large metadata/storage requests, as per project standards.
   // Users can override these via environment variables for hardened security.
-  const jsonLimit = process.env.MAX_JSON_BODY_SIZE || '100mb';
-  const urlencodedLimit = process.env.MAX_URLENCODED_BODY_SIZE || '10mb';
+  const jsonLimit = config.server.maxJsonBodySize;
+  const urlencodedLimit = config.server.maxUrlencodedBodySize;
 
   app.use(express.json({ limit: jsonLimit }));
   app.use(express.urlencoded({ extended: true, limit: urlencodedLimit }));
@@ -232,7 +221,7 @@ export async function createApp() {
 
     try {
       const functionService = FunctionService.getInstance();
-      const localRuntime = process.env.DENO_RUNTIME_URL || 'http://localhost:7133';
+      const localRuntime = config.functions.denoRuntimeUrl;
 
       // Get target base URL: prefer Subhosting deployment, fallback to local runtime
       const baseUrl =
@@ -320,8 +309,8 @@ export async function createApp() {
   return app;
 }
 
-// Use PORT from environment variable, fallback to 7130
-const PORT = parseInt(process.env.PORT || '7130');
+// Use PORT from config (already parsed from env, falls back to 7130)
+const PORT = config.app.port;
 
 async function initializeServer() {
   try {

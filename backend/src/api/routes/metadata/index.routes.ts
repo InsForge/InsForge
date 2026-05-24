@@ -16,6 +16,7 @@ import {
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { CloudDatabaseProvider } from '@/providers/database/cloud.provider.js';
+import { config } from '@/infra/config/app.config.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
@@ -130,8 +131,9 @@ router.get('/api-key', async (req: AuthRequest, res: Response, next: NextFunctio
 // Get backend project id from environment (admin only)
 router.get('/project-id', (_req: AuthRequest, res: Response, next: NextFunction) => {
   try {
+    const projectId = config.cloud.projectId;
     const projectIdResponse: ProjectIdResponse = {
-      projectId: process.env.PROJECT_ID || null,
+      projectId: projectId && projectId !== 'local' ? projectId : null,
     };
     successResponse(res, projectIdResponse);
   } catch (error) {

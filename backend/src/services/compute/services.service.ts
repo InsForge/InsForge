@@ -162,14 +162,14 @@ function makeFlyAppName(name: string, projectId: string): string {
 // guarantees a letter-leading name for every project, and APP_KEY's
 // per-project uniqueness still preserves 6PN isolation.
 function makeNetwork(): string {
-  if (!process.env.APP_KEY) {
+  if (!config.storage.appKey || config.storage.appKey === 'local') {
     throw new AppError(
       'APP_KEY environment variable is required for compute network isolation',
       500,
       ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED
     );
   }
-  return `n-${process.env.APP_KEY}`;
+  return `n-${config.storage.appKey}`;
 }
 
 // Default to Fly's own .fly.dev hostname (which Fly routes automatically for

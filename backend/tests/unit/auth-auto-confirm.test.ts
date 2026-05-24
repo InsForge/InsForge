@@ -125,6 +125,10 @@ vi.mock('../../src/infra/config/app.config', () => ({
     cloud: {
       projectId: null,
     },
+    auth: {
+      adminEmail: 'admin@test.com',
+      adminPassword: 'admin-password',
+    },
   },
   getApiBaseUrl: () => 'http://localhost:3000',
 }));

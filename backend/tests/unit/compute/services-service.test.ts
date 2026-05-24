@@ -36,6 +36,9 @@ vi.mock('@/infra/config/app.config.js', () => ({
     app: {
       jwtSecret: 'test-secret',
     },
+    storage: {
+      appKey: 'testkey1',
+    },
   },
 }));
 
@@ -79,8 +82,7 @@ describe('ComputeServicesService', () => {
   let service: ComputeServicesService;
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    process.env.APP_KEY = 'testkey1';
+    vi.resetAllMocks();
     service = ComputeServicesService.getInstance();
     mockIsConfigured.mockReturnValue(true);
   });

@@ -17,6 +17,7 @@ import {
   type DeploymentStatusType,
 } from '@/types/deployments.js';
 import logger from '@/utils/logger.js';
+import { config } from '@/infra/config/app.config.js';
 import {
   ERROR_CODES,
   type CreateDeploymentResponse,
@@ -44,9 +45,6 @@ export type {
   VerifyCustomDomainResponse,
 };
 
-const DEFAULT_MAX_DEPLOYMENT_FILES = 5000;
-const DEFAULT_MAX_DEPLOYMENT_TOTAL_BYTES = 100 * 1024 * 1024;
-const DEFAULT_MAX_DEPLOYMENT_FILE_BYTES = 100 * 1024 * 1024;
 const DEPLOYMENT_BUCKET = '_deployments';
 const getDeploymentKey = (id: string) => `${id}.zip`;
 
@@ -71,15 +69,11 @@ export class DeploymentService {
   }
 
   private initializeS3Provider(): void {
-    const s3Bucket = process.env.AWS_S3_BUCKET;
-    const appKey = process.env.APP_KEY || 'local';
+    const s3Bucket = config.storage.s3Bucket;
+    const appKey = config.storage.appKey;
 
     if (s3Bucket) {
-      this.s3Provider = new S3StorageProvider(
-        s3Bucket,
-        appKey,
-        process.env.AWS_REGION || 'us-east-2'
-      );
+      this.s3Provider = new S3StorageProvider(s3Bucket, appKey, config.storage.awsRegion);
       this.s3Provider.initialize();
     }
   }
@@ -711,34 +705,23 @@ export class DeploymentService {
    * Get the deployment URL - uses custom domain if APP_KEY is set, otherwise falls back to provider URL
    */
   private getDeploymentUrl(providerUrl: string | null): string | null {
-    const appKey = process.env.APP_KEY;
+    const appKey = config.storage.appKey !== 'local' ? config.storage.appKey : null;
     if (appKey) {
       return `https://${appKey}.insforge.site`;
     }
     return providerUrl;
   }
 
-  private getPositiveIntegerEnv(name: string, fallback: number): number {
-    const parsed = Number.parseInt(process.env[name] ?? '', 10);
-    return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback;
-  }
-
   private getMaxDeploymentFiles(): number {
-    return this.getPositiveIntegerEnv('MAX_DEPLOYMENT_FILES', DEFAULT_MAX_DEPLOYMENT_FILES);
+    return config.deployments.maxDeploymentFiles;
   }
 
   private getMaxDeploymentTotalBytes(): number {
-    return this.getPositiveIntegerEnv(
-      'MAX_DEPLOYMENT_TOTAL_BYTES',
-      DEFAULT_MAX_DEPLOYMENT_TOTAL_BYTES
-    );
+    return config.deployments.maxDeploymentTotalBytes;
   }
 
   private getMaxDeploymentFileBytes(): number {
-    return this.getPositiveIntegerEnv(
-      'MAX_DEPLOYMENT_FILE_BYTES',
-      DEFAULT_MAX_DEPLOYMENT_FILE_BYTES
-    );
+    return config.deployments.maxDeploymentFileBytes;
   }
 
   private normalizeDeploymentFilePath(filePath: string): string {
@@ -1320,7 +1303,7 @@ export class DeploymentService {
       );
     }
 
-    const projectId = process.env.PROJECT_ID;
+    const projectId = config.cloud.projectId !== 'local' ? config.cloud.projectId : undefined;
     if (!projectId) {
       throw new AppError(
         'PROJECT_ID not found in environment variables',
@@ -1329,7 +1312,7 @@ export class DeploymentService {
       );
     }
 
-    const jwtSecret = process.env.JWT_SECRET;
+    const jwtSecret = config.app.jwtSecret;
     if (!jwtSecret) {
       throw new AppError(
         'JWT_SECRET not found in environment variables',
@@ -1340,7 +1323,7 @@ export class DeploymentService {
 
     try {
       const signature = jwt.sign({ projectId }, jwtSecret, { expiresIn: '1h' });
-      const cloudApiHost = process.env.CLOUD_API_HOST || 'https://api.insforge.dev';
+      const cloudApiHost = config.cloud.apiHost;
 
       const response = await fetch(`${cloudApiHost}/sites/v1/${projectId}/slug`, {
         method: 'PUT',

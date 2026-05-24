@@ -4,6 +4,7 @@ import { DatabaseManager } from '@/infra/database/database.manager.js';
 import logger from '@/utils/logger.js';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 import { SecretSchema, CreateSecretRequest } from '@insforge/shared-schemas';
+import { config } from '@/infra/config/app.config.js';
 
 export interface CreateSecretInput extends CreateSecretRequest {
   isReserved?: boolean;
@@ -563,7 +564,7 @@ export class SecretService {
 
     if (!apiKey) {
       // Check if ACCESS_API_KEY is provided via environment
-      const envApiKey = process.env.ACCESS_API_KEY;
+      const envApiKey = config.auth.accessApiKey;
 
       if (envApiKey && envApiKey.trim() !== '') {
         // Use the provided API key from environment, ensure it has 'ik_' prefix

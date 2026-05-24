@@ -12,6 +12,7 @@ import {
 import { isCloudEnvironment } from '@/utils/environment.js';
 import { DenoSubhostingProvider } from '@/providers/functions/deno-subhosting.provider.js';
 import { FunctionService } from '@/services/functions/function.service.js';
+import { config } from '@/infra/config/app.config.js';
 
 // Re-export the type for backward compatibility
 export type GetBuildLogsResponse = GetBuildLogsResponseSchema;
@@ -33,7 +34,7 @@ export class LogService {
     // Use CloudWatch if AWS credentials are available or if it's cloud environment since we provided the permissions in instance profile
     // otherwise use file-based logging
     const hasAwsCredentials =
-      (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) || isCloudEnvironment();
+      (config.storage.awsAccessKeyId && config.storage.awsSecretAccessKey) || isCloudEnvironment();
 
     if (hasAwsCredentials) {
       logger.info('Using log provider: CloudWatch');
