@@ -403,6 +403,7 @@ export const stripeKeyConfigSchema = z.object({
 
 export const razorpayKeyConfigSchema = z.object({
   environment: razorpayEnvironmentSchema,
+  keyType: z.enum(['api_key', 'api_secret', 'webhook_secret']),
   hasKey: z.boolean(),
   maskedKey: z.string().nullable(),
 });
