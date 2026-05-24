@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Database, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Link, useLocation, useMatch, useNavigate } from 'react-router-dom';
-import EmptyBoxSvg from '#assets/images/empty_box.svg?react';
 import {
+  EmptyStateIllustration,
   FeatureSidebar,
   type FeatureSidebarActionButton,
   type FeatureSidebarItemAction,
@@ -282,16 +282,7 @@ export function DatabaseSidebar({
             emptyState={
               showEmptyState ? (
                 <div className="flex flex-col items-center gap-2 pt-2 text-center">
-                  <EmptyBoxSvg
-                    className="h-[95px] w-[160px]"
-                    style={
-                      {
-                        '--empty-box-fill-primary': 'rgb(var(--semantic-2))',
-                        '--empty-box-fill-secondary': 'rgb(var(--semantic-6))',
-                      } as CSSProperties
-                    }
-                    aria-hidden="true"
-                  />
+                  <EmptyStateIllustration />
                   <p className="text-sm font-medium leading-6 text-muted-foreground">
                     No Table Yet
                   </p>

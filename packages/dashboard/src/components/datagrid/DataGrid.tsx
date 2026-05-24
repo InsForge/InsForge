@@ -9,6 +9,7 @@ import ReactDataGrid, {
   type RenderCellProps,
 } from 'react-data-grid';
 import { cn } from '#lib/utils/utils';
+import { DataGridEmptyState } from '#components/DataGridEmptyState';
 import { PaginationControls } from '#components/PaginationControls';
 import { Checkbox } from '@insforge/ui';
 import { useTheme } from '#lib/contexts/ThemeContext';
@@ -336,10 +337,10 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
                 </div>
               ) : (
                 <div
-                  className="absolute inset-x-0 bottom-0 flex items-center justify-center bg-semantic-1"
+                  className="absolute inset-x-0 bottom-0 flex items-start justify-center bg-semantic-1"
                   style={{ top: headerRowHeight }}
                 >
-                  <div className="text-sm text-muted-foreground">No data to display</div>
+                  <DataGridEmptyState message="No data to display" />
                 </div>
               ),
             }}

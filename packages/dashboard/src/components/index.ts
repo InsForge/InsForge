@@ -18,6 +18,7 @@ export { CodeEditor } from './CodeEditor';
 export { DataGridEmptyState } from './DataGridEmptyState';
 export { DeleteActionButton } from './DeleteActionButton';
 export { EmptyState } from './EmptyState';
+export { EmptyStateIllustration } from './EmptyStateIllustration';
 export { ErrorState } from './ErrorState';
 export { LoadingState } from './LoadingState';
 export { PaginationControls, type PaginationControlsProps } from './PaginationControls';
