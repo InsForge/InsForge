@@ -1,6 +1,6 @@
 -- Up Migration
 
-CREATE TABLE payments.razorpay_connections (
+CREATE TABLE IF NOT EXISTS payments.razorpay_connections (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   environment TEXT NOT NULL CHECK (environment IN ('test', 'live')),
   razorpay_account_id TEXT,
@@ -28,7 +28,7 @@ CREATE TRIGGER trg_payments_razorpay_connections_updated_at
 BEFORE UPDATE ON payments.razorpay_connections
 FOR EACH ROW EXECUTE FUNCTION system.update_updated_at();
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON payments.razorpay_connections TO project_admin;
+GRANT SELECT ON payments.razorpay_connections TO project_admin;
 
 -- Down Migration
 

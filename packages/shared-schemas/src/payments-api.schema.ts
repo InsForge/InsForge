@@ -12,6 +12,8 @@ import {
   stripeProductSchema,
   stripeSubscriptionSchema,
   stripeWebhookEventSchema,
+  razorpayConnectionSchema,
+  razorpayEnvironmentSchema,
 } from './payments.schema.js';
 
 export const syncPaymentsRequestSchema = z.object({
@@ -179,6 +181,7 @@ export const updatePaymentPriceRequestSchema = z
 
 export const getPaymentsStatusResponseSchema = z.object({
   connections: z.array(stripeConnectionSchema),
+  razorpayConnections: z.array(razorpayConnectionSchema).optional(),
 });
 
 export const listPaymentCatalogResponseSchema = z.object({
@@ -398,8 +401,15 @@ export const stripeKeyConfigSchema = z.object({
   maskedKey: z.string().nullable(),
 });
 
+export const razorpayKeyConfigSchema = z.object({
+  environment: razorpayEnvironmentSchema,
+  hasKey: z.boolean(),
+  maskedKey: z.string().nullable(),
+});
+
 export const getPaymentsConfigResponseSchema = z.object({
   keys: z.array(stripeKeyConfigSchema),
+  razorpayKeys: z.array(razorpayKeyConfigSchema).optional(),
 });
 
 export const upsertPaymentsConfigBodySchema = z
@@ -471,6 +481,7 @@ export type MutatePaymentPriceResponse = z.infer<typeof mutatePaymentPriceRespon
 export type ArchivePaymentPriceResponse = z.infer<typeof archivePaymentPriceResponseSchema>;
 export type DeletePaymentProductResponse = z.infer<typeof deletePaymentProductResponseSchema>;
 export type StripeKeyConfig = z.infer<typeof stripeKeyConfigSchema>;
+export type RazorpayKeyConfig = z.infer<typeof razorpayKeyConfigSchema>;
 export type GetPaymentsConfigResponse = z.infer<typeof getPaymentsConfigResponseSchema>;
 export type UpsertPaymentsConfigBody = z.infer<typeof upsertPaymentsConfigBodySchema>;
 export type UpsertPaymentsConfigRequest = z.infer<typeof upsertPaymentsConfigRequestSchema>;

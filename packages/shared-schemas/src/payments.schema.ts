@@ -272,3 +272,29 @@ export const stripeWebhookEventSchema = z.object({
   updatedAt: z.string(),
 });
 export type StripeWebhookEvent = z.infer<typeof stripeWebhookEventSchema>;
+
+export const razorpayEnvironmentSchema = z.enum(['test', 'live']);
+export type RazorpayEnvironment = z.infer<typeof razorpayEnvironmentSchema>;
+
+export const razorpayConnectionStatusSchema = z.enum(['unconfigured', 'connected', 'error']);
+export type RazorpayConnectionStatus = z.infer<typeof razorpayConnectionStatusSchema>;
+
+export const razorpayLatestSyncStatusSchema = z.enum(['succeeded', 'failed']);
+export type RazorpayLatestSyncStatus = z.infer<typeof razorpayLatestSyncStatusSchema>;
+
+export const razorpayConnectionSchema = z.object({
+  environment: razorpayEnvironmentSchema,
+  status: razorpayConnectionStatusSchema,
+  razorpayAccountId: z.string().nullable(),
+  razorpayMerchantName: z.string().nullable(),
+  accountLivemode: z.boolean().nullable(),
+  webhookEndpointId: z.string().nullable(),
+  webhookEndpointUrl: z.string().nullable(),
+  webhookConfiguredAt: z.string().nullable(),
+  maskedKey: z.string().nullable(),
+  lastSyncedAt: z.string().nullable(),
+  lastSyncStatus: razorpayLatestSyncStatusSchema.nullable(),
+  lastSyncError: z.string().nullable(),
+  lastSyncCounts: z.record(z.number()),
+});
+export type RazorpayConnection = z.infer<typeof razorpayConnectionSchema>;
