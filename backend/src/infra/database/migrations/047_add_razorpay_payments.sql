@@ -9,9 +9,9 @@ CREATE TABLE payments.razorpay_connections (
   status TEXT NOT NULL DEFAULT 'unconfigured' CHECK (status IN ('unconfigured', 'connected', 'error')),
   webhook_endpoint_id TEXT,
   webhook_endpoint_url TEXT,
-  webhook_secret_id UUID REFERENCES system.secrets(id) ON DELETE SET NULL,
-  api_key_id UUID REFERENCES system.secrets(id) ON DELETE SET NULL,
-  api_secret_id UUID REFERENCES system.secrets(id) ON DELETE SET NULL,
+  webhook_secret_id UUID REFERENCES system.secrets(id) ON DELETE RESTRICT,
+  api_key_id UUID REFERENCES system.secrets(id) ON DELETE RESTRICT,
+  api_secret_id UUID REFERENCES system.secrets(id) ON DELETE RESTRICT,
   webhook_configured_at TIMESTAMPTZ,
   last_synced_at TIMESTAMPTZ,
   last_sync_status TEXT CHECK (last_sync_status IS NULL OR last_sync_status IN ('succeeded', 'failed')),
@@ -32,4 +32,4 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON payments.razorpay_connections TO project
 
 -- Down Migration
 
-DROP TABLE IF EXISTS payments.razorpay_connections CASCADE;
+DROP TABLE IF EXISTS payments.razorpay_connections;
