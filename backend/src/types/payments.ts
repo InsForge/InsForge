@@ -180,7 +180,7 @@ export interface RazorpayConnectionRow {
   lastSyncStatus: RazorpayLatestSyncStatus | null;
   lastSyncError: string | null;
   lastSyncCounts: Record<string, number>;
-  raw: unknown;
+  raw: Record<string, unknown>;
   createdAt: Date | string;
   updatedAt: Date | string;
 }
