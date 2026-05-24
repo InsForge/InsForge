@@ -69,6 +69,18 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
   }
 });
 
+// Schema diagram — returns all tables + columns + FK relationships in one query
+// Must be defined before /:tableName to avoid route collision
+router.get('/diagram', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const schemaName = normalizeDatabaseSchemaName(req.query.schema);
+    const tables = await tableService.getSchemaDiagram(schemaName);
+    successResponse(res, { tables });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Get table schema
 router.get(
   '/:tableName/schema',
