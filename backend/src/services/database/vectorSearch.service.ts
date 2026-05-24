@@ -53,13 +53,9 @@ export class VectorSearchService {
     const pool = this.dbManager.getPool();
 
     const result = await withUserContext(pool, ctx, async (client) => {
-      await client.query('SET statement_timeout = 30000');
-      try {
-        await this.assertVectorColumn(client, target, input.query_vector.length);
-        return this.executeVectorSearch(client, input, target);
-      } finally {
-        await client.query('SET statement_timeout = 0').catch(() => {});
-      }
+      await client.query('SET LOCAL statement_timeout = 30000');
+      await this.assertVectorColumn(client, target, input.query_vector.length);
+      return this.executeVectorSearch(client, input, target);
     });
     return result;
   }
@@ -127,11 +123,17 @@ export class VectorSearchService {
     const vectorColumn = `vector_source.${quoteIdentifier(target.columnName)}`;
     const distanceExpression = `${vectorColumn} ${operator} $1::vector`;
     const vectorLiteral = `[${input.query_vector.join(',')}]`;
+    const rowExpression = input.include_vector
+      ? 'row_to_json(vector_source)'
+      : 'to_jsonb(vector_source) - $3::text';
+    const queryParams = input.include_vector
+      ? [vectorLiteral, input.top_k]
+      : [vectorLiteral, input.top_k, target.columnName];
 
     const result = await client.query<VectorSearchRow>(
       `
         SELECT
-          row_to_json(vector_source) AS row,
+          ${rowExpression} AS row,
           vector_distance.distance
         FROM ${tableReference} AS vector_source
         CROSS JOIN LATERAL (
@@ -141,7 +143,7 @@ export class VectorSearchService {
         ORDER BY vector_distance.distance
         LIMIT $2
       `,
-      [vectorLiteral, input.top_k]
+      queryParams
     );
 
     const matches = result.rows.map((match) => {

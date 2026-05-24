@@ -37,7 +37,7 @@ describe('VectorSearchService', () => {
       if (query.includes('format_type')) {
         return Promise.resolve({ rows: [{ dataType: 'vector(3)' }] });
       }
-      if (query.includes('row_to_json')) {
+      if (query.includes('vector_distance.distance')) {
         return Promise.resolve({
           rows: [
             {
@@ -75,13 +75,14 @@ describe('VectorSearchService', () => {
     });
 
     const searchCall = mockClient.query.mock.calls.find(
-      ([query]) => typeof query === 'string' && query.includes('row_to_json')
+      ([query]) => typeof query === 'string' && query.includes('vector_distance.distance')
     );
+    expect(searchCall?.[0]).toContain('to_jsonb(vector_source) - $3::text AS row');
     expect(searchCall?.[0]).toContain('FROM "public"."documents" AS vector_source');
     expect(searchCall?.[0]).toContain('CROSS JOIN LATERAL');
     expect(searchCall?.[0]).toContain('ORDER BY vector_distance.distance');
     expect(searchCall?.[0]).toContain('vector_source."embedding" <=> $1::vector');
-    expect(searchCall?.[1]).toEqual(['[0.1,0.2,0.3]', 5]);
+    expect(searchCall?.[1]).toEqual(['[0.1,0.2,0.3]', 5, 'embedding']);
   });
 
   it('runs non-admin searches with the user RLS context', async () => {
@@ -89,7 +90,7 @@ describe('VectorSearchService', () => {
       if (query.includes('format_type')) {
         return Promise.resolve({ rows: [{ dataType: 'vector' }] });
       }
-      if (query.includes('row_to_json')) {
+      if (query.includes('vector_distance.distance')) {
         return Promise.resolve({ rows: [] });
       }
       return Promise.resolve({ rows: [] });
@@ -110,6 +111,7 @@ describe('VectorSearchService', () => {
     const executedStatements = mockClient.query.mock.calls.map(([query]) => String(query));
     expect(executedStatements).toContain('BEGIN');
     expect(executedStatements).toContain('SET LOCAL ROLE authenticated');
+    expect(executedStatements).toContain('SET LOCAL statement_timeout = 30000');
     expect(executedStatements).toContain('COMMIT');
     expect(executedStatements).toContain('RESET ROLE');
   });
@@ -161,7 +163,7 @@ describe('VectorSearchService', () => {
 
     expect(
       mockClient.query.mock.calls.some(
-        ([query]) => typeof query === 'string' && query.includes('row_to_json')
+        ([query]) => typeof query === 'string' && query.includes('vector_distance.distance')
       )
     ).toBe(false);
   });
