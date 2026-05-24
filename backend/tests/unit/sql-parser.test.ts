@@ -85,9 +85,13 @@ describe('SQL execution guards', () => {
     expect(checkSqlExecutionGuards('SET SESSION AUTHORIZATION postgres')).not.toBeNull();
     expect(checkSqlExecutionGuards('RESET SESSION AUTHORIZATION')).not.toBeNull();
     expect(checkSqlExecutionGuards("SELECT set_config('role', 'postgres', false)")).not.toBeNull();
-    expect(checkSqlExecutionGuards("SELECT set_config('role'::text, 'postgres', false)")).not.toBeNull();
+    expect(
+      checkSqlExecutionGuards("SELECT set_config('role'::text, 'postgres', false)")
+    ).not.toBeNull();
     expect(checkSqlExecutionGuards("SELECT set_config($1, 'postgres', false)")).not.toBeNull();
-    expect(checkSqlExecutionGuards("SELECT set_config('ro' || 'le', 'postgres', false)")).not.toBeNull();
+    expect(
+      checkSqlExecutionGuards("SELECT set_config('ro' || 'le', 'postgres', false)")
+    ).not.toBeNull();
     expect(checkSqlExecutionGuards("SELECT set_config('app.safe', 'value', false)")).toBeNull();
   });
 

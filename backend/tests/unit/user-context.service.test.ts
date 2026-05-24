@@ -301,7 +301,12 @@ describe('withAdminContext', () => {
     );
 
     await expect(
-      withAdminContext(client, async () => 'ok', false, (error) => cleanupErrors.push(error))
+      withAdminContext(
+        client,
+        async () => 'ok',
+        false,
+        (error) => cleanupErrors.push(error)
+      )
     ).rejects.toBe(resetError);
     expect(cleanupErrors).toEqual([resetError]);
   });
@@ -323,9 +328,14 @@ describe('withAdminContext', () => {
     );
 
     await expect(
-      withAdminContext(client, async () => {
-        throw sqlError;
-      }, false, (error) => cleanupErrors.push(error))
+      withAdminContext(
+        client,
+        async () => {
+          throw sqlError;
+        },
+        false,
+        (error) => cleanupErrors.push(error)
+      )
     ).rejects.toBe(sqlError);
     expect(sqlError.cause).toBe(resetError);
     expect(cleanupErrors).toEqual([resetError]);
