@@ -157,6 +157,7 @@ Start OAuth authentication flow with configured providers (built-in providers li
 - `provider` (string, required) - OAuth provider key (e.g., `google`, `github`, or custom provider key like `okta-company`)
 - `redirectTo` (string, optional) - URL to redirect after authentication
 - `skipBrowserRedirect` (boolean, optional) - If true, returns OAuth URL without auto-redirecting (for mobile apps)
+- `extraParams` (Record<string, string>, optional) - Additional OAuth parameters to include in the authorization URL (e.g., `{ prompt: 'select_account' }`, `{ access_type: 'offline' }`)
 
 ### Returns
 
@@ -175,6 +176,15 @@ Start OAuth authentication flow with configured providers (built-in providers li
 ### Example
 
 ```javascript
+// With extraParams: force account selection for Google
+await insforge.auth.signInWithOAuth({
+  provider: 'google',
+  redirectTo: 'http://localhost:3000/dashboard',
+  extraParams: {
+    prompt: 'select_account', // Force Google to show account picker
+  },
+});
+
 // Default: auto-redirect
 await insforge.auth.signInWithOAuth({
   provider: 'google',
