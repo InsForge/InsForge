@@ -17,10 +17,33 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-insforge}
+      AUTH_TYPE: scram-sha-256
+      POOL_MODE: transaction
+      DEFAULT_POOL_SIZE: ${PGBOUNCER_DEFAULT_POOL_SIZE:-20}
+      MAX_CLIENT_CONN: ${PGBOUNCER_MAX_CLIENT_CONN:-100}
+      MAX_DB_CONNECTIONS: ${PGBOUNCER_MAX_DB_CONNECTIONS:-0}
+      QUERY_WAIT_TIMEOUT: ${PGBOUNCER_QUERY_WAIT_TIMEOUT:-120}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    security_opt:
+      - no-new-privileges:true
+
   postgrest:
     image: postgrest/postgrest:v12.2.12
     restart: unless-stopped
     environment:
+      # PostgREST connects directly to Postgres (needs LISTEN/NOTIFY for schema reload)
       PGRST_DB_URI: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-insforge}
       PGRST_OPENAPI_SERVER_PROXY_URI: ${POSTGREST_OPENAPI_SERVER_PROXY_URI:-http://localhost:3000}
       PGRST_DB_SCHEMA: public
@@ -47,6 +70,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      pgbouncer:
+        condition: service_healthy
       postgrest:
         condition: service_started
     environment:
@@ -58,12 +83,14 @@ services:
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change-this-encryption-key-32chars}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-changeme123}
-      POSTGRES_HOST: postgres
+      POSTGRES_HOST: pgbouncer
       POSTGRES_PORT: "5432"
       POSTGRES_DB: ${POSTGRES_DB:-insforge}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-insforge}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@pgbouncer:5432/${POSTGRES_DB:-insforge}
+      POSTGRES_DIRECT_HOST: postgres
+      POSTGRES_DIRECT_PORT: "5432"
       POSTGREST_BASE_URL: http://postgrest:3000
       DENO_RUNTIME_URL: http://deno:7133
       LOGS_DIR: /insforge-logs
@@ -96,13 +123,13 @@ services:
     working_dir: /app
     restart: unless-stopped
     depends_on:
-      - postgres
+      - pgbouncer
       - postgrest
     environment:
       PORT: "7133"
       DENO_ENV: production
       DENO_DIR: /deno-dir
-      POSTGRES_HOST: postgres
+      POSTGRES_HOST: pgbouncer
       POSTGRES_PORT: "5432"
       POSTGRES_DB: ${POSTGRES_DB:-insforge}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}

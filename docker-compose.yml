@@ -25,13 +25,35 @@ services:
       timeout: 5s
       retries: 5
 
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-insforge}
+      - AUTH_TYPE=scram-sha-256
+      - POOL_MODE=transaction
+      - DEFAULT_POOL_SIZE=${PGBOUNCER_DEFAULT_POOL_SIZE:-20}
+      - MAX_CLIENT_CONN=${PGBOUNCER_MAX_CLIENT_CONN:-100}
+      - MAX_DB_CONNECTIONS=${PGBOUNCER_MAX_DB_CONNECTIONS:-0}
+      - QUERY_WAIT_TIMEOUT=${PGBOUNCER_QUERY_WAIT_TIMEOUT:-120}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - insforge-network
+
   postgrest:
     image: postgrest/postgrest:v12.2.12
     restart: unless-stopped
     environment:
-      # POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      # POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      # POSTGRES_DB: ${POSTGRES_DB:-insforge}
+      # PostgREST connects directly to Postgres (needs LISTEN/NOTIFY for schema reload)
       PGRST_DB_URI: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-insforge}
       PGRST_OPENAPI_SERVER_PROXY_URI: http://localhost:3000
       PGRST_DB_SCHEMA: public
@@ -60,6 +82,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      pgbouncer:
+        condition: service_healthy
     ports:
       - "${APP_PORT:-7130}:7130"
       - "${AUTH_PORT:-7131}:7131"
@@ -82,13 +106,16 @@ services:
       - MAX_FILE_SIZE=${MAX_FILE_SIZE:-}
       - MAX_JSON_BODY_SIZE=${MAX_JSON_BODY_SIZE:-}
       - MAX_URLENCODED_BODY_SIZE=${MAX_URLENCODED_BODY_SIZE:-}
-      # PostgreSQL connection
-      - POSTGRES_HOST=postgres
+      # PostgreSQL connection (via PgBouncer)
+      - POSTGRES_HOST=pgbouncer
       - POSTGRES_PORT=5432
       - POSTGRES_DB=${POSTGRES_DB:-insforge}
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-insforge}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@pgbouncer:5432/${POSTGRES_DB:-insforge}
+      # Direct Postgres connection (for LISTEN/NOTIFY, migrations)
+      - POSTGRES_DIRECT_HOST=postgres
+      - POSTGRES_DIRECT_PORT=5432
       - POSTGREST_BASE_URL=http://postgrest:3000
       # Deno Runtime URL for serverless functions
       - DENO_RUNTIME_URL=http://deno:7133
@@ -161,7 +188,7 @@ services:
       - ui_node_modules:/app/packages/ui/node_modules
       - shared-logs:/insforge-logs
       - storage-data:/insforge-storage
-    command: sh -c 'npm install && npx turbo run build --filter=@insforge/shared-schemas --filter=@insforge/ui --filter=@insforge/dashboard && cd backend && npm run migrate:up && cd .. && npx concurrently -n backend,frontend -c cyan,magenta "npm run dev:backend" "npm run dev:frontend"'
+    command: sh -c 'npm install && npx turbo run build --filter=@insforge/shared-schemas --filter=@insforge/ui --filter=@insforge/dashboard && cd backend && DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@${POSTGRES_DIRECT_HOST:-postgres}:${POSTGRES_DIRECT_PORT:-5432}/${POSTGRES_DB:-insforge} npm run migrate:up && cd .. && npx concurrently -n backend,frontend -c cyan,magenta "npm run dev:backend" "npm run dev:frontend"'
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
@@ -173,7 +200,7 @@ services:
     image: denoland/deno:alpine-2.0.6
     working_dir: /app
     depends_on:
-      - postgres
+      - pgbouncer
       - postgrest
     ports:
       - "${DENO_PORT:-7133}:7133"
@@ -181,8 +208,8 @@ services:
       - PORT=7133
       - DENO_ENV=${DENO_ENV:-development}
       - DENO_DIR=/deno-dir
-      # PostgreSQL connection
-      - POSTGRES_HOST=postgres
+      # PostgreSQL connection (via PgBouncer)
+      - POSTGRES_HOST=pgbouncer
       - POSTGRES_PORT=5432
       - POSTGRES_DB=${POSTGRES_DB:-insforge}
       - POSTGRES_USER=${POSTGRES_USER:-postgres}

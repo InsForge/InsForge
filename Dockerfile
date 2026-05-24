@@ -151,7 +151,7 @@ USER node
 EXPOSE 7130 7131
 
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["sh", "-c", "cd backend && npm run migrate:up && cd .. && exec npm start"]
+CMD ["sh", "-c", "cd backend && DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@${POSTGRES_DIRECT_HOST:-${POSTGRES_HOST:-localhost}}:${POSTGRES_DIRECT_PORT:-${POSTGRES_PORT:-5432}}/${POSTGRES_DB:-insforge} npm run migrate:up && cd .. && exec npm start"]
 
 
 # ============================================================
