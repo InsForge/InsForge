@@ -18,9 +18,9 @@ vi.mock('../../src/services/database/vectorSearch.service', () => ({
   },
 }));
 
-import { AppError } from '../../src/api/middlewares/error';
+import { AppError } from '../../src/utils/errors';
 import { vectorRouter } from '../../src/api/routes/vector/index.routes';
-import { ERROR_CODES } from '../../src/types/error-constants';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 
 function getSearchHandlers() {
   const layer = (

@@ -1,10 +1,9 @@
 import { Router, Response, NextFunction } from 'express';
 import { AuthRequest, verifyUser, type UserContext } from '@/api/middlewares/auth.js';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import { VectorSearchService } from '@/services/database/vectorSearch.service.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';
-import { vectorSearchRequestSchema } from '@insforge/shared-schemas';
+import { ERROR_CODES, vectorSearchRequestSchema } from '@insforge/shared-schemas';
 
 const router = Router();
 const vectorSearchService = VectorSearchService.getInstance();

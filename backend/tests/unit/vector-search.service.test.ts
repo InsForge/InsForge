@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AppError } from '../../src/api/middlewares/error';
+import { AppError } from '../../src/utils/errors';
 import { VectorSearchService } from '../../src/services/database/vectorSearch.service';
 
 const { mockPool, mockClient } = vi.hoisted(() => ({

@@ -1,4 +1,4 @@
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import {
   assertWritableDatabaseSchema,
@@ -9,12 +9,12 @@ import {
   splitQualifiedTableReference,
 } from '@/services/database/helpers.js';
 import { withUserContext } from '@/services/database/user-context.service.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
 import type { UserContext } from '@/api/middlewares/auth.js';
-import type {
-  VectorSearchMetric,
-  VectorSearchRequest,
-  VectorSearchResponse,
+import {
+  ERROR_CODES,
+  type VectorSearchMetric,
+  type VectorSearchRequest,
+  type VectorSearchResponse,
 } from '@insforge/shared-schemas';
 import type { PoolClient } from 'pg';
 
