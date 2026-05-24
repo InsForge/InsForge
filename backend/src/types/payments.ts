@@ -9,6 +9,12 @@ export type StripeEnvironment = (typeof STRIPE_ENVIRONMENTS)[number];
 export type StripeConnectionStatus = 'unconfigured' | 'connected' | 'error';
 export type StripeLatestSyncStatus = 'succeeded' | 'failed';
 
+export const RAZORPAY_ENVIRONMENTS = ['test', 'live'] as const;
+export type RazorpayEnvironment = (typeof RAZORPAY_ENVIRONMENTS)[number];
+
+export type RazorpayConnectionStatus = 'unconfigured' | 'connected' | 'error';
+export type RazorpayLatestSyncStatus = 'succeeded' | 'failed';
+
 export type StripeAccount = Awaited<ReturnType<Stripe['accounts']['retrieveCurrent']>>;
 export type StripeProduct = AsyncIterableItem<ReturnType<Stripe['products']['list']>>;
 export type StripePrice = AsyncIterableItem<ReturnType<Stripe['prices']['list']>>;
@@ -153,6 +159,24 @@ export interface StripeConnectionRow {
   maskedKey?: string | null;
   lastSyncedAt: Date | string | null;
   lastSyncStatus: StripeLatestSyncStatus | null;
+  lastSyncError: string | null;
+  lastSyncCounts: Record<string, number> | null;
+}
+
+export interface RazorpayConnectionRow {
+  environment: RazorpayEnvironment;
+  status: RazorpayConnectionStatus;
+  razorpayAccountId: string | null;
+  razorpayMerchantName: string | null;
+  accountLivemode: boolean | null;
+  webhookEndpointId: string | null;
+  webhookEndpointUrl: string | null;
+  webhookSecretId: string | null;
+  apiKeyId: string | null;
+  apiSecretId: string | null;
+  webhookConfiguredAt: Date | string | null;
+  lastSyncedAt: Date | string | null;
+  lastSyncStatus: RazorpayLatestSyncStatus | null;
   lastSyncError: string | null;
   lastSyncCounts: Record<string, number> | null;
 }
