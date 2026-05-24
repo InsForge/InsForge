@@ -34,6 +34,11 @@ export function ClientDetailPage({ clientId, onBack }: ClientDetailPageProps) {
   const { connectionData } = useDatabaseConnectionString();
   const { passwordData } = useDatabasePassword();
   const [tab, setTab] = useState<AgentTab>(availableTabs[0] ?? 'cli');
+  // Guard against `tab` drifting out of `availableTabs` if the variant filter
+  // changes after mount (e.g. PostHog flag resolves late). Click handlers
+  // continue to update `tab` directly; this just ensures the rendered tab is
+  // always one the user is allowed to see.
+  const activeTab: AgentTab = availableTabs.includes(tab) ? tab : (availableTabs[0] ?? 'cli');
 
   const appUrl = getBackendUrl();
   const displayApiKey = isApiKeyLoading ? 'ik_' + '*'.repeat(32) : apiKey || '';
@@ -78,7 +83,7 @@ export function ClientDetailPage({ clientId, onBack }: ClientDetailPageProps) {
                 {availableTabs.map((t) => (
                   <TabButton
                     key={t}
-                    active={tab === t}
+                    active={activeTab === t}
                     onClick={() => setTab(t)}
                     label={t === 'cli' ? 'CLI' : 'MCP'}
                   />
@@ -86,7 +91,7 @@ export function ClientDetailPage({ clientId, onBack }: ClientDetailPageProps) {
               </div>
             )}
 
-            {tab === 'cli' ? (
+            {activeTab === 'cli' ? (
               <DTestCLISection agentName={entry.label} />
             ) : (
               <DTestMCPSection
