@@ -456,21 +456,14 @@ export class SmtpConfigService {
     existingPasswordEncrypted: string
   ): Promise<void> {
     const password = input.password ?? this.getDecryptedPassword(existingPasswordEncrypted) ?? '';
-
-    if (!password) {
-      throw new AppError(
-        'SMTP password is required when enabling SMTP',
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
-    }
+    const auth = input.username || password ? { user: input.username, pass: password } : undefined;
 
     try {
       const transporter = nodemailer.createTransport({
         host: input.host,
         port: input.port,
         secure: input.port === 465,
-        auth: { user: input.username, pass: password },
+        auth,
         connectionTimeout: 10000,
       });
       await transporter.verify();
