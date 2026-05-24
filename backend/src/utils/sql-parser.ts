@@ -6,6 +6,7 @@ import logger from './logger.js';
 let initialized = false;
 
 const EXECUTION_CONTEXT_VARIABLES = new Set(['role', 'session_authorization']);
+const STATEMENT_TIMEOUT_VARIABLE = 'statement_timeout';
 const ROLE_MANAGEMENT_STATEMENTS = new Set([
   'CreateRoleStmt',
   'AlterRoleStmt',
@@ -14,7 +15,11 @@ const ROLE_MANAGEMENT_STATEMENTS = new Set([
   'GrantRoleStmt',
 ]);
 const SEARCH_PATH_VARIABLE = 'search_path';
-const RESTRICTED_CONFIG_VARIABLES = new Set([...EXECUTION_CONTEXT_VARIABLES, SEARCH_PATH_VARIABLE]);
+const RESTRICTED_CONFIG_VARIABLES = new Set([
+  ...EXECUTION_CONTEXT_VARIABLES,
+  SEARCH_PATH_VARIABLE,
+  STATEMENT_TIMEOUT_VARIABLE,
+]);
 const DATABASE_MANAGEMENT_STATEMENTS = new Set([
   'CreatedbStmt',
   'DropdbStmt',
@@ -130,12 +135,19 @@ export function checkSqlExecutionGuards(query: string): string | null {
       }
 
       if (stmtType === 'VariableSetStmt') {
+        if (data.kind === 'VAR_RESET_ALL') {
+          return 'RESET ALL is not allowed.';
+        }
+
         const name = ((data.name as string | undefined) ?? '').toLowerCase();
         if (EXECUTION_CONTEXT_VARIABLES.has(name)) {
           return 'Changing SQL execution role or session authorization is not allowed.';
         }
         if (name === SEARCH_PATH_VARIABLE) {
           return 'Changing SQL search_path is not allowed.';
+        }
+        if (name === STATEMENT_TIMEOUT_VARIABLE) {
+          return 'Changing SQL statement_timeout is not allowed.';
         }
       }
 
@@ -147,11 +159,9 @@ export function checkSqlExecutionGuards(query: string): string | null {
         return 'Transaction control statements are not allowed.';
       }
 
-      const setConfigVariable = getRestrictedSetConfigVariable(stmt);
-      if (setConfigVariable) {
-        return setConfigVariable === SEARCH_PATH_VARIABLE
-          ? 'Changing SQL search_path is not allowed.'
-          : 'Changing SQL execution role or session authorization is not allowed.';
+      const setConfigError = getSetConfigGuardError(stmt);
+      if (setConfigError) {
+        return setConfigError;
       }
     }
 
@@ -211,12 +221,12 @@ export function parseSQLStatements(sqlText: string): string[] {
   }
 }
 
-function getRestrictedSetConfigVariable(node: unknown): string | null {
+function getSetConfigGuardError(node: unknown): string | null {
   if (Array.isArray(node)) {
     for (const item of node) {
-      const setting = getRestrictedSetConfigVariable(item);
-      if (setting) {
-        return setting;
+      const error = getSetConfigGuardError(item);
+      if (error) {
+        return error;
       }
     }
     return null;
@@ -231,23 +241,39 @@ function getRestrictedSetConfigVariable(node: unknown): string | null {
     const functionName = getQualifiedName(funcCall.funcname).at(-1)?.toLowerCase();
     const args = Array.isArray(funcCall.args) ? funcCall.args : [];
     const setting = getStringConstant(args[0])?.toLowerCase();
-    if (
-      functionName === 'set_config' &&
-      setting !== undefined &&
-      RESTRICTED_CONFIG_VARIABLES.has(setting)
-    ) {
-      return setting;
+    if (functionName === 'set_config') {
+      if (setting === undefined) {
+        // A dynamic setting name can resolve to role/search_path/statement_timeout at execution.
+        return 'Dynamic set_config targets are not allowed.';
+      }
+      return getRestrictedConfigError(setting);
     }
   }
 
   for (const value of Object.values(node)) {
-    const setting = getRestrictedSetConfigVariable(value);
-    if (setting) {
-      return setting;
+    const error = getSetConfigGuardError(value);
+    if (error) {
+      return error;
     }
   }
 
   return null;
+}
+
+function getRestrictedConfigError(setting: string): string | null {
+  if (!RESTRICTED_CONFIG_VARIABLES.has(setting)) {
+    return null;
+  }
+
+  if (setting === SEARCH_PATH_VARIABLE) {
+    return 'Changing SQL search_path is not allowed.';
+  }
+
+  if (setting === STATEMENT_TIMEOUT_VARIABLE) {
+    return 'Changing SQL statement_timeout is not allowed.';
+  }
+
+  return 'Changing SQL execution role or session authorization is not allowed.';
 }
 
 function getQualifiedName(value: unknown): string[] {
@@ -267,7 +293,21 @@ function getQualifiedName(value: unknown): string[] {
 }
 
 function getStringConstant(value: unknown): string | null {
-  if (!isRecord(value) || !isRecord(value.A_Const)) {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const typeCast = value.TypeCast;
+  if (isRecord(typeCast)) {
+    return getStringConstant(typeCast.arg);
+  }
+
+  const collateClause = value.CollateClause;
+  if (isRecord(collateClause)) {
+    return getStringConstant(collateClause.arg);
+  }
+
+  if (!isRecord(value.A_Const)) {
     return null;
   }
 

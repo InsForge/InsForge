@@ -85,6 +85,10 @@ describe('SQL execution guards', () => {
     expect(checkSqlExecutionGuards('SET SESSION AUTHORIZATION postgres')).not.toBeNull();
     expect(checkSqlExecutionGuards('RESET SESSION AUTHORIZATION')).not.toBeNull();
     expect(checkSqlExecutionGuards("SELECT set_config('role', 'postgres', false)")).not.toBeNull();
+    expect(checkSqlExecutionGuards("SELECT set_config('role'::text, 'postgres', false)")).not.toBeNull();
+    expect(checkSqlExecutionGuards("SELECT set_config($1, 'postgres', false)")).not.toBeNull();
+    expect(checkSqlExecutionGuards("SELECT set_config('ro' || 'le', 'postgres', false)")).not.toBeNull();
+    expect(checkSqlExecutionGuards("SELECT set_config('app.safe', 'value', false)")).toBeNull();
   });
 
   it('blocks role management statements but allows object grants', () => {
@@ -109,8 +113,20 @@ describe('SQL execution guards', () => {
     expect(
       checkSqlExecutionGuards("SELECT set_config('search_path', 'public', false)")
     ).not.toBeNull();
+    expect(
+      checkSqlExecutionGuards("SELECT set_config('search_path'::text, 'public', false)")
+    ).not.toBeNull();
     expect(checkSqlExecutionGuards("SELECT 'SET search_path TO public'")).toBeNull();
     expect(checkSqlExecutionGuards('-- SET search_path TO public\nSELECT 1')).toBeNull();
+  });
+
+  it('blocks reset-all and statement timeout changes', () => {
+    expect(checkSqlExecutionGuards('RESET ALL')).not.toBeNull();
+    expect(checkSqlExecutionGuards('SET statement_timeout = 0')).not.toBeNull();
+    expect(checkSqlExecutionGuards('RESET statement_timeout')).not.toBeNull();
+    expect(
+      checkSqlExecutionGuards("SELECT set_config('statement_timeout', '0', false)")
+    ).not.toBeNull();
   });
 
   it('blocks database-level operations without matching comments or strings', () => {

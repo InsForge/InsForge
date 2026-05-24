@@ -287,18 +287,48 @@ describe('withAdminContext', () => {
 
   it('does not swallow admin context cleanup failures', async () => {
     const { client, calls } = makeMockClient();
+    const resetError = new Error('reset failed');
+    const cleanupErrors: Error[] = [];
 
     (client.query as ReturnType<typeof vi.fn>).mockImplementation(
       async (sql: string, params?: unknown[]) => {
         calls.push({ sql, params });
         if (sql === 'RESET ROLE') {
-          throw new Error('reset failed');
+          throw resetError;
         }
         return { rows: [], rowCount: 0 };
       }
     );
 
-    await expect(withAdminContext(client, async () => 'ok')).rejects.toThrow('reset failed');
+    await expect(
+      withAdminContext(client, async () => 'ok', false, (error) => cleanupErrors.push(error))
+    ).rejects.toBe(resetError);
+    expect(cleanupErrors).toEqual([resetError]);
+  });
+
+  it('preserves the original SQL error when admin context cleanup also fails', async () => {
+    const { client, calls } = makeMockClient();
+    const sqlError = new Error('sql failed');
+    const resetError = new Error('reset failed');
+    const cleanupErrors: Error[] = [];
+
+    (client.query as ReturnType<typeof vi.fn>).mockImplementation(
+      async (sql: string, params?: unknown[]) => {
+        calls.push({ sql, params });
+        if (sql === 'RESET ROLE') {
+          throw resetError;
+        }
+        return { rows: [], rowCount: 0 };
+      }
+    );
+
+    await expect(
+      withAdminContext(client, async () => {
+        throw sqlError;
+      }, false, (error) => cleanupErrors.push(error))
+    ).rejects.toBe(sqlError);
+    expect(sqlError.cause).toBe(resetError);
+    expect(cleanupErrors).toEqual([resetError]);
   });
 
   it('lets the surrounding transaction rollback clear local context after SQL failures', async () => {

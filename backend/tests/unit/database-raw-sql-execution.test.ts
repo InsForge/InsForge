@@ -112,6 +112,53 @@ describe('DatabaseAdvanceService - admin SQL execution', () => {
     expect(queryMock).not.toHaveBeenCalledWith('RESET ROLE');
   });
 
+  it('returns healthy clients to the pool after ordinary SQL errors', async () => {
+    const releaseMock = vi.fn();
+    const queryError = new Error('syntax error');
+    const queryMock = vi
+      .fn()
+      .mockResolvedValueOnce({}) // SET statement_timeout
+      .mockResolvedValueOnce({}) // SET ROLE project_admin
+      .mockResolvedValueOnce({}) // set request.jwt.claims
+      .mockRejectedValueOnce(queryError) // execute user SQL
+      .mockResolvedValueOnce({}) // RESET ROLE
+      .mockResolvedValueOnce({}) // reset request.jwt.claims
+      .mockResolvedValueOnce({}); // reset statement_timeout
+
+    connectMock.mockResolvedValue({
+      query: queryMock,
+      release: releaseMock,
+    });
+
+    const service = DatabaseAdvanceService.getInstance();
+    await expect(service.executeRawSQL('SELECT broken')).rejects.toBe(queryError);
+
+    expect(releaseMock).toHaveBeenCalledWith(undefined);
+  });
+
+  it('discards the pooled client when admin context cleanup fails', async () => {
+    const releaseMock = vi.fn();
+    const resetError = new Error('reset failed');
+    const queryMock = vi
+      .fn()
+      .mockResolvedValueOnce({}) // SET statement_timeout
+      .mockResolvedValueOnce({}) // SET ROLE project_admin
+      .mockResolvedValueOnce({}) // set request.jwt.claims
+      .mockResolvedValueOnce({ rows: [], rowCount: 0, fields: [] }) // execute user SQL
+      .mockRejectedValueOnce(resetError) // RESET ROLE
+      .mockResolvedValueOnce({}); // reset statement_timeout
+
+    connectMock.mockResolvedValue({
+      query: queryMock,
+      release: releaseMock,
+    });
+
+    const service = DatabaseAdvanceService.getInstance();
+    await expect(service.executeRawSQL('SELECT 1')).rejects.toBe(resetError);
+
+    expect(releaseMock).toHaveBeenCalledWith(resetError);
+  });
+
   it('imports SQL files under project_admin', async () => {
     const releaseMock = vi.fn();
     const queryMock = vi

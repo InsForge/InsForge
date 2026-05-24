@@ -95,8 +95,13 @@ export class DatabaseAdvanceService {
 
       const result = asRoot
         ? await client.query<Record<string, unknown>>(sanitizedQuery, params)
-        : await withAdminContext(client, () =>
-            client.query<Record<string, unknown>>(sanitizedQuery, params)
+        : await withAdminContext(
+            client,
+            () => client.query<Record<string, unknown>>(sanitizedQuery, params),
+            false,
+            (error) => {
+              releaseError = error;
+            }
           );
 
       // Refresh schema cache if it was a DDL operation
@@ -116,7 +121,6 @@ export class DatabaseAdvanceService {
 
       return response;
     } catch (error) {
-      releaseError = error instanceof Error ? error : new Error(String(error));
       // Handle timeout errors specifically for better error messages
       if (hasPgErrorCode(error, '57014')) {
         throw new Error('Query timeout: The query took longer than 30 seconds to execute');
@@ -974,7 +978,14 @@ export class DatabaseAdvanceService {
       const client = await pool.connect();
       let releaseError: Error | undefined;
       try {
-        const result = await withAdminContext(client, () => client.query(query));
+        const result = await withAdminContext(
+          client,
+          () => client.query(query),
+          false,
+          (error) => {
+            releaseError = error;
+          }
+        );
 
         // Refresh schema cache if needed
         await client.query(`NOTIFY pgrst, 'reload schema';`);
@@ -983,9 +994,6 @@ export class DatabaseAdvanceService {
           rowCount: result.rowCount || 0,
           rows: result.rows,
         };
-      } catch (error) {
-        releaseError = error instanceof Error ? error : new Error(String(error));
-        throw error;
       } finally {
         client.release(releaseError);
       }

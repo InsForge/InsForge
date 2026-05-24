@@ -79,13 +79,15 @@ export async function withUserContext<T>(
 export async function withAdminContext<T>(
   client: PoolClient,
   fn: () => Promise<T>,
-  transactionLocal: boolean = false
+  transactionLocal: boolean = false,
+  onCleanupError?: (error: Error) => void
 ): Promise<T> {
   let roleSet = false;
   let fnStarted = false;
   let fnFailed = false;
   let result: T | undefined;
   let pendingError: unknown;
+  let cleanupError: Error | undefined;
 
   try {
     await client.query(
@@ -105,16 +107,31 @@ export async function withAdminContext<T>(
   }
 
   if (roleSet && !(transactionLocal && fnFailed)) {
-    await client.query('RESET ROLE');
-    await client.query('SELECT set_config($1, $2, $3)', [
-      REQUEST_JWT_CLAIMS_SETTING,
-      '{}',
-      transactionLocal,
-    ]);
+    try {
+      await client.query('RESET ROLE');
+      await client.query('SELECT set_config($1, $2, $3)', [
+        REQUEST_JWT_CLAIMS_SETTING,
+        '{}',
+        transactionLocal,
+      ]);
+    } catch (error) {
+      cleanupError = error instanceof Error ? error : new Error(String(error));
+      onCleanupError?.(cleanupError);
+    }
+  }
+
+  if (pendingError && cleanupError) {
+    if (pendingError instanceof Error && pendingError.cause === undefined) {
+      pendingError.cause = cleanupError;
+    }
   }
 
   if (pendingError) {
     throw pendingError;
+  }
+
+  if (cleanupError) {
+    throw cleanupError;
   }
 
   return result as T;
