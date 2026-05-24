@@ -20,7 +20,12 @@ CREATE TABLE IF NOT EXISTS payments.razorpay_connections (
   raw JSONB NOT NULL DEFAULT '{}'::JSONB,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (environment)
+  UNIQUE (environment),
+  CONSTRAINT chk_connected_credentials
+    CHECK (
+      status != 'connected'
+      OR (api_key_id IS NOT NULL AND api_secret_id IS NOT NULL)
+    )
 );
 
 DROP TRIGGER IF EXISTS trg_payments_razorpay_connections_updated_at ON payments.razorpay_connections;
