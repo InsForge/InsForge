@@ -111,5 +111,4 @@ describe('DatabaseAdvanceService - executeRawSQL', () => {
     expect(queryMock).not.toHaveBeenCalledWith('SET ROLE project_admin');
     expect(queryMock).not.toHaveBeenCalledWith('RESET ROLE');
   });
-
 });

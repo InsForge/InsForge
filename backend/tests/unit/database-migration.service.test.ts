@@ -105,5 +105,4 @@ describe('DatabaseMigrationService', () => {
     expect(queryMock).toHaveBeenCalledWith(`NOTIFY pgrst, 'reload schema';`);
     expect(queryMock).not.toHaveBeenCalledWith(`NOTIFY pgrst, 'reload config';`);
   });
-
 });
