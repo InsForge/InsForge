@@ -5,12 +5,12 @@ import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import { validateTableName } from '@/utils/validations.js';
-import { DatabaseRecord } from '@/types/database.js';
 import { successResponse } from '@/utils/response.js';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import { DatabaseResourceUpdate } from '@/utils/sql-parser.js';
 import { PostgrestProxyService } from '@/services/database/postgrest-proxy.service.js';
+import { filterEmptyStringsForColumnTypes } from './record-body-filter.js';
 
 const router = Router();
 const proxyService = PostgrestProxyService.getInstance();
@@ -50,27 +50,7 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
 
     if (['POST', 'PATCH', 'PUT'].includes(method) && body && typeof body === 'object') {
       const columnTypeMap = await DatabaseManager.getColumnTypeMap(tableName);
-      if (Array.isArray(body)) {
-        body = body.map((item) => {
-          if (item && typeof item === 'object') {
-            const filtered: DatabaseRecord = {};
-            for (const key in item) {
-              if (columnTypeMap[key] !== 'text' && item[key] === '') {
-                continue;
-              }
-              filtered[key] = item[key];
-            }
-            return filtered;
-          }
-          return item;
-        });
-      } else {
-        for (const key in body) {
-          if (columnTypeMap[key] === 'uuid' && body[key] === '') {
-            delete body[key];
-          }
-        }
-      }
+      body = filterEmptyStringsForColumnTypes(body, columnTypeMap);
     }
 
     // Forward to PostgREST via service
