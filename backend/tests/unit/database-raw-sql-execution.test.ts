@@ -19,7 +19,7 @@ vi.mock('../../src/infra/database/database.manager', () => ({
 import { DatabaseAdvanceService } from '../../src/services/database/database-advance.service';
 import { initSqlParser } from '../../src/utils/sql-parser';
 
-describe('DatabaseAdvanceService - executeRawSQL', () => {
+describe('DatabaseAdvanceService - admin SQL execution', () => {
   beforeAll(async () => {
     await initSqlParser();
   });
@@ -110,5 +110,94 @@ describe('DatabaseAdvanceService - executeRawSQL', () => {
     expect(queryMock).toHaveBeenNthCalledWith(3, 'SET statement_timeout = 0');
     expect(queryMock).not.toHaveBeenCalledWith('SET ROLE project_admin');
     expect(queryMock).not.toHaveBeenCalledWith('RESET ROLE');
+  });
+
+  it('imports SQL files under project_admin', async () => {
+    const releaseMock = vi.fn();
+    const queryMock = vi
+      .fn()
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({}) // SET LOCAL ROLE project_admin
+      .mockResolvedValueOnce({}) // set local request.jwt.claims
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] }) // execute imported SQL
+      .mockResolvedValueOnce({}) // RESET ROLE
+      .mockResolvedValueOnce({}) // reset request.jwt.claims
+      .mockResolvedValueOnce({}) // NOTIFY pgrst
+      .mockResolvedValueOnce({}); // COMMIT
+
+    connectMock.mockResolvedValue({
+      query: queryMock,
+      release: releaseMock,
+    });
+
+    const service = DatabaseAdvanceService.getInstance();
+    const result = await service.importDatabase(
+      Buffer.from('INSERT INTO products (id) VALUES (1);'),
+      'seed.sql',
+      36
+    );
+
+    expect(result.rowsImported).toBe(1);
+    expect(queryMock).toHaveBeenNthCalledWith(1, 'BEGIN');
+    expect(queryMock).toHaveBeenNthCalledWith(2, 'SET LOCAL ROLE project_admin');
+    expect(queryMock).toHaveBeenNthCalledWith(3, 'SELECT set_config($1, $2, $3)', [
+      'request.jwt.claims',
+      JSON.stringify({ role: 'project_admin' }),
+      true,
+    ]);
+    expect(String(queryMock.mock.calls[3][0])).toContain('INSERT INTO products');
+    expect(queryMock).toHaveBeenNthCalledWith(5, 'RESET ROLE');
+    expect(queryMock).toHaveBeenNthCalledWith(6, 'SELECT set_config($1, $2, $3)', [
+      'request.jwt.claims',
+      '{}',
+      true,
+    ]);
+    expect(queryMock).toHaveBeenNthCalledWith(7, `NOTIFY pgrst, 'reload schema';`);
+    expect(queryMock).toHaveBeenNthCalledWith(8, 'COMMIT');
+    expect(releaseMock).toHaveBeenCalled();
+  });
+
+  it('bulk upserts under project_admin', async () => {
+    const releaseMock = vi.fn();
+    const queryMock = vi
+      .fn()
+      .mockResolvedValueOnce({}) // SET ROLE project_admin
+      .mockResolvedValueOnce({}) // set request.jwt.claims
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] }) // execute bulk upsert
+      .mockResolvedValueOnce({}) // RESET ROLE
+      .mockResolvedValueOnce({}) // reset request.jwt.claims
+      .mockResolvedValueOnce({}); // NOTIFY pgrst
+
+    connectMock.mockResolvedValue({
+      query: queryMock,
+      release: releaseMock,
+    });
+
+    const service = DatabaseAdvanceService.getInstance();
+    const result = await service.bulkUpsertFromFile(
+      'public',
+      'profiles',
+      Buffer.from('id,name\n1,Alice\n'),
+      'profiles.csv',
+      'id'
+    );
+
+    expect(result.rowsAffected).toBe(1);
+    expect(queryMock).toHaveBeenNthCalledWith(1, 'SET ROLE project_admin');
+    expect(queryMock).toHaveBeenNthCalledWith(2, 'SELECT set_config($1, $2, $3)', [
+      'request.jwt.claims',
+      JSON.stringify({ role: 'project_admin' }),
+      false,
+    ]);
+    expect(String(queryMock.mock.calls[2][0])).toContain('INSERT INTO public.profiles');
+    expect(String(queryMock.mock.calls[2][0])).toContain('ON CONFLICT (id) DO UPDATE');
+    expect(queryMock).toHaveBeenNthCalledWith(4, 'RESET ROLE');
+    expect(queryMock).toHaveBeenNthCalledWith(5, 'SELECT set_config($1, $2, $3)', [
+      'request.jwt.claims',
+      '{}',
+      false,
+    ]);
+    expect(queryMock).toHaveBeenNthCalledWith(6, `NOTIFY pgrst, 'reload schema';`);
+    expect(releaseMock).toHaveBeenCalled();
   });
 });

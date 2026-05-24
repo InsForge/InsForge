@@ -1,7 +1,6 @@
 import { beforeAll, describe, it, expect } from 'vitest';
 import {
-  checkSqlExecutionContextOperations,
-  checkSqlTransactionOperations,
+  checkSqlExecutionGuards,
   initSqlParser,
   parseSQLStatements,
 } from '../../src/utils/sql-parser';
@@ -80,31 +79,43 @@ describe('parseSQLStatements', () => {
 
 describe('SQL execution guards', () => {
   it('blocks role and session authorization changes', () => {
-    expect(checkSqlExecutionContextOperations('SET ROLE postgres')).not.toBeNull();
-    expect(checkSqlExecutionContextOperations('SET LOCAL ROLE postgres')).not.toBeNull();
-    expect(checkSqlExecutionContextOperations('RESET ROLE')).not.toBeNull();
-    expect(checkSqlExecutionContextOperations('SET SESSION AUTHORIZATION postgres')).not.toBeNull();
-    expect(checkSqlExecutionContextOperations('RESET SESSION AUTHORIZATION')).not.toBeNull();
+    expect(checkSqlExecutionGuards('SET ROLE postgres')).not.toBeNull();
+    expect(checkSqlExecutionGuards('SET LOCAL ROLE postgres')).not.toBeNull();
+    expect(checkSqlExecutionGuards('RESET ROLE')).not.toBeNull();
+    expect(checkSqlExecutionGuards('SET SESSION AUTHORIZATION postgres')).not.toBeNull();
+    expect(checkSqlExecutionGuards('RESET SESSION AUTHORIZATION')).not.toBeNull();
+    expect(checkSqlExecutionGuards("SELECT set_config('role', 'postgres', false)")).not.toBeNull();
   });
 
   it('blocks role management statements but allows object grants', () => {
-    expect(checkSqlExecutionContextOperations('CREATE ROLE app_owner')).not.toBeNull();
+    expect(checkSqlExecutionGuards('CREATE ROLE app_owner')).not.toBeNull();
     expect(
-      checkSqlExecutionContextOperations('ALTER ROLE project_admin SET search_path TO public')
+      checkSqlExecutionGuards('ALTER ROLE project_admin SET search_path TO public')
     ).not.toBeNull();
-    expect(checkSqlExecutionContextOperations('DROP ROLE app_owner')).not.toBeNull();
-    expect(
-      checkSqlExecutionContextOperations('GRANT authenticated TO project_admin')
-    ).not.toBeNull();
-    expect(
-      checkSqlExecutionContextOperations('GRANT SELECT ON public.todos TO authenticated')
-    ).toBeNull();
+    expect(checkSqlExecutionGuards('DROP ROLE app_owner')).not.toBeNull();
+    expect(checkSqlExecutionGuards('GRANT authenticated TO project_admin')).not.toBeNull();
+    expect(checkSqlExecutionGuards('GRANT SELECT ON public.todos TO authenticated')).toBeNull();
   });
 
   it('blocks transaction control statements', () => {
-    expect(checkSqlTransactionOperations('BEGIN')).not.toBeNull();
-    expect(checkSqlTransactionOperations('COMMIT')).not.toBeNull();
-    expect(checkSqlTransactionOperations('ROLLBACK')).not.toBeNull();
-    expect(checkSqlTransactionOperations('SELECT 1')).toBeNull();
+    expect(checkSqlExecutionGuards('BEGIN')).not.toBeNull();
+    expect(checkSqlExecutionGuards('COMMIT')).not.toBeNull();
+    expect(checkSqlExecutionGuards('ROLLBACK')).not.toBeNull();
+    expect(checkSqlExecutionGuards('SELECT 1')).toBeNull();
+  });
+
+  it('blocks search_path changes without matching comments or strings', () => {
+    expect(checkSqlExecutionGuards('SET search_path TO public')).not.toBeNull();
+    expect(
+      checkSqlExecutionGuards("SELECT set_config('search_path', 'public', false)")
+    ).not.toBeNull();
+    expect(checkSqlExecutionGuards("SELECT 'SET search_path TO public'")).toBeNull();
+    expect(checkSqlExecutionGuards('-- SET search_path TO public\nSELECT 1')).toBeNull();
+  });
+
+  it('blocks database-level operations without matching comments or strings', () => {
+    expect(checkSqlExecutionGuards('DROP DATABASE customer_project')).not.toBeNull();
+    expect(checkSqlExecutionGuards("SELECT 'DROP DATABASE customer_project'")).toBeNull();
+    expect(checkSqlExecutionGuards('-- DROP DATABASE customer_project\nSELECT 1')).toBeNull();
   });
 });

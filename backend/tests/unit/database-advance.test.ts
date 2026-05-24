@@ -6,12 +6,11 @@ import { ERROR_CODES } from '@insforge/shared-schemas';
 describe('DatabaseAdvanceService - sanitizeQuery', () => {
   const service = DatabaseAdvanceService.getInstance();
 
-  test('blocks database-level operations and direct pg_catalog access', () => {
+  test('blocks database-level operations', () => {
     const queries = [
       'DROP DATABASE customer_project',
       'CREATE DATABASE customer_project',
       'ALTER DATABASE customer_project SET timezone TO UTC',
-      'SELECT * FROM pg_catalog.pg_class LIMIT 1',
     ];
 
     for (const query of queries) {
@@ -26,6 +25,8 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
       'RESET ROLE',
       'SET SESSION AUTHORIZATION postgres',
       'RESET SESSION AUTHORIZATION',
+      'SET search_path TO public',
+      "SELECT set_config('search_path', 'public', false)",
       'CREATE ROLE app_owner',
       'ALTER ROLE project_admin SET search_path TO public',
       'DROP ROLE app_owner',
@@ -63,6 +64,7 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
     const queries = [
       "INSERT INTO auth.users (email, password_hash) VALUES ('demo@example.com', 'hash')",
       'CREATE TRIGGER user_profile_trigger AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public.create_user_profile()',
+      'SELECT * FROM pg_catalog.pg_class LIMIT 1',
       "INSERT INTO storage.objects (bucket_id, key, name) VALUES ('avatars', 'u1/a.png', 'a.png')",
       'ALTER TABLE realtime.messages ENABLE ROW LEVEL SECURITY',
       "UPDATE payments.customers SET email = 'new@example.com' WHERE id = 'cus_123'",

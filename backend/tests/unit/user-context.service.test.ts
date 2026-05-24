@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { withUserContext } from '../../src/services/database/user-context.service';
+import { withAdminContext, withUserContext } from '../../src/services/database/user-context.service';
 import type { Pool, PoolClient } from 'pg';
 
 /**
@@ -224,5 +224,98 @@ describe('withUserContext', () => {
 
     expect(calls.map((c) => c.sql)).toContain('RESET ROLE');
     expect(client.release).toHaveBeenCalledOnce();
+  });
+});
+
+describe('withAdminContext', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('uses session-level project_admin context by default and resets it', async () => {
+    const { client, calls } = makeMockClient();
+
+    const result = await withAdminContext(client, async () => {
+      await client.query('SELECT 1');
+      return 'ok';
+    });
+
+    expect(result).toBe('ok');
+    expect(calls.map((c) => c.sql)).toEqual([
+      'SET ROLE project_admin',
+      'SELECT set_config($1, $2, $3)',
+      'SELECT 1',
+      'RESET ROLE',
+      'SELECT set_config($1, $2, $3)',
+    ]);
+    expect(calls[1].params).toEqual([
+      'request.jwt.claims',
+      JSON.stringify({ role: 'project_admin' }),
+      false,
+    ]);
+    expect(calls[4].params).toEqual(['request.jwt.claims', '{}', false]);
+  });
+
+  it('uses transaction-local project_admin context when requested', async () => {
+    const { client, calls } = makeMockClient();
+
+    await withAdminContext(
+      client,
+      async () => {
+        await client.query('CREATE TABLE public.todos (id uuid)');
+      },
+      true
+    );
+
+    expect(calls.map((c) => c.sql)).toEqual([
+      'SET LOCAL ROLE project_admin',
+      'SELECT set_config($1, $2, $3)',
+      'CREATE TABLE public.todos (id uuid)',
+      'RESET ROLE',
+      'SELECT set_config($1, $2, $3)',
+    ]);
+    expect(calls[1].params).toEqual([
+      'request.jwt.claims',
+      JSON.stringify({ role: 'project_admin' }),
+      true,
+    ]);
+    expect(calls[4].params).toEqual(['request.jwt.claims', '{}', true]);
+  });
+
+  it('does not swallow admin context cleanup failures', async () => {
+    const { client, calls } = makeMockClient();
+
+    (client.query as ReturnType<typeof vi.fn>).mockImplementation(
+      async (sql: string, params?: unknown[]) => {
+        calls.push({ sql, params });
+        if (sql === 'RESET ROLE') {
+          throw new Error('reset failed');
+        }
+        return { rows: [], rowCount: 0 };
+      }
+    );
+
+    await expect(withAdminContext(client, async () => 'ok')).rejects.toThrow('reset failed');
+  });
+
+  it('lets the surrounding transaction rollback clear local context after SQL failures', async () => {
+    const { client, calls } = makeMockClient();
+
+    await expect(
+      withAdminContext(
+        client,
+        async () => {
+          await client.query('SELECT broken');
+          throw new Error('sql failed');
+        },
+        true
+      )
+    ).rejects.toThrow('sql failed');
+
+    expect(calls.map((c) => c.sql)).toEqual([
+      'SET LOCAL ROLE project_admin',
+      'SELECT set_config($1, $2, $3)',
+      'SELECT broken',
+    ]);
   });
 });

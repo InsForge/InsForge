@@ -69,8 +69,8 @@ describe('DatabaseMigrationService', () => {
       .mockResolvedValueOnce({}) // advisory lock
       .mockResolvedValueOnce({}) // search_path
       .mockResolvedValueOnce({ rows: [] }) // latest version
-      .mockResolvedValueOnce({}) // SET ROLE project_admin
-      .mockResolvedValueOnce({}) // set request.jwt.claims
+      .mockResolvedValueOnce({}) // SET LOCAL ROLE project_admin
+      .mockResolvedValueOnce({}) // set local request.jwt.claims
       .mockResolvedValueOnce({}) // execute migration SQL
       .mockResolvedValueOnce({}) // RESET ROLE
       .mockResolvedValueOnce({}) // reset request.jwt.claims
@@ -100,7 +100,12 @@ describe('DatabaseMigrationService', () => {
     });
 
     expect(result.migration.version).toBe('202605020002');
-    expect(queryMock).toHaveBeenCalledWith('SET ROLE project_admin');
+    expect(queryMock).toHaveBeenCalledWith('SET LOCAL ROLE project_admin');
+    expect(queryMock).toHaveBeenCalledWith('SELECT set_config($1, $2, $3)', [
+      'request.jwt.claims',
+      JSON.stringify({ role: 'project_admin' }),
+      true,
+    ]);
     expect(queryMock).toHaveBeenCalledWith('RESET ROLE');
     expect(queryMock).toHaveBeenCalledWith(`NOTIFY pgrst, 'reload schema';`);
     expect(queryMock).not.toHaveBeenCalledWith(`NOTIFY pgrst, 'reload config';`);

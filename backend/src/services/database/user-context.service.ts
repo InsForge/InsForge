@@ -76,22 +76,48 @@ export async function withUserContext<T>(
   }
 }
 
-export async function withAdminContext<T>(client: PoolClient, fn: () => Promise<T>): Promise<T> {
-  await client.query('SET ROLE project_admin');
-  await client.query('SELECT set_config($1, $2, $3)', [
-    REQUEST_JWT_CLAIMS_SETTING,
-    JSON.stringify({ role: 'project_admin' }),
-    false,
-  ]);
+export async function withAdminContext<T>(
+  client: PoolClient,
+  fn: () => Promise<T>,
+  transactionLocal: boolean = false
+): Promise<T> {
+  let roleSet = false;
+  let fnStarted = false;
+  let fnFailed = false;
+  let result: T | undefined;
+  let pendingError: unknown;
 
   try {
-    return await fn();
-  } finally {
-    await client.query('RESET ROLE').catch(() => {});
-    await client
-      .query('SELECT set_config($1, $2, $3)', [REQUEST_JWT_CLAIMS_SETTING, '{}', false])
-      .catch(() => {});
+    await client.query(
+      transactionLocal ? 'SET LOCAL ROLE project_admin' : 'SET ROLE project_admin'
+    );
+    roleSet = true;
+    await client.query('SELECT set_config($1, $2, $3)', [
+      REQUEST_JWT_CLAIMS_SETTING,
+      JSON.stringify({ role: 'project_admin' }),
+      transactionLocal,
+    ]);
+    fnStarted = true;
+    result = await fn();
+  } catch (error) {
+    fnFailed = fnStarted;
+    pendingError = error;
   }
+
+  if (roleSet && !(transactionLocal && fnFailed)) {
+    await client.query('RESET ROLE');
+    await client.query('SELECT set_config($1, $2, $3)', [
+      REQUEST_JWT_CLAIMS_SETTING,
+      '{}',
+      transactionLocal,
+    ]);
+  }
+
+  if (pendingError) {
+    throw pendingError;
+  }
+
+  return result as T;
 }
 
 async function setTransactionLocalConfig(

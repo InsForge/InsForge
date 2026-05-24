@@ -13,13 +13,15 @@ const ROLE_MANAGEMENT_STATEMENTS = new Set([
   'DropRoleStmt',
   'GrantRoleStmt',
 ]);
-
-const RESTRICTED_SQL_PATTERNS = [
-  /DROP\s+DATABASE/i,
-  /CREATE\s+DATABASE/i,
-  /ALTER\s+DATABASE/i,
-  /pg_catalog/i,
-];
+const SEARCH_PATH_VARIABLE = 'search_path';
+const RESTRICTED_CONFIG_VARIABLES = new Set([...EXECUTION_CONTEXT_VARIABLES, SEARCH_PATH_VARIABLE]);
+const DATABASE_MANAGEMENT_STATEMENTS = new Set([
+  'CreatedbStmt',
+  'DropdbStmt',
+  'AlterDatabaseStmt',
+  'AlterDatabaseSetStmt',
+  'AlterDatabaseRefreshCollStmt',
+]);
 
 /**
  * Initialize the SQL parser WASM module.
@@ -115,7 +117,7 @@ function extractChange(stmt: Record<string, unknown>): DatabaseResourceUpdate | 
   return { type };
 }
 
-export function checkSqlExecutionContextOperations(query: string): string | null {
+export function checkSqlExecutionGuards(query: string): string | null {
   try {
     const { stmts } = parseSync(query);
 
@@ -123,65 +125,41 @@ export function checkSqlExecutionContextOperations(query: string): string | null
       const stmt = stmtWrapper.stmt as Record<string, unknown>;
       const [stmtType, data] = Object.entries(stmt)[0] as [string, Record<string, unknown>];
 
+      if (DATABASE_MANAGEMENT_STATEMENTS.has(stmtType)) {
+        return 'Query contains restricted operations';
+      }
+
       if (stmtType === 'VariableSetStmt') {
         const name = ((data.name as string | undefined) ?? '').toLowerCase();
         if (EXECUTION_CONTEXT_VARIABLES.has(name)) {
           return 'Changing SQL execution role or session authorization is not allowed.';
+        }
+        if (name === SEARCH_PATH_VARIABLE) {
+          return 'Changing SQL search_path is not allowed.';
         }
       }
 
       if (ROLE_MANAGEMENT_STATEMENTS.has(stmtType)) {
         return 'Managing database roles is not allowed.';
       }
-    }
 
-    return null;
-  } catch (parseError) {
-    logger.warn(
-      'SQL parse error in checkSqlExecutionContextOperations, rejecting query:',
-      parseError
-    );
-    return 'Query could not be parsed and was rejected for security reasons.';
-  }
-}
-
-export function checkSqlTransactionOperations(query: string): string | null {
-  try {
-    const { stmts } = parseSync(query);
-
-    for (const stmtWrapper of stmts) {
-      const stmt = stmtWrapper.stmt as Record<string, unknown>;
-      const [stmtType] = Object.entries(stmt)[0] as [string, Record<string, unknown>];
       if (stmtType === 'TransactionStmt') {
         return 'Transaction control statements are not allowed.';
+      }
+
+      const setConfigVariable = getRestrictedSetConfigVariable(stmt);
+      if (setConfigVariable) {
+        return setConfigVariable === SEARCH_PATH_VARIABLE
+          ? 'Changing SQL search_path is not allowed.'
+          : 'Changing SQL execution role or session authorization is not allowed.';
       }
     }
 
     return null;
   } catch (parseError) {
-    logger.warn('SQL parse error in checkSqlTransactionOperations, rejecting query:', parseError);
+    logger.warn('SQL parse error in checkSqlExecutionGuards, rejecting query:', parseError);
     return 'Query could not be parsed and was rejected for security reasons.';
   }
-}
-
-export function checkSqlExecutionGuards(query: string): string | null {
-  for (const pattern of RESTRICTED_SQL_PATTERNS) {
-    if (pattern.test(query)) {
-      return 'Query contains restricted operations';
-    }
-  }
-
-  const executionContextError = checkSqlExecutionContextOperations(query);
-  if (executionContextError) {
-    return executionContextError;
-  }
-
-  const transactionError = checkSqlTransactionOperations(query);
-  if (transactionError) {
-    return transactionError;
-  }
-
-  return null;
 }
 
 /**
@@ -231,4 +209,76 @@ export function parseSQLStatements(sqlText: string): string[] {
       `Invalid SQL format: ${parseError instanceof Error ? parseError.message : String(parseError)}`
     );
   }
+}
+
+function getRestrictedSetConfigVariable(node: unknown): string | null {
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const setting = getRestrictedSetConfigVariable(item);
+      if (setting) {
+        return setting;
+      }
+    }
+    return null;
+  }
+
+  if (!isRecord(node)) {
+    return null;
+  }
+
+  const funcCall = node.FuncCall;
+  if (isRecord(funcCall)) {
+    const functionName = getQualifiedName(funcCall.funcname).at(-1)?.toLowerCase();
+    const args = Array.isArray(funcCall.args) ? funcCall.args : [];
+    const setting = getStringConstant(args[0])?.toLowerCase();
+    if (
+      functionName === 'set_config' &&
+      setting !== undefined &&
+      RESTRICTED_CONFIG_VARIABLES.has(setting)
+    ) {
+      return setting;
+    }
+  }
+
+  for (const value of Object.values(node)) {
+    const setting = getRestrictedSetConfigVariable(value);
+    if (setting) {
+      return setting;
+    }
+  }
+
+  return null;
+}
+
+function getQualifiedName(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const names: string[] = [];
+  for (const item of value) {
+    if (!isRecord(item) || !isRecord(item.String) || typeof item.String.sval !== 'string') {
+      return [];
+    }
+    names.push(item.String.sval);
+  }
+
+  return names;
+}
+
+function getStringConstant(value: unknown): string | null {
+  if (!isRecord(value) || !isRecord(value.A_Const)) {
+    return null;
+  }
+
+  const sval = value.A_Const.sval;
+  if (isRecord(sval) && typeof sval.sval === 'string') {
+    return sval.sval;
+  }
+
+  return null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
 }

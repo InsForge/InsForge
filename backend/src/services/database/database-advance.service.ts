@@ -87,6 +87,7 @@ export class DatabaseAdvanceService {
     const sanitizedQuery = this.sanitizeQuery(query);
     const pool = this.dbManager.getPool();
     const client = await pool.connect();
+    let releaseError: Error | undefined;
 
     try {
       // Set statement timeout at session level (30 seconds)
@@ -115,6 +116,7 @@ export class DatabaseAdvanceService {
 
       return response;
     } catch (error) {
+      releaseError = error instanceof Error ? error : new Error(String(error));
       // Handle timeout errors specifically for better error messages
       if (hasPgErrorCode(error, '57014')) {
         throw new Error('Query timeout: The query took longer than 30 seconds to execute');
@@ -122,8 +124,10 @@ export class DatabaseAdvanceService {
       // Re-throw other errors as-is
       throw error;
     } finally {
-      await client.query('SET statement_timeout = 0').catch(() => {});
-      client.release();
+      await client.query('SET statement_timeout = 0').catch((error: unknown) => {
+        releaseError = error instanceof Error ? error : new Error(String(error));
+      });
+      client.release(releaseError);
     }
   }
 
@@ -740,76 +744,79 @@ export class DatabaseAdvanceService {
       const importedTables: string[] = [];
       let totalRows = 0;
 
-      // If truncate is requested, truncate all public tables first
-      if (truncate) {
-        const tablesResult = await client.query(`
-          SELECT tablename 
-          FROM pg_tables 
-          WHERE schemaname = 'public'
-        `);
+      await withAdminContext(
+        client,
+        async () => {
+          // If truncate is requested, truncate all public tables first
+          if (truncate) {
+            const tablesResult = await client.query(`
+            SELECT tablename
+            FROM pg_tables
+            WHERE schemaname = 'public'
+          `);
 
-        for (const row of tablesResult.rows) {
+            for (const row of tablesResult.rows) {
+              try {
+                await client.query(pgFormat('TRUNCATE TABLE %I CASCADE', row.tablename));
+                logger.info(`Truncated table: ${row.tablename}`);
+              } catch (err) {
+                logger.warn(`Could not truncate table ${row.tablename}:`, err);
+              }
+            }
+          }
+
+          // Process SQL file using our SQL parser utility
+          let statements: string[] = [];
+
           try {
-            await client.query(pgFormat('TRUNCATE TABLE %I CASCADE', row.tablename));
-            logger.info(`Truncated table: ${row.tablename}`);
-          } catch (err) {
-            logger.warn(`Could not truncate table ${row.tablename}:`, err);
-          }
-        }
-      }
-
-      // Process SQL file using our SQL parser utility
-      let statements: string[] = [];
-
-      try {
-        statements = parseSQLStatements(data);
-        logger.info(`Parsed ${statements.length} SQL statements from import file`);
-      } catch (parseError) {
-        logger.warn('Failed to parse SQL file:', parseError);
-        throw new AppError(
-          'Invalid SQL file format. Please ensure the file contains valid SQL statements.',
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
-      }
-
-      for (const statement of statements) {
-        // Basic validation to prevent dangerous operations
-        this.sanitizeQuery(statement);
-
-        try {
-          const result = await client.query(statement);
-
-          // Track INSERT operations
-          if (statement.toUpperCase().startsWith('INSERT')) {
-            totalRows += result.rowCount || 0;
-
-            // Extract table name from INSERT statement
-            const tableMatch = statement.match(/INSERT\s+INTO\s+([a-zA-Z_][a-zA-Z0-9_]*)/i);
-            if (tableMatch && !importedTables.includes(tableMatch[1])) {
-              importedTables.push(tableMatch[1]);
-            }
-          }
-
-          // Track CREATE TABLE operations
-          if (statement.toUpperCase().includes('CREATE TABLE')) {
-            // Extract table name from CREATE TABLE statement
-            const tableMatch = statement.match(
-              /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-zA-Z_][a-zA-Z0-9_]*)/i
+            statements = parseSQLStatements(data);
+            logger.info(`Parsed ${statements.length} SQL statements from import file`);
+          } catch (parseError) {
+            logger.warn('Failed to parse SQL file:', parseError);
+            throw new AppError(
+              'Invalid SQL file format. Please ensure the file contains valid SQL statements.',
+              400,
+              ERROR_CODES.INVALID_INPUT
             );
-            if (tableMatch && !importedTables.includes(tableMatch[1])) {
-              importedTables.push(tableMatch[1]);
+          }
+
+          for (const statement of statements) {
+            try {
+              const result = await client.query(statement);
+
+              // Track INSERT operations
+              if (statement.toUpperCase().startsWith('INSERT')) {
+                totalRows += result.rowCount || 0;
+
+                // Extract table name from INSERT statement
+                const tableMatch = statement.match(/INSERT\s+INTO\s+([a-zA-Z_][a-zA-Z0-9_]*)/i);
+                if (tableMatch && !importedTables.includes(tableMatch[1])) {
+                  importedTables.push(tableMatch[1]);
+                }
+              }
+
+              // Track CREATE TABLE operations
+              if (statement.toUpperCase().includes('CREATE TABLE')) {
+                // Extract table name from CREATE TABLE statement
+                const tableMatch = statement.match(
+                  /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-zA-Z_][a-zA-Z0-9_]*)/i
+                );
+                if (tableMatch && !importedTables.includes(tableMatch[1])) {
+                  importedTables.push(tableMatch[1]);
+                }
+              }
+            } catch (err: unknown) {
+              logger.warn(`Failed to execute statement: ${statement.substring(0, 100)}...`, err);
+              throw new AppError(
+                `Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+                400,
+                ERROR_CODES.INVALID_INPUT
+              );
             }
           }
-        } catch (err: unknown) {
-          logger.warn(`Failed to execute statement: ${statement.substring(0, 100)}...`, err);
-          throw new AppError(
-            `Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
-            400,
-            ERROR_CODES.INVALID_INPUT
-          );
-        }
-      }
+        },
+        true
+      );
 
       await client.query(`NOTIFY pgrst, 'reload schema';`);
       await client.query('COMMIT');
@@ -964,16 +971,24 @@ export class DatabaseAdvanceService {
         query = pgFormat('INSERT INTO %I.%I (%I) VALUES %L', schemaName, table, columns, values);
       }
 
-      // Execute query
-      const result = await pool.query(query);
+      const client = await pool.connect();
+      let releaseError: Error | undefined;
+      try {
+        const result = await withAdminContext(client, () => client.query(query));
 
-      // Refresh schema cache if needed
-      await pool.query(`NOTIFY pgrst, 'reload schema';`);
+        // Refresh schema cache if needed
+        await client.query(`NOTIFY pgrst, 'reload schema';`);
 
-      return {
-        rowCount: result.rowCount || 0,
-        rows: result.rows,
-      };
+        return {
+          rowCount: result.rowCount || 0,
+          rows: result.rows,
+        };
+      } catch (error) {
+        releaseError = error instanceof Error ? error : new Error(String(error));
+        throw error;
+      } finally {
+        client.release(releaseError);
+      }
     } catch (error) {
       // Log the error for debugging
       logger.error('Bulk insert error:', error);

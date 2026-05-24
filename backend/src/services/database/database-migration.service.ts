@@ -96,7 +96,7 @@ export class DatabaseMigrationService {
         );
       }
 
-      await withAdminContext(client, () => client.query(input.sql));
+      await withAdminContext(client, () => client.query(input.sql), true);
 
       const insertResult = await client.query<Migration>(
         `
