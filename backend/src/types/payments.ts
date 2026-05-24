@@ -164,6 +164,7 @@ export interface StripeConnectionRow {
 }
 
 export interface RazorpayConnectionRow {
+  id: string;
   environment: RazorpayEnvironment;
   status: RazorpayConnectionStatus;
   razorpayAccountId: string | null;
@@ -178,7 +179,10 @@ export interface RazorpayConnectionRow {
   lastSyncedAt: Date | string | null;
   lastSyncStatus: RazorpayLatestSyncStatus | null;
   lastSyncError: string | null;
-  lastSyncCounts: Record<string, number> | null;
+  lastSyncCounts: Record<string, number>;
+  raw: unknown;
+  createdAt: Date | string;
+  updatedAt: Date | string;
 }
 
 export interface StripeProductRow {

@@ -1,8 +1,8 @@
 import { MigrationBuilder } from 'node-pg-migrate';
 
-export async function up(pgm: MigrationBuilder): Promise<void> {
+export function up(pgm: MigrationBuilder): void {
   pgm.sql(`
-    CREATE TABLE IF NOT EXISTS payments.razorpay_connections (
+    CREATE TABLE payments.razorpay_connections (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       environment TEXT NOT NULL CHECK (environment IN ('test', 'live')),
       razorpay_account_id TEXT,
@@ -22,7 +22,8 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
       raw JSONB NOT NULL DEFAULT '{}'::JSONB,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE (environment)
+      UNIQUE (environment),
+      CHECK (status != 'connected' OR (api_key_id IS NOT NULL AND api_secret_id IS NOT NULL))
     );
 
     DROP TRIGGER IF EXISTS trg_payments_razorpay_connections_updated_at ON payments.razorpay_connections;
@@ -34,9 +35,9 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
   `);
 }
 
-export async function down(pgm: MigrationBuilder): Promise<void> {
+export function down(pgm: MigrationBuilder): void {
   pgm.sql(`
-    DROP TRIGGER IF EXISTS trg_payments_razorpay_connections_updated_at ON payments.razorpay_connections;
+    REVOKE ALL ON payments.razorpay_connections FROM project_admin;
     DROP TABLE IF EXISTS payments.razorpay_connections;
   `);
 }
