@@ -152,6 +152,15 @@ export async function createApp() {
     next();
   });
 
+  app.use('/functions/:slug', (req: Request, res: Response, next: NextFunction) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk) => chunks.push(chunk));
+    req.on('end', () => {
+      req.rawBody = Buffer.concat(chunks);
+      next();
+    });
+  });
+
   // Mount webhooks with raw body parser BEFORE JSON middleware
   // This ensures signature verification uses the original bytes
   app.use('/api/webhooks', express.raw({ type: 'application/json' }), webhooksRouter);
@@ -237,7 +246,7 @@ export async function createApp() {
       const response = await fetch(targetUrl, {
         method: req.method,
         headers,
-        body: ['GET', 'HEAD'].includes(req.method) ? undefined : JSON.stringify(req.body),
+        body: ['GET', 'HEAD'].includes(req.method) ? undefined : req.rawBody,
       });
 
       // Read response as raw bytes to preserve binary data (images, PDFs, etc.)
