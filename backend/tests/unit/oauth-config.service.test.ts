@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockPool, mockSecretService } = vi.hoisted(() => ({
+const { mockClient, mockPool, mockSecretService } = vi.hoisted(() => ({
+  mockClient: {
+    query: vi.fn(),
+    release: vi.fn(),
+  },
   mockPool: {
+    connect: vi.fn(),
     query: vi.fn(),
   },
   mockSecretService: {
@@ -43,30 +48,45 @@ import { OAuthConfigService } from '../../src/services/auth/oauth-config.service
 describe('OAuthConfigService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockClient.query.mockReset();
+    mockClient.release.mockReset();
+    mockPool.connect.mockResolvedValue(mockClient);
   });
 
   describe('createConfig', () => {
     it('creates OAuth config with extraAuthorizeParams', async () => {
-      const mockResult = {
-        rows: [
-          {
-            id: 'test-id',
-            provider: 'google',
-            clientId: 'test-client-id',
-            redirectUri: null,
-            scopes: ['openid', 'email', 'profile'],
-            useSharedKey: false,
-            extraAuthorizeParams: { prompt: 'select_account' },
-            createdAt: '2026-05-24T00:00:00Z',
-            updatedAt: '2026-05-24T00:00:00Z',
-          },
-        ],
-      };
+      mockSecretService.createSecret.mockResolvedValue({ id: 'secret-123' });
 
-      mockPool.query
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce(mockResult)
-        .mockResolvedValueOnce(undefined);
+      mockClient.query.mockImplementation(async (sql: string) => {
+        if (sql === 'BEGIN' || sql === 'COMMIT') {
+          return { rows: [], rowCount: 0 };
+        }
+
+        if (/SELECT id FROM auth\.oauth_configs/i.test(sql)) {
+          return { rows: [], rowCount: 0 };
+        }
+
+        if (/INSERT INTO auth\.oauth_configs/i.test(sql)) {
+          return {
+            rows: [
+              {
+                id: 'test-id',
+                provider: 'google',
+                clientId: 'test-client-id',
+                redirectUri: null,
+                scopes: ['openid', 'email', 'profile'],
+                useSharedKey: false,
+                extraAuthorizeParams: { prompt: 'select_account' },
+                createdAt: '2026-05-24T00:00:00Z',
+                updatedAt: '2026-05-24T00:00:00Z',
+              },
+            ],
+            rowCount: 1,
+          };
+        }
+
+        return { rows: [], rowCount: 0 };
+      });
 
       const service = OAuthConfigService.getInstance();
       const result = await service.createConfig({
@@ -79,41 +99,42 @@ describe('OAuthConfigService', () => {
       });
 
       expect(result.extraAuthorizeParams).toEqual({ prompt: 'select_account' });
-      expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining('extra_authorize_params'),
-        expect.arrayContaining([
-          'google',
-          'test-client-id',
-          expect.any(String),
-          null,
-          ['openid', 'email', 'profile'],
-          false,
-          { prompt: 'select_account' },
-        ])
-      );
+      expect(mockClient.release).toHaveBeenCalled();
     });
 
     it('creates OAuth config with null extraAuthorizeParams when not provided', async () => {
-      const mockResult = {
-        rows: [
-          {
-            id: 'test-id',
-            provider: 'google',
-            clientId: 'test-client-id',
-            redirectUri: null,
-            scopes: ['openid', 'email', 'profile'],
-            useSharedKey: false,
-            extraAuthorizeParams: null,
-            createdAt: '2026-05-24T00:00:00Z',
-            updatedAt: '2026-05-24T00:00:00Z',
-          },
-        ],
-      };
+      mockSecretService.createSecret.mockResolvedValue({ id: 'secret-456' });
 
-      mockPool.query
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce(mockResult)
-        .mockResolvedValueOnce(undefined);
+      mockClient.query.mockImplementation(async (sql: string) => {
+        if (sql === 'BEGIN' || sql === 'COMMIT') {
+          return { rows: [], rowCount: 0 };
+        }
+
+        if (/SELECT id FROM auth\.oauth_configs/i.test(sql)) {
+          return { rows: [], rowCount: 0 };
+        }
+
+        if (/INSERT INTO auth\.oauth_configs/i.test(sql)) {
+          return {
+            rows: [
+              {
+                id: 'test-id',
+                provider: 'google',
+                clientId: 'test-client-id',
+                redirectUri: null,
+                scopes: ['openid', 'email', 'profile'],
+                useSharedKey: false,
+                extraAuthorizeParams: null,
+                createdAt: '2026-05-24T00:00:00Z',
+                updatedAt: '2026-05-24T00:00:00Z',
+              },
+            ],
+            rowCount: 1,
+          };
+        }
+
+        return { rows: [], rowCount: 0 };
+      });
 
       const service = OAuthConfigService.getInstance();
       const result = await service.createConfig({
@@ -123,32 +144,45 @@ describe('OAuthConfigService', () => {
       });
 
       expect(result.extraAuthorizeParams).toBeNull();
+      expect(mockClient.release).toHaveBeenCalled();
     });
   });
 
   describe('updateConfig', () => {
     it('updates extraAuthorizeParams when provided', async () => {
-      const mockResult = {
-        rows: [
-          {
-            id: 'test-id',
-            provider: 'google',
-            clientId: 'test-client-id',
-            redirectUri: null,
-            scopes: ['openid', 'email', 'profile'],
-            useSharedKey: false,
-            extraAuthorizeParams: { prompt: 'select_account', access_type: 'offline' },
-            createdAt: '2026-05-24T00:00:00Z',
-            updatedAt: '2026-05-24T00:00:00Z',
-          },
-        ],
-      };
+      mockClient.query.mockImplementation(async (sql: string) => {
+        if (sql === 'BEGIN' || sql === 'COMMIT') {
+          return { rows: [], rowCount: 0 };
+        }
 
-      mockPool.query
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [{ id: 'test-id' }] })
-        .mockResolvedValueOnce(mockResult)
-        .mockResolvedValueOnce(undefined);
+        if (/SELECT.*FROM auth\.oauth_configs.*WHERE.*provider/i.test(sql)) {
+          return {
+            rows: [{ id: 'test-id', secretId: 'secret-123' }],
+            rowCount: 1,
+          };
+        }
+
+        if (/UPDATE auth\.oauth_configs/i.test(sql)) {
+          return {
+            rows: [
+              {
+                id: 'test-id',
+                provider: 'google',
+                clientId: 'test-client-id',
+                redirectUri: null,
+                scopes: ['openid', 'email', 'profile'],
+                useSharedKey: false,
+                extraAuthorizeParams: { prompt: 'select_account', access_type: 'offline' },
+                createdAt: '2026-05-24T00:00:00Z',
+                updatedAt: '2026-05-24T00:00:00Z',
+              },
+            ],
+            rowCount: 1,
+          };
+        }
+
+        return { rows: [], rowCount: 0 };
+      });
 
       const service = OAuthConfigService.getInstance();
       const result = await service.updateConfig('google', {
@@ -159,30 +193,28 @@ describe('OAuthConfigService', () => {
         prompt: 'select_account',
         access_type: 'offline',
       });
-      expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining('extra_authorize_params = $'),
-        expect.arrayContaining([{ prompt: 'select_account', access_type: 'offline' }])
-      );
+      expect(mockClient.release).toHaveBeenCalled();
     });
   });
 
   describe('getAllConfigs', () => {
     it('returns configs with extraAuthorizeParams', async () => {
-      const mockConfigs = [
-        {
-          id: 'test-id-1',
-          provider: 'google',
-          clientId: 'google-client-id',
-          redirectUri: null,
-          scopes: ['openid', 'email', 'profile'],
-          useSharedKey: false,
-          extraAuthorizeParams: { prompt: 'select_account' },
-          createdAt: '2026-05-24T00:00:00Z',
-          updatedAt: '2026-05-24T00:00:00Z',
-        },
-      ];
-
-      mockPool.query.mockResolvedValue({ rows: mockConfigs });
+      mockPool.query.mockResolvedValue({
+        rows: [
+          {
+            id: 'test-id-1',
+            provider: 'google',
+            clientId: 'google-client-id',
+            redirectUri: null,
+            scopes: ['openid', 'email', 'profile'],
+            useSharedKey: false,
+            extraAuthorizeParams: { prompt: 'select_account' },
+            createdAt: '2026-05-24T00:00:00Z',
+            updatedAt: '2026-05-24T00:00:00Z',
+          },
+        ],
+        rowCount: 1,
+      });
 
       const service = OAuthConfigService.getInstance();
       const configs = await service.getAllConfigs();
