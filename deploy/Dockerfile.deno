@@ -2,6 +2,6 @@ FROM denoland/deno:alpine-2.0.6
 
 WORKDIR /app/functions
 
-COPY --chown=deno:deno . .
+COPY --chown=deno:deno functions /app/functions
 
 USER deno
