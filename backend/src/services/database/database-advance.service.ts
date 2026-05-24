@@ -9,17 +9,13 @@ import {
   type BulkUpsertResponse,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
-import {
-  parseSQLStatements,
-  checkManagedSchemaWriteOperations,
-  checkAuthSchemaOperations,
-  checkSystemSchemaOperations,
-} from '@/utils/sql-parser.js';
+import { checkSqlExecutionGuards, parseSQLStatements } from '@/utils/sql-parser.js';
 import { validateSchemaName, validateTableName } from '@/utils/validations.js';
 import pgFormat from 'pg-format';
 import { parse } from 'csv-parse/sync';
 import { type PoolClient } from 'pg';
 import { assertWritableDatabaseSchema } from './helpers.js';
+import { withAdminContext } from './user-context.service.js';
 
 export class DatabaseAdvanceService {
   private static instance: DatabaseAdvanceService;
@@ -71,74 +67,45 @@ export class DatabaseAdvanceService {
     return { rows, totalRows, wasTruncated };
   }
 
-  /**
-   * Sanitize query with strict or relaxed mode
-   *
-   * Blocks:
-   * - DROP DATABASE, CREATE DATABASE, ALTER DATABASE
-   * - pg_catalog and information_schema access
-   * - Write operations on InsForge-managed schemas
-   *
-   * Allows:
-   * - Read-only queries against InsForge-managed schemas
-   */
-  sanitizeQuery(query: string, _mode: 'strict' | 'relaxed' = 'strict'): string {
-    // Block database-level operations
-    const dangerousPatterns = [
-      /DROP\s+DATABASE/i,
-      /CREATE\s+DATABASE/i,
-      /ALTER\s+DATABASE/i,
-      /pg_catalog/i,
-    ];
-
-    for (const pattern of dangerousPatterns) {
-      if (pattern.test(query)) {
-        throw new AppError('Query contains restricted operations', 403, ERROR_CODES.FORBIDDEN);
-      }
-    }
-
-    const managedSchemaError = checkManagedSchemaWriteOperations(query);
-    if (managedSchemaError) {
-      logger.warn('Blocked operation on protected schema', {
+  sanitizeQuery(query: string): string {
+    const guardError = checkSqlExecutionGuards(query);
+    if (guardError) {
+      logger.warn('Blocked raw SQL operation', {
         query: query.substring(0, 100),
       });
-      throw new AppError(managedSchemaError, 403, ERROR_CODES.FORBIDDEN);
-    }
-
-    // Use parser-based check for auth schema operations
-    const authError = checkAuthSchemaOperations(query);
-    if (authError) {
-      logger.warn('Blocked operation on auth schema', {
-        query: query.substring(0, 100),
-      });
-      throw new AppError(authError, 403, ERROR_CODES.FORBIDDEN);
-    }
-
-    // Block DDL/DML on system schema
-    const systemError = checkSystemSchemaOperations(query);
-    if (systemError) {
-      logger.warn('Blocked operation on system schema', {
-        query: query.substring(0, 100),
-      });
-      throw new AppError(systemError, 403, ERROR_CODES.FORBIDDEN);
+      throw new AppError(guardError, 403, ERROR_CODES.FORBIDDEN);
     }
 
     return query;
   }
 
-  async executeRawSQL(query: string, params: unknown[] = []): Promise<RawSQLResponse> {
+  async executeRawSQL(
+    query: string,
+    params: unknown[] = [],
+    asRoot: boolean = false
+  ): Promise<RawSQLResponse> {
+    const sanitizedQuery = this.sanitizeQuery(query);
     const pool = this.dbManager.getPool();
     const client = await pool.connect();
+    let releaseError: Error | undefined;
 
     try {
       // Set statement timeout at session level (30 seconds)
       await client.query('SET statement_timeout = 30000');
 
-      // Execute query - database will enforce the timeout
-      const result = await client.query(query, params);
+      const result = asRoot
+        ? await client.query<Record<string, unknown>>(sanitizedQuery, params)
+        : await withAdminContext(
+            client,
+            () => client.query<Record<string, unknown>>(sanitizedQuery, params),
+            false,
+            (error) => {
+              releaseError = error;
+            }
+          );
 
       // Refresh schema cache if it was a DDL operation
-      if (/CREATE|ALTER|DROP/i.test(query)) {
+      if (/CREATE|ALTER|DROP/i.test(sanitizedQuery)) {
         await client.query(`NOTIFY pgrst, 'reload schema';`);
         // Metadata is now updated on-demand
       }
@@ -161,9 +128,10 @@ export class DatabaseAdvanceService {
       // Re-throw other errors as-is
       throw error;
     } finally {
-      // Reset timeout to default before releasing client back to pool
-      await client.query('SET statement_timeout = 0');
-      client.release();
+      await client.query('SET statement_timeout = 0').catch((error: unknown) => {
+        releaseError = error instanceof Error ? error : new Error(String(error));
+      });
+      client.release(releaseError);
     }
   }
 
@@ -780,76 +748,79 @@ export class DatabaseAdvanceService {
       const importedTables: string[] = [];
       let totalRows = 0;
 
-      // If truncate is requested, truncate all public tables first
-      if (truncate) {
-        const tablesResult = await client.query(`
-          SELECT tablename 
-          FROM pg_tables 
-          WHERE schemaname = 'public'
-        `);
+      await withAdminContext(
+        client,
+        async () => {
+          // If truncate is requested, truncate all public tables first
+          if (truncate) {
+            const tablesResult = await client.query(`
+            SELECT tablename
+            FROM pg_tables
+            WHERE schemaname = 'public'
+          `);
 
-        for (const row of tablesResult.rows) {
+            for (const row of tablesResult.rows) {
+              try {
+                await client.query(pgFormat('TRUNCATE TABLE %I CASCADE', row.tablename));
+                logger.info(`Truncated table: ${row.tablename}`);
+              } catch (err) {
+                logger.warn(`Could not truncate table ${row.tablename}:`, err);
+              }
+            }
+          }
+
+          // Process SQL file using our SQL parser utility
+          let statements: string[] = [];
+
           try {
-            await client.query(pgFormat('TRUNCATE TABLE %I CASCADE', row.tablename));
-            logger.info(`Truncated table: ${row.tablename}`);
-          } catch (err) {
-            logger.warn(`Could not truncate table ${row.tablename}:`, err);
-          }
-        }
-      }
-
-      // Process SQL file using our SQL parser utility
-      let statements: string[] = [];
-
-      try {
-        statements = parseSQLStatements(data);
-        logger.info(`Parsed ${statements.length} SQL statements from import file`);
-      } catch (parseError) {
-        logger.warn('Failed to parse SQL file:', parseError);
-        throw new AppError(
-          'Invalid SQL file format. Please ensure the file contains valid SQL statements.',
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
-      }
-
-      for (const statement of statements) {
-        // Basic validation to prevent dangerous operations
-        this.sanitizeQuery(statement);
-
-        try {
-          const result = await client.query(statement);
-
-          // Track INSERT operations
-          if (statement.toUpperCase().startsWith('INSERT')) {
-            totalRows += result.rowCount || 0;
-
-            // Extract table name from INSERT statement
-            const tableMatch = statement.match(/INSERT\s+INTO\s+([a-zA-Z_][a-zA-Z0-9_]*)/i);
-            if (tableMatch && !importedTables.includes(tableMatch[1])) {
-              importedTables.push(tableMatch[1]);
-            }
-          }
-
-          // Track CREATE TABLE operations
-          if (statement.toUpperCase().includes('CREATE TABLE')) {
-            // Extract table name from CREATE TABLE statement
-            const tableMatch = statement.match(
-              /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-zA-Z_][a-zA-Z0-9_]*)/i
+            statements = parseSQLStatements(data);
+            logger.info(`Parsed ${statements.length} SQL statements from import file`);
+          } catch (parseError) {
+            logger.warn('Failed to parse SQL file:', parseError);
+            throw new AppError(
+              'Invalid SQL file format. Please ensure the file contains valid SQL statements.',
+              400,
+              ERROR_CODES.INVALID_INPUT
             );
-            if (tableMatch && !importedTables.includes(tableMatch[1])) {
-              importedTables.push(tableMatch[1]);
+          }
+
+          for (const statement of statements) {
+            try {
+              const result = await client.query(statement);
+
+              // Track INSERT operations
+              if (statement.toUpperCase().startsWith('INSERT')) {
+                totalRows += result.rowCount || 0;
+
+                // Extract table name from INSERT statement
+                const tableMatch = statement.match(/INSERT\s+INTO\s+([a-zA-Z_][a-zA-Z0-9_]*)/i);
+                if (tableMatch && !importedTables.includes(tableMatch[1])) {
+                  importedTables.push(tableMatch[1]);
+                }
+              }
+
+              // Track CREATE TABLE operations
+              if (statement.toUpperCase().includes('CREATE TABLE')) {
+                // Extract table name from CREATE TABLE statement
+                const tableMatch = statement.match(
+                  /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-zA-Z_][a-zA-Z0-9_]*)/i
+                );
+                if (tableMatch && !importedTables.includes(tableMatch[1])) {
+                  importedTables.push(tableMatch[1]);
+                }
+              }
+            } catch (err: unknown) {
+              logger.warn(`Failed to execute statement: ${statement.substring(0, 100)}...`, err);
+              throw new AppError(
+                `Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+                400,
+                ERROR_CODES.INVALID_INPUT
+              );
             }
           }
-        } catch (err: unknown) {
-          logger.warn(`Failed to execute statement: ${statement.substring(0, 100)}...`, err);
-          throw new AppError(
-            `Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
-            400,
-            ERROR_CODES.INVALID_INPUT
-          );
-        }
-      }
+        },
+        true
+      );
 
       await client.query(`NOTIFY pgrst, 'reload schema';`);
       await client.query('COMMIT');
@@ -864,7 +835,7 @@ export class DatabaseAdvanceService {
         fileSize,
       };
     } catch (error) {
-      await client.query('ROLLBACK');
+      await client.query('ROLLBACK').catch(() => {});
       throw error;
     } finally {
       client.release();
@@ -1004,16 +975,28 @@ export class DatabaseAdvanceService {
         query = pgFormat('INSERT INTO %I.%I (%I) VALUES %L', schemaName, table, columns, values);
       }
 
-      // Execute query
-      const result = await pool.query(query);
+      const client = await pool.connect();
+      let releaseError: Error | undefined;
+      try {
+        const result = await withAdminContext(
+          client,
+          () => client.query(query),
+          false,
+          (error) => {
+            releaseError = error;
+          }
+        );
 
-      // Refresh schema cache if needed
-      await pool.query(`NOTIFY pgrst, 'reload schema';`);
+        // Refresh schema cache if needed
+        await client.query(`NOTIFY pgrst, 'reload schema';`);
 
-      return {
-        rowCount: result.rowCount || 0,
-        rows: result.rows,
-      };
+        return {
+          rowCount: result.rowCount || 0,
+          rows: result.rows,
+        };
+      } finally {
+        client.release(releaseError);
+      }
     } catch (error) {
       // Log the error for debugging
       logger.error('Bulk insert error:', error);

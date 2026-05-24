@@ -57,6 +57,7 @@ Use this skill for `backend/` work in the InsForge repository.
    - Routes that issue out-of-band URLs (S3 presigned redirects, signed download links, anything the client redeems against a service that won't re-evaluate RLS) must do an explicit RLS-scoped existence check before handing the URL out — RLS does not fire when the client redeems the URL directly. See `StorageService.objectIsVisible` as the template.
    - Migrations that enable RLS on an existing populated table must auto-install a sensible default policy set so the upgrade does not silently break existing rows. See migration 036's `IF EXISTS (SELECT 1 FROM <table>) THEN <create policies> END IF` pattern.
    - When adding a new RLS-enforced table: enable RLS, `GRANT` table-level CRUD to `authenticated`, and write per-operation policies (SELECT, INSERT, UPDATE, DELETE). Public-bucket-style anonymous bypasses live at the route layer before calling the RLS helper, not in policies.
+   - Normal raw SQL and custom migrations execute as `project_admin`. It has service-key row visibility, but PostgreSQL grants and ownership still limit object access and DDL.
 
 6. Always write unit tests for new code.
    - Every new feature, migration, service, or bug fix should have accompanying unit tests.
