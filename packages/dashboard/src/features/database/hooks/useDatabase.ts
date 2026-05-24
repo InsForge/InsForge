@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { databaseService } from '#features/database/services/database.service';
 import { databaseSchemaQueryKeys } from '#features/database/queryKeys';
 
@@ -80,5 +80,39 @@ export function useTriggers(schemaName: string, enabled = false) {
     isLoading,
     error,
     refetch,
+  };
+}
+
+export function useIndexMutations(schemaName: string) {
+  const queryClient = useQueryClient();
+  const QUERY_KEY = ['database', 'indexes', schemaName];
+
+  const createMutation = useMutation({
+    mutationFn: (args: {
+      tableName: string;
+      indexName: string;
+      columns: string[];
+      method?: string;
+      unique?: boolean;
+      concurrently?: boolean;
+    }) =>
+      databaseService.createIndex(schemaName, args.tableName, args.indexName, args.columns, {
+        method: args.method,
+        unique: args.unique,
+        concurrently: args.concurrently,
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
+  });
+
+  const dropMutation = useMutation({
+    mutationFn: (indexName: string) => databaseService.dropIndex(schemaName, indexName),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
+  });
+
+  return {
+    createIndex: createMutation.mutateAsync,
+    dropIndex: dropMutation.mutateAsync,
+    isCreating: createMutation.isPending,
+    isDropping: dropMutation.isPending,
   };
 }

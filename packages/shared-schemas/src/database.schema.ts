@@ -89,6 +89,7 @@ export const databaseIndexSchema = z.object({
   indexDef: z.string(),
   isUnique: z.boolean().nullable(),
   isPrimary: z.boolean().nullable(),
+  isValid: z.boolean().nullable(),
 });
 
 export const databasePolicySchema = z.object({

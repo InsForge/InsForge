@@ -108,4 +108,67 @@ router.get(
   }
 );
 
+/**
+ * Create a new index.
+ * POST /api/database/indexes
+ *
+ * Validates for name collisions and duplicate column coverage, then builds
+ * the index synchronously. For CONCURRENTLY builds on large tables this
+ * request may take several minutes — the client should show a loading state.
+ */
+router.post('/indexes', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const schemaName = normalizeDatabaseSchemaName(req.body.schema);
+    const { tableName, indexName, columns, method, unique, concurrently } = req.body as {
+      tableName: string;
+      indexName: string;
+      columns: string[];
+      method?: string;
+      unique?: boolean;
+      concurrently?: boolean;
+    };
+
+    const resolvedMethod = method ?? 'btree';
+
+    await databaseService.validateIndexCreation(
+      schemaName,
+      tableName,
+      indexName,
+      columns,
+      resolvedMethod
+    );
+
+    const result = await databaseService.createIndex(schemaName, tableName, indexName, columns, {
+      method: resolvedMethod,
+      unique,
+      concurrently,
+    });
+
+    successResponse(res, result);
+  } catch (error: unknown) {
+    logger.warn('Create index error:', error);
+    next(error);
+  }
+});
+
+/**
+ * Drop an index
+ * DELETE /api/database/indexes/:indexName
+ */
+router.delete(
+  '/indexes/:indexName',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const schemaName = normalizeDatabaseSchemaName(req.query.schema);
+      const { indexName } = req.params;
+      const response = await databaseService.dropIndex(schemaName, indexName);
+      successResponse(res, response);
+    } catch (error: unknown) {
+      logger.warn('Drop index error:', error);
+      next(error);
+    }
+  }
+);
+
 export default router;

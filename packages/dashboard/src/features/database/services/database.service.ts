@@ -65,6 +65,33 @@ export class DatabaseService {
       headers: apiClient.withAccessToken({}),
     });
   }
+
+  async createIndex(
+    schemaName: string,
+    tableName: string,
+    indexName: string,
+    columns: string[],
+    options: { method?: string; unique?: boolean; concurrently?: boolean } = {}
+  ): Promise<{ message: string; indexName: string }> {
+    return apiClient.request('/database/indexes', {
+      method: 'POST',
+      headers: apiClient.withAccessToken({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ schema: schemaName, tableName, indexName, columns, ...options }),
+    });
+  }
+
+  async dropIndex(
+    schemaName: string,
+    indexName: string
+  ): Promise<{ message: string; indexName: string }> {
+    return apiClient.request(
+      `/database/indexes/${encodeURIComponent(indexName)}${buildDatabaseSchemaSearch(schemaName)}`,
+      {
+        method: 'DELETE',
+        headers: apiClient.withAccessToken({}),
+      }
+    );
+  }
 }
 
 export const databaseService = new DatabaseService();
