@@ -68,7 +68,7 @@ function renderMain({
   projectIdLoading: boolean;
   projectIdError: Error | null;
 }) {
-  if (conn.isLoading || projectIdLoading) {
+  if (conn.isLoading || (!connection && projectIdLoading)) {
     return <LoadingState />;
   }
   if (conn.isError) {

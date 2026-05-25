@@ -4,9 +4,9 @@
 
 **Goal:** Restructure `/dashboard/analytics` from a single-page stack into a sidebar + nested sub-routes (Traffic / User Retention / Session Replay), with sidebar items disabled when PostHog is not connected, and a Settings modal that holds connection info / setup prompt / disconnect.
 
-**Architecture:** Mirror the existing OSS pattern used by `features/auth`, `features/payments`, `features/realtime`, `features/deployments`: `AnalyticsLayout` (default export, sidebar + `<Outlet />` | `EmptyConnectPanel`) + `AnalyticsSidebar` (wraps `FeatureSidebar`) + `AnalyticsConfigDialog` (`MenuDialog` for settings) + sub-pages under `pages/`. Shared change: add optional `disabled` flag to `FeatureSidebarListItem`. All styling via Tailwind semantic classes and existing CSS variables — no hex / rgba.
+**Architecture:** Mirror the existing OSS pattern used by `features/auth`, `features/payments`, `features/realtime`, `features/deployments`: `AnalyticsLayout` (default export, sidebar + `<Outlet />` | `EmptyConnectPanel`) + `AnalyticsSidebar` (wraps `FeatureSidebar`) + `AnalyticsConfigDialog` (`MenuDialog` for settings) + sub-pages under `pages/`. Shared change: add optional `disabled` flag to `FeatureSidebarListItem`. All styling via Tailwind semantic classes and existing CSS variables — no hex / `rgba()`.
 
-**Tech Stack:** React 18 + react-router-dom v6 + @tanstack/react-query + Tailwind + `@insforge/ui` (Button, MenuDialog family, Pagination, Input, CopyButton) + existing dashboard `#components` (`FeatureSidebar`, `LoadingState`, `ErrorState`, `PaginationControls`). Tests with vitest + @testing-library/react.
+**Tech Stack:** React 19 + react-router-dom v6 + @tanstack/react-query + Tailwind + `@insforge/ui` (Button, MenuDialog family, Pagination, Input, CopyButton) + existing dashboard `#components` (`FeatureSidebar`, `LoadingState`, `ErrorState`, `PaginationControls`). Tests with `vitest` + `@testing-library/react`.
 
 **Spec:** `docs/superpowers/specs/2026-05-24-posthog-analytics-layout-redesign-design.md`
 
@@ -21,7 +21,7 @@
 | `packages/dashboard/src/features/analytics/components/AnalyticsLayout.tsx` | CREATE | Default-export layout: sidebar + (connection-aware) `<Outlet />` or `EmptyConnectPanel`. Owns `TimeRangeProvider` and the `subscribePosthogConnectionStatus` toast effect. |
 | `packages/dashboard/src/features/analytics/components/AnalyticsSidebar.tsx` | CREATE | Wraps `FeatureSidebar` with title `Analytics`, 3 sub-items (disabled when `!connected`), Settings header button (disabled when `!connected`) that opens `AnalyticsConfigDialog`. |
 | `packages/dashboard/src/features/analytics/components/AnalyticsConfigDialog.tsx` | CREATE | `MenuDialog` with one `Connection` section: host / project ID / API key (read-only inputs with show-toggle + copy), Setup-with-Prompt block, footer Disconnect → triggers existing `DisconnectDialog`. |
-| `packages/dashboard/src/features/analytics/pages/TrafficPage.tsx` | CREATE | Page header (`Traffic` + `TimeRangeSelector`) + lag `Info` callout + `KpiSectionWithTrend` + `grid-cols-1 md:grid-cols-3` of `BreakdownPanel` (Page / Country / DeviceType). |
+| `packages/dashboard/src/features/analytics/pages/TrafficPage.tsx` | CREATE | Page header (`Traffic` + `TimeRangeSelector`) + lag `Info` notice + `KpiSectionWithTrend` + `grid-cols-1 md:grid-cols-3` of `BreakdownPanel` (Page / Country / DeviceType). |
 | `packages/dashboard/src/features/analytics/pages/RetentionPage.tsx` | CREATE | Page header + `RetentionCard` full-width. |
 | `packages/dashboard/src/features/analytics/pages/SessionReplayPage.tsx` | CREATE | Page header + `RecentReplaysCard` rendered with paginated slice + `PaginationControls`. |
 | `packages/dashboard/src/features/analytics/components/posthog/RecentReplaysCard.tsx` | MODIFY | Accept `items` + `isLoading` + `error` from parent (lift fetching out so the page owns pagination state). Drop the internal `useRecordings(10, enabled)` call. |
@@ -206,7 +206,7 @@ return (
 Run: `cd packages/dashboard && npx vitest run src/components/__tests__/FeatureSidebar.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 6: Also run the lint / typecheck to make sure other sidebars still compile**
+- [ ] **Step 6: Also run the lint / TypeScript check to make sure other sidebars still compile**
 
 Run: `cd packages/dashboard && npx tsc --noEmit`
 Expected: PASS (no new errors; existing sidebars don't pass `disabled` so they stay untouched).
@@ -325,7 +325,7 @@ with a stub block — the file is on its way out, so simply delete that line for
 {/* RecentReplaysCard moved to SessionReplayPage in Task 7 */}
 ```
 
-- [ ] **Step 3: Typecheck**
+- [ ] **Step 3: TypeScript check**
 
 Run: `cd packages/dashboard && npx tsc --noEmit`
 Expected: PASS.
@@ -496,7 +496,7 @@ function ReadOnlyField({ label, value }: { label: string; value: string }) {
 
 (All styling uses existing tokens / classes already in `AnalyticsPage.tsx` and `ApiKeyCard.tsx`. The `bg-semantic-0` / `border-[var(--alpha-8)]` are the same vars used in `AnalyticsPage.tsx` today.)
 
-- [ ] **Step 2: Typecheck**
+- [ ] **Step 2: TypeScript check**
 
 Run: `cd packages/dashboard && npx tsc --noEmit`
 Expected: PASS — `PosthogConnection` is already a known type from `@insforge/shared-schemas`.
@@ -584,7 +584,7 @@ export function AnalyticsSidebar({ connection }: AnalyticsSidebarProps) {
 }
 ```
 
-- [ ] **Step 2: Typecheck**
+- [ ] **Step 2: TypeScript check**
 
 Run: `cd packages/dashboard && npx tsc --noEmit`
 Expected: PASS.
@@ -677,7 +677,6 @@ import { useMemo, useState } from 'react';
 import { PaginationControls } from '#components';
 import { useRecordings } from '#features/analytics/hooks/useRecordings';
 import { RecentReplaysCard } from '#features/analytics/components/posthog/RecentReplaysCard';
-import { TimeRangeSelector } from '#features/analytics/components/posthog/TimeRangeSelector';
 
 const WINDOW_SIZE = 50;
 const PAGE_SIZE = 10;
@@ -686,25 +685,23 @@ export function SessionReplayPage() {
   const { data, isLoading, error } = useRecordings(WINDOW_SIZE, true);
   const [page, setPage] = useState(1);
 
-  const allItems = data?.items ?? [];
+  const allItems = useMemo(() => data?.items ?? [], [data?.items]);
   const totalPages = Math.max(1, Math.ceil(allItems.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
   const pageItems = useMemo(
-    () => allItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
-    [allItems, page]
+    () => allItems.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+    [allItems, safePage]
   );
 
   return (
     <div className="flex flex-col gap-4 p-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-foreground">Session Replay</h1>
-        <TimeRangeSelector />
-      </div>
+      <h1 className="text-2xl font-bold text-foreground">Session Replay</h1>
 
       <RecentReplaysCard items={pageItems} isLoading={isLoading} error={error} />
 
       {allItems.length > PAGE_SIZE && (
         <PaginationControls
-          currentPage={page}
+          currentPage={safePage}
           totalPages={totalPages}
           totalRecords={allItems.length}
           pageSize={PAGE_SIZE}
@@ -719,7 +716,7 @@ export function SessionReplayPage() {
 
 (Client-side pagination over a 50-record window: keeps the change scoped to the frontend. Backend `limit/offset` is a future enhancement noted in the spec.)
 
-- [ ] **Step 4: Typecheck**
+- [ ] **Step 4: TypeScript check**
 
 Run: `cd packages/dashboard && npx tsc --noEmit`
 Expected: PASS.
@@ -844,9 +841,9 @@ function renderMain({
 - [ ] **Step 2: Verify `ErrorState` / `LoadingState` prop signatures**
 
 Run: `cd packages/dashboard && head -40 src/components/ErrorState.tsx src/components/LoadingState.tsx`
-Expected: Confirms `ErrorState` accepts `title` (and possibly `message`) and `LoadingState` is parameterless. **If the props don't match what's used above, adjust the JSX in Step 1 to the actual props of these components before typechecking.**
+Expected: Confirms `ErrorState` accepts `title` (and possibly `message`) and `LoadingState` takes no props. **If the props don't match what's used above, adjust the JSX in Step 1 to the actual props of these components before the TypeScript check.**
 
-- [ ] **Step 3: Typecheck**
+- [ ] **Step 3: TypeScript check**
 
 Run: `cd packages/dashboard && npx tsc --noEmit`
 Expected: PASS.
@@ -929,7 +926,7 @@ cd packages/dashboard && grep -rn "AnalyticsPage\|ApiKeyCard\|ConnectStatusBar" 
 ```
 Expected: no matches.
 
-- [ ] **Step 5: Typecheck and build**
+- [ ] **Step 5: TypeScript check and build**
 
 Run: `cd packages/dashboard && npx tsc --noEmit`
 Expected: PASS.
@@ -972,7 +969,7 @@ Trigger a connect (via the host) or temporarily stub `usePosthogConnection` to r
 Expected:
 - Sidebar items enabled, clickable
 - `/dashboard/analytics` redirects to `/dashboard/analytics/traffic`
-- Traffic page renders header + lag callout + KPI + 3 breakdown panels (3 columns at `md+`)
+- Traffic page renders header + lag notice + KPI + 3 breakdown panels (3 columns at `md+`)
 - `/dashboard/analytics/retention` renders `RetentionCard` full-width
 - `/dashboard/analytics/session-replay` renders the replays list (top 10) with pagination at the bottom if there are >10 recordings
 
@@ -985,7 +982,7 @@ Expected:
 - Host / Project ID / API key fields read-only, with show toggle on the key and copy buttons on all three
 - Setup-with-Prompt block at the bottom with copy
 - Footer `Disconnect` button opens the existing `DisconnectDialog` confirm
-- Confirming disconnect closes both dialogs and returns to the disconnected layout
+- Confirming disconnect closes both modals and returns to the disconnected layout
 
 - [ ] **Step 5: Optional — Run the existing unit tests**
 
@@ -1006,7 +1003,7 @@ Expected: PASS (existing tests not affected; new `FeatureSidebar` test passes; n
 - Files to DELETE (AnalyticsPage / ApiKeyCard / ConnectStatusBar) → Task 7 ✓
 - `useRecordings` pagination consideration → Task 5 SessionReplayPage uses client-side paging over a 50-record window (spec's "fallback to top-N list" extended into a reasonable client-paged window); no `useRecordings.ts` change ✓
 - `isCloudHosting` route gate preserved → Task 7 (the `{isCloudHosting && ...}` wrap stays) ✓
-- No hex / rgba — all tokens / vars only → checked in Tasks 1 and 3; consistent with existing files ✓
+- No hex / `rgba()` — all tokens / vars only → checked in Tasks 1 and 3; consistent with existing files ✓
 
 **Placeholder scan:**
 - Step 2 of Task 6 says "If the props don't match… adjust." — this is the only conditional. It's a real verification step, not a TODO; the action is concrete (read the file, match the actual prop name). Acceptable.

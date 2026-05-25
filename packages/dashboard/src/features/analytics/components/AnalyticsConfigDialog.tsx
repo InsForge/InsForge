@@ -39,6 +39,13 @@ export function AnalyticsConfigDialog({
   const [revealed, setRevealed] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
 
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      setRevealed(false);
+    }
+    onOpenChange(nextOpen);
+  };
+
   const maskedKey =
     connection.apiKey.length > 8
       ? `${connection.apiKey.slice(0, 4)}${'•'.repeat(connection.apiKey.length - 8)}${connection.apiKey.slice(-4)}`
@@ -46,7 +53,7 @@ export function AnalyticsConfigDialog({
 
   return (
     <>
-      <MenuDialog open={open} onOpenChange={onOpenChange}>
+      <MenuDialog open={open} onOpenChange={handleOpenChange}>
         <MenuDialogContent>
           <MenuDialogSideNav>
             <MenuDialogSideNavHeader>
