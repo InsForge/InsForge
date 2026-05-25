@@ -4,7 +4,7 @@ sidebarTitle: "Overview"
 description: "Build and host frontend apps from your InsForge project."
 ---
 
-Use InsForge Deployments to ship the browser-facing app that belongs to your project. A connected agent, CLI, or custom tool uploads your frontend source and build settings through InsForge. InsForge creates a Vercel production deployment, then the dashboard tracks the URL, status, deployment history, environment variables, and domains.
+Use InsForge Deployments to ship the browser-facing app that belongs to your project. The InsForge CLI uploads your frontend source through InsForge, which creates a Vercel production deployment. The dashboard tracks the URL, status, deployment history, environment variables, and domains.
 
 <Frame caption="Deployments dashboard: latest deployment, custom domains, environment variables, and deployment history.">
   <img src="/images/dashboard-deployments.png" alt="InsForge Deployments dashboard" />
@@ -16,10 +16,10 @@ Use InsForge Deployments to ship the browser-facing app that belongs to your pro
 
 ```mermaid
 flowchart LR
-    Agent[Coding agent or CLI] --> API[InsForge deployment API]
+    CLI[InsForge CLI] --> API[InsForge deployment API]
     Dashboard[Dashboard] --> API
 
-    API --> Source[Frontend source and build settings]
+    API --> Source[Frontend source upload]
     API --> Env[Environment variables]
     API --> Domains[Domain settings]
 
@@ -32,7 +32,7 @@ flowchart LR
     URL --> App[Frontend website]
     App --> Project[InsForge APIs]
 
-    style Agent fill:#1e293b,stroke:#475569,color:#e2e8f0
+    style CLI fill:#1e293b,stroke:#475569,color:#e2e8f0
     style Dashboard fill:#1e293b,stroke:#475569,color:#e2e8f0
     style API fill:#166534,stroke:#22c55e,color:#dcfce7
     style Source fill:#0e7490,stroke:#06b6d4,color:#cffafe
@@ -47,21 +47,43 @@ flowchart LR
 
 ## Features
 
-### Agent-native deploys
+### CLI deploys
 
-Connected agents can deploy the app they just built. They upload source files, pass build settings when needed, and start a production build without leaving the development loop.
+Deploy from your app's source directory. The CLI uploads the source tree, skips local-only files such as `node_modules`, `.git`, build output, and `.env` files, then starts the Vercel build through InsForge.
+
+```bash
+npx @insforge/cli login
+npx @insforge/cli link
+npx @insforge/cli deployments deploy .
+```
 
 ### Framework builds
 
-Deploy React, Vue, Svelte, Next.js, and other frontend frameworks. InsForge sends the source files and project settings to Vercel. Build commands, install commands, root directories, and output directories can be supplied when framework detection is not enough.
+Deploy React, Vue, Svelte, Next.js, and other frontend frameworks. InsForge sends the source files to Vercel, where framework detection and project files such as `package.json` and `vercel.json` decide how the app builds.
+
+```bash
+npx @insforge/cli deployments deploy ./frontend
+```
 
 ### Environment variables
 
 Manage provider environment variables from the dashboard. Use public prefixes such as `VITE_` or `NEXT_PUBLIC_` only for values that are safe to expose in browser code.
 
+```bash
+npx @insforge/cli deployments env list
+npx @insforge/cli deployments env set VITE_INSFORGE_URL https://your-project.region.insforge.app
+npx @insforge/cli deployments env set VITE_INSFORGE_ANON_KEY ik_xxx
+```
+
 ### Deployment history
 
 Review previous runs, sync Vercel status, inspect metadata, and cancel in-progress deployments from the Deployment Logs page.
+
+```bash
+npx @insforge/cli deployments list
+npx @insforge/cli deployments status <deployment-id> --sync
+npx @insforge/cli deployments cancel <deployment-id>
+```
 
 ### Domains
 
@@ -70,12 +92,8 @@ Every ready deployment gets a default URL at `https://<appkey>.insforge.site`. Y
 ## Deploy with it
 
 <CardGroup cols={2}>
-  <Card title="Agent deployment guide" icon="terminal" href="/agent-docs/deployment">
-    Instructions for agents that deploy frontend source through InsForge.
-  </Card>
-
-  <Card title="Quickstart" icon="rocket" href="/quickstart">
-    Connect your project and start using InsForge from the CLI.
+  <Card title="CLI quickstart" icon="terminal" href="/quickstart">
+    Connect your project and run InsForge CLI commands from your app directory.
   </Card>
 
   <Card title="Compute" icon="server" href="/core-concepts/compute/overview">
@@ -86,5 +104,5 @@ Every ready deployment gets a default URL at `https://<appkey>.insforge.site`. Y
 ## Next steps
 
 - Set up the [CLI](/quickstart) and connect your project.
-- Ask your connected agent to deploy the frontend app.
-- Add browser-safe environment variables before deploying production builds.
+- Add browser-safe environment variables from the dashboard or with `npx @insforge/cli deployments env set`.
+- Run `npx @insforge/cli deployments deploy .` from the frontend app root.
