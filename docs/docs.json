@@ -91,29 +91,23 @@
                 ]
               },
               {
-                "group": "Messaging (Private Preview)",
+                "group": "Messaging",
                 "pages": [
                   "core-concepts/messaging/overview",
                   "core-concepts/messaging/custom-smtp"
                 ]
               },
               {
-                "group": "Payments (Private Preview)",
+                "group": "Payments",
                 "pages": [
                   "core-concepts/payments/overview",
                   "core-concepts/payments/cli"
                 ]
               },
               {
-                "group": "Compute (Private Preview)",
+                "group": "Compute",
                 "pages": [
                   "core-concepts/compute/overview"
-                ]
-              },
-              {
-                "group": "Developer Guides",
-                "pages": [
-                  "agent-docs/error-codes"
                 ]
               }
             ]
@@ -261,7 +255,7 @@
             "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/email.yaml"
           },
           {
-            "group": "Payments (Private Preview)",
+            "group": "Payments",
             "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/payments.yaml"
           },
           {
