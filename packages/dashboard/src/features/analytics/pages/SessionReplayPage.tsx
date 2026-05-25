@@ -11,7 +11,7 @@ export function SessionReplayPage() {
   const { data, isLoading, error } = useRecordings(WINDOW_SIZE, true);
   const [page, setPage] = useState(1);
 
-  const allItems = data?.items ?? [];
+  const allItems = useMemo(() => data?.items ?? [], [data?.items]);
   const totalPages = Math.max(1, Math.ceil(allItems.length / PAGE_SIZE));
   const pageItems = useMemo(
     () => allItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),

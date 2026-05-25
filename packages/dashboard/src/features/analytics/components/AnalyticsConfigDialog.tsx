@@ -31,7 +31,11 @@ interface AnalyticsConfigDialogProps {
   connection: PosthogConnection;
 }
 
-export function AnalyticsConfigDialog({ open, onOpenChange, connection }: AnalyticsConfigDialogProps) {
+export function AnalyticsConfigDialog({
+  open,
+  onOpenChange,
+  connection,
+}: AnalyticsConfigDialogProps) {
   const [revealed, setRevealed] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
 
@@ -67,9 +71,15 @@ export function AnalyticsConfigDialog({ open, onOpenChange, connection }: Analyt
                 <ReadOnlyField label="Project ID" value={connection.posthogProjectId} />
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Project API Key</label>
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Project API Key
+                  </label>
                   <div className="flex items-center gap-2">
-                    <Input readOnly value={revealed ? connection.apiKey : maskedKey} className="font-mono" />
+                    <Input
+                      readOnly
+                      value={revealed ? connection.apiKey : maskedKey}
+                      className="font-mono"
+                    />
                     <Button
                       variant="ghost"
                       size="icon"
@@ -78,24 +88,40 @@ export function AnalyticsConfigDialog({ open, onOpenChange, connection }: Analyt
                     >
                       {revealed ? <EyeOff /> : <Eye />}
                     </Button>
-                    <CopyButton text={connection.apiKey} showText={false} aria-label="Copy API key" />
+                    <CopyButton
+                      text={connection.apiKey}
+                      showText={false}
+                      aria-label="Copy API key"
+                    />
                   </div>
                 </div>
 
                 <div className="flex flex-col gap-2 rounded border border-[var(--alpha-8)] bg-semantic-0 p-3">
                   <div className="flex items-center justify-between">
                     <div className="flex h-5 items-center rounded bg-[var(--alpha-8)] px-2">
-                      <span className="text-xs font-medium leading-4 text-muted-foreground">setup prompt</span>
+                      <span className="text-xs font-medium leading-4 text-muted-foreground">
+                        setup prompt
+                      </span>
                     </div>
-                    <CopyButton text={ANALYTICS_SETUP_PROMPT} showText={false} className="shrink-0" />
+                    <CopyButton
+                      text={ANALYTICS_SETUP_PROMPT}
+                      showText={false}
+                      className="shrink-0"
+                    />
                   </div>
-                  <p className="font-mono text-sm leading-6 text-foreground">{ANALYTICS_SETUP_PROMPT}</p>
+                  <p className="font-mono text-sm leading-6 text-foreground">
+                    {ANALYTICS_SETUP_PROMPT}
+                  </p>
                 </div>
               </div>
             </MenuDialogBody>
 
             <MenuDialogFooter>
-              <Button variant="ghost" className="text-destructive" onClick={() => setDisconnecting(true)}>
+              <Button
+                variant="ghost"
+                className="text-destructive"
+                onClick={() => setDisconnecting(true)}
+              >
                 Disconnect
               </Button>
             </MenuDialogFooter>

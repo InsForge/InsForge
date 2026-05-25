@@ -1,8 +1,7 @@
-/// <reference types="@testing-library/jest-dom" />
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { FeatureSidebar, type FeatureSidebarListItem } from '../FeatureSidebar';
+import { FeatureSidebar, type FeatureSidebarListItem } from '#components';
 
 describe('FeatureSidebar disabled items', () => {
   const items: FeatureSidebarListItem[] = [
@@ -18,7 +17,7 @@ describe('FeatureSidebar disabled items', () => {
     );
 
     const enabled = screen.getByRole('link', { name: 'Active Item' });
-    expect(enabled).toHaveAttribute('href', '/a');
+    expect(enabled.getAttribute('href')).toBe('/a');
 
     expect(screen.queryByRole('link', { name: 'Disabled Item' })).toBeNull();
 

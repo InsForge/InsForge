@@ -5,8 +5,8 @@ import { ErrorState, LoadingState } from '#components';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
 import { useProjectId } from '#lib/hooks/useMetadata';
 import { useToast } from '#lib/hooks/useToast';
-import { TimeRangeProvider } from '../context/TimeRangeContext';
-import { usePosthogConnection } from '../hooks/usePosthogConnection';
+import { TimeRangeProvider } from '#features/analytics/context/TimeRangeContext';
+import { usePosthogConnection } from '#features/analytics/hooks/usePosthogConnection';
 import { AnalyticsSidebar } from './AnalyticsSidebar';
 import { EmptyConnectPanel } from './posthog/EmptyConnectPanel';
 
@@ -18,7 +18,9 @@ export default function AnalyticsLayout() {
   const { subscribePosthogConnectionStatus } = useDashboardHost();
 
   useEffect(() => {
-    if (!subscribePosthogConnectionStatus) return;
+    if (!subscribePosthogConnectionStatus) {
+      return;
+    }
     return subscribePosthogConnectionStatus((e) => {
       if (e.status === 'connected') {
         void qc.invalidateQueries({ queryKey: ['posthog'] });
