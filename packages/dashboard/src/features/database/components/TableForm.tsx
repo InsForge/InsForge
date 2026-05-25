@@ -143,22 +143,44 @@ export function TableForm({
   }, [form, mode]);
 
   useEffect(() => {
-    if (!open) return;
-
+    // Clear error when effect runs
     setError(null);
 
-    if (mode === 'edit' && editTable) {
+    if (open && mode === 'edit' && editTable) {
       form.reset({
         tableName: editTable.tableName,
-        columns: editTable.columns,
+        columns: editTable.columns.map((col) => ({
+          columnName: col.columnName,
+          type: col.type,
+          isPrimaryKey: col.isPrimaryKey,
+          isNullable: col.isNullable,
+          isUnique: col.isUnique || false,
+          defaultValue: col.defaultValue || '',
+          originalName: col.columnName, // Track original name for rename detection
+          isSystemColumn: SYSTEM_FIELDS.includes(col.columnName),
+          isNewColumn: false,
+        })),
       });
 
-      return;
-    }
+      // Set foreign keys from editTable
+      const existingForeignKeys = editTable.columns
+        .filter((col) => !SYSTEM_FIELDS.includes(col.columnName) && col.foreignKey)
+        .map((col) => {
+          const referenceTableValue = col.foreignKey?.referenceTable ?? '';
+          const { schemaName: referenceSchemaName, tableName: referenceTableName } =
+            parseDatabaseTableReference(referenceTableValue, schemaName);
 
-    const hasDraft = Boolean(localStorage.getItem('table-form-columns-draft'));
-
-    if (mode === 'create' && !hasDraft) {
+          return {
+            columnName: col.columnName,
+            referenceTable:
+              referenceSchemaName === schemaName ? referenceTableName : referenceTableValue,
+            referenceColumn: col.foreignKey?.referenceColumn ?? '',
+            onDelete: col.foreignKey?.onDelete || 'NO ACTION',
+            onUpdate: col.foreignKey?.onUpdate || 'NO ACTION',
+          };
+        });
+      setForeignKeys(existingForeignKeys);
+    } else {
       form.reset({
         tableName: '',
         columns: [
@@ -190,14 +212,12 @@ export function TableForm({
             isSystemColumn: true,
             isNewColumn: false,
           },
-          {
-            ...newColumn,
-          },
+          { ...newColumn },
         ],
       });
+      setForeignKeys([]);
     }
   }, [editTable, form, mode, open, schemaName]);
-
   useEffect(() => {
     setFormIsDirty(form.formState.isDirty);
   }, [form.formState.isDirty, setFormIsDirty]);
