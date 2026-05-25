@@ -2,6 +2,7 @@ import { ConvertedValue } from '#components/datagrid/datagridTypes';
 import { DEFAULT_DATABASE_SCHEMA } from '#features/database/helpers';
 import { apiClient } from '#lib/api/client';
 import { BulkUpsertResponse } from '@insforge/shared-schemas';
+import { convertToCSV } from '#lib/utils/csv';
 
 interface AdminRecordListResponse {
   data: { [key: string]: ConvertedValue }[];
@@ -274,6 +275,37 @@ export class RecordService {
       body: formData,
     });
     return response;
+  }
+
+  async exportTableAsCSV(
+    tableName: string,
+    schemaName: string = DEFAULT_DATABASE_SCHEMA
+  ): Promise<void> {
+    // Fetch all records from the table (with pagination to ensure we get all data)
+    // Backend API max limit is 500 records per request
+    const limit = 500;
+    const allRecords: { [key: string]: ConvertedValue }[] = [];
+    let offset = 0;
+    let hasMore = true;
+
+    while (hasMore) {
+      const { records } = await this.getTableRecords(tableName, schemaName, limit, offset);
+
+      allRecords.push(...records);
+
+      if (records.length < limit) {
+        hasMore = false;
+      } else {
+        offset += limit;
+      }
+    }
+
+    // Generate filename with timestamp
+    const timestamp = new Date().toISOString().split('T')[0];
+    const filename = `${tableName}-${timestamp}.csv`;
+
+    // Convert and download
+    convertToCSV(allRecords, filename);
   }
 }
 
