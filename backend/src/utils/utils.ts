@@ -1,5 +1,6 @@
 import crypto from 'crypto';
-import { ColumnType, type AuthConfigSchema } from '@insforge/shared-schemas';
+import { ColumnType, type AuthConfigSchema, ERROR_CODES } from '@insforge/shared-schemas';
+import { AppError } from '@/utils/errors.js';
 
 /**
  * Generates a user-friendly error message listing all password requirements
@@ -122,13 +123,22 @@ export function generateSecureToken(bytes: number = 32): string {
  */
 export type ClientType = 'web' | 'mobile' | 'desktop' | 'server';
 
+export const CLIENT_TYPES: readonly ClientType[] = ['web', 'mobile', 'desktop', 'server'] as const;
+
 /**
- * Parse and validate client_type query parameter
- * Returns 'web' as default if not provided or invalid
+ * Parse and validate client_type query parameter.
+ * Defaults to 'web' when not provided; throws for unknown values.
  */
 export function parseClientType(value: unknown): ClientType {
+  if (!value) {
+    return 'web';
+  }
   if (value === 'mobile' || value === 'desktop' || value === 'server') {
     return value;
   }
-  return 'web';
+  throw new AppError(
+    `Invalid client_type: "${value}". Must be one of: ${CLIENT_TYPES.join(', ')}`,
+    400,
+    ERROR_CODES.INVALID_INPUT
+  );
 }

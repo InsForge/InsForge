@@ -140,10 +140,12 @@ export const perEmailCooldown = (cooldownMs: number = 60000) => {
       const remainingMs = cooldownMs - (now - lastRequest);
       const remainingSec = Math.ceil(remainingMs / 1000);
 
-      throw new AppError(
-        `Please wait ${remainingSec} seconds before requesting another code for this email`,
-        429,
-        ERROR_CODES.TOO_MANY_REQUESTS
+      return next(
+        new AppError(
+          `Please wait ${remainingSec} seconds before requesting another code for this email`,
+          429,
+          ERROR_CODES.TOO_MANY_REQUESTS
+        )
       );
     }
 
@@ -167,6 +169,49 @@ export const sendEmailOTPLimiter = [
  * Only per-IP limit, no per-email limit (to allow legitimate retries)
  */
 export const verifyOTPLimiter = [verifyOTPRateLimiter];
+
+/**
+ * Per-IP rate limiter for invalid API-key attempts.
+ * Sits behind the global rate limiter (3000 req / 15 min) but adds
+ * a stricter cap on authentication failures so a single IP cannot
+ * brute-force API keys even within the global budget.
+ *
+ * Limits: 30 failed API-key attempts per 15 minutes per IP.
+ */
+export const apiKeyRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true, // only count failed attempts
+  skipFailedRequests: false,
+  handler: (_req: Request, _res: Response, next: NextFunction) => {
+    next(
+      new AppError(
+        'Too many failed API key attempts from this IP. Please try again in 15 minutes.',
+        429,
+        ERROR_CODES.TOO_MANY_REQUESTS
+      )
+    );
+  },
+});
+export const adminSessionRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // Limit each IP to 10 login attempts per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req: Request, _res: Response, next: NextFunction) => {
+    next(
+      new AppError(
+        'Too many admin login attempts from this IP. Please try again in 15 minutes.',
+        429,
+        ERROR_CODES.TOO_MANY_REQUESTS
+      )
+    );
+  },
+  skipSuccessfulRequests: false,
+  skipFailedRequests: false,
+});
 
 /**
  * Per-IP rate limiters for "write" endpoints that ultimately drive an external
@@ -302,7 +347,23 @@ async function fetchWriteEndpointLimitsConfig(): Promise<Partial<
       }
       return null;
     }
-    return (await response.json()) as Partial<Record<WriteLimiterCategory, unknown>>;
+
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      logger.warn(
+        `Invalid content type from ${url}: expected application/json, got ${contentType}`
+      );
+      return null;
+    }
+
+    try {
+      return (await response.json()) as Partial<Record<WriteLimiterCategory, unknown>>;
+    } catch (parseError) {
+      logger.warn(`Invalid JSON in write-endpoint rate-limit config from ${url}`, {
+        error: parseError instanceof Error ? parseError.message : String(parseError),
+      });
+      return null;
+    }
   } catch (error) {
     logger.warn(`Failed to fetch write-endpoint rate-limit config from ${url}`, {
       error: error instanceof Error ? error.message : String(error),

@@ -5,11 +5,18 @@ import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES, type TokenPayloadSchema } from '@insforge/shared-schemas';
 import { NEXT_ACTIONS } from '../../utils/next-actions.js';
 
-const JWT_SECRET = process.env.JWT_SECRET ?? '';
 const ACCESS_TOKEN_EXPIRES_IN = '15m';
 const REFRESH_TOKEN_EXPIRES_IN = '7d';
 
 export type RefreshSessionType = 'user' | 'admin';
+
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret.trim().length === 0) {
+    throw new Error('JWT_SECRET environment variable is required');
+  }
+  return secret;
+}
 
 /**
  * Refresh token payload interface
@@ -46,9 +53,8 @@ export class TokenManager {
   private static instance: TokenManager;
 
   private constructor() {
-    if (!process.env.JWT_SECRET) {
-      throw new Error('JWT_SECRET environment variable is required');
-    }
+    // Validate secret availability eagerly at first instantiation
+    getJwtSecret();
   }
 
   public static getInstance(): TokenManager {
@@ -62,7 +68,7 @@ export class TokenManager {
    * Generate JWT access token
    */
   generateAccessToken(payload: TokenPayloadSchema): string {
-    return jwt.sign(payload, JWT_SECRET, {
+    return jwt.sign(payload, getJwtSecret(), {
       algorithm: 'HS256',
       expiresIn: ACCESS_TOKEN_EXPIRES_IN,
     });
@@ -78,7 +84,7 @@ export class TokenManager {
       email: 'project-admin@email.com',
       role: 'project_admin',
     };
-    return jwt.sign(payload, JWT_SECRET, {
+    return jwt.sign(payload, getJwtSecret(), {
       algorithm: 'HS256',
       // No expiresIn means token never expires
     });
@@ -93,7 +99,7 @@ export class TokenManager {
     csrfNonce = this.generateCsrfNonce()
   ): string {
     const refreshPayload = this.createRefreshTokenPayload(userId, sessionType, csrfNonce);
-    return jwt.sign(refreshPayload, JWT_SECRET, {
+    return jwt.sign(refreshPayload, getJwtSecret(), {
       algorithm: 'HS256',
       expiresIn: REFRESH_TOKEN_EXPIRES_IN,
     });
@@ -106,7 +112,7 @@ export class TokenManager {
   ): RefreshTokenWithCsrf {
     const refreshPayload = this.createRefreshTokenPayload(userId, sessionType, csrfNonce);
     return {
-      refreshToken: jwt.sign(refreshPayload, JWT_SECRET, {
+      refreshToken: jwt.sign(refreshPayload, getJwtSecret(), {
         algorithm: 'HS256',
         expiresIn: REFRESH_TOKEN_EXPIRES_IN,
       }),
@@ -120,7 +126,7 @@ export class TokenManager {
    */
   verifyRefreshToken(token: string): RefreshTokenPayload {
     try {
-      const decoded = jwt.verify(token, JWT_SECRET, {
+      const decoded = jwt.verify(token, getJwtSecret(), {
         algorithms: ['HS256'],
         issuer: 'insforge',
       }) as RefreshTokenPayload;
@@ -154,7 +160,7 @@ export class TokenManager {
       email: 'anon@insforge.com',
       role: 'anon',
     };
-    return jwt.sign(payload, JWT_SECRET, {
+    return jwt.sign(payload, getJwtSecret(), {
       algorithm: 'HS256',
       // No expiresIn means token never expires
     });
@@ -165,7 +171,7 @@ export class TokenManager {
    */
   verifyToken(token: string): TokenPayloadSchema {
     try {
-      const decoded = jwt.verify(token, JWT_SECRET) as TokenPayloadSchema;
+      const decoded = jwt.verify(token, getJwtSecret()) as TokenPayloadSchema;
       return {
         sub: decoded.sub,
         email: decoded.email,
@@ -185,6 +191,8 @@ export class TokenManager {
       // JWKS handles caching internally, no need to manage it manually
       const { payload } = await jwtVerify(token, JWKS, {
         algorithms: ['RS256', 'RS384', 'RS512', 'ES256', 'ES384', 'ES512'],
+        issuer: `https://${cloudApiHost}`,
+        audience: 'insforge-api',
       });
 
       // Verify project_id matches if configured
@@ -225,7 +233,7 @@ export class TokenManager {
    */
   generateCsrfToken(payload: RefreshTokenPayload): string {
     return crypto
-      .createHmac('sha256', JWT_SECRET)
+      .createHmac('sha256', getJwtSecret())
       .update(`insforge:csrf:v1:${payload.sessionType}:${payload.sub}:${payload.csrfNonce}`)
       .digest('hex');
   }

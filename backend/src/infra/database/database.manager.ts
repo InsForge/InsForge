@@ -47,6 +47,7 @@ export class DatabaseManager {
       max: 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000,
+      query_timeout: 30000, // 30 seconds per-query timeout
     });
   }
 
