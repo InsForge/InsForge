@@ -8,7 +8,7 @@ Use InsForge Payments to add checkout, subscriptions, and billing management to 
 
 Connect Stripe once in the dashboard or CLI. From there, your app can sell one-time products, start subscriptions, let customers manage billing, and run custom fulfillment logic from synced payment state.
 
-<Frame caption="Payments dashboard: Stripe connection, catalog, customers, subscriptions, and payment history.">
+<Frame caption="Payments dashboard: connection, catalog, subscriptions, and history.">
   <img src="/images/payments-dashboard-placeholder.svg" alt="Placeholder for the InsForge Payments dashboard screenshot" />
 </Frame>
 
@@ -20,11 +20,11 @@ Connect Stripe once in the dashboard or CLI. From there, your app can sell one-t
 
 ```mermaid
 flowchart TB
-    Admin["Dashboard or CLI"] --> Payments["InsForge Payments"]
-    App["Frontend app"] --> SDK["TypeScript SDK"]
-    SDK --> Payments
+    Admin["Dashboard or CLI"] --> PaymentAPI["Payment API"]
+    App["Frontend App"] --> SDK["TypeScript SDK"]
+    SDK --> PaymentAPI
 
-    Payments --> Stripe["Stripe"]
+    PaymentAPI --> Stripe["Stripe"]
     Stripe --> Hosted["Checkout / Billing Portal"]
     Stripe --> Sync["Catalog and billing sync"]
     Stripe --> Events["Billing events"]
@@ -32,17 +32,20 @@ flowchart TB
     Webhooks --> State["Synced payment state"]
     Sync --> State
     State --> Logic["Triggers and business logic"]
-    Logic --> Tables["public app tables"]
+    Logic --> Tables["Public app tables"]
 
-    style Payments fill:#e0f2fe,stroke:#0284c7,color:#111827
-    style Stripe fill:#eef2ff,stroke:#4f46e5,color:#111827
-    style Hosted fill:#fef3c7,stroke:#d97706,color:#111827
-    style Sync fill:#fef3c7,stroke:#d97706,color:#111827
-    style Events fill:#dcfce7,stroke:#16a34a,color:#111827
-    style Webhooks fill:#dcfce7,stroke:#16a34a,color:#111827
-    style State fill:#ede9fe,stroke:#7c3aed,color:#111827
-    style Logic fill:#fee2e2,stroke:#dc2626,color:#111827
-    style Tables fill:#fee2e2,stroke:#dc2626,color:#111827
+    style Admin fill:#1e293b,stroke:#475569,color:#e2e8f0
+    style App fill:#1e293b,stroke:#475569,color:#e2e8f0
+    style SDK fill:#1e40af,stroke:#3b82f6,color:#dbeafe
+    style PaymentAPI fill:#166534,stroke:#22c55e,color:#dcfce7
+    style Stripe fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
+    style Hosted fill:#c2410c,stroke:#fb923c,color:#fed7aa
+    style Sync fill:#0e7490,stroke:#06b6d4,color:#cffafe
+    style Events fill:#c2410c,stroke:#fb923c,color:#fed7aa
+    style Webhooks fill:#c2410c,stroke:#fb923c,color:#fed7aa
+    style State fill:#0e7490,stroke:#06b6d4,color:#cffafe
+    style Logic fill:#6b21a8,stroke:#a855f7,color:#f3e8ff
+    style Tables fill:#6b21a8,stroke:#a855f7,color:#f3e8ff
 ```
 
 ## Features
@@ -120,11 +123,7 @@ Billing Portal inserts a row in `payments.customer_portal_sessions`. It requires
 
 ### Managed webhooks
 
-After a Stripe key is connected, InsForge automatically tries to create the managed Stripe webhook endpoint for that environment. Incoming Stripe events for checkout, invoices, payment intents, refunds, customers, and subscriptions are verified, processed, and recorded automatically. If your backend URL was not public during setup, recreate the endpoint later from the dashboard or CLI.
-
-```bash
-npx @insforge/cli payments webhooks configure test
-```
+After a Stripe key is connected, InsForge automatically tries to create the managed Stripe webhook endpoint for that environment. Incoming Stripe events for checkout, invoices, payment intents, refunds, customers, and subscriptions are verified, processed, and recorded automatically.
 
 ### Payment projections
 
@@ -163,8 +162,8 @@ InsForge does not provide platform-owned merchant accounts, Stripe Connect onboa
 
 ## Next steps
 
+- Set up the [CLI](/quickstart) and connect your project.
 - Configure Stripe keys in Dashboard -> Payments -> Settings or with `npx @insforge/cli payments config set test sk_test_xxx`.
-- Create products and prices in Stripe, the dashboard, or with the Payments CLI.
 - Add RLS policies for Checkout and Billing Portal session creation.
 - Use the [TypeScript SDK reference](/sdks/typescript/payments) to create Checkout and Billing Portal sessions.
 - Add trigger-backed fulfillment tables that map payment events to your product access model.
