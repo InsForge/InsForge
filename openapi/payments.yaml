@@ -6,7 +6,7 @@ info:
 
 tags:
   - name: Client
-    description: Runtime-safe routes used by generated applications
+    description: Runtime routes used by applications with a user token
   - name: Admin
     description: Project-admin routes for Stripe keys, catalog management, sync, and projections
   - name: Webhooks
@@ -16,7 +16,7 @@ paths:
   /api/payments/{environment}/checkout-sessions:
     post:
       summary: Create Checkout Session
-      description: Create a local checkout attempt and then create a Stripe Checkout Session. Subscription mode requires a billing subject.
+      description: Create a local checkout attempt with the caller's user context and then create a Stripe Checkout Session. Subscription mode requires a billing subject.
       tags:
         - Client
       security:
@@ -141,7 +141,7 @@ paths:
   /api/payments/{environment}/config:
     put:
       summary: Configure Stripe Secret Key
-      description: Validate and store a Stripe secret key. New Stripe accounts trigger managed webhook setup and a unified sync.
+      description: Validate and store a Stripe secret key. New Stripe accounts attempt managed webhook setup and then run a unified sync.
       tags:
         - Admin
       security:

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const sdkFeatureSchema = z
-  .enum(['db', 'storage', 'functions', 'auth', 'ai', 'realtime'])
+  .enum(['db', 'storage', 'functions', 'auth', 'ai', 'realtime', 'payments'])
   .describe(
     `
     SDK feature categories:
@@ -12,6 +12,7 @@ export const sdkFeatureSchema = z
     - "auth" - User authentication
     - "ai" - AI features
     - "realtime" - Real-time WebSockets
+    - "payments" - Stripe Checkout and Billing Portal
     `
   );
 
@@ -48,6 +49,7 @@ export const docTypeSchema = z
     'ai-integration-sdk',
     'real-time',
     'deployment',
+    'payments',
   ])
   .describe(
     `
@@ -59,7 +61,8 @@ export const docTypeSchema = z
       "auth-sdk" (direct SDK methods for custom auth flows),
       "ai-integration-sdk" (AI features),
       "real-time" (real-time pub/sub through WebSockets),
-      "deployment" (deploy frontend applications via MCP tool)
+      "deployment" (deploy frontend applications via MCP tool),
+      "payments" (Stripe Checkout, Billing Portal, and webhook-based fulfillment)
     `
   );
 

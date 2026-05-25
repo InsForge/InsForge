@@ -103,6 +103,7 @@ const LEGACY_DOCS_MAP: Record<DocTypeSchema, string> = {
   'ai-integration-sdk': 'sdks/typescript/ai.mdx',
   'real-time': 'agent-docs/real-time.md',
   deployment: 'agent-docs/deployment.md',
+  payments: 'agent-docs/payments.md',
 };
 
 // SDK documentation map for GET /api/docs/:docFeature/:docLanguage endpoint
@@ -143,6 +144,9 @@ const SDK_DOCS_MAP: Record<SdkFeatureSchema, Partial<Record<SdkLanguageSchema, s
     swift: 'sdks/swift/realtime.mdx',
     kotlin: 'sdks/kotlin/realtime.mdx',
     'rest-api': 'sdks/rest/realtime.mdx',
+  },
+  payments: {
+    typescript: 'sdks/typescript/payments.mdx',
   },
 };
 

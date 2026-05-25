@@ -100,8 +100,7 @@
               {
                 "group": "Payments",
                 "pages": [
-                  "core-concepts/payments/overview",
-                  "core-concepts/payments/cli"
+                  "core-concepts/payments/overview"
                 ]
               },
               {
