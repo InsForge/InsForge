@@ -165,10 +165,16 @@ export async function createApp() {
       return;
     }
     const chunks: Buffer[] = [];
+    let done = false;
     let totalBytes = 0;
+
     const onData = (chunk: Buffer) => {
+      if (done) {
+        return;
+      }
       totalBytes += chunk.length;
       if (totalBytes > maxFunctionProxyBodyBytes) {
+        done = true;
         res.status(413).json({ error: 'Payload too large' });
         req.destroy();
         return;
@@ -176,14 +182,26 @@ export async function createApp() {
       chunks.push(chunk);
     };
     const onEnd = () => {
+      if (done) {
+        return;
+      }
+      done = true;
       req.rawBody = Buffer.concat(chunks);
       next();
     };
     const onError = (error: Error) => {
+      if (done) {
+        return;
+      }
+      done = true;
       logger.error('Failed to read function proxy request body', { error: error.message });
       next(error);
     };
     const onAborted = () => {
+      if (done) {
+        return;
+      }
+      done = true;
       next(new Error('Request aborted while reading function proxy body'));
     };
     req.on('data', onData);
