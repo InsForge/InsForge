@@ -6,7 +6,7 @@
 - Stripe Checkout for subscriptions.
 - Stripe Billing Portal links for existing customers.
 - Webhook-projected payment history, subscriptions, customers, and refunds.
-- Admin setup for Stripe keys, sync, catalog, and managed webhooks.
+- Admin setup for Stripe keys, catalog visibility, and managed webhooks.
 
 Do not build raw card collection UI. Use Stripe Checkout and Billing Portal. Handle refunds, disputes, unusual invoice changes, and account-level financial operations in Stripe Dashboard.
 
@@ -23,7 +23,6 @@ Project admins configure Payments in Dashboard -> Payments -> Settings or with t
 ```bash
 npx @insforge/cli payments status
 npx @insforge/cli payments config set test sk_test_xxx
-npx @insforge/cli payments sync
 npx @insforge/cli payments webhooks configure test
 ```
 

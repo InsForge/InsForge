@@ -3,10 +3,6 @@ title: Payments SDK Reference
 description: Create Stripe Checkout and Billing Portal sessions with the InsForge TypeScript SDK
 ---
 
-<Warning>
-  Payments is currently in private preview. APIs and behavior may change.
-</Warning>
-
 import Installation from '/snippets/sdk-installation.mdx';
 
 <Installation />
@@ -18,7 +14,7 @@ The Payments SDK exposes runtime methods for generated app frontends:
 - `insforge.payments.createCheckoutSession(...)`
 - `insforge.payments.createCustomerPortalSession(...)`
 
-Stripe secret keys, catalog management, sync, webhook setup, and payment monitoring in the InsForge dashboard are admin operations. Configure them from the Dashboard or CLI before using the SDK.
+Stripe secret keys, catalog management, webhook setup, and payment monitoring in the InsForge dashboard are admin operations. Configure them from the Dashboard or CLI before using the SDK.
 
 ```bash
 npx @insforge/cli payments status
