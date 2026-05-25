@@ -233,6 +233,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
       if (mcpUsageCount === 1) {
         trackPostHog('onboarding_completed', {
           experiment_variant: getFeatureFlag('dashboard-v4-experiment'),
+          mcp_vs_cli_variant: getFeatureFlag('mcp-vs-cli'),
           tool_name: toolName,
         });
       }
