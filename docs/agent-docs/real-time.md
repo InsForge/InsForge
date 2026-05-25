@@ -7,7 +7,7 @@
 - Ephemeral presence on subscribed channels.
 - Webhook fan-out for messages published to a channel.
 
-Use Edge Functions, not Realtime, when backend code must react to a database change.
+Realtime delivers events to subscribed clients and configured webhook URLs. If backend code must perform work after a database change, such as sending email, writing another table, or calling an API, put that work in an Edge Function and invoke it from a database trigger.
 
 ## Mental Model
 
@@ -92,7 +92,7 @@ USING (
 );
 ```
 
-Publish is controlled by `INSERT` policies on `realtime.messages`:
+Publish is controlled by `INSERT` policies on `realtime.messages`. The WebSocket client publish path inserts without `RETURNING`, so client publish does not require a `SELECT` policy on `realtime.messages` in the current backend. Database-triggered publishes use the `SECURITY DEFINER` `realtime.publish()` function and return only the message ID to the trigger.
 
 ```sql
 CREATE POLICY "members_publish_chat"
