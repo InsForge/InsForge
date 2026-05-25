@@ -2,6 +2,7 @@ import { AppError } from '@/utils/errors.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import type { DatabaseRecord } from '@/types/database.js';
+import { TEXT_LIKE_DATA_TYPES } from '@/utils/constants.js';
 import { escapeSqlLikePattern, validateTableName } from '@/utils/validations.js';
 import { assertWritableDatabaseSchema, quoteIdentifier, quoteQualifiedName } from './helpers.js';
 
@@ -24,8 +25,6 @@ interface TableColumnMetadata {
   nullableColumns: Set<string>;
   searchableColumns: string[];
 }
-
-const TEXT_LIKE_DATA_TYPES = new Set(['text', 'character varying', 'character', 'citext']);
 
 export class AdminRecordService {
   private static instance: AdminRecordService;
