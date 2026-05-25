@@ -76,6 +76,7 @@ Available documentation types:
 - `"ai-integration-sdk"` - AI integration with the provisioned OpenRouter key and OpenAI SDK
 - `"real-time"` - Real-time pub/sub (database + client events) via WebSockets
 - `"deployment"` - Deploy frontend applications via MCP tool
+- `"payments"` - Stripe Checkout, Billing Portal, webhook projections, and fulfillment patterns
 
 These documentations are mostly for TypeScript SDK. For other languages, you can also use `fetch-sdk-docs` mcp tool to get specific documentation.
 
@@ -90,12 +91,15 @@ Available feature types:
 - auth - User authentication
 - ai - AI integration with the provisioned OpenRouter key and OpenAI SDK
 - realtime - Real-time pub/sub (database + client events) via WebSockets
+- payments - Stripe Checkout and Billing Portal with webhook-based fulfillment
 
 Available languages:
 - typescript - JavaScript/TypeScript SDK
 - swift - Swift SDK (for iOS, macOS, tvOS, and watchOS)
 - kotlin - Kotlin SDK (for Android and JVM applications)
 - rest-api - REST API
+
+Payments currently has TypeScript SDK docs only. Use the Payments API reference for non-TypeScript clients.
 
 ## When to Use SDK vs MCP Tools
 
@@ -106,6 +110,7 @@ Available languages:
 - Storage operations (upload, download files)
 - AI integration via the provisioned OpenRouter key with the OpenAI SDK or OpenRouter HTTP API
 - Serverless function invocation
+- Payments checkout and customer portal session creation
 
 ### Use MCP Tools for Infrastructure:
 

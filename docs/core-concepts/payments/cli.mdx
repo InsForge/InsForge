@@ -1,38 +1,64 @@
 ---
 title: Payments CLI
-description: Configure Stripe keys, sync catalog state, and manage products and prices
+description: Configure Stripe environments, sync payment mirrors, and manage Stripe catalog state.
 ---
 
 <Warning>
-  Private preview. APIs and behavior may change.
+  Payments is currently in private preview. CLI commands and API behavior may change before general availability.
 </Warning>
 
-The Payments CLI is the admin and agent control surface for [Stripe](https://stripe.com) setup: keys, sync, catalog, projections. Runtime checkout belongs in app code with the [TypeScript Payments SDK](/sdks/typescript/payments).
+The Payments CLI is an admin and agent control surface for Stripe setup. Use it for keys, sync, webhook setup, catalog mutations, and read-only debugging. Runtime checkout belongs in application code with the [TypeScript Payments SDK](/sdks/typescript/payments).
 
-## Concepts
+Examples use `npx @insforge/cli`. Pass `--json` for scripts and `--yes` for non-interactive destructive commands. Refunds and disputes belong in Stripe Dashboard.
 
-Examples use `npx @insforge/cli` (don't install globally). Pass `--json` for scripts and `--yes` for non-interactive destructive commands. Refunds and disputes belong in the Stripe Dashboard.
+## Environments
 
-## Usage
+Payments has separate Stripe environments.
 
-Run `status` to see key, account, sync, and webhook state. Setting a key validates with Stripe, records account identity, configures the webhook, and runs sync.
+| Environment | Secret key prefix | Use |
+|-------------|-------------------|-----|
+| `test` | `sk_test_` | Development and test checkout flows. |
+| `live` | `sk_live_` | Production checkout flows after explicit approval. |
+
+Never put Stripe secret keys in frontend code or browser-exposed deployment environment variables. Configure them through the Dashboard, CLI, or admin API.
+
+## Check Status
+
+Run `status` to see key, account, sync, and managed webhook state for each environment.
 
 ```bash
 npx @insforge/cli payments status
+```
+
+Status maps to `payments.stripe_connections` and includes the configured Stripe account, webhook endpoint, last sync result, and masked key when available.
+
+## Configure Stripe Keys
+
+Setting a key validates the prefix, verifies the Stripe account, stores the encrypted key in the InsForge secret store, attempts managed webhook setup, and syncs the environment.
+
+```bash
 npx @insforge/cli payments config set test sk_test_xxx
 npx @insforge/cli payments config set live sk_live_xxx
 ```
 
-Sync pulls products, prices, customers, and subscriptions. Stripe is the source of truth; sync overwrites local drift.
+If the backend does not have a public API URL yet, webhook setup may be skipped. The key can still be stored and synced. Configure the webhook again after the backend is reachable by Stripe.
+
+If a new key points at a different Stripe account than the previous key for that environment, InsForge clears the mirrored payment data for that environment before syncing the new account.
+
+## Sync Stripe State
+
+Sync pulls products, prices, customers, and subscriptions from Stripe.
 
 ```bash
 npx @insforge/cli payments sync
 npx @insforge/cli payments catalog --environment test
 ```
 
-## Specific usage cases
+Stripe is the source of truth. Catalog sync removes local product and price rows that no longer exist in Stripe. Do not edit mirrored payments tables directly.
 
-Create a product and recurring price. Use idempotency keys so retries don't duplicate.
+## Manage Catalog Objects
+
+Use catalog commands when you want scripted Stripe product and price changes. Use idempotency keys so retries do not duplicate Stripe objects.
 
 ```bash
 npx @insforge/cli payments products create \
@@ -45,36 +71,59 @@ npx @insforge/cli payments prices create \
   --idempotency-key "price:pro:monthly"
 ```
 
-Stripe prices are immutable for amount, currency, and cadence. Archive and recreate to change those. Products with prices cannot be deleted; use `products update --active false`.
+Stripe prices are immutable for amount, currency, and billing cadence. Archive and recreate a price when those fields need to change.
 
 ```bash
 npx @insforge/cli payments prices archive price_123 --environment test
 ```
 
-Retry webhook setup after deploying to a public URL:
+Products with active prices should usually be deactivated instead of deleted.
+
+```bash
+npx @insforge/cli payments products update prod_123 \
+  --environment test --active false
+```
+
+## Configure Webhooks
+
+Retry managed webhook setup after deploying the backend to a public URL.
 
 ```bash
 npx @insforge/cli payments webhooks configure test
 ```
 
-Read-only views for debugging. Don't expose to end users.
+The managed endpoint is:
+
+```text
+/api/webhooks/stripe/:environment
+```
+
+InsForge stores the Stripe webhook signing secret in the secret store and records the Stripe webhook endpoint ID in `payments.stripe_connections`.
+
+## Debug Projections
+
+Use read-only commands for operational debugging. Do not expose these views directly to end users.
 
 ```bash
 npx @insforge/cli payments subscriptions --environment test
 npx @insforge/cli payments history --environment test --subject-type team --subject-id team_123
 ```
 
+For user-facing billing pages, project the Stripe-derived rows into app-owned tables protected by your app's RLS policies.
+
 ## Troubleshooting
 
 | Symptom | Fix |
 |---------|-----|
-| `Payments are not available on this backend` | Upgrade the self-hosted backend or ask the project admin to enable payments |
-| No catalog after configuring keys | Run `payments sync`; confirm the right environment key |
-| Webhook setup fails on localhost | Deploy to a public URL or use the [Stripe CLI](https://docs.stripe.com/stripe-cli) |
-| Portal returns no customer mapping | Have the customer complete Checkout first, then retry |
+| `Payments are not available on this backend` | Upgrade the self-hosted backend or ask the project admin to enable payments. |
+| No catalog after configuring keys | Run `payments sync` and confirm the selected environment has the right Stripe key. |
+| Webhook setup fails on localhost | Deploy to a public URL or use the Stripe CLI for local webhook forwarding. |
+| Portal returns no customer mapping | Have the customer complete Checkout for the same billing subject, then retry. |
+| Live checkout uses test prices | Configure live products/prices and pass `environment: "live"` with live Stripe price IDs. |
 
-## More resources
+## More Resources
 
-- [Payments overview](/core-concepts/payments/overview) for the data model and fulfillment.
-- [TypeScript Payments SDK](/sdks/typescript/payments) for runtime flows.
-- [Stripe API reference](https://docs.stripe.com/api) for catalog semantics.
+- [Payments overview](/core-concepts/payments/overview) for the product model.
+- [Payments architecture](/core-concepts/payments/architecture) for routes, tables, webhook processing, and fulfillment.
+- [TypeScript Payments SDK](/sdks/typescript/payments) for runtime checkout and portal flows.
+- [Stripe API reference](https://docs.stripe.com/api) for product, price, checkout, and billing portal semantics.

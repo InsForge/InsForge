@@ -4,7 +4,7 @@ description: Create Stripe Checkout and Billing Portal sessions with the InsForg
 ---
 
 <Warning>
-  **Private Preview** — Payments is currently in private preview. APIs and behavior may change.
+  Payments is currently in private preview. APIs and behavior may change.
 </Warning>
 
 import Installation from '/snippets/sdk-installation.mdx';
@@ -13,12 +13,12 @@ import Installation from '/snippets/sdk-installation.mdx';
 
 ## Overview
 
-The Payments SDK exposes runtime-safe methods for generated app frontends:
+The Payments SDK exposes runtime methods for generated app frontends:
 
 - `insforge.payments.createCheckoutSession(...)`
 - `insforge.payments.createCustomerPortalSession(...)`
 
-Stripe secret keys, catalog management, sync, webhook setup, and payment monitoring in the InsForge dashboard are admin operations. Configure them from the dashboard or CLI before using the SDK.
+Stripe secret keys, catalog management, sync, webhook setup, and payment monitoring in the InsForge dashboard are admin operations. Configure them from the Dashboard or CLI before using the SDK.
 
 ```bash
 npx @insforge/cli payments status
@@ -26,8 +26,10 @@ npx @insforge/cli payments catalog --environment test
 ```
 
 <Note>
-  See [Payments overview](/core-concepts/payments/overview) for setup, Stripe key management, webhook projections, and fulfillment patterns.
+  See [Payments overview](/core-concepts/payments/overview) for setup and [Payments architecture](/core-concepts/payments/architecture) for routes, tables, webhook projections, and fulfillment patterns.
 </Note>
+
+The SDK methods require the current InsForge user token. Anonymous InsForge tokens can be used for guest one-time checkout, but an InsForge API key is not a substitute for these runtime calls because the backend needs a user context for local session rows.
 
 ## createCheckoutSession()
 
@@ -195,19 +197,19 @@ if (data?.customerPortalSession.url) {
 
 Customer portal sessions require an authenticated user and an existing Stripe customer mapping for the subject. The mapping is usually created after a Checkout Session completes and Stripe returns a customer. The synced customer data shown in the Payments dashboard can help you verify what happened, but portal creation relies on `payments.stripe_customer_mappings`.
 
-## Authorization and RLS
+## Authorization And RLS
 
 The SDK methods call runtime routes using the current InsForge token. The backend inserts local session rows using the caller context:
 
 - `payments.checkout_sessions` for Checkout attempts
 - `payments.customer_portal_sessions` for Billing Portal attempts
 
-In practice, one-time checkout can support guest or signed-in flows, while customer portal creation requires an authenticated user because it operates on an existing billing subject mapping.
+In practice, one-time checkout can support guest or signed-in flows when the client has an InsForge user token. Customer portal creation requires an authenticated user because it operates on an existing billing subject mapping.
 
-If users can pass shared subjects such as teams or organizations, enable app-specific RLS policies before exposing subscription checkout or customer portal UI. For example, if subscriptions belong to teams, only team members should be able to create sessions for that team.
+The backend does not infer membership from arbitrary `subject` values. If users can pass shared subjects such as teams or organizations, add an authorization boundary before exposing subscription checkout or customer portal UI. For example, enable RLS on `payments.checkout_sessions` and `payments.customer_portal_sessions` with policies that check team membership, or call Payments through your own server endpoint that checks membership first.
 
 <Warning>
-  Do not let users submit arbitrary `subject.type` and `subject.id` values unless your app has matching RLS policies.
+  Do not let users submit arbitrary `subject.type` and `subject.id` values unless your app checks that they can manage that billing subject.
 </Warning>
 
 ## Reading Payment State
@@ -223,7 +225,7 @@ For user-facing billing state, create app-owned tables with RLS and populate the
 - `public.user_entitlements`
 - `public.team_billing_status`
 
-Populate those tables from webhook-projected payment state. See [Payments overview](/core-concepts/payments/overview) for examples.
+Populate those tables from webhook-projected payment state. See [Payments architecture](/core-concepts/payments/architecture) for the projection model.
 
 <Warning>
   Do not mark an order paid, grant credits, or activate a subscription from the success URL alone. Stripe recommends webhooks for reliable fulfillment because customers might complete payment without returning to your app.
@@ -285,6 +287,6 @@ Use `environment: 'test'` while developing. Only switch to `live` after the deve
   </Card>
 
   <Card title="Protect Billing Subjects" icon="shield-check">
-    Add RLS before exposing subscription or portal flows.
+    Add RLS or server-side membership checks before exposing subscription or portal flows.
   </Card>
 </CardGroup>

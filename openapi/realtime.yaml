@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: Insforge Realtime API
   version: 1.0.0
-  description: Realtime pub/sub channel management and message history API
+  description: Realtime channel management, message history, permissions, and retention API. Live pub/sub uses Socket.IO.
 
 paths:
   /api/realtime/channels:
@@ -25,14 +25,14 @@ paths:
                   $ref: '#/components/schemas/Channel'
               example:
                 - id: "550e8400-e29b-41d4-a716-446655440000"
-                  pattern: "order:*"
+                  pattern: "order:%"
                   description: "Order updates channel"
                   webhookUrls: ["https://example.com/webhook"]
                   enabled: true
                   createdAt: "2024-01-15T10:30:00Z"
                   updatedAt: "2024-01-15T10:30:00Z"
                 - id: "550e8400-e29b-41d4-a716-446655440001"
-                  pattern: "chat:*"
+                  pattern: "chat:%"
                   description: "Chat room messages"
                   webhookUrls: null
                   enabled: true
@@ -54,7 +54,7 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateChannelRequest'
             example:
-              pattern: "order:*"
+              pattern: "order:%"
               description: "Order updates channel"
               webhookUrls: ["https://example.com/webhook"]
               enabled: true
@@ -67,7 +67,7 @@ paths:
                 $ref: '#/components/schemas/Channel'
               example:
                 id: "550e8400-e29b-41d4-a716-446655440000"
-                pattern: "order:*"
+                pattern: "order:%"
                 description: "Order updates channel"
                 webhookUrls: ["https://example.com/webhook"]
                 enabled: true
@@ -110,7 +110,7 @@ paths:
                 $ref: '#/components/schemas/Channel'
               example:
                 id: "550e8400-e29b-41d4-a716-446655440000"
-                pattern: "order:*"
+                pattern: "order:%"
                 description: "Order updates channel"
                 webhookUrls: ["https://example.com/webhook"]
                 enabled: true
@@ -161,7 +161,7 @@ paths:
                 $ref: '#/components/schemas/Channel'
               example:
                 id: "550e8400-e29b-41d4-a716-446655440000"
-                pattern: "order:*"
+                pattern: "order:%"
                 description: "Updated order channel description"
                 webhookUrls: ["https://example.com/webhook"]
                 enabled: false
@@ -190,7 +190,7 @@ paths:
 
     delete:
       summary: Delete Channel
-      description: Delete a channel and all associated subscriptions
+      description: Delete a channel definition. Existing message history is preserved with null channelId values.
       tags:
         - Channels
       security:
@@ -346,6 +346,7 @@ paths:
                     count: 380
                   - eventName: "order.completed"
                     count: 220
+                retentionDays: null
         '400':
           description: Invalid input
           content:
@@ -377,7 +378,7 @@ paths:
                 subscribe:
                   policies:
                     - policyName: "allow_authenticated_subscribe"
-                      tableName: "realtime_channels"
+                      tableName: "channels"
                       command: "SELECT"
                       roles: ["authenticated"]
                       using: "enabled = true"
@@ -385,11 +386,75 @@ paths:
                 publish:
                   policies:
                     - policyName: "allow_authenticated_publish"
-                      tableName: "realtime_messages"
+                      tableName: "messages"
                       command: "INSERT"
                       roles: ["authenticated"]
                       using: null
                       withCheck: "true"
+
+  /api/realtime/config:
+    get:
+      summary: Get Realtime Config
+      description: Retrieve realtime message retention configuration
+      tags:
+        - Configuration
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      responses:
+        '200':
+          description: Realtime configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RealtimeConfig'
+              example:
+                retentionDays: null
+    patch:
+      summary: Update Realtime Config
+      description: Update realtime message retention configuration
+      tags:
+        - Configuration
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRealtimeConfigRequest'
+            examples:
+              retainFor90Days:
+                value:
+                  retentionDays: 90
+              keepForever:
+                value:
+                  retentionDays: null
+      responses:
+        '200':
+          description: Realtime configuration updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+              example:
+                message: "Retention config updated successfully"
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "INVALID_INPUT"
+                message: "retentionDays: Number must be greater than 0"
+                statusCode: 400
 
 components:
   securitySchemes:
@@ -419,8 +484,8 @@ components:
         pattern:
           type: string
           minLength: 1
-          description: Channel pattern for subscription matching (supports wildcards like "order:*")
-          example: "order:*"
+          description: Channel pattern for subscription matching. Uses SQL LIKE wildcards, for example "order:%".
+          example: "order:%"
         description:
           type: string
           nullable: true
@@ -457,8 +522,8 @@ components:
         pattern:
           type: string
           minLength: 1
-          description: Channel pattern for subscription matching
-          example: "order:*"
+          description: Channel pattern for subscription matching. Uses SQL LIKE wildcards, for example "order:%".
+          example: "order:%"
         description:
           type: string
           description: Human-readable description of the channel
@@ -483,7 +548,7 @@ components:
           type: string
           minLength: 1
           description: Updated channel pattern
-          example: "order:*"
+          example: "order:%"
         description:
           type: string
           description: Updated description
@@ -579,6 +644,7 @@ components:
         - totalMessages
         - whDeliveryRate
         - topEvents
+        - retentionDays
       properties:
         totalMessages:
           type: integer
@@ -609,6 +675,36 @@ components:
                 minimum: 0
                 description: Number of occurrences
                 example: 450
+        retentionDays:
+          type: integer
+          nullable: true
+          minimum: 1
+          description: Number of days messages are retained. Null means messages are kept indefinitely.
+          example: null
+
+    RealtimeConfig:
+      type: object
+      required:
+        - retentionDays
+      properties:
+        retentionDays:
+          type: integer
+          nullable: true
+          minimum: 1
+          description: Number of days messages are retained. Null means messages are kept indefinitely.
+          example: null
+
+    UpdateRealtimeConfigRequest:
+      type: object
+      required:
+        - retentionDays
+      properties:
+        retentionDays:
+          type: integer
+          nullable: true
+          minimum: 1
+          description: Number of days messages are retained. Null means messages are kept indefinitely.
+          example: 90
 
     RlsPolicy:
       type: object
@@ -625,7 +721,7 @@ components:
         tableName:
           type: string
           description: Table the policy applies to
-          example: "realtime_channels"
+          example: "channels"
         command:
           type: string
           description: SQL command the policy applies to (SELECT, INSERT, UPDATE, DELETE)

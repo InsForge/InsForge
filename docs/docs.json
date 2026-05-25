@@ -68,7 +68,8 @@
               {
                 "group": "Realtime",
                 "pages": [
-                  "core-concepts/realtime/overview"
+                  "core-concepts/realtime/overview",
+                  "core-concepts/realtime/architecture"
                 ]
               },
               {
@@ -87,7 +88,8 @@
               {
                 "group": "Deployments",
                 "pages": [
-                  "core-concepts/deployments/overview"
+                  "core-concepts/deployments/overview",
+                  "core-concepts/deployments/architecture"
                 ]
               },
               {
@@ -101,6 +103,7 @@
                 "group": "Payments (Private Preview)",
                 "pages": [
                   "core-concepts/payments/overview",
+                  "core-concepts/payments/architecture",
                   "core-concepts/payments/cli"
                 ]
               },
@@ -255,6 +258,10 @@
           {
             "group": "Realtime",
             "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/realtime.yaml"
+          },
+          {
+            "group": "Deployments",
+            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/deployments.yaml"
           },
           {
             "group": "Messaging",

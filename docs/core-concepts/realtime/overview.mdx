@@ -1,64 +1,143 @@
 ---
 title: "Realtime"
 sidebarTitle: "Overview"
-description: "Stream Postgres changes and broadcast messages over one WebSocket."
+description: "Publish live database events, client broadcasts, presence, and webhooks through channels."
 ---
 
-Use InsForge Realtime to stream Postgres row changes, broadcast messages between clients, and track presence on one WebSocket connection. Clients subscribe to named channels like `orders:123` or `chat:room-1`; row changes reach those channels through database triggers that publish onto them.
+Use InsForge Realtime when a client needs to react while data is changing. A client subscribes to a channel such as `orders:123` or `chat:room-1`, and InsForge delivers matching events over Socket.IO. Those events can come from database triggers, client broadcasts, or any code that inserts into the realtime message pipeline.
 
 <Note>
-  **Need to react to changes on the server?** Use [Edge Functions](/core-concepts/functions/overview) with database triggers. Realtime is for clients that want to watch; Edge Functions are for code that responds.
+  **Need server-side work after a database change?** Use [Edge Functions](/core-concepts/functions/overview) with database triggers. Realtime is for live clients and webhook delivery.
 </Note>
 
 ```mermaid
 graph TB
-    Changes[DB Triggers] -->|realtime.publish| RT[Realtime Service]
-    Broadcast[Broadcast Messages] --> RT
-    Presence[Presence] --> RT
+    Channel[Channel pattern in realtime.channels] --> Message[Message row in realtime.messages]
+    Trigger[Database trigger] -->|realtime.publish| Message
+    Client[Subscribed client] -->|publish| Message
+    Message --> Notify[Postgres NOTIFY]
+    Notify --> Service[Realtime service]
+    Service --> Socket[Socket.IO room]
+    Service --> Webhook[Webhook URLs]
+    Socket --> App[Client application]
 
-    RLS["RLS on channels and messages"] -.->|gates access| RT
+    RLS[RLS policies] -.-> Channel
+    RLS -.-> Message
 
-    RT --> WS[Single WebSocket]
-    WS --> SDK[InsForge SDK]
-    SDK --> App[Client Application]
-
-    style Changes fill:#0e7490,stroke:#06b6d4,color:#cffafe
-    style Broadcast fill:#166534,stroke:#22c55e,color:#dcfce7
-    style Presence fill:#166534,stroke:#22c55e,color:#dcfce7
-    style RLS fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
-    style RT fill:#c2410c,stroke:#fb923c,color:#fed7aa
-    style WS fill:#c2410c,stroke:#fb923c,color:#fed7aa
-    style SDK fill:#1e40af,stroke:#3b82f6,color:#dbeafe
+    style Channel fill:#0e7490,stroke:#06b6d4,color:#cffafe
+    style Message fill:#0e7490,stroke:#06b6d4,color:#cffafe
+    style Trigger fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
+    style Client fill:#1e293b,stroke:#475569,color:#e2e8f0
+    style Notify fill:#c2410c,stroke:#fb923c,color:#fed7aa
+    style Service fill:#c2410c,stroke:#fb923c,color:#fed7aa
+    style Socket fill:#166534,stroke:#22c55e,color:#dcfce7
+    style Webhook fill:#166534,stroke:#22c55e,color:#dcfce7
     style App fill:#1e293b,stroke:#475569,color:#e2e8f0
+    style RLS fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
 ```
+
+## How It Works
+
+### Channels define what clients can join
+
+Create channel patterns in `realtime.channels`. Exact names such as `orders` match one channel. SQL `LIKE` patterns such as `order:%` match many resolved channel names like `order:123` and `order:456`.
+
+### Messages are the delivery unit
+
+Every database-triggered event and client-published event is stored in `realtime.messages`. The backend listens for new message rows, delivers them to subscribed WebSocket clients, forwards them to configured webhooks, and records delivery counts.
+
+### RLS is optional and uses the same auth context
+
+Realtime is open by default for fast development. To restrict access, enable RLS on `realtime.channels` for subscribe checks and `realtime.messages` for client publish checks. Policies read the same JWT helpers as the database, plus `realtime.channel_name()` for the requested channel.
 
 ## Features
 
 ### Postgres changes
 
-Mirror table writes to clients with a database trigger that calls `realtime.publish(channel, event, payload)`. The trigger decides which channel each `INSERT`, `UPDATE`, or `DELETE` lands on and what the payload carries, so a row change arrives as an event on a channel your clients already subscribe to.
+Mirror table writes to clients with a database trigger that calls `realtime.publish(channel, event, payload)`. The trigger decides the channel, event name, and payload.
 
-### Broadcast
+### Client broadcasts
 
-Send arbitrary messages to every client subscribed to a named channel. Useful for chat, multiplayer cursors, typing indicators, and any low-latency fan-out that does not need to hit the database.
+Send arbitrary messages to every client subscribed to the same channel. This is useful for chat, typing indicators, cursors, and live collaboration signals.
 
 ### Presence
 
-Track which clients are currently online in a channel and what state they hold (name, avatar, status). Presence syncs are CRDT-merged so eventual consistency is automatic.
+Track who is currently present in a channel. Presence is ephemeral online state, returned on subscribe and updated through `presence:join` and `presence:leave` events.
 
-### Row-level security
+### Webhooks
 
-By default any client can subscribe to any channel. Enable RLS on `realtime.channels` to gate who can subscribe (a `SELECT` policy) and on `realtime.messages` to gate who can publish (an `INSERT` policy). Both read the same JWT as REST and storage requests.
+Attach webhook URLs to a channel. Each delivered message posts the payload to those URLs with InsForge headers for the event, channel, and message ID.
 
-### One connection
+### Dashboard management
 
-Database changes, broadcast, and presence all multiplex over a single WebSocket. Open one connection per session, subscribe to as many channels as you need.
+Use the Dashboard to manage channels, inspect message history, view delivery stats, review realtime RLS policies, and configure message retention.
+
+## Quick Start
+
+### 1. Create a channel pattern
+
+```sql
+INSERT INTO realtime.channels (pattern, description, enabled)
+VALUES ('order:%', 'Per-order status updates', true);
+```
+
+### 2. Publish from a database trigger
+
+```sql
+CREATE OR REPLACE FUNCTION notify_order_status()
+RETURNS TRIGGER AS $$
+BEGIN
+  PERFORM realtime.publish(
+    'order:' || NEW.id::text,
+    'status_changed',
+    jsonb_build_object(
+      'id', NEW.id,
+      'status', NEW.status,
+      'updatedAt', NEW.updated_at
+    )
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER order_status_realtime
+  AFTER UPDATE OF status ON orders
+  FOR EACH ROW
+  WHEN (OLD.status IS DISTINCT FROM NEW.status)
+  EXECUTE FUNCTION notify_order_status();
+```
+
+### 3. Subscribe from the client
+
+```typescript
+await insforge.realtime.connect();
+
+const response = await insforge.realtime.subscribe(`order:${orderId}`);
+
+if (response.ok) {
+  insforge.realtime.on('status_changed', (message) => {
+    console.log(message.status);
+  });
+}
+```
+
+<Tip>
+  A client must subscribe to a channel before it can publish to that same channel.
+</Tip>
+
+## Concepts
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="diagram-project" href="/core-concepts/realtime/architecture">
+    Channel matching, message delivery, RLS checks, webhooks, and retention.
+  </Card>
+</CardGroup>
 
 ## Build with it
 
 <CardGroup cols={2}>
   <Card title="TypeScript SDK" icon="js" href="/sdks/typescript/realtime">
-    Subscribe to channels and database changes from Node, browser, and edge.
+    Subscribe to channels and receive event payloads from Node, browser, and edge.
   </Card>
 
   <Card title="Swift SDK" icon="swift" href="/sdks/swift/realtime">
@@ -76,5 +155,5 @@ Database changes, broadcast, and presence all multiplex over a single WebSocket.
 
 ## Next steps
 
-- Set up the [CLI](/quickstart) to link your project (the recommended path).
-- Browse the [TypeScript SDK reference](/sdks/typescript/realtime) for subscription patterns.
+- Read the [architecture guide](/core-concepts/realtime/architecture) for the runtime model.
+- Use the [TypeScript SDK reference](/sdks/typescript/realtime) for client subscriptions.

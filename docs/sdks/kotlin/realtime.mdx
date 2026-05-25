@@ -1,6 +1,6 @@
 ---
 title: Realtime SDK Reference
-description: Real-time subscriptions and messaging with the InsForge Kotlin SDK
+description: Subscribe to channels, publish events, and track presence with the InsForge Kotlin SDK.
 ---
 
 import KotlinSdkInstallation from '/snippets/kotlin-sdk-installation.mdx';
@@ -9,284 +9,163 @@ import KotlinSdkInstallation from '/snippets/kotlin-sdk-installation.mdx';
 
 <KotlinSdkInstallation />
 
----
+## Mental Model
 
-## connect()
+The Kotlin SDK connects to InsForge Realtime over Socket.IO. Subscribe to channel names such as `order:123` or `chat:room-1`, then listen for event names published to those channels.
 
-Establish a WebSocket connection to the realtime server.
+Events are published by database triggers that call `realtime.publish(...)` or by clients that publish to a channel they have already joined. See [Realtime Architecture](/core-concepts/realtime/architecture) for channel matching and RLS details.
 
-### Example
-
-```kotlin
-// Connect to Realtime server
-client.realtime.connect()
-
-// Check connection status
-println("Connected: ${client.realtime.isConnected}")
-println("Socket ID: ${client.realtime.socketId}")
-```
-
-### Monitor Connection State
-
-```kotlin
-// Monitor connection state using Flow
-client.realtime.connectionState.collect { state ->
-    when (state) {
-        is Realtime.ConnectionState.Connected -> println("Connected")
-        is Realtime.ConnectionState.Disconnected -> println("Disconnected")
-        is Realtime.ConnectionState.Connecting -> println("Connecting...")
-        is Realtime.ConnectionState.Error -> println("Error: ${state.message}")
-    }
-}
-```
-
----
-
-## disconnect()
-
-Disconnect from the realtime server.
-
-### Example
-
-```kotlin
-client.realtime.disconnect()
-
-// Verify disconnection
-println("Connected: ${client.realtime.isConnected}")  // false
-println("Socket ID: ${client.realtime.socketId}")      // null
-```
-
----
-
-## subscribe()
-
-Subscribe to a channel to receive events.
-
-### Parameters
-
-- `channel` (String) - The channel name to subscribe to
-
-### Returns
-
-```kotlin
-SubscribeResponse(
-    ok: Boolean,
-    channel: String,
-    presence: PresenceSnapshot?,  // present when ok is true
-    error: SubscribeError?  // null if ok is true
-)
-```
-
-### Example
-
-```kotlin
-client.realtime.connect()
-
-val response = client.realtime.subscribe("todos")
-
-if (response.ok) {
-    println("Subscribed to channel: ${response.channel}")
-    println("Members already present: ${response.presence?.members}")
-} else {
-    println("Subscribe failed: ${response.error?.message}")
-}
-```
-
----
-
-## unsubscribe()
-
-Unsubscribe from a channel.
-
-### Example
-
-```kotlin
-client.realtime.unsubscribe("todos")
-
-// Verify unsubscription
-val channels = client.realtime.getSubscribedChannels()
-println("Still subscribed: ${channels.contains("todos")}")  // false
-```
-
----
-
-## on()
-
-Register an event listener for a specific event type.
-
-### Parameters
-
-- `event` (String) - The event name to listen for (e.g., "INSERT", "UPDATE", "DELETE")
-- `callback` (EventCallback&lt;T&gt;) - Callback function that receives the event data
-
-### Example (Listen for INSERT Events)
+## Quick Start
 
 ```kotlin
 import dev.insforge.realtime.models.SocketMessage
 
 client.realtime.connect()
-client.realtime.subscribe("todos")
 
-// Register INSERT event listener
-client.realtime.on<SocketMessage>("INSERT") { message ->
+val response = client.realtime.subscribe("order:$orderId")
+
+if (!response.ok) {
+    println("Subscribe failed: ${response.error?.message}")
+    return
+}
+
+client.realtime.on<SocketMessage>("status_changed") { message ->
     message?.let {
-        println("INSERT event received:")
-        println("  Channel: ${it.channel}")
-        println("  MessageId: ${it.messageId}")
-        println("  Payload: ${it.payload}")
+        println("Status changed: ${it.payload}")
     }
 }
 ```
 
-### Example (Listen for Multiple Event Types)
+## connect()
+
+Establish a realtime connection.
 
 ```kotlin
 client.realtime.connect()
-client.realtime.subscribe("todos")
 
-// Register listeners for all CRUD events
-listOf("INSERT", "UPDATE", "DELETE").forEach { eventType ->
-    client.realtime.on<SocketMessage>(eventType) { message ->
-        message?.let {
-            println("$eventType event: ${it.payload}")
-        }
+println("Connected: ${client.realtime.isConnected}")
+println("Socket ID: ${client.realtime.socketId}")
+```
+
+Monitor connection state:
+
+```kotlin
+client.realtime.connectionState.collect { state ->
+    when (state) {
+        is Realtime.ConnectionState.Connected -> println("Connected")
+        is Realtime.ConnectionState.Connecting -> println("Connecting")
+        is Realtime.ConnectionState.Disconnected -> println("Disconnected")
+        is Realtime.ConnectionState.Error -> println("Error: ${state.message}")
     }
 }
 ```
 
----
+## subscribe()
+
+Subscribe to a channel and receive the current presence snapshot.
+
+```kotlin
+val response = client.realtime.subscribe("chat:room-1")
+
+if (response.ok) {
+    println("Subscribed to: ${response.channel}")
+    println("Members: ${response.presence?.members}")
+} else {
+    println("Error: ${response.error?.message}")
+}
+```
+
+## publish()
+
+Publish an event to a channel.
+
+```kotlin
+client.realtime.publish(
+    channel = "chat:room-1",
+    event = "new_message",
+    payload = mapOf(
+        "text" to "Hello from Kotlin",
+        "sentAt" to System.currentTimeMillis()
+    )
+)
+```
+
+<Note>
+  The client must subscribe to a channel before publishing to that same channel.
+</Note>
+
+If RLS is enabled on `realtime.messages`, publish is also checked against `INSERT` policies.
+
+## on()
+
+Register an event listener.
+
+```kotlin
+client.realtime.on<SocketMessage>("new_message") { message ->
+    message?.let {
+        println("Message: ${it.payload}")
+    }
+}
+```
+
+Connection and system events:
+
+| Event | Description |
+|-------|-------------|
+| `presence:join` | A logical member became present in the channel. |
+| `presence:leave` | A logical member is no longer present in the channel. |
+| `realtime:error` | Subscribe or publish failed. |
+
+## once()
+
+Listen for an event once.
+
+```kotlin
+client.realtime.once<SocketMessage>("checkout_completed") { message ->
+    println("Checkout completed: ${message?.payload}")
+}
+```
 
 ## off()
 
 Remove an event listener.
-
-### Example
 
 ```kotlin
 val callback = Realtime.EventCallback<SocketMessage> { message ->
     println("Event received: $message")
 }
 
-// Register listener
-client.realtime.on("INSERT", callback)
-
-// Later, remove the listener
-client.realtime.off("INSERT", callback)
+client.realtime.on("status_changed", callback)
+client.realtime.off("status_changed", callback)
 ```
 
----
+## unsubscribe()
 
-## once()
-
-Register a one-time event listener that automatically removes itself after the first event.
-
-### Example
+Leave a channel.
 
 ```kotlin
-client.realtime.once<SocketMessage>("INSERT") { message ->
-    println("Received first INSERT event: ${message?.payload}")
-    // Listener is automatically removed after this
-}
+client.realtime.unsubscribe("chat:room-1")
 ```
 
----
+## disconnect()
 
-## publish()
-
-Publish a message to a channel.
-
-<Note>
-You must be subscribed to a channel before publishing messages to it.
-</Note>
-
-### Parameters
-
-- `channel` (String) - The channel name to publish to
-- `event` (String) - The event name
-- `payload` (Any) - The message payload
-
-### Example
+Close the realtime connection.
 
 ```kotlin
-client.realtime.connect()
-client.realtime.subscribe("chat")
-
-// Publish a message
-client.realtime.publish(
-    channel = "chat",
-    event = "message",
-    payload = mapOf(
-        "text" to "Hello from Kotlin SDK",
-        "timestamp" to System.currentTimeMillis()
-    )
-)
+client.realtime.disconnect()
 ```
-
-### Error Handling
-
-```kotlin
-// Publishing without connection throws an error
-try {
-    client.realtime.publish("channel", "event", mapOf("test" to "data"))
-} catch (e: IllegalStateException) {
-    println("Error: ${e.message}")  // Not connected
-}
-```
-
----
 
 ## getSubscribedChannels()
 
-Get the list of currently subscribed channels.
-
-### Example
+Return locally subscribed channels.
 
 ```kotlin
-client.realtime.connect()
-client.realtime.subscribe("todos")
-client.realtime.subscribe("chat")
-
 val channels = client.realtime.getSubscribedChannels()
-println("Subscribed to: $channels")  // [todos, chat]
+println(channels)
 ```
 
----
+## Presence
 
-## Best Practices
+Successful subscriptions return a presence snapshot. Listen for `presence:join` and `presence:leave` to update local online state.
 
-1. **Always disconnect when done**: Call `disconnect()` in `onDispose` or `onDestroy` to clean up resources.
-
-2. **Check subscribe response**: Always verify `response.ok` before assuming subscription succeeded.
-
-3. **Handle connection state**: Monitor `connectionState` Flow to handle reconnection scenarios.
-
-4. **Use typed callbacks**: Specify the expected type in `on<T>()` for type-safe event handling.
-
-5. **Subscribe before publish**: You must subscribe to a channel before publishing messages to it.
-
-6. **Remove listeners when not needed**: Use `off()` to remove listeners and prevent memory leaks.
-
----
-
-## Error Handling
-
-```kotlin
-import dev.insforge.exceptions.InsforgeException
-
-try {
-    client.realtime.connect()
-    val response = client.realtime.subscribe("todos")
-
-    if (!response.ok) {
-        when (response.error?.code) {
-            "UNAUTHORIZED" -> println("Not authorized to subscribe")
-            "CHANNEL_NOT_FOUND" -> println("Channel does not exist")
-            else -> println("Subscribe failed: ${response.error?.message}")
-        }
-    }
-} catch (e: InsforgeException) {
-    println("Realtime error: ${e.message}")
-} catch (e: IllegalStateException) {
-    println("Invalid state: ${e.message}")
-}
-```
+Presence is ephemeral. It is not a durable room membership table.
