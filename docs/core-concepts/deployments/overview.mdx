@@ -6,7 +6,7 @@ description: "Build and host frontend apps from your InsForge project."
 
 Use InsForge Deployments to ship the browser-facing app that belongs to your project. The InsForge CLI uploads your frontend source through InsForge, which creates a Vercel production deployment. The dashboard tracks the URL, status, deployment history, environment variables, and domains.
 
-<Frame caption="Deployments dashboard: latest deployment, custom domains, environment variables, and deployment history.">
+<Frame caption="Deployments dashboard: status, domains, env vars, and history.">
   <img src="/images/dashboard-deployments.png" alt="InsForge Deployments dashboard" />
 </Frame>
 
@@ -15,20 +15,19 @@ Use InsForge Deployments to ship the browser-facing app that belongs to your pro
 </Note>
 
 ```mermaid
-flowchart LR
+flowchart TB
     CLI[InsForge CLI] --> API[InsForge deployment API]
     Dashboard[Dashboard] --> API
 
     API --> Source[Frontend source upload]
-    API --> Env[Environment variables]
-    API --> Domains[Domain settings]
+    API --> Config[Environment variables and domains]
 
     Source --> Vercel[Vercel production build]
-    Env --> Vercel
-    Domains --> Vercel
+    Config --> Vercel
 
-    Vercel --> History[Deployment history and status]
-    Vercel --> URL[Hosted URLs]
+    Vercel --> Result[Hosted URLs and deployment status]
+    Result --> History[Deployment history]
+    Result --> URL[Public URL]
     URL --> App[Frontend website]
     App --> Project[InsForge APIs]
 
@@ -36,9 +35,9 @@ flowchart LR
     style Dashboard fill:#1e293b,stroke:#475569,color:#e2e8f0
     style API fill:#166534,stroke:#22c55e,color:#dcfce7
     style Source fill:#0e7490,stroke:#06b6d4,color:#cffafe
-    style Env fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
-    style Domains fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
+    style Config fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
     style Vercel fill:#c2410c,stroke:#fb923c,color:#fed7aa
+    style Result fill:#166534,stroke:#22c55e,color:#dcfce7
     style History fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
     style URL fill:#166534,stroke:#22c55e,color:#dcfce7
     style App fill:#1e293b,stroke:#475569,color:#e2e8f0
@@ -52,9 +51,7 @@ flowchart LR
 Deploy from your app's source directory. The CLI uploads the source tree, skips local-only files such as `node_modules`, `.git`, build output, and `.env` files, then starts the Vercel build through InsForge.
 
 ```bash
-npx @insforge/cli login
-npx @insforge/cli link
-npx @insforge/cli deployments deploy .
+npx @insforge/cli deployments deploy <source_directory>
 ```
 
 ### Framework builds
@@ -105,4 +102,4 @@ Every ready deployment gets a default URL at `https://<appkey>.insforge.site`. Y
 
 - Set up the [CLI](/quickstart) and connect your project.
 - Add browser-safe environment variables from the dashboard or with `npx @insforge/cli deployments env set`.
-- Run `npx @insforge/cli deployments deploy .` from the frontend app root.
+- Run `npx @insforge/cli deployments deploy <source_directory>` with the frontend source directory.
