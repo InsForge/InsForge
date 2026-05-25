@@ -152,13 +152,44 @@ export async function createApp() {
     next();
   });
 
+  //default payload size 10 MB and it can be modified, depending upon the usage.
+  const maxFunctionProxyBodyBytes = Number(
+    process.env.FUNCTION_PROXY_MAX_BODY_BYTES || 25 * 1024 * 1024
+  );
+
+  // middleware to handle non json body for the function/:slug
   app.use('/functions/:slug', (req: Request, res: Response, next: NextFunction) => {
+    if (req.method === 'GET' || req.method === 'HEAD') {
+      req.rawBody = Buffer.alloc(0);
+      next();
+      return;
+    }
     const chunks: Buffer[] = [];
-    req.on('data', (chunk) => chunks.push(chunk));
-    req.on('end', () => {
+    let totalBytes = 0;
+    const onData = (chunk: Buffer) => {
+      totalBytes += chunk.length;
+      if (totalBytes > maxFunctionProxyBodyBytes) {
+        res.status(413).json({ error: 'Payload too large' });
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    };
+    const onEnd = () => {
       req.rawBody = Buffer.concat(chunks);
       next();
-    });
+    };
+    const onError = (error: Error) => {
+      logger.error('Failed to read function proxy request body', { error: error.message });
+      next(error);
+    };
+    const onAborted = () => {
+      next(new Error('Request aborted while reading function proxy body'));
+    };
+    req.on('data', onData);
+    req.on('end', onEnd);
+    req.on('error', onError);
+    req.on('aborted', onAborted);
   });
 
   // Mount webhooks with raw body parser BEFORE JSON middleware
