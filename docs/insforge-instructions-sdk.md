@@ -74,7 +74,6 @@ Available documentation types:
 - `"storage-sdk"` - File storage operations
 - `"functions-sdk"` - Serverless functions invocation
 - `"ai-integration-sdk"` - AI integration with the provisioned OpenRouter key and OpenAI SDK
-- `"real-time"` - Real-time pub/sub (database + client events) via WebSockets
 - `"deployment"` - Deploy frontend applications via MCP tool
 - `"payments"` - Stripe Checkout, Billing Portal, webhook projections, and fulfillment patterns
 

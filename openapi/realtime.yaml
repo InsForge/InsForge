@@ -4,6 +4,16 @@ info:
   version: 1.0.0
   description: Realtime channel management, message history, permissions, and retention API. Live pub/sub uses Socket.IO.
 
+tags:
+  - name: Channels
+    description: Configure realtime channel patterns, webhooks, and availability.
+  - name: Messages
+    description: Inspect realtime message history and delivery stats.
+  - name: Permissions
+    description: Manage helper endpoints for realtime RLS examples.
+  - name: Configuration
+    description: Manage realtime retention settings.
+
 paths:
   /api/realtime/channels:
     get:

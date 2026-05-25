@@ -246,6 +246,10 @@
             "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/functions.yaml"
           },
           {
+            "group": "Deployments",
+            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/deployments.yaml"
+          },
+          {
             "group": "Realtime",
             "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/realtime.yaml"
           },

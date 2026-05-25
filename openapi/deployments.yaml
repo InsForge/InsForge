@@ -802,6 +802,8 @@ components:
         files:
           type: array
           minItems: 1
+          maxItems: 5000
+          description: Source file manifest. The default backend limit is 5000 files.
           items:
             $ref: '#/components/schemas/DeploymentManifestFileEntry'
 
