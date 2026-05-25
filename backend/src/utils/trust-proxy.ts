@@ -16,8 +16,12 @@ export function parseTrustProxySetting(value = process.env.TRUST_PROXY): TrustPr
   }
 
   const hopCount = Number(normalized);
-  if (Number.isInteger(hopCount) && hopCount >= 0) {
-    return hopCount;
+  if (Number.isFinite(hopCount)) {
+    if (Number.isInteger(hopCount) && hopCount >= 0) {
+      return hopCount;
+    }
+
+    throw new Error('TRUST_PROXY must be a non-negative integer, boolean, or Express trust proxy string');
   }
 
   // Express also accepts named/address trust proxy values such as
