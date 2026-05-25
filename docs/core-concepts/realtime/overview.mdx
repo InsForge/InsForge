@@ -114,9 +114,47 @@ Attach webhook URLs to a channel when another service should receive each messag
 
 Presence tracks who is online in a channel. Clients receive the current member snapshot when they subscribe, then `presence:join` and `presence:leave` events as members come and go. Store durable room membership, roles, and permissions in your own tables; presence is only online state.
 
+```typescript
+const response = await insforge.realtime.subscribe(`chat:${roomId}`);
+
+if (response.ok) {
+  renderOnlineMembers(response.presence.members);
+}
+
+insforge.realtime.on('presence:join', (message) => {
+  addOnlineMember(message.member);
+});
+
+insforge.realtime.on('presence:leave', (message) => {
+  removeOnlineMember(message.member.presenceId);
+});
+```
+
 ### Row-level security
 
 Realtime can be open while prototyping, then locked down with Postgres RLS. Use `SELECT` policies on `realtime.channels` to control who can subscribe, and `INSERT` policies on `realtime.messages` to control who can publish from a client.
+
+This policy lets authenticated users subscribe to `order:<id>` channels only when the order belongs to them:
+
+```sql
+ALTER TABLE realtime.channels ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "users_subscribe_own_orders"
+ON realtime.channels
+FOR SELECT
+TO authenticated
+USING (
+  pattern = 'order:%'
+  AND EXISTS (
+    SELECT 1
+    FROM public.orders
+    WHERE id = NULLIF(split_part(realtime.channel_name(), ':', 2), '')::uuid
+      AND user_id = auth.uid()
+  )
+);
+```
+
+Use `realtime.channel_name()` in subscribe policies because clients subscribe to resolved channels such as `order:123`, while `realtime.channels` stores patterns such as `order:%`.
 
 ### Message history
 
