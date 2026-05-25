@@ -4,41 +4,43 @@ sidebarTitle: "Overview"
 description: "Build and host frontend apps from your InsForge project."
 ---
 
-Use InsForge Deployments to ship the browser-facing app that belongs to your project. A connected agent, CLI, or custom tool uploads your frontend source, InsForge starts a provider build, and the dashboard tracks the live URL, status, logs, environment variables, and domains.
+Use InsForge Deployments to ship the browser-facing app that belongs to your project. A connected agent, CLI, or custom tool uploads your frontend source and build settings through InsForge. InsForge creates a Vercel production deployment, then the dashboard tracks the URL, status, deployment history, environment variables, and domains.
 
-<Frame caption="Deployments dashboard: live preview, latest deployment, custom domains, and deployment history.">
-  <img src="/images/deployments-dashboard-placeholder.svg" alt="Placeholder for the InsForge Deployments dashboard screenshot" />
+<Frame caption="Deployments dashboard: latest deployment, custom domains, environment variables, and deployment history.">
+  <img src="/images/dashboard-deployments.png" alt="InsForge Deployments dashboard" />
 </Frame>
 
 <Note>
-  **Need an always-on backend process?** Use [Compute](/core-concepts/compute/overview) for workers, queues, WebSocket servers, and long-running services. Deployments are for hosted frontend apps and framework builds.
+  **Need to deploy a container or backend service?** Use [Compute](/core-concepts/compute/overview) for workers, queues, WebSocket servers, and long-running services. Deployments are for frontend websites and framework builds that produce a hosted web app.
 </Note>
 
 ```mermaid
-graph TB
+flowchart LR
     Agent[Coding agent or CLI] --> API[InsForge deployment API]
     Dashboard[Dashboard] --> API
 
-    API --> Source[Frontend source files]
-    Source --> Build[Provider build]
-    Build --> URL[Live URL]
+    API --> Source[Frontend source and build settings]
+    API --> Env[Environment variables]
+    API --> Domains[Domain settings]
 
-    Dashboard --> Logs[Deployment history]
-    Dashboard --> Env[Environment variables]
-    Dashboard --> Domains[Custom domains]
+    Source --> Vercel[Vercel production build]
+    Env --> Vercel
+    Domains --> Vercel
 
-    URL --> App[Your frontend app]
+    Vercel --> History[Deployment history and status]
+    Vercel --> URL[Hosted URLs]
+    URL --> App[Frontend website]
     App --> Project[InsForge APIs]
 
     style Agent fill:#1e293b,stroke:#475569,color:#e2e8f0
     style Dashboard fill:#1e293b,stroke:#475569,color:#e2e8f0
     style API fill:#166534,stroke:#22c55e,color:#dcfce7
     style Source fill:#0e7490,stroke:#06b6d4,color:#cffafe
-    style Build fill:#c2410c,stroke:#fb923c,color:#fed7aa
-    style URL fill:#166534,stroke:#22c55e,color:#dcfce7
-    style Logs fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
     style Env fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
     style Domains fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
+    style Vercel fill:#c2410c,stroke:#fb923c,color:#fed7aa
+    style History fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
+    style URL fill:#166534,stroke:#22c55e,color:#dcfce7
     style App fill:#1e293b,stroke:#475569,color:#e2e8f0
     style Project fill:#0e7490,stroke:#06b6d4,color:#cffafe
 ```
@@ -51,27 +53,19 @@ Connected agents can deploy the app they just built. They upload source files, p
 
 ### Framework builds
 
-Deploy React, Vue, Svelte, Next.js, and other frontend frameworks. Build commands, install commands, root directories, and output directories can be supplied when the default framework detection is not enough.
-
-### Live preview
-
-The dashboard shows the latest ready deployment with a preview, status, provider, creation time, and visit link.
-
-### Deployment history
-
-Review previous runs, sync provider status, inspect metadata, and cancel in-progress deployments from the Deployment Logs page.
+Deploy React, Vue, Svelte, Next.js, and other frontend frameworks. InsForge sends the source files and project settings to Vercel. Build commands, install commands, root directories, and output directories can be supplied when framework detection is not enough.
 
 ### Environment variables
 
 Manage provider environment variables from the dashboard. Use public prefixes such as `VITE_` or `NEXT_PUBLIC_` only for values that are safe to expose in browser code.
 
+### Deployment history
+
+Review previous runs, sync Vercel status, inspect metadata, and cancel in-progress deployments from the Deployment Logs page.
+
 ### Domains
 
-Use the provider URL immediately, set an InsForge-managed `.insforge.site` slug, or attach your own custom domain and follow the DNS verification hints in the dashboard.
-
-### Self-hosting support
-
-InsForge Cloud includes deployment provider wiring. Self-hosted instances need provider credentials configured before deployments can start.
+Every ready deployment gets a default URL at `https://<appkey>.insforge.site`. You can also set an InsForge-managed slug at `https://<slug>.insforge.site`. For a custom domain, add the domain in the dashboard and configure the DNS record it returns, usually a CNAME for subdomains.
 
 ## Deploy with it
 
@@ -85,7 +79,7 @@ InsForge Cloud includes deployment provider wiring. Self-hosted instances need p
   </Card>
 
   <Card title="Compute" icon="server" href="/core-concepts/compute/overview">
-    Use Compute when the app needs a long-running backend process.
+    Use Compute when the app needs a container or long-running backend service.
   </Card>
 </CardGroup>
 
