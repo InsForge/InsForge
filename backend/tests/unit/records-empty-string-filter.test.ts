@@ -8,6 +8,9 @@ describe('filterEmptyStringsForColumnTypes', () => {
     count: 'integer',
     enabled: 'boolean',
     publishedAt: 'timestamp with time zone',
+    slug: 'character varying',
+    code: 'character',
+    email: 'citext',
   };
 
   it('strips empty strings from non-text columns for single-record payloads', () => {
@@ -32,6 +35,15 @@ describe('filterEmptyStringsForColumnTypes', () => {
       { title: '', enabled: true },
       { id: 'uuid-1', title: 'ok', count: 0 },
     ]);
+  });
+
+  it('preserves empty strings for all text-like column types and unknown columns', () => {
+    expect(
+      filterEmptyStringsForColumnTypes(
+        { title: '', slug: '', code: '', email: '', unknownCol: '', count: '' },
+        columnTypes
+      )
+    ).toEqual({ title: '', slug: '', code: '', email: '', unknownCol: '' });
   });
 
   it('leaves non-empty falsey values intact', () => {
