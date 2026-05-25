@@ -282,7 +282,7 @@ Currently rendered between `ApiKeyCard` and `KpiSectionWithTrend` in `AnalyticsP
 
 Everything maps to existing Tailwind semantic classes already used by Auth/Payments/Realtime:
 
-| Figma element       | Token / class                                                              |
+| Design element      | Token / class                                                              |
 |---------------------|---------------------------------------------------------------------------|
 | Sidebar background  | `bg-semantic-1` (already on `FeatureSidebar`)                              |
 | Sidebar border      | `border-[var(--alpha-8)]` (already on `FeatureSidebar`)                    |

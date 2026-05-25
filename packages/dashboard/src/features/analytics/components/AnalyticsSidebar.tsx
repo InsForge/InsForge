@@ -10,9 +10,10 @@ import { AnalyticsConfigDialog } from './AnalyticsConfigDialog';
 
 interface AnalyticsSidebarProps {
   connection: PosthogConnection | null;
+  projectId: string;
 }
 
-export function AnalyticsSidebar({ connection }: AnalyticsSidebarProps) {
+export function AnalyticsSidebar({ connection, projectId }: AnalyticsSidebarProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const connected = connection !== null;
 
@@ -55,6 +56,7 @@ export function AnalyticsSidebar({ connection }: AnalyticsSidebarProps) {
           open={settingsOpen}
           onOpenChange={setSettingsOpen}
           connection={connection}
+          projectId={projectId}
         />
       )}
     </>

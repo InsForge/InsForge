@@ -46,7 +46,7 @@ export default function AnalyticsLayout() {
   return (
     <TimeRangeProvider>
       <div className="flex h-full min-h-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
-        <AnalyticsSidebar connection={connection} />
+        <AnalyticsSidebar connection={connection} projectId={projectId ?? ''} />
         <div className="min-w-0 flex-1 overflow-auto">
           {renderMain({ conn, connection, projectId, projectIdLoading, projectIdError })}
         </div>
@@ -89,8 +89,9 @@ function renderMain({
       );
     }
     return (
-      <div className="flex h-full items-center justify-center p-6">
-        <div className="w-full max-w-md">
+      <div className="h-full overflow-y-auto">
+        <div className="mx-auto flex w-4/5 max-w-[1024px] flex-col gap-6 pb-10 pt-10">
+          <h1 className="text-2xl font-medium leading-8 text-foreground">Setup Analytics</h1>
           <EmptyConnectPanel projectId={projectId} />
         </div>
       </div>

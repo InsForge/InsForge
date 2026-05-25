@@ -41,56 +41,35 @@ export function BreakdownPanel({ breakdown, enabled }: Props) {
   const { data, isLoading, error } = useWebStats(breakdown, timeframe, enabled);
   const title = TITLES[breakdown];
 
-  if (isLoading) {
-    return (
-      <div className="rounded-lg bg-card p-4">
-        <h3 className="mb-3 text-sm font-semibold text-foreground">{title}</h3>
-        <div className="text-sm text-muted-foreground">Loading…</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="rounded-lg bg-destructive/10 p-4">
-        <h3 className="mb-3 text-sm font-semibold text-destructive">{title}</h3>
-        <div className="text-sm text-destructive">Failed to load.</div>
-      </div>
-    );
-  }
-
   const rows = data?.rows ?? [];
-  if (rows.length === 0) {
-    return (
-      <div className="rounded-lg bg-card p-4">
-        <h3 className="mb-3 text-sm font-semibold text-foreground">{title}</h3>
-        <div className="text-sm text-muted-foreground">No data</div>
-      </div>
-    );
-  }
-
   const top = rows.slice(0, 8);
 
+  // Figma container spec: flex flex-col items-start gap-6 p-4 align-self-stretch
   return (
-    <div className="rounded-lg bg-card p-4">
-      <h3 className="mb-3 text-sm font-semibold text-foreground">{title}</h3>
-      <ul className="flex flex-col gap-2">
-        {top.map((row, i) => (
-          <li key={`${row.breakdownValue ?? 'unknown'}-${i}`} className="relative">
-            <div
-              className="absolute inset-y-0 left-0 rounded bg-primary/10"
-              style={{ width: `${Math.max(2, row.uiFillFraction * 100)}%` }}
-              aria-hidden="true"
-            />
-            <div className="relative flex items-center justify-between gap-3 px-2 py-1 text-sm">
-              <div className="min-w-0 flex-1 text-foreground">
+    <div className="flex flex-col items-start gap-6 self-stretch rounded-lg border border-[var(--alpha-8)] bg-card p-4">
+      <p className="text-sm text-muted-foreground">{title}</p>
+
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      ) : error ? (
+        <p className="text-sm text-destructive">Failed to load.</p>
+      ) : top.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No data</p>
+      ) : (
+        <ul className="flex w-full flex-col">
+          {top.map((row, i) => (
+            <li
+              key={`${row.breakdownValue ?? 'unknown'}-${i}`}
+              className="flex items-center justify-between gap-3 border-b border-[var(--alpha-8)] py-2 last:border-b-0"
+            >
+              <div className="min-w-0 flex-1 text-sm text-foreground">
                 {renderLabel(breakdown, row.breakdownValue)}
               </div>
-              <div className="shrink-0 text-muted-foreground">{formatNumber(row.visitors)}</div>
-            </div>
-          </li>
-        ))}
-      </ul>
+              <div className="shrink-0 text-sm text-foreground">{formatNumber(row.visitors)}</div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
