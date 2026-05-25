@@ -120,7 +120,7 @@ The body can include build settings, environment variables, and provider metadat
 }
 ```
 
-If `envVars` are provided, InsForge upserts them to Vercel before creating the deployment.
+If `envVars` are provided, InsForge creates or updates them in Vercel before creating the deployment.
 
 ## Legacy Zip Flow
 
@@ -157,7 +157,7 @@ Deployment environment variables are provider-level Vercel variables, not rows i
 | `POST /api/deployments/env-vars` | Creates or updates variables. Duplicate keys in one request are rejected. |
 | `DELETE /api/deployments/env-vars/{id}` | Deletes a provider variable by Vercel env var ID. |
 
-Variables are upserted as encrypted variables for `production`, `preview`, and `development` targets.
+Variables are stored as encrypted variables for `production`, `preview`, and `development` targets.
 
 ## Domains
 

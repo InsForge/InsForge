@@ -127,7 +127,7 @@ socket.disconnect();
 
 | Event | Direction | Description |
 |-------|-----------|-------------|
-| `realtime:subscribe` | Client to server | Subscribe to a channel. Ack returns success/error and a presence snapshot. |
+| `realtime:subscribe` | Client to server | Subscribe to a channel. The acknowledgement returns success/error and a presence snapshot. |
 | `realtime:unsubscribe` | Client to server | Leave a channel. |
 | `realtime:publish` | Client to server | Insert a user message into the realtime pipeline. |
 | Custom event name | Server to client | Delivered message, emitted under the message `eventName`. |

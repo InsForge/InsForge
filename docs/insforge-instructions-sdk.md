@@ -68,9 +68,9 @@ Available documentation types:
 - `"db-sdk-typescript"` - Database operations with TypeScript SDK
 - **Authentication** - Choose based on implementation:
   - `"auth-sdk-typescript"` - TypeScript SDK methods for custom auth flows
-  - `"auth-components-react"` - Pre-built auth UI for React+Vite (singlepage App)
-  - `"auth-components-react-router"` - Pre-built auth UI for React(Vite+React Router) (Multipage App)
-  - `"auth-components-nextjs"` - Pre-built auth UI for Nextjs (SSR App)
+  - `"auth-components-react"` - Pre-built auth UI for React+Vite (single-page app)
+  - `"auth-components-react-router"` - Pre-built auth UI for React(Vite+React Router) (multi-page app)
+  - `"auth-components-nextjs"` - Pre-built auth UI for Next.js (SSR app)
 - `"storage-sdk"` - File storage operations
 - `"functions-sdk"` - Serverless functions invocation
 - `"ai-integration-sdk"` - AI integration with the provisioned OpenRouter key and OpenAI SDK
@@ -78,26 +78,26 @@ Available documentation types:
 - `"deployment"` - Deploy frontend applications via MCP tool
 - `"payments"` - Stripe Checkout, Billing Portal, webhook projections, and fulfillment patterns
 
-These documentations are mostly for TypeScript SDK. For other languages, you can also use `fetch-sdk-docs` mcp tool to get specific documentation.
+These docs are mostly for the TypeScript SDK. For other languages, you can also use the `fetch-sdk-docs` MCP tool to get specific documentation.
 
 ### Use the InsForge `fetch-sdk-docs` MCP tool to get specific SDK documentation
 
-You can fetch sdk documentation using the `fetch-sdk-docs` MCP tool with specific feature type and language.
+You can fetch SDK documentation using the `fetch-sdk-docs` MCP tool with a specific feature type and language.
 
 Available feature types:
-- db - Database operations
-- storage - File storage operations
-- functions - Serverless functions invocation
-- auth - User authentication
-- ai - AI integration with the provisioned OpenRouter key and OpenAI SDK
-- realtime - Real-time pub/sub (database + client events) via WebSockets
-- payments - Stripe Checkout and Billing Portal with webhook-based fulfillment
+- `db` - Database operations
+- `storage` - File storage operations
+- `functions` - Serverless functions invocation
+- `auth` - User authentication
+- `ai` - AI integration with the provisioned OpenRouter key and OpenAI SDK
+- `realtime` - Real-time pub/sub (database + client events) via WebSockets
+- `payments` - Stripe Checkout and Billing Portal with webhook-based fulfillment
 
 Available languages:
-- typescript - JavaScript/TypeScript SDK
-- swift - Swift SDK (for iOS, macOS, tvOS, and watchOS)
-- kotlin - Kotlin SDK (for Android and JVM applications)
-- rest-api - REST API
+- `typescript` - JavaScript/TypeScript SDK
+- `swift` - Swift SDK (for iOS, macOS, tvOS, and watchOS)
+- `kotlin` - Kotlin SDK (for Android and JVM applications)
+- `rest-api` - REST API
 
 Payments currently has TypeScript SDK docs only. Use the Payments API reference for non-TypeScript clients.
 
@@ -126,7 +126,7 @@ Payments currently has TypeScript SDK docs only. Use the Payments API reference 
 - For auth: use `auth-sdk` for custom UI, or framework-specific components for pre-built UI
 - SDK returns `{data, error}` structure for all operations
 - Database inserts require array format: `[{...}]`
-- Serverless functions have single endpoint (no subpaths)
+- Serverless functions have one endpoint and do not support nested route paths
 - Storage: Upload files to buckets, store URLs in database
 - AI integrations should call OpenRouter directly with `baseURL: "https://openrouter.ai/api/v1"` and a server-side `OPENROUTER_API_KEY`
 - **EXTRA IMPORTANT**: Use Tailwind CSS 3.4 (do not upgrade to v4). Lock these dependencies in `package.json`

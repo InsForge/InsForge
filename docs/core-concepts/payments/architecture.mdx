@@ -187,12 +187,12 @@ Handled event groups:
 
 | Event group | Projection updates |
 |-------------|--------------------|
-| `customer.*` | Upserts or marks rows in `payments.customers`; customer deletion removes subject mappings for that Stripe customer. |
+| `customer.*` | Creates, updates, or marks rows in `payments.customers`; customer deletion removes subject mappings for that Stripe customer. |
 | `checkout.session.*` | Updates checkout session status, writes customer mappings, and can create one-time payment history. |
 | `payment_intent.*` | Records succeeded or failed one-time payment history when the intent came from an InsForge payment checkout. |
 | `invoice.*` | Records subscription invoice success or failure. |
 | `charge.refunded` and `refund.*` | Records refund rows and updates original payment refund state. |
-| `customer.subscription.*` | Upserts subscription and subscription item projections. |
+| `customer.subscription.*` | Creates or updates subscription and subscription item projections. |
 
 Events outside the handled set are marked `ignored`.
 

@@ -20,7 +20,7 @@ Call `create-deployment` with:
 | `projectSettings.installCommand` | No | Install command, for example `npm install` or `pnpm install`. |
 | `projectSettings.devCommand` | No | Development command metadata for framework-aware builds. |
 | `projectSettings.rootDirectory` | No | Root directory inside the uploaded source tree. |
-| `envVars` | No | Array of `{ "key": "...", "value": "..." }` variables to upsert before build. |
+| `envVars` | No | Array of `{ "key": "...", "value": "..." }` variables to create or update before build. |
 | `meta` | No | String key-value metadata for provider deployment creation. |
 
 Example:
@@ -52,7 +52,7 @@ Important:
 
 - `sourceDirectory` must be an absolute path.
 - Upload app source files, not only `dist`, unless the project is intentionally a plain static site.
-- Include framework files needed by Vercel, such as `package.json`, lockfile, framework config, and `vercel.json` when needed.
+- Include framework files needed by Vercel, such as `package.json`, lock file, framework config, and `vercel.json` when needed.
 - Prefix browser-exposed variables correctly, for example `VITE_` for Vite and `NEXT_PUBLIC_` for Next.js.
 - Do not put service-role keys, admin tokens, or private provider keys in browser-exposed variables.
 - Tailwind projects should stay on Tailwind CSS 3.4 unless the app already supports v4.
@@ -125,7 +125,7 @@ You can pass `envVars` during deployment or manage them from the Dashboard. Depl
 Rules:
 
 - Lists show keys and metadata only. Values are hidden unless a single variable is fetched for editing.
-- Duplicate keys in one upsert request are rejected.
+- Duplicate keys in one create-or-update request are rejected.
 - Values are applied to `production`, `preview`, and `development` targets.
 - Use public prefixes only for values that browser code may read.
 
@@ -154,7 +154,7 @@ Do not add this rewrite to frameworks that already own routing, such as Next.js.
 | Upload fails with content type error | Direct file upload must use `application/octet-stream`. |
 | Upload fails with size or SHA mismatch | Recompute the manifest from the exact bytes being uploaded. |
 | Start fails before provider build | Query `deployments.files` and confirm every row has `uploaded_at`. |
-| Build cannot find scripts | Confirm `package.json`, lockfile, root directory, and build command. |
+| Build cannot find scripts | Confirm `package.json`, lock file, root directory, and build command. |
 | SPA route returns 404 | Add the `vercel.json` rewrite for static SPA apps. |
 | Provider rate limit | Retry the failed upload/start step with a fresh request. |
 

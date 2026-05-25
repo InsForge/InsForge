@@ -260,10 +260,6 @@
             "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/realtime.yaml"
           },
           {
-            "group": "Deployments",
-            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/deployments.yaml"
-          },
-          {
             "group": "Messaging",
             "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/email.yaml"
           },

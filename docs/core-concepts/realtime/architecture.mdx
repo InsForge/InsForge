@@ -39,7 +39,7 @@ Channels are configured in `realtime.channels`.
 |---------|---------|----------|
 | `orders` | `orders` | One shared channel |
 | `order:%` | `order:123`, `order:456` | Per-record channels |
-| `chat:%:messages` | `chat:room-1:messages` | Namespaced rooms |
+| `chat:%:messages` | `chat:room-1:messages` | Scoped rooms |
 
 Pattern matching uses SQL `LIKE`. Use `%` as the wildcard. Use `:` as the path separator. Channel patterns may contain letters, numbers, hyphens, colons, and `%`; `_` is intentionally rejected because it is also a SQL wildcard.
 
@@ -73,7 +73,7 @@ The raw Socket.IO endpoint is the project origin, for example `https://your-app.
 
 Client-to-server events:
 
-| Event | Payload | Ack |
+| Event | Payload | Acknowledgement |
 |-------|---------|-----|
 | `realtime:subscribe` | `{ channel }` | `{ ok, channel, presence?, error? }` |
 | `realtime:unsubscribe` | `{ channel }` | None |
@@ -94,7 +94,7 @@ Delivered messages include your payload fields plus a `meta` object with `messag
 
 Presence is ephemeral online state. It is not stored in Postgres.
 
-On a successful subscribe, the ack includes the current presence snapshot:
+On a successful subscribe, the server acknowledgement includes the current presence snapshot:
 
 ```json
 {
@@ -177,7 +177,7 @@ Webhook requests include:
 | `X-InsForge-Channel` | Resolved channel name |
 | `X-InsForge-Message-Id` | Message UUID |
 
-Network failures are retried twice with short backoff. Non-2xx HTTP responses are recorded as failed deliveries and are not retried.
+Network failures are retried twice with a short retry delay. Non-2xx HTTP responses are recorded as failed deliveries and are not retried.
 
 ## Message History And Retention
 
