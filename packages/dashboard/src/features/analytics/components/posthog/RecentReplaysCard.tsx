@@ -1,10 +1,17 @@
 import { useState } from 'react';
-import { useRecordings } from '#features/analytics/hooks/useRecordings';
+import type { PosthogRecordingItem } from '@insforge/shared-schemas';
 import { formatDuration, formatRelativeTime, truncateId } from '#features/analytics/lib/format';
 import { ReplayModal } from './ReplayModal';
 
-export function RecentReplaysCard({ enabled }: { enabled: boolean }) {
-  const { data, isLoading, error } = useRecordings(10, enabled);
+export function RecentReplaysCard({
+  items,
+  isLoading,
+  error,
+}: {
+  items: PosthogRecordingItem[];
+  isLoading: boolean;
+  error: unknown;
+}) {
   const [openId, setOpenId] = useState<string | null>(null);
 
   if (isLoading) {
@@ -25,7 +32,6 @@ export function RecentReplaysCard({ enabled }: { enabled: boolean }) {
     );
   }
 
-  const items = data?.items ?? [];
   if (items.length === 0) {
     return (
       <div className="rounded-lg bg-card p-4">
