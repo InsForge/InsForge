@@ -111,4 +111,22 @@ describe('records empty-string stripping', () => {
       );
     });
   });
+
+  describe('USER-DEFINED type normalization', () => {
+    it('citext resolved via udt_name is preserved (matches DatabaseManager normalization)', () => {
+      // DatabaseManager.getColumnTypeMap now normalizes USER-DEFINED → udt_name,
+      // so the columnTypeMap will contain 'citext' not 'USER-DEFINED'.
+      const normalizedMap = { note: 'citext' };
+      const result = filterRecord({ note: '' }, normalizedMap);
+      expect(result).toHaveProperty('note', '');
+    });
+
+    it('raw USER-DEFINED without normalization would incorrectly strip (regression guard)', () => {
+      // If normalization were missing, the map would contain 'USER-DEFINED'
+      // which is NOT in TEXT_LIKE_DATA_TYPES, so empty strings would be stripped.
+      const rawMap = { note: 'USER-DEFINED' };
+      const result = filterRecord({ note: '' }, rawMap);
+      expect(result).not.toHaveProperty('note');
+    });
+  });
 });
