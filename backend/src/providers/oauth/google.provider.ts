@@ -74,12 +74,6 @@ export class GoogleOAuthProvider implements OAuthProvider {
     );
     authUrl.searchParams.set('access_type', 'offline');
 
-    // Merge extra authorize params from config
-    if (config.extraAuthorizeParams) {
-      Object.entries(config.extraAuthorizeParams).forEach(([key, value]) => {
-        authUrl.searchParams.set(key, value);
-      });
-    }
     if (state) {
       authUrl.searchParams.set('state', state);
     }

@@ -86,7 +86,6 @@ export const oAuthConfigSchema = z.object({
   scopes: z.array(z.string()).optional(),
   redirectUri: z.string().optional(),
   useSharedKey: z.boolean(),
-  extraAuthorizeParams: z.record(z.string()).optional(), // Custom OAuth params like prompt=select_account
   createdAt: z.string(), // PostgreSQL timestamp
   updatedAt: z.string(), // PostgreSQL timestamp
 });

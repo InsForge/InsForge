@@ -12,7 +12,6 @@ export interface CreateOAuthConfigInput {
   redirectUri?: string;
   scopes?: string[];
   useSharedKey?: boolean;
-  extraAuthorizeParams?: Record<string, string>;
 }
 
 export interface UpdateOAuthConfigInput {
@@ -21,7 +20,6 @@ export interface UpdateOAuthConfigInput {
   redirectUri?: string;
   scopes?: string[];
   useSharedKey?: boolean;
-  extraAuthorizeParams?: Record<string, string>;
 }
 
 export class OAuthConfigService {
@@ -62,7 +60,6 @@ export class OAuthConfigService {
           scopes,
           use_shared_key as "useSharedKey",
           created_at as "createdAt",
-          extra_authorize_params as "extraAuthorizeParams",
           updated_at as "updatedAt"
          FROM auth.oauth_configs
          ORDER BY provider ASC`
@@ -109,7 +106,6 @@ export class OAuthConfigService {
           scopes,
           use_shared_key as "useSharedKey",
           created_at as "createdAt",
-          extra_authorize_params as "extraAuthorizeParams",
           updated_at as "updatedAt"
          FROM auth.oauth_configs
          WHERE LOWER(provider) = LOWER($1)
@@ -241,8 +237,8 @@ export class OAuthConfigService {
 
       // Create new OAuth config
       const result = await client.query(
-        `INSERT INTO auth.oauth_configs (provider, client_id, secret_id, redirect_uri, scopes, use_shared_key, extra_authorize_params)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `INSERT INTO auth.oauth_configs (provider, client_id, secret_id, redirect_uri, scopes, use_shared_key)
+         VALUES ($1, $2, $3, $4, $5, $6, $6)
          RETURNING
            id,
            provider,
@@ -250,7 +246,6 @@ export class OAuthConfigService {
            redirect_uri as "redirectUri",
            scopes,
            use_shared_key as "useSharedKey",
-          extra_authorize_params as "extraAuthorizeParams",
            created_at as "createdAt",
            updated_at as "updatedAt"`,
         [
@@ -260,7 +255,6 @@ export class OAuthConfigService {
           null, // Deprecating redirect_uri
           scopes,
           input.useSharedKey || false,
-          input.extraAuthorizeParams || null,
         ]
       );
 
@@ -357,11 +351,6 @@ export class OAuthConfigService {
         values.push(input.useSharedKey);
       }
 
-      if (input.extraAuthorizeParams !== undefined) {
-        updates.push(`extra_authorize_params = $${paramCount++}`);
-        values.push(input.extraAuthorizeParams);
-      }
-
       if (!updates.length && input.clientSecret === undefined) {
         await client.query('COMMIT');
         // Return the config in the correct format
@@ -388,7 +377,6 @@ export class OAuthConfigService {
              scopes,
              use_shared_key as "useSharedKey",
              created_at as "createdAt",
-          extra_authorize_params as "extraAuthorizeParams",
              updated_at as "updatedAt"`,
           values
         );
