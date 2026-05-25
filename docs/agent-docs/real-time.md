@@ -7,7 +7,7 @@
 - Ephemeral presence on subscribed channels.
 - Webhook fan-out for messages published to a channel.
 
-Realtime delivers events to subscribed clients and configured webhook URLs. If backend code must perform work after a database change, such as sending email, writing another table, or calling an API, put that work in an Edge Function and invoke it from a database trigger.
+Realtime delivers events to subscribed clients and configured webhook URLs. If server-side code must perform work after a database change, such as sending email, writing another table, or calling an API, put that work in an Edge Function and invoke it from a database trigger.
 
 ## Mental Model
 
@@ -35,7 +35,7 @@ You can also create channels in the Dashboard Realtime page.
 
 ### 2. Publish Database Changes
 
-Create a trigger function that calls `realtime.publish(channel, event, payload)`.
+Create a trigger on the app table you want to watch. In the trigger function, call `realtime.publish(channel, event, payload)` to choose the channel, event name, and payload.
 
 ```sql
 CREATE OR REPLACE FUNCTION notify_order_status()
@@ -92,7 +92,7 @@ USING (
 );
 ```
 
-Publish is controlled by `INSERT` policies on `realtime.messages`. The WebSocket client publish path inserts without `RETURNING`, so client publish does not require a `SELECT` policy on `realtime.messages` in the current backend. Database-triggered publishes use the `SECURITY DEFINER` `realtime.publish()` function and return only the message ID to the trigger.
+Publish is controlled by `INSERT` policies on `realtime.messages`:
 
 ```sql
 CREATE POLICY "members_publish_chat"

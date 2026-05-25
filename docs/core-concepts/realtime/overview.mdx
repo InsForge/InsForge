@@ -4,14 +4,14 @@ sidebarTitle: "Overview"
 description: "Send database changes, broadcasts, presence, and webhook fan-out through realtime channels."
 ---
 
-Use InsForge Realtime when your app needs to update without a page refresh. Clients subscribe to channels such as `orders:123` or `chat:room-1`, then receive database changes, broadcasts, and presence updates over WebSockets. Channels can also fan out the same messages to webhook URLs when another backend should receive the event.
+Use InsForge Realtime when your app needs to update without a page refresh. Clients subscribe to channels such as `orders:123` or `chat:room-1`, then receive database changes, broadcasts, and presence updates over WebSockets. Channels can also fan out the same messages to webhook URLs when another service should receive the event.
 
 <Frame caption="Realtime dashboard: channel patterns, message history, permissions, and retention settings.">
   <img src="/images/realtime-dashboard-placeholder.svg" alt="Placeholder for the InsForge Realtime dashboard screenshot" />
 </Frame>
 
 <Note>
-  **Need code to run after a database change?** Put that business logic in an [Edge Function](/core-concepts/functions/overview) and trigger it from the database. Realtime delivers events to browsers, mobile apps, and webhook endpoints; it does not replace server-side jobs.
+  **Need server-side code to run after a database change?** Put that business logic in an [Edge Function](/core-concepts/functions/overview) and invoke it from a database trigger. Use Realtime when the change should be delivered to connected clients or configured webhook endpoints.
 </Note>
 
 ```mermaid
@@ -49,23 +49,23 @@ Channels are named topics that clients can join. Use exact names for shared room
 
 ### Database changes
 
-Use database changes when a table write should become a live app event. A Postgres trigger calls `realtime.publish(channel, event, payload)`, which records the message and notifies the realtime service. You choose the channel, event name, and payload, so clients receive domain events like `status_changed` instead of a raw row replication stream.
+Use database changes when a table write should become a live app event. Create a trigger on the table you want to watch. In its trigger function, call the predefined `realtime.publish(channel, event, payload)` function to decide which channel receives the message, which event name clients handle, and what payload they receive.
 
 ### Client broadcasts
 
 Clients can publish messages to channels they have already joined. Use this for chat, typing indicators, cursors, collaborative editing signals, and other user-to-user updates that do not need to start from a database write.
 
+### Webhooks
+
+Attach webhook URLs to a channel when another service should receive each message. InsForge posts the event payload to every configured URL, includes headers for the event name, channel, and message ID, retries transient network failures, and records webhook delivery counts in message history.
+
 ### Presence
 
 Presence tracks who is online in a channel. Clients receive the current member snapshot when they subscribe, then `presence:join` and `presence:leave` events as members come and go. Store durable room membership, roles, and permissions in your own tables; presence is only online state.
 
-### Webhooks
-
-Attach webhook URLs to a channel when another server should receive each message. InsForge posts the event payload to every configured URL, includes headers for the event name, channel, and message ID, retries transient network failures, and records webhook delivery counts in message history.
-
 ### Row-level security
 
-Realtime can be open while prototyping, then locked down with Postgres RLS. Subscribe checks run `SELECT` against `realtime.channels`; client publish checks run `INSERT` against `realtime.messages`. The client publish path does not return the inserted row, while database-triggered publishes use the backend-owned `realtime.publish()` function.
+Realtime can be open while prototyping, then locked down with Postgres RLS. Use `SELECT` policies on `realtime.channels` to control who can subscribe, and `INSERT` policies on `realtime.messages` to control who can publish from a client.
 
 ### Message history
 
@@ -96,4 +96,4 @@ Every delivered event is recorded with WebSocket and webhook delivery counts. Th
 - Set up the [CLI](/quickstart) to link your project.
 - Create channels in the Realtime dashboard.
 - Use the [TypeScript SDK reference](/sdks/typescript/realtime) for client subscriptions.
-- Add webhook URLs to a channel when another backend needs the same event stream.
+- Add webhook URLs to a channel when another service needs the same event stream.
