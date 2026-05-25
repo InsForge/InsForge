@@ -25,11 +25,9 @@ flowchart TB
     Source --> Vercel[Vercel production build]
     Config --> Vercel
 
-    Vercel --> Result[Hosted URLs and deployment status]
-    Result --> History[Deployment history]
-    Result --> URL[Public URL]
-    URL --> App[Frontend website]
-    App --> Project[InsForge APIs]
+    Vercel --> App[Frontend app]
+    App --> URL[Hosted URLs]
+    App --> Status[Status and deployment history]
 
     style CLI fill:#1e293b,stroke:#475569,color:#e2e8f0
     style Dashboard fill:#1e293b,stroke:#475569,color:#e2e8f0
@@ -37,11 +35,9 @@ flowchart TB
     style Source fill:#0e7490,stroke:#06b6d4,color:#cffafe
     style Config fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
     style Vercel fill:#c2410c,stroke:#fb923c,color:#fed7aa
-    style Result fill:#166534,stroke:#22c55e,color:#dcfce7
-    style History fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
+    style App fill:#166534,stroke:#22c55e,color:#dcfce7
     style URL fill:#166534,stroke:#22c55e,color:#dcfce7
-    style App fill:#1e293b,stroke:#475569,color:#e2e8f0
-    style Project fill:#0e7490,stroke:#06b6d4,color:#cffafe
+    style Status fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
 ```
 
 ## Features
@@ -51,16 +47,12 @@ flowchart TB
 Deploy from your app's source directory. The CLI uploads the source tree, skips local-only files such as `node_modules`, `.git`, build output, and `.env` files, then starts the Vercel build through InsForge.
 
 ```bash
-npx @insforge/cli deployments deploy <source_directory>
+npx @insforge/cli deployments deploy path/to/frontend
 ```
 
 ### Framework builds
 
-Deploy React, Vue, Svelte, Next.js, and other frontend frameworks. InsForge sends the source files to Vercel, where framework detection and project files such as `package.json` and `vercel.json` decide how the app builds.
-
-```bash
-npx @insforge/cli deployments deploy ./frontend
-```
+Deploy React, Vue, Svelte, Next.js, static sites, and other frontend projects. InsForge sends the source files to Vercel, where framework detection and project files such as `package.json` and `vercel.json` decide how the app builds.
 
 ### Environment variables
 
@@ -102,4 +94,4 @@ Every ready deployment gets a default URL at `https://<appkey>.insforge.site`. Y
 
 - Set up the [CLI](/quickstart) and connect your project.
 - Add browser-safe environment variables from the dashboard or with `npx @insforge/cli deployments env set`.
-- Run `npx @insforge/cli deployments deploy <source_directory>` with the frontend source directory.
+- Run `npx @insforge/cli deployments deploy path/to/frontend` with the frontend source directory.
