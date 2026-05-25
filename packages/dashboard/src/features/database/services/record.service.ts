@@ -280,24 +280,41 @@ export class RecordService {
   async exportTableAsCSV(
     tableName: string,
     schemaName: string = DEFAULT_DATABASE_SCHEMA
-  ): Promise<void> {
-    // Fetch all records from the table (with pagination to ensure we get all data)
+  ): Promise<{ limited: boolean }> {
+    // Export limit to prevent browser crashes on large tables
+    const MAX_EXPORT_ROWS = 10_000;
     // Backend API max limit is 500 records per request
     const limit = 500;
     const allRecords: { [key: string]: ConvertedValue }[] = [];
     let offset = 0;
-    let hasMore = true;
+    let isLimited = false;
 
-    while (hasMore) {
+    while (allRecords.length < MAX_EXPORT_ROWS) {
       const { records } = await this.getTableRecords(tableName, schemaName, limit, offset);
 
-      allRecords.push(...records);
+      if (records.length === 0) {
+        break;
+      }
+
+      // Only take what we need up to the limit
+      const remaining = MAX_EXPORT_ROWS - allRecords.length;
+      allRecords.push(...records.slice(0, remaining));
+
+      // Check if we've hit the limit or exhausted records
+      if (allRecords.length >= MAX_EXPORT_ROWS) {
+        isLimited = true;
+        break;
+      }
 
       if (records.length < limit) {
-        hasMore = false;
-      } else {
-        offset += limit;
+        break;
       }
+
+      offset += limit;
+    }
+
+    if (allRecords.length === 0) {
+      throw new Error('No records found in this table. Cannot export an empty table.');
     }
 
     // Generate filename with timestamp
@@ -306,6 +323,8 @@ export class RecordService {
 
     // Convert and download
     convertToCSV(allRecords, filename);
+
+    return { limited: isLimited };
   }
 }
 

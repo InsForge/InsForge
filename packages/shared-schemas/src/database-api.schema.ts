@@ -203,7 +203,7 @@ export const exportJsonDataSchema = z.object({
 });
 
 export const exportResponseSchema = z.object({
-  format: z.enum(['sql', 'json', 'csv']),
+  format: z.enum(['sql', 'json']),
   data: z.union([z.string(), exportJsonDataSchema]),
   timestamp: z.string(),
 });

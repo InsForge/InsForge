@@ -250,6 +250,9 @@ export default function TablesPage() {
       showToast('Export successful!', 'success');
       resetExport();
     },
+    onWarning: (message: string) => {
+      showToast(message, 'warn');
+    },
     onError: (error: Error) => {
       const message =
         error?.message || 'An unexpected error occurred during export. Please try again.';
@@ -607,20 +610,20 @@ export default function TablesPage() {
                               {isImporting ? 'Importing...' : 'Import CSV'}
                             </span>
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 rounded px-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] hover:text-foreground active:bg-[var(--alpha-8)]"
-                            onClick={() => exportCSV()}
-                            disabled={isExporting}
-                          >
-                            <FolderOutput className="h-6 w-6 stroke-[1.5]" />
-                            <span className="px-1 text-sm font-medium leading-5">
-                              {isExporting ? 'Exporting...' : 'Export CSV'}
-                            </span>
-                          </Button>
                         </>
                       )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 rounded px-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] hover:text-foreground active:bg-[var(--alpha-8)]"
+                        onClick={() => exportCSV()}
+                        disabled={isExporting}
+                      >
+                        <FolderOutput className="h-6 w-6 stroke-[1.5]" />
+                        <span className="px-1 text-sm font-medium leading-5">
+                          {isExporting ? 'Exporting...' : 'Export CSV'}
+                        </span>
+                      </Button>
                     </div>
                   )
                 }

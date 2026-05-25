@@ -2,10 +2,6 @@
  * Converts records to CSV format with proper escaping
  */
 export function convertToCSV(records: Record<string, unknown>[], filename: string): void {
-  if (records.length === 0) {
-    return;
-  }
-
   // Get headers from first record
   const headers = Object.keys(records[0]);
 
@@ -21,12 +17,12 @@ export function convertToCSV(records: Record<string, unknown>[], filename: strin
   const csv = [csvHeader, ...csvRows].join('\n');
 
   // Create blob and download
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8;' });
   downloadFile(blob, filename);
 }
 
 /**
- * Escapes CSV field values to handle commas, quotes, and newlines
+ * Escapes CSV field values to handle commas, quotes, newlines, and formula injection
  */
 function escapeCSVField(field: unknown): string {
   if (field === null || field === undefined) {
@@ -35,8 +31,14 @@ function escapeCSVField(field: unknown): string {
 
   let value = String(field);
 
+  // Sanitize formula injection: prefix dangerous characters with single quote
+  // Values starting with =, +, -, or @ can execute formulas in spreadsheet tools
+  if (value.match(/^[=+\-@]/)) {
+    value = `'${value}`;
+  }
+
   // If field contains comma, newline, or double quote, wrap in quotes and escape inner quotes
-  if (value.includes(',') || value.includes('\n') || value.includes('"')) {
+  if (value.includes(',') || value.includes('\n') || value.includes('"') || value.includes('\r')) {
     value = `"${value.replace(/"/g, '""')}"`;
   }
 
