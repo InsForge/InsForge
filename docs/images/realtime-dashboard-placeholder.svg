@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" role="img" aria-labelledby="title desc">
+  <title id="title">Realtime dashboard screenshot placeholder</title>
+  <desc id="desc">Placeholder image for the InsForge Realtime dashboard.</desc>
+  <rect width="1440" height="900" fill="#f8fafc"/>
+  <rect x="64" y="64" width="1312" height="772" rx="28" fill="#ffffff" stroke="#d7dee8"/>
+  <rect x="64" y="64" width="220" height="772" rx="28" fill="#0f172a"/>
+  <text x="104" y="130" fill="#e2e8f0" font-family="Inter, Arial, sans-serif" font-size="30" font-weight="700">Realtime</text>
+  <rect x="104" y="178" width="140" height="38" rx="10" fill="#1d4ed8"/>
+  <text x="128" y="203" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="16">Channels</text>
+  <text x="128" y="259" fill="#94a3b8" font-family="Inter, Arial, sans-serif" font-size="16">Messages</text>
+  <text x="128" y="313" fill="#94a3b8" font-family="Inter, Arial, sans-serif" font-size="16">Permissions</text>
+  <rect x="332" y="118" width="328" height="42" rx="12" fill="#e0f2fe"/>
+  <text x="356" y="145" fill="#075985" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">Channel patterns</text>
+  <rect x="332" y="200" width="992" height="86" rx="16" fill="#f1f5f9"/>
+  <text x="368" y="252" fill="#0f172a" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="700">order:%</text>
+  <text x="560" y="252" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="18">Per-order status updates</text>
+  <rect x="1160" y="228" width="84" height="30" rx="15" fill="#dcfce7"/>
+  <text x="1184" y="249" fill="#166534" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="700">Enabled</text>
+  <rect x="332" y="314" width="992" height="86" rx="16" fill="#f8fafc" stroke="#e2e8f0"/>
+  <text x="368" y="366" fill="#0f172a" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="700">chat:%</text>
+  <text x="560" y="366" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="18">Room broadcasts and presence</text>
+  <rect x="332" y="458" width="470" height="250" rx="18" fill="#f8fafc" stroke="#e2e8f0"/>
+  <text x="368" y="510" fill="#0f172a" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="700">Message history</text>
+  <rect x="368" y="552" width="360" height="16" rx="8" fill="#cbd5e1"/>
+  <rect x="368" y="592" width="300" height="16" rx="8" fill="#e2e8f0"/>
+  <rect x="368" y="632" width="390" height="16" rx="8" fill="#e2e8f0"/>
+  <rect x="854" y="458" width="470" height="250" rx="18" fill="#f8fafc" stroke="#e2e8f0"/>
+  <text x="890" y="510" fill="#0f172a" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="700">Presence and RLS</text>
+  <circle cx="916" cy="570" r="18" fill="#2563eb"/>
+  <circle cx="968" cy="570" r="18" fill="#16a34a"/>
+  <circle cx="1020" cy="570" r="18" fill="#9333ea"/>
+  <rect x="890" y="626" width="338" height="16" rx="8" fill="#cbd5e1"/>
+</svg>

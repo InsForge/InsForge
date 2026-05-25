@@ -68,8 +68,7 @@
               {
                 "group": "Realtime",
                 "pages": [
-                  "core-concepts/realtime/overview",
-                  "core-concepts/realtime/architecture"
+                  "core-concepts/realtime/overview"
                 ]
               },
               {
@@ -88,8 +87,7 @@
               {
                 "group": "Deployments",
                 "pages": [
-                  "core-concepts/deployments/overview",
-                  "core-concepts/deployments/architecture"
+                  "core-concepts/deployments/overview"
                 ]
               },
               {
@@ -103,7 +101,6 @@
                 "group": "Payments (Private Preview)",
                 "pages": [
                   "core-concepts/payments/overview",
-                  "core-concepts/payments/architecture",
                   "core-concepts/payments/cli"
                 ]
               },

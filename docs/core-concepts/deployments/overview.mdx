@@ -1,13 +1,17 @@
 ---
 title: "Deployments"
 sidebarTitle: "Overview"
-description: "Build and host frontend apps through InsForge's Vercel-backed deployment pipeline."
+description: "Build and host frontend apps from your InsForge project."
 ---
 
-Use InsForge Deployments to ship the browser-facing application that belongs to your project. A deployment run uploads source files through InsForge, asks the configured Vercel project to build them, and stores the resulting status and URL in `deployments.runs`.
+Use InsForge Deployments to ship the browser-facing app that belongs to your project. A connected agent, CLI, or custom tool uploads your frontend source, InsForge starts a provider build, and the dashboard tracks the live URL, status, logs, environment variables, and domains.
+
+<Frame caption="Deployments dashboard: live preview, latest deployment, custom domains, and deployment history.">
+  <img src="/images/deployments-dashboard-placeholder.svg" alt="Placeholder for the InsForge Deployments dashboard screenshot" />
+</Frame>
 
 <Note>
-  **Need a long-running backend service?** Use [Compute](/core-concepts/compute/overview) for workers, queues, websocket servers, and other always-on processes. Deployments are for hosted frontend apps and framework builds.
+  **Need an always-on backend process?** Use [Compute](/core-concepts/compute/overview) for workers, queues, WebSocket servers, and long-running services. Deployments are for hosted frontend apps and framework builds.
 </Note>
 
 ```mermaid
@@ -15,104 +19,78 @@ graph TB
     Agent[Coding agent or CLI] --> API[InsForge deployment API]
     Dashboard[Dashboard] --> API
 
-    API --> Manifest[File manifest]
-    Manifest --> Uploads[Direct file uploads]
-    Uploads --> Vercel[Vercel project]
-    API --> Runs[(deployments.runs)]
-    API --> Files[(deployments.files)]
+    API --> Source[Frontend source files]
+    Source --> Build[Provider build]
+    Build --> URL[Live URL]
 
-    Vercel --> Live[Live deployment URL]
-    Live --> App[Your frontend app]
-    App --> Project[InsForge project APIs]
+    Dashboard --> Logs[Deployment history]
+    Dashboard --> Env[Environment variables]
+    Dashboard --> Domains[Custom domains]
+
+    URL --> App[Your frontend app]
+    App --> Project[InsForge APIs]
 
     style Agent fill:#1e293b,stroke:#475569,color:#e2e8f0
     style Dashboard fill:#1e293b,stroke:#475569,color:#e2e8f0
     style API fill:#166534,stroke:#22c55e,color:#dcfce7
-    style Manifest fill:#0e7490,stroke:#06b6d4,color:#cffafe
-    style Uploads fill:#0e7490,stroke:#06b6d4,color:#cffafe
-    style Runs fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
-    style Files fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
-    style Vercel fill:#c2410c,stroke:#fb923c,color:#fed7aa
-    style Live fill:#166534,stroke:#22c55e,color:#dcfce7
+    style Source fill:#0e7490,stroke:#06b6d4,color:#cffafe
+    style Build fill:#c2410c,stroke:#fb923c,color:#fed7aa
+    style URL fill:#166534,stroke:#22c55e,color:#dcfce7
+    style Logs fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
+    style Env fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
+    style Domains fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
     style App fill:#1e293b,stroke:#475569,color:#e2e8f0
     style Project fill:#0e7490,stroke:#06b6d4,color:#cffafe
 ```
 
-## How It Works
+## Features
 
-### Source upload is the default path
+### Agent-native deploys
 
-Agents and tooling deploy by registering a file manifest, streaming each file through InsForge to Vercel, then starting the deployment. The backend verifies every path, file size, and SHA-1 digest before a run can build.
+Connected agents can deploy the app they just built. They upload source files, pass build settings when needed, and start a production build without leaving the development loop.
 
-The older source-zip flow still exists for backward compatibility, but new tools should use direct uploads.
+### Framework builds
 
-### Vercel does the build
+Deploy React, Vue, Svelte, Next.js, and other frontend frameworks. Build commands, install commands, root directories, and output directories can be supplied when the default framework detection is not enough.
 
-InsForge creates production deployments in the configured Vercel project. You can pass `buildCommand`, `installCommand`, `outputDirectory`, `devCommand`, and `rootDirectory` when starting a run. If a setting is omitted, Vercel uses its framework detection and project defaults.
+### Live preview
 
-### Status is stored in Postgres
+The dashboard shows the latest ready deployment with a preview, status, provider, creation time, and visit link.
 
-Each deployment run moves through InsForge upload states and provider build states:
+### Deployment history
 
-`WAITING` -> `UPLOADING` -> `QUEUED` -> `BUILDING` -> `READY`
+Review previous runs, sync provider status, inspect metadata, and cancel in-progress deployments from the Deployment Logs page.
 
-Failures end in `ERROR`. Canceled runs end in `CANCELED`. The Dashboard reads the same `deployments.runs` records that the API returns.
+### Environment variables
 
-### Environment variables live on the provider
+Manage provider environment variables from the dashboard. Use public prefixes such as `VITE_` or `NEXT_PUBLIC_` only for values that are safe to expose in browser code.
 
-Deployment environment variables are stored in Vercel as encrypted variables for `production`, `preview`, and `development` targets. Listing variables returns keys and metadata only. A single-variable fetch returns the decrypted value for editing.
+### Domains
 
-You can also include `envVars` in a start request when a deployment needs variables created or updated before the build begins.
+Use the provider URL immediately, set an InsForge-managed `.insforge.site` slug, or attach your own custom domain and follow the DNS verification hints in the dashboard.
 
-### Domains are managed after a successful deploy
+### Self-hosting support
 
-Every ready deployment has a provider URL. InsForge Cloud projects can also set a custom `.insforge.site` slug and manage user-owned domains from the Dashboard. User-owned domains return the DNS records needed for verification, including CNAME, A record, and provider verification records when required.
+InsForge Cloud includes deployment provider wiring. Self-hosted instances need provider credentials configured before deployments can start.
 
-## Dashboard
-
-The Dashboard exposes the deployment workflow in four areas:
-
-| Page | What it shows |
-|------|---------------|
-| Overview | The latest ready deployment, preview iframe, status, and visit link |
-| Deployment Logs | Deployment history, status filters, sync, and cancel actions |
-| Environment Variables | Provider environment variable keys, add/edit flow, and delete actions |
-| Domains | Default URL, `.insforge.site` slug, custom domains, DNS records, and verification |
-
-## Self-Hosting
-
-InsForge Cloud retrieves deployment credentials from the InsForge control plane. Self-hosted instances need Vercel credentials in the backend environment:
-
-```env
-VERCEL_TOKEN=
-VERCEL_TEAM_ID=
-VERCEL_PROJECT_ID=
-```
-
-The legacy zip endpoint, `POST /api/deployments`, also requires S3-compatible storage for the source zip. Direct uploads do not use the deployment S3 bucket.
-
-## Limits
-
-Direct upload deployments default to:
-
-| Limit | Default |
-|-------|---------|
-| Files per deployment | `5000` |
-| Total source size | `100 MB` |
-| Single file size | `100 MB` |
-
-Self-hosted operators can override these with `MAX_DEPLOYMENT_FILES`, `MAX_DEPLOYMENT_TOTAL_BYTES`, and `MAX_DEPLOYMENT_FILE_BYTES`.
-
-## Concepts
+## Deploy with it
 
 <CardGroup cols={2}>
-  <Card title="Architecture" icon="diagram-project" href="/core-concepts/deployments/architecture">
-    Direct upload flow, provider state, tables, status transitions, environment variables, and domains.
+  <Card title="Agent deployment guide" icon="terminal" href="/agent-docs/deployment">
+    Instructions for agents that deploy frontend source through InsForge.
+  </Card>
+
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Connect your project and start using InsForge from the CLI.
+  </Card>
+
+  <Card title="Compute" icon="server" href="/core-concepts/compute/overview">
+    Use Compute when the app needs a long-running backend process.
   </Card>
 </CardGroup>
 
-## Next Steps
+## Next steps
 
-- Read the [architecture guide](/core-concepts/deployments/architecture) for the runtime model.
-- Use the Dashboard's Deployments page to inspect the latest deployed app.
-- Use the API reference when building deployment tooling outside the MCP and CLI paths.
+- Set up the [CLI](/quickstart) and connect your project.
+- Ask your connected agent to deploy the frontend app.
+- Add browser-safe environment variables before deploying production builds.

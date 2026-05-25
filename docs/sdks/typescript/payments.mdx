@@ -26,7 +26,7 @@ npx @insforge/cli payments catalog --environment test
 ```
 
 <Note>
-  See [Payments overview](/core-concepts/payments/overview) for setup and [Payments architecture](/core-concepts/payments/architecture) for routes, tables, webhook projections, and fulfillment patterns.
+  See [Payments overview](/core-concepts/payments/overview) for setup, webhook projections, and fulfillment patterns.
 </Note>
 
 The SDK methods require the current InsForge user token. Anonymous InsForge tokens can be used for guest one-time checkout, but an InsForge API key is not a substitute for these runtime calls because the backend needs a user context for local session rows.
@@ -225,7 +225,7 @@ For user-facing billing state, create app-owned tables with RLS and populate the
 - `public.user_entitlements`
 - `public.team_billing_status`
 
-Populate those tables from webhook-projected payment state. See [Payments architecture](/core-concepts/payments/architecture) for the projection model.
+Populate those tables from webhook-projected payment state. See [Payments overview](/core-concepts/payments/overview) for the fulfillment model.
 
 <Warning>
   Do not mark an order paid, grant credits, or activate a subscription from the success URL alone. Stripe recommends webhooks for reliable fulfillment because customers might complete payment without returning to your app.

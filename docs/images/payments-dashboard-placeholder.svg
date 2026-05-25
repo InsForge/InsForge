@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" role="img" aria-labelledby="title desc">
+  <title id="title">Payments dashboard screenshot placeholder</title>
+  <desc id="desc">Placeholder image for the InsForge Payments dashboard.</desc>
+  <rect width="1440" height="900" fill="#f8fafc"/>
+  <rect x="64" y="64" width="1312" height="772" rx="28" fill="#ffffff" stroke="#d7dee8"/>
+  <rect x="64" y="64" width="220" height="772" rx="28" fill="#18181b"/>
+  <text x="104" y="130" fill="#fafafa" font-family="Inter, Arial, sans-serif" font-size="30" font-weight="700">Payments</text>
+  <rect x="104" y="178" width="120" height="38" rx="10" fill="#635bff"/>
+  <text x="128" y="203" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="16">Catalog</text>
+  <text x="128" y="259" fill="#a1a1aa" font-family="Inter, Arial, sans-serif" font-size="16">Customers</text>
+  <text x="128" y="313" fill="#a1a1aa" font-family="Inter, Arial, sans-serif" font-size="16">Subscriptions</text>
+  <text x="128" y="367" fill="#a1a1aa" font-family="Inter, Arial, sans-serif" font-size="16">History</text>
+  <text x="332" y="146" fill="#18181b" font-family="Inter, Arial, sans-serif" font-size="30" font-weight="700">Stripe catalog</text>
+  <rect x="332" y="188" width="992" height="72" rx="18" fill="#f4f4f5" stroke="#e4e4e7"/>
+  <text x="370" y="232" fill="#18181b" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="700">Test mode connected</text>
+  <rect x="1110" y="208" width="138" height="32" rx="16" fill="#dcfce7"/>
+  <text x="1140" y="230" fill="#166534" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="700">Synced</text>
+  <rect x="332" y="304" width="992" height="98" rx="16" fill="#f8fafc" stroke="#e4e4e7"/>
+  <text x="370" y="356" fill="#18181b" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="700">Pro plan</text>
+  <text x="620" y="356" fill="#52525b" font-family="Inter, Arial, sans-serif" font-size="18">$29 / month</text>
+  <rect x="1100" y="330" width="96" height="32" rx="16" fill="#dbeafe"/>
+  <text x="1126" y="352" fill="#1d4ed8" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="700">Active</text>
+  <rect x="332" y="430" width="992" height="98" rx="16" fill="#f8fafc" stroke="#e4e4e7"/>
+  <text x="370" y="482" fill="#18181b" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="700">Team plan</text>
+  <text x="620" y="482" fill="#52525b" font-family="Inter, Arial, sans-serif" font-size="18">$99 / month</text>
+  <rect x="332" y="594" width="300" height="126" rx="18" fill="#f8fafc" stroke="#e4e4e7"/>
+  <text x="368" y="648" fill="#18181b" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="700">Customers</text>
+  <rect x="368" y="680" width="190" height="16" rx="8" fill="#d4d4d8"/>
+  <rect x="676" y="594" width="300" height="126" rx="18" fill="#f8fafc" stroke="#e4e4e7"/>
+  <text x="712" y="648" fill="#18181b" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="700">Subscriptions</text>
+  <rect x="712" y="680" width="210" height="16" rx="8" fill="#d4d4d8"/>
+  <rect x="1024" y="594" width="300" height="126" rx="18" fill="#f8fafc" stroke="#e4e4e7"/>
+  <text x="1060" y="648" fill="#18181b" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="700">Payment history</text>
+  <rect x="1060" y="680" width="214" height="16" rx="8" fill="#d4d4d8"/>
+</svg>

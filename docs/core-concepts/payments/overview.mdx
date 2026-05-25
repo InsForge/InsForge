@@ -1,138 +1,96 @@
 ---
 title: "Payments"
 sidebarTitle: "Overview"
-description: "Connect Stripe, create Checkout and Billing Portal sessions, and mirror payment state into Postgres."
+description: "Connect Stripe Checkout and Billing Portal to your InsForge app."
 ---
 
-Use InsForge Payments when your app needs Stripe Checkout or Billing Portal without storing Stripe secret keys in app code. InsForge stores separate Stripe `test` and `live` keys in the secret store, attempts to create managed Stripe webhooks, syncs Stripe catalog and customer state, and projects payment events into the `payments` schema.
+Use InsForge Payments when your app needs Stripe Checkout or Billing Portal without putting Stripe secret keys in application code. InsForge stores separate `test` and `live` Stripe keys, syncs catalog and customer state, creates managed webhook endpoints, and mirrors payment activity into Postgres for your app to fulfill from.
 
 <Warning>
   Payments is currently in private preview. APIs and behavior may change before general availability.
 </Warning>
 
-## How It Fits
+<Frame caption="Payments dashboard: Stripe connection, catalog, customers, subscriptions, and payment history.">
+  <img src="/images/payments-dashboard-placeholder.svg" alt="Placeholder for the InsForge Payments dashboard screenshot" />
+</Frame>
+
+<Note>
+  Stripe remains the source of truth for charges, invoices, refunds, and disputes. InsForge gives your app a safer Checkout and Billing Portal path plus local payment projections for fulfillment.
+</Note>
 
 ```mermaid
-graph LR
-    Admin[Dashboard, CLI, or admin API] --> Control[Payments admin routes]
+graph TB
+    Admin[Dashboard or CLI] --> Config[Stripe keys and sync]
+    Config --> Stripe[Stripe]
+
     App[Your app] --> SDK[TypeScript SDK]
-    SDK --> Runtime[Runtime checkout routes]
+    SDK --> Checkout[Checkout or Billing Portal]
+    Checkout --> Stripe
 
-    Control --> Secrets[InsForge secret store]
-    Control --> Stripe[Stripe API]
-    Runtime --> Stripe
-    Runtime --> Payments[(payments schema)]
+    Stripe --> Webhook[Managed webhook]
+    Webhook --> Payments[(payments schema)]
+    Payments --> Fulfillment[App-owned fulfillment tables]
+    Fulfillment --> App
 
-    Stripe --> Webhook[Managed Stripe webhook]
-    Webhook --> Projection[Projection services]
-    Projection --> Payments
-
-    Payments --> Logic[App triggers or jobs]
-    Logic --> AppTables[(App-owned tables)]
-    AppTables --> App
+    style Admin fill:#1e293b,stroke:#475569,color:#e2e8f0
+    style Config fill:#166534,stroke:#22c55e,color:#dcfce7
+    style Stripe fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
+    style App fill:#1e293b,stroke:#475569,color:#e2e8f0
+    style SDK fill:#1e40af,stroke:#3b82f6,color:#dbeafe
+    style Checkout fill:#c2410c,stroke:#fb923c,color:#fed7aa
+    style Webhook fill:#c2410c,stroke:#fb923c,color:#fed7aa
+    style Payments fill:#0e7490,stroke:#06b6d4,color:#cffafe
+    style Fulfillment fill:#0e7490,stroke:#06b6d4,color:#cffafe
 ```
 
-Payments is split into three surfaces.
+## Features
 
-| Surface | What it owns |
-|---------|--------------|
-| Control plane | Stripe keys, connection status, catalog management, sync, and managed webhook setup. |
-| Runtime plane | Checkout Session and Billing Portal Session creation from application code. |
-| Projection plane | Webhook-processed rows for checkout state, customer mappings, payment history, subscriptions, customers, and webhook processing. |
+### Stripe connection
 
-Stripe remains the source of truth for money movement. InsForge mirrors the Stripe state your app and dashboard need to reason about billing without making every request call Stripe.
+Configure `test` and `live` Stripe secret keys from the dashboard, CLI, or admin API. InsForge validates the key, stores it in the secret store, and reports connection health.
 
-## Control Plane
+### Catalog sync
 
-Project admins configure Stripe from the Dashboard, CLI, or REST API.
+Sync Stripe products and prices into InsForge so your dashboard and app can reason about the catalog without making every request call Stripe.
 
-- Configure separate `test` and `live` Stripe secret keys.
-- Check account, sync, and webhook status for each environment.
-- Sync products, prices, customers, and subscriptions from Stripe.
-- Create or recreate the InsForge-managed Stripe webhook endpoint.
-- Manage products and prices through the CLI or REST API when you need scripted catalog changes.
+### Checkout Sessions
 
-Saving a new key validates it against Stripe and stores it as a reserved InsForge secret. If the key points at a different Stripe account than the previously configured key for that environment, InsForge clears the mirrored payment data for that environment before syncing the new account.
+Create one-time payment or subscription Checkout Sessions from the TypeScript SDK. Your frontend receives a Stripe-hosted URL and redirects the user to complete payment.
 
-## Runtime Plane
+### Billing Portal
 
-Application code uses the [TypeScript Payments SDK](/sdks/typescript/payments) for user-facing flows.
+Create Billing Portal sessions for existing customers so users can update payment methods, review invoices, change plans, or cancel subscriptions through Stripe-hosted UI.
 
-| SDK method | Use it for | Auth requirement |
-|------------|------------|------------------|
-| `createCheckoutSession` | Start one-time payment or subscription checkout. | Requires a user token. Anonymous InsForge tokens can be used for guest one-time checkout. |
-| `createCustomerPortalSession` | Open Stripe Billing Portal for an existing billing subject. | Requires an authenticated user and an existing Stripe customer mapping. |
+### Managed webhooks
 
-Subscription checkout requires a billing `subject`, such as `{ type: "team", id: "team_123" }`, because the resulting subscription must belong to a stable app-defined owner. One-time checkout can omit `subject` for guest payments, or include it when you want InsForge to map the Stripe customer back to that subject after checkout completes.
+InsForge can create the Stripe webhook endpoint for each environment. Incoming Stripe events update local payment state and record processing status.
 
-## Projection Plane
+### Payment projections
 
-Stripe webhooks update local payment state:
+The `payments` schema mirrors checkout sessions, customer mappings, customers, subscriptions, payment history, refunds, and webhook events. Use those rows as operational inputs, not as your public end-user billing API.
 
-- `payments.checkout_sessions` records local checkout attempts and their Stripe session IDs.
-- `payments.stripe_customer_mappings` maps app-defined billing subjects to Stripe customers.
-- `payments.payment_history` records one-time payments, subscription invoices, refunds, and failed payments.
-- `payments.subscriptions` and `payments.subscription_items` mirror subscription state.
-- `payments.customers` mirrors Stripe customer display data for dashboard and admin views.
-- `payments.webhook_events` records webhook processing, retries, ignored events, and failures.
+### Fulfillment model
 
-Use these rows as operational records and fulfillment inputs. Do not expose them directly as your end-user billing API. Instead, write app-owned tables such as `orders`, `credit_ledger`, `team_entitlements`, or `billing_status`, protect those tables with your app's RLS policies, and populate them from webhook-projected payment rows.
+Do not fulfill from the Checkout success URL alone. Populate app-owned tables such as `orders`, `credit_ledger`, or `team_entitlements` from webhook-projected payment state, then protect those tables with your own RLS policies.
 
-<Warning>
-  Do not mark an order paid, grant credits, or activate a subscription from the Checkout success URL alone. Treat success and return URLs as UX redirects. Fulfillment should come from webhook-projected payment state.
-</Warning>
-
-## Dashboard
-
-The Payments dashboard uses the same admin REST API.
-
-| Page | Purpose |
-|------|---------|
-| Catalog | Read-only view of synced Stripe products and prices for the selected environment. |
-| Customers | Read-only customer mirror with email, payment method summary, country, spend, and payment count. |
-| Subscriptions | Read-only subscription mirror with status, period, customer, and line items. |
-| Payment History | Read-only payment, invoice, refund, and failed-payment activity. |
-| Settings | Stripe key configuration, sync, and managed webhook setup for `test` and `live`. |
-
-If an environment has no Stripe key, the dashboard shows a key-missing state before loading catalog, customer, subscription, or history data.
-
-## Common Build Paths
-
-### One-time orders
-
-1. Create an app-owned pending order row.
-2. Create a Checkout Session with `mode: "payment"` and pass the order ID in metadata.
-3. Redirect the user to the returned Stripe Checkout URL.
-4. Fulfill from `payments.payment_history` after the webhook records a succeeded one-time payment.
-
-### Subscriptions
-
-1. Decide the billing subject, such as user, team, organization, workspace, or tenant.
-2. Create a Checkout Session with `mode: "subscription"` and the subject.
-3. Redirect the user to Checkout.
-4. Read or project subscription status from `payments.subscriptions` after Stripe webhooks are processed.
-5. Open Billing Portal for plan changes, payment method changes, invoices, and cancellation flows.
-
-### Catalog administration
-
-Create and edit products and prices in Stripe, then sync them into InsForge, or use the Payments CLI/REST API to create Stripe catalog objects and mirror them locally after Stripe succeeds.
-
-## More Resources
+## Build with it
 
 <CardGroup cols={2}>
-  <Card title="Architecture" icon="diagram-project" href="/core-concepts/payments/architecture">
-    Learn the backend routes, tables, webhook processing, and fulfillment model.
+  <Card title="TypeScript SDK" icon="js" href="/sdks/typescript/payments">
+    Create Checkout and Billing Portal sessions from your app.
   </Card>
 
   <Card title="Payments CLI" icon="terminal" href="/core-concepts/payments/cli">
-    Configure Stripe keys, sync state, manage catalog objects, and inspect projections.
-  </Card>
-
-  <Card title="TypeScript SDK" icon="js" href="/sdks/typescript/payments">
-    Create Checkout and Billing Portal sessions from your app.
+    Configure Stripe keys, sync state, and manage catalog objects from scripts.
   </Card>
 
   <Card title="REST patterns" icon="code" href="/sdks/rest/overview">
     Use REST client setup patterns for admin tooling and non-TypeScript clients.
   </Card>
 </CardGroup>
+
+## Next steps
+
+- Configure Stripe keys in Dashboard -> Payments -> Settings.
+- Sync your Stripe catalog into InsForge.
+- Use the [TypeScript SDK reference](/sdks/typescript/payments) to create Checkout and Billing Portal sessions.
