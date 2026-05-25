@@ -29,9 +29,26 @@ describe('assertValidWebLogoutCsrf', () => {
   });
 
   it('requires a valid csrf token before clearing a web refresh cookie', () => {
+    const call = () => assertValidWebLogoutCsrf({ refreshToken: 'refresh-token' }, verifier(false));
+
+    expect(call).toThrow(AppError);
+    expect(call).toThrow(expect.objectContaining({ statusCode: 403 }));
+  });
+
+  it('allows logout cleanup when the refresh token is expired or invalid', () => {
+    const tokenVerifier: CsrfTokenVerifier = {
+      verifyRefreshToken: vi
+        .fn()
+        .mockImplementation(() => {
+          throw new AppError('Invalid refresh token', 401, 'AUTH_UNAUTHORIZED');
+        }),
+      verifyCsrfToken: vi.fn(),
+    };
+
     expect(() =>
-      assertValidWebLogoutCsrf({ refreshToken: 'refresh-token' }, verifier(false))
-    ).toThrow(AppError);
+      assertValidWebLogoutCsrf({ refreshToken: 'stale-refresh-token' }, tokenVerifier)
+    ).not.toThrow();
+    expect(tokenVerifier.verifyCsrfToken).not.toHaveBeenCalled();
   });
 
   it('accepts a matching csrf token for a user refresh session', () => {
@@ -52,12 +69,15 @@ describe('assertValidWebLogoutCsrf', () => {
       verifyCsrfToken: vi.fn(),
     };
 
-    expect(() =>
+    const call = () => {
       assertValidWebLogoutCsrf(
         { refreshToken: 'refresh-token', csrfToken: 'csrf-token' },
         tokenVerifier
-      )
-    ).toThrow(AppError);
+      );
+    };
+
+    expect(call).toThrow(AppError);
+    expect(call).toThrow(expect.objectContaining({ statusCode: 401 }));
     expect(tokenVerifier.verifyCsrfToken).not.toHaveBeenCalled();
   });
 });

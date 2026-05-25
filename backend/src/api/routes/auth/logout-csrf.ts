@@ -20,7 +20,16 @@ export function assertValidWebLogoutCsrf(
     return;
   }
 
-  const payload = tokenManager.verifyRefreshToken(input.refreshToken);
+  let payload: RefreshTokenPayload;
+  try {
+    payload = tokenManager.verifyRefreshToken(input.refreshToken);
+  } catch (error) {
+    if (error instanceof AppError && error.statusCode === 401) {
+      return;
+    }
+    throw error;
+  }
+
   if (payload.sessionType !== 'user') {
     throw new AppError('Invalid refresh session type', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
   }
