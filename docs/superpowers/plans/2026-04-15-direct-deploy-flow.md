@@ -8,7 +8,7 @@
 
 **Tech Stack:** Express, PostgreSQL, Zod shared schemas, Axios + node-fetch streaming, Vercel file upload API, React service layer, Docker Compose, Vitest, MCP server tooling
 
-**Reference:** `docs/core-concepts/deployments/overview.mdx`
+**Reference:** `docs/core-concepts/deployments/architecture.mdx`
 
 ---
 
@@ -34,7 +34,7 @@
 | `deploy/docker-compose/.env.example` | Packaged deployment sample env |
 | `deploy/docker-compose/docker-compose.yml` | Packaged deployment compose pass-through |
 | `docs/agent-docs/deployment.md` | Agent-facing deployment instructions |
-| `docs/core-concepts/deployments/overview.mdx` | Product documentation for deployments |
+| `docs/core-concepts/deployments/architecture.mdx` | Product/architecture documentation for both direct and legacy flows |
 
 ### MCP repo
 
@@ -603,7 +603,7 @@ git commit -m "feat: add direct deployment support to mcp"
 - Modify: `deploy/docker-compose/.env.example`
 - Modify: `deploy/docker-compose/docker-compose.yml`
 - Modify: `docs/agent-docs/deployment.md`
-- Modify: `docs/core-concepts/deployments/overview.mdx`
+- Modify: `docs/core-concepts/deployments/architecture.mdx`
 
 - [ ] **Step 1: Mirror the direct deployment endpoints in the dashboard service client**
 
@@ -700,7 +700,7 @@ git add \
   deploy/docker-compose/.env.example \
   deploy/docker-compose/docker-compose.yml \
   docs/agent-docs/deployment.md \
-  docs/core-concepts/deployments/overview.mdx
+  docs/core-concepts/deployments/architecture.mdx
 git commit -m "docs: document direct deploy flow and self-host config"
 ```
 
