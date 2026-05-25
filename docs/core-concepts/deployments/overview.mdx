@@ -44,7 +44,7 @@ flowchart TB
 
 ### CLI deploys
 
-Deploy from your app's source directory. The CLI uploads the source tree, skips local-only files such as `node_modules`, `.git`, build output, and `.env` files, then starts the Vercel build through InsForge. The example uses `./frontend`; replace it with your frontend source directory.
+Deploy from your app's source directory. The CLI uploads the source tree, skips local-only files such as `node_modules`, `.git`, build output, and `.env` files, then starts the Vercel build through InsForge.
 
 ```bash
 npx @insforge/cli deployments deploy ./frontend
@@ -66,7 +66,7 @@ npx @insforge/cli deployments env set VITE_INSFORGE_ANON_KEY ik_xxx
 
 ### Deployment history
 
-Review previous runs, sync Vercel status, inspect metadata, and cancel in-progress deployments from the Deployment Logs page. Replace the example ID with the ID from the deployment list.
+Review previous runs, sync Vercel status, inspect metadata, and cancel in-progress deployments from the Deployment Logs page.
 
 ```bash
 npx @insforge/cli deployments list
@@ -90,4 +90,4 @@ Every ready deployment gets a default URL at `https://<appkey>.insforge.site`. Y
 
 - Set up the [CLI](/quickstart) and connect your project.
 - Add browser-safe environment variables from the dashboard or with `npx @insforge/cli deployments env set`.
-- Run `npx @insforge/cli deployments deploy ./frontend`, replacing `./frontend` with the frontend source directory.
+- Run `npx @insforge/cli deployments deploy ./frontend`.
