@@ -9,7 +9,7 @@ import {
   DeploymentResult,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
-import { Pool } from 'pg';
+import { Pool, PoolClient } from 'pg';
 import fetch from 'node-fetch';
 import { AppError, hasPgErrorCode } from '@/utils/errors.js';
 import { DenoSubhostingProvider } from '@/providers/functions/deno-subhosting.provider.js';
@@ -305,27 +305,57 @@ export class FunctionService {
    * Delete a function
    */
   async deleteFunction(slug: string): Promise<boolean> {
+    const client: PoolClient = await this.getPool().connect();
+
     try {
-      const result = await this.getPool().query(
+      await client.query('BEGIN');
+
+      const result = await client.query(
         'DELETE FROM functions.definitions WHERE slug = $1',
         [slug]
       );
 
       if (result.rowCount === 0) {
+        await client.query('ROLLBACK');
         return false;
       }
+
+      // Delete deployments that only referenced this function 
+      await client.query(
+        `DELETE FROM functions.deployments
+         WHERE id IN (
+           SELECT id FROM functions.deployments
+           WHERE functions @> to_jsonb(ARRAY[$1]::text[])
+             AND jsonb_array_length(functions - $1) = 0
+         )`,
+        [slug]
+      );
+
+      // Remove the deleted slug from deployments that reference multiple functions
+      await client.query(
+        `UPDATE functions.deployments
+         SET functions = functions - $1
+         WHERE functions @> to_jsonb(ARRAY[$1]::text[])
+           AND jsonb_array_length(functions) > 1`,
+        [slug]
+      );
+
+      await client.query('COMMIT');
 
       // Trigger redeployment without the deleted function
       this.scheduleDeployment();
 
       return true;
     } catch (error) {
+      await client.query('ROLLBACK');
       logger.error('Failed to delete function', {
         error: error instanceof Error ? error.message : String(error),
         operation: 'deleteFunction',
         slug,
       });
       throw error;
+    } finally {
+      client.release();
     }
   }
 
