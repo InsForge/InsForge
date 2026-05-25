@@ -53,9 +53,7 @@ export function SessionReplayPage() {
                 No replays yet. Make sure session_recording is enabled in your PostHog project.
               </div>
             ) : (
-              pageItems.map((rec) => (
-                <SessionRow key={rec.id} recording={rec} onOpen={setOpenId} />
-              ))
+              pageItems.map((rec) => <SessionRow key={rec.id} recording={rec} onOpen={setOpenId} />)
             )}
           </div>
         </div>

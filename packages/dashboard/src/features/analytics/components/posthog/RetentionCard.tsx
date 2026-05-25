@@ -101,10 +101,7 @@ export function RetentionCard({ enabled }: { enabled: boolean }) {
       {grid.map((row) => {
         const size = row.cells[0]?.count ?? 0;
         return (
-          <div
-            key={row.date}
-            className="flex items-center border-b border-[var(--alpha-8)] pl-1.5"
-          >
+          <div key={row.date} className="flex items-center border-b border-[var(--alpha-8)] pl-1.5">
             <div className="flex h-8 w-[202px] items-center p-1.5">
               <span className="px-1 text-[13px] leading-[18px] text-foreground">
                 {formatCohortRange(row.date)}
