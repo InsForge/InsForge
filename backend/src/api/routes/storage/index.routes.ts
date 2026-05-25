@@ -394,10 +394,13 @@ router.post(
   }
 );
 
-// GET /api/storage/buckets/:bucketName/objects/:objectKey/download-strategy - Get download URL (presigned or direct)
+// GET /api/storage/buckets/:bucketName/objects/*\/download-strategy - Get download URL (presigned or direct)
 // Read-only strategy hand-off; aligns with S3-style object retrieval semantics.
-// MUST be registered before the wildcard `/objects/*` download route below,
-// otherwise the wildcard intercepts `<key>/download-strategy` as an object key.
+// Uses a wildcard for the object key (same as the download route below) so
+// keys containing `/` (pseudo-folders like `folder/file.txt`) are matched in
+// full. MUST be registered before the wildcard `/objects/*` download route
+// below, otherwise the wildcard intercepts `<key>/download-strategy` as an
+// object key.
 // POST is retained as a deprecated alias for backward compatibility with older SDKs.
 const downloadStrategyHandler = async (
   req: AuthRequest | Request,
@@ -405,7 +408,13 @@ const downloadStrategyHandler = async (
   next: NextFunction
 ) => {
   try {
-    const { bucketName, objectKey } = req.params;
+    const { bucketName } = req.params;
+    // Wildcard captures the full object key (may contain `/`).
+    const objectKey = req.params[0];
+
+    if (!objectKey) {
+      throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
+    }
 
     const storageService = StorageService.getInstance();
 
@@ -436,14 +445,14 @@ const downloadStrategyHandler = async (
 };
 
 router.get(
-  '/buckets/:bucketName/objects/:objectKey/download-strategy',
+  '/buckets/:bucketName/objects/*/download-strategy',
   conditionalDownloadAuth,
   downloadStrategyHandler
 );
 
 // @deprecated Use GET instead. Retained for backward compatibility with older SDK releases.
 router.post(
-  '/buckets/:bucketName/objects/:objectKey/download-strategy',
+  '/buckets/:bucketName/objects/*/download-strategy',
   conditionalDownloadAuth,
   downloadStrategyHandler
 );
