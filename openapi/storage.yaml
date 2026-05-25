@@ -664,13 +664,16 @@ paths:
                 statusCode: 409
 
   /api/storage/buckets/{bucketName}/objects/{objectKey}/download-strategy:
-    post:
+    get:
       summary: Get Download Strategy (Direct or Presigned URL)
       description: |
         Returns download strategy based on storage backend and bucket visibility.
         - S3 with public bucket: Direct URLs (no presigning, better performance)
         - S3 with private bucket: Presigned URLs with expiration
         - Local storage: Always direct endpoints
+
+        Expiry (when presigned) is auto-calculated server-side from bucket
+        visibility; no request body is accepted.
       tags:
         - Client
       security:
@@ -689,17 +692,6 @@ paths:
           schema:
             type: string
           example: profile-photo.jpg
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                expiresIn:
-                  type: integer
-                  description: URL expiration time in seconds (default 3600)
-                  example: 3600
-                  default: 3600
       responses:
         '200':
           description: Download strategy details
@@ -724,6 +716,44 @@ paths:
                   value:
                     method: direct
                     url: /api/storage/buckets/avatars/objects/profile-photo.jpg
+        '404':
+          description: Object not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      deprecated: true
+      summary: Get Download Strategy (Deprecated — use GET)
+      description: |
+        Deprecated alias of `GET /api/storage/buckets/{bucketName}/objects/{objectKey}/download-strategy`.
+        Retained for backward compatibility with older SDK releases. Any
+        request body is ignored.
+      tags:
+        - Client
+      security:
+        - apiKey: []
+      parameters:
+        - name: bucketName
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9_-]+$'
+          example: avatars
+        - name: objectKey
+          in: path
+          required: true
+          schema:
+            type: string
+          example: profile-photo.jpg
+      responses:
+        '200':
+          description: Download strategy details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadStrategy'
         '404':
           description: Object not found
           content:

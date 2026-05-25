@@ -243,22 +243,22 @@ The download strategy API returns the optimal download method based on the stora
 - **S3-Compatible**: Presigned URL for S3.
 
 ```
-POST /api/storage/buckets/{bucketName}/objects/{objectKey}/download-strategy
+GET /api/storage/buckets/{bucketName}/objects/{objectKey}/download-strategy
 ```
 
-#### Request Body
+<Note>
+  Expiry (for presigned URLs) is auto-calculated server-side from bucket
+  visibility. The endpoint takes no request body.
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `expiresIn` | integer | No | URL expiration in seconds (default: 3600) |
+  `POST` on the same path is retained as a deprecated alias for older SDK
+  releases and will be removed in a future major version. Migrate to `GET`.
+</Note>
 
 #### Example
 
 ```bash
-curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/objects/profile.jpg/download-strategy" \
-  -H "Authorization: Bearer your-jwt-token" \
-  -H "Content-Type: application/json" \
-  -d '{"expiresIn": 3600}'
+curl "https://your-app.insforge.app/api/storage/buckets/avatars/objects/profile.jpg/download-strategy" \
+  -H "Authorization: Bearer your-jwt-token"
 ```
 
 #### Response (S3 Public Bucket)

@@ -179,12 +179,8 @@ fi
 # Step 6: Get download URL
 echo ""
 echo "6. Getting download URL..."
-DOWNLOAD_STRATEGY=$(curl -s -X POST $API_URL/api/storage/buckets/$BUCKET_NAME/objects/$KEY/download-strategy \
-  -H "Authorization: Bearer $TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "expiresIn": 3600
-  }')
+DOWNLOAD_STRATEGY=$(curl -s $API_URL/api/storage/buckets/$BUCKET_NAME/objects/$KEY/download-strategy \
+  -H "Authorization: Bearer $TOKEN")
 
 echo -e "${YELLOW}Download Strategy Response:${NC}"
 echo $DOWNLOAD_STRATEGY | jq .

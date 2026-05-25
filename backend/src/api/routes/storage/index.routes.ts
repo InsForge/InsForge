@@ -24,8 +24,9 @@ const storageConfigService = StorageConfigService.getInstance();
 const s3AccessKeyService = S3AccessKeyService.getInstance();
 
 // Middleware to conditionally apply authentication based on bucket visibility.
-// This is only attached to object download hand-offs: GET object bytes and POST
-// download-strategy. The strategy endpoint is POST, but it is still a read path.
+// This is only attached to object download hand-offs: GET object bytes and
+// GET/POST download-strategy. Strategy endpoint is GET (POST retained as a
+// deprecated alias for older SDKs); both are read paths.
 const conditionalDownloadAuth = async (req: Request, res: Response, next: NextFunction) => {
   if (req.params.bucketName) {
     try {
@@ -393,6 +394,60 @@ router.post(
   }
 );
 
+// GET /api/storage/buckets/:bucketName/objects/:objectKey/download-strategy - Get download URL (presigned or direct)
+// Read-only strategy hand-off; aligns with S3-style object retrieval semantics.
+// MUST be registered before the wildcard `/objects/*` download route below,
+// otherwise the wildcard intercepts `<key>/download-strategy` as an object key.
+// POST is retained as a deprecated alias for backward compatibility with older SDKs.
+const downloadStrategyHandler = async (
+  req: AuthRequest | Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { bucketName, objectKey } = req.params;
+
+    const storageService = StorageService.getInstance();
+
+    // RLS-gate the strategy hand-off, same as GET /objects/*. A presigned
+    // URL bypasses RLS at redeem time, so we must verify ownership before
+    // issuing one.
+    const authReq = req as AuthRequest;
+    const visible = await storageService.objectIsVisible(
+      authReq.user,
+      bucketName,
+      objectKey,
+      !!authReq.hasApiKey
+    );
+    if (!visible) {
+      throw new AppError('Object not found', 404, ERROR_CODES.STORAGE_NOT_FOUND);
+    }
+
+    const strategy = await storageService.getDownloadStrategy(bucketName, objectKey);
+
+    successResponse(res, strategy);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('Invalid')) {
+      next(new AppError(error.message, 400, ERROR_CODES.STORAGE_INVALID_PARAMETER));
+    } else {
+      next(error);
+    }
+  }
+};
+
+router.get(
+  '/buckets/:bucketName/objects/:objectKey/download-strategy',
+  conditionalDownloadAuth,
+  downloadStrategyHandler
+);
+
+// @deprecated Use GET instead. Retained for backward compatibility with older SDK releases.
+router.post(
+  '/buckets/:bucketName/objects/:objectKey/download-strategy',
+  conditionalDownloadAuth,
+  downloadStrategyHandler
+);
+
 // GET /api/storage/buckets/:bucketName/objects/:objectKey - Download object from bucket (conditional auth)
 router.get(
   '/buckets/:bucketName/objects/*',
@@ -621,42 +676,6 @@ router.post(
   }
 );
 
-// POST /api/storage/buckets/:bucketName/objects/:objectKey/download-strategy - Get download URL (presigned or direct)
-router.post(
-  '/buckets/:bucketName/objects/:objectKey/download-strategy',
-  conditionalDownloadAuth,
-  async (req: AuthRequest | Request, res: Response, next: NextFunction) => {
-    try {
-      const { bucketName, objectKey } = req.params;
-
-      const storageService = StorageService.getInstance();
-
-      // RLS-gate the strategy hand-off, same as GET /objects/*. A presigned
-      // URL bypasses RLS at redeem time, so we must verify ownership before
-      // issuing one.
-      const authReq = req as AuthRequest;
-      const visible = await storageService.objectIsVisible(
-        authReq.user,
-        bucketName,
-        objectKey,
-        !!authReq.hasApiKey
-      );
-      if (!visible) {
-        throw new AppError('Object not found', 404, ERROR_CODES.STORAGE_NOT_FOUND);
-      }
-
-      const strategy = await storageService.getDownloadStrategy(bucketName, objectKey);
-
-      successResponse(res, strategy);
-    } catch (error) {
-      if (error instanceof Error && error.message.includes('Invalid')) {
-        next(new AppError(error.message, 400, ERROR_CODES.STORAGE_INVALID_PARAMETER));
-      } else {
-        next(error);
-      }
-    }
-  }
-);
 // ============================================================================
 // S3 Protocol — Gateway Config + Access Key Management (admin only)
 // Per-IP rate limiting applied across all three access-key endpoints since
