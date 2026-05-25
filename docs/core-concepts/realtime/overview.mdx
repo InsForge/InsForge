@@ -51,9 +51,60 @@ Channels are named topics that clients can join. Use exact names for shared room
 
 Use database changes when a table write should become a live app event. Create a trigger on the table you want to watch. In its trigger function, call the predefined `realtime.publish(channel, event, payload)` function to decide which channel receives the message, which event name clients handle, and what payload they receive.
 
+For a channel pattern such as `order:%`, a trigger can publish one event per order:
+
+```sql
+CREATE OR REPLACE FUNCTION public.notify_order_status()
+RETURNS TRIGGER AS $$
+BEGIN
+  PERFORM realtime.publish(
+    'order:' || NEW.id::text,
+    'status_changed',
+    jsonb_build_object(
+      'id', NEW.id,
+      'status', NEW.status,
+      'updatedAt', NEW.updated_at
+    )
+  );
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER order_status_realtime
+  AFTER UPDATE OF status ON public.orders
+  FOR EACH ROW
+  WHEN (OLD.status IS DISTINCT FROM NEW.status)
+  EXECUTE FUNCTION public.notify_order_status();
+```
+
+Then subscribe from the app with the SDK:
+
+```typescript
+const channel = `order:${orderId}`;
+
+await insforge.realtime.connect();
+
+const subscription = await insforge.realtime.subscribe(channel);
+if (!subscription.ok) {
+  throw new Error(subscription.error.message);
+}
+
+insforge.realtime.on('status_changed', (message) => {
+  renderOrderStatus(message.status);
+});
+```
+
 ### Client broadcasts
 
 Clients can publish messages to channels they have already joined. Use this for chat, typing indicators, cursors, collaborative editing signals, and other user-to-user updates that do not need to start from a database write.
+
+```typescript
+await insforge.realtime.publish(`chat:${roomId}`, 'typing', {
+  userId,
+  isTyping: true
+});
+```
 
 ### Webhooks
 
