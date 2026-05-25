@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Plus, X, Link, MoveRight } from 'lucide-react';
@@ -39,6 +39,15 @@ interface TableFormProps {
   setFormIsDirty: (dirty: boolean) => void;
 }
 
+interface ColumnValueSnapshot {
+  columnName: string;
+  type: string;
+  defaultValue: string;
+  isNullable: boolean;
+  isUnique: boolean;
+  isPrimaryKey?: boolean;
+}
+
 export function TableForm({
   schemaName,
   open,
@@ -55,6 +64,8 @@ export function TableForm({
   const [foreignKeysDirty, setForeignKeysDirty] = useState(false);
   const queryClient = useQueryClient();
   const { showToast } = useToast();
+
+  const STORAGE_KEY = 'table-form-columns-draft';
 
   const form = useForm({
     resolver: zodResolver(tableFormSchema),
@@ -99,46 +110,55 @@ export function TableForm({
     },
   });
 
-  // Reset form when switching between modes or when editTable changes
-  useEffect(() => {
-    // Clear error when effect runs
-    setError(null);
+  const hasRestoredDraft = useRef(false);
+  const columns = useWatch({
+    control: form.control,
+    name: 'columns',
+  });
 
-    if (open && mode === 'edit' && editTable) {
+  useEffect(() => {
+    if (hasRestoredDraft.current) return;
+    if (mode !== 'create') return;
+
+    hasRestoredDraft.current = true;
+
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+
+      if (!stored) return;
+
+      const restoredColumns: ColumnValueSnapshot[] = JSON.parse(stored);
+
+      if (!Array.isArray(restoredColumns) || restoredColumns.length === 0) return;
+
       form.reset({
-        tableName: editTable.tableName,
-        columns: editTable.columns.map((col) => ({
-          columnName: col.columnName,
-          type: col.type,
-          isPrimaryKey: col.isPrimaryKey,
-          isNullable: col.isNullable,
-          isUnique: col.isUnique || false,
-          defaultValue: col.defaultValue || '',
-          originalName: col.columnName, // Track original name for rename detection
-          isSystemColumn: SYSTEM_FIELDS.includes(col.columnName),
-          isNewColumn: false,
-        })),
+        ...form.getValues(),
+        columns: restoredColumns,
       });
 
-      // Set foreign keys from editTable
-      const existingForeignKeys = editTable.columns
-        .filter((col) => !SYSTEM_FIELDS.includes(col.columnName) && col.foreignKey)
-        .map((col) => {
-          const referenceTableValue = col.foreignKey?.referenceTable ?? '';
-          const { schemaName: referenceSchemaName, tableName: referenceTableName } =
-            parseDatabaseTableReference(referenceTableValue, schemaName);
+      console.log('Restored columns from localStorage:', restoredColumns);
+    } catch (error) {
+      console.error('Failed to restore columns from localStorage:', error);
+    }
+  }, [form, mode]);
 
-          return {
-            columnName: col.columnName,
-            referenceTable:
-              referenceSchemaName === schemaName ? referenceTableName : referenceTableValue,
-            referenceColumn: col.foreignKey?.referenceColumn ?? '',
-            onDelete: col.foreignKey?.onDelete || 'NO ACTION',
-            onUpdate: col.foreignKey?.onUpdate || 'NO ACTION',
-          };
-        });
-      setForeignKeys(existingForeignKeys);
-    } else {
+  useEffect(() => {
+    if (!open) return;
+
+    setError(null);
+
+    if (mode === 'edit' && editTable) {
+      form.reset({
+        tableName: editTable.tableName,
+        columns: editTable.columns,
+      });
+
+      return;
+    }
+
+    const hasDraft = Boolean(localStorage.getItem('table-form-columns-draft'));
+
+    if (mode === 'create' && !hasDraft) {
       form.reset({
         tableName: '',
         columns: [
@@ -170,10 +190,11 @@ export function TableForm({
             isSystemColumn: true,
             isNewColumn: false,
           },
-          { ...newColumn },
+          {
+            ...newColumn,
+          },
         ],
       });
-      setForeignKeys([]);
     }
   }, [editTable, form, mode, open, schemaName]);
 

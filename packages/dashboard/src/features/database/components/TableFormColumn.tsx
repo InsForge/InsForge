@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from 'react';
+import { memo } from 'react';
 import { Controller, Control, useWatch } from 'react-hook-form';
 import { X, Key } from 'lucide-react';
 import { Checkbox, Input } from '@insforge/ui';
@@ -30,26 +30,34 @@ export const TableFormColumn = memo(function TableFormColumn({
   isLast,
   column,
 }: TableFormColumnProps) {
-  const [columnValueSnapshots, setColumnValueSnapshots] = useState<ColumnValueSnapshot[]>([]);
-  const columns = useWatch({
-    control,
-    name: 'columns',
-  });
+  // const columns = useWatch({
+  //   control,
+  //   name: 'columns',
+  // });
 
-  useEffect(() => {
-    const nextColumnValueSnapshots: ColumnValueSnapshot[] =
-      columns?.map((column) => ({
-        columnName: column.columnName?.toString() ?? '',
-        columnType: column.type?.toString() ?? '',
-        defaultValue: column.defaultValue?.toString() ?? '',
-      })) ?? [];
-    nextColumnValueSnapshots.splice(0, 3);
-    setColumnValueSnapshots(nextColumnValueSnapshots);
-  }, [columns]);
+  // useEffect(() => {
+  //   const nextColumnValueSnapshots: ColumnValueSnapshot[] =
+  //     columns?.map((column, columnIndex) => ({
+  //       columnName: column.columnName?.toString() ?? '',
+  //       columnType: column.type?.toString() ?? '',
+  //       defaultValue: column.defaultValue?.toString() ?? '',
+  //       index: columnIndex,
+  //     })) ?? [];
+  //   // setColumnValueSnapshots(nextColumnValueSnapshots);
+  //   console.log('Initial Value : ', nextColumnValueSnapshots);
+  //   localStorage.setItem('values', JSON.stringify(nextColumnValueSnapshots));
+  // }, [columns]);
 
-  useEffect(() => {
-    console.log('column values:', columnValueSnapshots);
-  }, [columnValueSnapshots]);
+  // useEffect(() => {
+  //   try {
+  //     const stored = localStorage.getItem('values');
+  //     const retrievedValues = stored ? JSON.parse(stored) : [];
+
+  //     console.log(retrievedValues);
+  //   } catch {
+  //     console.log([]);
+  //   }
+  // }, []);
 
   return (
     <div
