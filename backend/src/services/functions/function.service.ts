@@ -310,17 +310,16 @@ export class FunctionService {
     try {
       await client.query('BEGIN');
 
-      const result = await client.query(
-        'DELETE FROM functions.definitions WHERE slug = $1',
-        [slug]
-      );
+      const result = await client.query('DELETE FROM functions.definitions WHERE slug = $1', [
+        slug,
+      ]);
 
       if (result.rowCount === 0) {
         await client.query('ROLLBACK');
         return false;
       }
 
-      // Delete deployments that only referenced this function 
+      // Delete deployments that only referenced this function
       await client.query(
         `DELETE FROM functions.deployments
          WHERE id IN (
