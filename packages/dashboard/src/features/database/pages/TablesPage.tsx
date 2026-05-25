@@ -8,7 +8,11 @@ import { useTables } from '#features/database/hooks/useTables';
 import { useRecords } from '#features/database/hooks/useRecords';
 import { DatabaseSidebar } from '#features/database/components/DatabaseSidebar';
 import { RecordFormDialog } from '#features/database/components/RecordFormDialog';
-import { TableForm } from '#features/database/components/TableForm';
+import {
+  clearTableFormCreateDraft,
+  hasRestorableTableFormCreateDraft,
+  TableForm,
+} from '#features/database/components/TableForm';
 import { TablesEmptyState } from '#features/database/components/TablesEmptyState';
 import { TemplatePreview } from '#features/database/components/TemplatePreview';
 import { DATABASE_TEMPLATES, DatabaseTemplate } from '#features/database/templates';
@@ -309,6 +313,9 @@ export default function TablesPage() {
 
       const shouldDiscard = await confirm(confirmOptions);
       if (shouldDiscard) {
+        if (!editingTable) {
+          clearTableFormCreateDraft();
+        }
         setShowTableForm(false);
         setEditingTable(null);
         return true;
@@ -316,6 +323,9 @@ export default function TablesPage() {
         return false;
       }
     } else {
+      if (!editingTable) {
+        clearTableFormCreateDraft();
+      }
       setShowTableForm(false);
       return true;
     }
@@ -444,6 +454,16 @@ export default function TablesPage() {
   // Show empty state when there are no tables and not loading
   const showEmptyState = !isLoadingTables && tables?.length === 0 && !showTableForm;
   const canMutateSelectedSchema = !selectedSchemaInfo.isProtected;
+
+  useEffect(() => {
+    if (showTableForm || editingTable || selectedSchemaInfo.isProtected) {
+      return;
+    }
+
+    if (hasRestorableTableFormCreateDraft(selectedSchema)) {
+      setShowTableForm(true);
+    }
+  }, [editingTable, selectedSchema, selectedSchemaInfo.isProtected, showTableForm]);
 
   // Show template preview - takes full width without sidebar
   if (previewingTemplate) {

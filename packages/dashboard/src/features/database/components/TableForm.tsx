@@ -9,6 +9,7 @@ import { tableService } from '#features/database/services/table.service';
 import {
   TableFormColumnSchema,
   TableFormForeignKeySchema,
+  tableFormForeignKeySchema,
   tableFormSchema,
   TableFormSchema,
 } from '#features/database/schema';
@@ -29,6 +30,191 @@ const newColumn: TableFormColumnSchema = {
   isNewColumn: true,
 };
 
+const TABLE_FORM_CREATE_DRAFT_STORAGE_KEY = 'table-form-columns-draft';
+
+interface TableFormCreateDraft {
+  schemaName: string;
+  tableName: string;
+  columns: TableFormColumnSchema[];
+  foreignKeys: TableFormForeignKeySchema[];
+}
+
+const createDefaultColumns = (): TableFormColumnSchema[] => [
+  {
+    columnName: 'id',
+    type: ColumnType.UUID,
+    defaultValue: 'gen_random_uuid()',
+    isPrimaryKey: true,
+    isNullable: false,
+    isUnique: true,
+    isSystemColumn: true,
+    isNewColumn: false,
+  },
+  {
+    columnName: 'created_at',
+    type: ColumnType.DATETIME,
+    defaultValue: 'CURRENT_TIMESTAMP',
+    isNullable: true,
+    isUnique: false,
+    isSystemColumn: true,
+    isNewColumn: false,
+  },
+  {
+    columnName: 'updated_at',
+    type: ColumnType.DATETIME,
+    defaultValue: 'CURRENT_TIMESTAMP',
+    isNullable: true,
+    isUnique: false,
+    isSystemColumn: true,
+    isNewColumn: false,
+  },
+  { ...newColumn },
+];
+
+const getTableFormDraftStorage = (): Storage | null => {
+  try {
+    return typeof window === 'undefined' ? null : window.localStorage;
+  } catch {
+    return null;
+  }
+};
+
+const getRecordValue = (value: unknown, key: string): unknown => {
+  if (typeof value !== 'object' || value === null) {
+    return undefined;
+  }
+
+  return (value as Record<string, unknown>)[key];
+};
+
+const toColumnType = (value: unknown): ColumnType => {
+  const columnTypes = new Set<string>(Object.values(ColumnType));
+  return typeof value === 'string' && columnTypes.has(value)
+    ? (value as ColumnType)
+    : ColumnType.STRING;
+};
+
+const toOptionalString = (value: unknown): string => {
+  return typeof value === 'string' ? value : '';
+};
+
+const toOptionalBoolean = (value: unknown, fallback: boolean): boolean => {
+  return typeof value === 'boolean' ? value : fallback;
+};
+
+const toColumnFromSnapshot = (snapshot: unknown): TableFormColumnSchema => {
+  const columnType = getRecordValue(snapshot, 'type') ?? getRecordValue(snapshot, 'columnType');
+  console.log('Column Type : ', columnType);
+
+  return {
+    columnName: toOptionalString(getRecordValue(snapshot, 'columnName')),
+    type: toColumnType(columnType),
+    defaultValue: toOptionalString(getRecordValue(snapshot, 'defaultValue')),
+    isPrimaryKey: toOptionalBoolean(getRecordValue(snapshot, 'isPrimaryKey'), false),
+    isNullable: toOptionalBoolean(getRecordValue(snapshot, 'isNullable'), true),
+    isUnique: toOptionalBoolean(getRecordValue(snapshot, 'isUnique'), false),
+    isSystemColumn: false,
+    isNewColumn: true,
+  };
+};
+
+const hasUserColumnDraftData = (columns: TableFormColumnSchema[]): boolean => {
+  const userColumns = columns.filter((column) => !column.isSystemColumn);
+
+  return userColumns.some((column, index) => {
+    if (index > 0) {
+      return true;
+    }
+
+    return (
+      column.columnName.trim().length > 0 ||
+      (column.defaultValue ?? '').trim().length > 0 ||
+      column.type !== newColumn.type ||
+      column.isNullable !== newColumn.isNullable ||
+      column.isUnique !== newColumn.isUnique
+    );
+  });
+};
+
+const hasCreateDraftData = (draft: TableFormCreateDraft): boolean => {
+  return (
+    draft.tableName.trim().length > 0 ||
+    hasUserColumnDraftData(draft.columns) ||
+    draft.foreignKeys.length > 0
+  );
+};
+
+const readTableFormCreateDraft = (): TableFormCreateDraft | null => {
+  const storage = getTableFormDraftStorage();
+  if (!storage) {
+    return null;
+  }
+
+  try {
+    const storedValue = storage.getItem(TABLE_FORM_CREATE_DRAFT_STORAGE_KEY);
+    if (!storedValue) {
+      return null;
+    }
+
+    const parsedValue = JSON.parse(storedValue) as unknown;
+    console.log('value : ', parsedValue);
+
+    if (Array.isArray(parsedValue)) {
+      console.log('Its an Array');
+      return {
+        schemaName: '',
+        tableName: '',
+        columns: [
+          ...createDefaultColumns().filter((column) => column.isSystemColumn),
+          ...parsedValue.map(toColumnFromSnapshot),
+        ],
+        foreignKeys: [],
+      };
+    }
+
+    const schemaNameValue = getRecordValue(parsedValue, 'schemaName');
+    const foreignKeysValue = getRecordValue(parsedValue, 'foreignKeys');
+    console.log('foreign keys : ', foreignKeysValue);
+    const formDraft = tableFormSchema.safeParse(parsedValue);
+    console.log('formDraft : ', formDraft);
+    if (!formDraft.success) {
+      return null;
+    }
+
+    return {
+      schemaName: typeof schemaNameValue === 'string' ? schemaNameValue : '',
+      tableName: formDraft.data.tableName,
+      columns: formDraft.data.columns,
+      foreignKeys: Array.isArray(foreignKeysValue)
+        ? foreignKeysValue.flatMap((foreignKey) => {
+            const result = tableFormForeignKeySchema.safeParse(foreignKey);
+            return result.success ? [result.data] : [];
+          })
+        : [],
+    };
+  } catch {
+    return null;
+  }
+};
+
+export const hasRestorableTableFormCreateDraft = (schemaName?: string): boolean => {
+  const draft = readTableFormCreateDraft();
+  console.log('Draft : ', draft);
+  if (!draft) {
+    return false;
+  }
+
+  if (schemaName && draft.schemaName && draft.schemaName !== schemaName) {
+    return false;
+  }
+
+  return hasCreateDraftData(draft);
+};
+
+export const clearTableFormCreateDraft = () => {
+  getTableFormDraftStorage()?.removeItem(TABLE_FORM_CREATE_DRAFT_STORAGE_KEY);
+};
+
 interface TableFormProps {
   schemaName: string;
   open: boolean;
@@ -37,15 +223,6 @@ interface TableFormProps {
   mode?: 'create' | 'edit';
   editTable?: TableSchema;
   setFormIsDirty: (dirty: boolean) => void;
-}
-
-interface ColumnValueSnapshot {
-  columnName: string;
-  type: string;
-  defaultValue: string;
-  isNullable: boolean;
-  isUnique: boolean;
-  isPrimaryKey?: boolean;
 }
 
 export function TableForm({
@@ -62,91 +239,35 @@ export function TableForm({
   const [editingForeignKey, setEditingForeignKey] = useState<string>();
   const [foreignKeys, setForeignKeys] = useState<TableFormForeignKeySchema[]>([]);
   const [foreignKeysDirty, setForeignKeysDirty] = useState(false);
+  const skipNextDraftSaveRef = useRef(true);
   const queryClient = useQueryClient();
   const { showToast } = useToast();
-
-  const STORAGE_KEY = 'table-form-columns-draft';
 
   const form = useForm({
     resolver: zodResolver(tableFormSchema),
     defaultValues: {
       tableName: '',
-      columns:
-        mode === 'create'
-          ? [
-              {
-                columnName: 'id',
-                type: ColumnType.UUID,
-                defaultValue: 'gen_random_uuid()',
-                isPrimaryKey: true,
-                isNullable: false,
-                isUnique: true,
-                isSystemColumn: true,
-                isNewColumn: false,
-              },
-              {
-                columnName: 'created_at',
-                type: ColumnType.DATETIME,
-                defaultValue: 'CURRENT_TIMESTAMP',
-                isNullable: true,
-                isUnique: false,
-                isSystemColumn: true,
-                isNewColumn: false,
-              },
-              {
-                columnName: 'updated_at',
-                type: ColumnType.DATETIME,
-                defaultValue: 'CURRENT_TIMESTAMP',
-                isNullable: true,
-                isUnique: false,
-                isSystemColumn: true,
-                isNewColumn: false,
-              },
-              {
-                ...newColumn,
-              },
-            ]
-          : [{ ...newColumn }],
+      columns: mode === 'create' ? createDefaultColumns() : [{ ...newColumn }],
     },
   });
 
-  const hasRestoredDraft = useRef(false);
+  const tableName = useWatch({
+    control: form.control,
+    name: 'tableName',
+  });
   const columns = useWatch({
     control: form.control,
     name: 'columns',
   });
 
   useEffect(() => {
-    if (hasRestoredDraft.current) return;
-    if (mode !== 'create') return;
-
-    hasRestoredDraft.current = true;
-
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-
-      if (!stored) return;
-
-      const restoredColumns: ColumnValueSnapshot[] = JSON.parse(stored);
-
-      if (!Array.isArray(restoredColumns) || restoredColumns.length === 0) return;
-
-      form.reset({
-        ...form.getValues(),
-        columns: restoredColumns,
-      });
-
-      console.log('Restored columns from localStorage:', restoredColumns);
-    } catch (error) {
-      console.error('Failed to restore columns from localStorage:', error);
-    }
-  }, [form, mode]);
-
-  useEffect(() => {
+    console.log('use 1');
     // Clear error when effect runs
     setError(null);
 
     if (open && mode === 'edit' && editTable) {
+      console.log('okaye');
+      skipNextDraftSaveRef.current = true;
       form.reset({
         tableName: editTable.tableName,
         columns: editTable.columns.map((col) => ({
@@ -180,47 +301,77 @@ export function TableForm({
           };
         });
       setForeignKeys(existingForeignKeys);
-    } else {
+      return;
+    }
+
+    if (open && mode === 'create') {
+      const draft = readTableFormCreateDraft();
+      if (draft && (!draft.schemaName || draft.schemaName === schemaName)) {
+        console.log('inside draft condition in useEffect 1');
+        skipNextDraftSaveRef.current = true;
+        form.reset({
+          tableName: draft.tableName,
+          columns: draft.columns,
+        });
+        setForeignKeys(draft.foreignKeys);
+        return;
+      }
+
+      skipNextDraftSaveRef.current = true;
       form.reset({
         tableName: '',
-        columns: [
-          {
-            columnName: 'id',
-            type: ColumnType.UUID,
-            defaultValue: 'gen_random_uuid()',
-            isPrimaryKey: true,
-            isNullable: false,
-            isUnique: true,
-            isSystemColumn: true,
-            isNewColumn: false,
-          },
-          {
-            columnName: 'created_at',
-            type: ColumnType.DATETIME,
-            defaultValue: 'CURRENT_TIMESTAMP',
-            isNullable: true,
-            isUnique: false,
-            isSystemColumn: true,
-            isNewColumn: false,
-          },
-          {
-            columnName: 'updated_at',
-            type: ColumnType.DATETIME,
-            defaultValue: 'CURRENT_TIMESTAMP',
-            isNullable: true,
-            isUnique: false,
-            isSystemColumn: true,
-            isNewColumn: false,
-          },
-          { ...newColumn },
-        ],
+        columns: createDefaultColumns(),
       });
       setForeignKeys([]);
     }
   }, [editTable, form, mode, open, schemaName]);
   useEffect(() => {
-    setFormIsDirty(form.formState.isDirty);
-  }, [form.formState.isDirty, setFormIsDirty]);
+    console.log('use 2');
+    if (!open || mode !== 'create') {
+      return;
+    }
+
+    const storage = getTableFormDraftStorage();
+    if (!storage) {
+      return;
+    }
+
+    if (skipNextDraftSaveRef.current) {
+      skipNextDraftSaveRef.current = false;
+      return;
+    }
+
+    const draft: TableFormCreateDraft = {
+      schemaName,
+      tableName: tableName ?? '',
+      columns: columns ?? createDefaultColumns(),
+      foreignKeys,
+    };
+
+    try {
+      if (hasCreateDraftData(draft)) {
+        storage.setItem(TABLE_FORM_CREATE_DRAFT_STORAGE_KEY, JSON.stringify(draft));
+      } else {
+        storage.removeItem(TABLE_FORM_CREATE_DRAFT_STORAGE_KEY);
+      }
+    } catch {
+      // Keep the form usable if localStorage is blocked or full.
+    }
+  }, [columns, foreignKeys, mode, open, schemaName, tableName]);
+
+  const currentCreateDraftHasData =
+    mode === 'create' &&
+    hasCreateDraftData({
+      schemaName,
+      tableName: tableName ?? '',
+      columns: columns ?? createDefaultColumns(),
+      foreignKeys,
+    });
+  const formHasChanges = form.formState.isDirty || foreignKeysDirty || currentCreateDraftHasData;
+
+  useEffect(() => {
+    setFormIsDirty(formHasChanges);
+  }, [formHasChanges, setFormIsDirty]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -280,6 +431,8 @@ export function TableForm({
 
       showToast('Table created successfully!', 'success');
 
+      clearTableFormCreateDraft();
+      skipNextDraftSaveRef.current = true;
       form.reset();
       setError(null);
       setForeignKeys([]);
@@ -690,7 +843,7 @@ export function TableForm({
               !form.formState.isValid ||
               createTableMutation.isPending ||
               updateTableMutation.isPending ||
-              (!form.formState.isDirty && !foreignKeysDirty)
+              !formHasChanges
             }
             className="h-9 rounded bg-primary px-3 text-sm font-medium text-[rgb(var(--inverse))] hover:before:bg-[var(--alpha-inverse-8)] disabled:opacity-40"
           >
