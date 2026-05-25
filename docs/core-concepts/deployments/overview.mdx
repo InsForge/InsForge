@@ -46,8 +46,8 @@ flowchart TB
 
 Deploy from your app's source directory. The CLI uploads the source tree, skips local-only files such as `node_modules`, `.git`, build output, and `.env` files, then starts the Vercel build through InsForge.
 
-```text
-npx @insforge/cli deployments deploy <source-directory>
+```bash
+npx @insforge/cli deployments deploy '<source-directory>'
 ```
 
 ### Framework builds
@@ -68,10 +68,10 @@ npx @insforge/cli deployments env set VITE_INSFORGE_ANON_KEY ik_xxx
 
 Review previous runs, sync Vercel status, inspect metadata, and cancel in-progress deployments from the Deployment Logs page.
 
-```text
+```bash
 npx @insforge/cli deployments list
-npx @insforge/cli deployments status <deployment-id> --sync
-npx @insforge/cli deployments cancel <deployment-id>
+npx @insforge/cli deployments status '<deployment-id>' --sync
+npx @insforge/cli deployments cancel '<deployment-id>'
 ```
 
 ### Domains
