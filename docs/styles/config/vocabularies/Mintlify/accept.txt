@@ -1,4 +1,5 @@
 ACLs
+ack
 agentic
 APNs
 apis
@@ -31,9 +32,11 @@ IPs
 iptables
 IVFFlat
 Keycloak
+kotlin
 linode
 loopback
 mcp
+Multiplatform
 nginx
 nodemailer
 npm
@@ -61,6 +64,7 @@ roocode
 runtimes
 SDKs
 serverless
+sdk
 Sinch
 stderr
 subcommand
@@ -73,6 +77,7 @@ vcpus
 vercel
 vm
 vultr
+Vite
 vue
 walkthrough
 walkthroughs

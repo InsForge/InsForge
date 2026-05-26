@@ -3,11 +3,8 @@ title: "Products"
 description: "Every InsForge product in one place. Click any card to dive in."
 ---
 
-InsForge ships seven core products and three private-preview modules. Every
-one is exposed through the same REST surface, the same JWT auth, the same
-MCP server, and the same SDKs.
-
-## Core products
+InsForge ships ten products, each exposed through the same REST surface, the
+same JWT auth, the same MCP server, and the same SDKs.
 
 <CardGroup cols={2}>
   <Card title="Database" icon="database" href="/core-concepts/database/overview">
@@ -26,8 +23,8 @@ MCP server, and the same SDKs.
   </Card>
 
   <Card title="Realtime" icon="tower-broadcast" href="/core-concepts/realtime/overview">
-    Postgres changes, broadcast, and presence over one WebSocket connection.
-    Subscriptions enforce the same RLS as REST queries.
+    Database changes, broadcast, and presence over one WebSocket connection.
+    Subscriptions and client publish use RLS checks.
   </Card>
 
   <Card title="Edge Functions" icon="bolt" href="/core-concepts/functions/overview">
@@ -44,14 +41,7 @@ MCP server, and the same SDKs.
     Deploy frontends to InsForge-managed hosting and link them to your project
     backend automatically.
   </Card>
-</CardGroup>
 
-## Private preview
-
-These modules are functional but the API may change before general availability.
-Reach out if you want early access.
-
-<CardGroup cols={3}>
   <Card title="Messaging" icon="envelope" href="/core-concepts/messaging/overview">
     Transactional email today; SMS and push on the roadmap. One API.
   </Card>

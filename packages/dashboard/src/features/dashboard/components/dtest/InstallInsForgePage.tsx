@@ -4,9 +4,11 @@ import { DTestInstallCliSection } from './DTestInstallCliSection';
 import {
   CLIENT_ENTRIES,
   CODING_AGENT_GRID_IDS,
+  DEFAULT_AGENT_TABS,
   DIRECT_CONNECT_IDS,
   type ClientId,
 } from './clientRegistry';
+import { getFeatureFlag } from '#lib/analytics/posthog';
 
 interface InstallInsForgePageProps {
   onSelectClient: (id: ClientId) => void;
@@ -14,8 +16,19 @@ interface InstallInsForgePageProps {
 }
 
 export function InstallInsForgePage({ onSelectClient, onDismiss }: InstallInsForgePageProps) {
-  const gridEntries = CODING_AGENT_GRID_IDS.map((id) => CLIENT_ENTRIES[id]);
+  const mcpVsCliVariant = getFeatureFlag('mcp-vs-cli');
+  const gridEntries = CODING_AGENT_GRID_IDS.map((id) => CLIENT_ENTRIES[id]).filter((entry) => {
+    const tabs = entry.tabs ?? DEFAULT_AGENT_TABS;
+    if (mcpVsCliVariant === 'mcp') {
+      return tabs.includes('mcp');
+    }
+    if (mcpVsCliVariant === 'cli') {
+      return tabs.includes('cli');
+    }
+    return true;
+  });
   const directEntries = DIRECT_CONNECT_IDS.map((id) => CLIENT_ENTRIES[id]);
+  const showCliPrompt = mcpVsCliVariant !== 'mcp';
 
   return (
     <main className="h-full min-h-0 min-w-0 overflow-y-auto bg-semantic-1">
@@ -33,8 +46,8 @@ export function InstallInsForgePage({ onSelectClient, onDismiss }: InstallInsFor
           </button>
         </div>
 
-        {/* Section 1: Use InsForge with CLI */}
-        <DTestInstallCliSection />
+        {/* Section 1: Use InsForge with CLI — hidden for mcp-vs-cli=mcp */}
+        {showCliPrompt && <DTestInstallCliSection />}
 
         {/* Section 2: Install in Agent */}
         <section className="flex flex-col gap-3 rounded border border-[var(--alpha-8)] bg-card p-6">
