@@ -69,7 +69,8 @@ export class DatabaseManager {
       );
       const map: Record<string, string> = {};
       for (const row of result.rows) {
-        map[row.column_name] = row.data_type === 'USER-DEFINED' ? row.udt_name : row.data_type;
+        map[row.column_name] =
+          row.data_type === 'USER-DEFINED' ? (row.udt_name ?? row.data_type) : row.data_type;
       }
 
       DatabaseManager.setColumnTypeCache(cacheKey, map);
