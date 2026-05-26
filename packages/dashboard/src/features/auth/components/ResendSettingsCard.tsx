@@ -109,11 +109,12 @@ export function ResendSettingsCard({
     form.reset(toFormValues(config));
   }, [config, form]);
 
+  // Reset on every config change so the form re-syncs after a successful save
+  // (react-hook-form leaves isDirty=true post-submit until form.reset is
+  // called). Matches SmtpSettingsCard's pattern.
   useEffect(() => {
-    if (!form.formState.isDirty) {
-      resetForm();
-    }
-  }, [form.formState.isDirty, resetForm]);
+    resetForm();
+  }, [resetForm]);
 
   const handleSubmit = () => {
     void form.handleSubmit((data) => {

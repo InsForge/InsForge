@@ -296,6 +296,10 @@ export class ResendConfigService {
         subject: 'API Key Verification',
         text: 'Testing Resend configuration.',
       });
+      // Swallow late rejections so a hung verify that loses the race doesn't
+      // surface as an unhandledRejection if the SDK throws (most Resend SDK
+      // errors come back as `{error}` instead, but be defensive).
+      verifyPromise.catch(() => {});
       const timeoutPromise = new Promise<never>((_, reject) => {
         timer = setTimeout(
           () =>

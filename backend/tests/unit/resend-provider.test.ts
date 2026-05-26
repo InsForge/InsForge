@@ -101,6 +101,23 @@ describe('ResendEmailProvider', () => {
       expect(callArgs.html).not.toContain('<script>');
     });
 
+    it('passes $-tokens in variable values verbatim (no regex back-ref expansion)', async () => {
+      // String.prototype.replace interprets $&, $1, $$ etc. in the replacement
+      // string. Variables containing these tokens must not be re-interpreted.
+      await provider.sendWithTemplate(
+        'user@example.com',
+        'Test User',
+        'email-verification-code',
+        { code: '12$&34' }
+      );
+
+      const callArgs = sendMock.mock.calls[0][0];
+      // After HTML escaping, `$` stays `$` (only <>"&' are escaped), so the
+      // literal `12$&34` should be present (with `&` HTML-escaped to `&amp;`).
+      expect(callArgs.html).toContain('12$&amp;34');
+      expect(callArgs.html).not.toContain('{{ code }}');
+    });
+
     it('throws AppError when Resend is not configured', async () => {
       getRawResendConfigMock.mockResolvedValueOnce(null);
 

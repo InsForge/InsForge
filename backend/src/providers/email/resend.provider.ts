@@ -45,7 +45,9 @@ export class ResendEmailProvider implements EmailProvider {
         safeValue = escapeForHtml ? escapeHtml(value) : value;
       }
       const pattern = new RegExp(`\\{\\{\\s*${escapeRegex(key)}\\s*\\}\\}`, 'g');
-      rendered = rendered.replace(pattern, safeValue);
+      // Use a function replacer so `$&`, `$1`, `$$`, etc. in the value are
+      // not re-interpreted by String.prototype.replace as backreferences.
+      rendered = rendered.replace(pattern, () => safeValue);
     }
     return rendered;
   }
