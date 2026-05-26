@@ -184,11 +184,14 @@ export class ResendConfigService {
         apiKeyEncrypted = EncryptionManager.encrypt(input.apiKey);
       }
 
+      // NULLIF guards against an empty-string overwrite when disabling — without
+      // it, `senderEmail: ""` would persist as an empty string and break the
+      // CHECK constraint next time the admin tries to re-enable Resend.
       const result = await client.query(
         `UPDATE email.resend_config SET
            enabled = $1, api_key_encrypted = $2,
-           sender_email = COALESCE($3, sender_email),
-           sender_name = COALESCE($4, sender_name),
+           sender_email = COALESCE(NULLIF($3, ''), sender_email),
+           sender_name = COALESCE(NULLIF($4, ''), sender_name),
            updated_at = NOW()
          WHERE id = $5
          RETURNING ${RESEND_CONFIG_COLUMNS}`,
@@ -282,6 +285,7 @@ export class ResendConfigService {
     }
 
     const RESEND_VERIFY_TIMEOUT_MS = 5_000;
+    let timer: NodeJS.Timeout | undefined;
     try {
       const resend = new Resend(apiKey);
       // Use a test send to delivered@resend.dev — works with both full_access and
@@ -292,18 +296,14 @@ export class ResendConfigService {
         subject: 'API Key Verification',
         text: 'Testing Resend configuration.',
       });
-      const { error } = await Promise.race([
-        verifyPromise,
-        new Promise<never>((_, reject) =>
-          setTimeout(
-            () =>
-              reject(
-                new Error(`Resend verification timed out after ${RESEND_VERIFY_TIMEOUT_MS}ms`)
-              ),
-            RESEND_VERIFY_TIMEOUT_MS
-          )
-        ),
-      ]);
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () =>
+            reject(new Error(`Resend verification timed out after ${RESEND_VERIFY_TIMEOUT_MS}ms`)),
+          RESEND_VERIFY_TIMEOUT_MS
+        );
+      });
+      const { error } = await Promise.race([verifyPromise, timeoutPromise]);
       if (error) {
         throw new Error(error.message);
       }
@@ -315,6 +315,10 @@ export class ResendConfigService {
         400,
         ERROR_CODES.EMAIL_RESEND_CONNECTION_FAILED
       );
+    } finally {
+      if (timer) {
+        clearTimeout(timer);
+      }
     }
   }
 }

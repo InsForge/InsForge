@@ -87,6 +87,36 @@ describe('Resend schemas', () => {
       expect(result.success).toBe(false);
     });
 
+    it('rejects API key without the re_ prefix', () => {
+      const result = upsertResendConfigRequestSchema.safeParse({
+        enabled: true,
+        apiKey: 'sk_1234567890abcdef',
+        senderEmail: 'noreply@example.com',
+        senderName: 'My App',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects API key shorter than re_ + 8 chars', () => {
+      const result = upsertResendConfigRequestSchema.safeParse({
+        enabled: true,
+        apiKey: 're_short',
+        senderEmail: 'noreply@example.com',
+        senderName: 'My App',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects API key with disallowed characters', () => {
+      const result = upsertResendConfigRequestSchema.safeParse({
+        enabled: true,
+        apiKey: 're_abc!def$ghi',
+        senderEmail: 'noreply@example.com',
+        senderName: 'My App',
+      });
+      expect(result.success).toBe(false);
+    });
+
     it('rejects enabled request without required fields', () => {
       const result = upsertResendConfigRequestSchema.safeParse({
         enabled: true,
