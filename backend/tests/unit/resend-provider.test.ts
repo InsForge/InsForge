@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ResendEmailProvider } from '../../src/providers/email/resend.provider';
-import { AppError } from '../../src/api/middlewares/error';
+import { AppError } from '../../src/utils/errors';
 
 const sendMock = vi.fn().mockResolvedValue({ data: { id: 'test-email-id' }, error: null });
 
