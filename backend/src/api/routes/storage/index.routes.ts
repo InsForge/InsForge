@@ -434,6 +434,10 @@ const downloadStrategyHandler = async (
 
     const strategy = await storageService.getDownloadStrategy(bucketName, objectKey);
 
+    // Strategy responses embed presigned URLs with short, server-decided
+    // expiries. Prevent intermediaries (proxies, CDNs) from caching this
+    // GET response and replaying expired URLs to later callers.
+    res.setHeader('Cache-Control', 'no-store');
     successResponse(res, strategy);
   } catch (error) {
     if (error instanceof Error && error.message.includes('Invalid')) {
@@ -452,9 +456,11 @@ router.get(
 
 // @deprecated Use GET /buckets/:bucketName/download-strategy/objects/* instead.
 // Retained at the original path/method for backward compatibility with SDK
-// releases that already shipped against the POST endpoint.
+// releases that already shipped against the POST endpoint. Uses a wildcard
+// so it matches both single-segment (encodeURIComponent'd) and raw-slash
+// object keys.
 router.post(
-  '/buckets/:bucketName/objects/:objectKey/download-strategy',
+  '/buckets/:bucketName/objects/*/download-strategy',
   conditionalDownloadAuth,
   downloadStrategyHandler
 );
