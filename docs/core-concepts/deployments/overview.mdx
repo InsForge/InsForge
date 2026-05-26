@@ -1,59 +1,93 @@
 ---
 title: "Deployments"
 sidebarTitle: "Overview"
-description: "Host frontends on InsForge and bind them to your project automatically."
+description: "Deploy frontend apps from your project, powered by Vercel."
 ---
 
-Use InsForge Deployments to push a frontend (Next.js, React, Vue, Svelte, or any static site) and bind it to your project at build time. The SDK is configured automatically, so you never copy anon keys into environment variables or manage a separate dashboard.
+Use InsForge Deployments to ship the browser-facing app that belongs to your project. The InsForge CLI uploads your frontend source through InsForge, which creates a Vercel production deployment. The dashboard tracks the URL, status, deployment history, environment variables, and domains.
+
+<Frame caption="Deployments dashboard: status, domains, env vars, and history.">
+  <img src="/images/dashboard-deployments.png" alt="InsForge Deployments dashboard" />
+</Frame>
 
 <Note>
-  **Need to run a backend service?** Use [Compute](/core-concepts/compute/overview) for queue workers, AI inference loops, and other always-on jobs. Deployments are for the frontend; Compute is for the long-running back end.
+  **Need to deploy a container or backend service?** Use [Compute](/core-concepts/compute/overview) for workers, queues, WebSocket servers, and long-running services. Deployments are for frontend websites and framework builds that produce a hosted web app.
 </Note>
 
 ```mermaid
-graph TB
-    Agent[Coding Agent] --> MCP[InsForge MCP]
-    CLI[InsForge CLI] --> API[InsForge Server]
-    MCP --> API
+flowchart TB
+    CLI[InsForge CLI] --> API[InsForge deployment API]
+    Dashboard[Dashboard] --> API
 
-    API --> Build[Build & Deploy]
-    Build --> Live[Live Frontend]
+    API --> Source[Frontend source upload]
+    API --> Config[Environment variables and domains]
 
-    API --> Project[(Your Project)]
-    Live -->|auto-linked SDK| Project
+    Source --> Vercel[Vercel production build]
+    Config --> Vercel
 
-    style Agent fill:#1e293b,stroke:#475569,color:#e2e8f0
-    style CLI fill:#1e40af,stroke:#3b82f6,color:#dbeafe
-    style MCP fill:#1e40af,stroke:#3b82f6,color:#dbeafe
+    Vercel --> App[Frontend app]
+    App --> URL[Public URL]
+    App --> Status[Status and deployment history]
+
+    style CLI fill:#1e293b,stroke:#475569,color:#e2e8f0
+    style Dashboard fill:#1e293b,stroke:#475569,color:#e2e8f0
     style API fill:#166534,stroke:#22c55e,color:#dcfce7
-    style Build fill:#c2410c,stroke:#fb923c,color:#fed7aa
-    style Live fill:#166534,stroke:#22c55e,color:#dcfce7
-    style Project fill:#0e7490,stroke:#06b6d4,color:#cffafe
+    style Source fill:#0e7490,stroke:#06b6d4,color:#cffafe
+    style Config fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
+    style Vercel fill:#c2410c,stroke:#fb923c,color:#fed7aa
+    style App fill:#166534,stroke:#22c55e,color:#dcfce7
+    style URL fill:#166534,stroke:#22c55e,color:#dcfce7
+    style Status fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
 ```
 
 ## Features
 
-### Auto-linked SDK config
+### CLI deploys
 
-When a build runs, the InsForge SDK gets the project URL and anon key injected as environment variables. The same code works in local dev, preview, and production with zero config drift.
+Deploy from your app's source directory. The CLI uploads the source tree, skips local-only files such as `node_modules`, `.git`, build output, and `.env` files, then starts the Vercel build through InsForge.
 
-### Framework detection
+```bash
+npx @insforge/cli deployments deploy ./frontend
+```
 
-The build pipeline detects Next.js, React, Vue, Nuxt, Svelte, Astro, and plain static output. Set a custom build command and output directory when you need to override.
+### Framework builds
 
-### Custom domains
+Deploy React, Vue, Svelte, Next.js, static sites, and other frontend projects. InsForge sends the source files to Vercel, where framework detection and project files such as `package.json` and `vercel.json` decide how the app builds.
 
-Bring your own domain and point a `CNAME` at the deployment. HTTPS certificates are provisioned and renewed automatically via Let's Encrypt.
+### Environment variables
 
-### Preview environments
+Manage provider environment variables from the dashboard. Use public prefixes such as `VITE_` or `NEXT_PUBLIC_` only for values that are safe to expose in browser code.
 
-Every branch can publish to its own preview URL, wired to an isolated [database branch](/agent-native/branching). Merge to main and the preview promotes to production.
+```bash
+npx @insforge/cli deployments env list
+npx @insforge/cli deployments env set VITE_INSFORGE_URL https://your-project.region.insforge.app
+npx @insforge/cli deployments env set VITE_INSFORGE_ANON_KEY ik_xxx
+```
 
-### Build logs
+### Deployment history
 
-Structured logs per deploy, queryable by status and duration. Failures surface the offending command and stderr; no need to grep through a giant text dump.
+Review previous runs, sync Vercel status, inspect metadata, and cancel in-progress deployments from the Deployment Logs page.
+
+```bash
+npx @insforge/cli deployments list
+npx @insforge/cli deployments status deployment_123 --sync
+npx @insforge/cli deployments cancel deployment_123
+```
+
+### Domains
+
+Every ready deployment gets a default URL at `https://<appkey>.insforge.site`. You can also set an InsForge-managed slug at `https://<slug>.insforge.site`. For a custom domain, add the domain in the dashboard and configure the DNS record it returns, usually a CNAME for subdomains.
+
+## Deploy with it
+
+<CardGroup cols={2}>
+  <Card title="CLI quickstart" icon="terminal" href="/quickstart">
+    Connect your project and run InsForge CLI commands from your app directory.
+  </Card>
+</CardGroup>
 
 ## Next steps
 
-- Set up the [CLI](/quickstart) to link your project (the recommended path).
-- Pick a [framework guide](/examples/framework-guides/nextjs) to scaffold your first project.
+- Set up the [CLI](/quickstart) and connect your project.
+- Add browser-safe environment variables from the dashboard or with `npx @insforge/cli deployments env set`.
+- Run `npx @insforge/cli deployments deploy ./frontend`.

@@ -18,9 +18,9 @@ export function TablesEmptyState({
     <div className="flex h-full w-full justify-center overflow-y-auto bg-[rgb(var(--semantic-1))]">
       <div className="mx-auto flex w-full max-w-[1024px] flex-col gap-6 px-4 pb-10 pt-8 sm:px-6 sm:pt-10 lg:px-10">
         <h2 className="text-2xl font-medium leading-8 text-foreground">Create Your First Table</h2>
-        <Button className="h-9 min-h-9 w-fit gap-1 rounded px-3 py-2" onClick={onCreateTable}>
+        <Button className="h-8 w-fit gap-0 rounded px-1.5" onClick={onCreateTable}>
           <Plus className="h-5 w-5" />
-          <span className="text-sm font-medium">Create Table</span>
+          <span className="px-1 text-sm font-medium leading-5">Create Table</span>
         </Button>
         <div className="flex flex-col gap-3">
           <p className="text-sm leading-6 text-muted-foreground">or choose a template to start</p>

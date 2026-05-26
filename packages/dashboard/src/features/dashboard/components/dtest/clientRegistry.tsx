@@ -26,6 +26,8 @@ export type ClientKind = 'agent' | 'direct-connect';
 
 export type AgentTab = 'cli' | 'mcp';
 
+export const DEFAULT_AGENT_TABS: ReadonlyArray<AgentTab> = ['cli', 'mcp'];
+
 export interface ClientEntry {
   id: ClientId;
   label: string;
