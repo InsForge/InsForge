@@ -44,8 +44,7 @@ function getAllHeaders(data: Record<string, unknown>[]): string[] {
     Object.keys(row).forEach((key) => headerSet.add(key));
   }
 
-  // Sort headers for consistent output
-  return Array.from(headerSet).sort();
+  return Array.from(headerSet);
 }
 
 /**
@@ -84,7 +83,7 @@ export function convertToCSV(data: unknown[], filename = 'export'): void {
 
 /**
  * Convert data to JSON and trigger download
- * Handles circular references and special object types
+ * For flat table data with primitive values only
  */
 export function convertToJSON(data: unknown[], filename = 'export'): void {
   if (!Array.isArray(data)) {
@@ -92,26 +91,7 @@ export function convertToJSON(data: unknown[], filename = 'export'): void {
     return;
   }
 
-  // Use replacer to handle circular references and convert non-serializable objects
-  const jsonContent = JSON.stringify(
-    data,
-    (key, value) => {
-      // Handle circular references by returning undefined
-      if (typeof value === 'object' && value !== null) {
-        if (value instanceof Date) {
-          return value.toISOString();
-        }
-        if (value instanceof Set) {
-          return Array.from(value);
-        }
-        if (value instanceof Map) {
-          return Object.fromEntries(value);
-        }
-      }
-      return value;
-    },
-    2
-  );
+  const jsonContent = JSON.stringify(data, null, 2);
 
   downloadFile(jsonContent, `${filename}.json`, 'application/json;charset=utf-8;');
 }
