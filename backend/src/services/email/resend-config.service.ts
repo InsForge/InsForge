@@ -126,34 +126,36 @@ export class ResendConfigService {
   }
 
   async getRawResendConfig(): Promise<RawResendConfig | null> {
-    const result = await this.getPool().query(
-      `SELECT ${RESEND_CONFIG_COLUMNS} FROM email.resend_config LIMIT 1`
-    );
-    if (!result.rows.length) {
-      return null;
-    }
-
-    const row = result.rows[0];
-    if (!row.enabled) {
-      return null;
-    }
-
-    const apiKey = this.getDecryptedApiKey(row.api_key_encrypted);
-    if (apiKey === null) {
-      throw new AppError(
-        'Resend API key is corrupted — cannot decrypt stored credentials',
-        500,
-        ERROR_CODES.EMAIL_RESEND_CONNECTION_FAILED
+    try {
+      const result = await this.getPool().query(
+        `SELECT ${RESEND_CONFIG_COLUMNS} FROM email.resend_config LIMIT 1`
       );
-    }
+      if (!result.rows.length) {
+        return null;
+      }
 
-    return {
-      id: row.id,
-      enabled: row.enabled,
-      apiKey,
-      senderEmail: row.senderEmail,
-      senderName: row.senderName,
-    };
+      const row = result.rows[0];
+      if (!row.enabled) {
+        return null;
+      }
+
+      const apiKey = this.getDecryptedApiKey(row.api_key_encrypted);
+      if (apiKey === null) {
+        logger.error('Resend config has undecryptable API key — treating as unconfigured');
+        return null;
+      }
+
+      return {
+        id: row.id,
+        enabled: row.enabled,
+        apiKey,
+        senderEmail: row.senderEmail,
+        senderName: row.senderName,
+      };
+    } catch (error) {
+      logger.error('Failed to get raw Resend config', { error });
+      return null;
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -279,16 +281,29 @@ export class ResendConfigService {
       apiKey = decrypted;
     }
 
+    const RESEND_VERIFY_TIMEOUT_MS = 5_000;
     try {
       const resend = new Resend(apiKey);
       // Use a test send to delivered@resend.dev — works with both full_access and
       // sending_access keys, unlike apiKeys.list() which requires full_access.
-      const { error } = await resend.emails.send({
+      const verifyPromise = resend.emails.send({
         from: 'onboarding@resend.dev',
         to: ['delivered@resend.dev'],
         subject: 'API Key Verification',
         text: 'Testing Resend configuration.',
       });
+      const { error } = await Promise.race([
+        verifyPromise,
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () =>
+              reject(
+                new Error(`Resend verification timed out after ${RESEND_VERIFY_TIMEOUT_MS}ms`)
+              ),
+            RESEND_VERIFY_TIMEOUT_MS
+          )
+        ),
+      ]);
       if (error) {
         throw new Error(error.message);
       }

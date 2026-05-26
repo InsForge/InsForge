@@ -399,6 +399,14 @@ export const getPublicAuthConfigResponseSchema = authConfigAdminResponseSchema.o
 // Resend Configuration schemas
 // ============================================================================
 
+// Resend API keys follow the `re_<alphanumeric>` shape (32+ chars typical).
+const resendApiKeySchema = z
+  .string()
+  .regex(
+    /^re_[A-Za-z0-9_]{8,}$/,
+    'API key must start with "re_" followed by 8+ alphanumeric characters'
+  );
+
 /**
  * PUT /api/auth/resend-config - Upsert Resend configuration
  * Sender fields are only required when enabling Resend.
@@ -406,13 +414,13 @@ export const getPublicAuthConfigResponseSchema = authConfigAdminResponseSchema.o
 export const upsertResendConfigRequestSchema = z.discriminatedUnion('enabled', [
   z.object({
     enabled: z.literal(false),
-    apiKey: z.string().optional(),
+    apiKey: resendApiKeySchema.optional(),
     senderEmail: z.string().optional(),
     senderName: z.string().optional(),
   }),
   z.object({
     enabled: z.literal(true),
-    apiKey: z.string().min(1, 'Resend API key is required').optional(),
+    apiKey: resendApiKeySchema.optional(),
     senderEmail: z.string().email('Invalid sender email'),
     senderName: z.string().min(1, 'Sender name is required'),
   }),
