@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { CirclePlus, LogIn } from 'lucide-react';
+import { CirclePlus, FolderInput, FolderOutput } from 'lucide-react';
 import PencilIcon from '#assets/icons/pencil.svg?react';
 import RefreshIcon from '#assets/icons/refresh.svg?react';
 import { useDatabaseSchemas } from '#features/database/hooks/useDatabase';
@@ -35,6 +35,7 @@ import { DatabaseDataGrid } from '#features/database/components/DatabaseDataGrid
 import { SortColumn } from 'react-data-grid';
 import { convertValueForColumn } from '#lib/utils/utils';
 import { useCSVImport } from '#features/database/hooks/useCSVImport';
+import { useCSVExport } from '#features/database/hooks/useCSVExport';
 import { useTablePreferences } from '#features/database/hooks/useTablePreferences';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { usePageSize } from '#lib/hooks/usePageSize';
@@ -237,6 +238,26 @@ export default function TablesPage() {
         error?.message || 'An unexpected error occurred during import. Please try again.';
       showToast(message, 'error');
       resetImport();
+    },
+  });
+
+  const {
+    mutate: exportCSV,
+    isPending: isExporting,
+    reset: resetExport,
+  } = useCSVExport(selectedTable || '', selectedSchema, {
+    onSuccess: () => {
+      showToast('Export successful!', 'success');
+      resetExport();
+    },
+    onWarning: (message: string) => {
+      showToast(message, 'warn');
+    },
+    onError: (error: Error) => {
+      const message =
+        error?.message || 'An unexpected error occurred during export. Please try again.';
+      showToast(message, 'error');
+      resetExport();
     },
   });
 
@@ -584,13 +605,25 @@ export default function TablesPage() {
                             onClick={() => fileInputRef.current?.click()}
                             disabled={isImporting}
                           >
-                            <LogIn className="h-6 w-6 stroke-[1.5]" />
+                            <FolderInput className="h-6 w-6 stroke-[1.5]" />
                             <span className="px-1 text-sm font-medium leading-5">
                               {isImporting ? 'Importing...' : 'Import CSV'}
                             </span>
                           </Button>
                         </>
                       )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 rounded px-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] hover:text-foreground active:bg-[var(--alpha-8)]"
+                        onClick={() => exportCSV()}
+                        disabled={isExporting}
+                      >
+                        <FolderOutput className="h-6 w-6 stroke-[1.5]" />
+                        <span className="px-1 text-sm font-medium leading-5">
+                          {isExporting ? 'Exporting...' : 'Export CSV'}
+                        </span>
+                      </Button>
                     </div>
                   )
                 }
