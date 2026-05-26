@@ -78,6 +78,7 @@ export function AnalyticsConfigDialog({
       newTab.opener = null;
     } catch {
       newTab.close();
+      showToast('Could not open PostHog. Please try again.', 'error');
       return;
     }
     onOpenPosthog(projectId)
@@ -86,10 +87,12 @@ export function AnalyticsConfigDialog({
           newTab.location.href = result.url;
         } else {
           newTab.close();
+          showToast('Could not open PostHog. Please try again.', 'error');
         }
       })
       .catch(() => {
         newTab.close();
+        showToast('Could not open PostHog. Please try again.', 'error');
       });
   };
 

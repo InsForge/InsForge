@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { ErrorState, LoadingState } from '#components';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
@@ -15,6 +15,7 @@ export default function AnalyticsLayout() {
   const { projectId, isLoading: projectIdLoading, error: projectIdError } = useProjectId();
   const qc = useQueryClient();
   const { showToast } = useToast();
+  const navigate = useNavigate();
   const { subscribePosthogConnectionStatus } = useDashboardHost();
 
   useEffect(() => {
@@ -24,6 +25,7 @@ export default function AnalyticsLayout() {
     return subscribePosthogConnectionStatus((e) => {
       if (e.status === 'connected') {
         void qc.invalidateQueries({ queryKey: ['posthog'] });
+        navigate('/dashboard/analytics/traffic', { replace: true });
         return;
       }
       if (e.status === 'error') {
@@ -39,36 +41,34 @@ export default function AnalyticsLayout() {
         showToast('PostHog connection cancelled.', 'info');
       }
     });
-  }, [qc, showToast, subscribePosthogConnectionStatus]);
-
-  const connection = conn.data ?? null;
+  }, [qc, navigate, showToast, subscribePosthogConnectionStatus]);
 
   return (
     <TimeRangeProvider>
       <div className="flex h-full min-h-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
-        <AnalyticsSidebar connection={connection} projectId={projectId ?? ''} />
-        <div className="min-w-0 flex-1 overflow-auto">
-          {renderMain({ conn, connection, projectId, projectIdLoading, projectIdError })}
-        </div>
+        {renderLayout({
+          conn,
+          projectId,
+          projectIdLoading,
+          projectIdError,
+        })}
       </div>
     </TimeRangeProvider>
   );
 }
 
-function renderMain({
+function renderLayout({
   conn,
-  connection,
   projectId,
   projectIdLoading,
   projectIdError,
 }: {
   conn: ReturnType<typeof usePosthogConnection>;
-  connection: ReturnType<typeof usePosthogConnection>['data'] | null;
   projectId: string | null | undefined;
   projectIdLoading: boolean;
   projectIdError: Error | null;
 }) {
-  if (conn.isLoading || (!connection && projectIdLoading)) {
+  if (conn.isLoading || projectIdLoading) {
     return <LoadingState />;
   }
   if (conn.isError) {
@@ -79,23 +79,31 @@ function renderMain({
       />
     );
   }
-  if (!connection) {
-    if (projectIdError || !projectId) {
-      return (
-        <ErrorState
-          title="Failed to load project ID"
-          error="Please refresh, or contact support if the problem persists."
-        />
-      );
-    }
+  if (projectIdError || !projectId) {
     return (
-      <div className="h-full overflow-y-auto">
-        <div className="mx-auto flex w-4/5 max-w-[1024px] flex-col gap-6 pb-10 pt-10">
-          <h1 className="text-2xl font-medium leading-8 text-foreground">Setup Analytics</h1>
-          <EmptyConnectPanel projectId={projectId} />
-        </div>
-      </div>
+      <ErrorState
+        title="Failed to load project ID"
+        error="Please refresh, or contact support if the problem persists."
+      />
     );
   }
-  return <Outlet />;
+
+  const connection = conn.data ?? null;
+  return (
+    <>
+      <AnalyticsSidebar connection={connection} projectId={projectId} />
+      <div className="min-w-0 flex-1 overflow-auto">
+        {connection ? (
+          <Outlet />
+        ) : (
+          <div className="h-full overflow-y-auto">
+            <div className="mx-auto flex w-4/5 max-w-[1024px] flex-col gap-6 pb-10 pt-10">
+              <h1 className="text-2xl font-medium leading-8 text-foreground">Setup Analytics</h1>
+              <EmptyConnectPanel projectId={projectId} />
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
 }
