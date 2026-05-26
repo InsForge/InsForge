@@ -159,7 +159,7 @@ export function KpiSectionWithTrend({ enabled }: { enabled: boolean }) {
           </div>
         ) : chartData.length === 0 ? (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-            No data
+            No data available
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">

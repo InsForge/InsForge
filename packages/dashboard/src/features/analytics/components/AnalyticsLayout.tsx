@@ -25,7 +25,7 @@ export default function AnalyticsLayout() {
     return subscribePosthogConnectionStatus((e) => {
       if (e.status === 'connected') {
         void qc.invalidateQueries({ queryKey: ['posthog'] });
-        navigate('/dashboard/analytics/traffic', { replace: true });
+        void navigate('/dashboard/analytics/traffic', { replace: true });
         return;
       }
       if (e.status === 'error') {

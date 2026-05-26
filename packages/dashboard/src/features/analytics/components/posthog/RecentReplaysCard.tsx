@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { PosthogRecordingItem } from '@insforge/shared-schemas';
+import { EmptyState } from '#components';
 import { formatDuration, formatRelativeTime, truncateId } from '#features/analytics/lib/format';
 import { ReplayModal } from './ReplayModal';
 
@@ -23,11 +24,7 @@ export function RecentReplaysCard({
   }
 
   if (items.length === 0) {
-    return (
-      <div className="px-4 py-6 text-sm text-muted-foreground">
-        No replays yet. Make sure session_recording is enabled in your PostHog project.
-      </div>
-    );
+    return <EmptyState title="No data available" className="py-12" />;
   }
 
   return (
