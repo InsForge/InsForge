@@ -37,11 +37,9 @@ describe('assertValidWebLogoutCsrf', () => {
 
   it('allows logout cleanup when the refresh token is expired or invalid', () => {
     const tokenVerifier: CsrfTokenVerifier = {
-      verifyRefreshToken: vi
-        .fn()
-        .mockImplementation(() => {
-          throw new AppError('Invalid refresh token', 401, 'AUTH_UNAUTHORIZED');
-        }),
+      verifyRefreshToken: vi.fn().mockImplementation(() => {
+        throw new AppError('Invalid refresh token', 401, 'AUTH_UNAUTHORIZED');
+      }),
       verifyCsrfToken: vi.fn(),
     };
 
