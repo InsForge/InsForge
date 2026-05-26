@@ -1,0 +1,38 @@
+version: '3.8'
+
+# Ephemeral MinIO for S3-gateway integration tests.
+# Exposes the S3 API at :9100 and a console at :9101, deliberately shifted
+# off the common 9000/9001 so it doesn't clash with other local services.
+
+services:
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9100:9000"
+      - "9101:9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: miniosecret
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - minio-data:/data
+
+  minio-setup:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        until (/usr/bin/mc alias set local http://minio:9000 minio miniosecret) do sleep 1; done
+        /usr/bin/mc mb -p local/insforge-storage
+        exit 0
+
+volumes:
+  minio-data:

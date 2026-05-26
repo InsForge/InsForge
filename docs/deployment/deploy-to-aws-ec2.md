@@ -2,6 +2,10 @@
 
 This guide will walk you through deploying InsForge on an AWS EC2 instance using Docker Compose.
 
+<Note>
+  This cloud walkthrough is community-maintained and can lag the latest InsForge release. The canonical, always-current setup is the `deploy/docker-compose/` directory in the [InsForge repo](https://github.com/InsForge/InsForge).
+</Note>
+
 ## 📋 Prerequisites
 
 - AWS Account with EC2 access
@@ -34,8 +38,7 @@ Create or configure security group with the following inbound rules:
 | SSH         | TCP      | 22         | My IP     | SSH access           |
 | HTTP        | TCP      | 80         | 0.0.0.0/0 | HTTP access          |
 | HTTPS       | TCP      | 443        | 0.0.0.0/0 | HTTPS access         |
-| Custom TCP  | TCP      | 7130       | 0.0.0.0/0 | Backend API          |
-| Custom TCP  | TCP      | 7131       | 0.0.0.0/0 | Frontend Dashboard   |
+| Custom TCP  | TCP      | 7130       | 0.0.0.0/0 | Dashboard + API      |
 | Custom TCP  | TCP      | 5432       | 0.0.0.0/0 | PostgreSQL (optional)|
 
 > ⚠️ **Security Note**: For production, restrict PostgreSQL (5432) to specific IP addresses or remove external access entirely. Consider using a reverse proxy (nginx) and exposing only ports 80/443.
@@ -114,85 +117,41 @@ cd insforge/deploy/docker-compose
 
 #### 4.2 Create Environment Configuration
 
-Create your `.env` file with production settings:
+Copy the example template to create your `.env` file:
 
 ```bash
+cp .env.example .env
 nano .env
 ```
 
-Add the following configuration (customize the values):
+The full template lives at `deploy/docker-compose/.env.example`. These are the variables you must set:
 
 ```env
-
-# ============================================
-# Server Configuration
-# ============================================
-PORT=7130
-
-# ============================================
-# Database Configuration
-# ============================================
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres
-POSTGRES_DB=insforge
-
-# ============================================
-# Security & Authentication
-# ============================================
-# IMPORTANT: Generate a strong random secret for production
+# Required
 JWT_SECRET=your-secret-key-here-must-be-32-char-or-above
-ENCRYPTION_KEY=
-
-# Admin Account (used for initial setup)
 ADMIN_EMAIL=admin@example.com
 ADMIN_PASSWORD=change-this-password
+POSTGRES_PASSWORD=change-this-password
 
-# ============================================
-# API Configuration
-# ============================================
-# Replace with your EC2 public IP or domain
-API_BASE_URL=http://your-ec2-ip:7130
-VITE_API_BASE_URL=http://your-ec2-ip:7130
+# Optional: falls back to JWT_SECRET if left blank
+ENCRYPTION_KEY=
 
-# ============================================
-# OAuth Providers (Optional)
-# ============================================
-# Google OAuth
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-
-# GitHub OAuth
-GITHUB_CLIENT_ID=
-GITHUB_CLIENT_SECRET=
-
-# ============================================
-# AWS Storage Configuration (Optional)
-# ============================================
-# For S3 file storage
-AWS_S3_BUCKET=
-AWS_REGION=
-AWS_ACCESS_KEY_ID=
-AWS_SECRET_ACCESS_KEY=
-
-# ============================================
-# AI/LLM Configuration (Optional)
-# ============================================
+# Optional: enables AI features
 OPENROUTER_API_KEY=
 
-# ============================================
-# Multi-tenant Cloud Configuration (Optional)
-# ============================================
-DEPLOYMENT_ID=
-PROJECT_ID=
-APP_KEY=
-ACCESS_API_KEY=
+# Optional: enables site deployments
+VERCEL_TOKEN=
+VERCEL_TEAM_ID=
+VERCEL_PROJECT_ID=
 
-# ============================================
-# Advanced Configuration
-# ============================================
-DENO_ENV=production
-WORKER_TIMEOUT_MS=30000
+# Optional: OAuth providers
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
 ```
+
+The `.env.example` template carries the remaining variables and their defaults, so editing the copied file is enough.
 
 **Generate Secure Secrets:**
 
@@ -224,12 +183,11 @@ Press `Ctrl+C` to exit log view.
 # Check running containers
 docker compose ps
 
-# You should see 5 running services:
-# - insforge-postgres
-# - insforge-postgrest
+# You should see 4 running services:
+# - postgres
+# - postgrest
 # - insforge
-# - insforge-deno
-# - insforge-vector
+# - deno
 ```
 
 ### 5. Access Your InsForge Instance
@@ -244,7 +202,7 @@ Expected response:
 ```json
 {
   "status": "ok",
-  "version": "1.0.0",
+  "version": "2.1.7",
   "service": "Insforge OSS Backend",
   "timestamp": "2025-10-17T..."
 }
@@ -257,36 +215,7 @@ Open your browser and navigate to:
 http://your-ec2-ip:7130
 ```
 
-
-#### 5.3 ⚠️ Important: Custom Admin Credentials Configuration
-
-> **🚧 Active Development Notice**: InsForge is currently in active development and testing. The credential management system is being developed. The following is a temporary workaround that will be replaced with a secure implementation in future releases.
-
-**If you customize admin credentials** in your `.env` file (which is recommended), you must **also update the frontend login page** to match. This is a temporary requirement during our development phase.
-
-**Step 1: Update `.env` file**
-
-```env
-# In your .env file
-ADMIN_EMAIL=your-custom-admin@example.com
-ADMIN_PASSWORD=your-secure-password-here
-
-```
-
-After updating your `.env` file, manually edit the login page:
-
-```bash
-nano ~/insforge/frontend/src/features/login/page/LoginPage.tsx
-```
-
-Find this section (around line 38-41):
-```typescript
-defaultValues: {
-  email: 'admin@example.com',
-  password: 'change-this-password',
-},
-```
-
+Log in with the `ADMIN_EMAIL` and `ADMIN_PASSWORD` you set in `.env`.
 
 ### 6. Configure Domain (Optional but Recommended)
 
@@ -331,13 +260,13 @@ server {
     }
 }
 
-# Frontend Dashboard
+# Dashboard (served by the backend on the same port as the API)
 server {
     listen 80;
     server_name app.yourdomain.com;
 
     location / {
-        proxy_pass http://localhost:7131;
+        proxy_pass http://localhost:7130;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -373,7 +302,7 @@ sudo certbot --nginx -d api.yourdomain.com -d app.yourdomain.com
 Update your `.env` file with HTTPS URLs:
 
 ```bash
-cd ~/insforge
+cd ~/insforge/deploy/docker-compose
 nano .env
 ```
 
@@ -418,21 +347,24 @@ docker compose restart
 
 ### Update InsForge
 
+InsForge ships prebuilt images, so an update is a pull and restart. Run this from `~/insforge/deploy/docker-compose`:
+
 ```bash
-cd ~/insforge
+cd ~/insforge/deploy/docker-compose
 git pull origin main
-docker compose down
-docker compose up -d --build
+docker compose pull && docker compose up -d
 ```
 
 ### Backup Database
 
+Run these from `~/insforge/deploy/docker-compose`:
+
 ```bash
 # Create backup
-docker exec insforge-postgres pg_dump -U postgres insforge > backup_$(date +%Y%m%d_%H%M%S).sql
+docker compose exec postgres pg_dump -U postgres insforge > backup_$(date +%Y%m%d_%H%M%S).sql
 
 # Restore from backup
-cat backup_file.sql | docker exec -i insforge-postgres psql -U postgres -d insforge
+cat backup_file.sql | docker compose exec -T postgres psql -U postgres -d insforge
 ```
 
 ### Monitor Resources

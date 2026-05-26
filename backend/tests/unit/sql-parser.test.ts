@@ -1,9 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { beforeAll, describe, it, expect } from 'vitest';
 import {
+  checkSqlExecutionGuards,
+  initSqlParser,
   parseSQLStatements,
-  checkSystemSchemaOperations,
-  checkAuthSchemaOperations,
 } from '../../src/utils/sql-parser';
+
+beforeAll(async () => {
+  await initSqlParser();
+});
 
 describe('parseSQLStatements', () => {
   it('splits multiple statements by semicolon', () => {
@@ -26,7 +30,6 @@ describe('parseSQLStatements', () => {
       SELECT * FROM users; -- Inline comment
     `;
     const result = parseSQLStatements(sql);
-    // Parser returns the statement with comments filtered out
     expect(result).toHaveLength(1);
     expect(result[0]).toContain('SELECT * FROM users');
   });
@@ -38,7 +41,6 @@ describe('parseSQLStatements', () => {
       /* Another comment */
     `;
     const result = parseSQLStatements(sql);
-    // Parser returns the statement with comments filtered out
     expect(result).toHaveLength(1);
     expect(result[0]).toContain('SELECT * FROM users');
   });
@@ -46,7 +48,6 @@ describe('parseSQLStatements', () => {
   it('handles semicolons inside string literals', () => {
     const sql = `INSERT INTO messages (text) VALUES ('Hello; World')`;
     const result = parseSQLStatements(sql);
-    // Parser includes the trailing semicolon
     expect(result).toEqual([`INSERT INTO messages (text) VALUES ('Hello; World')`]);
   });
 
@@ -60,7 +61,6 @@ describe('parseSQLStatements', () => {
       /* Another comment */
     `;
     const result = parseSQLStatements(sql);
-    // Parser filters out comment-only content
     expect(result).toEqual([]);
   });
 
@@ -77,139 +77,91 @@ describe('parseSQLStatements', () => {
   });
 });
 
-describe('checkSystemSchemaOperations', () => {
-  it('blocks CREATE OR REPLACE FUNCTION on system schema', () => {
-    const query = `CREATE OR REPLACE FUNCTION system.update_updated_at()
-      RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql`;
-    expect(checkSystemSchemaOperations(query)).not.toBeNull();
-  });
-
-  it('blocks SET search_path', () => {
-    expect(checkSystemSchemaOperations('SET search_path TO system, public')).not.toBeNull();
-  });
-
-  it('blocks SET search_path (case-insensitive)', () => {
-    expect(checkSystemSchemaOperations('SET SEARCH_PATH TO public')).not.toBeNull();
-  });
-
-  it('blocks set_config search_path bypass', () => {
+describe('SQL execution guards', () => {
+  it('blocks role and session authorization changes', () => {
+    expect(checkSqlExecutionGuards('SET ROLE postgres')).not.toBeNull();
+    expect(checkSqlExecutionGuards('SET LOCAL ROLE postgres')).not.toBeNull();
+    expect(checkSqlExecutionGuards('RESET ROLE')).not.toBeNull();
+    expect(checkSqlExecutionGuards('SET SESSION AUTHORIZATION postgres')).not.toBeNull();
+    expect(checkSqlExecutionGuards('RESET SESSION AUTHORIZATION')).not.toBeNull();
+    expect(checkSqlExecutionGuards("SELECT set_config('role', 'postgres', false)")).not.toBeNull();
     expect(
-      checkSystemSchemaOperations("SELECT set_config('search_path', 'system', true)")
+      checkSqlExecutionGuards("SELECT set_config('role'::text, 'postgres', false)")
+    ).not.toBeNull();
+    expect(checkSqlExecutionGuards("SELECT set_config($1, 'postgres', false)")).not.toBeNull();
+    expect(
+      checkSqlExecutionGuards("SELECT set_config('ro' || 'le', 'postgres', false)")
+    ).not.toBeNull();
+    expect(
+      checkSqlExecutionGuards("SELECT pg_catalog.set_config('role', 'postgres', false)")
+    ).not.toBeNull();
+    expect(
+      checkSqlExecutionGuards("SELECT pg_catalog.\"set_config\"('role', 'postgres', false)")
+    ).not.toBeNull();
+    expect(checkSqlExecutionGuards("SELECT set_config('app.safe', 'value', false)")).not.toBeNull();
+  });
+
+  it('blocks role management statements but allows object grants', () => {
+    expect(checkSqlExecutionGuards('CREATE ROLE app_owner')).not.toBeNull();
+    expect(
+      checkSqlExecutionGuards('ALTER ROLE project_admin SET search_path TO public')
+    ).not.toBeNull();
+    expect(checkSqlExecutionGuards('DROP ROLE app_owner')).not.toBeNull();
+    expect(checkSqlExecutionGuards('GRANT authenticated TO project_admin')).not.toBeNull();
+    expect(checkSqlExecutionGuards('GRANT SELECT ON public.todos TO authenticated')).toBeNull();
+  });
+
+  it('blocks transaction control statements', () => {
+    expect(checkSqlExecutionGuards('BEGIN')).not.toBeNull();
+    expect(checkSqlExecutionGuards('COMMIT')).not.toBeNull();
+    expect(checkSqlExecutionGuards('ROLLBACK')).not.toBeNull();
+    expect(checkSqlExecutionGuards('SELECT 1')).toBeNull();
+  });
+
+  it('blocks search_path changes without matching comments or strings', () => {
+    expect(checkSqlExecutionGuards('SET search_path TO public')).not.toBeNull();
+    expect(
+      checkSqlExecutionGuards("SELECT set_config('search_path', 'public', false)")
+    ).not.toBeNull();
+    expect(
+      checkSqlExecutionGuards("SELECT set_config('search_path'::text, 'public', false)")
+    ).not.toBeNull();
+    expect(checkSqlExecutionGuards("SELECT 'SET search_path TO public'")).toBeNull();
+    expect(checkSqlExecutionGuards('-- SET search_path TO public\nSELECT 1')).toBeNull();
+  });
+
+  it('blocks reset-all and statement timeout changes', () => {
+    expect(checkSqlExecutionGuards('RESET ALL')).not.toBeNull();
+    expect(checkSqlExecutionGuards('SET statement_timeout = 0')).not.toBeNull();
+    expect(checkSqlExecutionGuards('RESET statement_timeout')).not.toBeNull();
+    expect(
+      checkSqlExecutionGuards("SELECT set_config('statement_timeout', '0', false)")
     ).not.toBeNull();
   });
 
-  it('blocks set_config search_path with dollar-quoting', () => {
+  it('blocks set_config inside DO blocks without blocking ordinary DO blocks', () => {
     expect(
-      checkSystemSchemaOperations("SELECT set_config($$search_path$$, 'system', true)")
+      checkSqlExecutionGuards(`
+        DO $$
+        BEGIN
+          PERFORM set_config('role', 'postgres', false);
+        END $$;
+      `)
     ).not.toBeNull();
-  });
 
-  it('blocks ALTER FUNCTION on system schema', () => {
-    const query = 'ALTER FUNCTION system.update_updated_at() SECURITY DEFINER';
-    expect(checkSystemSchemaOperations(query)).not.toBeNull();
-  });
-
-  it('blocks CREATE TRIGGER referencing system schema function', () => {
-    const query =
-      'CREATE TRIGGER t BEFORE UPDATE ON my_table FOR EACH ROW EXECUTE FUNCTION system.update_updated_at()';
-    expect(checkSystemSchemaOperations(query)).not.toBeNull();
-  });
-
-  it('blocks CREATE TRIGGER on system schema table', () => {
-    const query =
-      'CREATE TRIGGER t BEFORE UPDATE ON system.secrets FOR EACH ROW EXECUTE FUNCTION public.my_func()';
-    expect(checkSystemSchemaOperations(query)).not.toBeNull();
-  });
-
-  it('blocks DROP FUNCTION on system schema', () => {
-    expect(checkSystemSchemaOperations('DROP FUNCTION system.update_updated_at()')).not.toBeNull();
-  });
-
-  it('blocks DROP TABLE on system schema', () => {
-    expect(checkSystemSchemaOperations('DROP TABLE system.secrets')).not.toBeNull();
-  });
-
-  it('blocks DROP SCHEMA system', () => {
-    expect(checkSystemSchemaOperations('DROP SCHEMA system CASCADE')).not.toBeNull();
-  });
-
-  it('blocks DROP TYPE on system schema', () => {
-    expect(checkSystemSchemaOperations('DROP TYPE system.my_type')).not.toBeNull();
-  });
-
-  it('blocks DROP DOMAIN on system schema', () => {
-    expect(checkSystemSchemaOperations('DROP DOMAIN system.my_domain')).not.toBeNull();
-  });
-
-  it('blocks CREATE TABLE on system schema', () => {
     expect(
-      checkSystemSchemaOperations('CREATE TABLE system.foo (id uuid PRIMARY KEY)')
-    ).not.toBeNull();
+      checkSqlExecutionGuards(`
+        DO $$
+        BEGIN
+          RAISE NOTICE 'hello';
+        END $$;
+      `)
+    ).toBeNull();
   });
 
-  it('blocks ALTER TABLE on system schema', () => {
-    expect(
-      checkSystemSchemaOperations('ALTER TABLE system.secrets ADD COLUMN foo TEXT')
-    ).not.toBeNull();
-  });
-
-  it('blocks INSERT on system schema', () => {
-    expect(
-      checkSystemSchemaOperations("INSERT INTO system.secrets (key, value) VALUES ('a', 'b')")
-    ).not.toBeNull();
-  });
-
-  it('blocks UPDATE on system schema', () => {
-    expect(
-      checkSystemSchemaOperations("UPDATE system.secrets SET value = 'x' WHERE key = 'a'")
-    ).not.toBeNull();
-  });
-
-  it('blocks DELETE on system schema', () => {
-    expect(
-      checkSystemSchemaOperations("DELETE FROM system.secrets WHERE key = 'test'")
-    ).not.toBeNull();
-  });
-
-  it('blocks TRUNCATE on system schema', () => {
-    expect(checkSystemSchemaOperations('TRUNCATE system.audit_logs')).not.toBeNull();
-  });
-
-  it('allows SELECT on system schema', () => {
-    expect(checkSystemSchemaOperations('SELECT * FROM system.secrets')).toBeNull();
-  });
-
-  it('allows CREATE FUNCTION in public schema', () => {
-    const query = `CREATE OR REPLACE FUNCTION public.update_updated_date()
-      RETURNS TRIGGER AS $$ BEGIN NEW.updated_date = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql`;
-    expect(checkSystemSchemaOperations(query)).toBeNull();
-  });
-
-  it('allows CREATE TRIGGER referencing a public schema function', () => {
-    const query =
-      'CREATE TRIGGER t BEFORE UPDATE ON my_table FOR EACH ROW EXECUTE FUNCTION public.update_updated_date()';
-    expect(checkSystemSchemaOperations(query)).toBeNull();
-  });
-
-  it('allows DROP TABLE on public schema', () => {
-    expect(checkSystemSchemaOperations('DROP TABLE public.foo')).toBeNull();
-  });
-});
-
-describe('checkAuthSchemaOperations', () => {
-  it('blocks DELETE on auth schema', () => {
-    expect(checkAuthSchemaOperations("DELETE FROM auth.users WHERE id = '1'")).not.toBeNull();
-  });
-
-  it('blocks TRUNCATE on auth schema', () => {
-    expect(checkAuthSchemaOperations('TRUNCATE auth.users')).not.toBeNull();
-  });
-
-  it('blocks DROP on auth schema', () => {
-    expect(checkAuthSchemaOperations('DROP TABLE auth.users')).not.toBeNull();
-  });
-
-  it('allows SELECT on auth schema', () => {
-    expect(checkAuthSchemaOperations('SELECT * FROM auth.users')).toBeNull();
+  it('blocks database-level operations without matching comments or strings', () => {
+    expect(checkSqlExecutionGuards('DROP DATABASE customer_project')).not.toBeNull();
+    expect(checkSqlExecutionGuards("SELECT 'DROP DATABASE customer_project'")).toBeNull();
+    expect(checkSqlExecutionGuards('-- DROP DATABASE customer_project\nSELECT 1')).toBeNull();
   });
 });

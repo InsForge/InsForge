@@ -1,4 +1,4 @@
-import { apiClient } from '../../../lib/api/client';
+import { apiClient } from '#lib/api/client';
 import type { UserSchema, CreateUserResponse, DeleteUsersResponse } from '@insforge/shared-schemas';
 
 export class UserService {
@@ -10,7 +10,8 @@ export class UserService {
    */
   async getUsers(
     queryParams: string = '',
-    searchQuery?: string
+    searchQuery?: string,
+    signal?: AbortSignal
   ): Promise<{
     users: UserSchema[];
     pagination: { offset: number; limit: number; total: number };
@@ -26,7 +27,7 @@ export class UserService {
       url += `?${params.toString()}`;
     }
 
-    const response = await apiClient.request(url);
+    const response = await apiClient.request(url, { signal });
 
     return {
       users: response.data,

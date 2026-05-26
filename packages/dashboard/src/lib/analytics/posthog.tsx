@@ -9,6 +9,9 @@ if (POSTHOG_KEY) {
       api_host: 'https://us.i.posthog.com',
       capture_exceptions: true,
       debug: import.meta.env.DEV,
+      session_recording: {
+        recordCrossOriginIframes: true,
+      },
     });
   } catch (error) {
     console.error('[PostHog] ❌ Error initializing PostHog', error);

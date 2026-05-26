@@ -1,10 +1,10 @@
 import { ArrowLeft, Download, Edit3, Trash2, Upload } from 'lucide-react';
-import { FunctionRow } from '../components/FunctionRow';
-import FunctionEmptyState from '../components/FunctionEmptyState';
-import { useFunctions } from '../hooks/useFunctions';
-import { useToast } from '../../../lib/hooks/useToast';
+import { FunctionRow } from '#features/functions/components/FunctionRow';
+import FunctionEmptyState from '#features/functions/components/FunctionEmptyState';
+import { useFunctions } from '#features/functions/hooks/useFunctions';
+import { useToast } from '#lib/hooks/useToast';
 import { useState, useCallback, useRef, useEffect } from 'react';
-import RefreshIcon from '../../../assets/icons/refresh.svg?react';
+import RefreshIcon from '#assets/icons/refresh.svg?react';
 import {
   Button,
   ConfirmDialog,
@@ -13,8 +13,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@insforge/ui';
-import { CodeEditor, Skeleton, TableHeader } from '../../../components';
-import { useConfirm } from '../../../lib/hooks/useConfirm';
+import { CodeEditor, Skeleton, TableHeader } from '#components';
+import { useConfirm } from '#lib/hooks/useConfirm';
 
 const MAX_FUNCTION_FILE_SIZE_BYTES = 1024 * 1024;
 const ALLOWED_FUNCTION_FILE_EXTENSIONS = ['.ts', '.js', '.tsx', '.jsx'];

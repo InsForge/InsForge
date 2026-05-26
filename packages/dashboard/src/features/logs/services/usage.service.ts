@@ -1,4 +1,4 @@
-import { apiClient } from '../../../lib/api/client';
+import { apiClient } from '#lib/api/client';
 
 export interface McpUsageRecord {
   id?: string;
@@ -17,7 +17,8 @@ export class UsageService {
    */
   async getMcpUsage(
     success: boolean | null = true,
-    limit: number = 200
+    limit: number = 200,
+    signal?: AbortSignal
   ): Promise<McpUsageRecord[]> {
     const params = new URLSearchParams({
       limit: limit.toString(),
@@ -28,6 +29,7 @@ export class UsageService {
 
     const data = (await apiClient.request(`/usage/mcp?${params.toString()}`, {
       headers: apiClient.withAccessToken(),
+      signal,
     })) as McpUsageResponse;
 
     return data.records || [];

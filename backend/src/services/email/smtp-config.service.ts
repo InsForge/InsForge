@@ -4,11 +4,13 @@ import dns from 'dns/promises';
 import nodemailer from 'nodemailer';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
+import {
+  ERROR_CODES,
+  type SmtpConfigSchema,
+  type UpsertSmtpConfigRequest,
+} from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
-import type { SmtpConfigSchema, UpsertSmtpConfigRequest } from '@insforge/shared-schemas';
-
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -227,11 +229,12 @@ export class SmtpConfigService {
         passwordEncrypted = EncryptionManager.encrypt(input.password);
       }
 
-      if (input.host) {
-        await this.validateSmtpHost(input.host, input.port);
-      }
-
+      // Only validate host/port when enabling — when disabling, the user is
+      // turning SMTP off and the values aren't going to be used.
       if (input.enabled) {
+        if (input.host) {
+          await this.validateSmtpHost(input.host, input.port);
+        }
         await this.verifySmtpConnection(input, existingRow.password_encrypted);
       }
 

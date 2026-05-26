@@ -1,8 +1,8 @@
 import { CopyButton } from '@insforge/ui';
-import { cn } from '../../../../lib/utils/utils';
+import { cn } from '#lib/utils/utils';
 import { type ReactNode } from 'react';
-import LinkChainIcon from '../../../../assets/icons/link_chain.svg?react';
-import KeyHorizontalIcon from '../../../../assets/icons/key_horizontal.svg?react';
+import LinkChainIcon from '#assets/icons/link_chain.svg?react';
+import KeyHorizontalIcon from '#assets/icons/key_horizontal.svg?react';
 
 interface CredentialRowProps {
   icon: ReactNode;

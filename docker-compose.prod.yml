@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: ghcr.io/insforge/postgres:v15.13.2
+    image: ghcr.io/insforge/postgres:v15.13.3
 
     command: postgres -c config_file=/etc/postgresql/postgresql.conf -c app.encryption_key='${ENCRYPTION_KEY:-${JWT_SECRET:-dev-secret-please-change-in-production}}'
     environment:
@@ -104,6 +104,9 @@ services:
       - ACCESS_API_KEY=${ACCESS_API_KEY:-}
       # LLM Model API keys
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      # Stripe Payments Configuration
+      - STRIPE_TEST_SECRET_KEY=${STRIPE_TEST_SECRET_KEY:-}
+      - STRIPE_LIVE_SECRET_KEY=${STRIPE_LIVE_SECRET_KEY:-}
       # OAuth Configuration
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
@@ -168,44 +171,9 @@ services:
         echo 'Downloading Deno dependencies...' &&
         deno cache functions/server.ts &&
         echo 'Starting Deno server on port 7133...' &&
-        deno run --allow-net --allow-env --allow-read=./functions/worker-template.js functions/server.ts
+        deno run --unstable-worker-options --allow-net --allow-env --allow-read=./functions/worker-template.js functions/server.ts
       "
     restart: unless-stopped
-    networks:
-      - insforge-network
-
-  # Vector.dev for log collection and shipping
-  vector:
-
-    image: timberio/vector:0.28.1-alpine
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
-    depends_on:
-      postgres:
-        condition: service_healthy
-      postgrest:
-        condition: service_started
-      insforge:
-        condition: service_started
-      deno:
-        condition: service_started
-    volumes:
-      - ./deploy/docker-init/logs/vector.yml:/etc/vector/vector.yml:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - shared-logs:/insforge-logs
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:7135/health"]
-      timeout: 5s
-      interval: 5s
-      retries: 3
-    environment:
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
-      - AWS_REGION=${AWS_REGION:-skip}
-      - PROJECT_ID=${PROJECT_ID:-}
-      - HOSTNAME_OVERRIDE=${HOSTNAME_OVERRIDE:-}
-    command: ["--config", "/etc/vector/vector.yml"]
     networks:
       - insforge-network
 

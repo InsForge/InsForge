@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { useDashboardHost, useIsCloudHostingMode } from '../../../lib/config/DashboardHostContext';
-import type { DashboardBackupInfo, DashboardInstanceInfo } from '../../../types';
+import { useDashboardHost, useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
+import type { DashboardBackupInfo, DashboardInstanceInfo } from '#types';
 
 export function useDatabaseBackupInfo() {
   const host = useDashboardHost();

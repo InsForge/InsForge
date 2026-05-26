@@ -1,8 +1,8 @@
 import { useMemo, useState, useCallback, useEffect } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { Tabs, Tab } from '@insforge/ui';
-import { useLogs } from '../hooks/useLogs';
-import { EmptyState, TableHeader, DataGridEmptyState } from '../../../components';
+import { useLogs } from '#features/logs/hooks/useLogs';
+import { EmptyState, TableHeader, DataGridEmptyState } from '#components';
 import {
   LogsDataGrid,
   type LogsColumnDef,
@@ -10,10 +10,10 @@ import {
   LogDetailPanel,
   BuildLogsView,
   SeverityFilterDropdown,
-} from '../components';
-import { formatTime } from '../../../lib/utils/utils';
+} from '#features/logs/components';
+import { formatTime } from '#lib/utils/utils';
 import { LogSchema } from '@insforge/shared-schemas';
-import { usePageSize } from '../../../lib/hooks/usePageSize';
+import { usePageSize } from '#lib/hooks/usePageSize';
 
 type FunctionLogType = 'runtime' | 'build';
 

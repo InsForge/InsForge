@@ -10,7 +10,21 @@
     "sourceMap": true,
     "declaration": true,
     "outDir": "dist",
-    "skipLibCheck": true
+    "rootDir": "./src",
+    "skipLibCheck": true,
+    "paths": {
+      "#app/*": ["./src/app/*"],
+      "#assets/*": ["./src/assets/*"],
+      "#components": ["./src/components/index.ts"],
+      "#components/*": ["./src/components/*"],
+      "#features/*": ["./src/features/*"],
+      "#layout/*": ["./src/layout/*"],
+      "#lib/*": ["./src/lib/*"],
+      "#navigation/*": ["./src/navigation/*"],
+      "#router/*": ["./src/router/*"],
+      "#types": ["./src/types/index.ts"],
+      "#types/*": ["./src/types/*"]
+    }
   },
   "include": ["src"]
 }

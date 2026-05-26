@@ -8,14 +8,13 @@
   </a>
 
   <p>
-    The backend built for agentic development.<br />
+    The all-in-one, open-source backend platform for agentic coding.<br />
   </p>
 
   <p>
     <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-orange.svg" alt="License"></a>
     <a href="https://www.npmjs.com/package/@insforge/sdk"><img src="https://img.shields.io/npm/dt/@insforge/sdk?color=blue&label=downloads" alt="Downloads"></a>
-    <a href="https://github.com/InsForge/insforge/graphs/contributors"><img src="https://img.shields.io/github/contributors/InsForge/insforge?color=green" alt="Contributors"></a>
-    <a href="https://cursor.com/link/prompt?text=Help+me+set+up+InsForge+locally.+Follow+these+steps%3A%0A%0A1.+First%2C+verify+Docker+is+installed+and+running%3A%0A+++docker+--version%0A+++docker+info%0A%0A2.+Clone+the+repository%3A%0A+++git+clone+https%3A%2F%2Fgithub.com%2Finsforge%2Finsforge.git%0A+++cd+insforge%0A%0A3.+Copy+the+example+env+config+and+start+services%3A%0A+++cp+env.example+to+env+file%0A+++docker+compose+up+-d%0A%0A4.+Wait+for+all+containers+to+be+healthy+(this+may+take+1-2+minutes)%3A%0A+++docker+compose+ps%0A%0A5.+Verify+the+app+is+accessible+at+http%3A%2F%2Flocalhost%3A7131%0A%0A6.+Follow+the+steps+in+the+dashboard+to+connect+InsForge+MCP+Server+to+your+agent.%0A%0AIf+there+are+any+errors%2C+help+me+troubleshoot+them.+Common+issues%3A%0A-+Docker+not+running%0A-+Ports+already+in+use%0A-+Insufficient+memory"><img src="https://img.shields.io/badge/Set%20Up%20with-Cursor-181818?logo=cursor&logoColor=white&labelColor=555555" alt="Set Up With Cursor"></a>
+    <a href="https://github.com/InsForge/InsForge/graphs/contributors"><img src="https://img.shields.io/github/contributors/InsForge/InsForge?color=green" alt="Contributors"></a>
     <a href="https://insforge.dev"><img src="https://img.shields.io/badge/Visit-InsForge.dev-181818?logoColor=white&labelColor=555555&logo=data:image/svg%2bxml;base64,PHN2ZyB3aWR0aD0iMjQwIiBoZWlnaHQ9IjI0MCIgdmlld0JveD0iMCAwIDI0MCAyNDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTI2LjExODQgMTAxLjZDMjMuMjkzOSA5OC43ODMzIDIzLjI5MzkgOTQuMjE2NiAyNi4xMTg0IDkxLjRMOTcuNzE2NyAyMEwyMDAgMjBMNzcuMjYgMTQyLjRDNzQuNDM1NSAxNDUuMjE3IDY5Ljg1NjIgMTQ1LjIxNyA2Ny4wMzE3IDE0Mi40TDI2LjExODQgMTAxLjZaIiBmaWxsPSJ3aGl0ZSIvPjxwYXRoIGQ9Ik0xNTUuMjUxIDc3LjM3NUwyMDAgMTIyVjIyNEwxMDQuMTA5IDEyOC4zNzVMMTU1LjI1MSA3Ny4zNzVaIiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPgo=" alt="Visit InsForge.dev"></a>
     <a href="https://gitcgr.com/InsForge/InsForge">
       <img src="https://gitcgr.com/badge/InsForge/InsForge.svg" alt="gitcgr" />
@@ -40,18 +39,21 @@
 </p>
 
 ## InsForge
-InsForge is a backend development platform built for AI coding agents and AI code editors. It exposes backend primitives like databases, auth, storage, and functions through a semantic layer that agents can understand, reason about, and operate end to end.
+The all-in-one, open-source backend platform for agentic coding. InsForge gives your coding agent database, auth, storage, compute, hosting, and AI gateway to ship full-stack apps end-to-end.
 
-<p align="center">
-  <video width="100%" src="https://github.com/user-attachments/assets/2e2a43c9-4664-48a6-b61b-4f7cf8eb0ebf" controls></video>
-</p>
+https://github.com/user-attachments/assets/345efbc6-ca63-4189-bde0-12ef3bda561b
 
 ### How it works
-InsForge acts as a semantic layer between AI coding agents and backend primitives. It performs backend context engineering so agents can understand, operate, and inspect backend systems.
 
-- **Fetch backend context**: Agents can fetch documentation and available operations for the backend primitives they use.
-- **Configure primitives**: Agents can configure backend primitives directly.
-- **Inspect backend state**: Backend state and logs are exposed through structured schemas.
+Coding agents interact with InsForge through one of two interfaces:
+
+- **MCP Server** (self-hosted and cloud): exposes InsForge's operations as tools any MCP-compatible agent can call.
+- **CLI + Skills** (cloud only): a command-line interface paired with Skills that agents invoke directly from the terminal.
+
+Both interfaces let coding agents operate the backend like backend engineers:
+
+- **Read backend context and state**: Pull documentation, schemas, metadata (deployed functions, bucket contents, auth config), and runtime logs, so the agent has what it needs to write code, verify what it built, and debug when something breaks.
+- **Configure primitives**: Deploy edge functions, run database migrations, create storage buckets, set up auth providers, and configure other backend resources directly.
 
 ```mermaid
 graph TB
@@ -61,7 +63,7 @@ graph TB
     end
 
     subgraph MID[" "]
-        SL[InsForge Semantic Layer]
+        SL[InsForge]
     end
 
     AG --> SL
@@ -71,13 +73,14 @@ graph TB
     SL --> ST[Storage]
     SL --> EF[Edge Functions]
     SL --> MG[Model Gateway]
+    SL --> CP[Compute]
     SL --> DEP[Deployment]
 
     classDef bar fill:#0b0f14,stroke:#30363d,stroke-width:1px,color:#ffffff
     classDef card fill:#161b22,stroke:#30363d,stroke-width:1px,color:#ffffff
 
     class AG,SL bar
-    class AUTH,DB,ST,EF,MG,DEP card
+    class AUTH,DB,ST,EF,MG,CP,DEP card
 
     style TOP fill:transparent,stroke:transparent
     style MID fill:transparent,stroke:transparent
@@ -91,6 +94,7 @@ graph TB
 - **Storage**: S3 compatible file storage
 - **Model Gateway**: OpenAI compatible API across multiple LLM providers
 - **Edge Functions**: Serverless code running on the edge
+- **Compute** (private preview): Long-running container services
 - **Site Deployment**: Site build and deployment
 
 
@@ -121,7 +125,7 @@ You can run InsForge locally using Docker Compose. This will start a local InsFo
 Or run from source:
 ```bash
 # Run with Docker
-git clone https://github.com/insforge/insforge.git
+git clone https://github.com/InsForge/InsForge.git
 cd insforge
 cp .env.example .env
 docker compose -f docker-compose.prod.yml up
@@ -210,7 +214,7 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 ---
 
-[![Star History Chart](https://api.star-history.com/svg?repos=InsForge/insforge&type=Date)](https://www.star-history.com/#InsForge/insforge&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=InsForge/InsForge&type=Date)](https://www.star-history.com/#InsForge/InsForge&Date)
 
 ## Badges
 

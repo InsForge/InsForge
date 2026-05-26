@@ -15,8 +15,9 @@ import '@xyflow/react/dist/style.css';
 import { TableNode } from './TableNode';
 import { AuthNode } from './AuthNode';
 import { BucketNode } from './BucketNode';
-import { useAllTableSchemas } from '../../database/hooks/useTables';
-import { useTheme } from '../../../lib/contexts/ThemeContext';
+import { useAllTableSchemas } from '#features/database/hooks/useTables';
+import { DEFAULT_DATABASE_SCHEMA } from '#features/database/helpers';
+import { useTheme } from '#lib/contexts/ThemeContext';
 import {
   StorageBucketSchema,
   GetTableSchemaResponse,
@@ -211,7 +212,10 @@ export function SchemaVisualizer({
   const { resolvedTheme } = useTheme();
 
   // Fetch all table schemas (only when external schemas are not provided)
-  const { allSchemas, isLoading: isLoadingSchemas } = useAllTableSchemas(!externalSchemas);
+  const { allSchemas, isLoading: isLoadingSchemas } = useAllTableSchemas(
+    DEFAULT_DATABASE_SCHEMA,
+    !externalSchemas
+  );
 
   // Use external schemas if provided, otherwise use fetched schemas
   const tables = externalSchemas || allSchemas;

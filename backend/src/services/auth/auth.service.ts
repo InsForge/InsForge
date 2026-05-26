@@ -4,20 +4,11 @@ import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import logger from '@/utils/logger.js';
-import type {
-  UserSchema,
-  CreateUserResponse,
-  CreateSessionResponse,
-  VerifyEmailResponse,
-  ResetPasswordResponse,
-  CreateAdminSessionResponse,
-  AuthMetadataSchema,
-  OAuthProvidersSchema,
-} from '@insforge/shared-schemas';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { CustomOAuthConfigService } from '@/services/auth/custom-oauth-config.service.js';
 import { AuthConfigService } from './auth-config.service.js';
 import { AuthOTPService, OTPPurpose, OTPType } from './auth-otp.service.js';
+import { SmtpConfigService } from '@/services/email/smtp-config.service.js';
 import { GoogleOAuthProvider } from '@/providers/oauth/google.provider.js';
 import { GitHubOAuthProvider } from '@/providers/oauth/github.provider.js';
 import { DiscordOAuthProvider } from '@/providers/oauth/discord.provider.js';
@@ -39,12 +30,23 @@ import {
   OAuthUserData,
 } from '@/types/auth.js';
 import { ADMIN_ID } from '@/utils/constants.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
 import { EmailService } from '@/services/email/email.service.js';
 import { XOAuthProvider } from '@/providers/oauth/x.provider.js';
 import { AppleOAuthProvider } from '@/providers/oauth/apple.provider.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
+import {
+  ERROR_CODES,
+  type AuthMetadataSchema,
+  type CreateAdminSessionResponse,
+  type CreateSessionResponse,
+  type CreateUserResponse,
+  type GetPublicAuthConfigResponse,
+  type OAuthProvidersSchema,
+  type ResetPasswordResponse,
+  type UserSchema,
+  type VerifyEmailResponse,
+} from '@insforge/shared-schemas';
 
 /**
  * Simplified JWT-based auth service
@@ -197,7 +199,7 @@ export class AuthService {
       await client.query('ROLLBACK');
       // Postgres unique_violation
       if (e && typeof e === 'object' && 'code' in e && e.code === '23505') {
-        throw new AppError('User already exists', 409, ERROR_CODES.ALREADY_EXISTS);
+        throw new AppError('User already exists', 409, ERROR_CODES.AUTH_EMAIL_EXISTS);
       }
       throw e;
     } finally {
@@ -816,6 +818,19 @@ export class AuthService {
       return { user, accessToken };
     }
 
+    // No existing provider account and no existing user by email — this would
+    // create a brand-new user. Honor the project-level signup gate before
+    // creating, so a flipped "disable new user signups" toggle also blocks
+    // first-time OAuth signups (existing OAuth users can still sign in above).
+    const { disableSignup } = await AuthConfigService.getInstance().getAuthConfig();
+    if (disableSignup) {
+      throw new AppError(
+        'User signups are disabled for this project.',
+        403,
+        ERROR_CODES.AUTH_SIGNUP_DISABLED
+      );
+    }
+
     // Create new user with OAuth data
     return this.createThirdPartyUser(
       provider,
@@ -904,11 +919,16 @@ export class AuthService {
     }
   }
 
-  async getMetadata(): Promise<AuthMetadataSchema> {
+  /**
+   * Public auth metadata for the unauthenticated /api/auth/public-config route.
+   * Reads via getPublicAuthConfig(), which intentionally omits allowedRedirectUrls
+   * and other admin-only fields.
+   */
+  async getPublicMetadata(): Promise<GetPublicAuthConfigResponse> {
     const authConfigService = AuthConfigService.getInstance();
     const oAuthConfigService = OAuthConfigService.getInstance();
     const customOAuthConfigService = CustomOAuthConfigService.getInstance();
-    const [oAuthProviders, customOAuthConfigs, authConfigs] = await Promise.all([
+    const [oAuthProviders, customOAuthConfigs, authConfig] = await Promise.all([
       oAuthConfigService.getConfiguredProviders(),
       customOAuthConfigService.listConfigs(),
       authConfigService.getPublicAuthConfig(),
@@ -916,7 +936,52 @@ export class AuthService {
     return {
       oAuthProviders,
       customOAuthProviders: customOAuthConfigs.map((config) => config.key),
-      ...authConfigs,
+      ...authConfig,
+    };
+  }
+
+  /**
+   * Admin auth metadata for /api/metadata (gated behind verifyAdmin).
+   * Includes allowedRedirectUrls and smtpConfig so the CLI can render
+   * insforge.toml and probe backend capability for declarative config.
+   *
+   * smtpConfig.hasPassword is the only credential signal — the actual
+   * password is never returned by the SmtpConfigService.
+   */
+  async getMetadata(): Promise<AuthMetadataSchema> {
+    const authConfigService = AuthConfigService.getInstance();
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const customOAuthConfigService = CustomOAuthConfigService.getInstance();
+    const smtpConfigService = SmtpConfigService.getInstance();
+    const [oAuthProviders, customOAuthConfigs, authConfig, smtpConfig] = await Promise.all([
+      oAuthConfigService.getConfiguredProviders(),
+      customOAuthConfigService.listConfigs(),
+      authConfigService.getAuthConfig(),
+      smtpConfigService.getSmtpConfig(),
+    ]);
+    return {
+      oAuthProviders,
+      customOAuthProviders: customOAuthConfigs.map((config) => config.key),
+      smtpConfig: {
+        enabled: smtpConfig.enabled,
+        host: smtpConfig.host,
+        port: smtpConfig.port,
+        username: smtpConfig.username,
+        hasPassword: smtpConfig.hasPassword,
+        senderEmail: smtpConfig.senderEmail,
+        senderName: smtpConfig.senderName,
+        minIntervalSeconds: smtpConfig.minIntervalSeconds,
+      },
+      requireEmailVerification: authConfig.requireEmailVerification,
+      passwordMinLength: authConfig.passwordMinLength,
+      requireNumber: authConfig.requireNumber,
+      requireLowercase: authConfig.requireLowercase,
+      requireUppercase: authConfig.requireUppercase,
+      requireSpecialChar: authConfig.requireSpecialChar,
+      verifyEmailMethod: authConfig.verifyEmailMethod,
+      resetPasswordMethod: authConfig.resetPasswordMethod,
+      allowedRedirectUrls: authConfig.allowedRedirectUrls ?? [],
+      disableSignup: authConfig.disableSignup,
     };
   }
 
@@ -1323,7 +1388,7 @@ export class AuthService {
     );
 
     if (result.rows.length === 0) {
-      throw new AppError('User not found', 404, ERROR_CODES.NOT_FOUND);
+      throw new AppError('User not found', 404, ERROR_CODES.AUTH_USER_NOT_FOUND);
     }
 
     return {

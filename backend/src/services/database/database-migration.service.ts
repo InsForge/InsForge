@@ -1,44 +1,24 @@
-import { parseSync } from 'libpg-query';
-import type {
-  CreateMigrationRequest,
-  CreateMigrationResponse,
-  DatabaseMigrationsResponse,
-  Migration,
+import {
+  ERROR_CODES,
+  type CreateMigrationRequest,
+  type CreateMigrationResponse,
+  type DatabaseMigrationsResponse,
+  type Migration,
 } from '@insforge/shared-schemas';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError, isPgErrorLike } from '@/utils/errors.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
-import { isPgErrorLike } from '@/utils/errors.js';
 import {
   analyzeQuery,
+  checkSqlExecutionGuards,
   initSqlParser,
   parseSQLStatements,
   type DatabaseResourceUpdate,
 } from '@/utils/sql-parser.js';
+import { withAdminContext } from './user-context.service.js';
 
 interface CreateMigrationResult {
   migration: CreateMigrationResponse;
   changes: DatabaseResourceUpdate[];
-}
-
-export function assertMigrationDoesNotManageTransactions(statement: string): void {
-  const { stmts } = parseSync(statement);
-  const statementWrappers = stmts as Array<{ stmt: Record<string, unknown> }>;
-
-  for (const statementWrapper of statementWrappers) {
-    const [statementType] = Object.entries(statementWrapper.stmt)[0] as [
-      string,
-      Record<string, unknown>,
-    ];
-
-    if (statementType === 'TransactionStmt') {
-      throw new AppError(
-        'Custom migrations cannot manage their own transactions.',
-        400,
-        ERROR_CODES.DATABASE_FORBIDDEN
-      );
-    }
-  }
 }
 
 export class DatabaseMigrationService {
@@ -62,7 +42,7 @@ export class DatabaseMigrationService {
         statements,
         created_at AS "createdAt"
       FROM system.custom_migrations
-      ORDER BY version DESC
+      ORDER BY version::numeric DESC
     `);
 
     return {
@@ -82,8 +62,9 @@ export class DatabaseMigrationService {
 
     await initSqlParser();
 
-    for (const statement of statements) {
-      assertMigrationDoesNotManageTransactions(statement);
+    const guardError = checkSqlExecutionGuards(input.sql);
+    if (guardError) {
+      throw new AppError(guardError, 403, ERROR_CODES.FORBIDDEN);
     }
 
     const client = await this.dbManager.getPool().connect();
@@ -98,22 +79,24 @@ export class DatabaseMigrationService {
       const versionResult = await client.query<{
         latestVersion: string | null;
       }>(`
-        SELECT MAX(version) AS "latestVersion"
+        SELECT version AS "latestVersion"
         FROM system.custom_migrations
+        ORDER BY version::numeric DESC
+        LIMIT 1
       `);
 
       const latestVersion = versionResult.rows[0]?.latestVersion ?? null;
       const version = input.version;
 
-      if (latestVersion && version <= latestVersion) {
+      if (latestVersion && BigInt(version) <= BigInt(latestVersion)) {
         throw new AppError(
           'Migration version must be newer than the latest applied migration.',
           409,
-          ERROR_CODES.ALREADY_EXISTS
+          ERROR_CODES.DATABASE_MIGRATION_ALREADY_EXISTS
         );
       }
 
-      await client.query(input.sql);
+      await withAdminContext(client, () => client.query(input.sql), true);
 
       const insertResult = await client.query<Migration>(
         `
@@ -143,7 +126,7 @@ export class DatabaseMigrationService {
       };
     } catch (error) {
       if (transactionStarted) {
-        await client.query('ROLLBACK');
+        await client.query('ROLLBACK').catch(() => {});
       }
 
       if (
@@ -151,7 +134,11 @@ export class DatabaseMigrationService {
         error.code === '23505' &&
         error.constraint === 'custom_migrations_pkey'
       ) {
-        throw new AppError('Migration version already exists.', 409, ERROR_CODES.ALREADY_EXISTS);
+        throw new AppError(
+          'Migration version already exists.',
+          409,
+          ERROR_CODES.DATABASE_MIGRATION_ALREADY_EXISTS
+        );
       }
 
       throw error;

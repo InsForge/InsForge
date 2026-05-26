@@ -1,85 +1,77 @@
-import { describe, it, expect } from 'vitest';
-import { cn, isEmptyValue, compareVersions, formatTime, formatDate } from '../utils';
+import { ColumnType } from '@insforge/shared-schemas';
+import { describe, expect, it } from 'vitest';
+import {
+  cn,
+  compareVersions,
+  convertValueForColumn,
+  formatDate,
+  formatTime,
+  formatValueForDisplay,
+  isEmptyValue,
+} from '#lib/utils/utils';
 
 describe('cn', () => {
-  it('merges class names', () => {
-    expect(cn('foo', 'bar')).toBe('foo bar');
-  });
-
-  it('handles conditional classes', () => {
-    const isHidden = false;
-    expect(cn('base', isHidden && 'hidden', 'end')).toBe('base end');
-  });
-
-  it('deduplicates tailwind classes', () => {
-    expect(cn('p-4', 'p-2')).toBe('p-2');
+  it('merges conditional classes and resolves Tailwind conflicts', () => {
+    expect(cn('px-2', undefined, 'px-4', ['text-sm'])).toBe('px-4 text-sm');
   });
 });
 
 describe('isEmptyValue', () => {
-  it('returns true for null', () => {
+  it('only treats null and undefined as empty database values', () => {
     expect(isEmptyValue(null)).toBe(true);
-  });
-
-  it('returns true for undefined', () => {
     expect(isEmptyValue(undefined)).toBe(true);
-  });
-
-  it('returns false for empty string', () => {
     expect(isEmptyValue('')).toBe(false);
-  });
-
-  it('returns false for zero', () => {
     expect(isEmptyValue(0)).toBe(false);
-  });
-
-  it('returns false for false', () => {
     expect(isEmptyValue(false)).toBe(false);
   });
 });
 
 describe('compareVersions', () => {
-  it('returns 0 for equal versions', () => {
-    expect(compareVersions('1.0.0', '1.0.0')).toBe(0);
-  });
-
-  it('returns -1 when v1 < v2', () => {
-    expect(compareVersions('1.0.0', '2.0.0')).toBe(-1);
-    expect(compareVersions('1.0.0', '1.1.0')).toBe(-1);
-    expect(compareVersions('1.0.0', '1.0.1')).toBe(-1);
-  });
-
-  it('returns 1 when v1 > v2', () => {
-    expect(compareVersions('2.0.0', '1.0.0')).toBe(1);
-  });
-
-  it('handles v prefix', () => {
-    expect(compareVersions('v1.0.0', 'v1.0.0')).toBe(0);
-    expect(compareVersions('v2.0.0', '1.0.0')).toBe(1);
-  });
-
-  it('handles different length versions', () => {
-    expect(compareVersions('1.0', '1.0.0')).toBe(0);
-    expect(compareVersions('1.0', '1.0.1')).toBe(-1);
+  it('compares semantic versions with optional v prefix and missing segments', () => {
+    expect(compareVersions('v2.1.0', '2.0.9')).toBe(1);
+    expect(compareVersions('1.2', '1.2.0')).toBe(0);
+    expect(compareVersions('1.2.3', '1.10.0')).toBe(-1);
   });
 });
 
 describe('formatTime', () => {
-  it('formats a valid ISO timestamp', () => {
-    expect(formatTime('2025-01-15T15:30:00Z')).toContain('Jan 15, 2025');
-  });
-
-  it('returns original string for invalid timestamp', () => {
+  it('formats valid ISO timestamps and preserves invalid input', () => {
+    expect(formatTime('2026-05-17T12:30:00')).toBe('May 17, 2026, 12:30 PM');
     expect(formatTime('not-a-date')).toBe('not-a-date');
   });
 });
 
 describe('formatDate', () => {
-  it('formats a valid ISO timestamp to date only', () => {
-    expect(formatDate('2025-01-15T15:30:00Z')).toBe('Jan 15, 2025');
+  it('formats valid ISO dates and preserves invalid input', () => {
+    expect(formatDate('2026-05-17T12:30:00')).toBe('May 17, 2026');
+    expect(formatDate('not-a-date')).toBe('not-a-date');
+  });
+});
+
+describe('formatValueForDisplay', () => {
+  it('formats common database display values by column type', () => {
+    expect(formatValueForDisplay(null)).toBe('null');
+    expect(formatValueForDisplay(true, ColumnType.BOOLEAN)).toBe('True');
+    expect(formatValueForDisplay('2026-05-17', ColumnType.DATE)).toBe('May 17, 2026');
+    expect(formatValueForDisplay({ ok: true }, ColumnType.JSON)).toBe('{"ok":true}');
   });
 
-  it('returns original string for invalid timestamp', () => {
-    expect(formatDate('not-a-date')).toBe('not-a-date');
+  it('returns Invalid JSON for malformed JSON strings', () => {
+    expect(formatValueForDisplay('{bad json', ColumnType.JSON)).toBe('Invalid JSON');
+  });
+});
+
+describe('convertValueForColumn', () => {
+  it('converts valid values and reports validation errors', () => {
+    expect(convertValueForColumn(ColumnType.INTEGER, '42')).toEqual({ success: true, value: 42 });
+    expect(convertValueForColumn(ColumnType.BOOLEAN, 'true')).toEqual({
+      success: true,
+      value: true,
+    });
+    expect(convertValueForColumn('unsupported', 'x')).toEqual({
+      success: false,
+      error: 'Unsupported column type: unsupported',
+    });
+    expect(convertValueForColumn(ColumnType.INTEGER, 'not-number').success).toBe(false);
   });
 });

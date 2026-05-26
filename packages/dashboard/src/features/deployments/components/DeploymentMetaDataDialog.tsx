@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Copy, Check } from 'lucide-react';
 import { Button, Dialog, DialogContent, DialogDescription, DialogTitle } from '@insforge/ui';
-import { ScrollArea } from '../../../components';
-import type { DeploymentSchema } from '../services/deployments.service';
+import { ScrollArea } from '#components';
+import type { DeploymentSchema } from '#features/deployments/services/deployments.service';
 
 interface DeploymentMetaDataDialogProps {
   deployment: DeploymentSchema | null;

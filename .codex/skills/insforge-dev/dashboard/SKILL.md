@@ -45,6 +45,25 @@ Use this skill for dashboard work in the InsForge repository.
    - Keep `packages/dashboard/src/index.ts` and `packages/dashboard/src/types` aligned with the public package API.
    - Never use the TypeScript `any` type. Prefer precise prop, state, API, and hook result types.
 
+## Frontend Testing
+
+Use the lowest test layer that covers the risk. Add one focused regression test for bug fixes when practical.
+
+| Change type | Test layer | Location | Command |
+| --- | --- | --- | --- |
+| Pure helper, parser, formatter, state reducer | Unit | `packages/dashboard/src/**/__tests__/*.test.ts` | `npm --workspace @insforge/dashboard run test:unit` |
+| React component behavior, forms, dialogs, conditional rendering | Component | `packages/dashboard/src/**/__tests__/*.test.tsx` | `npm --workspace @insforge/dashboard run test:component` |
+| Routing, auth redirects, host-mode integration, browser-only behavior | UI smoke | `packages/dashboard/tests/ui/*.spec.ts` | `npm --workspace @insforge/dashboard run test:ui` |
+
+Conventions:
+
+- `npm --workspace @insforge/dashboard run test` runs the full Vitest suite: unit plus component.
+- GitHub Actions splits dashboard checks into unit, component, and UI jobs in `.github/workflows/frontend-tests.yml`. Update the workflow when adding or renaming test scripts.
+- Unit tests should avoid React rendering and network mocking. Test data transformations directly.
+- Component tests use Testing Library with `packages/dashboard/src/test/setup.ts`. Mock hooks, services, and host context at the package boundary; assert user-visible behavior and callback effects, not implementation details or CSS class strings.
+- UI smoke tests use Playwright against the local `frontend/` shell. Mock backend API routes in `packages/dashboard/tests/ui/fixtures/`; every mocked route must either fulfill, fallback, or abort. Do not leave requests pending after a test branch.
+- Prefer one clear test per user-observable behavior over broad snapshot tests. Avoid brittle assertions tied to copy that is not part of the behavior being protected.
+
 ## Local debug: viewing cloud-hosting-only UI in self-hosting
 
 **Use when** previewing UI gated on `useIsCloudHostingMode()`, `isInsForgeCloudProject()`, or a PostHog feature flag (e.g. the CTest dashboard variant, `dashboard-v3-experiment === 'c_test'`, the CLI connect panel) while running the local `frontend/` self-hosting shell.
@@ -78,6 +97,9 @@ Mark every hardcode with a trailing `// LOCAL DEBUG: <original expression>` comm
 
 ## Validation
 
+- `cd packages/dashboard && npm run test:unit` when changing pure helpers or reducers
+- `cd packages/dashboard && npm run test:component` when changing React component behavior
+- `cd packages/dashboard && npm run test:ui` when changing routing, auth, host-mode integration, or browser-only behavior
 - `cd packages/dashboard && npm run typecheck`
 - `cd packages/dashboard && npm run build`
 - `cd frontend && npm run build` when the local self-hosting shell changes

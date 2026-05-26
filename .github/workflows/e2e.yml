@@ -25,6 +25,7 @@ jobs:
           ADMIN_EMAIL=admin@example.com
           ADMIN_PASSWORD=test-admin-password-for-ci
           TEST_API_BASE=http://localhost:7130/api
+          INSFORGE_DISABLE_WRITE_RATE_LIMIT=1
           EOF
 
       - name: Start Docker Compose services
@@ -42,7 +43,7 @@ jobs:
           echo "Backend is ready!"
 
       - name: Install test dependencies in container
-        run: docker compose exec -T insforge apk add --no-cache bash curl jq
+        run: docker compose exec -T insforge apk add --no-cache bash curl jq postgresql-client
 
       - name: Run E2E tests
         run: docker compose exec -T insforge npm run test:e2e

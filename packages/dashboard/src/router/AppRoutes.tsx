@@ -1,55 +1,68 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { RequireAuth } from './RequireAuth';
-import AppLayout from '../layout/AppLayout';
-import LoginPage from '../features/login/pages/LoginPage';
-import CloudLoginPage from '../features/login/pages/CloudLoginPage';
-import DashboardLayout from '../features/dashboard/components/DashboardLayout';
-import DashboardPage from '../features/dashboard/pages/DashboardPage';
-import CTestDashboardPage from '../features/dashboard/pages/CTestDashboardPage';
-import { getFeatureFlag } from '../lib/analytics/posthog';
-import DatabaseLayout from '../features/database/components/DatabaseLayout';
-import SQLEditorLayout from '../features/database/components/SQLEditorLayout';
-import TablesPage from '../features/database/pages/TablesPage';
-import AuthenticationLayout from '../features/auth/components/AuthenticationLayout';
-import UsersPage from '../features/auth/pages/UsersPage';
-import AuthMethodsPage from '../features/auth/pages/AuthMethodsPage';
-import EmailPage from '../features/auth/pages/EmailPage';
-import LogsLayout from '../features/logs/components/LogsLayout';
-import LogsPage from '../features/logs/pages/LogsPage';
-import FunctionLogsPage from '../features/logs/pages/FunctionLogsPage';
-import MCPLogsPage from '../features/logs/pages/MCPLogsPage';
-import StorageLayout from '../features/storage/components/StorageLayout';
-import BucketsPage from '../features/storage/pages/BucketsPage';
-import VisualizerLayout from '../features/visualizer/components/VisualizerLayout';
-import VisualizerPage from '../features/visualizer/pages/VisualizerPage';
-import FunctionsLayout from '../features/functions/components/FunctionsLayout';
-import FunctionsPage from '../features/functions/pages/FunctionsPage';
-import SecretsPage from '../features/functions/pages/SecretsPage';
-import SchedulesPage from '../features/functions/pages/SchedulesPage';
-import AILayout from '../features/ai/components/AILayout';
-import AIPage from '../features/ai/pages/AIPage';
-import RealtimeLayout from '../features/realtime/components/RealtimeLayout';
-import RealtimeChannelsPage from '../features/realtime/pages/RealtimeChannelsPage';
-import RealtimeMessagesPage from '../features/realtime/pages/RealtimeMessagesPage';
-import RealtimePermissionsPage from '../features/realtime/pages/RealtimePermissionsPage';
-import SQLEditorPage from '../features/database/pages/SQLEditorPage';
-import IndexesPage from '../features/database/pages/IndexesPage';
-import DatabaseFunctionsPage from '../features/database/pages/FunctionsPage';
-import TriggersPage from '../features/database/pages/TriggersPage';
-import PoliciesPage from '../features/database/pages/PoliciesPage';
-import TemplatesPage from '../features/database/pages/TemplatesPage';
-import MigrationsPage from '../features/database/pages/MigrationsPage';
-import BackupsPage from '../features/database/pages/BackupsPage';
-import AuditsPage from '../features/logs/pages/AuditsPage';
-import DeploymentsLayout from '../features/deployments/components/DeploymentsLayout';
-import DeploymentLogsPage from '../features/deployments/pages/DeploymentLogsPage';
-import DeploymentOverviewPage from '../features/deployments/pages/DeploymentOverviewPage';
-import DeploymentEnvVarsPage from '../features/deployments/pages/DeploymentEnvVarsPage';
-import DeploymentDomainsPage from '../features/deployments/pages/DeploymentDomainsPage';
+import AILayout from '#features/ai/components/AILayout';
+import AIOverviewPage from '#features/ai/pages/AIOverviewPage';
+import AIQuickStartPage from '#features/ai/pages/AIQuickStartPage';
+import AIModelsPage from '#features/ai/pages/AIModelsPage';
+import { AnalyticsPage } from '#features/analytics';
+import AuthenticationLayout from '#features/auth/components/AuthenticationLayout';
+import AuthMethodsPage from '#features/auth/pages/AuthMethodsPage';
+import EmailPage from '#features/auth/pages/EmailPage';
+import UsersPage from '#features/auth/pages/UsersPage';
+import ComputePage from '#features/compute/pages/ComputePage';
+import DashboardLayout from '#features/dashboard/components/DashboardLayout';
+import DashboardPage from '#features/dashboard/pages/DashboardPage';
+import DTestDashboardPage from '#features/dashboard/pages/DTestDashboardPage';
+import DTestInstallPage from '#features/dashboard/pages/DTestInstallPage';
+import DatabaseLayout from '#features/database/components/DatabaseLayout';
+import SQLEditorLayout from '#features/database/components/SQLEditorLayout';
+import BackupsPage from '#features/database/pages/BackupsPage';
+import DatabaseFunctionsPage from '#features/database/pages/FunctionsPage';
+import IndexesPage from '#features/database/pages/IndexesPage';
+import MigrationsPage from '#features/database/pages/MigrationsPage';
+import PoliciesPage from '#features/database/pages/PoliciesPage';
+import SQLEditorPage from '#features/database/pages/SQLEditorPage';
+import TablesPage from '#features/database/pages/TablesPage';
+import TemplatesPage from '#features/database/pages/TemplatesPage';
+import TriggersPage from '#features/database/pages/TriggersPage';
+import DeploymentsLayout from '#features/deployments/components/DeploymentsLayout';
+import DeploymentDomainsPage from '#features/deployments/pages/DeploymentDomainsPage';
+import DeploymentEnvVarsPage from '#features/deployments/pages/DeploymentEnvVarsPage';
+import DeploymentLogsPage from '#features/deployments/pages/DeploymentLogsPage';
+import DeploymentOverviewPage from '#features/deployments/pages/DeploymentOverviewPage';
+import FunctionsLayout from '#features/functions/components/FunctionsLayout';
+import FunctionsPage from '#features/functions/pages/FunctionsPage';
+import SchedulesPage from '#features/functions/pages/SchedulesPage';
+import SecretsPage from '#features/functions/pages/SecretsPage';
+import CloudLoginPage from '#features/login/pages/CloudLoginPage';
+import LoginPage from '#features/login/pages/LoginPage';
+import LogsLayout from '#features/logs/components/LogsLayout';
+import AuditsPage from '#features/logs/pages/AuditsPage';
+import FunctionLogsPage from '#features/logs/pages/FunctionLogsPage';
+import LogsPage from '#features/logs/pages/LogsPage';
+import MCPLogsPage from '#features/logs/pages/MCPLogsPage';
+import PaymentsLayout from '#features/payments/components/PaymentsLayout';
+import CatalogPage from '#features/payments/pages/CatalogPage';
+import CustomersPage from '#features/payments/pages/CustomersPage';
+import PaymentHistoryPage from '#features/payments/pages/PaymentHistoryPage';
+import SubscriptionsPage from '#features/payments/pages/SubscriptionsPage';
+import RealtimeLayout from '#features/realtime/components/RealtimeLayout';
+import RealtimeChannelsPage from '#features/realtime/pages/RealtimeChannelsPage';
+import RealtimeMessagesPage from '#features/realtime/pages/RealtimeMessagesPage';
+import RealtimePermissionsPage from '#features/realtime/pages/RealtimePermissionsPage';
+import StorageLayout from '#features/storage/components/StorageLayout';
+import BucketsPage from '#features/storage/pages/BucketsPage';
+import VisualizerLayout from '#features/visualizer/components/VisualizerLayout';
+import VisualizerPage from '#features/visualizer/pages/VisualizerPage';
+import AppLayout from '#layout/AppLayout';
+import { getFeatureFlag } from '#lib/analytics/posthog';
+import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
 
 function AuthenticatedRoutes() {
-  const dashboardVariant = getFeatureFlag('dashboard-v3-experiment');
-  const DashboardHomePage = dashboardVariant === 'c_test' ? CTestDashboardPage : DashboardPage;
+  const dashboardVariant = getFeatureFlag('dashboard-v4-experiment');
+  const isDTest = dashboardVariant === 'd_test';
+  const DashboardHomePage = isDTest ? DTestDashboardPage : DashboardPage;
+  const isCloudHosting = useIsCloudHostingMode();
 
   return (
     <AppLayout>
@@ -57,6 +70,10 @@ function AuthenticatedRoutes() {
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<DashboardLayout />}>
           <Route index element={<DashboardHomePage />} />
+          <Route
+            path="install"
+            element={isDTest ? <DTestInstallPage /> : <Navigate to="/dashboard" replace />}
+          />
         </Route>
         <Route path="/dashboard/authentication" element={<AuthenticationLayout />}>
           <Route index element={<Navigate to="users" replace />} />
@@ -99,7 +116,17 @@ function AuthenticatedRoutes() {
           <Route index element={<VisualizerPage />} />
         </Route>
         <Route path="/dashboard/ai" element={<AILayout />}>
-          <Route index element={<AIPage />} />
+          <Route index element={<Navigate to="overview" replace />} />
+          <Route path="overview" element={<AIOverviewPage />} />
+          <Route path="quick-start" element={<AIQuickStartPage />} />
+          <Route path="models" element={<AIModelsPage />} />
+        </Route>
+        <Route path="/dashboard/payments" element={<PaymentsLayout />}>
+          <Route index element={<Navigate to="catalog" replace />} />
+          <Route path="catalog" element={<CatalogPage />} />
+          <Route path="customers" element={<CustomersPage />} />
+          <Route path="subscriptions" element={<SubscriptionsPage />} />
+          <Route path="payment-history" element={<PaymentHistoryPage />} />
         </Route>
         <Route path="/dashboard/realtime" element={<RealtimeLayout />}>
           <Route index element={<Navigate to="channels" replace />} />
@@ -114,6 +141,8 @@ function AuthenticatedRoutes() {
           <Route path="env-vars" element={<DeploymentEnvVarsPage />} />
           <Route path="domains" element={<DeploymentDomainsPage />} />
         </Route>
+        <Route path="/dashboard/compute" element={<ComputePage />} />
+        {isCloudHosting && <Route path="/dashboard/analytics" element={<AnalyticsPage />} />}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </AppLayout>

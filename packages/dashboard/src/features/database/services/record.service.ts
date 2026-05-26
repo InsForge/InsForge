@@ -1,9 +1,40 @@
-import { ConvertedValue } from '../../../components/datagrid/datagridTypes';
-import { apiClient } from '../../../lib/api/client';
-import { ColumnSchema, BulkUpsertResponse } from '@insforge/shared-schemas';
-import { tableService } from './table.service';
+import { ConvertedValue } from '#components/datagrid/datagridTypes';
+import { DEFAULT_DATABASE_SCHEMA } from '#features/database/helpers';
+import { apiClient } from '#lib/api/client';
+import { BulkUpsertResponse } from '@insforge/shared-schemas';
+
+interface AdminRecordListResponse {
+  data: { [key: string]: ConvertedValue }[];
+  pagination: { offset: number; limit: number; total: number };
+}
 
 export class RecordService {
+  private buildAdminRecordsPath(
+    tableName: string,
+    schemaName: string,
+    suffix: string = '',
+    params?: URLSearchParams
+  ): string {
+    const nextParams = params ? new URLSearchParams(params) : new URLSearchParams();
+
+    if (schemaName !== DEFAULT_DATABASE_SCHEMA) {
+      nextParams.set('schema', schemaName);
+    }
+
+    const query = nextParams.toString();
+    return `/database/admin/tables/${encodeURIComponent(tableName)}/records${suffix}${query ? `?${query}` : ''}`;
+  }
+
+  private buildSortParam(sortColumns?: { columnKey: string; direction: string }[]): string | null {
+    if (!sortColumns || sortColumns.length === 0) {
+      return null;
+    }
+
+    return sortColumns
+      .map((column) => `${column.columnKey}:${column.direction.toLowerCase()}`)
+      .join(',');
+  }
+
   /**
    * Data fetching method with built-in search, sorting, and pagination for UI components.
    *
@@ -16,6 +47,7 @@ export class RecordService {
    */
   async getTableRecords(
     tableName: string,
+    schemaName: string = DEFAULT_DATABASE_SCHEMA,
     limit = 10,
     offset = 0,
     searchQuery?: string,
@@ -25,44 +57,23 @@ export class RecordService {
     params.set('limit', limit.toString());
     params.set('offset', offset.toString());
 
-    // Construct PostgREST filter directly in frontend if search query is provided
     if (searchQuery && searchQuery.trim()) {
-      const searchValue = searchQuery.trim();
+      params.set('search', searchQuery.trim());
+    }
 
-      // Get table schema to identify text columns
-      const schema = await tableService.getTableSchema(tableName);
-      const textColumns = schema.columns
-        .filter((col: ColumnSchema) => {
-          const type = col.type.toLowerCase();
-          return type === 'string';
-        })
-        .map((col: ColumnSchema) => col.columnName);
+    const sortParam = this.buildSortParam(sortColumns);
+    if (sortParam) {
+      params.set('sort', sortParam);
+    }
 
-      if (textColumns.length) {
-        // Create PostgREST OR filter for text columns
-        const orFilters = textColumns
-          .map((column: string) => `${column}.ilike.*${searchValue}*`)
-          .join(',');
-        params.set('or', `(${orFilters})`);
+    const response: AdminRecordListResponse = await apiClient.request(
+      this.buildAdminRecordsPath(tableName, schemaName, '', params),
+      {
+        headers: {
+          Prefer: 'count=exact',
+        },
       }
-    }
-
-    // Add sorting if provided - PostgREST uses "order" parameter
-    if (sortColumns && sortColumns.length) {
-      const orderParam = sortColumns
-        .map((col) => `${col.columnKey}.${col.direction.toLowerCase()}`)
-        .join(',');
-      params.set('order', orderParam);
-    }
-
-    const response: {
-      data: { [key: string]: ConvertedValue }[];
-      pagination: { offset: number; limit: number; total: number };
-    } = await apiClient.request(`/database/records/${tableName}?${params.toString()}`, {
-      headers: {
-        Prefer: 'count=exact',
-      },
-    });
+    );
 
     return {
       records: response.data,
@@ -79,46 +90,92 @@ export class RecordService {
    * @param value - Value to match
    * @returns Single record or null if not found
    */
-  async getRecordByForeignKeyValue(tableName: string, columnName: string, value: string) {
-    const queryParams = `${columnName}=eq.${encodeURIComponent(value)}&limit=1`;
-    const response = await this.getRecords(tableName, queryParams);
-
-    // Return the first record if found, or null if not found
-    if (response.records && response.records.length) {
-      return response.records[0];
-    }
-    return null;
-  }
-
-  async getRecords(tableName: string, queryParams: string = '') {
-    const url = `/database/records/${tableName}${queryParams ? `?${queryParams}` : ''}`;
-    const response = await apiClient.request(url, {
-      headers: apiClient.withAccessToken(),
+  async getRecordByForeignKeyValue(
+    tableName: string,
+    columnName: string,
+    value: string,
+    schemaName: string = DEFAULT_DATABASE_SCHEMA
+  ) {
+    const params = new URLSearchParams({
+      column: columnName,
+      value,
     });
 
-    // Traditional REST: check if response is array (direct data) or wrapped
-    if (Array.isArray(response)) {
-      return {
-        records: response,
-        total: response.length,
-      };
+    return apiClient.request(this.buildAdminRecordsPath(tableName, schemaName, '/lookup', params), {
+      headers: apiClient.withAccessToken(),
+    });
+  }
+
+  async getRecords(
+    tableName: string,
+    schemaName: string = DEFAULT_DATABASE_SCHEMA,
+    queryParams: string = ''
+  ) {
+    const params = new URLSearchParams(queryParams);
+    const limit = Number(params.get('limit') || '100');
+    const offset = Number(params.get('offset') || '0');
+    const sort = params.get('order');
+    const normalizedSort = sort
+      ? sort
+          .split(',')
+          .map((clause) => clause.trim())
+          .filter(Boolean)
+          .map((clause) => {
+            const [columnName, direction = 'asc'] = clause.split('.');
+            return `${columnName}:${direction}`;
+          })
+          .join(',')
+      : null;
+
+    let filterColumn: string | undefined;
+    let filterValue: string | undefined;
+
+    for (const [key, rawValue] of params.entries()) {
+      if (key === 'limit' || key === 'offset' || key === 'order') {
+        continue;
+      }
+
+      if (!rawValue.startsWith('eq.')) {
+        throw new Error('Only simple eq filters are supported by the dashboard admin records API.');
+      }
+
+      if (filterColumn) {
+        throw new Error(
+          'Only one exact-match filter is supported by the dashboard admin records API.'
+        );
+      }
+
+      filterColumn = key;
+      filterValue = rawValue.slice(3);
     }
 
-    // If backend returns wrapped format for this endpoint
-    if (response.data && Array.isArray(response.data)) {
-      return {
-        records: response.data,
-        total: response.data.length,
-      };
-    }
+    const requestParams = new URLSearchParams({
+      limit: limit.toString(),
+      offset: offset.toString(),
+      ...(normalizedSort ? { sort: normalizedSort } : {}),
+      ...(filterColumn && filterValue !== undefined ? { filterColumn, filterValue } : {}),
+    });
+
+    const response: AdminRecordListResponse = await apiClient.request(
+      this.buildAdminRecordsPath(tableName, schemaName, '', requestParams),
+      {
+        headers: apiClient.withAccessToken({
+          Prefer: 'count=exact',
+        }),
+      }
+    );
 
     return {
-      records: response,
-      total: response.length,
+      records: response.data,
+      total: response.pagination.total,
     };
   }
 
-  createRecords(table: string, records: { [key: string]: ConvertedValue }[]) {
+  createRecords(
+    table: string,
+    records: { [key: string]: ConvertedValue }[],
+    schemaName: string = DEFAULT_DATABASE_SCHEMA
+  ) {
     // if data is json and data[id] == "" then remove id from data, because can't assign '' to uuid
     records = records.map((record) => {
       if (typeof record === 'object' && record.id === '') {
@@ -126,7 +183,8 @@ export class RecordService {
       }
       return record;
     });
-    return apiClient.request(`/database/records/${table}`, {
+
+    return apiClient.request(this.buildAdminRecordsPath(table, schemaName), {
       method: 'POST',
       headers: apiClient.withAccessToken({
         'Content-Type': 'application/json',
@@ -135,36 +193,54 @@ export class RecordService {
     });
   }
 
-  createRecord(table: string, data: { [key: string]: ConvertedValue }) {
+  createRecord(
+    table: string,
+    data: { [key: string]: ConvertedValue },
+    schemaName: string = DEFAULT_DATABASE_SCHEMA
+  ) {
     if (typeof data === 'object' && data.id === '') {
       // can't assign '' to uuid, so we need to remove it
       delete data.id;
     }
-    return this.createRecords(table, [data]);
+    return this.createRecords(table, [data], schemaName);
   }
 
   updateRecord(
     table: string,
     pkColumn: string,
     pkValue: string,
-    data: { [key: string]: ConvertedValue }
+    data: { [key: string]: ConvertedValue },
+    schemaName: string = DEFAULT_DATABASE_SCHEMA
   ) {
-    return apiClient.request(`/database/records/${table}?${pkColumn}=eq.${pkValue}`, {
-      method: 'PATCH',
-      headers: apiClient.withAccessToken({
-        'Content-Type': 'application/json',
-      }),
-      body: JSON.stringify(data),
-    });
+    const params = new URLSearchParams({ pkColumn });
+
+    return apiClient.request(
+      this.buildAdminRecordsPath(table, schemaName, `/${encodeURIComponent(pkValue)}`, params),
+      {
+        method: 'PATCH',
+        headers: apiClient.withAccessToken({
+          'Content-Type': 'application/json',
+        }),
+        body: JSON.stringify(data),
+      }
+    );
   }
 
-  // PostgREST supports bulk deletes via in.() filter
-  deleteRecords(table: string, pkColumn: string, pkValues: string[]) {
+  deleteRecords(
+    table: string,
+    pkColumn: string,
+    pkValues: string[],
+    schemaName: string = DEFAULT_DATABASE_SCHEMA
+  ) {
     if (!pkValues.length) {
       return Promise.resolve();
     }
-    const pkFilter = `in.(${pkValues.join(',')})`;
-    return apiClient.request(`/database/records/${table}?${pkColumn}=${pkFilter}`, {
+    const params = new URLSearchParams({
+      pkColumn,
+      pkValues: pkValues.join(','),
+    });
+
+    return apiClient.request(this.buildAdminRecordsPath(table, schemaName, '', params), {
       method: 'DELETE',
       headers: apiClient.withAccessToken(),
     });
@@ -177,7 +253,11 @@ export class RecordService {
     return { valid: true };
   }
 
-  async importCSV(tableName: string, file: File): Promise<BulkUpsertResponse> {
+  async importCSV(
+    tableName: string,
+    file: File,
+    schemaName: string = DEFAULT_DATABASE_SCHEMA
+  ): Promise<BulkUpsertResponse> {
     const validation = this.validateCSVFile(file);
     if (!validation.valid) {
       throw new Error(validation.error || 'Invalid CSV file.');
@@ -186,6 +266,7 @@ export class RecordService {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('table', tableName);
+    formData.append('schema', schemaName);
 
     const response: BulkUpsertResponse = await apiClient.request(`/database/advance/bulk-upsert`, {
       method: 'POST',

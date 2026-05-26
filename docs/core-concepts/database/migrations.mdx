@@ -1,0 +1,52 @@
+---
+title: "Database migrations"
+description: "Track schema changes in git and apply them with the InsForge CLI"
+---
+
+Migrations are versioned SQL files in `migrations/` applied with `@insforge/cli`. Each successful run is recorded in `system.custom_migrations`. The workflow is forward-only.
+
+## Concepts
+
+A migration is one SQL file prefixed with a 14-digit UTC timestamp: `<YYYYMMDDHHmmss>_<name>.sql`. The CLI applies pending files in order inside a transaction, sets `search_path` to `public`, and records history only on success. PostgREST reloads schema metadata automatically. `BEGIN`/`COMMIT`/`ROLLBACK` inside a file are rejected.
+
+## Usage
+
+Link the backend, then create a file.
+
+```bash
+npx @insforge/cli login
+npx @insforge/cli link
+npx @insforge/cli db migrations new create-employees-table
+```
+
+Write the SQL.
+
+```sql
+create table if not exists public.employees (
+  id bigint primary key generated always as identity,
+  name text not null,
+  email text,
+  created_at timestamptz default now()
+);
+```
+
+Apply pending migrations and check history.
+
+```bash
+npx @insforge/cli db migrations up --all
+npx @insforge/cli db migrations list
+```
+
+Target a single file with `up <version>`, or apply everything pending up to and including a target with `up --to <version>`.
+
+## Specific usage cases
+
+Adopting migrations on an existing project: run `db migrations fetch` first to materialize remote history into local files. Once applied remotely, never edit a migration in place. Write a forward migration instead.
+
+Once you opt in, route all schema changes through files. Ad hoc dashboard edits cause drift between git and `system.custom_migrations`.
+
+## More resources
+
+- [Database branching](/agent-native/branching) to rehearse a migration on a copy.
+- [Database overview](/core-concepts/database/overview) for how PostgREST picks up schema changes.
+- [PostgreSQL DDL docs](https://www.postgresql.org/docs/15/ddl.html) for the SQL you write.

@@ -9,8 +9,8 @@ import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { ServerEvents } from '@/types/socket.js';
 import { UsageService } from '@/services/usage/usage.service.js';
 import { successResponse } from '@/utils/response.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 
 export const usageRouter = Router();
 const usageService = UsageService.getInstance();

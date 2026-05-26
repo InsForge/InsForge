@@ -1,8 +1,8 @@
 import { useMemo, useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '../../../lib/contexts/AuthContext';
-import { usageService, McpUsageRecord } from '../services/usage.service';
-import { LOGS_PAGE_SIZE } from '../helpers';
+import { useAuth } from '#lib/contexts/AuthContext';
+import { usageService, McpUsageRecord } from '#features/logs/services/usage.service';
+import { LOGS_PAGE_SIZE } from '#features/logs/helpers';
 
 // ============================================================================
 // Main Hook
@@ -41,7 +41,7 @@ export function useMcpUsage(options: UseMcpUsageOptions = {}) {
     refetch,
   } = useQuery<McpUsageRecord[]>({
     queryKey: ['mcp-usage', successFilter, limit],
-    queryFn: () => usageService.getMcpUsage(successFilter, limit),
+    queryFn: ({ signal }) => usageService.getMcpUsage(successFilter, limit, signal),
     enabled: isAuthenticated,
     staleTime: 30 * 1000, // Cache for 30 seconds
     refetchInterval: false,

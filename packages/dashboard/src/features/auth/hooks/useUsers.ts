@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { userService } from '../services/user.service';
-import { loginService } from '../../login/services/login.service';
+import { userService } from '#features/auth/services/user.service';
+import { loginService } from '#features/login/services/login.service';
 
 interface UseUsersOptions {
   pageSize?: number;
@@ -22,13 +22,13 @@ export function useUsers(options: UseUsersOptions = {}) {
     refetch,
   } = useQuery({
     queryKey: ['users', currentPage, searchQuery, pageSize],
-    queryFn: () => {
+    queryFn: ({ signal }) => {
       const params = new URLSearchParams({
         limit: pageSize.toString(),
         offset: ((currentPage - 1) * pageSize).toString(),
       });
       // Use the user service to get users with search, backend handles filtering
-      return userService.getUsers(params.toString(), searchQuery);
+      return userService.getUsers(params.toString(), searchQuery, signal);
     },
     enabled: enabled,
     placeholderData: (previousData) => previousData, // Keep previous data while loading

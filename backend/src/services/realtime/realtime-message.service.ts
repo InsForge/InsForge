@@ -1,9 +1,10 @@
 import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import logger from '@/utils/logger.js';
-import type { RealtimeMessage, RoleSchema } from '@insforge/shared-schemas';
+import type { RealtimeMessage } from '@insforge/shared-schemas';
 import { RealtimeChannelService } from './realtime-channel.service.js';
-import { RealtimeAuthService } from './realtime-auth.service.js';
+import type { UserContext } from '@/api/middlewares/auth.js';
+import { withUserContext } from '@/services/database/user-context.service.js';
 
 export class RealtimeMessageService {
   private static instance: RealtimeMessageService;
@@ -36,8 +37,7 @@ export class RealtimeMessageService {
     channelName: string,
     eventName: string,
     payload: Record<string, unknown>,
-    userId: string | undefined,
-    userRole: RoleSchema
+    userContext: UserContext
   ): Promise<{
     channelId: string;
     channelName: string;
@@ -54,34 +54,28 @@ export class RealtimeMessageService {
       return null;
     }
 
-    const client = await this.getPool().connect();
+    const senderId = userContext.id ?? null;
 
     try {
-      // Begin transaction to ensure settings persist across queries
-      await client.query('BEGIN');
-
-      // Switch to specified role to enforce RLS policies
-      await client.query(`SET LOCAL ROLE ${userRole}`);
-
-      // Set user context for RLS policy evaluation
-      const authService = RealtimeAuthService.getInstance();
-      await authService.setUserContext(client, userId, channelName);
-
-      // Attempt INSERT with sender info - RLS will allow/deny based on policies
-      // No RETURNING clause needed - trigger handles pg_notify
-      await client.query(
-        `INSERT INTO realtime.messages (event_name, channel_id, channel_name, payload, sender_type, sender_id)
-         VALUES ($1, $2, $3, $4, 'user', $5)`,
-        [eventName, channel.id, channelName, JSON.stringify(payload), userId || null]
+      await withUserContext(
+        this.getPool(),
+        userContext,
+        async (client) => {
+          // Attempt INSERT with sender info - RLS will allow/deny based on policies.
+          // No RETURNING clause needed - trigger handles pg_notify.
+          await client.query(
+            `INSERT INTO realtime.messages (event_name, channel_id, channel_name, payload, sender_type, sender_id)
+             VALUES ($1, $2, $3, $4, 'user', $5)`,
+            [eventName, channel.id, channelName, JSON.stringify(payload), senderId]
+          );
+        },
+        { 'realtime.channel_name': channelName }
       );
-
-      // Commit transaction - insert succeeded
-      await client.query('COMMIT');
 
       logger.debug('Client message inserted', {
         channelName,
         eventName,
-        userId,
+        userId: senderId,
       });
 
       return {
@@ -89,19 +83,17 @@ export class RealtimeMessageService {
         channelName,
         eventName,
         payload,
-        senderId: userId || null,
+        senderId,
       };
     } catch (error) {
-      // Rollback transaction on error
-      await client.query('ROLLBACK').catch(() => {});
-
       // RLS policy denied the INSERT or other error
-      logger.debug('Message insert denied or failed', { channelName, eventName, userId, error });
+      logger.debug('Message insert denied or failed', {
+        channelName,
+        eventName,
+        userId: senderId,
+        error,
+      });
       return null;
-    } finally {
-      // Reset role back to default before releasing connection
-      await client.query('RESET ROLE');
-      client.release();
     }
   }
 

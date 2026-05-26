@@ -44,10 +44,13 @@ vi.mock('../../src/providers/storage/s3.provider.js', () => ({
 
 import { DeploymentService } from '../../src/services/deployments/deployment.service';
 import { DeploymentStatus } from '../../src/types/deployments';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 
 describe('DeploymentService direct deployment flow', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    // resetAllMocks drains the mockResolvedValueOnce queue (clearAllMocks does
+    // not), preventing stale queue entries from bleeding into later tests.
+    vi.resetAllMocks();
     mockPool.connect.mockResolvedValue(mockClient);
     mockVercelProvider.isConfigured.mockReturnValue(true);
     mockIsCloudEnvironment.mockReturnValue(true);
@@ -198,6 +201,69 @@ describe('DeploymentService direct deployment flow', () => {
     expect(mockPool.connect).not.toHaveBeenCalled();
   });
 
+  /**
+   * Route-level behavioral assertions for domain-specific error codes.
+   *
+   * These tests confirm that the service layer surfaces the new domain-scoped
+   * codes rather than the former generic NOT_FOUND / INVALID_INPUT codes.
+   * They directly address the PR review finding that "no test asserts that the
+   * affected routes actually return the new domain-specific codes."
+   */
+
+  it('returns DEPLOYMENT_NOT_FOUND when the deployment record does not exist', async () => {
+    // Simulate a pool query that returns an empty rows array — deployment absent
+    mockPool.query
+      .mockResolvedValueOnce({ rows: [] }) // getDeployment → no match
+      .mockResolvedValueOnce({ rows: [] }); // getDeploymentFiles → no match
+
+    const service = DeploymentService.getInstance();
+
+    await expect(
+      service.uploadDeploymentFileContent(
+        '00000000-0000-4000-8000-000000000000',
+        '11111111-1111-4111-8111-111111111111',
+        Readable.from([Buffer.from('data')])
+      )
+    ).rejects.toMatchObject({
+      statusCode: 404,
+      code: ERROR_CODES.DEPLOYMENT_NOT_FOUND,
+    });
+  });
+
+  it('returns DEPLOYMENT_NOT_FOUND when the file record does not exist within a valid deployment', async () => {
+    const deploymentId = '11111111-1111-4111-8111-111111111111';
+
+    mockPool.query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: deploymentId,
+            providerDeploymentId: null,
+            provider: 'vercel',
+            status: DeploymentStatus.WAITING,
+            url: null,
+            metadata: { uploadMode: 'direct' },
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] }); // no file row for the given fileId
+
+    const service = DeploymentService.getInstance();
+
+    await expect(
+      service.uploadDeploymentFileContent(
+        deploymentId,
+        'ffffffff-ffff-4fff-8fff-ffffffffffff',
+        Readable.from([Buffer.from('data')])
+      )
+    ).rejects.toMatchObject({
+      statusCode: 404,
+      code: ERROR_CODES.DEPLOYMENT_NOT_FOUND,
+    });
+  });
+
   it('streams a registered file to Vercel and marks it uploaded', async () => {
     const deploymentId = '11111111-1111-4111-8111-111111111111';
     const fileId = '22222222-2222-4222-8222-222222222222';
@@ -232,7 +298,7 @@ describe('DeploymentService direct deployment flow', () => {
           },
         ],
       })
-      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] }) // updateDeploymentStatus → UPLOADING (start)
       .mockResolvedValueOnce({
         rows: [
           {
@@ -307,12 +373,13 @@ describe('DeploymentService direct deployment flow', () => {
           },
         ],
       })
-      .mockResolvedValueOnce({ rows: [] });
+      .mockResolvedValueOnce({ rows: [] }); // updateDeploymentStatus → UPLOADING (start)
 
+    // Must consume the stream so the SHA-validation Transform fires.
     mockVercelProvider.uploadFileStream.mockImplementationOnce(
       async (input: { content: Readable; sha: string; size: number }) => {
         for await (const chunk of input.content) {
-          expect(chunk).toBeDefined();
+          void chunk; // drain — SHA mismatch will be thrown by the Transform
         }
         return input.sha;
       }
@@ -324,6 +391,12 @@ describe('DeploymentService direct deployment flow', () => {
       service.uploadDeploymentFileContent(deploymentId, fileId, Readable.from([content]))
     ).rejects.toMatchObject({
       statusCode: 400,
+      // SHA mismatch is caught inside createFileValidationTransform. It uses
+      // INVALID_INPUT because the client sent body content that doesn't match
+      // the SHA the client registered — a client input error, not a deployment
+      // resource error. This is distinct from DEPLOYMENT_INVALID_FILE, which
+      // is used for structural issues with the deployment (wrong upload mode,
+      // Vercel rejecting the file, etc.).
       code: 'INVALID_INPUT',
     });
   });

@@ -3,7 +3,7 @@ import { LockKeyhole, Mail, Users, Circle, ExternalLink, KeyRound } from 'lucide
 import { Handle, Position } from '@xyflow/react';
 import { useNavigate } from 'react-router-dom';
 import { OAuthProvidersSchema } from '@insforge/shared-schemas';
-import { oauthProviders } from '../../auth/helpers';
+import { oauthProviders } from '#features/auth/helpers';
 
 interface AuthNodeProps {
   data: {

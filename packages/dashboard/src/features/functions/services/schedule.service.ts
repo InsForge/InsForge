@@ -1,6 +1,7 @@
-import { apiClient } from '../../../lib/api/client';
+import { apiClient } from '#lib/api/client';
 import type {
   ScheduleSchema,
+  SchedulesConfig,
   ListSchedulesResponse,
   ListExecutionLogsResponse,
   CreateScheduleRequest,
@@ -80,6 +81,20 @@ export class ScheduleService {
       }
     );
     return response;
+  }
+
+  async getSchedulesConfig(): Promise<SchedulesConfig> {
+    return apiClient.request('/schedules/config', {
+      headers: apiClient.withAccessToken(),
+    });
+  }
+
+  async updateSchedulesConfig(payload: SchedulesConfig): Promise<void> {
+    await apiClient.request('/schedules/config', {
+      method: 'PATCH',
+      headers: apiClient.withAccessToken(),
+      body: JSON.stringify(payload),
+    });
   }
 }
 

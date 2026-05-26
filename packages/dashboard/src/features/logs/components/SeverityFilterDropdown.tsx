@@ -6,8 +6,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@insforge/ui';
-import { cn } from '../../../lib/utils/utils';
-import { SEVERITY_CONFIG, type SeverityType } from '../helpers';
+import { cn } from '#lib/utils/utils';
+import { SEVERITY_CONFIG, type SeverityType } from '#features/logs/helpers';
 
 const ORDERED_SEVERITIES: SeverityType[] = ['error', 'warning', 'informational'];
 const SEVERITY_DOT_COLORS: Record<SeverityType, string> = {

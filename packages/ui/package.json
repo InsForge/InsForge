@@ -52,8 +52,11 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json && cp src/styles.css dist/styles.css",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run --config vitest.unit.config.ts",
+    "test:component": "vitest run --config vitest.component.config.ts",
     "prepublishOnly": "npm run build",
-    "lint": "eslint src/"
+    "lint": "eslint ."
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.3",
@@ -72,5 +75,11 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tailwindcss": "^4.0.0"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "jsdom": "^29.1.1",
+    "vitest": "^4.1.6"
   }
 }

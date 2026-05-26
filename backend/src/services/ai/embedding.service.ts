@@ -1,14 +1,15 @@
 import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
-import type { EmbeddingsRequest, EmbeddingsResponse } from '@insforge/shared-schemas';
+import {
+  ERROR_CODES,
+  type EmbeddingsRequest,
+  type EmbeddingsResponse,
+} from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
-import { AIConfigService } from './ai-config.service.js';
-import { AIUsageService } from './ai-usage.service.js';
+import { AppError } from '@/utils/errors.js';
 
 export class EmbeddingService {
   private static instance: EmbeddingService;
   private openRouterProvider = OpenRouterProvider.getInstance();
-  private aiConfigService = AIConfigService.getInstance();
-  private aiUsageService = AIUsageService.getInstance();
 
   private constructor() {}
 
@@ -28,7 +29,6 @@ export class EmbeddingService {
   async createEmbeddings(options: EmbeddingsRequest): Promise<EmbeddingsResponse> {
     try {
       // Send request with automatic renewal and retry logic (same pattern as chat-completion)
-      const aiConfig = await this.aiConfigService.findByModelId(options.model);
       const { result: response } = await this.openRouterProvider.sendRequest((client) =>
         client.embeddings.create({
           model: options.model,
@@ -53,20 +53,6 @@ export class EmbeddingService {
           }
         : undefined;
 
-      // Track usage if config is available
-      if (aiConfig?.id && tokenUsage) {
-        const outputTokens = Math.max(
-          0,
-          (tokenUsage.totalTokens || 0) - (tokenUsage.promptTokens || 0)
-        );
-        await this.aiUsageService.trackChatUsage(
-          aiConfig.id,
-          tokenUsage.promptTokens,
-          outputTokens,
-          options.model // pass the actual model ID used
-        );
-      }
-
       // Transform to our response format with metadata
       return {
         object: 'list',
@@ -81,12 +67,17 @@ export class EmbeddingService {
         },
       };
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       logger.warn('Embedding error', {
         error: error instanceof Error ? error.message : String(error),
         model: options.model,
       });
-      throw new Error(
-        `Failed to generate embeddings: ${error instanceof Error ? error.message : String(error)}`
+      throw new AppError(
+        `Failed to generate embeddings: ${error instanceof Error ? error.message : String(error)}`,
+        500,
+        ERROR_CODES.AI_UPSTREAM_UNAVAILABLE
       );
     }
   }

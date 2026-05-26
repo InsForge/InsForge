@@ -2,9 +2,13 @@ import { z } from 'zod';
 import { storageBucketSchema } from './storage.schema.js';
 import { realtimeChannelSchema } from './realtime.schema.js';
 import { realtimePermissionsResponseSchema } from './realtime-api.schema.js';
-import { getPublicAuthConfigResponseSchema } from './auth-api.schema.js';
+import { authConfigAdminResponseSchema } from './auth-api.schema.js';
 
-export const authMetadataSchema = getPublicAuthConfigResponseSchema;
+// Admin metadata for /api/metadata/auth (gated behind verifyAdmin). Identical
+// shape to the canonical admin auth response — public response in
+// auth-api.schema.ts is derived from the same source by omitting sensitive
+// fields, so they can't drift.
+export const authMetadataSchema = authConfigAdminResponseSchema;
 
 export const databaseMetadataSchema = z.object({
   tables: z.array(
@@ -33,28 +37,31 @@ export const edgeFunctionMetadataSchema = z.object({
   status: z.string(),
 });
 
-export const aiMetadataSchema = z.object({
-  models: z.array(
-    z.object({
-      inputModality: z.array(z.string()),
-      outputModality: z.array(z.string()),
-      modelId: z.string(),
-    })
-  ),
-});
-
 export const realtimeMetadataSchema = z.object({
   channels: z.array(realtimeChannelSchema),
   permissions: realtimePermissionsResponseSchema,
+});
+
+/**
+ * Deployments slice for the admin metadata response. Cloud-only: this slice
+ * is omitted entirely in self-hosted backends (where custom slugs are not
+ * available). The CLI's capability probe uses presence/absence of this slice
+ * to decide whether to apply `[deployments]` TOML sections.
+ *
+ * `customSlug: null` means cloud + slug not set (project uses default URL).
+ * Absent slice means self-host (feature doesn't exist).
+ */
+export const deploymentsMetadataSchema = z.object({
+  customSlug: z.string().nullable(),
 });
 
 export const appMetaDataSchema = z.object({
   auth: authMetadataSchema,
   database: databaseMetadataSchema,
   storage: storageMetadataSchema,
-  aiIntegration: aiMetadataSchema.optional(),
   functions: z.array(edgeFunctionMetadataSchema),
   realtime: realtimeMetadataSchema.optional(),
+  deployments: deploymentsMetadataSchema.optional(),
   version: z.string().optional(),
 });
 
@@ -63,8 +70,8 @@ export type DatabaseMetadataSchema = z.infer<typeof databaseMetadataSchema>;
 export type BucketMetadataSchema = z.infer<typeof bucketMetadataSchema>;
 export type StorageMetadataSchema = z.infer<typeof storageMetadataSchema>;
 export type EdgeFunctionMetadataSchema = z.infer<typeof edgeFunctionMetadataSchema>;
-export type AIMetadataSchema = z.infer<typeof aiMetadataSchema>;
 export type RealtimeMetadataSchema = z.infer<typeof realtimeMetadataSchema>;
+export type DeploymentsMetadataSchema = z.infer<typeof deploymentsMetadataSchema>;
 export type AppMetadataSchema = z.infer<typeof appMetaDataSchema>;
 
 // Database connection schemas

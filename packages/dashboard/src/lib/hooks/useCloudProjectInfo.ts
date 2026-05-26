@@ -1,4 +1,4 @@
-import { useDashboardProject, useIsCloudHostingMode } from '../config/DashboardHostContext';
+import { useDashboardProject, useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
 
 export interface CloudProjectInfo {
   name?: string;

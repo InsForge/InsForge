@@ -2,10 +2,18 @@ import { createContext, useContext } from 'react';
 import type {
   DashboardBackupInfo,
   DashboardInstanceInfo,
+  DashboardModelCreditUsage,
   DashboardMode,
+  DashboardPosthogConnectionStatus,
+  DashboardPosthogOpenResult,
   DashboardProjectInfo,
   DashboardUserInfo,
-} from '../../types';
+  DashboardMetricsRange,
+  DashboardMetricsResponse,
+  DashboardAdvisorSummary,
+  DashboardAdvisorIssuesQuery,
+  DashboardAdvisorIssuesResponse,
+} from '#types';
 
 interface DashboardHostContextValue {
   backendUrl?: string;
@@ -14,7 +22,7 @@ interface DashboardHostContextValue {
   getAuthorizationCode?: () => Promise<string>;
   useAuthorizationCodeRefresh?: boolean;
   onRouteChange?: (path: string) => void;
-  onNavigateToSubscription?: () => void;
+  onShowUpgradeDialog?: () => void;
   onRenameProject?: (name: string) => Promise<void>;
   onDeleteProject?: () => Promise<void>;
   onRequestBackupInfo?: () => Promise<DashboardBackupInfo>;
@@ -28,6 +36,19 @@ interface DashboardHostContextValue {
   ) => Promise<{ success: boolean; instanceType?: string; error?: string }>;
   onUpdateVersion?: () => Promise<void>;
   onRequestUserInfo?: () => Promise<DashboardUserInfo>;
+  onRequestUserApiKey?: () => Promise<string>;
+  onRequestModelCredits?: () => Promise<DashboardModelCreditUsage>;
+  onRequestProjectMetrics?: (range: DashboardMetricsRange) => Promise<DashboardMetricsResponse>;
+  onRequestAdvisorLatest?: () => Promise<DashboardAdvisorSummary | null>;
+  onRequestAdvisorIssues?: (
+    query: DashboardAdvisorIssuesQuery
+  ) => Promise<DashboardAdvisorIssuesResponse>;
+  onTriggerAdvisorScan?: () => Promise<void>;
+  onConnectPosthog?: (projectId: string) => void;
+  subscribePosthogConnectionStatus?: (
+    cb: (event: DashboardPosthogConnectionStatus) => void
+  ) => () => void;
+  onOpenPosthog?: (projectId: string) => Promise<DashboardPosthogOpenResult>;
 }
 
 const DashboardHostContext = createContext<DashboardHostContextValue | null>(null);

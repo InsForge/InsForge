@@ -1,9 +1,12 @@
 import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
-import type { StorageConfigSchema, UpdateStorageConfigRequest } from '@insforge/shared-schemas';
+import {
+  ERROR_CODES,
+  type StorageConfigSchema,
+  type UpdateStorageConfigRequest,
+} from '@insforge/shared-schemas';
 
 const DEFAULT_MAX_FILE_SIZE_MB = 50;
 

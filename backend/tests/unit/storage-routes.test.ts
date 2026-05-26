@@ -124,6 +124,7 @@ describe('Storage routes', () => {
       'product-images',
       'products/prod_123/main.jpg'
     );
+    expect(authMocks.verifyUser).not.toHaveBeenCalled();
   });
 
   test('download strategy route returns 400 when object key is missing', async () => {

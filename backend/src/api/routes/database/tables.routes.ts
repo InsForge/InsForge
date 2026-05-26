@@ -3,10 +3,14 @@ import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { DatabaseTableService } from '@/services/database/database-table.service.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { successResponse } from '@/utils/response.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
-import { createTableRequestSchema, updateTableSchemaRequestSchema } from '@insforge/shared-schemas';
+import { AppError } from '@/utils/errors.js';
+import {
+  ERROR_CODES,
+  createTableRequestSchema,
+  updateTableSchemaRequestSchema,
+} from '@insforge/shared-schemas';
 import { AuditService } from '@/services/logs/audit.service.js';
+import { normalizeDatabaseSchemaName } from '@/services/database/helpers.js';
 
 const router = Router();
 const tableService = DatabaseTableService.getInstance();
@@ -18,7 +22,8 @@ const auditService = AuditService.getInstance();
 // List all tables
 router.get('/', verifyAdmin, async (_req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const tables = await tableService.listTables();
+    const schemaName = normalizeDatabaseSchemaName(_req.query.schema);
+    const tables = await tableService.listTables(schemaName);
     successResponse(res, tables);
   } catch (error) {
     next(error);
@@ -38,10 +43,11 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
       );
     }
 
+    const schemaName = normalizeDatabaseSchemaName(req.query.schema);
     const { tableName, columns, rlsEnabled } = validation.data;
-    const result = await tableService.createTable(tableName, columns, rlsEnabled);
+    const result = await tableService.createTable(schemaName, tableName, columns, rlsEnabled);
 
-    DatabaseManager.clearColumnTypeCache(tableName);
+    DatabaseManager.clearColumnTypeCache(tableName, schemaName);
 
     // Log audit for table creation
     await auditService.log({
@@ -49,6 +55,7 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
       action: 'CREATE_TABLE',
       module: 'DATABASE',
       details: {
+        schemaName,
         tableName,
         columns,
         rlsEnabled,
@@ -69,7 +76,8 @@ router.get(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { tableName } = req.params;
-      const schema = await tableService.getTableSchema(tableName);
+      const schemaName = normalizeDatabaseSchemaName(req.query.schema);
+      const schema = await tableService.getTableSchema(schemaName, tableName);
       successResponse(res, schema);
     } catch (error) {
       next(error);
@@ -84,6 +92,7 @@ router.patch(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { tableName } = req.params;
+      const schemaName = normalizeDatabaseSchemaName(req.query.schema);
 
       const validation = updateTableSchemaRequestSchema.safeParse(req.body);
       if (!validation.success) {
@@ -96,9 +105,9 @@ router.patch(
       }
 
       const operations = validation.data;
-      const result = await tableService.updateTableSchema(tableName, operations);
+      const result = await tableService.updateTableSchema(schemaName, tableName, operations);
 
-      DatabaseManager.clearColumnTypeCache(tableName);
+      DatabaseManager.clearColumnTypeCache(tableName, schemaName);
 
       // Log audit for table schema update
       await auditService.log({
@@ -106,6 +115,7 @@ router.patch(
         action: 'UPDATE_TABLE',
         module: 'DATABASE',
         details: {
+          schemaName,
           tableName,
           operations,
         },
@@ -126,9 +136,10 @@ router.delete(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { tableName } = req.params;
-      const result = await tableService.deleteTable(tableName);
+      const schemaName = normalizeDatabaseSchemaName(req.query.schema);
+      const result = await tableService.deleteTable(schemaName, tableName);
 
-      DatabaseManager.clearColumnTypeCache(tableName);
+      DatabaseManager.clearColumnTypeCache(tableName, schemaName);
 
       // Log audit for table deletion
       await auditService.log({
@@ -136,6 +147,7 @@ router.delete(
         action: 'DELETE_TABLE',
         module: 'DATABASE',
         details: {
+          schemaName,
           tableName,
         },
         ip_address: req.ip,

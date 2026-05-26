@@ -1,9 +1,9 @@
 import { Eye, EyeOff, Loader2, Trash2 } from 'lucide-react';
 import { Button, CopyButton } from '@insforge/ui';
 import { SecretSchema } from '@insforge/shared-schemas';
-import { cn } from '../../../lib/utils/utils';
+import { cn } from '#lib/utils/utils';
 import { formatDistance } from 'date-fns';
-import { useSecretValue } from '../hooks/useSecrets';
+import { useSecretValue } from '#features/functions/hooks/useSecrets';
 
 interface SecretRowProps {
   secret: SecretSchema;

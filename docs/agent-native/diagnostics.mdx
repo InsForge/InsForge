@@ -1,0 +1,69 @@
+---
+title: "Diagnostics & advisor"
+sidebarTitle: "Diagnostics & advisor"
+description: "The agent reads backend health, advisor findings, and error logs, then applies the fix."
+---
+
+When something breaks, an agent should not have to guess. `npx @insforge/cli diagnose` turns the backend's own signals into something an agent can fetch and act on directly: advisor findings with remediations, database health checks, instance metrics, and aggregated error logs. Each finding comes with a fix, so "what is wrong" and "what to do about it" arrive together. The agent pulls all of this itself, with no dashboard in the loop, which is what lets it close security gaps like a permissive RLS policy before they leak data.
+
+<Frame caption="A Backend Advisor finding: the problem, the affected table, and a remediation the agent can copy and apply.">
+  <img src="/images/backend-advisor.png" alt="Backend Advisor finding: a permissive RLS policy on public.messages with a Copy Remediation button" />
+</Frame>
+
+## Full health report
+
+Run `diagnose` with no subcommand for everything at once:
+
+```bash
+npx @insforge/cli diagnose
+npx @insforge/cli diagnose --json
+```
+
+The report bundles the advisor scan, database health, instance metrics, and recent error logs into one output. In `--json` mode the agent gets it all as structured data.
+
+## Backend Advisor
+
+The advisor scans for security, performance, and health issues and writes a remediation for each one. The dashboard shows the findings with a "Copy Remediation" button, but the agent does not need the dashboard: it fetches the same scan directly with `--json` and applies the fix itself, so a security issue gets closed without waiting for a human to notice it.
+
+```bash
+npx @insforge/cli diagnose advisor
+npx @insforge/cli diagnose advisor --json
+```
+
+A typical finding is a permissive RLS policy that exposes a table to anonymous users. The advisor names the table, the severity, and the SQL to fix it. The agent reads the finding, applies the remediation as a [migration](/core-concepts/database/migrations), and re-scans to confirm it cleared.
+
+## Targeted checks
+
+Each part of the report is also available on its own:
+
+| Command | What it checks |
+|---------|----------------|
+| `diagnose advisor` | Latest advisor scan: security, performance, and health issues |
+| `diagnose db` | Database health: connections, table bloat, index usage |
+| `diagnose metrics` | Instance metrics: CPU, memory, disk, and network |
+| `diagnose logs` | Error-level logs aggregated across every backend source |
+
+For raw logs from a single source, use the top-level command:
+
+```bash
+npx @insforge/cli logs function.logs
+npx @insforge/cli logs postgres.logs
+```
+
+Sources include `insforge.logs`, `postgREST.logs`, `postgres.logs`, `function.logs`, and `function-deploy.logs`.
+
+## Let the agent interpret it
+
+`diagnose --ai` hands the collected diagnostic data to a model and returns a plain-language analysis:
+
+```bash
+npx @insforge/cli diagnose --ai "why did write latency spike after the last deploy?"
+```
+
+This is the difference between dumping a stack trace and explaining the fix. The agent asks a question about the live backend and gets an answer grounded in the actual signals.
+
+## Next steps
+
+- Apply advisor remediations as [migrations](/core-concepts/database/migrations) so the fix is versioned.
+- Rehearse a risky fix on a [backend branch](/agent-native/branching) before it touches production.
+- Read the [CLI harness](/agent-native/cli-harness) for the rest of the command surface.

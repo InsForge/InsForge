@@ -15,7 +15,6 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
-    "test:bootstrap-import": "tsx tests/verify-bootstrap-import.js",
     "test:e2e": "./tests/run-all-tests.sh",
     "migrate:bootstrap": "tsx src/infra/database/migrations/bootstrap/bootstrap-migrations.js",
     "migrate:up": "npm run migrate:bootstrap && node-pg-migrate up --migrations-dir src/infra/database/migrations --migrations-schema system --migrations-table migrations",
@@ -25,7 +24,7 @@
     "migrate:up:local": "dotenv -e ../.env -- npm run migrate:bootstrap && dotenv -e ../.env -- node-pg-migrate up --migrations-dir src/infra/database/migrations --migrations-schema system --migrations-table migrations",
     "migrate:down:local": "dotenv -e ../.env -- node-pg-migrate down --migrations-dir src/infra/database/migrations --migrations-schema system --migrations-table migrations",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src/"
+    "lint": "eslint ."
   },
   "keywords": [
     "backend-as-a-service",
@@ -37,6 +36,7 @@
     "@aws-sdk/client-cloudwatch-logs": "^3.713.0",
     "@aws-sdk/client-s3": "^3.713.0",
     "@aws-sdk/cloudfront-signer": "^3.901.0",
+    "@aws-sdk/lib-storage": "^3.1035.0",
     "@aws-sdk/s3-presigned-post": "^3.879.0",
     "@aws-sdk/s3-request-presigner": "^3.879.0",
     "@databases/split-sql-query": "^1.0.4",
@@ -57,6 +57,7 @@
     "jose": "^6.1.0",
     "jsonwebtoken": "^9.0.2",
     "libpg-query": "^17.6.0",
+    "lru-cache": "^11.3.5",
     "multer": "^2.0.2",
     "node-fetch": "^3.3.2",
     "node-pg-migrate": "^8.0.3",
@@ -64,8 +65,11 @@
     "openai": "^5.19.1",
     "pg": "^8.16.3",
     "pg-format": "^1.0.4",
+    "picomatch": "^4.0.4",
     "socket.io": "^4.8.1",
+    "stripe": "^22.1.0",
     "winston": "^3.17.0",
+    "xml2js": "^0.6.2",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -77,7 +81,11 @@
     "@types/node": "^20.11.24",
     "@types/nodemailer": "^7.0.11",
     "@types/pg-format": "^1.0.5",
+    "@types/picomatch": "^4.0.3",
+    "@types/supertest": "^7.2.0",
+    "@types/xml2js": "^0.4.14",
     "dotenv-cli": "^10.0.0",
+    "supertest": "^7.2.2",
     "tsup": "^8.5.0",
     "tsx": "^4.7.1",
     "typescript": "^5.3.3",

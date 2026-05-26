@@ -1,7 +1,7 @@
-import { useSmtpConfig } from '../hooks/useSmtpConfig';
-import { useEmailTemplates } from '../hooks/useEmailTemplates';
-import { SmtpSettingsCard } from '../components/SmtpSettingsCard';
-import { EmailTemplateCard } from '../components/EmailTemplateCard';
+import { useSmtpConfig } from '#features/auth/hooks/useSmtpConfig';
+import { useEmailTemplates } from '#features/auth/hooks/useEmailTemplates';
+import { SmtpSettingsCard } from '#features/auth/components/SmtpSettingsCard';
+import { EmailTemplateCard } from '#features/auth/components/EmailTemplateCard';
 
 export default function EmailPage() {
   const {

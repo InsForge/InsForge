@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { deploymentsService } from '../services/deployments.service';
+import { deploymentsService } from '#features/deployments/services/deployments.service';
 
 export function useDeploymentMetadata() {
   const queryClient = useQueryClient();

@@ -2,6 +2,8 @@ node_modules/
 dist/
 data/
 coverage/
+playwright-report/
+test-results/
 .env
 .worktrees/
 .DS_Store
@@ -30,3 +32,4 @@ backend/logs/*
 
 # Turborepo
 .turbo
+.gstack/

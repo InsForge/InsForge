@@ -1,62 +1,71 @@
-import { Switch } from '@insforge/ui';
-import { ModelOption, formatPrice, formatModality } from '../helpers';
+import {
+  ModelOption,
+  formatInputPrice,
+  formatModality,
+  formatOutputPrice,
+  formatReleasedDate,
+} from '#features/ai/helpers';
 
 interface ModelRowProps {
   model: ModelOption;
-  isEnabled: boolean;
-  requests: number;
-  onToggle: (modelId: string, isEnabled: boolean) => void;
 }
 
-export function ModelRow({ model, isEnabled, requests, onToggle }: ModelRowProps) {
+export function ModelRow({ model }: ModelRowProps) {
+  const releasedDate = formatReleasedDate(model.created);
+  const inputPrice = formatInputPrice(model);
+  const outputPrice = formatOutputPrice(model);
+
   return (
-    <div className="grid grid-cols-[minmax(0,2fr)_1fr_1fr_1fr_1fr_1fr] gap-x-2.5 h-12 items-center px-4 border-b border-[var(--alpha-8)] last:border-b-0">
-      {/* Model with Toggle */}
-      <div className="flex items-center gap-3 min-w-0">
-        <Switch checked={isEnabled} onCheckedChange={() => onToggle(model.modelId, isEnabled)} />
-        <span className="text-sm text-foreground truncate" title={model.modelName}>
-          {model.modelName}
-        </span>
+    <div className="grid h-12 grid-cols-[149px_minmax(120px,1fr)_minmax(120px,1fr)_minmax(120px,1fr)_minmax(120px,1fr)_120px] items-center border-b border-[var(--alpha-8)] last:border-b-0">
+      <div className="flex h-full min-w-0 items-center border-r border-[var(--alpha-8)] px-2.5">
+        <div className="flex min-w-0 items-center gap-2">
+          <span
+            className="truncate text-[13px] leading-[18px] text-foreground"
+            title={model.modelName}
+          >
+            {model.modelName}
+          </span>
+        </div>
       </div>
 
       {/* Input Modalities */}
       <div
-        className="text-sm leading-5 text-foreground truncate"
+        className="truncate px-2.5 text-[13px] leading-[18px] text-foreground"
         title={model.inputModality.map(formatModality).join(' / ')}
       >
         {model.inputModality.map(formatModality).join(' / ')}
       </div>
 
       {/* Input Price */}
-      <div className="text-sm leading-5 text-foreground" title={formatPrice(model.inputPrice)}>
-        {formatPrice(model.inputPrice)}
-        {model.inputPrice !== undefined && model.inputPrice > 0 && (
-          <span className="text-muted-foreground"> / M tokens</span>
-        )}
+      <div
+        className="truncate px-2.5 text-[13px] leading-[18px] text-foreground"
+        title={inputPrice}
+      >
+        {inputPrice}
       </div>
 
       {/* Output Modalities */}
       <div
-        className="text-sm leading-5 text-foreground truncate"
+        className="truncate px-2.5 text-[13px] leading-[18px] text-foreground"
         title={model.outputModality.map(formatModality).join(' / ')}
       >
         {model.outputModality.map(formatModality).join(' / ')}
       </div>
 
       {/* Output Price */}
-      <div className="text-sm leading-5 text-foreground" title={formatPrice(model.outputPrice)}>
-        {formatPrice(model.outputPrice)}
-        {model.outputPrice !== undefined && model.outputPrice > 0 && (
-          <span className="text-muted-foreground"> / M tokens</span>
-        )}
+      <div
+        className="truncate px-2.5 text-[13px] leading-[18px] text-foreground"
+        title={outputPrice}
+      >
+        {outputPrice}
       </div>
 
-      {/* Requests Count */}
+      {/* Released */}
       <div
-        className="text-right text-sm leading-5 text-foreground"
-        title={requests > 0 ? requests.toLocaleString() : '-'}
+        className="truncate px-2.5 text-left text-[13px] leading-[18px] text-foreground"
+        title={releasedDate}
       >
-        {requests > 0 ? requests.toLocaleString() : '-'}
+        {releasedDate}
       </div>
     </div>
   );

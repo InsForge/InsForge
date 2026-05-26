@@ -7,8 +7,8 @@ import {
   ListOAuthConfigsResponse,
   OAuthProvidersSchema,
 } from '@insforge/shared-schemas';
-import { oAuthConfigService } from '../services/oauth-config.service';
-import { useToast } from '../../../lib/hooks/useToast';
+import { oAuthConfigService } from '#features/auth/services/oauth-config.service';
+import { useToast } from '#lib/hooks/useToast';
 
 export function useOAuthConfig(selectedProvider?: OAuthProvidersSchema | null) {
   const queryClient = useQueryClient();

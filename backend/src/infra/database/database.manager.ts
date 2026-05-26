@@ -4,6 +4,7 @@ import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { DatabaseMetadataSchema } from '@insforge/shared-schemas';
 import pgFormat from 'pg-format';
+import { buildQualifiedTableKey, DEFAULT_DATABASE_SCHEMA } from '@/services/database/helpers.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -49,8 +50,12 @@ export class DatabaseManager {
     });
   }
 
-  static async getColumnTypeMap(tableName: string): Promise<Record<string, string>> {
-    const cached = DatabaseManager.columnTypeCache.get(tableName);
+  static async getColumnTypeMap(
+    tableName: string,
+    schemaName: string = DEFAULT_DATABASE_SCHEMA
+  ): Promise<Record<string, string>> {
+    const cacheKey = buildQualifiedTableKey(tableName, schemaName);
+    const cached = DatabaseManager.columnTypeCache.get(cacheKey);
     if (cached && cached.expiry > Date.now()) {
       return cached.data;
     }
@@ -59,37 +64,40 @@ export class DatabaseManager {
     const client = await instance.pool.connect();
     try {
       const result = await client.query(
-        `SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1`,
-        [tableName]
+        `SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2`,
+        [schemaName, tableName]
       );
       const map: Record<string, string> = {};
       for (const row of result.rows) {
         map[row.column_name] = row.data_type;
       }
 
-      DatabaseManager.setColumnTypeCache(tableName, map);
+      DatabaseManager.setColumnTypeCache(cacheKey, map);
       return map;
     } finally {
       client.release();
     }
   }
 
-  private static setColumnTypeCache(tableName: string, data: Record<string, string>): void {
+  private static setColumnTypeCache(cacheKey: string, data: Record<string, string>): void {
     if (DatabaseManager.columnTypeCache.size >= DatabaseManager.MAX_CACHE_SIZE) {
       const firstKey = DatabaseManager.columnTypeCache.keys().next().value;
       if (firstKey) {
         DatabaseManager.columnTypeCache.delete(firstKey);
       }
     }
-    DatabaseManager.columnTypeCache.set(tableName, {
+    DatabaseManager.columnTypeCache.set(cacheKey, {
       data,
       expiry: Date.now() + DatabaseManager.COLUMN_TYPE_CACHE_TTL,
     });
   }
 
-  static clearColumnTypeCache(tableName?: string): void {
+  static clearColumnTypeCache(
+    tableName?: string,
+    schemaName: string = DEFAULT_DATABASE_SCHEMA
+  ): void {
     if (tableName) {
-      DatabaseManager.columnTypeCache.delete(tableName);
+      DatabaseManager.columnTypeCache.delete(buildQualifiedTableKey(tableName, schemaName));
     } else {
       DatabaseManager.columnTypeCache.clear();
     }

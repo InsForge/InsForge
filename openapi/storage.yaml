@@ -731,12 +731,298 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/storage/s3/config:
+    get:
+      summary: Get S3 Gateway Config
+      description: |
+        Return the externally-reachable endpoint URL and the SigV4 signing
+        region for the S3 protocol gateway. The endpoint is assembled from
+        the server's `VITE_API_BASE_URL` env var plus `/storage/v1/s3`, and
+        the region is `AWS_REGION` (default `us-east-2`).
+
+        Intended for Dashboard display so the UI doesn't make any
+        backend-topology assumptions client-side.
+      tags:
+        - S3 Access Keys
+      security:
+        - apiKey: []
+      responses:
+        '200':
+          description: Gateway config
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/S3GatewayConfig'
+              example:
+                data:
+                  endpoint: https://proj.insforge.app/storage/v1/s3
+                  region: us-east-2
+        '401':
+          description: Missing or invalid API key / admin token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/storage/s3/access-keys:
+    get:
+      summary: List S3 Access Keys
+      description: |
+        Return every S3 access key configured for this project. Plaintext
+        secrets are **never** returned here — the secret is only shown once
+        in the response of `POST /api/storage/s3/access-keys`.
+      tags:
+        - S3 Access Keys
+      security:
+        - apiKey: []
+      responses:
+        '200':
+          description: List of access keys (without secrets)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/S3AccessKey'
+        '401':
+          description: Missing or invalid API key / admin token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded (20 requests / 15 min / IP)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      summary: Create S3 Access Key
+      description: |
+        Mint a new S3 credential pair usable against the `/storage/v1/s3`
+        protocol gateway. The plaintext `secretAccessKey` in the response
+        is returned **exactly once** — it is encrypted at rest and can
+        never be retrieved again. If you lose it, revoke and re-create.
+
+        Limits:
+        - 50 keys per project (hard cap, enforced transactionally).
+        - Rate-limited to 20 management requests per 15 min per IP.
+      tags:
+        - S3 Access Keys
+      security:
+        - apiKey: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateS3AccessKeyRequest'
+      responses:
+        '201':
+          description: Access key created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/S3AccessKeyWithSecret'
+              example:
+                data:
+                  id: 11111111-1111-1111-1111-111111111111
+                  accessKeyId: INSFABC123DEF456GH78
+                  secretAccessKey: x7K2-a_pL9qRs4N8vYzWcE1fH5gJ3mUtBoD6ViXk
+                  description: backup-script
+                  createdAt: "2026-04-22T00:00:00Z"
+                  lastUsedAt: null
+        '400':
+          description: Validation error or 50-key cap reached
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API key / admin token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded (20 requests / 15 min / IP)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/storage/s3/access-keys/{id}:
+    delete:
+      summary: Revoke S3 Access Key
+      description: |
+        Revoke an S3 access key by its id. The in-memory LRU cache is
+        invalidated synchronously so subsequent S3 protocol requests with
+        this credential return `403 InvalidAccessKeyId`.
+      tags:
+        - S3 Access Keys
+      security:
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: UUID of the access key to revoke (from the create/list response)
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Access key revoked
+        '401':
+          description: Missing or invalid API key / admin token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Access key not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded (20 requests / 15 min / IP)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /storage/v1/s3/{path}:
+    parameters:
+      - name: path
+        in: path
+        required: true
+        description: |
+          Standard path-style S3 path, e.g. `my-bucket/object-key`,
+          `my-bucket` (bucket-level ops), or empty for ListBuckets.
+        schema:
+          type: string
+    description: |
+      **AWS S3-compatible protocol gateway.** Speak the S3 protocol directly
+      from any SigV4 client (AWS SDKs, `aws` CLI, `rclone`, Terraform, etc.)
+      against this endpoint. Only path-style URLs are supported; SDKs must
+      be configured with `forcePathStyle: true` and the signing region
+      `us-east-2` (or the value of `AWS_REGION` on this backend).
+
+      Supported operations: ListBuckets, CreateBucket, DeleteBucket,
+      HeadBucket, ListObjectsV2, PutObject (streaming + UNSIGNED +
+      pre-hashed), GetObject (incl. Range), HeadObject, DeleteObject,
+      DeleteObjects (batch), CopyObject, CreateMultipartUpload,
+      UploadPart, CompleteMultipartUpload, AbortMultipartUpload,
+      ListParts, plus `GetBucketLocation` / `GetBucketVersioning` stubs.
+
+      Buckets and objects are shared with the REST API — an object uploaded
+      via S3 protocol appears immediately in `GET /api/storage/buckets/{bucket}/objects`
+      and vice versa.
+
+      Example (AWS SDK v3):
+
+      ```
+      new S3Client({
+        endpoint: 'https://<host>/storage/v1/s3',
+        region: 'us-east-2',
+        forcePathStyle: true,
+        credentials: { accessKeyId, secretAccessKey },
+      });
+      ```
+
+      Errors use S3-style XML (`<Error><Code>...</Code>...</Error>`).
+    get:
+      summary: S3 protocol (GET)
+      description: Dispatched to ListBuckets / ListObjectsV2 / GetObject / HeadObject / ListParts / GetBucketLocation / GetBucketVersioning based on path shape and query.
+      tags:
+        - S3 Protocol
+      security:
+        - s3SigV4: []
+      responses:
+        '200':
+          description: Success
+        '206':
+          description: Partial content (Range GetObject)
+        '403':
+          description: SignatureDoesNotMatch / InvalidAccessKeyId / RequestTimeTooSkewed
+        '404':
+          description: NoSuchBucket / NoSuchKey
+        '501':
+          description: NotImplemented (backend is not S3-compatible, or op unsupported)
+    put:
+      summary: S3 protocol (PUT)
+      description: Dispatched to PutObject / UploadPart / CopyObject / CreateBucket based on path shape, query, and headers.
+      tags:
+        - S3 Protocol
+      security:
+        - s3SigV4: []
+      responses:
+        '200':
+          description: Success
+        '400':
+          description: EntityTooLarge / InvalidArgument / InvalidBucketName / MalformedXML
+        '403':
+          description: SignatureDoesNotMatch / AuthorizationHeaderMalformed
+        '409':
+          description: BucketAlreadyOwnedByYou
+    post:
+      summary: S3 protocol (POST)
+      description: Dispatched to CreateMultipartUpload / CompleteMultipartUpload / DeleteObjects based on query.
+      tags:
+        - S3 Protocol
+      security:
+        - s3SigV4: []
+      responses:
+        '200':
+          description: Success
+    delete:
+      summary: S3 protocol (DELETE)
+      description: Dispatched to DeleteObject / DeleteBucket / AbortMultipartUpload based on path and query.
+      tags:
+        - S3 Protocol
+      security:
+        - s3SigV4: []
+      responses:
+        '204':
+          description: Success
+        '409':
+          description: BucketNotEmpty
+    head:
+      summary: S3 protocol (HEAD)
+      description: Dispatched to HeadBucket / HeadObject based on path shape.
+      tags:
+        - S3 Protocol
+      security:
+        - s3SigV4: []
+      responses:
+        '200':
+          description: Success
+        '404':
+          description: NoSuchBucket / NoSuchKey
+
 components:
   securitySchemes:
     apiKey:
       type: apiKey
       in: header
       name: x-api-key
+    s3SigV4:
+      type: http
+      scheme: aws4-hmac-sha256
+      description: |
+        AWS SigV4 authentication using S3 access keys minted by
+        `POST /api/storage/s3/access-keys`. Region must match the server's
+        `AWS_REGION` (default `us-east-2`); service scope must be `s3`.
 
   schemas:
     StoredFile:
@@ -885,3 +1171,78 @@ components:
           type: string
           description: Suggested action to resolve the error
           example: "Check your request parameters"
+
+    S3GatewayConfig:
+      type: object
+      description: Read-only config of the S3 protocol gateway.
+      required:
+        - endpoint
+        - region
+      properties:
+        endpoint:
+          type: string
+          description: Full URL clients should configure as their S3 endpoint.
+          example: https://proj.insforge.app/storage/v1/s3
+        region:
+          type: string
+          description: SigV4 signing region the gateway validates incoming requests against.
+          example: us-east-2
+
+    S3AccessKey:
+      type: object
+      description: An S3 access key record (without the plaintext secret).
+      required:
+        - id
+        - accessKeyId
+        - description
+        - createdAt
+        - lastUsedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Internal UUID of the access key record
+          example: 11111111-1111-1111-1111-111111111111
+        accessKeyId:
+          type: string
+          pattern: '^INSF[A-Z0-9]{16}$'
+          description: 20-character access key id with fixed `INSF` prefix
+          example: INSFABC123DEF456GH78
+        description:
+          type: string
+          nullable: true
+          description: User-supplied label (max 200 chars)
+          example: backup-script
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-04-22T00:00:00Z"
+        lastUsedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Updated asynchronously after each successful SigV4 verification
+          example: null
+
+    S3AccessKeyWithSecret:
+      allOf:
+        - $ref: '#/components/schemas/S3AccessKey'
+        - type: object
+          required:
+            - secretAccessKey
+          properties:
+            secretAccessKey:
+              type: string
+              description: |
+                40-character base64url secret. **Returned only once** in the
+                create response — retrieve, store, and keep it secret.
+              example: x7K2-a_pL9qRs4N8vYzWcE1fH5gJ3mUtBoD6ViXk
+
+    CreateS3AccessKeyRequest:
+      type: object
+      properties:
+        description:
+          type: string
+          maxLength: 200
+          description: Optional label to help you identify the key later
+          example: backup-script

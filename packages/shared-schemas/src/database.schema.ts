@@ -52,6 +52,7 @@ export const columnSchema = z.object({
 });
 
 export const tableSchema = z.object({
+  schemaName: z.string().optional(),
   tableName: z
     .string()
     .min(1, 'Table name cannot be empty')
@@ -67,6 +68,13 @@ export type ColumnSchema = z.infer<typeof columnSchema>;
 export type ForeignKeySchema = z.infer<typeof foreignKeySchema>;
 export type OnUpdateActionSchema = z.infer<typeof onUpdateActionSchema>;
 export type OnDeleteActionSchema = z.infer<typeof onDeleteActionSchema>;
+
+export const databaseSchemaInfoSchema = z.object({
+  name: z.string(),
+  isProtected: z.boolean(),
+});
+
+export type DatabaseSchemaInfo = z.infer<typeof databaseSchemaInfoSchema>;
 
 // Database Metadata Object Schemas
 export const databaseFunctionSchema = z.object({
@@ -103,7 +111,12 @@ export const databaseTriggerSchema = z.object({
 });
 
 export const migrationSchema = z.object({
-  version: z.string().regex(/^\d{14}$/, 'Migration version must use YYYYMMDDHHmmss format.'),
+  version: z
+    .string()
+    .regex(
+      /^\d{1,64}$/,
+      'Migration version must be a numeric string of at most 64 digits (e.g. 0001 or 20260418091500).'
+    ),
   name: z.string().min(1),
   statements: z.array(z.string()).min(1),
   createdAt: z.string(),

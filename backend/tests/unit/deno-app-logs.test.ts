@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DenoSubhostingProvider } from '../../src/providers/functions/deno-subhosting.provider';
 import { LogService } from '../../src/services/logs/log.service';
 import { FunctionService } from '../../src/services/functions/function.service';
-import { AppError } from '../../src/api/middlewares/error';
+import { AppError } from '../../src/utils/errors';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 
 // Mock node-fetch — use vi.hoisted so the variable is available in the hoisted vi.mock factory
 const { mockFetch } = vi.hoisted(() => ({ mockFetch: vi.fn() }));
@@ -209,15 +210,21 @@ describe('DenoSubhostingProvider.getDeploymentAppLogs', () => {
   it('throws AppError on API error', async () => {
     mockFetch.mockResolvedValue(createMockResponse('Internal Server Error', 500));
 
-    await expect(provider.getDeploymentAppLogs('deploy-123')).rejects.toThrow(AppError);
+    await expect(provider.getDeploymentAppLogs('deploy-123')).rejects.toMatchObject({
+      statusCode: 500,
+      code: ERROR_CODES.UPSTREAM_FAILURE,
+      message: 'Internal Server Error',
+    });
   });
 
   it('throws AppError on network failure', async () => {
     mockFetch.mockRejectedValue(new Error('Network error'));
 
-    await expect(provider.getDeploymentAppLogs('deploy-123')).rejects.toThrow(
-      'Failed to get deployment app logs'
-    );
+    await expect(provider.getDeploymentAppLogs('deploy-123')).rejects.toMatchObject({
+      statusCode: 502,
+      code: ERROR_CODES.UPSTREAM_FAILURE,
+      message: 'Network error',
+    });
   });
 
   it('returns empty array when no logs', async () => {

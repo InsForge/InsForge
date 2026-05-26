@@ -1,10 +1,9 @@
 import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
-import type { CustomOAuthConfigSchema } from '@insforge/shared-schemas';
+import { ERROR_CODES, type CustomOAuthConfigSchema } from '@insforge/shared-schemas';
 
 interface CustomOAuthConfigRow {
   id: string;
@@ -190,7 +189,7 @@ export class CustomOAuthConfigService {
         throw new AppError(
           `Custom OAuth config ${keyLower} already exists`,
           409,
-          ERROR_CODES.ALREADY_EXISTS
+          ERROR_CODES.AUTH_OAUTH_CONFIG_ALREADY_EXISTS
         );
       }
       logger.error('Failed to create custom OAuth config', { error, key: input.key });
@@ -223,7 +222,7 @@ export class CustomOAuthConfigService {
         throw new AppError(
           `Custom OAuth configuration for ${key} not found`,
           404,
-          ERROR_CODES.NOT_FOUND
+          ERROR_CODES.AUTH_OAUTH_CONFIG_NOT_FOUND
         );
       }
 
@@ -271,7 +270,7 @@ export class CustomOAuthConfigService {
           throw new AppError(
             `Custom OAuth configuration for ${key} not found`,
             404,
-            ERROR_CODES.NOT_FOUND
+            ERROR_CODES.AUTH_OAUTH_CONFIG_NOT_FOUND
           );
         }
         return config;
@@ -297,7 +296,7 @@ export class CustomOAuthConfigService {
         throw new AppError(
           `Custom OAuth configuration for ${key} not found`,
           404,
-          ERROR_CODES.NOT_FOUND
+          ERROR_CODES.AUTH_OAUTH_CONFIG_NOT_FOUND
         );
       }
 

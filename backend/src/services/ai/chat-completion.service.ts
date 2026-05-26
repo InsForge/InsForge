@@ -1,16 +1,15 @@
 import OpenAI from 'openai';
-import { AIUsageService } from './ai-usage.service.js';
-import { AIConfigService } from './ai-config.service.js';
 import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
-import type {
-  AIConfigurationSchema,
-  ChatCompletionResponse,
-  ChatMessageSchema,
-  ToolCall,
-  UrlCitationAnnotation,
+import {
+  ERROR_CODES,
+  type ChatCompletionResponse,
+  type ChatMessageSchema,
+  type ToolCall,
+  type UrlCitationAnnotation,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import { ChatCompletionOptions } from '@/types/ai.js';
+import { AppError } from '@/utils/errors.js';
 
 // OpenRouter plugin type for web search
 interface OpenRouterWebPlugin {
@@ -62,8 +61,6 @@ interface MessageWithAnnotations {
 
 export class ChatCompletionService {
   private static instance: ChatCompletionService;
-  private aiUsageService = AIUsageService.getInstance();
-  private aiConfigService = AIConfigService.getInstance();
   private openRouterProvider = OpenRouterProvider.getInstance();
 
   private constructor() {}
@@ -94,7 +91,11 @@ export class ChatCompletionService {
       // Handle tool response messages
       if (msg.role === 'tool') {
         if (!msg.tool_call_id) {
-          throw new Error('Tool message is missing required tool_call_id');
+          throw new AppError(
+            'Tool message is missing required tool_call_id',
+            400,
+            ERROR_CODES.INVALID_INPUT
+          );
         }
         formattedMessages.push({
           role: 'tool',
@@ -139,25 +140,6 @@ export class ChatCompletionService {
     }
 
     return formattedMessages;
-  }
-
-  /**
-   * Validate model and get config
-   * For models with variants (e.g., model:thinking), first checks the full model ID
-   */
-  async validateAndGetConfig(
-    modelId: string,
-    thinking?: boolean
-  ): Promise<AIConfigurationSchema | null> {
-    // Build the actual model ID with optional :thinking suffix
-    const actualModelId = this.buildModelId(modelId, thinking);
-    const aiConfig = await this.aiConfigService.findByModelId(actualModelId);
-    if (!aiConfig) {
-      throw new Error(
-        `Model ${actualModelId} is not enabled. Please contact your administrator to enable this model.`
-      );
-    }
-    return aiConfig;
   }
 
   /**
@@ -273,14 +255,10 @@ export class ChatCompletionService {
     options: ChatCompletionOptions
   ): Promise<ChatCompletionResponse> {
     try {
-      // Validate model and get config (pass thinking option for variant checking)
-      const aiConfig = await this.validateAndGetConfig(options.model, options.thinking);
-
       // Build model ID with optional :thinking suffix
       const modelId = this.buildModelId(options.model, options.thinking);
 
-      // Apply system prompt from config if available
-      const formattedMessages = this.formatMessages(messages, aiConfig?.systemPrompt);
+      const formattedMessages = this.formatMessages(messages);
 
       // Build request with optional plugins (web search, file parser)
       const request: OpenRouterChatCompletionRequest = {
@@ -311,16 +289,6 @@ export class ChatCompletionService {
             totalTokens: response.usage.total_tokens,
           }
         : undefined;
-
-      // Track usage if config is available
-      if (aiConfig?.id && tokenUsage) {
-        await this.aiUsageService.trackChatUsage(
-          aiConfig.id,
-          tokenUsage.promptTokens,
-          tokenUsage.completionTokens,
-          modelId // pass the actual model ID used
-        );
-      }
 
       // Parse annotations from response (for web search results)
       const annotations = this.parseAnnotations(
@@ -356,9 +324,14 @@ export class ChatCompletionService {
         },
       };
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       logger.error('Chat error', { error });
-      throw new Error(
-        `Failed to get response: ${error instanceof Error ? error.message : String(error)}`
+      throw new AppError(
+        `Failed to get response: ${error instanceof Error ? error.message : String(error)}`,
+        500,
+        ERROR_CODES.AI_UPSTREAM_UNAVAILABLE
       );
     }
   }
@@ -378,14 +351,10 @@ export class ChatCompletionService {
     tool_calls?: ToolCall[];
   }> {
     try {
-      // Validate model and get config (pass thinking option for variant checking)
-      const aiConfig = await this.validateAndGetConfig(options.model, options.thinking);
-
       // Build model ID with optional :thinking suffix
       const modelId = this.buildModelId(options.model, options.thinking);
 
-      // Apply system prompt from config if available
-      const formattedMessages = this.formatMessages(messages, aiConfig?.systemPrompt);
+      const formattedMessages = this.formatMessages(messages);
 
       // Build request with optional plugins (web search, file parser)
       const request: OpenRouterChatCompletionStreamingRequest = {
@@ -485,20 +454,15 @@ export class ChatCompletionService {
       if (collectedAnnotations && collectedAnnotations.length > 0) {
         yield { annotations: collectedAnnotations };
       }
-
-      // Track usage after streaming completes
-      if (aiConfig?.id && tokenUsage.totalTokens > 0) {
-        await this.aiUsageService.trackChatUsage(
-          aiConfig.id,
-          tokenUsage.promptTokens,
-          tokenUsage.completionTokens,
-          modelId // pass the actual model ID used
-        );
-      }
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       logger.error('Streaming error', { error });
-      throw new Error(
-        `Failed to stream response: ${error instanceof Error ? error.message : String(error)}`
+      throw new AppError(
+        `Failed to stream response: ${error instanceof Error ? error.message : String(error)}`,
+        500,
+        ERROR_CODES.AI_UPSTREAM_UNAVAILABLE
       );
     }
   }

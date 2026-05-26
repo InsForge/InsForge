@@ -1,7 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
 import { successResponse } from '@/utils/response.js';
 import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
 import logger from '@/utils/logger.js';
@@ -12,6 +11,7 @@ import { CustomOAuthConfigService } from '@/services/auth/custom-oauth-config.se
 import { AuditService } from '@/services/logs/audit.service.js';
 import { CustomOAuthProvider } from '@/providers/oauth/custom.provider.js';
 import {
+  ERROR_CODES,
   createCustomOAuthConfigRequestSchema,
   updateCustomOAuthConfigRequestSchema,
   listCustomOAuthConfigsResponseSchema,
@@ -69,7 +69,7 @@ router.get(
         throw new AppError(
           `Custom OAuth configuration for ${key} not found`,
           404,
-          ERROR_CODES.NOT_FOUND
+          ERROR_CODES.AUTH_OAUTH_CONFIG_NOT_FOUND
         );
       }
       const clientSecret = await customOAuthConfigService.getClientSecretByKey(key);
@@ -180,7 +180,7 @@ router.delete(
         throw new AppError(
           `Custom OAuth configuration for ${req.params.key} not found`,
           404,
-          ERROR_CODES.NOT_FOUND
+          ERROR_CODES.AUTH_OAUTH_CONFIG_NOT_FOUND
         );
       }
       await auditService.log({

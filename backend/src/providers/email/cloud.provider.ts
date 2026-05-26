@@ -2,11 +2,10 @@ import jwt from 'jsonwebtoken';
 import axios from 'axios';
 import { config } from '@/infra/config/app.config.js';
 import logger from '@/utils/logger.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
 import { EmailTemplate } from '@/types/email.js';
-import { SendRawEmailRequest } from '@insforge/shared-schemas';
 import { EmailProvider } from './base.provider.js';
+import { ERROR_CODES, SendRawEmailRequest } from '@insforge/shared-schemas';
 
 /**
  * Cloud email provider for sending emails via Insforge cloud backend

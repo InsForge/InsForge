@@ -22,6 +22,7 @@ export default {
         primary: 'rgb(var(--primary))',
         destructive: 'rgb(var(--destructive))',
         warning: 'rgb(var(--warning))',
+        info: 'rgb(var(--info))',
         card: 'rgb(var(--card))',
         toast: 'rgb(var(--toast))',
       },

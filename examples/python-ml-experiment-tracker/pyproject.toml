@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ml-experiment-tracker"
+version = "0.1.0"
+description = "CLI tool for tracking ML experiments via InsForge BaaS"
+requires-python = ">=3.10"
+dependencies = [
+    "click>=8.1",
+    "httpx>=0.27",
+    "rich>=13.7",
+]
+
+[project.scripts]
+tracker = "tracker.cli:cli"
+
+[tool.hatch.build.targets.wheel]
+packages = ["tracker"]

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { useTimeout } from './useTimeout';
-import { cn, generateUUID } from '../utils/utils';
+import { cn, generateUUID } from '#lib/utils/utils';
 
 interface Toast {
   id: string;

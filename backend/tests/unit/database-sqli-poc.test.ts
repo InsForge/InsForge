@@ -40,12 +40,12 @@ describe('DatabaseTableService - SQL Injection Verification (Fixed)', () => {
   });
 
   test('getTableSchema correctly escapes table names to prevent SQL injection', async () => {
-    // Malicious table name designed to break out of double quotes
-    const maliciousTableName = 'users"; DROP TABLE secrets; --';
+    // Malicious table name keeps SQL metacharacters but avoids quotes so it reaches the SQL builder.
+    const maliciousTableName = 'users; DROP TABLE secrets; --';
 
     try {
       // Execute the method
-      await service.getTableSchema(maliciousTableName);
+      await service.getTableSchema('public', maliciousTableName);
     } catch {
       // Ignore logical errors, we only care about the captured SQL
     }
@@ -60,13 +60,11 @@ describe('DatabaseTableService - SQL Injection Verification (Fixed)', () => {
 
     console.log('Captured SQL Query:', capturedQuery);
 
-    // Assert that the double-quote WAS escaped, neutralizing the injection
-    // PostgreSQL escape for " inside an identifier is ""
-    // Correctly escaped should be: "users""; DROP TABLE secrets; --"
-    expect(capturedQuery).toContain(`FROM "users""; DROP TABLE secrets; --"`);
+    // Assert that the table name stays inside a schema-qualified quoted identifier.
+    expect(capturedQuery).toContain(`FROM "public"."users; DROP TABLE secrets; --"`);
 
     // This proves that the DROP TABLE command is now safely inside the identifier
     // string and will NOT be executed as a separate SQL command.
-    expect(capturedQuery).not.toMatch(/FROM "[^"]*"; DROP TABLE/);
+    expect(capturedQuery).not.toMatch(/FROM "public"\."[^"]*"; DROP TABLE/);
   });
 });

@@ -1,10 +1,7 @@
-import {
-  ModalitySchema,
-  AIModelSchema,
-  AIConfigurationWithUsageSchema,
-} from '@insforge/shared-schemas';
+import { ModalitySchema, AIModelSchema } from '@insforge/shared-schemas';
 export interface ModelOption {
   id: string;
+  created?: number;
   modelId: string;
   modelName: string;
   providerName: string;
@@ -13,19 +10,28 @@ export interface ModelOption {
   outputModality: ModalitySchema[];
   inputPrice?: number; // Price per million tokens in USD
   outputPrice?: number; // Price per million tokens in USD
-  usageStats?: {
-    totalRequests: number;
-  };
-  systemPrompt?: string | null;
+  inputPriceLabel?: string;
+  outputPriceLabel?: string;
 }
 
-import GrokIcon from '../../assets/logos/grok.svg?react';
-import GeminiIcon from '../../assets/logos/gemini.svg?react';
-import ClaudeIcon from '../../assets/logos/claude_code.svg?react';
-import OpenAIIcon from '../../assets/logos/openai.svg?react';
-import AmazonIcon from '../../assets/logos/amazon.svg?react';
-import DeepseekIcon from '../../assets/logos/deepseek.svg?react';
-import QwenIcon from '../../assets/logos/qwen.svg?react';
+import GrokIcon from '#assets/logos/grok.svg?react';
+import GeminiIcon from '#assets/logos/gemini.svg?react';
+import ClaudeIcon from '#assets/logos/claude_code.svg?react';
+import OpenAIIcon from '#assets/logos/openai.svg?react';
+import AmazonIcon from '#assets/logos/amazon.svg?react';
+import DeepseekIcon from '#assets/logos/deepseek.svg?react';
+import QwenIcon from '#assets/logos/qwen.svg?react';
+
+const PROVIDER_DISPLAY_ORDER: Record<string, number> = {
+  openai: 1,
+  anthropic: 2,
+  google: 3,
+  'x-ai': 4,
+  amazon: 5,
+  deepseek: 6,
+  qwen: 7,
+  other: 999,
+};
 
 // Provider tab configuration
 export interface ProviderTab {
@@ -73,6 +79,9 @@ export const getProviderLogo = (
   };
   return logoMap[providerId];
 };
+
+export const getProviderDisplayOrder = (providerId: string): number =>
+  PROVIDER_DISPLAY_ORDER[providerId.toLowerCase()] ?? 500;
 
 // Filter models by provider ID
 export const filterModelsByProvider = (
@@ -126,7 +135,10 @@ export const generateProviderTabs = (models: AIModelSchema[]): ProviderTab[] => 
     });
   }
 
-  return mainProviders;
+  return mainProviders.sort((a, b) => {
+    const orderDiff = getProviderDisplayOrder(a.id) - getProviderDisplayOrder(b.id);
+    return orderDiff !== 0 ? orderDiff : a.displayName.localeCompare(b.displayName);
+  });
 };
 
 export const formatTokenCount = (count: number): string => {
@@ -167,7 +179,7 @@ export const getFriendlyModelName = (rawModelName: string): string => {
     .join(' ');
 };
 
-export function toModelOption(model: AIModelSchema | AIConfigurationWithUsageSchema): ModelOption {
+export function toModelOption(model: AIModelSchema): ModelOption {
   const [rawProviderId, rawModelName] = model.modelId.split('/');
 
   return {
@@ -178,24 +190,8 @@ export function toModelOption(model: AIModelSchema | AIConfigurationWithUsageSch
   };
 }
 
-// Sort models with configured ones at the end
-export const sortModelsByConfigurationStatus = (
-  models: ModelOption[],
-  configuredModelIds: string[]
-): ModelOption[] => {
-  return [...models].sort((a, b) => {
-    const aConfigured = configuredModelIds.includes(a.modelId);
-    const bConfigured = configuredModelIds.includes(b.modelId);
-
-    if (aConfigured === bConfigured) {
-      return 0;
-    }
-    return aConfigured ? 1 : -1;
-  });
-};
-
 // Sorting types
-export type SortField = 'inputPrice' | 'outputPrice' | 'requests';
+export type SortField = 'inputPrice' | 'outputPrice' | 'released';
 export type SortDirection = 'asc' | 'desc';
 
 // Format credits display
@@ -208,7 +204,10 @@ export const formatCredits = (remaining: number): string => {
 
 // Format price per million tokens
 export const formatPrice = (price?: number): string => {
-  if (price === undefined || price === 0) {
+  if (price === undefined) {
+    return '-';
+  }
+  if (price === 0) {
     return 'Free';
   }
   if (price < 0.01) {
@@ -220,7 +219,25 @@ export const formatPrice = (price?: number): string => {
   return `$${price.toFixed(1)}`;
 };
 
+export const formatInputPrice = (model: Pick<ModelOption, 'inputPrice' | 'inputPriceLabel'>) =>
+  model.inputPriceLabel ?? formatPrice(model.inputPrice);
+
+export const formatOutputPrice = (model: Pick<ModelOption, 'outputPrice' | 'outputPriceLabel'>) =>
+  model.outputPriceLabel ?? formatPrice(model.outputPrice);
+
 // Format modality for display
 export const formatModality = (modality: string): string => {
   return modality.charAt(0).toUpperCase() + modality.slice(1);
+};
+
+export const formatReleasedDate = (created?: number): string => {
+  if (created === undefined || created === null) {
+    return '-';
+  }
+
+  return new Intl.DateTimeFormat('en-US', {
+    month: '2-digit',
+    day: '2-digit',
+    year: 'numeric',
+  }).format(new Date(created * 1000));
 };

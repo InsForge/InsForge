@@ -569,7 +569,7 @@ curl "https://your-app.insforge.app/api/database/migrations" \
   "migrations": [
     {
       "version": "20260416170500",
-      "name": "create_posts_table",
+      "name": "create-posts-table",
       "statements": [
         "CREATE TABLE posts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), title TEXT NOT NULL);"
       ],
@@ -593,8 +593,8 @@ POST /api/database/migrations
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `version` | string | Yes | Migration version in `YYYYMMDDHHmmss` format. |
-| `name` | string | Yes | Migration name |
+| `version` | string | Yes | Numeric migration version (up to 64 digits). Accepts Drizzle-style sequential prefixes (e.g. `0001`) or a `YYYYMMDDHHmmss` timestamp. Versions are compared numerically. The InsForge CLI generates 14-digit UTC timestamps for local migration filenames. |
+| `name` | string | Yes | Migration name using lowercase letters, numbers, and hyphens only |
 | `sql` | string | Yes | SQL text to parse and execute |
 
 ### Example
@@ -605,7 +605,7 @@ curl -X POST "https://your-app.insforge.app/api/database/migrations" \
   -H "Content-Type: application/json" \
   -d '{
     "version": "20260416170500",
-    "name": "create_posts_table",
+    "name": "create-posts-table",
     "sql": "CREATE TABLE posts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), title TEXT NOT NULL);"
   }'
 ```
@@ -615,7 +615,7 @@ curl -X POST "https://your-app.insforge.app/api/database/migrations" \
 ```json
 {
   "version": "20260416170500",
-  "name": "create_posts_table",
+  "name": "create-posts-table",
   "statements": [
     "CREATE TABLE posts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), title TEXT NOT NULL);"
   ],

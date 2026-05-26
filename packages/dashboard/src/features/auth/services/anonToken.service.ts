@@ -1,4 +1,4 @@
-import { apiClient } from '../../../lib/api/client';
+import { apiClient } from '#lib/api/client';
 
 export class AnonTokenService {
   async generateAnonToken(): Promise<{ accessToken: string; message: string }> {

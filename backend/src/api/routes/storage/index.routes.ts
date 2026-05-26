@@ -1,49 +1,49 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { verifyAdmin, AuthRequest, verifyUser } from '@/api/middlewares/auth.js';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import { StorageService } from '@/services/storage/storage.service.js';
 import { StorageConfigService } from '@/services/storage/storage-config.service.js';
 import { successResponse } from '@/utils/response.js';
 import { dynamicUploadSingle, handleUploadError } from '@/api/middlewares/upload.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
 import {
+  ERROR_CODES,
   createBucketRequestSchema,
   updateBucketRequestSchema,
   updateStorageConfigRequestSchema,
+  createS3AccessKeyRequestSchema,
 } from '@insforge/shared-schemas';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import { AuditService } from '@/services/logs/audit.service.js';
+import { S3AccessKeyService } from '@/services/storage/s3-access-key.service.js';
+import { s3AccessKeyManagementRateLimiter } from '@/api/middlewares/rate-limiters.js';
 
 const router = Router();
 const auditService = AuditService.getInstance();
 const storageConfigService = StorageConfigService.getInstance();
+const s3AccessKeyService = S3AccessKeyService.getInstance();
 
-// Middleware to conditionally apply authentication based on bucket visibility
-const conditionalAuth =
-  (options: { allowPublicPost?: boolean } = {}) =>
-  async (req: Request, res: Response, next: NextFunction) => {
-    const isObjectDownload = req.method === 'GET' || req.method === 'HEAD';
-    const isAllowedPublicPost = req.method === 'POST' && options.allowPublicPost;
+// Middleware to conditionally apply authentication based on bucket visibility.
+// This is only attached to object download hand-offs: GET object bytes and POST
+// download-strategy. The strategy endpoint is POST, but it is still a read path.
+const conditionalDownloadAuth = async (req: Request, res: Response, next: NextFunction) => {
+  if (req.params.bucketName) {
+    try {
+      const storageService = StorageService.getInstance();
+      const isPublic = await storageService.isBucketPublic(req.params.bucketName);
 
-    // For object download requests, check if bucket is public
-    if ((isObjectDownload || isAllowedPublicPost) && req.params.bucketName) {
-      try {
-        const storageService = StorageService.getInstance();
-        const isPublic = await storageService.isBucketPublic(req.params.bucketName);
-
-        if (isPublic) {
-          // Public bucket - skip authentication
-          return next();
-        }
-      } catch {
-        // If error checking bucket, continue with auth requirement
+      if (isPublic) {
+        // Public bucket - skip authentication
+        return next();
       }
+    } catch {
+      // If error checking bucket, continue with auth requirement
     }
+  }
 
-    // All other cases require authentication
-    return verifyUser(req, res, next);
-  };
+  // All other cases require authentication
+  return verifyUser(req, res, next);
+};
 
 // GET /api/storage/config - Get storage configuration (requires admin)
 router.get('/config', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -63,7 +63,7 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
       throw new AppError(
         validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
-        ERROR_CODES.INVALID_INPUT
+        ERROR_CODES.STORAGE_INVALID_PARAMETER
       );
     }
 
@@ -151,7 +151,7 @@ router.post(
       );
     } catch (error) {
       if (error instanceof Error && error.message.includes('already exists')) {
-        next(new AppError(error.message, 409, ERROR_CODES.ALREADY_EXISTS));
+        next(new AppError(error.message, 409, ERROR_CODES.STORAGE_ALREADY_EXISTS));
       } else if (error instanceof Error && error.message.includes('Invalid bucket name')) {
         next(
           new AppError(
@@ -229,7 +229,7 @@ router.patch(
       );
     } catch (error) {
       if (error instanceof Error && error.message.includes('does not exist')) {
-        next(new AppError(error.message, 404, ERROR_CODES.NOT_FOUND));
+        next(new AppError(error.message, 404, ERROR_CODES.STORAGE_NOT_FOUND));
       } else {
         next(error);
       }
@@ -237,10 +237,13 @@ router.patch(
   }
 );
 
-// GET /api/storage/buckets/:bucketName/objects - List objects in bucket (requires auth)
+// GET /api/storage/buckets/:bucketName/objects - List objects in bucket.
+// Visibility is decided by RLS on storage.objects for JWT callers. API-key
+// callers use the backend pool because they are machine credentials,
+// not a user identity.
 router.get(
   '/buckets/:bucketName/objects',
-  verifyAdmin,
+  verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { bucketName } = req.params;
@@ -249,13 +252,14 @@ router.get(
       const limit = Math.min(Math.max(1, parseInt(req.query.limit as string) || 100), 1000);
       const offset = Math.max(0, parseInt(req.query.offset as string) || 0);
 
-      const storageService = StorageService.getInstance();
-      const result = await storageService.listObjects(
+      const result = await StorageService.getInstance().listObjects(
+        req.user,
         bucketName,
         prefix,
         limit,
         offset,
-        searchQuery
+        searchQuery,
+        !!req.hasApiKey
       );
 
       successResponse(
@@ -297,12 +301,12 @@ router.put(
         throw new AppError('File is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
 
-      const storageService = StorageService.getInstance();
-      const storedFile = await storageService.putObject(
+      const storedFile = await StorageService.getInstance().putObject(
+        req.user,
         bucketName,
         objectKey,
         req.file,
-        req.user?.id
+        !!req.hasApiKey
       );
 
       try {
@@ -320,7 +324,7 @@ router.put(
       successResponse(res, storedFile, 201);
     } catch (error) {
       if (error instanceof Error && error.message.includes('already exists')) {
-        next(new AppError(error.message, 409, ERROR_CODES.ALREADY_EXISTS));
+        next(new AppError(error.message, 409, ERROR_CODES.STORAGE_ALREADY_EXISTS));
       } else if (error instanceof Error && error.message.includes('Invalid')) {
         next(new AppError(error.message, 400, ERROR_CODES.STORAGE_INVALID_PARAMETER));
       } else {
@@ -350,10 +354,11 @@ router.post(
       const objectKey = storageService.generateObjectKey(req.file.originalname);
 
       const storedFile = await storageService.putObject(
+        req.user,
         bucketName,
         objectKey,
         req.file,
-        req.user?.id
+        !!req.hasApiKey
       );
 
       try {
@@ -375,7 +380,7 @@ router.post(
           new AppError(
             'Bucket does not exist',
             404,
-            ERROR_CODES.NOT_FOUND,
+            ERROR_CODES.STORAGE_NOT_FOUND,
             'Create the bucket first using POST /api/storage/buckets'
           )
         );
@@ -391,7 +396,7 @@ router.post(
 // GET /api/storage/buckets/:bucketName/objects/:objectKey - Download object from bucket (conditional auth)
 router.get(
   '/buckets/:bucketName/objects/*',
-  conditionalAuth(),
+  conditionalDownloadAuth,
   async (req: AuthRequest | Request, res: Response, next: NextFunction) => {
     try {
       const { bucketName } = req.params;
@@ -402,17 +407,30 @@ router.get(
       }
 
       const storageService = StorageService.getInstance();
+      const authReq = req as AuthRequest;
+      const visible = await storageService.objectIsVisible(
+        authReq.user,
+        bucketName,
+        objectKey,
+        !!authReq.hasApiKey
+      );
+      if (!visible) {
+        throw new AppError('Object not found', 404, ERROR_CODES.STORAGE_NOT_FOUND);
+      }
 
-      // Get download strategy (service auto-calculates expiry based on bucket visibility)
       const strategy = await storageService.getDownloadStrategy(bucketName, objectKey);
-
       if (strategy.method === 'presigned') {
         return res.redirect(strategy.url);
       }
 
-      const result = await storageService.getObject(bucketName, objectKey);
+      const result = await storageService.getObject(
+        authReq.user,
+        bucketName,
+        objectKey,
+        !!authReq.hasApiKey
+      );
       if (!result) {
-        throw new AppError('Object not found', 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError('Object not found', 404, ERROR_CODES.STORAGE_NOT_FOUND);
       }
 
       const { file, metadata } = result;
@@ -444,7 +462,7 @@ router.delete(
       const deleted = await storageService.deleteBucket(bucketName);
 
       if (!deleted) {
-        throw new AppError('Bucket not found or already empty', 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError('Bucket not found or already empty', 404, ERROR_CODES.STORAGE_NOT_FOUND);
       }
 
       // Log audit for bucket deletion
@@ -494,16 +512,15 @@ router.delete(
         throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
 
-      const storageService = StorageService.getInstance();
-      const deleted = await storageService.deleteObject(
+      const deleted = await StorageService.getInstance().deleteObject(
+        req.user,
         bucketName,
         objectKey,
-        req.user?.id || '',
-        !!req.apiKey || req.user?.role === 'project_admin'
+        !!req.hasApiKey
       );
 
       if (!deleted) {
-        throw new AppError('Object not found', 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError('Object not found', 404, ERROR_CODES.STORAGE_NOT_FOUND);
       }
 
       successResponse(res, { message: 'Object deleted successfully' });
@@ -530,17 +547,17 @@ router.post(
         throw new AppError('Filename is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
 
-      const storageService = StorageService.getInstance();
-      const strategy = await storageService.getUploadStrategy(bucketName, {
-        filename,
-        contentType,
-        size,
-      });
+      const strategy = await StorageService.getInstance().getUploadStrategy(
+        req.user,
+        bucketName,
+        { filename, contentType, size },
+        !!req.hasApiKey
+      );
 
       successResponse(res, strategy);
     } catch (error) {
       if (error instanceof Error && error.message.includes('does not exist')) {
-        next(new AppError(error.message, 404, ERROR_CODES.NOT_FOUND));
+        next(new AppError(error.message, 404, ERROR_CODES.STORAGE_NOT_FOUND));
       } else {
         next(error);
       }
@@ -563,6 +580,7 @@ router.post(
 
       const storageService = StorageService.getInstance();
       const fileInfo = await storageService.confirmUpload(
+        req.user,
         bucketName,
         objectKey,
         {
@@ -570,7 +588,7 @@ router.post(
           contentType,
           etag,
         },
-        req.user?.id
+        !!req.hasApiKey
       );
 
       try {
@@ -588,9 +606,9 @@ router.post(
       successResponse(res, fileInfo, 201);
     } catch (error) {
       if (error instanceof Error && error.message.includes('not found')) {
-        next(new AppError(error.message, 404, ERROR_CODES.NOT_FOUND));
+        next(new AppError(error.message, 404, ERROR_CODES.STORAGE_NOT_FOUND));
       } else if (error instanceof Error && error.message.includes('already confirmed')) {
-        next(new AppError(error.message, 409, ERROR_CODES.ALREADY_EXISTS));
+        next(new AppError(error.message, 409, ERROR_CODES.STORAGE_ALREADY_EXISTS));
       } else if (
         error instanceof Error &&
         error.message.includes('exceeds the configured maximum')
@@ -606,7 +624,7 @@ router.post(
 // POST /api/storage/buckets/:bucketName/objects/:objectKey/download-strategy - Get download URL (presigned or direct)
 router.post(
   '/buckets/:bucketName/objects/*/download-strategy',
-  conditionalAuth({ allowPublicPost: true }),
+  conditionalDownloadAuth,
   async (req: AuthRequest | Request, res: Response, next: NextFunction) => {
     try {
       const { bucketName } = req.params;
@@ -617,6 +635,21 @@ router.post(
       }
 
       const storageService = StorageService.getInstance();
+
+      // RLS-gate the strategy hand-off, same as GET /objects/*. A presigned
+      // URL bypasses RLS at redeem time, so we must verify ownership before
+      // issuing one.
+      const authReq = req as AuthRequest;
+      const visible = await storageService.objectIsVisible(
+        authReq.user,
+        bucketName,
+        objectKey,
+        !!authReq.hasApiKey
+      );
+      if (!visible) {
+        throw new AppError('Object not found', 404, ERROR_CODES.STORAGE_NOT_FOUND);
+      }
+
       const strategy = await storageService.getDownloadStrategy(bucketName, objectKey);
       successResponse(res, strategy);
     } catch (error) {
@@ -628,4 +661,94 @@ router.post(
     }
   }
 );
+// ============================================================================
+// S3 Protocol — Gateway Config + Access Key Management (admin only)
+// Per-IP rate limiting applied across all three access-key endpoints since
+// they mint / revoke long-lived credentials.
+// ============================================================================
+
+// GET /api/storage/s3/config - Return the gateway endpoint + signing region.
+// Endpoint is assembled from VITE_API_BASE_URL (the externally-reachable base
+// URL clients use for this backend) plus the fixed /storage/v1/s3 path. The
+// signing region is the value the SigV4 middleware validates against; clients
+// must sign with exactly this value.
+router.get('/s3/config', verifyAdmin, (_req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const base = (process.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
+    const endpoint = base ? `${base}/storage/v1/s3` : '/storage/v1/s3';
+    const region = process.env.AWS_REGION || 'us-east-2';
+    successResponse(res, { endpoint, region });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/storage/s3/access-keys - Create a new access key. Plaintext secret
+// is returned ONCE in the response and never again.
+router.post(
+  '/s3/access-keys',
+  s3AccessKeyManagementRateLimiter,
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validation = createS3AccessKeyRequestSchema.safeParse(req.body ?? {});
+      if (!validation.success) {
+        throw new AppError(
+          validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.STORAGE_INVALID_PARAMETER
+        );
+      }
+      const result = await s3AccessKeyService.create(validation.data);
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'CREATE_S3_ACCESS_KEY',
+        module: 'STORAGE',
+        details: { accessKeyId: result.accessKeyId },
+        ip_address: req.ip,
+      });
+      successResponse(res, result, 201);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// GET /api/storage/s3/access-keys - List all access keys (no secrets)
+router.get(
+  '/s3/access-keys',
+  s3AccessKeyManagementRateLimiter,
+  verifyAdmin,
+  async (_req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const keys = await s3AccessKeyService.list();
+      successResponse(res, keys);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// DELETE /api/storage/s3/access-keys/:id - Revoke an access key
+router.delete(
+  '/s3/access-keys/:id',
+  s3AccessKeyManagementRateLimiter,
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      await s3AccessKeyService.delete(req.params.id);
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'DELETE_S3_ACCESS_KEY',
+        module: 'STORAGE',
+        details: { id: req.params.id },
+        ip_address: req.ip,
+      });
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 export { router as storageRouter };

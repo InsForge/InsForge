@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { ExternalLink, Copy, Check, RefreshCw } from 'lucide-react';
 import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
-import { Skeleton } from '../../../components';
-import { useDeployments } from '../hooks/useDeployments';
-import { useDeploymentMetadata } from '../hooks/useDeploymentMetadata';
-import { useCustomDomains } from '../hooks/useCustomDomains';
-import { useToast } from '../../../lib/hooks/useToast';
-import { cn, formatTime } from '../../../lib/utils/utils';
+import { Skeleton } from '#components';
+import { useDeployments } from '#features/deployments/hooks/useDeployments';
+import { useDeploymentMetadata } from '#features/deployments/hooks/useDeploymentMetadata';
+import { useCustomDomains } from '#features/deployments/hooks/useCustomDomains';
+import { useToast } from '#lib/hooks/useToast';
+import { cn, formatTime } from '#lib/utils/utils';
 
 const statusColors: Record<string, string> = {
   WAITING: 'bg-yellow-600',

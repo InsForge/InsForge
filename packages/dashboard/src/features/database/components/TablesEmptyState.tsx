@@ -1,6 +1,6 @@
 import { Plus } from 'lucide-react';
 import { Button } from '@insforge/ui';
-import { DatabaseTemplate } from '../templates';
+import { DatabaseTemplate } from '#features/database/templates';
 import { TemplateCard } from './TemplateCard';
 
 interface TablesEmptyStateProps {

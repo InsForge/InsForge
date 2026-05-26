@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Cpu, HardDrive, Plug, RefreshCw, Settings } from 'lucide-react';
 import {
   Button,
+  Checkbox,
   CopyButton,
   ConfirmDialog,
   Input,
@@ -23,24 +24,19 @@ import {
   MenuDialogCloseButton,
 } from '@insforge/ui';
 import type { InstanceInfoEvent } from '@insforge/shared-schemas';
-import { useApiKey } from '../../../lib/hooks/useMetadata';
-import { useDashboardHost, useIsCloudHostingMode } from '../../../lib/config/DashboardHostContext';
-import { useHealth } from '../../../lib/hooks/useHealth';
+import { useApiKey } from '#lib/hooks/useMetadata';
+import { useDashboardHost, useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
+import { useHealth } from '#lib/hooks/useHealth';
 import {
   CLOUD_PROJECT_INFO_QUERY_KEY,
   useCloudProjectInfo,
   type CloudProjectInfo,
-} from '../../../lib/hooks/useCloudProjectInfo';
-import { useConfirm } from '../../../lib/hooks/useConfirm';
-import { useToast } from '../../../lib/hooks/useToast';
-import {
-  cn,
-  compareVersions,
-  getBackendUrl,
-  isInsForgeCloudProject,
-} from '../../../lib/utils/utils';
+} from '#lib/hooks/useCloudProjectInfo';
+import { useConfirm } from '#lib/hooks/useConfirm';
+import { useToast } from '#lib/hooks/useToast';
+import { cn, compareVersions, getBackendUrl, isInsForgeCloudProject } from '#lib/utils/utils';
 import { MCPSection, CLISection, ConnectionStringSection } from './connect';
-import { metadataService } from '../../../lib/services/metadata.service';
+import { metadataService } from '#lib/services/metadata.service';
 
 type TabType = 'info' | 'compute' | 'connect';
 
@@ -72,6 +68,8 @@ export default function ProjectSettingsMenuDialog({
   const [selectedInstanceType, setSelectedInstanceType] = useState<string | null>(null);
   const [isChangingInstanceType, setIsChangingInstanceType] = useState(false);
   const [isRotatingApiKey, setIsRotatingApiKey] = useState(false);
+  const [isRotateDialogOpen, setIsRotateDialogOpen] = useState(false);
+  const [immediateRevoke, setImmediateRevoke] = useState(false);
 
   const { apiKey, isLoading: isApiKeyLoading } = useApiKey();
   const { version, isLoading: isVersionLoading } = useHealth();
@@ -280,26 +278,21 @@ export default function ProjectSettingsMenuDialog({
     setIsProjectNameFocused(false);
   };
 
-  const handleRotateApiKey = async () => {
-    const confirmed = await confirm({
-      title: 'Rotate API Key',
-      description:
-        'This will generate a new API key. The current key will remain valid for 24 hours to allow for a smooth transition. This action cannot be undone.',
-      confirmText: 'Rotate Key',
-      cancelText: 'Cancel',
-      destructive: true,
-    });
+  const openRotateApiKeyDialog = () => {
+    setImmediateRevoke(false);
+    setIsRotateDialogOpen(true);
+  };
 
-    if (!confirmed) {
-      return;
-    }
-
+  const handleConfirmRotateApiKey = async () => {
+    const gracePeriodHours = immediateRevoke ? 0 : 24;
     setIsRotatingApiKey(true);
     try {
-      const result = await metadataService.rotateApiKey(24);
+      const result = await metadataService.rotateApiKey(gracePeriodHours);
       queryClient.setQueryData(['metadata', 'apiKey'], result.apiKey);
       showToast(
-        'API key rotated successfully. The old key will remain valid for 24 hours.',
+        immediateRevoke
+          ? 'API key rotated. The old key is now revoked and will fail on the next request.'
+          : 'API key rotated successfully. The old key will remain valid for 24 hours.',
         'success'
       );
     } catch {
@@ -361,6 +354,41 @@ export default function ProjectSettingsMenuDialog({
   return (
     <>
       <ConfirmDialog {...confirmDialogProps} />
+      <ConfirmDialog
+        open={isRotateDialogOpen}
+        onOpenChange={(nextOpen) => {
+          setIsRotateDialogOpen(nextOpen);
+          if (!nextOpen) {
+            setImmediateRevoke(false);
+          }
+        }}
+        title="Rotate API Key"
+        confirmText={immediateRevoke ? 'Revoke & Rotate' : 'Rotate Key'}
+        cancelText="Cancel"
+        destructive
+        isLoading={isRotatingApiKey}
+        onConfirm={handleConfirmRotateApiKey}
+        description={
+          <div className="flex flex-col gap-3">
+            <p>
+              {immediateRevoke
+                ? 'This will generate a new API key and revoke the current key immediately. Any in-flight callers still using the old key will start failing on the next request. This action cannot be undone.'
+                : 'This will generate a new API key. The current key will remain valid for 24 hours to allow for a smooth transition. This action cannot be undone.'}
+            </p>
+            <label className="flex cursor-pointer items-start gap-2">
+              <Checkbox
+                checked={immediateRevoke}
+                onCheckedChange={(checked) => setImmediateRevoke(checked === true)}
+                disabled={isRotatingApiKey}
+                className="mt-0.5"
+              />
+              <span className="text-sm leading-5 text-foreground">
+                Revoke old key immediately (use if exposed)
+              </span>
+            </label>
+          </div>
+        }
+      />
       <MenuDialog open={open} onOpenChange={onOpenChange}>
         <MenuDialogContent>
           <MenuDialogSideNav>
@@ -485,7 +513,7 @@ export default function ProjectSettingsMenuDialog({
                       </div>
                       <Button
                         variant="secondary"
-                        onClick={() => void handleRotateApiKey()}
+                        onClick={openRotateApiKeyDialog}
                         disabled={isApiKeyLoading || isRotatingApiKey}
                         className="h-8 shrink-0 rounded border-[var(--alpha-8)] bg-card px-3 text-sm font-medium"
                       >
@@ -635,7 +663,7 @@ export default function ProjectSettingsMenuDialog({
                             <Button
                               type="button"
                               className="h-8 rounded px-3 text-sm font-medium"
-                              onClick={() => host.onNavigateToSubscription?.()}
+                              onClick={() => host.onShowUpgradeDialog?.()}
                             >
                               Upgrade Plan
                             </Button>

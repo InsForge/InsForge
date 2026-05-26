@@ -1,15 +1,13 @@
 import bcrypt from 'bcryptjs';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
-import { AIConfigService } from '@/services/ai/ai-config.service.js';
 import { isCloudEnvironment, getApiBaseUrl } from '@/utils/environment.js';
 import logger from '@/utils/logger.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
+import { PaymentService } from '@/services/payments/payment.service.js';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
-import { OAuthProvidersSchema, aiConfigurationInputSchema } from '@insforge/shared-schemas';
-import { z } from 'zod';
+import { OAuthProvidersSchema } from '@insforge/shared-schemas';
 import { AuthConfigService } from '@/services/auth/auth-config.service.js';
-import { fetchS3Config } from '@/utils/s3-config-loader.js';
 import { ADMIN_ID, ANON_ID } from '@/utils/constants.js';
 
 /**
@@ -70,47 +68,6 @@ async function seedSystemUsers(adminEmail: string, adminPassword: string): Promi
   } finally {
     client.release();
   }
-}
-
-/**
- * Seeds default AI configurations from S3 config
- */
-async function seedDefaultAIConfigs(): Promise<void> {
-  const aiConfigService = AIConfigService.getInstance();
-
-  const hasAnyConfig = await aiConfigService.hasAnyConfig();
-  if (hasAnyConfig) {
-    return;
-  }
-
-  const defaultModels =
-    await fetchS3Config<z.infer<typeof aiConfigurationInputSchema>[]>('default-ai-models.json');
-
-  if (!defaultModels || defaultModels.length === 0) {
-    logger.warn('⚠️ No default AI models configured - add via dashboard or check S3 config');
-    return;
-  }
-
-  const parsed = aiConfigurationInputSchema.array().safeParse(defaultModels);
-  if (!parsed.success) {
-    logger.error('❌ Invalid AI models configuration from S3', {
-      error: parsed.error.message,
-    });
-    return;
-  }
-
-  const validatedModels = parsed.data;
-  for (const model of validatedModels) {
-    await aiConfigService.create(
-      model.inputModality,
-      model.outputModality,
-      model.provider,
-      model.modelId,
-      model.systemPrompt
-    );
-  }
-
-  logger.info(`✅ Default AI models configured (${validatedModels.length} models)`);
 }
 
 /**
@@ -275,7 +232,7 @@ async function seedLocalOAuthConfigs(): Promise<void> {
   }
 }
 
-// Create api key, admin user, and default AI configs
+// Create api key and admin user
 export async function seedBackend(): Promise<void> {
   const secretService = SecretService.getInstance();
 
@@ -292,6 +249,9 @@ export async function seedBackend(): Promise<void> {
 
     // Initialize API key (from env or generate)
     const apiKey = await secretService.initializeApiKey();
+
+    // Seed Stripe secret keys into the secret store so payment code has one lookup path.
+    await PaymentService.getInstance().seedStripeKeysFromEnv();
 
     // Get database stats
     const tables = await dbManager.getUserTables();
@@ -310,24 +270,25 @@ export async function seedBackend(): Promise<void> {
     // seed default configs for cloud environment
     if (isCloudEnvironment()) {
       await seedDefaultOAuthConfigs();
-      await seedDefaultAIConfigs();
       await seedDefaultAuthConfig();
     } else {
       await seedLocalOAuthConfigs();
     }
 
     // Initialize reserved secrets for edge functions
-    // Add INSFORGE_INTERNAL_URL for Deno-to-backend container communication
-    const insforgInternalUrl = 'http://insforge:7130';
-    const existingInternalUrlSecret = await secretService.getSecretByKey('INSFORGE_INTERNAL_URL');
+    if (!isCloudEnvironment()) {
+      // Add INSFORGE_INTERNAL_URL for Deno-to-backend container communication
+      const insforgInternalUrl = 'http://insforge:7130';
+      const existingInternalUrlSecret = await secretService.getSecretByKey('INSFORGE_INTERNAL_URL');
 
-    if (existingInternalUrlSecret === null) {
-      await secretService.createSecret({
-        key: 'INSFORGE_INTERNAL_URL',
-        isReserved: true,
-        value: insforgInternalUrl,
-      });
-      logger.info('✅ INSFORGE_INTERNAL_URL secret initialized');
+      if (existingInternalUrlSecret === null) {
+        await secretService.createSecret({
+          key: 'INSFORGE_INTERNAL_URL',
+          isReserved: true,
+          value: insforgInternalUrl,
+        });
+        logger.info('✅ INSFORGE_INTERNAL_URL secret initialized');
+      }
     }
 
     // Add ANON_KEY for public edge function access

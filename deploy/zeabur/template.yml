@@ -24,6 +24,14 @@ spec:
           type: STRING
           name: OpenRouter API Key
           description: API key for OpenRouter LLM services (optional).
+        - key: STRIPE_TEST_SECRET_KEY
+          type: STRING
+          name: Stripe Test Secret Key
+          description: Stripe test mode secret key for payment catalog sync (optional).
+        - key: STRIPE_LIVE_SECRET_KEY
+          type: STRING
+          name: Stripe Live Secret Key
+          description: Stripe live mode secret key for payment catalog sync (optional).
     tags:
         - Development
         - Database
@@ -73,7 +81,7 @@ spec:
           template: PREBUILT_V2
           spec:
             source:
-                image: ghcr.io/insforge/postgres:v15.13.2
+                image: ghcr.io/insforge/postgres:v15.13.3
                 command:
                     - docker-entrypoint.sh
                     - postgres
@@ -154,7 +162,9 @@ spec:
                     # Set max WAL senders
                     max_wal_senders = 10
 
-                    shared_preload_libraries = 'pg_cron,http,pgcrypto'
+                    shared_preload_libraries = 'pg_cron,http,pgcrypto,insforge_pg_utils'
+                    insforge.policy_grant_role = 'project_admin'
+                    insforge.policy_grant_tables = 'storage.objects,realtime.channels,realtime.messages,payments.checkout_sessions,payments.customer_portal_sessions'
                     cron.database_name = 'insforge'
                 - path: /docker-entrypoint-initdb.d/01-init.sql
                   template: |
@@ -925,6 +935,10 @@ spec:
                     default: ""
                 OPENROUTER_API_KEY:
                     default: ${OPENROUTER_API_KEY}
+                STRIPE_TEST_SECRET_KEY:
+                    default: ${STRIPE_TEST_SECRET_KEY}
+                STRIPE_LIVE_SECRET_KEY:
+                    default: ${STRIPE_LIVE_SECRET_KEY}
             healthCheck:
                 type: HTTP
                 port: web

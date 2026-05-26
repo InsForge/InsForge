@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
-import { LogsDataGrid, LogsColumnDef } from '../../logs/components/LogsDataGrid';
-import { useScheduleLogs } from '../hooks/useSchedules';
+import { DataGridEmptyState } from '#components';
+import { LogsDataGrid, LogsColumnDef } from '#features/logs/components/LogsDataGrid';
+import { useScheduleLogs } from '#features/functions/hooks/useSchedules';
 import { format } from 'date-fns';
 
 const PAGE_SIZE = 50;
@@ -132,11 +133,7 @@ export function ScheduleLogs({ scheduleId }: ScheduleLogsProps) {
             pageSize={PAGE_SIZE}
             totalRecords={total}
             onPageChange={setCurrentPage}
-            emptyState={
-              <div className="text-sm text-zinc-500 dark:text-zinc-400">
-                No execution logs found
-              </div>
-            }
+            emptyState={<DataGridEmptyState message="No execution logs found" />}
           />
         )}
       </div>

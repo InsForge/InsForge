@@ -6,12 +6,16 @@ import {
   HardDrive,
   Code2,
   Radio,
+  Server,
   Sparkles,
   ChartLine,
+  BarChart3,
   Settings,
   Rocket,
-  GitFork,
   SquarePen,
+  Download,
+  BookOpen,
+  CreditCard,
 } from 'lucide-react';
 
 export interface DashboardSecondaryMenuItem {
@@ -95,8 +99,20 @@ export const dashboardStaticMenuItems: DashboardPrimaryMenuItem[] = [
   {
     id: 'ai',
     label: 'Model Gateway',
-    href: '/dashboard/ai',
+    href: '/dashboard/ai/overview',
     icon: Sparkles,
+  },
+  {
+    id: 'compute',
+    label: 'Compute',
+    href: '/dashboard/compute',
+    icon: Server,
+  },
+  {
+    id: 'payments',
+    label: 'Payments',
+    href: '/dashboard/payments',
+    icon: CreditCard,
     sectionEnd: true,
   },
   {
@@ -104,12 +120,6 @@ export const dashboardStaticMenuItems: DashboardPrimaryMenuItem[] = [
     label: 'Logs',
     href: '/dashboard/logs',
     icon: ChartLine,
-  },
-  {
-    id: 'visualizer',
-    label: 'Visualizer',
-    href: '/dashboard/visualizer',
-    icon: GitFork,
   },
 ];
 
@@ -125,4 +135,28 @@ export const dashboardDeploymentsMenuItem: DashboardPrimaryMenuItem = {
   label: 'Deployments',
   href: '/dashboard/deployments',
   icon: Rocket,
+};
+
+export const dashboardAnalyticsMenuItem: DashboardPrimaryMenuItem = {
+  id: 'analytics',
+  label: 'Analytics',
+  href: '/dashboard/analytics',
+  icon: BarChart3,
+};
+
+// d_test + cloud-hosting only: navigates to the Install InsForge route.
+export const dashboardDTestInstallMenuItem: DashboardPrimaryMenuItem = {
+  id: 'dtest-install',
+  label: 'Install',
+  href: '/dashboard/install',
+  icon: Download,
+};
+
+// d_test + cloud-hosting only: opens the docs site in a new tab.
+export const dashboardDTestDocMenuItem: DashboardPrimaryMenuItem = {
+  id: 'dtest-doc',
+  label: 'Doc',
+  href: 'https://docs.insforge.dev/introduction',
+  icon: BookOpen,
+  external: true,
 };

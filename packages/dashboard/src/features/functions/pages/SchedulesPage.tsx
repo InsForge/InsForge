@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useRef } from 'react';
 import { ArrowLeft, CirclePlus } from 'lucide-react';
-import { useSchedules } from '../hooks/useSchedules';
+import { useSchedules } from '#features/functions/hooks/useSchedules';
 import {
   Button,
   ConfirmDialog,
@@ -9,16 +9,16 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@insforge/ui';
-import { Skeleton, TableHeader } from '../../../components';
-import { ScheduleFormDialog } from '../components/ScheduleFormDialog';
-import type { ScheduleFormSchema } from '../types';
-import { normalizeHeaders } from '../helpers';
-import ScheduleRow from '../components/ScheduleRow';
-import ScheduleLogs from '../components/ScheduleLogs';
-import { Alert, AlertDescription } from '../../../components/radix/Alert';
-import ScheduleEmptyState from '../components/ScheduleEmptyState';
-import { useConfirm } from '../../../lib/hooks/useConfirm';
-import RefreshIcon from '../../../assets/icons/refresh.svg?react';
+import { Skeleton, TableHeader } from '#components';
+import { ScheduleFormDialog } from '#features/functions/components/ScheduleFormDialog';
+import type { ScheduleFormSchema } from '#features/functions/types';
+import { normalizeHeaders } from '#features/functions/helpers';
+import ScheduleRow from '#features/functions/components/ScheduleRow';
+import ScheduleLogs from '#features/functions/components/ScheduleLogs';
+import { Alert, AlertDescription } from '#components/radix/Alert';
+import ScheduleEmptyState from '#features/functions/components/ScheduleEmptyState';
+import { useConfirm } from '#lib/hooks/useConfirm';
+import RefreshIcon from '#assets/icons/refresh.svg?react';
 
 const PAGE_SIZE = 50;
 

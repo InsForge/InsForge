@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { LogOut, ChevronDown, Plug } from 'lucide-react';
 import {
   Button,
@@ -7,22 +8,37 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@insforge/ui';
-import { Avatar, AvatarFallback, Separator, ThemeSelect } from '../components';
-import { cn } from '../lib/utils/utils';
-import { useTheme } from '../lib/contexts/ThemeContext';
-import { useAuth } from '../lib/contexts/AuthContext';
+import { Avatar, AvatarFallback, Separator, ThemeSelect } from '#components';
+import { cn } from '#lib/utils/utils';
+import { useTheme } from '#lib/contexts/ThemeContext';
+import { useAuth } from '#lib/contexts/AuthContext';
 import { useOpenConnectDialog } from './ConnectDialogContext';
+import { getFeatureFlag } from '#lib/analytics/posthog';
 
 // Import SVG icons
-import DiscordIcon from '../assets/logos/discord.svg?react';
-import GitHubIcon from '../assets/logos/github.svg?react';
-import InsForgeLogoLight from '../assets/logos/insforge_light.svg';
-import InsForgeLogoDark from '../assets/logos/insforge_dark.svg';
+import DiscordIcon from '#assets/logos/discord.svg?react';
+import GitHubIcon from '#assets/logos/github.svg?react';
+import InsForgeLogoLight from '#assets/logos/insforge_light.svg';
+import InsForgeLogoDark from '#assets/logos/insforge_dark.svg';
 
 export default function AppHeader() {
   const { resolvedTheme } = useTheme();
   const { user, logout } = useAuth();
   const openConnectDialog = useOpenConnectDialog();
+  const dashboardVariant = getFeatureFlag('dashboard-v4-experiment');
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const isDTest = dashboardVariant === 'd_test';
+  const isConnectDisabled = isDTest && pathname === '/dashboard/install';
+
+  const handleConnectClick = () => {
+    if (isDTest) {
+      void navigate('/dashboard/install');
+      return;
+    }
+    openConnectDialog();
+  };
+
   const [githubStars, setGithubStars] = useState<number | null>(null);
 
   // Fetch GitHub stars
@@ -118,7 +134,8 @@ export default function AppHeader() {
             type="button"
             variant="secondary"
             size="sm"
-            onClick={openConnectDialog}
+            onClick={handleConnectClick}
+            disabled={isConnectDisabled}
             className="gap-1 rounded-[14px] border-[var(--alpha-8)] px-2 [&_svg]:size-4"
           >
             <Plug aria-hidden="true" />

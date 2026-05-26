@@ -1,4 +1,4 @@
-import { apiClient } from '../api/client';
+import { apiClient } from '#lib/api/client';
 import {
   ApiKeyResponse,
   AppMetadataSchema,
@@ -15,33 +15,37 @@ export interface RotateApiKeyResponse {
 }
 
 export class MetadataService {
-  async fetchApiKey(): Promise<string> {
-    const data: ApiKeyResponse = await apiClient.request('/metadata/api-key');
+  async fetchApiKey(signal?: AbortSignal): Promise<string> {
+    const data: ApiKeyResponse = await apiClient.request('/metadata/api-key', { signal });
     return data.apiKey;
   }
 
-  async fetchProjectId(): Promise<string | null> {
+  async fetchProjectId(signal?: AbortSignal): Promise<string | null> {
     const data: ProjectIdResponse = await apiClient.request('/metadata/project-id', {
       headers: apiClient.withAccessToken(),
+      signal,
     });
     return data.projectId;
   }
 
-  async getFullMetadata(): Promise<AppMetadataSchema> {
+  async getFullMetadata(signal?: AbortSignal): Promise<AppMetadataSchema> {
     return apiClient.request('/metadata', {
       headers: apiClient.withAccessToken(),
+      signal,
     });
   }
 
-  async getDatabaseConnectionString(): Promise<DatabaseConnectionInfo> {
+  async getDatabaseConnectionString(signal?: AbortSignal): Promise<DatabaseConnectionInfo> {
     return apiClient.request('/metadata/database-connection-string', {
       headers: apiClient.withAccessToken(),
+      signal,
     });
   }
 
-  async getDatabasePassword(): Promise<DatabasePasswordInfo> {
+  async getDatabasePassword(signal?: AbortSignal): Promise<DatabasePasswordInfo> {
     return apiClient.request('/metadata/database-password', {
       headers: apiClient.withAccessToken(),
+      signal,
     });
   }
 

@@ -18,14 +18,8 @@ describe('027_add-redirect-url-whitelist migration', () => {
 
   // ── Idempotent rename ────────────────────────────────────────────────
   it('wraps the configs→config rename in a DO block that checks both source and target', () => {
-    // Must check that auth.configs EXISTS before renaming
-    expect(sql).toMatch(
-      /information_schema\.tables\s+WHERE\s+table_schema\s*=\s*'auth'\s+AND\s+table_name\s*=\s*'configs'/i
-    );
-    // Must check that auth.config does NOT already exist
-    expect(sql).toMatch(
-      /NOT\s+EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+information_schema\.tables\s+WHERE\s+table_schema\s*=\s*'auth'\s+AND\s+table_name\s*=\s*'config'/i
-    );
+    expect(sql).toMatch(/to_regclass\('auth\.configs'\)\s+IS\s+NOT\s+NULL/i);
+    expect(sql).toMatch(/to_regclass\('auth\.config'\)\s+IS\s+NULL/i);
   });
 
   it('does NOT use bare ALTER TABLE ... RENAME (non-idempotent)', () => {
