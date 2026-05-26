@@ -663,7 +663,7 @@ paths:
                 message: "File 'profile-photo.jpg' already confirmed in bucket 'avatars'"
                 statusCode: 409
 
-  /api/storage/buckets/{bucketName}/objects/{objectKey}/download-strategy:
+  /api/storage/buckets/{bucketName}/download-strategy/objects/{objectKey}:
     get:
       summary: Get Download Strategy (Direct or Presigned URL)
       description: |
@@ -674,6 +674,10 @@ paths:
 
         Expiry (when presigned) is auto-calculated server-side from bucket
         visibility; no request body is accepted.
+
+        Object keys may contain `/` (pseudo-folders); the path is matched
+        with a wildcard, so callers should NOT percent-encode `/` inside
+        `objectKey`.
       tags:
         - Client
       security:
@@ -722,12 +726,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+
+  /api/storage/buckets/{bucketName}/objects/{objectKey}/download-strategy:
     post:
       deprecated: true
-      summary: Get Download Strategy (Deprecated — use GET)
+      summary: Get Download Strategy (Deprecated — use GET on the canonical path)
       description: |
-        Deprecated alias of `GET /api/storage/buckets/{bucketName}/objects/{objectKey}/download-strategy`.
-        Retained for backward compatibility with older SDK releases. Any
+        Deprecated alias of
+        `GET /api/storage/buckets/{bucketName}/download-strategy/objects/{objectKey}`.
+        Retained at the original path/method for backward compatibility with
+        SDK releases that already shipped against this POST endpoint. Any
         request body is ignored.
       tags:
         - Client

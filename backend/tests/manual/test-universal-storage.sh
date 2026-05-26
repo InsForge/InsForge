@@ -179,7 +179,7 @@ fi
 # Step 6: Get download URL
 echo ""
 echo "6. Getting download URL..."
-DOWNLOAD_STRATEGY=$(curl -s "${API_URL}/api/storage/buckets/${BUCKET_NAME}/objects/${KEY}/download-strategy" \
+DOWNLOAD_STRATEGY=$(curl -s "${API_URL}/api/storage/buckets/${BUCKET_NAME}/download-strategy/objects/${KEY}" \
   -H "Authorization: Bearer $TOKEN")
 
 echo -e "${YELLOW}Download Strategy Response:${NC}"

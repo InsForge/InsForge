@@ -243,21 +243,23 @@ The download strategy API returns the optimal download method based on the stora
 - **S3-Compatible**: Presigned URL for S3.
 
 ```
-GET /api/storage/buckets/{bucketName}/objects/{objectKey}/download-strategy
+GET /api/storage/buckets/{bucketName}/download-strategy/objects/{objectKey}
 ```
 
 <Note>
   Expiry (for presigned URLs) is auto-calculated server-side from bucket
-  visibility. The endpoint takes no request body.
+  visibility. The endpoint takes no request body. `objectKey` may contain
+  `/` (pseudo-folders) — do not percent-encode the separators.
 
-  `POST` on the same path is retained as a deprecated alias for older SDK
+  `POST /api/storage/buckets/{bucketName}/objects/{objectKey}/download-strategy`
+  is retained as a deprecated alias at the original path for older SDK
   releases and will be removed in a future major version. Migrate to `GET`.
 </Note>
 
 #### Example
 
 ```bash
-curl "https://your-app.insforge.app/api/storage/buckets/avatars/objects/profile.jpg/download-strategy" \
+curl "https://your-app.insforge.app/api/storage/buckets/avatars/download-strategy/objects/profile.jpg" \
   -H "Authorization: Bearer your-jwt-token"
 ```
 

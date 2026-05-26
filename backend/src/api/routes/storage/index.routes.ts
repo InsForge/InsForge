@@ -394,14 +394,13 @@ router.post(
   }
 );
 
-// GET /api/storage/buckets/:bucketName/objects/*\/download-strategy - Get download URL (presigned or direct)
+// GET /api/storage/buckets/:bucketName/download-strategy/objects/* - Get download URL (presigned or direct)
 // Read-only strategy hand-off; aligns with S3-style object retrieval semantics.
-// Uses a wildcard for the object key (same as the download route below) so
-// keys containing `/` (pseudo-folders like `folder/file.txt`) are matched in
-// full. MUST be registered before the wildcard `/objects/*` download route
-// below, otherwise the wildcard intercepts `<key>/download-strategy` as an
-// object key.
-// POST is retained as a deprecated alias for backward compatibility with older SDKs.
+// Strategy lives under a dedicated `/download-strategy/objects/*` path
+// (rather than `/objects/:objectKey/download-strategy`) so it cannot collide
+// with the wildcard download route below for object keys that legitimately
+// contain or end with `download-strategy`.
+// The wildcard captures the full object key, including `/` (pseudo-folders).
 const downloadStrategyHandler = async (
   req: AuthRequest | Request,
   res: Response,
@@ -409,8 +408,9 @@ const downloadStrategyHandler = async (
 ) => {
   try {
     const { bucketName } = req.params;
-    // Wildcard captures the full object key (may contain `/`).
-    const objectKey = req.params[0];
+    // For the canonical GET route the wildcard captures the full object key.
+    // For the deprecated POST alias the key is the named `:objectKey` param.
+    const objectKey = req.params[0] ?? req.params.objectKey;
 
     if (!objectKey) {
       throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
@@ -445,14 +445,16 @@ const downloadStrategyHandler = async (
 };
 
 router.get(
-  '/buckets/:bucketName/objects/*/download-strategy',
+  '/buckets/:bucketName/download-strategy/objects/*',
   conditionalDownloadAuth,
   downloadStrategyHandler
 );
 
-// @deprecated Use GET instead. Retained for backward compatibility with older SDK releases.
+// @deprecated Use GET /buckets/:bucketName/download-strategy/objects/* instead.
+// Retained at the original path/method for backward compatibility with SDK
+// releases that already shipped against the POST endpoint.
 router.post(
-  '/buckets/:bucketName/objects/*/download-strategy',
+  '/buckets/:bucketName/objects/:objectKey/download-strategy',
   conditionalDownloadAuth,
   downloadStrategyHandler
 );
