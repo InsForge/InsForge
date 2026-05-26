@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import {
+  Area,
+  AreaChart,
   CartesianGrid,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -44,13 +44,13 @@ function KpiTab({ metric, item, active, onClick }: KpiTabProps) {
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`relative flex flex-col gap-1 px-4 py-4 text-left transition-colors ${
-        active ? 'bg-card' : 'bg-card/60 hover:bg-card'
+      className={`flex flex-1 flex-col items-start gap-1 rounded p-3 text-left transition-colors ${
+        active ? 'bg-alpha-4' : 'hover:bg-alpha-4'
       }`}
     >
-      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-[13px] leading-[22px] text-muted-foreground">{label}</span>
       <span className="flex items-baseline gap-2">
-        <span className="text-2xl font-semibold text-foreground">{display}</span>
+        <span className="text-[20px] font-medium leading-7 text-foreground">{display}</span>
         {showDelta && (
           <span
             className={`text-xs ${
@@ -61,9 +61,6 @@ function KpiTab({ metric, item, active, onClick }: KpiTabProps) {
           </span>
         )}
       </span>
-      {active && (
-        <span aria-hidden="true" className="absolute inset-x-3 bottom-0 h-0.5 bg-foreground" />
-      )}
     </button>
   );
 }
@@ -139,8 +136,8 @@ export function KpiSectionWithTrend({ enabled }: { enabled: boolean }) {
   const tooltipLabel = webOverviewLabel(active);
 
   return (
-    <div className="overflow-hidden rounded-lg bg-card">
-      <div className="grid grid-cols-3 divide-x divide-[rgb(var(--muted-foreground)/0.1)]">
+    <div className="overflow-hidden rounded-lg border border-[var(--alpha-8)] bg-card">
+      <div className="flex gap-3 p-3">
         {TABS.map((metric) => (
           <KpiTab
             key={metric}
@@ -162,17 +159,25 @@ export function KpiSectionWithTrend({ enabled }: { enabled: boolean }) {
           </div>
         ) : chartData.length === 0 ? (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-            No data
+            No data available
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 5, right: 16, left: 8, bottom: 0 }}>
+            <AreaChart data={chartData} margin={{ top: 5, right: 16, left: 8, bottom: 0 }}>
+              <defs>
+                <linearGradient id="kpi-trend-fill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="rgb(var(--primary))" stopOpacity={0.4} />
+                  <stop offset="100%" stopColor="rgb(var(--primary))" stopOpacity={0} />
+                </linearGradient>
+              </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--muted-foreground) / 0.2)" />
               <XAxis
                 dataKey="label"
                 tick={{ fontSize: 11, fill: 'rgb(var(--muted-foreground))' }}
                 tickLine={false}
                 axisLine={false}
+                interval="preserveStartEnd"
+                minTickGap={48}
               />
               <YAxis
                 tick={{ fontSize: 11, fill: 'rgb(var(--muted-foreground))' }}
@@ -194,15 +199,16 @@ export function KpiSectionWithTrend({ enabled }: { enabled: boolean }) {
                 itemStyle={{ color: 'rgb(var(--foreground))' }}
                 formatter={(value) => [formatTooltipValue(active, Number(value)), tooltipLabel]}
               />
-              <Line
+              <Area
                 type="monotone"
                 dataKey="count"
                 stroke="rgb(var(--primary))"
                 strokeWidth={2}
+                fill="url(#kpi-trend-fill)"
                 dot={false}
                 activeDot={{ r: 4 }}
               />
-            </LineChart>
+            </AreaChart>
           </ResponsiveContainer>
         )}
       </div>
