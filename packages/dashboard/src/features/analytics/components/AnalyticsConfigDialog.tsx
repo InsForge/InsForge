@@ -165,7 +165,7 @@ export function AnalyticsConfigDialog({
 
                   <div className="h-px w-full bg-[var(--alpha-8)]" />
 
-                  <FieldRow label="Project API">
+                  <FieldRow label="Project API Key">
                     <div className="relative flex-1">
                       <Input
                         readOnly
