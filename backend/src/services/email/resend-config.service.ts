@@ -164,13 +164,23 @@ export class ResendConfigService {
 
   async upsertResendConfig(input: UpsertResendConfigRequest): Promise<ResendConfigSchema> {
     // Verify outside the transaction to avoid holding a DB connection and row lock
-    // during the external HTTP call to Resend.
+    // during the external HTTP call to Resend. Skip the verify HTTP call when the
+    // admin is not changing the API key AND not changing the sender domain —
+    // the existing config was already verified when it was set.
     if (input.enabled) {
       const existing = await this.getPool().query(
-        'SELECT api_key_encrypted FROM email.resend_config LIMIT 1'
+        'SELECT api_key_encrypted, sender_email FROM email.resend_config LIMIT 1'
       );
       const existingEncrypted: string = existing.rows[0]?.api_key_encrypted ?? '';
-      await this.verifyResendConnection(input, existingEncrypted);
+      const existingSenderEmail: string = existing.rows[0]?.sender_email ?? '';
+
+      const keyChanged = !!input.apiKey;
+      const senderChanged = !!input.senderEmail && input.senderEmail !== existingSenderEmail;
+      const wasNotEnabledBefore = !existingEncrypted;
+
+      if (keyChanged || senderChanged || wasNotEnabledBefore) {
+        await this.verifyResendConnection(input, existingEncrypted, existingSenderEmail);
+      }
     }
 
     const client = await this.getPool().connect();
@@ -260,7 +270,8 @@ export class ResendConfigService {
 
   private async verifyResendConnection(
     input: UpsertResendConfigRequest,
-    existingApiKeyEncrypted: string
+    existingApiKeyEncrypted: string,
+    existingSenderEmail: string
   ): Promise<void> {
     let apiKey: string;
 
@@ -284,14 +295,31 @@ export class ResendConfigService {
       apiKey = decrypted;
     }
 
+    // Verify sending from the user's actual sender address so we catch
+    // domain-not-verified misconfigurations AND so sending_access keys
+    // (which are restricted to their bound domain) can pass verification.
+    // Falls back to existing stored sender_email when only the key is being
+    // rotated without supplying a new sender.
+    const senderEmail = input.senderEmail || existingSenderEmail;
+    if (!senderEmail) {
+      throw new AppError(
+        'Sender email is required when enabling Resend',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
     const RESEND_VERIFY_TIMEOUT_MS = 5_000;
     let timer: NodeJS.Timeout | undefined;
     try {
       const resend = new Resend(apiKey);
-      // Use a test send to delivered@resend.dev — works with both full_access and
-      // sending_access keys, unlike apiKeys.list() which requires full_access.
+      // Test-send to delivered@resend.dev from the user's configured sender.
+      // Resend's documented `delivered@resend.dev` address is a no-op sink
+      // (counts against the team's per-second rate limit but lands as
+      // delivered). Sending from `senderEmail` validates that the key has
+      // permission for the configured domain.
       const verifyPromise = resend.emails.send({
-        from: 'onboarding@resend.dev',
+        from: senderEmail,
         to: ['delivered@resend.dev'],
         subject: 'API Key Verification',
         text: 'Testing Resend configuration.',

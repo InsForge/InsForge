@@ -119,7 +119,7 @@ export class ResendEmailProvider implements EmailProvider {
         subject: this.renderTemplate(emailTemplate.subject, allVariables, false),
         html: this.renderTemplate(emailTemplate.bodyHtml, allVariables),
       },
-      { template }
+      { template, to: email }
     );
   }
 
@@ -136,7 +136,7 @@ export class ResendEmailProvider implements EmailProvider {
         bcc: options.bcc,
         replyTo: options.replyTo,
       },
-      { recipientCount: Array.isArray(options.to) ? options.to.length : 1 }
+      { to: options.to }
     );
   }
 }
