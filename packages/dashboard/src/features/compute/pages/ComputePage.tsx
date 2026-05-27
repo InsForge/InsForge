@@ -212,19 +212,31 @@ export default function ComputePage() {
                   </dd>
                 </div>
                 <div className="col-span-2">
-                  <dt className="text-muted-foreground mb-1">Endpoint URL</dt>
+                  <dt className="text-muted-foreground mb-1">Endpoint</dt>
                   <dd className="text-foreground">
                     {reachableUrl ? (
-                      <a
-                        href={reachableUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary hover:underline"
-                      >
-                        {reachableUrl}
-                      </a>
+                      reachableUrl.href ? (
+                        <a
+                          href={reachableUrl.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline"
+                        >
+                          {reachableUrl.display}
+                        </a>
+                      ) : (
+                        <code className="text-foreground font-mono bg-[var(--alpha-8)] px-2 py-0.5 rounded">
+                          {reachableUrl.display}
+                        </code>
+                      )
                     ) : (
                       <span className="text-muted-foreground">Not available</span>
+                    )}
+                    {reachableUrl && !reachableUrl.href && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Raw TCP service. Connect with your protocol's native client (e.g.{' '}
+                        <code className="font-mono">redis-cli -h &lt;host&gt; -p &lt;port&gt;</code>).
+                      </p>
                     )}
                   </dd>
                 </div>

@@ -30,10 +30,29 @@ export const REGIONS = [
 ] as const;
 
 /**
- * Return the service endpoint. Backend now constructs `endpointUrl` from
- * COMPUTE_DOMAIN (when set) or falls back to `.fly.dev`, so this just returns
- * what the API provided.
+ * Return the service endpoint as a display string + optional href.
+ *
+ * For HTTP services we surface the full `https://<app>.fly.dev` URL and link
+ * it (clickable, opens in browser).
+ *
+ * For TCP services the backend's `endpointUrl` is still an `https://` form
+ * (the cloud-backend hasn't been made protocol-aware), but there is no HTTPS
+ * listener on the Fly app — clicking that link gets a TLS handshake timeout.
+ * Strip the scheme and append the user's port instead. `href` is null so
+ * callers render it as plain text rather than a misleading anchor. Users
+ * connect with the protocol-native client (redis-cli, psql, etc.).
  */
-export function getReachableUrl(service: ServiceSchema): string | null {
-  return service.endpointUrl;
+export interface ServiceEndpoint {
+  display: string;
+  /** null for TCP — browsers cannot navigate to raw TCP endpoints. */
+  href: string | null;
+}
+
+export function getReachableUrl(service: ServiceSchema): ServiceEndpoint | null {
+  if (!service.endpointUrl) return null;
+  if (service.protocol === 'tcp') {
+    const host = service.endpointUrl.replace(/^https?:\/\//, '');
+    return { display: `${host}:${service.port}`, href: null };
+  }
+  return { display: service.endpointUrl, href: service.endpointUrl };
 }
