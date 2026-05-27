@@ -104,12 +104,9 @@ describe('ResendEmailProvider', () => {
     it('passes $-tokens in variable values verbatim (no regex back-ref expansion)', async () => {
       // String.prototype.replace interprets $&, $1, $$ etc. in the replacement
       // string. Variables containing these tokens must not be re-interpreted.
-      await provider.sendWithTemplate(
-        'user@example.com',
-        'Test User',
-        'email-verification-code',
-        { code: '12$&34' }
-      );
+      await provider.sendWithTemplate('user@example.com', 'Test User', 'email-verification-code', {
+        code: '12$&34',
+      });
 
       const callArgs = sendMock.mock.calls[0][0];
       // After HTML escaping, `$` stays `$` (only <>"&' are escaped), so the
