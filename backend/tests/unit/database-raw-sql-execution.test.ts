@@ -112,6 +112,192 @@ describe('DatabaseAdvanceService - admin SQL execution', () => {
     expect(queryMock).not.toHaveBeenCalledWith('RESET ROLE');
   });
 
+  it('executes read-only SQL explain under project_admin', async () => {
+    const queryMock = vi
+      .fn()
+      .mockResolvedValueOnce({}) // SET statement_timeout
+      .mockResolvedValueOnce({}) // SET ROLE project_admin
+      .mockResolvedValueOnce({}) // set request.jwt.claims
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            'QUERY PLAN': [
+              {
+                Plan: {
+                  'Node Type': 'Seq Scan',
+                  'Relation Name': 'products',
+                  'Startup Cost': 0,
+                  'Total Cost': 12.5,
+                  'Plan Rows': 5,
+                  'Plan Width': 32,
+                  'Actual Startup Time': 0.01,
+                  'Actual Total Time': 0.03,
+                  'Actual Rows': 5,
+                  'Actual Loops': 1,
+                  'Shared Hit Blocks': 2,
+                },
+                'Planning Time': 0.25,
+                'Execution Time': 0.5,
+              },
+            ],
+          },
+        ],
+        rowCount: 1,
+        fields: [],
+      })
+      .mockResolvedValueOnce({}) // RESET ROLE
+      .mockResolvedValueOnce({}) // reset request.jwt.claims
+      .mockResolvedValueOnce({}); // reset statement_timeout
+
+    connectMock.mockResolvedValue({
+      query: queryMock,
+      release: vi.fn(),
+    });
+
+    const service = DatabaseAdvanceService.getInstance();
+    const result = await service.explainSQL('SELECT * FROM products', []);
+
+    expect(result).toEqual({
+      plan: {
+        nodeType: 'Seq Scan',
+        relationName: 'products',
+        startupCost: 0,
+        totalCost: 12.5,
+        planRows: 5,
+        planWidth: 32,
+        actualStartupTime: 0.01,
+        actualTotalTime: 0.03,
+        actualRows: 5,
+        actualLoops: 1,
+        sharedHitBlocks: 2,
+        plans: [],
+      },
+      planningTime: 0.25,
+      executionTime: 0.5,
+      totalQueryTime: 0.75,
+      rolledBack: false,
+    });
+    expect(queryMock).toHaveBeenNthCalledWith(
+      4,
+      'EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) SELECT * FROM products',
+      []
+    );
+  });
+
+  it('runs mutating SQL explain inside a rolled-back transaction', async () => {
+    const queryMock = vi
+      .fn()
+      .mockResolvedValueOnce({}) // SET statement_timeout
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({}) // SET LOCAL ROLE project_admin
+      .mockResolvedValueOnce({}) // set local request.jwt.claims
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            'QUERY PLAN': [
+              {
+                Plan: {
+                  'Node Type': 'Update',
+                  'Startup Cost': 0,
+                  'Total Cost': 10,
+                  'Plan Rows': 1,
+                  'Actual Total Time': 0.05,
+                  'Actual Rows': 0,
+                  Plans: [
+                    {
+                      'Node Type': 'Index Scan',
+                      'Index Name': 'products_pkey',
+                      'Plan Rows': 1,
+                    },
+                  ],
+                },
+                'Execution Time': 0.08,
+              },
+            ],
+          },
+        ],
+        rowCount: 1,
+        fields: [],
+      })
+      .mockResolvedValueOnce({}) // RESET ROLE
+      .mockResolvedValueOnce({}) // reset request.jwt.claims
+      .mockResolvedValueOnce({}) // ROLLBACK
+      .mockResolvedValueOnce({}); // reset statement_timeout
+
+    connectMock.mockResolvedValue({
+      query: queryMock,
+      release: vi.fn(),
+    });
+
+    const service = DatabaseAdvanceService.getInstance();
+    const result = await service.explainSQL('UPDATE products SET name = $1 WHERE id = $2', [
+      'Updated',
+      1,
+    ]);
+
+    expect(result.rolledBack).toBe(true);
+    expect(result.plan.nodeType).toBe('Update');
+    expect(result.plan.plans[0]).toMatchObject({
+      nodeType: 'Index Scan',
+      indexName: 'products_pkey',
+      planRows: 1,
+    });
+    expect(queryMock).toHaveBeenNthCalledWith(1, 'SET statement_timeout = 30000');
+    expect(queryMock).toHaveBeenNthCalledWith(2, 'BEGIN');
+    expect(queryMock).toHaveBeenNthCalledWith(3, 'SET LOCAL ROLE project_admin');
+    expect(queryMock).toHaveBeenNthCalledWith(4, 'SELECT set_config($1, $2, $3)', [
+      'request.jwt.claims',
+      JSON.stringify({ role: 'project_admin' }),
+      true,
+    ]);
+    expect(queryMock).toHaveBeenNthCalledWith(
+      5,
+      'EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) UPDATE products SET name = $1 WHERE id = $2',
+      ['Updated', 1]
+    );
+    expect(queryMock).toHaveBeenNthCalledWith(8, 'ROLLBACK');
+    expect(queryMock).toHaveBeenNthCalledWith(9, 'SET statement_timeout = 0');
+  });
+
+  it('rejects multi-statement SQL explain before opening a database connection', async () => {
+    const service = DatabaseAdvanceService.getInstance();
+
+    await expect(
+      service.explainSQL('SELECT 1; UPDATE products SET name = name')
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      code: ERROR_CODES.INVALID_INPUT,
+    });
+    expect(connectMock).not.toHaveBeenCalled();
+  });
+
+  it('surfaces postgres syntax errors from SQL explain', async () => {
+    const syntaxError = new Error('syntax error at or near "SELEC"');
+    const queryMock = vi
+      .fn()
+      .mockResolvedValueOnce({}) // SET statement_timeout
+      .mockResolvedValueOnce({}) // SET ROLE project_admin
+      .mockResolvedValueOnce({}) // set request.jwt.claims
+      .mockRejectedValueOnce(syntaxError) // execute EXPLAIN
+      .mockResolvedValueOnce({}) // RESET ROLE
+      .mockResolvedValueOnce({}) // reset request.jwt.claims
+      .mockResolvedValueOnce({}); // reset statement_timeout
+
+    connectMock.mockResolvedValue({
+      query: queryMock,
+      release: vi.fn(),
+    });
+
+    const service = DatabaseAdvanceService.getInstance();
+    await expect(service.explainSQL('SELEC * FROM products')).rejects.toBe(syntaxError);
+
+    expect(queryMock).toHaveBeenNthCalledWith(
+      4,
+      'EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) SELEC * FROM products',
+      []
+    );
+  });
+
   it('returns healthy clients to the pool after ordinary SQL errors', async () => {
     const releaseMock = vi.fn();
     const queryError = new Error('syntax error');

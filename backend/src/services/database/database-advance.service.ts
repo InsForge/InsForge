@@ -3,6 +3,8 @@ import { AppError, hasPgErrorCode } from '@/utils/errors.js';
 import {
   ERROR_CODES,
   type RawSQLResponse,
+  type ExplainPlanNode,
+  type ExplainSQLResponse,
   type ExportDatabaseResponse,
   type ExportDatabaseJsonData,
   type ImportDatabaseResponse,
@@ -13,9 +15,14 @@ import { checkSqlExecutionGuards, parseSQLStatements } from '@/utils/sql-parser.
 import { validateSchemaName, validateTableName } from '@/utils/validations.js';
 import pgFormat from 'pg-format';
 import { parse } from 'csv-parse/sync';
-import { type PoolClient } from 'pg';
+import { type PoolClient, type QueryResult } from 'pg';
 import { assertWritableDatabaseSchema } from './helpers.js';
 import { withAdminContext } from './user-context.service.js';
+
+const EXPLAIN_PARSE_GUARD_ERROR =
+  'Query could not be parsed and was rejected for security reasons.';
+const MUTATING_STATEMENT_PATTERN =
+  /^\s*(?:\/\*[\s\S]*?\*\/\s*|--[^\n]*(?:\n|$)\s*)*(insert|update|delete|merge|truncate|create|alter|drop|grant|revoke)\b/i;
 
 export class DatabaseAdvanceService {
   private static instance: DatabaseAdvanceService;
@@ -133,6 +140,113 @@ export class DatabaseAdvanceService {
       });
       client.release(releaseError);
     }
+  }
+
+  prepareExplainStatement(query: string): string {
+    let statements: string[];
+    try {
+      statements = parseSQLStatements(query);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new AppError(message, 400, ERROR_CODES.INVALID_INPUT);
+    }
+
+    if (statements.length !== 1) {
+      throw new AppError(
+        'Explain supports exactly one SQL statement.',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    const statement = statements[0];
+    const guardError = checkSqlExecutionGuards(statement);
+    if (guardError && guardError !== EXPLAIN_PARSE_GUARD_ERROR) {
+      throw new AppError(guardError, 403, ERROR_CODES.FORBIDDEN);
+    }
+
+    return statement;
+  }
+
+  async explainSQL(query: string, params: unknown[] = []): Promise<ExplainSQLResponse> {
+    const statement = this.prepareExplainStatement(query);
+    const shouldRollback = isMutationLikeStatement(statement);
+    const explainQuery = `EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) ${statement}`;
+    const pool = this.dbManager.getPool();
+    const client = await pool.connect();
+    let releaseError: Error | undefined;
+
+    try {
+      await client.query('SET statement_timeout = 30000');
+
+      const result = shouldRollback
+        ? await this.executeExplainInRolledBackTransaction(
+            client,
+            explainQuery,
+            params,
+            (error) => {
+              releaseError = error;
+            }
+          )
+        : await withAdminContext(
+            client,
+            () => client.query<Record<string, unknown>>(explainQuery, params),
+            false,
+            (error) => {
+              releaseError = error;
+            }
+          );
+
+      return normalizeExplainResponse(result.rows, shouldRollback);
+    } catch (error) {
+      if (hasPgErrorCode(error, '57014')) {
+        throw new Error('Query timeout: The query took longer than 30 seconds to execute');
+      }
+      throw error;
+    } finally {
+      await client.query('SET statement_timeout = 0').catch((error: unknown) => {
+        releaseError = error instanceof Error ? error : new Error(String(error));
+      });
+      client.release(releaseError);
+    }
+  }
+
+  private async executeExplainInRolledBackTransaction(
+    client: PoolClient,
+    explainQuery: string,
+    params: unknown[],
+    onCleanupError: (error: Error) => void
+  ): Promise<QueryResult<Record<string, unknown>>> {
+    let result: QueryResult<Record<string, unknown>> | undefined;
+    let pendingError: unknown;
+
+    await client.query('BEGIN');
+    try {
+      result = await withAdminContext(
+        client,
+        () => client.query<Record<string, unknown>>(explainQuery, params),
+        true,
+        onCleanupError
+      );
+    } catch (error) {
+      pendingError = error;
+    }
+
+    try {
+      await client.query('ROLLBACK');
+    } catch (error) {
+      const rollbackError = error instanceof Error ? error : new Error(String(error));
+      onCleanupError(rollbackError);
+      if (!pendingError) {
+        pendingError = rollbackError;
+      }
+    }
+
+    if (pendingError) {
+      throw pendingError;
+    }
+
+    return result as QueryResult<Record<string, unknown>>;
   }
 
   private async exportTableSchemaBySQL(client: PoolClient, table: string): Promise<string> {
@@ -1009,5 +1123,110 @@ export class DatabaseAdvanceService {
       const message = error instanceof Error ? error.message : 'Bulk insert failed';
       throw new AppError(message, 400, ERROR_CODES.INVALID_INPUT);
     }
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function getNumber(source: Record<string, unknown>, key: string): number | undefined {
+  const value = source[key];
+  return typeof value === 'number' ? value : undefined;
+}
+
+function getString(source: Record<string, unknown>, key: string): string | undefined {
+  const value = source[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
+function getStringArray(source: Record<string, unknown>, key: string): string[] | undefined {
+  const value = source[key];
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  return value.map((item) => String(item));
+}
+
+function isMutationLikeStatement(statement: string): boolean {
+  return MUTATING_STATEMENT_PATTERN.test(statement);
+}
+
+function normalizeExplainResponse(
+  rows: Record<string, unknown>[],
+  rolledBack: boolean
+): ExplainSQLResponse {
+  const explainValue = rows[0]?.['QUERY PLAN'];
+  const explainRoot = Array.isArray(explainValue) ? explainValue[0] : explainValue;
+
+  if (!isRecord(explainRoot) || !isRecord(explainRoot.Plan)) {
+    throw new Error('Unexpected EXPLAIN response from database');
+  }
+
+  const planningTime = getNumber(explainRoot, 'Planning Time');
+  const executionTime = getNumber(explainRoot, 'Execution Time');
+  const totalQueryTime =
+    planningTime !== undefined && executionTime !== undefined
+      ? planningTime + executionTime
+      : (executionTime ?? planningTime);
+
+  return {
+    plan: normalizeExplainPlanNode(explainRoot.Plan),
+    rolledBack,
+    ...(planningTime !== undefined ? { planningTime } : {}),
+    ...(executionTime !== undefined ? { executionTime } : {}),
+    ...(totalQueryTime !== undefined ? { totalQueryTime } : {}),
+  };
+}
+
+function normalizeExplainPlanNode(node: Record<string, unknown>): ExplainPlanNode {
+  const childPlans = node.Plans;
+  const plan: ExplainPlanNode = {
+    nodeType: getString(node, 'Node Type') ?? 'Unknown',
+    plans: Array.isArray(childPlans)
+      ? childPlans.filter(isRecord).map((childPlan) => normalizeExplainPlanNode(childPlan))
+      : [],
+  };
+
+  setOptional(plan, 'relationName', getString(node, 'Relation Name'));
+  setOptional(plan, 'alias', getString(node, 'Alias'));
+  setOptional(plan, 'indexName', getString(node, 'Index Name'));
+  setOptional(plan, 'startupCost', getNumber(node, 'Startup Cost'));
+  setOptional(plan, 'totalCost', getNumber(node, 'Total Cost'));
+  setOptional(plan, 'planRows', getNumber(node, 'Plan Rows'));
+  setOptional(plan, 'planWidth', getNumber(node, 'Plan Width'));
+  setOptional(plan, 'actualStartupTime', getNumber(node, 'Actual Startup Time'));
+  setOptional(plan, 'actualTotalTime', getNumber(node, 'Actual Total Time'));
+  setOptional(plan, 'actualRows', getNumber(node, 'Actual Rows'));
+  setOptional(plan, 'actualLoops', getNumber(node, 'Actual Loops'));
+  setOptional(plan, 'sharedHitBlocks', getNumber(node, 'Shared Hit Blocks'));
+  setOptional(plan, 'sharedReadBlocks', getNumber(node, 'Shared Read Blocks'));
+  setOptional(plan, 'sharedDirtiedBlocks', getNumber(node, 'Shared Dirtied Blocks'));
+  setOptional(plan, 'sharedWrittenBlocks', getNumber(node, 'Shared Written Blocks'));
+  setOptional(plan, 'localHitBlocks', getNumber(node, 'Local Hit Blocks'));
+  setOptional(plan, 'localReadBlocks', getNumber(node, 'Local Read Blocks'));
+  setOptional(plan, 'localDirtiedBlocks', getNumber(node, 'Local Dirtied Blocks'));
+  setOptional(plan, 'localWrittenBlocks', getNumber(node, 'Local Written Blocks'));
+  setOptional(plan, 'tempReadBlocks', getNumber(node, 'Temp Read Blocks'));
+  setOptional(plan, 'tempWrittenBlocks', getNumber(node, 'Temp Written Blocks'));
+  setOptional(plan, 'filter', getString(node, 'Filter'));
+  setOptional(plan, 'indexCond', getString(node, 'Index Cond'));
+  setOptional(plan, 'hashCond', getString(node, 'Hash Cond'));
+  setOptional(plan, 'joinFilter', getString(node, 'Join Filter'));
+  setOptional(plan, 'recheckCond', getString(node, 'Recheck Cond'));
+  setOptional(plan, 'groupKey', getStringArray(node, 'Group Key'));
+  setOptional(plan, 'sortKey', getStringArray(node, 'Sort Key'));
+
+  return plan;
+}
+
+function setOptional<Key extends keyof ExplainPlanNode>(
+  node: ExplainPlanNode,
+  key: Key,
+  value: ExplainPlanNode[Key] | undefined
+): void {
+  if (value !== undefined) {
+    node[key] = value;
   }
 }
