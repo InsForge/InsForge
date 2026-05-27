@@ -236,6 +236,141 @@ describe('ComputeServicesService', () => {
       expect(failedUpdateCall[1]).toContain('failed');
     });
 
+    // INS-271: end-to-end pass-through of `protocol: 'tcp'` from createService
+    // input → INSERT column list → launchMachine params. The cloud-backend +
+    // CLI work is wasted if the OSS strips this field. Pin both wire surfaces.
+    it('forwards protocol: tcp to INSERT and launchMachine when supplied', async () => {
+      const serviceId = 'svc-tcp-create';
+      const tcpInput = { ...input, protocol: 'tcp' as const, port: 6379, name: 'my-redis' };
+
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          {
+            id: serviceId,
+            project_id: tcpInput.projectId,
+            name: tcpInput.name,
+            image_url: tcpInput.imageUrl,
+            port: tcpInput.port,
+            cpu: tcpInput.cpu,
+            memory: tcpInput.memory,
+            region: tcpInput.region,
+            protocol: 'tcp',
+            fly_app_id: null,
+            fly_machine_id: null,
+            status: 'creating',
+            endpoint_url: null,
+            env_vars_encrypted: null,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+      });
+      mockCreateApp.mockResolvedValue({ appId: 'my-redis-proj-123' });
+      mockLaunchMachine.mockResolvedValue({ machineId: 'mach-tcp' });
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          {
+            id: serviceId,
+            project_id: tcpInput.projectId,
+            name: tcpInput.name,
+            image_url: tcpInput.imageUrl,
+            port: tcpInput.port,
+            cpu: tcpInput.cpu,
+            memory: tcpInput.memory,
+            region: tcpInput.region,
+            protocol: 'tcp',
+            fly_app_id: 'my-redis-proj-123',
+            fly_machine_id: 'mach-tcp',
+            status: 'running',
+            endpoint_url: 'https://my-redis-proj-123.fly.dev',
+            env_vars_encrypted: null,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+      });
+
+      const result = await service.createService(tcpInput);
+
+      // INSERT must include the column AND the value (positional bind, so
+      // assert the value made it into the params list rather than parsing the
+      // SQL string).
+      const insertCall = mockQuery.mock.calls[0];
+      expect(insertCall[0]).toContain('protocol');
+      expect(insertCall[1]).toContain('tcp');
+
+      // launchMachine must receive protocol: 'tcp' so the provider can pick
+      // raw-TCP edge handlers instead of HTTP.
+      expect(mockLaunchMachine).toHaveBeenCalledWith(
+        expect.objectContaining({ protocol: 'tcp' })
+      );
+
+      // Response shape echoes the persisted value (verified via mapRowToSchema).
+      expect(result.protocol).toBe('tcp');
+    });
+
+    // Back-compat — omitting protocol must NOT inject 'http' into the
+    // launchMachine call as a positive value. Sending `protocol: undefined` is
+    // fine (JSON.stringify drops it on the wire); sending `protocol: 'http'`
+    // would change the wire format vs pre-INS-271 deploys, which we don't
+    // want until we also rev the cloud-backend's wire-format invariant.
+    it('omitting protocol does not inject a default value into launchMachine', async () => {
+      const serviceId = 'svc-no-proto';
+
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          {
+            id: serviceId,
+            project_id: input.projectId,
+            name: input.name,
+            image_url: input.imageUrl,
+            port: input.port,
+            cpu: input.cpu,
+            memory: input.memory,
+            region: input.region,
+            fly_app_id: null,
+            fly_machine_id: null,
+            status: 'creating',
+            endpoint_url: null,
+            env_vars_encrypted: null,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+      });
+      mockCreateApp.mockResolvedValue({ appId: 'my-api-proj-123' });
+      mockLaunchMachine.mockResolvedValue({ machineId: 'mach-default' });
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          {
+            id: serviceId,
+            project_id: input.projectId,
+            name: input.name,
+            image_url: input.imageUrl,
+            port: input.port,
+            cpu: input.cpu,
+            memory: input.memory,
+            region: input.region,
+            fly_app_id: 'my-api-proj-123',
+            fly_machine_id: 'mach-default',
+            status: 'running',
+            endpoint_url: 'https://my-api-proj-123.fly.dev',
+            env_vars_encrypted: null,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+      });
+
+      await service.createService(input); // input has no `protocol`
+
+      // launchMachine was called; protocol param is undefined (the provider
+      // applies its own default). JSON.stringify drops undefined fields, so
+      // this preserves the pre-INS-271 wire format byte-for-byte.
+      const launchCall = mockLaunchMachine.mock.calls[0][0];
+      expect(launchCall.protocol).toBeUndefined();
+    });
+
     it('passes through structured cloud errors (quota, invalid input, etc.) instead of swallowing as generic 502', async () => {
       // Reproduces the bug found by stress-testing against staging:
       // when the cloud backend returns 403 COMPUTE_QUOTA_EXCEEDED with a clear
@@ -395,6 +530,11 @@ describe('ComputeServicesService', () => {
         cpu: 'shared-1x',
         memory: 256,
         region: 'iad',
+        // mapRowToSchema / snapshot path falls back to 'http' when the row is
+        // missing the column (pre-INS-271 rows backfilled by the 047
+        // migration). The fixture above doesn't set `protocol`, so this is
+        // the back-compat default surfacing.
+        protocol: 'http',
         flyAppId: 'app-del-proj-123',
         flyMachineId: 'machine-del',
         endpointUrl: 'https://app-del-proj-123.fly.dev',
@@ -878,6 +1018,62 @@ describe('ComputeServicesService', () => {
 
       // Final UPDATE must NOT have run — Fly call failed.
       expect(mockQuery.mock.calls.some((c) => String(c[0]).startsWith('UPDATE'))).toBe(false);
+    });
+
+    // INS-271: updateService forwards protocol through to updateMachine on
+    // the redeploy path. Switching http<->tcp swaps the Fly edge handlers
+    // entirely, so the provider has to know.
+    it('forwards protocol: tcp to updateMachine on redeploy', async () => {
+      const deployedRow = {
+        ...baseRow,
+        fly_machine_id: 'mach-existing',
+        status: 'running',
+        protocol: 'http',
+      };
+      mockQuery.mockResolvedValueOnce({ rows: [deployedRow] }); // getService
+      mockQuery.mockResolvedValueOnce({ rows: [{ env_vars_encrypted: null }] }); // hoisted SELECT
+      mockUpdateMachine.mockResolvedValue(undefined);
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ ...deployedRow, protocol: 'tcp' }],
+      });
+
+      await service.updateService('svc-pa-1', { protocol: 'tcp' });
+
+      expect(mockUpdateMachine).toHaveBeenCalledWith(
+        expect.objectContaining({
+          appId: 'my-api-proj-123',
+          machineId: 'mach-existing',
+          protocol: 'tcp',
+        })
+      );
+
+      // SQL UPDATE persists the new protocol value.
+      const updateCall = mockQuery.mock.calls[2];
+      expect(updateCall[0]).toContain('protocol');
+      expect(updateCall[1]).toContain('tcp');
+    });
+
+    // Back-compat — if the caller doesn't pass `protocol`, the persisted value
+    // (from `existing.protocol`) flows through. This is how a port-only update
+    // keeps the existing service's protocol setting.
+    it('preserves existing.protocol when update omits the field', async () => {
+      const deployedRow = {
+        ...baseRow,
+        fly_machine_id: 'mach-existing',
+        status: 'running',
+        protocol: 'tcp',
+      };
+      mockQuery.mockResolvedValueOnce({ rows: [deployedRow] }); // getService
+      mockQuery.mockResolvedValueOnce({ rows: [{ env_vars_encrypted: null }] }); // hoisted SELECT
+      mockUpdateMachine.mockResolvedValue(undefined);
+      mockQuery.mockResolvedValueOnce({ rows: [deployedRow] });
+
+      // Memory-only update — should still forward the existing tcp protocol.
+      await service.updateService('svc-pa-1', { memory: 1024 });
+
+      expect(mockUpdateMachine).toHaveBeenCalledWith(
+        expect.objectContaining({ protocol: 'tcp' })
+      );
     });
 
     it('regression: existing machine + imageUrl takes the redeploy path (updateMachine, no launch, no optimistic lock)', async () => {

@@ -37,6 +37,16 @@ export const createServiceSchema = z.object({
     )
     .optional(),
   region: z.string().default('iad'),
+  /**
+   * Edge protocol. `'http'` (default) is the existing behaviour — Fly terminates
+   * TLS at its anycast edge and proxies HTTP/1.1 + HTTP/2 to the container on
+   * the container's port. `'tcp'` is for raw TCP services (Redis, the Postgres
+   * wire protocol, custom binary protocols) — Fly exposes the container's port
+   * directly with empty L7 handlers so bytes flow end-to-end without HTTP
+   * inspection. Optional and back-compat: omitting the field is identical to
+   * sending `'http'` at every fallback site downstream.
+   */
+  protocol: z.enum(['http', 'tcp']).optional(),
 });
 
 export const updateServiceSchema = z
@@ -94,6 +104,11 @@ export const updateServiceSchema = z
       })
       .optional(),
     region: z.string().optional(),
+    /**
+     * Edge protocol — same semantics as createServiceSchema.protocol. Optional
+     * on update; omitting it leaves the existing service's protocol in place.
+     */
+    protocol: z.enum(['http', 'tcp']).optional(),
   })
   .refine((data) => !(data.envVars !== undefined && data.envVarsPatch !== undefined), {
     message:

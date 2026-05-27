@@ -10,6 +10,13 @@ export interface LaunchMachineParams {
   memory: number;
   envVars: Record<string, string>;
   region: string;
+  /**
+   * Edge protocol. `'http'` (default) terminates TLS at the Fly anycast edge
+   * and proxies HTTP/1.1+HTTP/2 to the container. `'tcp'` exposes the container's
+   * port directly with empty handlers — for Redis, Postgres-protocol, and other
+   * raw TCP services. Omitting the field is identical to `'http'`.
+   */
+  protocol?: 'http' | 'tcp';
 }
 
 export interface UpdateMachineParams {
@@ -24,6 +31,11 @@ export interface UpdateMachineParams {
   cpu: string;
   memory: number;
   envVars: Record<string, string>;
+  /**
+   * Edge protocol — same semantics as LaunchMachineParams.protocol. Omit
+   * for back-compat HTTP behavior.
+   */
+  protocol?: 'http' | 'tcp';
 }
 
 export interface MachineSummary {
