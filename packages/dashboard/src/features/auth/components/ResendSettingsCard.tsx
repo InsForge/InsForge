@@ -5,6 +5,10 @@ import { Button, Input, Switch } from '@insforge/ui';
 import { z } from 'zod';
 import { type ResendConfigSchema, type UpsertResendConfigRequest } from '@insforge/shared-schemas';
 
+// Mirrors the resendApiKeySchema in @insforge/shared-schemas. Kept inline so
+// the form can surface a field-level error before the request reaches the API.
+const RESEND_API_KEY_PATTERN = /^re_[A-Za-z0-9_]{8,}$/;
+
 const resendFormSchema = z
   .object({
     enabled: z.boolean(),
@@ -28,6 +32,15 @@ const resendFormSchema = z
         code: z.ZodIssueCode.custom,
         message: 'Sender name is required',
         path: ['senderName'],
+      });
+    }
+    // Validate apiKey shape only when the admin actually typed a key.
+    // Leaving the field blank to keep the previously-saved key is fine.
+    if (data.apiKey && !RESEND_API_KEY_PATTERN.test(data.apiKey)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'API key must start with "re_" followed by 8+ alphanumeric characters',
+        path: ['apiKey'],
       });
     }
   });

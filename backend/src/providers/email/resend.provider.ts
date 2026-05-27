@@ -26,8 +26,21 @@ function formatFromAddress(name: string, email: string): string {
 }
 
 export class ResendEmailProvider implements EmailProvider {
+  // Memoize the Resend client so repeated sends with the same API key reuse
+  // the underlying HTTPS connection (TLS keep-alive). Invalidates automatically
+  // when the admin rotates the key — next send sees a different apiKey and
+  // gets a fresh client.
+  private clientCache: { apiKey: string; client: Resend } | null = null;
+
   supportsTemplates(): boolean {
     return true;
+  }
+
+  private getClient(apiKey: string): Resend {
+    if (this.clientCache?.apiKey !== apiKey) {
+      this.clientCache = { apiKey, client: new Resend(apiKey) };
+    }
+    return this.clientCache.client;
   }
 
   private renderTemplate(
@@ -76,7 +89,7 @@ export class ResendEmailProvider implements EmailProvider {
     },
     logContext: Record<string, unknown>
   ): Promise<void> {
-    const resend = new Resend(config.apiKey);
+    const resend = this.getClient(config.apiKey);
     const from = formatFromAddress(config.senderName, config.senderEmail);
 
     const { data, error } = await resend.emails.send({
