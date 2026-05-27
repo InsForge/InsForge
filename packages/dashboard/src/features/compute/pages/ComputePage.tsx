@@ -234,8 +234,9 @@ export default function ComputePage() {
                     )}
                     {reachableUrl && !reachableUrl.href && (
                       <p className="text-xs text-muted-foreground mt-1">
-                        Raw TCP service. Connect with your protocol's native client (e.g.{' '}
-                        <code className="font-mono">redis-cli -h &lt;host&gt; -p &lt;port&gt;</code>).
+                        Raw TCP service. Connect with the protocol&apos;s native client (e.g.{' '}
+                        <code className="font-mono">redis-cli -h &lt;host&gt; -p &lt;port&gt;</code>
+                        ).
                       </p>
                     )}
                   </dd>

@@ -90,8 +90,8 @@ export function ServiceCard({ service, onClick, onStop, onStart, onDelete }: Ser
         {service.imageUrl === 'dockerfile' ? 'Built from Dockerfile' : service.imageUrl}
       </p>
 
-      {reachableUrl && (
-        reachableUrl.href ? (
+      {reachableUrl &&
+        (reachableUrl.href ? (
           <a
             href={reachableUrl.href}
             target="_blank"
@@ -110,8 +110,7 @@ export function ServiceCard({ service, onClick, onStop, onStart, onDelete }: Ser
           >
             {reachableUrl.display}
           </code>
-        )
-      )}
+        ))}
 
       <div className="flex items-center gap-3 text-xs text-muted-foreground pt-2 border-t border-[var(--alpha-8)]">
         <span>CPU: {service.cpu}</span>
