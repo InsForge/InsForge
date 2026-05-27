@@ -9,9 +9,14 @@ import { EmailTemplate } from '@/types/email.js';
 import logger from '@/utils/logger.js';
 import { ERROR_CODES, SendRawEmailRequest } from '@insforge/shared-schemas';
 
+// Default per-recipient throttle for providers without a configurable interval
+// (Resend, Cloud). SMTP uses its own configured minIntervalSeconds.
+const DEFAULT_MIN_INTERVAL_SECONDS = 60;
+
 interface ResolvedProvider {
   provider: EmailProvider;
   smtpConfig: RawSmtpConfig | null;
+  minIntervalSeconds: number;
 }
 
 /**
@@ -40,16 +45,26 @@ export class EmailService {
     // Resend takes priority — simplest setup (just API key)
     const resendConfig = await ResendConfigService.getInstance().getRawResendConfig();
     if (resendConfig) {
-      return { provider: this.resendProvider, smtpConfig: null };
+      return {
+        provider: this.resendProvider,
+        smtpConfig: null,
+        minIntervalSeconds: DEFAULT_MIN_INTERVAL_SECONDS,
+      };
     }
 
     // SMTP fallback
     const smtpConfig = await SmtpConfigService.getInstance().getRawSmtpConfig();
     if (smtpConfig) {
-      return { provider: this.smtpProvider, smtpConfig };
+      return {
+        provider: this.smtpProvider,
+        smtpConfig,
+        minIntervalSeconds: smtpConfig.minIntervalSeconds,
+      };
     }
 
-    return { provider: this.cloudProvider, smtpConfig: null };
+    // Cloud — preserves the long-standing behavior of no app-level throttle
+    // (cloud has provider-side rate limiting).
+    return { provider: this.cloudProvider, smtpConfig: null, minIntervalSeconds: 0 };
   }
 
   // -------------------------------------------------------------------------
@@ -75,6 +90,9 @@ export class EmailService {
   }
 
   private recordEmailSent(email: string, minIntervalSeconds: number): void {
+    if (minIntervalSeconds <= 0) {
+      return;
+    }
     this.lastEmailSentAt.set(email, Date.now());
 
     // Prune stale entries to prevent unbounded memory growth
@@ -98,28 +116,22 @@ export class EmailService {
     template: EmailTemplate,
     variables?: Record<string, string>
   ): Promise<void> {
-    const { provider, smtpConfig } = await this.resolveProvider();
+    const { provider, minIntervalSeconds } = await this.resolveProvider();
 
-    if (smtpConfig) {
-      this.checkMinInterval(email, smtpConfig.minIntervalSeconds);
-    }
+    this.checkMinInterval(email, minIntervalSeconds);
 
     await provider.sendWithTemplate(email, name, template, variables);
 
-    if (smtpConfig) {
-      this.recordEmailSent(email, smtpConfig.minIntervalSeconds);
-    }
+    this.recordEmailSent(email, minIntervalSeconds);
   }
 
   public async sendRaw(options: SendRawEmailRequest): Promise<void> {
-    const { provider, smtpConfig } = await this.resolveProvider();
+    const { provider, minIntervalSeconds } = await this.resolveProvider();
 
     const recipients = Array.isArray(options.to) ? options.to : [options.to];
 
-    if (smtpConfig) {
-      for (const recipient of recipients) {
-        this.checkMinInterval(recipient, smtpConfig.minIntervalSeconds);
-      }
+    for (const recipient of recipients) {
+      this.checkMinInterval(recipient, minIntervalSeconds);
     }
 
     if (!provider.sendRaw) {
@@ -127,10 +139,8 @@ export class EmailService {
     }
     await provider.sendRaw(options);
 
-    if (smtpConfig) {
-      for (const recipient of recipients) {
-        this.recordEmailSent(recipient, smtpConfig.minIntervalSeconds);
-      }
+    for (const recipient of recipients) {
+      this.recordEmailSent(recipient, minIntervalSeconds);
     }
   }
 }
