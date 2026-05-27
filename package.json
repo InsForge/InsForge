@@ -59,7 +59,7 @@
   "license": "Apache-2.0",
   "overrides": {
     "express": "^4.22.0",
-    "undici": "^6.24.0",
+    "undici": "^7.24.0",
     "fast-xml-parser": "^5.7.0",
     "handlebars": "^4.7.9",
     "path-to-regexp": "0.1.13",
