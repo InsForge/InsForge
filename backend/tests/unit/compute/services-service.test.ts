@@ -301,9 +301,7 @@ describe('ComputeServicesService', () => {
 
       // launchMachine must receive protocol: 'tcp' so the provider can pick
       // raw-TCP edge handlers instead of HTTP.
-      expect(mockLaunchMachine).toHaveBeenCalledWith(
-        expect.objectContaining({ protocol: 'tcp' })
-      );
+      expect(mockLaunchMachine).toHaveBeenCalledWith(expect.objectContaining({ protocol: 'tcp' }));
 
       // Response shape echoes the persisted value (verified via mapRowToSchema).
       expect(result.protocol).toBe('tcp');
@@ -1071,9 +1069,7 @@ describe('ComputeServicesService', () => {
       // Memory-only update — should still forward the existing tcp protocol.
       await service.updateService('svc-pa-1', { memory: 1024 });
 
-      expect(mockUpdateMachine).toHaveBeenCalledWith(
-        expect.objectContaining({ protocol: 'tcp' })
-      );
+      expect(mockUpdateMachine).toHaveBeenCalledWith(expect.objectContaining({ protocol: 'tcp' }));
     });
 
     it('regression: existing machine + imageUrl takes the redeploy path (updateMachine, no launch, no optimistic lock)', async () => {
