@@ -80,12 +80,6 @@ describe('internal runtime defaults migration', () => {
     expect(sql).not.toMatch(/WHERE\s+polrelid\s+=\s+'auth\.users'::regclass/i);
   });
 
-  it('keeps project_admin auth schema access explicit', () => {
-    const sql = readMigration();
-
-    expect(sql).toMatch(/GRANT\s+USAGE\s+ON\s+SCHEMA\s+auth\s+TO\s+project_admin/i);
-  });
-
   it('does not change auth helper function grants', () => {
     const sql = readMigration();
 

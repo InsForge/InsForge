@@ -84,11 +84,6 @@ BEGIN
     END IF;
   END IF;
 
-  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'project_admin')
-     AND EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'auth') THEN
-    GRANT USAGE ON SCHEMA auth TO project_admin;
-  END IF;
-
   IF to_regclass('storage.objects') IS NOT NULL
      AND NOT EXISTS (
        SELECT 1
