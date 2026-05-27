@@ -6,12 +6,25 @@
 -- the container's port is exposed directly with empty L7 handlers so bytes
 -- flow end-to-end without HTTP inspection.
 --
--- Two-step pattern (ADD with default, then NOT NULL) so existing rows get
--- backfilled to 'http' without a separate UPDATE. Safe on Postgres 11+ —
--- ADD COLUMN ... NOT NULL DEFAULT rewrites in O(1) since PG 11.
+-- Idempotent four-step pattern so re-running the migration on a database
+-- that already has the column (from a partial prior run or a hot-fix) still
+-- ends with the column NOT NULL + DEFAULT 'http' applied. `ADD COLUMN IF NOT
+-- EXISTS protocol TEXT NOT NULL DEFAULT 'http'` does not apply the constraints
+-- when the column already exists — only when it creates it — so we split.
 
 ALTER TABLE compute.services
-  ADD COLUMN IF NOT EXISTS protocol TEXT NOT NULL DEFAULT 'http';
+  ADD COLUMN IF NOT EXISTS protocol TEXT;
+
+-- Backfill any rows where protocol is NULL (only possible if the column
+-- pre-existed without our DEFAULT). The NOT NULL constraint at the end
+-- would otherwise fail.
+UPDATE compute.services SET protocol = 'http' WHERE protocol IS NULL;
+
+ALTER TABLE compute.services
+  ALTER COLUMN protocol SET DEFAULT 'http';
+
+ALTER TABLE compute.services
+  ALTER COLUMN protocol SET NOT NULL;
 
 -- CHECK constraint isolated from the ADD so re-running the migration on a
 -- DB that already has the column (but not the constraint) still applies it.
