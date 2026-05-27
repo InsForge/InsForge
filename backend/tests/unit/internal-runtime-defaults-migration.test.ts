@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const migrationDir = path.resolve(currentDir, '../../src/infra/database/migrations');
-const migrationFile = '047_harden_internal_runtime_defaults.sql';
+const migrationFile = '047_harden-internal-runtime-defaults.sql';
 const migrationPath = path.resolve(migrationDir, migrationFile);
 
 function readMigration(): string {
@@ -30,10 +30,19 @@ describe('internal runtime defaults migration', () => {
     const sql = readMigration();
 
     expect(sql).toMatch(
+      /EXISTS\s+\(\s*SELECT\s+1\s+FROM\s+pg_namespace\s+WHERE\s+nspname\s+=\s+'auth'/i
+    );
+    expect(sql).toMatch(
       /REVOKE\s+ALL\s+PRIVILEGES\s+ON\s+ALL\s+TABLES\s+IN\s+SCHEMA\s+auth\s+FROM\s+PUBLIC,\s*anon,\s*authenticated/i
     );
     expect(sql).toMatch(
+      /EXISTS\s+\(\s*SELECT\s+1\s+FROM\s+pg_namespace\s+WHERE\s+nspname\s+=\s+'system'/i
+    );
+    expect(sql).toMatch(
       /REVOKE\s+ALL\s+PRIVILEGES\s+ON\s+ALL\s+TABLES\s+IN\s+SCHEMA\s+system\s+FROM\s+anon,\s*authenticated/i
+    );
+    expect(sql).toMatch(
+      /EXISTS\s+\(\s*SELECT\s+1\s+FROM\s+pg_namespace\s+WHERE\s+nspname\s+=\s+'functions'/i
     );
     expect(sql).toMatch(
       /REVOKE\s+ALL\s+PRIVILEGES\s+ON\s+ALL\s+TABLES\s+IN\s+SCHEMA\s+functions\s+FROM\s+anon,\s*authenticated/i
@@ -43,6 +52,7 @@ describe('internal runtime defaults migration', () => {
   it('removes direct runtime-role auth schema and profile grants', () => {
     const sql = readMigration();
 
+    expect(sql).toMatch(/to_regclass\('auth\.users'\)\s+IS\s+NOT\s+NULL/i);
     expect(sql).toMatch(
       /REVOKE\s+USAGE\s+ON\s+SCHEMA\s+auth\s+FROM\s+PUBLIC,\s*anon,\s*authenticated/i
     );
@@ -67,6 +77,13 @@ describe('internal runtime defaults migration', () => {
       /DROP\s+POLICY\s+IF\s+EXISTS\s+"Users can update own profile"\s+ON\s+auth\.users/i
     );
     expect(sql).toMatch(/ALTER\s+TABLE\s+auth\.users\s+DISABLE\s+ROW\s+LEVEL\s+SECURITY/i);
+    expect(sql).not.toMatch(/WHERE\s+polrelid\s+=\s+'auth\.users'::regclass/i);
+  });
+
+  it('keeps project_admin auth schema access explicit', () => {
+    const sql = readMigration();
+
+    expect(sql).toMatch(/GRANT\s+USAGE\s+ON\s+SCHEMA\s+auth\s+TO\s+project_admin/i);
   });
 
   it('does not change auth helper function grants', () => {
@@ -80,14 +97,45 @@ describe('internal runtime defaults migration', () => {
     const sql = readMigration();
 
     expect(sql).toMatch(/REVOKE\s+USAGE\s+ON\s+SCHEMA\s+storage\s+FROM\s+anon/i);
-    expect(sql).toMatch(
-      /REVOKE\s+ALL\s+PRIVILEGES\s+ON\s+TABLE\s+storage\.objects\s+FROM\s+anon/i
-    );
-    expect(sql).toMatch(
-      /REVOKE\s+ALL\s+PRIVILEGES\s+ON\s+TABLE\s+storage\.buckets\s+FROM\s+anon/i
-    );
+    expect(sql).toMatch(/REVOKE\s+ALL\s+PRIVILEGES\s+ON\s+TABLE\s+storage\.objects\s+FROM\s+anon/i);
+    expect(sql).toMatch(/REVOKE\s+ALL\s+PRIVILEGES\s+ON\s+TABLE\s+storage\.buckets\s+FROM\s+anon/i);
     expect(sql).not.toMatch(
       /REVOKE\s+ALL\s+PRIVILEGES\s+ON\s+TABLE\s+storage\.objects\s+FROM\s+authenticated/i
+    );
+  });
+
+  it('keeps public schema existing and future data grants for runtime roles', () => {
+    const sql = readMigration();
+
+    expect(sql).toMatch(/GRANT\s+USAGE\s+ON\s+SCHEMA\s+public\s+TO\s+anon,\s*authenticated/i);
+    expect(sql).toMatch(
+      /GRANT\s+SELECT,\s*INSERT,\s*UPDATE,\s*DELETE\s+ON\s+ALL\s+TABLES\s+IN\s+SCHEMA\s+public\s+TO\s+anon,\s*authenticated/i
+    );
+    expect(sql).toMatch(
+      /GRANT\s+USAGE,\s*SELECT\s+ON\s+ALL\s+SEQUENCES\s+IN\s+SCHEMA\s+public\s+TO\s+anon,\s*authenticated/i
+    );
+    expect(sql).toMatch(
+      /ALTER\s+DEFAULT\s+PRIVILEGES\s+IN\s+SCHEMA\s+public\s+GRANT\s+SELECT,\s*INSERT,\s*UPDATE,\s*DELETE\s+ON\s+TABLES\s+TO\s+anon,\s*authenticated/i
+    );
+    expect(sql).toMatch(
+      /ALTER\s+DEFAULT\s+PRIVILEGES\s+IN\s+SCHEMA\s+public\s+GRANT\s+USAGE,\s*SELECT\s+ON\s+SEQUENCES\s+TO\s+anon,\s*authenticated/i
+    );
+    expect(sql).toMatch(
+      /ALTER\s+DEFAULT\s+PRIVILEGES\s+FOR\s+ROLE\s+project_admin\s+IN\s+SCHEMA\s+public\s+GRANT\s+SELECT,\s*INSERT,\s*UPDATE,\s*DELETE\s+ON\s+TABLES\s+TO\s+anon,\s*authenticated/i
+    );
+    expect(sql).toMatch(
+      /ALTER\s+DEFAULT\s+PRIVILEGES\s+FOR\s+ROLE\s+project_admin\s+IN\s+SCHEMA\s+public\s+GRANT\s+USAGE,\s*SELECT\s+ON\s+SEQUENCES\s+TO\s+anon,\s*authenticated/i
+    );
+    expect(sql).not.toMatch(
+      /GRANT\s+(?:REFERENCES|TRIGGER|TRUNCATE)[\s\S]*?TO\s+anon,\s*authenticated/i
+    );
+    expect(sql).not.toMatch(/CREATE\s+EVENT\s+TRIGGER/i);
+    expect(sql).not.toMatch(/RETURNS\s+event_trigger/i);
+    expect(sql).not.toMatch(
+      /REVOKE[\s\S]*?(?:ON\s+SCHEMA\s+public|IN\s+SCHEMA\s+public)[\s\S]*?FROM\s+anon/i
+    );
+    expect(sql).not.toMatch(
+      /REVOKE[\s\S]*?(?:ON\s+SCHEMA\s+public|IN\s+SCHEMA\s+public)[\s\S]*?FROM\s+authenticated/i
     );
   });
 
@@ -95,7 +143,10 @@ describe('internal runtime defaults migration', () => {
     const sql = readMigration();
 
     expect(sql).toMatch(/to_regclass\('storage\.objects'\)\s+IS\s+NOT\s+NULL/i);
-    expect(sql).toMatch(/NOT\s+EXISTS\s+\(\s*SELECT\s+1\s+FROM\s+storage\.buckets\s+LIMIT\s+1\s*\)/i);
+    expect(sql).toMatch(/to_regclass\('storage\.buckets'\)\s+IS\s+NULL/i);
+    expect(sql).toMatch(
+      /ELSIF\s+NOT\s+EXISTS\s+\(\s*SELECT\s+1\s+FROM\s+storage\.buckets\s+LIMIT\s+1\s*\)/i
+    );
     expect(sql).toMatch(/NOT\s+EXISTS\s+\(\s*SELECT\s+1\s+FROM\s+pg_policy/i);
     expect(sql).toMatch(/ALTER\s+TABLE\s+storage\.objects\s+DISABLE\s+ROW\s+LEVEL\s+SECURITY/i);
   });
