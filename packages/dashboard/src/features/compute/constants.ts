@@ -49,7 +49,9 @@ export interface ServiceEndpoint {
 }
 
 export function getReachableUrl(service: ServiceSchema): ServiceEndpoint | null {
-  if (!service.endpointUrl) return null;
+  if (!service.endpointUrl) {
+    return null;
+  }
   if (service.protocol === 'tcp') {
     const host = service.endpointUrl.replace(/^https?:\/\//, '');
     return { display: `${host}:${service.port}`, href: null };
