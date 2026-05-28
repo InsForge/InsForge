@@ -27,7 +27,9 @@ export function validateRazorpayKey(environment: RazorpayEnvironment, keyId: str
 }
 
 export function maskRazorpayKey(key: string): string {
-  if (key.length <= 8) return '****';
+  if (key.length <= 8) {
+    return '****';
+  }
   const prefix = key.startsWith('rzp_test_')
     ? 'rzp_test_'
     : key.startsWith('rzp_live_')
@@ -88,7 +90,16 @@ export interface RazorpaySubscription {
   entity: string;
   plan_id: string;
   customer_id: string | null;
-  status: 'created' | 'authenticated' | 'active' | 'pending' | 'halted' | 'cancelled' | 'completed' | 'expired' | 'paused';
+  status:
+    | 'created'
+    | 'authenticated'
+    | 'active'
+    | 'pending'
+    | 'halted'
+    | 'cancelled'
+    | 'completed'
+    | 'expired'
+    | 'paused';
   current_start: number | null;
   current_end: number | null;
   ended_at: number | null;
@@ -213,10 +224,7 @@ export class RazorpayProvider {
    * Razorpay signs webhooks using HMAC-SHA256 of the raw body.
    */
   verifyWebhookSignature(rawBody: string, signature: string, webhookSecret: string): boolean {
-    const expected = crypto
-      .createHmac('sha256', webhookSecret)
-      .update(rawBody)
-      .digest('hex');
+    const expected = crypto.createHmac('sha256', webhookSecret).update(rawBody).digest('hex');
     return crypto.timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(signature, 'hex'));
   }
 
@@ -225,27 +233,29 @@ export class RazorpayProvider {
    * Razorpay does not have a dedicated "retrieve account" endpoint in the OSS SDK,
    * so we use a lightweight probe — list plans with limit=1.
    */
-  async retrieveAccount(): Promise<RazorpayAccountInfo> {
+  retrieveAccount(): Promise<RazorpayAccountInfo> {
     // Razorpay key ID encodes the environment implicitly (rzp_test_ / rzp_live_)
-    return {
+    return Promise.resolve({
       id: this.keyId,
       merchantName: null, // requires dashboard API not available in OSS SDK
       livemode: this.environment === 'live',
-    };
+    });
   }
 
   async listPlans(): Promise<RazorpayPlan[]> {
-    const response = await this.client.plans.all({ count: 100 }) as { items: RazorpayPlan[] };
+    const response = (await this.client.plans.all({ count: 100 })) as { items: RazorpayPlan[] };
     return response.items ?? [];
   }
 
   async listItems(): Promise<RazorpayItem[]> {
-    const response = await this.client.items.all({ count: 100 }) as { items: RazorpayItem[] };
+    const response = (await this.client.items.all({ count: 100 })) as { items: RazorpayItem[] };
     return response.items ?? [];
   }
 
   async listCustomers(): Promise<RazorpayCustomer[]> {
-    const response = await this.client.customers.all({ count: 100 }) as { items: RazorpayCustomer[] };
+    const response = (await this.client.customers.all({ count: 100 })) as {
+      items: RazorpayCustomer[];
+    };
     return response.items ?? [];
   }
 
@@ -256,10 +266,15 @@ export class RazorpayProvider {
 
     // Paginate — Razorpay returns max 100 per call
     while (true) {
-      const response = await this.client.subscriptions.all({ count, skip }) as { items: RazorpaySubscription[]; count: number };
+      const response = (await this.client.subscriptions.all({ count, skip })) as {
+        items: RazorpaySubscription[];
+        count: number;
+      };
       const items = response.items ?? [];
       all.push(...items);
-      if (items.length < count) break;
+      if (items.length < count) {
+        break;
+      }
       skip += count;
     }
 
@@ -272,10 +287,15 @@ export class RazorpayProvider {
     const count = 100;
 
     while (true) {
-      const response = await this.client.payments.all({ count, skip }) as { items: RazorpayPayment[]; count: number };
+      const response = (await this.client.payments.all({ count, skip })) as {
+        items: RazorpayPayment[];
+        count: number;
+      };
       const items = response.items ?? [];
       all.push(...items);
-      if (items.length < count) break;
+      if (items.length < count) {
+        break;
+      }
       skip += count;
     }
 
@@ -288,10 +308,15 @@ export class RazorpayProvider {
     const count = 100;
 
     while (true) {
-      const response = await this.client.invoices.all({ count, skip }) as { items: RazorpayInvoice[]; count: number };
+      const response = (await this.client.invoices.all({ count, skip })) as {
+        items: RazorpayInvoice[];
+        count: number;
+      };
       const items = response.items ?? [];
       all.push(...items);
-      if (items.length < count) break;
+      if (items.length < count) {
+        break;
+      }
       skip += count;
     }
 
@@ -305,10 +330,18 @@ export class RazorpayProvider {
     notes?: Record<string, string>;
   }): Promise<RazorpayCustomer> {
     const params: Record<string, unknown> = {};
-    if (input.name) params.name = input.name;
-    if (input.email) params.email = input.email;
-    if (input.contact) params.contact = input.contact;
-    if (input.notes) params.notes = input.notes;
+    if (input.name) {
+      params.name = input.name;
+    }
+    if (input.email) {
+      params.email = input.email;
+    }
+    if (input.contact) {
+      params.contact = input.contact;
+    }
+    if (input.notes) {
+      params.notes = input.notes;
+    }
     return this.client.customers.create(params) as Promise<RazorpayCustomer>;
   }
 
@@ -324,8 +357,7 @@ export class RazorpayProvider {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization:
-          'Basic ' + Buffer.from(`${this.keyId}:${this.keySecret}`).toString('base64'),
+        Authorization: 'Basic ' + Buffer.from(`${this.keyId}:${this.keySecret}`).toString('base64'),
       },
       body: JSON.stringify({
         url: input.url,
@@ -343,7 +375,11 @@ export class RazorpayProvider {
     return response.json() as Promise<RazorpayWebhookEndpointCreateResult>;
   }
 
-  async syncCatalog(): Promise<{ account: RazorpayAccountInfo; plans: RazorpayPlan[]; items: RazorpayItem[] }> {
+  async syncCatalog(): Promise<{
+    account: RazorpayAccountInfo;
+    plans: RazorpayPlan[];
+    items: RazorpayItem[];
+  }> {
     const [account, plans, items] = await Promise.all([
       this.retrieveAccount(),
       this.listPlans(),

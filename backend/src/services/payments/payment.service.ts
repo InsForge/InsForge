@@ -178,7 +178,7 @@ export class PaymentService {
       this.configService.getStatus(),
       this.razorpayConfigService.getRazorpayStatus(),
     ]);
-    
+
     return {
       connections: stripeStatus.connections,
       razorpayConnections: razorpayStatus,

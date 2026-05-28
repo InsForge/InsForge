@@ -9,8 +9,7 @@ import type {
   RazorpaySubscription,
   RazorpayPayment,
 } from '@/providers/payments/razorpay.provider.js';
-import type { RazorpayEnvironment } from '@/types/payments.js';
-import { RAZORPAY_ENVIRONMENTS } from '@/types/payments.js';
+import { RAZORPAY_ENVIRONMENTS, type RazorpayEnvironment } from '@/types/payments.js';
 import logger from '@/utils/logger.js';
 
 export interface RazorpaySyncResult {
@@ -48,8 +47,7 @@ export class RazorpaySyncService {
    * Pulls Plans → products, Items → prices, Customers, Subscriptions, Payments.
    */
   async syncAll(environmentInput: RazorpayEnvironment | 'all'): Promise<RazorpaySyncResult[]> {
-    const environments =
-      environmentInput === 'all' ? RAZORPAY_ENVIRONMENTS : [environmentInput];
+    const environments = environmentInput === 'all' ? RAZORPAY_ENVIRONMENTS : [environmentInput];
 
     const results: RazorpaySyncResult[] = [];
 
@@ -207,11 +205,11 @@ export class RazorpaySyncService {
            updated_at = NOW()`,
         [
           environment,
-          plan.id,                           // plan_xxxxx stored as stripe_product_id
+          plan.id, // plan_xxxxx stored as stripe_product_id
           plan.item.name,
           plan.item.description ?? null,
           plan.item.active !== false,
-          plan.item.id,                      // item_xxxxx as default_price_id
+          plan.item.id, // item_xxxxx as default_price_id
           plan.notes ?? {},
           plan,
         ]
@@ -271,18 +269,18 @@ export class RazorpaySyncService {
            updated_at = NOW()`,
         [
           environment,
-          item.id,                                   // item_xxxxx stored as stripe_price_id
-          plan?.id ?? null,                           // plan_xxxxx links to the product
+          item.id, // item_xxxxx stored as stripe_price_id
+          plan?.id ?? null, // plan_xxxxx links to the product
           item.active !== false,
           item.currency.toLowerCase(),
-          item.amount,                               // Razorpay amounts are in paise/cents
+          item.amount, // Razorpay amounts are in paise/cents
           item.amount?.toString() ?? null,
           plan ? 'recurring' : 'one_time',
-          null,                                      // no lookup_key in Razorpay
+          null, // no lookup_key in Razorpay
           'per_unit',
-          null,                                      // no tax_behavior in Razorpay
-          plan?.period ?? null,                       // 'daily', 'weekly', 'monthly', 'yearly'
-          plan?.interval ?? null,                     // e.g. 1 means every 1 month
+          null, // no tax_behavior in Razorpay
+          plan?.period ?? null, // 'daily', 'weekly', 'monthly', 'yearly'
+          plan?.interval ?? null, // e.g. 1 means every 1 month
           {},
           item,
         ]
@@ -360,9 +358,7 @@ export class RazorpaySyncService {
       await client.query('BEGIN');
 
       for (const customer of customers) {
-        const createdAt = customer.created_at
-          ? new Date(customer.created_at * 1000)
-          : null;
+        const createdAt = customer.created_at ? new Date(customer.created_at * 1000) : null;
 
         await client.query(
           `INSERT INTO payments.customers (
@@ -390,7 +386,7 @@ export class RazorpaySyncService {
              updated_at = NOW()`,
           [
             environment,
-            customer.id,                              // cust_xxxxx stored as stripe_customer_id
+            customer.id, // cust_xxxxx stored as stripe_customer_id
             customer.email ?? null,
             customer.name ?? null,
             customer.contact ?? null,
@@ -462,7 +458,7 @@ export class RazorpaySyncService {
              updated_at = NOW()`,
           [
             environment,
-            sub.id,                                                       // sub_xxxxx
+            sub.id, // sub_xxxxx
             sub.customer_id ?? null,
             status,
             sub.current_start ? new Date(sub.current_start * 1000) : null,
@@ -470,7 +466,7 @@ export class RazorpaySyncService {
             sub.status === 'cancelled' || sub.end_at !== null,
             sub.end_at ? new Date(sub.end_at * 1000) : null,
             sub.ended_at ? new Date(sub.ended_at * 1000) : null,
-            null,                                                         // latest_invoice_id (not directly in sub)
+            null, // latest_invoice_id (not directly in sub)
             sub.notes ?? {},
             sub,
           ]
@@ -500,10 +496,10 @@ export class RazorpaySyncService {
                updated_at = NOW()`,
             [
               environment,
-              `${sub.id}_${plan.id}`,                   // synthetic subscription item ID
+              `${sub.id}_${plan.id}`, // synthetic subscription item ID
               sub.id,
-              plan.id,                                   // plan_xxxxx → product
-              plan.item.id,                              // item_xxxxx → price
+              plan.id, // plan_xxxxx → product
+              plan.item.id, // item_xxxxx → price
               sub.quantity ?? 1,
               sub.notes ?? {},
               sub,
@@ -554,13 +550,9 @@ export class RazorpaySyncService {
       for (const payment of payments) {
         const status = this.mapRazorpayPaymentStatus(payment.status);
         const paidAt =
-          status === 'succeeded' && payment.created_at
-            ? new Date(payment.created_at * 1000)
-            : null;
+          status === 'succeeded' && payment.created_at ? new Date(payment.created_at * 1000) : null;
         const failedAt =
-          status === 'failed' && payment.created_at
-            ? new Date(payment.created_at * 1000)
-            : null;
+          status === 'failed' && payment.created_at ? new Date(payment.created_at * 1000) : null;
         const refundedAt =
           (status === 'refunded' || status === 'partially_refunded') && payment.created_at
             ? new Date(payment.created_at * 1000)
@@ -614,9 +606,9 @@ export class RazorpaySyncService {
             status,
             payment.customer_id ?? null,
             payment.email ?? null,
-            payment.id,                                  // pay_xxxxx stored as stripe_payment_intent_id
+            payment.id, // pay_xxxxx stored as stripe_payment_intent_id
             payment.invoice_id ?? null,
-            payment.order_id ?? null,                     // order_xxxxx stored as stripe_charge_id
+            payment.order_id ?? null, // order_xxxxx stored as stripe_charge_id
             payment.amount,
             payment.amount_refunded ?? 0,
             payment.currency.toLowerCase(),
@@ -641,9 +633,7 @@ export class RazorpaySyncService {
 
   // ─── Status mapping helpers ───────────────────────────────────────────────
 
-  private mapRazorpaySubscriptionStatus(
-    rzpStatus: RazorpaySubscription['status']
-  ): string {
+  private mapRazorpaySubscriptionStatus(rzpStatus: RazorpaySubscription['status']): string {
     switch (rzpStatus) {
       case 'active':
         return 'active';

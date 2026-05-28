@@ -1,8 +1,6 @@
 import { Settings, CreditCard } from 'lucide-react';
 import { Button } from '@insforge/ui';
 import type { StripeEnvironment } from '@insforge/shared-schemas';
-import StripeWordmark from '#assets/logos/stripe-wordmark.svg';
-
 const STRIPE_KEY_NAMES: Record<StripeEnvironment, string> = {
   test: 'STRIPE_TEST_SECRET_KEY',
   live: 'STRIPE_LIVE_SECRET_KEY',
@@ -41,7 +39,8 @@ export function PaymentsKeyMissingState({
             Configure a Payment Provider
           </h2>
           <p className="max-w-[400px] text-sm leading-5 text-muted-foreground">
-            To view {environment} {resourceLabel}, you need to configure either Stripe or Razorpay API keys.
+            To view {environment} {resourceLabel}, you need to configure either Stripe or Razorpay
+            API keys.
           </p>
         </div>
 
@@ -55,19 +54,10 @@ export function PaymentsKeyMissingState({
               </div>
             </div>
             <div className="flex w-full flex-col items-center gap-1">
-              <h3 className="text-sm font-medium text-foreground">
-                Stripe {modeLabel} Keys
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                Add {stripeKeyName}
-              </p>
+              <h3 className="text-sm font-medium text-foreground">Stripe {modeLabel} Keys</h3>
+              <p className="text-xs text-muted-foreground">Add {stripeKeyName}</p>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onConfigure}
-              className="mt-2 w-full"
-            >
+            <Button variant="outline" size="sm" onClick={onConfigure} className="mt-2 w-full">
               <Settings className="mr-2 h-4 w-4" />
               Configure Stripe
             </Button>
@@ -82,19 +72,10 @@ export function PaymentsKeyMissingState({
               </div>
             </div>
             <div className="flex w-full flex-col items-center gap-1">
-              <h3 className="text-sm font-medium text-foreground">
-                Razorpay {modeLabel} Keys
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                Add {razorpayKeyName}
-              </p>
+              <h3 className="text-sm font-medium text-foreground">Razorpay {modeLabel} Keys</h3>
+              <p className="text-xs text-muted-foreground">Add {razorpayKeyName}</p>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onConfigure}
-              className="mt-2 w-full"
-            >
+            <Button variant="outline" size="sm" onClick={onConfigure} className="mt-2 w-full">
               <Settings className="mr-2 h-4 w-4" />
               Configure Razorpay
             </Button>

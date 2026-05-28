@@ -1,6 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { RazorpayEnvironment } from '@insforge/shared-schemas';
-import { razorpayService, type SyncRazorpayPaymentsRequest, type SyncRazorpayPaymentsResponse } from '#features/payments/services/razorpay.service';
+import {
+  razorpayService,
+  type SyncRazorpayPaymentsRequest,
+  type SyncRazorpayPaymentsResponse,
+} from '#features/payments/services/razorpay.service';
 import { useToast } from '#lib/hooks/useToast';
 
 const ENVIRONMENT_LABEL: Record<RazorpayEnvironment, string> = {
@@ -16,7 +20,9 @@ function isFailedSyncResult(result: SyncRazorpayPaymentsResponse) {
   return result.connection.status === 'error' || result.connection.lastSyncStatus === 'failed';
 }
 
-function getRazorpaySyncToast(result: SyncRazorpayPaymentsResponse | SyncRazorpayPaymentsResponse[]) {
+function getRazorpaySyncToast(
+  result: SyncRazorpayPaymentsResponse | SyncRazorpayPaymentsResponse[]
+) {
   const results = Array.isArray(result) ? result : [result];
   const attemptedResults = results.filter((item) => item.connection.status !== 'unconfigured');
   const failedResults = attemptedResults.filter(isFailedSyncResult);

@@ -17,11 +17,7 @@ import {
   MenuDialogSideNavTitle,
   MenuDialogTitle,
 } from '@insforge/ui';
-import type {
-  StripeConnection,
-  StripeEnvironment,
-  StripeKeyConfig,
-} from '@insforge/shared-schemas';
+import type { StripeEnvironment, StripeKeyConfig } from '@insforge/shared-schemas';
 import { usePaymentsConfig } from '#features/payments/hooks/usePaymentsConfig';
 import { usePaymentsSync } from '#features/payments/hooks/usePaymentsSync';
 import { usePaymentsWebhook } from '#features/payments/hooks/usePaymentsWebhook';
@@ -379,13 +375,20 @@ function RazorpayKeysTabContent({
 
       <div className="flex flex-col gap-6">
         {ENVIRONMENTS.map((environment, index) => {
-          const envIdKey = keys.find((key) => key.environment === environment && key.keyType === 'api_key');
-          const envSecretKey = keys.find((key) => key.environment === environment && key.keyType === 'api_secret');
-          
+          const envIdKey = keys.find(
+            (key) => key.environment === environment && key.keyType === 'api_key'
+          );
+          const envSecretKey = keys.find(
+            (key) => key.environment === environment && key.keyType === 'api_secret'
+          );
+
           const hasKeys = envIdKey?.hasKey && envSecretKey?.hasKey;
           const expectedPrefix = RAZORPAY_PREFIX_BY_ENVIRONMENT[environment];
           const environmentLabel = environment === 'test' ? 'Test Mode' : 'Live Mode';
-          const hasPendingInput = keyIdInputs[environment].trim().length > 0 || keySecretInputs[environment].trim().length > 0 || webhookSecretInputs[environment].trim().length > 0;
+          const hasPendingInput =
+            keyIdInputs[environment].trim().length > 0 ||
+            keySecretInputs[environment].trim().length > 0 ||
+            webhookSecretInputs[environment].trim().length > 0;
 
           return (
             <div key={environment} className="flex flex-col gap-2">
@@ -423,14 +426,20 @@ function RazorpayKeysTabContent({
                         className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                         disabled={isBusy}
                       >
-                        {visibleKeys[environment] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        {visibleKeys[environment] ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
                       </button>
                     </div>
                     <div className="relative mt-2">
                       <input
                         type={visibleKeys[environment] ? 'text' : 'password'}
                         value={webhookSecretInputs[environment]}
-                        onChange={(event) => onWebhookSecretInputChange(environment, event.target.value)}
+                        onChange={(event) =>
+                          onWebhookSecretInputChange(environment, event.target.value)
+                        }
                         placeholder="Webhook Secret (Optional)"
                         disabled={isBusy}
                         className="h-8 w-full rounded border border-[var(--alpha-12)] bg-[var(--alpha-4)] px-2.5 pr-9 text-sm leading-5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:shadow-[0_0_0_1px_rgb(var(--inverse)),0_0_0_2px_rgb(var(--foreground))] hover:bg-[var(--alpha-4)] disabled:opacity-50"
@@ -441,12 +450,18 @@ function RazorpayKeysTabContent({
                         className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                         disabled={isBusy}
                       >
-                        {visibleKeys[environment] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        {visibleKeys[environment] ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
                       </button>
                     </div>
                   </div>
 
-                  {errors[environment] && <p className="text-xs text-destructive">{errors[environment]}</p>}
+                  {errors[environment] && (
+                    <p className="text-xs text-destructive">{errors[environment]}</p>
+                  )}
 
                   {(hasKeys || hasPendingInput) && (
                     <div className="flex flex-wrap items-center justify-between gap-2 mt-2">
@@ -515,11 +530,12 @@ function SyncTabContent({
   isLoading: boolean;
   error: unknown;
   configuredKeys: any[];
-  syncPayments: ReturnType<typeof usePaymentsSync>['syncPayments'] | ReturnType<typeof useRazorpaySync>['syncPayments'];
+  syncPayments:
+    | ReturnType<typeof usePaymentsSync>['syncPayments']
+    | ReturnType<typeof useRazorpaySync>['syncPayments'];
   onSync: () => void;
   provider?: 'stripe' | 'razorpay';
 }) {
-
   const providerName = provider === 'stripe' ? 'Stripe' : 'Razorpay';
   if (isLoading && !error) {
     return (
@@ -605,7 +621,9 @@ function WebhooksTabContent({
   isLoadingWebhooks: boolean;
   error: unknown;
   webhooksError: unknown;
-  configureWebhook: ReturnType<typeof usePaymentsWebhook>['configureWebhook'] | ReturnType<typeof useRazorpayWebhook>['configureWebhook'];
+  configureWebhook:
+    | ReturnType<typeof usePaymentsWebhook>['configureWebhook']
+    | ReturnType<typeof useRazorpayWebhook>['configureWebhook'];
   isBusy: boolean;
   onConfigure: (environment: StripeEnvironment) => void;
   provider?: 'stripe' | 'razorpay';
@@ -688,9 +706,9 @@ function WebhookEnvironmentSection({
         ? 'STRIPE_TEST_SECRET_KEY'
         : 'STRIPE_LIVE_SECRET_KEY'
       : environment === 'test'
-      ? 'RZP_TEST_KEY_SECRET'
-      : 'RZP_LIVE_KEY_SECRET';
-  
+        ? 'RZP_TEST_KEY_SECRET'
+        : 'RZP_LIVE_KEY_SECRET';
+
   const isKeyConfigured = !!config?.hasKey;
   const isWebhookConfigured = !!connection?.webhookEndpointId && !!connection.webhookEndpointUrl;
 
@@ -775,12 +793,23 @@ export function PaymentsSettingsDialog({ open, onOpenChange }: PaymentsSettingsD
   } = usePaymentsWebhook();
 
   // Razorpay hooks
-  const { keys: rzpKeys, isLoading: rzpIsLoading, error: rzpError, saveKey: rzpSaveKey, removeKey: rzpRemoveKey } = useRazorpayConfig();
+  const {
+    keys: rzpKeys,
+    isLoading: rzpIsLoading,
+    error: rzpError,
+    saveKey: rzpSaveKey,
+    removeKey: rzpRemoveKey,
+  } = useRazorpayConfig();
   const { syncPayments: rzpSyncPayments } = useRazorpaySync();
-  const { connections: rzpConnections, isLoading: rzpIsLoadingWebhooks, error: rzpWebhooksError, configureWebhook: rzpConfigureWebhook } = useRazorpayWebhook();
+  const {
+    connections: rzpConnections,
+    isLoading: rzpIsLoadingWebhooks,
+    error: rzpWebhooksError,
+    configureWebhook: rzpConfigureWebhook,
+  } = useRazorpayWebhook();
 
   const [activeTab, setActiveTab] = useState<PaymentsSettingsTab>('keys');
-  
+
   // Stripe state
   const [keyInputs, setKeyInputs] = useState<Record<StripeEnvironment, string>>({
     test: '',
@@ -793,10 +822,21 @@ export function PaymentsSettingsDialog({ open, onOpenChange }: PaymentsSettingsD
   const [errors, setErrors] = useState<Partial<Record<StripeEnvironment, string>>>({});
 
   // Razorpay state
-  const [rzpKeyIdInputs, setRzpKeyIdInputs] = useState<Record<StripeEnvironment, string>>({ test: '', live: '' });
-  const [rzpKeySecretInputs, setRzpKeySecretInputs] = useState<Record<StripeEnvironment, string>>({ test: '', live: '' });
-  const [rzpWebhookSecretInputs, setRzpWebhookSecretInputs] = useState<Record<StripeEnvironment, string>>({ test: '', live: '' });
-  const [rzpVisibleKeys, setRzpVisibleKeys] = useState<Record<StripeEnvironment, boolean>>({ test: false, live: false });
+  const [rzpKeyIdInputs, setRzpKeyIdInputs] = useState<Record<StripeEnvironment, string>>({
+    test: '',
+    live: '',
+  });
+  const [rzpKeySecretInputs, setRzpKeySecretInputs] = useState<Record<StripeEnvironment, string>>({
+    test: '',
+    live: '',
+  });
+  const [rzpWebhookSecretInputs, setRzpWebhookSecretInputs] = useState<
+    Record<StripeEnvironment, string>
+  >({ test: '', live: '' });
+  const [rzpVisibleKeys, setRzpVisibleKeys] = useState<Record<StripeEnvironment, boolean>>({
+    test: false,
+    live: false,
+  });
   const [rzpErrors, setRzpErrors] = useState<Partial<Record<StripeEnvironment, string>>>({});
 
   const isBusy =
@@ -812,8 +852,15 @@ export function PaymentsSettingsDialog({ open, onOpenChange }: PaymentsSettingsD
   const canClose = !isBusy;
   const configuredKeys = keys.filter((key) => key.hasKey);
   const configuredRzpKeys = rzpKeys.filter((key) => key.keyType === 'api_key' && key.hasKey);
-  
-  const title = activeTab === 'keys' ? 'Stripe Keys' : activeTab === 'razorpay-keys' ? 'Razorpay Keys' : activeTab === 'sync' ? 'Sync' : 'Webhooks';
+
+  const title =
+    activeTab === 'keys'
+      ? 'Stripe Keys'
+      : activeTab === 'razorpay-keys'
+        ? 'Razorpay Keys'
+        : activeTab === 'sync'
+          ? 'Sync'
+          : 'Webhooks';
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!canClose) {
@@ -829,17 +876,17 @@ export function PaymentsSettingsDialog({ open, onOpenChange }: PaymentsSettingsD
       setRzpWebhookSecretInputs({ test: '', live: '' });
       setRzpVisibleKeys({ test: false, live: false });
       setRzpErrors({});
-      
+
       saveKey.reset();
       removeKey.reset();
       syncPayments.reset();
       configureWebhook.reset();
-      
+
       rzpSaveKey.reset();
       rzpRemoveKey.reset();
       rzpSyncPayments.reset();
       rzpConfigureWebhook.reset();
-      
+
       setActiveTab('keys');
     }
 
@@ -876,14 +923,17 @@ export function PaymentsSettingsDialog({ open, onOpenChange }: PaymentsSettingsD
     }
   };
 
-  const handleRzpSave = async (environment: StripeEnvironment) => {
+  const handleRzpSave = (environment: StripeEnvironment) => {
     const keyId = rzpKeyIdInputs[environment].trim();
     const secretKey = rzpKeySecretInputs[environment].trim();
     const webhookSecret = rzpWebhookSecretInputs[environment].trim();
     const expectedPrefix = RAZORPAY_PREFIX_BY_ENVIRONMENT[environment];
 
     if (!keyId || !secretKey) {
-      setRzpErrors((current) => ({ ...current, [environment]: 'Please enter both Key ID and Key Secret.' }));
+      setRzpErrors((current) => ({
+        ...current,
+        [environment]: 'Please enter both Key ID and Key Secret.',
+      }));
       return;
     }
 
@@ -1097,7 +1147,7 @@ export function PaymentsSettingsDialog({ open, onOpenChange }: PaymentsSettingsD
                 </div>
                 <div>
                   <WebhooksTabContent
-                    keys={rzpKeys.filter(k => k.keyType === 'api_key')}
+                    keys={rzpKeys.filter((k) => k.keyType === 'api_key')}
                     connections={rzpConnections as any}
                     isLoading={rzpIsLoading}
                     isLoadingWebhooks={rzpIsLoadingWebhooks}

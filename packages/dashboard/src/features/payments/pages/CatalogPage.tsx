@@ -249,7 +249,9 @@ function CatalogRow({
           </div>
 
           <div className="px-2 py-3">
-            <ProviderBadge provider={product.stripeProductId.startsWith('plan_') ? 'Razorpay' : 'Stripe'} />
+            <ProviderBadge
+              provider={product.stripeProductId.startsWith('plan_') ? 'Razorpay' : 'Stripe'}
+            />
           </div>
 
           <div className="px-2 py-3">
@@ -318,8 +320,16 @@ export default function CatalogPage() {
   const { openPaymentsSettings, environment } = useOutletContext<PaymentsOutletContext>();
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedProductId, setExpandedProductId] = useState<string | null>(null);
-  const { activeConnection, activeRazorpayConnection, hasActiveKey, products, prices, isLoading, error, refetch } =
-    usePaymentCatalog(environment);
+  const {
+    activeConnection,
+    activeRazorpayConnection,
+    hasActiveKey,
+    products,
+    prices,
+    isLoading,
+    error,
+    refetch,
+  } = usePaymentCatalog(environment);
 
   useEffect(() => {
     setExpandedProductId(null);
@@ -384,7 +394,10 @@ export default function CatalogPage() {
         leftSlot={
           hasActiveKey ? (
             <span className="text-xs text-muted-foreground">
-              Last synced: {formatLastSynced(activeConnection?.lastSyncedAt ?? activeRazorpayConnection?.lastSyncedAt ?? null)}
+              Last synced:{' '}
+              {formatLastSynced(
+                activeConnection?.lastSyncedAt ?? activeRazorpayConnection?.lastSyncedAt ?? null
+              )}
             </span>
           ) : null
         }
