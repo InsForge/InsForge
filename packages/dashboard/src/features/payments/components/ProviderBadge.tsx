@@ -1,4 +1,3 @@
-
 export function ProviderBadge({ provider }: { provider: string }) {
   if (provider === 'Razorpay') {
     return (
