@@ -227,7 +227,7 @@ export type StripeSubscriptionItem = z.infer<typeof stripeSubscriptionItemSchema
 export const stripeSubscriptionSchema = z.object({
   environment: stripeEnvironmentSchema,
   stripeSubscriptionId: z.string(),
-  stripeCustomerId: z.string(),
+  stripeCustomerId: z.string().nullable(),
   subjectType: z.string().nullable(),
   subjectId: z.string().nullable(),
   status: stripeSubscriptionStatusSchema,

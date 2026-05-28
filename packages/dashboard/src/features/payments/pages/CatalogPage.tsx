@@ -12,6 +12,7 @@ import {
   TableHeader,
 } from '#components';
 import { PaymentsKeyMissingState } from '#features/payments/components/PaymentsKeyMissingState';
+import { ProviderBadge } from '#features/payments/components/ProviderBadge';
 import type { PaymentsOutletContext } from '#features/payments/components/PaymentsLayout';
 import { usePaymentCatalog } from '#features/payments/hooks/usePaymentCatalog';
 
@@ -131,7 +132,7 @@ function EmptyCatalogState({ hasSearchQuery }: { hasSearchQuery: boolean }) {
       <p className="mt-1 text-sm text-muted-foreground">
         {hasSearchQuery
           ? 'Try a different product name, ID, or default price reference.'
-          : 'Open Payments Settings and sync after creating products in your Stripe dashboard.'}
+          : 'Open Payments Settings and sync after creating products in your provider dashboard.'}
       </p>
     </div>
   );
@@ -149,7 +150,7 @@ function ProductPricesTable({
       <div className="rounded border border-dashed border-[var(--alpha-8)] bg-card p-6 text-center">
         <p className="text-sm font-medium text-foreground">No prices synced for this product</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Prices attached to this Stripe product will appear after the next sync.
+          Prices attached to this product will appear after the next sync.
         </p>
       </div>
     );
@@ -238,13 +239,17 @@ function CatalogRow({
         onClick={onToggle}
         className="w-full text-left transition-colors hover:bg-alpha-4"
       >
-        <div className="grid min-h-12 grid-cols-[32px_minmax(240px,1.5fr)_120px_90px_140px_minmax(220px,1fr)] items-center gap-0 px-2 text-sm">
+        <div className="grid min-h-12 grid-cols-[32px_minmax(240px,1.5fr)_100px_100px_90px_140px_minmax(220px,1fr)] items-center gap-0 px-2 text-sm">
           <div className="flex items-center justify-center text-muted-foreground">
             {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </div>
 
           <div className="min-w-0 px-2 py-3">
             <p className="truncate text-foreground">{product.name}</p>
+          </div>
+
+          <div className="px-2 py-3">
+            <ProviderBadge provider={product.stripeProductId.startsWith('plan_') ? 'Razorpay' : 'Stripe'} />
           </div>
 
           <div className="px-2 py-3">
@@ -297,7 +302,7 @@ function CatalogRow({
               <div>
                 <h2 className="text-sm font-medium text-foreground">Prices</h2>
                 <p className="text-sm text-muted-foreground">
-                  Active prices, Stripe price IDs, and Stripe lookup keys are shown here.
+                  Active prices, price IDs, and lookup keys are shown here.
                 </p>
               </div>
               <ProductPricesTable product={product} prices={productPrices} />
@@ -313,7 +318,7 @@ export default function CatalogPage() {
   const { openPaymentsSettings, environment } = useOutletContext<PaymentsOutletContext>();
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedProductId, setExpandedProductId] = useState<string | null>(null);
-  const { activeConnection, products, prices, isLoading, error, refetch } =
+  const { activeConnection, activeRazorpayConnection, hasActiveKey, products, prices, isLoading, error, refetch } =
     usePaymentCatalog(environment);
 
   useEffect(() => {
@@ -368,8 +373,6 @@ export default function CatalogPage() {
 
   const handlePageChange = useCallback((_page: number) => {}, []);
 
-  const hasActiveKey = !!activeConnection?.maskedKey;
-
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
       <TableHeader
@@ -381,7 +384,7 @@ export default function CatalogPage() {
         leftSlot={
           hasActiveKey ? (
             <span className="text-xs text-muted-foreground">
-              Last synced: {formatLastSynced(activeConnection?.lastSyncedAt ?? null)}
+              Last synced: {formatLastSynced(activeConnection?.lastSyncedAt ?? activeRazorpayConnection?.lastSyncedAt ?? null)}
             </span>
           ) : null
         }
@@ -398,7 +401,7 @@ export default function CatalogPage() {
         {error ? (
           <ErrorState error={error as Error} onRetry={() => void refetch()} />
         ) : isLoading ? (
-          <LoadingState message="Loading Stripe catalog..." />
+          <LoadingState message="Loading catalog..." />
         ) : !hasActiveKey ? (
           <PaymentsKeyMissingState
             environment={environment}
@@ -419,9 +422,10 @@ export default function CatalogPage() {
                   </Alert>
                 )}
 
-                <div className="grid grid-cols-[32px_minmax(240px,1.5fr)_120px_90px_140px_minmax(220px,1fr)] gap-0 px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <div className="grid grid-cols-[32px_minmax(240px,1.5fr)_100px_100px_90px_140px_minmax(220px,1fr)] gap-0 px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   <div />
                   <div className="px-2 py-1.5">Product</div>
+                  <div className="px-2 py-1.5">Provider</div>
                   <div className="px-2 py-1.5">Status</div>
                   <div className="px-2 py-1.5">Prices</div>
                   <div className="px-2 py-1.5">Default Price</div>

@@ -17,11 +17,19 @@ export function usePaymentCatalog(environment: StripeEnvironment) {
   });
 
   const connections = useMemo(() => statusData?.connections ?? [], [statusData]);
+  const razorpayConnections = useMemo(() => statusData?.razorpayConnections ?? [], [statusData]);
+  
   const activeConnection = useMemo(
     () => connections.find((connection) => connection.environment === environment) ?? null,
     [connections, environment]
   );
-  const hasActiveKey = !!activeConnection?.maskedKey;
+  
+  const activeRazorpayConnection = useMemo(
+    () => razorpayConnections.find((connection) => connection.environment === environment) ?? null,
+    [razorpayConnections, environment]
+  );
+  
+  const hasActiveKey = !!activeConnection?.maskedKey || !!activeRazorpayConnection?.maskedKey;
 
   const {
     data: catalogData,
@@ -38,7 +46,10 @@ export function usePaymentCatalog(environment: StripeEnvironment) {
 
   return {
     connections,
+    razorpayConnections,
     activeConnection,
+    activeRazorpayConnection,
+    hasActiveKey,
     products: hasActiveKey ? (catalogData?.products ?? []) : [],
     prices: hasActiveKey ? (catalogData?.prices ?? []) : [],
     isLoading: isLoadingStatus || (hasActiveKey && isLoadingCatalog),

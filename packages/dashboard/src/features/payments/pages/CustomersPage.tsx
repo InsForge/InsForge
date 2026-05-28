@@ -18,6 +18,7 @@ import {
   type DataGridRowType,
 } from '#components';
 import { PaymentsKeyMissingState } from '#features/payments/components/PaymentsKeyMissingState';
+import { ProviderBadge } from '#features/payments/components/ProviderBadge';
 import type { PaymentsOutletContext } from '#features/payments/components/PaymentsLayout';
 import { usePaymentCustomers } from '#features/payments/hooks/usePaymentCustomers';
 import { cn } from '#lib/utils/utils';
@@ -80,6 +81,16 @@ const CUSTOMER_COLUMNS: DataGridColumn<CustomerGridRow>[] = [
         </span>
         <CustomerBadge variant={row.badgeVariant} />
       </div>
+    ),
+  },
+  {
+    key: 'provider',
+    name: 'Provider',
+    width: 120,
+    minWidth: 120,
+    sortable: false,
+    renderCell: ({ row }) => (
+      <ProviderBadge provider={row.customerId.startsWith('cust_') ? 'Razorpay' : 'Stripe'} />
     ),
   },
   {
@@ -391,9 +402,8 @@ export default function CustomersPage() {
     { columnKey: 'lastPaymentAt', direction: 'DESC' },
   ]);
 
-  const { activeConnection, customers, isLoading, error, refetch } =
+  const { activeConnection, activeRazorpayConnection, hasActiveKey, customers, isLoading, error, refetch } =
     usePaymentCustomers(environment);
-  const hasActiveKey = !!activeConnection?.maskedKey;
 
   const filteredCustomers = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -484,7 +494,7 @@ export default function CustomersPage() {
         {error ? (
           <ErrorState error={error as Error} onRetry={() => void refetch()} />
         ) : isLoading ? (
-          <LoadingState message="Loading Stripe customers..." />
+          <LoadingState message="Loading customers..." />
         ) : !hasActiveKey ? (
           <PaymentsKeyMissingState
             environment={environment}

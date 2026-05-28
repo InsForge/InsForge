@@ -322,7 +322,7 @@ export interface PaymentHistoryRow {
 export interface StripeSubscriptionRow {
   environment: StripeEnvironment;
   stripeSubscriptionId: string;
-  stripeCustomerId: string;
+  stripeCustomerId: string | null;
   subjectType: string | null;
   subjectId: string | null;
   status:

@@ -19,6 +19,7 @@ import {
   TableHeader,
 } from '#components';
 import { PaymentsKeyMissingState } from '#features/payments/components/PaymentsKeyMissingState';
+import { ProviderBadge } from '#features/payments/components/ProviderBadge';
 import type { PaymentsOutletContext } from '#features/payments/components/PaymentsLayout';
 import { usePaymentCatalog } from '#features/payments/hooks/usePaymentCatalog';
 import { usePaymentCustomers } from '#features/payments/hooks/usePaymentCustomers';
@@ -37,7 +38,7 @@ const SUBSCRIPTION_STATUS_CLASSES: Record<StripeSubscriptionStatus, string> = {
 };
 
 const SUBSCRIPTION_ROW_GRID_TEMPLATE =
-  '32px minmax(0, 1.3fr) minmax(0, 1fr) 120px minmax(0, 1.2fr) minmax(0, 0.75fr)';
+  '32px minmax(0, 1.3fr) minmax(0, 1fr) 100px 100px minmax(0, 1.2fr) minmax(0, 0.75fr)';
 
 const SUBSCRIPTION_ITEM_GRID_TEMPLATE = 'minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) 100px';
 
@@ -124,7 +125,7 @@ function formatPriceAmount(price: StripePrice) {
 }
 
 function getCustomerLabel(customer: StripeCustomer | null, subscription: StripeSubscription) {
-  return customer?.email ?? customer?.name ?? subscription.stripeCustomerId;
+  return customer?.email ?? customer?.name ?? subscription.stripeCustomerId ?? 'Unknown Customer';
 }
 
 function getSubscriptionItemProductLabel(
@@ -160,7 +161,7 @@ function EmptySubscriptionsState({ hasSearchQuery }: { hasSearchQuery: boolean }
       <p className="mt-1 text-sm text-muted-foreground">
         {hasSearchQuery
           ? 'Try a different subscription, customer, invoice, or product reference.'
-          : 'Completed subscription checkouts will appear after Stripe webhooks are processed.'}
+          : 'Completed subscription checkouts will appear after provider webhooks are processed.'}
       </p>
     </div>
   );
@@ -180,7 +181,7 @@ function SubscriptionItemsTable({
       <div className="rounded border border-dashed border-[var(--alpha-8)] bg-card p-8 text-center">
         <p className="text-sm font-medium text-foreground">No subscription items found</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Stripe items will appear after the subscription webhook projection is updated.
+          Provider items will appear after the subscription webhook projection is updated.
         </p>
       </div>
     );
@@ -299,6 +300,10 @@ function SubscriptionRow({
           </div>
 
           <div className="px-2 py-3">
+            <ProviderBadge provider={(!subscription.stripeCustomerId || subscription.stripeCustomerId.startsWith('cust_')) ? 'Razorpay' : 'Stripe'} />
+          </div>
+
+          <div className="px-2 py-3">
             <SubscriptionStatus status={subscription.status} />
           </div>
 
@@ -328,7 +333,7 @@ function SubscriptionRow({
               <div>
                 <h2 className="text-base font-medium text-foreground">Subscription Items</h2>
                 <p className="text-sm text-muted-foreground">
-                  Stripe items associated with this subscription, including product and price links.
+                  Items associated with this subscription, including product and price links.
                 </p>
               </div>
               <SubscriptionItemsTable
@@ -349,7 +354,7 @@ export default function SubscriptionsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<string | null>(null);
 
-  const { activeConnection, subscriptions, isLoading, error, refetch } =
+  const { activeConnection, activeRazorpayConnection, hasActiveKey, subscriptions, isLoading, error, refetch } =
     usePaymentSubscriptions(environment);
   const { customers } = usePaymentCustomers(environment);
   const { products, prices } = usePaymentCatalog(environment);
@@ -392,7 +397,7 @@ export default function SubscriptionsPage() {
     }
 
     return subscriptions.filter((subscription) => {
-      const customer = customersById.get(subscription.stripeCustomerId) ?? null;
+      const customer = subscription.stripeCustomerId ? (customersById.get(subscription.stripeCustomerId) ?? null) : null;
       const itemValues = (subscription.items ?? []).flatMap((item) => {
         const product = item.stripeProductId
           ? (productsById.get(item.stripeProductId) ?? null)
@@ -436,8 +441,6 @@ export default function SubscriptionsPage() {
 
   const handlePageChange = useCallback((_page: number) => {}, []);
 
-  const hasActiveKey = !!activeConnection?.maskedKey;
-
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
       <TableHeader
@@ -449,7 +452,7 @@ export default function SubscriptionsPage() {
         leftSlot={
           hasActiveKey ? (
             <span className="text-xs text-muted-foreground">
-              Last synced: {formatLastSynced(activeConnection?.lastSyncedAt ?? null)}
+              Last synced: {formatLastSynced(activeConnection?.lastSyncedAt ?? activeRazorpayConnection?.lastSyncedAt ?? null)}
             </span>
           ) : null
         }
@@ -466,7 +469,7 @@ export default function SubscriptionsPage() {
         {error ? (
           <ErrorState error={error as Error} onRetry={() => void refetch()} />
         ) : isLoading ? (
-          <LoadingState message="Loading Stripe subscriptions..." />
+          <LoadingState message="Loading subscriptions..." />
         ) : !hasActiveKey ? (
           <PaymentsKeyMissingState
             environment={environment}
@@ -494,6 +497,7 @@ export default function SubscriptionsPage() {
                   <div />
                   <div className="px-2 py-1.5">Subscription</div>
                   <div className="px-2 py-1.5">Customer</div>
+                  <div className="px-2 py-1.5">Provider</div>
                   <div className="px-2 py-1.5">Status</div>
                   <div className="px-2 py-1.5">Current Period</div>
                   <div className="px-2 py-1.5">Latest Invoice</div>
@@ -507,7 +511,7 @@ export default function SubscriptionsPage() {
                       <SubscriptionRow
                         key={`${subscription.environment}:${subscription.stripeSubscriptionId}`}
                         subscription={subscription}
-                        customer={customersById.get(subscription.stripeCustomerId) ?? null}
+                        customer={subscription.stripeCustomerId ? (customersById.get(subscription.stripeCustomerId) ?? null) : null}
                         productsById={productsById}
                         pricesById={pricesById}
                         expanded={expandedSubscriptionId === subscription.stripeSubscriptionId}

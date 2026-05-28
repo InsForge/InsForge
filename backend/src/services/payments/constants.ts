@@ -1,4 +1,4 @@
-import type { StripeEnvironment } from '@/types/payments.js';
+import type { StripeEnvironment, RazorpayEnvironment } from '@/types/payments.js';
 
 export const SECRET_KEY_BY_ENVIRONMENT: Record<StripeEnvironment, string> = {
   test: 'STRIPE_TEST_SECRET_KEY',
@@ -8,6 +8,44 @@ export const SECRET_KEY_BY_ENVIRONMENT: Record<StripeEnvironment, string> = {
 export const WEBHOOK_SECRET_BY_ENVIRONMENT: Record<StripeEnvironment, string> = {
   test: 'STRIPE_TEST_WEBHOOK_SECRET',
   live: 'STRIPE_LIVE_WEBHOOK_SECRET',
+};
+
+// Razorpay secret names stored via SecretService (same encryption pattern as Stripe)
+export const RAZORPAY_KEY_ID_BY_ENVIRONMENT: Record<RazorpayEnvironment, string> = {
+  test: 'RAZORPAY_TEST_KEY_ID',
+  live: 'RAZORPAY_LIVE_KEY_ID',
+};
+
+export const RAZORPAY_KEY_SECRET_BY_ENVIRONMENT: Record<RazorpayEnvironment, string> = {
+  test: 'RAZORPAY_TEST_KEY_SECRET',
+  live: 'RAZORPAY_LIVE_KEY_SECRET',
+};
+
+export const RAZORPAY_WEBHOOK_SECRET_BY_ENVIRONMENT: Record<RazorpayEnvironment, string> = {
+  test: 'RAZORPAY_TEST_WEBHOOK_SECRET',
+  live: 'RAZORPAY_LIVE_WEBHOOK_SECRET',
+};
+
+// Razorpay webhook events to subscribe to (mirrors Stripe's MANAGED_WEBHOOK_EVENTS)
+export const RAZORPAY_MANAGED_WEBHOOK_EVENTS: Record<string, boolean> = {
+  'payment.authorized': true,
+  'payment.captured': true,
+  'payment.failed': true,
+  'refund.created': true,
+  'refund.failed': true,
+  'subscription.created': true,
+  'subscription.activated': true,
+  'subscription.charged': true,
+  'subscription.completed': true,
+  'subscription.updated': true,
+  'subscription.pending': true,
+  'subscription.halted': true,
+  'subscription.cancelled': true,
+  'subscription.paused': true,
+  'subscription.resumed': true,
+  'invoice.paid': true,
+  'invoice.expired': true,
+  'order.paid': true,
 };
 
 export const SUBJECT_METADATA_KEYS = {

@@ -11,6 +11,7 @@ import { PaymentProductService } from '@/services/payments/payment-product.servi
 import { PaymentPriceService } from '@/services/payments/payment-price.service.js';
 import { PaymentSubscriptionService } from '@/services/payments/payment-subscription.service.js';
 import { PaymentWebhookService } from '@/services/payments/payment-webhook.service.js';
+import { RazorpayConfigService } from '@/services/payments/razorpay-config.service.js';
 import {
   withPaymentSessionAdvisoryLock,
   type PaymentSessionAdvisoryLockMode,
@@ -96,6 +97,7 @@ export class PaymentService {
   private readonly priceService = PaymentPriceService.getInstance();
   private readonly subscriptionService = PaymentSubscriptionService.getInstance();
   private readonly webhookService = PaymentWebhookService.getInstance();
+  private readonly razorpayConfigService = RazorpayConfigService.getInstance();
 
   static getInstance(): PaymentService {
     if (!PaymentService.instance) {
@@ -172,7 +174,15 @@ export class PaymentService {
   }
 
   async getStatus(): Promise<GetPaymentsStatusResponse> {
-    return this.configService.getStatus();
+    const [stripeStatus, razorpayStatus] = await Promise.all([
+      this.configService.getStatus(),
+      this.razorpayConfigService.getRazorpayStatus(),
+    ]);
+    
+    return {
+      connections: stripeStatus.connections,
+      razorpayConnections: razorpayStatus,
+    };
   }
 
   async configureWebhook(environment: StripeEnvironment): Promise<ConfigurePaymentWebhookResponse> {

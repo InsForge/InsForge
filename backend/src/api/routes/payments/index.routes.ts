@@ -5,6 +5,7 @@ import { PaymentService } from '@/services/payments/payment.service.js';
 import { successResponse } from '@/utils/response.js';
 import { catalogRouter } from './catalog.routes.js';
 import { configRouter } from './config.routes.js';
+import { razorpayRouter } from './razorpay.routes.js';
 import { normalizeStripeError } from '@/providers/payments/stripe-errors.js';
 import {
   ERROR_CODES,
@@ -199,6 +200,9 @@ environmentRouter.get('/customers', async (req: AuthRequest, res: Response, next
     next(error);
   }
 });
+
+// Razorpay routes — /api/payments/razorpay/...
+router.use('/razorpay', razorpayRouter);
 
 router.use('/:environment', environmentRouter);
 
