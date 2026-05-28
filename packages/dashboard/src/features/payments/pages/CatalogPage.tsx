@@ -388,9 +388,10 @@ export default function CatalogPage() {
     activeRazorpayConnection?.lastSyncedAt,
   ].filter(Boolean);
 
-  const mostRecentSync = (lastSyncedTimes.length > 0
-    ? lastSyncedTimes.sort((a, b) => new Date(b!).getTime() - new Date(a!).getTime())[0]
-    : null) ?? null;
+  const mostRecentSync =
+    (lastSyncedTimes.length > 0
+      ? lastSyncedTimes.sort((a, b) => new Date(b!).getTime() - new Date(a!).getTime())[0]
+      : null) ?? null;
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
