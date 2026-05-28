@@ -23,6 +23,12 @@ const DATABASE_MANAGEMENT_STATEMENTS = new Set([
   'AlterDatabaseSetStmt',
   'AlterDatabaseRefreshCollStmt',
 ]);
+const DANGEROUS_STATEMENTS = new Set([
+  'ExecuteStmt', // EXECUTE — can run arbitrary prepared statements
+  'CreateEventTrigStmt', // Event triggers can intercept DDL
+  'DropEventTrigStmt',
+]);
+const ALTER_SYSTEM_PATTERN = /\balter\s+system\b/i;
 
 function getRawTextGuardError(query: string): string | null {
   if (SET_CONFIG_PATTERN.test(query)) {
@@ -139,8 +145,12 @@ export function checkSqlExecutionGuards(query: string): string | null {
       const stmt = stmtWrapper.stmt as Record<string, unknown>;
       const [stmtType, data] = Object.entries(stmt)[0] as [string, Record<string, unknown>];
 
-      if (DATABASE_MANAGEMENT_STATEMENTS.has(stmtType)) {
+      if (DATABASE_MANAGEMENT_STATEMENTS.has(stmtType) || DANGEROUS_STATEMENTS.has(stmtType)) {
         return 'Query contains restricted operations';
+      }
+
+      if (ALTER_SYSTEM_PATTERN.test(query)) {
+        return 'ALTER SYSTEM is not allowed.';
       }
 
       if (stmtType === 'VariableSetStmt') {

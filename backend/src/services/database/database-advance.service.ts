@@ -123,9 +123,15 @@ export class DatabaseAdvanceService {
     } catch (error) {
       // Handle timeout errors specifically for better error messages
       if (hasPgErrorCode(error, '57014')) {
-        throw new Error('Query timeout: The query took longer than 30 seconds to execute');
+        throw new AppError(
+          'Query timeout: The query took longer than 30 seconds to execute',
+          504,
+          ERROR_CODES.INTERNAL_ERROR
+        );
       }
-      // Re-throw other errors as-is
+      // All other errors are re-thrown as-is. The global errorMiddleware
+      // ensures clients receive a generic "Internal server error" response
+      // so that raw PostgreSQL messages never leak externally.
       throw error;
     } finally {
       await client.query('SET statement_timeout = 0').catch((error: unknown) => {
@@ -853,7 +859,15 @@ export class DatabaseAdvanceService {
     validateTableName(table);
     assertWritableDatabaseSchema(schemaName);
 
-    const fileExtension = filename.toLowerCase().substring(filename.lastIndexOf('.'));
+    const lastDot = filename.lastIndexOf('.');
+    if (lastDot <= 0) {
+      throw new AppError(
+        'Unable to determine file extension. Use a filename with an extension such as .csv or .json',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+    const fileExtension = filename.toLowerCase().substring(lastDot);
     let records: Record<string, unknown>[] = [];
 
     // Parse file based on type
@@ -978,6 +992,7 @@ export class DatabaseAdvanceService {
       const client = await pool.connect();
       let releaseError: Error | undefined;
       try {
+        await client.query('BEGIN');
         const result = await withAdminContext(
           client,
           () => client.query(query),
@@ -989,11 +1004,15 @@ export class DatabaseAdvanceService {
 
         // Refresh schema cache if needed
         await client.query(`NOTIFY pgrst, 'reload schema';`);
+        await client.query('COMMIT');
 
         return {
           rowCount: result.rowCount || 0,
           rows: result.rows,
         };
+      } catch (error) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw error;
       } finally {
         client.release(releaseError);
       }
