@@ -48,9 +48,10 @@ export function validatePassword(password: string, config: AuthConfigSchema): bo
  * - " (double quotes) - could break SQL queries
  * - \x00-\x1F (ASCII 0-31) - control characters like null, tab, newline
  * - \x7F (ASCII 127) - DEL character
+ * - \ (backslash) - could be used in escape sequences
  */
 // eslint-disable-next-line no-control-regex
-const IDENTIFIER_REGEX = /^[^"\x00-\x1F\x7F]+$/;
+const IDENTIFIER_REGEX = /^[^"\x00-\x1F\x7F\\]+$/;
 
 /**
  * Validates a PostgreSQL identifier (table name, column name, etc.)
