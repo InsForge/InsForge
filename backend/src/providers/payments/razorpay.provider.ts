@@ -252,7 +252,7 @@ export class RazorpayProvider {
     let skip = 0;
     const count = 100;
     while (true) {
-      const response = (await this.client.plans.all({ count, skip })) as { items: RazorpayPlan[] };
+      const response = (await this.client.plans.all({ count, skip })) as unknown as { items: RazorpayPlan[] };
       const items = response.items ?? [];
       all.push(...items);
       if (items.length < count) {
@@ -268,7 +268,7 @@ export class RazorpayProvider {
     let skip = 0;
     const count = 100;
     while (true) {
-      const response = (await this.client.items.all({ count, skip })) as { items: RazorpayItem[] };
+      const response = (await this.client.items.all({ count, skip })) as unknown as { items: RazorpayItem[] };
       const items = response.items ?? [];
       all.push(...items);
       if (items.length < count) {
@@ -284,7 +284,7 @@ export class RazorpayProvider {
     let skip = 0;
     const count = 100;
     while (true) {
-      const response = (await this.client.customers.all({ count, skip })) as {
+      const response = (await this.client.customers.all({ count, skip })) as unknown as {
         items: RazorpayCustomer[];
       };
       const items = response.items ?? [];
@@ -304,7 +304,7 @@ export class RazorpayProvider {
 
     // Paginate — Razorpay returns max 100 per call
     while (true) {
-      const response = (await this.client.subscriptions.all({ count, skip })) as {
+      const response = (await this.client.subscriptions.all({ count, skip })) as unknown as {
         items: RazorpaySubscription[];
         count: number;
       };
@@ -325,7 +325,7 @@ export class RazorpayProvider {
     const count = 100;
 
     while (true) {
-      const response = (await this.client.payments.all({ count, skip })) as {
+      const response = (await this.client.payments.all({ count, skip })) as unknown as {
         items: RazorpayPayment[];
         count: number;
       };
@@ -346,7 +346,7 @@ export class RazorpayProvider {
     const count = 100;
 
     while (true) {
-      const response = (await this.client.invoices.all({ count, skip })) as {
+      const response = (await this.client.invoices.all({ count, skip })) as unknown as {
         items: RazorpayInvoice[];
         count: number;
       };
