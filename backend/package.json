@@ -20,6 +20,7 @@
     "migrate:up": "npm run migrate:bootstrap && node-pg-migrate up --migrations-dir src/infra/database/migrations --migrations-schema system --migrations-table migrations",
     "migrate:down": "node-pg-migrate down --migrations-dir src/infra/database/migrations --migrations-schema system --migrations-table migrations",
     "migrate:create": "node-pg-migrate create --migrations-dir src/infra/database/migrations --migrations-schema system --migrations-table migrations",
+    "migrate:check-duplicates": "node scripts/check-migration-duplicates.js",
     "migrate:redo": "npm run migrate:bootstrap && node-pg-migrate redo --migrations-dir src/infra/database/migrations --migrations-schema system --migrations-table migrations",
     "migrate:up:local": "dotenv -e ../.env -- npm run migrate:bootstrap && dotenv -e ../.env -- node-pg-migrate up --migrations-dir src/infra/database/migrations --migrations-schema system --migrations-table migrations",
     "migrate:down:local": "dotenv -e ../.env -- node-pg-migrate down --migrations-dir src/infra/database/migrations --migrations-schema system --migrations-table migrations",
