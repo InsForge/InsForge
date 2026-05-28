@@ -1,4 +1,3 @@
-import React from 'react';
 
 export function ProviderBadge({ provider }: { provider: string }) {
   if (provider === 'Razorpay') {
