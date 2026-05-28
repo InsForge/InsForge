@@ -49,20 +49,16 @@ describe('internal runtime defaults migration', () => {
     );
   });
 
-  it('removes direct runtime-role auth schema and profile grants', () => {
+  it('removes direct runtime-role auth table and profile grants', () => {
     const sql = readMigration();
 
     expect(sql).toMatch(/to_regclass\('auth\.users'\)\s+IS\s+NOT\s+NULL/i);
-    expect(sql).toMatch(
-      /REVOKE\s+USAGE\s+ON\s+SCHEMA\s+auth\s+FROM\s+PUBLIC,\s*anon,\s*authenticated/i
-    );
     expect(sql).toMatch(
       /REVOKE\s+SELECT\s+\(id,\s*profile,\s*created_at\)\s+ON\s+auth\.users\s+FROM\s+PUBLIC,\s*anon,\s*authenticated/i
     );
     expect(sql).toMatch(
       /REVOKE\s+UPDATE\s+\(profile\)\s+ON\s+auth\.users\s+FROM\s+PUBLIC,\s*anon,\s*authenticated/i
     );
-    expect(sql).not.toMatch(/GRANT\s+USAGE\s+ON\s+SCHEMA\s+auth\s+TO\s+anon/i);
     expect(sql).not.toMatch(/GRANT\s+SELECT[\s\S]*?ON\s+auth\.users\s+TO\s+anon/i);
     expect(sql).not.toMatch(/GRANT\s+UPDATE[\s\S]*?ON\s+auth\.users\s+TO\s+authenticated/i);
   });

@@ -36,8 +36,6 @@ BEGIN
       ALTER TABLE auth.users DISABLE ROW LEVEL SECURITY;
     END IF;
 
-    REVOKE USAGE ON SCHEMA auth FROM PUBLIC, anon, authenticated;
-
     -- These direct grants were ineffective without schema USAGE, but remove
     -- them so catalog output matches the intended access model.
     IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'system') THEN
