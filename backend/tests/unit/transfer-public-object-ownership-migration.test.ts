@@ -21,23 +21,28 @@ describe('transfer public object ownership migration', () => {
       .filter((file) => file.endsWith('.sql'))
       .sort();
 
-    expect(migrations.indexOf(migrationFile)).toBeGreaterThan(
-      migrations.indexOf('045_project-admin-public-privileges.sql')
-    );
+    const migrationIndex = migrations.indexOf(migrationFile);
+    const predecessorIndex = migrations.indexOf('045_project-admin-public-privileges.sql');
+
+    expect(predecessorIndex).not.toBe(-1);
+    expect(migrationIndex).not.toBe(-1);
+    expect(migrationIndex).toBeGreaterThan(predecessorIndex);
   });
 
   it('does not directly alter table-owned sequences', () => {
     const sql = readMigration();
 
     expect(sql).toMatch(/WHEN 'S' THEN 'SEQUENCE'/i);
-    expect(sql).toMatch(/c\.relkind\s*=\s*'S'/i);
-    expect(sql).toMatch(/d\.deptype\s+IN\s+\('a',\s*'i'\)/i);
+    expect(sql).toMatch(
+      /AND NOT\s*\(\s*c\.relkind\s*=\s*'S'\s+AND EXISTS\s*\(\s*SELECT 1\s+FROM pg_depend d\s+WHERE d\.objid = c\.oid\s+AND d\.deptype IN \('a', 'i'\)\s*\)\s*\)/
+    );
   });
 
   it('does not directly alter table row types', () => {
     const sql = readMigration();
 
     expect(sql).toMatch(/ALTER TYPE %I\.%I OWNER TO project_admin/i);
-    expect(sql).toMatch(/type_class\.relkind\s*=\s*'c'/i);
+    expect(sql).toMatch(/LEFT JOIN pg_class type_class ON type_class\.oid = t\.typrelid/);
+    expect(sql).toMatch(/AND \(t\.typrelid = 0 OR type_class\.relkind = 'c'\)/);
   });
 });
