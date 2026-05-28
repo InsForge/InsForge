@@ -252,7 +252,9 @@ export class RazorpayProvider {
     let skip = 0;
     const count = 100;
     while (true) {
-      const response = (await this.client.plans.all({ count, skip })) as unknown as { items: RazorpayPlan[] };
+      const response = (await this.client.plans.all({ count, skip })) as unknown as {
+        items: RazorpayPlan[];
+      };
       const items = response.items ?? [];
       all.push(...items);
       if (items.length < count) {
@@ -268,7 +270,9 @@ export class RazorpayProvider {
     let skip = 0;
     const count = 100;
     while (true) {
-      const response = (await this.client.items.all({ count, skip })) as unknown as { items: RazorpayItem[] };
+      const response = (await this.client.items.all({ count, skip })) as unknown as {
+        items: RazorpayItem[];
+      };
       const items = response.items ?? [];
       all.push(...items);
       if (items.length < count) {
