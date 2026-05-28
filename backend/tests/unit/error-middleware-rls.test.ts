@@ -89,7 +89,8 @@ describe('errorMiddleware', () => {
     expect(res.statusCode).toBe(500);
     const body = res.body as { error: string; message: string };
     expect(body.error).toBe(ERROR_CODES.INTERNAL_ERROR);
-    expect(body.message).toBe('not found from an unknown source');
+    // Security fix: generic 500s must not leak internal error messages.
+    expect(body.message).toBe('Internal server error');
   });
 
   it('falls back to 500 for unrecognized pg codes', () => {

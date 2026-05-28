@@ -35,14 +35,12 @@ describe('Rate Limit Middleware', () => {
       middleware(req as Request, res as Response, next);
       expect(next).toHaveBeenCalledOnce();
 
-      // Second request should be blocked
-      expect(() => {
-        middleware(req as Request, res as Response, next);
-      }).toThrow(AppError);
-
-      expect(() => {
-        middleware(req as Request, res as Response, next);
-      }).toThrow(/Please wait.*seconds before requesting another code/);
+      // Second request should call next with an AppError instead of throwing
+      middleware(req as Request, res as Response, next);
+      expect(next).toHaveBeenCalledTimes(2);
+      const secondCall = (next as ReturnType<typeof vi.fn>).mock.calls[1][0];
+      expect(secondCall).toBeInstanceOf(AppError);
+      expect(secondCall.message).toMatch(/Please wait.*seconds before requesting another code/);
     });
 
     it('allows request after cooldown period expires', async () => {
@@ -73,9 +71,10 @@ describe('Rate Limit Middleware', () => {
 
       // Second request with lowercase should be blocked
       req.body = { email: uniqueEmail.toLowerCase() };
-      expect(() => {
-        middleware(req as Request, res as Response, next);
-      }).toThrow(AppError);
+      middleware(req as Request, res as Response, next);
+      expect(next).toHaveBeenCalledTimes(2);
+      const secondCall = (next as ReturnType<typeof vi.fn>).mock.calls[1][0];
+      expect(secondCall).toBeInstanceOf(AppError);
     });
 
     it('allows requests for different emails', () => {
@@ -111,19 +110,17 @@ describe('Rate Limit Middleware', () => {
       middleware(req as Request, res as Response, next);
 
       // Try second request immediately
-      try {
-        middleware(req as Request, res as Response, next);
-      } catch (error) {
-        if (error instanceof AppError) {
-          // Should show approximately 60 seconds remaining
-          expect(error.message).toMatch(/wait (\d+) seconds/);
-          const match = error.message.match(/wait (\d+) seconds/);
-          if (match) {
-            const seconds = parseInt(match[1]);
-            expect(seconds).toBeGreaterThanOrEqual(59);
-            expect(seconds).toBeLessThanOrEqual(60);
-          }
-        }
+      middleware(req as Request, res as Response, next);
+      expect(next).toHaveBeenCalledTimes(2);
+      const secondCall = (next as ReturnType<typeof vi.fn>).mock.calls[1][0];
+      expect(secondCall).toBeInstanceOf(AppError);
+      expect(secondCall).toHaveProperty('message');
+      const match = secondCall.message.match(/wait (\d+) seconds/);
+      expect(match).toBeTruthy();
+      if (match) {
+        const seconds = parseInt(match[1]);
+        expect(seconds).toBeGreaterThanOrEqual(59);
+        expect(seconds).toBeLessThanOrEqual(60);
       }
     });
 
@@ -136,18 +133,17 @@ describe('Rate Limit Middleware', () => {
       middleware(req as Request, res as Response, next);
 
       // Second request should show 30 second cooldown
-      try {
-        middleware(req as Request, res as Response, next);
-      } catch (error) {
-        if (error instanceof AppError) {
-          expect(error.message).toMatch(/wait \d+ seconds/);
-          const match = error.message.match(/wait (\d+) seconds/);
-          if (match) {
-            const seconds = parseInt(match[1]);
-            expect(seconds).toBeGreaterThanOrEqual(29);
-            expect(seconds).toBeLessThanOrEqual(30);
-          }
-        }
+      middleware(req as Request, res as Response, next);
+      expect(next).toHaveBeenCalledTimes(2);
+      const secondCall = (next as ReturnType<typeof vi.fn>).mock.calls[1][0];
+      expect(secondCall).toBeInstanceOf(AppError);
+      expect(secondCall).toHaveProperty('message');
+      const match = secondCall.message.match(/wait (\d+) seconds/);
+      expect(match).toBeTruthy();
+      if (match) {
+        const seconds = parseInt(match[1]);
+        expect(seconds).toBeGreaterThanOrEqual(29);
+        expect(seconds).toBeLessThanOrEqual(30);
       }
     });
   });
