@@ -29,12 +29,8 @@ const forwardRpcToPostgrest = async (req: AuthRequest, res: Response, next: Next
 
   try {
     // Validate function name
-    try {
-      validateFunctionName(functionName);
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
+    const isValid = validateFunctionName(functionName);
+    if (!isValid) {
       throw new AppError(`Invalid function name: ${functionName}`, 400, ERROR_CODES.INVALID_INPUT);
     }
 

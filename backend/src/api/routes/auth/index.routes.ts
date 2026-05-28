@@ -71,12 +71,25 @@ const emailLinkRequestSchema = z.object({
   token: z.string().regex(/^[a-fA-F0-9]{64}$/, 'token must be a 64-character hexadecimal token'),
 });
 
+const MAX_REDIRECT_URL_LENGTH = 2048;
+
 function buildRedirectUrl(baseUrl: string, params: Record<string, string>): string {
   const url = new URL(baseUrl);
   Object.entries(params).forEach(([key, value]) => {
     url.searchParams.set(key, value);
   });
-  return url.toString();
+  const finalUrl = url.toString();
+  if (finalUrl.length > MAX_REDIRECT_URL_LENGTH) {
+    // Strip error params to stay under the limit, then truncate if still too long
+    const trimmed = new URL(baseUrl);
+    trimmed.searchParams.set('insforge_status', 'error');
+    const trimmedUrl = trimmed.toString();
+    if (trimmedUrl.length > MAX_REDIRECT_URL_LENGTH) {
+      return `${baseUrl.split('?')[0]}?insforge_status=error`;
+    }
+    return trimmedUrl;
+  }
+  return finalUrl;
 }
 
 // Mount OAuth routes
@@ -675,7 +688,7 @@ router.get('/users', verifyAdmin, async (req: Request, res: Response, next: Next
     const queryParams = queryValidation.success ? queryValidation.data : req.query;
     const { limit = '10', offset = '0', search } = queryParams || {};
 
-    const parsedLimit = Math.max(1, parseInt(limit as string) || 10);
+    const parsedLimit = Math.min(Math.max(1, parseInt(limit as string) || 10), 1000);
     const parsedOffset = Math.max(0, parseInt(offset as string) || 0);
 
     const { users, total } = await authService.listUsers(
