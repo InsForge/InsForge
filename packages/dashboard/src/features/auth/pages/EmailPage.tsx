@@ -26,6 +26,9 @@ export default function EmailPage() {
   } = useEmailTemplates();
 
   const hasCustomProvider = smtpConfig?.enabled || resendConfig?.enabled;
+  // Backend resolves providers Resend > SMTP > Cloud, so when both are enabled
+  // SMTP never runs. Surface that precedence instead of silently ignoring SMTP.
+  const smtpShadowedByResend = Boolean(resendConfig?.enabled && smtpConfig?.enabled);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
@@ -67,6 +70,11 @@ export default function EmailPage() {
                 Configure a custom SMTP server for sending emails. Your credentials are always
                 encrypted.
               </p>
+              {smtpShadowedByResend && (
+                <p className="mt-2 text-[13px] text-amber-600 dark:text-amber-500">
+                  Resend is enabled and takes precedence. Disable Resend above to send through SMTP.
+                </p>
+              )}
             </div>
             <div className="px-6 py-6">
               <SmtpSettingsCard
