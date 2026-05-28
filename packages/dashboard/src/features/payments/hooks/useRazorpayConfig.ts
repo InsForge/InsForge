@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type {
-  RazorpayEnvironment,
-} from '@insforge/shared-schemas';
-import { razorpayService, type GetRazorpayConfigResponse, type UpsertRazorpayConfigRequest } from '#features/payments/services/razorpay.service';
+import type { RazorpayEnvironment } from '@insforge/shared-schemas';
+import {
+  razorpayService,
+  type GetRazorpayConfigResponse,
+  type UpsertRazorpayConfigRequest,
+} from '#features/payments/services/razorpay.service';
 import { useToast } from '#lib/hooks/useToast';
 
 const RAZORPAY_CONFIG_QUERY_KEY = ['payments', 'razorpay', 'config'];

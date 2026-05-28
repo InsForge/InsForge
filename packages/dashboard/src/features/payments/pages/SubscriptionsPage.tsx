@@ -300,7 +300,13 @@ function SubscriptionRow({
           </div>
 
           <div className="px-2 py-3">
-            <ProviderBadge provider={(!subscription.stripeCustomerId || subscription.stripeCustomerId.startsWith('cust_')) ? 'Razorpay' : 'Stripe'} />
+            <ProviderBadge
+              provider={
+                !subscription.stripeCustomerId || subscription.stripeCustomerId.startsWith('cust_')
+                  ? 'Razorpay'
+                  : 'Stripe'
+              }
+            />
           </div>
 
           <div className="px-2 py-3">
@@ -354,8 +360,15 @@ export default function SubscriptionsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<string | null>(null);
 
-  const { activeConnection, activeRazorpayConnection, hasActiveKey, subscriptions, isLoading, error, refetch } =
-    usePaymentSubscriptions(environment);
+  const {
+    activeConnection,
+    activeRazorpayConnection,
+    hasActiveKey,
+    subscriptions,
+    isLoading,
+    error,
+    refetch,
+  } = usePaymentSubscriptions(environment);
   const { customers } = usePaymentCustomers(environment);
   const { products, prices } = usePaymentCatalog(environment);
 
@@ -397,7 +410,9 @@ export default function SubscriptionsPage() {
     }
 
     return subscriptions.filter((subscription) => {
-      const customer = subscription.stripeCustomerId ? (customersById.get(subscription.stripeCustomerId) ?? null) : null;
+      const customer = subscription.stripeCustomerId
+        ? (customersById.get(subscription.stripeCustomerId) ?? null)
+        : null;
       const itemValues = (subscription.items ?? []).flatMap((item) => {
         const product = item.stripeProductId
           ? (productsById.get(item.stripeProductId) ?? null)
@@ -452,7 +467,10 @@ export default function SubscriptionsPage() {
         leftSlot={
           hasActiveKey ? (
             <span className="text-xs text-muted-foreground">
-              Last synced: {formatLastSynced(activeConnection?.lastSyncedAt ?? activeRazorpayConnection?.lastSyncedAt ?? null)}
+              Last synced:{' '}
+              {formatLastSynced(
+                activeConnection?.lastSyncedAt ?? activeRazorpayConnection?.lastSyncedAt ?? null
+              )}
             </span>
           ) : null
         }
@@ -511,7 +529,11 @@ export default function SubscriptionsPage() {
                       <SubscriptionRow
                         key={`${subscription.environment}:${subscription.stripeSubscriptionId}`}
                         subscription={subscription}
-                        customer={subscription.stripeCustomerId ? (customersById.get(subscription.stripeCustomerId) ?? null) : null}
+                        customer={
+                          subscription.stripeCustomerId
+                            ? (customersById.get(subscription.stripeCustomerId) ?? null)
+                            : null
+                        }
                         productsById={productsById}
                         pricesById={pricesById}
                         expanded={expandedSubscriptionId === subscription.stripeSubscriptionId}

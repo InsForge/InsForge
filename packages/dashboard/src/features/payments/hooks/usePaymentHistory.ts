@@ -20,17 +20,17 @@ export function usePaymentHistory(environment: StripeEnvironment) {
 
   const connections = useMemo(() => statusData?.connections ?? [], [statusData]);
   const razorpayConnections = useMemo(() => statusData?.razorpayConnections ?? [], [statusData]);
-  
+
   const activeConnection = useMemo(
     () => connections.find((connection) => connection.environment === environment) ?? null,
     [connections, environment]
   );
-  
+
   const activeRazorpayConnection = useMemo(
     () => razorpayConnections.find((connection) => connection.environment === environment) ?? null,
     [razorpayConnections, environment]
   );
-  
+
   const hasActiveKey = !!activeConnection?.maskedKey || !!activeRazorpayConnection?.maskedKey;
 
   const {

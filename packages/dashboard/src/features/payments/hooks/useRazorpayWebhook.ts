@@ -1,6 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { RazorpayEnvironment } from '@insforge/shared-schemas';
-import { razorpayService, type GetRazorpayStatusResponse } from '#features/payments/services/razorpay.service';
+import {
+  razorpayService,
+  type GetRazorpayStatusResponse,
+} from '#features/payments/services/razorpay.service';
 import { useToast } from '#lib/hooks/useToast';
 
 const RAZORPAY_STATUS_QUERY_KEY = ['payments', 'razorpay', 'status'];

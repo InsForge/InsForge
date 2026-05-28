@@ -1,5 +1,5 @@
 import type { Pool } from 'pg';
-import crypto from 'crypto';
+
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
@@ -13,7 +13,6 @@ import {
   RAZORPAY_KEY_ID_BY_ENVIRONMENT,
   RAZORPAY_KEY_SECRET_BY_ENVIRONMENT,
   RAZORPAY_WEBHOOK_SECRET_BY_ENVIRONMENT,
-  RAZORPAY_MANAGED_WEBHOOK_EVENTS,
 } from '@/services/payments/constants.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
 import logger from '@/utils/logger.js';
@@ -23,7 +22,11 @@ import {
   type RazorpayEnvironment,
   type RazorpayConnectionRow,
 } from '@/types/payments.js';
-import { ERROR_CODES, type RazorpayConnection, type RazorpayKeyConfig } from '@insforge/shared-schemas';
+import {
+  ERROR_CODES,
+  type RazorpayConnection,
+  type RazorpayKeyConfig,
+} from '@insforge/shared-schemas';
 
 export class RazorpayConfigService {
   private static instance: RazorpayConfigService;
@@ -49,7 +52,9 @@ export class RazorpayConfigService {
     const keyId = await SecretService.getInstance().getSecretByKey(
       RAZORPAY_KEY_ID_BY_ENVIRONMENT[environment]
     );
-    if (!keyId) return null;
+    if (!keyId) {
+      return null;
+    }
     validateRazorpayKey(environment, keyId);
     return keyId;
   }
@@ -141,7 +146,7 @@ export class RazorpayConfigService {
          WHERE key = $1 AND is_active = true`,
         [RAZORPAY_KEY_SECRET_BY_ENVIRONMENT[environment]]
       );
-      const resultWebhook = await client.query(
+      await client.query(
         `UPDATE system.secrets SET is_active = false, updated_at = NOW()
          WHERE key = $1 AND is_active = true`,
         [RAZORPAY_WEBHOOK_SECRET_BY_ENVIRONMENT[environment]]
@@ -222,7 +227,7 @@ export class RazorpayConfigService {
     const keyId = await this.getRazorpayKeyId(environment);
     const maskedKey = keyId ? maskRazorpayKey(keyId) : null;
 
-    return this.normalizeConnectionRow(row.rows[0]!, maskedKey);
+    return this.normalizeConnectionRow(row.rows[0] as RazorpayConnectionRow, maskedKey);
   }
 
   async getRazorpayStatus(): Promise<RazorpayConnection[]> {
@@ -303,14 +308,14 @@ export class RazorpayConfigService {
 
   async configureWebhook(
     environment: RazorpayEnvironment,
-    provider: RazorpayProvider
+    _provider: RazorpayProvider
   ): Promise<RazorpayConnection> {
     let webhookSecret = await this.getRazorpayWebhookSecret(environment);
-    
+
     if (!webhookSecret) {
       // Auto-generate a secure random secret for Razorpay webhooks
       webhookSecret = generateSecureToken(32);
-      
+
       const secretName = RAZORPAY_WEBHOOK_SECRET_BY_ENVIRONMENT[environment];
       await this.getPool().query(
         `INSERT INTO system.secrets (key, value_ciphertext, is_active, is_reserved)

@@ -402,8 +402,15 @@ export default function CustomersPage() {
     { columnKey: 'lastPaymentAt', direction: 'DESC' },
   ]);
 
-  const { activeConnection, activeRazorpayConnection, hasActiveKey, customers, isLoading, error, refetch } =
-    usePaymentCustomers(environment);
+  const {
+    activeConnection,
+
+    hasActiveKey,
+    customers,
+    isLoading,
+    error,
+    refetch,
+  } = usePaymentCustomers(environment);
 
   const filteredCustomers = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();

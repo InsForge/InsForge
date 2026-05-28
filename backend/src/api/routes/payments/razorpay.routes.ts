@@ -1,7 +1,5 @@
-import { Router } from 'express';
-import type { Response, NextFunction } from 'express';
-import type { AuthRequest } from '@/api/middlewares/auth.js';
-import { verifyAdmin } from '@/api/middlewares/auth.js';
+import { Router, type Response, type NextFunction } from 'express';
+import { verifyAdmin, type AuthRequest } from '@/api/middlewares/auth.js';
 import { AppError } from '@/utils/errors.js';
 import { successResponse } from '@/utils/response.js';
 import { RazorpayConfigService } from '@/services/payments/razorpay-config.service.js';
@@ -139,16 +137,18 @@ router.put(
       }
 
       const secretKey = RAZORPAY_WEBHOOK_SECRET_BY_ENVIRONMENT[environment];
-      await DatabaseManager.getInstance().getPool().query(
-        `INSERT INTO system.secrets (key, value_ciphertext, is_active, is_reserved)
+      await DatabaseManager.getInstance()
+        .getPool()
+        .query(
+          `INSERT INTO system.secrets (key, value_ciphertext, is_active, is_reserved)
          VALUES ($1, $2, true, true)
          ON CONFLICT (key) DO UPDATE SET
            value_ciphertext = EXCLUDED.value_ciphertext,
            is_active        = true,
            is_reserved      = true,
            updated_at       = NOW()`,
-        [secretKey, EncryptionManager.encrypt(validation.data.webhookSecret)]
-      );
+          [secretKey, EncryptionManager.encrypt(validation.data.webhookSecret)]
+        );
 
       successResponse(res, { ok: true });
     } catch (error) {
@@ -165,14 +165,10 @@ router.post(
     try {
       const environment = getEnvironment(req.params);
       const results = await syncService.syncAll(environment);
-      const result = results[0]!;
+      const [result] = results;
 
       if (result.status === 'failed') {
-        throw new AppError(
-          result.error ?? 'Razorpay sync failed',
-          500,
-          ERROR_CODES.INTERNAL_ERROR
-        );
+        throw new AppError(result.error ?? 'Razorpay sync failed', 500, ERROR_CODES.INTERNAL_ERROR);
       }
 
       const connection = await configService.getConnection(environment);
@@ -248,7 +244,7 @@ router.post(
       }
 
       // Route to specific handlers based on event type
-      const handled = await handleRazorpayWebhookEvent(environment, payload);
+      const handled = handleRazorpayWebhookEvent(environment, payload);
 
       const eventId = `${payload.account_id}.${payload.event}.${payload.created_at}`;
       await webhookService.markWebhookEvent(
@@ -270,10 +266,10 @@ router.post(
  * On any recognized event we trigger a lightweight re-sync for that environment
  * so the database stays fresh without waiting for the next manual sync.
  */
-async function handleRazorpayWebhookEvent(
+function handleRazorpayWebhookEvent(
   environment: RazorpayEnvironment,
   payload: RazorpayWebhookPayload
-): Promise<boolean> {
+): boolean {
   const { event } = payload;
 
   const handledEvents = [
@@ -303,7 +299,7 @@ async function handleRazorpayWebhookEvent(
   // The sync service is idempotent and safe to call concurrently.
   syncService.syncAll(environment).catch((err) => {
     const message = err instanceof Error ? err.message : String(err);
-    // eslint-disable-next-line no-console
+
     console.error(`[Razorpay Webhook] Background sync failed for ${environment}: ${message}`);
   });
 

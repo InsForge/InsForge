@@ -154,12 +154,13 @@ function getPaymentProvider(payment: PaymentHistory) {
     payment.stripeInvoiceId,
   ].filter(Boolean) as string[];
 
-  const isRazorpay = ids.some(id => 
-    id.startsWith('pay_') || 
-    id.startsWith('order_') || 
-    id.startsWith('cust_') || 
-    id.startsWith('rfnd_') || 
-    id.startsWith('inv_')
+  const isRazorpay = ids.some(
+    (id) =>
+      id.startsWith('pay_') ||
+      id.startsWith('order_') ||
+      id.startsWith('cust_') ||
+      id.startsWith('rfnd_') ||
+      id.startsWith('inv_')
   );
 
   return isRazorpay ? 'Razorpay' : 'Stripe';
@@ -244,8 +245,15 @@ function PaymentHistoryRow({ payment }: { payment: PaymentHistory }) {
 export default function PaymentHistoryPage() {
   const { openPaymentsSettings, environment } = useOutletContext<PaymentsOutletContext>();
   const [searchQuery, setSearchQuery] = useState('');
-  const { activeConnection, activeRazorpayConnection, hasActiveKey, paymentHistory, isLoading, error, refetch } =
-    usePaymentHistory(environment);
+  const {
+    activeConnection,
+    activeRazorpayConnection,
+    hasActiveKey,
+    paymentHistory,
+    isLoading,
+    error,
+    refetch,
+  } = usePaymentHistory(environment);
 
   const filteredPaymentHistory = useMemo(() => {
     const normalizedSearch = searchQuery.trim().toLowerCase();

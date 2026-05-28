@@ -77,7 +77,7 @@ export class RazorpayWebhookService {
       [environment, eventId, payload.event]
     );
 
-    const row = result.rows[0]!;
+    const row = result.rows[0] as RazorpayWebhookEventRow;
     const shouldProcess = row.processingStatus !== 'processed';
 
     if (!shouldProcess) {
@@ -117,6 +117,6 @@ export class RazorpayWebhookService {
       [environment, eventId, status, error]
     );
 
-    return result.rows[0]!;
+    return result.rows[0] as RazorpayWebhookEventRow;
   }
 }

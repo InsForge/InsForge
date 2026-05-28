@@ -71,31 +71,34 @@ export class RazorpayService {
     });
   }
 
-  async configureWebhook(environment: RazorpayEnvironment): Promise<ConfigureRazorpayWebhookResponse> {
+  async configureWebhook(
+    environment: RazorpayEnvironment
+  ): Promise<ConfigureRazorpayWebhookResponse> {
     return apiClient.request(`/payments/razorpay/${environment}/webhook-configure`, {
       method: 'POST',
       headers: apiClient.withAccessToken(),
     });
   }
 
-  async syncPayments(input: SyncRazorpayPaymentsRequest): Promise<SyncRazorpayPaymentsResponse | SyncRazorpayPaymentsResponse[]> {
+  async syncPayments(
+    input: SyncRazorpayPaymentsRequest
+  ): Promise<SyncRazorpayPaymentsResponse | SyncRazorpayPaymentsResponse[]> {
     if (input.environment === 'all') {
       const results = await Promise.allSettled([
         this.syncPayments({ environment: 'test' }),
         this.syncPayments({ environment: 'live' }),
       ]);
-      
+
       const successes = results
         .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
-        .map(r => r.value);
-        
-      const failures = results
-        .filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+        .map((r) => r.value);
+
+      const failures = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
 
       if (successes.length === 0 && failures.length > 0) {
         throw failures[0].reason;
       }
-      
+
       return successes as SyncRazorpayPaymentsResponse[];
     }
 
