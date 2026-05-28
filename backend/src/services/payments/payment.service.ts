@@ -83,6 +83,7 @@ import {
   type SyncPaymentsResponse,
   type SyncPaymentsEnvironmentResult,
   type SyncPaymentsSubscriptionsSummary,
+  type RazorpayConnection,
 } from '@insforge/shared-schemas';
 
 export class PaymentService {
