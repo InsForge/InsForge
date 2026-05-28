@@ -510,22 +510,20 @@ export class RazorpaySyncService {
 
       // Clean up subscriptions that are no longer in Razorpay
       const syncedIds = subscriptions.map((s) => s.id);
-      if (syncedIds.length > 0) {
-        await client.query(
-          `DELETE FROM payments.subscription_items
-           WHERE environment = $1
-             AND stripe_subscription_id LIKE 'sub_%'
-             AND NOT (stripe_subscription_id = ANY($2::TEXT[]))`,
-          [environment, syncedIds]
-        );
-        await client.query(
-          `DELETE FROM payments.subscriptions
-           WHERE environment = $1
-             AND stripe_subscription_id LIKE 'sub_%'
-             AND NOT (stripe_subscription_id = ANY($2::TEXT[]))`,
-          [environment, syncedIds]
-        );
-      }
+      await client.query(
+        `DELETE FROM payments.subscription_items
+         WHERE environment = $1
+           AND (raw->>'entity' = 'subscription_item' OR raw->>'entity' = 'item')
+           AND NOT (stripe_subscription_id = ANY($2::TEXT[]))`,
+        [environment, syncedIds]
+      );
+      await client.query(
+        `DELETE FROM payments.subscriptions
+         WHERE environment = $1
+           AND raw->>'entity' = 'subscription'
+           AND NOT (stripe_subscription_id = ANY($2::TEXT[]))`,
+        [environment, syncedIds]
+      );
 
       await client.query('COMMIT');
     } catch (err) {

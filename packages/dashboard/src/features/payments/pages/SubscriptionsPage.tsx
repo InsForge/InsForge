@@ -302,9 +302,7 @@ function SubscriptionRow({
           <div className="px-2 py-3">
             <ProviderBadge
               provider={
-                !subscription.stripeCustomerId || subscription.stripeCustomerId.startsWith('cust_')
-                  ? 'Razorpay'
-                  : 'Stripe'
+                ((subscription as any).raw as any)?.entity === 'subscription' ? 'Razorpay' : 'Stripe'
               }
             />
           </div>

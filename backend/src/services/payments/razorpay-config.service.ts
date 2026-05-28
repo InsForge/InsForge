@@ -77,6 +77,8 @@ export class RazorpayConfigService {
     keySecret: string,
     webhookSecret?: string
   ): Promise<void> {
+    validateRazorpayKey(environment, keyId);
+
     const keyIdKey = RAZORPAY_KEY_ID_BY_ENVIRONMENT[environment];
     const keySecretKey = RAZORPAY_KEY_SECRET_BY_ENVIRONMENT[environment];
     const webhookSecretKey = RAZORPAY_WEBHOOK_SECRET_BY_ENVIRONMENT[environment];
@@ -84,10 +86,12 @@ export class RazorpayConfigService {
     const encryptedKeyId = EncryptionManager.encrypt(keyId);
     const encryptedKeySecret = EncryptionManager.encrypt(keySecret);
 
-    await this.getPool().query('BEGIN');
+    const client = await this.getPool().connect();
     try {
+      await client.query('BEGIN');
+
       // Save Key ID
-      await this.getPool().query(
+      await client.query(
         `INSERT INTO system.secrets (key, value_ciphertext, is_active, is_reserved)
          VALUES ($1, $2, true, true)
          ON CONFLICT (key) DO UPDATE SET
@@ -99,7 +103,7 @@ export class RazorpayConfigService {
       );
 
       // Save Key Secret
-      await this.getPool().query(
+      await client.query(
         `INSERT INTO system.secrets (key, value_ciphertext, is_active, is_reserved)
          VALUES ($1, $2, true, true)
          ON CONFLICT (key) DO UPDATE SET
@@ -113,7 +117,7 @@ export class RazorpayConfigService {
       // Save Webhook Secret (if provided)
       if (webhookSecret) {
         const encryptedWebhookSecret = EncryptionManager.encrypt(webhookSecret);
-        await this.getPool().query(
+        await client.query(
           `INSERT INTO system.secrets (key, value_ciphertext, is_active, is_reserved)
            VALUES ($1, $2, true, true)
            ON CONFLICT (key) DO UPDATE SET
@@ -125,10 +129,12 @@ export class RazorpayConfigService {
         );
       }
 
-      await this.getPool().query('COMMIT');
+      await client.query('COMMIT');
     } catch (error) {
-      await this.getPool().query('ROLLBACK');
+      await client.query('ROLLBACK');
       throw error;
+    } finally {
+      client.release();
     }
   }
 
@@ -334,12 +340,14 @@ export class RazorpayConfigService {
     // Standard Razorpay integrations do not support creating webhooks via API.
     // We generate the secret and URL locally so the user can copy them into the Razorpay Dashboard.
     await this.getPool().query(
-      `UPDATE payments.razorpay_connections
-       SET webhook_endpoint_id   = 'manual',
-           webhook_endpoint_url  = $1,
-           webhook_configured_at = NOW(),
-           updated_at            = NOW()
-       WHERE environment = $2`,
+      `INSERT INTO payments.razorpay_connections
+         (environment, webhook_endpoint_id, webhook_endpoint_url, webhook_configured_at, updated_at)
+       VALUES ($2, 'manual', $1, NOW(), NOW())
+       ON CONFLICT (environment) DO UPDATE SET
+         webhook_endpoint_id   = EXCLUDED.webhook_endpoint_id,
+         webhook_endpoint_url  = EXCLUDED.webhook_endpoint_url,
+         webhook_configured_at = EXCLUDED.webhook_configured_at,
+         updated_at            = EXCLUDED.updated_at`,
       [webhookUrl, environment]
     );
 

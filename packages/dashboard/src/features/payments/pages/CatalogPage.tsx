@@ -383,6 +383,15 @@ export default function CatalogPage() {
 
   const handlePageChange = useCallback((_page: number) => {}, []);
 
+  const lastSyncedTimes = [
+    activeConnection?.lastSyncedAt,
+    activeRazorpayConnection?.lastSyncedAt,
+  ].filter(Boolean);
+
+  const mostRecentSync = (lastSyncedTimes.length > 0
+    ? lastSyncedTimes.sort((a, b) => new Date(b!).getTime() - new Date(a!).getTime())[0]
+    : null) ?? null;
+
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
       <TableHeader
@@ -394,10 +403,7 @@ export default function CatalogPage() {
         leftSlot={
           hasActiveKey ? (
             <span className="text-xs text-muted-foreground">
-              Last synced:{' '}
-              {formatLastSynced(
-                activeConnection?.lastSyncedAt ?? activeRazorpayConnection?.lastSyncedAt ?? null
-              )}
+              Last synced: {formatLastSynced(mostRecentSync)}
             </span>
           ) : null
         }

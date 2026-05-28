@@ -225,7 +225,12 @@ export class RazorpayProvider {
    */
   verifyWebhookSignature(rawBody: string, signature: string, webhookSecret: string): boolean {
     const expected = crypto.createHmac('sha256', webhookSecret).update(rawBody).digest('hex');
-    return crypto.timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(signature, 'hex'));
+    const expectedBuf = Buffer.from(expected, 'hex');
+    const signatureBuf = Buffer.from(signature, 'hex');
+    if (expectedBuf.length !== signatureBuf.length) {
+      return false;
+    }
+    return crypto.timingSafeEqual(expectedBuf, signatureBuf);
   }
 
   /**
@@ -243,20 +248,53 @@ export class RazorpayProvider {
   }
 
   async listPlans(): Promise<RazorpayPlan[]> {
-    const response = (await this.client.plans.all({ count: 100 })) as { items: RazorpayPlan[] };
-    return response.items ?? [];
+    const all: RazorpayPlan[] = [];
+    let skip = 0;
+    const count = 100;
+    while (true) {
+      const response = (await this.client.plans.all({ count, skip })) as { items: RazorpayPlan[] };
+      const items = response.items ?? [];
+      all.push(...items);
+      if (items.length < count) {
+        break;
+      }
+      skip += count;
+    }
+    return all;
   }
 
   async listItems(): Promise<RazorpayItem[]> {
-    const response = (await this.client.items.all({ count: 100 })) as { items: RazorpayItem[] };
-    return response.items ?? [];
+    const all: RazorpayItem[] = [];
+    let skip = 0;
+    const count = 100;
+    while (true) {
+      const response = (await this.client.items.all({ count, skip })) as { items: RazorpayItem[] };
+      const items = response.items ?? [];
+      all.push(...items);
+      if (items.length < count) {
+        break;
+      }
+      skip += count;
+    }
+    return all;
   }
 
   async listCustomers(): Promise<RazorpayCustomer[]> {
-    const response = (await this.client.customers.all({ count: 100 })) as {
-      items: RazorpayCustomer[];
-    };
-    return response.items ?? [];
+    const all: RazorpayCustomer[] = [];
+    let skip = 0;
+    const count = 100;
+    while (true) {
+      const response = (await this.client.customers.all({ count, skip })) as {
+        items: RazorpayCustomer[];
+      };
+      const items = response.items ?? [];
+      all.push(...items);
+      if (items.length < count) {
+        break;
+      }
+      skip += count;
+    }
+    return all;
   }
 
   async listSubscriptions(): Promise<RazorpaySubscription[]> {
