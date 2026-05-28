@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, CopyButton } from '@insforge/ui';
-import { Database, Sparkles, Rocket } from 'lucide-react';
+import { Database, Rocket } from 'lucide-react';
 import StepUserIcon from '#assets/icons/step_user.svg?react';
 import StepUploadIcon from '#assets/icons/step_upload.svg?react';
 import stepBgDecoration from '#assets/images/step_bg_decoration.svg';
@@ -13,7 +13,7 @@ import { useMcpUsage } from '#features/logs/hooks/useMcpUsage';
 
 // --- Prompt Stepper Data ---
 
-type StepKey = 'database' | 'auth' | 'storage' | 'ai' | 'deployment';
+type StepKey = 'database' | 'auth' | 'storage' | 'deployment';
 
 interface PromptStep {
   id: number;
@@ -57,16 +57,6 @@ const PROMPT_STEPS: PromptStep[] = [
   },
   {
     id: 4,
-    key: 'ai',
-    category: 'Model Gateway',
-    title: 'Add LLM feature',
-    prompt:
-      'Use InsForge Skills to add an AI feature to this app using the InsForge Model Gateway.\nUsers should be able to type natural language and have the AI generate a useful response automatically.',
-    icon: <Sparkles className="size-12 text-[rgb(var(--disabled))]" />,
-    navigateTo: { label: 'Go to Model Gateway', path: '/dashboard/ai/overview' },
-  },
-  {
-    id: 5,
     key: 'deployment',
     category: 'Deployment',
     title: 'Deploy your site',
@@ -316,7 +306,6 @@ export function DashboardPromptStepper() {
       database: databaseStepComplete,
       auth: (totalUsers ?? 0) >= 1,
       storage: storageStepComplete,
-      ai: false,
       deployment: !!currentDeploymentId,
     }),
     [databaseStepComplete, totalUsers, storageStepComplete, currentDeploymentId]
