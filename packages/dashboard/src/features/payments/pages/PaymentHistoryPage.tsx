@@ -16,12 +16,13 @@ import {
   TableHeader,
 } from '#components';
 import { PaymentsKeyMissingState } from '#features/payments/components/PaymentsKeyMissingState';
+import { ProviderBadge } from '#features/payments/components/ProviderBadge';
 import type { PaymentsOutletContext } from '#features/payments/components/PaymentsLayout';
 import { usePaymentHistory } from '#features/payments/hooks/usePaymentHistory';
 import { cn } from '#lib/utils/utils';
 
 const PAYMENT_HISTORY_GRID_TEMPLATE =
-  'minmax(0,1.45fr) 160px minmax(0,1.1fr) 160px minmax(0,1fr) 200px';
+  'minmax(0,1.45fr) 120px 100px minmax(0,1.1fr) 120px minmax(0,1fr) 180px';
 
 const PAYMENT_STATUS_CLASS_NAMES: Record<PaymentHistoryStatus, string> = {
   succeeded: 'bg-[var(--alpha-8)] text-emerald-400',
@@ -144,6 +145,26 @@ function PaymentStatusBadge({ status }: { status: PaymentHistoryStatus }) {
   );
 }
 
+function getPaymentProvider(payment: PaymentHistory) {
+  const ids = [
+    payment.stripePaymentIntentId,
+    payment.stripeChargeId,
+    payment.stripeCustomerId,
+    payment.stripeRefundId,
+    payment.stripeInvoiceId,
+  ].filter(Boolean) as string[];
+
+  const isRazorpay = ids.some(id => 
+    id.startsWith('pay_') || 
+    id.startsWith('order_') || 
+    id.startsWith('cust_') || 
+    id.startsWith('rfnd_') || 
+    id.startsWith('inv_')
+  );
+
+  return isRazorpay ? 'Razorpay' : 'Stripe';
+}
+
 function EmptyPaymentHistoryState({ hasSearchQuery }: { hasSearchQuery: boolean }) {
   return (
     <div className="rounded border border-dashed border-[var(--alpha-8)] bg-card p-8 text-center">
@@ -153,7 +174,7 @@ function EmptyPaymentHistoryState({ hasSearchQuery }: { hasSearchQuery: boolean 
       <p className="mt-1 text-sm text-muted-foreground">
         {hasSearchQuery
           ? 'Try a different payment type, customer, payment intent, or invoice reference.'
-          : 'Checkout, invoice, and refund events will appear here after Stripe activity is recorded.'}
+          : 'Checkout, invoice, and refund events will appear here after payment activity is recorded.'}
       </p>
     </div>
   );
@@ -174,6 +195,10 @@ function PaymentHistoryRow({ payment }: { payment: PaymentHistory }) {
 
         <div className="px-2 py-3">
           <PaymentStatusBadge status={payment.status} />
+        </div>
+
+        <div className="px-2 py-3">
+          <ProviderBadge provider={getPaymentProvider(payment)} />
         </div>
 
         <div className="min-w-0 px-2 py-3">
@@ -219,7 +244,7 @@ function PaymentHistoryRow({ payment }: { payment: PaymentHistory }) {
 export default function PaymentHistoryPage() {
   const { openPaymentsSettings, environment } = useOutletContext<PaymentsOutletContext>();
   const [searchQuery, setSearchQuery] = useState('');
-  const { activeConnection, paymentHistory, isLoading, error, refetch } =
+  const { activeConnection, activeRazorpayConnection, hasActiveKey, paymentHistory, isLoading, error, refetch } =
     usePaymentHistory(environment);
 
   const filteredPaymentHistory = useMemo(() => {
@@ -253,7 +278,6 @@ export default function PaymentHistoryPage() {
   }, [paymentHistory, searchQuery]);
 
   const handlePageChange = useCallback((_page: number) => {}, []);
-  const hasActiveKey = !!activeConnection?.maskedKey;
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
@@ -274,7 +298,7 @@ export default function PaymentHistoryPage() {
         {error ? (
           <ErrorState error={error as Error} onRetry={() => void refetch()} />
         ) : isLoading ? (
-          <LoadingState message="Loading Stripe payment history..." />
+          <LoadingState message="Loading payment history..." />
         ) : !hasActiveKey ? (
           <PaymentsKeyMissingState
             environment={environment}
@@ -288,9 +312,18 @@ export default function PaymentHistoryPage() {
                 {activeConnection?.lastSyncError && (
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Latest sync failed</AlertTitle>
+                    <AlertTitle>Latest Stripe sync failed</AlertTitle>
                     <AlertDescription className="mt-2">
                       {activeConnection.lastSyncError}
+                    </AlertDescription>
+                  </Alert>
+                )}
+                {activeRazorpayConnection?.lastSyncError && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Latest Razorpay sync failed</AlertTitle>
+                    <AlertDescription className="mt-2">
+                      {activeRazorpayConnection.lastSyncError}
                     </AlertDescription>
                   </Alert>
                 )}
@@ -301,6 +334,7 @@ export default function PaymentHistoryPage() {
                 >
                   <div className="px-2 py-1.5">Payment</div>
                   <div className="px-2 py-1.5">Status</div>
+                  <div className="px-2 py-1.5">Provider</div>
                   <div className="px-2 py-1.5">Customer</div>
                   <div className="px-2 py-1.5">Amount</div>
                   <div className="px-2 py-1.5">Payment ID</div>
