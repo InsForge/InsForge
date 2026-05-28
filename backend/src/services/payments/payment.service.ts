@@ -174,10 +174,19 @@ export class PaymentService {
   }
 
   async getStatus(): Promise<GetPaymentsStatusResponse> {
-    const [stripeStatus, razorpayStatus] = await Promise.all([
-      this.configService.getStatus(),
-      this.razorpayConfigService.getRazorpayStatus(),
-    ]);
+    const stripeStatus = await this.configService.getStatus();
+
+    let razorpayStatus: RazorpayConnection[] = [];
+    try {
+      razorpayStatus = await this.razorpayConfigService.getRazorpayStatus();
+    } catch (err) {
+      logger.error(
+        'Failed to get Razorpay status',
+        err instanceof Error ? err : new Error(String(err))
+      );
+      // Return empty array or keep previous default depending on behavior
+      // The Stripe status should still be returned
+    }
 
     return {
       connections: stripeStatus.connections,

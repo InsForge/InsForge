@@ -95,7 +95,7 @@ export class RazorpayService {
 
       const failures = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
 
-      if (successes.length === 0 && failures.length > 0) {
+      if (failures.length > 0) {
         throw failures[0].reason;
       }
 

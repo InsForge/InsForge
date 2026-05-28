@@ -273,12 +273,14 @@ export class PaymentSubscriptionService {
       await client.query(
         `DELETE FROM payments.subscription_items
          WHERE environment = $1
+           AND raw->>'object' = 'subscription_item'
            AND NOT (stripe_subscription_id = ANY($2::TEXT[]))`,
         [environment, stripeSubscriptionIds]
       );
       const result = await client.query(
         `DELETE FROM payments.subscriptions
          WHERE environment = $1
+           AND raw->>'object' = 'subscription'
            AND NOT (stripe_subscription_id = ANY($2::TEXT[]))`,
         [environment, stripeSubscriptionIds]
       );

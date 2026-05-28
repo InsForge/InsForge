@@ -53,17 +53,13 @@ export class RazorpayWebhookService {
     // since it does not send a stable event ID in the OSS API.
     const eventId = `${payload.account_id}.${payload.event}.${payload.created_at}`;
 
-    const result = await this.getPool().query<RazorpayWebhookEventRow>(
+    const pendingReclaimCutoff = new Date(Date.now() - 5 * 60 * 1000); // 5 minutes
+
+    const insertResult = await this.getPool().query<RazorpayWebhookEventRow>(
       `INSERT INTO payments.razorpay_webhook_events
          (environment, event_id, event_type, processing_status, attempt_count, received_at)
        VALUES ($1, $2, $3, 'pending', 1, NOW())
-       ON CONFLICT (environment, event_id) DO UPDATE SET
-         attempt_count     = payments.razorpay_webhook_events.attempt_count + 1,
-         processing_status = CASE
-           WHEN payments.razorpay_webhook_events.processing_status = 'processed' THEN 'processed'
-           ELSE 'pending'
-         END,
-         updated_at = NOW()
+       ON CONFLICT (environment, event_id) DO NOTHING
        RETURNING
          id,
          environment,
@@ -77,18 +73,66 @@ export class RazorpayWebhookService {
       [environment, eventId, payload.event]
     );
 
-    const row = result.rows[0] as RazorpayWebhookEventRow;
-    const shouldProcess = row.processingStatus !== 'processed';
-
-    if (!shouldProcess) {
-      logger.info('Razorpay webhook event already processed — skipping', {
-        environment,
-        eventId,
-        eventType: payload.event,
-      });
+    const inserted = insertResult.rows[0];
+    if (inserted) {
+      return { row: inserted, shouldProcess: true };
     }
 
-    return { shouldProcess, row };
+    const retryResult = await this.getPool().query<RazorpayWebhookEventRow>(
+      `UPDATE payments.razorpay_webhook_events
+       SET processing_status = 'pending',
+           attempt_count = attempt_count + 1,
+           last_error = NULL,
+           processed_at = NULL,
+           updated_at = NOW()
+       WHERE environment = $1
+         AND event_id = $2
+         AND (
+           processing_status = 'failed'
+           OR (processing_status = 'pending' AND updated_at < $3)
+         )
+       RETURNING
+         id,
+         environment,
+         event_id           AS "eventId",
+         event_type         AS "eventType",
+         processing_status  AS "processingStatus",
+         attempt_count      AS "attemptCount",
+         last_error         AS "lastError",
+         received_at        AS "receivedAt",
+         processed_at       AS "processedAt"`,
+      [environment, eventId, pendingReclaimCutoff]
+    );
+
+    const retried = retryResult.rows[0];
+    if (retried) {
+      return { row: retried, shouldProcess: true };
+    }
+
+    const existingResult = await this.getPool().query<RazorpayWebhookEventRow>(
+      `SELECT
+         id,
+         environment,
+         event_id           AS "eventId",
+         event_type         AS "eventType",
+         processing_status  AS "processingStatus",
+         attempt_count      AS "attemptCount",
+         last_error         AS "lastError",
+         received_at        AS "receivedAt",
+         processed_at       AS "processedAt"
+       FROM payments.razorpay_webhook_events
+       WHERE environment = $1 AND event_id = $2`,
+      [environment, eventId]
+    );
+
+    const row = existingResult.rows[0] as RazorpayWebhookEventRow;
+    logger.info('Razorpay webhook event already processed or currently processing — skipping', {
+      environment,
+      eventId,
+      eventType: payload.event,
+    });
+
+    return { shouldProcess: false, row };
   }
 
   async markWebhookEvent(

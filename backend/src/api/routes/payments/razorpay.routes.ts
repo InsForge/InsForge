@@ -229,7 +229,7 @@ router.post(
 
       // Verify signature against the raw body string
       const provider = await configService.createRazorpayProvider(environment);
-      const rawBody = JSON.stringify(req.body);
+      const rawBody = ((req as any).rawBody as Buffer).toString('utf8');
       const isValid = provider.verifyWebhookSignature(rawBody, signature, webhookSecret);
       if (!isValid) {
         throw new AppError('Invalid Razorpay webhook signature', 400, ERROR_CODES.INVALID_INPUT);
@@ -244,7 +244,7 @@ router.post(
       }
 
       // Route to specific handlers based on event type
-      const handled = handleRazorpayWebhookEvent(environment, payload);
+      const handled = await handleRazorpayWebhookEvent(environment, payload);
 
       const eventId = `${payload.account_id}.${payload.event}.${payload.created_at}`;
       await webhookService.markWebhookEvent(
@@ -266,10 +266,10 @@ router.post(
  * On any recognized event we trigger a lightweight re-sync for that environment
  * so the database stays fresh without waiting for the next manual sync.
  */
-function handleRazorpayWebhookEvent(
+async function handleRazorpayWebhookEvent(
   environment: RazorpayEnvironment,
   payload: RazorpayWebhookPayload
-): boolean {
+): Promise<boolean> {
   const { event } = payload;
 
   const handledEvents = [
@@ -295,13 +295,14 @@ function handleRazorpayWebhookEvent(
     return false;
   }
 
-  // Fire-and-forget a full sync — this keeps all tables up-to-date.
-  // The sync service is idempotent and safe to call concurrently.
-  syncService.syncAll(environment).catch((err) => {
+  // Wait for sync to complete before acknowledging the webhook
+  try {
+    await syncService.syncAll(environment);
+  } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-
     console.error(`[Razorpay Webhook] Background sync failed for ${environment}: ${message}`);
-  });
+    throw err;
+  }
 
   return true;
 }
