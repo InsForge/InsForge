@@ -239,8 +239,16 @@ export class SocketManager {
       stack: error.stack,
     });
 
-    // DO NOT clean up metadata here - the socket might recover
-    // The 'disconnect' event will handle cleanup when/if the socket actually disconnects
+    // If the socket is no longer connected, clean up metadata immediately
+    // to prevent zombie entries from accumulating.
+    if (!socket.connected) {
+      const metadata = this.socketMetadata.get(socket.id);
+      logger.warn('Cleaning up metadata for disconnected socket after error', {
+        socketId: socket.id,
+        userId: metadata?.userId,
+      });
+      this.socketMetadata.delete(socket.id);
+    }
   }
 
   /**
