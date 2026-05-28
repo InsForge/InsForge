@@ -13,6 +13,7 @@
  * Exports `findDuplicateMigrations()` for the test suite; runs as a CLI (exit 1 on
  * new duplicates) when executed directly.
  */
+/* global console, process */
 import { readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
