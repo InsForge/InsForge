@@ -363,7 +363,7 @@ export default function SQLEditorPage() {
                   </span>
                 )}
               </Tab>
-              <Tab value="chart">Chart</Tab>
+              <Tab value="table">Table View</Tab>
             </Tabs>
             {/* Run Button + Export Menu */}
             <div className="flex items-center gap-2 relative">

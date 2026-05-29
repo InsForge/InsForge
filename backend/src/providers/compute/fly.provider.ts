@@ -197,12 +197,28 @@ export class FlyProvider implements ComputeProvider {
   // Machines API silently ignores unknown fields, so getting these wrong
   // looks like it works but leaves machines always-on. Source of truth:
   // https://docs.machines.dev/spec/openapi3.json — fly.MachineService.
-  private serviceConfig(internalPort: number, scale: ScaleOptions = FlyProvider.SCALE_TO_ZERO) {
+  //
+  // `edgeProtocol` selects the edge-handler shape:
+  //   - `'http'` (default): TLS-terminated at the Fly anycast edge, HTTP/1.1+H2
+  //     proxied to the container's port. Two public ports (443 TLS, 80 plain).
+  //   - `'tcp'`: container's port exposed directly with empty handlers, for
+  //     Redis / Postgres-protocol / raw TCP services. Single public port =
+  //     internal port. Fly's `services[].protocol` stays `'tcp'` either way
+  //     (that's the L4 protocol field, not L7).
+  private serviceConfig(
+    internalPort: number,
+    edgeProtocol: 'http' | 'tcp' = 'http',
+    scale: ScaleOptions = FlyProvider.SCALE_TO_ZERO
+  ) {
+    const ports =
+      edgeProtocol === 'tcp'
+        ? [{ port: internalPort, handlers: [] as string[] }]
+        : [
+            { port: 443, handlers: ['tls', 'http'] },
+            { port: 80, handlers: ['http'] },
+          ];
     return {
-      ports: [
-        { port: 443, handlers: ['tls', 'http'] },
-        { port: 80, handlers: ['http'] },
-      ],
+      ports,
       internal_port: internalPort,
       protocol: 'tcp',
       // Scale config. `stop` (vs `suspend`) fully releases the machine —
@@ -223,6 +239,7 @@ export class FlyProvider implements ComputeProvider {
     memory: number;
     envVars: Record<string, string>;
     region: string;
+    protocol?: 'http' | 'tcp';
   }): Promise<{ machineId: string }> {
     const guest = this.mapCpuTier(params.cpu, params.memory);
     const result = await this.requestJson<{ id: string }>(`/apps/${params.appId}/machines`, {
@@ -232,7 +249,7 @@ export class FlyProvider implements ComputeProvider {
           image: params.image,
           guest,
           env: params.envVars,
-          services: [this.serviceConfig(params.port)],
+          services: [this.serviceConfig(params.port, params.protocol ?? 'http')],
         },
         region: params.region,
       }),
@@ -248,6 +265,7 @@ export class FlyProvider implements ComputeProvider {
     cpu: string;
     memory: number;
     envVars: Record<string, string>;
+    protocol?: 'http' | 'tcp';
   }): Promise<void> {
     const guest = this.mapCpuTier(params.cpu, params.memory);
     await this.request(`/apps/${params.appId}/machines/${params.machineId}`, {
@@ -257,7 +275,7 @@ export class FlyProvider implements ComputeProvider {
           image: params.image,
           guest,
           env: params.envVars,
-          services: [this.serviceConfig(params.port)],
+          services: [this.serviceConfig(params.port, params.protocol ?? 'http')],
         },
       }),
     });

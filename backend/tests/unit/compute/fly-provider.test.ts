@@ -182,6 +182,65 @@ describe('FlyProvider', () => {
       expect(body.config.services[0].min_machines_running).toBe(0);
       expect(body.region).toBe('iad');
     });
+
+    // INS-271: protocol: 'tcp' switches the edge-handler shape from the
+    // HTTP-terminating 443/80 pair to a single direct-passthrough port that
+    // matches internal_port with empty L7 handlers. Without this, raw TCP
+    // services (Redis, the Postgres wire protocol, etc.) wedge behind the
+    // Fly anycast HTTP proxy.
+    it('protocol: tcp sets services[].ports to a single passthrough entry with empty handlers', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(JSON.stringify({ id: 'machine-tcp' })),
+      });
+      vi.stubGlobal('fetch', mockFetch);
+
+      await provider.launchMachine({
+        appId: 'my-redis',
+        image: 'redis:7',
+        port: 6379,
+        cpu: 'shared-1x',
+        memory: 256,
+        envVars: {},
+        region: 'iad',
+        protocol: 'tcp',
+      });
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.config.services[0].internal_port).toBe(6379);
+      // Single port = internal port, no TLS/HTTP handlers — bytes pass through.
+      expect(body.config.services[0].ports).toEqual([{ port: 6379, handlers: [] }]);
+      // Fly's services[].protocol stays 'tcp' (L4 protocol) regardless of
+      // edge mode — that's a Fly API constant, not our protocol field.
+      expect(body.config.services[0].protocol).toBe('tcp');
+    });
+
+    // Back-compat — omitting `protocol` is the same as passing 'http'. We pin
+    // both call shapes so a future refactor that flips the default doesn't
+    // silently change the wire format for existing HTTP deploys.
+    it('omitting protocol defaults to http edge handlers (443 TLS + 80 plain)', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(JSON.stringify({ id: 'machine-http' })),
+      });
+      vi.stubGlobal('fetch', mockFetch);
+
+      await provider.launchMachine({
+        appId: 'my-api',
+        image: 'node:20',
+        port: 8080,
+        cpu: 'shared-1x',
+        memory: 256,
+        envVars: {},
+        region: 'iad',
+      });
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.config.services[0].ports).toEqual([
+        { port: 443, handlers: ['tls', 'http'] },
+        { port: 80, handlers: ['http'] },
+      ]);
+    });
   });
 
   describe('stopMachine', () => {

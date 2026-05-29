@@ -4,7 +4,10 @@ import AILayout from '#features/ai/components/AILayout';
 import AIOverviewPage from '#features/ai/pages/AIOverviewPage';
 import AIQuickStartPage from '#features/ai/pages/AIQuickStartPage';
 import AIModelsPage from '#features/ai/pages/AIModelsPage';
-import { AnalyticsPage } from '#features/analytics';
+import AnalyticsLayout from '#features/analytics/components/AnalyticsLayout';
+import { TrafficPage } from '#features/analytics/pages/TrafficPage';
+import { RetentionPage } from '#features/analytics/pages/RetentionPage';
+import { SessionReplayPage } from '#features/analytics/pages/SessionReplayPage';
 import AuthenticationLayout from '#features/auth/components/AuthenticationLayout';
 import AuthMethodsPage from '#features/auth/pages/AuthMethodsPage';
 import EmailPage from '#features/auth/pages/EmailPage';
@@ -142,7 +145,14 @@ function AuthenticatedRoutes() {
           <Route path="domains" element={<DeploymentDomainsPage />} />
         </Route>
         <Route path="/dashboard/compute" element={<ComputePage />} />
-        {isCloudHosting && <Route path="/dashboard/analytics" element={<AnalyticsPage />} />}
+        {isCloudHosting && (
+          <Route path="/dashboard/analytics" element={<AnalyticsLayout />}>
+            <Route index element={<Navigate to="traffic" replace />} />
+            <Route path="traffic" element={<TrafficPage />} />
+            <Route path="retention" element={<RetentionPage />} />
+            <Route path="session-replay" element={<SessionReplayPage />} />
+          </Route>
+        )}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </AppLayout>

@@ -1,6 +1,6 @@
 {
   "name": "insforge",
-  "version": "2.1.7",
+  "version": "2.1.10",
   "description": "InsForge - Open source backend-as-a-service with PostgreSQL and MCP integration",
   "type": "module",
   "workspaces": [

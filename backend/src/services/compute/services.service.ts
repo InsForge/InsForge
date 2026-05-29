@@ -33,6 +33,12 @@ export interface CreateServiceInput {
   memory: number;
   region: string;
   envVars?: Record<string, string>;
+  /**
+   * Edge protocol — `'http'` (default) for HTTP/HTTPS edge handlers,
+   * `'tcp'` for raw TCP (Redis, Postgres wire protocol, etc.). Optional;
+   * the DB column defaults to `'http'`.
+   */
+  protocol?: 'http' | 'tcp';
 }
 
 export interface UpdateServiceInput {
@@ -53,6 +59,8 @@ export interface UpdateServiceInput {
    * GET path doesn't return env values, so the merge has to happen here).
    */
   envVarsPatch?: { set?: Record<string, string>; unset?: string[] };
+  /** Edge protocol — same semantics as CreateServiceInput.protocol. */
+  protocol?: 'http' | 'tcp';
 }
 
 /**
@@ -71,6 +79,7 @@ export interface DeletedServiceSnapshot {
   cpu: string;
   memory: number;
   region: string;
+  protocol: 'http' | 'tcp';
   flyAppId: string | null;
   flyMachineId: string | null;
   endpointUrl: string | null;
@@ -87,6 +96,11 @@ interface ServiceRow {
   cpu: string;
   memory: number;
   region: string;
+  // Backfilled to 'http' for pre-INS-271 rows by the 047 migration, NOT NULL
+  // going forward. Older self-hosters who somehow have a row without the
+  // column will see undefined here; mapRowToSchema normalizes to 'http' so the
+  // response shape's required `protocol` field never goes out as undefined.
+  protocol: 'http' | 'tcp';
   fly_app_id: string | null;
   fly_machine_id: string | null;
   status: string;
@@ -106,6 +120,11 @@ function mapRowToSchema(row: ServiceRow): ServiceSchema {
     cpu: row.cpu as ServiceSchema['cpu'],
     memory: row.memory,
     region: row.region,
+    // Defense-in-depth: the migration backfills + sets NOT NULL DEFAULT 'http',
+    // but if a downstream consumer fetches a row from a pre-migration DB the
+    // serviceSchema would reject `undefined`. Fall back to 'http' so a stale
+    // schema doesn't break the response.
+    protocol: (row.protocol ?? 'http') as ServiceSchema['protocol'],
     flyAppId: row.fly_app_id,
     flyMachineId: row.fly_machine_id,
     status: row.status as ServiceSchema['status'],
@@ -329,8 +348,8 @@ export class ComputeServicesService {
     let insertResult;
     try {
       insertResult = await this.getPool().query(
-        `INSERT INTO compute.services (project_id, name, image_url, port, cpu, memory, region, env_vars_encrypted, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'creating')
+        `INSERT INTO compute.services (project_id, name, image_url, port, cpu, memory, region, protocol, env_vars_encrypted, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'creating')
          RETURNING *`,
         [
           input.projectId,
@@ -340,6 +359,7 @@ export class ComputeServicesService {
           input.cpu,
           input.memory,
           input.region,
+          input.protocol ?? 'http',
           envVarsEncrypted,
         ]
       );
@@ -376,6 +396,7 @@ export class ComputeServicesService {
         memory: input.memory,
         envVars: input.envVars ?? {},
         region: input.region,
+        protocol: input.protocol,
       });
       flyMachineId = machineId;
 
@@ -444,8 +465,8 @@ export class ComputeServicesService {
     let insertResult;
     try {
       insertResult = await this.getPool().query(
-        `INSERT INTO compute.services (project_id, name, image_url, port, cpu, memory, region, env_vars_encrypted, fly_app_id, endpoint_url, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'deploying')
+        `INSERT INTO compute.services (project_id, name, image_url, port, cpu, memory, region, protocol, env_vars_encrypted, fly_app_id, endpoint_url, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'deploying')
          RETURNING *`,
         [
           input.projectId,
@@ -455,6 +476,7 @@ export class ComputeServicesService {
           input.cpu,
           input.memory,
           input.region,
+          input.protocol ?? 'http',
           envVarsEncrypted,
           flyAppName,
           endpointUrl,
@@ -580,6 +602,10 @@ export class ComputeServicesService {
       updates.push(`env_vars_encrypted = $${paramIdx++}`);
       values.push(EncryptionManager.encrypt(JSON.stringify(data.envVars)));
     }
+    if (data.protocol !== undefined) {
+      updates.push(`protocol = $${paramIdx++}`);
+      values.push(data.protocol);
+    }
 
     if (updates.length === 0) {
       return existing;
@@ -587,7 +613,9 @@ export class ComputeServicesService {
 
     // If deployment-affecting fields changed and a machine exists, update Fly FIRST.
     // Only commit to DB after Fly accepts the new config to avoid stale DB state.
-    const deployFields = ['imageUrl', 'port', 'cpu', 'memory', 'envVars'] as const;
+    // `protocol` is a deploy field — switching http<->tcp swaps the Fly edge
+    // handlers entirely, so it has to propagate to Fly to take effect.
+    const deployFields = ['imageUrl', 'port', 'cpu', 'memory', 'envVars', 'protocol'] as const;
     const hasDeployChange = deployFields.some((f) => data[f] !== undefined);
 
     // env_vars merge is needed by both Fly-touching branches (updateMachine
@@ -622,6 +650,7 @@ export class ComputeServicesService {
           cpu: data.cpu ?? existing.cpu,
           memory: data.memory ?? existing.memory,
           envVars: mergedEnvVars ?? {},
+          protocol: data.protocol ?? existing.protocol,
         });
         logger.info('Compute service machine updated', { id });
       } catch (error) {
@@ -641,6 +670,7 @@ export class ComputeServicesService {
           memory: data.memory ?? existing.memory,
           envVars: mergedEnvVars ?? {},
           region: data.region ?? existing.region,
+          protocol: data.protocol ?? existing.protocol,
         });
         justLaunchedMachineId = machineId;
         // Persist machine id + flip status alongside the field updates below.
@@ -783,6 +813,7 @@ export class ComputeServicesService {
       cpu: row.cpu,
       memory: row.memory,
       region: row.region,
+      protocol: (row.protocol ?? 'http') as 'http' | 'tcp',
       flyAppId: row.fly_app_id,
       flyMachineId: row.fly_machine_id,
       endpointUrl: row.endpoint_url,

@@ -90,18 +90,27 @@ export function ServiceCard({ service, onClick, onStop, onStart, onDelete }: Ser
         {service.imageUrl === 'dockerfile' ? 'Built from Dockerfile' : service.imageUrl}
       </p>
 
-      {reachableUrl && (
-        <a
-          href={reachableUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          className="inline-flex items-center gap-1 text-xs text-primary hover:underline mb-3"
-        >
-          <ExternalLink className="h-3 w-3" />
-          {reachableUrl}
-        </a>
-      )}
+      {reachableUrl &&
+        (reachableUrl.href ? (
+          <a
+            href={reachableUrl.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex items-center gap-1 text-xs text-primary hover:underline mb-3"
+          >
+            <ExternalLink className="h-3 w-3" />
+            {reachableUrl.display}
+          </a>
+        ) : (
+          <code
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex items-center text-xs text-foreground bg-[var(--alpha-8)] px-2 py-0.5 rounded mb-3 font-mono"
+            title="Raw TCP endpoint — connect with redis-cli, psql, or your protocol-native client"
+          >
+            {reachableUrl.display}
+          </code>
+        ))}
 
       <div className="flex items-center gap-3 text-xs text-muted-foreground pt-2 border-t border-[var(--alpha-8)]">
         <span>CPU: {service.cpu}</span>
