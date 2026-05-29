@@ -3,7 +3,7 @@
 To keep repository size manageable:
 
 - Prefer compressed MP4 files.
-- Avoid videos larger than 5 MB when possible.
+- Avoid videos larger than 5 MiB when possible.
 - Compress screen recordings before committing.
 - Optimize PNG/JPEG assets.
 - Consider external hosting for large media.
