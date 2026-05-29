@@ -181,3 +181,41 @@ describe('FunctionService Code Validation (Public API)', () => {
     });
   });
 });
+
+describe('FunctionService deleteFunction', () => {
+  let service: FunctionService;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    service = FunctionService.getInstance();
+  });
+
+  it('should return false when slug does not exist', async () => {
+    mockPool.query.mockResolvedValueOnce({ rowCount: 0 });
+
+    const result = await service.deleteFunction('non-existent');
+
+    expect(result).toBe(false);
+  });
+
+  it('should return true and call scheduleDeployment on success', async () => {
+    const scheduleSpy = vi.spyOn(service as any, 'scheduleDeployment');
+    mockPool.query.mockResolvedValueOnce({ rowCount: 1 });
+
+    const result = await service.deleteFunction('my-func');
+
+    expect(result).toBe(true);
+    expect(mockPool.query).toHaveBeenCalledWith(
+      'DELETE FROM functions.definitions WHERE slug = $1',
+      ['my-func']
+    );
+    expect(scheduleSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('should re-throw on DB error', async () => {
+    const dbError = new Error('Connection failure');
+    mockPool.query.mockRejectedValueOnce(dbError);
+
+    await expect(service.deleteFunction('my-func')).rejects.toThrow('Connection failure');
+  });
+});

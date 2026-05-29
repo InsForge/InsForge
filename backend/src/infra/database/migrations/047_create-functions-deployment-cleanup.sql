@@ -1,90 +1,35 @@
--- Migration: 047 - Add orphan cleanup for functions.deployments
+-- Migration: 047 - Normalize functions.deployments.functions into a join table
 --
--- functions.deployments has no FK to functions.definitions. When a function
--- is deleted, its deployment records remain orphaned permanently. This adds
--- a batched cleanup function and a pg_cron job that runs it daily at 3 AM.
+-- functions.deployments had no FK to functions.definitions. Function slugs
+-- were stored in a JSONB array (functions column), making orphan cleanup
+-- error-prone and requiring app-level logic or cron jobs.
+--
+-- This migration normalizes the relationship into a join table with a proper
+-- FK constraint so that deleting a function automatically cascades.
 
+-- Add a composite index for common query patterns
 CREATE INDEX IF NOT EXISTS idx_functions_deployments_status_created
   ON functions.deployments(status, created_at);
 
-CREATE OR REPLACE FUNCTION functions.cleanup_orphan_deployments(
-  p_batch_size INT DEFAULT 1000,
-  p_max_age_days INT DEFAULT NULL
-)
-RETURNS INT AS $$
-DECLARE
-  v_cutoff TIMESTAMPTZ;
-  v_deleted_count INT := 0;
-  v_total_deleted INT := 0;
-BEGIN
-  IF p_batch_size IS NULL OR p_batch_size <= 0 THEN
-    RAISE WARNING 'functions.cleanup_orphan_deployments received invalid batch size: %', p_batch_size;
-    RETURN 0;
-  END IF;
+-- Add a GIN index on the functions JSONB column for backward-compatible queries
+CREATE INDEX IF NOT EXISTS idx_functions_deployments_functions_gin
+  ON functions.deployments USING GIN (functions);
 
-  IF p_max_age_days IS NOT NULL AND p_max_age_days > 0 THEN
-    v_cutoff := NOW() - (p_max_age_days || ' days')::INTERVAL;
-  END IF;
+-- Create the join table
+CREATE TABLE IF NOT EXISTS functions.deployment_functions (
+  deployment_id TEXT NOT NULL REFERENCES functions.deployments(id) ON DELETE CASCADE,
+  slug TEXT NOT NULL REFERENCES functions.definitions(slug) ON DELETE CASCADE,
+  PRIMARY KEY (deployment_id, slug)
+);
 
-  LOOP
-    WITH candidate_deployments AS (
-      SELECT d.id
-      FROM functions.deployments d
-      WHERE (v_cutoff IS NULL OR d.created_at < v_cutoff)
-        AND jsonb_array_length(d.functions) > 0
-        AND NOT EXISTS (
-          SELECT 1
-          FROM jsonb_array_elements_text(d.functions) AS slug
-          WHERE EXISTS (
-            SELECT 1 FROM functions.definitions fd
-            WHERE fd.slug = slug
-          )
-        )
-      ORDER BY d.created_at ASC
-      LIMIT p_batch_size
-      FOR UPDATE OF d SKIP LOCKED
-    ),
-    deleted AS (
-      DELETE FROM functions.deployments d
-      WHERE d.id IN (SELECT id FROM candidate_deployments)
-      RETURNING d.id
-    )
-    SELECT COUNT(*) INTO v_deleted_count FROM deleted;
+-- Index for looking up deployments by function slug
+CREATE INDEX IF NOT EXISTS idx_deployment_functions_slug
+  ON functions.deployment_functions(slug);
 
-    v_total_deleted := v_total_deleted + v_deleted_count;
-
-    EXIT WHEN v_deleted_count < p_batch_size;
-  END LOOP;
-
-  RETURN v_total_deleted;
-EXCEPTION WHEN OTHERS THEN
-  RAISE WARNING 'functions.cleanup_orphan_deployments failed: %', SQLERRM;
-  RETURN v_total_deleted;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-REVOKE ALL ON FUNCTION functions.cleanup_orphan_deployments FROM PUBLIC;
-
--- Schedule daily at 3 AM (staggered from realtime cleanup at midnight)
-DO $$
-DECLARE
-  v_existing_job_id BIGINT;
-BEGIN
-  FOR v_existing_job_id IN
-    SELECT DISTINCT existing_jobs.jobid
-    FROM (
-      SELECT jobid
-      FROM cron.job
-      WHERE command = 'SELECT functions.cleanup_orphan_deployments()'
-         OR jobname = 'functions-deployment-cleanup'
-    ) AS existing_jobs
-  LOOP
-    PERFORM cron.unschedule(v_existing_job_id);
-  END LOOP;
-
-  PERFORM cron.schedule(
-    'functions-deployment-cleanup',
-    '0 3 * * *',
-    'SELECT functions.cleanup_orphan_deployments()'
-  );
-END $$;
+-- Backfill existing data from the JSONB array into the join table
+INSERT INTO functions.deployment_functions (deployment_id, slug)
+  SELECT d.id, jsonb_array_elements_text(d.functions) AS slug
+  FROM functions.deployments d
+  WHERE d.functions IS NOT NULL
+    AND jsonb_array_length(d.functions) > 0
+ON CONFLICT DO NOTHING;
