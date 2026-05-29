@@ -90,7 +90,9 @@ describe('DatabaseTableService project_admin DDL context', () => {
 
     const sqlCalls = queryMock.mock.calls.map(([sql]) => sql as string);
     const setRoleIndex = sqlCalls.indexOf('SET LOCAL ROLE project_admin');
-    const createTableIndex = sqlCalls.findIndex((sql) => sql.includes('CREATE TABLE "public"."posts"'));
+    const createTableIndex = sqlCalls.findIndex((sql) =>
+      sql.includes('CREATE TABLE "public"."posts"')
+    );
     const resetRoleIndex = sqlCalls.indexOf('RESET ROLE');
     const commitIndex = sqlCalls.indexOf('COMMIT');
 
@@ -109,8 +111,8 @@ describe('DatabaseTableService project_admin DDL context', () => {
 
     const sqlCalls = queryMock.mock.calls.map(([sql]) => sql as string);
     const setRoleIndex = sqlCalls.indexOf('SET LOCAL ROLE project_admin');
-    const alterTableIndex = sqlCalls.findIndex((sql) =>
-      sql.includes('ALTER TABLE "public"."posts"') && sql.includes('ADD COLUMN "summary"')
+    const alterTableIndex = sqlCalls.findIndex(
+      (sql) => sql.includes('ALTER TABLE "public"."posts"') && sql.includes('ADD COLUMN "summary"')
     );
     const resetRoleIndex = sqlCalls.indexOf('RESET ROLE');
     const commitIndex = sqlCalls.indexOf('COMMIT');
