@@ -10,5 +10,5 @@ This package is intended to become the single source of truth for the project da
 It is wired into the root workspace and is the shared source of truth for dashboard code used by
 the self-hosting app in this repo.
 
-See [../../docs/dashboard-package-rfc.md](../../docs/dashboard-package-rfc.md) for the current API
-and migration plan.
+See the shared dashboard package RFC documentation for the current API and migration plans.
+

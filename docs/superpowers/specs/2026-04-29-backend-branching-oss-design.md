@@ -2,8 +2,9 @@
 
 **Date:** 2026-04-29
 **Status:** Draft
-**Source PRD:** [insforge-cloud-backend Backend-Branching.md](../../../../insforge-cloud-backend/Backend-Branching.md)
-**Cloud-backend spec:** [2026-04-29-backend-branching-cloud-design.md](../../../../insforge-cloud-backend/docs/superpowers/specs/2026-04-29-backend-branching-cloud-design.md)
+**Source PRD:** `insforge-cloud-backend/Backend-Branching.md` (Private Repository)
+**Cloud-backend spec:** `insforge-cloud-backend/docs/superpowers/specs/2026-04-29-backend-branching-cloud-design.md` (Private Repository)
+
 
 This spec covers the **OSS slice** of backend branching v1: read-only fallback from a branch project's storage to its parent project's S3 directory.
 

@@ -384,7 +384,7 @@ gh pr create --title "feat: storage fallback to parent for branch projects" --bo
 - Local storage provider is unaffected (no fallback).
 
 ## Spec
-- [docs/superpowers/specs/2026-04-29-backend-branching-oss-design.md](docs/superpowers/specs/2026-04-29-backend-branching-oss-design.md)
+- [docs/superpowers/specs/2026-04-29-backend-branching-oss-design.md](../specs/2026-04-29-backend-branching-oss-design.md)
 
 ## Test plan
 - [ ] Vitest suite green
