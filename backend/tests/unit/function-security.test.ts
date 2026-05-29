@@ -199,7 +199,7 @@ describe('FunctionService deleteFunction', () => {
   });
 
   it('should return true and call scheduleDeployment on success', async () => {
-    const scheduleSpy = vi.spyOn(service as any, 'scheduleDeployment');
+    const scheduleSpy = vi.spyOn(service as unknown as { scheduleDeployment: () => void }, 'scheduleDeployment');
     mockPool.query.mockResolvedValueOnce({ rowCount: 1 });
 
     const result = await service.deleteFunction('my-func');
