@@ -68,6 +68,7 @@ export function RecordFormDialog({
   useEffect(() => {
     if (!open) {
       setError(null);
+      setAddMore(false);
     }
   }, [open]);
 
