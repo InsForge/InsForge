@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppError } from '../../src/utils/errors';
 
-const { poolQueryMock, connectMock } = vi.hoisted(() => ({
+const { poolQueryMock, connectMock, clientQueryMock, releaseMock } = vi.hoisted(() => ({
   poolQueryMock: vi.fn(),
   connectMock: vi.fn(),
+  clientQueryMock: vi.fn(),
+  releaseMock: vi.fn(),
 }));
 
 vi.mock('../../src/infra/database/database.manager', () => ({
@@ -22,23 +24,35 @@ import { AdminRecordService } from '../../src/services/database/admin-record.ser
 describe('AdminRecordService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    connectMock.mockResolvedValue({
+      query: clientQueryMock,
+      release: releaseMock,
+    });
   });
 
   it('reads protected-schema records through direct SQL with search and sorting', async () => {
-    poolQueryMock
-      .mockResolvedValueOnce({
-        rows: [
-          { column_name: 'id', data_type: 'uuid', is_nullable: 'NO', udt_name: 'uuid' },
-          { column_name: 'email', data_type: 'text', is_nullable: 'NO', udt_name: 'text' },
-        ],
-      })
-      .mockResolvedValueOnce({ rows: [{ total: '2' }] })
-      .mockResolvedValueOnce({
-        rows: [
-          { id: '1', email: 'demo-1@example.com' },
-          { id: '2', email: 'demo-2@example.com' },
-        ],
-      });
+    clientQueryMock.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM information_schema.columns')) {
+        return {
+          rows: [
+            { column_name: 'id', data_type: 'uuid', is_nullable: 'NO', udt_name: 'uuid' },
+            { column_name: 'email', data_type: 'text', is_nullable: 'NO', udt_name: 'text' },
+          ],
+        };
+      }
+      if (sql.includes('COUNT(*)::text AS total')) {
+        return { rows: [{ total: '2' }] };
+      }
+      if (sql.includes('SELECT * FROM "auth"."users"')) {
+        return {
+          rows: [
+            { id: '1', email: 'demo-1@example.com' },
+            { id: '2', email: 'demo-2@example.com' },
+          ],
+        };
+      }
+      return { rows: [] };
+    });
 
     const service = AdminRecordService.getInstance();
     const result = await service.listRecords('auth', 'users', {
@@ -51,34 +65,68 @@ describe('AdminRecordService', () => {
     expect(result.total).toBe(2);
     expect(result.records).toHaveLength(2);
 
-    expect(poolQueryMock.mock.calls[1]?.[0]).toContain('FROM "auth"."users"');
-    expect(poolQueryMock.mock.calls[1]?.[1]).toEqual(['%demo%']);
-    expect(poolQueryMock.mock.calls[2]?.[0]).toContain('ORDER BY "email" ASC LIMIT $2 OFFSET $3');
-    expect(poolQueryMock.mock.calls[2]?.[1]).toEqual(['%demo%', 10, 0]);
+    const sqlCalls = clientQueryMock.mock.calls.map(([sql]) => sql as string);
+    const setRoleIndex = sqlCalls.indexOf('SET ROLE project_admin');
+    const dataQueryIndex = sqlCalls.findIndex((sql) =>
+      sql.includes('ORDER BY "email" ASC LIMIT $2 OFFSET $3')
+    );
+    const resetRoleIndex = sqlCalls.indexOf('RESET ROLE');
+
+    expect(setRoleIndex).toBeGreaterThan(-1);
+    expect(dataQueryIndex).toBeGreaterThan(setRoleIndex);
+    expect(resetRoleIndex).toBeGreaterThan(dataQueryIndex);
+    expect(clientQueryMock.mock.calls[dataQueryIndex]?.[1]).toEqual(['%demo%', 10, 0]);
   });
 
-  it('blocks writes on protected schemas before opening a transaction', async () => {
-    const service = AdminRecordService.getInstance();
-
-    await expect(
-      service.createRecords('auth', 'users', [{ email: 'demo@example.com' }])
-    ).rejects.toBeInstanceOf(AppError);
-
-    expect(connectMock).not.toHaveBeenCalled();
-  });
-
-  it('updates public records and converts blank nullable uuid values to null', async () => {
-    poolQueryMock
+  it('delegates protected-schema writes to project_admin privileges', async () => {
+    clientQueryMock
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({}) // SET LOCAL ROLE
+      .mockResolvedValueOnce({}) // set request.jwt.claims
       .mockResolvedValueOnce({
         rows: [
           { column_name: 'id', data_type: 'uuid', is_nullable: 'NO', udt_name: 'uuid' },
-          { column_name: 'owner_id', data_type: 'uuid', is_nullable: 'YES', udt_name: 'uuid' },
-          { column_name: 'name', data_type: 'text', is_nullable: 'NO', udt_name: 'text' },
+          { column_name: 'email', data_type: 'text', is_nullable: 'NO', udt_name: 'text' },
         ],
-      })
+      }) // metadata
       .mockResolvedValueOnce({
-        rows: [{ id: 'p1', owner_id: null, name: 'Renamed project' }],
-      });
+        rows: [{ id: 'u1', email: 'demo@example.com' }],
+      }) // INSERT
+      .mockResolvedValueOnce({}) // RESET ROLE
+      .mockResolvedValueOnce({}) // reset config
+      .mockResolvedValueOnce({}); // COMMIT
+
+    const service = AdminRecordService.getInstance();
+    const result = await service.createRecords('auth', 'users', [{ email: 'demo@example.com' }]);
+
+    expect(result).toEqual([{ id: 'u1', email: 'demo@example.com' }]);
+
+    const sqlCalls = clientQueryMock.mock.calls.map(([sql]) => sql as string);
+    const setRoleIndex = sqlCalls.indexOf('SET LOCAL ROLE project_admin');
+    const insertIndex = sqlCalls.findIndex((sql) => sql.includes('INSERT INTO "auth"."users"'));
+
+    expect(setRoleIndex).toBeGreaterThan(-1);
+    expect(insertIndex).toBeGreaterThan(setRoleIndex);
+  });
+
+  it('updates public records and converts blank nullable uuid values to null', async () => {
+    clientQueryMock.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM information_schema.columns')) {
+        return {
+          rows: [
+            { column_name: 'id', data_type: 'uuid', is_nullable: 'NO', udt_name: 'uuid' },
+            { column_name: 'owner_id', data_type: 'uuid', is_nullable: 'YES', udt_name: 'uuid' },
+            { column_name: 'name', data_type: 'text', is_nullable: 'NO', udt_name: 'text' },
+          ],
+        };
+      }
+      if (sql.includes('UPDATE "public"."projects"')) {
+        return {
+          rows: [{ id: 'p1', owner_id: null, name: 'Renamed project' }],
+        };
+      }
+      return { rows: [] };
+    });
 
     const service = AdminRecordService.getInstance();
     const record = await service.updateRecord('public', 'projects', 'id', 'p1', {
@@ -87,61 +135,70 @@ describe('AdminRecordService', () => {
     });
 
     expect(record).toEqual({ id: 'p1', owner_id: null, name: 'Renamed project' });
-    expect(poolQueryMock.mock.calls[1]?.[0]).toContain(
+    const updateCall = clientQueryMock.mock.calls.find(
+      ([sql]) => typeof sql === 'string' && sql.includes('UPDATE "public"."projects"')
+    );
+    expect(updateCall?.[0]).toContain(
       'SET "owner_id" = $1, "name" = $2 WHERE "id" = $3 RETURNING *'
     );
-    expect(poolQueryMock.mock.calls[1]?.[1]).toEqual([null, 'Renamed project', 'p1']);
+    expect(updateCall?.[1]).toEqual([null, 'Renamed project', 'p1']);
   });
 
   it('preserves empty strings for character varying inserts', async () => {
-    const clientQueryMock = vi
-      .fn()
+    clientQueryMock
       .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({}) // SET LOCAL ROLE
+      .mockResolvedValueOnce({}) // set_config
+      .mockResolvedValueOnce({
+        rows: [
+          { column_name: 'id', data_type: 'uuid', is_nullable: 'NO', udt_name: 'uuid' },
+          {
+            column_name: 'name',
+            data_type: 'character varying',
+            is_nullable: 'YES',
+            udt_name: 'varchar',
+          },
+        ],
+      }) // metadata
       .mockResolvedValueOnce({
         rows: [{ id: 'r1', name: '' }],
       }) // INSERT
+      .mockResolvedValueOnce({}) // RESET ROLE
+      .mockResolvedValueOnce({}) // reset config
       .mockResolvedValueOnce({}); // COMMIT
-
-    connectMock.mockResolvedValue({
-      query: clientQueryMock,
-      release: vi.fn(),
-    });
-
-    poolQueryMock.mockResolvedValueOnce({
-      rows: [
-        { column_name: 'id', data_type: 'uuid', is_nullable: 'NO', udt_name: 'uuid' },
-        {
-          column_name: 'name',
-          data_type: 'character varying',
-          is_nullable: 'YES',
-          udt_name: 'varchar',
-        },
-      ],
-    });
 
     const service = AdminRecordService.getInstance();
     const result = await service.createRecords('public', 'projects', [{ name: '' }]);
 
     expect(result).toEqual([{ id: 'r1', name: '' }]);
-    expect(clientQueryMock.mock.calls[1]?.[1]).toEqual(['']);
+    const insertCall = clientQueryMock.mock.calls.find(
+      ([sql]) => typeof sql === 'string' && sql.includes('INSERT INTO "public"."projects"')
+    );
+    expect(insertCall?.[1]).toEqual(['']);
   });
 
   it('converts blank updates on nullable non-text columns to null', async () => {
-    poolQueryMock
-      .mockResolvedValueOnce({
-        rows: [
-          { column_name: 'id', data_type: 'uuid', is_nullable: 'NO', udt_name: 'uuid' },
-          {
-            column_name: 'priority',
-            data_type: 'integer',
-            is_nullable: 'YES',
-            udt_name: 'int4',
-          },
-        ],
-      })
-      .mockResolvedValueOnce({
-        rows: [{ id: 'p1', priority: null }],
-      });
+    clientQueryMock.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM information_schema.columns')) {
+        return {
+          rows: [
+            { column_name: 'id', data_type: 'uuid', is_nullable: 'NO', udt_name: 'uuid' },
+            {
+              column_name: 'priority',
+              data_type: 'integer',
+              is_nullable: 'YES',
+              udt_name: 'int4',
+            },
+          ],
+        };
+      }
+      if (sql.includes('UPDATE "public"."projects"')) {
+        return {
+          rows: [{ id: 'p1', priority: null }],
+        };
+      }
+      return { rows: [] };
+    });
 
     const service = AdminRecordService.getInstance();
     const record = await service.updateRecord('public', 'projects', 'id', 'p1', {
@@ -149,20 +206,28 @@ describe('AdminRecordService', () => {
     });
 
     expect(record).toEqual({ id: 'p1', priority: null });
-    expect(poolQueryMock.mock.calls[1]?.[1]).toEqual([null, 'p1']);
+    const updateCall = clientQueryMock.mock.calls.find(
+      ([sql]) => typeof sql === 'string' && sql.includes('UPDATE "public"."projects"')
+    );
+    expect(updateCall?.[1]).toEqual([null, 'p1']);
   });
 
   it('rejects blank updates on required non-text columns with a 400', async () => {
-    poolQueryMock.mockResolvedValueOnce({
-      rows: [
-        { column_name: 'id', data_type: 'uuid', is_nullable: 'NO', udt_name: 'uuid' },
-        {
-          column_name: 'priority',
-          data_type: 'integer',
-          is_nullable: 'NO',
-          udt_name: 'int4',
-        },
-      ],
+    clientQueryMock.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM information_schema.columns')) {
+        return {
+          rows: [
+            { column_name: 'id', data_type: 'uuid', is_nullable: 'NO', udt_name: 'uuid' },
+            {
+              column_name: 'priority',
+              data_type: 'integer',
+              is_nullable: 'NO',
+              udt_name: 'int4',
+            },
+          ],
+        };
+      }
+      return { rows: [] };
     });
 
     const service = AdminRecordService.getInstance();
