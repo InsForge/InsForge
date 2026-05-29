@@ -14,7 +14,6 @@ import { validateSchemaName, validateTableName } from '@/utils/validations.js';
 import pgFormat from 'pg-format';
 import { parse } from 'csv-parse/sync';
 import { type PoolClient } from 'pg';
-import { assertWritableDatabaseSchema } from './helpers.js';
 import { withAdminContext } from './user-context.service.js';
 
 export class DatabaseAdvanceService {
@@ -851,7 +850,6 @@ export class DatabaseAdvanceService {
   ): Promise<BulkUpsertResponse> {
     validateSchemaName(schemaName);
     validateTableName(table);
-    assertWritableDatabaseSchema(schemaName);
 
     const fileExtension = filename.toLowerCase().substring(filename.lastIndexOf('.'));
     let records: Record<string, unknown>[] = [];

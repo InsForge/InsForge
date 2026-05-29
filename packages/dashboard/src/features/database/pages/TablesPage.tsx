@@ -654,7 +654,7 @@ export default function TablesPage() {
                     title={`No tables in ${selectedSchema}`}
                     description={
                       selectedSchemaInfo.isProtected
-                        ? 'InsForge-managed schemas are protected in the dashboard.'
+                        ? 'This schema is protected in the dashboard.'
                         : 'Create a table from the sidebar to get started.'
                     }
                   />

@@ -81,7 +81,7 @@ spec:
           template: PREBUILT_V2
           spec:
             source:
-                image: ghcr.io/insforge/postgres:v15.13.3
+                image: ghcr.io/insforge/postgres:v15.13.4
                 command:
                     - docker-entrypoint.sh
                     - postgres

@@ -4,29 +4,8 @@ import { validateIdentifier, validateSchemaName, validateTableName } from '@/uti
 
 export const DEFAULT_DATABASE_SCHEMA = 'public' as const;
 
-export const INSFORGE_MANAGED_DATABASE_SCHEMAS = [
-  'ai',
-  'auth',
-  'compute',
-  'cron',
-  'deployments',
-  'email',
-  'functions',
-  'payments',
-  'realtime',
-  'schedules',
-  'storage',
-  'system',
-] as const;
-
-const insforgeManagedDatabaseSchemaSet = new Set<string>(INSFORGE_MANAGED_DATABASE_SCHEMAS);
-
 export function isInternalDashboardSchema(schemaName: string): boolean {
   return schemaName === 'information_schema' || schemaName.startsWith('pg_');
-}
-
-export function isInsForgeManagedDatabaseSchema(schemaName: string): boolean {
-  return insforgeManagedDatabaseSchemaSet.has(schemaName);
 }
 
 export function normalizeDatabaseSchemaName(schemaName: unknown): string {
@@ -47,17 +26,6 @@ export function normalizeDatabaseSchemaName(schemaName: unknown): string {
   }
 
   return normalizedSchemaName;
-}
-
-export function assertWritableDatabaseSchema(schemaName: string): void {
-  if (isInsForgeManagedDatabaseSchema(schemaName)) {
-    throw new AppError(
-      `Schema "${schemaName}" is protected in the dashboard`,
-      403,
-      ERROR_CODES.DATABASE_FORBIDDEN,
-      'Switch to public to create or modify tables and records.'
-    );
-  }
 }
 
 export function buildQualifiedTableKey(tableName: string, schemaName: string): string {
