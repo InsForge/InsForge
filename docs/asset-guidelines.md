@@ -9,7 +9,7 @@ To keep repository size manageable:
 - Consider external hosting for large media.
 - Review asset size before opening a pull request.
 
-Recommended Tools
+## Recommended Tools
 
 - FFmpeg
 - pngquant
