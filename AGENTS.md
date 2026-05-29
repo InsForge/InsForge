@@ -1,99 +1,76 @@
 ---
-description: Instructions building apps with MCP
+description: Contributor guidance for the InsForge OSS monorepo
 globs: *
 alwaysApply: true
 ---
 
-# InsForge SDK Documentation - Overview
+# InsForge Monorepo Contributor Guide
 
-## What is InsForge?
+These instructions apply to work inside the `InsForge/InsForge` repository. They are for contributors and automated assistants maintaining the OSS monorepo, not for developers scaffolding a consumer application with the InsForge SDK or MCP tools.
 
-Backend-as-a-service (BaaS) platform providing:
+## Repository Scope
 
-- **Database**: PostgreSQL with PostgREST API
-- **Authentication**: Email/password + OAuth (Google, GitHub)
-- **Storage**: File upload/download
-- **AI**: OpenRouter key provisioning and model catalog for direct OpenAI-compatible integrations
-- **Functions**: Serverless function deployment
+- `backend/` contains the Express backend, PostgreSQL integrations, migrations, services, routes, and backend tests.
+- `frontend/` is the self-hosting dashboard host app.
+- `packages/dashboard/` contains the shared dashboard package used by hosting surfaces.
+- `packages/ui/` contains shared React UI components and design-system assets.
+- `packages/shared-schemas/` contains shared Zod schemas and TypeScript types.
+- `docs/` contains documentation for InsForge features and MCP usage.
+- `functions/` contains serverless function examples and related assets.
 
-## Installation
+Keep SDK or app-builder instructions scoped to docs, examples, templates, or README sections that are explicitly about using InsForge from an application. Do not put consumer project scaffolding steps in this root contributor file.
 
-### 🚨 CRITICAL: Follow these steps in order
+## Working Guidelines
 
-### Step 1: Download Template
+- Start from the issue or PR context and keep changes focused on that scope.
+- Prefer existing package patterns, naming, route structure, services, hooks, and test helpers.
+- Keep shared contracts in `packages/shared-schemas` when backend and frontend both depend on a shape.
+- Add or update tests when behavior changes. For documentation-only changes, validate formatting and links where practical.
+- Avoid unrelated refactors, generated churn, or lockfile updates unless the change requires them.
+- For database migrations, use the existing migration structure under `backend/src/infra/database/migrations` and run the duplicate-number check.
+- For UI work, prefer components from `packages/ui` and existing dashboard patterns before adding new primitives.
 
-Use the `download-template` MCP tool to create a new project with your backend URL and anon key pre-configured.
+## Common Commands
 
-### Step 2: Install SDK
+Install dependencies from the repo root:
 
 ```bash
-npm install @insforge/sdk@latest
+npm install
 ```
 
-### Step 3: Create SDK Client
+Run the full workspace checks:
 
-You must create a client instance using `createClient()` with your base URL and anon key:
-
-```javascript
-import { createClient } from '@insforge/sdk';
-
-const client = createClient({
-  baseUrl: 'https://your-app.region.insforge.app',  // Your InsForge backend URL
-  anonKey: 'your-anon-key-here'       // Get this from backend metadata
-});
-
+```bash
+npm test
+npm run lint
+npm run typecheck
+npm run format:check
 ```
 
-**API BASE URL**: Your API base URL is `https://your-app.region.insforge.app`.
+Run backend-only checks:
 
-## Getting Detailed Documentation
+```bash
+npm run test:backend
+cd backend && npm run typecheck
+cd backend && npm run lint
+```
 
-### 🚨 CRITICAL: Always Fetch Documentation Before Writing Code
+Run end-to-end tests when the change touches workflows covered by Dockerized integration tests:
 
-Before writing or editing any InsForge integration code, you **MUST** call the `fetch-docs` MCP tool to get the latest SDK documentation. This ensures you have accurate, up-to-date implementation patterns.
+```bash
+npm run test:e2e
+```
 
-### Use the InsForge `fetch-docs` MCP tool to get specific SDK documentation:
+Check migration numbering when adding or editing migrations:
 
-Available documentation types:
+```bash
+cd backend && npm run migrate:check-duplicates
+```
 
-- `"instructions"` - Essential backend setup (START HERE)
-- `"db-sdk"` - Database operations with SDK
-- **Authentication** - Choose based on implementation:
-  - `"auth-sdk"` - Direct SDK methods for custom auth flows
-  - `"auth-components-react"` - Pre-built auth UI for React+Vite (singlepage App)
-  - `"auth-components-react-router"` - Pre-built auth UI for React(Vite+React Router) (Multipage App)
-  - `"auth-components-nextjs"` - Pre-built auth UI for Nextjs (SSR App)
-- `"storage-sdk"` - File storage operations
-- `"functions-sdk"` - Serverless functions invocation
-- `"ai-integration-sdk"` - AI integration with the provisioned OpenRouter key and OpenAI SDK
-- `"real-time"` - Real-time pub/sub (database + client events) via WebSockets
+## Pull Requests
 
-For InsForge Cloud projects, InsForge provisions the OpenRouter key and admins can copy the active key from Model Gateway into a server-only `OPENROUTER_API_KEY`. For self-hosted projects, configure `OPENROUTER_API_KEY` in the backend environment.
-
-## When to Use SDK vs MCP Tools
-
-### Always SDK for Application Logic:
-
-- Authentication (register, login, logout, profiles)
-- Database CRUD (select, insert, update, delete)
-- Storage operations (upload, download files)
-- AI integration via the provisioned OpenRouter key with the OpenAI SDK or OpenRouter HTTP API
-- Serverless function invocation
-
-### Use MCP Tools for Infrastructure:
-
-- Project scaffolding (`download-template`) - Download starter templates with InsForge integration
-- Backend setup and metadata (`get-backend-metadata`)
-- Database schema management (`run-raw-sql`, `get-table-schema`)
-- Storage bucket creation (`create-bucket`, `list-buckets`, `delete-bucket`)
-- Serverless function deployment (`create-function`, `update-function`, `delete-function`)
-
-## Important Notes
-
-- For auth: use `auth-sdk` for custom UI, or framework-specific components for pre-built UI
-- SDK returns `{data, error}` structure for all operations
-- Database inserts require array format: `[{...}]`
-- Serverless functions have single endpoint (no subpaths)
-- Storage: Upload files to buckets, store URLs in database
-- AI integrations should call OpenRouter directly with `baseURL: "https://openrouter.ai/api/v1"` and a server-side `OPENROUTER_API_KEY`
-- **EXTRA IMPORTANT**: Use Tailwind CSS 3.4 (do not upgrade to v4). Lock these dependencies in `package.json`
+- Use a focused branch name such as `docs/rescope-agents-md`, `fix/auth-refresh-session`, or `feat/storage-policy`.
+- Link the issue in the PR body when applicable.
+- Summarize the user-visible change, implementation notes, and validation commands.
+- Keep maintainer edits enabled for fork PRs.
+- If a check cannot be run locally, state the blocker clearly in the PR body or follow-up comment.
