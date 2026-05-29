@@ -6,7 +6,7 @@ description: "Product analytics for your app, powered by PostHog."
 
 Use InsForge Analytics to understand how people actually use your app: page traffic, retention, and session replays, all wired up by connecting a PostHog project to your InsForge backend. Once connected, the dashboard renders Traffic, User Retention, and Session Replay pages on top of your PostHog data without leaving InsForge.
 
-Connect PostHog once with one click, drop the setup prompt into your coding agent so it instruments `@insforge/sdk` events on your frontend, and the Analytics pages start filling in.
+Connect PostHog once with one click, drop the setup prompt into your coding agent so it runs the PostHog wizard and installs the PostHog SDK on your frontend, and the Analytics pages start filling in.
 
 <Frame caption="Analytics dashboard: KPIs over time plus breakdowns by page, country, and device.">
   <img src="/images/dashboard-analytics.png" alt="InsForge Analytics dashboard showing visitor KPIs, a visitor trend chart, and top pages, countries, and devices breakdowns" />
@@ -56,7 +56,7 @@ After connecting, the empty state ships a setup prompt you can paste into your c
 I want to add product analytics to this project. Read the current directory and use the InsForge skill to set up PostHog analytics by running `npx @insforge/cli posthog setup`.
 ```
 
-`@insforge/cli posthog setup` links your InsForge project to PostHog, then hands off to the official [PostHog wizard](https://posthog.com/docs/libraries/wizard) (`npx -y @posthog/wizard@latest`) to wire the SDK into your code. The wizard detects your framework, installs the right PostHog SDK, and drops in initialization code so pageviews, autocapture events, and session recordings start flowing.
+`@insforge/cli posthog setup` links your InsForge project to PostHog, then prints the official [PostHog wizard](https://posthog.com/docs/libraries/wizard) command (`npx -y @posthog/wizard@latest`) for you (or your agent) to run next. The wizard detects your framework, installs the right PostHog SDK, and drops in initialization code so pageviews, autocapture events, and session recordings start flowing.
 
 ### Traffic
 
