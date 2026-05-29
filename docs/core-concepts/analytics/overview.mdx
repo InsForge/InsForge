@@ -1,0 +1,109 @@
+---
+title: "Analytics"
+sidebarTitle: "Overview"
+description: "Product analytics for your app, powered by PostHog."
+---
+
+Use InsForge Analytics to understand how people actually use your app: page traffic, retention, and session replays, all wired up by connecting a PostHog project to your InsForge backend. Once connected, the dashboard renders Traffic, User Retention, and Session Replay pages on top of your PostHog data without leaving InsForge.
+
+Connect PostHog once with one click, drop the setup prompt into your coding agent so it instruments `@insforge/sdk` events on your frontend, and the Analytics pages start filling in.
+
+<Frame caption="Analytics dashboard: KPIs over time plus breakdowns by page, country, and device.">
+  <img src="/images/dashboard-analytics.png" alt="InsForge Analytics dashboard showing visitor KPIs, a visitor trend chart, and top pages, countries, and devices breakdowns" />
+</Frame>
+
+<Note>
+  PostHog remains the source of truth for events, dashboards, insights, and recordings. InsForge surfaces a focused subset for everyday checks, then deep-links into PostHog for anything beyond it.
+</Note>
+
+```mermaid
+flowchart TB
+    Admin["Dashboard"] --> AnalyticsAPI["Analytics API"]
+    App["Frontend App"] --> SDK["PostHog SDK"]
+    SDK --> PostHog["PostHog"]
+
+    AnalyticsAPI --> PostHog
+    PostHog --> Traffic["Traffic / KPIs"]
+    PostHog --> Retention["User Retention"]
+    PostHog --> Replay["Session Replay"]
+
+    Traffic --> Pages["Analytics pages"]
+    Retention --> Pages
+    Replay --> Pages
+
+    style Admin fill:#1e293b,stroke:#475569,color:#e2e8f0
+    style App fill:#1e293b,stroke:#475569,color:#e2e8f0
+    style SDK fill:#1e40af,stroke:#3b82f6,color:#dbeafe
+    style AnalyticsAPI fill:#166534,stroke:#22c55e,color:#dcfce7
+    style PostHog fill:#c2410c,stroke:#fb923c,color:#fed7aa
+    style Traffic fill:#0e7490,stroke:#06b6d4,color:#cffafe
+    style Retention fill:#0e7490,stroke:#06b6d4,color:#cffafe
+    style Replay fill:#0e7490,stroke:#06b6d4,color:#cffafe
+    style Pages fill:#6b21a8,stroke:#a855f7,color:#f3e8ff
+```
+
+## Features
+
+### One-click PostHog connection
+
+Connect PostHog from the Analytics page in the dashboard. InsForge provisions or links a PostHog project for you, stores credentials server-side, and unlocks the Traffic, Retention, and Session Replay pages once the connection succeeds.
+
+### SDK setup via PostHog wizard
+
+After connecting, the empty state ships a setup prompt you can paste into your coding agent:
+
+```
+I want to add product analytics to this project. Read the current directory and use the InsForge skill to set up PostHog analytics by running `npx @insforge/cli posthog setup`.
+```
+
+`@insforge/cli posthog setup` links your InsForge project to PostHog, then hands off to the official [PostHog wizard](https://posthog.com/docs/libraries/wizard) (`npx -y @posthog/wizard@latest`) to wire the SDK into your code. The wizard detects your framework, installs the right PostHog SDK, and drops in initialization code so pageviews, autocapture events, and session recordings start flowing.
+
+### Traffic
+
+KPIs over your selected time range (visitors, pageviews, sessions, bounce rate, and trend), plus breakdowns by Page, Country, and Device Type. Useful for the first "how is the app doing this week" pass without opening PostHog.
+
+### User retention
+
+Cohort retention chart built from your PostHog events. Pick a time range and see how many users come back over the following days or weeks.
+
+### Session replay
+
+A paginated list of recent session recordings with duration, person, and a deep-link into PostHog's full replay player. Helps you watch what users actually did right after spotting something odd in Traffic or Retention.
+
+### Settings and disconnect
+
+The Analytics Config dialog (the gear icon in the sidebar) lets admins review the linked PostHog project, jump straight into PostHog, and disconnect when needed. Disconnecting only severs the InsForge ↔ PostHog link; your PostHog project, events, and recordings stay intact.
+
+## Concepts
+
+<CardGroup cols={2}>
+  <Card title="PostHog product analytics" icon="chart-mixed" href="https://posthog.com/docs/product-analytics">
+    Events, autocapture, insights, and dashboards behind the Analytics pages.
+  </Card>
+
+  <Card title="PostHog session replay" icon="circle-play" href="https://posthog.com/docs/session-replay">
+    How recordings are captured, redacted, and played back.
+  </Card>
+</CardGroup>
+
+## Build with it
+
+<CardGroup cols={2}>
+  <Card title="PostHog wizard" icon="wand-magic-sparkles" href="https://posthog.com/docs/libraries/wizard">
+    Auto-detects your framework, installs the right PostHog SDK, and adds initialization code.
+  </Card>
+
+  <Card title="PostHog JavaScript SDK" icon="js" href="https://posthog.com/docs/libraries/js">
+    Capture custom events on top of what the wizard sets up.
+  </Card>
+
+  <Card title="InsForge CLI" icon="terminal" href="/quickstart">
+    `npx @insforge/cli posthog setup` links your InsForge project to PostHog, then prints the wizard command.
+  </Card>
+</CardGroup>
+
+## Next steps
+
+- Open the Analytics page in the dashboard and click **Connect PostHog**.
+- Paste the setup prompt into your coding agent, then run the `@posthog/wizard` command it prints to wire the SDK into your app.
+- Set up the [CLI](/quickstart) if you want to manage the connection from the terminal.
