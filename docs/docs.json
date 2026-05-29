@@ -85,7 +85,7 @@
                 ]
               },
               {
-                "group": "Deployments",
+                "group": "Sites",
                 "pages": [
                   "core-concepts/deployments/overview"
                 ]

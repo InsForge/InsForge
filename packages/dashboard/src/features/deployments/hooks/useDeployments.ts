@@ -48,10 +48,10 @@ export function useDeployments() {
     mutationFn: () => deploymentsService.createDeployment(),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['deployments'] });
-      showToast('Deployment created successfully', 'success');
+      showToast('Site build created successfully', 'success');
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to create deployment', 'error');
+      showToast(error.message || 'Failed to create site build', 'error');
     },
   });
 
@@ -60,10 +60,10 @@ export function useDeployments() {
       deploymentsService.startDeployment(id, data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['deployments'] });
-      showToast('Deployment started successfully', 'success');
+      showToast('Site build started successfully', 'success');
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to start deployment', 'error');
+      showToast(error.message || 'Failed to start site build', 'error');
     },
   });
 
@@ -75,10 +75,10 @@ export function useDeployments() {
       if (selectedDeployment?.id === updatedDeployment.id) {
         setSelectedDeployment(updatedDeployment);
       }
-      showToast('Deployment synced successfully', 'success');
+      showToast('Site build synced successfully', 'success');
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to sync deployment', 'error');
+      showToast(error.message || 'Failed to sync site build', 'error');
     },
   });
 
@@ -86,13 +86,13 @@ export function useDeployments() {
     mutationFn: (id: string) => deploymentsService.cancelDeployment(id),
     onSuccess: (_, id) => {
       void queryClient.invalidateQueries({ queryKey: ['deployments'] });
-      showToast('Deployment cancelled successfully', 'success');
+      showToast('Site build cancelled successfully', 'success');
       if (selectedDeployment?.id === id) {
         setSelectedDeployment(null);
       }
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to cancel deployment', 'error');
+      showToast(error.message || 'Failed to cancel site build', 'error');
     },
   });
 

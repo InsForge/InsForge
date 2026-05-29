@@ -74,7 +74,7 @@ Available documentation types:
 - `"storage-sdk"` - File storage operations
 - `"functions-sdk"` - Serverless functions invocation
 - `"ai-integration-sdk"` - AI integration with the provisioned OpenRouter key and OpenAI SDK
-- `"deployment"` - Deploy frontend applications via MCP tool
+- `"deployment"` - Sites: publish frontend applications via MCP tool
 - `"payments"` - Stripe Checkout, Billing Portal, webhook projections, and fulfillment patterns
 
 These docs are mostly for the TypeScript SDK. For other languages, you can also use the `fetch-sdk-docs` MCP tool to get specific documentation.
@@ -118,7 +118,7 @@ Payments currently has TypeScript SDK docs only. Use the Payments API reference 
 - Database schema management (`run-raw-sql`, `get-table-schema`)
 - Storage bucket creation (`create-bucket`, `list-buckets`, `delete-bucket`)
 - Serverless function deployment (`create-function`, `update-function`, `delete-function`)
-- Frontend deployment (`create-deployment`) - Deploy frontend apps to InsForge hosting
+- Sites (`create-deployment`) - Publish frontend apps to InsForge hosting
 
 ## Important Notes
 

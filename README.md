@@ -74,7 +74,7 @@ graph TB
     SL --> EF[Edge Functions]
     SL --> MG[Model Gateway]
     SL --> CP[Compute]
-    SL --> DEP[Deployment]
+    SL --> DEP[Sites]
 
     classDef bar fill:#0b0f14,stroke:#30363d,stroke-width:1px,color:#ffffff
     classDef card fill:#161b22,stroke:#30363d,stroke-width:1px,color:#ffffff
@@ -95,7 +95,7 @@ graph TB
 - **Model Gateway**: OpenAI compatible API across multiple LLM providers
 - **Edge Functions**: Serverless code running on the edge
 - **Compute** (private preview): Long-running container services
-- **Site Deployment**: Site build and deployment
+- **Sites**: Frontend hosting with builds and custom domains
 
 
 ## ⭐️ Star the Repository

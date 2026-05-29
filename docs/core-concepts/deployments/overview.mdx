@@ -1,22 +1,22 @@
 ---
-title: "Deployments"
+title: "Sites"
 sidebarTitle: "Overview"
-description: "Deploy frontend apps from your project, powered by Vercel."
+description: "Publish frontend sites from your project, powered by Vercel."
 ---
 
-Use InsForge Deployments to ship the browser-facing app that belongs to your project. The InsForge CLI uploads your frontend source through InsForge, which creates a Vercel production deployment. The dashboard tracks the URL, status, deployment history, environment variables, and domains.
+Use InsForge Sites to ship the browser-facing app that belongs to your project. The InsForge CLI uploads your frontend source through InsForge, which creates a Vercel production build. The dashboard tracks the URL, status, deployment history, environment variables, and domains.
 
-<Frame caption="Deployments dashboard: status, domains, env vars, and history.">
-  <img src="/images/dashboard-deployments.png" alt="InsForge Deployments dashboard" />
+<Frame caption="Sites dashboard: status, domains, env vars, and history.">
+  <img src="/images/dashboard-deployments.png" alt="InsForge Sites dashboard" />
 </Frame>
 
 <Note>
-  **Need to deploy a container or backend service?** Use [Compute](/core-concepts/compute/overview) for workers, queues, WebSocket servers, and long-running services. Deployments are for frontend websites and framework builds that produce a hosted web app.
+  **Need to deploy a container or backend service?** Use [Compute](/core-concepts/compute/overview) for workers, queues, WebSocket servers, and long-running services. Sites are for frontend websites and framework builds that produce a hosted web app.
 </Note>
 
 ```mermaid
 flowchart TB
-    CLI[InsForge CLI] --> API[InsForge deployment API]
+    CLI[InsForge CLI] --> API[InsForge Sites API]
     Dashboard[Dashboard] --> API
 
     API --> Source[Frontend source upload]
@@ -42,9 +42,9 @@ flowchart TB
 
 ## Features
 
-### CLI deploys
+### CLI publish
 
-Deploy from your app's source directory. The CLI uploads the source tree, skips local-only files such as `node_modules`, `.git`, build output, and `.env` files, then starts the Vercel build through InsForge.
+Publish from your app's source directory. The CLI uploads the source tree, skips local-only files such as `node_modules`, `.git`, build output, and `.env` files, then starts the Vercel build through InsForge.
 
 ```bash
 npx @insforge/cli deployments deploy ./frontend
@@ -52,7 +52,7 @@ npx @insforge/cli deployments deploy ./frontend
 
 ### Framework builds
 
-Deploy React, Vue, Svelte, Next.js, static sites, and other frontend projects. InsForge sends the source files to Vercel, where framework detection and project files such as `package.json` and `vercel.json` decide how the app builds.
+Publish React, Vue, Svelte, Next.js, static sites, and other frontend projects. InsForge sends the source files to Vercel, where framework detection and project files such as `package.json` and `vercel.json` decide how the app builds.
 
 ### Environment variables
 
@@ -76,9 +76,9 @@ npx @insforge/cli deployments cancel deployment_123
 
 ### Domains
 
-Every ready deployment gets a default URL at `https://<appkey>.insforge.site`. You can also set an InsForge-managed slug at `https://<slug>.insforge.site`. For a custom domain, add the domain in the dashboard and configure the DNS record it returns, usually a CNAME for subdomains.
+Every ready site gets a default URL at `https://<appkey>.insforge.site`. You can also set an InsForge-managed slug at `https://<slug>.insforge.site`. For a custom domain, add the domain in the dashboard and configure the DNS record it returns, usually a CNAME for subdomains.
 
-## Deploy with it
+## Publish with it
 
 <CardGroup cols={2}>
   <Card title="CLI quickstart" icon="terminal" href="/quickstart">

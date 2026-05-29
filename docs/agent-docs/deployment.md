@@ -1,14 +1,14 @@
-# InsForge Deployment - Agent Documentation
+# InsForge Sites - Agent Documentation
 
 ## Overview
 
-Deploy frontend applications to InsForge with the `create-deployment` MCP tool. The tool uploads the source directory through InsForge's direct deployment flow, starts a Vercel-backed production build, and records the result in `deployments.runs`.
+Publish frontend applications as InsForge Sites with the `create-deployment` MCP tool. The tool uploads the source directory through InsForge's direct site build flow, starts a Vercel-backed production build, and records the result in `deployments.runs`.
 
-Use the source directory, not a pre-built artifact directory. The backend validates the manifest, streams each file to the provider, verifies file size and SHA-1 digest, then starts the deployment after all files are uploaded.
+Use the source directory, not a pre-built artifact directory. The backend validates the manifest, streams each file to the provider, verifies file size and SHA-1 digest, then starts the site build after all files are uploaded.
 
 The REST API still supports the legacy source-zip flow for older clients. Do not use it from agents unless the direct MCP tool is unavailable.
 
-## Deploy With MCP
+## Publish With MCP
 
 Call `create-deployment` with:
 
@@ -21,7 +21,7 @@ Call `create-deployment` with:
 | `projectSettings.devCommand` | No | Development command metadata for framework-aware builds. |
 | `projectSettings.rootDirectory` | No | Root directory inside the uploaded source tree. |
 | `envVars` | No | Array of `{ "key": "...", "value": "..." }` variables to create or update before build. |
-| `meta` | No | String key-value metadata for provider deployment creation. |
+| `meta` | No | String key-value metadata for provider build creation. |
 
 Example:
 
@@ -59,7 +59,7 @@ Important:
 
 ## What The Tool Does
 
-The current deployment path maps to these backend steps:
+The current site build path maps to these backend steps:
 
 1. Register a direct upload manifest in `POST /api/deployments/direct`.
 2. Upload each file with `PUT /api/deployments/:id/files/:fileId/content`.
@@ -68,7 +68,7 @@ The current deployment path maps to these backend steps:
 
 The direct file upload endpoint requires `Content-Type: application/octet-stream`. The backend rejects missing files, size mismatches, SHA mismatches, invalid relative paths, and attempts to start before every file has `uploaded_at`.
 
-## Check Deployment Status
+## Check Site Status
 
 Use the Dashboard, MCP SQL tools, or the REST API. For SQL:
 
@@ -88,7 +88,7 @@ WHERE deployment_id = '<deployment-id>'
 ORDER BY file_path;
 ```
 
-If a deployment has a provider ID but the status looks stale, sync it through the API:
+If a run has a provider ID but the status looks stale, sync it through the API:
 
 ```http
 POST /api/deployments/<deployment-id>/sync
@@ -99,12 +99,12 @@ POST /api/deployments/<deployment-id>/sync
 | Status | Description |
 |--------|-------------|
 | `WAITING` | Run exists and is waiting for source uploads. |
-| `UPLOADING` | Source files are uploading or provider deployment creation is in progress. |
-| `QUEUED` | Provider accepted the deployment and queued the build. |
+| `UPLOADING` | Source files are uploading or provider build creation is in progress. |
+| `QUEUED` | Provider accepted the build and queued it. |
 | `BUILDING` | Provider is building the app. |
-| `READY` | Deployment completed. The `url` column contains the live URL. |
+| `READY` | Site is ready. The `url` column contains the live URL. |
 | `ERROR` | Upload, build, provider, or webhook processing failed. |
-| `CANCELED` | Deployment was canceled. |
+| `CANCELED` | Site build was canceled. |
 
 ## Get The Live URL
 
@@ -120,7 +120,7 @@ The Dashboard may show a friendlier domain when a custom `.insforge.site` slug o
 
 ## Environment Variables
 
-You can pass `envVars` during deployment or manage them from the Dashboard. Deployment env vars are Vercel encrypted environment variables, not database rows.
+You can pass `envVars` when publishing or manage them from the Dashboard. Site env vars are Vercel encrypted environment variables, not database rows.
 
 Rules:
 
@@ -150,7 +150,7 @@ Do not add this rewrite to frameworks that already own routing, such as Next.js.
 
 | Symptom | Check |
 |---------|-------|
-| Deployment service is not configured | Self-hosted backend needs `VERCEL_TOKEN`, `VERCEL_TEAM_ID`, and `VERCEL_PROJECT_ID`. |
+| Sites service is not configured | Self-hosted backend needs `VERCEL_TOKEN`, `VERCEL_TEAM_ID`, and `VERCEL_PROJECT_ID`. |
 | Upload fails with content type error | Direct file upload must use `application/octet-stream`. |
 | Upload fails with size or SHA mismatch | Recompute the manifest from the exact bytes being uploaded. |
 | Start fails before provider build | Query `deployments.files` and confirm every row has `uploaded_at`. |
@@ -162,8 +162,8 @@ Do not add this rewrite to frameworks that already own routing, such as Next.js.
 
 | Task | Preferred tool |
 |------|----------------|
-| Deploy app | `create-deployment` MCP tool |
+| Publish app | `create-deployment` MCP tool |
 | Check latest runs | Dashboard or `SELECT * FROM deployments.runs ORDER BY created_at DESC` |
 | Inspect direct file upload state | `SELECT * FROM deployments.files WHERE deployment_id = '...'` |
-| Manage env vars | Dashboard Deployments -> Environment Variables |
-| Manage domains | Dashboard Deployments -> Domains |
+| Manage env vars | Dashboard Sites -> Environment Variables |
+| Manage domains | Dashboard Sites -> Domains |

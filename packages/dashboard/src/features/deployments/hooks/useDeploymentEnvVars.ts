@@ -118,7 +118,7 @@ export function useDeploymentEnvVars() {
     async (envVar: DeploymentEnvVar) => {
       const shouldDelete = await confirm({
         title: 'Delete Environment Variable',
-        description: `Are you sure you want to delete "${envVar.key}"? This will affect your deployed application.`,
+        description: `Are you sure you want to delete "${envVar.key}"? This will affect your published site.`,
         confirmText: 'Delete',
         cancelText: 'Cancel',
         destructive: true,

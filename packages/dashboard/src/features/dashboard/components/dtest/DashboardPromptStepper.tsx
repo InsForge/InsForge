@@ -58,12 +58,12 @@ const PROMPT_STEPS: PromptStep[] = [
   {
     id: 4,
     key: 'deployment',
-    category: 'Deployment',
-    title: 'Deploy your site',
+    category: 'Sites',
+    title: 'Publish your site',
     prompt:
-      'Use InsForge Skills to deploy this app on InsForge, after deploying, share the live URL.',
+      'Use InsForge Skills to publish this app as an InsForge site. After publishing, share the live URL.',
     icon: <Rocket className="size-12 text-[rgb(var(--disabled))]" />,
-    navigateTo: { label: 'Go to Deployment', path: '/dashboard/deployments' },
+    navigateTo: { label: 'Go to Sites', path: '/dashboard/deployments' },
   },
 ];
 
