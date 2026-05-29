@@ -76,6 +76,14 @@ export async function withUserContext<T>(
   }
 }
 
+/**
+ * Run `fn` as project_admin on an existing client.
+ *
+ * By default, role and request claims are session-scoped and must be cleaned
+ * before returning the client to the pool. Pass `transactionLocal: true` only
+ * when the caller has already opened an explicit transaction; rollback can then
+ * clear local role/config state if fn or cleanup fails.
+ */
 export async function withAdminContext<T>(
   client: PoolClient,
   fn: () => Promise<T>,

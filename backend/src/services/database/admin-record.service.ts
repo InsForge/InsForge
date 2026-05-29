@@ -48,35 +48,30 @@ export class AdminRecordService {
     options: ListTableRecordsOptions
   ): Promise<{ records: DatabaseRecord[]; total: number }> {
     validateTableName(tableName);
-    const client = await this.dbManager.getPool().connect();
 
-    try {
-      return await withAdminContext(client, async () => {
-        const metadata = await this.getTableColumnMetadata(schemaName, tableName, client);
-        const { whereSql, params } = this.buildWhereClause(metadata, options);
-        const qualifiedTableName = quoteQualifiedName(schemaName, tableName);
-        const orderBySql = this.buildOrderByClause(metadata, options.sort);
+    return this.withAdminTransaction(async (client) => {
+      const metadata = await this.getTableColumnMetadata(schemaName, tableName, client);
+      const { whereSql, params } = this.buildWhereClause(metadata, options);
+      const qualifiedTableName = quoteQualifiedName(schemaName, tableName);
+      const orderBySql = this.buildOrderByClause(metadata, options.sort);
 
-        const countResult = await client.query<{
-          total: string;
-        }>(`SELECT COUNT(*)::text AS total FROM ${qualifiedTableName}${whereSql}`, params);
+      const countResult = await client.query<{
+        total: string;
+      }>(`SELECT COUNT(*)::text AS total FROM ${qualifiedTableName}${whereSql}`, params);
 
-        const dataParams = [...params, options.limit, options.offset];
-        const limitPlaceholder = `$${params.length + 1}`;
-        const offsetPlaceholder = `$${params.length + 2}`;
-        const recordsResult = await client.query<DatabaseRecord>(
-          `SELECT * FROM ${qualifiedTableName}${whereSql}${orderBySql} LIMIT ${limitPlaceholder} OFFSET ${offsetPlaceholder}`,
-          dataParams
-        );
+      const dataParams = [...params, options.limit, options.offset];
+      const limitPlaceholder = `$${params.length + 1}`;
+      const offsetPlaceholder = `$${params.length + 2}`;
+      const recordsResult = await client.query<DatabaseRecord>(
+        `SELECT * FROM ${qualifiedTableName}${whereSql}${orderBySql} LIMIT ${limitPlaceholder} OFFSET ${offsetPlaceholder}`,
+        dataParams
+      );
 
-        return {
-          records: recordsResult.rows,
-          total: Number(countResult.rows[0]?.total ?? 0),
-        };
-      });
-    } finally {
-      client.release();
-    }
+      return {
+        records: recordsResult.rows,
+        total: Number(countResult.rows[0]?.total ?? 0),
+      };
+    });
   }
 
   async lookupRecord(
@@ -86,24 +81,19 @@ export class AdminRecordService {
     value: string
   ): Promise<DatabaseRecord | null> {
     validateTableName(tableName);
-    const client = await this.dbManager.getPool().connect();
 
-    try {
-      return await withAdminContext(client, async () => {
-        const metadata = await this.getTableColumnMetadata(schemaName, tableName, client);
-        this.assertColumnExists(metadata, columnName);
+    return this.withAdminTransaction(async (client) => {
+      const metadata = await this.getTableColumnMetadata(schemaName, tableName, client);
+      this.assertColumnExists(metadata, columnName);
 
-        const qualifiedTableName = quoteQualifiedName(schemaName, tableName);
-        const result = await client.query<DatabaseRecord>(
-          `SELECT * FROM ${qualifiedTableName} WHERE ${quoteIdentifier(columnName)} = $1 LIMIT 1`,
-          [value]
-        );
+      const qualifiedTableName = quoteQualifiedName(schemaName, tableName);
+      const result = await client.query<DatabaseRecord>(
+        `SELECT * FROM ${qualifiedTableName} WHERE ${quoteIdentifier(columnName)} = $1 LIMIT 1`,
+        [value]
+      );
 
-        return result.rows[0] ?? null;
-      });
-    } finally {
-      client.release();
-    }
+      return result.rows[0] ?? null;
+    });
   }
 
   async createRecords(
@@ -113,58 +103,36 @@ export class AdminRecordService {
   ): Promise<DatabaseRecord[]> {
     validateTableName(tableName);
 
-    const client = await this.dbManager.getPool().connect();
-    const createdRecords: DatabaseRecord[] = [];
-    let transactionStarted = false;
+    return this.withAdminTransaction(async (client) => {
+      const createdRecords: DatabaseRecord[] = [];
+      const metadata = await this.getTableColumnMetadata(schemaName, tableName, client);
+      const qualifiedTableName = quoteQualifiedName(schemaName, tableName);
 
-    try {
-      await client.query('BEGIN');
-      transactionStarted = true;
+      for (const record of records) {
+        const sanitizedRecord = this.sanitizeInsertRecord(record, metadata);
+        const entries = Object.entries(sanitizedRecord);
 
-      await withAdminContext(
-        client,
-        async () => {
-          const metadata = await this.getTableColumnMetadata(schemaName, tableName, client);
-          const qualifiedTableName = quoteQualifiedName(schemaName, tableName);
+        if (entries.length === 0) {
+          const result = await client.query<DatabaseRecord>(
+            `INSERT INTO ${qualifiedTableName} DEFAULT VALUES RETURNING *`
+          );
+          createdRecords.push(...result.rows);
+          continue;
+        }
 
-          for (const record of records) {
-            const sanitizedRecord = this.sanitizeInsertRecord(record, metadata);
-            const entries = Object.entries(sanitizedRecord);
+        const columns = entries.map(([columnName]) => quoteIdentifier(columnName));
+        const placeholders = entries.map((_, index) => `$${index + 1}`);
+        const values = entries.map(([, value]) => value);
 
-            if (entries.length === 0) {
-              const result = await client.query<DatabaseRecord>(
-                `INSERT INTO ${qualifiedTableName} DEFAULT VALUES RETURNING *`
-              );
-              createdRecords.push(...result.rows);
-              continue;
-            }
-
-            const columns = entries.map(([columnName]) => quoteIdentifier(columnName));
-            const placeholders = entries.map((_, index) => `$${index + 1}`);
-            const values = entries.map(([, value]) => value);
-
-            const result = await client.query<DatabaseRecord>(
-              `INSERT INTO ${qualifiedTableName} (${columns.join(', ')}) VALUES (${placeholders.join(', ')}) RETURNING *`,
-              values
-            );
-            createdRecords.push(...result.rows);
-          }
-        },
-        true
-      );
-
-      await client.query('COMMIT');
-      transactionStarted = false;
+        const result = await client.query<DatabaseRecord>(
+          `INSERT INTO ${qualifiedTableName} (${columns.join(', ')}) VALUES (${placeholders.join(', ')}) RETURNING *`,
+          values
+        );
+        createdRecords.push(...result.rows);
+      }
 
       return createdRecords;
-    } catch (error) {
-      if (transactionStarted) {
-        await client.query('ROLLBACK');
-      }
-      throw error;
-    } finally {
-      client.release();
-    }
+    });
   }
 
   async updateRecord(
@@ -176,52 +144,46 @@ export class AdminRecordService {
   ): Promise<DatabaseRecord> {
     validateTableName(tableName);
 
-    const client = await this.dbManager.getPool().connect();
+    return this.withAdminTransaction(async (client) => {
+      const metadata = await this.getTableColumnMetadata(schemaName, tableName, client);
+      this.assertColumnExists(metadata, pkColumn);
 
-    try {
-      return await withAdminContext(client, async () => {
-        const metadata = await this.getTableColumnMetadata(schemaName, tableName, client);
-        this.assertColumnExists(metadata, pkColumn);
+      const sanitizedRecord = this.sanitizeUpdateRecord(data, metadata);
+      const entries = Object.entries(sanitizedRecord);
 
-        const sanitizedRecord = this.sanitizeUpdateRecord(data, metadata);
-        const entries = Object.entries(sanitizedRecord);
-
-        if (entries.length === 0) {
-          throw new AppError(
-            'No valid fields to update.',
-            400,
-            ERROR_CODES.INVALID_INPUT,
-            'Provide at least one editable field with a non-empty value.'
-          );
-        }
-
-        const assignments = entries.map(
-          ([columnName], index) => `${quoteIdentifier(columnName)} = $${index + 1}`
+      if (entries.length === 0) {
+        throw new AppError(
+          'No valid fields to update.',
+          400,
+          ERROR_CODES.INVALID_INPUT,
+          'Provide at least one editable field with a non-empty value.'
         );
-        const values = entries.map(([, value]) => value);
-        values.push(pkValue);
+      }
 
-        const qualifiedTableName = quoteQualifiedName(schemaName, tableName);
-        const result = await client.query<DatabaseRecord>(
-          `UPDATE ${qualifiedTableName} SET ${assignments.join(', ')} WHERE ${quoteIdentifier(pkColumn)} = $${values.length} RETURNING *`,
-          values
+      const assignments = entries.map(
+        ([columnName], index) => `${quoteIdentifier(columnName)} = $${index + 1}`
+      );
+      const values = entries.map(([, value]) => value);
+      values.push(pkValue);
+
+      const qualifiedTableName = quoteQualifiedName(schemaName, tableName);
+      const result = await client.query<DatabaseRecord>(
+        `UPDATE ${qualifiedTableName} SET ${assignments.join(', ')} WHERE ${quoteIdentifier(pkColumn)} = $${values.length} RETURNING *`,
+        values
+      );
+
+      const updatedRecord = result.rows[0];
+      if (!updatedRecord) {
+        throw new AppError(
+          'Record not found.',
+          404,
+          ERROR_CODES.DATABASE_NOT_FOUND,
+          'Check the record identifier and try again.'
         );
+      }
 
-        const updatedRecord = result.rows[0];
-        if (!updatedRecord) {
-          throw new AppError(
-            'Record not found.',
-            404,
-            ERROR_CODES.DATABASE_NOT_FOUND,
-            'Check the record identifier and try again.'
-          );
-        }
-
-        return updatedRecord;
-      });
-    } finally {
-      client.release();
-    }
+      return updatedRecord;
+    });
   }
 
   async deleteRecords(
@@ -232,28 +194,58 @@ export class AdminRecordService {
   ): Promise<number> {
     validateTableName(tableName);
 
+    return this.withAdminTransaction(async (client) => {
+      const metadata = await this.getTableColumnMetadata(schemaName, tableName, client);
+      this.assertColumnExists(metadata, pkColumn);
+
+      if (pkValues.length === 0) {
+        return 0;
+      }
+
+      const placeholders = pkValues.map((_, index) => `$${index + 1}`);
+      const qualifiedTableName = quoteQualifiedName(schemaName, tableName);
+      const result = await client.query(
+        `DELETE FROM ${qualifiedTableName} WHERE ${quoteIdentifier(pkColumn)} IN (${placeholders.join(', ')})`,
+        pkValues
+      );
+
+      return result.rowCount ?? 0;
+    });
+  }
+
+  private async withAdminTransaction<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
     const client = await this.dbManager.getPool().connect();
+    let transactionStarted = false;
+    let releaseError: Error | undefined;
 
     try {
-      return await withAdminContext(client, async () => {
-        const metadata = await this.getTableColumnMetadata(schemaName, tableName, client);
-        this.assertColumnExists(metadata, pkColumn);
+      await client.query('BEGIN');
+      transactionStarted = true;
 
-        if (pkValues.length === 0) {
-          return 0;
+      const result = await withAdminContext(
+        client,
+        () => fn(client),
+        true,
+        (error) => {
+          releaseError = error;
         }
+      );
 
-        const placeholders = pkValues.map((_, index) => `$${index + 1}`);
-        const qualifiedTableName = quoteQualifiedName(schemaName, tableName);
-        const result = await client.query(
-          `DELETE FROM ${qualifiedTableName} WHERE ${quoteIdentifier(pkColumn)} IN (${placeholders.join(', ')})`,
-          pkValues
-        );
-
-        return result.rowCount ?? 0;
-      });
+      await client.query('COMMIT');
+      transactionStarted = false;
+      return result;
+    } catch (error) {
+      if (transactionStarted) {
+        try {
+          await client.query('ROLLBACK');
+        } catch (rollbackError) {
+          releaseError =
+            rollbackError instanceof Error ? rollbackError : new Error(String(rollbackError));
+        }
+      }
+      throw error;
     } finally {
-      client.release();
+      client.release(releaseError);
     }
   }
 

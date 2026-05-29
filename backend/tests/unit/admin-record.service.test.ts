@@ -66,15 +66,19 @@ describe('AdminRecordService', () => {
     expect(result.records).toHaveLength(2);
 
     const sqlCalls = clientQueryMock.mock.calls.map(([sql]) => sql as string);
-    const setRoleIndex = sqlCalls.indexOf('SET ROLE project_admin');
+    const beginIndex = sqlCalls.indexOf('BEGIN');
+    const setRoleIndex = sqlCalls.indexOf('SET LOCAL ROLE project_admin');
     const dataQueryIndex = sqlCalls.findIndex((sql) =>
       sql.includes('ORDER BY "email" ASC LIMIT $2 OFFSET $3')
     );
     const resetRoleIndex = sqlCalls.indexOf('RESET ROLE');
+    const commitIndex = sqlCalls.indexOf('COMMIT');
 
+    expect(beginIndex).toBe(0);
     expect(setRoleIndex).toBeGreaterThan(-1);
     expect(dataQueryIndex).toBeGreaterThan(setRoleIndex);
     expect(resetRoleIndex).toBeGreaterThan(dataQueryIndex);
+    expect(commitIndex).toBeGreaterThan(resetRoleIndex);
     expect(clientQueryMock.mock.calls[dataQueryIndex]?.[1]).toEqual(['%demo%', 10, 0]);
   });
 
@@ -104,9 +108,12 @@ describe('AdminRecordService', () => {
     const sqlCalls = clientQueryMock.mock.calls.map(([sql]) => sql as string);
     const setRoleIndex = sqlCalls.indexOf('SET LOCAL ROLE project_admin');
     const insertIndex = sqlCalls.findIndex((sql) => sql.includes('INSERT INTO "auth"."users"'));
+    const commitIndex = sqlCalls.indexOf('COMMIT');
 
+    expect(sqlCalls[0]).toBe('BEGIN');
     expect(setRoleIndex).toBeGreaterThan(-1);
     expect(insertIndex).toBeGreaterThan(setRoleIndex);
+    expect(commitIndex).toBeGreaterThan(insertIndex);
   });
 
   it('updates public records and converts blank nullable uuid values to null', async () => {
@@ -142,6 +149,16 @@ describe('AdminRecordService', () => {
       'SET "owner_id" = $1, "name" = $2 WHERE "id" = $3 RETURNING *'
     );
     expect(updateCall?.[1]).toEqual([null, 'Renamed project', 'p1']);
+
+    const sqlCalls = clientQueryMock.mock.calls.map(([sql]) => sql as string);
+    const setRoleIndex = sqlCalls.indexOf('SET LOCAL ROLE project_admin');
+    const updateIndex = sqlCalls.findIndex((sql) => sql.includes('UPDATE "public"."projects"'));
+    const commitIndex = sqlCalls.indexOf('COMMIT');
+
+    expect(sqlCalls[0]).toBe('BEGIN');
+    expect(setRoleIndex).toBeGreaterThan(-1);
+    expect(updateIndex).toBeGreaterThan(setRoleIndex);
+    expect(commitIndex).toBeGreaterThan(updateIndex);
   });
 
   it('preserves empty strings for character varying inserts', async () => {
@@ -237,5 +254,74 @@ describe('AdminRecordService', () => {
         priority: '',
       })
     ).rejects.toBeInstanceOf(AppError);
+
+    const sqlCalls = clientQueryMock.mock.calls.map(([sql]) => sql as string);
+    expect(sqlCalls).toContain('ROLLBACK');
+  });
+
+  it('deletes records inside a project_admin transaction', async () => {
+    clientQueryMock.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM information_schema.columns')) {
+        return {
+          rows: [
+            { column_name: 'id', data_type: 'uuid', is_nullable: 'NO', udt_name: 'uuid' },
+            { column_name: 'name', data_type: 'text', is_nullable: 'NO', udt_name: 'text' },
+          ],
+        };
+      }
+      if (sql.includes('DELETE FROM "public"."projects"')) {
+        return { rowCount: 2, rows: [] };
+      }
+      return { rows: [], rowCount: 0 };
+    });
+
+    const service = AdminRecordService.getInstance();
+    const deletedCount = await service.deleteRecords('public', 'projects', 'id', ['p1', 'p2']);
+
+    expect(deletedCount).toBe(2);
+
+    const sqlCalls = clientQueryMock.mock.calls.map(([sql]) => sql as string);
+    const setRoleIndex = sqlCalls.indexOf('SET LOCAL ROLE project_admin');
+    const deleteIndex = sqlCalls.findIndex((sql) =>
+      sql.includes('DELETE FROM "public"."projects"')
+    );
+    const commitIndex = sqlCalls.indexOf('COMMIT');
+
+    expect(sqlCalls[0]).toBe('BEGIN');
+    expect(deleteIndex).toBeGreaterThan(setRoleIndex);
+    expect(commitIndex).toBeGreaterThan(deleteIndex);
+  });
+
+  it('discards the pooled client when admin transaction cleanup fails', async () => {
+    const resetError = new Error('reset failed');
+
+    clientQueryMock.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM information_schema.columns')) {
+        return {
+          rows: [
+            { column_name: 'id', data_type: 'uuid', is_nullable: 'NO', udt_name: 'uuid' },
+            { column_name: 'name', data_type: 'text', is_nullable: 'NO', udt_name: 'text' },
+          ],
+        };
+      }
+      if (sql.includes('UPDATE "public"."projects"')) {
+        return { rows: [{ id: 'p1', name: 'Renamed project' }] };
+      }
+      if (sql === 'RESET ROLE') {
+        throw resetError;
+      }
+      return { rows: [], rowCount: 0 };
+    });
+
+    const service = AdminRecordService.getInstance();
+
+    await expect(
+      service.updateRecord('public', 'projects', 'id', 'p1', {
+        name: 'Renamed project',
+      })
+    ).rejects.toBe(resetError);
+
+    expect(clientQueryMock.mock.calls.map(([sql]) => sql as string)).toContain('ROLLBACK');
+    expect(releaseMock).toHaveBeenCalledWith(resetError);
   });
 });
