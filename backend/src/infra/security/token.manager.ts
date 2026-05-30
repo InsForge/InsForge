@@ -47,7 +47,7 @@ export class TokenManager {
   private static instance: TokenManager;
 
   private constructor() {
-    if (!config.app.jwtSecret) {
+    if (!config.app.jwtSecret || config.app.jwtSecret === 'your_jwt_secret') {
       throw new Error('JWT_SECRET environment variable is required');
     }
   }

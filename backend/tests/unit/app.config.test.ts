@@ -248,6 +248,34 @@ describe('config.server', () => {
     process.env.LOGS_DIR = '/var/log/insforge';
     expect(loadConfig().server.logsDir).toBe('/var/log/insforge');
   });
+
+  it('defaults trustProxy to 2 hops', () => {
+    unsetEnvKeys('TRUST_PROXY');
+    expect(loadConfig().server.trustProxy).toBe(2);
+  });
+
+  it('reads trustProxy as boolean true', () => {
+    process.env.TRUST_PROXY = 'true';
+    expect(loadConfig().server.trustProxy).toBe(true);
+  });
+
+  it('reads trustProxy as number', () => {
+    process.env.TRUST_PROXY = '3';
+    expect(loadConfig().server.trustProxy).toBe(3);
+  });
+
+  it('reads trustProxy as Express subnet string', () => {
+    process.env.TRUST_PROXY = 'loopback, 10.0.0.0/8';
+    expect(loadConfig().server.trustProxy).toBe('loopback, 10.0.0.0/8');
+  });
+
+  it('robustly falls back to defaults for 0 or negative limits', () => {
+    process.env.MAX_FILES_PER_FIELD = '0';
+    process.env.MAX_FILE_SIZE = '0';
+    const c = loadConfig();
+    expect(c.server.maxFilesPerField).toBe(10);
+    expect(c.server.maxFileSize).toBeUndefined();
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

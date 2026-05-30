@@ -2,13 +2,21 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import fs from 'fs';
+import { parseTrustProxySetting, TrustProxySetting } from '../../utils/trust-proxy.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Timing Fix: Load .env file from the root directory before configuration parses
-const envPath = path.resolve(__dirname, '../../../../.env');
-if (fs.existsSync(envPath)) {
+// Timing Fix: Load .env file from the root directory before configuration parses.
+// We search upwards from __dirname or check a few relative locations to ensure robust path resolution in both source and build dist modes.
+const envPaths = [
+  path.resolve(__dirname, '../../../../.env'), // Source mode: backend/src/infra/config/app.config.ts -> root/.env
+  path.resolve(__dirname, '../../../.env'), // Alternative source mode
+  path.resolve(process.cwd(), '.env'), // Current working directory (usually root for dev/prod servers)
+  path.resolve(process.cwd(), '../.env'), // One level above process.cwd()
+];
+const envPath = envPaths.find((p) => fs.existsSync(p));
+if (envPath) {
   dotenv.config({ path: envPath });
 } else {
   dotenv.config();
@@ -103,6 +111,8 @@ export interface AppConfig {
     maxFilesPerField: number;
     /** Directory for Winston file-transport logs. env: LOGS_DIR */
     logsDir: string;
+    /** Trust proxy configuration. env: TRUST_PROXY */
+    trustProxy: TrustProxySetting;
   };
 
   /**
@@ -219,11 +229,11 @@ export interface AppConfig {
   };
 }
 
-/** Safe integer parser with default fallback to avoid NaN leakages */
+/** Safe positive integer parser with default fallback to avoid NaN, zero, or negative leakages */
 function parseEnvInt(val: string | undefined, fallback: number): number {
   if (!val) return fallback;
   const parsed = parseInt(val, 10);
-  return isNaN(parsed) ? fallback : parsed;
+  return isNaN(parsed) || parsed <= 0 ? fallback : parsed;
 }
 
 /** Fail-fast helper that requires environment variables to be set in production */
@@ -251,7 +261,7 @@ export function loadConfig(): AppConfig {
       // '7130' matches docker-compose.yml, server.ts, and the documented default.
       port: parseEnvInt(process.env.PORT, 7130),
       jwtSecret: requireEnv('JWT_SECRET', 'your_jwt_secret'),
-      apiKey: requireEnv('ACCESS_API_KEY', 'your_api_key'),
+      apiKey: process.env.ACCESS_API_KEY || 'your_api_key',
       logLevel: process.env.LOG_LEVEL || 'info',
     },
 
@@ -291,10 +301,11 @@ export function loadConfig(): AppConfig {
       maxUrlencodedBodySize: process.env.MAX_URLENCODED_BODY_SIZE || '10mb',
       maxFileSize: (() => {
         const parsed = parseInt(process.env.MAX_FILE_SIZE || '', 10);
-        return isNaN(parsed) ? undefined : parsed;
+        return isNaN(parsed) || parsed <= 0 ? undefined : parsed;
       })(),
       maxFilesPerField: parseEnvInt(process.env.MAX_FILES_PER_FIELD, 10),
       logsDir: process.env.LOGS_DIR || path.join(__dirname, '../../logs'),
+      trustProxy: parseTrustProxySetting(process.env.TRUST_PROXY),
     },
 
     database: {
