@@ -99,14 +99,12 @@ export default function DeploymentOverviewPage() {
       return (
         <div className="bg-neutral-100 dark:bg-[#333] rounded-lg p-6">
           <div className="flex flex-col gap-6">
-            <h2 className="text-xl font-semibold text-zinc-950 dark:text-white">
-              No Deployments Yet
-            </h2>
+            <h2 className="text-xl font-semibold text-zinc-950 dark:text-white">No Sites Yet</h2>
 
             <div className="flex flex-col gap-3">
               <p className="text-sm text-muted-foreground dark:text-neutral-400">
-                Send the prompt below to your connected AI agent to deploy your project for the
-                first time.
+                Send the prompt below to your connected AI agent to deploy your site for the first
+                time.
               </p>
 
               <div className="bg-neutral-200 dark:bg-[#171717] rounded-lg p-3 flex flex-col gap-2">
@@ -157,7 +155,7 @@ export default function DeploymentOverviewPage() {
                 <iframe
                   key={iframeKey}
                   src={deploymentUrl}
-                  title="Deployment Preview"
+                  title="Site Preview"
                   className="absolute top-0 left-0 w-[1215px] h-[912px] origin-top-left scale-[0.333] border-0 pointer-events-none"
                   sandbox="allow-scripts allow-same-origin"
                   loading="lazy"

@@ -228,7 +228,7 @@ export function EnvVarDialog({
           </DialogTitle>
         </div>
         <DialogDescription className="sr-only">
-          Configure deployment environment variables
+          Configure site environment variables
         </DialogDescription>
 
         <div className="flex max-h-[70vh] flex-col gap-6 overflow-y-auto p-6">

@@ -1,17 +1,17 @@
 ---
-title: "Deployments"
+title: "Sites"
 sidebarTitle: "Overview"
 description: "Deploy frontend apps from your project, powered by Vercel."
 ---
 
-Use InsForge Deployments to ship the browser-facing app that belongs to your project. The InsForge CLI uploads your frontend source through InsForge, which creates a Vercel production deployment. The dashboard tracks the URL, status, deployment history, environment variables, and domains.
+Use InsForge Sites to ship the browser-facing app that belongs to your project. The InsForge CLI uploads your frontend source through InsForge, which creates a Vercel production site. The dashboard tracks the URL, status, deployment history, environment variables, and domains.
 
-<Frame caption="Deployments dashboard: status, domains, env vars, and history.">
-  <img src="/images/dashboard-deployments.png" alt="InsForge Deployments dashboard" />
+<Frame caption="Sites dashboard: status, domains, env vars, and history.">
+  <img src="/images/dashboard-deployments.png" alt="InsForge Sites dashboard" />
 </Frame>
 
 <Note>
-  **Need to deploy a container or backend service?** Use [Compute](/core-concepts/compute/overview) for workers, queues, WebSocket servers, and long-running services. Deployments are for frontend websites and framework builds that produce a hosted web app.
+  **Need to deploy a container or backend service?** Use [Compute](/core-concepts/compute/overview) for workers, queues, WebSocket servers, and long-running services. Sites are for frontend websites and framework builds that produce a hosted web app.
 </Note>
 
 ```mermaid
@@ -27,7 +27,7 @@ flowchart TB
 
     Vercel --> App[Frontend app]
     App --> URL[Public URL]
-    App --> Status[Status and deployment history]
+    App --> Status[Status and site history]
 
     style CLI fill:#1e293b,stroke:#475569,color:#e2e8f0
     style Dashboard fill:#1e293b,stroke:#475569,color:#e2e8f0
@@ -64,9 +64,9 @@ npx @insforge/cli deployments env set VITE_INSFORGE_URL https://your-project.reg
 npx @insforge/cli deployments env set VITE_INSFORGE_ANON_KEY ik_xxx
 ```
 
-### Deployment history
+### Site history
 
-Review previous runs, sync Vercel status, inspect metadata, and cancel in-progress deployments from the Deployment Logs page.
+Review previous runs, sync Vercel status, inspect metadata, and cancel in-progress deployments from the Site Logs page.
 
 ```bash
 npx @insforge/cli deployments list

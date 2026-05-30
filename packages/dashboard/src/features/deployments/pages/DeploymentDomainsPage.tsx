@@ -508,7 +508,7 @@ export default function DeploymentDomainsPage() {
                   </div>
                 ) : (
                   <span className="text-[13px] text-muted-foreground dark:text-neutral-500">
-                    No deployment yet
+                    No site yet
                   </span>
                 )}
               </div>
@@ -681,7 +681,7 @@ export default function DeploymentDomainsPage() {
                 </DialogTitle>
               </div>
               <DialogDescription className="sr-only">
-                Add a custom domain to your deployment
+                Add a custom domain to your site
               </DialogDescription>
 
               <div className="flex flex-col gap-4 p-6">

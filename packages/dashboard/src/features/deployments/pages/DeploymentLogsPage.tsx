@@ -131,7 +131,7 @@ export default function DeploymentLogsPage() {
       <div className="flex flex-col gap-6 p-4">
         {/* Title */}
         <h1 className="text-xl font-semibold text-zinc-950 dark:text-white tracking-[-0.1px]">
-          Deployment Log
+          Site Log
         </h1>
 
         {/* Filters Row */}
@@ -180,7 +180,7 @@ export default function DeploymentLogsPage() {
 
         {/* Table Header */}
         <div className="grid grid-cols-10 px-3 text-sm text-muted-foreground dark:text-neutral-400">
-          <div className="col-span-3 py-1 px-3">Deployment ID</div>
+          <div className="col-span-3 py-1 px-3">Site ID</div>
           <div className="col-span-3 py-1 px-3">Status</div>
           <div className="col-span-3 py-1 px-3">Created At</div>
           <div className="col-span-1" />
@@ -294,7 +294,7 @@ export default function DeploymentLogsPage() {
             onPageChange={handlePageChange}
             totalRecords={totalDeployments}
             pageSize={pageSize}
-            recordLabel="deployments"
+            recordLabel="sites"
           />
         </div>
       )}

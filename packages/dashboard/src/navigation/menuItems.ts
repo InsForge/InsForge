@@ -132,7 +132,7 @@ export const dashboardSettingsMenuItem: DashboardPrimaryMenuItem = {
 
 export const dashboardDeploymentsMenuItem: DashboardPrimaryMenuItem = {
   id: 'deployments',
-  label: 'Deployments',
+  label: 'Sites',
   href: '/dashboard/deployments',
   icon: Rocket,
 };
