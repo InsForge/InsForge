@@ -33,6 +33,7 @@
             "group": "Getting Started",
             "pages": [
               "introduction",
+              "products",
               {
                 "group": "Quickstart",
                 "expanded": true,
@@ -121,6 +122,7 @@
             "group": "Agent-Native Initiatives",
             "pages": [
               "agent-native/overview",
+              "vscode-extension",
               "agent-native/cli-harness",
               "agent-native/diagnostics",
               "agent-native/config-as-code",
@@ -140,6 +142,7 @@
               "deployment/deployment-security-guide",
               "deployment/deploy-to-aws-ec2",
               "deployment/deploy-to-azure-virtual-machines",
+              "deployment/deploy-to-containarium",
               "deployment/deploy-to-google-cloud-compute-engine"
             ]
           },
