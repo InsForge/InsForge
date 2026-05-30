@@ -4,6 +4,7 @@ agentic
 APNs
 apis
 Astro
+autocapture
 backend
 backfills
 betterstack
@@ -33,6 +34,7 @@ iptables
 IVFFlat
 Keycloak
 kotlin
+KPIs
 linode
 loopback
 mcp
@@ -46,6 +48,7 @@ nuxt
 oauth
 Okta
 opencode
+pageviews
 passwordless
 PDFs
 pg_cron

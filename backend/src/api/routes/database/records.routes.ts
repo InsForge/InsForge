@@ -6,6 +6,7 @@ import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import { validateTableName } from '@/utils/validations.js';
 import { DatabaseRecord } from '@/types/database.js';
+import { TEXT_LIKE_DATA_TYPES } from '@/utils/constants.js';
 import { successResponse } from '@/utils/response.js';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
@@ -55,7 +56,7 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
           if (item && typeof item === 'object') {
             const filtered: DatabaseRecord = {};
             for (const key in item) {
-              if (columnTypeMap[key] !== 'text' && item[key] === '') {
+              if (!TEXT_LIKE_DATA_TYPES.has(columnTypeMap[key] ?? '') && item[key] === '') {
                 continue;
               }
               filtered[key] = item[key];
@@ -66,7 +67,7 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
         });
       } else {
         for (const key in body) {
-          if (columnTypeMap[key] === 'uuid' && body[key] === '') {
+          if (!TEXT_LIKE_DATA_TYPES.has(columnTypeMap[key] ?? '') && body[key] === '') {
             delete body[key];
           }
         }

@@ -104,9 +104,15 @@
                 ]
               },
               {
-                "group": "Compute",
+                "group": "Custom Compute",
                 "pages": [
                   "core-concepts/compute/overview"
+                ]
+              },
+              {
+                "group": "Analytics",
+                "pages": [
+                  "core-concepts/analytics/overview"
                 ]
               }
             ]
