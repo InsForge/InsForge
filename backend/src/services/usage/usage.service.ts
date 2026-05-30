@@ -102,9 +102,9 @@ export class UsageService {
         `SELECT pg_database_size(current_database()) as size`
       );
 
-      // Get total storage size
+      // Get total storage size from cached aggregates
       const storageResult = await this.getPool().query(
-        `SELECT COALESCE(SUM(size), 0) as total_size FROM storage.objects`
+        `SELECT COALESCE(SUM(total_size_bytes), 0) as total_size FROM storage.buckets`
       );
 
       // Get total user count (exclude anonymous and project admin accounts)
