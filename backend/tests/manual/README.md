@@ -49,3 +49,23 @@ These tests are kept separate because:
 1. They use authentication endpoints (`/api/auth/v2/*`) that require specific setup
 2. They test admin-specific functionality that needs manual verification
 3. They verify JWT token structure and claims that may vary between environments
+
+---
+
+## Google ID Token Sign-In Verification Tool
+
+### test-google-id-token.html
+
+This is a standalone, client-side HTML test helper utility to manually verify Google Sign-In and the ID Token authentication endpoint (`/api/auth/id-token?client_type=mobile`).
+
+#### Prerequisites
+
+- Running local InsForge backend on `http://localhost:7130`.
+- A valid Google Client ID configured in your `.env` (or use the pre-configured default client ID inside the HTML file for testing).
+
+#### How to Use
+
+1. Serve or open `test-google-id-token.html` directly in your browser.
+2. Click **"Sign in with Google"** to authenticate via Google OAuth and retrieve your raw `id_token`.
+3. Once authenticated, the **"Test /api/auth/id-token"** button will be enabled. Click it to transmit the token to your local backend API.
+4. The backend response will print directly in the results console showing either a successful authentication profile or validation error.
