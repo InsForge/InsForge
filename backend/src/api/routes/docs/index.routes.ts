@@ -94,21 +94,21 @@ async function processSnippets(content: string, docsRoot: string): Promise<strin
 
 // Legacy documentation map for GET /api/docs/:docType endpoint
 // Only contains keys defined in DocTypeSchema for type safety
-const LEGACY_DOCS_MAP: Record<DocTypeSchema, string> = {
-  instructions: 'insforge-instructions-sdk.md',
+export const LEGACY_DOCS_MAP: Record<DocTypeSchema, string> = {
+  instructions: '../.agents/docs/insforge-instructions-sdk.md',
   'db-sdk': 'sdks/typescript/database.mdx',
   'auth-sdk': 'sdks/typescript/auth.mdx',
   'storage-sdk': 'sdks/typescript/storage.mdx',
   'functions-sdk': 'sdks/typescript/functions.mdx',
   'ai-integration-sdk': 'sdks/typescript/ai.mdx',
-  'real-time': 'agent-docs/real-time.md',
-  deployment: 'agent-docs/deployment.md',
-  payments: 'agent-docs/payments.md',
+  'real-time': '../.agents/docs/real-time.md',
+  deployment: '../.agents/docs/deployment.md',
+  payments: '../.agents/docs/payments.md',
 };
 
 // SDK documentation map for GET /api/docs/:docFeature/:docLanguage endpoint
 // Supports feature × language combinations with type safety
-const SDK_DOCS_MAP: Record<SdkFeatureSchema, Partial<Record<SdkLanguageSchema, string>>> = {
+export const SDK_DOCS_MAP: Record<SdkFeatureSchema, Partial<Record<SdkLanguageSchema, string>>> = {
   db: {
     typescript: 'sdks/typescript/database.mdx',
     swift: 'sdks/swift/database.mdx',
