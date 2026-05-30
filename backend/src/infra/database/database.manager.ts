@@ -64,12 +64,13 @@ export class DatabaseManager {
     const client = await instance.pool.connect();
     try {
       const result = await client.query(
-        `SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2`,
+        `SELECT column_name, data_type, udt_name FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2`,
         [schemaName, tableName]
       );
       const map: Record<string, string> = {};
       for (const row of result.rows) {
-        map[row.column_name] = row.data_type;
+        const dataType = row.data_type.toLowerCase();
+        map[row.column_name] = dataType === 'user-defined' ? row.udt_name.toLowerCase() : dataType;
       }
 
       DatabaseManager.setColumnTypeCache(cacheKey, map);
