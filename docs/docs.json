@@ -104,7 +104,7 @@
                 ]
               },
               {
-                "group": "Compute",
+                "group": "Custom Compute",
                 "pages": [
                   "core-concepts/compute/overview"
                 ]
