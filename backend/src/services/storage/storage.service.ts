@@ -716,31 +716,34 @@ export class StorageService {
    * Get storage metadata
    */
   async getMetadata(): Promise<StorageMetadataSchema> {
-    // Get storage buckets from storage.buckets table
+    // Get storage buckets from storage.buckets table with cached aggregates
     const result = await this.getPool().query(
-      'SELECT name, public, created_at as "createdAt" FROM storage.buckets ORDER BY name'
+      `SELECT name, public, created_at as "createdAt", 
+              object_count as "objectCount", 
+              total_size_bytes as "totalSize" 
+       FROM storage.buckets 
+       ORDER BY name`
     );
 
-    const storageBuckets = result.rows as StorageBucketSchema[];
-
-    // Get object counts for each bucket
-    const bucketsObjectCountMap = await this.getBucketsObjectCount();
-    const storageSize = await this.getStorageSizeInGB();
+    const buckets = result.rows;
+    const totalSizeBytes = buckets.reduce((sum, b) => sum + Number(b.totalSize), 0);
 
     return {
-      buckets: storageBuckets.map((bucket) => ({
-        ...bucket,
-        objectCount: bucketsObjectCountMap.get(bucket.name) ?? 0,
+      buckets: buckets.map((bucket) => ({
+        name: bucket.name,
+        public: bucket.public,
+        createdAt: bucket.createdAt,
+        objectCount: Number(bucket.objectCount),
       })),
-      totalSizeInGB: storageSize,
+      totalSizeInGB: totalSizeBytes / GIGABYTE_IN_BYTES,
     };
   }
 
   private async getBucketsObjectCount(): Promise<Map<string, number>> {
     try {
-      // Query to get object count for each bucket
+      // Query to get object count for each bucket from cached columns
       const result = await this.getPool().query(
-        'SELECT bucket, COUNT(*) as count FROM storage.objects GROUP BY bucket'
+        'SELECT name as bucket, object_count as count FROM storage.buckets'
       );
 
       const bucketCounts = result.rows as { bucket: string; count: string }[];
@@ -763,12 +766,9 @@ export class StorageService {
 
   private async getStorageSizeInGB(): Promise<number> {
     try {
-      // Query the storage.objects table to sum all file sizes
+      // Sum the total cached size of all buckets
       const result = await this.getPool().query(
-        `
-        SELECT COALESCE(SUM(size), 0) as total_size
-        FROM storage.objects
-      `
+        'SELECT COALESCE(SUM(total_size_bytes), 0) as total_size FROM storage.buckets'
       );
 
       const totalSize = result.rows[0]?.total_size || 0;
