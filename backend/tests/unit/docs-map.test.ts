@@ -11,7 +11,9 @@ describe('Documentation Maps', () => {
     for (const [key, docFileName] of Object.entries(LEGACY_DOCS_MAP)) {
       const filePath = path.join(docsRoot, docFileName);
       const exists = fs.existsSync(filePath);
-      expect(exists, `Expected file for legacy doc type '${key}' to exist at: ${filePath}`).toBe(true);
+      expect(exists, `Expected file for legacy doc type '${key}' to exist at: ${filePath}`).toBe(
+        true
+      );
     }
   });
 
@@ -21,7 +23,10 @@ describe('Documentation Maps', () => {
         if (docFileName) {
           const filePath = path.join(docsRoot, docFileName);
           const exists = fs.existsSync(filePath);
-          expect(exists, `Expected file for SDK doc feature '${feature}' language '${language}' to exist at: ${filePath}`).toBe(true);
+          expect(
+            exists,
+            `Expected file for SDK doc feature '${feature}' language '${language}' to exist at: ${filePath}`
+          ).toBe(true);
         }
       }
     }
