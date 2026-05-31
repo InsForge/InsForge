@@ -1100,9 +1100,14 @@ export class AuthService {
         userData = this.appleOAuthProvider.handleSharedCallback(payloadData);
         break;
       case 'microsoft':
-      default:
         throw new AppError(
           `OAuth provider '${provider}' does not support the shared-keys callback path. Configure local client credentials instead.`,
+          501,
+          ERROR_CODES.AUTH_UNSUPPORTED_PROVIDER
+        );
+      default:
+        throw new AppError(
+          `OAuth provider '${provider}' is not implemented yet. See docs for supported providers.`,
           501,
           ERROR_CODES.AUTH_UNSUPPORTED_PROVIDER
         );

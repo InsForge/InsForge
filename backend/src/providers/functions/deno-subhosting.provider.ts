@@ -865,6 +865,7 @@ globalThis.__insforge_dispatch__ = (req: Request) => (_legacyModule.exports as (
 declare global {
   var __insforge_dispatch__: (req: Request) => Promise<Response>;
 }
+export {};
 
 const dispatch = async (req: Request): Promise<Response> => {
   const url = new URL(req.url);
@@ -905,6 +906,10 @@ Deno.serve(dispatch);
 // Auto-generated router
 import { AsyncLocalStorage } from 'node:async_hooks';
 ${imports}
+
+declare global {
+  var __insforge_dispatch__: (req: Request) => Promise<Response>;
+}
 
 const routes: Record<string, (req: Request) => Promise<Response>> = {
 ${routes}
@@ -1000,7 +1005,7 @@ const dispatch = async (req: Request): Promise<Response> => {
 };
 
 // __insforge_dispatch__ bridges the isolate boundary for in-process dispatch.
-(globalThis as unknown as { __insforge_dispatch__: typeof dispatch }).__insforge_dispatch__ = dispatch;
+globalThis.__insforge_dispatch__ = dispatch;
 
 Deno.serve(dispatch);
 `;
