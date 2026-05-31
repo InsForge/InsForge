@@ -5,7 +5,6 @@
  * Issue #1405 — Phase 2: OAuth Error Standardization.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { AppError } from '../../src/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 
 // ---------------------------------------------------------------------------
