@@ -11,7 +11,9 @@ import { ERROR_CODES } from '@insforge/shared-schemas';
 // Minimal mocks for all AuthService dependencies
 // ---------------------------------------------------------------------------
 vi.mock('../../src/infra/database/database.manager.js', () => ({
-  DatabaseManager: { getInstance: () => ({ getPool: () => ({ query: vi.fn(), connect: vi.fn() }) }) },
+  DatabaseManager: {
+    getInstance: () => ({ getPool: () => ({ query: vi.fn(), connect: vi.fn() }) }),
+  },
 }));
 vi.mock('../../src/infra/security/token.manager.js', () => ({
   TokenManager: { getInstance: () => ({ generateAccessToken: vi.fn(), verifyToken: vi.fn() }) },
@@ -66,14 +68,30 @@ const makeOAuthProviderMock = () => ({
   }),
 });
 
-vi.mock('../../src/providers/oauth/google.provider.js', () => ({ GoogleOAuthProvider: makeOAuthProviderMock() }));
-vi.mock('../../src/providers/oauth/github.provider.js', () => ({ GitHubOAuthProvider: makeOAuthProviderMock() }));
-vi.mock('../../src/providers/oauth/discord.provider.js', () => ({ DiscordOAuthProvider: makeOAuthProviderMock() }));
-vi.mock('../../src/providers/oauth/linkedin.provider.js', () => ({ LinkedInOAuthProvider: makeOAuthProviderMock() }));
-vi.mock('../../src/providers/oauth/facebook.provider.js', () => ({ FacebookOAuthProvider: makeOAuthProviderMock() }));
-vi.mock('../../src/providers/oauth/microsoft.provider.js', () => ({ MicrosoftOAuthProvider: makeOAuthProviderMock() }));
-vi.mock('../../src/providers/oauth/x.provider.js', () => ({ XOAuthProvider: makeOAuthProviderMock() }));
-vi.mock('../../src/providers/oauth/apple.provider.js', () => ({ AppleOAuthProvider: makeOAuthProviderMock() }));
+vi.mock('../../src/providers/oauth/google.provider.js', () => ({
+  GoogleOAuthProvider: makeOAuthProviderMock(),
+}));
+vi.mock('../../src/providers/oauth/github.provider.js', () => ({
+  GitHubOAuthProvider: makeOAuthProviderMock(),
+}));
+vi.mock('../../src/providers/oauth/discord.provider.js', () => ({
+  DiscordOAuthProvider: makeOAuthProviderMock(),
+}));
+vi.mock('../../src/providers/oauth/linkedin.provider.js', () => ({
+  LinkedInOAuthProvider: makeOAuthProviderMock(),
+}));
+vi.mock('../../src/providers/oauth/facebook.provider.js', () => ({
+  FacebookOAuthProvider: makeOAuthProviderMock(),
+}));
+vi.mock('../../src/providers/oauth/microsoft.provider.js', () => ({
+  MicrosoftOAuthProvider: makeOAuthProviderMock(),
+}));
+vi.mock('../../src/providers/oauth/x.provider.js', () => ({
+  XOAuthProvider: makeOAuthProviderMock(),
+}));
+vi.mock('../../src/providers/oauth/apple.provider.js', () => ({
+  AppleOAuthProvider: makeOAuthProviderMock(),
+}));
 
 // ---------------------------------------------------------------------------
 
@@ -96,20 +114,18 @@ describe('AuthService — unsupported OAuth provider branches (Issue #1405 Phase
       const authService = await getAuthService();
 
       // Force the TypeScript exhaustive switch to hit its default branch
-      await expect(
-        authService.generateOAuthUrl('unknown_provider' as never)
-      ).rejects.toMatchObject({
-        statusCode: 501,
-        code: ERROR_CODES.AUTH_UNSUPPORTED_PROVIDER,
-        name: 'AppError',
-      });
+      await expect(authService.generateOAuthUrl('unknown_provider' as never)).rejects.toMatchObject(
+        {
+          statusCode: 501,
+          code: ERROR_CODES.AUTH_UNSUPPORTED_PROVIDER,
+          name: 'AppError',
+        }
+      );
     });
 
     it('error message includes the provider name', async () => {
       const authService = await getAuthService();
-      await expect(
-        authService.generateOAuthUrl('tiktok' as never)
-      ).rejects.toThrow(/tiktok/);
+      await expect(authService.generateOAuthUrl('tiktok' as never)).rejects.toThrow(/tiktok/);
     });
 
     it('is an AppError (name === AppError), not a plain Error', async () => {
@@ -153,9 +169,7 @@ describe('AuthService — unsupported OAuth provider branches (Issue #1405 Phase
 
     it('throws AppError(501, AUTH_UNSUPPORTED_PROVIDER) for unknown provider', async () => {
       const authService = await getAuthService();
-      await expect(
-        authService.handleSharedCallback('unknown' as never, {})
-      ).rejects.toMatchObject({
+      await expect(authService.handleSharedCallback('unknown' as never, {})).rejects.toMatchObject({
         statusCode: 501,
         code: ERROR_CODES.AUTH_UNSUPPORTED_PROVIDER,
         name: 'AppError',
