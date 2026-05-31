@@ -60,11 +60,13 @@ describe('TokenManager – API-key token (Issue #1436)', () => {
 
   it('a regular user access token still carries a UUID sub', () => {
     const userSub = '11111111-2222-3333-4444-555555555555';
-    const userToken = jwt.sign(
-      { sub: userSub, email: 'user@example.com', role: 'authenticated' },
-      process.env.JWT_SECRET ?? '',
-      { algorithm: 'HS256' }
-    );
+    // Use the real generator — not a manual jwt.sign — so this test catches
+    // any future accidental removal of sub from generateAccessToken().
+    const userToken = tokenManager.generateAccessToken({
+      sub: userSub,
+      email: 'user@example.com',
+      role: 'authenticated',
+    });
     const payload = tokenManager.verifyToken(userToken);
 
     expect(payload.sub).toBe(userSub);

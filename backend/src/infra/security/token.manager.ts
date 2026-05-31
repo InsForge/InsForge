@@ -172,16 +172,16 @@ export class TokenManager {
    * `sub` is optional in the returned payload: system/API-key tokens
    * carry no subject (Issue #1436) so `sub` will be `undefined` for
    * those tokens. Callers that need a user ID must guard against this.
+   *
+   * Uses spread so future claims added to TokenPayloadSchema are not
+   * silently dropped (e.g. aud, jti, custom claims).
    */
   verifyToken(token: string): TokenPayloadSchema {
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as TokenPayloadSchema;
-      return {
-        // sub is undefined for system tokens — intentional, see Issue #1436
-        sub: decoded.sub,
-        email: decoded.email,
-        role: decoded.role || 'authenticated',
-      };
+      // Spread preserves all claims; role override provides the fallback default.
+      // sub is undefined for system tokens — intentional, see Issue #1436.
+      return { ...decoded, role: decoded.role || 'authenticated' };
     } catch {
       throw new AppError('Invalid token', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
