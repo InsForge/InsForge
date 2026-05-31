@@ -7,7 +7,7 @@
   "plugins": [
     {
       "name": "insforge",
-      "source": "./claude-plugin",
+      "source": "./.claude",
       "description": "Official InsForge plugin with schema patterns, best practices for database design, RLS policies, and SDK usage examples. Includes patterns for social graphs, multi-tenancy, and complex relationships.",
       "version": "1.0.0",
       "author": {

@@ -21,7 +21,7 @@ Then install the plugin:
 ### Option 2: Install Directly from Repository
 
 ```
-/plugin install https://github.com/InsForge/InsForge/claude-plugin
+/plugin install https://github.com/InsForge/InsForge/.claude
 ```
 
 ### Option 3: Local Installation (Development)
@@ -29,7 +29,7 @@ Then install the plugin:
 ```bash
 cd ~/.claude-plugins
 git clone https://github.com/InsForge/InsForge.git
-ln -s InsForge/claude-plugin insforge
+ln -s InsForge/.claude insforge
 ```
 
 ## What's Included
@@ -89,9 +89,13 @@ We're planning to add:
 Want to improve the skills or add new ones?
 
 1. Fork the repository
-2. Edit or add skills in `claude-plugin/skills/`
+2. Edit or add skills in `.claude/skills/`
 3. Test locally by installing from your fork
 4. Submit a PR
+
+The Claude Code plugin is maintained from `.claude/`. Its skills live in
+`.claude/skills/`, and `.agents/skills/` mirrors the same contributor guidance
+for compatible agent tooling.
 
 Skills are just Markdown files with YAML frontmatter - easy to contribute!
 
