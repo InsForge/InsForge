@@ -70,11 +70,17 @@ export class TokenManager {
 
   /**
    * Generate API key token (never expires)
-   * Used for internal API key authenticated requests to PostgREST
+   * Used for internal API key authenticated requests to PostgREST.
+   *
+   * IMPORTANT: `sub` is intentionally omitted (Issue #1436).
+   * A non-UUID `sub` literal causes PostgREST to forward it as
+   * request.jwt.claims.sub, which makes auth.uid() raise SQLSTATE 22P02
+   * (invalid input syntax for type uuid) inside every RLS policy / trigger.
+   * Omitting `sub` makes PostgREST inject NULL, matching the Supabase
+   * service-role contract where auth.uid() returns NULL for system actors.
    */
   generateApiKeyToken(): string {
     const payload = {
-      sub: 'project-admin-with-api-key',
       email: 'project-admin@email.com',
       role: 'project_admin',
     };
@@ -161,12 +167,17 @@ export class TokenManager {
   }
 
   /**
-   * Verify JWT token
+   * Verify JWT token.
+   *
+   * `sub` is optional in the returned payload: system/API-key tokens
+   * carry no subject (Issue #1436) so `sub` will be `undefined` for
+   * those tokens. Callers that need a user ID must guard against this.
    */
   verifyToken(token: string): TokenPayloadSchema {
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as TokenPayloadSchema;
       return {
+        // sub is undefined for system tokens — intentional, see Issue #1436
         sub: decoded.sub,
         email: decoded.email,
         role: decoded.role || 'authenticated',

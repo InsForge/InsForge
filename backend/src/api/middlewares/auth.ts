@@ -48,7 +48,7 @@ export function extractApiKey(req: AuthRequest): string | null {
 // Helper function to set user on request
 function setRequestUser(
   req: AuthRequest,
-  payload: { sub: string; email: string; role: RoleSchema }
+  payload: { sub?: string | undefined; email: string; role: RoleSchema }
 ) {
   req.user = {
     id: payload.sub,
