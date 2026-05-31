@@ -1007,7 +1007,11 @@ export class AuthService {
       case 'apple':
         return this.appleOAuthProvider.generateOAuthUrl(state);
       default:
-        throw new Error(`OAuth provider ${provider} is not implemented yet.`);
+        throw new AppError(
+          `OAuth provider '${provider}' is not implemented yet. See docs for supported providers.`,
+          501,
+          ERROR_CODES.AUTH_UNSUPPORTED_PROVIDER
+        );
     }
   }
 
@@ -1046,7 +1050,11 @@ export class AuthService {
         userData = await this.appleOAuthProvider.handleCallback(payload);
         break;
       default:
-        throw new Error(`OAuth provider ${provider} is not implemented yet.`);
+        throw new AppError(
+          `OAuth provider '${provider}' is not implemented yet. See docs for supported providers.`,
+          501,
+          ERROR_CODES.AUTH_UNSUPPORTED_PROVIDER
+        );
     }
 
     return this.findOrCreateThirdPartyUser(
@@ -1093,7 +1101,11 @@ export class AuthService {
         break;
       case 'microsoft':
       default:
-        throw new Error(`OAuth provider ${provider} is not supported for shared callback.`);
+        throw new AppError(
+          `OAuth provider '${provider}' does not support the shared-keys callback path. Configure local client credentials instead.`,
+          501,
+          ERROR_CODES.AUTH_UNSUPPORTED_PROVIDER
+        );
     }
 
     return this.findOrCreateThirdPartyUser(

@@ -71,7 +71,11 @@ paths:
     post:
       summary: Generate chat completion (deprecated)
       deprecated: true
-      description: Deprecated compatibility proxy. New integrations should call https://openrouter.ai/api/v1/chat/completions directly with the provisioned OpenRouter key.
+      description: |
+        **Deprecated. Sunset target: v2.0.0.**
+        Compatibility proxy retained for SDK releases that shipped against this endpoint.
+        New integrations should call https://openrouter.ai/api/v1/chat/completions directly
+        with the provisioned OpenRouter key.
       tags:
         - Client
       security:
@@ -104,7 +108,10 @@ paths:
     post:
       summary: Generate images (deprecated)
       deprecated: true
-      description: Deprecated compatibility proxy. New integrations should use OpenRouter image-capable models directly with the provisioned OpenRouter key.
+      description: |
+        **Deprecated. Sunset target: v2.0.0.**
+        Compatibility proxy retained for SDK releases that shipped against this endpoint.
+        New integrations should use OpenRouter image-capable models directly with the provisioned OpenRouter key.
       tags:
         - Client
       security:
@@ -159,7 +166,11 @@ paths:
     post:
       summary: Generate embeddings (deprecated)
       deprecated: true
-      description: Deprecated compatibility proxy. New integrations should call https://openrouter.ai/api/v1/embeddings directly with the provisioned OpenRouter key.
+      description: |
+        **Deprecated. Sunset target: v2.0.0.**
+        Compatibility proxy retained for SDK releases that shipped against this endpoint.
+        New integrations should call https://openrouter.ai/api/v1/embeddings directly
+        with the provisioned OpenRouter key.
       tags:
         - Client
       security:

@@ -30,8 +30,13 @@ paths:
           $ref: '#/components/responses/Error'
 
     post:
-      summary: Create legacy deployment session
-      description: Creates a `WAITING` deployment run and returns presigned form data for the legacy source-zip upload flow. New tooling should use `/api/deployments/direct`.
+      summary: Create legacy deployment session (deprecated)
+      deprecated: true
+      description: |
+        **Deprecated. Sunset target: v2.0.0.**
+        Creates a `WAITING` deployment run and returns presigned form data for the legacy
+        source-zip upload flow. New tooling should use `/api/deployments/direct` which
+        supports the direct-upload manifest workflow and does not require S3 staging.
       tags:
         - Admin
       security:
