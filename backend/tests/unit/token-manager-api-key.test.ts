@@ -59,7 +59,7 @@ describe('TokenManager – API-key token (Issue #1436)', () => {
   });
 
   it('a regular user access token still carries a UUID sub', () => {
-    const userSub = '11111111-2222-3333-4444-555555555555';
+    const userSub = '550e8400-e29b-41d4-a716-446655440000';
     // Use the real generator — not a manual jwt.sign — so this test catches
     // any future accidental removal of sub from generateAccessToken().
     const userToken = tokenManager.generateAccessToken({
@@ -70,5 +70,29 @@ describe('TokenManager – API-key token (Issue #1436)', () => {
     const payload = tokenManager.verifyToken(userToken);
 
     expect(payload.sub).toBe(userSub);
+  });
+
+  it('verifyToken() rejects a refresh token even though it shares JWT_SECRET', () => {
+    // Refresh tokens share the same signing secret but carry a different shape:
+    // they have no `email` or `role` claim. verifyToken() must reject them so
+    // a refresh token cannot be presented as an access token (coderabbit finding).
+    const refreshToken = tokenManager.generateRefreshToken(
+      '550e8400-e29b-41d4-a716-446655440000',
+      'user'
+    );
+
+    expect(() => tokenManager.verifyToken(refreshToken)).toThrow();
+  });
+
+  it('verifyToken() rejects a token whose sub is a non-UUID string', () => {
+    // Extra defence: even if someone mints a JWT with JWT_SECRET and sets a
+    // non-UUID sub, tokenPayloadSchema.parse() must reject it.
+    const poisonToken = jwt.sign(
+      { sub: 'project-admin-with-api-key', email: 'x@example.com', role: 'project_admin' },
+      process.env.JWT_SECRET ?? '',
+      { algorithm: 'HS256' }
+    );
+
+    expect(() => tokenManager.verifyToken(poisonToken)).toThrow();
   });
 });

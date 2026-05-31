@@ -2,7 +2,13 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { createRemoteJWKSet, JWTPayload, jwtVerify } from 'jose';
 import { AppError } from '@/utils/errors.js';
-import { ERROR_CODES, type TokenPayloadSchema } from '@insforge/shared-schemas';
+import {
+  ERROR_CODES,
+  tokenPayloadSchema,
+  systemTokenPayloadSchema,
+  type TokenPayloadSchema,
+  type SystemTokenPayloadSchema,
+} from '@insforge/shared-schemas';
 import { NEXT_ACTIONS } from '../../utils/next-actions.js';
 
 const JWT_SECRET = process.env.JWT_SECRET ?? '';
@@ -169,20 +175,34 @@ export class TokenManager {
   /**
    * Verify JWT token.
    *
-   * `sub` is optional in the returned payload: system/API-key tokens
-   * carry no subject (Issue #1436) so `sub` will be `undefined` for
-   * those tokens. Callers that need a user ID must guard against this.
+   * Two-step validation (fail-closed):
+   *   1. `jwt.verify` checks signature + expiry against JWT_SECRET.
+   *   2. `tokenPayloadSchema.parse` enforces the access-token shape:
+   *      - `email` must be present and valid  (rejects refresh tokens which lack it)
+   *      - `role`  must be a known enum value  (rejects tokens with no role claim)
+   *      - `sub`   must be a UUID if present   (extra guard against non-UUID subjects)
    *
-   * Uses spread so future claims added to TokenPayloadSchema are not
-   * silently dropped (e.g. aud, jti, custom claims).
+   * This prevents refresh tokens — which share JWT_SECRET but carry different
+   * claims — from being accepted as access tokens (coderabbit finding).
+   *
+   * `sub` is optional in the returned payload: system/API-key tokens carry no
+   * subject (Issue #1436), so auth.uid() receives NULL instead of raising 22P02.
    */
-  verifyToken(token: string): TokenPayloadSchema {
+  verifyToken(token: string): TokenPayloadSchema | SystemTokenPayloadSchema {
     try {
-      const decoded = jwt.verify(token, JWT_SECRET) as TokenPayloadSchema;
-      // Spread preserves all claims; role override provides the fallback default.
-      // sub is undefined for system tokens — intentional, see Issue #1436.
-      return { ...decoded, role: decoded.role || 'authenticated' };
-    } catch {
+      const verified = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }) as Record<
+        string,
+        unknown
+      >;
+
+      if (verified.role === 'project_admin') {
+        return systemTokenPayloadSchema.parse(verified);
+      }
+      return tokenPayloadSchema.parse(verified);
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       throw new AppError('Invalid token', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
   }

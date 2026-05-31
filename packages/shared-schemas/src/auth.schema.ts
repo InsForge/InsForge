@@ -162,6 +162,17 @@ export const emailTemplateSchema = z.object({
  * JWT token payload schema
  */
 export const tokenPayloadSchema = z.object({
+  sub: userIdSchema, // Subject (user ID)
+  email: emailSchema,
+  role: roleSchema,
+  iat: z.number().optional(), // Issued at
+  exp: z.number().optional(), // Expiration
+});
+
+/**
+ * System JWT token payload schema (where sub is optional for system/API-key tokens)
+ */
+export const systemTokenPayloadSchema = z.object({
   sub: userIdSchema.optional(), // Subject (user ID) — absent for system/API-key tokens
   email: emailSchema,
   role: roleSchema,
@@ -181,6 +192,7 @@ export type VerificationMethodSchema = z.infer<typeof verificationMethodSchema>;
 export type ProfileSchema = z.infer<typeof profileSchema>;
 export type UserSchema = z.infer<typeof userSchema>;
 export type TokenPayloadSchema = z.infer<typeof tokenPayloadSchema>;
+export type SystemTokenPayloadSchema = z.infer<typeof systemTokenPayloadSchema>;
 export type OAuthConfigSchema = z.infer<typeof oAuthConfigSchema>;
 export type OAuthProvidersSchema = z.infer<typeof oAuthProvidersSchema>;
 export type AuthConfigSchema = z.infer<typeof authConfigSchema>;
