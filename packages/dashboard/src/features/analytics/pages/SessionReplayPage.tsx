@@ -10,9 +10,14 @@ const PAGE_SIZE = 10;
 
 export function SessionReplayPage() {
   return (
-    <RequirePosthogConnection>
-      <SessionReplayPageBody />
-    </RequirePosthogConnection>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-semantic-1">
+      <TableHeader title="Session Replay" showSearch={false} />
+      <div className="min-h-0 flex-1">
+        <RequirePosthogConnection>
+          <SessionReplayPageBody />
+        </RequirePosthogConnection>
+      </div>
+    </div>
   );
 }
 
@@ -30,9 +35,7 @@ function SessionReplayPageBody() {
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-semantic-1">
-      <TableHeader title="Session Replay" showSearch={false} />
-
+    <div className="flex h-full min-h-0 flex-col">
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-4/5 max-w-[1024px] pb-10 pt-10">
           {/* Table header */}
