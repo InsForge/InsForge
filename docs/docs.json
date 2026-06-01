@@ -87,7 +87,7 @@
               {
                 "group": "Sites",
                 "pages": [
-                  "core-concepts/deployments/overview"
+                  "core-concepts/sites/overview"
                 ]
               },
               {
@@ -310,6 +310,7 @@
   "redirects": [
     { "source": "/core-concepts/database/branching", "destination": "/agent-native/branching" },
     { "source": "/configuration/config-as-code", "destination": "/agent-native/config-as-code" },
+    { "source": "/core-concepts/deployments/overview", "destination": "/core-concepts/sites/overview" },
     { "source": "/deployment/deploy-to-render", "destination": "/deployment/deploy-to-aws-ec2" }
   ],
   "logo": {

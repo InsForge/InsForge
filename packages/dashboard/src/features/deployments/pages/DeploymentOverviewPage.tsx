@@ -99,7 +99,9 @@ export default function DeploymentOverviewPage() {
       return (
         <div className="bg-neutral-100 dark:bg-[#333] rounded-lg p-6">
           <div className="flex flex-col gap-6">
-            <h2 className="text-xl font-semibold text-zinc-950 dark:text-white">No Sites Yet</h2>
+            <h2 className="text-xl font-semibold text-zinc-950 dark:text-white">
+              No deployments yet
+            </h2>
 
             <div className="flex flex-col gap-3">
               <p className="text-sm text-muted-foreground dark:text-neutral-400">
@@ -171,7 +173,9 @@ export default function DeploymentOverviewPage() {
           {/* Metadata Grid */}
           <div className="flex-1 flex flex-col gap-6 justify-center">
             <div className="flex flex-col">
-              <p className="text-sm text-muted-foreground dark:text-neutral-400 leading-6">ID</p>
+              <p className="text-sm text-muted-foreground dark:text-neutral-400 leading-6">
+                Deployment ID
+              </p>
               <p className="text-sm text-zinc-950 dark:text-white font-mono">
                 {latestReadyDeployment.id}
               </p>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, CopyButton } from '@insforge/ui';
-import { Database, Rocket } from 'lucide-react';
+import { Database, Globe } from 'lucide-react';
 import StepUserIcon from '#assets/icons/step_user.svg?react';
 import StepUploadIcon from '#assets/icons/step_upload.svg?react';
 import stepBgDecoration from '#assets/images/step_bg_decoration.svg';
@@ -62,7 +62,7 @@ const PROMPT_STEPS: PromptStep[] = [
     title: 'Deploy your site',
     prompt:
       'Use InsForge Skills to deploy this app on InsForge, after deploying, share the live URL.',
-    icon: <Rocket className="size-12 text-[rgb(var(--disabled))]" />,
+    icon: <Globe className="size-12 text-[rgb(var(--disabled))]" />,
     navigateTo: { label: 'Go to Sites', path: '/dashboard/deployments' },
   },
 ];
