@@ -305,19 +305,7 @@ export const oAuthInitRequestSchema = z.object({
     .min(43, 'Code challenge must be at least 43 characters')
     .max(128, 'Code challenge must be at most 128 characters')
     .regex(pkceRegex, 'Code challenge must be base64url encoded'),
-  additionalParams: z
-    .preprocess((value) => {
-      if (value === undefined || value === null || typeof value !== 'string') {
-        return value;
-      }
-
-      try {
-        return JSON.parse(value);
-      } catch {
-        return value;
-      }
-    }, z.record(z.string()))
-    .optional(),
+  additionalParams: z.record(z.string()).optional(),
 });
 
 /**
