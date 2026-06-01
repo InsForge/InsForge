@@ -11,7 +11,7 @@ import {
   ChartLine,
   BarChart3,
   Settings,
-  Rocket,
+  Globe,
   SquarePen,
   Download,
   BookOpen,
@@ -134,7 +134,7 @@ export const dashboardDeploymentsMenuItem: DashboardPrimaryMenuItem = {
   id: 'deployments',
   label: 'Sites',
   href: '/dashboard/deployments',
-  icon: Rocket,
+  icon: Globe,
 };
 
 export const dashboardAnalyticsMenuItem: DashboardPrimaryMenuItem = {

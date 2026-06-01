@@ -508,7 +508,7 @@ export default function DeploymentDomainsPage() {
                   </div>
                 ) : (
                   <span className="text-[13px] text-muted-foreground dark:text-neutral-500">
-                    No site yet
+                    No deployment yet
                   </span>
                 )}
               </div>

@@ -8,7 +8,7 @@ const DEPLOYMENTS_SIDEBAR_ITEMS: FeatureSidebarListItem[] = [
   },
   {
     id: 'deployment-logs',
-    label: 'Site Logs',
+    label: 'Deployment Logs',
     href: '/dashboard/deployments/logs',
   },
   {

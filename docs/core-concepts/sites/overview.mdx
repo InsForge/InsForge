@@ -4,10 +4,10 @@ sidebarTitle: "Overview"
 description: "Deploy frontend apps from your project, powered by Vercel."
 ---
 
-Use InsForge Sites to ship the browser-facing app that belongs to your project. The InsForge CLI uploads your frontend source through InsForge, which creates a Vercel production site. The dashboard tracks the URL, status, site history, environment variables, and domains.
+Use InsForge Sites to ship the browser-facing app that belongs to your project. The InsForge CLI uploads your frontend source through InsForge, which creates a Vercel production deployment. The dashboard tracks the URL, status, deployment history, environment variables, and domains.
 
-<Frame caption="Sites dashboard: status, domains, env vars, and history.">
-  <img src="/images/dashboard-deployments.png" alt="InsForge Sites dashboard" />
+<Frame caption="Sites dashboard: status, domains, env vars, and deployment history.">
+  <img src="/images/dashboard-sites.png" alt="InsForge Sites dashboard" />
 </Frame>
 
 <Note>
@@ -27,7 +27,7 @@ flowchart TB
 
     Vercel --> App[Frontend app]
     App --> URL[Public URL]
-    App --> Status[Status and site history]
+    App --> Status[Status and deployment history]
 
     style CLI fill:#1e293b,stroke:#475569,color:#e2e8f0
     style Dashboard fill:#1e293b,stroke:#475569,color:#e2e8f0
@@ -64,9 +64,9 @@ npx @insforge/cli deployments env set VITE_INSFORGE_URL https://your-project.reg
 npx @insforge/cli deployments env set VITE_INSFORGE_ANON_KEY ik_xxx
 ```
 
-### Site history
+### Deployment history
 
-Review previous runs, sync Vercel status, inspect metadata, and cancel in-progress deployments from the Site Logs page.
+Review previous runs, sync Vercel status, inspect metadata, and cancel in-progress deployments from the Deployment Logs page.
 
 ```bash
 npx @insforge/cli deployments list
