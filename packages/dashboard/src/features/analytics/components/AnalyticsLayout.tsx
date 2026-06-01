@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { ErrorState, LoadingState } from '#components';
@@ -8,7 +8,6 @@ import { useToast } from '#lib/hooks/useToast';
 import { TimeRangeProvider } from '#features/analytics/context/TimeRangeContext';
 import { usePosthogConnection } from '#features/analytics/hooks/usePosthogConnection';
 import { AnalyticsSidebar } from './AnalyticsSidebar';
-import { EmptyConnectPanel } from './posthog/EmptyConnectPanel';
 
 export default function AnalyticsLayout() {
   const conn = usePosthogConnection();
@@ -43,67 +42,45 @@ export default function AnalyticsLayout() {
     });
   }, [qc, navigate, showToast, subscribePosthogConnectionStatus]);
 
+  const connection = conn.data ?? null;
+
+  let topLevelStatus: ReactNode | null = null;
+  if (conn.isLoading || projectIdLoading) {
+    topLevelStatus = (
+      <div className="flex h-full min-h-0 items-center justify-center">
+        <LoadingState className="py-0" message="Loading Analytics…" />
+      </div>
+    );
+  } else if (conn.isError) {
+    topLevelStatus = (
+      <div className="flex h-full min-h-0 items-center justify-center px-6">
+        <div className="w-full max-w-[420px]">
+          <ErrorState
+            title="Failed to load PostHog connection"
+            error="Please refresh, or contact support if the problem persists."
+          />
+        </div>
+      </div>
+    );
+  } else if (projectIdError || !projectId) {
+    topLevelStatus = (
+      <div className="flex h-full min-h-0 items-center justify-center px-6">
+        <div className="w-full max-w-[420px]">
+          <ErrorState
+            title="Failed to load project ID"
+            error="Please refresh, or contact support if the problem persists."
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <TimeRangeProvider>
       <div className="flex h-full min-h-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
-        {renderLayout({
-          conn,
-          projectId,
-          projectIdLoading,
-          projectIdError,
-        })}
+        <AnalyticsSidebar connection={connection} projectId={projectId ?? ''} />
+        <div className="min-w-0 flex-1 overflow-hidden">{topLevelStatus ?? <Outlet />}</div>
       </div>
     </TimeRangeProvider>
-  );
-}
-
-function renderLayout({
-  conn,
-  projectId,
-  projectIdLoading,
-  projectIdError,
-}: {
-  conn: ReturnType<typeof usePosthogConnection>;
-  projectId: string | null | undefined;
-  projectIdLoading: boolean;
-  projectIdError: Error | null;
-}) {
-  if (conn.isLoading || projectIdLoading) {
-    return <LoadingState />;
-  }
-  if (conn.isError) {
-    return (
-      <ErrorState
-        title="Failed to load PostHog connection"
-        error="Please refresh, or contact support if the problem persists."
-      />
-    );
-  }
-  if (projectIdError || !projectId) {
-    return (
-      <ErrorState
-        title="Failed to load project ID"
-        error="Please refresh, or contact support if the problem persists."
-      />
-    );
-  }
-
-  const connection = conn.data ?? null;
-  return (
-    <>
-      <AnalyticsSidebar connection={connection} projectId={projectId} />
-      <div className="min-w-0 flex-1 overflow-auto">
-        {connection ? (
-          <Outlet />
-        ) : (
-          <div className="h-full overflow-y-auto">
-            <div className="mx-auto flex w-4/5 max-w-[1024px] flex-col gap-6 pb-10 pt-10">
-              <h1 className="text-2xl font-medium leading-8 text-foreground">Setup Analytics</h1>
-              <EmptyConnectPanel projectId={projectId} />
-            </div>
-          </div>
-        )}
-      </div>
-    </>
   );
 }
