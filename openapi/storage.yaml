@@ -732,11 +732,11 @@ paths:
       deprecated: true
       summary: Get Download Strategy (Deprecated — use GET on the canonical path)
       description: |
-        **Deprecated. Sunset target: v2.0.0.**
-        Alias of `GET /api/storage/buckets/{bucketName}/download-strategy/objects/{objectKey}`.
+        Deprecated alias of
+        `GET /api/storage/buckets/{bucketName}/download-strategy/objects/{objectKey}`.
         Retained at the original path/method for backward compatibility with
         SDK releases that already shipped against this POST endpoint. Any
-        request body is ignored. Migrate to the canonical GET endpoint before v2.0.0.
+        request body is ignored.
       tags:
         - Client
       security:
