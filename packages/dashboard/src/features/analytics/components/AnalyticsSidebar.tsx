@@ -40,6 +40,7 @@ export function AnalyticsSidebar({ connection, projectId }: AnalyticsSidebarProp
       label: 'Analytics Config',
       icon: Settings,
       onClick: () => setSettingsOpen(true),
+      disabled: !projectId,
     },
   ];
 
