@@ -29,6 +29,14 @@ type StorageObjectResult = {
   metadata: StorageFileSchema;
 };
 
+interface BucketRow {
+  name: string;
+  public: boolean;
+  createdAt: Date | string;
+  objectCount: string;
+  totalSize: string;
+}
+
 export class StorageService {
   private static instance: StorageService;
   private provider: StorageProvider;
@@ -725,62 +733,19 @@ export class StorageService {
        ORDER BY name`
     );
 
-    const buckets = result.rows;
-    const totalSizeBytes = buckets.reduce((sum, b) => sum + Number(b.totalSize), 0);
+    const buckets = result.rows as BucketRow[];
+    const totalSizeBytes = buckets.reduce((sum, b) => sum + (Number(b.totalSize) || 0), 0);
 
     return {
       buckets: buckets.map((bucket) => ({
         name: bucket.name,
         public: bucket.public,
-        createdAt: bucket.createdAt,
-        objectCount: Number(bucket.objectCount),
+        createdAt:
+          bucket.createdAt instanceof Date ? bucket.createdAt.toISOString() : bucket.createdAt,
+        objectCount: Number(bucket.objectCount) || 0,
       })),
       totalSizeInGB: totalSizeBytes / GIGABYTE_IN_BYTES,
     };
-  }
-
-  private async getBucketsObjectCount(): Promise<Map<string, number>> {
-    try {
-      // Query to get object count for each bucket from cached columns
-      const result = await this.getPool().query(
-        'SELECT name as bucket, object_count as count FROM storage.buckets'
-      );
-
-      const bucketCounts = result.rows as { bucket: string; count: string }[];
-
-      // Convert to Map for easy lookup
-      const countMap = new Map<string, number>();
-      bucketCounts.forEach((row) => {
-        countMap.set(row.bucket, parseInt(row.count, 10));
-      });
-
-      return countMap;
-    } catch (error) {
-      logger.error('Error getting bucket object counts', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      // Return empty map on error
-      return new Map<string, number>();
-    }
-  }
-
-  private async getStorageSizeInGB(): Promise<number> {
-    try {
-      // Sum the total cached size of all buckets
-      const result = await this.getPool().query(
-        'SELECT COALESCE(SUM(total_size_bytes), 0) as total_size FROM storage.buckets'
-      );
-
-      const totalSize = result.rows[0]?.total_size || 0;
-
-      // Convert bytes to GB
-      return Number(totalSize) / GIGABYTE_IN_BYTES;
-    } catch (error) {
-      logger.error('Error getting storage size', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return 0;
-    }
   }
 
   // ==========================================================================
