@@ -43,6 +43,7 @@ import { useTablePreferences } from '#features/database/hooks/useTablePreference
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { usePageSize } from '#lib/hooks/usePageSize';
 import { DEFAULT_DATABASE_SCHEMA, getDatabaseSchemaInfo } from '#features/database/helpers';
+import { useProjectId } from '#lib/hooks/useMetadata';
 
 export default function TablesPage() {
   const location = useLocation();
@@ -69,6 +70,8 @@ export default function TablesPage() {
   const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { schemas, isLoading: isLoadingSchemas } = useDatabaseSchemas();
+  const { projectId, isLoading: isProjectIdLoading } = useProjectId();
+  const tableFormDraftScope = projectId ? `project:${projectId}` : undefined;
   const selectedSchemaInfo = useMemo(
     () => getDatabaseSchemaInfo(schemas, selectedSchema),
     [schemas, selectedSchema]
@@ -314,7 +317,7 @@ export default function TablesPage() {
       const shouldDiscard = await confirm(confirmOptions);
       if (shouldDiscard) {
         if (!editingTable) {
-          clearTableFormCreateDraft();
+          clearTableFormCreateDraft(tableFormDraftScope);
         }
         setShowTableForm(false);
         setEditingTable(null);
@@ -324,9 +327,10 @@ export default function TablesPage() {
       }
     } else {
       if (!editingTable) {
-        clearTableFormCreateDraft();
+        clearTableFormCreateDraft(tableFormDraftScope);
       }
       setShowTableForm(false);
+      setEditingTable(null);
       return true;
     }
   };
@@ -456,14 +460,21 @@ export default function TablesPage() {
   const canMutateSelectedSchema = !selectedSchemaInfo.isProtected;
 
   useEffect(() => {
-    if (showTableForm || editingTable || selectedSchemaInfo.isProtected) {
+    if (showTableForm || editingTable || selectedSchemaInfo.isProtected || isProjectIdLoading) {
       return;
     }
 
-    if (hasRestorableTableFormCreateDraft(selectedSchema)) {
+    if (hasRestorableTableFormCreateDraft(selectedSchema, tableFormDraftScope)) {
       setShowTableForm(true);
     }
-  }, [editingTable, selectedSchema, selectedSchemaInfo.isProtected, showTableForm]);
+  }, [
+    editingTable,
+    isProjectIdLoading,
+    selectedSchema,
+    selectedSchemaInfo.isProtected,
+    showTableForm,
+    tableFormDraftScope,
+  ]);
 
   // Show template preview - takes full width without sidebar
   if (previewingTemplate) {

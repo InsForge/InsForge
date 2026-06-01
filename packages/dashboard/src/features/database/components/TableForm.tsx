@@ -19,6 +19,7 @@ import { ForeignKeyPopover } from './ForeignKeyPopover';
 import { ColumnType, TableSchema, UpdateTableSchemaRequest } from '@insforge/shared-schemas';
 import { parseDatabaseTableReference, SYSTEM_FIELDS } from '#features/database/helpers';
 import { databaseTableQueryKeys } from '#features/database/queryKeys';
+import { useProjectId } from '#lib/hooks/useMetadata';
 
 const newColumn: TableFormColumnSchema = {
   columnName: '',
@@ -31,6 +32,12 @@ const newColumn: TableFormColumnSchema = {
 };
 
 const TABLE_FORM_CREATE_DRAFT_STORAGE_KEY = 'table-form-columns-draft';
+
+export const getTableFormCreateDraftStorageKey = (draftScope?: string): string => {
+  return draftScope
+    ? `${TABLE_FORM_CREATE_DRAFT_STORAGE_KEY}:${encodeURIComponent(draftScope)}`
+    : TABLE_FORM_CREATE_DRAFT_STORAGE_KEY;
+};
 
 interface TableFormCreateDraft {
   schemaName: string;
@@ -104,7 +111,6 @@ const toOptionalBoolean = (value: unknown, fallback: boolean): boolean => {
 
 const toColumnFromSnapshot = (snapshot: unknown): TableFormColumnSchema => {
   const columnType = getRecordValue(snapshot, 'type') ?? getRecordValue(snapshot, 'columnType');
-  console.log('Column Type : ', columnType);
 
   return {
     columnName: toOptionalString(getRecordValue(snapshot, 'columnName')),
@@ -144,23 +150,21 @@ const hasCreateDraftData = (draft: TableFormCreateDraft): boolean => {
   );
 };
 
-const readTableFormCreateDraft = (): TableFormCreateDraft | null => {
+const readTableFormCreateDraft = (draftScope?: string): TableFormCreateDraft | null => {
   const storage = getTableFormDraftStorage();
   if (!storage) {
     return null;
   }
 
   try {
-    const storedValue = storage.getItem(TABLE_FORM_CREATE_DRAFT_STORAGE_KEY);
+    const storedValue = storage.getItem(getTableFormCreateDraftStorageKey(draftScope));
     if (!storedValue) {
       return null;
     }
 
     const parsedValue = JSON.parse(storedValue) as unknown;
-    console.log('value : ', parsedValue);
 
     if (Array.isArray(parsedValue)) {
-      console.log('Its an Array');
       return {
         schemaName: '',
         tableName: '',
@@ -174,9 +178,9 @@ const readTableFormCreateDraft = (): TableFormCreateDraft | null => {
 
     const schemaNameValue = getRecordValue(parsedValue, 'schemaName');
     const foreignKeysValue = getRecordValue(parsedValue, 'foreignKeys');
-    console.log('foreign keys : ', foreignKeysValue);
+
     const formDraft = tableFormSchema.safeParse(parsedValue);
-    console.log('formDraft : ', formDraft);
+
     if (!formDraft.success) {
       return null;
     }
@@ -197,9 +201,12 @@ const readTableFormCreateDraft = (): TableFormCreateDraft | null => {
   }
 };
 
-export const hasRestorableTableFormCreateDraft = (schemaName?: string): boolean => {
-  const draft = readTableFormCreateDraft();
-  console.log('Draft : ', draft);
+export const hasRestorableTableFormCreateDraft = (
+  schemaName?: string,
+  draftScope?: string
+): boolean => {
+  const draft = readTableFormCreateDraft(draftScope);
+
   if (!draft) {
     return false;
   }
@@ -211,8 +218,8 @@ export const hasRestorableTableFormCreateDraft = (schemaName?: string): boolean 
   return hasCreateDraftData(draft);
 };
 
-export const clearTableFormCreateDraft = () => {
-  getTableFormDraftStorage()?.removeItem(TABLE_FORM_CREATE_DRAFT_STORAGE_KEY);
+export const clearTableFormCreateDraft = (draftScope?: string) => {
+  getTableFormDraftStorage()?.removeItem(getTableFormCreateDraftStorageKey(draftScope));
 };
 
 interface TableFormProps {
@@ -234,6 +241,9 @@ export function TableForm({
   editTable,
   setFormIsDirty,
 }: TableFormProps) {
+  const { projectId, isLoading: isProjectIdLoading } = useProjectId();
+  const draftScope = projectId ? `project:${projectId}` : undefined;
+
   const [error, setError] = useState<string | null>(null);
   const [showForeignKeyDialog, setShowForeignKeyDialog] = useState(false);
   const [editingForeignKey, setEditingForeignKey] = useState<string>();
@@ -261,12 +271,10 @@ export function TableForm({
   });
 
   useEffect(() => {
-    console.log('use 1');
     // Clear error when effect runs
     setError(null);
 
     if (open && mode === 'edit' && editTable) {
-      console.log('okaye');
       skipNextDraftSaveRef.current = true;
       form.reset({
         tableName: editTable.tableName,
@@ -305,9 +313,12 @@ export function TableForm({
     }
 
     if (open && mode === 'create') {
-      const draft = readTableFormCreateDraft();
+      if (isProjectIdLoading) {
+        return;
+      }
+
+      const draft = readTableFormCreateDraft(draftScope);
       if (draft && (!draft.schemaName || draft.schemaName === schemaName)) {
-        console.log('inside draft condition in useEffect 1');
         skipNextDraftSaveRef.current = true;
         form.reset({
           tableName: draft.tableName,
@@ -324,10 +335,13 @@ export function TableForm({
       });
       setForeignKeys([]);
     }
-  }, [editTable, form, mode, open, schemaName]);
+  }, [draftScope, editTable, form, isProjectIdLoading, mode, open, schemaName]);
   useEffect(() => {
-    console.log('use 2');
     if (!open || mode !== 'create') {
+      return;
+    }
+
+    if (isProjectIdLoading) {
       return;
     }
 
@@ -350,14 +364,14 @@ export function TableForm({
 
     try {
       if (hasCreateDraftData(draft)) {
-        storage.setItem(TABLE_FORM_CREATE_DRAFT_STORAGE_KEY, JSON.stringify(draft));
+        storage.setItem(getTableFormCreateDraftStorageKey(draftScope), JSON.stringify(draft));
       } else {
-        storage.removeItem(TABLE_FORM_CREATE_DRAFT_STORAGE_KEY);
+        storage.removeItem(getTableFormCreateDraftStorageKey(draftScope));
       }
     } catch {
       // Keep the form usable if localStorage is blocked or full.
     }
-  }, [columns, foreignKeys, mode, open, schemaName, tableName]);
+  }, [columns, draftScope, foreignKeys, isProjectIdLoading, mode, open, schemaName, tableName]);
 
   const currentCreateDraftHasData =
     mode === 'create' &&
@@ -431,7 +445,7 @@ export function TableForm({
 
       showToast('Table created successfully!', 'success');
 
-      clearTableFormCreateDraft();
+      clearTableFormCreateDraft(draftScope);
       skipNextDraftSaveRef.current = true;
       form.reset();
       setError(null);
