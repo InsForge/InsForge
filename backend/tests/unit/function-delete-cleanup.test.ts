@@ -48,10 +48,6 @@ describe('FunctionService.deleteFunction — deployment cleanup', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockPool.connect.mockResolvedValue({
-      query: clientQueryMock,
-      release: releaseMock,
-    });
     service = FunctionService.getInstance();
   });
 
