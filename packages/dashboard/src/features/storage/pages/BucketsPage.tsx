@@ -126,10 +126,19 @@ export default function BucketsPage() {
     try {
       setSelectedFiles(new Set());
       setSearchValue('');
-      await Promise.all([
-        refetchBuckets(),
-        queryClient.invalidateQueries({ queryKey: ['storage'] }),
-      ]);
+      const invalidateStorageQueries = [
+        queryClient.invalidateQueries({
+          queryKey: selectedBucket
+            ? ['storage', 'objects', selectedBucket]
+            : ['storage', 'objects'],
+        }),
+        queryClient.invalidateQueries({ queryKey: ['storage', 'bucket-stats'] }),
+      ];
+      await Promise.all([refetchBuckets(), ...invalidateStorageQueries]);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to refresh storage data';
+      showToast(errorMessage, 'error');
     } finally {
       setIsRefreshing(false);
     }
