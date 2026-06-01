@@ -4,6 +4,11 @@ import { getApiBaseUrl } from '@/utils/environment.js';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { OAuthProvider } from './base.provider.js';
 import type { LinkedInUserInfo, OAuthUserData } from '@/types/auth.js';
+import {
+  appendAdditionalOAuthParams,
+  appendAdditionalOAuthParamsToUrlString,
+  type OAuthAdditionalParams,
+} from './additional-params.js';
 
 /**
  * LinkedIn OAuth Service
@@ -30,7 +35,10 @@ export class LinkedInOAuthProvider implements OAuthProvider {
   /**
    * Generate LinkedIn OAuth authorization URL
    */
-  async generateOAuthUrl(state?: string): Promise<string> {
+  async generateOAuthUrl(
+    state?: string,
+    additionalParams?: OAuthAdditionalParams
+  ): Promise<string> {
     const oAuthConfigService = OAuthConfigService.getInstance();
     const config = await oAuthConfigService.getConfigByProvider('linkedin');
 
@@ -55,7 +63,10 @@ export class LinkedInOAuthProvider implements OAuthProvider {
           },
         }
       );
-      return response.data.auth_url || response.data.url || '';
+      return appendAdditionalOAuthParamsToUrlString(
+        response.data.auth_url || response.data.url || '',
+        additionalParams
+      );
     }
 
     logger.debug('LinkedIn OAuth Config (fresh from DB):', {
@@ -73,6 +84,7 @@ export class LinkedInOAuthProvider implements OAuthProvider {
     if (state) {
       authUrl.searchParams.set('state', state);
     }
+    appendAdditionalOAuthParams(authUrl, additionalParams);
 
     return authUrl.toString();
   }

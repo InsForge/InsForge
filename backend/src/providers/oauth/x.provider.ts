@@ -5,6 +5,11 @@ import logger from '@/utils/logger.js';
 import { OAuthProvider } from './base.provider.js';
 import axios from 'axios';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
+import {
+  appendAdditionalOAuthParams,
+  appendAdditionalOAuthParamsToUrlString,
+  type OAuthAdditionalParams,
+} from './additional-params.js';
 
 export class XOAuthProvider implements OAuthProvider {
   private static instance: XOAuthProvider;
@@ -25,7 +30,10 @@ export class XOAuthProvider implements OAuthProvider {
   /**
    * Generate X OAuth authorization URL
    */
-  async generateOAuthUrl(state?: string): Promise<string> {
+  async generateOAuthUrl(
+    state?: string,
+    additionalParams?: OAuthAdditionalParams
+  ): Promise<string> {
     const oauthConfigService = OAuthConfigService.getInstance();
     const config = await oauthConfigService.getConfigByProvider('x');
     const verifier = crypto.randomBytes(32).toString('base64url');
@@ -57,7 +65,10 @@ export class XOAuthProvider implements OAuthProvider {
           },
         }
       );
-      return response.data.auth_url || response.data.url || '';
+      return appendAdditionalOAuthParamsToUrlString(
+        response.data.auth_url || response.data.url || '',
+        additionalParams
+      );
     }
 
     logger.debug('X OAuth Config (fresh from DB):', {
@@ -75,6 +86,7 @@ export class XOAuthProvider implements OAuthProvider {
     authUrl.searchParams.set('state', state ?? '');
     authUrl.searchParams.set('code_challenge', challenge);
     authUrl.searchParams.set('code_challenge_method', 'S256');
+    appendAdditionalOAuthParams(authUrl, additionalParams);
 
     return authUrl.toString();
   }

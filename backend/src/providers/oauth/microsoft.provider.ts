@@ -4,6 +4,7 @@ import { getApiBaseUrl } from '@/utils/environment.js';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { OAuthProvider } from './base.provider.js';
 import type { MicrosoftUserInfo, OAuthUserData } from '@/types/auth.js';
+import { appendAdditionalOAuthParams, type OAuthAdditionalParams } from './additional-params.js';
 
 /**
  * Microsoft OAuth Service
@@ -26,7 +27,10 @@ export class MicrosoftOAuthProvider implements OAuthProvider {
   /**
    * Generate Microsoft OAuth authorization URL
    */
-  async generateOAuthUrl(state?: string): Promise<string> {
+  async generateOAuthUrl(
+    state?: string,
+    additionalParams?: OAuthAdditionalParams
+  ): Promise<string> {
     const oAuthConfigService = OAuthConfigService.getInstance();
     const config = await oAuthConfigService.getConfigByProvider('microsoft');
     if (!config) {
@@ -53,6 +57,7 @@ export class MicrosoftOAuthProvider implements OAuthProvider {
     if (state) {
       authUrl.searchParams.set('state', state);
     }
+    appendAdditionalOAuthParams(authUrl, additionalParams);
     return authUrl.toString();
   }
 

@@ -3,6 +3,7 @@ import axios from 'axios';
 import { getApiBaseUrl } from '@/utils/environment.js';
 import { CustomOAuthConfigService } from '@/services/auth/custom-oauth-config.service.js';
 import type { OAuthUserData } from '@/types/auth.js';
+import { appendAdditionalOAuthParams, type OAuthAdditionalParams } from './additional-params.js';
 
 interface DiscoveredEndpoints {
   authorization_endpoint?: string;
@@ -75,7 +76,11 @@ export class CustomOAuthProvider {
     return { authorizationUrl, tokenUrl, userInfoUrl };
   }
 
-  async generateOAuthUrl(key: string, state: string): Promise<string> {
+  async generateOAuthUrl(
+    key: string,
+    state: string,
+    additionalParams?: OAuthAdditionalParams
+  ): Promise<string> {
     const config = await this.customConfigService.getConfigByKey(key);
     if (!config) {
       throw new Error(`Custom OAuth provider ${key} is not configured.`);
@@ -97,6 +102,7 @@ export class CustomOAuthProvider {
     url.searchParams.set('state', state);
     url.searchParams.set('code_challenge_method', 'S256');
     url.searchParams.set('code_challenge', challenge);
+    appendAdditionalOAuthParams(url, additionalParams);
 
     return url.toString();
   }

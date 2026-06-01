@@ -5,6 +5,11 @@ import { getApiBaseUrl } from '@/utils/environment.js';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import type { GoogleUserInfo, OAuthUserData } from '@/types/auth.js';
 import { OAuthProvider } from './base.provider.js';
+import {
+  appendAdditionalOAuthParams,
+  appendAdditionalOAuthParamsToUrlString,
+  type OAuthAdditionalParams,
+} from './additional-params.js';
 
 /**
  * Google OAuth Service
@@ -31,7 +36,10 @@ export class GoogleOAuthProvider implements OAuthProvider {
   /**
    * Generate Google OAuth authorization URL
    */
-  async generateOAuthUrl(state?: string): Promise<string> {
+  async generateOAuthUrl(
+    state?: string,
+    additionalParams?: OAuthAdditionalParams
+  ): Promise<string> {
     const oauthConfigService = OAuthConfigService.getInstance();
     const config = await oauthConfigService.getConfigByProvider('google');
 
@@ -57,7 +65,10 @@ export class GoogleOAuthProvider implements OAuthProvider {
           },
         }
       );
-      return response.data.auth_url || response.data.url || '';
+      return appendAdditionalOAuthParamsToUrlString(
+        response.data.auth_url || response.data.url || '',
+        additionalParams
+      );
     }
 
     logger.debug('Google OAuth Config (fresh from DB):', {
@@ -76,6 +87,7 @@ export class GoogleOAuthProvider implements OAuthProvider {
     if (state) {
       authUrl.searchParams.set('state', state);
     }
+    appendAdditionalOAuthParams(authUrl, additionalParams);
 
     return authUrl.toString();
   }

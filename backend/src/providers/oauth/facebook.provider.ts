@@ -4,6 +4,11 @@ import { getApiBaseUrl } from '@/utils/environment.js';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { OAuthProvider } from './base.provider.js';
 import type { FacebookUserInfo, OAuthUserData } from '@/types/auth.js';
+import {
+  appendAdditionalOAuthParams,
+  appendAdditionalOAuthParamsToUrlString,
+  type OAuthAdditionalParams,
+} from './additional-params.js';
 
 /**
  * Facebook OAuth Service
@@ -26,7 +31,10 @@ export class FacebookOAuthProvider implements OAuthProvider {
   /**
    * Generate Facebook OAuth authorization URL
    */
-  async generateOAuthUrl(state?: string): Promise<string> {
+  async generateOAuthUrl(
+    state?: string,
+    additionalParams?: OAuthAdditionalParams
+  ): Promise<string> {
     const oAuthConfigService = OAuthConfigService.getInstance();
     const config = await oAuthConfigService.getConfigByProvider('facebook');
 
@@ -51,7 +59,10 @@ export class FacebookOAuthProvider implements OAuthProvider {
           },
         }
       );
-      return response.data.auth_url || response.data.url || '';
+      return appendAdditionalOAuthParamsToUrlString(
+        response.data.auth_url || response.data.url || '',
+        additionalParams
+      );
     }
 
     logger.debug('Facebook OAuth Config (fresh from DB):', {
@@ -69,6 +80,7 @@ export class FacebookOAuthProvider implements OAuthProvider {
     if (state) {
       authUrl.searchParams.set('state', state);
     }
+    appendAdditionalOAuthParams(authUrl, additionalParams);
 
     return authUrl.toString();
   }
