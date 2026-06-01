@@ -54,7 +54,7 @@ export function RetentionCard({ enabled }: { enabled: boolean }) {
   if (!grid || grid.length === 0) {
     return (
       <div className="flex h-full min-h-0 items-center justify-center">
-        <EmptyState title="No data" />
+        <EmptyState title="No data available" />
       </div>
     );
   }

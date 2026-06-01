@@ -55,7 +55,7 @@ export function BreakdownPanel({ breakdown, enabled }: Props) {
       ) : error ? (
         <ErrorState title="Failed to load" error="Please try again." />
       ) : top.length === 0 ? (
-        <EmptyState title="No data" />
+        <EmptyState title="No data available" />
       ) : (
         <ul className="flex w-full flex-col">
           {top.map((row, i) => (

@@ -221,7 +221,7 @@ export function AnalyticsConfigDialog({
                     </p>
                     <Button
                       variant="primary"
-                      disabled={!onConnectPosthog}
+                      disabled={!onConnectPosthog || !projectId}
                       onClick={() => onConnectPosthog?.(projectId)}
                     >
                       Connect PostHog
