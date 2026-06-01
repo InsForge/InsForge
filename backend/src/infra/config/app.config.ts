@@ -233,7 +233,10 @@ export interface AppConfig {
 function parseEnvInt(val: string | undefined, fallback: number): number {
   if (!val) return fallback;
   const parsed = parseInt(val, 10);
-  return isNaN(parsed) || parsed <= 0 ? fallback : parsed;
+  if (isNaN(parsed) || parsed <= 0 || !Number.isSafeInteger(parsed)) {
+    return fallback;
+  }
+  return parsed;
 }
 
 /** Fail-fast helper that requires environment variables to be set in production */
@@ -260,7 +263,13 @@ export function loadConfig(): AppConfig {
       // BUG FIX: was '3000', conflicting with server.ts which defaulted to '7130'.
       // '7130' matches docker-compose.yml, server.ts, and the documented default.
       port: parseEnvInt(process.env.PORT, 7130),
-      jwtSecret: requireEnv('JWT_SECRET', 'your_jwt_secret'),
+      jwtSecret:
+        process.env.JWT_SECRET?.trim() ||
+        (process.env.NODE_ENV === 'test'
+          ? 'test_jwt_secret'
+          : (() => {
+              throw new Error('FATAL: JWT_SECRET environment variable is missing.');
+            })()),
       apiKey: process.env.ACCESS_API_KEY || 'your_api_key',
       logLevel: process.env.LOG_LEVEL || 'info',
     },

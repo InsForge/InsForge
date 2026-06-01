@@ -56,7 +56,7 @@ describe('config.app', () => {
     const c = loadConfig();
 
     expect(c.app.port).toBe(7130);
-    expect(c.app.jwtSecret).toBe('your_jwt_secret');
+    expect(c.app.jwtSecret).toBe('test_jwt_secret');
     expect(c.app.apiKey).toBe('your_api_key');
     expect(c.app.logLevel).toBe('info');
   });
@@ -64,7 +64,7 @@ describe('config.app', () => {
   it('throws an error when required secrets are missing in production', () => {
     process.env.NODE_ENV = 'production';
     unsetEnvKeys('PORT', 'JWT_SECRET', 'ACCESS_API_KEY', 'LOG_LEVEL');
-    expect(() => loadConfig()).toThrow('Missing required environment variable: JWT_SECRET');
+    expect(() => loadConfig()).toThrow('FATAL: JWT_SECRET environment variable is missing.');
   });
 
   it('overrides all app fields from env', () => {
