@@ -92,8 +92,9 @@ export async function createApp() {
     skip: shouldSkipGlobalRateLimit,
     // Advertise rate-limit headers so API/agent clients (and readiness scanners)
     // can discover the limits. Enforcement is unchanged; this only emits headers.
+    // Only standard RateLimit-* headers are emitted so per-route limiters (which
+    // also use standardHeaders) overwrite them with their stricter values.
     standardHeaders: true, // emit RateLimit-* (IETF draft) headers
-    legacyHeaders: true, // also emit X-RateLimit-* for broad client/scanner compat
   });
 
   // Basic middleware
