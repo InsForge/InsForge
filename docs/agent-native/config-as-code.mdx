@@ -90,9 +90,9 @@ The file mirrors a curated subset of project config, the parts that are useful t
 | `[schedules]` | `retention_days` |
 | `[deployments]` | `subdomain` |
 
-`retention_days = 0` disables retention cleanup for realtime messages or schedule execution logs. Email templates, OAuth provider app credentials, buckets, realtime channels, functions, deployment environment variables, and secrets are not managed through this file.
+Because TOML has no `null` literal, use `retention_days = 0` to disable retention cleanup for realtime messages or schedule execution logs; `config apply` sends `null` to the backend for that value. Email templates, OAuth provider app credentials, buckets, realtime channels, functions, deployment environment variables, and secrets are not managed through this file.
 
-A minimal example:
+A complete example:
 
 ```toml
 [auth]
