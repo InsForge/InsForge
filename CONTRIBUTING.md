@@ -7,6 +7,7 @@ Thank you for your interest in contributing to InsForge. This guide will help yo
 - [Project Structure](#project-structure)
 - [Prerequisites](#prerequisites)
 - [Getting Started](#getting-started)
+- [Claiming an Issue](#claiming-an-issue)
 - [Development Workflow](#development-workflow)
 - [Testing](#testing)
 - [Pull Request Process](#pull-request-process)
@@ -60,6 +61,18 @@ Before you start development, ensure you have the following:
    docker compose up
    ```
 
+## Claiming an Issue
+
+We follow an **issue-first workflow**: open or find an issue, get it assigned to you, and only then start working on a PR. This keeps work tracked, avoids two people building the same thing, and makes review smoother.
+
+1. **Find or open an issue** for the work. If one doesn't exist, open a new issue describing the bug or feature first.
+2. **Claim it.** Comment on the issue asking for it to be assigned to you (for example, "I'd like to work on this" or "please assign this to me"). Our repo maintainer agent, **章北海 (Zhang Beihai)**, will assign you automatically if it can.
+   - Each contributor may hold **at most 3 open assigned issues at a time, across all InsForge repositories** (not per repo). Finish or release one before claiming another. To release an issue, comment "unassign me" on it.
+   - If the agent can't assign you (some accounts lack the required access), a maintainer will assign you manually.
+3. **Wait until the issue is assigned to you** before opening your PR, and **link the issue from the PR** (for example, "Closes #123").
+
+> Drive-by fixes are welcome — a PR without an assigned issue will still be reviewed. But the agent will add a `needs-issue` or `needs-assignment` label and leave a friendly reminder, and unlinked work is easier to lose track of. Claiming an issue first is the smoothest path.
+
 ## Development Workflow
 
 1. Create a new branch for your changes:
@@ -109,12 +122,14 @@ All contributions must include appropriate tests. Follow these guidelines:
 
 ## Pull Request Process
 
-1. Create a draft pull request early to facilitate discussion
-2. Reference any related issues in your PR description (e.g., 'Closes #123')
-3. Ensure all tests pass and the build is successful
-4. Update documentation as needed
-5. Keep your PR focused on a single feature or bug fix
-6. Be responsive to code review feedback
+1. Make sure the issue you're resolving is [assigned to you](#claiming-an-issue) before opening the PR
+2. Create a draft pull request early to facilitate discussion
+3. Link the issue your PR resolves in the description (e.g., 'Closes #123')
+4. Ensure all tests pass and the build is successful
+5. Update documentation as needed
+6. Keep your PR focused on a single feature or bug fix
+7. Be responsive to code review feedback
+8. **After you address review comments, re-request a review from your assigned reviewer** (use the 🔁 button next to their name in the Reviewers section). This is how the reviewer is notified that your changes are ready for another look — without it, your PR may sit unnoticed.
 
 ## Code Style
 
