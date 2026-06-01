@@ -51,11 +51,11 @@ export function BreakdownPanel({ breakdown, enabled }: Props) {
       <p className="text-sm text-muted-foreground">{title}</p>
 
       {isLoading ? (
-        <LoadingState className="py-4" />
+        <LoadingState className="py-4 self-center" />
       ) : error ? (
-        <ErrorState title="Failed to load" error="Please try again." />
+        <ErrorState title="Failed to load" error="Please try again." className="self-center" />
       ) : top.length === 0 ? (
-        <EmptyState title="No data available" />
+        <EmptyState title="No data available" className="self-center" />
       ) : (
         <ul className="flex w-full flex-col">
           {top.map((row, i) => (
