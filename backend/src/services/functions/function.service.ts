@@ -315,6 +315,11 @@ export class FunctionService {
         return false;
       }
 
+      // Remove deployment records that reference the deleted function
+      await this.getPool().query('DELETE FROM functions.deployments WHERE functions @> $1::jsonb', [
+        JSON.stringify([slug]),
+      ]);
+
       // Trigger redeployment without the deleted function
       this.scheduleDeployment();
 
