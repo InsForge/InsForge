@@ -736,7 +736,7 @@ export class StorageService {
       // Calculate total storage size in GB by summing cached totals
       let totalSizeBytes = 0;
       storageBuckets.forEach((bucket) => {
-        totalSizeBytes += bucket.total_size_bytes;
+        totalSizeBytes += Number(bucket.total_size_bytes);
       });
 
       // Remove the internal column and map to schema

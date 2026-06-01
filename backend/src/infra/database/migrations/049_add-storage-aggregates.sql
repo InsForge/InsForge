@@ -42,13 +42,26 @@ BEGIN
     RETURN OLD;
 
   ELSIF TG_OP = 'UPDATE' THEN
-    -- On UPDATE: adjust size if it changed, count stays same
-    size_delta := NEW.size - OLD.size;
+    -- On UPDATE: handle bucket reassignment or size changes.
+    -- Use a single UPDATE with CASE expressions and a WHERE IN (...) clause
+    -- to ensure rows are locked in a deterministic order and avoid
+    -- deadlocks when concurrent transactions move objects between buckets.
     UPDATE storage.buckets
     SET
-      total_size_bytes = GREATEST(total_size_bytes + size_delta, 0),
+      object_count = CASE
+        WHEN name = OLD.bucket AND NEW.bucket <> OLD.bucket THEN GREATEST(object_count - 1, 0)
+        WHEN name = NEW.bucket AND NEW.bucket <> OLD.bucket THEN object_count + 1
+        ELSE object_count
+      END,
+      total_size_bytes = CASE
+        WHEN name = OLD.bucket AND NEW.bucket <> OLD.bucket THEN GREATEST(total_size_bytes - OLD.size, 0)
+        WHEN name = NEW.bucket AND NEW.bucket <> OLD.bucket THEN total_size_bytes + NEW.size
+        WHEN name = NEW.bucket AND NEW.bucket = OLD.bucket THEN GREATEST(total_size_bytes + (NEW.size - OLD.size), 0)
+        ELSE total_size_bytes
+      END,
       updated_at = CURRENT_TIMESTAMP
-    WHERE name = NEW.bucket;
+    WHERE name IN (OLD.bucket, NEW.bucket);
+
     RETURN NEW;
   END IF;
 END;
