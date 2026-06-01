@@ -1,5 +1,11 @@
 import { useMemo, useState } from 'react';
-import { EmptyState, ErrorState, LoadingState, PaginationControls, TableHeader } from '#components';
+import {
+  EmptyStateIllustration,
+  ErrorState,
+  LoadingState,
+  PaginationControls,
+  TableHeader,
+} from '#components';
 import { RequirePosthogConnection } from '#features/analytics/components/RequirePosthogConnection';
 import { useRecordings } from '#features/analytics/hooks/useRecordings';
 import { SessionRow } from '#features/analytics/components/posthog/SessionRow';
@@ -61,10 +67,15 @@ function SessionReplayPageBody() {
             ) : error ? (
               <ErrorState title="Failed to load replays" error="Please try again." />
             ) : pageItems.length === 0 ? (
-              <EmptyState
-                title="No replays yet"
-                description="Make sure session_recording is enabled in your PostHog project."
-              />
+              <div className="flex flex-col items-center gap-2 pb-12 pt-6 text-center">
+                <EmptyStateIllustration />
+                <p className="text-sm font-medium leading-6 text-muted-foreground">
+                  No replays yet
+                </p>
+                <p className="text-xs leading-4 text-muted-foreground">
+                  Make sure session_recording is enabled in your PostHog project.
+                </p>
+              </div>
             ) : (
               pageItems.map((rec) => <SessionRow key={rec.id} recording={rec} onOpen={setOpenId} />)
             )}
