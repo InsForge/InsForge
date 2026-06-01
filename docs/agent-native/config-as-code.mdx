@@ -202,7 +202,7 @@ This is what lets one `insforge.toml` apply cleanly to multiple environments: th
 
 ## When to use this
 
-- **Version control for project config.** Redirect URLs, signup policy, password policy, email verification mode, SMTP, storage upload size, and retention windows live in a file your team reviews via PR.
+- **Version control for project config.** Redirect URLs, sign-up policy, password policy, email verification mode, SMTP, storage upload size, and retention windows live in a file your team reviews via PR.
 - **Multi-environment parity.** One TOML, applied to dev, staging, and prod, keeps the supported project settings aligned everywhere. Environment-specific values (subdomain, SMTP credentials) flow through `--project-id` overrides and `env(...)` refs.
 - **CI-driven config changes.** Run `config apply --auto-approve --json` from your deploy pipeline. Combine with `config plan` as a PR check so reviewers see what the merge will change in prod.
 - **Disaster recovery.** A committed `insforge.toml` is a known-good config snapshot. Re-apply it after restoring a project to bring auth, SMTP, storage, retention, and deployment settings back to the expected shape in seconds.
