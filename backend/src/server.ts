@@ -90,6 +90,10 @@ export async function createApp() {
     max: 3000,
     message: 'Too many requests from this IP',
     skip: shouldSkipGlobalRateLimit,
+    // Advertise rate-limit headers so API/agent clients (and readiness scanners)
+    // can discover the limits. Enforcement is unchanged; this only emits headers.
+    standardHeaders: true, // emit RateLimit-* (IETF draft) headers
+    legacyHeaders: true, // also emit X-RateLimit-* for broad client/scanner compat
   });
 
   // Basic middleware
