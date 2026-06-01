@@ -268,10 +268,6 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
     const validatedProvider = providerValidation.data;
     const redirectUri = redirect_uri;
 
-    if (!redirectUri) {
-      throw new AppError('Redirect URI is required', 400, ERROR_CODES.INVALID_INPUT);
-    }
-
     if (!(await authConfigService.validateRedirectUrl(redirectUri))) {
       throw new AppError(
         `${redirectUri} is not in the allowed redirect URLs`,

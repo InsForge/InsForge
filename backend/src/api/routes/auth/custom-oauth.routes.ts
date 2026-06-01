@@ -229,9 +229,6 @@ router.get('/:key', async (req: Request, res: Response, next: NextFunction) => {
 
     const { redirect_uri, code_challenge, additionalParams } = queryValidation.data;
     const redirectUri = redirect_uri;
-    if (!redirectUri) {
-      throw new AppError('Redirect URI is required', 400, ERROR_CODES.INVALID_INPUT);
-    }
 
     if (!(await authConfigService.validateRedirectUrl(redirectUri))) {
       throw new AppError(

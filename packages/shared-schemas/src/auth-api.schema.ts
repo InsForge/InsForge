@@ -298,7 +298,7 @@ const pkceRegex = /^[A-Za-z0-9._~-]+$/;
  */
 export const oAuthInitRequestSchema = z.object({
   // eslint-disable-next-line @typescript-eslint/naming-convention
-  redirect_uri: z.string().url().optional(),
+  redirect_uri: z.string({ required_error: 'Redirect URI is required' }).url(),
   // eslint-disable-next-line @typescript-eslint/naming-convention
   code_challenge: z
     .string()
