@@ -153,9 +153,9 @@ export async function createApp() {
   });
 
   //default payload size 10 MB and it can be modified, depending upon the usage.
-  const maxFunctionProxyBodyBytes = Number(
-    process.env.FUNCTION_PROXY_MAX_BODY_BYTES || 25 * 1024 * 1024
-  );
+  const _rawLimit = parseInt(process.env.FUNCTION_PROXY_MAX_BODY_BYTES ?? '', 10);
+  const maxFunctionProxyBodyBytes =
+    Number.isFinite(_rawLimit) && _rawLimit > 0 ? _rawLimit : 25 * 1024 * 1024;
 
   // middleware to handle non json body for the function/:slug
   app.use('/functions/:slug', (req: Request, res: Response, next: NextFunction) => {
