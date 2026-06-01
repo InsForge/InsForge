@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { PaginationControls, TableHeader } from '#components';
+import { EmptyState, ErrorState, LoadingState, PaginationControls, TableHeader } from '#components';
+import { RequirePosthogConnection } from '#features/analytics/components/RequirePosthogConnection';
 import { useRecordings } from '#features/analytics/hooks/useRecordings';
 import { SessionRow } from '#features/analytics/components/posthog/SessionRow';
 import { ReplayModal } from '#features/analytics/components/posthog/ReplayModal';
@@ -8,6 +9,14 @@ const WINDOW_SIZE = 50;
 const PAGE_SIZE = 10;
 
 export function SessionReplayPage() {
+  return (
+    <RequirePosthogConnection>
+      <SessionReplayPageBody />
+    </RequirePosthogConnection>
+  );
+}
+
+function SessionReplayPageBody() {
   const { data, isLoading, error } = useRecordings(WINDOW_SIZE, true);
   const [page, setPage] = useState(1);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -45,13 +54,14 @@ export function SessionReplayPage() {
           {/* Table body */}
           <div className="mt-1 flex flex-col gap-1">
             {isLoading ? (
-              <div className="px-2.5 py-4 text-sm text-muted-foreground">Loading…</div>
+              <LoadingState message="Loading replays…" />
             ) : error ? (
-              <div className="px-2.5 py-4 text-sm text-destructive">Failed to load replays.</div>
+              <ErrorState title="Failed to load replays" error="Please try again." />
             ) : pageItems.length === 0 ? (
-              <div className="px-2.5 py-4 text-sm text-muted-foreground">
-                No replays yet. Make sure session_recording is enabled in your PostHog project.
-              </div>
+              <EmptyState
+                title="No replays yet"
+                description="Make sure session_recording is enabled in your PostHog project."
+              />
             ) : (
               pageItems.map((rec) => <SessionRow key={rec.id} recording={rec} onOpen={setOpenId} />)
             )}
