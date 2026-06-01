@@ -57,6 +57,7 @@ export class FunctionService {
           name,
           description,
           status,
+          auth,
           created_at as "createdAt",
           updated_at as "updatedAt",
           deployed_at as "deployedAt"
@@ -117,6 +118,7 @@ export class FunctionService {
           description,
           code,
           status,
+          auth,
           created_at as "createdAt",
           updated_at as "updatedAt",
           deployed_at as "deployedAt"
@@ -144,7 +146,7 @@ export class FunctionService {
   async createFunction(
     data: UploadFunctionRequest
   ): Promise<{ function: FunctionSchema; deployment?: DeploymentResult | null }> {
-    const { name, code, description, status } = data;
+    const { name, code, description, status, auth } = data;
     const slug = data.slug || name.toLowerCase().replace(/\s+/g, '-');
 
     // Validate only platform contract constraints; runtime security is enforced by the runtime/provider.
@@ -157,9 +159,9 @@ export class FunctionService {
       const id = crypto.randomUUID();
 
       await client.query(
-        `INSERT INTO functions.definitions (id, slug, name, description, code, status)
-        VALUES ($1, $2, $3, $4, $5, $6)`,
-        [id, slug, name, description || null, code, status]
+        `INSERT INTO functions.definitions (id, slug, name, description, code, status, auth)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [id, slug, name, description || null, code, status, auth]
       );
 
       if (status === 'active') {
@@ -170,7 +172,7 @@ export class FunctionService {
       }
 
       const result = await client.query(
-        `SELECT id, slug, name, description, code, status,
+        `SELECT id, slug, name, description, code, status, auth,
           created_at as "createdAt", updated_at as "updatedAt", deployed_at as "deployedAt"
         FROM functions.definitions WHERE id = $1`,
         [id]
@@ -269,13 +271,20 @@ export class FunctionService {
         }
       }
 
+      if (updates.auth !== undefined) {
+        await client.query('UPDATE functions.definitions SET auth = $1 WHERE slug = $2', [
+          updates.auth,
+          slug,
+        ]);
+      }
+
       await client.query(
         'UPDATE functions.definitions SET updated_at = CURRENT_TIMESTAMP WHERE slug = $1',
         [slug]
       );
 
       const result = await client.query(
-        `SELECT id, slug, name, description, code, status,
+        `SELECT id, slug, name, description, code, status, auth,
           created_at as "createdAt", updated_at as "updatedAt", deployed_at as "deployedAt"
         FROM functions.definitions WHERE slug = $1`,
         [slug]

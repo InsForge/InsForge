@@ -171,6 +171,7 @@ DROP POLICY IF EXISTS storage_objects_owner_select ON storage.objects;
 DROP POLICY IF EXISTS storage_objects_owner_insert ON storage.objects;
 DROP POLICY IF EXISTS storage_objects_owner_update ON storage.objects;
 DROP POLICY IF EXISTS storage_objects_owner_delete ON storage.objects;
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 CREATE POLICY storage_objects_owner_select ON storage.objects
   FOR SELECT TO authenticated
   USING (uploaded_by = (SELECT auth.jwt() ->> 'sub'));

@@ -81,6 +81,7 @@ router.post(
           slug: result.function.slug,
           name: result.function.name,
           status: result.function.status,
+          auth: result.function.auth,
         },
         ip_address: req.ip,
       });
@@ -140,6 +141,7 @@ router.put(
         details: {
           slug,
           changes: validation.data,
+          authChanged: validation.data.auth !== undefined,
         },
         ip_address: req.ip,
       });

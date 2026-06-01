@@ -58,3 +58,39 @@ describe('Database RPC Route Authentication', () => {
     }
   });
 });
+
+describe('Function Proxy Route Authentication', () => {
+  const serverSource = readFileSync(resolve(__dirname, '../../src/server.ts'), 'utf-8');
+
+  test('imports auth types and middleware', () => {
+    expect(serverSource).toContain('import { AuthRequest, optionalAuth }');
+  });
+
+  test('proxy route checks auth policy from function', () => {
+    expect(serverSource).toContain("const authPolicy = func.auth || 'user'");
+  });
+
+  test('proxy route enforces admin policy', () => {
+    expect(serverSource).toContain("if (authPolicy === 'admin')");
+    expect(serverSource).toContain("if (!isAdmin)");
+  });
+
+  test('proxy route enforces user policy', () => {
+    expect(serverSource).toContain("if (authPolicy === 'user')");
+    expect(serverSource).toContain("if (!isAuthenticated)");
+  });
+
+  test('proxy route allows public access for none policy', () => {
+    expect(serverSource).toContain("authPolicy === 'none'");
+  });
+
+  test('proxy route returns 403 for unauthorized admin access', () => {
+    expect(serverSource).toContain('403');
+    expect(serverSource).toContain('Admin access required');
+  });
+
+  test('proxy route returns 401 for unauthenticated user access', () => {
+    expect(serverSource).toContain('401');
+    expect(serverSource).toContain('Authentication required');
+  });
+});

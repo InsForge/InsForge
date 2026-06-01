@@ -41,6 +41,7 @@ import { schedulesRouter } from '@/api/routes/schedules/index.routes.js';
 import { servicesRouter } from '@/api/routes/compute/services.routes.js';
 import { analyticsRouter } from '@/api/routes/analytics/index.routes.js';
 import { parseTrustProxySetting } from '@/utils/trust-proxy.js';
+import { AuthRequest, optionalAuth } from './api/middlewares/auth.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -226,13 +227,43 @@ export async function createApp() {
   app.use('/api', apiRouter);
 
   // Proxy function execution to Deno Subhosting or local runtime
-  // this logic is used for backward compatibility, we will let the sdk directly call the edge function
-  app.all('/functions/:slug', async (req: Request, res: Response) => {
+  // Enforces per-function auth policy: "admin" (admins only), "user" (any authenticated), "none" (public)
+  app.all('/functions/:slug', optionalAuth, async (req: Request & AuthRequest, res: Response) => {
     const { slug } = req.params;
 
     try {
       const functionService = FunctionService.getInstance();
       const localRuntime = process.env.DENO_RUNTIME_URL || 'http://localhost:7133';
+
+      // Fetch function to check auth policy and status
+      const func = await functionService.getFunction(slug);
+      if (!func) {
+        return res.status(404).json({ error: 'Function not found' });
+      }
+
+      if (func.status !== 'active') {
+        return res.status(404).json({ error: 'Function not active' });
+      }
+
+      // Enforce auth policy based on function configuration
+      const authPolicy = func.auth || 'user'; // default to 'user' for backward compatibility
+      const isAuthenticated = !!req.user || !!req.hasApiKey;
+      const isAdmin = req.user?.role === 'project_admin';
+
+      if (authPolicy === 'admin') {
+        // Admin-only: require project admin role
+        if (!isAdmin) {
+          return res.status(403).json({ error: 'Admin access required for this function' });
+        }
+      } else if (authPolicy === 'user') {
+        // User-level: require any authenticated token (user, service key, or anon token)
+        if (!isAuthenticated) {
+          return res
+            .status(401)
+            .json({ error: 'Authentication required. Provide a token via Authorization header.' });
+        }
+      }
+      // authPolicy === 'none': fully public, no auth required
 
       // Get target base URL: prefer Subhosting deployment, fallback to local runtime
       const baseUrl =

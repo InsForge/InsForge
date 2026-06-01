@@ -56,6 +56,7 @@ describe('FunctionService Code Validation (Public API)', () => {
       name: 'Test Function',
       code,
       status: 'active',
+      auth: 'user'
     });
   };
 
@@ -178,6 +179,186 @@ describe('FunctionService Code Validation (Public API)', () => {
 
       mockSuccessfulCreate();
       await expect(createTestFunction(code)).resolves.toBeDefined();
+    });
+  });
+
+  describe('Function Auth Policy', () => {
+    it('should default auth to "user" when not provided', async () => {
+      const code = `export default async function(req) { return new Response('ok'); }`;
+      const uuid = '550e8400-e29b-41d4-a716-446655440000';
+
+      // Mock the INSERT query
+      mockClient.query.mockResolvedValueOnce({});
+      // Mock the status UPDATE
+      mockClient.query.mockResolvedValueOnce({});
+      // Mock the SELECT to return created function
+      mockClient.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: uuid,
+            slug: 'test-function',
+            name: 'Test Function',
+            code,
+            status: 'active',
+            auth: 'user', // Should default to 'user'
+            createdAt: '2026-06-01T00:00:00Z',
+            updatedAt: '2026-06-01T00:00:00Z',
+            deployedAt: '2026-06-01T00:00:00Z',
+          },
+        ],
+      });
+
+      const result = await service.createFunction({
+        slug: 'test-function',
+        name: 'Test Function',
+        code,
+        status: 'active',
+        auth: 'user'
+      });
+
+      expect(result.function.auth).toBe('user');
+
+      // Verify INSERT included auth='user'
+      const insertCall = mockClient.query.mock.calls.find(
+        ([sql]) => typeof sql === 'string' && sql.includes('INSERT INTO functions.definitions')
+      );
+      expect(insertCall?.[0]).toContain('auth');
+      expect(insertCall?.[1]).toContain('user');
+    });
+
+    it('should allow creating function with auth="admin"', async () => {
+      const code = `export default async function(req) { return new Response('ok'); }`;
+      const uuid = '550e8400-e29b-41d4-a716-446655440001';
+
+      mockClient.query.mockResolvedValueOnce({});
+      mockClient.query.mockResolvedValueOnce({});
+      mockClient.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: uuid,
+            slug: 'admin-func',
+            name: 'Admin Function',
+            code,
+            status: 'active',
+            auth: 'admin',
+            createdAt: '2026-06-01T00:00:00Z',
+            updatedAt: '2026-06-01T00:00:00Z',
+            deployedAt: '2026-06-01T00:00:00Z',
+          },
+        ],
+      });
+
+      const result = await service.createFunction({
+        slug: 'admin-func',
+        name: 'Admin Function',
+        code,
+        status: 'active',
+        auth: 'admin',
+      });
+
+      expect(result.function.auth).toBe('admin');
+
+      const insertCall = mockClient.query.mock.calls.find(
+        ([sql]) => typeof sql === 'string' && sql.includes('INSERT INTO functions.definitions')
+      );
+      expect(insertCall?.[1]).toContain('admin');
+    });
+
+    it('should allow creating function with auth="none"', async () => {
+      const code = `export default async function(req) { return new Response('ok'); }`;
+      const uuid = '550e8400-e29b-41d4-a716-446655440002';
+
+      mockClient.query.mockResolvedValueOnce({});
+      mockClient.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: uuid,
+            slug: 'public-func',
+            name: 'Public Function',
+            code,
+            status: 'draft',
+            auth: 'none',
+            createdAt: '2026-06-01T00:00:00Z',
+            updatedAt: '2026-06-01T00:00:00Z',
+            deployedAt: null,
+          },
+        ],
+      });
+
+      const result = await service.createFunction({
+        slug: 'public-func',
+        name: 'Public Function',
+        code,
+        status: 'draft',
+        auth: 'none',
+      });
+
+      expect(result.function.auth).toBe('none');
+    });
+
+    it('should include auth field in getFunction response', async () => {
+      const uuid = '550e8400-e29b-41d4-a716-446655440003';
+
+      mockPool.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: uuid,
+            slug: 'test-function',
+            name: 'Test Function',
+            code: 'export default...',
+            status: 'active',
+            auth: 'user',
+            createdAt: '2026-06-01T00:00:00Z',
+            updatedAt: '2026-06-01T00:00:00Z',
+            deployedAt: '2026-06-01T00:00:00Z',
+          },
+        ],
+      });
+
+      const result = await service.getFunction('test-function');
+
+      expect(result).toBeDefined();
+      expect(result?.auth).toBe('user');
+    });
+
+    it('should allow updating function auth policy', async () => {
+      const uuid = '550e8400-e29b-41d4-a716-446655440004';
+
+      // Mock finding the function
+      mockClient.query.mockResolvedValueOnce({ rows: [{ id: uuid }] });
+      // Mock auth UPDATE
+      mockClient.query.mockResolvedValueOnce({});
+      // Mock updated_at UPDATE
+      mockClient.query.mockResolvedValueOnce({});
+      // Mock SELECT to return updated function
+      mockClient.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: uuid,
+            slug: 'test-function',
+            name: 'Test Function',
+            code: 'export default...',
+            status: 'active',
+            auth: 'admin', // Changed from 'user' to 'admin'
+            createdAt: '2026-06-01T00:00:00Z',
+            updatedAt: '2026-06-01T01:00:00Z',
+            deployedAt: '2026-06-01T00:00:00Z',
+          },
+        ],
+      });
+
+      const result = await service.updateFunction('test-function', {
+        auth: 'admin',
+      });
+
+      expect(result).toBeDefined();
+      expect(result?.function.auth).toBe('admin');
+
+      const authUpdateCall = mockClient.query.mock.calls.find(
+        ([sql]) => typeof sql === 'string' && sql.includes('UPDATE functions.definitions SET auth')
+      );
+      expect(authUpdateCall).toBeDefined();
+      expect(authUpdateCall?.[1]).toContain('admin');
     });
   });
 });

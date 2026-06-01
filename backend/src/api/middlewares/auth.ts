@@ -71,6 +71,29 @@ export async function verifyUser(req: AuthRequest, res: Response, next: NextFunc
 }
 
 /**
+ * Parses auth credentials if present, but does not require them.
+ * This allows the function proxy route to evaluate public authPolicy='none'
+ * while still populating req.user and req.hasApiKey when a valid token is sent.
+ */
+export async function optionalAuth(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const apiKey = extractApiKey(req);
+    if (apiKey) {
+      return verifyApiKey(req, res, next);
+    }
+
+    const token = extractBearerToken(req.headers.authorization);
+    if (!token) {
+      return next();
+    }
+
+    return verifyToken(req, res, next);
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
  * Verifies admin authentication (requires admin token)
  */
 export async function verifyAdmin(req: AuthRequest, res: Response, next: NextFunction) {

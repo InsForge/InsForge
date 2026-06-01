@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { functionSchema } from './functions.schema.js';
+import { functionSchema, functionAuthPolicyEnum } from './functions.schema.js';
 
 export const uploadFunctionRequestSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -13,6 +13,7 @@ export const uploadFunctionRequestSchema = z.object({
   code: z.string().min(1),
   description: z.string().optional(),
   status: z.enum(['draft', 'active']).optional().default('active'),
+  auth: functionAuthPolicyEnum.optional().default('user'),
 });
 
 export const updateFunctionRequestSchema = z.object({
@@ -20,6 +21,7 @@ export const updateFunctionRequestSchema = z.object({
   code: z.string().optional(),
   description: z.string().optional(),
   status: z.enum(['draft', 'active']).optional(),
+  auth: functionAuthPolicyEnum.optional(),
 });
 
 export const listFunctionsResponseSchema = z.object({
