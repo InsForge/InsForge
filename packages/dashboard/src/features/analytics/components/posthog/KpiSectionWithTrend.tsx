@@ -8,6 +8,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { EmptyState, ErrorState, LoadingState } from '#components';
 import type { PosthogWebOverviewItem } from '@insforge/shared-schemas';
 import { useTimeframe } from '#features/analytics/context/TimeRangeContext';
 import { useWebOverview } from '#features/analytics/hooks/useWebOverview';
@@ -150,16 +151,18 @@ export function KpiSectionWithTrend({ enabled }: { enabled: boolean }) {
       </div>
       <div className="h-[260px] p-4">
         {trend.isLoading ? (
-          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-            Loading…
+          <div className="flex h-full items-center justify-center">
+            <LoadingState className="py-0" />
           </div>
         ) : trend.error ? (
-          <div className="flex h-full items-center justify-center text-sm text-destructive">
-            Failed to load trend.
+          <div className="flex h-full items-center justify-center px-6">
+            <div className="w-full max-w-[420px]">
+              <ErrorState title="Failed to load trend" error="Please try again." />
+            </div>
           </div>
         ) : chartData.length === 0 ? (
-          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-            No data available
+          <div className="flex h-full items-center justify-center">
+            <EmptyState title="No data available" />
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">

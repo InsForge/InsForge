@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { EmptyState, ErrorState, LoadingState } from '#components';
 import { useRetention } from '#features/analytics/hooks/useRetention';
 import { formatNumber } from '#features/analytics/lib/format';
 
@@ -33,15 +34,29 @@ export function RetentionCard({ enabled }: { enabled: boolean }) {
   }, [data]);
 
   if (isLoading) {
-    return <div className="px-4 py-6 text-sm text-muted-foreground">Loading…</div>;
+    return (
+      <div className="flex h-full min-h-0 items-center justify-center">
+        <LoadingState className="py-0" />
+      </div>
+    );
   }
 
   if (error) {
-    return <div className="px-4 py-6 text-sm text-destructive">Failed to load retention.</div>;
+    return (
+      <div className="flex h-full min-h-0 items-center justify-center px-6">
+        <div className="w-full max-w-[420px]">
+          <ErrorState title="Failed to load retention" error="Please try again." />
+        </div>
+      </div>
+    );
   }
 
   if (!grid || grid.length === 0) {
-    return <div className="px-4 py-6 text-sm text-muted-foreground">No data</div>;
+    return (
+      <div className="flex h-full min-h-0 items-center justify-center">
+        <EmptyState title="No data available" />
+      </div>
+    );
   }
 
   const intervals = grid[0].cells.length;
