@@ -11,6 +11,7 @@ import {
   authConfigSchema,
   customOAuthConfigSchema,
   customOAuthKeySchema,
+  resendConfigSchema,
   smtpConfigSchema,
   emailTemplateSchema,
 } from './auth.schema.js';
@@ -395,6 +396,42 @@ export const getPublicAuthConfigResponseSchema = authConfigAdminResponseSchema.o
 });
 
 // ============================================================================
+// Resend Configuration schemas
+// ============================================================================
+
+// Resend API keys follow the `re_<alphanumeric>` shape (32+ chars typical).
+const resendApiKeySchema = z
+  .string()
+  .regex(
+    /^re_[A-Za-z0-9_]{8,}$/,
+    'API key must start with "re_" followed by 8+ alphanumeric characters'
+  );
+
+/**
+ * PUT /api/auth/resend-config - Upsert Resend configuration
+ * Sender fields are only required when enabling Resend.
+ */
+export const upsertResendConfigRequestSchema = z.discriminatedUnion('enabled', [
+  z.object({
+    enabled: z.literal(false),
+    apiKey: resendApiKeySchema.optional(),
+    senderEmail: z.string().optional(),
+    senderName: z.string().optional(),
+  }),
+  z.object({
+    enabled: z.literal(true),
+    apiKey: resendApiKeySchema.optional(),
+    senderEmail: z.string().email('Invalid sender email'),
+    senderName: z.string().min(1, 'Sender name is required'),
+  }),
+]);
+
+/**
+ * Response for GET /api/auth/resend-config
+ */
+export const getResendConfigResponseSchema = resendConfigSchema;
+
+// ============================================================================
 // SMTP Configuration schemas
 // ============================================================================
 
@@ -559,6 +596,8 @@ export const listCustomOAuthConfigsResponseSchema = z.object({
 export type CreateCustomOAuthConfigRequest = z.infer<typeof createCustomOAuthConfigRequestSchema>;
 export type UpdateCustomOAuthConfigRequest = z.infer<typeof updateCustomOAuthConfigRequestSchema>;
 export type ListCustomOAuthConfigsResponse = z.infer<typeof listCustomOAuthConfigsResponseSchema>;
+export type UpsertResendConfigRequest = z.infer<typeof upsertResendConfigRequestSchema>;
+export type GetResendConfigResponse = z.infer<typeof getResendConfigResponseSchema>;
 export type UpsertSmtpConfigRequest = z.infer<typeof upsertSmtpConfigRequestSchema>;
 export type GetSmtpConfigResponse = z.infer<typeof getSmtpConfigResponseSchema>;
 export type UpdateEmailTemplateRequest = z.infer<typeof updateEmailTemplateRequestSchema>;
