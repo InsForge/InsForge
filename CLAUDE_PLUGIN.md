@@ -2,9 +2,12 @@
 
 Official plugin for building with InsForge in Claude Code.
 
-## Installation
+The public plugin is maintained in the
+[InsForge/insforge-skills](https://github.com/InsForge/insforge-skills)
+repository. This repository keeps the marketplace entry so users can install it
+from the InsForge marketplace.
 
-### Option 1: Install from InsForge Marketplace (Recommended)
+## Installation
 
 In Claude Code, run:
 
@@ -18,91 +21,69 @@ Then install the plugin:
 /plugin install insforge
 ```
 
-### Option 2: Install Directly from Repository
-
-```
-/plugin install https://github.com/InsForge/InsForge/.claude
-```
-
-### Option 3: Local Installation (Development)
-
-```bash
-cd ~/.claude-plugins
-git clone https://github.com/InsForge/InsForge.git
-ln -s InsForge/.claude insforge
-```
-
 ## What's Included
 
-### Skill: `insforge-schema-patterns`
+The public plugin currently includes four skills.
 
-Automatically activates when designing database schemas. Includes:
+### `insforge`
 
-- **Social Graph Patterns** - Follows, likes, and social relationships
-- **Junction Tables** - Many-to-many relationships with proper indexes
-- **Nested Comments** - Self-referential hierarchical data
-- **Multi-Tenant Patterns** - Organization-scoped data with RLS
-- **Best Practices** - Foreign keys, indexes, Row Level Security
+Guidance for building application code with InsForge and `@insforge/sdk`,
+including database CRUD, auth, storage uploads, functions, OpenRouter AI,
+realtime, email, Stripe flows, and S3-compatible storage integrations.
+
+### `insforge-cli`
+
+Command-line project management with `@insforge/cli`, including project
+creation, linking, SQL, migrations, RLS policies, functions, storage,
+deployments, compute services, secrets, AI setup, payments, schedules, logs,
+imports, exports, and backend branches.
+
+### `insforge-debug`
+
+Diagnostics for InsForge project issues, including SDK errors, HTTP failures,
+edge function failures, database performance, auth and RLS denials, realtime
+issues, and deployment failures.
+
+### `insforge-integrations`
+
+Integration guides for third-party auth providers and related RLS setup,
+including Auth0, Clerk, Kinde, Stytch, WorkOS, Better Auth, and payment
+facilitator guidance.
 
 ## Usage
 
-Once installed, the skill automatically loads when relevant:
+Once installed, Claude Code can load InsForge-specific guidance when you are:
 
-**Example:**
-```
-You: "I need to build a social media app with follows and likes"
+- setting up backend infrastructure such as tables, buckets, functions, auth,
+  AI, payments, or deployments
+- integrating `@insforge/sdk` into frontend or server applications
+- implementing database access with RLS-aware patterns
+- debugging InsForge project errors and deployment issues
+- connecting external auth providers to InsForge
 
-Claude: [Automatically loads insforge-schema-patterns]
-"I'll use the Social Graph pattern from InsForge best practices:
+## Repository Layout Note
 
-CREATE TABLE follows (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  follower_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  following_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(follower_id, following_id)
-);
-..."
-```
+The public plugin lives in
+[InsForge/insforge-skills](https://github.com/InsForge/insforge-skills).
 
-No special commands needed - Claude knows when to use it based on your conversation!
-
-## What Are Skills?
-
-Skills are folders containing instructions and examples that Claude automatically loads when they're relevant to the task. Think of them as giving Claude domain expertise in specific areas.
-
-The `insforge-schema-patterns` skill teaches Claude:
-- Proven database design patterns for common use cases
-- How to write efficient PostgREST queries with the InsForge SDK
-- Best practices for security (RLS policies)
-- Performance optimization (indexes, query patterns)
-
-## Future Skills (Coming Soon)
-
-We're planning to add:
-- `insforge-fullstack-templates` - Complete app templates (Instagram, Todo, Blog)
-- `insforge-edge-functions` - Serverless function recipes
-- `insforge-realtime` - WebSocket and live collaboration patterns
+The `.claude/skills/` and `.agents/skills/` directories in this repository are
+internal contributor skills for people working on the InsForge OSS repository.
+They are not the public Claude Code plugin and should not be used as the
+marketplace source.
 
 ## Contributing
 
-Want to improve the skills or add new ones?
+To improve the public plugin, contribute to
+[InsForge/insforge-skills](https://github.com/InsForge/insforge-skills).
 
-1. Fork the repository
-2. Edit or add skills in `.claude/skills/`
-3. Test locally by installing from your fork
-4. Submit a PR
-
-The Claude Code plugin is maintained from `.claude/`. Its skills live in
-`.claude/skills/`, and `.agents/skills/` mirrors the same contributor guidance
-for compatible agent tooling.
-
-Skills are just Markdown files with YAML frontmatter - easy to contribute!
+The skills in that repository are Markdown files with YAML frontmatter. See its
+`CONTRIBUTING.md` for guidelines on adding or improving skills.
 
 ## Feedback
 
-Found an issue or have a suggestion? [Open an issue](https://github.com/InsForge/InsForge/issues) or join our [Discord](https://discord.com/invite/MPxwj5xVvW).
+Found an issue or have a suggestion? [Open an issue](https://github.com/InsForge/InsForge/issues)
+or join our [Discord](https://discord.com/invite/MPxwj5xVvW).
 
 ## License
 
-MIT - Same as InsForge
+MIT - Same as the public InsForge skills plugin.
