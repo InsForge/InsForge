@@ -27,6 +27,7 @@ export class RazorpaySyncService {
   private static instance: RazorpaySyncService;
   private pool: Pool | null = null;
   private readonly configService = RazorpayConfigService.getInstance();
+  private readonly syncPromises = new Map<RazorpayEnvironment, Promise<RazorpaySyncResult>>();
 
   static getInstance(): RazorpaySyncService {
     if (!RazorpaySyncService.instance) {
@@ -58,7 +59,21 @@ export class RazorpaySyncService {
     return results;
   }
 
-  private async syncEnvironment(environment: RazorpayEnvironment): Promise<RazorpaySyncResult> {
+  private syncEnvironment(environment: RazorpayEnvironment): Promise<RazorpaySyncResult> {
+    let syncPromise = this.syncPromises.get(environment);
+    if (syncPromise) {
+      return syncPromise;
+    }
+
+    syncPromise = this.performSyncEnvironment(environment).finally(() => {
+      this.syncPromises.delete(environment);
+    });
+
+    this.syncPromises.set(environment, syncPromise);
+    return syncPromise;
+  }
+
+  private async performSyncEnvironment(environment: RazorpayEnvironment): Promise<RazorpaySyncResult> {
     let provider: RazorpayProvider;
     try {
       provider = await this.configService.createRazorpayProvider(environment);
