@@ -237,7 +237,22 @@ router.post(
       }
 
       const payload = req.body as RazorpayWebhookPayload;
-      const eventStart = await webhookService.recordWebhookEventStart(environment, payload);
+
+      const headerEventId = req.headers['x-razorpay-event-id'];
+      const entityType = payload.contains?.[0];
+      const entityId = entityType
+        ? (payload.payload as any)?.[entityType]?.entity?.id
+        : 'no_entity';
+      const eventId =
+        typeof headerEventId === 'string'
+          ? headerEventId
+          : `${payload.account_id}.${payload.event}.${entityId}.${payload.created_at}`;
+
+      const eventStart = await webhookService.recordWebhookEventStart(
+        environment,
+        eventId,
+        payload.event
+      );
 
       if (!eventStart.shouldProcess) {
         res.status(200).json({ received: true, handled: false });
@@ -247,7 +262,6 @@ router.post(
       // Determine whether this event type is handled
       const handled = isHandledRazorpayEvent(payload.event);
 
-      const eventId = `${payload.account_id}.${payload.event}.${payload.created_at}`;
       await webhookService.markWebhookEvent(
         environment,
         eventId,
