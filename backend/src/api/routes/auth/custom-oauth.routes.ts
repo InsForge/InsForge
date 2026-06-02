@@ -250,11 +250,7 @@ router.get('/:key', async (req: Request, res: Response, next: NextFunction) => {
       { algorithm: 'HS256', expiresIn: '1h' }
     );
 
-    const authUrl = await customOAuthProvider.generateOAuthUrl(
-      key,
-      state,
-      additionalParams
-    );
+    const authUrl = await customOAuthProvider.generateOAuthUrl(key, state, additionalParams);
     successResponse(res, { authUrl });
   } catch (error) {
     logger.error('Custom OAuth init failed', { error, key: req.params.key });

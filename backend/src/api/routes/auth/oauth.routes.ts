@@ -289,11 +289,7 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
       expiresIn: '1h', // Set expiration time for the state token
     });
 
-    const authUrl = await authService.generateOAuthUrl(
-      validatedProvider,
-      state,
-      additionalParams
-    );
+    const authUrl = await authService.generateOAuthUrl(validatedProvider, state, additionalParams);
     successResponse(res, { authUrl });
   } catch (error) {
     logger.error(`${req.params.provider} OAuth error`, { error });
