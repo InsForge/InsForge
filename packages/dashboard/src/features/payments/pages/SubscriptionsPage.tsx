@@ -301,11 +301,7 @@ function SubscriptionRow({
 
           <div className="px-2 py-3">
             <ProviderBadge
-              provider={
-                ((subscription as any).raw as any)?.entity === 'subscription'
-                  ? 'Razorpay'
-                  : 'Stripe'
-              }
+              provider={subscription.provider === 'razorpay' ? 'Razorpay' : 'Stripe'}
             />
           </div>
 

@@ -79,6 +79,7 @@ export class PaymentHistoryService {
     const result = await this.getPool().query(
       `SELECT
          environment,
+         provider,
          type,
          status,
          subject_type AS "subjectType",
@@ -865,6 +866,7 @@ export class PaymentHistoryService {
   ): ListPaymentHistoryResponse['paymentHistory'][number] {
     return {
       environment: row.environment,
+      provider: (row as any).provider ?? 'stripe',
       type: row.type,
       status: row.status,
       subjectType: row.subjectType ?? null,

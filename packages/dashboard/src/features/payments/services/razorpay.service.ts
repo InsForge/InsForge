@@ -39,6 +39,15 @@ export interface SyncRazorpayPaymentsResponse {
   };
 }
 
+export interface SyncRazorpayPaymentsMultiResponse {
+  results: {
+    environment: RazorpayEnvironment;
+    status: 'fulfilled' | 'rejected';
+    value?: SyncRazorpayPaymentsResponse;
+    reason?: any;
+  }[];
+}
+
 export class RazorpayService {
   async getStatus(): Promise<GetRazorpayStatusResponse> {
     return apiClient.request('/payments/razorpay/status', {
@@ -82,24 +91,22 @@ export class RazorpayService {
 
   async syncPayments(
     input: SyncRazorpayPaymentsRequest
-  ): Promise<SyncRazorpayPaymentsResponse | SyncRazorpayPaymentsResponse[]> {
+  ): Promise<SyncRazorpayPaymentsResponse | SyncRazorpayPaymentsMultiResponse> {
     if (input.environment === 'all') {
-      const results = await Promise.allSettled([
-        this.syncPayments({ environment: 'test' }),
-        this.syncPayments({ environment: 'live' }),
-      ]);
+      const environments: RazorpayEnvironment[] = ['test', 'live'];
+      const results = await Promise.allSettled(
+        environments.map((env) => this.syncPayments({ environment: env }))
+      );
 
-      const successes = results
-        .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
-        .map((r) => r.value);
-
-      const failures = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
-
-      if (failures.length > 0) {
-        throw failures[0].reason;
-      }
-
-      return successes as SyncRazorpayPaymentsResponse[];
+      return {
+        results: results.map((r, i) => ({
+          environment: environments[i],
+          status: r.status,
+          ...(r.status === 'fulfilled'
+            ? { value: r.value as SyncRazorpayPaymentsResponse }
+            : { reason: r.reason }),
+        })),
+      };
     }
 
     return apiClient.request(`/payments/razorpay/${input.environment}/sync`, {

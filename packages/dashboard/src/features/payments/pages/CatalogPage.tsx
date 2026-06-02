@@ -250,7 +250,7 @@ function CatalogRow({
 
           <div className="px-2 py-3">
             <ProviderBadge
-              provider={product.stripeProductId.startsWith('plan_') ? 'Razorpay' : 'Stripe'}
+              provider={product.provider === 'razorpay' ? 'Razorpay' : 'Stripe'}
             />
           </div>
 

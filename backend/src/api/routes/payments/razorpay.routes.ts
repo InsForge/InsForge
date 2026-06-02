@@ -12,6 +12,7 @@ import { ERROR_CODES } from '@insforge/shared-schemas';
 import { z } from 'zod';
 import type { RazorpayWebhookPayload } from '@/providers/payments/razorpay.provider.js';
 import type { RazorpayEnvironment } from '@/types/payments.js';
+import logger from '@/utils/logger.js';
 
 const router = Router();
 const configService = RazorpayConfigService.getInstance();
@@ -243,8 +244,8 @@ router.post(
         return;
       }
 
-      // Route to specific handlers based on event type
-      const handled = await handleRazorpayWebhookEvent(environment, payload);
+      // Determine whether this event type is handled
+      const handled = isHandledRazorpayEvent(payload.event);
 
       const eventId = `${payload.account_id}.${payload.event}.${payload.created_at}`;
       await webhookService.markWebhookEvent(
@@ -254,57 +255,46 @@ router.post(
         null
       );
 
+      // Acknowledge immediately — Razorpay has a 5-second delivery timeout.
+      // The sync runs in the background so it can never block the response.
       res.status(200).json({ received: true, handled });
+
+      if (handled) {
+        // Fire-and-forget: sync runs after the response is sent.
+        setImmediate(() => {
+          syncService.syncAll(environment).catch((err: unknown) => {
+            const message = err instanceof Error ? err.message : String(err);
+            logger.error('[Razorpay Webhook] Background sync failed', { environment, error: message });
+          });
+        });
+      }
     } catch (error) {
       next(error);
     }
   }
 );
 
-/**
- * Route Razorpay webhook events to their handlers.
- * On any recognized event we trigger a lightweight re-sync for that environment
- * so the database stays fresh without waiting for the next manual sync.
- */
-async function handleRazorpayWebhookEvent(
-  environment: RazorpayEnvironment,
-  payload: RazorpayWebhookPayload
-): Promise<boolean> {
-  const { event } = payload;
+const HANDLED_RAZORPAY_EVENTS = new Set([
+  'payment.authorized',
+  'payment.captured',
+  'payment.failed',
+  'subscription.created',
+  'subscription.activated',
+  'subscription.charged',
+  'subscription.updated',
+  'subscription.cancelled',
+  'subscription.paused',
+  'subscription.resumed',
+  'subscription.halted',
+  'refund.created',
+  'refund.failed',
+  'invoice.paid',
+  'invoice.expired',
+  'order.paid',
+]);
 
-  const handledEvents = [
-    'payment.authorized',
-    'payment.captured',
-    'payment.failed',
-    'subscription.created',
-    'subscription.activated',
-    'subscription.charged',
-    'subscription.updated',
-    'subscription.cancelled',
-    'subscription.paused',
-    'subscription.resumed',
-    'subscription.halted',
-    'refund.created',
-    'refund.failed',
-    'invoice.paid',
-    'invoice.expired',
-    'order.paid',
-  ];
-
-  if (!handledEvents.includes(event)) {
-    return false;
-  }
-
-  // Wait for sync to complete before acknowledging the webhook
-  try {
-    await syncService.syncAll(environment);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error(`[Razorpay Webhook] Background sync failed for ${environment}: ${message}`);
-    throw err;
-  }
-
-  return true;
+function isHandledRazorpayEvent(event: string): boolean {
+  return HANDLED_RAZORPAY_EVENTS.has(event);
 }
 
 export { router as razorpayRouter };

@@ -60,6 +60,7 @@ export class PaymentProductService {
     const result = await this.getPool().query(
       `SELECT
          environment,
+         provider,
          stripe_product_id AS "stripeProductId",
          name,
          description,
