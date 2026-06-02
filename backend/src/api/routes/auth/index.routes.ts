@@ -621,13 +621,35 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
 
 // POST /api/auth/logout - Logout and clear refresh token cookie
 // Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'
-// Web clients: clears the httpOnly refresh token cookie
+// Web clients: validates X-CSRF-Token then clears the httpOnly refresh token cookie
 // Non-web clients (mobile, desktop, server): no server-side action needed (client should discard token)
 router.post('/logout', (req: Request, res: Response, next: NextFunction) => {
   try {
     const clientType = parseClientType(req.query.client_type);
 
     if (clientType === 'web') {
+      // CSRF protection: verify x-csrf-token header against the refresh token stored in the
+      // httpOnly cookie before clearing it. This prevents malicious third-party sites from
+      // force-logging out a user via a cross-site form submission (CSRF attack).
+      const tokenManager = TokenManager.getInstance();
+      const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE_NAME];
+
+      if (refreshToken) {
+        // Only validate CSRF when a refresh token cookie is actually present.
+        // If the cookie is missing the user is already logged out — clear and succeed.
+        const payload = tokenManager.verifyRefreshToken(refreshToken);
+
+        if (payload.sessionType !== 'user') {
+          throw new AppError('Invalid refresh session type', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+        }
+
+        const csrfHeader = req.headers['x-csrf-token'] as string | undefined;
+        if (!tokenManager.verifyCsrfToken(csrfHeader, payload)) {
+          logger.warn('[Auth:Logout] CSRF token validation failed');
+          throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
+        }
+      }
+
       clearRefreshTokenCookie(res);
     }
     // For non-web clients: no server-side cleanup needed.
