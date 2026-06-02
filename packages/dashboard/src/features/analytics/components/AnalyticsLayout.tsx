@@ -1,7 +1,8 @@
 import { useEffect, type ReactNode } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { ErrorState, LoadingState } from '#components';
+import { LoadingState } from '#components';
+import { ErrorState } from '#components/ErrorState';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
 import { useProjectId } from '#lib/hooks/useMetadata';
 import { useToast } from '#lib/hooks/useToast';

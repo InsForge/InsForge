@@ -5,12 +5,12 @@ import {
   type DataGridProps,
   DataGridEmptyState,
   EmptyState,
-  ErrorState,
   LoadingState,
   type RenderCellProps,
   type DataGridColumn,
   type DataGridRowType,
 } from '#components';
+import { ErrorState } from '#components/ErrorState';
 import {
   Download,
   Eye,

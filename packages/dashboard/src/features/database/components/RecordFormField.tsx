@@ -5,10 +5,10 @@ import { Button, Input } from '@insforge/ui';
 import {
   BooleanCellEditor,
   DateCellEditor,
-  JsonCellEditor,
   type DatabaseRecord,
   type ConvertedValue,
 } from '#components';
+import { JsonCellEditor } from '#components/datagrid/cell-editors/JsonCellEditor';
 import { ColumnSchema, ColumnType } from '@insforge/shared-schemas';
 import { convertValueForColumn, cn, formatValueForDisplay } from '#lib/utils/utils';
 import { LinkRecordDialog } from './LinkRecordDialog';

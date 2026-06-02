@@ -8,7 +8,8 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { EmptyState, ErrorState, LoadingState } from '#components';
+import { EmptyState, LoadingState } from '#components';
+import { ErrorState } from '#components/ErrorState';
 import type { PosthogWebOverviewItem } from '@insforge/shared-schemas';
 import { useTimeframe } from '#features/analytics/context/TimeRangeContext';
 import { useWebOverview } from '#features/analytics/hooks/useWebOverview';

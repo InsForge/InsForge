@@ -6,11 +6,11 @@ import {
   Alert,
   AlertDescription,
   AlertTitle,
-  ErrorState,
   LoadingState,
   PaginationControls,
   TableHeader,
 } from '#components';
+import { ErrorState } from '#components/ErrorState';
 import { PaymentsKeyMissingState } from '#features/payments/components/PaymentsKeyMissingState';
 import type { PaymentsOutletContext } from '#features/payments/components/PaymentsLayout';
 import { usePaymentCatalog } from '#features/payments/hooks/usePaymentCatalog';

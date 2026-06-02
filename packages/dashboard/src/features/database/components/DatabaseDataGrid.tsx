@@ -9,9 +9,9 @@ import {
   type RenderEditCellProps,
   BooleanCellEditor,
   DateCellEditor,
-  JsonCellEditor,
   TextCellEditor,
 } from '#components/datagrid';
+import { JsonCellEditor } from '#components/datagrid/cell-editors/JsonCellEditor';
 import { ColumnSchema, ColumnType, TableSchema } from '@insforge/shared-schemas';
 import { ForeignKeyCell } from './ForeignKeyCell';
 
