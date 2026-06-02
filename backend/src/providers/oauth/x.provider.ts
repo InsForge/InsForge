@@ -60,7 +60,11 @@ export class XOAuthProvider implements OAuthProvider {
           },
         }
       );
-      const authUrl = new URL(response.data.auth_url || response.data.url || '');
+      const sharedAuthUrl = response.data.auth_url || response.data.url;
+      if (!sharedAuthUrl) {
+        throw new Error('Shared X OAuth did not return an authorization URL');
+      }
+      const authUrl = new URL(sharedAuthUrl);
       Object.entries(additionalParams ?? {}).forEach(([key, value]) => {
         if (!authUrl.searchParams.has(key)) {
           authUrl.searchParams.set(key, value);
