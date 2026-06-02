@@ -13,9 +13,6 @@ ALTER TABLE payments.products
   ADD COLUMN IF NOT EXISTS provider TEXT NOT NULL DEFAULT 'stripe'
     CHECK (provider IN ('stripe', 'razorpay'));
 
--- Drop the DEFAULT so new rows must supply a value explicitly
-ALTER TABLE payments.products
-  ALTER COLUMN provider DROP DEFAULT;
 
 CREATE INDEX IF NOT EXISTS idx_payments_products_provider
   ON payments.products(environment, provider);
@@ -25,8 +22,6 @@ ALTER TABLE payments.prices
   ADD COLUMN IF NOT EXISTS provider TEXT NOT NULL DEFAULT 'stripe'
     CHECK (provider IN ('stripe', 'razorpay'));
 
-ALTER TABLE payments.prices
-  ALTER COLUMN provider DROP DEFAULT;
 
 CREATE INDEX IF NOT EXISTS idx_payments_prices_provider
   ON payments.prices(environment, provider);
@@ -36,8 +31,6 @@ ALTER TABLE payments.customers
   ADD COLUMN IF NOT EXISTS provider TEXT NOT NULL DEFAULT 'stripe'
     CHECK (provider IN ('stripe', 'razorpay'));
 
-ALTER TABLE payments.customers
-  ALTER COLUMN provider DROP DEFAULT;
 
 CREATE INDEX IF NOT EXISTS idx_payments_customers_provider
   ON payments.customers(environment, provider);
@@ -47,8 +40,6 @@ ALTER TABLE payments.subscriptions
   ADD COLUMN IF NOT EXISTS provider TEXT NOT NULL DEFAULT 'stripe'
     CHECK (provider IN ('stripe', 'razorpay'));
 
-ALTER TABLE payments.subscriptions
-  ALTER COLUMN provider DROP DEFAULT;
 
 CREATE INDEX IF NOT EXISTS idx_payments_subscriptions_provider
   ON payments.subscriptions(environment, provider);
@@ -58,8 +49,6 @@ ALTER TABLE payments.subscription_items
   ADD COLUMN IF NOT EXISTS provider TEXT NOT NULL DEFAULT 'stripe'
     CHECK (provider IN ('stripe', 'razorpay'));
 
-ALTER TABLE payments.subscription_items
-  ALTER COLUMN provider DROP DEFAULT;
 
 CREATE INDEX IF NOT EXISTS idx_payments_subscription_items_provider
   ON payments.subscription_items(environment, provider);
@@ -69,8 +58,6 @@ ALTER TABLE payments.payment_history
   ADD COLUMN IF NOT EXISTS provider TEXT NOT NULL DEFAULT 'stripe'
     CHECK (provider IN ('stripe', 'razorpay'));
 
-ALTER TABLE payments.payment_history
-  ALTER COLUMN provider DROP DEFAULT;
 
 CREATE INDEX IF NOT EXISTS idx_payments_payment_history_provider
   ON payments.payment_history(environment, provider);
