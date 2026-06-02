@@ -2,7 +2,6 @@ import type { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import logger from '@/utils/logger.js';
 import type { RazorpayEnvironment } from '@/types/payments.js';
-import type { RazorpayWebhookPayload } from '@/providers/payments/razorpay.provider.js';
 
 export type RazorpayWebhookProcessingStatus = 'pending' | 'processed' | 'failed' | 'ignored';
 
@@ -47,12 +46,9 @@ export class RazorpayWebhookService {
    */
   async recordWebhookEventStart(
     environment: RazorpayEnvironment,
-    payload: RazorpayWebhookPayload
+    eventId: string,
+    eventType: string
   ): Promise<ShouldProcessResult> {
-    // Razorpay uses <account_id>.<event>.<created_at> as a pseudo-idempotency key
-    // since it does not send a stable event ID in the OSS API.
-    const eventId = `${payload.account_id}.${payload.event}.${payload.created_at}`;
-
     const pendingReclaimCutoff = new Date(Date.now() - 5 * 60 * 1000); // 5 minutes
 
     const insertResult = await this.getPool().query<RazorpayWebhookEventRow>(
@@ -70,7 +66,7 @@ export class RazorpayWebhookService {
          last_error         AS "lastError",
          received_at        AS "receivedAt",
          processed_at       AS "processedAt"`,
-      [environment, eventId, payload.event]
+      [environment, eventId, eventType]
     );
 
     const inserted = insertResult.rows[0];
@@ -129,7 +125,7 @@ export class RazorpayWebhookService {
     logger.info('Razorpay webhook event already processed or currently processing — skipping', {
       environment,
       eventId,
-      eventType: payload.event,
+      eventType,
     });
 
     return { shouldProcess: false, row };
