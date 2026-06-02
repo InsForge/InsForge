@@ -249,9 +249,7 @@ function CatalogRow({
           </div>
 
           <div className="px-2 py-3">
-            <ProviderBadge
-              provider={product.provider === 'razorpay' ? 'Razorpay' : 'Stripe'}
-            />
+            <ProviderBadge provider={product.provider === 'razorpay' ? 'Razorpay' : 'Stripe'} />
           </div>
 
           <div className="px-2 py-3">
