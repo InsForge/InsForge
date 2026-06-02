@@ -1,4 +1,4 @@
-import { describe, test, expect } from 'vitest';
+import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { DatabaseAdvanceService } from '../../src/services/database/database-advance.service';
 import { AppError } from '../../src/utils/errors';
 import { ERROR_CODES } from '@insforge/shared-schemas';
@@ -91,5 +91,102 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
     for (const query of queries) {
       expect(() => service.sanitizeQuery(query)).not.toThrow();
     }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// bulkInsert — optional-column data-loss fix (issue #8)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const { mockPoolQuery } = vi.hoisted(() => ({ mockPoolQuery: vi.fn() }));
+
+vi.mock('../../src/infra/database/database.manager', () => ({
+  DatabaseManager: {
+    getInstance: vi.fn(() => ({
+      getPool: vi.fn(() => ({ query: mockPoolQuery })),
+    })),
+  },
+}));
+
+describe('DatabaseAdvanceService - bulkInsert optional-column fix', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPoolQuery.mockResolvedValue({ rows: [], rowCount: 2 });
+  });
+
+  test('includes columns from ALL records, not only the first', async () => {
+    // records[0] has no `phone`; records[1] and records[2] do.
+    // Before the fix, `phone` was silently omitted from the INSERT entirely.
+    const svc = DatabaseAdvanceService.getInstance();
+
+    await svc.bulkInsert('public', 'contacts', [
+      { id: '1', name: 'Alice' },
+      { id: '2', name: 'Bob',   phone: '555-0001' },
+      { id: '3', name: 'Carol', phone: '555-0002' },
+    ]);
+
+    const sql: string = mockPoolQuery.mock.calls[0][0] as string;
+
+    // phone must appear in the INSERT column list
+    expect(sql).toContain('"phone"');
+    // Bob and Carol phone values must be present in the values literal
+    expect(sql).toContain('555-0001');
+    expect(sql).toContain('555-0002');
+  });
+
+  test('records missing an optional field get NULL, not undefined', async () => {
+    const svc = DatabaseAdvanceService.getInstance();
+
+    await svc.bulkInsert('public', 'contacts', [
+      { id: '1', name: 'Alice' },
+      { id: '2', name: 'Bob', phone: '555-0001' },
+    ]);
+
+    const sql: string = mockPoolQuery.mock.calls[0][0] as string;
+
+    // Alice's row must not embed a raw JS `undefined` string
+    expect(sql).not.toContain('undefined');
+    // Her phone slot must be NULL
+    expect(sql).toContain('NULL');
+  });
+
+  test('uniform records (all same columns) still work correctly', async () => {
+    const svc = DatabaseAdvanceService.getInstance();
+
+    await svc.bulkInsert('public', 'contacts', [
+      { id: '1', name: 'Alice', phone: '555-0001' },
+      { id: '2', name: 'Bob',   phone: '555-0002' },
+    ]);
+
+    const sql: string = mockPoolQuery.mock.calls[0][0] as string;
+    expect(sql).toContain('"id"');
+    expect(sql).toContain('"name"');
+    expect(sql).toContain('"phone"');
+    expect(sql).toContain('555-0001');
+    expect(sql).toContain('555-0002');
+  });
+
+  test('throws AppError when records array is empty', async () => {
+    const svc = DatabaseAdvanceService.getInstance();
+    await expect(svc.bulkInsert('public', 'contacts', [])).rejects.toBeInstanceOf(AppError);
+  });
+
+  test('upsert: optional column from later records is included in ON CONFLICT SET', async () => {
+    const svc = DatabaseAdvanceService.getInstance();
+
+    await svc.bulkInsert(
+      'public',
+      'contacts',
+      [
+        { id: '1', name: 'Alice' },
+        { id: '2', name: 'Bob', phone: '555-0001' },
+      ],
+      'id'
+    );
+
+    const sql: string = mockPoolQuery.mock.calls[0][0] as string;
+    expect(sql).toContain('"phone"');
+    expect(sql).toContain('ON CONFLICT');
+    expect(sql).toContain('DO UPDATE SET');
   });
 });

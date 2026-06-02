@@ -914,16 +914,20 @@ export class DatabaseAdvanceService {
     const pool = this.dbManager.getPool();
 
     try {
-      // Get column names from first record
-      const columns = Object.keys(records[0]);
+      // Build the column list from the union of keys across ALL records.
+      // Previously only records[0] was inspected, which silently discarded
+      // optional fields that appeared only in later records (issue #8).
+      const columns = Array.from(new Set(records.flatMap((rec) => Object.keys(rec))));
 
-      // Convert records to array format for pg-format
+      // Convert records to array format for pg-format.
+      // Fields absent from a given record are mapped to null so that every
+      // row in the INSERT has the same number of values as the column list.
       const values = records.map((record) =>
         columns.map((col) => {
           const value = record[col];
-          // pg-format handles NULL, dates, JSON automatically
-          // Convert empty strings to NULL for consistency
-          return value === '' ? null : value;
+          // pg-format handles NULL, dates, JSON automatically.
+          // Convert empty strings and undefined to NULL for consistency.
+          return value === '' || value === undefined ? null : value;
         })
       );
 
