@@ -50,7 +50,9 @@ vi.mock('../../src/infra/database/database.manager', () => ({
 }));
 
 vi.mock('../../src/providers/payments/stripe.provider', () => ({
-  StripeProvider: vi.fn(() => mockProvider),
+  StripeProvider: vi.fn(function () {
+    return mockProvider;
+  }),
   maskStripeKey: (apiKey: string) => `masked:${apiKey.slice(-4)}`,
   validateStripeSecretKey: (environment: 'test' | 'live', value: string) => {
     const prefix = environment === 'test' ? 'sk_test_' : 'sk_live_';

@@ -45,7 +45,7 @@
     "@types/multer": "^1.4.13",
     "@types/pg": "^8.15.4",
     "adm-zip": "^0.5.16",
-    "axios": "^1.15.0",
+    "axios": "^1.16.1",
     "bcryptjs": "^3.0.2",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -91,6 +91,6 @@
     "tsx": "^4.7.1",
     "typescript": "^5.3.3",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^3.2.4"
+    "vitest": "^4.1.8"
   }
 }
