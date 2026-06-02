@@ -253,7 +253,7 @@ router.get('/:key', async (req: Request, res: Response, next: NextFunction) => {
     const authUrl = await customOAuthProvider.generateOAuthUrl(
       key,
       state,
-      Object.keys(additionalParams).length > 0 ? additionalParams : undefined
+      additionalParams
     );
     successResponse(res, { authUrl });
   } catch (error) {

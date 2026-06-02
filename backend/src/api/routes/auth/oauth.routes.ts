@@ -292,7 +292,7 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
     const authUrl = await authService.generateOAuthUrl(
       validatedProvider,
       state,
-      Object.keys(additionalParams).length > 0 ? additionalParams : undefined
+      additionalParams
     );
     successResponse(res, { authUrl });
   } catch (error) {
