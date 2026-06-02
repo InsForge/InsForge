@@ -262,29 +262,42 @@ router.post(
       // Determine whether this event type is handled
       const handled = isHandledRazorpayEvent(payload.event);
 
-      await webhookService.markWebhookEvent(
-        environment,
-        eventId,
-        handled ? 'processed' : 'ignored',
-        null
-      );
+      if (!handled) {
+        await webhookService.markWebhookEvent(environment, eventId, 'ignored', null);
+        res.status(200).json({ received: true, handled });
+        return;
+      }
 
       // Acknowledge immediately — Razorpay has a 5-second delivery timeout.
-      // The sync runs in the background so it can never block the response.
+      // We leave the event as 'pending' until the background sync finishes.
       res.status(200).json({ received: true, handled });
 
-      if (handled) {
-        // Fire-and-forget: sync runs after the response is sent.
-        setImmediate(() => {
-          syncService.syncAll(environment).catch((err: unknown) => {
+      // Fire-and-forget: sync runs after the response is sent.
+      setImmediate(() => {
+        syncService
+          .syncAll(environment)
+          .then(async (results) => {
+            const result = results.find((r) => r.environment === environment);
+            if (result && result.status === 'failed') {
+              await webhookService.markWebhookEvent(
+                environment,
+                eventId,
+                'failed',
+                result.error || 'Sync failed'
+              );
+            } else {
+              await webhookService.markWebhookEvent(environment, eventId, 'processed', null);
+            }
+          })
+          .catch(async (err: unknown) => {
             const message = err instanceof Error ? err.message : String(err);
             logger.error('[Razorpay Webhook] Background sync failed', {
               environment,
               error: message,
             });
+            await webhookService.markWebhookEvent(environment, eventId, 'failed', message);
           });
-        });
-      }
+      });
     } catch (error) {
       next(error);
     }
