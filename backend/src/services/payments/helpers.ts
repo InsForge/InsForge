@@ -129,6 +129,7 @@ export function normalizeStripePrice(
 ): SharedStripePrice {
   return {
     environment,
+    provider: 'stripe',
     stripePriceId: price.id,
     stripeProductId: getStripeObjectId(price.product),
     active: price.active,

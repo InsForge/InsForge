@@ -205,6 +205,7 @@ export class PaymentService {
       this.getPool().query(
         `SELECT
            environment,
+           provider,
            stripe_product_id AS "stripeProductId",
            name,
            description,
@@ -220,6 +221,7 @@ export class PaymentService {
       this.getPool().query(
         `SELECT
            environment,
+           provider,
            stripe_price_id AS "stripePriceId",
            stripe_product_id AS "stripeProductId",
            active,

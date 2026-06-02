@@ -199,6 +199,7 @@ export interface StripeProductRow {
 
 export interface StripePriceRow {
   environment: StripeEnvironment;
+  provider: 'stripe' | 'razorpay';
   stripePriceId: string;
   stripeProductId: string | null;
   active: boolean;
