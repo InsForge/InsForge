@@ -264,7 +264,7 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
       );
     }
 
-    const { redirect_uri, code_challenge, additionalParams } = queryValidation.data;
+    const { redirect_uri, code_challenge, ...additionalParams } = queryValidation.data;
     const validatedProvider = providerValidation.data;
     const redirectUri = redirect_uri;
 
@@ -289,7 +289,11 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
       expiresIn: '1h', // Set expiration time for the state token
     });
 
-    const authUrl = await authService.generateOAuthUrl(validatedProvider, state, additionalParams);
+    const authUrl = await authService.generateOAuthUrl(
+      validatedProvider,
+      state,
+      Object.keys(additionalParams).length > 0 ? additionalParams : undefined
+    );
     successResponse(res, { authUrl });
   } catch (error) {
     logger.error(`${req.params.provider} OAuth error`, { error });

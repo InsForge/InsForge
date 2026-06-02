@@ -296,17 +296,18 @@ const pkceRegex = /^[A-Za-z0-9._~-]+$/;
  * Query params for PKCE flow as per RFC 7636
  * Note: code_challenge uses snake_case as per OAuth 2.0 PKCE specification
  */
-export const oAuthInitRequestSchema = z.object({
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  redirect_uri: z.string({ required_error: 'Redirect URI is required' }).url(),
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  code_challenge: z
-    .string()
-    .min(43, 'Code challenge must be at least 43 characters')
-    .max(128, 'Code challenge must be at most 128 characters')
-    .regex(pkceRegex, 'Code challenge must be base64url encoded'),
-  additionalParams: z.record(z.string()).optional(),
-});
+export const oAuthInitRequestSchema = z
+  .object({
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    redirect_uri: z.string({ required_error: 'Redirect URI is required' }).url(),
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    code_challenge: z
+      .string()
+      .min(43, 'Code challenge must be at least 43 characters')
+      .max(128, 'Code challenge must be at most 128 characters')
+      .regex(pkceRegex, 'Code challenge must be base64url encoded'),
+  })
+  .catchall(z.string());
 
 /**
  * POST /api/auth/oauth/exchange - Exchange OAuth code for tokens
