@@ -50,14 +50,14 @@ insforge/
 │   ├── src/
 │   │   ├── App.tsx       ← Thin router selecting cloud vs self-host mode
 │   │   └── self-hosting/ ← Delegates full routing to @insforge/dashboard
-│   └── package.json      ← Declares dependency on "@insforge/dashboard": "workspace:*"
+│   └── package.json      ← Declares dependency on "@insforge/dashboard": "*"
 │
-55: └── packages/
-56:     └── dashboard/        ← THIS PACKAGE
-57:         ├── src/
-58:         │   ├── features/ ← Feature-specific pages and components
-59:         │   └── router/   ← Consolidated AppRoutes router mapping
-60:         └── package.json
+└── packages/
+    └── dashboard/        ← THIS PACKAGE
+        ├── src/
+        │   ├── features/ ← Feature-specific pages and components
+        │   └── router/   ← Consolidated AppRoutes router mapping
+        └── package.json
 ```
 
 ---
@@ -74,11 +74,9 @@ To maintain package isolation and clean separation of concerns, the `@insforge/d
 
 ## Release Expectations
 
-The `@insforge/dashboard` package conforms to standard build and release patterns:
-
-* **Build Target:** Bundled using Vite and TypeScript into a compiled ESM package located in `/dist` (`dist/index.js` for script logic, and `dist/styles.css` for styling).
-* **Versioning:** Follows Semantic Versioning (SemVer) guidelines. Major version bumps are reserved for breaking API changes in host routing or initialization contracts.
-* **Downstream Integration:** Consumed dynamically by the self-hosting shell (`frontend`) and the cloud host via standard monorepo workspace resolution or NPM registry installs.
+Build output: Vite + tsc produce ESM under dist/, with dist/index.js and dist/styles.css declared via exports in package.json.
+Distribution: Currently consumed only via the monorepo workspace ("@insforge/dashboard": "*" in frontend/package.json). The package is not yet published to a public registry; the 0.0.0-dev.* versions track internal iterations.
+Versioning: Will adopt SemVer once the package is published externally. Until then, treat any change as potentially breaking for host shells.
 
 ---
 
@@ -98,8 +96,14 @@ Inside `packages/dashboard/`, you can run the following package-specific command
 # Run unit tests via Vitest
 npm run test:unit
 
-# Run UI/component tests
+# Run component tests (Vitest + Testing Library)
+npm run test:component
+
+# Run end-to-end UI tests (Playwright)
 npm run test:ui
+
+# Type-check without emitting
+npm run typecheck
 
 # Verify code formatting and lint rules
 npm run lint
