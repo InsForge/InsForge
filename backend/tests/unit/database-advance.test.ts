@@ -121,7 +121,7 @@ describe('DatabaseAdvanceService - bulkInsert optional-column fix', () => {
 
     await svc.bulkInsert('public', 'contacts', [
       { id: '1', name: 'Alice' },
-      { id: '2', name: 'Bob',   phone: '555-0001' },
+      { id: '2', name: 'Bob', phone: '555-0001' },
       { id: '3', name: 'Carol', phone: '555-0002' },
     ]);
 
@@ -155,7 +155,7 @@ describe('DatabaseAdvanceService - bulkInsert optional-column fix', () => {
 
     await svc.bulkInsert('public', 'contacts', [
       { id: '1', name: 'Alice', phone: '555-0001' },
-      { id: '2', name: 'Bob',   phone: '555-0002' },
+      { id: '2', name: 'Bob', phone: '555-0002' },
     ]);
 
     const sql: string = mockPoolQuery.mock.calls[0][0] as string;
