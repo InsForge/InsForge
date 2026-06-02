@@ -2,13 +2,16 @@ ACLs
 ack
 additionalParams
 agentic
+allowlisted
 APNs
 apis
 Astro
 autocapture
+avatar_url
 backend
 backfills
 betterstack
+boolean
 bundler
 burstable
 caddy
@@ -16,6 +19,8 @@ certbot
 CI
 claude
 cli
+code_challenge
+code_verifier
 codeVerifier
 config
 cooldown
@@ -29,6 +34,7 @@ env
 hardcoding
 hetzner
 hoc
+httpOnly
 idempotency
 insforge
 IPs
@@ -51,6 +57,7 @@ oauth
 Okta
 opencode
 pageviews
+params
 passwordless
 PDFs
 pg_cron
