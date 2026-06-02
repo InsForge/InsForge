@@ -184,6 +184,7 @@ export class RazorpaySyncService {
       await client.query(
         `INSERT INTO payments.products (
            environment,
+           provider,
            stripe_product_id,
            name,
            description,
@@ -193,8 +194,9 @@ export class RazorpaySyncService {
            raw,
            synced_at
          )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+         VALUES ($1, 'razorpay', $2, $3, $4, $5, $6, $7, $8, NOW())
          ON CONFLICT (environment, stripe_product_id) DO UPDATE SET
+           provider = 'razorpay',
            name = EXCLUDED.name,
            description = EXCLUDED.description,
            active = EXCLUDED.active,
@@ -237,6 +239,7 @@ export class RazorpaySyncService {
       await client.query(
         `INSERT INTO payments.prices (
            environment,
+           provider,
            stripe_price_id,
            stripe_product_id,
            active,
@@ -253,8 +256,9 @@ export class RazorpaySyncService {
            raw,
            synced_at
          )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW())
+         VALUES ($1, 'razorpay', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW())
          ON CONFLICT (environment, stripe_price_id) DO UPDATE SET
+           provider = 'razorpay',
            stripe_product_id = EXCLUDED.stripe_product_id,
            active = EXCLUDED.active,
            currency = EXCLUDED.currency,
@@ -293,6 +297,7 @@ export class RazorpaySyncService {
         await client.query(
           `INSERT INTO payments.prices (
              environment,
+             provider,
              stripe_price_id,
              stripe_product_id,
              active,
@@ -309,8 +314,9 @@ export class RazorpaySyncService {
              raw,
              synced_at
            )
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW())
+           VALUES ($1, 'razorpay', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW())
            ON CONFLICT (environment, stripe_price_id) DO UPDATE SET
+             provider = 'razorpay',
              stripe_product_id = EXCLUDED.stripe_product_id,
              active = EXCLUDED.active,
              currency = EXCLUDED.currency,
@@ -363,6 +369,7 @@ export class RazorpaySyncService {
         await client.query(
           `INSERT INTO payments.customers (
              environment,
+             provider,
              stripe_customer_id,
              email,
              name,
@@ -373,8 +380,9 @@ export class RazorpaySyncService {
              stripe_created_at,
              synced_at
            )
-           VALUES ($1, $2, $3, $4, $5, false, $6, $7, $8, $9)
+           VALUES ($1, 'razorpay', $2, $3, $4, $5, false, $6, $7, $8, $9)
            ON CONFLICT (environment, stripe_customer_id) DO UPDATE SET
+             provider = 'razorpay',
              email = EXCLUDED.email,
              name = EXCLUDED.name,
              phone = EXCLUDED.phone,
@@ -429,6 +437,7 @@ export class RazorpaySyncService {
         await client.query(
           `INSERT INTO payments.subscriptions (
              environment,
+             provider,
              stripe_subscription_id,
              stripe_customer_id,
              status,
@@ -442,8 +451,9 @@ export class RazorpaySyncService {
              raw,
              synced_at
            )
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
+           VALUES ($1, 'razorpay', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
            ON CONFLICT (environment, stripe_subscription_id) DO UPDATE SET
+             provider = 'razorpay',
              stripe_customer_id = EXCLUDED.stripe_customer_id,
              status = EXCLUDED.status,
              current_period_start = EXCLUDED.current_period_start,
@@ -477,6 +487,7 @@ export class RazorpaySyncService {
           await client.query(
             `INSERT INTO payments.subscription_items (
                environment,
+               provider,
                stripe_subscription_item_id,
                stripe_subscription_id,
                stripe_product_id,
@@ -485,8 +496,9 @@ export class RazorpaySyncService {
                metadata,
                raw
              )
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+             VALUES ($1, 'razorpay', $2, $3, $4, $5, $6, $7, $8)
              ON CONFLICT (environment, stripe_subscription_item_id) DO UPDATE SET
+               provider = 'razorpay',
                stripe_subscription_id = EXCLUDED.stripe_subscription_id,
                stripe_product_id = EXCLUDED.stripe_product_id,
                stripe_price_id = EXCLUDED.stripe_price_id,
@@ -508,19 +520,20 @@ export class RazorpaySyncService {
         }
       }
 
-      // Clean up subscriptions that are no longer in Razorpay
+      // Clean up Razorpay subscriptions and their items that are no longer returned by the API.
+      // Use provider='razorpay' to ensure Stripe rows are never touched.
       const syncedIds = subscriptions.map((s) => s.id);
       await client.query(
         `DELETE FROM payments.subscription_items
          WHERE environment = $1
-           AND (raw->>'entity' = 'subscription_item' OR raw->>'entity' = 'item')
+           AND provider = 'razorpay'
            AND NOT (stripe_subscription_id = ANY($2::TEXT[]))`,
         [environment, syncedIds]
       );
       await client.query(
         `DELETE FROM payments.subscriptions
          WHERE environment = $1
-           AND raw->>'entity' = 'subscription'
+           AND provider = 'razorpay'
            AND NOT (stripe_subscription_id = ANY($2::TEXT[]))`,
         [environment, syncedIds]
       );
@@ -560,6 +573,7 @@ export class RazorpaySyncService {
         await client.query(
           `INSERT INTO payments.payment_history (
              environment,
+             provider,
              type,
              status,
              stripe_customer_id,
@@ -577,11 +591,12 @@ export class RazorpaySyncService {
              stripe_created_at,
              raw
            )
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+           VALUES ($1, 'razorpay', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
            ON CONFLICT (environment, stripe_payment_intent_id)
              WHERE stripe_payment_intent_id IS NOT NULL
                AND type <> 'refund'
            DO UPDATE SET
+             provider = 'razorpay',
              type = EXCLUDED.type,
              status = EXCLUDED.status,
              stripe_customer_id = EXCLUDED.stripe_customer_id,

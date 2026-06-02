@@ -61,6 +61,7 @@ export class PaymentSubscriptionService {
     const subscriptionsResult = await this.getPool().query(
       `SELECT
          environment,
+         provider,
          stripe_subscription_id AS "stripeSubscriptionId",
          stripe_customer_id AS "stripeCustomerId",
          subject_type AS "subjectType",
@@ -396,6 +397,7 @@ export class PaymentSubscriptionService {
   ): Omit<ListSubscriptionsResponse['subscriptions'][number], 'items'> {
     return {
       environment: row.environment,
+      provider: (row as any).provider ?? 'stripe',
       stripeSubscriptionId: row.stripeSubscriptionId,
       stripeCustomerId: row.stripeCustomerId,
       subjectType: row.subjectType ?? null,

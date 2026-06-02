@@ -103,6 +103,7 @@ export function normalizeStripeProduct(
 ): SharedStripeProduct {
   return {
     environment,
+    provider: 'stripe',
     stripeProductId: product.id,
     name: product.name,
     description: product.description ?? null,

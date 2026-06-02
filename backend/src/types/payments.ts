@@ -187,6 +187,7 @@ export interface RazorpayConnectionRow {
 
 export interface StripeProductRow {
   environment: StripeEnvironment;
+  provider: 'stripe' | 'razorpay';
   stripeProductId: string;
   name: string;
   description: string | null;
@@ -216,6 +217,7 @@ export interface StripePriceRow {
 
 export interface StripeCustomerRow {
   environment: StripeEnvironment;
+  provider: 'stripe' | 'razorpay';
   stripeCustomerId: string;
   email: string | null;
   name: string | null;

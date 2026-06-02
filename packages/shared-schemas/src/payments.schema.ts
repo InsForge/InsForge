@@ -26,8 +26,12 @@ export const stripeConnectionSchema = z.object({
 });
 export type StripeConnection = z.infer<typeof stripeConnectionSchema>;
 
+export const paymentProviderSchema = z.enum(['stripe', 'razorpay']);
+export type PaymentProvider = z.infer<typeof paymentProviderSchema>;
+
 export const stripeProductSchema = z.object({
   environment: stripeEnvironmentSchema,
+  provider: paymentProviderSchema,
   stripeProductId: z.string(),
   name: z.string(),
   description: z.string().nullable(),
@@ -59,6 +63,7 @@ export type StripePrice = z.infer<typeof stripePriceSchema>;
 
 export const stripeCustomerSchema = z.object({
   environment: stripeEnvironmentSchema,
+  provider: paymentProviderSchema,
   stripeCustomerId: z.string(),
   email: z.string().nullable(),
   name: z.string().nullable(),
@@ -172,6 +177,7 @@ export type PaymentHistoryStatus = z.infer<typeof paymentHistoryStatusSchema>;
 
 export const paymentHistorySchema = z.object({
   environment: stripeEnvironmentSchema,
+  provider: paymentProviderSchema,
   type: paymentHistoryTypeSchema,
   status: paymentHistoryStatusSchema,
   subjectType: z.string().nullable(),
@@ -226,6 +232,7 @@ export type StripeSubscriptionItem = z.infer<typeof stripeSubscriptionItemSchema
 
 export const stripeSubscriptionSchema = z.object({
   environment: stripeEnvironmentSchema,
+  provider: paymentProviderSchema,
   stripeSubscriptionId: z.string(),
   stripeCustomerId: z.string().nullable(),
   subjectType: z.string().nullable(),

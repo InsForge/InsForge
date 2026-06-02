@@ -156,6 +156,7 @@ export class PaymentCustomerService {
        )
        SELECT
          customers.environment,
+         customers.provider,
          customers.stripe_customer_id AS "stripeCustomerId",
          customers.email,
          customers.name,
@@ -418,6 +419,7 @@ export class PaymentCustomerService {
   private normalizeCustomerRow(row: StripeCustomerRow): SharedStripeCustomer {
     return {
       environment: row.environment,
+      provider: row.provider ?? 'stripe',
       stripeCustomerId: row.stripeCustomerId,
       email: row.email ?? null,
       name: row.name ?? null,
