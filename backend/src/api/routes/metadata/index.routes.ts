@@ -1,5 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import { DatabaseAdvanceService } from '@/services/database/database-advance.service.js';
+import { DatabaseService } from '@/services/database/database.service.js';
 import { AuthService } from '@/services/auth/auth.service.js';
 import { StorageService } from '@/services/storage/storage.service.js';
 import { FunctionService } from '@/services/functions/function.service.js';
@@ -16,6 +17,7 @@ import {
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { CloudDatabaseProvider } from '@/providers/database/cloud.provider.js';
+import { formatContextAsMarkdown } from '@/utils/context-formatter.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
@@ -23,6 +25,7 @@ const storageService = StorageService.getInstance();
 const functionService = FunctionService.getInstance();
 const realtimeChannelService = RealtimeChannelService.getInstance();
 const dbManager = DatabaseManager.getInstance();
+const databaseService = DatabaseService.getInstance();
 const dbAdvanceService = DatabaseAdvanceService.getInstance();
 const deploymentService = DeploymentService.getInstance();
 
@@ -159,6 +162,59 @@ router.get('/database-password', async (_req: AuthRequest, res: Response, next: 
     const cloudDbProvider = CloudDatabaseProvider.getInstance();
     const passwordInfo = await cloudDbProvider.getDatabasePassword();
     successResponse(res, passwordInfo);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Structured context export — aggregates all project metadata into a single response
+// for AI coding tools and developer onboarding.
+// GET /api/metadata/context?format=json (default) or ?format=markdown
+router.get('/context', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const format = req.query.format === 'markdown' ? 'markdown' : 'json';
+    const schemaName = 'public';
+
+    // Fetch all metadata in parallel from existing services
+    const [auth, database, storage, functions, realtime, schemas, indexes, policies, triggers] =
+      await Promise.all([
+        authService.getMetadata(),
+        dbAdvanceService.exportDatabase(undefined, 'json', false, true, false, true),
+        storageService.getMetadata(),
+        functionService.getMetadata(),
+        realtimeChannelService.getMetadata(),
+        databaseService.getSchemas(),
+        databaseService.getIndexes(schemaName),
+        databaseService.getPolicies(schemaName),
+        databaseService.getTriggers(schemaName),
+      ]);
+
+    const version = process.env.npm_package_version || '1.0.0';
+    const exportedAt = new Date().toISOString();
+
+    const context = {
+      exportedAt,
+      version,
+      auth,
+      database: {
+        schemas: schemas.schemas,
+        tables: (database.data as { tables: Record<string, unknown> }).tables,
+        indexes: indexes.indexes,
+        policies: policies.policies,
+        triggers: triggers.triggers,
+      },
+      storage,
+      functions,
+      realtime,
+    };
+
+    if (format === 'markdown') {
+      res
+        .set('Content-Type', 'text/markdown; charset=utf-8')
+        .send(formatContextAsMarkdown(context));
+    } else {
+      successResponse(res, context);
+    }
   } catch (error) {
     next(error);
   }
