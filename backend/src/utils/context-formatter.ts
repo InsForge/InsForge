@@ -7,10 +7,13 @@
 
 export function formatContextAsMarkdown(context: any): string {
   const lines: string[] = [];
+  /** Escape pipes + newlines for Markdown table cells. */
   const esc = (s: unknown) =>
     String(s ?? '')
       .replace(/\|/g, '\\|')
       .replace(/\n/g, ' ');
+  /** Strip newlines for inline code spans (pipes are safe inside backticks). */
+  const code = (s: unknown) => String(s ?? '').replace(/\n/g, ' ');
 
   lines.push(`# Project Context Export`);
   lines.push(`> Exported at ${context.exportedAt} · v${context.version}`);
@@ -40,7 +43,7 @@ export function formatContextAsMarkdown(context: any): string {
     if (db.schemas?.length) {
       lines.push(`### Schemas`);
       for (const s of db.schemas) {
-        lines.push(`- \`${esc(s.name)}\`${s.isProtected ? ' (protected)' : ''}`);
+        lines.push(`- \`${code(s.name)}\`${s.isProtected ? ' (protected)' : ''}`);
       }
       lines.push('');
     }
@@ -69,7 +72,7 @@ export function formatContextAsMarkdown(context: any): string {
           lines.push('**Foreign keys:**');
           for (const fk of tableData.foreignKeys) {
             lines.push(
-              `- \`${esc(fk.columnName)}\` → \`${esc(fk.foreignTableName)}.${esc(fk.foreignColumnName)}\``
+              `- \`${code(fk.columnName)}\` → \`${code(fk.foreignTableName)}.${code(fk.foreignColumnName)}\``
             );
           }
           lines.push('');
@@ -84,7 +87,7 @@ export function formatContextAsMarkdown(context: any): string {
         if (tableData.policies?.length) {
           lines.push('**Policies:**');
           for (const p of tableData.policies) {
-            lines.push(`- \`${esc(p.policyname)}\` (${esc(p.cmd)}) — roles: ${esc(p.roles)}`);
+            lines.push(`- \`${code(p.policyname)}\` (${code(p.cmd)}) — roles: ${code(p.roles)}`);
           }
           lines.push('');
         }
@@ -96,7 +99,7 @@ export function formatContextAsMarkdown(context: any): string {
             const flags = [idx.isPrimary && 'PK', idx.isUnique && 'UNIQUE']
               .filter(Boolean)
               .join(', ');
-            lines.push(`- \`${esc(idx.indexname)}\`${flags ? ` (${flags})` : ''}`);
+            lines.push(`- \`${code(idx.indexname)}\`${flags ? ` (${flags})` : ''}`);
           }
           lines.push('');
         }
@@ -106,7 +109,7 @@ export function formatContextAsMarkdown(context: any): string {
           lines.push('**Triggers:**');
           for (const t of tableData.triggers) {
             lines.push(
-              `- \`${esc(t.triggerName)}\` — ${esc(t.actionTiming)} ${esc(t.eventManipulation)}`
+              `- \`${code(t.triggerName)}\` — ${code(t.actionTiming)} ${code(t.eventManipulation)}`
             );
           }
           lines.push('');
@@ -119,7 +122,7 @@ export function formatContextAsMarkdown(context: any): string {
       lines.push('### Database Functions');
       for (const f of db.dbFunctions) {
         const kind = f.kind === 'p' ? 'procedure' : 'function';
-        lines.push(`- \`${esc(f.functionName)}\` (${kind})`);
+        lines.push(`- \`${code(f.functionName)}\` (${kind})`);
       }
       lines.push('');
     }
@@ -128,7 +131,7 @@ export function formatContextAsMarkdown(context: any): string {
     if (db.views?.length) {
       lines.push('### Views');
       for (const v of db.views) {
-        lines.push(`- \`${esc(v.viewName)}\``);
+        lines.push(`- \`${code(v.viewName)}\``);
       }
       lines.push('');
     }
@@ -141,7 +144,7 @@ export function formatContextAsMarkdown(context: any): string {
     if (storage.buckets?.length) {
       for (const b of storage.buckets) {
         lines.push(
-          `- \`${esc(b.name)}\` — ${b.public ? 'public' : 'private'}, ${b.objectCount ?? 0} objects`
+          `- \`${code(b.name)}\` — ${b.public ? 'public' : 'private'}, ${b.objectCount ?? 0} objects`
         );
       }
     } else {
@@ -159,7 +162,7 @@ export function formatContextAsMarkdown(context: any): string {
   if (functions?.length) {
     for (const f of functions) {
       lines.push(
-        `- \`${esc(f.slug)}\` — ${esc(f.status)}${f.description ? `: ${esc(f.description)}` : ''}`
+        `- \`${code(f.slug)}\` — ${code(f.status)}${f.description ? `: ${code(f.description)}` : ''}`
       );
     }
   } else {
@@ -172,7 +175,7 @@ export function formatContextAsMarkdown(context: any): string {
   const realtime = context.realtime;
   if (realtime?.channels?.length) {
     for (const ch of realtime.channels) {
-      lines.push(`- \`${esc(ch.name)}\``);
+      lines.push(`- \`${code(ch.name)}\``);
     }
   } else {
     lines.push('No realtime channels configured.');
