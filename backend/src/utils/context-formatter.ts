@@ -114,6 +114,25 @@ export function formatContextAsMarkdown(context: any): string {
       }
       lines.push('');
     }
+
+    // Database functions (stored procedures)
+    if (db.dbFunctions?.length) {
+      lines.push('### Database Functions');
+      for (const f of db.dbFunctions) {
+        const kind = f.kind === 'p' ? 'procedure' : 'function';
+        lines.push(`- \`${f.functionName}\` (${kind})`);
+      }
+      lines.push('');
+    }
+
+    // Views
+    if (db.views?.length) {
+      lines.push('### Views');
+      for (const v of db.views) {
+        lines.push(`- \`${v.viewName}\``);
+      }
+      lines.push('');
+    }
   }
 
   // Storage

@@ -57,6 +57,8 @@ const sampleContext = {
         eventManipulation: 'INSERT',
       },
     ],
+    dbFunctions: [{ functionName: 'notify_changes', kind: 'f' }],
+    views: [{ viewName: 'active_users' }],
   },
   storage: {
     buckets: [{ name: 'avatars', public: true, objectCount: 42 }],
@@ -105,6 +107,13 @@ describe('formatContextAsMarkdown', () => {
     // Triggers
     expect(md).toContain('`audit_trigger`');
     expect(md).toContain('AFTER INSERT');
+
+    // DB functions
+    expect(md).toContain('`notify_changes`');
+    expect(md).toContain('(function)');
+
+    // Views
+    expect(md).toContain('`active_users`');
 
     // Storage
     expect(md).toContain('`avatars`');

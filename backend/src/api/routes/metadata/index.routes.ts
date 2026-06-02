@@ -192,13 +192,21 @@ router.get('/context', async (req: AuthRequest, res: Response, next: NextFunctio
     const version = process.env.npm_package_version || '1.0.0';
     const exportedAt = new Date().toISOString();
 
+    const dbExport = database.data as {
+      tables: Record<string, unknown>;
+      functions: unknown[];
+      views: unknown[];
+    };
+
     const context = {
       exportedAt,
       version,
       auth,
       database: {
         schemas: schemas.schemas,
-        tables: (database.data as { tables: Record<string, unknown> }).tables,
+        tables: dbExport.tables,
+        dbFunctions: dbExport.functions,
+        views: dbExport.views,
         indexes: indexes.indexes,
         policies: policies.policies,
         triggers: triggers.triggers,
