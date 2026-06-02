@@ -128,11 +128,15 @@ build_admin_login_body() {
     printf '{"email":"%s","password":"%s"}' "$escaped_email" "$escaped_password"
 }
 
+preflight_curl() {
+    curl -sS --connect-timeout "${PREFLIGHT_CONNECT_TIMEOUT:-5}" --max-time "${PREFLIGHT_MAX_TIME:-10}" "$@"
+}
+
 get_admin_token() {
     local body
     local response
     body=$(build_admin_login_body)
-    response=$(curl -sS -X POST "$TEST_API_BASE/auth/admin/sessions" \
+    response=$(preflight_curl -X POST "$TEST_API_BASE/auth/admin/sessions" \
         -H "Content-Type: application/json" \
         -d "$body" 2>/dev/null)
 
@@ -142,7 +146,7 @@ get_admin_token() {
 get_api_key_from_metadata() {
     local admin_token="$1"
     local response
-    response=$(curl -sS "$TEST_API_BASE/metadata/api-key" \
+    response=$(preflight_curl "$TEST_API_BASE/metadata/api-key" \
         -H "Authorization: Bearer $admin_token" 2>/dev/null)
 
     extract_json_value "$response" "apiKey"
@@ -158,7 +162,7 @@ run_preflight() {
 
     local health_response
     local health_status
-    health_response=$(curl -sS -w "\n%{http_code}" "$TEST_API_BASE/health" 2>/dev/null)
+    health_response=$(preflight_curl -w "\n%{http_code}" "$TEST_API_BASE/health" 2>/dev/null)
     health_status=$(echo "$health_response" | tail -n 1)
 
     if [ "$health_status" != "200" ]; then
