@@ -1,10 +1,5 @@
 import { useMemo, useState } from 'react';
-import {
-  EmptyStateIllustration,
-  LoadingState,
-  PaginationControls,
-  TableHeader,
-} from '#components';
+import { EmptyStateIllustration, LoadingState, PaginationControls, TableHeader } from '#components';
 import { ErrorState } from '#components/ErrorState';
 import { RequirePosthogConnection } from '#features/analytics/components/RequirePosthogConnection';
 import { useRecordings } from '#features/analytics/hooks/useRecordings';
