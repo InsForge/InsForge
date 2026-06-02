@@ -26,7 +26,7 @@ const sampleContext = {
           },
           { columnName: 'email', dataType: 'text', isNullable: 'NO', columnDefault: null },
         ],
-        indexes: [],
+        indexes: [{ indexname: 'users_pkey', isPrimary: true, isUnique: true }],
         foreignKeys: [
           {
             columnName: 'org_id',
@@ -36,27 +36,12 @@ const sampleContext = {
         ],
         rlsEnabled: true,
         policies: [{ policyname: 'users_select', cmd: 'SELECT', roles: '{authenticated}' }],
-        triggers: [],
+        triggers: [
+          { triggerName: 'audit_trigger', actionTiming: 'AFTER', eventManipulation: 'INSERT' },
+        ],
         rows: [],
       },
     },
-    indexes: [{ indexName: 'users_pkey', tableName: 'users', isPrimary: true, isUnique: true }],
-    policies: [
-      {
-        policyName: 'users_select',
-        tableName: 'users',
-        cmd: 'SELECT',
-        roles: '{authenticated}',
-      },
-    ],
-    triggers: [
-      {
-        triggerName: 'audit_trigger',
-        tableName: 'users',
-        actionTiming: 'AFTER',
-        eventManipulation: 'INSERT',
-      },
-    ],
     dbFunctions: [{ functionName: 'notify_changes', kind: 'f' }],
     views: [{ viewName: 'active_users' }],
   },
@@ -100,11 +85,13 @@ describe('formatContextAsMarkdown', () => {
     expect(md).toContain('**RLS**: enabled');
     expect(md).toContain('`users_select`');
 
-    // Indexes
+    // Per-table indexes
+    expect(md).toContain('**Indexes:**');
     expect(md).toContain('`users_pkey`');
     expect(md).toContain('(PK, UNIQUE)');
 
-    // Triggers
+    // Per-table triggers
+    expect(md).toContain('**Triggers:**');
     expect(md).toContain('`audit_trigger`');
     expect(md).toContain('AFTER INSERT');
 

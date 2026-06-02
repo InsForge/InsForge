@@ -7,6 +7,10 @@
 
 export function formatContextAsMarkdown(context: any): string {
   const lines: string[] = [];
+  const esc = (s: unknown) =>
+    String(s ?? '')
+      .replace(/\|/g, '\\|')
+      .replace(/\n/g, ' ');
 
   lines.push(`# Project Context Export`);
   lines.push(`> Exported at ${context.exportedAt} · v${context.version}`);
@@ -53,7 +57,9 @@ export function formatContextAsMarkdown(context: any): string {
           for (const col of tableData.schema) {
             const nullable = col.isNullable === 'YES' ? 'yes' : 'no';
             const def = col.columnDefault ?? '-';
-            lines.push(`| ${col.columnName} | ${col.dataType} | ${nullable} | ${def} |`);
+            lines.push(
+              `| ${esc(col.columnName)} | ${esc(col.dataType)} | ${nullable} | ${esc(def)} |`
+            );
           }
           lines.push('');
         }
@@ -82,37 +88,28 @@ export function formatContextAsMarkdown(context: any): string {
           }
           lines.push('');
         }
-      }
-    }
 
-    // Indexes
-    if (db.indexes?.length) {
-      lines.push('### Indexes');
-      for (const idx of db.indexes) {
-        const flags = [idx.isPrimary && 'PK', idx.isUnique && 'UNIQUE'].filter(Boolean).join(', ');
-        lines.push(`- \`${idx.indexName}\` on \`${idx.tableName}\`${flags ? ` (${flags})` : ''}`);
-      }
-      lines.push('');
-    }
+        // Indexes
+        if (tableData.indexes?.length) {
+          lines.push('**Indexes:**');
+          for (const idx of tableData.indexes) {
+            const flags = [idx.isPrimary && 'PK', idx.isUnique && 'UNIQUE']
+              .filter(Boolean)
+              .join(', ');
+            lines.push(`- \`${idx.indexname}\`${flags ? ` (${flags})` : ''}`);
+          }
+          lines.push('');
+        }
 
-    // Policies (schema-level summary)
-    if (db.policies?.length) {
-      lines.push('### RLS Policies');
-      for (const p of db.policies) {
-        lines.push(`- \`${p.policyName}\` on \`${p.tableName}\` (${p.cmd}) — roles: ${p.roles}`);
+        // Triggers
+        if (tableData.triggers?.length) {
+          lines.push('**Triggers:**');
+          for (const t of tableData.triggers) {
+            lines.push(`- \`${t.triggerName}\` — ${t.actionTiming} ${t.eventManipulation}`);
+          }
+          lines.push('');
+        }
       }
-      lines.push('');
-    }
-
-    // Triggers
-    if (db.triggers?.length) {
-      lines.push('### Triggers');
-      for (const t of db.triggers) {
-        lines.push(
-          `- \`${t.triggerName}\` on \`${t.tableName}\` — ${t.actionTiming} ${t.eventManipulation}`
-        );
-      }
-      lines.push('');
     }
 
     // Database functions (stored procedures)

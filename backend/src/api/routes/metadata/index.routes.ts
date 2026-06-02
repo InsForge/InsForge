@@ -173,26 +173,21 @@ router.get('/database-password', async (_req: AuthRequest, res: Response, next: 
 router.get('/context', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const format = req.query.format === 'markdown' ? 'markdown' : 'json';
-    const schemaName = 'public';
 
     // Fetch all metadata in parallel from existing services
-    const [auth, database, storage, functions, realtime, schemas, indexes, policies, triggers] =
-      await Promise.all([
-        authService.getMetadata(),
-        dbAdvanceService.exportDatabase(undefined, 'json', false, true, false, true),
-        storageService.getMetadata(),
-        functionService.getMetadata(),
-        realtimeChannelService.getMetadata(),
-        databaseService.getSchemas(),
-        databaseService.getIndexes(schemaName),
-        databaseService.getPolicies(schemaName),
-        databaseService.getTriggers(schemaName),
-      ]);
+    const [auth, database, storage, functions, realtime, schemas] = await Promise.all([
+      authService.getMetadata(),
+      dbAdvanceService.exportDatabase(undefined, 'json', false, true, false, true),
+      storageService.getMetadata(),
+      functionService.getMetadata(),
+      realtimeChannelService.getMetadata(),
+      databaseService.getSchemas(),
+    ]);
 
     const version = process.env.npm_package_version || '1.0.0';
     const exportedAt = new Date().toISOString();
 
-    const dbExport = database.data as {
+    const dbExport = (database.data ?? {}) as {
       tables: Record<string, unknown>;
       functions: unknown[];
       views: unknown[];
@@ -204,12 +199,9 @@ router.get('/context', async (req: AuthRequest, res: Response, next: NextFunctio
       auth,
       database: {
         schemas: schemas.schemas,
-        tables: dbExport.tables,
-        dbFunctions: dbExport.functions,
-        views: dbExport.views,
-        indexes: indexes.indexes,
-        policies: policies.policies,
-        triggers: triggers.triggers,
+        tables: dbExport.tables ?? {},
+        dbFunctions: dbExport.functions ?? [],
+        views: dbExport.views ?? [],
       },
       storage,
       functions,
