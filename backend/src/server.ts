@@ -248,7 +248,7 @@ export async function createApp() {
       // Enforce auth policy based on function configuration
       const authPolicy = func.auth || 'user'; // default to 'user' for backward compatibility
       const isAuthenticated = !!req.user || !!req.hasApiKey;
-      const isAdmin = req.user?.role === 'project_admin';
+      const isAdmin = req.hasApiKey;
 
       if (authPolicy === 'admin') {
         // Admin-only: require project admin role
