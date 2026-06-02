@@ -10,7 +10,30 @@
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+
+PREFLIGHT_ONLY=0
+
+for arg in "$@"; do
+    case "$arg" in
+        --preflight-only)
+            PREFLIGHT_ONLY=1
+            ;;
+        -h|--help)
+            echo "Usage: $0 [--preflight-only]"
+            echo ""
+            echo "Options:"
+            echo "  --preflight-only  Check local E2E prerequisites, then exit."
+            exit 0
+            ;;
+        *)
+            echo -e "${RED}Unknown option: $arg${NC}"
+            echo "Usage: $0 [--preflight-only]"
+            exit 1
+            ;;
+    esac
+done
 
 # Get the directory where this script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -43,13 +66,6 @@ if [ -z "$ADMIN_EMAIL" ] || [ -z "$ADMIN_PASSWORD" ]; then
     echo ""
 fi
 
-# Check if API key is set
-if [ -z "$ACCESS_API_KEY" ]; then
-    echo -e "${YELLOW}Warning: ACCESS_API_KEY not set. Some tests may fail.${NC}"
-    echo "Set with: export ACCESS_API_KEY=your_api_key"
-    echo ""
-fi
-
 # Check if running cloud tests
 if [ -z "$AWS_S3_BUCKET" ]; then
     echo -e "${YELLOW}Note: AWS_S3_BUCKET not set. Cloud/S3 tests will be skipped.${NC}"
@@ -59,6 +75,111 @@ fi
 # Export admin credentials for tests
 export TEST_ADMIN_EMAIL="$ADMIN_EMAIL"
 export TEST_ADMIN_PASSWORD="$ADMIN_PASSWORD"
+
+print_setup_help() {
+    echo ""
+    echo -e "${BLUE}Local setup:${NC}"
+    echo "  cp .env.example .env"
+    echo "  docker compose -f docker-compose.prod.yml up"
+    echo ""
+    echo "Then rerun:"
+    echo "  npm run test:e2e"
+    echo ""
+    echo "If your backend runs elsewhere, set:"
+    echo "  export TEST_API_BASE=http://localhost:7130/api"
+    echo "  export ADMIN_EMAIL=admin@example.com"
+    echo "  export ADMIN_PASSWORD=change-this-password"
+    echo "  export ACCESS_API_KEY=ik_..."
+}
+
+extract_json_value() {
+    local json="$1"
+    local key="$2"
+    echo "$json" | grep -o "\"$key\":\"[^\"]*\"" | head -1 | cut -d'"' -f4
+}
+
+get_admin_token() {
+    local response
+    response=$(curl -sS -X POST "$TEST_API_BASE/auth/admin/sessions" \
+        -H "Content-Type: application/json" \
+        -d "{\"email\":\"$TEST_ADMIN_EMAIL\",\"password\":\"$TEST_ADMIN_PASSWORD\"}" 2>/dev/null)
+
+    extract_json_value "$response" "accessToken"
+}
+
+get_api_key_from_metadata() {
+    local admin_token="$1"
+    local response
+    response=$(curl -sS "$TEST_API_BASE/metadata/api-key" \
+        -H "Authorization: Bearer $admin_token" 2>/dev/null)
+
+    extract_json_value "$response" "apiKey"
+}
+
+run_preflight() {
+    echo -e "${YELLOW}=== Running E2E Preflight ===${NC}"
+
+    if ! command -v curl >/dev/null 2>&1; then
+        echo -e "${RED}Preflight failed: curl is required but was not found.${NC}"
+        return 1
+    fi
+
+    local health_response
+    local health_status
+    health_response=$(curl -sS -w "\n%{http_code}" "$TEST_API_BASE/health" 2>/dev/null)
+    health_status=$(echo "$health_response" | tail -n 1)
+
+    if [ "$health_status" != "200" ]; then
+        echo -e "${RED}Preflight failed: backend health check did not return 200.${NC}"
+        echo "Checked: $TEST_API_BASE/health"
+        echo "Status: ${health_status:-unreachable}"
+        print_setup_help
+        return 1
+    fi
+
+    echo -e "${GREEN}✓ Backend health check passed${NC}"
+
+    local admin_token
+    admin_token=$(get_admin_token)
+
+    if [ -z "$admin_token" ]; then
+        echo -e "${RED}Preflight failed: admin login did not return an access token.${NC}"
+        echo "Checked: $TEST_API_BASE/auth/admin/sessions"
+        echo "Admin email: $TEST_ADMIN_EMAIL"
+        print_setup_help
+        return 1
+    fi
+
+    echo -e "${GREEN}✓ Admin login passed${NC}"
+
+    local resolved_api_key="${TEST_API_KEY:-${ACCESS_API_KEY:-}}"
+
+    if [ -z "$resolved_api_key" ]; then
+        resolved_api_key=$(get_api_key_from_metadata "$admin_token")
+    fi
+
+    if [ -z "$resolved_api_key" ]; then
+        echo -e "${RED}Preflight failed: no API key was available.${NC}"
+        echo "Set TEST_API_KEY or ACCESS_API_KEY, or ensure /metadata/api-key works for the admin session."
+        print_setup_help
+        return 1
+    fi
+
+    export ACCESS_API_KEY="$resolved_api_key"
+    echo -e "${GREEN}✓ API key is available${NC}"
+
+    echo -e "${GREEN}Preflight passed.${NC}"
+    echo ""
+    return 0
+}
+
+if ! run_preflight; then
+    exit 1
+fi
+
+if [ "$PREFLIGHT_ONLY" -eq 1 ]; then
+    exit 0
+fi
 
 # Keep track of test results
 TOTAL_TESTS=0
