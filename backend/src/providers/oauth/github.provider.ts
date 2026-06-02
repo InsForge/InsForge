@@ -4,11 +4,6 @@ import { getApiBaseUrl } from '@/utils/environment.js';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import type { GitHubUserInfo, GitHubEmailInfo, OAuthUserData } from '@/types/auth.js';
 import { OAuthProvider } from './base.provider.js';
-import {
-  appendAdditionalOAuthParams,
-  appendAdditionalOAuthParamsToUrlString,
-  type OAuthAdditionalParams,
-} from './additional-params.js';
 
 /**
  * GitHub OAuth Service
@@ -33,7 +28,7 @@ export class GitHubOAuthProvider implements OAuthProvider {
    */
   async generateOAuthUrl(
     state?: string,
-    additionalParams?: OAuthAdditionalParams
+    additionalParams?: Record<string, string>
   ): Promise<string> {
     const oAuthConfigService = OAuthConfigService.getInstance();
     const config = await oAuthConfigService.getConfigByProvider('github');
@@ -60,10 +55,13 @@ export class GitHubOAuthProvider implements OAuthProvider {
           },
         }
       );
-      return appendAdditionalOAuthParamsToUrlString(
-        response.data.auth_url || response.data.url || '',
-        additionalParams
-      );
+      const authUrl = new URL(response.data.auth_url || response.data.url || '');
+      Object.entries(additionalParams ?? {}).forEach(([key, value]) => {
+        if (!authUrl.searchParams.has(key)) {
+          authUrl.searchParams.set(key, value);
+        }
+      });
+      return authUrl.toString();
     }
 
     logger.debug('GitHub OAuth Config (fresh from DB):', {
@@ -77,7 +75,11 @@ export class GitHubOAuthProvider implements OAuthProvider {
     if (state) {
       authUrl.searchParams.set('state', state);
     }
-    appendAdditionalOAuthParams(authUrl, additionalParams);
+    Object.entries(additionalParams ?? {}).forEach(([key, value]) => {
+      if (!authUrl.searchParams.has(key)) {
+        authUrl.searchParams.set(key, value);
+      }
+    });
 
     return authUrl.toString();
   }

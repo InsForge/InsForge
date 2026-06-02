@@ -1,5 +1,4 @@
 import type { OAuthUserData } from '@/types/auth.js';
-import type { OAuthAdditionalParams } from './additional-params.js';
 
 /**
  * OAuth provider interface
@@ -11,7 +10,7 @@ export interface OAuthProvider {
    * @param state - Optional state parameter for CSRF protection
    * @returns Authorization URL
    */
-  generateOAuthUrl(state?: string, additionalParams?: OAuthAdditionalParams): Promise<string>;
+  generateOAuthUrl(state?: string, additionalParams?: Record<string, string>): Promise<string>;
 
   /**
    * Handle OAuth callback and exchange code/token for user info

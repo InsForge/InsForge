@@ -5,11 +5,6 @@ import logger from '@/utils/logger.js';
 import { OAuthProvider } from './base.provider.js';
 import axios from 'axios';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
-import {
-  appendAdditionalOAuthParams,
-  appendAdditionalOAuthParamsToUrlString,
-  type OAuthAdditionalParams,
-} from './additional-params.js';
 
 export class XOAuthProvider implements OAuthProvider {
   private static instance: XOAuthProvider;
@@ -32,7 +27,7 @@ export class XOAuthProvider implements OAuthProvider {
    */
   async generateOAuthUrl(
     state?: string,
-    additionalParams?: OAuthAdditionalParams
+    additionalParams?: Record<string, string>
   ): Promise<string> {
     const oauthConfigService = OAuthConfigService.getInstance();
     const config = await oauthConfigService.getConfigByProvider('x');
@@ -65,10 +60,13 @@ export class XOAuthProvider implements OAuthProvider {
           },
         }
       );
-      return appendAdditionalOAuthParamsToUrlString(
-        response.data.auth_url || response.data.url || '',
-        additionalParams
-      );
+      const authUrl = new URL(response.data.auth_url || response.data.url || '');
+      Object.entries(additionalParams ?? {}).forEach(([key, value]) => {
+        if (!authUrl.searchParams.has(key)) {
+          authUrl.searchParams.set(key, value);
+        }
+      });
+      return authUrl.toString();
     }
 
     logger.debug('X OAuth Config (fresh from DB):', {
@@ -86,7 +84,11 @@ export class XOAuthProvider implements OAuthProvider {
     authUrl.searchParams.set('state', state ?? '');
     authUrl.searchParams.set('code_challenge', challenge);
     authUrl.searchParams.set('code_challenge_method', 'S256');
-    appendAdditionalOAuthParams(authUrl, additionalParams);
+    Object.entries(additionalParams ?? {}).forEach(([key, value]) => {
+      if (!authUrl.searchParams.has(key)) {
+        authUrl.searchParams.set(key, value);
+      }
+    });
 
     return authUrl.toString();
   }

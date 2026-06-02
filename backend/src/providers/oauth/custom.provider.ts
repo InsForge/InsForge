@@ -3,7 +3,6 @@ import axios from 'axios';
 import { getApiBaseUrl } from '@/utils/environment.js';
 import { CustomOAuthConfigService } from '@/services/auth/custom-oauth-config.service.js';
 import type { OAuthUserData } from '@/types/auth.js';
-import { appendAdditionalOAuthParams, type OAuthAdditionalParams } from './additional-params.js';
 
 interface DiscoveredEndpoints {
   authorization_endpoint?: string;
@@ -79,7 +78,7 @@ export class CustomOAuthProvider {
   async generateOAuthUrl(
     key: string,
     state: string,
-    additionalParams?: OAuthAdditionalParams
+    additionalParams?: Record<string, string>
   ): Promise<string> {
     const config = await this.customConfigService.getConfigByKey(key);
     if (!config) {
@@ -102,7 +101,11 @@ export class CustomOAuthProvider {
     url.searchParams.set('state', state);
     url.searchParams.set('code_challenge_method', 'S256');
     url.searchParams.set('code_challenge', challenge);
-    appendAdditionalOAuthParams(url, additionalParams);
+    Object.entries(additionalParams ?? {}).forEach(([paramKey, value]) => {
+      if (!url.searchParams.has(paramKey)) {
+        url.searchParams.set(paramKey, value);
+      }
+    });
 
     return url.toString();
   }
