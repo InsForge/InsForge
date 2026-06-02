@@ -232,9 +232,7 @@ export const hasRestorableTableFormCreateDraft = (
 };
 
 export const clearTableFormCreateDraft = (draftScope?: string, schemaName?: string) => {
-  getTableFormDraftStorage()?.removeItem(
-    getTableFormCreateDraftStorageKey(draftScope, schemaName)
-  );
+  getTableFormDraftStorage()?.removeItem(getTableFormCreateDraftStorageKey(draftScope, schemaName));
 };
 
 interface TableFormProps {
