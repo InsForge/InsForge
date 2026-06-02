@@ -69,6 +69,7 @@ export default function TablesPage() {
   const { confirm, confirmDialogProps } = useConfirm();
   const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pendingCreateDraftClearSchemasRef = useRef<Set<string>>(new Set());
   const { schemas, isLoading: isLoadingSchemas } = useDatabaseSchemas();
   const { projectId, isLoading: isProjectIdLoading } = useProjectId();
   const tableFormDraftScope = projectId ? `project:${projectId}` : undefined;
@@ -305,6 +306,16 @@ export default function TablesPage() {
     }
   };
 
+  const clearCreateDraftForSelectedSchema = useCallback(() => {
+    if (isProjectIdLoading) {
+      pendingCreateDraftClearSchemasRef.current.add(selectedSchema);
+      return;
+    }
+
+    pendingCreateDraftClearSchemasRef.current.delete(selectedSchema);
+    clearTableFormCreateDraft(tableFormDraftScope, selectedSchema);
+  }, [isProjectIdLoading, selectedSchema, tableFormDraftScope]);
+
   const handleTableFormClose = async (): Promise<boolean> => {
     if (isTableFormDirty) {
       const confirmOptions = {
@@ -317,7 +328,7 @@ export default function TablesPage() {
       const shouldDiscard = await confirm(confirmOptions);
       if (shouldDiscard) {
         if (!editingTable) {
-          clearTableFormCreateDraft(tableFormDraftScope, selectedSchema);
+          clearCreateDraftForSelectedSchema();
         }
         setShowTableForm(false);
         setEditingTable(null);
@@ -327,7 +338,7 @@ export default function TablesPage() {
       }
     } else {
       if (!editingTable) {
-        clearTableFormCreateDraft(tableFormDraftScope, selectedSchema);
+        clearCreateDraftForSelectedSchema();
       }
       setShowTableForm(false);
       setEditingTable(null);
@@ -361,6 +372,7 @@ export default function TablesPage() {
   };
 
   const handleCreateTable = () => {
+    pendingCreateDraftClearSchemasRef.current.delete(selectedSchema);
     setEditingTable(null);
     setShowTableForm(true);
   };
@@ -458,6 +470,17 @@ export default function TablesPage() {
   // Show empty state when there are no tables and not loading
   const showEmptyState = !isLoadingTables && tables?.length === 0 && !showTableForm;
   const canMutateSelectedSchema = !selectedSchemaInfo.isProtected;
+
+  useEffect(() => {
+    if (isProjectIdLoading || pendingCreateDraftClearSchemasRef.current.size === 0) {
+      return;
+    }
+
+    pendingCreateDraftClearSchemasRef.current.forEach((schemaName) => {
+      clearTableFormCreateDraft(tableFormDraftScope, schemaName);
+    });
+    pendingCreateDraftClearSchemasRef.current.clear();
+  }, [isProjectIdLoading, tableFormDraftScope]);
 
   useEffect(() => {
     if (showTableForm || editingTable || selectedSchemaInfo.isProtected || isProjectIdLoading) {
