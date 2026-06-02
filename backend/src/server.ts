@@ -252,6 +252,11 @@ export async function createApp() {
 
       if (authPolicy === 'admin') {
         // Admin-only: require project admin role
+        if (!isAuthenticated) {
+          return res
+            .status(401)
+            .json({ error: 'Authentication required. Provide a token via Authorization header.' });
+        }
         if (!isAdmin) {
           return res.status(403).json({ error: 'Admin access required for this function' });
         }
@@ -263,8 +268,8 @@ export async function createApp() {
             .json({ error: 'Authentication required. Provide a token via Authorization header.' });
         }
       }
-      // authPolicy === 'none': fully public, no auth required
 
+      // authPolicy === 'none': fully public, no auth required
       // Get target base URL: prefer Subhosting deployment, fallback to local runtime
       const baseUrl =
         (functionService.isSubhostingConfigured() && (await functionService.getDeploymentUrl())) ||

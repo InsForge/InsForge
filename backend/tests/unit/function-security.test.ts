@@ -56,7 +56,7 @@ describe('FunctionService Code Validation (Public API)', () => {
       name: 'Test Function',
       code,
       status: 'active',
-      auth: 'user'
+      auth: 'user',
     });
   };
 
@@ -213,7 +213,7 @@ describe('FunctionService Code Validation (Public API)', () => {
         name: 'Test Function',
         code,
         status: 'active',
-        auth: 'user'
+        auth: 'user',
       });
 
       expect(result.function.auth).toBe('user');

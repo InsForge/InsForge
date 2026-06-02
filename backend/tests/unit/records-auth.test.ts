@@ -72,12 +72,12 @@ describe('Function Proxy Route Authentication', () => {
 
   test('proxy route enforces admin policy', () => {
     expect(serverSource).toContain("if (authPolicy === 'admin')");
-    expect(serverSource).toContain("if (!isAdmin)");
+    expect(serverSource).toContain('if (!isAdmin)');
   });
 
   test('proxy route enforces user policy', () => {
     expect(serverSource).toContain("if (authPolicy === 'user')");
-    expect(serverSource).toContain("if (!isAuthenticated)");
+    expect(serverSource).toContain('if (!isAuthenticated)');
   });
 
   test('proxy route allows public access for none policy', () => {

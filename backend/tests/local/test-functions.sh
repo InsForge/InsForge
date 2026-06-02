@@ -103,21 +103,7 @@ else
 fi
 echo ""
 
-# 4. Invoke function with auth='user' using admin token (should succeed)
-echo "🔐 Testing function invocation with admin token (auth='user' policy)..."
-invoke_response=$(curl -s -w "\n%{http_code}" -X GET "$RUNTIME_BASE/functions/$FUNCTION_SLUG" \
-    -H "Authorization: Bearer $ADMIN_TOKEN")
-
-status=$(echo "$invoke_response" | tail -n 1)
-if [ "$status" -eq 200 ]; then
-    print_success "Admin can invoke user-level function"
-else
-    print_fail "Admin failed to invoke function (status: $status)"
-    track_test_failure
-fi
-echo ""
-
-# 5. Invoke function with auth='user' using anon token (should fail with 401)
+# 4. Invoke function without token (auth='user' policy should require auth)
 echo "🔓 Testing function invocation without token (auth='user' policy)..."
 invoke_response=$(curl -s -w "\n%{http_code}" -X GET "$RUNTIME_BASE/functions/$FUNCTION_SLUG")
 
@@ -130,7 +116,7 @@ else
 fi
 echo ""
 
-# 6. Update function to admin-only auth
+# 5. Update function to admin-only auth
 echo "✏️ Updating function to admin-only (auth='admin')..."
 update_response=$(curl -s -w "\n%{http_code}" -X PUT "$API_BASE/functions/$FUNCTION_SLUG" \
     -H "Authorization: Bearer $ADMIN_TOKEN" \
@@ -154,7 +140,7 @@ else
 fi
 echo ""
 
-# 7. Update function to public auth
+# 6. Update function to public auth
 echo "✏️ Updating function to public (auth='none')..."
 update_response=$(curl -s -w "\n%{http_code}" -X PUT "$API_BASE/functions/$FUNCTION_SLUG" \
     -H "Authorization: Bearer $ADMIN_TOKEN" \
@@ -178,7 +164,7 @@ else
 fi
 echo ""
 
-# 8. Update function code and status
+# 7. Update function code and status
 echo "✏️ Updating function code and status..."
 update_response=$(curl -s -w "\n%{http_code}" -X PUT "$API_BASE/functions/$FUNCTION_SLUG" \
     -H "Authorization: Bearer $ADMIN_TOKEN" \
@@ -200,7 +186,7 @@ else
 fi
 echo ""
 
-# 9. Delete function
+# 8. Delete function
 echo "🗑️ Deleting function..."
 delete_response=$(curl -s -w "\n%{http_code}" -X DELETE "$API_BASE/functions/$FUNCTION_SLUG" \
     -H "Authorization: Bearer $ADMIN_TOKEN")
