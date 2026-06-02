@@ -317,7 +317,7 @@ export default function TablesPage() {
       const shouldDiscard = await confirm(confirmOptions);
       if (shouldDiscard) {
         if (!editingTable) {
-          clearTableFormCreateDraft(tableFormDraftScope);
+          clearTableFormCreateDraft(tableFormDraftScope, selectedSchema);
         }
         setShowTableForm(false);
         setEditingTable(null);
@@ -327,7 +327,7 @@ export default function TablesPage() {
       }
     } else {
       if (!editingTable) {
-        clearTableFormCreateDraft(tableFormDraftScope);
+        clearTableFormCreateDraft(tableFormDraftScope, selectedSchema);
       }
       setShowTableForm(false);
       setEditingTable(null);

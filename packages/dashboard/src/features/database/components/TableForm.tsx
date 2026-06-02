@@ -33,10 +33,21 @@ const newColumn: TableFormColumnSchema = {
 
 const TABLE_FORM_CREATE_DRAFT_STORAGE_KEY = 'table-form-columns-draft';
 
-export const getTableFormCreateDraftStorageKey = (draftScope?: string): string => {
-  return draftScope
-    ? `${TABLE_FORM_CREATE_DRAFT_STORAGE_KEY}:${encodeURIComponent(draftScope)}`
-    : TABLE_FORM_CREATE_DRAFT_STORAGE_KEY;
+export const getTableFormCreateDraftStorageKey = (
+  draftScope?: string,
+  schemaName?: string
+): string => {
+  const keyParts = [TABLE_FORM_CREATE_DRAFT_STORAGE_KEY];
+
+  if (draftScope) {
+    keyParts.push(encodeURIComponent(draftScope));
+  }
+
+  if (schemaName) {
+    keyParts.push(encodeURIComponent(schemaName));
+  }
+
+  return keyParts.join(':');
 };
 
 interface TableFormCreateDraft {
@@ -150,14 +161,17 @@ const hasCreateDraftData = (draft: TableFormCreateDraft): boolean => {
   );
 };
 
-const readTableFormCreateDraft = (draftScope?: string): TableFormCreateDraft | null => {
+const readTableFormCreateDraft = (
+  draftScope?: string,
+  schemaName?: string
+): TableFormCreateDraft | null => {
   const storage = getTableFormDraftStorage();
   if (!storage) {
     return null;
   }
 
   try {
-    const storedValue = storage.getItem(getTableFormCreateDraftStorageKey(draftScope));
+    const storedValue = storage.getItem(getTableFormCreateDraftStorageKey(draftScope, schemaName));
     if (!storedValue) {
       return null;
     }
@@ -178,7 +192,6 @@ const readTableFormCreateDraft = (draftScope?: string): TableFormCreateDraft | n
 
     const schemaNameValue = getRecordValue(parsedValue, 'schemaName');
     const foreignKeysValue = getRecordValue(parsedValue, 'foreignKeys');
-
     const formDraft = tableFormSchema.safeParse(parsedValue);
 
     if (!formDraft.success) {
@@ -205,7 +218,7 @@ export const hasRestorableTableFormCreateDraft = (
   schemaName?: string,
   draftScope?: string
 ): boolean => {
-  const draft = readTableFormCreateDraft(draftScope);
+  const draft = readTableFormCreateDraft(draftScope, schemaName);
 
   if (!draft) {
     return false;
@@ -218,8 +231,10 @@ export const hasRestorableTableFormCreateDraft = (
   return hasCreateDraftData(draft);
 };
 
-export const clearTableFormCreateDraft = (draftScope?: string) => {
-  getTableFormDraftStorage()?.removeItem(getTableFormCreateDraftStorageKey(draftScope));
+export const clearTableFormCreateDraft = (draftScope?: string, schemaName?: string) => {
+  getTableFormDraftStorage()?.removeItem(
+    getTableFormCreateDraftStorageKey(draftScope, schemaName)
+  );
 };
 
 interface TableFormProps {
@@ -317,7 +332,7 @@ export function TableForm({
         return;
       }
 
-      const draft = readTableFormCreateDraft(draftScope);
+      const draft = readTableFormCreateDraft(draftScope, schemaName);
       if (draft && (!draft.schemaName || draft.schemaName === schemaName)) {
         skipNextDraftSaveRef.current = true;
         form.reset({
@@ -364,9 +379,12 @@ export function TableForm({
 
     try {
       if (hasCreateDraftData(draft)) {
-        storage.setItem(getTableFormCreateDraftStorageKey(draftScope), JSON.stringify(draft));
+        storage.setItem(
+          getTableFormCreateDraftStorageKey(draftScope, schemaName),
+          JSON.stringify(draft)
+        );
       } else {
-        storage.removeItem(getTableFormCreateDraftStorageKey(draftScope));
+        storage.removeItem(getTableFormCreateDraftStorageKey(draftScope, schemaName));
       }
     } catch {
       // Keep the form usable if localStorage is blocked or full.
@@ -445,7 +463,7 @@ export function TableForm({
 
       showToast('Table created successfully!', 'success');
 
-      clearTableFormCreateDraft(draftScope);
+      clearTableFormCreateDraft(draftScope, schemaName);
       skipNextDraftSaveRef.current = true;
       form.reset();
       setError(null);
