@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { AuthService } from '@/services/auth/auth.service.js';
-import { TokenManager } from '@/infra/security/token.manager.js';
+import { TokenManager, type RefreshTokenPayload } from '@/infra/security/token.manager.js';
 import { AppError } from '@/utils/errors.js';
 import { successResponse } from '@/utils/response.js';
 import {
@@ -147,20 +147,28 @@ router.post('/logout', (req: Request, res: Response, next: NextFunction) => {
     if (refreshToken) {
       // Only validate CSRF when a refresh token cookie is actually present.
       // If the cookie is missing the user is already logged out — clear and succeed.
-      const payload = tokenManager.verifyRefreshToken(refreshToken);
-
-      if (payload.sessionType !== 'admin') {
-        throw new AppError(
-          'Invalid admin refresh session type',
-          401,
-          ERROR_CODES.AUTH_UNAUTHORIZED
-        );
+      let payload: RefreshTokenPayload | undefined;
+      try {
+        payload = tokenManager.verifyRefreshToken(refreshToken);
+      } catch {
+        // Token is expired or malformed — session is already dead.
+        // Clear the cookie and succeed; no CSRF check needed.
       }
 
-      const csrfHeader = req.headers['x-csrf-token'] as string | undefined;
-      if (!tokenManager.verifyCsrfToken(csrfHeader, payload)) {
-        logger.warn('[Auth:AdminLogout] CSRF token validation failed');
-        throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
+      if (payload) {
+        if (payload.sessionType !== 'admin') {
+          throw new AppError(
+            'Invalid admin refresh session type',
+            401,
+            ERROR_CODES.AUTH_UNAUTHORIZED
+          );
+        }
+
+        const csrfHeader = req.headers['x-csrf-token'] as string | undefined;
+        if (!csrfHeader || !tokenManager.verifyCsrfToken(csrfHeader, payload)) {
+          logger.warn('[Auth:AdminLogout] CSRF token validation failed');
+          throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
+        }
       }
     }
 
