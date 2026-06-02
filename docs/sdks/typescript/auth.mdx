@@ -156,7 +156,7 @@ Start OAuth authentication flow with configured providers (built-in providers li
 
 - `provider` (string, required) - OAuth provider key (e.g., `google`, `github`, or custom provider key like `okta-company`)
 - `redirectTo` (string, required) - URL to redirect after authentication
-- `additionalParams` (Record<string, string>, optional) - Provider-specific OAuth hints such as Google's `prompt=select_account`
+- `additionalParams` (`Record<string, string>`, optional) - Provider-specific OAuth hints such as Google's `prompt=select_account`
 - `skipBrowserRedirect` (boolean, optional) - If true, returns OAuth URL without auto-redirecting (for server-rendered or mobile flows)
 
 ### Returns

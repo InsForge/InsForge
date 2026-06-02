@@ -1,5 +1,6 @@
 ACLs
 ack
+additionalParams
 agentic
 APNs
 apis
@@ -15,6 +16,7 @@ certbot
 CI
 claude
 cli
+codeVerifier
 config
 cooldown
 cron
@@ -66,7 +68,9 @@ rmcp
 roocode
 runtimes
 SDKs
+select_account
 serverless
+skipBrowserRedirect
 sdk
 Sinch
 stderr
