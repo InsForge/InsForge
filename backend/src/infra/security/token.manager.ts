@@ -73,8 +73,11 @@ export class TokenManager {
    * Used for internal API key authenticated requests to PostgREST
    */
   generateApiKeyToken(): string {
+    // Admin API key auth is intentionally NOT modeled as a user row.
+    // Keep JWT sub cast-safe for DB helpers (auth.uid()) by using the real
+    // admin UUID.
     const payload = {
-      sub: 'project-admin-with-api-key',
+      sub: '00000000-0000-0000-0000-000000000001',
       email: 'project-admin@email.com',
       role: 'project_admin',
     };

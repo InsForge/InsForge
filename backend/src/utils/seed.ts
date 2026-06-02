@@ -8,22 +8,24 @@ import { PaymentService } from '@/services/payments/payment.service.js';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { OAuthProvidersSchema } from '@insforge/shared-schemas';
 import { AuthConfigService } from '@/services/auth/auth-config.service.js';
-import { ADMIN_ID, ANON_ID } from '@/utils/constants.js';
+import { ADMIN_ID } from '@/utils/constants.js';
 
 /**
- * Seeds system users (admin and anon) if they don't exist in the database
+ * Seeds system administrators (platform admin) if they don't exist in the database
  */
+
 async function seedSystemUsers(adminEmail: string, adminPassword: string): Promise<void> {
   const dbManager = DatabaseManager.getInstance();
   const pool = dbManager.getPool();
   const client = await pool.connect();
 
   try {
-    // Seed admin user
+    // Seed platform admin (dashboard)
     if (adminEmail && adminPassword) {
-      const existingAdmin = await client.query('SELECT id FROM auth.users WHERE id = $1', [
-        ADMIN_ID,
-      ]);
+      const existingAdmin = await client.query(
+        'SELECT id FROM system.administrators WHERE id = $1',
+        [ADMIN_ID]
+      );
 
       if (existingAdmin.rows.length > 0) {
         logger.info(`✅ Admin configured: ${adminEmail}`);
@@ -32,8 +34,8 @@ async function seedSystemUsers(adminEmail: string, adminPassword: string): Promi
         const profile = JSON.stringify({ name: 'Administrator' });
 
         await client.query(
-          `INSERT INTO auth.users (id, email, password, profile, email_verified, is_project_admin, is_anonymous, created_at, updated_at)
-           VALUES ($1, $2, $3, $4::jsonb, true, true, false, NOW(), NOW())
+          `INSERT INTO system.administrators (id, email, password_hash, profile, email_verified, created_at, updated_at)
+           VALUES ($1, $2, $3, $4::jsonb, true, NOW(), NOW())
            ON CONFLICT (id) DO NOTHING`,
           [ADMIN_ID, adminEmail, hashedPassword, profile]
         );
@@ -42,24 +44,6 @@ async function seedSystemUsers(adminEmail: string, adminPassword: string): Promi
       }
     } else {
       logger.warn('⚠️ Admin credentials not configured - check ADMIN_EMAIL and ADMIN_PASSWORD');
-    }
-
-    // Seed anon user
-    const existingAnon = await client.query('SELECT id FROM auth.users WHERE id = $1', [ANON_ID]);
-
-    if (existingAnon.rows.length > 0) {
-      logger.info(`✅ Anon user configured`);
-    } else {
-      const profile = JSON.stringify({ name: 'Anonymous' });
-
-      await client.query(
-        `INSERT INTO auth.users (id, email, password, profile, email_verified, is_project_admin, is_anonymous, created_at, updated_at)
-         VALUES ($1, $2, NULL, $3::jsonb, false, false, true, NOW(), NOW())
-         ON CONFLICT (id) DO NOTHING`,
-        [ANON_ID, 'anon@example.com', profile]
-      );
-
-      logger.info(`✅ Anon user seeded`);
     }
   } catch (error) {
     logger.error('Failed to seed system users', {
@@ -244,7 +228,7 @@ export async function seedBackend(): Promise<void> {
   try {
     logger.info(`\n🚀 Insforge Backend Starting...`);
 
-    // Seed system users (admin and anon) if not exists
+    // Seed system platform administrators (dashboard)
     await seedSystemUsers(adminEmail, adminPassword);
 
     // Initialize API key (from env or generate)
