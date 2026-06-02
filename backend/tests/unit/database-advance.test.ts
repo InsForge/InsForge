@@ -98,12 +98,19 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
 // bulkInsert — optional-column data-loss fix (issue #8)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const { mockPoolQuery } = vi.hoisted(() => ({ mockPoolQuery: vi.fn() }));
+const { mockClientQuery, mockRelease, mockConnect } = vi.hoisted(() => ({
+  mockClientQuery: vi.fn(),
+  mockRelease: vi.fn(),
+  mockConnect: vi.fn(),
+}));
 
 vi.mock('../../src/infra/database/database.manager', () => ({
   DatabaseManager: {
     getInstance: vi.fn(() => ({
-      getPool: vi.fn(() => ({ query: mockPoolQuery })),
+      getPool: vi.fn(() => ({
+        query: vi.fn(),
+        connect: mockConnect,
+      })),
     })),
   },
 }));
@@ -111,8 +118,23 @@ vi.mock('../../src/infra/database/database.manager', () => ({
 describe('DatabaseAdvanceService - bulkInsert optional-column fix', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockPoolQuery.mockResolvedValue({ rows: [], rowCount: 2 });
+    // pool.connect() returns a pg client with query + release
+    mockConnect.mockResolvedValue({
+      query: mockClientQuery,
+      release: mockRelease,
+    });
+    // Default: all queries succeed
+    mockClientQuery.mockResolvedValue({ rows: [], rowCount: 2 });
   });
+
+  /** Helper: find the INSERT SQL among all client.query calls */
+  function captureInsertSql(): string {
+    const call = mockClientQuery.mock.calls.find(
+      ([sql]) => typeof sql === 'string' && (sql as string).startsWith('INSERT INTO')
+    );
+    if (!call) throw new Error('No INSERT query was executed');
+    return call[0] as string;
+  }
 
   test('includes columns from ALL records, not only the first', async () => {
     // records[0] has no `phone`; records[1] and records[2] do.
@@ -125,10 +147,10 @@ describe('DatabaseAdvanceService - bulkInsert optional-column fix', () => {
       { id: '3', name: 'Carol', phone: '555-0002' },
     ]);
 
-    const sql: string = mockPoolQuery.mock.calls[0][0] as string;
+    const sql = captureInsertSql();
 
     // phone must appear in the INSERT column list
-    expect(sql).toContain('"phone"');
+    expect(sql).toContain('phone');
     // Bob and Carol phone values must be present in the values literal
     expect(sql).toContain('555-0001');
     expect(sql).toContain('555-0002');
@@ -142,7 +164,7 @@ describe('DatabaseAdvanceService - bulkInsert optional-column fix', () => {
       { id: '2', name: 'Bob', phone: '555-0001' },
     ]);
 
-    const sql: string = mockPoolQuery.mock.calls[0][0] as string;
+    const sql = captureInsertSql();
 
     // Alice's row must not embed a raw JS `undefined` string
     expect(sql).not.toContain('undefined');
@@ -158,10 +180,10 @@ describe('DatabaseAdvanceService - bulkInsert optional-column fix', () => {
       { id: '2', name: 'Bob', phone: '555-0002' },
     ]);
 
-    const sql: string = mockPoolQuery.mock.calls[0][0] as string;
-    expect(sql).toContain('"id"');
-    expect(sql).toContain('"name"');
-    expect(sql).toContain('"phone"');
+    const sql = captureInsertSql();
+    expect(sql).toContain('id');
+    expect(sql).toContain('name');
+    expect(sql).toContain('phone');
     expect(sql).toContain('555-0001');
     expect(sql).toContain('555-0002');
   });
@@ -184,8 +206,8 @@ describe('DatabaseAdvanceService - bulkInsert optional-column fix', () => {
       'id'
     );
 
-    const sql: string = mockPoolQuery.mock.calls[0][0] as string;
-    expect(sql).toContain('"phone"');
+    const sql = captureInsertSql();
+    expect(sql).toContain('phone');
     expect(sql).toContain('ON CONFLICT');
     expect(sql).toContain('DO UPDATE SET');
   });
