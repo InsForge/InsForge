@@ -122,7 +122,7 @@
             "group": "Agent-Native Initiatives",
             "pages": [
               "agent-native/overview",
-              "vscode-extension",
+              "agent-native/vscode-extension",
               "agent-native/cli-harness",
               "agent-native/diagnostics",
               "agent-native/config-as-code",

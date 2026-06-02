@@ -168,6 +168,16 @@ router.get('/:docType', async (req: Request, res: Response, next: NextFunction) 
     const projectRoot = process.env.PROJECT_ROOT || path.resolve(__dirname, '../../../..');
     const docsRoot = path.join(projectRoot, 'docs');
     const filePath = path.join(docsRoot, docFileName);
+
+    // Security check: ensure path is within either docs/ or .agents/docs/
+    const resolvedPath = path.resolve(filePath);
+    const resolvedDocsRoot = path.resolve(docsRoot);
+    const resolvedAgentsRoot = path.resolve(projectRoot, '.agents/docs');
+    
+    if (!resolvedPath.startsWith(resolvedDocsRoot) && !resolvedPath.startsWith(resolvedAgentsRoot)) {
+      throw new AppError('Invalid documentation path', 403, ERROR_CODES.FORBIDDEN);
+    }
+
     const rawContent = await readFile(filePath, 'utf-8');
 
     // Process snippet imports and replace component tags with actual content
@@ -215,6 +225,16 @@ router.get('/:docFeature/:docLanguage', async (req: Request, res: Response, next
     const projectRoot = process.env.PROJECT_ROOT || path.resolve(__dirname, '../../../..');
     const docsRoot = path.join(projectRoot, 'docs');
     const filePath = path.join(docsRoot, docFileName);
+
+    // Security check: ensure path is within either docs/ or .agents/docs/
+    const resolvedPath = path.resolve(filePath);
+    const resolvedDocsRoot = path.resolve(docsRoot);
+    const resolvedAgentsRoot = path.resolve(projectRoot, '.agents/docs');
+    
+    if (!resolvedPath.startsWith(resolvedDocsRoot) && !resolvedPath.startsWith(resolvedAgentsRoot)) {
+      throw new AppError('Invalid documentation path', 403, ERROR_CODES.FORBIDDEN);
+    }
+
     const rawContent = await readFile(filePath, 'utf-8');
 
     // Process snippet imports and replace component tags with actual content

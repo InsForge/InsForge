@@ -129,6 +129,7 @@ COPY --from=build --chown=node:node /app/dist ./dist
 
 # Runtime docs for /api/docs endpoints and documentation assets
 COPY --from=build --chown=node:node /app/docs ./docs
+COPY --from=build --chown=node:node /app/.agents/docs ./.agents/docs
 
 # Migration runtime: tsx resolves @/* aliases via tsconfig.json,
 # node-pg-migrate reads .sql files from backend/src/
