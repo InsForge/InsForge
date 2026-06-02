@@ -73,7 +73,9 @@ export class RazorpaySyncService {
     return syncPromise;
   }
 
-  private async performSyncEnvironment(environment: RazorpayEnvironment): Promise<RazorpaySyncResult> {
+  private async performSyncEnvironment(
+    environment: RazorpayEnvironment
+  ): Promise<RazorpaySyncResult> {
     let provider: RazorpayProvider;
     try {
       provider = await this.configService.createRazorpayProvider(environment);
