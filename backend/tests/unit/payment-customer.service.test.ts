@@ -40,6 +40,7 @@ describe('PaymentCustomerService', () => {
       rows: [
         {
           environment: 'test',
+          provider: 'stripe',
           stripeCustomerId: 'cus_123',
           email: 'buyer@example.com',
           name: 'Buyer Example',
@@ -76,6 +77,7 @@ describe('PaymentCustomerService', () => {
       customers: [
         {
           environment: 'test',
+          provider: 'stripe',
           stripeCustomerId: 'cus_123',
           email: 'buyer@example.com',
           name: 'Buyer Example',

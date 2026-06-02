@@ -4020,6 +4020,7 @@ describe('PaymentService', () => {
       rows: [
         {
           environment: 'test',
+          provider: 'stripe',
           type: 'one_time_payment',
           status: 'succeeded',
           subjectType: 'team',
@@ -4059,6 +4060,7 @@ describe('PaymentService', () => {
       paymentHistory: [
         {
           environment: 'test',
+          provider: 'stripe',
           type: 'one_time_payment',
           status: 'succeeded',
           subjectType: 'team',
@@ -4098,6 +4100,7 @@ describe('PaymentService', () => {
       rows: [
         {
           environment: 'test',
+          provider: 'stripe',
           stripeCustomerId: 'cus_123',
           email: 'buyer@example.com',
           name: 'Buyer Example',
@@ -4134,6 +4137,7 @@ describe('PaymentService', () => {
       customers: [
         {
           environment: 'test',
+          provider: 'stripe',
           stripeCustomerId: 'cus_123',
           email: 'buyer@example.com',
           name: 'Buyer Example',
@@ -4164,6 +4168,7 @@ describe('PaymentService', () => {
       rows: [
         {
           environment: 'test',
+          provider: 'stripe',
           stripeCustomerId: 'cus_sparse',
           email: 'sparse@example.com',
           name: 'Sparse Customer',
@@ -4190,6 +4195,7 @@ describe('PaymentService', () => {
       customers: [
         {
           environment: 'test',
+          provider: 'stripe',
           stripeCustomerId: 'cus_sparse',
           email: 'sparse@example.com',
           name: 'Sparse Customer',

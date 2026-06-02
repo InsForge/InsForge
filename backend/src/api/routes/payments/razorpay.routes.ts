@@ -264,7 +264,10 @@ router.post(
         setImmediate(() => {
           syncService.syncAll(environment).catch((err: unknown) => {
             const message = err instanceof Error ? err.message : String(err);
-            logger.error('[Razorpay Webhook] Background sync failed', { environment, error: message });
+            logger.error('[Razorpay Webhook] Background sync failed', {
+              environment,
+              error: message,
+            });
           });
         });
       }
