@@ -139,3 +139,11 @@ All contributions must include appropriate tests. Follow these guidelines:
 - Use meaningful variable and function names
 - Add comments for complex logic
 - Update relevant documentation when making API changes
+
+## Documentation Assets
+
+Please review the documentation asset guidelines before adding images, videos, SVGs, or other media files to the repository:
+
+- [Documentation Asset Guidelines](docs/asset-guidelines.md)
+
+
