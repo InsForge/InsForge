@@ -95,14 +95,46 @@ print_setup_help() {
 extract_json_value() {
     local json="$1"
     local key="$2"
-    echo "$json" | grep -o "\"$key\":\"[^\"]*\"" | head -1 | cut -d'"' -f4
+
+    if command -v jq >/dev/null 2>&1; then
+        echo "$json" | jq -r --arg key "$key" '.[$key] // empty' 2>/dev/null
+        return
+    fi
+
+    echo "$json" | grep -o "\"$key\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" | head -1 | cut -d'"' -f4
+}
+
+json_escape() {
+    local value="$1"
+    value="${value//\\/\\\\}"
+    value="${value//\"/\\\"}"
+    value="${value//$'\n'/\\n}"
+    value="${value//$'\r'/\\r}"
+    value="${value//$'\t'/\\t}"
+    echo "$value"
+}
+
+build_admin_login_body() {
+    if command -v jq >/dev/null 2>&1; then
+        jq -n --arg email "$TEST_ADMIN_EMAIL" --arg password "$TEST_ADMIN_PASSWORD" \
+            '{email: $email, password: $password}'
+        return
+    fi
+
+    local escaped_email
+    local escaped_password
+    escaped_email=$(json_escape "$TEST_ADMIN_EMAIL")
+    escaped_password=$(json_escape "$TEST_ADMIN_PASSWORD")
+    printf '{"email":"%s","password":"%s"}' "$escaped_email" "$escaped_password"
 }
 
 get_admin_token() {
+    local body
     local response
+    body=$(build_admin_login_body)
     response=$(curl -sS -X POST "$TEST_API_BASE/auth/admin/sessions" \
         -H "Content-Type: application/json" \
-        -d "{\"email\":\"$TEST_ADMIN_EMAIL\",\"password\":\"$TEST_ADMIN_PASSWORD\"}" 2>/dev/null)
+        -d "$body" 2>/dev/null)
 
     extract_json_value "$response" "accessToken"
 }
