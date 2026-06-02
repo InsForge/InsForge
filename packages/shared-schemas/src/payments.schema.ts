@@ -44,6 +44,7 @@ export type StripeProduct = z.infer<typeof stripeProductSchema>;
 
 export const stripePriceSchema = z.object({
   environment: stripeEnvironmentSchema,
+  provider: paymentProviderSchema,
   stripePriceId: z.string(),
   stripeProductId: z.string().nullable(),
   active: z.boolean(),
