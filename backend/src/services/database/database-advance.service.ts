@@ -946,86 +946,95 @@ export class DatabaseAdvanceService {
       const allRows: unknown[] = [];
 
       try {
-        for (const { columns, records: groupRecords } of groupsMap.values()) {
-          // Convert records to array format for pg-format.
-          const values = groupRecords.map((record) =>
-            columns.map((col) => {
-              const value = record[col];
-              // pg-format handles NULL, dates, JSON automatically.
-              // Convert empty strings and undefined to NULL for consistency (preserving original behaviour).
-              return value === '' || value === undefined ? null : value;
-            })
-          );
+        await withAdminContext(
+          client,
+          async () => {
+            await client.query('BEGIN');
+            try {
+              for (const { columns, records: groupRecords } of groupsMap.values()) {
+                // Convert records to array format for pg-format.
+                const values = groupRecords.map((record) =>
+                  columns.map((col) => {
+                    const value = record[col];
+                    // pg-format handles NULL, dates, JSON automatically.
+                    // Convert empty strings and undefined to NULL for consistency (preserving original behaviour).
+                    return value === '' || value === undefined ? null : value;
+                  })
+                );
 
-          let query: string;
+                let query: string;
 
-          if (upsertKey) {
-            // Validate upsert key exists in columns
-            if (!columns.includes(upsertKey)) {
-              throw new AppError(
-                `Upsert key '${upsertKey}' not found in record columns`,
-                400,
-                ERROR_CODES.INVALID_INPUT
-              );
+                if (upsertKey) {
+                  // Validate upsert key exists in columns
+                  if (!columns.includes(upsertKey)) {
+                    throw new AppError(
+                      `Upsert key '${upsertKey}' not found in record columns`,
+                      400,
+                      ERROR_CODES.INVALID_INPUT
+                    );
+                  }
+
+                  // Build upsert query with pg-format
+                  const updateColumns = columns.filter((c) => c !== upsertKey);
+
+                  if (updateColumns.length) {
+                    // Build UPDATE SET clause
+                    const updateClause = updateColumns
+                      .map((col) => pgFormat('%I = EXCLUDED.%I', col, col))
+                      .join(', ');
+
+                    query = pgFormat(
+                      'INSERT INTO %I.%I (%I) VALUES %L ON CONFLICT (%I) DO UPDATE SET %s',
+                      schemaName,
+                      table,
+                      columns,
+                      values,
+                      upsertKey,
+                      updateClause
+                    );
+                  } else {
+                    // No columns to update, just do nothing on conflict
+                    query = pgFormat(
+                      'INSERT INTO %I.%I (%I) VALUES %L ON CONFLICT (%I) DO NOTHING',
+                      schemaName,
+                      table,
+                      columns,
+                      values,
+                      upsertKey
+                    );
+                  }
+                } else {
+                  // Simple insert
+                  query = pgFormat(
+                    'INSERT INTO %I.%I (%I) VALUES %L',
+                    schemaName,
+                    table,
+                    columns,
+                    values
+                  );
+                }
+
+                const result = await client.query(query);
+
+                totalRowCount += result.rowCount || 0;
+                if (result.rows) {
+                  allRows.push(...result.rows);
+                }
+              }
+
+              // Refresh schema cache if needed
+              await client.query(`NOTIFY pgrst, 'reload schema';`);
+              await client.query('COMMIT');
+            } catch (err) {
+              await client.query('ROLLBACK').catch(() => {});
+              throw err;
             }
-
-            // Build upsert query with pg-format
-            const updateColumns = columns.filter((c) => c !== upsertKey);
-
-            if (updateColumns.length) {
-              // Build UPDATE SET clause
-              const updateClause = updateColumns
-                .map((col) => pgFormat('%I = EXCLUDED.%I', col, col))
-                .join(', ');
-
-              query = pgFormat(
-                'INSERT INTO %I.%I (%I) VALUES %L ON CONFLICT (%I) DO UPDATE SET %s',
-                schemaName,
-                table,
-                columns,
-                values,
-                upsertKey,
-                updateClause
-              );
-            } else {
-              // No columns to update, just do nothing on conflict
-              query = pgFormat(
-                'INSERT INTO %I.%I (%I) VALUES %L ON CONFLICT (%I) DO NOTHING',
-                schemaName,
-                table,
-                columns,
-                values,
-                upsertKey
-              );
-            }
-          } else {
-            // Simple insert
-            query = pgFormat(
-              'INSERT INTO %I.%I (%I) VALUES %L',
-              schemaName,
-              table,
-              columns,
-              values
-            );
+          },
+          false,
+          (error) => {
+            releaseError = error;
           }
-
-          const result = await withAdminContext(
-            client,
-            () => client.query(query),
-            false,
-            (error) => {
-              releaseError = error;
-            }
-          );
-
-          totalRowCount += result.rowCount || 0;
-          if (result.rows) {
-            allRows.push(...result.rows);
-          }
-        }
-
-        // Refresh schema cache if needed
-        await client.query(`NOTIFY pgrst, 'reload schema';`);
+        );
 
         return {
           rowCount: totalRowCount,

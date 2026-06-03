@@ -240,4 +240,33 @@ describe('DatabaseAdvanceService - bulkInsert optional-column fix', () => {
     expect(sqlQueries[0]).toContain('phone');
     expect(sqlQueries[0]).toContain('NULL');
   });
+
+  test('rolls back entire transaction if one shape group insert fails', async () => {
+    const svc = DatabaseAdvanceService.getInstance();
+
+    mockClientQuery.mockReset();
+    mockClientQuery
+      .mockResolvedValueOnce({}) // SET ROLE project_admin
+      .mockResolvedValueOnce({}) // set_config claims
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 }) // First INSERT (Alice)
+      .mockRejectedValueOnce(new Error('Constraint violation on second group')) // Second INSERT (Bob)
+      .mockResolvedValueOnce({}) // ROLLBACK
+      .mockResolvedValueOnce({}) // RESET ROLE
+      .mockResolvedValueOnce({}); // set_config empty claims
+
+    const records = [
+      { id: '1', name: 'Alice' },
+      { id: '2', name: 'Bob', phone: '555-0001' },
+    ];
+
+    await expect(svc.bulkInsert('public', 'contacts', records)).rejects.toThrow(
+      'Constraint violation on second group'
+    );
+
+    const calls = mockClientQuery.mock.calls.map(([sql]) => sql);
+    expect(calls).toContain('BEGIN');
+    expect(calls).toContain('ROLLBACK');
+    expect(calls).not.toContain('COMMIT');
+  });
 });
