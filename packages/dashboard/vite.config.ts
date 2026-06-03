@@ -3,7 +3,6 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import svgr from 'vite-plugin-svgr';
 import tailwindcss from '@tailwindcss/vite';
-import { manualChunks } from './build/manualChunks';
 
 const dashboardSrcPath = path.resolve(__dirname, 'src');
 
@@ -34,7 +33,6 @@ export default defineConfig({
     rollupOptions: {
       external: ['react', 'react-dom'],
       output: {
-        manualChunks,
         assetFileNames: (assetInfo) =>
           assetInfo.name?.endsWith('.css') ? 'styles.css' : 'assets/[name]-[hash][extname]',
       },

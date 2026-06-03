@@ -3,7 +3,6 @@ import react from '@vitejs/plugin-react';
 import svgr from 'vite-plugin-svgr';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
-import { manualChunks } from '../packages/dashboard/build/manualChunks';
 
 const BACKEND_URL = process.env.VITE_API_BASE_URL || 'http://localhost:7130';
 const dashboardSrcPath = path.resolve(__dirname, '../packages/dashboard/src');
@@ -47,10 +46,5 @@ export default defineConfig({
   },
   build: {
     outDir: '../dist/frontend',
-    rollupOptions: {
-      output: {
-        manualChunks,
-      },
-    },
   },
 });
