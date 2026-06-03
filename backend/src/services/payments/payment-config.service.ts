@@ -1,7 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import {
   maskStripeKey,
   StripeProvider,
@@ -22,7 +22,6 @@ import {
 import { withPaymentSessionAdvisoryLock } from '@/services/payments/payments-advisory-lock.js';
 import logger from '@/utils/logger.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
 import {
   STRIPE_ENVIRONMENTS,
   type StripeAccount,
@@ -33,10 +32,11 @@ import {
   type StripeSyncSnapshot,
   type StripeWebhookEndpoint,
 } from '@/types/payments.js';
-import type {
-  GetPaymentsConfigResponse,
-  GetPaymentsStatusResponse,
-  StripeConnection,
+import {
+  ERROR_CODES,
+  type GetPaymentsConfigResponse,
+  type GetPaymentsStatusResponse,
+  type StripeConnection,
 } from '@insforge/shared-schemas';
 
 export interface ManagedStripeWebhookSetup {
@@ -106,7 +106,7 @@ export class PaymentConfigService {
       throw new AppError(
         `STRIPE_${environment.toUpperCase()}_SECRET_KEY is not configured`,
         400,
-        ERROR_CODES.INVALID_INPUT
+        ERROR_CODES.PAYMENT_CONFIG_INVALID
       );
     }
 

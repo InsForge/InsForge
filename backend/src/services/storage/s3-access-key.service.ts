@@ -3,13 +3,13 @@ import { Pool } from 'pg';
 import { LRUCache } from 'lru-cache';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
-import type {
-  S3AccessKeySchema,
-  S3AccessKeyWithSecretSchema,
-  CreateS3AccessKeyRequest,
+import {
+  ERROR_CODES,
+  type S3AccessKeySchema,
+  type S3AccessKeyWithSecretSchema,
+  type CreateS3AccessKeyRequest,
 } from '@insforge/shared-schemas';
 
 const ACCESS_KEY_ID_CHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';

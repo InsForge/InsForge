@@ -1,17 +1,12 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import {
-  verifyAdmin,
-  AuthRequest,
-  verifyUser,
-  getUserContextFromReq,
-} from '@/api/middlewares/auth.js';
-import { AppError } from '@/api/middlewares/error.js';
+import { verifyAdmin, AuthRequest, verifyUser } from '@/api/middlewares/auth.js';
+import { AppError } from '@/utils/errors.js';
 import { StorageService } from '@/services/storage/storage.service.js';
 import { StorageConfigService } from '@/services/storage/storage-config.service.js';
 import { successResponse } from '@/utils/response.js';
 import { dynamicUploadSingle, handleUploadError } from '@/api/middlewares/upload.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
 import {
+  ERROR_CODES,
   createBucketRequestSchema,
   updateBucketRequestSchema,
   updateStorageConfigRequestSchema,
@@ -22,17 +17,18 @@ import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { S3AccessKeyService } from '@/services/storage/s3-access-key.service.js';
 import { s3AccessKeyManagementRateLimiter } from '@/api/middlewares/rate-limiters.js';
-import { UserContext } from '@/services/db/user-context.service.js';
 
 const router = Router();
 const auditService = AuditService.getInstance();
 const storageConfigService = StorageConfigService.getInstance();
 const s3AccessKeyService = S3AccessKeyService.getInstance();
 
-// Middleware to conditionally apply authentication based on bucket visibility
-const conditionalAuth = async (req: Request, res: Response, next: NextFunction) => {
-  // For GET and HEAD requests to download objects, check if bucket is public
-  if ((req.method === 'GET' || req.method === 'HEAD') && req.params.bucketName) {
+// Middleware to conditionally apply authentication based on bucket visibility.
+// This is only attached to object download hand-offs: GET object bytes and
+// GET/POST download-strategy. Strategy endpoint is GET (POST retained as a
+// deprecated alias for older SDKs); both are read paths.
+const conditionalDownloadAuth = async (req: Request, res: Response, next: NextFunction) => {
+  if (req.params.bucketName) {
     try {
       const storageService = StorageService.getInstance();
       const isPublic = await storageService.isBucketPublic(req.params.bucketName);
@@ -68,7 +64,7 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
       throw new AppError(
         validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
-        ERROR_CODES.INVALID_INPUT
+        ERROR_CODES.STORAGE_INVALID_PARAMETER
       );
     }
 
@@ -156,7 +152,7 @@ router.post(
       );
     } catch (error) {
       if (error instanceof Error && error.message.includes('already exists')) {
-        next(new AppError(error.message, 409, ERROR_CODES.ALREADY_EXISTS));
+        next(new AppError(error.message, 409, ERROR_CODES.STORAGE_ALREADY_EXISTS));
       } else if (error instanceof Error && error.message.includes('Invalid bucket name')) {
         next(
           new AppError(
@@ -234,7 +230,7 @@ router.patch(
       );
     } catch (error) {
       if (error instanceof Error && error.message.includes('does not exist')) {
-        next(new AppError(error.message, 404, ERROR_CODES.NOT_FOUND));
+        next(new AppError(error.message, 404, ERROR_CODES.STORAGE_NOT_FOUND));
       } else {
         next(error);
       }
@@ -243,9 +239,9 @@ router.patch(
 );
 
 // GET /api/storage/buckets/:bucketName/objects - List objects in bucket.
-// Visibility is decided by RLS on storage.objects: admin (apiKey /
-// project_admin) bypasses, authenticated callers see only rows their
-// policies allow.
+// Visibility is decided by RLS on storage.objects for JWT callers. API-key
+// callers use the backend pool because they are machine credentials,
+// not a user identity.
 router.get(
   '/buckets/:bucketName/objects',
   verifyUser,
@@ -258,12 +254,13 @@ router.get(
       const offset = Math.max(0, parseInt(req.query.offset as string) || 0);
 
       const result = await StorageService.getInstance().listObjects(
-        getUserContextFromReq(req),
+        req.user,
         bucketName,
         prefix,
         limit,
         offset,
-        searchQuery
+        searchQuery,
+        !!req.hasApiKey
       );
 
       successResponse(
@@ -306,10 +303,11 @@ router.put(
       }
 
       const storedFile = await StorageService.getInstance().putObject(
-        getUserContextFromReq(req),
+        req.user,
         bucketName,
         objectKey,
-        req.file
+        req.file,
+        !!req.hasApiKey
       );
 
       try {
@@ -327,7 +325,7 @@ router.put(
       successResponse(res, storedFile, 201);
     } catch (error) {
       if (error instanceof Error && error.message.includes('already exists')) {
-        next(new AppError(error.message, 409, ERROR_CODES.ALREADY_EXISTS));
+        next(new AppError(error.message, 409, ERROR_CODES.STORAGE_ALREADY_EXISTS));
       } else if (error instanceof Error && error.message.includes('Invalid')) {
         next(new AppError(error.message, 400, ERROR_CODES.STORAGE_INVALID_PARAMETER));
       } else {
@@ -357,10 +355,11 @@ router.post(
       const objectKey = storageService.generateObjectKey(req.file.originalname);
 
       const storedFile = await storageService.putObject(
-        getUserContextFromReq(req),
+        req.user,
         bucketName,
         objectKey,
-        req.file
+        req.file,
+        !!req.hasApiKey
       );
 
       try {
@@ -382,7 +381,7 @@ router.post(
           new AppError(
             'Bucket does not exist',
             404,
-            ERROR_CODES.NOT_FOUND,
+            ERROR_CODES.STORAGE_NOT_FOUND,
             'Create the bucket first using POST /api/storage/buckets'
           )
         );
@@ -395,10 +394,81 @@ router.post(
   }
 );
 
+// GET /api/storage/buckets/:bucketName/download-strategy/objects/* - Get download URL (presigned or direct)
+// Read-only strategy hand-off; aligns with S3-style object retrieval semantics.
+// Strategy lives under a dedicated `/download-strategy/objects/*` path
+// (rather than `/objects/:objectKey/download-strategy`) so it cannot collide
+// with the wildcard download route below for object keys that legitimately
+// contain or end with `download-strategy`.
+// The wildcard captures the full object key, including `/` (pseudo-folders).
+const downloadStrategyHandler = async (
+  req: AuthRequest | Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { bucketName } = req.params;
+    // For the canonical GET route the wildcard captures the full object key.
+    // For the deprecated POST alias the key is the named `:objectKey` param.
+    const objectKey = req.params[0] ?? req.params.objectKey;
+
+    if (!objectKey) {
+      throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
+    }
+
+    const storageService = StorageService.getInstance();
+
+    // RLS-gate the strategy hand-off, same as GET /objects/*. A presigned
+    // URL bypasses RLS at redeem time, so we must verify ownership before
+    // issuing one.
+    const authReq = req as AuthRequest;
+    const visible = await storageService.objectIsVisible(
+      authReq.user,
+      bucketName,
+      objectKey,
+      !!authReq.hasApiKey
+    );
+    if (!visible) {
+      throw new AppError('Object not found', 404, ERROR_CODES.STORAGE_NOT_FOUND);
+    }
+
+    const strategy = await storageService.getDownloadStrategy(bucketName, objectKey);
+
+    // Strategy responses embed presigned URLs with short, server-decided
+    // expiries. Prevent intermediaries (proxies, CDNs) from caching this
+    // GET response and replaying expired URLs to later callers.
+    res.setHeader('Cache-Control', 'no-store');
+    successResponse(res, strategy);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('Invalid')) {
+      next(new AppError(error.message, 400, ERROR_CODES.STORAGE_INVALID_PARAMETER));
+    } else {
+      next(error);
+    }
+  }
+};
+
+router.get(
+  '/buckets/:bucketName/download-strategy/objects/*',
+  conditionalDownloadAuth,
+  downloadStrategyHandler
+);
+
+// @deprecated Use GET /buckets/:bucketName/download-strategy/objects/* instead.
+// Retained at the original path/method for backward compatibility with SDK
+// releases that already shipped against the POST endpoint. Uses a wildcard
+// so it matches both single-segment (encodeURIComponent'd) and raw-slash
+// object keys.
+router.post(
+  '/buckets/:bucketName/objects/*/download-strategy',
+  conditionalDownloadAuth,
+  downloadStrategyHandler
+);
+
 // GET /api/storage/buckets/:bucketName/objects/:objectKey - Download object from bucket (conditional auth)
 router.get(
   '/buckets/:bucketName/objects/*',
-  conditionalAuth,
+  conditionalDownloadAuth,
   async (req: AuthRequest | Request, res: Response, next: NextFunction) => {
     try {
       const { bucketName } = req.params;
@@ -409,35 +479,30 @@ router.get(
       }
 
       const storageService = StorageService.getInstance();
-
-      // Public-bucket reads bypass RLS: conditionalAuth has already confirmed
-      // public=true before letting an unauthed request through, so the bypass
-      // only triggers in that case. Authed callers always go through RLS.
       const authReq = req as AuthRequest;
-      const ctx: UserContext =
-        !authReq.user && !authReq.apiKey
-          ? { isAdmin: true, role: 'authenticated' }
-          : getUserContextFromReq(authReq);
+      const visible = await storageService.objectIsVisible(
+        authReq.user,
+        bucketName,
+        objectKey,
+        !!authReq.hasApiKey
+      );
+      if (!visible) {
+        throw new AppError('Object not found', 404, ERROR_CODES.STORAGE_NOT_FOUND);
+      }
 
-      // Get download strategy (service auto-calculates expiry based on bucket visibility)
       const strategy = await storageService.getDownloadStrategy(bucketName, objectKey);
-
       if (strategy.method === 'presigned') {
-        // Presigned URLs bypass the backend, so RLS doesn't fire when the
-        // client redeems them. Gate the redirect on an RLS-scoped existence
-        // check — without this, an authenticated non-owner could redeem any
-        // known key in a private bucket. Admin/anon-public-bucket contexts
-        // bypass RLS at the DB level and always return true.
-        const visible = await storageService.objectIsVisible(ctx, bucketName, objectKey);
-        if (!visible) {
-          throw new AppError('Object not found', 404, ERROR_CODES.NOT_FOUND);
-        }
         return res.redirect(strategy.url);
       }
 
-      const result = await storageService.getObject(ctx, bucketName, objectKey);
+      const result = await storageService.getObject(
+        authReq.user,
+        bucketName,
+        objectKey,
+        !!authReq.hasApiKey
+      );
       if (!result) {
-        throw new AppError('Object not found', 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError('Object not found', 404, ERROR_CODES.STORAGE_NOT_FOUND);
       }
 
       const { file, metadata } = result;
@@ -469,7 +534,7 @@ router.delete(
       const deleted = await storageService.deleteBucket(bucketName);
 
       if (!deleted) {
-        throw new AppError('Bucket not found or already empty', 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError('Bucket not found or already empty', 404, ERROR_CODES.STORAGE_NOT_FOUND);
       }
 
       // Log audit for bucket deletion
@@ -520,13 +585,14 @@ router.delete(
       }
 
       const deleted = await StorageService.getInstance().deleteObject(
-        getUserContextFromReq(req),
+        req.user,
         bucketName,
-        objectKey
+        objectKey,
+        !!req.hasApiKey
       );
 
       if (!deleted) {
-        throw new AppError('Object not found', 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError('Object not found', 404, ERROR_CODES.STORAGE_NOT_FOUND);
       }
 
       successResponse(res, { message: 'Object deleted successfully' });
@@ -554,15 +620,16 @@ router.post(
       }
 
       const strategy = await StorageService.getInstance().getUploadStrategy(
-        getUserContextFromReq(req),
+        req.user,
         bucketName,
-        { filename, contentType, size }
+        { filename, contentType, size },
+        !!req.hasApiKey
       );
 
       successResponse(res, strategy);
     } catch (error) {
       if (error instanceof Error && error.message.includes('does not exist')) {
-        next(new AppError(error.message, 404, ERROR_CODES.NOT_FOUND));
+        next(new AppError(error.message, 404, ERROR_CODES.STORAGE_NOT_FOUND));
       } else {
         next(error);
       }
@@ -585,14 +652,15 @@ router.post(
 
       const storageService = StorageService.getInstance();
       const fileInfo = await storageService.confirmUpload(
-        getUserContextFromReq(req),
+        req.user,
         bucketName,
         objectKey,
         {
           size,
           contentType,
           etag,
-        }
+        },
+        !!req.hasApiKey
       );
 
       try {
@@ -610,9 +678,9 @@ router.post(
       successResponse(res, fileInfo, 201);
     } catch (error) {
       if (error instanceof Error && error.message.includes('not found')) {
-        next(new AppError(error.message, 404, ERROR_CODES.NOT_FOUND));
+        next(new AppError(error.message, 404, ERROR_CODES.STORAGE_NOT_FOUND));
       } else if (error instanceof Error && error.message.includes('already confirmed')) {
-        next(new AppError(error.message, 409, ERROR_CODES.ALREADY_EXISTS));
+        next(new AppError(error.message, 409, ERROR_CODES.STORAGE_ALREADY_EXISTS));
       } else if (
         error instanceof Error &&
         error.message.includes('exceeds the configured maximum')
@@ -625,42 +693,6 @@ router.post(
   }
 );
 
-// POST /api/storage/buckets/:bucketName/objects/:objectKey/download-strategy - Get download URL (presigned or direct)
-router.post(
-  '/buckets/:bucketName/objects/:objectKey/download-strategy',
-  conditionalAuth,
-  async (req: AuthRequest | Request, res: Response, next: NextFunction) => {
-    try {
-      const { bucketName, objectKey } = req.params;
-
-      const storageService = StorageService.getInstance();
-
-      // RLS-gate the strategy hand-off, same as GET /objects/*. A presigned
-      // URL bypasses RLS at redeem time, so we must verify ownership before
-      // issuing one. Public-bucket unauthed callers bypass via isAdmin: true
-      // because conditionalAuth has already confirmed public=true.
-      const authReq = req as AuthRequest;
-      const ctx: UserContext =
-        !authReq.user && !authReq.apiKey
-          ? { isAdmin: true, role: 'authenticated' }
-          : getUserContextFromReq(authReq);
-      const visible = await storageService.objectIsVisible(ctx, bucketName, objectKey);
-      if (!visible) {
-        throw new AppError('Object not found', 404, ERROR_CODES.NOT_FOUND);
-      }
-
-      const strategy = await storageService.getDownloadStrategy(bucketName, objectKey);
-
-      successResponse(res, strategy);
-    } catch (error) {
-      if (error instanceof Error && error.message.includes('Invalid')) {
-        next(new AppError(error.message, 400, ERROR_CODES.STORAGE_INVALID_PARAMETER));
-      } else {
-        next(error);
-      }
-    }
-  }
-);
 // ============================================================================
 // S3 Protocol — Gateway Config + Access Key Management (admin only)
 // Per-IP rate limiting applied across all three access-key endpoints since

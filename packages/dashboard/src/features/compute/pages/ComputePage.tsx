@@ -212,19 +212,32 @@ export default function ComputePage() {
                   </dd>
                 </div>
                 <div className="col-span-2">
-                  <dt className="text-muted-foreground mb-1">Endpoint URL</dt>
+                  <dt className="text-muted-foreground mb-1">Endpoint</dt>
                   <dd className="text-foreground">
                     {reachableUrl ? (
-                      <a
-                        href={reachableUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary hover:underline"
-                      >
-                        {reachableUrl}
-                      </a>
+                      reachableUrl.href ? (
+                        <a
+                          href={reachableUrl.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline"
+                        >
+                          {reachableUrl.display}
+                        </a>
+                      ) : (
+                        <code className="text-foreground font-mono bg-[var(--alpha-8)] px-2 py-0.5 rounded">
+                          {reachableUrl.display}
+                        </code>
+                      )
                     ) : (
                       <span className="text-muted-foreground">Not available</span>
+                    )}
+                    {reachableUrl && !reachableUrl.href && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Raw TCP service. Connect with the protocol&apos;s native client (e.g.{' '}
+                        <code className="font-mono">redis-cli -h &lt;host&gt; -p &lt;port&gt;</code>
+                        ).
+                      </p>
                     )}
                   </dd>
                 </div>
@@ -284,7 +297,7 @@ export default function ComputePage() {
                       Use the button above, the CLI:
                     </p>
                     <code className="block px-3 py-2 bg-muted text-foreground rounded text-xs font-mono break-all">
-                      npx @insforge/cli compute create --name my-api --image nginx:alpine
+                      npx @insforge/cli compute deploy --name my-api --image nginx:alpine --port 80
                     </code>
                   </div>
                   <div>

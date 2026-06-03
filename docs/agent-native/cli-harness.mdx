@@ -1,0 +1,62 @@
+---
+title: "CLI harness"
+sidebarTitle: "CLI harness"
+description: "The InsForge CLI is the agent's hands: one terminal interface for schema, config, deploys, and diagnostics."
+---
+
+The `@insforge/cli` is the interface a coding agent uses to operate your backend. Where a human reaches for the dashboard, the agent reaches for the terminal: it runs a command, reads the output, and decides what to do next. Every command speaks `--json`, so the agent works from structured data instead of scraping a screen.
+
+<Note>
+  Run the CLI with `npx @insforge/cli`. Do not install it globally, so the agent always uses the version pinned to the project.
+</Note>
+
+## Why a CLI for agents
+
+A dashboard is built for a human pointer; a CLI is built for anything that can write text. Pass `--json` to any command and the agent gets a structured result it can parse; pass `--yes` and it runs without stopping for a confirmation prompt. Schema, auth config, storage, functions, deploys, branches, and diagnostics are all subcommands of the same tool, so there is one surface to learn instead of a dashboard to navigate. It runs in any terminal, any editor, or CI, with no integration to set up. And after a change, the agent can run [`npx @insforge/cli diagnose`](/agent-native/diagnostics) and read back exactly what broke.
+
+## Command surface
+
+| Area | Commands |
+|------|----------|
+| Auth & context | `login`, `logout`, `whoami`, `current`, `list` |
+| Project | `create`, `link` |
+| Schema | `db migrations new`, `db migrations up`, `db migrations list` |
+| Config as code | `config plan`, `config apply`, `config export` |
+| Branching | `branch create`, `branch merge`, `branch reset`, `branch delete` |
+| Build | `functions`, `storage`, `deployments`, `secrets`, `schedules`, `ai` |
+| Diagnose | `diagnose`, `diagnose advisor`, `diagnose db`, `diagnose logs`, `metadata` |
+
+Run `npx @insforge/cli help <command>` for the flags on any of these.
+
+## A typical agent run
+
+```bash
+# connect
+npx @insforge/cli login
+npx @insforge/cli link
+
+# read current state
+npx @insforge/cli --json metadata
+
+# change schema, safely
+npx @insforge/cli db migrations new add-orders-table
+npx @insforge/cli db migrations up --all
+
+# check the result
+npx @insforge/cli diagnose --json
+```
+
+## Let the agent interpret the output
+
+Diagnostics ships an AI flag so the agent can hand its own backend data to a model and get back an explanation:
+
+```bash
+npx @insforge/cli diagnose --ai "why are auth requests failing after the last migration?"
+```
+
+This pairs the raw signals (advisor findings, DB health, error logs) with a plain-language read, which is what turns "here is a stack trace" into "here is the fix." See [Diagnostics & advisor](/agent-native/diagnostics).
+
+## Next steps
+
+- Put auth, SMTP, storage, retention, and deployment settings in version control with [config as code](/agent-native/config-as-code).
+- Test risky changes on a [backend branch](/agent-native/branching) before touching production.

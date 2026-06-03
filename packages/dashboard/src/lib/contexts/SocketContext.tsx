@@ -43,7 +43,6 @@ export enum DataUpdateResourceType {
   FUNCTIONS = 'functions',
   DEPLOYMENTS = 'deployments',
   REALTIME = 'realtime',
-  AI_USAGE = 'ai_usage',
 }
 
 export interface DatabaseResourceUpdate {
@@ -234,6 +233,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
       if (mcpUsageCount === 1) {
         trackPostHog('onboarding_completed', {
           experiment_variant: getFeatureFlag('dashboard-v4-experiment'),
+          mcp_vs_cli_variant: getFeatureFlag('mcp-vs-cli'),
           tool_name: toolName,
         });
       }
@@ -326,9 +326,6 @@ export function SocketProvider({ children }: SocketProviderProps) {
           break;
         case DataUpdateResourceType.REALTIME:
           void queryClient.invalidateQueries({ queryKey: ['realtime'] });
-          break;
-        case DataUpdateResourceType.AI_USAGE:
-          void queryClient.invalidateQueries({ queryKey: ['ai-usage-summary'] });
           break;
       }
     };

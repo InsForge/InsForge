@@ -2,12 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ChatMessageSchema } from '@insforge/shared-schemas';
 
 // Mock dependencies before importing the service
-vi.mock('../../src/services/ai/ai-usage.service.js', () => ({
-  AIUsageService: { getInstance: () => ({}) },
-}));
-vi.mock('../../src/services/ai/ai-config.service.js', () => ({
-  AIConfigService: { getInstance: () => ({}) },
-}));
 vi.mock('../../src/providers/ai/openrouter.provider.js', () => ({
   OpenRouterProvider: { getInstance: () => ({}) },
 }));

@@ -1,12 +1,9 @@
 import type { Pool } from 'pg';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { StripeProvider } from '@/providers/payments/stripe.provider.js';
 import { PaymentConfigService } from '@/services/payments/payment-config.service.js';
-import {
-  PaymentCheckoutService,
-  type CheckoutUserContext,
-} from '@/services/payments/payment-checkout.service.js';
+import { PaymentCheckoutService } from '@/services/payments/payment-checkout.service.js';
 import { PaymentCustomerService } from '@/services/payments/payment-customer.service.js';
 import { PaymentCustomerPortalService } from '@/services/payments/payment-customer-portal.service.js';
 import { PaymentHistoryService } from '@/services/payments/payment-history.service.js';
@@ -33,7 +30,7 @@ import {
   normalizeProductRow,
 } from '@/services/payments/helpers.js';
 import logger from '@/utils/logger.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import type { UserContext } from '@/api/middlewares/auth.js';
 import {
   STRIPE_ENVIRONMENTS,
   type StripeCheckoutSession,
@@ -47,43 +44,44 @@ import {
   type StripeRefund,
   type StripeSubscription,
 } from '@/types/payments.js';
-import type {
-  ArchivePaymentPriceResponse,
-  ConfigurePaymentWebhookResponse,
-  CreatePaymentPriceRequest,
-  GetPaymentsStatusResponse,
-  GetPaymentPriceResponse,
-  ListPaymentCatalogResponse,
-  ListPaymentCustomersRequest,
-  ListPaymentCustomersResponse,
-  ListPaymentPricesRequest,
-  ListPaymentPricesResponse,
-  ListPaymentProductsRequest,
-  StripeConnection,
-  GetPaymentsConfigResponse,
-  CreatePaymentProductRequest,
-  DeletePaymentProductResponse,
-  GetPaymentProductResponse,
-  ListPaymentProductsResponse,
-  MutatePaymentPriceResponse,
-  MutatePaymentProductResponse,
-  UpdatePaymentPriceRequest,
-  UpdatePaymentProductRequest,
-  CreateCheckoutSessionRequest,
-  CreateCheckoutSessionResponse,
-  CreateCustomerPortalSessionRequest,
-  CreateCustomerPortalSessionResponse,
-  CheckoutSession,
-  BillingSubject,
-  StripeWebhookResponse,
-  ListPaymentHistoryRequest,
-  ListPaymentHistoryResponse,
-  ListSubscriptionsRequest,
-  ListSubscriptionsResponse,
-  SyncPaymentsRequest,
-  SyncPaymentsResponse,
-  SyncPaymentsEnvironmentResult,
-  SyncPaymentsSubscriptionsSummary,
+import {
+  ERROR_CODES,
+  type ArchivePaymentPriceResponse,
+  type ConfigurePaymentWebhookResponse,
+  type CreatePaymentPriceRequest,
+  type GetPaymentsStatusResponse,
+  type GetPaymentPriceResponse,
+  type ListPaymentCatalogResponse,
+  type ListPaymentCustomersRequest,
+  type ListPaymentCustomersResponse,
+  type ListPaymentPricesRequest,
+  type ListPaymentPricesResponse,
+  type ListPaymentProductsRequest,
+  type StripeConnection,
+  type GetPaymentsConfigResponse,
+  type CreatePaymentProductRequest,
+  type DeletePaymentProductResponse,
+  type GetPaymentProductResponse,
+  type ListPaymentProductsResponse,
+  type MutatePaymentPriceResponse,
+  type MutatePaymentProductResponse,
+  type UpdatePaymentPriceRequest,
+  type UpdatePaymentProductRequest,
+  type CreateCheckoutSessionRequest,
+  type CreateCheckoutSessionResponse,
+  type CreateCustomerPortalSessionRequest,
+  type CreateCustomerPortalSessionResponse,
+  type CheckoutSession,
+  type BillingSubject,
+  type StripeWebhookResponse,
+  type ListPaymentHistoryRequest,
+  type ListPaymentHistoryResponse,
+  type ListSubscriptionsRequest,
+  type ListSubscriptionsResponse,
+  type SyncPaymentsRequest,
+  type SyncPaymentsResponse,
+  type SyncPaymentsEnvironmentResult,
+  type SyncPaymentsSubscriptionsSummary,
 } from '@insforge/shared-schemas';
 
 export class PaymentService {
@@ -315,7 +313,7 @@ export class PaymentService {
 
   async createCheckoutSession(
     input: CreateCheckoutSessionRequest,
-    user: CheckoutUserContext
+    user: UserContext
   ): Promise<CreateCheckoutSessionResponse> {
     if (input.mode === 'subscription' && !input.subject) {
       throw new AppError(
@@ -394,7 +392,7 @@ export class PaymentService {
 
   async createCustomerPortalSession(
     input: CreateCustomerPortalSessionRequest,
-    user: CheckoutUserContext
+    user: UserContext
   ): Promise<CreateCustomerPortalSessionResponse> {
     if (user.role === 'anon') {
       throw new AppError(
@@ -415,7 +413,7 @@ export class PaymentService {
         throw new AppError(
           'No Stripe customer is mapped to this billing subject',
           404,
-          ERROR_CODES.NOT_FOUND
+          ERROR_CODES.PAYMENT_NOT_FOUND
         );
       }
 

@@ -2,9 +2,12 @@ import { Router, Response, NextFunction } from 'express';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { RealtimeMessageService } from '@/services/realtime/realtime-message.service.js';
 import { successResponse } from '@/utils/response.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
-import { listMessagesRequestSchema, messageStatsRequestSchema } from '@insforge/shared-schemas';
+import { AppError } from '@/utils/errors.js';
+import {
+  ERROR_CODES,
+  listMessagesRequestSchema,
+  messageStatsRequestSchema,
+} from '@insforge/shared-schemas';
 
 const router = Router();
 const messageService = RealtimeMessageService.getInstance();

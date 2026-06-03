@@ -8,6 +8,7 @@ export interface DashboardProjectInfo {
   latestVersion?: string | null;
   currentVersion?: string | null;
   status?: string;
+  isBranch?: boolean;
 }
 
 export interface DashboardUserInfo {
@@ -54,11 +55,19 @@ export interface DashboardInstanceInfo {
   }>;
 }
 
+export interface DashboardModelCreditUsage {
+  used: number;
+  limit: number;
+  isFree: boolean;
+}
+
 export type DashboardMetricsRange = '1h' | '6h' | '24h' | '3d';
 export type DashboardMetricName =
   | 'cpu_usage'
   | 'memory_usage'
   | 'disk_usage'
+  | 'disk_used'
+  | 'disk_total'
   | 'network_in'
   | 'network_out';
 
@@ -115,12 +124,24 @@ export interface DashboardAdvisorIssuesQuery {
   offset?: number;
 }
 
+/** Status event posted from cloud-shell after the PostHog OAuth flow finishes. */
+export interface DashboardPosthogConnectionStatus {
+  status: 'connected' | 'error' | 'cancelled';
+  reason?: string;
+  timestamp: number;
+}
+
+/** Resolution of an `onOpenPosthog` call — exactly one of `url` or `error` is set. */
+export type DashboardPosthogOpenResult =
+  | { url: string; error?: never }
+  | { url?: never; error: string };
+
 export interface DashboardProps {
   backendUrl?: string;
   showNavbar?: boolean;
   project?: DashboardProjectInfo;
   onRouteChange?: (path: string) => void;
-  onNavigateToSubscription?: () => void;
+  onShowUpgradeDialog?: () => void;
   onRenameProject?: (name: string) => Promise<void>;
   onDeleteProject?: () => Promise<void>;
   onRequestBackupInfo?: () => Promise<DashboardBackupInfo>;
@@ -135,12 +156,20 @@ export interface DashboardProps {
   onUpdateVersion?: () => Promise<void>;
   onRequestUserInfo?: () => Promise<DashboardUserInfo>;
   onRequestUserApiKey?: () => Promise<string>;
+  onRequestModelCredits?: () => Promise<DashboardModelCreditUsage>;
   onRequestProjectMetrics?: (range: DashboardMetricsRange) => Promise<DashboardMetricsResponse>;
   onRequestAdvisorLatest?: () => Promise<DashboardAdvisorSummary | null>;
   onRequestAdvisorIssues?: (
     query: DashboardAdvisorIssuesQuery
   ) => Promise<DashboardAdvisorIssuesResponse>;
   onTriggerAdvisorScan?: () => Promise<void>;
+  /** Cloud-hosting only: ask the parent shell to start the PostHog OAuth flow. */
+  onConnectPosthog?: (projectId: string) => void;
+  /** Cloud-hosting only: subscribe to PostHog OAuth completion / failure events. */
+  subscribePosthogConnectionStatus?: (
+    cb: (event: DashboardPosthogConnectionStatus) => void
+  ) => () => void;
+  onOpenPosthog?: (projectId: string) => Promise<DashboardPosthogOpenResult>;
 }
 
 export interface SelfHostingDashboardProps extends DashboardProps {

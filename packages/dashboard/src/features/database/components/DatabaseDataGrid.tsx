@@ -218,6 +218,7 @@ export function convertSchemaToColumns(
       type: col.type as ColumnType,
       width,
       resizable: true,
+      draggable: true,
       sortable: isSortable,
       editable: isEditable,
       isPrimaryKey: col.isPrimaryKey,

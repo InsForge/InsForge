@@ -1,8 +1,7 @@
-import { useState, useEffect, useCallback, useMemo, useRef, type CSSProperties } from 'react';
-import { CirclePlus, LogIn } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { CirclePlus, FolderInput, FolderOutput } from 'lucide-react';
 import PencilIcon from '#assets/icons/pencil.svg?react';
 import RefreshIcon from '#assets/icons/refresh.svg?react';
-import EmptyBoxSvg from '#assets/images/empty_box.svg?react';
 import { useDatabaseSchemas } from '#features/database/hooks/useDatabase';
 import { useDatabaseSchemaSelection } from '#features/database/hooks/useDatabaseSchemaSelection';
 import { useTables } from '#features/database/hooks/useTables';
@@ -25,6 +24,7 @@ import {
   Alert,
   AlertDescription,
   EmptyState,
+  EmptyStateIllustration,
   SelectionClearButton,
   DeleteActionButton,
   TableHeader,
@@ -35,7 +35,8 @@ import { DatabaseDataGrid } from '#features/database/components/DatabaseDataGrid
 import { SortColumn } from 'react-data-grid';
 import { convertValueForColumn } from '#lib/utils/utils';
 import { useCSVImport } from '#features/database/hooks/useCSVImport';
-import { useTableColumnWidthsPreference } from '#features/database/hooks/useTableColumnWidthsPreference';
+import { useCSVExport } from '#features/database/hooks/useCSVExport';
+import { useTablePreferences } from '#features/database/hooks/useTablePreferences';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { usePageSize } from '#lib/hooks/usePageSize';
 import { DEFAULT_DATABASE_SCHEMA, getDatabaseSchemaInfo } from '#features/database/helpers';
@@ -197,7 +198,7 @@ export default function TablesPage() {
     () => `${selectedTable ?? 'no-table'}:${availableColumns.join('|')}`,
     [selectedTable, availableColumns]
   );
-  const { columnWidths, setColumnWidth } = useTableColumnWidthsPreference(
+  const { columnOrder, columnWidths, reorderColumns, setColumnWidth } = useTablePreferences(
     selectedTable,
     selectedSchema,
     availableColumns
@@ -237,6 +238,26 @@ export default function TablesPage() {
         error?.message || 'An unexpected error occurred during import. Please try again.';
       showToast(message, 'error');
       resetImport();
+    },
+  });
+
+  const {
+    mutate: exportCSV,
+    isPending: isExporting,
+    reset: resetExport,
+  } = useCSVExport(selectedTable || '', selectedSchema, {
+    onSuccess: () => {
+      showToast('Export successful!', 'success');
+      resetExport();
+    },
+    onWarning: (message: string) => {
+      showToast(message, 'warn');
+    },
+    onError: (error: Error) => {
+      const message =
+        error?.message || 'An unexpected error occurred during export. Please try again.';
+      showToast(message, 'error');
+      resetExport();
     },
   });
 
@@ -584,13 +605,25 @@ export default function TablesPage() {
                             onClick={() => fileInputRef.current?.click()}
                             disabled={isImporting}
                           >
-                            <LogIn className="h-6 w-6 stroke-[1.5]" />
+                            <FolderInput className="h-6 w-6 stroke-[1.5]" />
                             <span className="px-1 text-sm font-medium leading-5">
                               {isImporting ? 'Importing...' : 'Import CSV'}
                             </span>
                           </Button>
                         </>
                       )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 rounded px-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] hover:text-foreground active:bg-[var(--alpha-8)]"
+                        onClick={() => exportCSV()}
+                        disabled={isExporting}
+                      >
+                        <FolderOutput className="h-6 w-6 stroke-[1.5]" />
+                        <span className="px-1 text-sm font-medium leading-5">
+                          {isExporting ? 'Exporting...' : 'Export CSV'}
+                        </span>
+                      </Button>
                     </div>
                   )
                 }
@@ -621,7 +654,7 @@ export default function TablesPage() {
                     title={`No tables in ${selectedSchema}`}
                     description={
                       selectedSchemaInfo.isProtected
-                        ? 'InsForge-managed schemas are protected in the dashboard.'
+                        ? 'This schema is protected in the dashboard.'
                         : 'Create a table from the sidebar to get started.'
                     }
                   />
@@ -638,7 +671,9 @@ export default function TablesPage() {
                   key={dataGridKey}
                   data={tableData?.records || []}
                   schema={tableData?.schema}
+                  columnOrder={columnOrder}
                   columnWidths={columnWidths}
+                  onColumnsReorder={reorderColumns}
                   loading={isLoadingTable && !tableData}
                   isSorting={isSorting}
                   isRefreshing={isRefreshing}
@@ -664,16 +699,7 @@ export default function TablesPage() {
                   onPageSizeChange={handlePageSizeChange}
                   emptyState={
                     <div className="flex flex-col items-center gap-2 pb-12 pt-6 text-center">
-                      <EmptyBoxSvg
-                        className="h-[95px] w-[160px]"
-                        style={
-                          {
-                            '--empty-box-fill-primary': 'rgb(var(--semantic-2))',
-                            '--empty-box-fill-secondary': 'rgb(var(--semantic-6))',
-                          } as CSSProperties
-                        }
-                        aria-hidden="true"
-                      />
+                      <EmptyStateIllustration />
                       <p className="text-sm font-medium leading-6 text-muted-foreground">
                         No Records Found
                       </p>

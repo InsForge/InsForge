@@ -1,440 +1,352 @@
 ---
 title: Realtime SDK Reference
-description: Real-time subscriptions and messaging with the InsForge TypeScript SDK
+description: Subscribe to channels, publish events, and track presence with the InsForge TypeScript SDK.
 ---
-
-## Installation
 
 import Installation from '/snippets/sdk-installation.mdx';
 
+## Installation
+
 <Installation />
+
+## Mental Model
+
+The TypeScript SDK opens one Socket.IO connection to your InsForge backend. You subscribe to named channels, listen for event names, and optionally publish events back to channels you have joined.
+
+Events can come from two places:
+
+- Database triggers that call `realtime.publish(channel, event, payload)`.
+- Clients that call `insforge.realtime.publish(channel, event, payload)`.
+
+For the backend channel and RLS model, see [Realtime overview](/core-concepts/realtime/overview).
+
+## Quick Start
+
+```typescript
+import { createClient } from '@insforge/sdk';
+
+const insforge = createClient({
+  baseUrl: 'https://your-app.insforge.app',
+  anonKey: 'your-anon-key'
+});
+
+insforge.realtime.on('connect', () => {
+  console.log('Connected:', insforge.realtime.socketId);
+});
+
+insforge.realtime.on('error', (error) => {
+  console.error(error.code, error.message);
+});
+
+await insforge.realtime.connect();
+
+const subscription = await insforge.realtime.subscribe('order:123');
+
+if (!subscription.ok) {
+  throw new Error(subscription.error.message);
+}
+
+insforge.realtime.on('status_changed', (message) => {
+  console.log(message.status);
+  console.log(message.meta.messageId);
+});
+```
+
+<Tip>
+  Register `connect`, `disconnect`, `connect_error`, and `error` handlers before calling `connect()` so early connection failures are visible.
+</Tip>
 
 ## connect()
 
-Establish a WebSocket connection to the realtime server.
+Establish a WebSocket connection.
 
-### Returns
+```typescript
+await insforge.realtime.connect();
+```
+
+Returns:
 
 ```typescript
 Promise<void>
 ```
 
-<Note>
-The SDK automatically includes the authentication token from the logged-in user. Multiple calls to `connect()` while connecting will safely return the same promise.
-</Note>
+Notes:
 
-### Connection Timeout
-
-The connection will timeout after **10 seconds** if the server is unreachable, rejecting the promise with a timeout error.
-
-### Example
-
-```javascript
-try {
-  await insforge.realtime.connect()
-  console.log('Connected:', insforge.realtime.isConnected)
-} catch (error) {
-  console.error('Connection failed:', error.message)
-}
-```
-
----
+- The SDK includes the current auth token when one exists. If there is no signed-in user, it can use the configured anon key.
+- Multiple `connect()` calls while a connection is already in progress reuse the same connection promise.
+- The connection attempt times out after 10 seconds.
 
 ## subscribe()
 
-Subscribe to a channel to receive events.
-
-### Parameters
-
-- `channel` (string, required) - Channel name (e.g., `'orders:123'`, `'chat:room-1'`)
-
-### Returns
+Subscribe to a channel and receive the current presence snapshot.
 
 ```typescript
-Promise<
-  | {
-      ok: true,
-      channel: string,
-      presence: {
-        members: PresenceMember[]
-      }
-    }
-  | {
-      ok: false,
-      channel: string,
-      error: { code: string, message: string }
-    }
->
-```
-
-<Note>
-**Auto-connect**: If not connected, `subscribe()` will automatically call `connect()` for you. However, calling `connect()` explicitly is still recommended so you can set up connection event listeners (`connect`, `disconnect`, `connect_error`) beforehand.
-
-<Tip>
-By default, all users can subscribe to any channel. If RLS is enabled on `realtime.channels`, subscriptions are subject to SELECT policies.
-</Tip>
-</Note>
-
-### Example
-
-```javascript
-await insforge.realtime.connect()
-const response = await insforge.realtime.subscribe('orders:123')
+const response = await insforge.realtime.subscribe('chat:room-1');
 
 if (response.ok) {
-  console.log('Subscribed to:', response.channel)
-  console.log('Members already present:', response.presence.members)
+  console.log(response.channel);
+  console.log(response.presence.members);
 } else {
-  console.error('Failed:', response.error.message)
+  console.error(response.error.code, response.error.message);
 }
 ```
 
-### Output (Success)
+Parameters:
 
-```json
-{
-  "ok": true,
-  "channel": "orders:123",
-  "presence": {
-    "members": [
-      {
-        "type": "user",
-        "presenceId": "user-123",
-        "joinedAt": "2026-04-25T17:00:00.000Z"
-      }
-    ]
-  }
-}
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `channel` | `string` | Resolved channel name, such as `orders`, `order:123`, or `chat:room-1`. |
+
+Returns:
+
+```typescript
+type SubscribeResponse =
+  | {
+      ok: true;
+      channel: string;
+      presence: {
+        members: PresenceMember[];
+      };
+    }
+  | {
+      ok: false;
+      channel: string;
+      error: {
+        code: string;
+        message: string;
+      };
+    };
 ```
 
-`presenceId` is the stable identity for the member: a user ID when `type` is `'user'`, or a socket ID when `type` is `'anonymous'`.
-
-### Output (Error - Connection Failed)
-
-```json
-{
-  "ok": false,
-  "channel": "orders:123",
-  "error": {
-    "code": "CONNECTION_FAILED",
-    "message": "Connection timeout after 10000ms"
-  }
-}
-```
-
-### Output (Error - Unauthorized)
-
-```json
-{
-  "ok": false,
-  "channel": "orders:123",
-  "error": {
-    "code": "UNAUTHORIZED",
-    "message": "Not authorized to subscribe to this channel"
-  }
-}
-```
-
----
-
-## unsubscribe()
-
-Unsubscribe from a channel. This is a fire-and-forget operation.
-
-### Parameters
-
-- `channel` (string, required) - Channel name to unsubscribe from
-
-### Example
-
-```javascript
-insforge.realtime.unsubscribe('orders:123')
-```
-
----
+`subscribe()` auto-connects if needed. Calling `connect()` explicitly is still recommended so connection event handlers are already attached.
 
 ## publish()
 
-Publish a message to a channel.
+Publish an event to a channel.
 
-### Parameters
-
-- `channel` (string, required) - Channel name
-- `event` (string, required) - Event name
-- `payload` (object, required) - Message payload
-
-<Warning>
-You must be subscribed to a channel before publishing to it. If RLS is enabled on `realtime.messages`, publishing is also subject to INSERT policies.
-</Warning>
-
-### Example
-
-```javascript
-await insforge.realtime.publish('orders:123', 'status_changed', {
-  status: 'shipped',
-  trackingNumber: 'ABC123'
-})
+```typescript
+await insforge.realtime.publish('chat:room-1', 'new_message', {
+  text: 'Hello',
+  sentAt: new Date().toISOString()
+});
 ```
 
----
+Parameters:
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `channel` | `string` | Channel to publish to. The client must already be subscribed. |
+| `event` | `string` | Event name that subscribers listen for. |
+| `payload` | `Record<string, unknown>` | JSON-serializable message payload. |
+
+<Warning>
+  Publishing requires a prior successful subscription to the same channel. If RLS is enabled on `realtime.messages`, publish is also checked against `INSERT` policies.
+</Warning>
+
+Publish failures are emitted through the `error` event.
 
 ## on()
 
-Listen for events.
+Listen for custom events, connection events, presence events, and realtime errors.
 
-### Parameters
+```typescript
+insforge.realtime.on('new_message', (message) => {
+  console.log(message.text);
+  console.log(message.meta.senderType);
+});
+```
 
-- `event` (string, required) - Event name to listen for
-- `callback` (function, required) - Callback function receiving the payload
-
-### Reserved Events
+Reserved events:
 
 | Event | Payload | Description |
 |-------|---------|-------------|
-| `connect` | - | Fired when connected to the server |
-| `connect_error` | `Error` | Fired when connection fails (including reconnection attempts) |
-| `disconnect` | `string` (reason) | Fired when disconnected from the server |
-| `error` | `RealtimeErrorPayload` | Fired when a realtime error occurs |
-| `presence:join` | `PresenceJoinMessage` | Fired when a logical member becomes present in the channel |
-| `presence:leave` | `PresenceLeaveMessage` | Fired when a logical member is no longer present in the channel |
+| `connect` | None | The WebSocket connected. |
+| `connect_error` | `Error` | Initial connection or reconnect failed. |
+| `disconnect` | `string` | The WebSocket disconnected. |
+| `error` | `RealtimeErrorPayload` | Subscribe or publish failed. |
+| `presence:join` | `PresenceJoinMessage` | A logical member became present in a channel. |
+| `presence:leave` | `PresenceLeaveMessage` | A logical member is no longer present in a channel. |
 
-### Example
+## once()
 
-```javascript
-// Custom events
-insforge.realtime.on('order_updated', (payload) => {
-  console.log('Order updated:', payload)
-})
-
-// Connection events
-insforge.realtime.on('connect', () => {
-  console.log('Connected! Socket ID:', insforge.realtime.socketId)
-})
-
-insforge.realtime.on('connect_error', (error) => {
-  console.error('Connection failed:', error.message)
-})
-
-insforge.realtime.on('disconnect', (reason) => {
-  console.log('Disconnected:', reason)
-})
-
-// Realtime error handling
-insforge.realtime.on('error', (error) => {
-  console.error('Realtime error:', error.code, error.message)
-})
-
-// Presence deltas
-insforge.realtime.on('presence:join', (message) => {
-  console.log('Member joined:', message.member)
-})
-
-insforge.realtime.on('presence:leave', (message) => {
-  console.log('Member left:', message.member)
-})
-```
-
-### Error Codes
-
-| Code | Description |
-|------|-------------|
-| `UNAUTHORIZED` | Not authorized to subscribe/publish to this channel |
-| `NOT_SUBSCRIBED` | Must subscribe to channel before publishing |
-| `INTERNAL_ERROR` | Server error occurred |
-
----
-
-## Message Types
-
-All messages from the server include a `meta` field with metadata enforced by the server.
-
-### SocketMessage
+Listen for an event once, then remove the listener automatically.
 
 ```typescript
-import type { SocketMessage, SocketMessageMeta } from '@insforge/sdk'
-
-interface SocketMessage {
-  meta: SocketMessageMeta
-  // ...your custom payload fields
-}
-
-interface SocketMessageMeta {
-  channel?: string        // Channel the message was sent to
-  messageId: string       // Unique message ID (UUID)
-  senderType: 'system' | 'user'
-  senderId?: string       // User ID of sender (UUID) if senderType is 'user'
-  timestamp: string         // Server timestamp ISO string
-}
+insforge.realtime.once('checkout_completed', (message) => {
+  console.log('Completed:', message.orderId);
+});
 ```
-
-### Example with Type Safety
-
-```typescript
-import type { SocketMessage } from '@insforge/sdk'
-
-interface ChatMessage extends SocketMessage {
-  text: string
-  sender: string
-}
-
-insforge.realtime.on<ChatMessage>('new_message', (payload) => {
-  console.log('Message ID:', payload.meta.messageId)
-  console.log('Sender ID:', payload.meta.senderId)
-  console.log('Sent at:', payload.meta.timestamp)
-  console.log('Text:', payload.text)
-})
-```
-
----
 
 ## off()
 
 Remove an event listener.
 
-### Parameters
-
-- `event` (string, required) - Event name
-- `callback` (function, required) - The callback function to remove
-
-### Example
-
-```javascript
-function handleOrderUpdate(payload) {
-  console.log('Order updated:', payload)
+```typescript
+function handleStatus(message: OrderStatusMessage) {
+  console.log(message.status);
 }
 
-// Add listener
-insforge.realtime.on('order_updated', handleOrderUpdate)
-
-// Remove listener
-insforge.realtime.off('order_updated', handleOrderUpdate)
+insforge.realtime.on('status_changed', handleStatus);
+insforge.realtime.off('status_changed', handleStatus);
 ```
 
----
+## unsubscribe()
 
-## once()
+Leave a channel.
 
-Listen for an event only once, then automatically remove the listener.
-
-### Parameters
-
-- `event` (string, required) - Event name to listen for
-- `callback` (function, required) - Callback function receiving the payload
-
-### Example
-
-```javascript
-// Wait for a single event
-insforge.realtime.once('order_completed', (payload) => {
-  console.log('Order completed:', payload)
-  // Listener is automatically removed after this callback
-})
-
-// Useful for one-time confirmations
-insforge.realtime.once('connect', () => {
-  console.log('First connection established')
-})
+```typescript
+insforge.realtime.unsubscribe('chat:room-1');
 ```
 
----
+`unsubscribe()` is fire-and-forget. If this was the final socket for a logical member, other subscribers receive `presence:leave`.
 
 ## disconnect()
 
-Disconnect from the realtime server and clear all subscriptions.
+Close the WebSocket and clear local subscriptions.
 
-### Example
-
-```javascript
-insforge.realtime.disconnect()
+```typescript
+insforge.realtime.disconnect();
 ```
 
----
+## Message Shape
+
+Delivered messages include your payload fields plus server metadata.
+
+```typescript
+import type { SocketMessage } from '@insforge/sdk';
+
+interface OrderStatusMessage extends SocketMessage {
+  id: string;
+  status: string;
+}
+
+insforge.realtime.on<OrderStatusMessage>('status_changed', (message) => {
+  console.log(message.id);
+  console.log(message.status);
+  console.log(message.meta.messageId);
+  console.log(message.meta.senderType);
+  console.log(message.meta.senderId);
+  console.log(message.meta.timestamp);
+});
+```
+
+Metadata:
+
+```typescript
+interface SocketMessageMeta {
+  channel?: string;
+  messageId: string;
+  senderType: 'system' | 'user';
+  senderId?: string;
+  timestamp: string;
+}
+```
+
+`senderType` is `system` for database-triggered messages and `user` for client-published messages.
+
+## Presence
+
+A successful subscription returns the current presence snapshot.
+
+```typescript
+const response = await insforge.realtime.subscribe('chat:room-1');
+
+if (response.ok) {
+  for (const member of response.presence.members) {
+    console.log(member.type, member.presenceId, member.joinedAt);
+  }
+}
+```
+
+Presence member:
+
+```typescript
+type PresenceMember =
+  | {
+      type: 'user';
+      presenceId: string;
+      joinedAt: string;
+    }
+  | {
+      type: 'anonymous';
+      presenceId: string;
+      joinedAt: string;
+    };
+```
+
+Listen for changes:
+
+```typescript
+insforge.realtime.on('presence:join', (message) => {
+  console.log('Joined:', message.member.presenceId);
+});
+
+insforge.realtime.on('presence:leave', (message) => {
+  console.log('Left:', message.member.presenceId);
+});
+```
 
 ## Properties
 
-### isConnected
+| Property | Type | Description |
+|----------|------|-------------|
+| `isConnected` | `boolean` | Whether the socket is currently connected. |
+| `connectionState` | `'disconnected' \| 'connecting' \| 'connected'` | Current SDK connection state. |
+| `socketId` | `string \| undefined` | Socket.IO ID when connected. |
+| `getSubscribedChannels()` | `() => string[]` | Local list of subscribed channels. |
 
-Check if connected to the realtime server.
-
-```javascript
-if (insforge.realtime.isConnected) {
-  console.log('Connected')
-}
-```
-
-### connectionState
-
-Get the current connection state.
+## Error Handling
 
 ```typescript
-type ConnectionState = 'disconnected' | 'connecting' | 'connected'
+insforge.realtime.on('connect_error', (error) => {
+  console.error('Connection failed:', error.message);
+});
+
+insforge.realtime.on('disconnect', (reason) => {
+  console.log('Disconnected:', reason);
+});
+
+insforge.realtime.on('error', (error) => {
+  console.error(error.channel, error.code, error.message);
+});
 ```
 
-```javascript
-console.log(insforge.realtime.connectionState) // 'connected'
-```
+Common realtime error codes:
 
-### socketId
-
-Get the socket ID (available when connected).
-
-```javascript
-console.log(insforge.realtime.socketId) // 'abc123xyz'
-```
-
-### getSubscribedChannels()
-
-Get all currently subscribed channels.
-
-```javascript
-const channels = insforge.realtime.getSubscribedChannels()
-console.log(channels) // ['orders:123', 'chat:room-1']
-```
-
----
+| Code | Meaning |
+|------|---------|
+| `REALTIME_UNAUTHORIZED` | RLS or channel matching denied subscribe or publish. |
+| `REALTIME_NOT_SUBSCRIBED` | The client tried to publish before subscribing to the channel. |
+| `INTERNAL_ERROR` | The backend could not complete the realtime operation. |
 
 ## Complete Example
 
-### Chat Room
+```typescript
+const channel = `order:${orderId}`;
 
-```javascript
-const insforge = createClient({ baseUrl: 'https://your-app.insforge.app' })
-
-// Setup error handling
 insforge.realtime.on('error', (error) => {
-  console.error('Error:', error.message)
-})
+  console.error(error.code, error.message);
+});
 
-insforge.realtime.on('disconnect', (reason) => {
-  console.log('Disconnected:', reason)
-})
+await insforge.realtime.connect();
 
-// Connect and subscribe
-await insforge.realtime.connect()
-const { ok } = await insforge.realtime.subscribe('chat:room-1')
+const response = await insforge.realtime.subscribe(channel);
 
-if (!ok) {
-  console.error('Failed to join room')
-  return
+if (!response.ok) {
+  throw new Error(response.error.message);
 }
 
-// Listen for messages
-insforge.realtime.on('new_message', (payload) => {
-  displayMessage(payload.sender, payload.text)
-})
+insforge.realtime.on('status_changed', (message) => {
+  renderOrderStatus(message.status);
+});
 
-// Send a message
-async function sendMessage(text) {
-  await insforge.realtime.publish('chat:room-1', 'new_message', {
-    sender: currentUser.name,
-    text,
-    timestamp: new Date().toISOString()
-  })
-}
+await insforge.realtime.publish(channel, 'customer_viewed', {
+  orderId,
+  viewedAt: new Date().toISOString()
+});
 
-// Cleanup on leave
-function leaveRoom() {
-  insforge.realtime.unsubscribe('chat:room-1')
-  insforge.realtime.disconnect()
+function cleanup() {
+  insforge.realtime.unsubscribe(channel);
+  insforge.realtime.disconnect();
 }
 ```

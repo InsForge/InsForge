@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
+import type { UserContext } from '@/api/middlewares/auth.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { getStripeObjectId, toISOString } from '@/services/payments/helpers.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { withUserContext } from '@/services/database/user-context.service.js';
 import type {
   CheckoutSessionPaymentStatus,
   CheckoutSessionRow,
@@ -11,10 +12,11 @@ import type {
   StripeCheckoutSession,
   StripeEnvironment,
 } from '@/types/payments.js';
-import type {
-  CheckoutSession,
-  CreateCheckoutSessionRequest,
-  RoleSchema,
+import {
+  ERROR_CODES,
+  type CheckoutSession,
+  type CreateCheckoutSessionRequest,
+  type RoleSchema,
 } from '@insforge/shared-schemas';
 
 const CHECKOUT_SESSION_COLUMNS = `
@@ -37,12 +39,6 @@ const CHECKOUT_SESSION_COLUMNS = `
 `;
 
 const CHECKOUT_INSERT_ROLES = new Set<RoleSchema>(['anon', 'authenticated', 'project_admin']);
-
-export interface CheckoutUserContext {
-  id: string;
-  email: string;
-  role: RoleSchema;
-}
 
 export class PaymentCheckoutService {
   private static instance: PaymentCheckoutService;
@@ -67,75 +63,64 @@ export class PaymentCheckoutService {
   async insertInitializedCheckoutSession(
     input: CreateCheckoutSessionRequest,
     metadata: Record<string, string>,
-    user: CheckoutUserContext
+    user: UserContext
   ): Promise<{ id: string; existingCheckoutSession: CheckoutSession | null }> {
     const id = randomUUID();
-    const client = await this.getPool().connect();
-    let inserted = false;
-    let existingCheckoutSession: CheckoutSession | null = null;
 
     try {
-      await client.query('BEGIN');
-      await client.query(`SET LOCAL ROLE ${this.getSafeRole(user.role)}`);
-      await this.setRequestContext(client, user);
-      const result = await client.query(
-        `INSERT INTO payments.checkout_sessions (
-           id,
-           environment,
-           mode,
-           status,
-           subject_type,
-           subject_id,
-           customer_email,
-           line_items,
-           success_url,
-           cancel_url,
-           idempotency_key,
-           metadata
-         )
-         VALUES ($1, $2, $3, 'initialized', $4, $5, $6, $7::JSONB, $8, $9, $10, $11::JSONB)
-         ON CONFLICT (environment, idempotency_key)
-           WHERE idempotency_key IS NOT NULL
-         DO NOTHING`,
-        [
-          id,
-          input.environment,
-          input.mode,
-          input.subject?.type ?? null,
-          input.subject?.id ?? null,
-          input.customerEmail ?? null,
-          JSON.stringify(input.lineItems),
-          input.successUrl,
-          input.cancelUrl,
-          input.idempotencyKey ?? null,
-          JSON.stringify(metadata),
-        ]
+      return await withUserContext(
+        this.getPool(),
+        this.getSafeUserContext(user),
+        async (client) => {
+          const result = await client.query(
+            `INSERT INTO payments.checkout_sessions (
+             id,
+             environment,
+             mode,
+             status,
+             subject_type,
+             subject_id,
+             customer_email,
+             line_items,
+             success_url,
+             cancel_url,
+             idempotency_key,
+             metadata
+           )
+           VALUES ($1, $2, $3, 'initialized', $4, $5, $6, $7::JSONB, $8, $9, $10, $11::JSONB)
+           ON CONFLICT (environment, idempotency_key)
+             WHERE idempotency_key IS NOT NULL
+           DO NOTHING`,
+            [
+              id,
+              input.environment,
+              input.mode,
+              input.subject?.type ?? null,
+              input.subject?.id ?? null,
+              input.customerEmail ?? null,
+              JSON.stringify(input.lineItems),
+              input.successUrl,
+              input.cancelUrl,
+              input.idempotencyKey ?? null,
+              JSON.stringify(metadata),
+            ]
+          );
+
+          if (result.rowCount !== 0) {
+            return { id, existingCheckoutSession: null };
+          }
+
+          const existingCheckoutSession = await this.findMatchingIdempotentCheckoutSession(
+            client,
+            input,
+            metadata
+          );
+          return { id: existingCheckoutSession.id, existingCheckoutSession };
+        }
       );
-      inserted = result.rowCount !== 0;
-      if (!inserted) {
-        existingCheckoutSession = await this.findMatchingIdempotentCheckoutSession(
-          client,
-          input,
-          metadata
-        );
-      }
-      await client.query('COMMIT');
     } catch (error) {
-      await client.query('ROLLBACK').catch(() => {});
       throw this.normalizeCheckoutInsertError(error);
-    } finally {
-      await client.query('RESET ROLE').catch(() => {});
-      client.release();
     }
-
-    if (!inserted) {
-      if (!existingCheckoutSession) {
-        throw new AppError('Checkout session was not created', 500, ERROR_CODES.INTERNAL_ERROR);
-      }
-      return { id: existingCheckoutSession.id, existingCheckoutSession };
-    }
-
-    return { id, existingCheckoutSession: null };
   }
 
   async markCheckoutSessionOpen(
@@ -290,17 +275,19 @@ export class PaymentCheckoutService {
       throw new AppError(
         'Idempotency key is already used for another checkout request',
         409,
-        ERROR_CODES.ALREADY_EXISTS
+        ERROR_CODES.PAYMENT_CHECKOUT_ALREADY_EXISTS
       );
     }
 
     return this.normalizeCheckoutSessionRow(row);
   }
 
-  private async setRequestContext(client: PoolClient, user: CheckoutUserContext): Promise<void> {
-    await client.query("SELECT set_config('request.jwt.claim.sub', $1, true)", [user.id]);
-    await client.query("SELECT set_config('request.jwt.claim.role', $1, true)", [user.role]);
-    await client.query("SELECT set_config('request.jwt.claim.email', $1, true)", [user.email]);
+  private getSafeUserContext(user: UserContext): UserContext {
+    return {
+      id: user.id,
+      email: user.email,
+      role: this.getSafeRole(user.role),
+    };
   }
 
   private getSafeRole(role: RoleSchema): RoleSchema {

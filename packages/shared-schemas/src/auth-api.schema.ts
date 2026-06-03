@@ -53,7 +53,8 @@ export const createSessionRequestSchema = z.object({
 export const createAdminSessionRequestSchema = createSessionRequestSchema;
 
 /**
- * POST /api/auth/refresh - Refresh session
+ * POST /api/auth/refresh - Refresh user session
+ * POST /api/auth/admin/refresh - Refresh dashboard admin session
  * Non-web clients send refreshToken in the request body
  */
 export const refreshSessionRequestSchema = z.object({
@@ -295,16 +296,18 @@ const pkceRegex = /^[A-Za-z0-9._~-]+$/;
  * Query params for PKCE flow as per RFC 7636
  * Note: code_challenge uses snake_case as per OAuth 2.0 PKCE specification
  */
-export const oAuthInitRequestSchema = z.object({
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  redirect_uri: z.string().url().optional(),
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  code_challenge: z
-    .string()
-    .min(43, 'Code challenge must be at least 43 characters')
-    .max(128, 'Code challenge must be at most 128 characters')
-    .regex(pkceRegex, 'Code challenge must be base64url encoded'),
-});
+export const oAuthInitRequestSchema = z
+  .object({
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    redirect_uri: z.string({ required_error: 'Redirect URI is required' }).url(),
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    code_challenge: z
+      .string()
+      .min(43, 'Code challenge must be at least 43 characters')
+      .max(128, 'Code challenge must be at most 128 characters')
+      .regex(pkceRegex, 'Code challenge must be base64url encoded'),
+  })
+  .catchall(z.string());
 
 /**
  * POST /api/auth/oauth/exchange - Exchange OAuth code for tokens
@@ -359,9 +362,21 @@ export const getAuthConfigResponseSchema = authConfigSchema;
  * call in `getPublicAuthConfigResponseSchema`. This way the safer default
  * (admin-only) is what you get if you forget to think about it.
  */
+/**
+ * SMTP slice for the admin metadata response. Excludes id/createdAt/updatedAt
+ * (rendering metadata, not the row); password is never exposed — hasPassword
+ * is the only signal admins get about credential presence.
+ */
+export const adminSmtpMetadataSchema = smtpConfigSchema.omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const authConfigAdminResponseSchema = z.object({
   oAuthProviders: z.array(oAuthProvidersSchema),
   customOAuthProviders: z.array(customOAuthKeySchema),
+  smtpConfig: adminSmtpMetadataSchema,
   ...authConfigSchema.omit({
     id: true,
     updatedAt: true,
@@ -372,7 +387,9 @@ export const authConfigAdminResponseSchema = z.object({
 /**
  * Response for GET /api/auth/public-config — admin response minus
  * admin-only fields. This route is unauthenticated, so anything sensitive
- * MUST be omitted here.
+ * MUST be omitted here. SMTP host can leak internal infrastructure
+ * (e.g. internal corp mail server), so the entire smtpConfig slice is
+ * admin-only.
  */
 export const getPublicAuthConfigResponseSchema = authConfigAdminResponseSchema.omit({
   allowedRedirectUrls: true,
@@ -380,6 +397,7 @@ export const getPublicAuthConfigResponseSchema = authConfigAdminResponseSchema.o
   verifyEmailLinkExpiryMinutes: true,
   resetPasswordCodeExpiryMinutes: true,
   resetPasswordLinkExpiryMinutes: true,
+  smtpConfig: true,
 });
 
 // ============================================================================

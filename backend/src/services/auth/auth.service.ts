@@ -4,21 +4,11 @@ import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import logger from '@/utils/logger.js';
-import type {
-  UserSchema,
-  CreateUserResponse,
-  CreateSessionResponse,
-  VerifyEmailResponse,
-  ResetPasswordResponse,
-  CreateAdminSessionResponse,
-  AuthMetadataSchema,
-  OAuthProvidersSchema,
-  GetPublicAuthConfigResponse,
-} from '@insforge/shared-schemas';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { CustomOAuthConfigService } from '@/services/auth/custom-oauth-config.service.js';
 import { AuthConfigService } from './auth-config.service.js';
 import { AuthOTPService, OTPPurpose, OTPType } from './auth-otp.service.js';
+import { SmtpConfigService } from '@/services/email/smtp-config.service.js';
 import { GoogleOAuthProvider } from '@/providers/oauth/google.provider.js';
 import { GitHubOAuthProvider } from '@/providers/oauth/github.provider.js';
 import { DiscordOAuthProvider } from '@/providers/oauth/discord.provider.js';
@@ -40,12 +30,23 @@ import {
   OAuthUserData,
 } from '@/types/auth.js';
 import { ADMIN_ID } from '@/utils/constants.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
 import { EmailService } from '@/services/email/email.service.js';
 import { XOAuthProvider } from '@/providers/oauth/x.provider.js';
 import { AppleOAuthProvider } from '@/providers/oauth/apple.provider.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
+import {
+  ERROR_CODES,
+  type AuthMetadataSchema,
+  type CreateAdminSessionResponse,
+  type CreateSessionResponse,
+  type CreateUserResponse,
+  type GetPublicAuthConfigResponse,
+  type OAuthProvidersSchema,
+  type ResetPasswordResponse,
+  type UserSchema,
+  type VerifyEmailResponse,
+} from '@insforge/shared-schemas';
 
 /**
  * Simplified JWT-based auth service
@@ -198,7 +199,7 @@ export class AuthService {
       await client.query('ROLLBACK');
       // Postgres unique_violation
       if (e && typeof e === 'object' && 'code' in e && e.code === '23505') {
-        throw new AppError('User already exists', 409, ERROR_CODES.ALREADY_EXISTS);
+        throw new AppError('User already exists', 409, ERROR_CODES.AUTH_EMAIL_EXISTS);
       }
       throw e;
     } finally {
@@ -941,20 +942,36 @@ export class AuthService {
 
   /**
    * Admin auth metadata for /api/metadata (gated behind verifyAdmin).
-   * Includes allowedRedirectUrls so the CLI can render insforge.toml.
+   * Includes allowedRedirectUrls and smtpConfig so the CLI can render
+   * insforge.toml and probe backend capability for declarative config.
+   *
+   * smtpConfig.hasPassword is the only credential signal — the actual
+   * password is never returned by the SmtpConfigService.
    */
   async getMetadata(): Promise<AuthMetadataSchema> {
     const authConfigService = AuthConfigService.getInstance();
     const oAuthConfigService = OAuthConfigService.getInstance();
     const customOAuthConfigService = CustomOAuthConfigService.getInstance();
-    const [oAuthProviders, customOAuthConfigs, authConfig] = await Promise.all([
+    const smtpConfigService = SmtpConfigService.getInstance();
+    const [oAuthProviders, customOAuthConfigs, authConfig, smtpConfig] = await Promise.all([
       oAuthConfigService.getConfiguredProviders(),
       customOAuthConfigService.listConfigs(),
       authConfigService.getAuthConfig(),
+      smtpConfigService.getSmtpConfig(),
     ]);
     return {
       oAuthProviders,
       customOAuthProviders: customOAuthConfigs.map((config) => config.key),
+      smtpConfig: {
+        enabled: smtpConfig.enabled,
+        host: smtpConfig.host,
+        port: smtpConfig.port,
+        username: smtpConfig.username,
+        hasPassword: smtpConfig.hasPassword,
+        senderEmail: smtpConfig.senderEmail,
+        senderName: smtpConfig.senderName,
+        minIntervalSeconds: smtpConfig.minIntervalSeconds,
+      },
       requireEmailVerification: authConfig.requireEmailVerification,
       passwordMinLength: authConfig.passwordMinLength,
       requireNumber: authConfig.requireNumber,
@@ -975,26 +992,34 @@ export class AuthService {
   /**
    * Generate OAuth authorization URL for any supported provider
    */
-  async generateOAuthUrl(provider: OAuthProvidersSchema, state?: string): Promise<string> {
+  async generateOAuthUrl(
+    provider: OAuthProvidersSchema,
+    state?: string,
+    additionalParams?: Record<string, string>
+  ): Promise<string> {
     switch (provider) {
       case 'google':
-        return this.googleOAuthProvider.generateOAuthUrl(state);
+        return this.googleOAuthProvider.generateOAuthUrl(state, additionalParams);
       case 'github':
-        return this.githubOAuthProvider.generateOAuthUrl(state);
+        return this.githubOAuthProvider.generateOAuthUrl(state, additionalParams);
       case 'discord':
-        return this.discordOAuthProvider.generateOAuthUrl(state);
+        return this.discordOAuthProvider.generateOAuthUrl(state, additionalParams);
       case 'linkedin':
-        return this.linkedinOAuthProvider.generateOAuthUrl(state);
+        return this.linkedinOAuthProvider.generateOAuthUrl(state, additionalParams);
       case 'facebook':
-        return this.facebookOAuthProvider.generateOAuthUrl(state);
+        return this.facebookOAuthProvider.generateOAuthUrl(state, additionalParams);
       case 'microsoft':
-        return this.microsoftOAuthProvider.generateOAuthUrl(state);
+        return this.microsoftOAuthProvider.generateOAuthUrl(state, additionalParams);
       case 'x':
-        return this.xOAuthProvider.generateOAuthUrl(state);
+        return this.xOAuthProvider.generateOAuthUrl(state, additionalParams);
       case 'apple':
-        return this.appleOAuthProvider.generateOAuthUrl(state);
+        return this.appleOAuthProvider.generateOAuthUrl(state, additionalParams);
       default:
-        throw new Error(`OAuth provider ${provider} is not implemented yet.`);
+        throw new AppError(
+          `OAuth provider '${provider}' is not implemented yet.`,
+          501,
+          ERROR_CODES.AUTH_UNSUPPORTED_PROVIDER
+        );
     }
   }
 
@@ -1033,7 +1058,11 @@ export class AuthService {
         userData = await this.appleOAuthProvider.handleCallback(payload);
         break;
       default:
-        throw new Error(`OAuth provider ${provider} is not implemented yet.`);
+        throw new AppError(
+          `OAuth provider '${provider}' is not implemented yet.`,
+          501,
+          ERROR_CODES.AUTH_UNSUPPORTED_PROVIDER
+        );
     }
 
     return this.findOrCreateThirdPartyUser(
@@ -1078,9 +1107,12 @@ export class AuthService {
       case 'apple':
         userData = this.appleOAuthProvider.handleSharedCallback(payloadData);
         break;
-      case 'microsoft':
       default:
-        throw new Error(`OAuth provider ${provider} is not supported for shared callback.`);
+        throw new AppError(
+          `OAuth provider '${provider}' is not supported for shared callback.`,
+          501,
+          ERROR_CODES.AUTH_UNSUPPORTED_PROVIDER
+        );
     }
 
     return this.findOrCreateThirdPartyUser(
@@ -1375,7 +1407,7 @@ export class AuthService {
     );
 
     if (result.rows.length === 0) {
-      throw new AppError('User not found', 404, ERROR_CODES.NOT_FOUND);
+      throw new AppError('User not found', 404, ERROR_CODES.AUTH_USER_NOT_FOUND);
     }
 
     return {

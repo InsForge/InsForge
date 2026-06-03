@@ -688,6 +688,9 @@ paths:
                     $ref: '#/components/schemas/UserResponse'
                   accessToken:
                     type: string
+                  csrfToken:
+                    type: string
+                    description: CSRF token for `/api/auth/admin/refresh`
         '401':
           description: Invalid credentials
         '403':
@@ -725,12 +728,67 @@ paths:
                   accessToken:
                     type: string
                     description: Internal JWT for admin authentication
+                  csrfToken:
+                    type: string
+                    description: CSRF token for `/api/auth/admin/refresh`
         '400':
           description: Invalid authorization code or JWT verification failed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/admin/refresh:
+    post:
+      summary: Refresh admin dashboard access token
+      description: Uses the dashboard-only httpOnly `insforge_admin_refresh_token` cookie with an `X-CSRF-Token` header.
+      tags:
+        - Admin
+      parameters:
+        - name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+          description: CSRF token returned from admin login or admin refresh
+      responses:
+        '200':
+          description: Admin token refreshed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/UserResponse'
+                  accessToken:
+                    type: string
+                  csrfToken:
+                    type: string
+                    description: CSRF token for the next admin refresh request
+        '401':
+          description: No admin refresh token provided or project admin not found
+        '403':
+          description: Invalid CSRF token
+
+  /api/auth/admin/logout:
+    post:
+      summary: Logout admin dashboard session
+      description: Clears the dashboard-only `insforge_admin_refresh_token` cookie.
+      tags:
+        - Admin
+      responses:
+        '200':
+          description: Logged out successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
 
   /api/auth/tokens/anon:
     post:

@@ -1,509 +1,95 @@
 import { describe, test, expect } from 'vitest';
 import { DatabaseAdvanceService } from '../../src/services/database/database-advance.service';
-import { AppError } from '../../src/api/middlewares/error';
-import { ERROR_CODES } from '../../src/types/error-constants';
+import { AppError } from '../../src/utils/errors';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 
 describe('DatabaseAdvanceService - sanitizeQuery', () => {
   const service = DatabaseAdvanceService.getInstance();
 
-  describe('auth schema blocking', () => {
-    test('blocks DELETE FROM auth.users', () => {
-      const query = "DELETE FROM auth.users WHERE id = '00000000-0000-0000-0000-000000000001'";
+  test('blocks database-level operations', () => {
+    const queries = [
+      'DROP DATABASE customer_project',
+      'CREATE DATABASE customer_project',
+      'ALTER DATABASE customer_project SET timezone TO UTC',
+    ];
+
+    for (const query of queries) {
       expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-      expect(() => service.sanitizeQuery(query)).toThrow(/auth schema/i);
-    });
+    }
+  });
 
-    test('blocks DELETE FROM quoted auth schema', () => {
-      const query = 'DELETE FROM "auth"."users" WHERE id = $1';
+  test('blocks role and session authorization management', () => {
+    const queries = [
+      'SET ROLE postgres',
+      'SET LOCAL ROLE postgres',
+      'RESET ROLE',
+      'SET SESSION AUTHORIZATION postgres',
+      'RESET SESSION AUTHORIZATION',
+      'RESET ALL',
+      'SET search_path TO public',
+      "SELECT set_config('search_path', 'public', false)",
+      'SET statement_timeout = 0',
+      'RESET statement_timeout',
+      'CREATE ROLE app_owner',
+      'ALTER ROLE project_admin SET search_path TO public',
+      'DROP ROLE app_owner',
+      'GRANT postgres TO project_admin',
+    ];
+
+    for (const query of queries) {
       expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
+    }
+  });
 
-    test('blocks TRUNCATE auth.users', () => {
-      const query = 'TRUNCATE TABLE auth.users';
+  test('blocks transaction control in raw SQL', () => {
+    const queries = ['BEGIN', 'COMMIT', 'ROLLBACK', 'SAVEPOINT before_change'];
+
+    for (const query of queries) {
       expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
+    }
+  });
 
-    test('blocks TRUNCATE without TABLE keyword', () => {
-      const query = 'TRUNCATE auth.users';
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
-
-    test('blocks DROP TABLE auth.users', () => {
-      const query = 'DROP TABLE auth.users';
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
-
-    test('blocks DROP TABLE with IF EXISTS', () => {
-      const query = 'DROP TABLE IF EXISTS auth.users';
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
-
-    test('blocks DROP INDEX on auth schema', () => {
-      const query = 'DROP INDEX auth.users_email_idx';
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
-
-    test('blocks DROP TRIGGER on auth schema tables', () => {
-      const queries = [
-        'DROP TRIGGER user_created_trigger ON auth.users',
-        'DROP TRIGGER IF EXISTS user_created_trigger ON auth.users',
-        'DROP TRIGGER trigger_name ON "auth"."users"',
-      ];
-
-      queries.forEach((query) => {
-        expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-      });
-    });
-
-    test('blocks DROP FUNCTION on auth schema', () => {
-      const query = 'DROP FUNCTION auth.create_user_profile()';
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
-
-    test('blocks DROP VIEW on auth schema', () => {
-      const query = 'DROP VIEW auth.user_summary';
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
-
-    test('blocks DROP SCHEMA auth (no dot after auth)', () => {
-      const queries = [
-        'DROP SCHEMA auth',
-        'DROP SCHEMA auth CASCADE',
-        'DROP SCHEMA IF EXISTS auth',
-        'DROP SCHEMA "auth" CASCADE',
-      ];
-
-      queries.forEach((query) => {
-        expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-      });
-    });
-
-    test('allows SELECT FROM auth.users (read-only)', () => {
-      const query = 'SELECT * FROM auth.users LIMIT 1';
-      expect(() => service.sanitizeQuery(query)).not.toThrow();
-    });
-
-    test('blocks case-insensitive AUTH.users', () => {
-      const query = 'DELETE FROM AUTH.users WHERE id = $1';
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
-
-    test('blocks mixed case Auth.Users', () => {
-      const query = 'DELETE FROM Auth.Users WHERE id = $1';
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
-
-    test('blocks auth schema with quoted table name', () => {
-      const query = 'DELETE FROM auth."users" WHERE id = $1';
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
-
-    test('blocks DELETE with whitespace before dot in auth schema', () => {
-      const queries = [
-        'DELETE FROM auth . users WHERE id = $1',
-        'DELETE FROM auth  .users WHERE id = $1',
-        'DELETE FROM auth\t.users WHERE id = $1',
-      ];
-
-      queries.forEach((query) => {
-        expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-      });
-    });
-
-    test('blocks UPDATE on auth schema', () => {
-      const queries = [
-        'UPDATE auth.users SET email = $1 WHERE id = $2',
-        'UPDATE auth.user_providers SET provider = $1 WHERE id = $2',
-      ];
-
-      queries.forEach((query) => {
-        expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-      });
-    });
-
-    test('blocks DELETE on other auth schema tables', () => {
-      const queries = [
-        'DELETE FROM auth.user_providers WHERE id = $1',
-        'DELETE FROM auth.config WHERE id = $1',
-        'DELETE FROM auth.oauth_configs WHERE id = $1',
-      ];
-
-      queries.forEach((query) => {
-        expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-      });
-    });
-
-    test('blocks TRUNCATE on other auth schema tables', () => {
-      const queries = ['TRUNCATE TABLE auth.user_providers', 'TRUNCATE auth.config'];
-
-      queries.forEach((query) => {
-        expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-      });
-    });
-
-    test('blocks DROP operations on other auth schema tables', () => {
-      const queries = [
-        'DROP TABLE auth.user_providers',
-        'DROP INDEX auth.config_key_idx',
-        'DROP FUNCTION auth.some_function()',
-        'DROP VIEW auth.user_view',
-        'DROP SEQUENCE auth.user_id_seq',
-        'DROP POLICY auth_policy ON auth.users',
-        'DROP TYPE auth.user_type',
-        'DROP DOMAIN auth.email_domain',
-      ];
-
-      queries.forEach((query) => {
-        expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-      });
-    });
-
-    test('allows SELECT on other auth schema tables', () => {
-      const queries = [
-        'SELECT * FROM auth.email_otps',
-        'SELECT * FROM auth.user_providers',
-        'SELECT * FROM auth.config',
-      ];
-
-      queries.forEach((query) => {
-        expect(() => service.sanitizeQuery(query)).not.toThrow();
-      });
-    });
-
-    test('blocks INSERT into auth schema', () => {
-      const queries = [
-        "INSERT INTO auth.users (email, password) VALUES ('test@example.com', 'hashed')",
-        'INSERT INTO auth.user_providers (user_id, provider) VALUES ($1, $2)',
-      ];
-
-      queries.forEach((query) => {
-        expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-      });
-    });
-
-    test('blocks CREATE TRIGGER on auth schema', () => {
-      const query =
-        'CREATE TRIGGER user_profile_trigger AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION create_user_profile()';
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
-
-    test('blocks ALTER TABLE and CREATE INDEX on auth schema', () => {
-      const queries = [
-        'ALTER TABLE auth.users ADD CONSTRAINT email_unique UNIQUE (email)',
-        'CREATE INDEX idx_auth_users_email ON auth.users(email)',
-      ];
-
-      queries.forEach((query) => {
-        expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-      });
-    });
-
-    test('throws AppError with FORBIDDEN error code', () => {
-      const query = 'DELETE FROM auth.users WHERE id = $1';
-      try {
-        service.sanitizeQuery(query);
-        expect.fail('Should have thrown an error');
-      } catch (error) {
-        expect(error).toBeInstanceOf(AppError);
-        if (error instanceof AppError) {
-          expect(error.statusCode).toBe(403);
-          expect(error.code).toBe(ERROR_CODES.FORBIDDEN);
-          expect(error.message).toContain('auth schema');
-        }
+  test('throws AppError with 403 FORBIDDEN for execution context violations', () => {
+    try {
+      service.sanitizeQuery('RESET ROLE');
+      expect.fail('Should have thrown an error');
+    } catch (error) {
+      expect(error).toBeInstanceOf(AppError);
+      if (error instanceof AppError) {
+        expect(error.statusCode).toBe(403);
+        expect(error.code).toBe(ERROR_CODES.FORBIDDEN);
+        expect(error.message).toContain('execution role');
       }
-    });
+    }
   });
 
-  describe('allowed queries', () => {
-    test('allows DELETE from other tables even when auth is referenced in subquery', () => {
-      const queries = [
-        'DELETE FROM orders WHERE user_id NOT IN (SELECT id FROM auth.users)',
-        'DELETE FROM user_profiles WHERE id IN (SELECT user_id FROM auth.sessions WHERE expired = true)',
-        'DELETE FROM public.users WHERE email IN (SELECT email FROM auth.users WHERE verified = false)',
-      ];
+  test('allows managed schema statements to be decided by project_admin database grants', () => {
+    const queries = [
+      "INSERT INTO auth.users (email, password_hash) VALUES ('demo@example.com', 'hash')",
+      'CREATE TRIGGER user_profile_trigger AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public.create_user_profile()',
+      'SELECT * FROM pg_catalog.pg_class LIMIT 1',
+      "INSERT INTO storage.objects (bucket_id, key, name) VALUES ('avatars', 'u1/a.png', 'a.png')",
+      'ALTER TABLE realtime.messages ENABLE ROW LEVEL SECURITY',
+      "UPDATE payments.customers SET email = 'new@example.com' WHERE id = 'cus_123'",
+      "INSERT INTO system.custom_migrations (version, name, statements) VALUES ('1', 'manual', ARRAY['SELECT 1'])",
+    ];
 
-      queries.forEach((query) => {
-        expect(() => service.sanitizeQuery(query)).not.toThrow();
-      });
-    });
-
-    test('allows queries with auth schema in string literals or comments', () => {
-      const queries = [
-        "SELECT 'DELETE FROM auth.users' AS example_query",
-        '/* DELETE FROM auth.users */ SELECT * FROM public.users',
-        "SELECT 'DROP TABLE auth.users' AS test",
-      ];
-
-      queries.forEach((query) => {
-        expect(() => service.sanitizeQuery(query)).not.toThrow();
-      });
-    });
-
-    test('blocks DELETE FROM auth even when previous line has a comment', () => {
-      const queries = [
-        'SELECT 1; -- some comment\nDELETE FROM auth.users WHERE id = 1',
-        '-- previous comment\nDELETE FROM auth.users',
-        '/* block comment */\nDELETE FROM auth.users WHERE id = 1',
-      ];
-
-      queries.forEach((query) => {
-        expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-      });
-    });
-
-    test('allows SELECT from public schema', () => {
-      const query = 'SELECT 1 as test';
+    for (const query of queries) {
       expect(() => service.sanitizeQuery(query)).not.toThrow();
-    });
-
-    test('allows auth.uid() function calls', () => {
-      const queries = [
-        'SELECT auth.uid()',
-        'SELECT * FROM users WHERE id = auth.uid()',
-        'CREATE POLICY test ON users FOR SELECT USING (id = auth.uid())',
-      ];
-
-      queries.forEach((query) => {
-        expect(() => service.sanitizeQuery(query)).not.toThrow();
-      });
-    });
-
-    test('allows auth.role() and auth.email() function calls', () => {
-      const queries = [
-        'SELECT auth.role()',
-        'SELECT auth.email()',
-        'SELECT * FROM users WHERE email = auth.email()',
-      ];
-
-      queries.forEach((query) => {
-        expect(() => service.sanitizeQuery(query)).not.toThrow();
-      });
-    });
-
-    test('allows DELETE from public schema tables', () => {
-      const query = 'DELETE FROM users WHERE id = $1';
-      expect(() => service.sanitizeQuery(query)).not.toThrow();
-    });
-
-    test('allows INSERT into public schema tables', () => {
-      const query = "INSERT INTO products (name) VALUES ('test')";
-      expect(() => service.sanitizeQuery(query)).not.toThrow();
-    });
-
-    test('allows UPDATE public schema tables', () => {
-      const query = 'UPDATE products SET price = 100 WHERE id = $1';
-      expect(() => service.sanitizeQuery(query)).not.toThrow();
-    });
-
-    test('allows CREATE TABLE in public schema', () => {
-      const query = 'CREATE TABLE test_table (id UUID PRIMARY KEY)';
-      expect(() => service.sanitizeQuery(query)).not.toThrow();
-    });
+    }
   });
 
-  describe('system schema blocking', () => {
-    test('blocks CREATE OR REPLACE FUNCTION on system schema', () => {
-      const query = `CREATE OR REPLACE FUNCTION system.update_updated_at()
-        RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql`;
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-      expect(() => service.sanitizeQuery(query)).toThrow(/system/i);
-    });
+  test('allows public schema DDL and grants', () => {
+    const queries = [
+      'CREATE TABLE public.products (id uuid PRIMARY KEY)',
+      'ALTER TABLE public.products ENABLE ROW LEVEL SECURITY',
+      'CREATE POLICY products_select ON public.products FOR SELECT TO authenticated USING (true)',
+      'GRANT SELECT ON public.products TO authenticated',
+      'DROP POLICY products_select ON public.products',
+    ];
 
-    test('blocks SET search_path', () => {
-      const query = 'SET search_path TO system, public';
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
-
-    test('blocks ALTER FUNCTION on system schema', () => {
-      const query = 'ALTER FUNCTION system.update_updated_at() SECURITY DEFINER';
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
-
-    test('blocks CREATE TRIGGER on system schema table', () => {
-      const query =
-        'CREATE TRIGGER t BEFORE UPDATE ON system.secrets FOR EACH ROW EXECUTE FUNCTION public.my_func()';
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
-
-    test('blocks CREATE TRIGGER referencing a system schema function', () => {
-      const query =
-        'CREATE TRIGGER t BEFORE UPDATE ON my_table FOR EACH ROW EXECUTE FUNCTION system.update_updated_at()';
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
-
-    test('blocks DROP FUNCTION on system schema', () => {
-      const query = 'DROP FUNCTION system.update_updated_at()';
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
-
-    test('blocks DROP TABLE on system schema', () => {
-      const query = 'DROP TABLE system.secrets';
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
-
-    test('blocks DROP SCHEMA system', () => {
-      const query = 'DROP SCHEMA system CASCADE';
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
-
-    test('blocks CREATE TABLE on system schema', () => {
-      const query = 'CREATE TABLE system.foo (id uuid PRIMARY KEY)';
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
-
-    test('blocks ALTER TABLE on system schema', () => {
-      const query = 'ALTER TABLE system.secrets ADD COLUMN foo TEXT';
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
-
-    test('blocks DROP TYPE on system schema', () => {
-      const query = 'DROP TYPE system.my_type';
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
-
-    test('blocks DROP DOMAIN on system schema', () => {
-      const query = 'DROP DOMAIN system.my_domain';
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
-
-    test('blocks INSERT on system schema', () => {
-      const query = "INSERT INTO system.secrets (key, value) VALUES ('a', 'b')";
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
-
-    test('blocks UPDATE on system schema', () => {
-      const query = "UPDATE system.secrets SET value = 'x' WHERE key = 'a'";
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
-
-    test('blocks DELETE on system schema', () => {
-      const query = "DELETE FROM system.secrets WHERE key = 'test'";
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
-
-    test('blocks TRUNCATE on system schema', () => {
-      const query = 'TRUNCATE system.audit_logs';
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
-
-    test('allows SELECT on system schema (read-only)', () => {
-      const query = 'SELECT * FROM system.secrets';
+    for (const query of queries) {
       expect(() => service.sanitizeQuery(query)).not.toThrow();
-    });
-
-    test('allows CREATE TABLE in public schema (not blocked)', () => {
-      const query = 'CREATE TABLE public.foo (id uuid PRIMARY KEY)';
-      expect(() => service.sanitizeQuery(query)).not.toThrow();
-    });
-
-    test('allows CREATE FUNCTION in public schema', () => {
-      const query = `CREATE OR REPLACE FUNCTION public.update_updated_date()
-        RETURNS TRIGGER AS $$ BEGIN NEW.updated_date = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql`;
-      expect(() => service.sanitizeQuery(query)).not.toThrow();
-    });
-
-    test('throws AppError with 403 FORBIDDEN for system schema violations', () => {
-      const query = 'DROP TABLE system.secrets';
-      try {
-        service.sanitizeQuery(query);
-        expect.fail('Should have thrown an error');
-      } catch (error) {
-        expect(error).toBeInstanceOf(AppError);
-        if (error instanceof AppError) {
-          expect(error.statusCode).toBe(403);
-          expect(error.code).toBe(ERROR_CODES.FORBIDDEN);
-        }
-      }
-    });
-  });
-
-  describe('other managed schema blocking', () => {
-    test('allows storage RLS setup', () => {
-      const alterQuery = 'ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY';
-      expect(() => service.sanitizeQuery(alterQuery)).not.toThrow();
-
-      const query =
-        'CREATE POLICY storage_owner_select ON storage.objects FOR SELECT TO authenticated USING (true)';
-      expect(() => service.sanitizeQuery(query)).not.toThrow();
-    });
-
-    test('allows payments session RLS setup', () => {
-      const queries = [
-        'ALTER TABLE payments.checkout_sessions ENABLE ROW LEVEL SECURITY',
-        'ALTER TABLE payments.customer_portal_sessions FORCE ROW LEVEL SECURITY',
-        `CREATE POLICY checkout_subject_guard
-         ON payments.checkout_sessions
-         FOR INSERT TO authenticated
-         WITH CHECK (subject_type = 'team')`,
-      ];
-
-      queries.forEach((query) => {
-        expect(() => service.sanitizeQuery(query)).not.toThrow();
-      });
-    });
-
-    test('blocks INSERT on storage schema', () => {
-      const query = "INSERT INTO storage.objects (name) VALUES ('avatar.png')";
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-      expect(() => service.sanitizeQuery(query)).toThrow(/storage schema/i);
-    });
-
-    test('blocks broad writes on payments session tables', () => {
-      const queries = [
-        `INSERT INTO payments.checkout_sessions
-         (environment, mode, success_url, cancel_url)
-         VALUES ('test', 'payment', 'https://example.com/success', 'https://example.com/cancel')`,
-        'ALTER TABLE payments.checkout_sessions ADD COLUMN internal_note TEXT',
-      ];
-
-      queries.forEach((query) => {
-        expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-        expect(() => service.sanitizeQuery(query)).toThrow(/payments schema/i);
-      });
-    });
-
-    test('blocks renames on managed extension tables', () => {
-      const queries = [
-        'ALTER TABLE realtime.channels RENAME TO realtime_channels_v2',
-        'ALTER TABLE realtime.channels RENAME COLUMN description TO details',
-      ];
-
-      queries.forEach((query) => {
-        expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-        expect(() => service.sanitizeQuery(query)).toThrow(/realtime schema/i);
-      });
-    });
-
-    test('blocks CREATE INDEX on storage schema', () => {
-      const query = 'CREATE INDEX idx_storage_objects_name ON storage.objects(name)';
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
-
-    test('allows SELECT on storage schema', () => {
-      const query = 'SELECT * FROM storage.objects';
-      expect(() => service.sanitizeQuery(query)).not.toThrow();
-    });
-  });
-
-  describe('other blocked operations', () => {
-    test('blocks DROP DATABASE', () => {
-      const query = 'DROP DATABASE testdb';
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
-
-    test('blocks CREATE DATABASE', () => {
-      const query = 'CREATE DATABASE testdb';
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
-
-    test('blocks ALTER DATABASE', () => {
-      const query = 'ALTER DATABASE testdb SET connection_limit = 100';
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
-
-    test('blocks pg_catalog access', () => {
-      const query = 'SELECT * FROM pg_catalog.pg_tables';
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
+    }
   });
 });

@@ -117,7 +117,7 @@ export default function SQLEditorPage() {
 
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [editingTabName, setEditingTabName] = useState('');
-  const [resultView, setResultView] = useState<'result' | 'chart'>('result');
+  const [resultView, setResultView] = useState<'result' | 'table'>('result');
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { executeSQL, isPending, data, isSuccess, error, isError } = useRawSQL({
@@ -316,7 +316,7 @@ export default function SQLEditorPage() {
                   </span>
                 )}
               </Tab>
-              <Tab value="chart">Chart</Tab>
+              <Tab value="table">Table View</Tab>
             </Tabs>
             {/* Run Button */}
             <Button onClick={handleExecuteQuery} disabled={isPending || !activeTab?.query.trim()}>

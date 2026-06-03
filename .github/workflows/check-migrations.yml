@@ -1,0 +1,25 @@
+name: Check Migrations
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ '*' ]
+
+jobs:
+  check-duplicate-numbers:
+    name: Check for duplicate migration numbers
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Check for duplicate migration numbers
+        run: node scripts/check-migration-duplicates.js
+        working-directory: backend

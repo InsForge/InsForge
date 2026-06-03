@@ -1,15 +1,15 @@
 import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
-import type {
-  RealtimeChannel,
-  CreateChannelRequest,
-  UpdateChannelRequest,
-  RealtimeMetadataSchema,
-  RlsPolicy,
-  RealtimePermissionsResponse,
+import {
+  ERROR_CODES,
+  type RealtimeChannel,
+  type CreateChannelRequest,
+  type UpdateChannelRequest,
+  type RealtimeMetadataSchema,
+  type RlsPolicy,
+  type RealtimePermissionsResponse,
 } from '@insforge/shared-schemas';
 
 const SYSTEM_POLICIES = ['project_admin_policy'];
@@ -117,7 +117,7 @@ export class RealtimeChannelService {
   async update(id: string, input: UpdateChannelRequest): Promise<RealtimeChannel> {
     const existing = await this.getById(id);
     if (!existing) {
-      throw new AppError('Channel not found', 404, ERROR_CODES.NOT_FOUND);
+      throw new AppError('Channel not found', 404, ERROR_CODES.REALTIME_CHANNEL_NOT_FOUND);
     }
 
     if (input.pattern) {
@@ -150,7 +150,7 @@ export class RealtimeChannelService {
   async delete(id: string): Promise<void> {
     const existing = await this.getById(id);
     if (!existing) {
-      throw new AppError('Channel not found', 404, ERROR_CODES.NOT_FOUND);
+      throw new AppError('Channel not found', 404, ERROR_CODES.REALTIME_CHANNEL_NOT_FOUND);
     }
 
     await this.getPool().query('DELETE FROM realtime.channels WHERE id = $1', [id]);
@@ -230,7 +230,7 @@ export class RealtimeChannelService {
       throw new AppError(
         'Invalid channel pattern. Use alphanumeric characters, colons, hyphens, and % for wildcards.',
         400,
-        ERROR_CODES.INVALID_INPUT
+        ERROR_CODES.REALTIME_INVALID_CHANNEL_PATTERN
       );
     }
   }

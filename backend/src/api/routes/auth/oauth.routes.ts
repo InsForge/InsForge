@@ -5,8 +5,7 @@ import { AuthConfigService } from '@/services/auth/auth-config.service.js';
 import { OAuthPKCEService } from '@/services/auth/oauth-pkce.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
 import { successResponse } from '@/utils/response.js';
 import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
 import { setRefreshTokenCookie } from '@/utils/cookies.js';
@@ -17,6 +16,7 @@ import logger from '@/utils/logger.js';
 import jwt from 'jsonwebtoken';
 
 import {
+  ERROR_CODES,
   createOAuthConfigRequestSchema,
   updateOAuthConfigRequestSchema,
   oAuthInitRequestSchema,
@@ -76,7 +76,7 @@ router.get(
         throw new AppError(
           `OAuth configuration for ${provider} not found`,
           404,
-          ERROR_CODES.NOT_FOUND
+          ERROR_CODES.AUTH_OAUTH_CONFIG_NOT_FOUND
         );
       }
 
@@ -212,7 +212,7 @@ router.delete(
         throw new AppError(
           `OAuth configuration for ${provider} not found`,
           404,
-          ERROR_CODES.NOT_FOUND
+          ERROR_CODES.AUTH_OAUTH_CONFIG_NOT_FOUND
         );
       }
 
@@ -264,13 +264,9 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
       );
     }
 
-    const { redirect_uri, code_challenge } = queryValidation.data;
+    const { redirect_uri, code_challenge, ...additionalParams } = queryValidation.data;
     const validatedProvider = providerValidation.data;
     const redirectUri = redirect_uri;
-
-    if (!redirectUri) {
-      throw new AppError('Redirect URI is required', 400, ERROR_CODES.INVALID_INPUT);
-    }
 
     if (!(await authConfigService.validateRedirectUrl(redirectUri))) {
       throw new AppError(
@@ -293,7 +289,7 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
       expiresIn: '1h', // Set expiration time for the state token
     });
 
-    const authUrl = await authService.generateOAuthUrl(validatedProvider, state);
+    const authUrl = await authService.generateOAuthUrl(validatedProvider, state, additionalParams);
     successResponse(res, { authUrl });
   } catch (error) {
     logger.error(`${req.params.provider} OAuth error`, { error });
@@ -561,8 +557,6 @@ router.post('/exchange', async (req: Request, res: Response, next: NextFunction)
     const result = await oAuthPKCEService.exchangeCode(code, code_verifier);
 
     const tokenManager = TokenManager.getInstance();
-    const refreshToken = tokenManager.generateRefreshToken(result.user.id);
-
     const socket = SocketManager.getInstance();
     socket.broadcastToRoom(
       'role:project_admin',
@@ -572,8 +566,11 @@ router.post('/exchange', async (req: Request, res: Response, next: NextFunction)
     );
 
     if (clientType === 'web') {
+      const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
+        result.user.id,
+        'user'
+      );
       setRefreshTokenCookie(res, refreshToken);
-      const csrfToken = tokenManager.generateCsrfToken(refreshToken);
 
       successResponse(res, {
         accessToken: result.accessToken,
@@ -581,6 +578,7 @@ router.post('/exchange', async (req: Request, res: Response, next: NextFunction)
         csrfToken,
       });
     } else {
+      const refreshToken = tokenManager.generateRefreshToken(result.user.id, 'user');
       successResponse(res, {
         accessToken: result.accessToken,
         user: result.user,

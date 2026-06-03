@@ -32,7 +32,10 @@ export class AppleOAuthProvider implements OAuthProvider {
   /**
    * Generate Apple OAuth authorization URL
    */
-  async generateOAuthUrl(state?: string): Promise<string> {
+  async generateOAuthUrl(
+    state?: string,
+    additionalParams?: Record<string, string>
+  ): Promise<string> {
     const oAuthConfigService = OAuthConfigService.getInstance();
     const config = await oAuthConfigService.getConfigByProvider('apple');
 
@@ -58,7 +61,17 @@ export class AppleOAuthProvider implements OAuthProvider {
           },
         }
       );
-      return response.data.auth_url || response.data.url || '';
+      const sharedAuthUrl = response.data.auth_url || response.data.url;
+      if (!sharedAuthUrl) {
+        throw new Error('Shared Apple OAuth did not return an authorization URL');
+      }
+      const authUrl = new URL(sharedAuthUrl);
+      Object.entries(additionalParams ?? {}).forEach(([key, value]) => {
+        if (!authUrl.searchParams.has(key)) {
+          authUrl.searchParams.set(key, value);
+        }
+      });
+      return authUrl.toString();
     }
 
     logger.debug('Apple OAuth Config (fresh from DB):', {
@@ -77,6 +90,11 @@ export class AppleOAuthProvider implements OAuthProvider {
     if (state) {
       authUrl.searchParams.set('state', state);
     }
+    Object.entries(additionalParams ?? {}).forEach(([key, value]) => {
+      if (!authUrl.searchParams.has(key)) {
+        authUrl.searchParams.set(key, value);
+      }
+    });
 
     return authUrl.toString();
   }

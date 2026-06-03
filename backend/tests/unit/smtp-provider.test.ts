@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SmtpEmailProvider } from '../../src/providers/email/smtp.provider';
-import { AppError } from '../../src/api/middlewares/error';
+import { AppError } from '../../src/utils/errors';
 
 // Mock dependencies
 vi.mock('nodemailer', () => {

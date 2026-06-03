@@ -1,6 +1,7 @@
 import { Pagination } from '@insforge/ui';
 
 export interface PaginationControlsProps {
+  className?: string;
   currentPage?: number;
   totalPages?: number;
   onPageChange?: (page: number) => void;
@@ -12,6 +13,7 @@ export interface PaginationControlsProps {
 }
 
 export function PaginationControls({
+  className,
   currentPage = 1,
   totalPages = 1,
   onPageChange,
@@ -23,6 +25,7 @@ export function PaginationControls({
 }: PaginationControlsProps) {
   return (
     <Pagination
+      className={className}
       currentPage={currentPage}
       totalPages={totalPages}
       onPageChange={onPageChange}

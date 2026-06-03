@@ -1,5 +1,5 @@
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError, UpstreamError } from '@/utils/errors.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { config } from '@/infra/config/app.config.js';
 import logger from '@/utils/logger.js';
 import { z } from 'zod';
@@ -12,21 +12,63 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
+// Ambient declaration for the Deno isolate IPC dispatch binding.
+// This global is intentionally set on globalThis inside each generated
+// Deno router script so the InsForge host can reach into the isolate
+// for in-process function invocation. Typing it here prevents any
+// TypeScript code in this module from resorting to `(globalThis as any)`.
+declare global {
+  var __insforge_dispatch__: ((req: Request) => Promise<Response>) | undefined;
+}
+
 const DENO_SUBHOSTING_API_BASE = 'https://api.deno.com/v1';
 const DEFAULT_TIMEOUT_MS = 10000;
 
-// ============================================
-// Helper functions
-// ============================================
+// Exponential backoff schedule for 429 (rate-limited) responses, in ms.
+// Deno Subhosting doesn't always surface Retry-After, so we fall back to this
+// schedule. When Retry-After is present we honour it (taking the max of the
+// header value and the scheduled backoff), plus a small jitter.
+const DEFAULT_RATE_LIMIT_BACKOFF_MS = [1000, 2000, 4000];
+
+// Cap on a single 429 retry wait so a misbehaving upstream that returns
+// `Retry-After: 600` cannot park a worker for 10 minutes. Mirrors the
+// Vercel helper's `maxDelayMs` default.
+const MAX_RETRY_AFTER_MS = 30_000;
+
+export function parseRetryAfterMs(header: string | null): number {
+  if (!header) {
+    return NaN;
+  }
+  const trimmed = header.trim();
+  if (/^\d+$/.test(trimmed)) {
+    return parseInt(trimmed, 10) * 1000;
+  }
+  const dateMs = Date.parse(trimmed);
+  if (Number.isNaN(dateMs)) {
+    return NaN;
+  }
+  return Math.max(0, dateMs - Date.now());
+}
 
 /**
- * Fetch with timeout and retry for transient errors (DNS, network)
+ * Fetch with timeout, retry for transient network errors (DNS/socket), and
+ * a separate retry layer for HTTP 429 (rate-limited) responses with
+ * exponential backoff that honours `Retry-After`.
+ *
+ * The 429 retries sit INSIDE each network-attempt: if a fetch succeeds
+ * network-wise but returns 429, we retry with backoff according to
+ * `rateLimitBackoffMs`. If retries are exhausted while the response is still
+ * 429, we throw `AppError(429, RATE_LIMITED)` so the rate-limit signal
+ * surfaces to the client (the generic `!response.ok` paths in the callers
+ * would otherwise flatten it to `500 INTERNAL_ERROR`). Mirrors the Vercel
+ * helper's behaviour.
  */
 async function fetchWithTimeout(
   url: string,
   options: RequestInit = {},
   timeoutMs: number = DEFAULT_TIMEOUT_MS,
-  maxRetries: number = 2
+  maxRetries: number = 2,
+  rateLimitBackoffMs: number[] = DEFAULT_RATE_LIMIT_BACKOFF_MS
 ): Promise<Response> {
   let lastError: Error | undefined;
 
@@ -47,8 +89,66 @@ async function fetchWithTimeout(
     });
 
     try {
-      const response = await Promise.race([fetchPromise, timeoutPromise]);
-      return response;
+      const initialResponse = await Promise.race([fetchPromise, timeoutPromise]);
+      // Initial fetch returned; outer timer is no longer relevant. Cancel it so
+      // the 429 inner-loop delays don't keep a dangling handle.
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = undefined;
+      }
+      let currentResponse = initialResponse;
+
+      // 429-aware retry layer. Runs only when the initial response is 429.
+      if (currentResponse.status === 429) {
+        for (let r = 0; r < rateLimitBackoffMs.length; r++) {
+          // Drain the previous 429 body so node-fetch can release the connection.
+          if (currentResponse.body) {
+            currentResponse.body.resume();
+          }
+          const retryAfter = currentResponse.headers.get('retry-after');
+          const retryAfterMs = parseRetryAfterMs(retryAfter);
+          const baseMs = !isNaN(retryAfterMs)
+            ? Math.min(Math.max(retryAfterMs, rateLimitBackoffMs[r]), MAX_RETRY_AFTER_MS)
+            : rateLimitBackoffMs[r];
+          const delay = Math.min(baseMs + Math.floor(Math.random() * 250), MAX_RETRY_AFTER_MS);
+          logger.warn('Deno Subhosting 429 — retrying', {
+            url,
+            attempt: r + 1,
+            delayMs: delay,
+          });
+          await new Promise((res) => setTimeout(res, delay));
+
+          const retryController = new AbortController();
+          const retryTimeoutId = setTimeout(() => retryController.abort(), timeoutMs);
+          try {
+            currentResponse = await fetch(url, {
+              ...options,
+              signal: retryController.signal,
+            });
+            if (currentResponse.status !== 429) {
+              break;
+            }
+          } finally {
+            clearTimeout(retryTimeoutId);
+          }
+        }
+
+        // If we exhausted every retry and still hold a 429, surface the
+        // rate-limit signal to the caller. Otherwise their generic
+        // `if (!response.ok)` branch would re-package it as 500.
+        if (currentResponse.status === 429) {
+          if (currentResponse.body) {
+            currentResponse.body.resume();
+          }
+          throw new AppError(
+            'Deno Subhosting rate limit exceeded after retries. Please retry shortly.',
+            429,
+            ERROR_CODES.RATE_LIMITED
+          );
+        }
+      }
+
+      return currentResponse;
     } catch (error) {
       // Check if this was a timeout (abort) vs other error
       if (controller.signal.aborted) {
@@ -221,10 +321,15 @@ export class DenoSubhostingProvider {
     }
 
     if (checkResponse.status !== 404) {
-      throw new AppError(
-        `Failed to check project: ${checkResponse.statusText}`,
-        500,
-        ERROR_CODES.INTERNAL_ERROR
+      throw new UpstreamError(
+        {
+          response: {
+            status: checkResponse.status,
+            statusText: checkResponse.statusText,
+            data: await checkResponse.text(),
+          },
+        },
+        'Failed to check project'
       );
     }
 
@@ -244,8 +349,16 @@ export class DenoSubhostingProvider {
     );
 
     if (!createResponse.ok) {
-      const errorText = await createResponse.text();
-      throw new AppError(`Failed to create project: ${errorText}`, 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(
+        {
+          response: {
+            status: createResponse.status,
+            statusText: createResponse.statusText,
+            data: await createResponse.text(),
+          },
+        },
+        'Failed to create project'
+      );
     }
 
     logger.info('Deno Subhosting project created', { projectId });
@@ -383,16 +496,20 @@ export class DenoSubhostingProvider {
       );
 
       if (!response.ok) {
-        const errorText = await response.text();
         logger.error('Deno Subhosting API error', {
           status: response.status,
-          error: errorText,
+          statusText: response.statusText,
           projectId,
         });
-        throw new AppError(
-          `Deno Subhosting failed: ${response.status} - ${errorText}`,
-          500,
-          ERROR_CODES.INTERNAL_ERROR
+        throw new UpstreamError(
+          {
+            response: {
+              status: response.status,
+              statusText: response.statusText,
+              data: await response.text(),
+            },
+          },
+          'Deno Subhosting failed'
         );
       }
 
@@ -424,7 +541,7 @@ export class DenoSubhostingProvider {
         error: error instanceof Error ? error.message : String(error),
         projectId,
       });
-      throw new AppError('Failed to deploy to Deno Subhosting', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to deploy to Deno Subhosting');
     }
   }
 
@@ -446,12 +563,21 @@ export class DenoSubhostingProvider {
 
       if (!response.ok) {
         if (response.status === 404) {
-          throw new AppError(`Deployment not found: ${deploymentId}`, 404, ERROR_CODES.NOT_FOUND);
+          throw new AppError(
+            `Deployment not found: ${deploymentId}`,
+            404,
+            ERROR_CODES.FUNCTION_DEPLOYMENT_NOT_FOUND
+          );
         }
-        throw new AppError(
-          `Failed to get deployment: ${response.statusText}`,
-          500,
-          ERROR_CODES.INTERNAL_ERROR
+        throw new UpstreamError(
+          {
+            response: {
+              status: response.status,
+              statusText: response.statusText,
+              data: await response.text(),
+            },
+          },
+          'Failed to get deployment'
         );
       }
 
@@ -473,11 +599,7 @@ export class DenoSubhostingProvider {
         error: error instanceof Error ? error.message : String(error),
         deploymentId,
       });
-      throw new AppError(
-        'Failed to get Deno Subhosting deployment',
-        500,
-        ERROR_CODES.INTERNAL_ERROR
-      );
+      throw new UpstreamError(error, 'Failed to get Deno Subhosting deployment');
     }
   }
 
@@ -537,13 +659,21 @@ export class DenoSubhostingProvider {
 
       if (!response.ok) {
         if (response.status === 404) {
-          throw new AppError(`Deployment not found: ${deploymentId}`, 404, ERROR_CODES.NOT_FOUND);
+          throw new AppError(
+            `Deployment not found: ${deploymentId}`,
+            404,
+            ERROR_CODES.FUNCTION_DEPLOYMENT_NOT_FOUND
+          );
         }
-        const errorText = await response.text();
-        throw new AppError(
-          `Failed to get app logs: ${response.status} - ${errorText}`,
-          500,
-          ERROR_CODES.INTERNAL_ERROR
+        throw new UpstreamError(
+          {
+            response: {
+              status: response.status,
+              statusText: response.statusText,
+              data: await response.text(),
+            },
+          },
+          'Failed to get app logs'
         );
       }
 
@@ -571,7 +701,7 @@ export class DenoSubhostingProvider {
         error: error instanceof Error ? error.message : String(error),
         deploymentId,
       });
-      throw new AppError('Failed to get deployment app logs', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to get deployment app logs');
     }
   }
 
@@ -709,12 +839,18 @@ export class DenoSubhostingProvider {
 // createClient is injected and available in scope
 import { createClient } from 'npm:@insforge/sdk';
 
+declare global {
+  var __insforge_dispatch__: (req: Request) => Promise<Response>;
+}
+
 const _legacyModule: { exports: unknown } = { exports: {} };
 const module = _legacyModule;
 
 ${userCode}
 
 export default _legacyModule.exports as (req: Request) => Promise<Response>;
+
+globalThis.__insforge_dispatch__ = (req: Request) => (_legacyModule.exports as (req: Request) => Promise<Response>)(req);
 `;
   }
 
@@ -726,6 +862,11 @@ export default _legacyModule.exports as (req: Request) => Promise<Response>;
       // Empty router when no functions
       return `
 // Auto-generated router (no functions)
+declare global {
+  var __insforge_dispatch__: (req: Request) => Promise<Response>;
+}
+export {};
+
 const dispatch = async (req: Request): Promise<Response> => {
   const url = new URL(req.url);
   const pathname = url.pathname;
@@ -749,7 +890,7 @@ const dispatch = async (req: Request): Promise<Response> => {
   });
 };
 
-(globalThis as any).__insforge_dispatch__ = dispatch;
+globalThis.__insforge_dispatch__ = dispatch;
 
 Deno.serve(dispatch);
 `;
@@ -763,8 +904,12 @@ Deno.serve(dispatch);
 
     return `
 // Auto-generated router
-import { AsyncLocalStorage } from "node:async_hooks";
+import { AsyncLocalStorage } from 'node:async_hooks';
 ${imports}
+
+declare global {
+  var __insforge_dispatch__: (req: Request) => Promise<Response>;
+}
 
 const routes: Record<string, (req: Request) => Promise<Response>> = {
 ${routes}
@@ -834,6 +979,9 @@ const dispatch = async (req: Request): Promise<Response> => {
       const response = await handler(funcReq);
       const duration = Date.now() - startTime;
 
+      // Structured JSON log — matches InsForge backend log format:
+      // { timestamp, slug, method, status, duration }. Captured by the
+      // Deno Subhosting platform from stdout and surfaced as app logs.
       console.log(JSON.stringify({
         timestamp: new Date().toISOString(),
         slug,
@@ -856,7 +1004,8 @@ const dispatch = async (req: Request): Promise<Response> => {
   });
 };
 
-(globalThis as any).__insforge_dispatch__ = dispatch;
+// __insforge_dispatch__ bridges the isolate boundary for in-process dispatch.
+globalThis.__insforge_dispatch__ = dispatch;
 
 Deno.serve(dispatch);
 `;

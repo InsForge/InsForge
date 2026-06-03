@@ -3,17 +3,18 @@ import { Server as SocketIOServer, Socket } from 'socket.io';
 import logger from '@/utils/logger.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { ServerEvents, ClientEvents, SocketMetadata, NotificationPayload } from '@/types/socket.js';
-import type {
-  SubscribeChannelPayload,
-  PublishEventPayload,
-  SocketMessage,
-  SocketMessageMeta,
-  SubscribeResponse,
-  UnsubscribeChannelPayload,
-  PresenceMember,
+import {
+  ERROR_CODES,
+  type SubscribeChannelPayload,
+  type PublishEventPayload,
+  type SocketMessage,
+  type SocketMessageMeta,
+  type SubscribeResponse,
+  type UnsubscribeChannelPayload,
+  type PresenceMember,
 } from '@insforge/shared-schemas';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
+import { NEXT_ACTIONS } from '../../utils/next-actions.js';
+import { AppError } from '@/utils/errors.js';
 import { RealtimeAuthService } from '@/services/realtime/realtime-auth.service.js';
 import { RealtimeMessageService } from '@/services/realtime/realtime-message.service.js';
 import { RealtimePresenceService } from '@/services/realtime/realtime-presence.service.js';
@@ -93,7 +94,7 @@ export class SocketManager {
             'Invalid API key',
             401,
             ERROR_CODES.AUTH_INVALID_API_KEY,
-            NEXT_ACTION.CHECK_API_KEY
+            NEXT_ACTIONS.CHECK_API_KEY
           );
         }
 
@@ -103,7 +104,7 @@ export class SocketManager {
             'No authentication provided',
             401,
             ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-            NEXT_ACTION.CHECK_TOKEN
+            NEXT_ACTIONS.CHECK_TOKEN
           );
         }
 
@@ -113,7 +114,7 @@ export class SocketManager {
             'Invalid token: missing role',
             401,
             ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-            NEXT_ACTION.CHECK_TOKEN
+            NEXT_ACTIONS.CHECK_TOKEN
           );
         }
         socket.data.user = {
@@ -133,7 +134,7 @@ export class SocketManager {
               'Invalid authentication',
               401,
               ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-              NEXT_ACTION.CHECK_TOKEN
+              NEXT_ACTIONS.CHECK_TOKEN
             )
           );
         }
@@ -284,17 +285,19 @@ export class SocketManager {
     const authService = RealtimeAuthService.getInstance();
     const { channel } = payload;
     const userId = socket.data.user?.id;
-    const userRole = socket.data.user?.role;
 
     try {
       // Check subscribe permission via RLS SELECT policy
-      const canSubscribe = await authService.checkSubscribePermission(channel, userId, userRole);
+      const canSubscribe = await authService.checkSubscribePermission(channel, socket.data.user);
 
       if (!canSubscribe) {
         ack?.({
           ok: false,
           channel,
-          error: { code: 'UNAUTHORIZED', message: 'Not authorized to subscribe to this channel' },
+          error: {
+            code: ERROR_CODES.REALTIME_UNAUTHORIZED,
+            message: 'Not authorized to subscribe to this channel',
+          },
         });
         return;
       }
@@ -346,7 +349,7 @@ export class SocketManager {
       ack?.({
         ok: false,
         channel,
-        error: { code: 'INTERNAL_ERROR', message: 'Failed to subscribe to channel' },
+        error: { code: ERROR_CODES.INTERNAL_ERROR, message: 'Failed to subscribe to channel' },
       });
     }
   }
@@ -385,8 +388,6 @@ export class SocketManager {
    */
   private async handleRealtimePublish(socket: Socket, payload: PublishEventPayload): Promise<void> {
     const { channel, event, payload: eventPayload } = payload;
-    const userId = socket.data.user?.id;
-    const userRole = socket.data.user?.role;
 
     // Check if client has subscribed to this channel
     const roomName = `realtime:${channel}`;
@@ -394,7 +395,7 @@ export class SocketManager {
     if (!metadata?.subscriptions.has(roomName)) {
       socket.emit(ServerEvents.REALTIME_ERROR, {
         channel,
-        code: 'NOT_SUBSCRIBED',
+        code: ERROR_CODES.REALTIME_NOT_SUBSCRIBED,
         message: 'Must subscribe to channel before publishing messages',
       });
       return;
@@ -407,14 +408,13 @@ export class SocketManager {
         channel,
         event,
         eventPayload,
-        userId,
-        userRole
+        socket.data.user
       );
 
       if (!result) {
         socket.emit(ServerEvents.REALTIME_ERROR, {
           channel,
-          code: 'UNAUTHORIZED',
+          code: ERROR_CODES.REALTIME_UNAUTHORIZED,
           message: 'Not authorized to publish to this channel',
         });
         return;
@@ -429,7 +429,7 @@ export class SocketManager {
       logger.error('Error handling realtime publish', { error, channel });
       socket.emit(ServerEvents.REALTIME_ERROR, {
         channel,
-        code: 'INTERNAL_ERROR',
+        code: ERROR_CODES.INTERNAL_ERROR,
         message: 'Failed to publish message',
       });
     }

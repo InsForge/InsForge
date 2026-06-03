@@ -1,7 +1,6 @@
 import type { Pool } from 'pg';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
 import type {
   StripeEnvironment,
   StripePriceRow,
@@ -17,14 +16,15 @@ import {
 } from '@/services/payments/helpers.js';
 import { withPaymentSessionAdvisoryLock } from '@/services/payments/payments-advisory-lock.js';
 import { PaymentConfigService } from '@/services/payments/payment-config.service.js';
-import type {
-  CreatePaymentProductRequest,
-  DeletePaymentProductResponse,
-  GetPaymentProductResponse,
-  ListPaymentProductsRequest,
-  ListPaymentProductsResponse,
-  MutatePaymentProductResponse,
-  UpdatePaymentProductRequest,
+import {
+  ERROR_CODES,
+  type CreatePaymentProductRequest,
+  type DeletePaymentProductResponse,
+  type GetPaymentProductResponse,
+  type ListPaymentProductsRequest,
+  type ListPaymentProductsResponse,
+  type MutatePaymentProductResponse,
+  type UpdatePaymentProductRequest,
 } from '@insforge/shared-schemas';
 
 export class PaymentProductService {
@@ -129,7 +129,7 @@ export class PaymentProductService {
       throw new AppError(
         `Stripe ${environment} product not found: ${stripeProductId}`,
         404,
-        ERROR_CODES.NOT_FOUND
+        ERROR_CODES.PAYMENT_PRODUCT_NOT_FOUND
       );
     }
 

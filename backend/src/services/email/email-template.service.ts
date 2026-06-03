@@ -1,9 +1,12 @@
 import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
-import type { EmailTemplateSchema, UpdateEmailTemplateRequest } from '@insforge/shared-schemas';
+import {
+  ERROR_CODES,
+  type EmailTemplateSchema,
+  type UpdateEmailTemplateRequest,
+} from '@insforge/shared-schemas';
 
 /**
  * Normalize a pg timestamp value to an ISO string

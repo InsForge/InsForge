@@ -1,0 +1,1091 @@
+openapi: 3.0.3
+info:
+  title: Insforge Deployments API
+  version: 1.0.0
+  description: Frontend deployment sessions, source uploads, environment variables, and custom domains.
+
+paths:
+  /api/deployments:
+    get:
+      summary: List deployments
+      description: Returns deployment runs ordered by creation time descending. Pagination metadata is returned in `Content-Range` headers.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          $ref: '#/components/responses/DeploymentList'
+        '206':
+          $ref: '#/components/responses/DeploymentList'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Admin access required
+        '500':
+          $ref: '#/components/responses/Error'
+
+    post:
+      summary: Create legacy deployment session (deprecated)
+      deprecated: true
+      description: Creates a `WAITING` deployment run and returns presigned form data for the legacy source-zip upload flow. New tooling should use `/api/deployments/direct`.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      responses:
+        '201':
+          description: Legacy deployment session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateDeploymentResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Admin access required
+        '503':
+          description: Deployment provider or legacy S3 staging is not configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/deployments/direct:
+    post:
+      summary: Create direct-upload deployment session
+      description: Registers a source file manifest and returns file IDs for direct file uploads.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDirectDeploymentRequest'
+      responses:
+        '201':
+          description: Direct deployment session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateDirectDeploymentResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Admin access required
+        '503':
+          description: Deployment provider is not configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/deployments/metadata:
+    get:
+      summary: Get deployment metadata
+      description: Returns the latest ready deployment ID, the default deployment URL, and any custom domain URL known to the provider.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      responses:
+        '200':
+          description: Deployment metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentMetadata'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Admin access required
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/deployments/slug:
+    put:
+      summary: Update InsForge-hosted slug
+      description: Updates the Cloud project slug used for the `.insforge.site` domain. Pass `null` to clear the slug.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSlugRequest'
+      responses:
+        '200':
+          description: Slug updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateSlugResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '409':
+          description: Slug is already taken
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Admin access required
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/deployments/env-vars:
+    get:
+      summary: List deployment environment variables
+      description: Lists provider environment variable keys and metadata. Values are not included.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      responses:
+        '200':
+          description: Environment variables
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListEnvVarsResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Admin access required
+        '503':
+          description: Deployment provider is not configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/Error'
+
+    post:
+      summary: Create or update deployment environment variables
+      description: Upserts encrypted Vercel environment variables for production, preview, and development targets.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpsertEnvVarsRequest'
+      responses:
+        '201':
+          description: Environment variables saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpsertEnvVarsResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Admin access required
+        '503':
+          description: Deployment provider is not configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/deployments/env-vars/{id}:
+    get:
+      summary: Get deployment environment variable
+      description: Returns one provider environment variable, including its decrypted value.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/EnvVarId'
+      responses:
+        '200':
+          description: Environment variable with value
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetEnvVarResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Admin access required
+        '404':
+          $ref: '#/components/responses/Error'
+        '503':
+          description: Deployment provider is not configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/Error'
+
+    delete:
+      summary: Delete deployment environment variable
+      description: Deletes a provider environment variable by Vercel environment variable ID.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/EnvVarId'
+      responses:
+        '200':
+          description: Environment variable deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Admin access required
+        '404':
+          $ref: '#/components/responses/Error'
+        '503':
+          description: Deployment provider is not configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/deployments/domains:
+    get:
+      summary: List custom domains
+      description: Lists user-owned custom domains configured on the provider project.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      responses:
+        '200':
+          description: Custom domains
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListCustomDomainsResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Admin access required
+        '503':
+          description: Deployment provider is not configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/Error'
+
+    post:
+      summary: Add custom domain
+      description: Registers a user-owned custom domain on the provider project and returns DNS setup instructions.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddCustomDomainRequest'
+      responses:
+        '201':
+          description: Custom domain added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomDomain'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Admin access required
+        '503':
+          description: Deployment provider is not configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/deployments/domains/{domain}/verify:
+    post:
+      summary: Verify custom domain
+      description: Re-checks DNS configuration for a custom domain and returns the latest provider verification state.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/Domain'
+      responses:
+        '200':
+          description: Custom domain verification state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomDomain'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Admin access required
+        '404':
+          $ref: '#/components/responses/Error'
+        '503':
+          description: Deployment provider is not configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/deployments/domains/{domain}:
+    delete:
+      summary: Remove custom domain
+      description: Removes a user-owned custom domain from the provider project.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/Domain'
+      responses:
+        '200':
+          description: Custom domain removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Admin access required
+        '404':
+          $ref: '#/components/responses/Error'
+        '503':
+          description: Deployment provider is not configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/deployments/{id}:
+    get:
+      summary: Get deployment
+      description: Returns a deployment run by database ID.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/DeploymentId'
+      responses:
+        '200':
+          description: Deployment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deployment'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Admin access required
+        '404':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/deployments/{id}/files/{fileId}/content:
+    put:
+      summary: Upload direct deployment file content
+      description: Streams one registered file through InsForge to the provider. The request body must match the manifest size and SHA-1 digest.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/DeploymentId'
+        - $ref: '#/components/parameters/FileId'
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: File uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentManifestFileUploaded'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Admin access required
+        '404':
+          $ref: '#/components/responses/Error'
+        '415':
+          description: File content must be uploaded as application/octet-stream
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/deployments/{id}/start:
+    post:
+      summary: Start deployment
+      description: Starts the provider deployment after source files are available.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/DeploymentId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartDeploymentRequest'
+      responses:
+        '200':
+          description: Deployment started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deployment'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Admin access required
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/deployments/{id}/sync:
+    post:
+      summary: Sync deployment status
+      description: Reads the latest provider state and stores it on the deployment run.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/DeploymentId'
+      responses:
+        '200':
+          description: Deployment synced
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deployment'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Admin access required
+        '404':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/deployments/{id}/cancel:
+    post:
+      summary: Cancel deployment
+      description: Cancels a provider deployment when available and marks the run as `CANCELED`.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/DeploymentId'
+      responses:
+        '200':
+          description: Deployment canceled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Admin access required
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Project admin JWT or an API key passed as a Bearer token.
+    apiKey:
+      type: apiKey
+      in: header
+      name: x-api-key
+
+  parameters:
+    DeploymentId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Deployment run ID.
+    FileId:
+      name: fileId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Direct upload file ID returned by `POST /api/deployments/direct`.
+    EnvVarId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Provider environment variable ID.
+    Domain:
+      name: domain
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$'
+      description: User-owned custom domain.
+      example: app.example.com
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 50
+      description: Maximum number of deployments to return.
+    Offset:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+      description: Number of deployments to skip.
+
+  responses:
+    DeploymentList:
+      description: Deployment runs
+      headers:
+        Content-Range:
+          schema:
+            type: string
+          description: Range of deployment records returned, for example `0-49/125`.
+        Preference-Applied:
+          schema:
+            type: string
+          description: Count preference applied by the backend.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/Deployment'
+    Error:
+      description: Error response
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    DeploymentStatus:
+      type: string
+      enum:
+        - WAITING
+        - UPLOADING
+        - QUEUED
+        - BUILDING
+        - READY
+        - ERROR
+        - CANCELED
+
+    Deployment:
+      type: object
+      required:
+        - id
+        - providerDeploymentId
+        - provider
+        - status
+        - url
+        - metadata
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        providerDeploymentId:
+          type: string
+          nullable: true
+          description: Provider deployment ID. Null until the provider deployment is created.
+        provider:
+          type: string
+          example: vercel
+        status:
+          $ref: '#/components/schemas/DeploymentStatus'
+        url:
+          type: string
+          nullable: true
+          example: https://my-app.vercel.app
+        metadata:
+          type: object
+          nullable: true
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateDeploymentResponse:
+      type: object
+      required:
+        - id
+        - uploadUrl
+        - uploadFields
+      properties:
+        id:
+          type: string
+          format: uuid
+        uploadUrl:
+          type: string
+          format: uri
+        uploadFields:
+          type: object
+          additionalProperties:
+            type: string
+
+    DeploymentManifestFileEntry:
+      type: object
+      required:
+        - path
+        - sha
+        - size
+      properties:
+        path:
+          type: string
+          minLength: 1
+          maxLength: 2048
+          description: Relative source path using forward slashes.
+          example: src/App.tsx
+        sha:
+          type: string
+          pattern: '^[a-fA-F0-9]{40}$'
+          description: SHA-1 hex digest of the file content.
+        size:
+          type: integer
+          minimum: 0
+          description: File size in bytes.
+
+    DeploymentManifestFile:
+      allOf:
+        - $ref: '#/components/schemas/DeploymentManifestFileEntry'
+        - type: object
+          required:
+            - fileId
+            - uploadedAt
+          properties:
+            fileId:
+              type: string
+              format: uuid
+            uploadedAt:
+              type: string
+              format: date-time
+              nullable: true
+
+    DeploymentManifestFileUploaded:
+      allOf:
+        - $ref: '#/components/schemas/DeploymentManifestFileEntry'
+        - type: object
+          required:
+            - fileId
+            - uploadedAt
+          properties:
+            fileId:
+              type: string
+              format: uuid
+            uploadedAt:
+              type: string
+              format: date-time
+
+    CreateDirectDeploymentRequest:
+      type: object
+      required:
+        - files
+      properties:
+        files:
+          type: array
+          minItems: 1
+          maxItems: 5000
+          description: Source file manifest. The default backend limit is 5000 files.
+          items:
+            $ref: '#/components/schemas/DeploymentManifestFileEntry'
+
+    CreateDirectDeploymentResponse:
+      type: object
+      required:
+        - id
+        - status
+        - files
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/DeploymentStatus'
+        files:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeploymentManifestFile'
+
+    ProjectSettings:
+      type: object
+      properties:
+        buildCommand:
+          type: string
+          nullable: true
+        outputDirectory:
+          type: string
+          nullable: true
+        installCommand:
+          type: string
+          nullable: true
+        devCommand:
+          type: string
+          nullable: true
+        rootDirectory:
+          type: string
+          nullable: true
+
+    EnvVarInput:
+      type: object
+      required:
+        - key
+        - value
+      properties:
+        key:
+          type: string
+        value:
+          type: string
+
+    StartDeploymentRequest:
+      type: object
+      properties:
+        projectSettings:
+          $ref: '#/components/schemas/ProjectSettings'
+        envVars:
+          type: array
+          items:
+            $ref: '#/components/schemas/EnvVarInput'
+        meta:
+          type: object
+          additionalProperties:
+            type: string
+
+    DeploymentMetadata:
+      type: object
+      required:
+        - currentDeploymentId
+        - defaultDomainUrl
+        - customDomainUrl
+      properties:
+        currentDeploymentId:
+          type: string
+          format: uuid
+          nullable: true
+        defaultDomainUrl:
+          type: string
+          nullable: true
+        customDomainUrl:
+          type: string
+          nullable: true
+
+    DeploymentEnvVar:
+      type: object
+      required:
+        - id
+        - key
+        - type
+      properties:
+        id:
+          type: string
+        key:
+          type: string
+        type:
+          type: string
+          enum:
+            - plain
+            - encrypted
+            - secret
+            - sensitive
+            - system
+        updatedAt:
+          type: integer
+          description: Unix timestamp in milliseconds.
+
+    DeploymentEnvVarWithValue:
+      allOf:
+        - $ref: '#/components/schemas/DeploymentEnvVar'
+        - type: object
+          required:
+            - value
+          properties:
+            value:
+              type: string
+
+    ListEnvVarsResponse:
+      type: object
+      required:
+        - envVars
+      properties:
+        envVars:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeploymentEnvVar'
+
+    GetEnvVarResponse:
+      type: object
+      required:
+        - envVar
+      properties:
+        envVar:
+          $ref: '#/components/schemas/DeploymentEnvVarWithValue'
+
+    UpsertEnvVarsRequest:
+      type: object
+      required:
+        - envVars
+      properties:
+        envVars:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/EnvVarInput'
+
+    UpsertEnvVarsResponse:
+      type: object
+      required:
+        - success
+        - message
+        - count
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        count:
+          type: integer
+          minimum: 1
+
+    UpdateSlugRequest:
+      type: object
+      required:
+        - slug
+      properties:
+        slug:
+          type: string
+          nullable: true
+          minLength: 3
+          maxLength: 63
+          pattern: '^[a-z0-9]([a-z0-9-]*[a-z0-9])?$'
+
+    UpdateSlugResponse:
+      type: object
+      required:
+        - success
+        - slug
+        - domain
+      properties:
+        success:
+          type: boolean
+        slug:
+          type: string
+          nullable: true
+        domain:
+          type: string
+          nullable: true
+
+    DomainVerificationRecord:
+      type: object
+      required:
+        - type
+        - domain
+        - value
+      properties:
+        type:
+          type: string
+          example: TXT
+        domain:
+          type: string
+        value:
+          type: string
+
+    CustomDomain:
+      type: object
+      required:
+        - domain
+        - apexDomain
+        - verified
+        - misconfigured
+        - verification
+        - cnameTarget
+        - aRecordValue
+      properties:
+        domain:
+          type: string
+          example: app.example.com
+        apexDomain:
+          type: string
+          example: example.com
+        verified:
+          type: boolean
+        misconfigured:
+          type: boolean
+        verification:
+          type: array
+          items:
+            $ref: '#/components/schemas/DomainVerificationRecord'
+        cnameTarget:
+          type: string
+          nullable: true
+        aRecordValue:
+          type: string
+          nullable: true
+
+    AddCustomDomainRequest:
+      type: object
+      required:
+        - domain
+      properties:
+        domain:
+          type: string
+          pattern: '^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$'
+          example: app.example.com
+          description: User-owned domain. Domains ending in `.insforge.site` are reserved.
+
+    ListCustomDomainsResponse:
+      type: object
+      required:
+        - domains
+      properties:
+        domains:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomDomain'
+
+    DeleteResponse:
+      type: object
+      required:
+        - success
+        - message
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+        - statusCode
+      properties:
+        error:
+          type: string
+          description: Error code for programmatic handling.
+        message:
+          type: string
+          description: Human-readable error message.
+        statusCode:
+          type: integer
+        nextActions:
+          type: string
+          description: Suggested action to resolve the error.

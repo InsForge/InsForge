@@ -81,7 +81,7 @@ spec:
           template: PREBUILT_V2
           spec:
             source:
-                image: ghcr.io/insforge/postgres:v15.13.2
+                image: ghcr.io/insforge/postgres:v15.13.4
                 command:
                     - docker-entrypoint.sh
                     - postgres
@@ -162,7 +162,9 @@ spec:
                     # Set max WAL senders
                     max_wal_senders = 10
 
-                    shared_preload_libraries = 'pg_cron,http,pgcrypto'
+                    shared_preload_libraries = 'pg_cron,http,pgcrypto,insforge_pg_utils'
+                    insforge.policy_grant_role = 'project_admin'
+                    insforge.policy_grant_tables = 'storage.objects,realtime.channels,realtime.messages,payments.checkout_sessions,payments.customer_portal_sessions'
                     cron.database_name = 'insforge'
                 - path: /docker-entrypoint-initdb.d/01-init.sql
                   template: |

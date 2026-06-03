@@ -1,7 +1,13 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { RequireAuth } from './RequireAuth';
 import AILayout from '#features/ai/components/AILayout';
-import AIPage from '#features/ai/pages/AIPage';
+import AIOverviewPage from '#features/ai/pages/AIOverviewPage';
+import AIQuickStartPage from '#features/ai/pages/AIQuickStartPage';
+import AIModelsPage from '#features/ai/pages/AIModelsPage';
+import AnalyticsLayout from '#features/analytics/components/AnalyticsLayout';
+import { TrafficPage } from '#features/analytics/pages/TrafficPage';
+import { RetentionPage } from '#features/analytics/pages/RetentionPage';
+import { SessionReplayPage } from '#features/analytics/pages/SessionReplayPage';
 import AuthenticationLayout from '#features/auth/components/AuthenticationLayout';
 import AuthMethodsPage from '#features/auth/pages/AuthMethodsPage';
 import EmailPage from '#features/auth/pages/EmailPage';
@@ -53,11 +59,13 @@ import VisualizerLayout from '#features/visualizer/components/VisualizerLayout';
 import VisualizerPage from '#features/visualizer/pages/VisualizerPage';
 import AppLayout from '#layout/AppLayout';
 import { getFeatureFlag } from '#lib/analytics/posthog';
+import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
 
 function AuthenticatedRoutes() {
   const dashboardVariant = getFeatureFlag('dashboard-v4-experiment');
   const isDTest = dashboardVariant === 'd_test';
   const DashboardHomePage = isDTest ? DTestDashboardPage : DashboardPage;
+  const isCloudHosting = useIsCloudHostingMode();
 
   return (
     <AppLayout>
@@ -111,7 +119,10 @@ function AuthenticatedRoutes() {
           <Route index element={<VisualizerPage />} />
         </Route>
         <Route path="/dashboard/ai" element={<AILayout />}>
-          <Route index element={<AIPage />} />
+          <Route index element={<Navigate to="overview" replace />} />
+          <Route path="overview" element={<AIOverviewPage />} />
+          <Route path="quick-start" element={<AIQuickStartPage />} />
+          <Route path="models" element={<AIModelsPage />} />
         </Route>
         <Route path="/dashboard/payments" element={<PaymentsLayout />}>
           <Route index element={<Navigate to="catalog" replace />} />
@@ -134,6 +145,14 @@ function AuthenticatedRoutes() {
           <Route path="domains" element={<DeploymentDomainsPage />} />
         </Route>
         <Route path="/dashboard/compute" element={<ComputePage />} />
+        {isCloudHosting && (
+          <Route path="/dashboard/analytics" element={<AnalyticsLayout />}>
+            <Route index element={<Navigate to="traffic" replace />} />
+            <Route path="traffic" element={<TrafficPage />} />
+            <Route path="retention" element={<RetentionPage />} />
+            <Route path="session-replay" element={<SessionReplayPage />} />
+          </Route>
+        )}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </AppLayout>

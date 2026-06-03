@@ -41,7 +41,7 @@ export function useMcpUsage(options: UseMcpUsageOptions = {}) {
     refetch,
   } = useQuery<McpUsageRecord[]>({
     queryKey: ['mcp-usage', successFilter, limit],
-    queryFn: () => usageService.getMcpUsage(successFilter, limit),
+    queryFn: ({ signal }) => usageService.getMcpUsage(successFilter, limit, signal),
     enabled: isAuthenticated,
     staleTime: 30 * 1000, // Cache for 30 seconds
     refetchInterval: false,

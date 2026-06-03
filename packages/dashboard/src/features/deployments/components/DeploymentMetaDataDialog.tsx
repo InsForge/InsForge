@@ -85,7 +85,7 @@ export function DeploymentMetaDataDialog({
             className="h-8 px-3 bg-zinc-950 text-white hover:bg-zinc-800 dark:bg-emerald-300 dark:text-zinc-950 dark:hover:bg-emerald-400"
           >
             {copied ? <Check className="h-4 w-4 mr-1" /> : <Copy className="h-4 w-4 mr-1" />}
-            {copied ? 'Copied' : 'Copy Meta Data'}
+            {copied ? 'Copied' : 'Copy Deployment Meta Data'}
           </Button>
         </div>
       </DialogContent>

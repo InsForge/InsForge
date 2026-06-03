@@ -3,9 +3,9 @@ import { readFile } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { successResponse } from '@/utils/response.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
-import { AppError } from '@/api/middlewares/error.js';
+import { AppError } from '@/utils/errors.js';
 import {
+  ERROR_CODES,
   DocTypeSchema,
   SdkFeatureSchema,
   SdkLanguageSchema,
@@ -103,6 +103,7 @@ const LEGACY_DOCS_MAP: Record<DocTypeSchema, string> = {
   'ai-integration-sdk': 'sdks/typescript/ai.mdx',
   'real-time': 'agent-docs/real-time.md',
   deployment: 'agent-docs/deployment.md',
+  payments: 'agent-docs/payments.md',
 };
 
 // SDK documentation map for GET /api/docs/:docFeature/:docLanguage endpoint
@@ -144,6 +145,9 @@ const SDK_DOCS_MAP: Record<SdkFeatureSchema, Partial<Record<SdkLanguageSchema, s
     kotlin: 'sdks/kotlin/realtime.mdx',
     'rest-api': 'sdks/rest/realtime.mdx',
   },
+  payments: {
+    typescript: 'sdks/typescript/payments.mdx',
+  },
 };
 
 // GET /api/docs/:docType - Get specific documentation (legacy endpoint)
@@ -154,7 +158,7 @@ router.get('/:docType', async (req: Request, res: Response, next: NextFunction) 
     // Validate doc type using Zod enum
     const parsed = docTypeSchema.safeParse(docType);
     if (!parsed.success) {
-      throw new AppError('Documentation not found', 404, ERROR_CODES.NOT_FOUND);
+      throw new AppError('Documentation not found', 404, ERROR_CODES.DOCS_NOT_FOUND);
     }
 
     const docFileName = LEGACY_DOCS_MAP[parsed.data];
@@ -189,7 +193,7 @@ router.get('/:docFeature/:docLanguage', async (req: Request, res: Response, next
     const parsedLanguage = sdkLanguageSchema.safeParse(docLanguage);
 
     if (!parsedFeature.success || !parsedLanguage.success) {
-      throw new AppError('Documentation not found', 404, ERROR_CODES.NOT_FOUND);
+      throw new AppError('Documentation not found', 404, ERROR_CODES.DOCS_NOT_FOUND);
     }
 
     // Look up the documentation file from SDK_DOCS_MAP
@@ -197,7 +201,7 @@ router.get('/:docFeature/:docLanguage', async (req: Request, res: Response, next
     const docFileName = featureDocs[parsedLanguage.data];
 
     if (!docFileName) {
-      throw new AppError('Documentation not found', 404, ERROR_CODES.NOT_FOUND);
+      throw new AppError('Documentation not found', 404, ERROR_CODES.DOCS_NOT_FOUND);
     }
 
     // Construct docType for response

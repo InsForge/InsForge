@@ -3,10 +3,6 @@ title: Email SDK Reference
 description: Send custom transactional emails with the InsForge SDK
 ---
 
-<Warning>
-  **Private Preview** — This feature is currently in private preview. APIs and behavior may change.
-</Warning>
-
 import Installation from '/snippets/sdk-installation.mdx';
 
 <Installation />
@@ -26,7 +22,7 @@ Send custom HTML emails to one or more recipients.
 - `replyTo` (string, optional) - Reply-to email address, must be a valid email address
 
 <Note>
-When [Custom SMTP](/core-concepts/email/custom-smtp) is enabled for your project, the `from` field is ignored — the sender name and email are always taken from your SMTP configuration to prevent spoofing through your server.
+When [Custom SMTP](/core-concepts/messaging/custom-smtp) is enabled for your project, the `from` field is ignored. The sender name and email are always taken from your SMTP configuration to prevent spoofing through your server.
 </Note>
 
 ### Returns

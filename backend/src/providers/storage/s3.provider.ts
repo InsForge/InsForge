@@ -128,7 +128,11 @@ export class S3StorageProvider implements StorageProvider {
     return op(parentPath);
   }
 
-  async putObject(bucket: string, key: string, file: Express.Multer.File): Promise<void> {
+  async putObject(
+    bucket: string,
+    key: string,
+    file: Express.Multer.File
+  ): Promise<{ etag: string }> {
     if (!this.s3Client) {
       throw new Error('S3 client not initialized');
     }
@@ -142,7 +146,8 @@ export class S3StorageProvider implements StorageProvider {
     });
 
     try {
-      await this.s3Client.send(command);
+      const resp = await this.s3Client.send(command);
+      return { etag: stripEtagQuotes(resp.ETag) };
     } catch (error) {
       logger.error('S3 Upload error', {
         error: error instanceof Error ? error.message : String(error),
@@ -305,7 +310,8 @@ export class S3StorageProvider implements StorageProvider {
     bucket: string,
     key: string,
     expiresIn: number = ONE_HOUR_IN_SECONDS,
-    isPublic: boolean = false
+    isPublic: boolean = false,
+    version?: string | null
   ): Promise<DownloadStrategyResponse> {
     if (!this.s3Client) {
       throw new Error('S3 client not initialized');
@@ -360,7 +366,14 @@ export class S3StorageProvider implements StorageProvider {
               .split('/')
               .map((segment) => encodeURIComponent(segment))
               .join('/');
-            const cloudFrontObjectUrl = `${cloudFrontUrl.replace(/\/$/, '')}/${encodedS3Key}`;
+            const baseUrl = `${cloudFrontUrl.replace(/\/$/, '')}/${encodedS3Key}`;
+            // Canned-policy signatures cover the full Resource URL minus the
+            // three CF params (Expires / Signature / Key-Pair-Id). CloudFront
+            // reconstructs Resource by stripping those three from the request
+            // URL, so any *other* query — including our `?v=<version>` cache
+            // stamp — must be in the URL *before* signing or verification
+            // fails with 403. Append v first, then sign.
+            const urlToSign = version ? `${baseUrl}?v=${encodeURIComponent(version)}` : baseUrl;
 
             // Convert escaped newlines to actual newlines in the private key
             const formattedPrivateKey = cloudFrontPrivateKey.replace(/\\n/g, '\n');
@@ -369,7 +382,7 @@ export class S3StorageProvider implements StorageProvider {
             const dateLessThan = new Date(Date.now() + actualExpiresIn * 1000);
 
             const signedUrl = getCloudFrontSignedUrl({
-              url: cloudFrontObjectUrl,
+              url: urlToSign,
               keyPairId: cloudFrontKeyPairId,
               privateKey: formattedPrivateKey,
               dateLessThan,
@@ -399,7 +412,12 @@ export class S3StorageProvider implements StorageProvider {
       // so we always use presigned URLs for security.
       // The "public" setting only affects the URL expiration time.
 
-      // Always generate presigned URL for security in multi-tenant environment
+      // Always generate presigned URL for security in multi-tenant environment.
+      // SigV4's canonical query string covers every parameter in the URL, so
+      // we intentionally do NOT append `?v=<version>` here — doing so after
+      // signing would yield SignatureDoesNotMatch. When no CloudFront is
+      // configured there is no CDN in front of S3 anyway; the per-request
+      // signature (X-Amz-Signature, X-Amz-Date) already makes the URL unique.
       const command = new GetObjectCommand({
         Bucket: this.s3Bucket,
         Key: s3Key,
@@ -425,7 +443,7 @@ export class S3StorageProvider implements StorageProvider {
   async verifyObjectExists(
     bucket: string,
     key: string
-  ): Promise<{ exists: boolean; size?: number }> {
+  ): Promise<{ exists: boolean; size?: number; etag?: string }> {
     if (!this.s3Client) {
       throw new Error('S3 client not initialized');
     }
@@ -438,7 +456,11 @@ export class S3StorageProvider implements StorageProvider {
         Key: s3Key,
       });
       const response = await this.s3Client.send(command);
-      return { exists: true, size: response.ContentLength };
+      return {
+        exists: true,
+        size: response.ContentLength,
+        etag: stripEtagQuotes(response.ETag) || undefined,
+      };
     } catch {
       return { exists: false };
     }

@@ -5,7 +5,7 @@ import { formatTime, cn } from '#lib/utils/utils';
 import { useConfirm } from '#lib/hooks/useConfirm';
 import { usePageSize } from '#lib/hooks/usePageSize';
 import { Button, ConfirmDialog } from '@insforge/ui';
-import { TableHeader } from '#components';
+import { DataGridEmptyState, TableHeader } from '#components';
 import { useAuditLogs, useClearAuditLogs } from '#features/logs/hooks/useAuditLogs';
 import type { GetAuditLogsRequest } from '@insforge/shared-schemas';
 
@@ -163,13 +163,19 @@ export default function AuditsPage() {
           paginationRecordLabel="logs"
           gridContainerClassName="border-t border-[var(--alpha-8)]"
           emptyState={
-            <div className="text-[13px] text-muted-foreground">
-              {error
-                ? `Error loading audit logs: ${error instanceof Error ? error.message : 'An unexpected error occurred'}`
-                : searchQuery
-                  ? 'No audit logs match your search criteria'
-                  : 'No audit logs found'}
-            </div>
+            error ? (
+              <div className="text-[13px] text-muted-foreground">
+                {`Error loading audit logs: ${
+                  error instanceof Error ? error.message : 'An unexpected error occurred'
+                }`}
+              </div>
+            ) : (
+              <DataGridEmptyState
+                message={
+                  searchQuery ? 'No audit logs match your search criteria' : 'No audit logs found'
+                }
+              />
+            )
           }
         />
       </div>

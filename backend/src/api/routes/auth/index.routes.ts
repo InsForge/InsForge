@@ -5,8 +5,7 @@ import { AuthConfigService } from '@/services/auth/auth-config.service.js';
 import { AuthOTPService, OTPPurpose } from '@/services/auth/auth-otp.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
 import { successResponse } from '@/utils/response.js';
 import {
   AuthRequest,
@@ -14,6 +13,7 @@ import {
   verifyToken,
   extractBearerToken,
 } from '@/api/middlewares/auth.js';
+import adminRouter from './admin.routes.js';
 import oauthRouter from './oauth.routes.js';
 import customOAuthRouter from './custom-oauth.routes.js';
 import { sendEmailOTPLimiter, verifyOTPLimiter } from '@/api/middlewares/rate-limiters.js';
@@ -24,10 +24,10 @@ import {
 } from '@/utils/cookies.js';
 import { parseClientType } from '@/utils/utils.js';
 import {
+  ERROR_CODES,
   userIdSchema,
   createUserRequestSchema,
   createSessionRequestSchema,
-  createAdminSessionRequestSchema,
   refreshSessionRequestSchema,
   deleteUsersRequestSchema,
   listUsersRequestSchema,
@@ -42,13 +42,11 @@ import {
   type VerifyEmailResponse,
   type ExchangeResetPasswordTokenResponse,
   type ResetPasswordResponse,
-  type CreateAdminSessionResponse,
   type GetCurrentSessionResponse,
   type GetProfileResponse,
   type ListUsersResponse,
   type DeleteUsersResponse,
   type GetPublicAuthConfigResponse,
-  exchangeAdminSessionRequestSchema,
   type GetAuthConfigResponse,
   updateAuthConfigRequestSchema,
   upsertSmtpConfigRequestSchema,
@@ -82,6 +80,7 @@ function buildRedirectUrl(baseUrl: string, params: Record<string, string>): stri
 }
 
 // Mount OAuth routes
+router.use('/admin', adminRouter);
 router.use('/oauth/custom', customOAuthRouter);
 router.use('/oauth', oauthRouter);
 
@@ -243,7 +242,7 @@ router.patch(
   verifyToken,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      if (!req.user) {
+      if (!req.user?.id) {
         throw new AppError('User not authenticated', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
       }
 
@@ -280,7 +279,7 @@ router.get('/profiles/:userId', async (req: Request, res: Response, next: NextFu
     const userProfile = await authService.getProfileById(userId);
 
     if (!userProfile) {
-      throw new AppError('User not found', 404, ERROR_CODES.NOT_FOUND);
+      throw new AppError('User not found', 404, ERROR_CODES.AUTH_USER_NOT_FOUND);
     }
 
     const response: GetProfileResponse = userProfile;
@@ -394,13 +393,16 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
     // Set refresh token based on client type (skip when admin is adding a user)
     if (result.accessToken && result.user && !adminCreatingUser) {
       const tokenManager = TokenManager.getInstance();
-      const refreshToken = tokenManager.generateRefreshToken(result.user.id);
-
       if (clientType === 'web') {
         // Web clients: use httpOnly cookie + CSRF token
+        const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
+          result.user.id,
+          'user'
+        );
         setRefreshTokenCookie(res, refreshToken);
-        result.csrfToken = tokenManager.generateCsrfToken(refreshToken);
+        result.csrfToken = csrfToken;
       } else {
+        const refreshToken = tokenManager.generateRefreshToken(result.user.id, 'user');
         // Non-web clients (mobile, desktop, server): return refresh token in response body.
         // Server clients cannot rely on browser cookies, so they follow the native-app flow.
         result.refreshToken = refreshToken;
@@ -441,13 +443,16 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
 
     // Set refresh token based on client type
     const tokenManager = TokenManager.getInstance();
-    const refreshToken = tokenManager.generateRefreshToken(result.user.id);
-
     if (clientType === 'web') {
       // Web clients: use httpOnly cookie + CSRF token
+      const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
+        result.user.id,
+        'user'
+      );
       setRefreshTokenCookie(res, refreshToken);
-      result.csrfToken = tokenManager.generateCsrfToken(refreshToken);
+      result.csrfToken = csrfToken;
     } else {
+      const refreshToken = tokenManager.generateRefreshToken(result.user.id, 'user');
       // Non-web clients (mobile, desktop, server): return refresh token in response body.
       // Server clients cannot rely on browser cookies, so they follow the native-app flow.
       result.refreshToken = refreshToken;
@@ -489,13 +494,16 @@ router.post('/id-token', async (req: Request, res: Response, next: NextFunction)
 
     // Set refresh token based on client type
     const tokenManager = TokenManager.getInstance();
-    const refreshToken = tokenManager.generateRefreshToken(result.user.id);
-
     if (clientType === 'web') {
       // Web clients: use httpOnly cookie + CSRF token
+      const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
+        result.user.id,
+        'user'
+      );
       setRefreshTokenCookie(res, refreshToken);
-      result.csrfToken = tokenManager.generateCsrfToken(refreshToken);
+      result.csrfToken = csrfToken;
     } else {
+      const refreshToken = tokenManager.generateRefreshToken(result.user.id, 'user');
       // Non-web clients (mobile, desktop, server): return refresh token in response body.
       // Server clients cannot rely on browser cookies, so they follow the native-app flow.
       result.refreshToken = refreshToken;
@@ -526,13 +534,6 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
       if (!refreshToken) {
         throw new AppError('No refresh token provided', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
       }
-
-      // Verify CSRF token by re-computing from refresh token (web only)
-      const csrfHeader = req.headers['x-csrf-token'] as string | undefined;
-      if (!tokenManager.verifyCsrfToken(csrfHeader, refreshToken)) {
-        logger.warn('[Auth:Refresh] CSRF token validation failed');
-        throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
-      }
     } else {
       // Non-web clients (mobile, desktop, server): get refresh token from request body.
       // This includes trusted server-side callers that store the token outside the browser.
@@ -553,6 +554,17 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
     }
 
     const payload = tokenManager.verifyRefreshToken(refreshToken);
+    if (payload.sessionType !== 'user') {
+      throw new AppError('Invalid refresh session type', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+    }
+
+    if (clientType === 'web') {
+      const csrfHeader = req.headers['x-csrf-token'] as string | undefined;
+      if (!tokenManager.verifyCsrfToken(csrfHeader, payload)) {
+        logger.warn('[Auth:Refresh] CSRF token validation failed');
+        throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
+      }
+    }
 
     // Fetch current user data from DB (raw record includes is_project_admin)
     const dbUser = await authService.getUserById(payload.sub);
@@ -575,13 +587,12 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
       role,
     });
 
-    // Generate new refresh token (token rotation for security)
-    const newRefreshToken = tokenManager.generateRefreshToken(user.id);
-
     if (clientType === 'web') {
+      const { refreshToken: newRefreshToken, csrfToken: newCsrfToken } =
+        tokenManager.generateRefreshTokenWithCsrf(user.id, 'user', payload.csrfNonce);
+
       // Web clients: set cookie + return CSRF token
       setRefreshTokenCookie(res, newRefreshToken);
-      const newCsrfToken = tokenManager.generateCsrfToken(newRefreshToken);
 
       successResponse(res, {
         accessToken: newAccessToken,
@@ -589,6 +600,8 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
         csrfToken: newCsrfToken,
       });
     } else {
+      const newRefreshToken = tokenManager.generateRefreshToken(user.id, 'user', payload.csrfNonce);
+
       // Non-web clients (mobile, desktop, server): return refresh token in body.
       // Server callers are expected to persist the rotated token between requests.
       successResponse(res, {
@@ -598,8 +611,8 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
       });
     }
   } catch (error) {
-    // Clear invalid cookie on error (only for web clients)
-    if (clientType === 'web') {
+    // Clear cookies only when the refresh token itself is no longer trustworthy.
+    if (clientType === 'web' && error instanceof AppError && error.statusCode === 401) {
       clearRefreshTokenCookie(res);
     }
     next(error);
@@ -629,79 +642,13 @@ router.post('/logout', (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-// POST /api/auth/admin/sessions/exchange - Exchange authorization code for admin session
-router.post('/admin/sessions/exchange', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const validationResult = exchangeAdminSessionRequestSchema.safeParse(req.body);
-    if (!validationResult.success) {
-      throw new AppError(
-        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
-    }
-
-    const { code } = validationResult.data;
-    const result: CreateAdminSessionResponse =
-      await authService.adminLoginWithAuthorizationCode(code);
-
-    // Set refresh token as httpOnly cookie + CSRF token for web clients
-    const tokenManager = TokenManager.getInstance();
-    const refreshToken = tokenManager.generateRefreshToken(result.user.id);
-    setRefreshTokenCookie(res, refreshToken);
-    const csrfToken = tokenManager.generateCsrfToken(refreshToken);
-
-    successResponse(res, { ...result, csrfToken });
-  } catch (error) {
-    if (error instanceof AppError) {
-      next(error);
-    } else {
-      // Convert other errors (like JWT verification errors) to 400
-      next(
-        new AppError(
-          'Failed to exchange admin session' + (error instanceof Error ? `: ${error.message}` : ''),
-          400,
-          ERROR_CODES.INVALID_INPUT
-        )
-      );
-    }
-  }
-});
-
-// POST /api/auth/admin/sessions - Create admin session (web only)
-router.post('/admin/sessions', (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const validationResult = createAdminSessionRequestSchema.safeParse(req.body);
-    if (!validationResult.success) {
-      throw new AppError(
-        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
-    }
-
-    const { email, password } = validationResult.data;
-    const result: CreateAdminSessionResponse = authService.adminLogin(email, password);
-
-    // Set refresh token as httpOnly cookie + CSRF token for web clients
-    const tokenManager = TokenManager.getInstance();
-    const refreshToken = tokenManager.generateRefreshToken(result.user.id);
-    setRefreshTokenCookie(res, refreshToken);
-    const csrfToken = tokenManager.generateCsrfToken(refreshToken);
-
-    successResponse(res, { ...result, csrfToken });
-  } catch (error) {
-    next(error);
-  }
-});
-
 // GET /api/auth/sessions/current - Get current session user
 router.get(
   '/sessions/current',
   verifyToken,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      if (!req.user) {
+      if (!req.user?.id) {
         throw new AppError('User not authenticated', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
       }
 
@@ -768,7 +715,7 @@ router.get(
       const user = await authService.getUserSchemaById(userId);
 
       if (!user) {
-        throw new AppError('User does not exist', 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError('User does not exist', 404, ERROR_CODES.AUTH_USER_NOT_FOUND);
       }
 
       successResponse(res, user);
@@ -931,13 +878,16 @@ router.post(
 
       // Set refresh token based on client type
       const tokenManager = TokenManager.getInstance();
-      const refreshToken = tokenManager.generateRefreshToken(result.user.id);
-
       if (clientType === 'web') {
         // Web clients: use httpOnly cookie + CSRF token
+        const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
+          result.user.id,
+          'user'
+        );
         setRefreshTokenCookie(res, refreshToken);
-        result.csrfToken = tokenManager.generateCsrfToken(refreshToken);
+        result.csrfToken = csrfToken;
       } else {
+        const refreshToken = tokenManager.generateRefreshToken(result.user.id, 'user');
         // Non-web clients (mobile, desktop, server): return refresh token in response body.
         // Server clients cannot rely on browser cookies, so they follow the native-app flow.
         result.refreshToken = refreshToken;

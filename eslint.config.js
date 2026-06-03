@@ -260,6 +260,13 @@ export default defineConfig(
           selector: 'enumMember',
           format: ['UPPER_CASE'],
         },
+        // Allow exported constant maps like ERROR_CODES.
+        {
+          selector: 'variable',
+          modifiers: ['const', 'global'],
+          format: ['camelCase', 'UPPER_CASE', 'PascalCase'],
+          leadingUnderscore: 'allow',
+        },
         // Default for everything else - camelCase
         {
           selector: 'default',

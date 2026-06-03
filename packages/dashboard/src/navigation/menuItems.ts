@@ -9,8 +9,9 @@ import {
   Server,
   Sparkles,
   ChartLine,
+  BarChart3,
   Settings,
-  Rocket,
+  Globe,
   SquarePen,
   Download,
   BookOpen,
@@ -98,7 +99,7 @@ export const dashboardStaticMenuItems: DashboardPrimaryMenuItem[] = [
   {
     id: 'ai',
     label: 'Model Gateway',
-    href: '/dashboard/ai',
+    href: '/dashboard/ai/overview',
     icon: Sparkles,
   },
   {
@@ -131,9 +132,16 @@ export const dashboardSettingsMenuItem: DashboardPrimaryMenuItem = {
 
 export const dashboardDeploymentsMenuItem: DashboardPrimaryMenuItem = {
   id: 'deployments',
-  label: 'Deployments',
+  label: 'Sites',
   href: '/dashboard/deployments',
-  icon: Rocket,
+  icon: Globe,
+};
+
+export const dashboardAnalyticsMenuItem: DashboardPrimaryMenuItem = {
+  id: 'analytics',
+  label: 'Analytics',
+  href: '/dashboard/analytics',
+  icon: BarChart3,
 };
 
 // d_test + cloud-hosting only: navigates to the Install InsForge route.

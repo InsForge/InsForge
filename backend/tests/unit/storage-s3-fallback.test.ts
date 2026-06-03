@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from 'vitest';
 import { S3StorageProvider } from '../../src/providers/storage/s3.provider.ts';
 import { CopyObjectCommand, GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { Readable } from 'stream';
+import crypto from 'crypto';
 
 function asyncIterableFromString(s: string): AsyncIterable<Uint8Array> {
   return {
@@ -179,6 +180,85 @@ describe('S3StorageProvider — branch fallback', () => {
       const p = makeProvider('parentkey');
       const strategy = await p.getDownloadStrategy('photos', 'a.txt');
       expect(strategy.url).toContain('branchkey/photos/a.txt');
+    });
+  });
+
+  describe('getDownloadStrategy — CloudFront signed URL with cache-bust version', () => {
+    // CloudFront canned-policy verification reconstructs `Resource` from the
+    // request URL minus the three CF params (Expires/Signature/Key-Pair-Id).
+    // Any *other* query — like our `?v=<etag>` — must be in the URL BEFORE
+    // signing or CloudFront returns 403 SignatureDoesNotMatch on download.
+    let testPrivateKey: string;
+    const savedEnv: Record<string, string | undefined> = {};
+
+    beforeAll(() => {
+      const { privateKey } = crypto.generateKeyPairSync('rsa', {
+        modulusLength: 2048,
+        privateKeyEncoding: { type: 'pkcs1', format: 'pem' },
+        publicKeyEncoding: { type: 'pkcs1', format: 'pem' },
+      });
+      testPrivateKey = privateKey;
+    });
+
+    beforeEach(() => {
+      for (const k of [
+        'AWS_CLOUDFRONT_URL',
+        'AWS_CLOUDFRONT_KEY_PAIR_ID',
+        'AWS_CLOUDFRONT_PRIVATE_KEY',
+        'S3_ENDPOINT_URL',
+      ]) {
+        savedEnv[k] = process.env[k];
+      }
+      process.env.AWS_CLOUDFRONT_URL = 'https://cdn.example.test';
+      process.env.AWS_CLOUDFRONT_KEY_PAIR_ID = 'K123TEST';
+      process.env.AWS_CLOUDFRONT_PRIVATE_KEY = testPrivateKey;
+      delete process.env.S3_ENDPOINT_URL;
+    });
+
+    afterEach(() => {
+      for (const [k, v] of Object.entries(savedEnv)) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
+    });
+
+    it('places v= before the CF signing params (i.e. v is part of the signed Resource)', async () => {
+      const p = makeProvider(); // no parent — skip the HEAD round-trip
+      const strategy = await p.getDownloadStrategy('photos', 'a.txt', 3600, false, 'etag-abc');
+
+      expect(strategy.method).toBe('presigned');
+      const url = new URL(strategy.url);
+      expect(url.searchParams.get('v')).toBe('etag-abc');
+
+      // Order matters: getCloudFrontSignedUrl appends Expires/Signature/Key-Pair-Id
+      // *after* the URL it signs. So v= sitting before Expires= proves v was
+      // present at signing time and is therefore covered by the signature.
+      const params = url.search.replace(/^\?/, '').split('&');
+      const vIdx = params.findIndex((p) => p.startsWith('v='));
+      const expiresIdx = params.findIndex((p) => p.startsWith('Expires='));
+      expect(vIdx).toBeGreaterThanOrEqual(0);
+      expect(expiresIdx).toBeGreaterThanOrEqual(0);
+      expect(vIdx).toBeLessThan(expiresIdx);
+    });
+
+    it('omits v= when no version is supplied', async () => {
+      const p = makeProvider();
+      const strategy = await p.getDownloadStrategy('photos', 'a.txt');
+
+      const url = new URL(strategy.url);
+      expect(url.searchParams.get('v')).toBeNull();
+      expect(url.searchParams.get('Signature')).not.toBeNull();
+    });
+
+    it('URL-encodes version values with reserved characters', async () => {
+      const p = makeProvider();
+      const strategy = await p.getDownloadStrategy('photos', 'a.txt', 3600, false, 'a&b c');
+
+      const url = new URL(strategy.url);
+      expect(url.searchParams.get('v')).toBe('a&b c');
+      // Raw-form check: the literal `&` from the version must be percent-encoded
+      // so it doesn't break the query into a separate param.
+      expect(url.search).toContain('v=a%26b%20c');
     });
   });
 

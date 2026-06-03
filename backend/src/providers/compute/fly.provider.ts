@@ -4,6 +4,16 @@ import type { ComputeProvider } from './compute.provider.js';
 
 const FLY_API_BASE = 'https://api.machines.dev/v1';
 
+// Fly Machines API field names for the autostop/autostart block on a
+// service. Kept narrow on purpose: extend when we expose CLI overrides.
+// `autostop` accepts `"off" | "stop" | "suspend"` per fly.MachineService
+// in https://docs.machines.dev/spec/openapi3.json.
+type ScaleOptions = {
+  autostop: 'off' | 'stop' | 'suspend';
+  autostart: boolean;
+  min_machines_running: number;
+};
+
 export class FlyProvider implements ComputeProvider {
   private static instance: FlyProvider;
 
@@ -165,6 +175,62 @@ export class FlyProvider implements ComputeProvider {
     await this.request(`/apps/${appId}`, { method: 'DELETE' });
   }
 
+  // Scale-to-zero is v1's only mode — see compute-deploy.md in the skill
+  // for the rationale. Callers don't pass autostop overrides today. When
+  // we do want to expose `--autostop` / `--min-machines` CLI flags later,
+  // this is the one spot to plumb them through: extend `ScaleOptions` and
+  // pass it from launchMachine/updateMachine. The defaults stay correct
+  // regardless of how callers evolve.
+  private static readonly SCALE_TO_ZERO: ScaleOptions = {
+    autostop: 'stop',
+    autostart: true,
+    min_machines_running: 0,
+  };
+
+  // Single source of truth for the per-machine service block. Both launch
+  // and update need to send the same shape, including the autostop fields:
+  // without them Fly defaults to never stopping and machines run 24/7 even
+  // when idle.
+  //
+  // Field names are the **Machines API** spelling (`autostart` / `autostop`),
+  // NOT fly.toml's longer `auto_start_machines` / `auto_stop_machines`. The
+  // Machines API silently ignores unknown fields, so getting these wrong
+  // looks like it works but leaves machines always-on. Source of truth:
+  // https://docs.machines.dev/spec/openapi3.json — fly.MachineService.
+  //
+  // `edgeProtocol` selects the edge-handler shape:
+  //   - `'http'` (default): TLS-terminated at the Fly anycast edge, HTTP/1.1+H2
+  //     proxied to the container's port. Two public ports (443 TLS, 80 plain).
+  //   - `'tcp'`: container's port exposed directly with empty handlers, for
+  //     Redis / Postgres-protocol / raw TCP services. Single public port =
+  //     internal port. Fly's `services[].protocol` stays `'tcp'` either way
+  //     (that's the L4 protocol field, not L7).
+  private serviceConfig(
+    internalPort: number,
+    edgeProtocol: 'http' | 'tcp' = 'http',
+    scale: ScaleOptions = FlyProvider.SCALE_TO_ZERO
+  ) {
+    const ports =
+      edgeProtocol === 'tcp'
+        ? [{ port: internalPort, handlers: [] as string[] }]
+        : [
+            { port: 443, handlers: ['tls', 'http'] },
+            { port: 80, handlers: ['http'] },
+          ];
+    return {
+      ports,
+      internal_port: internalPort,
+      protocol: 'tcp',
+      // Scale config. `stop` (vs `suspend`) fully releases the machine —
+      // cheaper for compute that isn't sensitive to ~1s cold-start latency.
+      // `min_machines_running: 0` is required for full scale-to-zero (any
+      // value > 0 keeps that many warm).
+      autostop: scale.autostop,
+      autostart: scale.autostart,
+      min_machines_running: scale.min_machines_running,
+    };
+  }
+
   async launchMachine(params: {
     appId: string;
     image: string;
@@ -173,6 +239,7 @@ export class FlyProvider implements ComputeProvider {
     memory: number;
     envVars: Record<string, string>;
     region: string;
+    protocol?: 'http' | 'tcp';
   }): Promise<{ machineId: string }> {
     const guest = this.mapCpuTier(params.cpu, params.memory);
     const result = await this.requestJson<{ id: string }>(`/apps/${params.appId}/machines`, {
@@ -182,16 +249,7 @@ export class FlyProvider implements ComputeProvider {
           image: params.image,
           guest,
           env: params.envVars,
-          services: [
-            {
-              ports: [
-                { port: 443, handlers: ['tls', 'http'] },
-                { port: 80, handlers: ['http'] },
-              ],
-              internal_port: params.port,
-              protocol: 'tcp',
-            },
-          ],
+          services: [this.serviceConfig(params.port, params.protocol ?? 'http')],
         },
         region: params.region,
       }),
@@ -207,6 +265,7 @@ export class FlyProvider implements ComputeProvider {
     cpu: string;
     memory: number;
     envVars: Record<string, string>;
+    protocol?: 'http' | 'tcp';
   }): Promise<void> {
     const guest = this.mapCpuTier(params.cpu, params.memory);
     await this.request(`/apps/${params.appId}/machines/${params.machineId}`, {
@@ -216,16 +275,7 @@ export class FlyProvider implements ComputeProvider {
           image: params.image,
           guest,
           env: params.envVars,
-          services: [
-            {
-              ports: [
-                { port: 443, handlers: ['tls', 'http'] },
-                { port: 80, handlers: ['http'] },
-              ],
-              internal_port: params.port,
-              protocol: 'tcp',
-            },
-          ],
+          services: [this.serviceConfig(params.port, params.protocol ?? 'http')],
         },
       }),
     });

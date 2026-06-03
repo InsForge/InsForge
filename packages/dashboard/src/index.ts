@@ -11,6 +11,7 @@ export type {
   DashboardBackupInfo,
   CloudHostingDashboardProps,
   DashboardInstanceInfo,
+  DashboardModelCreditUsage,
   DashboardMode,
   DashboardProjectInfo,
   DashboardProps,
@@ -29,5 +30,7 @@ export type {
   DashboardAdvisorIssue,
   DashboardAdvisorIssuesQuery,
   DashboardAdvisorIssuesResponse,
+  DashboardPosthogConnectionStatus,
+  DashboardPosthogOpenResult,
 } from './types';
 export type { DashboardPrimaryMenuItem } from './navigation/menuItems';

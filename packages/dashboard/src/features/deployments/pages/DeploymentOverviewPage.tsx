@@ -100,13 +100,13 @@ export default function DeploymentOverviewPage() {
         <div className="bg-neutral-100 dark:bg-[#333] rounded-lg p-6">
           <div className="flex flex-col gap-6">
             <h2 className="text-xl font-semibold text-zinc-950 dark:text-white">
-              No Deployments Yet
+              No deployments yet
             </h2>
 
             <div className="flex flex-col gap-3">
               <p className="text-sm text-muted-foreground dark:text-neutral-400">
-                Send the prompt below to your connected AI agent to deploy your project for the
-                first time.
+                Send the prompt below to your connected AI agent to deploy your site for the first
+                time.
               </p>
 
               <div className="bg-neutral-200 dark:bg-[#171717] rounded-lg p-3 flex flex-col gap-2">
@@ -157,7 +157,7 @@ export default function DeploymentOverviewPage() {
                 <iframe
                   key={iframeKey}
                   src={deploymentUrl}
-                  title="Deployment Preview"
+                  title="Site Preview"
                   className="absolute top-0 left-0 w-[1215px] h-[912px] origin-top-left scale-[0.333] border-0 pointer-events-none"
                   sandbox="allow-scripts allow-same-origin"
                   loading="lazy"
@@ -173,7 +173,9 @@ export default function DeploymentOverviewPage() {
           {/* Metadata Grid */}
           <div className="flex-1 flex flex-col gap-6 justify-center">
             <div className="flex flex-col">
-              <p className="text-sm text-muted-foreground dark:text-neutral-400 leading-6">ID</p>
+              <p className="text-sm text-muted-foreground dark:text-neutral-400 leading-6">
+                Deployment ID
+              </p>
               <p className="text-sm text-zinc-950 dark:text-white font-mono">
                 {latestReadyDeployment.id}
               </p>

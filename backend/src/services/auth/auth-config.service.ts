@@ -1,10 +1,13 @@
 import { Pool } from 'pg';
 import picomatch from 'picomatch';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
-import type { AuthConfigSchema, UpdateAuthConfigRequest } from '@insforge/shared-schemas';
+import {
+  ERROR_CODES,
+  type AuthConfigSchema,
+  type UpdateAuthConfigRequest,
+} from '@insforge/shared-schemas';
 import { URL } from 'url';
 
 export class AuthConfigService {

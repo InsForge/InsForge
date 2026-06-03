@@ -1,40 +1,33 @@
-import { isCloudEnvironment } from '@/utils/environment.js';
-import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
 import type { RawOpenRouterModel } from '@/types/ai.js';
-import type { AIModelSchema } from '@insforge/shared-schemas';
-import { calculatePricePerMillion, filterAndSortModalities, getProviderOrder } from './helpers.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { ERROR_CODES, type AIModelSchema } from '@insforge/shared-schemas';
+import { calculateTokenPrices, normalizeModalities, getProviderOrder } from './helpers.js';
+import { AppError } from '@/utils/errors.js';
+
+const MODELS_CACHE_TTL_MS = 60 * 60 * 1000;
+const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models?output_modalities=all';
+
+let modelsCache: {
+  expiresAt: number;
+  models: AIModelSchema[];
+} | null = null;
 
 export class AIModelService {
   /**
    * Get all available AI models
-   * Fetches from cloud API if in cloud environment, otherwise from OpenRouter directly
+   * Fetches the public OpenRouter catalog directly.
    */
   static async getModels(): Promise<AIModelSchema[]> {
-    const openRouterProvider = OpenRouterProvider.getInstance();
-    const configured = await openRouterProvider.isConfiguredAsync();
-
-    if (!configured) {
-      return [];
+    const now = Date.now();
+    if (modelsCache && modelsCache.expiresAt > now) {
+      return modelsCache.models;
     }
 
-    // Get API key from OpenRouter provider
-    const apiKey = await openRouterProvider.getApiKey();
-
-    // Determine the API endpoint based on environment
-    const apiUrl = isCloudEnvironment()
-      ? 'https://api.insforge.dev/ai/v1/models'
-      : 'https://openrouter.ai/api/v1/models/user';
-
-    // Fetch models from the appropriate endpoint
-    const response = await fetch(apiUrl, {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-      },
-    });
+    const response = await fetch(OPENROUTER_MODELS_URL);
 
     if (!response.ok) {
+      if (modelsCache) {
+        return modelsCache.models;
+      }
       throw new AppError(
         `Failed to fetch models: ${response.statusText}`,
         500,
@@ -47,23 +40,38 @@ export class AIModelService {
 
     const models: AIModelSchema[] = rawModels
       .map((rawModel) => {
-        const { inputPrice, outputPrice } = calculatePricePerMillion(rawModel.pricing);
+        const inputModality = normalizeModalities(rawModel.architecture?.input_modalities || []);
+        const outputModality = normalizeModalities(rawModel.architecture?.output_modalities || []);
+        const { inputPrice, outputPrice, inputPriceLabel, outputPriceLabel } = calculateTokenPrices(
+          rawModel.pricing,
+          inputModality,
+          outputModality
+        );
         return {
           id: rawModel.id, // OpenRouter provided model ID
+          created: rawModel.created,
           modelId: rawModel.id,
           provider: 'openrouter',
-          inputModality: filterAndSortModalities(rawModel.architecture?.input_modalities || []),
-          outputModality: filterAndSortModalities(rawModel.architecture?.output_modalities || []),
+          inputModality,
+          outputModality,
           inputPrice,
           outputPrice,
+          inputPriceLabel,
+          outputPriceLabel,
         };
       })
+      .filter((model) => model.inputModality.length > 0 && model.outputModality.length > 0)
       .sort((a, b) => {
         const [aCompany = '', bCompany = ''] = [a.id.split('/')[0], b.id.split('/')[0]];
 
         const orderDiff = getProviderOrder(aCompany) - getProviderOrder(bCompany);
         return orderDiff !== 0 ? orderDiff : a.id.localeCompare(b.id);
       });
+
+    modelsCache = {
+      expiresAt: now + MODELS_CACHE_TTL_MS,
+      models,
+    };
 
     return models || [];
   }

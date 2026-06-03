@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ERROR_CODES } from '../../src/types/error-constants';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 
 const { mockClient, mockPool } = vi.hoisted(() => ({
   mockClient: {
@@ -36,7 +36,7 @@ describe('PaymentCheckoutService', () => {
         sql === 'ROLLBACK' ||
         sql === 'RESET ROLE' ||
         sql.startsWith('SET LOCAL ROLE') ||
-        sql.startsWith("SELECT set_config('request.jwt.claim.")
+        sql === 'SELECT set_config($1, $2, true)'
       ) {
         return { rows: [], rowCount: 0 };
       }
@@ -75,7 +75,7 @@ describe('PaymentCheckoutService', () => {
       )
     ).rejects.toMatchObject({
       statusCode: 409,
-      code: ERROR_CODES.ALREADY_EXISTS,
+      code: ERROR_CODES.PAYMENT_CHECKOUT_ALREADY_EXISTS,
     });
 
     expect(

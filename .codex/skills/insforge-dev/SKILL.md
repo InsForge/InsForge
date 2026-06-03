@@ -37,6 +37,7 @@ Then use the narrowest package skill that matches the task:
    - Backend success responses usually return raw JSON, not `{ data }`.
    - Backend validation commonly uses shared Zod schemas plus `AppError`.
    - Dashboard data access goes through `apiClient` and React Query.
+   - Dashboard frontend tests are split into Vitest unit tests, Vitest component tests, and Playwright UI smoke tests.
    - Shared payloads belong in `@insforge/shared-schemas`.
    - Never use the TypeScript `any` type. Prefer precise types, schema-derived types, `unknown`, or generics.
 
@@ -49,6 +50,7 @@ Then use the narrowest package skill that matches the task:
 - Run the smallest validation that gives confidence for the change.
 - Use repo-level checks like `npm run lint`, `npm run build`, and `npm test` when the change crosses package boundaries.
 - `npm run typecheck` does not cover `packages/dashboard/` or `packages/shared-schemas/`, so run package-specific validation when either package changes.
+- For dashboard UI behavior changes, choose the lowest useful frontend test layer from the `dashboard` skill and run that command before reporting back.
 - Use the package-specific validation steps in the child skill when the work is isolated to one package.
 - When reporting back, state what changed, what you validated, and what you could not validate.
 

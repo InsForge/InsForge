@@ -1,6 +1,5 @@
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
-import type { AuthConfigSchema } from '@insforge/shared-schemas';
+import { AppError } from '@/utils/errors.js';
+import { ERROR_CODES, type AuthConfigSchema } from '@insforge/shared-schemas';
 
 export function validateEmail(email: string) {
   return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email);

@@ -21,7 +21,7 @@ export function useTables(schemaName: string = DEFAULT_DATABASE_SCHEMA) {
     refetch: refetchTables,
   } = useQuery({
     queryKey: databaseTableQueryKeys.tables(schemaName),
-    queryFn: () => tableService.listTables(schemaName),
+    queryFn: ({ signal }) => tableService.listTables(schemaName, signal),
     staleTime: 2 * 60 * 1000,
   });
 
@@ -33,7 +33,7 @@ export function useTables(schemaName: string = DEFAULT_DATABASE_SCHEMA) {
   ) => {
     return useQuery({
       queryKey: databaseTableQueryKeys.tableSchema(tableSchemaName, tableName),
-      queryFn: () => tableService.getTableSchema(tableName, tableSchemaName),
+      queryFn: ({ signal }) => tableService.getTableSchema(tableName, tableSchemaName, signal),
       enabled: enabled && !!tableName,
       staleTime: 2 * 60 * 1000,
     });
@@ -124,7 +124,8 @@ export function useAllTableSchemas(schemaName: string = DEFAULT_DATABASE_SCHEMA,
     queries: enabled
       ? tables.map((tableName) => ({
           queryKey: databaseTableQueryKeys.tableSchema(schemaName, tableName),
-          queryFn: () => tableService.getTableSchema(tableName, schemaName),
+          queryFn: ({ signal }: { signal: AbortSignal }) =>
+            tableService.getTableSchema(tableName, schemaName, signal),
           staleTime: 2 * 60 * 1000,
         }))
       : [],

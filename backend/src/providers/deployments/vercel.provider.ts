@@ -3,8 +3,8 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import type { Readable } from 'stream';
 import { isCloudEnvironment } from '@/utils/environment.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError, UpstreamError } from '@/utils/errors.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import logger from '@/utils/logger.js';
 
@@ -105,6 +105,88 @@ export interface VercelProjectDomain {
   verified: boolean;
   verification?: Array<{ type: string; domain: string; value: string; reason: string }>;
 }
+
+export interface VercelRateLimitRetryOptions {
+  maxRetries: number;
+  /** Base delay for exponential schedule when X-RateLimit-Reset is missing. */
+  baseDelayMs: number;
+  /** Cap on the computed delay so a wildly-future reset header doesn't stall the worker. */
+  maxDelayMs: number;
+  /** Max jitter (ms) added on top of the base. */
+  jitterMaxMs: number;
+}
+
+/**
+ * Wrap any Vercel API call so HTTP 429 responses trigger an exponential-backoff
+ * retry. Vercel returns `X-RateLimit-Reset` as a Unix epoch (seconds); when
+ * present we wait until that instant (capped at `maxDelayMs`). Otherwise we
+ * fall back to `2^attempt * baseDelayMs + jitter`. The final delay (base +
+ * jitter) is clamped to `maxDelayMs` so jitter cannot push the wait past the
+ * intended cap.
+ *
+ * On 429 retry exhaustion the helper throws `AppError(429, RATE_LIMITED)`
+ * rather than the raw axios error, so callers can rethrow it as-is and have
+ * the rate-limit semantics surface to the client instead of being flattened
+ * to a generic 500 INTERNAL_ERROR.
+ *
+ * Used by these write endpoints: createDeployment, cancelDeployment,
+ * upsertEnvironmentVariables, addCustomDomain, removeCustomDomain,
+ * verifyCustomDomain. uploadFile keeps its own bespoke streaming-aware
+ * retry loop and is intentionally NOT wrapped by this helper.
+ */
+export async function withVercelRateLimitRetry<T>(
+  op: () => Promise<T>,
+  opts: VercelRateLimitRetryOptions
+): Promise<T> {
+  let attempt = 0;
+  while (true) {
+    try {
+      return await op();
+    } catch (error: unknown) {
+      const isAxios429 = axios.isAxiosError(error) && error.response?.status === 429;
+
+      if (!isAxios429) {
+        throw error;
+      }
+      if (attempt >= opts.maxRetries) {
+        throw new AppError(
+          'Vercel rate limit exceeded after retries. Please retry shortly.',
+          429,
+          ERROR_CODES.RATE_LIMITED
+        );
+      }
+
+      const headers = error.response?.headers ?? {};
+      const reset = headers['x-ratelimit-reset'];
+      const parsedReset = reset !== undefined && reset !== null ? parseInt(String(reset), 10) : NaN;
+      let baseDelay: number;
+      if (!isNaN(parsedReset)) {
+        const resetMs = parsedReset * 1000;
+        baseDelay = Math.min(Math.max(resetMs - Date.now(), opts.baseDelayMs), opts.maxDelayMs);
+      } else {
+        baseDelay = Math.min(2 ** attempt * opts.baseDelayMs, opts.maxDelayMs);
+      }
+      const delay = Math.min(
+        baseDelay + Math.floor(Math.random() * opts.jitterMaxMs),
+        opts.maxDelayMs
+      );
+      logger.warn('Vercel rate limit hit — retrying', {
+        attempt: attempt + 1,
+        maxRetries: opts.maxRetries,
+        delayMs: Math.round(delay),
+      });
+      await new Promise((res) => setTimeout(res, delay));
+      attempt++;
+    }
+  }
+}
+
+export const DEFAULT_VERCEL_RATE_LIMIT_OPTS: VercelRateLimitRetryOptions = {
+  maxRetries: 3,
+  baseDelayMs: 1000,
+  maxDelayMs: 30_000,
+  jitterMaxMs: 250,
+};
 
 export class VercelProvider {
   private static instance: VercelProvider;
@@ -317,17 +399,21 @@ export class VercelProvider {
     const credentials = await this.getCredentials();
 
     try {
-      const response = await axios.post(
-        `https://api.vercel.com/v13/deployments?teamId=${credentials.teamId}&skipAutoDetectionConfirmation=1`,
-        {
-          name: options.name || 'deployment',
-          target: 'production',
-          project: credentials.projectId,
-          files: options.files,
-          projectSettings: options.projectSettings,
-          meta: options.meta,
-        },
-        { headers: { Authorization: `Bearer ${credentials.token}` } }
+      const response = await withVercelRateLimitRetry(
+        () =>
+          axios.post(
+            `https://api.vercel.com/v13/deployments?teamId=${credentials.teamId}&skipAutoDetectionConfirmation=1`,
+            {
+              name: options.name || 'deployment',
+              target: 'production',
+              project: credentials.projectId,
+              files: options.files,
+              projectSettings: options.projectSettings,
+              meta: options.meta,
+            },
+            { headers: { Authorization: `Bearer ${credentials.token}` } }
+          ),
+        DEFAULT_VERCEL_RATE_LIMIT_OPTS
       );
 
       const deployment = response.data;
@@ -347,10 +433,13 @@ export class VercelProvider {
         createdAt: new Date(deployment.createdAt),
       };
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       logger.error('Failed to create Vercel deployment', {
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new AppError('Failed to create Vercel deployment', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to create Vercel deployment');
     }
   }
 
@@ -384,13 +473,17 @@ export class VercelProvider {
       };
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 404) {
-        throw new AppError(`Deployment not found: ${deploymentId}`, 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError(
+          `Deployment not found: ${deploymentId}`,
+          404,
+          ERROR_CODES.DEPLOYMENT_NOT_FOUND
+        );
       }
       logger.error('Failed to get Vercel deployment', {
         error: error instanceof Error ? error.message : String(error),
         deploymentId,
       });
-      throw new AppError('Failed to get Vercel deployment', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to get Vercel deployment');
     }
   }
 
@@ -402,18 +495,25 @@ export class VercelProvider {
     const credentials = await this.getCredentials();
 
     try {
-      await axios.patch(
-        `https://api.vercel.com/v12/deployments/${deploymentId}/cancel?teamId=${credentials.teamId}`,
-        {},
-        { headers: { Authorization: `Bearer ${credentials.token}` } }
+      await withVercelRateLimitRetry(
+        () =>
+          axios.patch(
+            `https://api.vercel.com/v12/deployments/${deploymentId}/cancel?teamId=${credentials.teamId}`,
+            {},
+            { headers: { Authorization: `Bearer ${credentials.token}` } }
+          ),
+        DEFAULT_VERCEL_RATE_LIMIT_OPTS
       );
       logger.info('Vercel deployment cancelled', { deploymentId });
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       logger.error('Failed to cancel Vercel deployment', {
         error: error instanceof Error ? error.message : String(error),
         deploymentId,
       });
-      throw new AppError('Failed to cancel Vercel deployment', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to cancel Vercel deployment');
     }
   }
 
@@ -431,10 +531,14 @@ export class VercelProvider {
         target: ['production', 'preview', 'development'],
       }));
 
-      await axios.post(
-        `https://api.vercel.com/v10/projects/${credentials.projectId}/env?teamId=${credentials.teamId}&upsert=true`,
-        payload,
-        { headers: { Authorization: `Bearer ${credentials.token}` } }
+      await withVercelRateLimitRetry(
+        () =>
+          axios.post(
+            `https://api.vercel.com/v10/projects/${credentials.projectId}/env?teamId=${credentials.teamId}&upsert=true`,
+            payload,
+            { headers: { Authorization: `Bearer ${credentials.token}` } }
+          ),
+        DEFAULT_VERCEL_RATE_LIMIT_OPTS
       );
 
       logger.info('Environment variables upserted', {
@@ -442,10 +546,13 @@ export class VercelProvider {
         keys: envVars.map((e) => e.key),
       });
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       logger.error('Failed to upsert environment variables', {
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new AppError('Failed to upsert environment variables', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to upsert environment variables');
     }
   }
 
@@ -517,7 +624,7 @@ export class VercelProvider {
       logger.error('Failed to list environment variables', {
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new AppError('Failed to list environment variables', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to list environment variables');
     }
   }
 
@@ -563,13 +670,17 @@ export class VercelProvider {
       };
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 404) {
-        throw new AppError(`Environment variable not found: ${envId}`, 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError(
+          `Environment variable not found: ${envId}`,
+          404,
+          ERROR_CODES.ENVIRONMENT_VARIABLE_NOT_FOUND
+        );
       }
       logger.error('Failed to get environment variable', {
         error: error instanceof Error ? error.message : String(error),
         envId,
       });
-      throw new AppError('Failed to get environment variable', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to get environment variable');
     }
   }
 
@@ -580,21 +691,32 @@ export class VercelProvider {
     const credentials = await this.getCredentials();
 
     try {
-      await axios.delete(
-        `https://api.vercel.com/v10/projects/${credentials.projectId}/env/${envId}?teamId=${credentials.teamId}`,
-        { headers: { Authorization: `Bearer ${credentials.token}` } }
+      await withVercelRateLimitRetry(
+        () =>
+          axios.delete(
+            `https://api.vercel.com/v10/projects/${credentials.projectId}/env/${envId}?teamId=${credentials.teamId}`,
+            { headers: { Authorization: `Bearer ${credentials.token}` } }
+          ),
+        DEFAULT_VERCEL_RATE_LIMIT_OPTS
       );
 
       logger.info('Environment variable deleted', { envId });
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       if (axios.isAxiosError(error) && error.response?.status === 404) {
-        throw new AppError(`Environment variable not found: ${envId}`, 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError(
+          `Environment variable not found: ${envId}`,
+          404,
+          ERROR_CODES.ENVIRONMENT_VARIABLE_NOT_FOUND
+        );
       }
       logger.error('Failed to delete environment variable', {
         error: error instanceof Error ? error.message : String(error),
         envId,
       });
-      throw new AppError('Failed to delete environment variable', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to delete environment variable');
     }
   }
 
@@ -677,7 +799,7 @@ export class VercelProvider {
       logger.error('Failed to list custom domains from Vercel', {
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new AppError('Failed to list custom domains', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to list custom domains');
     }
   }
 
@@ -706,7 +828,7 @@ export class VercelProvider {
         error: error instanceof Error ? error.message : String(error),
         domain,
       });
-      throw new AppError('Failed to get custom domain config', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to get custom domain config');
     }
   }
 
@@ -732,13 +854,17 @@ export class VercelProvider {
       return response.data as VercelProjectDomain;
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 404) {
-        throw new AppError(`Domain not found on Vercel: ${domain}`, 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError(
+          `Domain not found on Vercel: ${domain}`,
+          404,
+          ERROR_CODES.DOMAIN_NOT_FOUND
+        );
       }
       logger.error('Failed to fetch custom domain from Vercel', {
         error: error instanceof Error ? error.message : String(error),
         domain,
       });
-      throw new AppError('Failed to get custom domain', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to get custom domain');
     }
   }
 
@@ -761,15 +887,22 @@ export class VercelProvider {
     const credentials = await this.getCredentials();
 
     try {
-      const response = await axios.post(
-        `https://api.vercel.com/v10/projects/${credentials.projectId}/domains?teamId=${credentials.teamId}`,
-        { name: domain },
-        { headers: { Authorization: `Bearer ${credentials.token}` } }
+      const response = await withVercelRateLimitRetry(
+        () =>
+          axios.post(
+            `https://api.vercel.com/v10/projects/${credentials.projectId}/domains?teamId=${credentials.teamId}`,
+            { name: domain },
+            { headers: { Authorization: `Bearer ${credentials.token}` } }
+          ),
+        DEFAULT_VERCEL_RATE_LIMIT_OPTS
       );
 
       logger.info('Custom domain added to Vercel project', { domain });
       return response.data;
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       if (axios.isAxiosError(error)) {
         const status = error.response?.status;
         const msg = (error.response?.data as { error?: { message?: string } })?.error?.message;
@@ -777,18 +910,18 @@ export class VercelProvider {
           throw new AppError(
             msg || `Domain ${domain} is already added to this project`,
             409,
-            ERROR_CODES.ALREADY_EXISTS
+            ERROR_CODES.DOMAIN_ALREADY_EXISTS
           );
         }
         if (status === 400) {
-          throw new AppError(msg || `Invalid domain: ${domain}`, 400, ERROR_CODES.INVALID_INPUT);
+          throw new AppError(msg || `Invalid domain: ${domain}`, 400, ERROR_CODES.DOMAIN_INVALID);
         }
       }
       logger.error('Failed to add custom domain to Vercel', {
         error: error instanceof Error ? error.message : String(error),
         domain,
       });
-      throw new AppError('Failed to add custom domain', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to add custom domain');
     }
   }
 
@@ -800,13 +933,20 @@ export class VercelProvider {
     const credentials = await this.getCredentials();
 
     try {
-      await axios.delete(
-        `https://api.vercel.com/v9/projects/${credentials.projectId}/domains/${domain}?teamId=${credentials.teamId}`,
-        { headers: { Authorization: `Bearer ${credentials.token}` } }
+      await withVercelRateLimitRetry(
+        () =>
+          axios.delete(
+            `https://api.vercel.com/v9/projects/${credentials.projectId}/domains/${domain}?teamId=${credentials.teamId}`,
+            { headers: { Authorization: `Bearer ${credentials.token}` } }
+          ),
+        DEFAULT_VERCEL_RATE_LIMIT_OPTS
       );
 
       logger.info('Custom domain removed from Vercel project', { domain });
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       if (axios.isAxiosError(error) && error.response?.status === 404) {
         // Domain not found on Vercel side – treat as already removed
         return;
@@ -815,7 +955,7 @@ export class VercelProvider {
         error: error instanceof Error ? error.message : String(error),
         domain,
       });
-      throw new AppError('Failed to remove custom domain', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to remove custom domain');
     }
   }
 
@@ -830,10 +970,14 @@ export class VercelProvider {
     const credentials = await this.getCredentials();
 
     try {
-      const response = await axios.post(
-        `https://api.vercel.com/v9/projects/${credentials.projectId}/domains/${domain}/verify?teamId=${credentials.teamId}`,
-        {},
-        { headers: { Authorization: `Bearer ${credentials.token}` } }
+      const response = await withVercelRateLimitRetry(
+        () =>
+          axios.post(
+            `https://api.vercel.com/v9/projects/${credentials.projectId}/domains/${domain}/verify?teamId=${credentials.teamId}`,
+            {},
+            { headers: { Authorization: `Bearer ${credentials.token}` } }
+          ),
+        DEFAULT_VERCEL_RATE_LIMIT_OPTS
       );
 
       const data = response.data as {
@@ -844,14 +988,21 @@ export class VercelProvider {
       logger.info('Custom domain verification result', { domain, verified: data.verified });
       return data;
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       if (axios.isAxiosError(error) && error.response?.status === 404) {
-        throw new AppError(`Domain not found on Vercel: ${domain}`, 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError(
+          `Domain not found on Vercel: ${domain}`,
+          404,
+          ERROR_CODES.DOMAIN_NOT_FOUND
+        );
       }
       logger.error('Failed to verify custom domain', {
         error: error instanceof Error ? error.message : String(error),
         domain,
       });
-      throw new AppError('Failed to verify custom domain', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to verify custom domain');
     }
   }
 
@@ -930,12 +1081,12 @@ export class VercelProvider {
         logger.error('Failed to upload file to Vercel', {
           error: error instanceof Error ? error.message : String(error),
         });
-        throw new AppError('Failed to upload file to Vercel', 500, ERROR_CODES.INTERNAL_ERROR);
+        throw new UpstreamError(error, 'Failed to upload file to Vercel');
       }
     }
 
     // Unreachable, but TypeScript needs a return
-    throw new AppError('Failed to upload file to Vercel', 500, ERROR_CODES.INTERNAL_ERROR);
+    throw new AppError('Failed to upload file to Vercel', 502, ERROR_CODES.UPSTREAM_FAILURE);
   }
 
   /**
@@ -994,7 +1145,7 @@ export class VercelProvider {
         throw new AppError(
           `Vercel file upload timed out after ${VERCEL_UPLOAD_TIMEOUT_MS}ms. Retry the file upload.`,
           504,
-          ERROR_CODES.INTERNAL_ERROR
+          ERROR_CODES.UPSTREAM_FAILURE
         );
       }
 
@@ -1015,26 +1166,27 @@ export class VercelProvider {
         );
       }
 
-      if (axios.isAxiosError(error) && error.response?.status === 400) {
+      if (axios.isAxiosError(error) && error.response) {
         logger.warn('Vercel rejected streamed file upload', {
           sha: input.sha,
           status: error.response.status,
+          responseData: error.response.data,
         });
-        throw new AppError(
-          'Uploaded file content does not match the registered deployment file.',
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
+        throw new UpstreamError(error, 'Failed to upload file to Vercel');
       }
 
       if (axios.isAxiosError(error) && error.code === 'ERR_CANCELED') {
-        throw new AppError('Vercel file upload was interrupted.', 499, ERROR_CODES.INVALID_INPUT);
+        throw new AppError(
+          'Vercel file upload was interrupted.',
+          499,
+          ERROR_CODES.DEPLOYMENT_UPLOAD_CANCELED
+        );
       }
 
       logger.error('Failed to stream file to Vercel', {
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new AppError('Failed to upload file to Vercel', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to upload file to Vercel');
     } finally {
       cleanup();
     }
@@ -1119,7 +1271,7 @@ export class VercelProvider {
         error: error instanceof Error ? error.message : String(error),
         fileCount: files.length,
       });
-      throw new AppError('Failed to create Vercel deployment', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new UpstreamError(error, 'Failed to create Vercel deployment');
     }
   }
 }

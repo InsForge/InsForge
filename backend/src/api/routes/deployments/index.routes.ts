@@ -2,11 +2,12 @@ import { Router, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { DeploymentService } from '@/services/deployments/deployment.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
+import { deploymentsWriteLimiter } from '@/api/middlewares/rate-limiters.js';
 import { AuditService } from '@/services/logs/audit.service.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/utils/errors.js';
 import { successResponse, paginatedResponse } from '@/utils/response.js';
 import {
+  ERROR_CODES,
   createDirectDeploymentRequestSchema,
   startDeploymentRequestSchema,
   updateSlugRequestSchema,
@@ -28,60 +29,73 @@ router.use('/env-vars', envVarsRouter);
  * Returns presigned upload info for the legacy source zip flow
  * POST /api/deployments
  */
-router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const response = await deploymentService.createDeployment();
+router.post(
+  '/',
+  verifyAdmin,
+  deploymentsWriteLimiter,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const response = await deploymentService.createDeployment();
 
-    // Log audit
-    await auditService.log({
-      actor: req.user?.email || 'api-key',
-      action: 'CREATE_DEPLOYMENT',
-      module: 'DEPLOYMENTS',
-      details: { id: response.id },
-      ip_address: req.ip,
-    });
+      // Log audit
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'CREATE_DEPLOYMENT',
+        module: 'DEPLOYMENTS',
+        details: { id: response.id },
+        ip_address: req.ip,
+      });
 
-    successResponse(res, response, 201);
-  } catch (error) {
-    next(error);
+      successResponse(res, response, 201);
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 /**
  * Create a new direct-upload deployment record with WAITING status
  * POST /api/deployments/direct
  */
-router.post('/direct', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const validationResult = createDirectDeploymentRequestSchema.safeParse(req.body);
-    if (!validationResult.success) {
-      throw new AppError(
-        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
+router.post(
+  '/direct',
+  verifyAdmin,
+  deploymentsWriteLimiter,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validationResult = createDirectDeploymentRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        throw new AppError(
+          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const response = await deploymentService.createDirectDeployment(validationResult.data);
+
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'CREATE_DIRECT_DEPLOYMENT',
+        module: 'DEPLOYMENTS',
+        details: { id: response.id, fileCount: response.files.length },
+        ip_address: req.ip,
+      });
+
+      successResponse(res, response, 201);
+    } catch (error) {
+      next(error);
     }
-
-    const response = await deploymentService.createDirectDeployment(validationResult.data);
-
-    await auditService.log({
-      actor: req.user?.email || 'api-key',
-      action: 'CREATE_DIRECT_DEPLOYMENT',
-      module: 'DEPLOYMENTS',
-      details: { id: response.id, fileCount: response.files.length },
-      ip_address: req.ip,
-    });
-
-    successResponse(res, response, 201);
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 /**
  * Stream one direct deployment file through the backend to Vercel
  * PUT /api/deployments/:id/files/:fileId/content
  */
+// Intentionally NOT rate-limited: this is the per-file content sub-step of a
+// direct deploy. The parent POST /direct already consumes a deploymentsWriteLimiter
+// token; capping each chunk separately would break legit deploys with >3 files.
 router.put(
   '/:id/files/:fileId/content',
   verifyAdmin,
@@ -142,6 +156,7 @@ router.put(
 router.post(
   '/:id/start',
   verifyAdmin,
+  deploymentsWriteLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
@@ -216,33 +231,38 @@ router.get(
  * Update custom slug for the project
  * PUT /api/deployments/slug
  */
-router.put('/slug', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const validationResult = updateSlugRequestSchema.safeParse(req.body);
-    if (!validationResult.success) {
-      throw new AppError(
-        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
+router.put(
+  '/slug',
+  verifyAdmin,
+  deploymentsWriteLimiter,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validationResult = updateSlugRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        throw new AppError(
+          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const result = await deploymentService.updateSlug(validationResult.data.slug);
+
+      // Log audit
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'UPDATE_DEPLOYMENT_SLUG',
+        module: 'DEPLOYMENTS',
+        details: { slug: result.slug, domain: result.domain },
+        ip_address: req.ip,
+      });
+
+      successResponse(res, result);
+    } catch (error) {
+      next(error);
     }
-
-    const result = await deploymentService.updateSlug(validationResult.data.slug);
-
-    // Log audit
-    await auditService.log({
-      actor: req.user?.email || 'api-key',
-      action: 'UPDATE_DEPLOYMENT_SLUG',
-      module: 'DEPLOYMENTS',
-      details: { slug: result.slug, domain: result.domain },
-      ip_address: req.ip,
-    });
-
-    successResponse(res, result);
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // ============================================================================
 // Custom Domain Routes (user-owned domains)
@@ -272,6 +292,7 @@ router.get(
 router.post(
   '/domains',
   verifyAdmin,
+  deploymentsWriteLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const validationResult = addCustomDomainRequestSchema.safeParse(req.body);
@@ -307,6 +328,7 @@ router.post(
 router.post(
   '/domains/:domain/verify',
   verifyAdmin,
+  deploymentsWriteLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const validationResult = domainParamSchema.safeParse(req.params.domain);
@@ -333,6 +355,7 @@ router.post(
 router.delete(
   '/domains/:domain',
   verifyAdmin,
+  deploymentsWriteLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const validationResult = domainParamSchema.safeParse(req.params.domain);
@@ -373,7 +396,7 @@ router.get('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: Ne
     const deployment = await deploymentService.getDeploymentById(id);
 
     if (!deployment) {
-      throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.NOT_FOUND);
+      throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
     }
 
     successResponse(res, deployment);
@@ -386,6 +409,10 @@ router.get('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: Ne
  * Sync deployment status from Vercel and update database
  * POST /api/deployments/:id/sync
  */
+// Intentionally NOT rate-limited: this route triggers a Vercel GET
+// (vercelProvider.getDeployment) — a read, not a write. The
+// deploymentsWriteLimiter is reserved for endpoints that consume Vercel's
+// write quotas (deployment creation, env-var writes, domain CRUD).
 router.post(
   '/:id/sync',
   verifyAdmin,
@@ -396,7 +423,7 @@ router.post(
       const deployment = await deploymentService.syncDeploymentById(id);
 
       if (!deployment) {
-        throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.DEPLOYMENT_NOT_FOUND);
       }
 
       successResponse(res, deployment);
@@ -413,6 +440,7 @@ router.post(
 router.post(
   '/:id/cancel',
   verifyAdmin,
+  deploymentsWriteLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;

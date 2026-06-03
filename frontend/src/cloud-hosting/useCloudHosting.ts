@@ -3,6 +3,9 @@ import type {
   DashboardBackup,
   DashboardBackupInfo,
   DashboardInstanceInfo,
+  DashboardModelCreditUsage,
+  DashboardPosthogConnectionStatus,
+  DashboardPosthogOpenResult,
   DashboardProjectInfo,
   DashboardUserInfo,
   DashboardMetricName,
@@ -19,6 +22,8 @@ const VALID_METRIC_NAMES: readonly DashboardMetricName[] = [
   'cpu_usage',
   'memory_usage',
   'disk_usage',
+  'disk_used',
+  'disk_total',
   'network_in',
   'network_out',
 ] as const;
@@ -50,6 +55,7 @@ type PendingRequestKey =
   | 'updateVersion'
   | 'userInfo'
   | 'userApiKey'
+  | 'modelCredits'
   | 'projectMetrics'
   | 'advisorLatest'
   | 'advisorIssues'
@@ -75,6 +81,7 @@ type PendingRequestValues = {
   updateVersion: void;
   userInfo: DashboardUserInfo;
   userApiKey: string;
+  modelCredits: DashboardModelCreditUsage;
   projectMetrics: DashboardMetricsResponse;
   advisorLatest: DashboardAdvisorSummary;
   advisorIssues: DashboardAdvisorIssuesResponse;
@@ -272,6 +279,7 @@ function normalizeProjectInfo(
         : previousInfo.currentVersion,
     status:
       typeof message.status === 'string' && message.status ? message.status : previousInfo.status,
+    isBranch: typeof message.isBranch === 'boolean' ? message.isBranch : previousInfo.isBranch,
   };
 }
 
@@ -283,6 +291,9 @@ export function useCloudHosting() {
   const parentOriginTrustedRef = useRef(false);
   const openerOriginTrustedRef = useRef(false);
   const pendingRequestsRef = useRef<PendingRequests>({});
+  const posthogStatusSubscribersRef = useRef<
+    Set<(event: DashboardPosthogConnectionStatus) => void>
+  >(new Set());
 
   const setPendingRequest = useCallback(
     <K extends PendingRequestKey>(
@@ -332,6 +343,10 @@ export function useCloudHosting() {
         case 'userApiKey':
           pendingRequestsRef.current.userApiKey = pendingRequest as PendingRequest<string>;
           return;
+        case 'modelCredits':
+          pendingRequestsRef.current.modelCredits =
+            pendingRequest as PendingRequest<DashboardModelCreditUsage>;
+          return;
         case 'projectMetrics':
           pendingRequestsRef.current.projectMetrics =
             pendingRequest as PendingRequest<DashboardMetricsResponse>;
@@ -347,6 +362,10 @@ export function useCloudHosting() {
         case 'advisorScan':
           pendingRequestsRef.current.advisorScan = pendingRequest as PendingRequest<void>;
           return;
+        default: {
+          const exhaustiveKey: never = key;
+          throw new Error(`Unhandled pending request key: ${exhaustiveKey}`);
+        }
       }
     },
     []
@@ -619,6 +638,28 @@ export function useCloudHosting() {
             );
             return;
           }
+          case 'MODEL_CREDITS': {
+            const used =
+              typeof message.used === 'number' && Number.isFinite(message.used) ? message.used : 0;
+            const limit =
+              typeof message.limit === 'number' && Number.isFinite(message.limit)
+                ? message.limit
+                : 0;
+
+            resolvePendingRequest('modelCredits', {
+              used,
+              limit,
+              isFree: message.isFree === true,
+            });
+            return;
+          }
+          case 'MODEL_CREDITS_ERROR': {
+            rejectPendingRequest(
+              'modelCredits',
+              getErrorMessage(message.error, 'Failed to load model credit usage')
+            );
+            return;
+          }
           case 'INSTANCE_INFO': {
             resolvePendingRequest('instanceInfo', {
               currentInstanceType:
@@ -835,6 +876,25 @@ export function useCloudHosting() {
             );
             return;
           }
+          case 'POSTHOG_CONNECTION_STATUS': {
+            const status = message.status;
+            if (status !== 'connected' && status !== 'error' && status !== 'cancelled') {
+              return;
+            }
+            const rawReason = typeof message.reason === 'string' ? message.reason : undefined;
+            const reason = rawReason ? rawReason.slice(0, 200) : undefined;
+            const timestamp =
+              typeof message.timestamp === 'number' ? message.timestamp : Date.now();
+            const event: DashboardPosthogConnectionStatus = { status, reason, timestamp };
+            posthogStatusSubscribersRef.current.forEach((cb) => {
+              try {
+                cb(event);
+              } catch {
+                // Subscriber crashes shouldn't break delivery to other subscribers.
+              }
+            });
+            return;
+          }
           default:
             return;
         }
@@ -981,6 +1041,16 @@ export function useCloudHosting() {
     return createPendingRequest('userApiKey', 'User API key request');
   }, [createPendingRequest, sendMessageToParent]);
 
+  const requestModelCredits = useCallback(async (): Promise<DashboardModelCreditUsage> => {
+    await sendMessageToParent(
+      { type: 'REQUEST_MODEL_CREDITS' },
+      'Unable to request model credit usage from the parent window'
+    );
+    return createPendingRequest('modelCredits', 'Model credits request', {
+      supersede: true,
+    });
+  }, [createPendingRequest, sendMessageToParent]);
+
   const requestProjectMetrics = useCallback(
     async (range: DashboardMetricsRange): Promise<DashboardMetricsResponse> => {
       await sendMessageToParent(
@@ -1035,8 +1105,8 @@ export function useCloudHosting() {
     return createPendingRequest('advisorScan', 'Advisor scan trigger');
   }, [createPendingRequest, sendMessageToParent]);
 
-  const navigateToSubscription = useCallback(() => {
-    void postMessageToParent({ type: 'NAVIGATE_TO_SUBSCRIPTION' });
+  const showUpgradeDialog = useCallback(() => {
+    void postMessageToParent({ type: 'SHOW_UPGRADE_DIALOG' });
   }, [postMessageToParent]);
 
   const reportRouteChange = useCallback(
@@ -1044,6 +1114,95 @@ export function useCloudHosting() {
       void postMessageToParent({ type: 'APP_ROUTE_CHANGE', path });
     },
     [postMessageToParent]
+  );
+
+  const connectPosthog = useCallback(
+    (projectId: string) => {
+      void postMessageToParent({
+        type: 'POSTHOG_CONNECT_REQUEST',
+        projectId,
+        timestamp: Date.now(),
+      });
+    },
+    [postMessageToParent]
+  );
+
+  // Deep-link "Open in PostHog". Cloud calls /integrations/posthog/v1/open and
+  // posts the resolved URL back as POSTHOG_OPEN_RESPONSE. Self-contained one-off
+  // listener (rather than the PendingRequest singleton machinery) so concurrent
+  // clicks across multiple projects don't collide.
+  const openPosthog = useCallback(
+    (projectId: string): Promise<DashboardPosthogOpenResult> => {
+      return new Promise((resolve) => {
+        const requestId =
+          typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+            ? crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+        const cleanup = () => {
+          window.clearTimeout(timeoutId);
+          window.removeEventListener('message', handleResponse);
+        };
+
+        const handleResponse = (ev: MessageEvent<CloudHostingMessage>) => {
+          if (ev.source !== getParentWindow()) {
+            return;
+          }
+          const expectedOrigin = parentOriginRef.current;
+          if (!expectedOrigin || ev.origin !== expectedOrigin) {
+            return;
+          }
+          if (ev.data?.type !== 'POSTHOG_OPEN_RESPONSE' || ev.data.requestId !== requestId) {
+            return;
+          }
+          cleanup();
+          const url = typeof ev.data.url === 'string' ? ev.data.url : undefined;
+          const error = typeof ev.data.error === 'string' ? ev.data.error : undefined;
+          if (url) {
+            resolve({ url });
+          } else {
+            resolve({ error: error ?? 'missing_url' });
+          }
+        };
+
+        const timeoutId = window.setTimeout(() => {
+          cleanup();
+          resolve({ error: 'timeout' });
+        }, DEFAULT_TIMEOUT_MS);
+
+        window.addEventListener('message', handleResponse);
+        // Don't wait the full timeout if delivery to the parent fails
+        // (untrusted origin / no parent window / sync throw) — resolve right
+        // away so the caller can close its placeholder tab.
+        postMessageToParent({
+          type: 'POSTHOG_OPEN_REQUEST',
+          projectId,
+          requestId,
+        }).then(
+          (delivered) => {
+            if (!delivered) {
+              cleanup();
+              resolve({ error: 'no_parent_window' });
+            }
+          },
+          (err) => {
+            cleanup();
+            resolve({ error: err instanceof Error ? err.message : 'post_failed' });
+          }
+        );
+      });
+    },
+    [postMessageToParent]
+  );
+
+  const subscribePosthogConnectionStatus = useCallback(
+    (cb: (event: DashboardPosthogConnectionStatus) => void) => {
+      posthogStatusSubscribersRef.current.add(cb);
+      return () => {
+        posthogStatusSubscribersRef.current.delete(cb);
+      };
+    },
+    []
   );
 
   return {
@@ -1060,12 +1219,16 @@ export function useCloudHosting() {
     renameProject,
     deleteProject,
     updateVersion,
-    navigateToSubscription,
+    showUpgradeDialog,
     requestUserInfo,
     requestUserApiKey,
+    requestModelCredits,
     requestProjectMetrics,
     requestAdvisorLatest,
     requestAdvisorIssues,
     triggerAdvisorScan,
+    connectPosthog,
+    openPosthog,
+    subscribePosthogConnectionStatus,
   };
 }

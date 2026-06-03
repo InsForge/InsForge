@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Request, Response } from 'express';
 import { perEmailCooldown } from '../../src/api/middlewares/rate-limiters';
-import { AppError } from '../../src/api/middlewares/error';
+import { AppError } from '../../src/utils/errors';
 
 describe('Rate Limit Middleware', () => {
   describe('perEmailCooldown', () => {

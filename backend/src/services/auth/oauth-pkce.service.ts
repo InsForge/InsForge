@@ -1,8 +1,7 @@
 import crypto from 'crypto';
-import type { CreateSessionResponse } from '@insforge/shared-schemas';
-import { AppError } from '@/api/middlewares/error.js';
+import { ERROR_CODES, type CreateSessionResponse } from '@insforge/shared-schemas';
+import { AppError } from '@/utils/errors.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
 import logger from '@/utils/logger.js';
 import { generateSecureToken } from '@/utils/utils.js';
 import { AuthService } from './auth.service.js';
@@ -110,7 +109,7 @@ export class OAuthPKCEService {
     const user = await authService.getUserSchemaById(data.userId);
     if (!user) {
       logger.error('User not found during PKCE exchange', { userId: data.userId });
-      throw new AppError('User not found', 404, ERROR_CODES.NOT_FOUND);
+      throw new AppError('User not found', 404, ERROR_CODES.AUTH_USER_NOT_FOUND);
     }
 
     const accessToken = tokenManager.generateAccessToken({

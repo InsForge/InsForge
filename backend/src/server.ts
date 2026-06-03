@@ -39,6 +39,8 @@ import { FunctionService } from '@/services/functions/function.service.js';
 import packageJson from '../../package.json';
 import { schedulesRouter } from '@/api/routes/schedules/index.routes.js';
 import { servicesRouter } from '@/api/routes/compute/services.routes.js';
+import { analyticsRouter } from '@/api/routes/analytics/index.routes.js';
+import { parseTrustProxySetting } from '@/utils/trust-proxy.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -79,8 +81,9 @@ export async function createApp() {
 
   const app = express();
 
-  // Enable trust proxy setting for rate limiting behind proxies/load balancers
-  app.set('trust proxy', 2);
+  // Enable trust proxy setting for rate limiting behind proxies/load balancers.
+  // TRUST_PROXY can be a boolean, hop count, or Express trust proxy string.
+  app.set('trust proxy', parseTrustProxySetting());
 
   const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -217,6 +220,7 @@ export async function createApp() {
   apiRouter.use('/schedules', schedulesRouter);
   apiRouter.use('/payments', paymentsRouter);
   apiRouter.use('/compute/services', servicesRouter);
+  apiRouter.use('/analytics', analyticsRouter);
 
   // Mount all API routes under /api prefix
   app.use('/api', apiRouter);

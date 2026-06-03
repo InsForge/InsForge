@@ -25,7 +25,8 @@ export function useProjectMetrics(range: DashboardMetricsRange): UseProjectMetri
     },
     enabled: !!fetcher,
     retry: false,
-    staleTime: 60 * 1000,
+    staleTime: 30 * 1000,
+    refetchInterval: 30 * 1000,
   });
 
   const isUnavailable = !fetcher || query.error?.message === 'METRICS_UNAVAILABLE';
