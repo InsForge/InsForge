@@ -165,9 +165,7 @@ describe('DatabaseAdvanceService - bulkInsert optional-column fix', () => {
   test('explicit undefined values are converted to NULL', async () => {
     const svc = DatabaseAdvanceService.getInstance();
 
-    await svc.bulkInsert('public', 'contacts', [
-      { id: '1', name: 'Alice', phone: undefined },
-    ]);
+    await svc.bulkInsert('public', 'contacts', [{ id: '1', name: 'Alice', phone: undefined }]);
 
     const sqlQueries = captureAllInsertSql();
     expect(sqlQueries).toHaveLength(1);
@@ -231,9 +229,7 @@ describe('DatabaseAdvanceService - bulkInsert optional-column fix', () => {
   test('explicit null values are preserved in the SQL', async () => {
     const svc = DatabaseAdvanceService.getInstance();
 
-    await svc.bulkInsert('public', 'contacts', [
-      { id: '1', name: 'Alice', phone: null },
-    ]);
+    await svc.bulkInsert('public', 'contacts', [{ id: '1', name: 'Alice', phone: null }]);
 
     const sqlQueries = captureAllInsertSql();
     expect(sqlQueries).toHaveLength(1);
