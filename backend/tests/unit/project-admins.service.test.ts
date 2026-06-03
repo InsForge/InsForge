@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 process.env.ADMIN_EMAIL = 'admin@example.com';
@@ -84,10 +85,10 @@ describe('AuthService project admins', () => {
     Reflect.set(AuthService, 'instance', undefined);
   });
 
-  it('rejects cloud admin tokens without a valid email claim before touching the database', async () => {
+  it('rejects cloud admin tokens without any cloud principal before touching the database', async () => {
     mockVerifyCloudToken.mockResolvedValue({
       projectId: 'project-1',
-      payload: { sub: 'cloud-subject' },
+      payload: { type: 'project_authorization' },
     });
 
     const authService = AuthService.getInstance();
@@ -96,6 +97,41 @@ describe('AuthService project admins', () => {
       statusCode: 401,
     });
     expect(mockPoolQuery).not.toHaveBeenCalled();
+  });
+
+  it('derives a stable admin email from cloud userId when the token has no email', async () => {
+    const expectedEmail = `cloud-${crypto
+      .createHash('sha256')
+      .update('project-1:cloud-user-1')
+      .digest('hex')
+      .slice(0, 32)}@admin.insforge.dev`;
+
+    mockVerifyCloudToken.mockResolvedValue({
+      projectId: 'project-1',
+      payload: { projectId: 'project-1', userId: 'cloud-user-1', type: 'project_authorization' },
+    });
+    mockPoolQuery.mockResolvedValue({
+      rows: [
+        {
+          id: '3cb9a3b5-89de-4421-bcc1-0afbcba607ec',
+          email: expectedEmail,
+          created_at: '2026-06-03T00:00:00.000Z',
+          updated_at: '2026-06-03T00:00:00.000Z',
+        },
+      ],
+    });
+
+    const authService = AuthService.getInstance();
+    const result = await authService.adminLoginWithAuthorizationCode('cloud-token');
+    const [, params] = mockPoolQuery.mock.calls[0];
+
+    expect(params).toEqual([expectedEmail]);
+    expect(result.user.email).toBe(expectedEmail);
+    expect(mockGenerateAccessToken).toHaveBeenCalledWith({
+      sub: '3cb9a3b5-89de-4421-bcc1-0afbcba607ec',
+      email: expectedEmail,
+      role: 'project_admin',
+    });
   });
 
   it('upserts cloud admins using the minimal project_admins schema', async () => {

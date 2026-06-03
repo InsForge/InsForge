@@ -129,6 +129,32 @@ export class AuthService {
     return admin;
   }
 
+  private resolveCloudAdminEmail(projectId: string, payload: Record<string, unknown>): string {
+    const emailResult = emailSchema.safeParse(payload['email']);
+    if (emailResult.success) {
+      return emailResult.data;
+    }
+
+    const cloudSubject =
+      typeof payload['userId'] === 'string' && payload['userId'].trim().length > 0
+        ? payload['userId']
+        : typeof payload['sub'] === 'string' && payload['sub'].trim().length > 0
+          ? payload['sub']
+          : null;
+
+    if (!cloudSubject) {
+      logger.warn('Cloud admin token is missing both email and subject claims', { projectId });
+      throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+    }
+
+    const digest = crypto
+      .createHash('sha256')
+      .update(`${projectId}:${cloudSubject}`)
+      .digest('hex')
+      .slice(0, 32);
+    return `cloud-${digest}@admin.insforge.dev`;
+  }
+
   async getProjectAdminById(adminId: string): Promise<ProjectAdminRecord | null> {
     const pool = this.getPool();
     const result = await pool.query(
@@ -728,16 +754,10 @@ export class AuthService {
   async adminLoginWithAuthorizationCode(code: string): Promise<CreateAdminSessionResponse> {
     try {
       // Use TokenManager to verify cloud token
-      const { payload } = await this.tokenManager.verifyCloudToken(code);
+      const { projectId, payload } = await this.tokenManager.verifyCloudToken(code);
 
       // If verification succeeds, extract user info and generate internal token
-      const emailResult = emailSchema.safeParse(payload['email']);
-      if (!emailResult.success) {
-        logger.warn('Cloud admin token is missing a valid email claim');
-        throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
-      }
-
-      const email = emailResult.data;
+      const email = this.resolveCloudAdminEmail(projectId, payload);
       const admin = await this.upsertProjectAdmin(email);
       const user = this.transformProjectAdminRecordToSchema(admin);
       const accessToken = this.tokenManager.generateAccessToken({
