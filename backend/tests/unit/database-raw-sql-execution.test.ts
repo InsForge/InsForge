@@ -204,6 +204,55 @@ describe('DatabaseAdvanceService - admin SQL execution', () => {
     expect(releaseMock).toHaveBeenCalled();
   });
 
+  it('handles table truncate failures using savepoints in importDatabase', async () => {
+    const releaseMock = vi.fn();
+    const queryMock = vi
+      .fn()
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({}) // SET LOCAL ROLE project_admin
+      .mockResolvedValueOnce({}) // set local request.jwt.claims
+      // For the SELECT tablename query:
+      .mockResolvedValueOnce({
+        rows: [{ tablename: 'table1' }, { tablename: 'table2' }],
+      })
+      // Truncate table1:
+      .mockResolvedValueOnce({}) // SAVEPOINT truncate_attempt
+      .mockRejectedValueOnce(new Error('Truncate table1 failed (mock locked)')) // TRUNCATE TABLE table1 CASCADE (FAILS)
+      .mockResolvedValueOnce({}) // ROLLBACK TO SAVEPOINT truncate_attempt
+      .mockResolvedValueOnce({}) // RELEASE SAVEPOINT truncate_attempt (after rollback)
+      // Truncate table2:
+      .mockResolvedValueOnce({}) // SAVEPOINT truncate_attempt
+      .mockResolvedValueOnce({}) // TRUNCATE TABLE table2 CASCADE (SUCCEEDS)
+      .mockResolvedValueOnce({}) // RELEASE SAVEPOINT truncate_attempt
+      // SQL statements:
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] }) // execute imported SQL
+      // Reset context:
+      .mockResolvedValueOnce({}) // RESET ROLE
+      .mockResolvedValueOnce({}) // reset request.jwt.claims
+      .mockResolvedValueOnce({}) // NOTIFY pgrst
+      .mockResolvedValueOnce({}); // COMMIT
+
+    connectMock.mockResolvedValue({
+      query: queryMock,
+      release: releaseMock,
+    });
+
+    const service = DatabaseAdvanceService.getInstance();
+    const result = await service.importDatabase(
+      Buffer.from('INSERT INTO products (id) VALUES (1);'),
+      'seed.sql',
+      36,
+      true // truncate = true
+    );
+
+    expect(result.rowsImported).toBe(1);
+    expect(queryMock).toHaveBeenCalledWith('SAVEPOINT truncate_attempt');
+    expect(queryMock).toHaveBeenCalledWith('ROLLBACK TO SAVEPOINT truncate_attempt');
+    expect(queryMock).toHaveBeenCalledWith('RELEASE SAVEPOINT truncate_attempt');
+    expect(queryMock).toHaveBeenLastCalledWith('COMMIT');
+    expect(releaseMock).toHaveBeenCalled();
+  });
+
   it('bulk upserts under project_admin', async () => {
     const releaseMock = vi.fn();
     const queryMock = vi
