@@ -914,87 +914,122 @@ export class DatabaseAdvanceService {
     const pool = this.dbManager.getPool();
 
     try {
-      // Build the column list from the union of keys across ALL records.
-      // Previously only records[0] was inspected, which silently discarded
-      // optional fields that appeared only in later records (issue #8).
-      const columns = Array.from(new Set(records.flatMap((rec) => Object.keys(rec))));
+      // Group records by their key shape (sorted keys signature) to prevent data loss
+      // and avoid overwriting existing non-null columns with NULL during upserts.
+      const groupsMap = new Map<
+        string,
+        { columns: string[]; records: Record<string, unknown>[] }
+      >();
 
-      // Convert records to array format for pg-format.
-      // Fields absent from a given record are mapped to null so that every
-      // row in the INSERT has the same number of values as the column list.
-      const values = records.map((record) =>
-        columns.map((col) => {
-          const value = record[col];
-          // pg-format handles NULL, dates, JSON automatically.
-          // Convert empty strings and undefined to NULL for consistency.
-          return value === '' || value === undefined ? null : value;
-        })
-      );
-
-      let query: string;
-
-      if (upsertKey) {
-        // Validate upsert key exists in columns
-        if (!columns.includes(upsertKey)) {
-          throw new AppError(
-            `Upsert key '${upsertKey}' not found in record columns`,
-            400,
-            ERROR_CODES.INVALID_INPUT
-          );
+      for (const record of records) {
+        const keys: string[] = [];
+        for (const key of Object.keys(record)) {
+          keys.push(key);
         }
+        keys.sort();
+        const signature = keys.join(',');
 
-        // Build upsert query with pg-format
-        const updateColumns = columns.filter((c) => c !== upsertKey);
-
-        if (updateColumns.length) {
-          // Build UPDATE SET clause
-          const updateClause = updateColumns
-            .map((col) => pgFormat('%I = EXCLUDED.%I', col, col))
-            .join(', ');
-
-          query = pgFormat(
-            'INSERT INTO %I.%I (%I) VALUES %L ON CONFLICT (%I) DO UPDATE SET %s',
-            schemaName,
-            table,
-            columns,
-            values,
-            upsertKey,
-            updateClause
-          );
-        } else {
-          // No columns to update, just do nothing on conflict
-          query = pgFormat(
-            'INSERT INTO %I.%I (%I) VALUES %L ON CONFLICT (%I) DO NOTHING',
-            schemaName,
-            table,
-            columns,
-            values,
-            upsertKey
-          );
+        let group = groupsMap.get(signature);
+        if (!group) {
+          group = {
+            columns: keys,
+            records: [],
+          };
+          groupsMap.set(signature, group);
         }
-      } else {
-        // Simple insert
-        query = pgFormat('INSERT INTO %I.%I (%I) VALUES %L', schemaName, table, columns, values);
+        group.records.push(record);
       }
 
       const client = await pool.connect();
       let releaseError: Error | undefined;
+      let totalRowCount = 0;
+      const allRows: unknown[] = [];
+
       try {
-        const result = await withAdminContext(
-          client,
-          () => client.query(query),
-          false,
-          (error) => {
-            releaseError = error;
+        for (const { columns, records: groupRecords } of groupsMap.values()) {
+          // Convert records to array format for pg-format.
+          const values = groupRecords.map((record) =>
+            columns.map((col) => {
+              const value = record[col];
+              // pg-format handles NULL, dates, JSON automatically.
+              // Convert empty strings and undefined to NULL for consistency (preserving original behaviour).
+              return value === '' || value === undefined ? null : value;
+            })
+          );
+
+          let query: string;
+
+          if (upsertKey) {
+            // Validate upsert key exists in columns
+            if (!columns.includes(upsertKey)) {
+              throw new AppError(
+                `Upsert key '${upsertKey}' not found in record columns`,
+                400,
+                ERROR_CODES.INVALID_INPUT
+              );
+            }
+
+            // Build upsert query with pg-format
+            const updateColumns = columns.filter((c) => c !== upsertKey);
+
+            if (updateColumns.length) {
+              // Build UPDATE SET clause
+              const updateClause = updateColumns
+                .map((col) => pgFormat('%I = EXCLUDED.%I', col, col))
+                .join(', ');
+
+              query = pgFormat(
+                'INSERT INTO %I.%I (%I) VALUES %L ON CONFLICT (%I) DO UPDATE SET %s',
+                schemaName,
+                table,
+                columns,
+                values,
+                upsertKey,
+                updateClause
+              );
+            } else {
+              // No columns to update, just do nothing on conflict
+              query = pgFormat(
+                'INSERT INTO %I.%I (%I) VALUES %L ON CONFLICT (%I) DO NOTHING',
+                schemaName,
+                table,
+                columns,
+                values,
+                upsertKey
+              );
+            }
+          } else {
+            // Simple insert
+            query = pgFormat(
+              'INSERT INTO %I.%I (%I) VALUES %L',
+              schemaName,
+              table,
+              columns,
+              values
+            );
           }
-        );
+
+          const result = await withAdminContext(
+            client,
+            () => client.query(query),
+            false,
+            (error) => {
+              releaseError = error;
+            }
+          );
+
+          totalRowCount += result.rowCount || 0;
+          if (result.rows) {
+            allRows.push(...result.rows);
+          }
+        }
 
         // Refresh schema cache if needed
         await client.query(`NOTIFY pgrst, 'reload schema';`);
 
         return {
-          rowCount: result.rowCount || 0,
-          rows: result.rows,
+          rowCount: totalRowCount,
+          rows: allRows,
         };
       } finally {
         client.release(releaseError);

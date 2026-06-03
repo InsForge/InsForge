@@ -127,18 +127,14 @@ describe('DatabaseAdvanceService - bulkInsert optional-column fix', () => {
     mockClientQuery.mockResolvedValue({ rows: [], rowCount: 2 });
   });
 
-  /** Helper: find the INSERT SQL among all client.query calls */
-  function captureInsertSql(): string {
-    const call = mockClientQuery.mock.calls.find(
-      ([sql]) => typeof sql === 'string' && (sql as string).startsWith('INSERT INTO')
-    );
-    if (!call) throw new Error('No INSERT query was executed');
-    return call[0] as string;
+  /** Helper: find all INSERT SQL queries executed */
+  function captureAllInsertSql(): string[] {
+    return mockClientQuery.mock.calls
+      .map(([sql]) => sql as string)
+      .filter((sql) => typeof sql === 'string' && sql.startsWith('INSERT INTO'));
   }
 
-  test('includes columns from ALL records, not only the first', async () => {
-    // records[0] has no `phone`; records[1] and records[2] do.
-    // Before the fix, `phone` was silently omitted from the INSERT entirely.
+  test('groups records by shape and executes shape-coherent batch queries', async () => {
     const svc = DatabaseAdvanceService.getInstance();
 
     await svc.bulkInsert('public', 'contacts', [
@@ -147,29 +143,37 @@ describe('DatabaseAdvanceService - bulkInsert optional-column fix', () => {
       { id: '3', name: 'Carol', phone: '555-0002' },
     ]);
 
-    const sql = captureInsertSql();
+    const sqlQueries = captureAllInsertSql();
+    expect(sqlQueries).toHaveLength(2);
 
-    // phone must appear in the INSERT column list
-    expect(sql).toContain('phone');
-    // Bob and Carol phone values must be present in the values literal
-    expect(sql).toContain('555-0001');
-    expect(sql).toContain('555-0002');
+    // First query (Alice) has no phone
+    const query1 = sqlQueries[0];
+    expect(query1).toContain('id');
+    expect(query1).toContain('name');
+    expect(query1).not.toContain('phone');
+    expect(query1).toContain('Alice');
+
+    // Second query (Bob and Carol) has phone
+    const query2 = sqlQueries[1];
+    expect(query2).toContain('id');
+    expect(query2).toContain('name');
+    expect(query2).toContain('phone');
+    expect(query2).toContain('555-0001');
+    expect(query2).toContain('555-0002');
   });
 
-  test('records missing an optional field get NULL, not undefined', async () => {
+  test('explicit undefined values are converted to NULL', async () => {
     const svc = DatabaseAdvanceService.getInstance();
 
     await svc.bulkInsert('public', 'contacts', [
-      { id: '1', name: 'Alice' },
-      { id: '2', name: 'Bob', phone: '555-0001' },
+      { id: '1', name: 'Alice', phone: undefined },
     ]);
 
-    const sql = captureInsertSql();
-
-    // Alice's row must not embed a raw JS `undefined` string
-    expect(sql).not.toContain('undefined');
-    // Her phone slot must be NULL
-    expect(sql).toContain('NULL');
+    const sqlQueries = captureAllInsertSql();
+    expect(sqlQueries).toHaveLength(1);
+    expect(sqlQueries[0]).toContain('phone');
+    expect(sqlQueries[0]).not.toContain('undefined');
+    expect(sqlQueries[0]).toContain('NULL');
   });
 
   test('uniform records (all same columns) still work correctly', async () => {
@@ -180,7 +184,9 @@ describe('DatabaseAdvanceService - bulkInsert optional-column fix', () => {
       { id: '2', name: 'Bob', phone: '555-0002' },
     ]);
 
-    const sql = captureInsertSql();
+    const sqlQueries = captureAllInsertSql();
+    expect(sqlQueries).toHaveLength(1);
+    const sql = sqlQueries[0];
     expect(sql).toContain('id');
     expect(sql).toContain('name');
     expect(sql).toContain('phone');
@@ -193,7 +199,7 @@ describe('DatabaseAdvanceService - bulkInsert optional-column fix', () => {
     await expect(svc.bulkInsert('public', 'contacts', [])).rejects.toBeInstanceOf(AppError);
   });
 
-  test('upsert: optional column from later records is included in ON CONFLICT SET', async () => {
+  test('upsert: optional column from later records is included in ON CONFLICT SET for its group', async () => {
     const svc = DatabaseAdvanceService.getInstance();
 
     await svc.bulkInsert(
@@ -206,9 +212,32 @@ describe('DatabaseAdvanceService - bulkInsert optional-column fix', () => {
       'id'
     );
 
-    const sql = captureInsertSql();
-    expect(sql).toContain('phone');
-    expect(sql).toContain('ON CONFLICT');
-    expect(sql).toContain('DO UPDATE SET');
+    const sqlQueries = captureAllInsertSql();
+    expect(sqlQueries).toHaveLength(2);
+
+    const query1 = sqlQueries[0]; // Alice: keys ['id', 'name']
+    expect(query1).toContain('ON CONFLICT');
+    expect(query1).toContain('DO UPDATE SET');
+    expect(query1).toContain('name = EXCLUDED.name');
+    expect(query1).not.toContain('phone');
+
+    const query2 = sqlQueries[1]; // Bob: keys ['id', 'name', 'phone']
+    expect(query2).toContain('ON CONFLICT');
+    expect(query2).toContain('DO UPDATE SET');
+    expect(query2).toContain('name = EXCLUDED.name');
+    expect(query2).toContain('phone = EXCLUDED.phone');
+  });
+
+  test('explicit null values are preserved in the SQL', async () => {
+    const svc = DatabaseAdvanceService.getInstance();
+
+    await svc.bulkInsert('public', 'contacts', [
+      { id: '1', name: 'Alice', phone: null },
+    ]);
+
+    const sqlQueries = captureAllInsertSql();
+    expect(sqlQueries).toHaveLength(1);
+    expect(sqlQueries[0]).toContain('phone');
+    expect(sqlQueries[0]).toContain('NULL');
   });
 });
