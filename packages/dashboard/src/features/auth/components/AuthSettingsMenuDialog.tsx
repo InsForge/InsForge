@@ -558,86 +558,90 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                       </div>
                     </SettingRow>
 
-                    <SettingRow
-                      label="Password Reset Method"
-                      description="Choose between 6-digit reset code or reset link"
-                    >
-                      <Controller
-                        name="resetPasswordMethod"
-                        control={form.control}
-                        render={({ field }) => (
-                          <Select
-                            value={field.value}
-                            onValueChange={(value) => {
-                              if (value) {
-                                field.onChange(value);
-                              }
-                            }}
+                    {isCloudProject && (
+                      <>
+                        <SettingRow
+                          label="Password Reset Method"
+                          description="Choose between 6-digit reset code or reset link"
+                        >
+                          <Controller
+                            name="resetPasswordMethod"
+                            control={form.control}
+                            render={({ field }) => (
+                              <Select
+                                value={field.value}
+                                onValueChange={(value) => {
+                                  if (value) {
+                                    field.onChange(value);
+                                  }
+                                }}
+                              >
+                                <SelectTrigger>
+                                  <span>{field.value === 'code' ? 'Code' : 'Link'}</span>
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="code">Code</SelectItem>
+                                  <SelectItem value="link">Link</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            )}
+                          />
+                        </SettingRow>
+
+                        {resetPasswordMethod === 'code' && (
+                          <SettingRow
+                            label="Reset Code Expiry"
+                            description="How long a 6-digit password reset code remains valid (in minutes)"
                           >
-                            <SelectTrigger>
-                              <span>{field.value === 'code' ? 'Code' : 'Link'}</span>
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="code">Code</SelectItem>
-                              <SelectItem value="link">Link</SelectItem>
-                            </SelectContent>
-                          </Select>
+                            <Input
+                              type="number"
+                              min="1"
+                              max="1440"
+                              {...form.register('resetPasswordCodeExpiryMinutes', {
+                                valueAsNumber: true,
+                              })}
+                              className={
+                                form.formState.errors.resetPasswordCodeExpiryMinutes
+                                  ? 'border-destructive'
+                                  : ''
+                              }
+                            />
+                            {form.formState.errors.resetPasswordCodeExpiryMinutes && (
+                              <p className="pt-1 text-xs text-destructive">
+                                {form.formState.errors.resetPasswordCodeExpiryMinutes.message ||
+                                  'Must be between 1 and 1440 minutes'}
+                              </p>
+                            )}
+                          </SettingRow>
                         )}
-                      />
-                    </SettingRow>
 
-                    {resetPasswordMethod === 'code' && (
-                      <SettingRow
-                        label="Reset Code Expiry"
-                        description="How long a 6-digit password reset code remains valid (in minutes)"
-                      >
-                        <Input
-                          type="number"
-                          min="1"
-                          max="1440"
-                          {...form.register('resetPasswordCodeExpiryMinutes', {
-                            valueAsNumber: true,
-                          })}
-                          className={
-                            form.formState.errors.resetPasswordCodeExpiryMinutes
-                              ? 'border-destructive'
-                              : ''
-                          }
-                        />
-                        {form.formState.errors.resetPasswordCodeExpiryMinutes && (
-                          <p className="pt-1 text-xs text-destructive">
-                            {form.formState.errors.resetPasswordCodeExpiryMinutes.message ||
-                              'Must be between 1 and 1440 minutes'}
-                          </p>
+                        {resetPasswordMethod === 'link' && (
+                          <SettingRow
+                            label="Reset Link Expiry"
+                            description="How long a password reset link remains valid (in minutes)"
+                          >
+                            <Input
+                              type="number"
+                              min="1"
+                              max="1440"
+                              {...form.register('resetPasswordLinkExpiryMinutes', {
+                                valueAsNumber: true,
+                              })}
+                              className={
+                                form.formState.errors.resetPasswordLinkExpiryMinutes
+                                  ? 'border-destructive'
+                                  : ''
+                              }
+                            />
+                            {form.formState.errors.resetPasswordLinkExpiryMinutes && (
+                              <p className="pt-1 text-xs text-destructive">
+                                {form.formState.errors.resetPasswordLinkExpiryMinutes.message ||
+                                  'Must be between 1 and 1440 minutes'}
+                              </p>
+                            )}
+                          </SettingRow>
                         )}
-                      </SettingRow>
-                    )}
-
-                    {resetPasswordMethod === 'link' && (
-                      <SettingRow
-                        label="Reset Link Expiry"
-                        description="How long a password reset link remains valid (in minutes)"
-                      >
-                        <Input
-                          type="number"
-                          min="1"
-                          max="1440"
-                          {...form.register('resetPasswordLinkExpiryMinutes', {
-                            valueAsNumber: true,
-                          })}
-                          className={
-                            form.formState.errors.resetPasswordLinkExpiryMinutes
-                              ? 'border-destructive'
-                              : ''
-                          }
-                        />
-                        {form.formState.errors.resetPasswordLinkExpiryMinutes && (
-                          <p className="pt-1 text-xs text-destructive">
-                            {form.formState.errors.resetPasswordLinkExpiryMinutes.message ||
-                              'Must be between 1 and 1440 minutes'}
-                          </p>
-                        )}
-                      </SettingRow>
+                      </>
                     )}
                   </>
                 )}

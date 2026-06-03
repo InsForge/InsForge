@@ -31,6 +31,36 @@ export class AuthConfigService {
     this.configCache = null;
   }
 
+  private cacheAuthConfig(data: AuthConfigSchema): AuthConfigSchema {
+    this.configCache = {
+      data,
+      expiresAt: Date.now() + AuthConfigService.CACHE_TTL_MS,
+    };
+    return data;
+  }
+
+  private buildFallbackAuthConfig(): AuthConfigSchema {
+    return {
+      id: '00000000-0000-0000-0000-000000000000',
+      requireEmailVerification: false,
+      passwordMinLength: 6,
+      requireNumber: false,
+      requireLowercase: false,
+      requireUppercase: false,
+      requireSpecialChar: false,
+      verifyEmailMethod: 'code',
+      resetPasswordMethod: 'code',
+      allowedRedirectUrls: [],
+      verifyEmailCodeExpiryMinutes: 15,
+      verifyEmailLinkExpiryMinutes: 1440,
+      resetPasswordCodeExpiryMinutes: 10,
+      resetPasswordLinkExpiryMinutes: 60,
+      disableSignup: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
   private getPool(): Pool {
     if (!this.pool) {
       this.pool = DatabaseManager.getInstance().getPool();
@@ -122,34 +152,10 @@ export class AuthConfigService {
       // If no config exists, return fallback values
       if (!result.rows.length) {
         logger.warn('No auth config found, returning default fallback values');
-        // Return a config with fallback values and generate a temporary ID
-        return {
-          id: '00000000-0000-0000-0000-000000000000',
-          requireEmailVerification: false,
-          passwordMinLength: 6,
-          requireNumber: false,
-          requireLowercase: false,
-          requireUppercase: false,
-          requireSpecialChar: false,
-          verifyEmailMethod: 'code' as const,
-          resetPasswordMethod: 'code' as const,
-          allowedRedirectUrls: [],
-          verifyEmailCodeExpiryMinutes: 15,
-          verifyEmailLinkExpiryMinutes: 1440,
-          resetPasswordCodeExpiryMinutes: 10,
-          resetPasswordLinkExpiryMinutes: 60,
-          disableSignup: false,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
+        return this.cacheAuthConfig(this.buildFallbackAuthConfig());
       }
 
-      const config = result.rows[0];
-      this.configCache = {
-        data: config,
-        expiresAt: Date.now() + AuthConfigService.CACHE_TTL_MS,
-      };
-      return config;
+      return this.cacheAuthConfig(result.rows[0]);
     } catch (error) {
       logger.error('Failed to get auth config', { error });
       throw new AppError(
