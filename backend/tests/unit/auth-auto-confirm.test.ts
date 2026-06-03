@@ -116,8 +116,8 @@ vi.mock('../../src/providers/oauth/apple.oauth.provider', () => ({
   AppleOAuthProvider: mockOAuthProvider,
 }));
 
-vi.mock('../../src/infra/config/app.config', () => ({
-  config: {
+vi.mock('../../src/infra/config/app.config', () => {
+  const c = {
     app: {
       jwtSecret: 'test-secret',
       name: 'test',
@@ -129,9 +129,13 @@ vi.mock('../../src/infra/config/app.config', () => ({
       adminEmail: 'admin@test.com',
       adminPassword: 'admin-password',
     },
-  },
-  getApiBaseUrl: () => 'http://localhost:3000',
-}));
+  };
+  return {
+    config: c,
+    appConfig: c,
+    getApiBaseUrl: () => 'http://localhost:3000',
+  };
+});
 
 import { AuthService } from '../../src/services/auth/auth.service';
 

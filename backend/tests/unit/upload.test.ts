@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 
-vi.mock('@/infra/config/app.config.js', () => ({
-  config: {
+vi.mock('@/infra/config/app.config.js', () => {
+  const c = {
     server: {
       get maxFileSize() {
         const val = process.env.MAX_FILE_SIZE;
@@ -15,8 +15,9 @@ vi.mock('@/infra/config/app.config.js', () => ({
     app: {
       logLevel: 'info',
     },
-  },
-}));
+  };
+  return { config: c, appConfig: c };
+});
 
 import { getMaxFileSize } from '../../src/api/middlewares/upload';
 

@@ -5,7 +5,7 @@ import logger from '@/utils/logger.js';
 import { OAuthProvider } from './base.provider.js';
 import axios from 'axios';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
-import { config as appConfig } from '@/infra/config/app.config.js';
+import { appConfig } from '@/infra/config/app.config.js';
 
 export class XOAuthProvider implements OAuthProvider {
   private static instance: XOAuthProvider;

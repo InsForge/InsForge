@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { config } from '@/infra/config/app.config.js';
+import { appConfig } from '@/infra/config/app.config.js';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import type {
@@ -22,10 +22,10 @@ export class CloudComputeProvider implements ComputeProvider {
 
   isConfigured(): boolean {
     return (
-      !!config.cloud?.projectId &&
-      config.cloud.projectId !== 'local' &&
-      !!config.cloud?.apiHost &&
-      !!config.app?.jwtSecret
+      !!appConfig.cloud?.projectId &&
+      appConfig.cloud.projectId !== 'local' &&
+      !!appConfig.cloud?.apiHost &&
+      !!appConfig.app?.jwtSecret
     );
   }
 
@@ -37,13 +37,13 @@ export class CloudComputeProvider implements ComputeProvider {
         ERROR_CODES.COMPUTE_NOT_CONFIGURED
       );
     }
-    return jwt.sign({ sub: config.cloud.projectId }, config.app.jwtSecret, {
+    return jwt.sign({ sub: appConfig.cloud.projectId }, appConfig.app.jwtSecret, {
       expiresIn: '10m',
     });
   }
 
   private url(path: string): string {
-    return `${config.cloud.apiHost}/projects/v1/${config.cloud.projectId}/compute${path}`;
+    return `${appConfig.cloud.apiHost}/projects/v1/${appConfig.cloud.projectId}/compute${path}`;
   }
 
   private async call<T>(method: string, path: string, body?: unknown): Promise<T | undefined> {

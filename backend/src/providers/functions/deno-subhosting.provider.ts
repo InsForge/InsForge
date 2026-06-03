@@ -1,6 +1,6 @@
 import { AppError, UpstreamError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
-import { config } from '@/infra/config/app.config.js';
+import { appConfig } from '@/infra/config/app.config.js';
 import logger from '@/utils/logger.js';
 import { z } from 'zod';
 import fetch, { RequestInit, Response } from 'node-fetch';
@@ -273,7 +273,7 @@ export class DenoSubhostingProvider {
    * Check if Deno Subhosting is properly configured
    */
   isConfigured(): boolean {
-    const { token, organizationId } = config.denoSubhosting;
+    const { token, organizationId } = appConfig.denoSubhosting;
     return !!(token && organizationId);
   }
 
@@ -281,7 +281,7 @@ export class DenoSubhostingProvider {
    * Get Deno Subhosting credentials from config
    */
   getCredentials(): DenoSubhostingCredentials {
-    const { token, organizationId } = config.denoSubhosting;
+    const { token, organizationId } = appConfig.denoSubhosting;
 
     if (!token) {
       throw new AppError('DENO_SUBHOSTING_TOKEN not configured', 500, ERROR_CODES.INTERNAL_ERROR);
@@ -470,7 +470,7 @@ export class DenoSubhostingProvider {
         // Pass secrets directly as env vars - accessible via Deno.env.get('KEY')
         envVars: secrets,
         // Use template variable for stable subdomain (Subhosting resolves this)
-        domains: [`{project.name}.${config.denoSubhosting.domain}`],
+        domains: [`{project.name}.${appConfig.denoSubhosting.domain}`],
       };
 
       const response = await fetchWithTimeout(
@@ -520,7 +520,7 @@ export class DenoSubhostingProvider {
         url:
           data.domains.length > 0
             ? `https://${data.domains[0]}`
-            : `https://${projectId}.${config.denoSubhosting.domain}`,
+            : `https://${projectId}.${appConfig.denoSubhosting.domain}`,
         createdAt: new Date(data.createdAt),
       };
     } catch (error) {

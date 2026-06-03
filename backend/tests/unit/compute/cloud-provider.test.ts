@@ -2,12 +2,16 @@ import { describe, it, expect, beforeEach, vi, type MockInstance } from 'vitest'
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import jwt from 'jsonwebtoken';
 
-vi.mock('@/infra/config/app.config.js', () => ({
-  config: {
+vi.mock('@/infra/config/app.config.js', () => {
+  const c = {
     cloud: { apiHost: 'https://cloud.test', projectId: 'proj-1' },
     app: { jwtSecret: 'secret-1' },
-  },
-}));
+  };
+  return {
+    config: c,
+    appConfig: c,
+  };
+});
 
 import { CloudComputeProvider } from '@/providers/compute/cloud.provider.js';
 

@@ -4,8 +4,8 @@ import { CopyObjectCommand, GetObjectCommand, S3Client } from '@aws-sdk/client-s
 import { Readable } from 'stream';
 import crypto from 'crypto';
 
-vi.mock('@/infra/config/app.config.js', () => ({
-  config: {
+vi.mock('@/infra/config/app.config.js', () => {
+  const c = {
     cloud: {
       get cloudFrontUrl() {
         return process.env.AWS_CLOUDFRONT_URL;
@@ -28,8 +28,9 @@ vi.mock('@/infra/config/app.config.js', () => ({
     app: {
       logLevel: 'info',
     },
-  },
-}));
+  };
+  return { config: c, appConfig: c };
+});
 
 function asyncIterableFromString(s: string): AsyncIterable<Uint8Array> {
   return {

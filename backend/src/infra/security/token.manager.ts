@@ -4,9 +4,9 @@ import { createRemoteJWKSet, JWTPayload, jwtVerify } from 'jose';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES, type TokenPayloadSchema } from '@insforge/shared-schemas';
 import { NEXT_ACTIONS } from '../../utils/next-actions.js';
-import { config } from '@/infra/config/app.config.js';
+import { appConfig } from '@/infra/config/app.config.js';
 
-const JWT_SECRET = config.app.jwtSecret;
+const JWT_SECRET = appConfig.app.jwtSecret;
 const ACCESS_TOKEN_EXPIRES_IN = '15m';
 const REFRESH_TOKEN_EXPIRES_IN = '7d';
 
@@ -32,7 +32,7 @@ export interface RefreshTokenWithCsrf {
  * Create JWKS instance with caching and timeout configuration
  * The instance will automatically cache keys and handle refetching
  */
-const cloudApiHost = config.cloud.apiHost;
+const cloudApiHost = appConfig.cloud.apiHost;
 const JWKS = createRemoteJWKSet(new URL(`${cloudApiHost}/.well-known/jwks.json`), {
   timeoutDuration: 10000, // 10 second timeout for HTTP requests
   cooldownDuration: 30000, // 30 seconds cooldown after successful fetch
@@ -47,7 +47,7 @@ export class TokenManager {
   private static instance: TokenManager;
 
   private constructor() {
-    if (!config.app.jwtSecret || config.app.jwtSecret === 'your_jwt_secret') {
+    if (!appConfig.app.jwtSecret) {
       throw new Error('JWT_SECRET environment variable is required');
     }
   }
@@ -190,8 +190,7 @@ export class TokenManager {
 
       // Verify project_id matches if configured
       const tokenProjectId = payload['projectId'] as string;
-      const expectedProjectId =
-        config.cloud.projectId !== 'local' ? config.cloud.projectId : undefined;
+      const expectedProjectId = appConfig.cloud.projectId;
 
       if (expectedProjectId && tokenProjectId !== expectedProjectId) {
         throw new AppError(

@@ -5,7 +5,7 @@ import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 import { FlyProvider } from '@/providers/compute/fly.provider.js';
 import { CloudComputeProvider } from '@/providers/compute/cloud.provider.js';
 import type { ComputeProvider } from '@/providers/compute/compute.provider.js';
-import { config } from '@/infra/config/app.config.js';
+import { appConfig } from '@/infra/config/app.config.js';
 import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
 import {
@@ -162,14 +162,14 @@ function makeFlyAppName(name: string, projectId: string): string {
 // guarantees a letter-leading name for every project, and APP_KEY's
 // per-project uniqueness still preserves 6PN isolation.
 function makeNetwork(): string {
-  if (!config.storage.appKey || config.storage.appKey === 'local') {
+  if (!process.env.APP_KEY) {
     throw new AppError(
       'APP_KEY environment variable is required for compute network isolation',
       500,
       ERROR_CODES.COMPUTE_SERVICE_NOT_CONFIGURED
     );
   }
-  return `n-${config.storage.appKey}`;
+  return `n-${process.env.APP_KEY}`;
 }
 
 // Default to Fly's own .fly.dev hostname (which Fly routes automatically for
@@ -177,7 +177,7 @@ function makeNetwork(): string {
 // we return a URL that actually resolves instead of a vanity domain the operator
 // doesn't control.
 function makeEndpointUrl(flyAppName: string): string {
-  const domain = config.fly.domain || 'fly.dev';
+  const domain = appConfig.fly.domain || 'fly.dev';
   return `https://${flyAppName}.${domain}`;
 }
 
@@ -222,7 +222,7 @@ export function selectComputeProvider(): ComputeProvider {
   // (PROJECT_ID + CLOUD_API_HOST + JWT_SECRET all present).
   const fly = FlyProvider.getInstance();
   if (fly.isConfigured()) {
-    if (!config.fly.org) {
+    if (!appConfig.fly.org) {
       // FLY_ORG used to default to "insforge" — our internal org. Operators
       // who copied .env.example verbatim got opaque "unauthorized" errors
       // from Fly. Warn loudly at provider selection time instead.
@@ -385,7 +385,7 @@ export class ComputeServicesService {
       await fly.createApp({
         name: flyAppName,
         network,
-        org: config.fly.org,
+        org: appConfig.fly.org,
       });
 
       const { machineId } = await fly.launchMachine({
@@ -495,7 +495,7 @@ export class ComputeServicesService {
 
     // Create Fly app (no machine — flyctl deploy will create it)
     try {
-      await fly.createApp({ name: flyAppName, network, org: config.fly.org });
+      await fly.createApp({ name: flyAppName, network, org: appConfig.fly.org });
     } catch (error) {
       // App might already exist from a previous deploy attempt — ignore "already exists"
       const msg = error instanceof Error ? error.message : '';

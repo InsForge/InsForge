@@ -6,12 +6,16 @@ const apiHost = 'https://cloud.test.insforge.dev';
 const projectId = '77777777-7777-7777-7777-777777777777';
 const jwtSecret = 's'.repeat(32);
 
-vi.mock('../../src/infra/config/app.config', () => ({
-  config: {
+vi.mock('../../src/infra/config/app.config', () => {
+  const c = {
     cloud: { projectId, apiHost },
     app: { jwtSecret },
-  },
-}));
+  };
+  return {
+    config: c,
+    appConfig: c,
+  };
+});
 
 interface MockAxiosError extends Error {
   __isAxiosError: true;

@@ -7,7 +7,7 @@ import {
   type StorageConfigSchema,
   type UpdateStorageConfigRequest,
 } from '@insforge/shared-schemas';
-import { config } from '@/infra/config/app.config.js';
+import { appConfig } from '@/infra/config/app.config.js';
 
 const DEFAULT_MAX_FILE_SIZE_MB = 50;
 
@@ -63,7 +63,7 @@ export class StorageConfigService {
 
       if (!result.rows.length) {
         logger.warn('No storage config found, returning default fallback values');
-        const envBytes = config.server.maxFileSize;
+        const envBytes = appConfig.server.maxFileSize;
         const fallbackMb = envBytes
           ? Math.round(envBytes / (1024 * 1024))
           : DEFAULT_MAX_FILE_SIZE_MB;
@@ -79,7 +79,7 @@ export class StorageConfigService {
     } catch (error) {
       logger.error('Failed to get storage config, returning fallback values', { error });
       // Return the effective fallback so the UI still sees the active cap
-      const envBytes = config.server.maxFileSize;
+      const envBytes = appConfig.server.maxFileSize;
       const effectiveMb = envBytes
         ? Math.round(envBytes / (1024 * 1024))
         : DEFAULT_MAX_FILE_SIZE_MB;
@@ -103,7 +103,7 @@ export class StorageConfigService {
       return storageConfig.maxFileSizeMb * 1024 * 1024;
     } catch {
       // Fall back to env if DB is unavailable
-      return config.server.maxFileSize ?? DEFAULT_MAX_FILE_SIZE_MB * 1024 * 1024;
+      return appConfig.server.maxFileSize ?? DEFAULT_MAX_FILE_SIZE_MB * 1024 * 1024;
     }
   }
 

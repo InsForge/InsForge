@@ -7,7 +7,7 @@ import { AppError, UpstreamError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import logger from '@/utils/logger.js';
-import { config } from '@/infra/config/app.config.js';
+import { appConfig } from '@/infra/config/app.config.js';
 
 const VERCEL_UPLOAD_TIMEOUT_MS = 120_000;
 
@@ -251,9 +251,9 @@ export class VercelProvider {
       return await this.fetchCloudCredentials();
     }
 
-    const token = config.deployments.vercelToken;
-    const teamId = config.deployments.vercelTeamId;
-    const projectId = config.deployments.vercelProjectId;
+    const token = appConfig.deployments.vercelToken;
+    const teamId = appConfig.deployments.vercelTeamId;
+    const projectId = appConfig.deployments.vercelProjectId;
 
     if (!token) {
       throw new AppError(
@@ -288,9 +288,9 @@ export class VercelProvider {
       return true;
     }
     return !!(
-      config.deployments.vercelToken &&
-      config.deployments.vercelTeamId &&
-      config.deployments.vercelProjectId
+      appConfig.deployments.vercelToken &&
+      appConfig.deployments.vercelTeamId &&
+      appConfig.deployments.vercelProjectId
     );
   }
 
@@ -305,12 +305,12 @@ export class VercelProvider {
 
     this.fetchPromise = (async () => {
       try {
-        const projectId = config.cloud.projectId !== 'local' ? config.cloud.projectId : undefined;
+        const projectId = appConfig.cloud.projectId;
         if (!projectId) {
           throw new Error('PROJECT_ID not found in environment variables');
         }
 
-        const jwtSecret = config.app.jwtSecret;
+        const jwtSecret = appConfig.app.jwtSecret;
         if (!jwtSecret) {
           throw new Error('JWT_SECRET not found in environment variables');
         }
@@ -318,7 +318,7 @@ export class VercelProvider {
         const signature = jwt.sign({ projectId }, jwtSecret, { expiresIn: '1h' });
 
         const response = await fetch(
-          `${config.cloud.apiHost}/sites/v1/credentials/${projectId}?sign=${signature}`
+          `${appConfig.cloud.apiHost}/sites/v1/credentials/${projectId}?sign=${signature}`
         );
 
         if (!response.ok) {

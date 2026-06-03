@@ -39,7 +39,7 @@ import packageJson from '../../package.json';
 import { schedulesRouter } from '@/api/routes/schedules/index.routes.js';
 import { servicesRouter } from '@/api/routes/compute/services.routes.js';
 import { analyticsRouter } from '@/api/routes/analytics/index.routes.js';
-import { config } from '@/infra/config/app.config.js';
+import { appConfig } from '@/infra/config/app.config.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -72,7 +72,7 @@ export async function createApp() {
   const app = express();
 
   // Enable trust proxy setting for rate limiting behind proxies/load balancers.
-  app.set('trust proxy', config.server.trustProxy);
+  app.set('trust proxy', appConfig.server.trustProxy);
 
   const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -173,8 +173,8 @@ export async function createApp() {
   // We use high defaults (100mb/10mb) to ensure a smooth "out-of-the-box" experience
   // for large metadata/storage requests, as per project standards.
   // Users can override these via environment variables for hardened security.
-  const jsonLimit = config.server.maxJsonBodySize;
-  const urlencodedLimit = config.server.maxUrlencodedBodySize;
+  const jsonLimit = appConfig.server.maxJsonBodySize;
+  const urlencodedLimit = appConfig.server.maxUrlencodedBodySize;
 
   app.use(express.json({ limit: jsonLimit }));
   app.use(express.urlencoded({ extended: true, limit: urlencodedLimit }));
@@ -221,7 +221,7 @@ export async function createApp() {
 
     try {
       const functionService = FunctionService.getInstance();
-      const localRuntime = config.functions.denoRuntimeUrl;
+      const localRuntime = appConfig.functions.denoRuntimeUrl;
 
       // Get target base URL: prefer Subhosting deployment, fallback to local runtime
       const baseUrl =
@@ -310,7 +310,7 @@ export async function createApp() {
 }
 
 // Use PORT from config (already parsed from env, falls back to 7130)
-const PORT = config.app.port;
+const PORT = appConfig.app.port;
 
 async function initializeServer() {
   try {

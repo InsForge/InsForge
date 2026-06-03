@@ -20,7 +20,7 @@ import { Readable } from 'stream';
 import { UploadStrategyResponse, DownloadStrategyResponse } from '@insforge/shared-schemas';
 import { StorageProvider, ObjectMetadata, GetObjectResult } from './base.provider.js';
 import logger from '@/utils/logger.js';
-import { config } from '@/infra/config/app.config.js';
+import { appConfig } from '@/infra/config/app.config.js';
 
 function stripEtagQuotes(etag: string | undefined): string {
   return (etag ?? '').replace(/^"(.*)"$/, '$1');
@@ -77,19 +77,21 @@ export class S3StorageProvider implements StorageProvider {
     };
 
     // Use S3-specific credentials as a pair, otherwise fall back to AWS credentials as a pair
-    const useS3Creds = config.storage.s3AccessKeyId && config.storage.s3SecretAccessKey;
-    const accessKeyId = useS3Creds ? config.storage.s3AccessKeyId : config.storage.awsAccessKeyId;
+    const useS3Creds = appConfig.storage.s3AccessKeyId && appConfig.storage.s3SecretAccessKey;
+    const accessKeyId = useS3Creds
+      ? appConfig.storage.s3AccessKeyId
+      : appConfig.storage.awsAccessKeyId;
     const secretAccessKey = useS3Creds
-      ? config.storage.s3SecretAccessKey
-      : config.storage.awsSecretAccessKey;
+      ? appConfig.storage.s3SecretAccessKey
+      : appConfig.storage.awsSecretAccessKey;
 
     if (accessKeyId && secretAccessKey) {
       s3Config.credentials = { accessKeyId, secretAccessKey };
     }
 
     // Support MinIO or other S3-compatible endpoints
-    if (config.storage.s3EndpointUrl) {
-      s3Config.endpoint = config.storage.s3EndpointUrl;
+    if (appConfig.storage.s3EndpointUrl) {
+      s3Config.endpoint = appConfig.storage.s3EndpointUrl;
       // MinIO requires path-style URLs
       s3Config.forcePathStyle = true;
     }
@@ -345,14 +347,14 @@ export class S3StorageProvider implements StorageProvider {
     }
     // Public files get longer expiration (7 days), private files get shorter (1 hour default)
     const actualExpiresIn = isPublic ? SEVEN_DAYS_IN_SECONDS : expiresIn; // 604800 = 7 days
-    const cloudFrontUrl = config.cloud.cloudFrontUrl || undefined;
+    const cloudFrontUrl = appConfig.cloud.cloudFrontUrl;
 
     try {
       // If CloudFront URL is configured and not using a custom S3 endpoint, use CloudFront for downloads
       // CloudFront only works with AWS S3, not with S3-compatible providers like Wasabi/MinIO
-      if (cloudFrontUrl && !config.storage.s3EndpointUrl) {
-        const cloudFrontKeyPairId = config.cloud.cloudFrontKeyPairId || undefined;
-        const cloudFrontPrivateKey = config.cloud.cloudFrontPrivateKey || undefined;
+      if (cloudFrontUrl && !appConfig.storage.s3EndpointUrl) {
+        const cloudFrontKeyPairId = appConfig.cloud.cloudFrontKeyPairId;
+        const cloudFrontPrivateKey = appConfig.cloud.cloudFrontPrivateKey;
 
         if (!cloudFrontKeyPairId || !cloudFrontPrivateKey) {
           logger.warn(

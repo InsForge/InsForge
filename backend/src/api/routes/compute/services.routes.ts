@@ -9,7 +9,6 @@ import { AuditService } from '@/services/logs/audit.service.js';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import logger from '@/utils/logger.js';
-import { config } from '@/infra/config/app.config.js';
 
 const router = Router();
 const auditService = AuditService.getInstance();
@@ -17,8 +16,7 @@ const auditService = AuditService.getInstance();
 function getProjectId(req: AuthRequest): string {
   // Cloud: projectId is set by verifyCloudBackend from the JWT claim
   // Self-hosted: fall back to the server-level PROJECT_ID env var
-  const projectId = config.cloud.projectId;
-  return req.projectId || (projectId && projectId !== 'local' ? projectId : 'default');
+  return req.projectId || process.env.PROJECT_ID || 'default';
 }
 
 function bestEffortAudit(params: Parameters<typeof auditService.log>[0]) {

@@ -4,7 +4,7 @@ import { S3AccessKeyService } from '@/services/storage/s3-access-key.service.js'
 import { verifyHeaderSignature } from '@/services/storage/s3-signature.js';
 import { sendS3Error } from '@/api/routes/s3-gateway/errors.js';
 import logger from '@/utils/logger.js';
-import { config } from '@/infra/config/app.config.js';
+import { appConfig } from '@/infra/config/app.config.js';
 
 /**
  * Region used to validate the `Credential=<ak>/<date>/<region>/s3/aws4_request`
@@ -13,7 +13,7 @@ import { config } from '@/infra/config/app.config.js';
  * lives in (and so `GET /api/storage/s3/config` surfaces exactly what the
  * middleware will accept). Defaults to `us-east-2`.
  */
-const SIGNING_REGION = config.storage.awsRegion;
+const SIGNING_REGION = appConfig.storage.awsRegion;
 const MAX_CLOCK_SKEW_MS = 15 * 60 * 1000;
 
 /**

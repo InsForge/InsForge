@@ -17,7 +17,7 @@ import {
   type DeploymentStatusType,
 } from '@/types/deployments.js';
 import logger from '@/utils/logger.js';
-import { config } from '@/infra/config/app.config.js';
+import { appConfig } from '@/infra/config/app.config.js';
 import {
   ERROR_CODES,
   type CreateDeploymentResponse,
@@ -69,11 +69,11 @@ export class DeploymentService {
   }
 
   private initializeS3Provider(): void {
-    const s3Bucket = config.storage.s3Bucket;
-    const appKey = config.storage.appKey;
+    const s3Bucket = appConfig.storage.s3Bucket;
+    const appKey = appConfig.storage.appKey;
 
     if (s3Bucket) {
-      this.s3Provider = new S3StorageProvider(s3Bucket, appKey, config.storage.awsRegion);
+      this.s3Provider = new S3StorageProvider(s3Bucket, appKey, appConfig.storage.awsRegion);
       this.s3Provider.initialize();
     }
   }
@@ -705,7 +705,7 @@ export class DeploymentService {
    * Get the deployment URL - uses custom domain if APP_KEY is set, otherwise falls back to provider URL
    */
   private getDeploymentUrl(providerUrl: string | null): string | null {
-    const appKey = config.storage.appKey !== 'local' ? config.storage.appKey : null;
+    const appKey = process.env.APP_KEY;
     if (appKey) {
       return `https://${appKey}.insforge.site`;
     }
@@ -713,15 +713,15 @@ export class DeploymentService {
   }
 
   private getMaxDeploymentFiles(): number {
-    return config.deployments.maxDeploymentFiles;
+    return appConfig.deployments.maxDeploymentFiles;
   }
 
   private getMaxDeploymentTotalBytes(): number {
-    return config.deployments.maxDeploymentTotalBytes;
+    return appConfig.deployments.maxDeploymentTotalBytes;
   }
 
   private getMaxDeploymentFileBytes(): number {
-    return config.deployments.maxDeploymentFileBytes;
+    return appConfig.deployments.maxDeploymentFileBytes;
   }
 
   private normalizeDeploymentFilePath(filePath: string): string {
@@ -1303,7 +1303,7 @@ export class DeploymentService {
       );
     }
 
-    const projectId = config.cloud.projectId !== 'local' ? config.cloud.projectId : undefined;
+    const projectId = appConfig.cloud.projectId;
     if (!projectId) {
       throw new AppError(
         'PROJECT_ID not found in environment variables',
@@ -1312,7 +1312,7 @@ export class DeploymentService {
       );
     }
 
-    const jwtSecret = config.app.jwtSecret;
+    const jwtSecret = appConfig.app.jwtSecret;
     if (!jwtSecret) {
       throw new AppError(
         'JWT_SECRET not found in environment variables',
@@ -1323,7 +1323,7 @@ export class DeploymentService {
 
     try {
       const signature = jwt.sign({ projectId }, jwtSecret, { expiresIn: '1h' });
-      const cloudApiHost = config.cloud.apiHost;
+      const cloudApiHost = appConfig.cloud.apiHost;
 
       const response = await fetch(`${cloudApiHost}/sites/v1/${projectId}/slug`, {
         method: 'PUT',

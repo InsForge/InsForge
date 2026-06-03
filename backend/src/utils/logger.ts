@@ -1,11 +1,11 @@
 import winston from 'winston';
 import path from 'path';
-import { config } from '@/infra/config/app.config.js';
+import { appConfig } from '@/infra/config/app.config.js';
 
-const logsDir = config.server.logsDir;
+const logsDir = appConfig.server.logsDir;
 
 export const logger = winston.createLogger({
-  level: config.app.logLevel,
+  level: appConfig.app.logLevel,
   format: winston.format.combine(
     winston.format.timestamp(),
     // Security: Only include error stack traces outside of production.

@@ -1,7 +1,7 @@
 FROM denoland/deno:alpine-2.0.6
 
-# The denoland/deno base image already ships with a 'deno' user and group,
-# so no addgroup/adduser is needed here.
+# Create non-root user
+RUN addgroup -S deno && adduser -S deno -G deno
 
 WORKDIR /app/functions
 

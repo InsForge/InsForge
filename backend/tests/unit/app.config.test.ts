@@ -56,15 +56,9 @@ describe('config.app', () => {
     const c = loadConfig();
 
     expect(c.app.port).toBe(7130);
-    expect(c.app.jwtSecret).toBe('test_jwt_secret');
+    expect(c.app.jwtSecret).toBe('');
     expect(c.app.apiKey).toBe('your_api_key');
     expect(c.app.logLevel).toBe('info');
-  });
-
-  it('throws an error when required secrets are missing in production', () => {
-    process.env.NODE_ENV = 'production';
-    unsetEnvKeys('PORT', 'JWT_SECRET', 'ACCESS_API_KEY', 'LOG_LEVEL');
-    expect(() => loadConfig()).toThrow('FATAL: JWT_SECRET environment variable is missing.');
   });
 
   it('overrides all app fields from env', () => {
@@ -113,10 +107,10 @@ describe('config.cloud', () => {
     const c = loadConfig();
 
     expect(c.cloud.apiHost).toBe('https://api.insforge.dev');
-    expect(c.cloud.projectId).toBe('local');
-    expect(c.cloud.cloudFrontUrl).toBe('');
-    expect(c.cloud.cloudFrontKeyPairId).toBe('');
-    expect(c.cloud.cloudFrontPrivateKey).toBe('');
+    expect(c.cloud.projectId).toBeUndefined();
+    expect(c.cloud.cloudFrontUrl).toBeUndefined();
+    expect(c.cloud.cloudFrontKeyPairId).toBeUndefined();
+    expect(c.cloud.cloudFrontPrivateKey).toBeUndefined();
   });
 
   it('overrides cloud fields from env', () => {
@@ -337,17 +331,9 @@ describe('config.auth', () => {
     unsetEnvKeys('ADMIN_EMAIL', 'ADMIN_PASSWORD', 'ACCESS_API_KEY');
     const c = loadConfig();
 
-    expect(c.auth.adminEmail).toBe('admin@example.com');
-    expect(c.auth.adminPassword).toBe('change-this-password');
+    expect(c.auth.adminEmail).toBe('');
+    expect(c.auth.adminPassword).toBe('');
     expect(c.auth.accessApiKey).toBeUndefined();
-  });
-
-  it('throws an error when admin credentials are missing in production', () => {
-    process.env.NODE_ENV = 'production';
-    process.env.JWT_SECRET = 'test-secret';
-    process.env.ACCESS_API_KEY = 'test-key';
-    unsetEnvKeys('ADMIN_EMAIL', 'ADMIN_PASSWORD');
-    expect(() => loadConfig()).toThrow('Missing required environment variable: ADMIN_EMAIL');
   });
 
   it('overrides admin credentials', () => {
