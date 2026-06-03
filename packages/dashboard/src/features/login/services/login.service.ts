@@ -59,9 +59,15 @@ export class LoginService {
   }
 
   async logout(): Promise<void> {
+    const csrfToken = apiClient.getCsrfToken();
     try {
+      const headers: Record<string, string> = {};
+      if (csrfToken) {
+        headers['X-CSRF-Token'] = csrfToken;
+      }
       await apiClient.request('/auth/admin/logout', {
         method: 'POST',
+        headers,
         skipRefresh: true,
       });
     } catch {

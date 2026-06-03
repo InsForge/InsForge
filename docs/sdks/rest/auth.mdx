@@ -295,10 +295,24 @@ Logout and clear refresh token cookie.
 POST /api/auth/logout
 ```
 
-### Example
+### Query Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `client_type` | string | No | Client type: `web` (default), `mobile`, `desktop`, or `server`. CSRF validation is only performed for `web`. |
+
+### Headers (Web Client)
+
+| Header | Type | Required | Description |
+|--------|------|----------|-------------|
+| `X-CSRF-Token` | string | Yes | CSRF token received from login/register response (required if refresh cookie is present) |
+
+### Example (Web Client)
 
 ```bash
-curl -X POST "https://your-app.insforge.app/api/auth/logout"
+curl -X POST "https://your-app.insforge.app/api/auth/logout" \
+  -H "X-CSRF-Token: abc123..." \
+  --cookie "refresh_token=..."
 ```
 
 ### Response
@@ -1010,6 +1024,29 @@ curl -X POST "https://your-app.insforge.app/api/auth/admin/refresh" \
 
 ```
 POST /api/auth/admin/logout
+```
+
+#### Headers
+
+| Header | Type | Required | Description |
+|--------|------|----------|-------------|
+| `X-CSRF-Token` | string | Yes | CSRF token received from admin login or admin refresh (required if refresh cookie is present) |
+
+#### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/admin/logout" \
+  -H "X-CSRF-Token: abc123..." \
+  --cookie "insforge_admin_refresh_token=..."
+```
+
+#### Response
+
+```json
+{
+  "success": true,
+  "message": "Logged out successfully"
+}
 ```
 
 ---
