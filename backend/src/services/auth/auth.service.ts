@@ -1411,12 +1411,47 @@ export class AuthService {
     }
 
     const pool = this.getPool();
+    const client = await pool.connect();
     const placeholders = filtered.map((_, i) => `$${i + 1}`).join(',');
-    const result = await pool.query(
-      `DELETE FROM auth.users WHERE id IN (${placeholders})`,
-      filtered
-    );
 
-    return result.rowCount || 0;
+    try {
+      await client.query('BEGIN');
+
+      const emailsResult = await client.query<{ email: string }>(
+        `SELECT email
+         FROM auth.users
+         WHERE id IN (${placeholders})`,
+        filtered
+      );
+
+      const emails = Array.from(
+        new Set(
+          emailsResult.rows
+            .map((row) => row.email)
+            .filter((email): email is string => typeof email === 'string' && email.length > 0)
+        )
+      );
+
+      if (emails.length > 0) {
+        await client.query(`DELETE FROM auth.email_otps WHERE email = ANY($1::text[])`, [emails]);
+      }
+
+      const result = await client.query(
+        `DELETE FROM auth.users WHERE id IN (${placeholders})`,
+        filtered
+      );
+
+      await client.query('COMMIT');
+      return result.rowCount || 0;
+    } catch (error) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        // Preserve the original error if rollback fails.
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 }
