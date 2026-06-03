@@ -200,12 +200,14 @@ export class DatabaseManager {
   }
 
   /**
-   * Create a dedicated client for operations that can't use pooled connections (e.g., LISTEN/NOTIFY)
+   * Create a dedicated client for operations that can't use pooled connections (e.g., LISTEN/NOTIFY).
+   * Always connects directly to Postgres, bypassing PgBouncer (transaction pooling
+   * does not support LISTEN/NOTIFY or prepared statements).
    */
   createClient(): Client {
     return new Client({
-      host: process.env.POSTGRES_HOST || 'localhost',
-      port: parseInt(process.env.POSTGRES_PORT || '5432'),
+      host: process.env.POSTGRES_DIRECT_HOST || process.env.POSTGRES_HOST || 'localhost',
+      port: parseInt(process.env.POSTGRES_DIRECT_PORT || process.env.POSTGRES_PORT || '5432'),
       database: process.env.POSTGRES_DB || 'insforge',
       user: process.env.POSTGRES_USER || 'postgres',
       password: process.env.POSTGRES_PASSWORD || 'postgres',
