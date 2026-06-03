@@ -26,10 +26,10 @@ import {
   DiscordUserInfo,
   XUserInfo,
   AppleUserInfo,
+  ProjectAdminRecord,
   UserRecord,
   OAuthUserData,
 } from '@/types/auth.js';
-import { ADMIN_ID } from '@/utils/constants.js';
 import { AppError } from '@/utils/errors.js';
 import { EmailService } from '@/services/email/email.service.js';
 import { XOAuthProvider } from '@/providers/oauth/x.provider.js';
@@ -106,6 +106,61 @@ export class AuthService {
       this.pool = dbManager.getPool();
     }
     return this.pool;
+  }
+
+  private async upsertProjectAdmin(
+    email: string,
+    source: ProjectAdminRecord['source'],
+    externalSubject: string | null = null
+  ): Promise<ProjectAdminRecord> {
+    const pool = this.getPool();
+    const profile = JSON.stringify({ name: 'Administrator' });
+    const result = await pool.query(
+      `
+      INSERT INTO auth.project_admins (email, source, external_subject, profile, created_at, updated_at)
+      VALUES ($1, $2, $3, $4::jsonb, NOW(), NOW())
+      ON CONFLICT (email) DO UPDATE SET
+        source = EXCLUDED.source,
+        external_subject = COALESCE(EXCLUDED.external_subject, auth.project_admins.external_subject),
+        profile = COALESCE(auth.project_admins.profile, EXCLUDED.profile),
+        updated_at = NOW()
+      RETURNING id, email, source, external_subject, profile, created_at, updated_at
+    `,
+      [email, source, externalSubject, profile]
+    );
+
+    const admin = result.rows[0] as ProjectAdminRecord | undefined;
+    if (!admin) {
+      throw new Error('Failed to upsert project admin');
+    }
+    return admin;
+  }
+
+  async getProjectAdminById(adminId: string): Promise<ProjectAdminRecord | null> {
+    const pool = this.getPool();
+    const result = await pool.query(
+      `
+      SELECT id, email, source, external_subject, profile, created_at, updated_at
+      FROM auth.project_admins
+      WHERE id = $1
+    `,
+      [adminId]
+    );
+
+    return (result.rows[0] as ProjectAdminRecord | undefined) || null;
+  }
+
+  transformProjectAdminRecordToSchema(admin: ProjectAdminRecord): UserSchema {
+    return {
+      id: admin.id,
+      email: admin.email,
+      emailVerified: true,
+      createdAt: admin.created_at,
+      updatedAt: admin.updated_at,
+      providers: [admin.source],
+      profile: admin.profile ?? { name: 'Administrator' },
+      metadata: null,
+    };
   }
 
   /**
@@ -654,31 +709,22 @@ export class AuthService {
   /**
    * Admin login (validates against env variables only)
    */
-  adminLogin(email: string, password: string): CreateAdminSessionResponse {
+  async adminLogin(email: string, password: string): Promise<CreateAdminSessionResponse> {
     // Simply validate against environment variables
     if (email !== this.adminEmail || password !== this.adminPassword) {
       throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
-    // Use a fixed admin ID for the system administrator
-
-    // Return admin user with JWT token (24h expiration) - no database interaction
+    const admin = await this.upsertProjectAdmin(email, 'env');
+    const user = this.transformProjectAdminRecordToSchema(admin);
     const accessToken = this.tokenManager.generateAccessToken({
-      sub: ADMIN_ID,
+      sub: user.id,
       email,
       role: 'project_admin',
     });
 
     return {
-      user: {
-        id: ADMIN_ID,
-        email: email,
-        emailVerified: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        profile: { name: 'Administrator' },
-        metadata: null,
-      },
+      user,
       accessToken,
     };
   }
@@ -692,25 +738,22 @@ export class AuthService {
       const { payload } = await this.tokenManager.verifyCloudToken(code);
 
       // If verification succeeds, extract user info and generate internal token
-      const email = payload['email'] || payload['sub'] || 'admin@insforge.local';
+      const email =
+        typeof payload['email'] === 'string' && payload['email'].includes('@')
+          ? payload['email']
+          : 'admin@insforge.local';
+      const externalSubject = typeof payload['sub'] === 'string' ? payload['sub'] : null;
 
-      // Generate internal access token (24h expiration)
+      const admin = await this.upsertProjectAdmin(email, 'cloud', externalSubject);
+      const user = this.transformProjectAdminRecordToSchema(admin);
       const accessToken = this.tokenManager.generateAccessToken({
-        sub: ADMIN_ID,
-        email: email as string,
+        sub: user.id,
+        email,
         role: 'project_admin',
       });
 
       return {
-        user: {
-          id: ADMIN_ID,
-          email: email as string,
-          emailVerified: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          profile: { name: 'Administrator' },
-          metadata: null,
-        },
+        user,
         accessToken,
       };
     } catch (error) {
@@ -1189,7 +1232,6 @@ export class AuthService {
         u.profile,
         u.metadata,
         u.email_verified,
-        u.is_project_admin,
         u.is_anonymous,
         u.created_at,
         u.updated_at,
@@ -1207,7 +1249,7 @@ export class AuthService {
   }
 
   /**
-   * Get user by ID (returns raw database record with is_project_admin field)
+   * Get user by ID.
    */
   async getUserById(userId: string): Promise<UserRecord | null> {
     const pool = this.getPool();
@@ -1219,7 +1261,6 @@ export class AuthService {
         u.profile,
         u.metadata,
         u.email_verified,
-        u.is_project_admin,
         u.is_anonymous,
         u.created_at,
         u.updated_at,
@@ -1233,27 +1274,7 @@ export class AuthService {
       [userId]
     );
 
-    if (result.rows[0]) {
-      return result.rows[0];
-    }
-
-    // Fallback: if admin record is missing from DB, construct it from env vars
-    if (userId === ADMIN_ID) {
-      const now = new Date().toISOString();
-      return {
-        id: ADMIN_ID,
-        email: this.adminEmail,
-        profile: { name: 'Administrator' },
-        metadata: {},
-        email_verified: true,
-        is_project_admin: true,
-        is_anonymous: false,
-        created_at: now,
-        updated_at: now,
-      };
-    }
-
-    return null;
+    return result.rows[0] || null;
   }
 
   /**
@@ -1302,7 +1323,6 @@ export class AuthService {
         u.profile,
         u.metadata,
         u.email_verified,
-        u.is_project_admin,
         u.is_anonymous,
         u.created_at,
         u.updated_at,
@@ -1310,7 +1330,7 @@ export class AuthService {
         STRING_AGG(a.provider, ',') as providers
       FROM auth.users u
       LEFT JOIN auth.user_providers a ON u.id = a.user_id
-      WHERE u.is_project_admin = false AND u.is_anonymous = false
+      WHERE u.is_anonymous = false
     `;
     const params: (string | number)[] = [];
 
@@ -1328,9 +1348,8 @@ export class AuthService {
     // Transform users
     const users = dbUsers.map((dbUser) => this.transformUserRecordToSchema(dbUser));
 
-    // Get total count (exclude admins and anonymous users)
-    let countQuery =
-      'SELECT COUNT(*) as count FROM auth.users WHERE is_project_admin = false AND is_anonymous = false';
+    // Get total count (exclude anonymous users)
+    let countQuery = 'SELECT COUNT(*) as count FROM auth.users WHERE is_anonymous = false';
     const countParams: string[] = [];
     if (search) {
       countQuery += ` AND (email LIKE $1 OR profile->>'name' LIKE $2)`;
@@ -1405,16 +1424,15 @@ export class AuthService {
    * Delete multiple users by IDs
    */
   async deleteUsers(userIds: string[]): Promise<number> {
-    const filtered = userIds.filter((id) => id !== ADMIN_ID);
-    if (filtered.length === 0) {
+    if (userIds.length === 0) {
       return 0;
     }
 
     const pool = this.getPool();
-    const placeholders = filtered.map((_, i) => `$${i + 1}`).join(',');
+    const placeholders = userIds.map((_, i) => `$${i + 1}`).join(',');
     const result = await pool.query(
       `DELETE FROM auth.users WHERE id IN (${placeholders})`,
-      filtered
+      userIds
     );
 
     return result.rowCount || 0;

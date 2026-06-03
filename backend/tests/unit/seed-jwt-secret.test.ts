@@ -109,6 +109,19 @@ describe('seedBackend secret initialization', () => {
     });
   });
 
+  it('seeds the env admin into auth.project_admins instead of auth.users', async () => {
+    mockIsCloudEnvironment.mockReturnValue(false);
+    mockGetSecretByKey.mockResolvedValue('already-seeded-secret');
+
+    const { seedBackend } = await import('../../src/utils/seed.js');
+
+    await seedBackend();
+
+    const sqlCalls = mockClientQuery.mock.calls.map(([sql]) => String(sql));
+    expect(sqlCalls.some((sql) => sql.includes('auth.project_admins'))).toBe(true);
+    expect(sqlCalls.some((sql) => sql.includes('auth.users'))).toBe(false);
+  });
+
   it('skips INSFORGE_INTERNAL_URL in cloud but still seeds JWT_SECRET when missing', async () => {
     mockIsCloudEnvironment.mockReturnValue(true);
     mockGetSecretByKey.mockImplementation(async (key: string) => {

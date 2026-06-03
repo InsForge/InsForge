@@ -6,12 +6,21 @@ export interface UserRecord {
   profile: Record<string, unknown> | null;
   metadata: Record<string, unknown> | null;
   email_verified: boolean;
-  is_project_admin: boolean;
   is_anonymous: boolean;
   created_at: string;
   updated_at: string;
   password?: string;
   providers?: string;
+}
+
+export interface ProjectAdminRecord {
+  id: string;
+  email: string;
+  source: 'env' | 'cloud';
+  external_subject: string | null;
+  profile: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
 }
 
 // OAuth provider data from external providers

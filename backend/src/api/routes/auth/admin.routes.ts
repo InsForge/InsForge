@@ -55,7 +55,7 @@ router.post('/sessions/exchange', async (req: Request, res: Response, next: Next
 });
 
 // POST /api/auth/admin/sessions - Create admin session (web only)
-router.post('/sessions', (req: Request, res: Response, next: NextFunction) => {
+router.post('/sessions', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validationResult = createAdminSessionRequestSchema.safeParse(req.body);
     if (!validationResult.success) {
@@ -67,7 +67,7 @@ router.post('/sessions', (req: Request, res: Response, next: NextFunction) => {
     }
 
     const { email, password } = validationResult.data;
-    const result: CreateAdminSessionResponse = authService.adminLogin(email, password);
+    const result: CreateAdminSessionResponse = await authService.adminLogin(email, password);
 
     // Set refresh token as httpOnly cookie + CSRF token for web clients
     const tokenManager = TokenManager.getInstance();
@@ -105,8 +105,14 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
       throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
-    const dbUser = await authService.getUserById(payload.sub);
-    if (!dbUser || !dbUser.is_project_admin) {
+    if (!payload.sub) {
+      logger.warn('[Auth:AdminRefresh] Refresh token is missing admin subject');
+      clearAdminRefreshTokenCookie(res);
+      throw new AppError('Project admin not found', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+    }
+
+    const dbUser = await authService.getProjectAdminById(payload.sub);
+    if (!dbUser) {
       logger.warn('[Auth:AdminRefresh] Project admin not found for valid refresh token', {
         userId: payload.sub,
       });
@@ -114,7 +120,7 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
       throw new AppError('Project admin not found', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
-    const user = authService.transformUserRecordToSchema(dbUser);
+    const user = authService.transformProjectAdminRecordToSchema(dbUser);
     const newAccessToken = tokenManager.generateAccessToken({
       sub: user.id,
       email: user.email,

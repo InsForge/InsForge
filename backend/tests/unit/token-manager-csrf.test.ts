@@ -113,4 +113,22 @@ describe('TokenManager refresh CSRF tokens', () => {
 
     expect(() => tokenManager.verifyRefreshToken(legacyRefreshToken)).toThrow(AppError);
   });
+
+  it('generates public anon tokens without a user subject', () => {
+    const anonToken = tokenManager.generateAnonToken();
+    const payload = tokenManager.verifyToken(anonToken);
+
+    expect(payload.role).toBe('anon');
+    expect(payload.sub).toBeUndefined();
+    expect(payload.email).toBeUndefined();
+  });
+
+  it('generates API-key PostgREST tokens without a fake admin subject', () => {
+    const apiKeyToken = tokenManager.generateApiKeyToken();
+    const payload = tokenManager.verifyToken(apiKeyToken);
+
+    expect(payload.role).toBe('project_admin');
+    expect(payload.sub).toBeUndefined();
+    expect(payload.email).toBeUndefined();
+  });
 });

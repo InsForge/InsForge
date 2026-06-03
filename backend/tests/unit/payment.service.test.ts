@@ -101,8 +101,6 @@ describe('PaymentService', () => {
     role: 'authenticated' as const,
   };
   const anonCheckoutUser = {
-    id: '12345678-1234-5678-90ab-cdef12345678',
-    email: 'anon@insforge.com',
     role: 'anon' as const,
   };
   const checkoutSessionRow = {

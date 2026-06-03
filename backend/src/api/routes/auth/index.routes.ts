@@ -566,7 +566,7 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
       }
     }
 
-    // Fetch current user data from DB (raw record includes is_project_admin)
+    // Fetch current user data from DB
     const dbUser = await authService.getUserById(payload.sub);
 
     if (!dbUser) {
@@ -578,13 +578,12 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
     }
 
     const user = authService.transformUserRecordToSchema(dbUser);
-    const role = dbUser.is_project_admin ? 'project_admin' : 'authenticated';
 
     // Generate new access token
     const newAccessToken = tokenManager.generateAccessToken({
       sub: user.id,
       email: user.email,
-      role,
+      role: 'authenticated',
     });
 
     if (clientType === 'web') {

@@ -162,8 +162,8 @@ export const emailTemplateSchema = z.object({
  * JWT token payload schema
  */
 export const tokenPayloadSchema = z.object({
-  sub: userIdSchema, // Subject (user ID)
-  email: emailSchema,
+  sub: userIdSchema.optional(), // Subject (user/admin ID), omitted for public anon/API-key tokens
+  email: emailSchema.optional(),
   role: roleSchema,
   iat: z.number().optional(), // Issued at
   exp: z.number().optional(), // Expiration

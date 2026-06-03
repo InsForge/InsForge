@@ -74,8 +74,6 @@ export class TokenManager {
    */
   generateApiKeyToken(): string {
     const payload = {
-      sub: 'project-admin-with-api-key',
-      email: 'project-admin@email.com',
       role: 'project_admin',
     };
     return jwt.sign(payload, JWT_SECRET, {
@@ -150,8 +148,6 @@ export class TokenManager {
    */
   generateAnonToken(): string {
     const payload = {
-      sub: '12345678-1234-5678-90ab-cdef12345678',
-      email: 'anon@insforge.com',
       role: 'anon',
     };
     return jwt.sign(payload, JWT_SECRET, {

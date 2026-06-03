@@ -140,7 +140,7 @@ const FAKE_DB_USER = {
   created_at: new Date(),
   updated_at: new Date(),
   auth_metadata: null,
-  is_project_admin: false,
+  is_anonymous: false,
 };
 
 describe('AuthService.findOrCreateThirdPartyUser – disableSignup gate', () => {
