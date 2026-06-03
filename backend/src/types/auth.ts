@@ -16,9 +16,6 @@ export interface UserRecord {
 export interface ProjectAdminRecord {
   id: string;
   email: string;
-  source: 'env' | 'cloud';
-  external_subject: string | null;
-  profile: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }

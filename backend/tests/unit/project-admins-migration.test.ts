@@ -32,18 +32,24 @@ describe('project admins migration', () => {
     expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS auth\.project_admins/i);
     expect(sql).toMatch(/id UUID PRIMARY KEY DEFAULT gen_random_uuid\(\)/i);
     expect(sql).toMatch(/email TEXT NOT NULL UNIQUE/i);
-    expect(sql).toMatch(/source TEXT NOT NULL DEFAULT 'env' CHECK \(source IN \('env', 'cloud'\)\)/i);
-    expect(sql).toMatch(/external_subject TEXT/i);
-    expect(sql).toMatch(/profile JSONB NOT NULL DEFAULT '\{\}'::jsonb/i);
+    expect(sql).not.toMatch(/source TEXT/i);
+    expect(sql).not.toMatch(/external_subject TEXT/i);
+    expect(sql).not.toMatch(/profile JSONB/i);
   });
 
   it('backfills existing project-admin users before dropping the auth.users flag', () => {
     const sql = readMigration();
 
-    expect(sql).toMatch(/INSERT INTO auth\.project_admins \(id, email, source, profile/i);
+    expect(sql).toMatch(/INSERT INTO auth\.project_admins \(id, email, created_at, updated_at\)/i);
     expect(sql).toMatch(/FROM auth\.users\s+WHERE is_project_admin = true/i);
     expect(sql).toMatch(/DELETE FROM auth\.users\s+WHERE is_project_admin = true/i);
     expect(sql).toMatch(/ALTER TABLE auth\.users DROP COLUMN is_project_admin/i);
+  });
+
+  it('preserves old admin ids when backfill finds an existing admin email', () => {
+    const sql = readMigration();
+
+    expect(sql).toMatch(/ON CONFLICT \(email\) DO UPDATE SET\s+id = EXCLUDED\.id/i);
   });
 
   it('guards the drop so the migration is idempotent', () => {

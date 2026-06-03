@@ -8,9 +8,6 @@
 CREATE TABLE IF NOT EXISTS auth.project_admins (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email TEXT NOT NULL UNIQUE,
-  source TEXT NOT NULL DEFAULT 'env' CHECK (source IN ('env', 'cloud')),
-  external_subject TEXT,
-  profile JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -24,18 +21,16 @@ BEGIN
       AND table_name = 'users'
       AND column_name = 'is_project_admin'
   ) THEN
-    INSERT INTO auth.project_admins (id, email, source, profile, created_at, updated_at)
+    INSERT INTO auth.project_admins (id, email, created_at, updated_at)
     SELECT
       id,
       email,
-      'env',
-      COALESCE(profile, '{}'::jsonb),
       COALESCE(created_at, NOW()),
       COALESCE(updated_at, NOW())
     FROM auth.users
     WHERE is_project_admin = true
     ON CONFLICT (email) DO UPDATE SET
-      profile = EXCLUDED.profile,
+      id = EXCLUDED.id,
       updated_at = NOW();
 
     DELETE FROM auth.users

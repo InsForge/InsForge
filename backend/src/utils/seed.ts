@@ -12,24 +12,22 @@ import { AuthConfigService } from '@/services/auth/auth-config.service.js';
  * Seeds the env-configured project admin if it doesn't exist in the database.
  */
 async function seedProjectAdmin(adminEmail: string): Promise<void> {
+  if (!adminEmail) {
+    logger.warn('⚠️ Admin email not configured - check ADMIN_EMAIL');
+    return;
+  }
+
   const dbManager = DatabaseManager.getInstance();
   const pool = dbManager.getPool();
   const client = await pool.connect();
 
   try {
-    if (!adminEmail) {
-      logger.warn('⚠️ Admin email not configured - check ADMIN_EMAIL');
-      return;
-    }
-
     await client.query(
-      `INSERT INTO auth.project_admins (email, source, profile, created_at, updated_at)
-       VALUES ($1, 'env', $2::jsonb, NOW(), NOW())
+      `INSERT INTO auth.project_admins (email, created_at, updated_at)
+       VALUES ($1, NOW(), NOW())
        ON CONFLICT (email) DO UPDATE SET
-         source = 'env',
-         profile = COALESCE(auth.project_admins.profile, EXCLUDED.profile),
          updated_at = NOW()`,
-      [adminEmail, JSON.stringify({ name: 'Administrator' })]
+      [adminEmail]
     );
 
     logger.info(`✅ Project admin configured: ${adminEmail}`);

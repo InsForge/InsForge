@@ -120,6 +120,8 @@ describe('seedBackend secret initialization', () => {
     const sqlCalls = mockClientQuery.mock.calls.map(([sql]) => String(sql));
     expect(sqlCalls.some((sql) => sql.includes('auth.project_admins'))).toBe(true);
     expect(sqlCalls.some((sql) => sql.includes('auth.users'))).toBe(false);
+    expect(sqlCalls.some((sql) => sql.includes('source'))).toBe(false);
+    expect(sqlCalls.some((sql) => sql.includes('profile'))).toBe(false);
   });
 
   it('skips INSFORGE_INTERNAL_URL in cloud but still seeds JWT_SECRET when missing', async () => {

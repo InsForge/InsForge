@@ -37,6 +37,7 @@ import { AppleOAuthProvider } from '@/providers/oauth/apple.provider.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
 import {
   ERROR_CODES,
+  emailSchema,
   type AuthMetadataSchema,
   type CreateAdminSessionResponse,
   type CreateSessionResponse,
@@ -108,25 +109,17 @@ export class AuthService {
     return this.pool;
   }
 
-  private async upsertProjectAdmin(
-    email: string,
-    source: ProjectAdminRecord['source'],
-    externalSubject: string | null = null
-  ): Promise<ProjectAdminRecord> {
+  private async upsertProjectAdmin(email: string): Promise<ProjectAdminRecord> {
     const pool = this.getPool();
-    const profile = JSON.stringify({ name: 'Administrator' });
     const result = await pool.query(
       `
-      INSERT INTO auth.project_admins (email, source, external_subject, profile, created_at, updated_at)
-      VALUES ($1, $2, $3, $4::jsonb, NOW(), NOW())
+      INSERT INTO auth.project_admins (email, created_at, updated_at)
+      VALUES ($1, NOW(), NOW())
       ON CONFLICT (email) DO UPDATE SET
-        source = EXCLUDED.source,
-        external_subject = COALESCE(EXCLUDED.external_subject, auth.project_admins.external_subject),
-        profile = COALESCE(auth.project_admins.profile, EXCLUDED.profile),
         updated_at = NOW()
-      RETURNING id, email, source, external_subject, profile, created_at, updated_at
+      RETURNING id, email, created_at, updated_at
     `,
-      [email, source, externalSubject, profile]
+      [email]
     );
 
     const admin = result.rows[0] as ProjectAdminRecord | undefined;
@@ -140,7 +133,7 @@ export class AuthService {
     const pool = this.getPool();
     const result = await pool.query(
       `
-      SELECT id, email, source, external_subject, profile, created_at, updated_at
+      SELECT id, email, created_at, updated_at
       FROM auth.project_admins
       WHERE id = $1
     `,
@@ -157,8 +150,8 @@ export class AuthService {
       emailVerified: true,
       createdAt: admin.created_at,
       updatedAt: admin.updated_at,
-      providers: [admin.source],
-      profile: admin.profile ?? { name: 'Administrator' },
+      providers: [],
+      profile: { name: 'Administrator' },
       metadata: null,
     };
   }
@@ -715,7 +708,7 @@ export class AuthService {
       throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
-    const admin = await this.upsertProjectAdmin(email, 'env');
+    const admin = await this.upsertProjectAdmin(email);
     const user = this.transformProjectAdminRecordToSchema(admin);
     const accessToken = this.tokenManager.generateAccessToken({
       sub: user.id,
@@ -738,13 +731,14 @@ export class AuthService {
       const { payload } = await this.tokenManager.verifyCloudToken(code);
 
       // If verification succeeds, extract user info and generate internal token
-      const email =
-        typeof payload['email'] === 'string' && payload['email'].includes('@')
-          ? payload['email']
-          : 'admin@insforge.local';
-      const externalSubject = typeof payload['sub'] === 'string' ? payload['sub'] : null;
+      const emailResult = emailSchema.safeParse(payload['email']);
+      if (!emailResult.success) {
+        logger.warn('Cloud admin token is missing a valid email claim');
+        throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+      }
 
-      const admin = await this.upsertProjectAdmin(email, 'cloud', externalSubject);
+      const email = emailResult.data;
+      const admin = await this.upsertProjectAdmin(email);
       const user = this.transformProjectAdminRecordToSchema(admin);
       const accessToken = this.tokenManager.generateAccessToken({
         sub: user.id,
