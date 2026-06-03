@@ -48,8 +48,8 @@ describe('TableForm draft storage', () => {
 
     window.localStorage.setItem(projectADraftKey, createDraft('public'));
 
-    expect(hasRestorableTableFormCreateDraft('public', 'project:project-a')).toBe(true);
-    expect(hasRestorableTableFormCreateDraft('public', 'project:project-b')).toBe(false);
+    expect(hasRestorableTableFormCreateDraft('project:project-a', 'public')).toBe(true);
+    expect(hasRestorableTableFormCreateDraft('project:project-b', 'public')).toBe(false);
   });
 
   it('does not restore drafts written for another schema in the same project', () => {
@@ -57,13 +57,13 @@ describe('TableForm draft storage', () => {
 
     window.localStorage.setItem(publicDraftKey, createDraft('public'));
 
-    expect(hasRestorableTableFormCreateDraft('public', 'project:project-a')).toBe(true);
-    expect(hasRestorableTableFormCreateDraft('custom', 'project:project-a')).toBe(false);
+    expect(hasRestorableTableFormCreateDraft('project:project-a', 'public')).toBe(true);
+    expect(hasRestorableTableFormCreateDraft('project:project-a', 'custom')).toBe(false);
   });
 
   it('ignores the legacy unscoped draft key', () => {
     window.localStorage.setItem('table-form-columns-draft', createDraft('public'));
 
-    expect(hasRestorableTableFormCreateDraft('public', 'project:project-a')).toBe(false);
+    expect(hasRestorableTableFormCreateDraft('project:project-a', 'public')).toBe(false);
   });
 });

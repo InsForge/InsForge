@@ -20,6 +20,11 @@ import { ColumnType, TableSchema, UpdateTableSchemaRequest } from '@insforge/sha
 import { parseDatabaseTableReference, SYSTEM_FIELDS } from '#features/database/helpers';
 import { databaseTableQueryKeys } from '#features/database/queryKeys';
 import { useProjectId } from '#lib/hooks/useMetadata';
+import {
+  getLocalStorageJSON,
+  removeLocalStorageItem,
+  setLocalStorageJSON,
+} from '#lib/utils/local-storage';
 
 const newColumn: TableFormColumnSchema = {
   columnName: '',
@@ -89,14 +94,6 @@ const createDefaultColumns = (): TableFormColumnSchema[] => [
   { ...newColumn },
 ];
 
-const getTableFormDraftStorage = (): Storage | null => {
-  try {
-    return typeof window === 'undefined' ? null : window.localStorage;
-  } catch {
-    return null;
-  }
-};
-
 const getRecordValue = (value: unknown, key: string): unknown => {
   if (typeof value !== 'object' || value === null) {
     return undefined;
@@ -135,22 +132,18 @@ const toColumnFromSnapshot = (snapshot: unknown): TableFormColumnSchema => {
   };
 };
 
+const hasColumnDraftData = (column: TableFormColumnSchema): boolean => {
+  return (
+    column.columnName.trim().length > 0 ||
+    (column.defaultValue ?? '').trim().length > 0 ||
+    column.type !== newColumn.type ||
+    column.isNullable !== newColumn.isNullable ||
+    column.isUnique !== newColumn.isUnique
+  );
+};
+
 const hasUserColumnDraftData = (columns: TableFormColumnSchema[]): boolean => {
-  const userColumns = columns.filter((column) => !column.isSystemColumn);
-
-  return userColumns.some((column, index) => {
-    if (index > 0) {
-      return true;
-    }
-
-    return (
-      column.columnName.trim().length > 0 ||
-      (column.defaultValue ?? '').trim().length > 0 ||
-      column.type !== newColumn.type ||
-      column.isNullable !== newColumn.isNullable ||
-      column.isUnique !== newColumn.isUnique
-    );
-  });
+  return columns.some((column) => !column.isSystemColumn && hasColumnDraftData(column));
 };
 
 const hasCreateDraftData = (draft: TableFormCreateDraft): boolean => {
@@ -165,18 +158,10 @@ const readTableFormCreateDraft = (
   draftScope?: string,
   schemaName?: string
 ): TableFormCreateDraft | null => {
-  const storage = getTableFormDraftStorage();
-  if (!storage) {
-    return null;
-  }
-
   try {
-    const storedValue = storage.getItem(getTableFormCreateDraftStorageKey(draftScope, schemaName));
-    if (!storedValue) {
-      return null;
-    }
-
-    const parsedValue = JSON.parse(storedValue) as unknown;
+    const parsedValue = getLocalStorageJSON<unknown>(
+      getTableFormCreateDraftStorageKey(draftScope, schemaName)
+    );
 
     if (Array.isArray(parsedValue)) {
       return {
@@ -215,8 +200,8 @@ const readTableFormCreateDraft = (
 };
 
 export const hasRestorableTableFormCreateDraft = (
-  schemaName?: string,
-  draftScope?: string
+  draftScope?: string,
+  schemaName?: string
 ): boolean => {
   const draft = readTableFormCreateDraft(draftScope, schemaName);
 
@@ -232,7 +217,7 @@ export const hasRestorableTableFormCreateDraft = (
 };
 
 export const clearTableFormCreateDraft = (draftScope?: string, schemaName?: string) => {
-  getTableFormDraftStorage()?.removeItem(getTableFormCreateDraftStorageKey(draftScope, schemaName));
+  removeLocalStorageItem(getTableFormCreateDraftStorageKey(draftScope, schemaName));
 };
 
 interface TableFormProps {
@@ -263,6 +248,7 @@ export function TableForm({
   const [foreignKeys, setForeignKeys] = useState<TableFormForeignKeySchema[]>([]);
   const [foreignKeysDirty, setForeignKeysDirty] = useState(false);
   const skipNextDraftSaveRef = useRef(true);
+  const formScrollRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
@@ -282,6 +268,12 @@ export function TableForm({
     control: form.control,
     name: 'columns',
   });
+
+  useEffect(() => {
+    if (open) {
+      formScrollRef.current?.scrollTo({ top: 0, left: 0 });
+    }
+  }, [editTable?.tableName, mode, open, schemaName]);
 
   useEffect(() => {
     // Clear error when effect runs
@@ -358,11 +350,6 @@ export function TableForm({
       return;
     }
 
-    const storage = getTableFormDraftStorage();
-    if (!storage) {
-      return;
-    }
-
     if (skipNextDraftSaveRef.current) {
       skipNextDraftSaveRef.current = false;
       return;
@@ -375,14 +362,18 @@ export function TableForm({
       foreignKeys,
     };
 
+    const draftToSave = {
+      ...draft,
+      columns: draft.columns.filter(
+        (column) => column.isSystemColumn || hasColumnDraftData(column)
+      ),
+    };
+
     try {
-      if (hasCreateDraftData(draft)) {
-        storage.setItem(
-          getTableFormCreateDraftStorageKey(draftScope, schemaName),
-          JSON.stringify(draft)
-        );
+      if (hasCreateDraftData(draftToSave)) {
+        setLocalStorageJSON(getTableFormCreateDraftStorageKey(draftScope, schemaName), draftToSave);
       } else {
-        storage.removeItem(getTableFormCreateDraftStorageKey(draftScope, schemaName));
+        removeLocalStorageItem(getTableFormCreateDraftStorageKey(draftScope, schemaName));
       }
     } catch {
       // Keep the form usable if localStorage is blocked or full.
@@ -696,7 +687,7 @@ export function TableForm({
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto px-4 pb-6 sm:px-6 lg:px-10">
+      <div ref={formScrollRef} className="flex-1 overflow-auto px-4 pb-6 sm:px-6 lg:px-10">
         <form
           onSubmit={() => void handleSubmit()}
           className="mx-auto flex w-full max-w-[1024px] flex-col gap-6"

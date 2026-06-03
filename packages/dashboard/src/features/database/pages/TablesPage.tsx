@@ -8,11 +8,7 @@ import { useTables } from '#features/database/hooks/useTables';
 import { useRecords } from '#features/database/hooks/useRecords';
 import { DatabaseSidebar } from '#features/database/components/DatabaseSidebar';
 import { RecordFormDialog } from '#features/database/components/RecordFormDialog';
-import {
-  clearTableFormCreateDraft,
-  hasRestorableTableFormCreateDraft,
-  TableForm,
-} from '#features/database/components/TableForm';
+import { clearTableFormCreateDraft, TableForm } from '#features/database/components/TableForm';
 import { TablesEmptyState } from '#features/database/components/TablesEmptyState';
 import { TemplatePreview } from '#features/database/components/TemplatePreview';
 import { DATABASE_TEMPLATES, DatabaseTemplate } from '#features/database/templates';
@@ -481,23 +477,6 @@ export default function TablesPage() {
     });
     pendingCreateDraftClearSchemasRef.current.clear();
   }, [isProjectIdLoading, tableFormDraftScope]);
-
-  useEffect(() => {
-    if (showTableForm || editingTable || selectedSchemaInfo.isProtected || isProjectIdLoading) {
-      return;
-    }
-
-    if (hasRestorableTableFormCreateDraft(selectedSchema, tableFormDraftScope)) {
-      setShowTableForm(true);
-    }
-  }, [
-    editingTable,
-    isProjectIdLoading,
-    selectedSchema,
-    selectedSchemaInfo.isProtected,
-    showTableForm,
-    tableFormDraftScope,
-  ]);
 
   // Show template preview - takes full width without sidebar
   if (previewingTemplate) {
