@@ -391,6 +391,55 @@ describe('AuthConfigService', () => {
   });
 
   // --------------------------------------------------------------------------
+  // getAuthConfig cache
+  // --------------------------------------------------------------------------
+  describe('getAuthConfig — cache', () => {
+    it('caches fallback config when no row exists', async () => {
+      mockPool.query.mockResolvedValue({ rows: [] });
+
+      const service = AuthConfigService.getInstance();
+      const first = await service.getAuthConfig();
+      const second = await service.getAuthConfig();
+
+      expect(first.resetPasswordCodeExpiryMinutes).toBe(10);
+      expect(second).toBe(first);
+      expect(mockPool.query).toHaveBeenCalledTimes(1);
+      expect(logger.warn).toHaveBeenCalledWith(
+        'No auth config found, returning default fallback values'
+      );
+    });
+
+    it('caches config loaded from the database', async () => {
+      const row = {
+        id: '00000000-0000-0000-0000-000000000001',
+        requireEmailVerification: false,
+        passwordMinLength: 8,
+        requireNumber: false,
+        requireLowercase: false,
+        requireUppercase: false,
+        requireSpecialChar: false,
+        verifyEmailMethod: 'code',
+        resetPasswordMethod: 'code',
+        allowedRedirectUrls: [],
+        verifyEmailCodeExpiryMinutes: 15,
+        verifyEmailLinkExpiryMinutes: 1440,
+        resetPasswordCodeExpiryMinutes: 10,
+        resetPasswordLinkExpiryMinutes: 60,
+        disableSignup: false,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      };
+      mockPool.query.mockResolvedValue({ rows: [row] });
+
+      const service = AuthConfigService.getInstance();
+      await service.getAuthConfig();
+      await service.getAuthConfig();
+
+      expect(mockPool.query).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // --------------------------------------------------------------------------
   // Custom scheme support (deep links)
   // --------------------------------------------------------------------------
   describe('validateRedirectUrl — custom schemes', () => {
