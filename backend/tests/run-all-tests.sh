@@ -10,7 +10,30 @@
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+
+PREFLIGHT_ONLY=0
+
+for arg in "$@"; do
+    case "$arg" in
+        --preflight-only)
+            PREFLIGHT_ONLY=1
+            ;;
+        -h|--help)
+            echo "Usage: $0 [--preflight-only]"
+            echo ""
+            echo "Options:"
+            echo "  --preflight-only  Check local E2E prerequisites, then exit."
+            exit 0
+            ;;
+        *)
+            echo -e "${RED}Unknown option: $arg${NC}"
+            echo "Usage: $0 [--preflight-only]"
+            exit 1
+            ;;
+    esac
+done
 
 # Get the directory where this script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -43,13 +66,6 @@ if [ -z "$ADMIN_EMAIL" ] || [ -z "$ADMIN_PASSWORD" ]; then
     echo ""
 fi
 
-# Check if API key is set
-if [ -z "$ACCESS_API_KEY" ]; then
-    echo -e "${YELLOW}Warning: ACCESS_API_KEY not set. Some tests may fail.${NC}"
-    echo "Set with: export ACCESS_API_KEY=your_api_key"
-    echo ""
-fi
-
 # Check if running cloud tests
 if [ -z "$AWS_S3_BUCKET" ]; then
     echo -e "${YELLOW}Note: AWS_S3_BUCKET not set. Cloud/S3 tests will be skipped.${NC}"
@@ -59,6 +75,16 @@ fi
 # Export admin credentials for tests
 export TEST_ADMIN_EMAIL="$ADMIN_EMAIL"
 export TEST_ADMIN_PASSWORD="$ADMIN_PASSWORD"
+
+. "$SCRIPT_DIR/preflight.sh"
+
+if ! run_preflight; then
+    exit 1
+fi
+
+if [ "$PREFLIGHT_ONLY" -eq 1 ]; then
+    exit 0
+fi
 
 # Keep track of test results
 TOTAL_TESTS=0
