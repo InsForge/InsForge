@@ -102,7 +102,7 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
     const csrfHeader = req.headers['x-csrf-token'] as string | undefined;
     if (!tokenManager.verifyCsrfToken(csrfHeader, payload)) {
       logger.warn('[Auth:AdminRefresh] CSRF token validation failed');
-      throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
+      throw new AppError('Invalid CSRF token', 403, ERROR_CODES.FORBIDDEN);
     }
 
     const dbUser = await authService.getUserById(payload.sub);
@@ -167,7 +167,7 @@ router.post('/logout', (req: Request, res: Response, next: NextFunction) => {
         const csrfHeader = req.headers['x-csrf-token'] as string | undefined;
         if (!csrfHeader || !tokenManager.verifyCsrfToken(csrfHeader, payload)) {
           logger.warn('[Auth:AdminLogout] CSRF token validation failed');
-          throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
+          throw new AppError('Invalid CSRF token', 403, ERROR_CODES.FORBIDDEN);
         }
       }
     }
