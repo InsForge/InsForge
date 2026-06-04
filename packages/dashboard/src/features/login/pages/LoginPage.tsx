@@ -32,7 +32,7 @@ export default function LoginPage() {
   const form = useForm<LoginForm>({
     resolver: zodResolver(loginFormSchema),
     defaultValues: {
-      username: 'root',
+      username: 'admin',
       password: 'change-this-password',
     },
   });

@@ -20,7 +20,7 @@ else
     API_BASE="${TEST_API_BASE}/api"
 fi
 ADMIN_USERNAME="$TEST_ADMIN_USERNAME"
-ADMIN_SECRET="$TEST_ADMIN_PASSWORD"
+ADMIN_PASSWORD="$TEST_ADMIN_PASSWORD"
 AUTH_TOKEN=""
 
 # Dynamic table name to avoid conflicts
@@ -166,9 +166,13 @@ login_admin() {
         exit 1
     fi
     
-    local response=$(curl -s -X POST "$API_BASE/auth/admin/sessions" \
+    local payload
+    payload=$(build_admin_login_payload "$ADMIN_USERNAME" "$ADMIN_PASSWORD")
+
+    local response
+    response=$(curl -s -X POST "$API_BASE/auth/admin/sessions" \
         -H "Content-Type: application/json" \
-        -d "{\"username\":\"$ADMIN_USERNAME\",\"password\":\"$ADMIN_SECRET\"}")
+        -d "$payload")
     
     AUTH_TOKEN=$(echo "$response" | grep -o '"accessToken":"[^"]*' | cut -d'"' -f4)
     
@@ -178,10 +182,10 @@ login_admin() {
         echo ""
         echo "   Make sure you have the correct root admin credentials:"
         echo "   Username: $ADMIN_USERNAME"
-        echo "   Password: $ADMIN_SECRET"
+        echo "   Password: <hidden>"
         echo ""
         echo "   You can set these with environment variables:"
-        echo "   TEST_ADMIN_USERNAME=root TEST_ADMIN_PASSWORD=yourpassword ./test-bulk-upsert.sh"
+        echo "   TEST_ADMIN_USERNAME=admin TEST_ADMIN_PASSWORD=yourpassword ./test-bulk-upsert.sh"
         exit 1
     fi
     

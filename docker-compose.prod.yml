@@ -68,8 +68,10 @@ services:
       - API_BASE_URL=${API_BASE_URL:-}
       - JWT_SECRET=${JWT_SECRET:-dev-secret-please-change-in-production}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
-      - ROOT_ADMIN_USERNAME=${ROOT_ADMIN_USERNAME:-root}
-      - ROOT_ADMIN_PASSWORD=${ROOT_ADMIN_PASSWORD:-change-this-password}
+      - ROOT_ADMIN_USERNAME=${ROOT_ADMIN_USERNAME:-${ADMIN_EMAIL:-admin}}
+      - ROOT_ADMIN_PASSWORD=${ROOT_ADMIN_PASSWORD:-${ADMIN_PASSWORD:-change-this-password}}
+      - ADMIN_EMAIL=${ROOT_ADMIN_USERNAME:-${ADMIN_EMAIL:-admin}}
+      - ADMIN_PASSWORD=${ROOT_ADMIN_PASSWORD:-${ADMIN_PASSWORD:-change-this-password}}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
       # PostgreSQL connection

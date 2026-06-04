@@ -65,12 +65,14 @@ AUTH_TOKEN=""
 
 # Read .env file to get root admin credentials
 if [ -f "$SCRIPT_DIR/../../.env" ]; then
-    export $(grep -v '^#' "$SCRIPT_DIR/../../.env" | xargs)
+    set -a
+    source "$SCRIPT_DIR/../../.env"
+    set +a
     print_info "Loaded environment variables from .env"
 fi
 
 # Use root admin credentials from environment
-ROOT_ADMIN_USERNAME="${ROOT_ADMIN_USERNAME:-root}"
+ROOT_ADMIN_USERNAME="${ROOT_ADMIN_USERNAME:-admin}"
 ROOT_ADMIN_PASSWORD="${ROOT_ADMIN_PASSWORD:-change-this-password}"
 
 print_info "Using root admin username: $ROOT_ADMIN_USERNAME"
@@ -80,12 +82,10 @@ print_info "Using root admin username: $ROOT_ADMIN_USERNAME"
 # ========================================
 print_blue "1. Logging in as admin..."
 
+admin_login_payload=$(build_admin_login_payload "$ROOT_ADMIN_USERNAME" "$ROOT_ADMIN_PASSWORD")
 auth_response=$(curl -s -X POST "$API_BASE/auth/admin/sessions" \
     -H "Content-Type: application/json" \
-    -d "{
-        \"username\": \"$ROOT_ADMIN_USERNAME\",
-        \"password\": \"$ROOT_ADMIN_PASSWORD\"
-    }")
+    -d "$admin_login_payload")
 
 # Check if login was successful
 if echo "$auth_response" | grep -q '"accessToken"'; then

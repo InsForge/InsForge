@@ -641,10 +641,16 @@ paths:
               schema:
                 oneOf:
                   - type: object
+                    required:
+                      - user
+                    additionalProperties: false
                     properties:
                       user:
                         $ref: '#/components/schemas/UserResponse'
                   - type: object
+                    required:
+                      - projectAdmin
+                    additionalProperties: false
                     properties:
                       projectAdmin:
                         $ref: '#/components/schemas/ProjectAdminResponse'
@@ -669,7 +675,7 @@ paths:
               properties:
                 username:
                   type: string
-                  example: root
+                  example: admin
                 password:
                   type: string
       responses:
@@ -1862,13 +1868,16 @@ components:
   schemas:
     ProjectAdminResponse:
       type: object
+      required:
+        - subject
+        - username
       properties:
         subject:
           type: string
-          example: local:root
+          example: local:admin
         username:
           type: string
-          example: root
+          example: admin
 
     UserResponse:
       type: object

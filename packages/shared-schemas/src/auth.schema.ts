@@ -23,9 +23,9 @@ export const nameSchema = z
 
 export const projectAdminUsernameSchema = z
   .string()
+  .trim()
   .min(1, 'Username is required')
-  .max(100, 'Username must be less than 100 characters')
-  .trim();
+  .max(100, 'Username must be at most 100 characters');
 
 export const projectAdminSubjectSchema = z
   .string()

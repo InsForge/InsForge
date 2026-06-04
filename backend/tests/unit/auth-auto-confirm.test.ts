@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Set required env vars before any imports
-process.env.ROOT_ADMIN_USERNAME = 'root';
+process.env.ROOT_ADMIN_USERNAME = 'admin';
 process.env.ROOT_ADMIN_PASSWORD = 'admin-password';
 
 const { mockPool, mockClient } = vi.hoisted(() => ({
@@ -151,7 +151,8 @@ describe('AuthService.register – autoConfirm', () => {
       email_verified: false,
       created_at: new Date(),
       updated_at: new Date(),
-      auth_metadata: null,
+      metadata: null,
+      is_anonymous: false,
     });
   });
 

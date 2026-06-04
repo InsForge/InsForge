@@ -17,7 +17,7 @@ Run the Better Auth test:
 
 - Docker must be running with the InsForge backend on port 7130
 - Root admin credentials should be configured in environment variables:
-  - `ROOT_ADMIN_USERNAME` (default: root)
+  - `ROOT_ADMIN_USERNAME` (default: admin)
   - `ROOT_ADMIN_PASSWORD` (default: change-this-password)
 
 ### Example Commands
@@ -30,7 +30,7 @@ cd backend
 ./tests/manual/test-better-auth.sh
 
 # Run with custom root admin credentials
-ROOT_ADMIN_USERNAME=root ROOT_ADMIN_PASSWORD=mysecurepass ./tests/manual/test-better-auth.sh
+ROOT_ADMIN_USERNAME=admin ROOT_ADMIN_PASSWORD=mysecurepass ./tests/manual/test-better-auth.sh
 ```
 
 ### Test Coverage

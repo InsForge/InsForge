@@ -85,7 +85,7 @@ router.post('/sessions', (req: Request, res: Response, next: NextFunction) => {
 
 // POST /api/auth/admin/refresh - Refresh admin dashboard access token
 // Uses a dashboard-specific httpOnly cookie + X-CSRF-Token header.
-router.post('/refresh', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/refresh', (req: Request, res: Response, next: NextFunction) => {
   try {
     const tokenManager = TokenManager.getInstance();
     const refreshToken = req.cookies?.[ADMIN_REFRESH_TOKEN_COOKIE_NAME];

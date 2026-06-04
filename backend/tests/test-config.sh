@@ -7,7 +7,7 @@
 export TEST_API_BASE="${TEST_API_BASE:-http://localhost:7130/api}"
 
 # Root admin credentials - can be overridden by environment variables
-export TEST_ADMIN_USERNAME="${TEST_ADMIN_USERNAME:-${ROOT_ADMIN_USERNAME:-root}}"
+export TEST_ADMIN_USERNAME="${TEST_ADMIN_USERNAME:-${ROOT_ADMIN_USERNAME:-admin}}"
 export TEST_ADMIN_PASSWORD="${TEST_ADMIN_PASSWORD:-${ROOT_ADMIN_PASSWORD:-change-this-password}}"
 
 # User test credentials
@@ -38,12 +38,28 @@ print_blue() {
     echo -e "${BLUE}$1${NC}"
 }
 
+# Build admin login JSON without trusting shell string interpolation.
+build_admin_login_payload() {
+    if command -v jq &> /dev/null; then
+        jq -cn \
+            --arg username "$1" \
+            --arg password "$2" \
+            '{username: $username, password: $password}'
+    else
+        node -e 'process.stdout.write(JSON.stringify({ username: process.argv[1] ?? "", password: process.argv[2] ?? "" }))' "$1" "$2"
+    fi
+}
+
 # Function to login as admin and get token
 get_admin_token() {
     # Use JWT admin endpoint
-    local response=$(curl -s -X POST "$TEST_API_BASE/auth/admin/sessions" \
+    local payload
+    payload=$(build_admin_login_payload "$TEST_ADMIN_USERNAME" "$TEST_ADMIN_PASSWORD")
+
+    local response
+    response=$(curl -s -X POST "$TEST_API_BASE/auth/admin/sessions" \
         -H "Content-Type: application/json" \
-        -d "{\"username\":\"$TEST_ADMIN_USERNAME\",\"password\":\"$TEST_ADMIN_PASSWORD\"}")
+        -d "$payload")
     
     if echo "$response" | grep -q '"accessToken"'; then
             echo "$response" | grep -o '"accessToken":"[^"]*"' | cut -d'"' -f4

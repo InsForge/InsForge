@@ -87,7 +87,7 @@ describe('withUserContext', () => {
     await withUserContext(
       pool,
       {
-        subject: 'local:root',
+        subject: 'local:admin',
         role: 'project_admin',
       },
       async () => {}

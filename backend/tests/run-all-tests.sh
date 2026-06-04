@@ -37,8 +37,8 @@ export TEST_API_BASE="${TEST_API_BASE:-http://localhost:7130/api}"
 # Check if root admin credentials are set
 if [ -z "$ROOT_ADMIN_USERNAME" ] || [ -z "$ROOT_ADMIN_PASSWORD" ]; then
     echo -e "${YELLOW}Warning: Root admin credentials not set. Using defaults.${NC}"
-    echo "Set with: export ROOT_ADMIN_USERNAME=root ROOT_ADMIN_PASSWORD=your_password"
-    export ROOT_ADMIN_USERNAME="${ROOT_ADMIN_USERNAME:-root}"
+    echo "Set with: export ROOT_ADMIN_USERNAME=admin ROOT_ADMIN_PASSWORD=your_password"
+    export ROOT_ADMIN_USERNAME="${ROOT_ADMIN_USERNAME:-admin}"
     export ROOT_ADMIN_PASSWORD="${ROOT_ADMIN_PASSWORD:-change-this-password}"
     echo ""
 fi

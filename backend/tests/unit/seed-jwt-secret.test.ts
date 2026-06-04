@@ -89,7 +89,7 @@ describe('seedBackend secret initialization', () => {
     vi.clearAllMocks();
     mockClientQuery.mockResolvedValue({ rows: [] });
     mockGetUserTables.mockResolvedValue([]);
-    process.env.ROOT_ADMIN_USERNAME = 'root';
+    process.env.ROOT_ADMIN_USERNAME = 'admin';
     process.env.ROOT_ADMIN_PASSWORD = 'change-this-password';
     process.env.JWT_SECRET = 'jwt-secret';
   });

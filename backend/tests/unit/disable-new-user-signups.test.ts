@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Required env vars before any imports
-process.env.ROOT_ADMIN_USERNAME = 'root';
+process.env.ROOT_ADMIN_USERNAME = 'admin';
 process.env.ROOT_ADMIN_PASSWORD = 'admin-password';
 
 const { mockPool, mockClient } = vi.hoisted(() => ({
@@ -139,7 +139,8 @@ const FAKE_DB_USER = {
   email_verified: true,
   created_at: new Date(),
   updated_at: new Date(),
-  auth_metadata: null,
+  metadata: null,
+  is_anonymous: false,
 };
 
 describe('AuthService.findOrCreateThirdPartyUser – disableSignup gate', () => {

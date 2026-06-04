@@ -104,7 +104,7 @@ This guide provides comprehensive, step-by-step instructions for deploying, mana
     ```ini
     # Required
     JWT_SECRET=your-secret-key-here-must-be-32-char-or-above
-    ROOT_ADMIN_USERNAME=root
+    ROOT_ADMIN_USERNAME=admin
     ROOT_ADMIN_PASSWORD=change-this-password
     POSTGRES_PASSWORD=change-this-password
 

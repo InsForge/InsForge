@@ -1,7 +1,6 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { Pool } from 'pg';
-import type { JWTPayload } from 'jose';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import logger from '@/utils/logger.js';
@@ -117,19 +116,6 @@ export class AuthService {
 
   private createCloudAdminSubject(cloudSubject: string): string {
     return `cloud:${cloudSubject}`;
-  }
-
-  private getStringClaim(payload: JWTPayload, keys: string[]): string | undefined {
-    for (const key of keys) {
-      const value = payload[key];
-      if (typeof value === 'string' && value.trim()) {
-        return value.trim();
-      }
-      if (typeof value === 'number' && Number.isFinite(value)) {
-        return String(value);
-      }
-    }
-    return undefined;
   }
 
   private projectAdminFromSubject(subject: string, username?: string): ProjectAdminSchema | null {
@@ -735,14 +721,19 @@ export class AuthService {
   async adminLoginWithAuthorizationCode(code: string): Promise<CreateAdminSessionResponse> {
     try {
       // Use TokenManager to verify cloud token
-      const { payload, projectId } = await this.tokenManager.verifyCloudToken(code);
+      const { payload } = await this.tokenManager.verifyCloudToken(code);
 
-      // If verification succeeds, extract user info and generate internal token
-      const cloudSubject =
-        this.getStringClaim(payload, ['userId', 'user_id', 'sub', 'actorId', 'actor_id']) ??
-        projectId;
-      const username = this.getStringClaim(payload, ['email', 'username', 'name']) ?? cloudSubject;
-      const subject = this.createCloudAdminSubject(cloudSubject);
+      // insforge-cloud-backend signs project authorization codes with this exact shape.
+      if (payload.type !== 'project_authorization' || typeof payload.userId !== 'string') {
+        throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+      }
+
+      const username = payload.userId.trim();
+      if (!username) {
+        throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+      }
+
+      const subject = this.createCloudAdminSubject(username);
       const projectAdmin: ProjectAdminSchema = {
         subject,
         username,

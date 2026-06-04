@@ -63,7 +63,7 @@ Edit `~/insforge/deploy/docker-compose/.env` inside the box. At minimum set:
 JWT_SECRET=<32+ char random string — `openssl rand -base64 32`>
 ENCRYPTION_KEY=<24+ char random string — `openssl rand -base64 24`>
 POSTGRES_PASSWORD=<strong password>
-ROOT_ADMIN_USERNAME=root
+ROOT_ADMIN_USERNAME=admin
 ROOT_ADMIN_PASSWORD=<change this>
 
 API_BASE_URL=https://<your-subdomain>

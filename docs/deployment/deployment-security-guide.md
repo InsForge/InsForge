@@ -226,7 +226,7 @@ These **must** be changed from defaults before going to production:
 # ── Security (CRITICAL — generate unique values) ──────────────
 JWT_SECRET=<output of: openssl rand -base64 32>
 ENCRYPTION_KEY=<output of: openssl rand -base64 24>
-ROOT_ADMIN_USERNAME=root
+ROOT_ADMIN_USERNAME=admin
 ROOT_ADMIN_PASSWORD=<strong-unique-password>
 
 # ── Public URL (must match your domain/IP) ────────────────────

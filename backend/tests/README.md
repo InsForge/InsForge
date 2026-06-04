@@ -17,7 +17,7 @@ Set these before running tests:
 export ACCESS_API_KEY="your_api_key_here"
 
 # Optional - defaults shown
-export ROOT_ADMIN_USERNAME="root"
+export ROOT_ADMIN_USERNAME="admin"
 export ROOT_ADMIN_PASSWORD="change-this-password"
 export TEST_API_BASE="http://localhost:7130/api"
 

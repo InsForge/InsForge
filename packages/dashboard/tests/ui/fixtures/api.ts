@@ -1,8 +1,8 @@
 import type { Page, Route } from '@playwright/test';
 
 const projectAdmin = {
-  subject: 'local:root',
-  username: 'root',
+  subject: 'local:admin',
+  username: 'admin',
 };
 
 const selfHostingMetadata = {

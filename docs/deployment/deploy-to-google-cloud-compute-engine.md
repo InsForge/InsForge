@@ -172,7 +172,7 @@ At a minimum, set these values:
 JWT_SECRET=your-secret-key-here-must-be-32-char-or-above
 
 # Admin account (used for initial setup)
-ROOT_ADMIN_USERNAME=root
+ROOT_ADMIN_USERNAME=admin
 ROOT_ADMIN_PASSWORD=change-this-password
 
 # Database (required)

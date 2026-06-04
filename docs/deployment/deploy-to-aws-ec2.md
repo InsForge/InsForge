@@ -129,7 +129,7 @@ The full template lives at `deploy/docker-compose/.env.example`. These are the v
 ```env
 # Required
 JWT_SECRET=your-secret-key-here-must-be-32-char-or-above
-ROOT_ADMIN_USERNAME=root
+ROOT_ADMIN_USERNAME=admin
 ROOT_ADMIN_PASSWORD=change-this-password
 POSTGRES_PASSWORD=change-this-password
 
