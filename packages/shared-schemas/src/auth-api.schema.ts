@@ -6,7 +6,6 @@ import {
   projectAdminUsernameSchema,
   userIdSchema,
   userSchema,
-  projectAdminSchema,
   profileSchema,
   oAuthConfigSchema,
   oAuthProvidersSchema,
@@ -215,7 +214,7 @@ export const resetPasswordResponseSchema = z.object({
  * Response for POST /api/auth/admin/sessions
  */
 export const createAdminSessionResponseSchema = z.object({
-  projectAdmin: projectAdminSchema,
+  sub: z.string().min(1),
   accessToken: z.string(),
   csrfToken: z.string().nullable().optional(),
   refreshToken: z.string().optional(),
@@ -229,7 +228,7 @@ export const getCurrentSessionResponseSchema = z.union([
     user: userSchema,
   }),
   z.object({
-    projectAdmin: projectAdminSchema,
+    sub: z.string().min(1),
   }),
 ]);
 

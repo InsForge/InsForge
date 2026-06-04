@@ -50,14 +50,6 @@ function setRequestUser(
   req: AuthRequest,
   payload: { sub: string; email?: string; role: RoleSchema }
 ) {
-  if (payload.role === 'project_admin') {
-    req.user = {
-      id: payload.sub,
-      role: payload.role,
-    };
-    return;
-  }
-
   req.user = {
     id: payload.sub,
     email: payload.email,

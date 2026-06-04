@@ -1,8 +1,6 @@
 import { apiClient } from '#lib/api/client';
-import type { ProjectAdminSchema } from '@insforge/shared-schemas';
-
 interface LoginResult {
-  projectAdmin: ProjectAdminSchema;
+  sub: string;
   accessToken: string;
   csrfToken?: string;
 }
@@ -15,7 +13,7 @@ export class LoginService {
       skipRefresh: true,
     });
 
-    if (!response.projectAdmin || !response.accessToken) {
+    if (!response.sub || !response.accessToken) {
       throw new Error('Invalid login response');
     }
 
@@ -27,7 +25,7 @@ export class LoginService {
     }
 
     return {
-      projectAdmin: response.projectAdmin,
+      sub: response.sub,
       accessToken: response.accessToken,
       csrfToken: response.csrfToken ?? undefined,
     };
@@ -40,7 +38,7 @@ export class LoginService {
       skipRefresh: true,
     });
 
-    if (!response.projectAdmin || !response.accessToken) {
+    if (!response.sub || !response.accessToken) {
       throw new Error('Invalid authorization code exchange response');
     }
 
@@ -52,7 +50,7 @@ export class LoginService {
     }
 
     return {
-      projectAdmin: response.projectAdmin,
+      sub: response.sub,
       accessToken: response.accessToken,
       csrfToken: response.csrfToken ?? undefined,
     };
@@ -70,10 +68,10 @@ export class LoginService {
     apiClient.clearTokens();
   }
 
-  async getCurrentUser(): Promise<ProjectAdminSchema | null> {
+  async getCurrentUser(): Promise<string | null> {
     try {
       const response = await apiClient.request('/auth/sessions/current');
-      return response.projectAdmin ?? null;
+      return response.sub ?? null;
     } catch {
       return null;
     }

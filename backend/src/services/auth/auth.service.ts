@@ -42,7 +42,6 @@ import {
   type CreateUserResponse,
   type GetPublicAuthConfigResponse,
   type OAuthProvidersSchema,
-  type ProjectAdminSchema,
   type ResetPasswordResponse,
   type UserSchema,
   type VerifyEmailResponse,
@@ -108,41 +107,6 @@ export class AuthService {
       this.pool = dbManager.getPool();
     }
     return this.pool;
-  }
-
-  private createLocalAdminSubject(username: string): string {
-    return `local:${username}`;
-  }
-
-  private createCloudAdminSubject(cloudSubject: string): string {
-    return `cloud:${cloudSubject}`;
-  }
-
-  private projectAdminFromSubject(subject: string, username?: string): ProjectAdminSchema | null {
-    const localSubject = this.createLocalAdminSubject(this.adminUsername);
-    if (subject.startsWith('local:')) {
-      if (subject !== localSubject) {
-        return null;
-      }
-      return {
-        subject,
-        username: this.adminUsername,
-      };
-    }
-
-    if (subject.startsWith('cloud:')) {
-      const fallbackUsername = subject.slice('cloud:'.length);
-      return {
-        subject,
-        username: username?.trim() || fallbackUsername,
-      };
-    }
-
-    return null;
-  }
-
-  getProjectAdminFromSubject(subject: string, username?: string): ProjectAdminSchema | null {
-    return this.projectAdminFromSubject(subject, username);
   }
 
   /**
@@ -697,20 +661,14 @@ export class AuthService {
       throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
-    const subject = this.createLocalAdminSubject(username);
-    const projectAdmin: ProjectAdminSchema = {
-      subject,
-      username,
-    };
-
-    // Return project admin session with JWT token (24h expiration) - no database interaction
+    const sub = `local:${username}`;
     const accessToken = this.tokenManager.generateAccessToken({
-      sub: subject,
+      sub,
       role: 'project_admin',
     });
 
     return {
-      projectAdmin,
+      sub,
       accessToken,
     };
   }
@@ -719,40 +677,17 @@ export class AuthService {
    * Admin login with authorization token (validates JWT from external issuer)
    */
   async adminLoginWithAuthorizationCode(code: string): Promise<CreateAdminSessionResponse> {
-    try {
-      // Use TokenManager to verify cloud token
-      const { payload } = await this.tokenManager.verifyCloudToken(code);
+    const { payload } = await this.tokenManager.verifyCloudToken(code);
+    const sub = `cloud:${payload.userId}`;
+    const accessToken = this.tokenManager.generateAccessToken({
+      sub,
+      role: 'project_admin',
+    });
 
-      // insforge-cloud-backend signs project authorization codes with this exact shape.
-      if (payload.type !== 'project_authorization' || typeof payload.userId !== 'string') {
-        throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
-      }
-
-      const username = payload.userId.trim();
-      if (!username) {
-        throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
-      }
-
-      const subject = this.createCloudAdminSubject(username);
-      const projectAdmin: ProjectAdminSchema = {
-        subject,
-        username,
-      };
-
-      // Generate internal access token (24h expiration)
-      const accessToken = this.tokenManager.generateAccessToken({
-        sub: subject,
-        role: 'project_admin',
-      });
-
-      return {
-        projectAdmin,
-        accessToken,
-      };
-    } catch (error) {
-      logger.error('Admin token verification failed:', error);
-      throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
-    }
+    return {
+      sub,
+      accessToken,
+    };
   }
 
   /**

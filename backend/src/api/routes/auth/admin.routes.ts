@@ -38,7 +38,7 @@ router.post('/sessions/exchange', async (req: Request, res: Response, next: Next
     // Set refresh token as httpOnly cookie + CSRF token for web clients
     const tokenManager = TokenManager.getInstance();
     const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
-      result.projectAdmin.subject,
+      result.sub,
       'admin'
     );
     setAdminRefreshTokenCookie(res, refreshToken);
@@ -72,7 +72,7 @@ router.post('/sessions', (req: Request, res: Response, next: NextFunction) => {
     // Set refresh token as httpOnly cookie + CSRF token for web clients
     const tokenManager = TokenManager.getInstance();
     const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
-      result.projectAdmin.subject,
+      result.sub,
       'admin'
     );
     setAdminRefreshTokenCookie(res, refreshToken);
@@ -105,26 +105,17 @@ router.post('/refresh', (req: Request, res: Response, next: NextFunction) => {
       throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
-    const projectAdmin = authService.getProjectAdminFromSubject(payload.sub);
-    if (!projectAdmin) {
-      logger.warn('[Auth:AdminRefresh] Project admin not found for valid refresh token', {
-        subject: payload.sub,
-      });
-      clearAdminRefreshTokenCookie(res);
-      throw new AppError('Project admin not found', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
-    }
-
     const newAccessToken = tokenManager.generateAccessToken({
-      sub: projectAdmin.subject,
+      sub: payload.sub,
       role: 'project_admin',
     });
     const { refreshToken: newRefreshToken, csrfToken: newCsrfToken } =
-      tokenManager.generateRefreshTokenWithCsrf(projectAdmin.subject, 'admin', payload.csrfNonce);
+      tokenManager.generateRefreshTokenWithCsrf(payload.sub, 'admin', payload.csrfNonce);
     setAdminRefreshTokenCookie(res, newRefreshToken);
 
     successResponse(res, {
       accessToken: newAccessToken,
-      projectAdmin,
+      sub: payload.sub,
       csrfToken: newCsrfToken,
     });
   } catch (error) {

@@ -652,13 +652,8 @@ router.get(
           throw new AppError('User not authenticated', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
         }
 
-        const projectAdmin = authService.getProjectAdminFromSubject(req.user.id);
-        if (!projectAdmin) {
-          throw new AppError('User not found', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
-        }
-
         const response: GetCurrentSessionResponse = {
-          projectAdmin,
+          sub: req.user.id,
         };
 
         successResponse(res, response);

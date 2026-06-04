@@ -27,12 +27,6 @@ export const projectAdminUsernameSchema = z
   .min(1, 'Username is required')
   .max(100, 'Username must be at most 100 characters');
 
-export const projectAdminSubjectSchema = z
-  .string()
-  .min(1, 'Subject is required')
-  .max(255, 'Subject must be less than 255 characters')
-  .trim();
-
 export const roleSchema = z.enum(['anon', 'authenticated', 'project_admin']);
 
 export const verificationMethodSchema = z.enum(['code', 'link']);
@@ -65,14 +59,6 @@ export const userSchema = z.object({
   updatedAt: z.string(), // PostgreSQL timestamp
   profile: profileSchema.nullable(), // User profile data (name, avatar_url, bio, etc.)
   metadata: z.record(z.unknown()).nullable(), // System metadata (device ID, login IP, etc.)
-});
-
-/**
- * Project admin schema - represents an admin session, not an auth.users row.
- */
-export const projectAdminSchema = z.object({
-  subject: projectAdminSubjectSchema,
-  username: projectAdminUsernameSchema,
 });
 
 /**
@@ -197,12 +183,10 @@ export type UserIdSchema = z.infer<typeof userIdSchema>;
 export type EmailSchema = z.infer<typeof emailSchema>;
 export type PasswordSchema = z.infer<typeof passwordSchema>;
 export type ProjectAdminUsernameSchema = z.infer<typeof projectAdminUsernameSchema>;
-export type ProjectAdminSubjectSchema = z.infer<typeof projectAdminSubjectSchema>;
 export type RoleSchema = z.infer<typeof roleSchema>;
 export type VerificationMethodSchema = z.infer<typeof verificationMethodSchema>;
 export type ProfileSchema = z.infer<typeof profileSchema>;
 export type UserSchema = z.infer<typeof userSchema>;
-export type ProjectAdminSchema = z.infer<typeof projectAdminSchema>;
 export type TokenPayloadSchema = z.infer<typeof tokenPayloadSchema>;
 export type OAuthConfigSchema = z.infer<typeof oAuthConfigSchema>;
 export type OAuthProvidersSchema = z.infer<typeof oAuthProvidersSchema>;

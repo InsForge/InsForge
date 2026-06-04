@@ -23,13 +23,14 @@ import InsForgeLogoDark from '#assets/logos/insforge_dark.svg';
 
 export default function AppHeader() {
   const { resolvedTheme } = useTheme();
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const openConnectDialog = useOpenConnectDialog();
   const dashboardVariant = getFeatureFlag('dashboard-v4-experiment');
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const isDTest = dashboardVariant === 'd_test';
   const isConnectDisabled = isDTest && pathname === '/dashboard/install';
+  const adminLabel = 'Administrator';
 
   const handleConnectClick = () => {
     if (isDTest) {
@@ -149,21 +150,16 @@ export default function AppHeader() {
               <button className="w-50 flex items-center gap-3 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[8px] pr-3 transition-all duration-200 group">
                 <Avatar className="h-8 w-8 ring-2 ring-white dark:ring-gray-700 shadow-sm">
                   <AvatarFallback
-                    className={cn(
-                      'text-white font-medium text-sm',
-                      getAvatarColor(user?.username ?? '')
-                    )}
+                    className={cn('text-white font-medium text-sm', getAvatarColor(adminLabel))}
                   >
-                    {getUserInitials(user?.username ?? '')}
+                    {getUserInitials(adminLabel)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="text-left hidden md:block">
                   <p className="text-sm font-medium text-zinc-950 dark:text-zinc-100 leading-tight">
                     Admin
                   </p>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    {user?.username || 'Administrator'}
-                  </p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">{adminLabel}</p>
                 </div>
                 <ChevronDown className="h-5 w-5 text-black dark:text-white hidden md:block ml-auto" />
               </button>
