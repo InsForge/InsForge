@@ -90,7 +90,7 @@ router.post(
       successResponse(res, service, 201);
 
       bestEffortAudit({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'CREATE_COMPUTE_SERVICE',
         module: 'COMPUTE',
         details: { serviceName: validation.data.name, projectId },
@@ -127,7 +127,7 @@ router.post(
       successResponse(res, service, 201);
 
       bestEffortAudit({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'PREPARE_COMPUTE_DEPLOY',
         module: 'COMPUTE',
         details: { serviceName: validation.data.name, projectId },
@@ -209,7 +209,7 @@ router.patch(
       }
 
       bestEffortAudit({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'UPDATE_COMPUTE_SERVICE',
         module: 'COMPUTE',
         details: auditDetails,
@@ -245,7 +245,7 @@ router.delete(
       successResponse(res, { message: 'Service deleted' });
 
       bestEffortAudit({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'DELETE_COMPUTE_SERVICE',
         module: 'COMPUTE',
         details: {
@@ -281,7 +281,7 @@ router.post(
       successResponse(res, service);
 
       bestEffortAudit({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'STOP_COMPUTE_SERVICE',
         module: 'COMPUTE',
         details: { serviceId: req.params.id, serviceName: existing.name },
@@ -313,7 +313,7 @@ router.post(
       successResponse(res, service);
 
       bestEffortAudit({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'START_COMPUTE_SERVICE',
         module: 'COMPUTE',
         details: { serviceId: req.params.id, serviceName: existing.name },

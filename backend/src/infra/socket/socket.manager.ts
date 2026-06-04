@@ -81,8 +81,7 @@ export class SocketManager {
           const isValid = await secretService.verifyApiKey(apiKey);
           if (isValid) {
             socket.data.user = {
-              subject: 'api-key',
-              email: 'api-key@client',
+              id: 'api-key',
               role: 'project_admin',
             };
             socket.data.presenceType = 'anonymous';
@@ -120,8 +119,7 @@ export class SocketManager {
         socket.data.user =
           payload.role === 'project_admin'
             ? {
-                subject: payload.sub,
-                email: payload.email ?? payload.sub,
+                id: payload.sub,
                 role: payload.role,
               }
             : {

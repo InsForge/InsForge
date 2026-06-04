@@ -6,8 +6,7 @@ import { NEXT_ACTIONS } from '../../utils/next-actions.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 
 export type UserContext = {
-  id?: string;
-  subject?: string;
+  id: string;
   email?: string;
   role: RoleSchema;
 };
@@ -53,9 +52,7 @@ function setRequestUser(
 ) {
   if (payload.role === 'project_admin') {
     req.user = {
-      subject: payload.sub,
-      // Existing audit/log call sites read req.user.email as their actor label.
-      email: payload.email ?? payload.sub,
+      id: payload.sub,
       role: payload.role,
     };
     return;

@@ -317,7 +317,7 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
     const config: GetAuthConfigResponse = await authConfigService.updateAuthConfig(input);
 
     await auditService.log({
-      actor: req.user?.email || 'api-key',
+      actor: req.hasApiKey ? 'api-key' : req.user?.id,
       action: 'UPDATE_AUTH_CONFIG',
       module: 'AUTH',
       details: {
@@ -648,11 +648,11 @@ router.get(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       if (req.user?.role === 'project_admin') {
-        if (!req.user.subject) {
+        if (!req.user.id) {
           throw new AppError('User not authenticated', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
         }
 
-        const projectAdmin = authService.getProjectAdminFromSubject(req.user.subject);
+        const projectAdmin = authService.getProjectAdminFromSubject(req.user.id);
         if (!projectAdmin) {
           throw new AppError('User not found', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
         }
@@ -763,7 +763,7 @@ router.delete(
 
       // Log audit for user deletion
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'DELETE_USERS',
         module: 'AUTH',
         details: {
@@ -1088,7 +1088,7 @@ router.put(
       const config = await smtpConfigService.upsertSmtpConfig(input);
 
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'UPDATE_SMTP_CONFIG',
         module: 'EMAIL',
         details: {
@@ -1150,7 +1150,7 @@ router.put(
       );
 
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'UPDATE_EMAIL_TEMPLATE',
         module: 'EMAIL',
         details: {

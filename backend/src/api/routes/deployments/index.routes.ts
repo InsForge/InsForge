@@ -39,7 +39,7 @@ router.post(
 
       // Log audit
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'CREATE_DEPLOYMENT',
         module: 'DEPLOYMENTS',
         details: { id: response.id },
@@ -75,7 +75,7 @@ router.post(
       const response = await deploymentService.createDirectDeployment(validationResult.data);
 
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'CREATE_DIRECT_DEPLOYMENT',
         module: 'DEPLOYMENTS',
         details: { id: response.id, fileCount: response.files.length },
@@ -174,7 +174,7 @@ router.post(
 
       // Log audit
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'START_DEPLOYMENT',
         module: 'DEPLOYMENTS',
         details: {
@@ -250,7 +250,7 @@ router.put(
 
       // Log audit
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'UPDATE_DEPLOYMENT_SLUG',
         module: 'DEPLOYMENTS',
         details: { slug: result.slug, domain: result.domain },
@@ -307,7 +307,7 @@ router.post(
       const domain = await deploymentService.addCustomDomain(validationResult.data.domain);
 
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'ADD_CUSTOM_DOMAIN',
         module: 'DEPLOYMENTS',
         details: { domain: domain.domain },
@@ -371,7 +371,7 @@ router.delete(
       await deploymentService.removeCustomDomain(domain);
 
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'REMOVE_CUSTOM_DOMAIN',
         module: 'DEPLOYMENTS',
         details: { domain },
@@ -449,7 +449,7 @@ router.post(
 
       // Log audit
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'CANCEL_DEPLOYMENT',
         module: 'DEPLOYMENTS',
         details: { id },
