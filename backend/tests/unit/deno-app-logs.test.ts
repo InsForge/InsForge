@@ -332,6 +332,39 @@ describe('LogService.getLogsBySource with Deno Subhosting', () => {
     expect(calledUrl).toContain('order=desc');
   });
 
+  it('does not send a level filter so all severities are returned', async () => {
+    // Deno's `level` param is an exact-match filter, not a min-severity threshold.
+    // Hardcoding level=debug previously dropped all info/warning/error logs, so we
+    // must omit it entirely to surface the full runtime log stream.
+    mockPool.query.mockResolvedValue({
+      rows: [{ id: 'deploy-latest' }],
+    });
+
+    const mockLogs = [
+      {
+        time: '2025-01-15T10:00:00Z',
+        level: 'debug',
+        message: 'isolate start time',
+        region: 'us-east1',
+      },
+      {
+        time: '2025-01-15T10:00:01Z',
+        level: 'info',
+        message: 'request handled',
+        region: 'us-east1',
+      },
+      { time: '2025-01-15T10:00:02Z', level: 'error', message: 'boom', region: 'us-east1' },
+    ];
+    mockFetch.mockResolvedValue(createMockResponse(mockLogs));
+
+    const result = await logService.getLogsBySource('function.logs', 100);
+
+    const calledUrl = mockFetch.mock.calls[0][0] as string;
+    expect(calledUrl).not.toContain('level=');
+    // All severities flow through, not just debug
+    expect(result.logs.map((l) => l.body.level)).toEqual(['debug', 'info', 'error']);
+  });
+
   it('generates unique log IDs from deployment ID and timestamp', async () => {
     mockPool.query.mockResolvedValue({
       rows: [{ id: 'deploy-abc' }],
