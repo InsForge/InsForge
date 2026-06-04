@@ -128,7 +128,9 @@ export class LogService {
         limit,
         until: beforeTimestamp,
         order: 'desc',
-        level: 'debug',
+        // Deno's `level` param is an exact-match filter (comma-separated), not a
+        // minimum-severity threshold. Omitting it returns all levels (error, warning,
+        // info, debug); passing `debug` would return ONLY debug-level entries.
       });
 
       const logs: LogSchema[] = result.logs.map((entry, index) => ({
