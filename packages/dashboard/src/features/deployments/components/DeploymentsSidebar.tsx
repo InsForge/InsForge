@@ -24,5 +24,5 @@ const DEPLOYMENTS_SIDEBAR_ITEMS: FeatureSidebarListItem[] = [
 ];
 
 export function DeploymentsSidebar() {
-  return <FeatureSidebar title="Deployments" items={DEPLOYMENTS_SIDEBAR_ITEMS} />;
+  return <FeatureSidebar title="Sites" items={DEPLOYMENTS_SIDEBAR_ITEMS} />;
 }

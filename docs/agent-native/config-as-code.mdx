@@ -1,11 +1,11 @@
 ---
 title: Config as code
-description: Manage InsForge auth, SMTP, and deployment settings declaratively from a single insforge.toml using the CLI's plan, apply, and export workflow.
+description: Manage InsForge auth, SMTP, storage, retention, and deployment settings declaratively from a single insforge.toml using the CLI's plan, apply, and export workflow.
 ---
 
 ## Overview
 
-`insforge.toml` is a declarative, version-controlled snapshot of a subset of your project's config: auth policy, allowed redirect URLs, password rules, SMTP, and the deployment subdomain. The CLI provides three commands that work against this file:
+`insforge.toml` is a declarative, version-controlled snapshot of a subset of your project's config: auth policy, allowed redirect URLs, password rules, SMTP, storage upload size, realtime and schedule retention, and the deployment subdomain. The CLI provides three commands that work against this file:
 
 - **`config plan`**: diff `insforge.toml` against the linked project. Shows what would change.
 - **`config apply`**: push the diff to the live project. Per-change capability gating, env-resolved secrets, dry-run mode.
@@ -82,18 +82,24 @@ The file mirrors a curated subset of project config, the parts that are useful t
 
 | Section | Keys |
 |---------|------|
-| `[auth]` | `allowed_redirect_urls`, `require_email_verification`, `verify_email_method`, `reset_password_method` |
-| `[auth.password]` | `min_length`, `max_length`, `require_uppercase`, `require_lowercase`, `require_number`, `require_special` |
+| `[auth]` | `allowed_redirect_urls`, `require_email_verification`, `verify_email_method`, `reset_password_method`, `disable_signup` |
+| `[auth.password]` | `min_length`, `require_number`, `require_lowercase`, `require_uppercase`, `require_special_char` |
 | `[auth.smtp]` | `enabled`, `host`, `port`, `username`, `password`, `sender_email`, `sender_name`, `min_interval_seconds` |
+| `[storage]` | `max_file_size_mb` |
+| `[realtime]` | `retention_days` |
+| `[schedules]` | `retention_days` |
 | `[deployments]` | `subdomain` |
 
-A minimal example:
+Because TOML has no `null` literal, use `retention_days = 0` to disable retention cleanup for realtime messages or schedule execution logs; `config apply` sends `null` to the backend for that value. Email templates, OAuth provider app credentials, buckets, realtime channels, functions, deployment environment variables, and secrets are not managed through this file.
+
+A complete example:
 
 ```toml
 [auth]
 require_email_verification = true
 verify_email_method = "code"
 reset_password_method = "code"
+disable_signup = false
 allowed_redirect_urls = [
   "https://app.example.com/auth/callback",
   "http://localhost:3000/auth/callback",
@@ -101,8 +107,10 @@ allowed_redirect_urls = [
 
 [auth.password]
 min_length = 12
-require_uppercase = true
 require_number = true
+require_lowercase = true
+require_uppercase = true
+require_special_char = false
 
 [auth.smtp]
 enabled = true
@@ -112,6 +120,15 @@ username = "apikey"
 password = "env(SENDGRID_API_KEY)"
 sender_email = "noreply@example.com"
 sender_name = "Acme"
+
+[storage]
+max_file_size_mb = 100
+
+[realtime]
+retention_days = 7
+
+[schedules]
+retention_days = 0
 
 [deployments]
 subdomain = "acme-prod"
@@ -125,7 +142,7 @@ npx @insforge/cli config plan --file ./config/insforge.toml
 npx @insforge/cli --json config plan
 ```
 
-`plan` reads `insforge.toml`, fetches live state via `/api/metadata`, and prints a rendered diff. It also tags any section the live backend doesn't expose yet (older self-hosted versions, etc.). Apply will skip those instead of failing the whole run.
+`plan` reads `insforge.toml`, fetches live state via `/api/metadata` and the optional config endpoints for storage, realtime, and schedules, then prints a rendered diff. It also tags any section the live backend doesn't expose yet (older self-hosted versions, etc.). Apply will skip those instead of failing the whole run.
 
 Use `plan` before every `apply` in interactive sessions, and as a CI gate to catch unintended drift.
 
@@ -140,9 +157,9 @@ npx @insforge/cli --json config apply --auto-approve
 
 `apply` runs the same diff as `plan`, then walks the change set:
 
-1. **Per-change capability gate.** Each change is checked against the backend's metadata. If the backend doesn't support a section (e.g. an older self-hosted instance without SMTP exposed), that section is skipped with a named warning, and the rest of the changes still apply.
+1. **Per-change capability gate.** Each change is checked against the backend's metadata or the section's config endpoint. If the backend doesn't support a section (e.g. an older self-hosted instance without SMTP exposed), that section is skipped with a named warning, and the rest of the changes still apply.
 2. **Secret resolution.** `env(...)` references in the TOML are resolved at apply time from the local environment. If a referenced variable is missing, the command aborts before sending any update, so the backend isn't left half-configured.
-3. **Per-section dispatch.** Each change is sent to the appropriate backend endpoint (`/api/auth/config`, `/api/auth/smtp-config`, `/api/deployments/slug`, etc.). Changes are independent, so a failure on one section won't roll back earlier successful sections.
+3. **Per-section dispatch.** Each change is sent to the appropriate backend endpoint (`/api/auth/config`, `/api/auth/smtp-config`, `/api/storage/config`, `/api/realtime/config`, `/api/schedules/config`, `/api/deployments/slug`, etc.). Changes are independent, so a failure on one section won't roll back earlier successful sections.
 
 Flags:
 
@@ -185,10 +202,10 @@ This is what lets one `insforge.toml` apply cleanly to multiple environments: th
 
 ## When to use this
 
-- **Version control for auth.** Redirect URLs, password policy, and email verification mode (all the things you'd otherwise change through the dashboard or curl) live in a file your team reviews via PR.
-- **Multi-environment parity.** One TOML, applied to dev, staging, and prod, guarantees the same auth shape everywhere. Environment-specific values (subdomain, SMTP credentials) flow through `--project-id` overrides and `env(...)` refs.
+- **Version control for project config.** Redirect URLs, sign-up policy, password policy, email verification mode, SMTP, storage upload size, and retention windows live in a file your team reviews via PR.
+- **Multi-environment parity.** One TOML, applied to dev, staging, and prod, keeps the supported project settings aligned everywhere. Environment-specific values (subdomain, SMTP credentials) flow through `--project-id` overrides and `env(...)` refs.
 - **CI-driven config changes.** Run `config apply --auto-approve --json` from your deploy pipeline. Combine with `config plan` as a PR check so reviewers see what the merge will change in prod.
-- **Disaster recovery.** A committed `insforge.toml` is a known-good config snapshot. Re-apply it after restoring a project to bring auth/SMTP back to the expected shape in seconds.
+- **Disaster recovery.** A committed `insforge.toml` is a known-good config snapshot. Re-apply it after restoring a project to bring auth, SMTP, storage, retention, and deployment settings back to the expected shape in seconds.
 - **Self-hosted and local OSS development.** Run `npx @insforge/cli link --api-base-url http://localhost:7130 --api-key <local-key>` against a docker-compose stack, then point the CLI's config commands at your local OSS instance the same way you'd point at cloud.
 
 ## Troubleshooting

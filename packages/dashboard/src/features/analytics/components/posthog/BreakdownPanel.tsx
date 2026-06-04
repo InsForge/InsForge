@@ -1,3 +1,4 @@
+import { EmptyState, ErrorState, LoadingState } from '#components';
 import { useTimeframe } from '#features/analytics/context/TimeRangeContext';
 import { useWebStats } from '#features/analytics/hooks/useWebStats';
 import { type Breakdown } from '#features/analytics/services/analytics.service';
@@ -50,11 +51,11 @@ export function BreakdownPanel({ breakdown, enabled }: Props) {
       <p className="text-sm text-muted-foreground">{title}</p>
 
       {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <LoadingState className="py-4 self-center" />
       ) : error ? (
-        <p className="text-sm text-destructive">Failed to load.</p>
+        <ErrorState title="Failed to load" error="Please try again." className="self-center" />
       ) : top.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No data</p>
+        <EmptyState title="No data available" className="self-center" />
       ) : (
         <ul className="flex w-full flex-col">
           {top.map((row, i) => (

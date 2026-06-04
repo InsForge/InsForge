@@ -30,7 +30,8 @@ paths:
           $ref: '#/components/responses/Error'
 
     post:
-      summary: Create legacy deployment session
+      summary: Create legacy deployment session (deprecated)
+      deprecated: true
       description: Creates a `WAITING` deployment run and returns presigned form data for the legacy source-zip upload flow. New tooling should use `/api/deployments/direct`.
       tags:
         - Admin
