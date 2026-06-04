@@ -5,9 +5,10 @@ import { loginService } from '#features/login/services/login.service';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
 import { apiClient } from '#lib/api/client';
 import { getCurrentDistinctId, identifyUser } from '#lib/analytics/posthog';
+import type { ProjectAdminSchema } from '@insforge/shared-schemas';
 
 interface AuthContextType {
-  user: string | null;
+  user: ProjectAdminSchema | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   loginWithPassword: (username: string, password: string) => Promise<boolean>;
@@ -36,12 +37,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const getAuthorizationCode = isCloudHosting ? host.getAuthorizationCode : null;
   const onRequestUserInfo = isCloudHosting ? host.onRequestUserInfo : undefined;
   const location = useLocation();
-  const [user, setUser] = useState<string | null>(null);
+  const [user, setUser] = useState<ProjectAdminSchema | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
   const queryClient = useQueryClient();
-  const cloudAuthenticationRef = useRef<Promise<string | null> | null>(null);
+  const cloudAuthenticationRef = useRef<Promise<ProjectAdminSchema | null> | null>(null);
   const shouldAttemptCloudAuthentication =
     isCloudHosting && !location.pathname.startsWith('/dashboard/login');
   const shouldUseAuthorizationCodeRefresh =
@@ -117,7 +118,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, [onRequestUserInfo]);
 
   const applyAuthenticatedUser = useCallback(
-    async (nextUser: string): Promise<void> => {
+    async (nextUser: ProjectAdminSchema): Promise<void> => {
       await performPostHogIdentify();
       // Drop the previous user's cached data BEFORE switching identity, but
       // ONLY when identity actually changes. Same-user token refresh (cloud
@@ -126,10 +127,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // First login from a fresh session has previousSubjectRef.current === null,
       // so the wipe runs but the cache is already
       // empty, so it's a harmless no-op.
-      if (previousSubjectRef.current !== nextUser) {
+      if (previousSubjectRef.current !== nextUser.sub) {
         removeAuthScopedQueries();
       }
-      previousSubjectRef.current = nextUser;
+      previousSubjectRef.current = nextUser.sub;
       setUser(nextUser);
       setIsAuthenticated(true);
     },
@@ -137,12 +138,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   );
 
   const exchangeAuthorizationCode = useCallback(
-    async (code: string): Promise<string> => {
+    async (code: string): Promise<ProjectAdminSchema> => {
       try {
         setError(null);
         const result = await loginService.loginWithAuthorizationCode(code);
-        await applyAuthenticatedUser(result.sub);
-        return result.sub;
+        const projectAdmin = { sub: result.sub };
+        await applyAuthenticatedUser(projectAdmin);
+        return projectAdmin;
       } catch (err) {
         setError(err instanceof Error ? err : new Error('Authorization code exchange failed'));
         throw err;
@@ -151,7 +153,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     [applyAuthenticatedUser]
   );
 
-  const authenticateCloudSession = useCallback(async (): Promise<string | null> => {
+  const authenticateCloudSession = useCallback(async (): Promise<ProjectAdminSchema | null> => {
     if (!shouldAttemptCloudAuthentication || !getAuthorizationCode) {
       return null;
     }
@@ -181,7 +183,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       try {
         setError(null);
         const result = await loginService.loginWithPassword(username, password);
-        await applyAuthenticatedUser(result.sub);
+        await applyAuthenticatedUser({ sub: result.sub });
         return true;
       } catch (err) {
         setError(err instanceof Error ? err : new Error('Login failed'));

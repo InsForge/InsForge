@@ -3,7 +3,8 @@ import {
   emailSchema,
   passwordSchema,
   nameSchema,
-  projectAdminUsernameSchema,
+  usernameSchema,
+  projectAdminSchema,
   userIdSchema,
   userSchema,
   profileSchema,
@@ -52,7 +53,7 @@ export const createSessionRequestSchema = z.object({
  * POST /api/auth/admin/sessions - Create admin session
  */
 export const createAdminSessionRequestSchema = z.object({
-  username: projectAdminUsernameSchema,
+  username: usernameSchema,
   password: passwordSchema,
 });
 
@@ -223,14 +224,13 @@ export const createAdminSessionResponseSchema = z.object({
 /**
  * Response for GET /api/auth/sessions/current
  */
-export const getCurrentSessionResponseSchema = z.union([
-  z.object({
-    user: userSchema,
-  }),
-  z.object({
-    sub: z.string().min(1),
-  }),
-]);
+export const getCurrentSessionResponseSchema = z.object({
+  user: userSchema,
+});
+
+export const getCurrentAdminSessionResponseSchema = z.object({
+  projectAdmin: projectAdminSchema,
+});
 
 /**
  * Response for GET /api/auth/profiles/:userId - Get user profile
@@ -540,6 +540,7 @@ export type RefreshSessionResponse = z.infer<typeof refreshSessionResponseSchema
 export type ResetPasswordResponse = z.infer<typeof resetPasswordResponseSchema>;
 export type CreateAdminSessionResponse = z.infer<typeof createAdminSessionResponseSchema>;
 export type GetCurrentSessionResponse = z.infer<typeof getCurrentSessionResponseSchema>;
+export type GetCurrentAdminSessionResponse = z.infer<typeof getCurrentAdminSessionResponseSchema>;
 export type GetProfileResponse = z.infer<typeof getProfileResponseSchema>;
 export type ListUsersResponse = z.infer<typeof listUsersResponseSchema>;
 export type DeleteUsersResponse = z.infer<typeof deleteUsersResponseSchema>;

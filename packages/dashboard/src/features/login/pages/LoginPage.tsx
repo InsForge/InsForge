@@ -94,7 +94,7 @@ export default function LoginPage() {
                           <Input
                             {...field}
                             type="text"
-                            placeholder="root"
+                            placeholder="admin"
                             className="pl-10"
                             autoComplete="username"
                           />

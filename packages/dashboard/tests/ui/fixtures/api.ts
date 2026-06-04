@@ -1,6 +1,6 @@
 import type { Page, Route } from '@playwright/test';
 
-const adminSub = 'local:admin';
+const projectAdmin = { sub: 'local:admin' };
 
 const selfHostingMetadata = {
   auth: {
@@ -46,18 +46,18 @@ async function fulfillLoggedOutSession(route: Route) {
 
 async function fulfillLoggedInSession(route: Route) {
   return fulfillJson(route, 200, {
-    sub: adminSub,
+    projectAdmin,
   });
 }
 
 export async function mockLoggedOutApi(page: Page) {
-  await page.route('**/api/auth/sessions/current', fulfillLoggedOutSession);
+  await page.route('**/api/auth/admin/sessions/current', fulfillLoggedOutSession);
 }
 
 export async function mockSelfHostingDashboardApi(page: Page) {
   let isLoggedIn = false;
 
-  await page.route('**/api/auth/sessions/current', (route) => {
+  await page.route('**/api/auth/admin/sessions/current', (route) => {
     if (!isLoggedIn) {
       return fulfillLoggedOutSession(route);
     }
@@ -78,7 +78,7 @@ export async function mockSelfHostingDashboardApi(page: Page) {
 
     isLoggedIn = true;
     return fulfillJson(route, 200, {
-      sub: adminSub,
+      sub: projectAdmin.sub,
       accessToken: 'test-access-token',
       csrfToken: 'test-csrf-token',
     });

@@ -21,7 +21,7 @@ export const nameSchema = z
   .max(100, 'Name must be less than 100 characters')
   .trim();
 
-export const projectAdminUsernameSchema = z
+export const usernameSchema = z
   .string()
   .trim()
   .min(1, 'Username is required')
@@ -59,6 +59,10 @@ export const userSchema = z.object({
   updatedAt: z.string(), // PostgreSQL timestamp
   profile: profileSchema.nullable(), // User profile data (name, avatar_url, bio, etc.)
   metadata: z.record(z.unknown()).nullable(), // System metadata (device ID, login IP, etc.)
+});
+
+export const projectAdminSchema = z.object({
+  sub: z.string().min(1),
 });
 
 /**
@@ -182,11 +186,12 @@ export const tokenPayloadSchema = z.object({
 export type UserIdSchema = z.infer<typeof userIdSchema>;
 export type EmailSchema = z.infer<typeof emailSchema>;
 export type PasswordSchema = z.infer<typeof passwordSchema>;
-export type ProjectAdminUsernameSchema = z.infer<typeof projectAdminUsernameSchema>;
+export type UsernameSchema = z.infer<typeof usernameSchema>;
 export type RoleSchema = z.infer<typeof roleSchema>;
 export type VerificationMethodSchema = z.infer<typeof verificationMethodSchema>;
 export type ProfileSchema = z.infer<typeof profileSchema>;
 export type UserSchema = z.infer<typeof userSchema>;
+export type ProjectAdminSchema = z.infer<typeof projectAdminSchema>;
 export type TokenPayloadSchema = z.infer<typeof tokenPayloadSchema>;
 export type OAuthConfigSchema = z.infer<typeof oAuthConfigSchema>;
 export type OAuthProvidersSchema = z.infer<typeof oAuthProvidersSchema>;

@@ -116,17 +116,11 @@ export class SocketManager {
             NEXT_ACTIONS.CHECK_TOKEN
           );
         }
-        socket.data.user =
-          payload.role === 'project_admin'
-            ? {
-                id: payload.sub,
-                role: payload.role,
-              }
-            : {
-                id: payload.sub,
-                email: payload.email,
-                role: payload.role,
-              };
+        socket.data.user = {
+          id: payload.sub,
+          email: payload.email,
+          role: payload.role,
+        };
         socket.data.presenceType = 'user';
 
         next();

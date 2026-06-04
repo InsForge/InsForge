@@ -994,6 +994,24 @@ curl -X POST "https://your-app.insforge.app/api/auth/admin/sessions/exchange" \
 }
 ```
 
+### Get Current Admin Session
+
+Get the current dashboard admin session from a project admin access token.
+
+```
+GET /api/auth/admin/sessions/current
+```
+
+#### Response
+
+```json
+{
+  "projectAdmin": {
+    "sub": "local:admin"
+  }
+}
+```
+
 ### Refresh Admin Session
 
 Refresh a dashboard admin access token. This endpoint uses the dashboard-only

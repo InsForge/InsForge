@@ -68,7 +68,7 @@ export class PostgrestProxyService {
   private adminToken: string;
 
   private constructor() {
-    this.adminToken = this.tokenManager.generateApiKeyToken();
+    this.adminToken = this.tokenManager.generatePostgrestAdminToken();
   }
 
   public static getInstance(): PostgrestProxyService {

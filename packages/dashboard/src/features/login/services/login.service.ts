@@ -1,17 +1,17 @@
 import { apiClient } from '#lib/api/client';
-interface LoginResult {
-  sub: string;
-  accessToken: string;
-  csrfToken?: string;
-}
+import type {
+  CreateAdminSessionResponse,
+  GetCurrentAdminSessionResponse,
+  ProjectAdminSchema,
+} from '@insforge/shared-schemas';
 
 export class LoginService {
-  async loginWithPassword(username: string, password: string): Promise<LoginResult> {
-    const response = await apiClient.request('/auth/admin/sessions', {
+  async loginWithPassword(username: string, password: string): Promise<CreateAdminSessionResponse> {
+    const response = (await apiClient.request('/auth/admin/sessions', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
       skipRefresh: true,
-    });
+    })) as CreateAdminSessionResponse;
 
     if (!response.sub || !response.accessToken) {
       throw new Error('Invalid login response');
@@ -31,12 +31,12 @@ export class LoginService {
     };
   }
 
-  async loginWithAuthorizationCode(code: string): Promise<LoginResult> {
-    const response = await apiClient.request('/auth/admin/sessions/exchange', {
+  async loginWithAuthorizationCode(code: string): Promise<CreateAdminSessionResponse> {
+    const response = (await apiClient.request('/auth/admin/sessions/exchange', {
       method: 'POST',
       body: JSON.stringify({ code }),
       skipRefresh: true,
-    });
+    })) as CreateAdminSessionResponse;
 
     if (!response.sub || !response.accessToken) {
       throw new Error('Invalid authorization code exchange response');
@@ -68,10 +68,12 @@ export class LoginService {
     apiClient.clearTokens();
   }
 
-  async getCurrentUser(): Promise<string | null> {
+  async getCurrentUser(): Promise<ProjectAdminSchema | null> {
     try {
-      const response = await apiClient.request('/auth/sessions/current');
-      return response.sub ?? null;
+      const response = (await apiClient.request(
+        '/auth/admin/sessions/current'
+      )) as GetCurrentAdminSessionResponse;
+      return response.projectAdmin ?? null;
     } catch {
       return null;
     }

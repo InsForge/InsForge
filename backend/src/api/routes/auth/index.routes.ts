@@ -25,6 +25,7 @@ import {
 import { parseClientType } from '@/utils/utils.js';
 import {
   ERROR_CODES,
+  roleSchema,
   userIdSchema,
   createUserRequestSchema,
   createSessionRequestSchema,
@@ -583,7 +584,7 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
     const newAccessToken = tokenManager.generateAccessToken({
       sub: user.id,
       email: user.email,
-      role: 'authenticated',
+      role: roleSchema.enum.authenticated,
     });
 
     if (clientType === 'web') {
@@ -647,20 +648,7 @@ router.get(
   verifyToken,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      if (req.user?.role === 'project_admin') {
-        if (!req.user.id) {
-          throw new AppError('User not authenticated', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
-        }
-
-        const response: GetCurrentSessionResponse = {
-          sub: req.user.id,
-        };
-
-        successResponse(res, response);
-        return;
-      }
-
-      if (!req.user?.id) {
+      if (req.user?.role !== roleSchema.enum.authenticated || !req.user.id) {
         throw new AppError('User not authenticated', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
       }
 

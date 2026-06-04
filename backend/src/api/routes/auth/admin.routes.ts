@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { AuthService } from '@/services/auth/auth.service.js';
+import { AuthRequest, verifyToken } from '@/api/middlewares/auth.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from '@/utils/errors.js';
 import { successResponse } from '@/utils/response.js';
@@ -13,6 +14,7 @@ import {
   createAdminSessionRequestSchema,
   exchangeAdminSessionRequestSchema,
   type CreateAdminSessionResponse,
+  type GetCurrentAdminSessionResponse,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 
@@ -82,6 +84,29 @@ router.post('/sessions', (req: Request, res: Response, next: NextFunction) => {
     next(error);
   }
 });
+
+// GET /api/auth/admin/sessions/current - Get current dashboard admin session
+router.get(
+  '/sessions/current',
+  verifyToken,
+  (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      if (req.user?.role !== 'project_admin' || !req.user.id) {
+        throw new AppError('Admin access required', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
+      }
+
+      const response: GetCurrentAdminSessionResponse = {
+        projectAdmin: {
+          sub: req.user.id,
+        },
+      };
+
+      successResponse(res, response);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 // POST /api/auth/admin/refresh - Refresh admin dashboard access token
 // Uses a dashboard-specific httpOnly cookie + X-CSRF-Token header.

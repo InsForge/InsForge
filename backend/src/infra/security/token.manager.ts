@@ -69,10 +69,10 @@ export class TokenManager {
   }
 
   /**
-   * Generate API key token (never expires)
-   * Used for internal API key authenticated requests to PostgREST
+   * Generate PostgREST project admin token (never expires)
+   * Used only for internal PostgREST proxy requests
    */
-  generateApiKeyToken(): string {
+  generatePostgrestAdminToken(): string {
     const payload = {
       role: 'project_admin',
     };
