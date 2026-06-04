@@ -668,7 +668,7 @@ export class AuthService {
     });
 
     return {
-      sub,
+      admin: { sub },
       accessToken,
     };
   }
@@ -685,7 +685,7 @@ export class AuthService {
     });
 
     return {
-      sub,
+      admin: { sub },
       accessToken,
     };
   }

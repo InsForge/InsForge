@@ -61,7 +61,7 @@ export const userSchema = z.object({
   metadata: z.record(z.unknown()).nullable(), // System metadata (device ID, login IP, etc.)
 });
 
-export const projectAdminSchema = z.object({
+export const adminSchema = z.object({
   sub: z.string().min(1),
 });
 
@@ -191,7 +191,7 @@ export type RoleSchema = z.infer<typeof roleSchema>;
 export type VerificationMethodSchema = z.infer<typeof verificationMethodSchema>;
 export type ProfileSchema = z.infer<typeof profileSchema>;
 export type UserSchema = z.infer<typeof userSchema>;
-export type ProjectAdminSchema = z.infer<typeof projectAdminSchema>;
+export type AdminSchema = z.infer<typeof adminSchema>;
 export type TokenPayloadSchema = z.infer<typeof tokenPayloadSchema>;
 export type OAuthConfigSchema = z.infer<typeof oAuthConfigSchema>;
 export type OAuthProvidersSchema = z.infer<typeof oAuthProvidersSchema>;

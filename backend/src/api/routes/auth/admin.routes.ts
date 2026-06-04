@@ -40,7 +40,7 @@ router.post('/sessions/exchange', async (req: Request, res: Response, next: Next
     // Set refresh token as httpOnly cookie + CSRF token for web clients
     const tokenManager = TokenManager.getInstance();
     const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
-      result.sub,
+      result.admin.sub,
       'admin'
     );
     setAdminRefreshTokenCookie(res, refreshToken);
@@ -74,7 +74,7 @@ router.post('/sessions', (req: Request, res: Response, next: NextFunction) => {
     // Set refresh token as httpOnly cookie + CSRF token for web clients
     const tokenManager = TokenManager.getInstance();
     const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
-      result.sub,
+      result.admin.sub,
       'admin'
     );
     setAdminRefreshTokenCookie(res, refreshToken);
@@ -96,7 +96,7 @@ router.get(
       }
 
       const response: GetCurrentAdminSessionResponse = {
-        projectAdmin: {
+        admin: {
           sub: req.user.id,
         },
       };
@@ -139,8 +139,10 @@ router.post('/refresh', (req: Request, res: Response, next: NextFunction) => {
     setAdminRefreshTokenCookie(res, newRefreshToken);
 
     successResponse(res, {
+      admin: {
+        sub: payload.sub,
+      },
       accessToken: newAccessToken,
-      sub: payload.sub,
       csrfToken: newCsrfToken,
     });
   } catch (error) {

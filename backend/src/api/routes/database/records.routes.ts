@@ -1,6 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import axios from 'axios';
-import { AuthRequest, extractApiKey, verifyUser } from '@/api/middlewares/auth.js';
+import { AuthRequest, verifyUser } from '@/api/middlewares/auth.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
@@ -75,15 +75,18 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
     }
 
     // Forward to PostgREST via service
-    const result = await proxyService.forward({
+    const proxyRequest = {
       method: req.method,
       path,
       query: req.query as Record<string, unknown>,
       headers: req.headers as Record<string, string | string[] | undefined>,
       body: ['POST', 'PUT', 'PATCH'].includes(req.method) ? body : undefined,
-      apiKey: extractApiKey(req) ?? undefined,
-      useAdminToken: req.user?.role === 'project_admin' || req.hasApiKey === true,
-    });
+    };
+
+    const result =
+      req.user?.role === 'project_admin' || req.hasApiKey === true
+        ? await proxyService.forwardAsAdmin(proxyRequest)
+        : await proxyService.forward(proxyRequest);
 
     // Forward response headers
     const headers = PostgrestProxyService.filterHeaders(result.headers);

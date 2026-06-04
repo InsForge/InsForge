@@ -988,7 +988,9 @@ curl -X POST "https://your-app.insforge.app/api/auth/admin/sessions/exchange" \
 
 ```json
 {
-  "sub": "cloud:user_123",
+  "admin": {
+    "sub": "cloud:user_123"
+  },
   "accessToken": "eyJhbGciOiJIUzI1NiIs...",
   "csrfToken": "abc123..."
 }
@@ -1006,7 +1008,7 @@ GET /api/auth/admin/sessions/current
 
 ```json
 {
-  "projectAdmin": {
+  "admin": {
     "sub": "local:admin"
   }
 }
