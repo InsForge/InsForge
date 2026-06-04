@@ -89,8 +89,8 @@ describe('seedBackend secret initialization', () => {
     vi.clearAllMocks();
     mockClientQuery.mockResolvedValue({ rows: [] });
     mockGetUserTables.mockResolvedValue([]);
-    process.env.ADMIN_EMAIL = 'admin@example.com';
-    process.env.ADMIN_PASSWORD = 'change-this-password';
+    process.env.ROOT_ADMIN_USERNAME = 'root';
+    process.env.ROOT_ADMIN_PASSWORD = 'change-this-password';
     process.env.JWT_SECRET = 'jwt-secret';
   });
 
@@ -107,21 +107,6 @@ describe('seedBackend secret initialization', () => {
       isReserved: true,
       value: 'http://insforge:7130',
     });
-  });
-
-  it('seeds the env admin into auth.project_admins instead of auth.users', async () => {
-    mockIsCloudEnvironment.mockReturnValue(false);
-    mockGetSecretByKey.mockResolvedValue('already-seeded-secret');
-
-    const { seedBackend } = await import('../../src/utils/seed.js');
-
-    await seedBackend();
-
-    const sqlCalls = mockClientQuery.mock.calls.map(([sql]) => String(sql));
-    expect(sqlCalls.some((sql) => sql.includes('auth.project_admins'))).toBe(true);
-    expect(sqlCalls.some((sql) => sql.includes('auth.users'))).toBe(false);
-    expect(sqlCalls.some((sql) => sql.includes('source'))).toBe(false);
-    expect(sqlCalls.some((sql) => sql.includes('profile'))).toBe(false);
   });
 
   it('skips INSFORGE_INTERNAL_URL in cloud but still seeds JWT_SECRET when missing', async () => {

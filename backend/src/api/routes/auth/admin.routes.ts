@@ -38,7 +38,7 @@ router.post('/sessions/exchange', async (req: Request, res: Response, next: Next
     // Set refresh token as httpOnly cookie + CSRF token for web clients
     const tokenManager = TokenManager.getInstance();
     const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
-      result.user.id,
+      result.projectAdmin.subject,
       'admin'
     );
     setAdminRefreshTokenCookie(res, refreshToken);
@@ -55,7 +55,7 @@ router.post('/sessions/exchange', async (req: Request, res: Response, next: Next
 });
 
 // POST /api/auth/admin/sessions - Create admin session (web only)
-router.post('/sessions', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/sessions', (req: Request, res: Response, next: NextFunction) => {
   try {
     const validationResult = createAdminSessionRequestSchema.safeParse(req.body);
     if (!validationResult.success) {
@@ -66,13 +66,13 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
       );
     }
 
-    const { email, password } = validationResult.data;
-    const result: CreateAdminSessionResponse = await authService.adminLogin(email, password);
+    const { username, password } = validationResult.data;
+    const result: CreateAdminSessionResponse = authService.adminLogin(username, password);
 
     // Set refresh token as httpOnly cookie + CSRF token for web clients
     const tokenManager = TokenManager.getInstance();
     const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
-      result.user.id,
+      result.projectAdmin.subject,
       'admin'
     );
     setAdminRefreshTokenCookie(res, refreshToken);
@@ -105,34 +105,26 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
       throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
-    if (!payload.sub) {
-      logger.warn('[Auth:AdminRefresh] Refresh token is missing admin subject');
-      clearAdminRefreshTokenCookie(res);
-      throw new AppError('Project admin not found', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
-    }
-
-    const dbUser = await authService.getProjectAdminById(payload.sub);
-    if (!dbUser) {
+    const projectAdmin = authService.getProjectAdminFromSubject(payload.sub);
+    if (!projectAdmin) {
       logger.warn('[Auth:AdminRefresh] Project admin not found for valid refresh token', {
-        userId: payload.sub,
+        subject: payload.sub,
       });
       clearAdminRefreshTokenCookie(res);
       throw new AppError('Project admin not found', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
-    const user = authService.transformProjectAdminRecordToSchema(dbUser);
     const newAccessToken = tokenManager.generateAccessToken({
-      sub: user.id,
-      email: user.email,
+      sub: projectAdmin.subject,
       role: 'project_admin',
     });
     const { refreshToken: newRefreshToken, csrfToken: newCsrfToken } =
-      tokenManager.generateRefreshTokenWithCsrf(user.id, 'admin', payload.csrfNonce);
+      tokenManager.generateRefreshTokenWithCsrf(projectAdmin.subject, 'admin', payload.csrfNonce);
     setAdminRefreshTokenCookie(res, newRefreshToken);
 
     successResponse(res, {
       accessToken: newAccessToken,
-      user,
+      projectAdmin,
       csrfToken: newCsrfToken,
     });
   } catch (error) {

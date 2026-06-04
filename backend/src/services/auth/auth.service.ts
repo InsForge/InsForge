@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { Pool } from 'pg';
+import type { JWTPayload } from 'jose';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import logger from '@/utils/logger.js';
@@ -26,7 +27,6 @@ import {
   DiscordUserInfo,
   XUserInfo,
   AppleUserInfo,
-  ProjectAdminRecord,
   UserRecord,
   OAuthUserData,
 } from '@/types/auth.js';
@@ -37,13 +37,13 @@ import { AppleOAuthProvider } from '@/providers/oauth/apple.provider.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
 import {
   ERROR_CODES,
-  emailSchema,
   type AuthMetadataSchema,
   type CreateAdminSessionResponse,
   type CreateSessionResponse,
   type CreateUserResponse,
   type GetPublicAuthConfigResponse,
   type OAuthProvidersSchema,
+  type ProjectAdminSchema,
   type ResetPasswordResponse,
   type UserSchema,
   type VerifyEmailResponse,
@@ -55,7 +55,7 @@ import {
  */
 export class AuthService {
   private static instance: AuthService;
-  private adminEmail: string;
+  private adminUsername: string;
   private adminPassword: string;
   private pool: Pool | null = null;
   private tokenManager: TokenManager;
@@ -71,11 +71,13 @@ export class AuthService {
   private appleOAuthProvider: AppleOAuthProvider;
 
   private constructor() {
-    this.adminEmail = process.env.ADMIN_EMAIL ?? '';
-    this.adminPassword = process.env.ADMIN_PASSWORD ?? '';
+    this.adminUsername = process.env.ROOT_ADMIN_USERNAME ?? process.env.ADMIN_EMAIL ?? '';
+    this.adminPassword = process.env.ROOT_ADMIN_PASSWORD ?? process.env.ADMIN_PASSWORD ?? '';
 
-    if (!this.adminEmail || !this.adminPassword) {
-      throw new Error('ADMIN_EMAIL and ADMIN_PASSWORD environment variables are required');
+    if (!this.adminUsername || !this.adminPassword) {
+      throw new Error(
+        'ROOT_ADMIN_USERNAME and ROOT_ADMIN_PASSWORD environment variables are required'
+      );
     }
 
     // Initialize token manager
@@ -109,77 +111,52 @@ export class AuthService {
     return this.pool;
   }
 
-  private async upsertProjectAdmin(email: string): Promise<ProjectAdminRecord> {
-    const pool = this.getPool();
-    const result = await pool.query(
-      `
-      INSERT INTO auth.project_admins (email, created_at, updated_at)
-      VALUES ($1, NOW(), NOW())
-      ON CONFLICT (email) DO UPDATE SET
-        updated_at = NOW()
-      RETURNING id, email, created_at, updated_at
-    `,
-      [email]
-    );
-
-    const admin = result.rows[0] as ProjectAdminRecord | undefined;
-    if (!admin) {
-      throw new Error('Failed to upsert project admin');
-    }
-    return admin;
+  private createLocalAdminSubject(username: string): string {
+    return `local:${username}`;
   }
 
-  private resolveCloudAdminEmail(projectId: string, payload: Record<string, unknown>): string {
-    const emailResult = emailSchema.safeParse(payload['email']);
-    if (emailResult.success) {
-      return emailResult.data;
-    }
-
-    const cloudSubject =
-      typeof payload['userId'] === 'string' && payload['userId'].trim().length > 0
-        ? payload['userId']
-        : typeof payload['sub'] === 'string' && payload['sub'].trim().length > 0
-          ? payload['sub']
-          : null;
-
-    if (!cloudSubject) {
-      logger.warn('Cloud admin token is missing both email and subject claims', { projectId });
-      throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
-    }
-
-    const digest = crypto
-      .createHash('sha256')
-      .update(`${projectId}:${cloudSubject}`)
-      .digest('hex')
-      .slice(0, 32);
-    return `cloud-${digest}@admin.insforge.dev`;
+  private createCloudAdminSubject(cloudSubject: string): string {
+    return `cloud:${cloudSubject}`;
   }
 
-  async getProjectAdminById(adminId: string): Promise<ProjectAdminRecord | null> {
-    const pool = this.getPool();
-    const result = await pool.query(
-      `
-      SELECT id, email, created_at, updated_at
-      FROM auth.project_admins
-      WHERE id = $1
-    `,
-      [adminId]
-    );
-
-    return (result.rows[0] as ProjectAdminRecord | undefined) || null;
+  private getStringClaim(payload: JWTPayload, keys: string[]): string | undefined {
+    for (const key of keys) {
+      const value = payload[key];
+      if (typeof value === 'string' && value.trim()) {
+        return value.trim();
+      }
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return String(value);
+      }
+    }
+    return undefined;
   }
 
-  transformProjectAdminRecordToSchema(admin: ProjectAdminRecord): UserSchema {
-    return {
-      id: admin.id,
-      email: admin.email,
-      emailVerified: true,
-      createdAt: admin.created_at,
-      updatedAt: admin.updated_at,
-      providers: [],
-      profile: { name: 'Administrator' },
-      metadata: null,
-    };
+  private projectAdminFromSubject(subject: string, username?: string): ProjectAdminSchema | null {
+    const localSubject = this.createLocalAdminSubject(this.adminUsername);
+    if (subject.startsWith('local:')) {
+      if (subject !== localSubject) {
+        return null;
+      }
+      return {
+        subject,
+        username: this.adminUsername,
+      };
+    }
+
+    if (subject.startsWith('cloud:')) {
+      const fallbackUsername = subject.slice('cloud:'.length);
+      return {
+        subject,
+        username: username?.trim() || fallbackUsername,
+      };
+    }
+
+    return null;
+  }
+
+  getProjectAdminFromSubject(subject: string, username?: string): ProjectAdminSchema | null {
+    return this.projectAdminFromSubject(subject, username);
   }
 
   /**
@@ -728,22 +705,26 @@ export class AuthService {
   /**
    * Admin login (validates against env variables only)
    */
-  async adminLogin(email: string, password: string): Promise<CreateAdminSessionResponse> {
+  adminLogin(username: string, password: string): CreateAdminSessionResponse {
     // Simply validate against environment variables
-    if (email !== this.adminEmail || password !== this.adminPassword) {
+    if (username !== this.adminUsername || password !== this.adminPassword) {
       throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
-    const admin = await this.upsertProjectAdmin(email);
-    const user = this.transformProjectAdminRecordToSchema(admin);
+    const subject = this.createLocalAdminSubject(username);
+    const projectAdmin: ProjectAdminSchema = {
+      subject,
+      username,
+    };
+
+    // Return project admin session with JWT token (24h expiration) - no database interaction
     const accessToken = this.tokenManager.generateAccessToken({
-      sub: user.id,
-      email,
+      sub: subject,
       role: 'project_admin',
     });
 
     return {
-      user,
+      projectAdmin,
       accessToken,
     };
   }
@@ -754,20 +735,27 @@ export class AuthService {
   async adminLoginWithAuthorizationCode(code: string): Promise<CreateAdminSessionResponse> {
     try {
       // Use TokenManager to verify cloud token
-      const { projectId, payload } = await this.tokenManager.verifyCloudToken(code);
+      const { payload, projectId } = await this.tokenManager.verifyCloudToken(code);
 
       // If verification succeeds, extract user info and generate internal token
-      const email = this.resolveCloudAdminEmail(projectId, payload);
-      const admin = await this.upsertProjectAdmin(email);
-      const user = this.transformProjectAdminRecordToSchema(admin);
+      const cloudSubject =
+        this.getStringClaim(payload, ['userId', 'user_id', 'sub', 'actorId', 'actor_id']) ??
+        projectId;
+      const username = this.getStringClaim(payload, ['email', 'username', 'name']) ?? cloudSubject;
+      const subject = this.createCloudAdminSubject(cloudSubject);
+      const projectAdmin: ProjectAdminSchema = {
+        subject,
+        username,
+      };
+
+      // Generate internal access token (24h expiration)
       const accessToken = this.tokenManager.generateAccessToken({
-        sub: user.id,
-        email,
+        sub: subject,
         role: 'project_admin',
       });
 
       return {
-        user,
+        projectAdmin,
         accessToken,
       };
     } catch (error) {
@@ -1263,7 +1251,7 @@ export class AuthService {
   }
 
   /**
-   * Get user by ID.
+   * Get user by ID (returns raw database record)
    */
   async getUserById(userId: string): Promise<UserRecord | null> {
     const pool = this.getPool();
@@ -1288,7 +1276,11 @@ export class AuthService {
       [userId]
     );
 
-    return result.rows[0] || null;
+    if (result.rows[0]) {
+      return result.rows[0];
+    }
+
+    return null;
   }
 
   /**
@@ -1438,10 +1430,6 @@ export class AuthService {
    * Delete multiple users by IDs
    */
   async deleteUsers(userIds: string[]): Promise<number> {
-    if (userIds.length === 0) {
-      return 0;
-    }
-
     const pool = this.getPool();
     const placeholders = userIds.map((_, i) => `$${i + 1}`).join(',');
     const result = await pool.query(

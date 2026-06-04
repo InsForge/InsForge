@@ -27,7 +27,7 @@ echo "1. Logging in..."
 LOGIN_RESPONSE=$(curl -s -X POST $API_URL/api/auth/admin/sessions \
   -H 'Content-Type: application/json' \
   -d '{
-    "email": "admin@example.com",
+    "username": "root",
     "password": "change-this-password"
   }')
 

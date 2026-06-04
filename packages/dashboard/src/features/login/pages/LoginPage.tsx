@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Loader2, Lock, Mail } from 'lucide-react';
+import { Loader2, Lock, User } from 'lucide-react';
 import {
   Alert,
   AlertDescription,
@@ -32,7 +32,7 @@ export default function LoginPage() {
   const form = useForm<LoginForm>({
     resolver: zodResolver(loginFormSchema),
     defaultValues: {
-      email: 'admin@example.com',
+      username: 'root',
       password: 'change-this-password',
     },
   });
@@ -42,10 +42,10 @@ export default function LoginPage() {
     setSubmitError(null);
 
     try {
-      const success = await loginWithPassword(data.email, data.password);
+      const success = await loginWithPassword(data.username, data.password);
 
       if (!success) {
-        throw new Error('Invalid email or password');
+        throw new Error('Invalid username or password');
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'An error occurred';
@@ -84,19 +84,19 @@ export default function LoginPage() {
               <CardContent className="space-y-4">
                 <FormField
                   control={form.control}
-                  name="email"
+                  name="username"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Email</FormLabel>
+                      <FormLabel>Username</FormLabel>
                       <FormControl>
                         <div className="relative">
-                          <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                          <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                           <Input
                             {...field}
-                            type="email"
-                            placeholder="admin@example.com"
+                            type="text"
+                            placeholder="root"
                             className="pl-10"
-                            autoComplete="email"
+                            autoComplete="username"
                           />
                         </div>
                       </FormControl>

@@ -13,13 +13,6 @@ export interface UserRecord {
   providers?: string;
 }
 
-export interface ProjectAdminRecord {
-  id: string;
-  email: string;
-  created_at: string;
-  updated_at: string;
-}
-
 // OAuth provider data from external providers
 export interface OAuthIdentityData {
   sub?: string; // Subject identifier from provider

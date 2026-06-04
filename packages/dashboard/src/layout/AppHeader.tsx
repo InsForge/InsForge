@@ -62,22 +62,22 @@ export default function AppHeader() {
     return count.toString();
   };
 
-  const getUserInitials = (email: string) => {
-    if (!email) {
+  const getUserInitials = (label: string) => {
+    if (!label) {
       return 'U';
     }
-    const parts = email.split('@')[0].split('.');
+    const parts = label.split('@')[0].split('.');
     if (parts.length > 1) {
       return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase();
     }
-    return email.substring(0, 2).toUpperCase();
+    return label.substring(0, 2).toUpperCase();
   };
 
-  const getAvatarColor = (email: string) => {
-    if (!email) {
+  const getAvatarColor = (label: string) => {
+    if (!label) {
       return 'bg-gray-500';
     }
-    const hash = email.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const hash = label.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
     const colors = [
       'bg-blue-500',
       'bg-green-500',
@@ -151,10 +151,10 @@ export default function AppHeader() {
                   <AvatarFallback
                     className={cn(
                       'text-white font-medium text-sm',
-                      getAvatarColor(user?.email ?? '')
+                      getAvatarColor(user?.username ?? '')
                     )}
                   >
-                    {getUserInitials(user?.email ?? '')}
+                    {getUserInitials(user?.username ?? '')}
                   </AvatarFallback>
                 </Avatar>
                 <div className="text-left hidden md:block">
@@ -162,7 +162,7 @@ export default function AppHeader() {
                     Admin
                   </p>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    {user?.email || 'Administrator'}
+                    {user?.username || 'Administrator'}
                   </p>
                 </div>
                 <ChevronDown className="h-5 w-5 text-black dark:text-white hidden md:block ml-auto" />

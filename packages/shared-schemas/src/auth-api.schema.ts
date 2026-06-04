@@ -3,8 +3,10 @@ import {
   emailSchema,
   passwordSchema,
   nameSchema,
+  projectAdminUsernameSchema,
   userIdSchema,
   userSchema,
+  projectAdminSchema,
   profileSchema,
   oAuthConfigSchema,
   oAuthProvidersSchema,
@@ -50,7 +52,10 @@ export const createSessionRequestSchema = z.object({
 /**
  * POST /api/auth/admin/sessions - Create admin session
  */
-export const createAdminSessionRequestSchema = createSessionRequestSchema;
+export const createAdminSessionRequestSchema = z.object({
+  username: projectAdminUsernameSchema,
+  password: passwordSchema,
+});
 
 /**
  * POST /api/auth/refresh - Refresh user session
@@ -209,14 +214,24 @@ export const resetPasswordResponseSchema = z.object({
 /**
  * Response for POST /api/auth/admin/sessions
  */
-export const createAdminSessionResponseSchema = createSessionResponseSchema;
+export const createAdminSessionResponseSchema = z.object({
+  projectAdmin: projectAdminSchema,
+  accessToken: z.string(),
+  csrfToken: z.string().nullable().optional(),
+  refreshToken: z.string().optional(),
+});
 
 /**
  * Response for GET /api/auth/sessions/current
  */
-export const getCurrentSessionResponseSchema = z.object({
-  user: userSchema,
-});
+export const getCurrentSessionResponseSchema = z.union([
+  z.object({
+    user: userSchema,
+  }),
+  z.object({
+    projectAdmin: projectAdminSchema,
+  }),
+]);
 
 /**
  * Response for GET /api/auth/profiles/:userId - Get user profile

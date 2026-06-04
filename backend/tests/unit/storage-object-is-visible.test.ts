@@ -125,7 +125,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     queryResults = [{ rows: [{ '?column?': 1 }], rowCount: 1 }];
 
     const visible = await svc.objectIsVisible(
-      { id: 'admin-sub', email: 'admin@example.com', role: 'project_admin' },
+      { subject: 'local:root', role: 'project_admin' },
       'photos',
       'alice/cat.jpg'
     );
@@ -162,7 +162,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     ];
 
     const result = await svc.getObject(
-      { id: 'admin-sub', email: 'admin@example.com', role: 'project_admin' },
+      { subject: 'local:root', role: 'project_admin' },
       'photos',
       'alice/cat.jpg'
     );
@@ -204,7 +204,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     ];
 
     const result = await svc.listObjects(
-      { id: 'admin-sub', email: 'admin@example.com', role: 'project_admin' },
+      { subject: 'local:root', role: 'project_admin' },
       'photos',
       undefined,
       10,
@@ -329,7 +329,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     ];
 
     const strategy = await svc.getUploadStrategy(
-      { id: 'admin-sub', email: 'admin@example.com', role: 'project_admin' },
+      { subject: 'local:root', role: 'project_admin' },
       'photos',
       { filename: 'note.txt', contentType: 'text/plain', size: 8 }
     );
@@ -356,7 +356,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     ];
 
     const result = await svc.putObject(
-      { id: 'admin-sub', email: 'admin@example.com', role: 'project_admin' },
+      { subject: 'local:root', role: 'project_admin' },
       'photos',
       'note.txt',
       { size: 8, mimetype: 'text/plain' } as Express.Multer.File
@@ -395,7 +395,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     ];
 
     const result = await svc.confirmUpload(
-      { id: 'admin-sub', email: 'admin@example.com', role: 'project_admin' },
+      { subject: 'local:root', role: 'project_admin' },
       'photos',
       'note.txt',
       { size: 8, contentType: 'text/plain' }
@@ -424,7 +424,7 @@ describe('StorageService.objectIsVisible — RLS-gated visibility check', () => 
     queryResults = [{ rows: [], rowCount: 1 }];
 
     const deleted = await svc.deleteObject(
-      { id: 'admin-sub', email: 'admin@example.com', role: 'project_admin' },
+      { subject: 'local:root', role: 'project_admin' },
       'photos',
       'note.txt'
     );

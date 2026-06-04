@@ -137,7 +137,7 @@ describe('DatabaseMigrationService.createMigration', () => {
       service.createMigration({
         name: 'break-auth',
         sql: 'CREATE TABLE auth.test_users (id uuid);',
-        actor: 'admin@example.com',
+        actor: 'local:root',
       })
     ).rejects.toThrow(/public schema/i);
   });
@@ -153,7 +153,7 @@ describe('DatabaseMigrationService.createMigration', () => {
     await service.createMigration({
       name: 'create-posts',
       sql: 'CREATE TABLE posts (id uuid primary key);',
-      actor: 'admin@example.com',
+      actor: 'local:root',
     });
 
     expect(mockClient.query).toHaveBeenCalledWith(

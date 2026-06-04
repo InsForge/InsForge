@@ -16,9 +16,9 @@ Run the Better Auth test:
 ### Prerequisites
 
 - Docker must be running with the InsForge backend on port 7130
-- Admin credentials should be configured in environment variables:
-  - `ADMIN_EMAIL` (default: admin@example.com)
-  - `ADMIN_PASSWORD` (default: change-this-password)
+- Root admin credentials should be configured in environment variables:
+  - `ROOT_ADMIN_USERNAME` (default: root)
+  - `ROOT_ADMIN_PASSWORD` (default: change-this-password)
 
 ### Example Commands
 
@@ -29,14 +29,14 @@ cd backend
 # Run Better Auth test
 ./tests/manual/test-better-auth.sh
 
-# Run with custom admin credentials
-ADMIN_EMAIL=admin@mycompany.com ADMIN_PASSWORD=mysecurepass ./tests/manual/test-better-auth.sh
+# Run with custom root admin credentials
+ROOT_ADMIN_USERNAME=root ROOT_ADMIN_PASSWORD=mysecurepass ./tests/manual/test-better-auth.sh
 ```
 
 ### Test Coverage
 
 The test covers:
-- Admin authentication (sign-in, wrong password, non-admin email)
+- Admin authentication (sign-in, wrong password, wrong admin username)
 - User registration and sign-in
 - Admin user management (list users with pagination)
 - JWT token verification (admin role and type claims)
@@ -68,4 +68,4 @@ This is a standalone, client-side HTML test helper utility to manually verify Go
 1. Serve or open `test-google-id-token.html` directly in your browser.
 2. Click **"Sign in with Google"** to authenticate via Google OAuth and retrieve your raw `id_token`.
 3. Once authenticated, the **"Test /api/auth/id-token"** button will be enabled. Click it to transmit the token to your local backend API.
-4. The backend response will print directly in the results console showing either a successful authentication profile or validation error.
+4. The backend response will print directly in the results console showing either a successful authentication profile or validation error.

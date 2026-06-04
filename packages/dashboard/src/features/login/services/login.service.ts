@@ -1,21 +1,21 @@
 import { apiClient } from '#lib/api/client';
-import type { UserSchema } from '@insforge/shared-schemas';
+import type { ProjectAdminSchema } from '@insforge/shared-schemas';
 
 interface LoginResult {
-  user: UserSchema;
+  projectAdmin: ProjectAdminSchema;
   accessToken: string;
   csrfToken?: string;
 }
 
 export class LoginService {
-  async loginWithPassword(email: string, password: string): Promise<LoginResult> {
+  async loginWithPassword(username: string, password: string): Promise<LoginResult> {
     const response = await apiClient.request('/auth/admin/sessions', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ username, password }),
       skipRefresh: true,
     });
 
-    if (!response.user || !response.accessToken) {
+    if (!response.projectAdmin || !response.accessToken) {
       throw new Error('Invalid login response');
     }
 
@@ -27,7 +27,7 @@ export class LoginService {
     }
 
     return {
-      user: response.user,
+      projectAdmin: response.projectAdmin,
       accessToken: response.accessToken,
       csrfToken: response.csrfToken ?? undefined,
     };
@@ -40,7 +40,7 @@ export class LoginService {
       skipRefresh: true,
     });
 
-    if (!response.user || !response.accessToken) {
+    if (!response.projectAdmin || !response.accessToken) {
       throw new Error('Invalid authorization code exchange response');
     }
 
@@ -52,7 +52,7 @@ export class LoginService {
     }
 
     return {
-      user: response.user,
+      projectAdmin: response.projectAdmin,
       accessToken: response.accessToken,
       csrfToken: response.csrfToken ?? undefined,
     };
@@ -70,10 +70,10 @@ export class LoginService {
     apiClient.clearTokens();
   }
 
-  async getCurrentUser(): Promise<UserSchema | null> {
+  async getCurrentUser(): Promise<ProjectAdminSchema | null> {
     try {
       const response = await apiClient.request('/auth/sessions/current');
-      return response.user;
+      return response.projectAdmin ?? null;
     } catch {
       return null;
     }

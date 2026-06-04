@@ -7,6 +7,7 @@ import { SecretService } from '@/services/secrets/secret.service.js';
 
 export type UserContext = {
   id?: string;
+  subject?: string;
   email?: string;
   role: RoleSchema;
 };
@@ -48,8 +49,18 @@ export function extractApiKey(req: AuthRequest): string | null {
 // Helper function to set user on request
 function setRequestUser(
   req: AuthRequest,
-  payload: { sub?: string; email?: string; role: RoleSchema }
+  payload: { sub: string; email?: string; role: RoleSchema }
 ) {
+  if (payload.role === 'project_admin') {
+    req.user = {
+      subject: payload.sub,
+      // Existing audit/log call sites read req.user.email as their actor label.
+      email: payload.email ?? payload.sub,
+      role: payload.role,
+    };
+    return;
+  }
+
   req.user = {
     id: payload.sub,
     email: payload.email,

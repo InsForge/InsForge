@@ -67,9 +67,9 @@ Without the Bearer token, you'll get "permission denied" errors when trying to i
 # 1. First login to get JWT token
 curl -X POST http://localhost:7130/api/auth/admin/sessions \
   -H "Content-Type: application/json" \
-  -d "{\"email\":\"admin@example.com\",\"password\":\"your-password\"}"
+  -d "{\"username\":\"root\",\"password\":\"your-password\"}"
 
-# Response includes token: {"accessToken": "eyJ...", "user": {...}}
+# Response includes token: {"accessToken": "eyJ...", "projectAdmin": {...}}
 
 # Works on both Windows and Unix (Windows PowerShell: use curl.exe)
 # 2. Use the auth token for database operations

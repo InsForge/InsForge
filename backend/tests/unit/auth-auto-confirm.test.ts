@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Set required env vars before any imports
-process.env.ADMIN_EMAIL = 'admin@test.com';
-process.env.ADMIN_PASSWORD = 'admin-password';
+process.env.ROOT_ADMIN_USERNAME = 'root';
+process.env.ROOT_ADMIN_PASSWORD = 'admin-password';
 
 const { mockPool, mockClient } = vi.hoisted(() => ({
   mockPool: {

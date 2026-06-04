@@ -5,13 +5,13 @@ import { loginService } from '#features/login/services/login.service';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
 import { apiClient } from '#lib/api/client';
 import { getCurrentDistinctId, identifyUser } from '#lib/analytics/posthog';
-import type { UserSchema } from '@insforge/shared-schemas';
+import type { ProjectAdminSchema } from '@insforge/shared-schemas';
 
 interface AuthContextType {
-  user: UserSchema | null;
+  user: ProjectAdminSchema | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  loginWithPassword: (email: string, password: string) => Promise<boolean>;
+  loginWithPassword: (username: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   refreshAuth: () => Promise<void>;
   error: Error | null;
@@ -37,12 +37,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const getAuthorizationCode = isCloudHosting ? host.getAuthorizationCode : null;
   const onRequestUserInfo = isCloudHosting ? host.onRequestUserInfo : undefined;
   const location = useLocation();
-  const [user, setUser] = useState<UserSchema | null>(null);
+  const [user, setUser] = useState<ProjectAdminSchema | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
   const queryClient = useQueryClient();
-  const cloudAuthenticationRef = useRef<Promise<UserSchema | null> | null>(null);
+  const cloudAuthenticationRef = useRef<Promise<ProjectAdminSchema | null> | null>(null);
   const shouldAttemptCloudAuthentication =
     isCloudHosting && !location.pathname.startsWith('/dashboard/login');
   const shouldUseAuthorizationCodeRefresh =
@@ -74,17 +74,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, [queryClient]);
 
-  // Tracks the currently authenticated user id so `applyAuthenticatedUser`
+  // Tracks the currently authenticated admin subject so `applyAuthenticatedUser`
   // can tell a same-user token refresh apart from a real identity switch and
   // only drop cached data in the latter case. Initial value `null` means
-  // "no prior session"; first login transitions null → userId without
+  // "no prior session"; first login transitions null -> subject without
   // wiping (the cache is already empty).
-  const previousUserIdRef = useRef<string | null>(null);
+  const previousSubjectRef = useRef<string | null>(null);
 
   const handleAuthError = useCallback(() => {
     setUser(null);
     setIsAuthenticated(false);
-    previousUserIdRef.current = null;
+    previousSubjectRef.current = null;
     removeAuthScopedQueries();
   }, [removeAuthScopedQueries]);
 
@@ -118,19 +118,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, [onRequestUserInfo]);
 
   const applyAuthenticatedUser = useCallback(
-    async (nextUser: UserSchema): Promise<void> => {
+    async (nextUser: ProjectAdminSchema): Promise<void> => {
       await performPostHogIdentify();
       // Drop the previous user's cached data BEFORE switching identity, but
       // ONLY when identity actually changes. Same-user token refresh (cloud
       // authorization-code re-exchange after a 401) must NOT wipe the cache,
       // otherwise the dashboard flashes empty/skeleton state on every refresh.
-      // First login from a fresh session has previousUserIdRef.current === null,
-      // so `null !== nextUser.id` and the wipe runs — but the cache is already
+      // First login from a fresh session has previousSubjectRef.current === null,
+      // so the wipe runs but the cache is already
       // empty, so it's a harmless no-op.
-      if (previousUserIdRef.current !== nextUser.id) {
+      if (previousSubjectRef.current !== nextUser.subject) {
         removeAuthScopedQueries();
       }
-      previousUserIdRef.current = nextUser.id;
+      previousSubjectRef.current = nextUser.subject;
       setUser(nextUser);
       setIsAuthenticated(true);
     },
@@ -138,12 +138,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   );
 
   const exchangeAuthorizationCode = useCallback(
-    async (code: string): Promise<UserSchema> => {
+    async (code: string): Promise<ProjectAdminSchema> => {
       try {
         setError(null);
         const result = await loginService.loginWithAuthorizationCode(code);
-        await applyAuthenticatedUser(result.user);
-        return result.user;
+        await applyAuthenticatedUser(result.projectAdmin);
+        return result.projectAdmin;
       } catch (err) {
         setError(err instanceof Error ? err : new Error('Authorization code exchange failed'));
         throw err;
@@ -152,7 +152,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     [applyAuthenticatedUser]
   );
 
-  const authenticateCloudSession = useCallback(async (): Promise<UserSchema | null> => {
+  const authenticateCloudSession = useCallback(async (): Promise<ProjectAdminSchema | null> => {
     if (!shouldAttemptCloudAuthentication || !getAuthorizationCode) {
       return null;
     }
@@ -178,11 +178,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, [exchangeAuthorizationCode, getAuthorizationCode, shouldAttemptCloudAuthentication]);
 
   const loginWithPassword = useCallback(
-    async (email: string, password: string): Promise<boolean> => {
+    async (username: string, password: string): Promise<boolean> => {
       try {
         setError(null);
-        const result = await loginService.loginWithPassword(email, password);
-        await applyAuthenticatedUser(result.user);
+        const result = await loginService.loginWithPassword(username, password);
+        await applyAuthenticatedUser(result.projectAdmin);
         return true;
       } catch (err) {
         setError(err instanceof Error ? err : new Error('Login failed'));
@@ -221,7 +221,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       const currentUser = await loginService.getCurrentUser();
       if (currentUser) {
-        // Route through applyAuthenticatedUser so previousUserIdRef stays in
+        // Route through applyAuthenticatedUser so previousSubjectRef stays in
         // sync. Otherwise a session hydrated here as user A, followed later
         // by an auth-code re-exchange that switches to user B, would skip the
         // cache wipe (ref still null) and leak A's tenant-scoped queries to B.
@@ -254,7 +254,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(null);
     setIsAuthenticated(false);
     setError(null);
-    previousUserIdRef.current = null;
+    previousSubjectRef.current = null;
     removeAuthScopedQueries();
   }, [removeAuthScopedQueries]);
 

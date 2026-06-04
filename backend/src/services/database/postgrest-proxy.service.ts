@@ -42,6 +42,7 @@ export interface ProxyRequest {
   headers?: Record<string, string | string[] | undefined>;
   body?: unknown;
   apiKey?: string;
+  useAdminToken?: boolean;
 }
 
 export interface ProxyResponse {
@@ -118,10 +119,15 @@ export class PostgrestProxyService {
       },
     };
 
-    // Use admin token if valid API key provided
-    if (request.apiKey) {
-      const isValid = await this.secretService.verifyApiKey(request.apiKey);
-      if (isValid) {
+    if (request.useAdminToken) {
+      // Project admin subjects are intentionally dropped before PostgREST
+      // because auth.uid() is UUID-based while admin subjects are not.
+      if (request.apiKey) {
+        const isValid = await this.secretService.verifyApiKey(request.apiKey);
+        if (isValid) {
+          axiosConfig.headers.authorization = `Bearer ${this.adminToken}`;
+        }
+      } else {
         axiosConfig.headers.authorization = `Bearer ${this.adminToken}`;
       }
     }

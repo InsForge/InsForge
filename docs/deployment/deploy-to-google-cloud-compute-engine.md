@@ -172,8 +172,8 @@ At a minimum, set these values:
 JWT_SECRET=your-secret-key-here-must-be-32-char-or-above
 
 # Admin account (used for initial setup)
-ADMIN_EMAIL=admin@example.com
-ADMIN_PASSWORD=change-this-password
+ROOT_ADMIN_USERNAME=root
+ROOT_ADMIN_PASSWORD=change-this-password
 
 # Database (required)
 POSTGRES_PASSWORD=your-secure-postgres-password

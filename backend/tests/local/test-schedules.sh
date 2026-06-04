@@ -10,7 +10,7 @@
 #
 # Requires:
 #   - Backend reachable at $TEST_API_BASE (default http://localhost:7130/api)
-#   - Admin credentials per test-config.sh
+#   - Root admin credentials per test-config.sh
 #   - A reachable echo server. By default we use http://example.com (returns 200);
 #     set ECHO_URL to override.
 

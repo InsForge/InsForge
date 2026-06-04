@@ -5,7 +5,7 @@ This directory contains all test scripts for the Insforge backend.
 ## Prerequisites
 
 - Backend server running on `http://localhost:7130`
-- Admin credentials: `admin@example.com` / `change-this-password`
+- Root admin credentials: `root` / `change-this-password`
 - API key for storage operations
 
 ## Environment Variables
@@ -17,8 +17,8 @@ Set these before running tests:
 export ACCESS_API_KEY="your_api_key_here"
 
 # Optional - defaults shown
-export ADMIN_EMAIL="admin@example.com"
-export ADMIN_PASSWORD="change-this-password"
+export ROOT_ADMIN_USERNAME="root"
+export ROOT_ADMIN_PASSWORD="change-this-password"
 export TEST_API_BASE="http://localhost:7130/api"
 
 # Required for cloud/S3 tests

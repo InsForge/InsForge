@@ -566,7 +566,7 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
       }
     }
 
-    // Fetch current user data from DB
+    // Fetch current user data from DB.
     const dbUser = await authService.getUserById(payload.sub);
 
     if (!dbUser) {
@@ -647,6 +647,24 @@ router.get(
   verifyToken,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      if (req.user?.role === 'project_admin') {
+        if (!req.user.subject) {
+          throw new AppError('User not authenticated', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
+        }
+
+        const projectAdmin = authService.getProjectAdminFromSubject(req.user.subject);
+        if (!projectAdmin) {
+          throw new AppError('User not found', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
+        }
+
+        const response: GetCurrentSessionResponse = {
+          projectAdmin,
+        };
+
+        successResponse(res, response);
+        return;
+      }
+
       if (!req.user?.id) {
         throw new AppError('User not authenticated', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
       }
