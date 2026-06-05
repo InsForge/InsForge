@@ -1,8 +1,16 @@
 import { appConfig } from '@/infra/config/app.config.js';
 import logger from '@/utils/logger.js';
-import type { ComputeProvider } from './compute.provider.js';
+import type { ComputeProvider, ComputeLogsResult } from './compute.provider.js';
 
 const FLY_API_BASE = 'https://api.machines.dev/v1';
+// Container stdout/stderr lives on a different host + auth scheme than the
+// Machines API: api.fly.io with the `FlyV1 <macaroon>` scheme. The Machines
+// host (api.machines.dev) does NOT serve logs, and this endpoint rejects the
+// `Bearer` scheme with 401 — verified against a live Fly app. Same token,
+// different host + prefix. Fly documents this endpoint as stable-but-unofficial
+// (flyctl depends on it); we degrade to a thrown error rather than crash if it
+// ever changes shape.
+const FLY_LOGS_API_BASE = 'https://api.fly.io/api/v1';
 
 // Fly Machines API field names for the autostop/autostart block on a
 // service. Kept narrow on purpose: extend when we expose CLI overrides.
@@ -12,6 +20,20 @@ type ScaleOptions = {
   autostop: 'off' | 'stop' | 'suspend';
   autostart: boolean;
   min_machines_running: number;
+};
+
+// Shape of Fly's logs API response (JSON:API-style). Fields are optional on
+// purpose — we parse defensively since the endpoint is unofficial.
+type FlyLogsResponse = {
+  data?: {
+    attributes?: {
+      timestamp?: string | number;
+      message?: string;
+      instance?: string;
+      region?: string;
+    };
+  }[];
+  meta?: { next_token?: string | number };
 };
 
 export class FlyProvider implements ComputeProvider {
@@ -357,6 +379,71 @@ export class FlyProvider implements ComputeProvider {
 
     const limit = options?.limit ?? 100;
     return mapped.slice(0, limit);
+  }
+
+  /**
+   * Returns container stdout/stderr ("application logs") from Fly's logs API
+   * (api.fly.io/api/v1/apps/:app/logs). Unlike getEvents (machine lifecycle),
+   * these are the lines the running process writes. Supports backfill from
+   * Fly's ~7-day retention window and forward paging via `nextToken` for
+   * live tailing.
+   */
+  async getLogs(
+    appId: string,
+    machineId: string,
+    options?: { limit?: number; nextToken?: string }
+  ): Promise<ComputeLogsResult> {
+    const params = new URLSearchParams();
+    // Scope to this service's single machine — a Fly app may briefly hold more
+    // than one (e.g. mid-redeploy), and we only want this service's lines.
+    if (machineId) {
+      params.set('instance', machineId);
+    }
+    if (options?.nextToken) {
+      params.set('next_token', options.nextToken);
+    }
+    const url = `${FLY_LOGS_API_BASE}/apps/${appId}/logs?${params.toString()}`;
+
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `FlyV1 ${config.fly.apiToken}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      logger.error('Fly logs API error', { url, status: response.status, body: text });
+      throw new Error(`Fly logs API error (${response.status}): ${text}`);
+    }
+
+    const raw = await response.text();
+    const body = JSON.parse(raw) as FlyLogsResponse;
+
+    const lines = (body.data ?? []).map((entry) => {
+      const a = entry.attributes ?? {};
+      // Fly returns RFC3339 strings (e.g. "2026-06-04T21:25:05.152Z"); some
+      // shapes carry epoch numbers. Normalize to epoch ms; 0 if unparseable.
+      const parsed = typeof a.timestamp === 'number' ? a.timestamp : Date.parse(a.timestamp ?? '');
+      return {
+        timestamp: Number.isNaN(parsed) ? 0 : parsed,
+        message: a.message ?? '',
+        instance: a.instance,
+        region: a.region,
+      };
+    });
+
+    const limit = options?.limit ?? 100;
+    // Keep the most-recent `limit` lines (Fly returns oldest→newest).
+    const bounded = lines.length > limit ? lines.slice(-limit) : lines;
+
+    // `next_token` is a nanosecond Unix timestamp — it exceeds
+    // Number.MAX_SAFE_INTEGER, so JSON.parse() would silently round it and
+    // corrupt the cursor. Pull the exact digits from the raw text instead.
+    const tokenMatch = raw.match(/"next_token"\s*:\s*"?(\d+)"?/);
+    const nextToken = tokenMatch ? tokenMatch[1] : null;
+
+    return { lines: bounded, nextToken };
   }
 
   // Parse Fly.io's `<kind>-<N>x` format (e.g. shared-2x, performance-8x).

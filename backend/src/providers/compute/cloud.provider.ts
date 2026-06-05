@@ -8,6 +8,7 @@ import type {
   UpdateMachineParams,
   MachineSummary,
   ComputeEvent,
+  ComputeLogsResult,
 } from './compute.provider.js';
 
 export class CloudComputeProvider implements ComputeProvider {
@@ -187,6 +188,25 @@ export class CloudComputeProvider implements ComputeProvider {
         `/machines/${encodeURIComponent(machineId)}/events${qs}`
       )) ?? []
     );
+  }
+
+  async getLogs(
+    appId: string,
+    machineId: string,
+    options?: { limit?: number; nextToken?: string }
+  ): Promise<ComputeLogsResult> {
+    const params = new URLSearchParams({ appId });
+    if (options?.limit) {
+      params.set('limit', String(options.limit));
+    }
+    if (options?.nextToken) {
+      params.set('next_token', options.nextToken);
+    }
+    const result = await this.call<ComputeLogsResult>(
+      'GET',
+      `/machines/${encodeURIComponent(machineId)}/logs?${params.toString()}`
+    );
+    return result ?? { lines: [], nextToken: null };
   }
 
   async waitForState(

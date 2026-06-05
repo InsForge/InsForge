@@ -323,4 +323,73 @@ describe('FlyProvider', () => {
       );
     });
   });
+
+  describe('getLogs', () => {
+    const okText = (raw: string) => ({ ok: true, text: () => Promise.resolve(raw) });
+
+    it('hits the api.fly.io logs host with the FlyV1 scheme, scoped to the machine', async () => {
+      const mockFetch = vi.fn().mockResolvedValue(okText('{"data":[],"meta":{}}'));
+      vi.stubGlobal('fetch', mockFetch);
+
+      await provider.getLogs('my-app', 'machine-123');
+
+      const [calledUrl, init] = mockFetch.mock.calls[0];
+      expect(calledUrl).toContain('https://api.fly.io/api/v1/apps/my-app/logs');
+      // Scopes to this service's machine via the `instance` query param.
+      expect(calledUrl).toContain('instance=machine-123');
+      // Logs use Fly's macaroon scheme, NOT Bearer (which 401s on this host).
+      expect((init.headers as Record<string, string>).Authorization).toBe('FlyV1 test-token');
+    });
+
+    it('normalizes RFC3339 timestamps to epoch ms', async () => {
+      const raw =
+        '{"data":[{"attributes":{"timestamp":"2026-06-04T21:25:05.000Z",' +
+        '"message":"hello from container","instance":"machine-123","region":"iad"}}],"meta":{}}';
+      const mockFetch = vi.fn().mockResolvedValue(okText(raw));
+      vi.stubGlobal('fetch', mockFetch);
+
+      const result = await provider.getLogs('my-app', 'machine-123');
+
+      expect(result.lines).toEqual([
+        {
+          timestamp: Date.parse('2026-06-04T21:25:05.000Z'),
+          message: 'hello from container',
+          instance: 'machine-123',
+          region: 'iad',
+        },
+      ]);
+    });
+
+    it('returns next_token at full precision (it exceeds Number.MAX_SAFE_INTEGER)', async () => {
+      // A bare JSON number here would round to ...890600 under JSON.parse;
+      // the provider must preserve every digit by reading the raw text.
+      const raw = '{"data":[],"meta":{"next_token":1780608313161890637}}';
+      const mockFetch = vi.fn().mockResolvedValue(okText(raw));
+      vi.stubGlobal('fetch', mockFetch);
+
+      const result = await provider.getLogs('my-app', 'machine-123');
+
+      expect(result.nextToken).toBe('1780608313161890637');
+    });
+
+    it('forwards the nextToken cursor as the Fly next_token query param', async () => {
+      const mockFetch = vi.fn().mockResolvedValue(okText('{"data":[],"meta":{}}'));
+      vi.stubGlobal('fetch', mockFetch);
+
+      await provider.getLogs('my-app', 'machine-123', { nextToken: 'cursor-abc' });
+
+      expect(mockFetch.mock.calls[0][0]).toContain('next_token=cursor-abc');
+    });
+
+    it('throws on a non-2xx logs response', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        text: () => Promise.resolve('Unauthorized'),
+      });
+      vi.stubGlobal('fetch', mockFetch);
+
+      await expect(provider.getLogs('my-app', 'machine-123')).rejects.toThrow(/401/);
+    });
+  });
 });
