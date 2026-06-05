@@ -36,9 +36,9 @@ describe('Deno Subhosting 429 backoff', () => {
         return jsonResponse({
           id: 'dep-1',
           projectId: 'proj-1',
-          status: 'success',
-          domains: [],
-          createdAt: new Date().toISOString(),
+          status: 'succeeded',
+          failure_reason: null,
+          created_at: new Date().toISOString(),
         });
       }),
       Response,
@@ -65,9 +65,9 @@ describe('Deno Subhosting 429 backoff', () => {
         return jsonResponse({
           id: 'dep-2',
           projectId: 'proj-1',
-          status: 'success',
-          domains: [],
-          createdAt: new Date().toISOString(),
+          status: 'succeeded',
+          failure_reason: null,
+          created_at: new Date().toISOString(),
         });
       }),
       Response,
@@ -138,9 +138,9 @@ describe('Deno Subhosting 429 backoff', () => {
         return jsonResponse({
           id: 'dep-cap',
           projectId: 'proj-1',
-          status: 'success',
-          domains: [],
-          createdAt: new Date().toISOString(),
+          status: 'succeeded',
+          failure_reason: null,
+          created_at: new Date().toISOString(),
         });
       }),
       Response,

@@ -126,8 +126,9 @@ export class LogService {
     try {
       const result = await denoProvider.getDeploymentAppLogs(deploymentId, {
         limit,
-        until: beforeTimestamp,
-        order: 'desc',
+        // v2 logs are a [start, end] window; `end` caps at the requested
+        // beforeTimestamp and the provider defaults `start` to 24h earlier.
+        end: beforeTimestamp,
         // Deno's `level` param is an exact-match filter (comma-separated), not a
         // minimum-severity threshold. Omitting it returns all levels (error, warning,
         // info, debug); passing `debug` would return ONLY debug-level entries.

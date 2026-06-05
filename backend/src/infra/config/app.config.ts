@@ -47,7 +47,12 @@ export const config: AppConfig = {
   denoSubhosting: {
     token: process.env.DENO_SUBHOSTING_TOKEN || '',
     organizationId: process.env.DENO_SUBHOSTING_ORG_ID || '',
-    domain: 'functions.insforge.app',
+    // Public function domain. On Deno v2 this is the CloudFront proxy domain
+    // (`function2.insforge.app`) that forwards `{appkey}.function2.insforge.app`
+    // → `{appkey}.insforge.deno.net`. Overridable so the cloud control-plane can
+    // pin v1 (`functions.insforge.app`) vs v2 per deployment. See
+    // docs/deno-subhosting.md §4.1.
+    domain: process.env.FUNCTIONS_DOMAIN || 'function2.insforge.app',
   },
   fly: {
     // Self-hosters enable compute by setting both FLY_API_TOKEN and FLY_ORG.

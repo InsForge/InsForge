@@ -24,13 +24,17 @@ vi.mock('../../src/utils/logger', () => ({
   },
 }));
 
-// Mock config
+// Mock config. `cloud.appKey` is the Deno app slug the v2 logs endpoint is
+// scoped to (GET /v2/apps/{slug}/logs).
 vi.mock('../../src/infra/config/app.config', () => ({
   config: {
     denoSubhosting: {
       token: 'test-deno-token',
       organizationId: 'test-org-id',
-      domain: 'deno.dev',
+      domain: 'function2.insforge.app',
+    },
+    cloud: {
+      appKey: 'test-app-key',
     },
   },
 }));
@@ -85,29 +89,31 @@ vi.mock('../../src/providers/logs/local.provider', () => ({
   LocalFileProvider: vi.fn().mockImplementation(() => mockLocalProvider),
 }));
 
-// Helper to create a mock fetch Response
-function createMockResponse(body: unknown, status = 200, headers: Record<string, string> = {}) {
+// Helper to create a mock fetch Response. The v2 logs endpoint returns a JSON
+// object { logs, next_cursor } (consumed via response.json()).
+function createMockResponse(body: unknown, status = 200) {
   return {
     ok: status >= 200 && status < 300,
     status,
     statusText: status === 200 ? 'OK' : 'Error',
     json: () => Promise.resolve(body),
-    text: () =>
-      Promise.resolve(
-        typeof body === 'string'
-          ? body
-          : Array.isArray(body)
-            ? body.map((item) => JSON.stringify(item)).join('\n')
-            : JSON.stringify(body)
-      ),
+    text: () => Promise.resolve(typeof body === 'string' ? body : JSON.stringify(body)),
     headers: {
-      get: (name: string) => headers[name.toLowerCase()] || null,
+      get: () => null,
     },
   };
 }
 
+// v2 RuntimeLogsResponse builder.
+function logsResponse(
+  entries: Array<{ timestamp: string; level: string; message: string; region?: string }>,
+  nextCursor: string | null = null
+) {
+  return createMockResponse({ logs: entries, next_cursor: nextCursor });
+}
+
 // ============================================
-// DenoSubhostingProvider.getDeploymentAppLogs
+// DenoSubhostingProvider.getDeploymentAppLogs (v2)
 // ============================================
 
 describe('DenoSubhostingProvider.getDeploymentAppLogs', () => {
@@ -118,35 +124,31 @@ describe('DenoSubhostingProvider.getDeploymentAppLogs', () => {
     provider = DenoSubhostingProvider.getInstance();
   });
 
-  it('fetches app logs with default options', async () => {
-    const mockLogs = [
-      {
-        time: '2025-01-15T10:00:00Z',
-        level: 'info',
-        message: 'Hello from function',
-        region: 'us-east1',
-      },
-      {
-        time: '2025-01-15T10:00:01Z',
-        level: 'error',
-        message: 'Something failed',
-        region: 'us-east1',
-      },
+  it('fetches app logs and normalizes timestamp -> time', async () => {
+    const entries = [
+      { timestamp: '2025-01-15T10:00:00Z', level: 'info', message: 'Hello from function', region: 'us-east1' },
+      { timestamp: '2025-01-15T10:00:01Z', level: 'error', message: 'Something failed', region: 'us-east1' },
     ];
 
-    mockFetch.mockResolvedValue(createMockResponse(mockLogs));
+    mockFetch.mockResolvedValue(logsResponse(entries));
 
-    const result = await provider.getDeploymentAppLogs('deploy-123');
+    const result = await provider.getDeploymentAppLogs('rev-123');
 
     expect(result.logs).toHaveLength(2);
     expect(result.logs[0].message).toBe('Hello from function');
+    expect(result.logs[0].time).toBe('2025-01-15T10:00:00Z');
     expect(result.logs[1].level).toBe('error');
     expect(result.cursor).toBeNull();
     expect(result.hasMore).toBe(false);
 
-    // Verify fetch was called with correct URL and auth
+    // v2 endpoint is app-scoped and filtered by revision_id; auth header present.
+    const calledUrl = mockFetch.mock.calls[0][0] as string;
+    expect(calledUrl).toContain('https://api.deno.com/v2/apps/test-app-key/logs?');
+    expect(calledUrl).toContain('revision_id=rev-123');
+    // start is required by v2 — provider must always supply it.
+    expect(calledUrl).toContain('start=');
     expect(mockFetch).toHaveBeenCalledWith(
-      'https://api.deno.com/v1/deployments/deploy-123/app_logs',
+      expect.any(String),
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: 'Bearer test-deno-token' }),
       })
@@ -154,48 +156,55 @@ describe('DenoSubhostingProvider.getDeploymentAppLogs', () => {
   });
 
   it('passes query parameters correctly', async () => {
-    mockFetch.mockResolvedValue(createMockResponse([]));
+    mockFetch.mockResolvedValue(logsResponse([]));
 
-    await provider.getDeploymentAppLogs('deploy-123', {
-      q: 'error',
+    await provider.getDeploymentAppLogs('rev-123', {
+      query: 'error',
       level: 'error,warning',
-      since: '2025-01-15T00:00:00Z',
-      until: '2025-01-15T23:59:59Z',
+      start: '2025-01-15T00:00:00Z',
+      end: '2025-01-15T23:59:59Z',
       limit: 50,
-      order: 'asc',
     });
 
     const calledUrl = mockFetch.mock.calls[0][0] as string;
-    expect(calledUrl).toContain('q=error');
+    expect(calledUrl).toContain('query=error');
     expect(calledUrl).toContain('level=error%2Cwarning');
-    expect(calledUrl).toContain('since=2025-01-15T00%3A00%3A00Z');
-    expect(calledUrl).toContain('until=2025-01-15T23%3A59%3A59Z');
+    expect(calledUrl).toContain('start=2025-01-15T00%3A00%3A00Z');
+    expect(calledUrl).toContain('end=2025-01-15T23%3A59%3A59Z');
     expect(calledUrl).toContain('limit=50');
-    expect(calledUrl).toContain('order=asc');
   });
 
-  it('extracts cursor from Link header', async () => {
-    const mockLogs = [
-      { time: '2025-01-15T10:00:00Z', level: 'info', message: 'Log entry', region: 'us-east1' },
-    ];
+  it('extracts cursor from next_cursor', async () => {
+    mockFetch.mockResolvedValue(
+      logsResponse(
+        [{ timestamp: '2025-01-15T10:00:00Z', level: 'info', message: 'Log entry', region: 'us-east1' }],
+        'abc123'
+      )
+    );
 
-    const linkHeader =
-      '<https://api.deno.com/v1/deployments/deploy-123/app_logs?cursor=abc123>; rel="next"';
-    mockFetch.mockResolvedValue(createMockResponse(mockLogs, 200, { link: linkHeader }));
-
-    const result = await provider.getDeploymentAppLogs('deploy-123');
+    const result = await provider.getDeploymentAppLogs('rev-123');
 
     expect(result.cursor).toBe('abc123');
     expect(result.hasMore).toBe(true);
   });
 
-  it('returns null cursor when no Link header', async () => {
-    mockFetch.mockResolvedValue(createMockResponse([]));
+  it('returns null cursor when next_cursor is null', async () => {
+    mockFetch.mockResolvedValue(logsResponse([]));
 
-    const result = await provider.getDeploymentAppLogs('deploy-123');
+    const result = await provider.getDeploymentAppLogs('rev-123');
 
     expect(result.cursor).toBeNull();
     expect(result.hasMore).toBe(false);
+  });
+
+  it('defaults region to empty string when omitted', async () => {
+    mockFetch.mockResolvedValue(
+      logsResponse([{ timestamp: '2025-01-15T10:00:00Z', level: 'info', message: 'no region' }])
+    );
+
+    const result = await provider.getDeploymentAppLogs('rev-123');
+
+    expect(result.logs[0].region).toBe('');
   });
 
   it('throws AppError on 404', async () => {
@@ -210,7 +219,7 @@ describe('DenoSubhostingProvider.getDeploymentAppLogs', () => {
   it('throws AppError on API error', async () => {
     mockFetch.mockResolvedValue(createMockResponse('Internal Server Error', 500));
 
-    await expect(provider.getDeploymentAppLogs('deploy-123')).rejects.toMatchObject({
+    await expect(provider.getDeploymentAppLogs('rev-123')).rejects.toMatchObject({
       statusCode: 500,
       code: ERROR_CODES.UPSTREAM_FAILURE,
       message: 'Internal Server Error',
@@ -220,7 +229,7 @@ describe('DenoSubhostingProvider.getDeploymentAppLogs', () => {
   it('throws AppError on network failure', async () => {
     mockFetch.mockRejectedValue(new Error('Network error'));
 
-    await expect(provider.getDeploymentAppLogs('deploy-123')).rejects.toMatchObject({
+    await expect(provider.getDeploymentAppLogs('rev-123')).rejects.toMatchObject({
       statusCode: 502,
       code: ERROR_CODES.UPSTREAM_FAILURE,
       message: 'Network error',
@@ -228,9 +237,9 @@ describe('DenoSubhostingProvider.getDeploymentAppLogs', () => {
   });
 
   it('returns empty array when no logs', async () => {
-    mockFetch.mockResolvedValue(createMockResponse([]));
+    mockFetch.mockResolvedValue(logsResponse([]));
 
-    const result = await provider.getDeploymentAppLogs('deploy-123');
+    const result = await provider.getDeploymentAppLogs('rev-123');
 
     expect(result.logs).toHaveLength(0);
     expect(result.hasMore).toBe(false);
@@ -264,22 +273,17 @@ describe('LogService.getLogsBySource with Deno Subhosting', () => {
   });
 
   it('routes function.logs to Deno API when Subhosting is configured', async () => {
-    // Mock DB query for latest deployment ID
+    // Mock DB query for latest deployment (revision) ID
     mockPool.query.mockResolvedValue({
-      rows: [{ id: 'deploy-latest' }],
+      rows: [{ id: 'rev-latest' }],
     });
 
-    // Mock Deno API response
-    const mockLogs = [
-      {
-        time: '2025-01-15T10:00:00Z',
-        level: 'info',
-        message: 'Function executed',
-        region: 'us-east1',
-      },
-      { time: '2025-01-15T10:00:05Z', level: 'warning', message: 'Slow query', region: 'us-east1' },
-    ];
-    mockFetch.mockResolvedValue(createMockResponse(mockLogs));
+    mockFetch.mockResolvedValue(
+      logsResponse([
+        { timestamp: '2025-01-15T10:00:00Z', level: 'info', message: 'Function executed', region: 'us-east1' },
+        { timestamp: '2025-01-15T10:00:05Z', level: 'warning', message: 'Slow query', region: 'us-east1' },
+      ])
+    );
 
     const result = await logService.getLogsBySource('function.logs', 100);
 
@@ -297,9 +301,9 @@ describe('LogService.getLogsBySource with Deno Subhosting', () => {
 
   it('also works with deno-relay-logs source name', async () => {
     mockPool.query.mockResolvedValue({
-      rows: [{ id: 'deploy-latest' }],
+      rows: [{ id: 'rev-latest' }],
     });
-    mockFetch.mockResolvedValue(createMockResponse([]));
+    mockFetch.mockResolvedValue(logsResponse([]));
 
     const result = await logService.getLogsBySource('deno-relay-logs', 50);
 
@@ -318,44 +322,35 @@ describe('LogService.getLogsBySource with Deno Subhosting', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it('passes beforeTimestamp as until parameter to Deno API', async () => {
+  it('passes beforeTimestamp as the end parameter to Deno API', async () => {
     mockPool.query.mockResolvedValue({
-      rows: [{ id: 'deploy-latest' }],
+      rows: [{ id: 'rev-latest' }],
     });
-    mockFetch.mockResolvedValue(createMockResponse([]));
+    mockFetch.mockResolvedValue(logsResponse([]));
 
     await logService.getLogsBySource('function.logs', 50, '2025-01-15T09:00:00Z');
 
     const calledUrl = mockFetch.mock.calls[0][0] as string;
-    expect(calledUrl).toContain('until=2025-01-15T09%3A00%3A00Z');
+    expect(calledUrl).toContain('end=2025-01-15T09%3A00%3A00Z');
     expect(calledUrl).toContain('limit=50');
-    expect(calledUrl).toContain('order=desc');
+    // provider derives a default start window (24h before end).
+    expect(calledUrl).toContain('start=2025-01-14T09%3A00%3A00');
   });
 
   it('does not send a level filter so all severities are returned', async () => {
     // Deno's `level` param is an exact-match filter, not a min-severity threshold.
-    // Hardcoding level=debug previously dropped all info/warning/error logs, so we
-    // must omit it entirely to surface the full runtime log stream.
+    // Omitting it surfaces the full runtime log stream (error, warning, info, debug).
     mockPool.query.mockResolvedValue({
-      rows: [{ id: 'deploy-latest' }],
+      rows: [{ id: 'rev-latest' }],
     });
 
-    const mockLogs = [
-      {
-        time: '2025-01-15T10:00:00Z',
-        level: 'debug',
-        message: 'isolate start time',
-        region: 'us-east1',
-      },
-      {
-        time: '2025-01-15T10:00:01Z',
-        level: 'info',
-        message: 'request handled',
-        region: 'us-east1',
-      },
-      { time: '2025-01-15T10:00:02Z', level: 'error', message: 'boom', region: 'us-east1' },
-    ];
-    mockFetch.mockResolvedValue(createMockResponse(mockLogs));
+    mockFetch.mockResolvedValue(
+      logsResponse([
+        { timestamp: '2025-01-15T10:00:00Z', level: 'debug', message: 'isolate start time', region: 'us-east1' },
+        { timestamp: '2025-01-15T10:00:01Z', level: 'info', message: 'request handled', region: 'us-east1' },
+        { timestamp: '2025-01-15T10:00:02Z', level: 'error', message: 'boom', region: 'us-east1' },
+      ])
+    );
 
     const result = await logService.getLogsBySource('function.logs', 100);
 
@@ -367,20 +362,21 @@ describe('LogService.getLogsBySource with Deno Subhosting', () => {
 
   it('generates unique log IDs from deployment ID and timestamp', async () => {
     mockPool.query.mockResolvedValue({
-      rows: [{ id: 'deploy-abc' }],
+      rows: [{ id: 'rev-abc' }],
     });
 
-    const mockLogs = [
-      { time: '2025-01-15T10:00:00Z', level: 'info', message: 'Log 1', region: 'us-east1' },
-      { time: '2025-01-15T10:00:00Z', level: 'info', message: 'Log 2', region: 'us-east1' },
-    ];
-    mockFetch.mockResolvedValue(createMockResponse(mockLogs));
+    mockFetch.mockResolvedValue(
+      logsResponse([
+        { timestamp: '2025-01-15T10:00:00Z', level: 'info', message: 'Log 1', region: 'us-east1' },
+        { timestamp: '2025-01-15T10:00:00Z', level: 'info', message: 'Log 2', region: 'us-east1' },
+      ])
+    );
 
     const result = await logService.getLogsBySource('function.logs', 100);
 
     // Same timestamp but different index ensures unique IDs
-    expect(result.logs[0].id).toBe('deno-deploy-abc-2025-01-15T10:00:00Z-0');
-    expect(result.logs[1].id).toBe('deno-deploy-abc-2025-01-15T10:00:00Z-1');
+    expect(result.logs[0].id).toBe('deno-rev-abc-2025-01-15T10:00:00Z-0');
+    expect(result.logs[1].id).toBe('deno-rev-abc-2025-01-15T10:00:00Z-1');
   });
 
   it('falls back to provider for non-function-logs sources', async () => {

@@ -21,7 +21,7 @@ declare global {
   var __insforge_dispatch__: ((req: Request) => Promise<Response>) | undefined;
 }
 
-const DENO_SUBHOSTING_API_BASE = 'https://api.deno.com/v1';
+const DENO_SUBHOSTING_API_BASE = 'https://api.deno.com/v2';
 const DEFAULT_TIMEOUT_MS = 10000;
 
 // Exponential backoff schedule for 429 (rate-limited) responses, in ms.
@@ -212,28 +212,42 @@ interface DenoSubhostingAsset {
   encoding: 'utf-8';
 }
 
-// App log types
+// App log types (v2: GET /v2/apps/{app}/logs)
 export interface AppLogQueryOptions {
-  q?: string;
+  // `start` is required by the v2 API; getDeploymentAppLogs supplies a default
+  // window when the caller omits it.
+  start?: string;
+  end?: string;
   level?: string;
-  region?: string;
-  since?: string;
-  until?: string;
+  query?: string;
   limit?: number;
-  order?: 'asc' | 'desc';
   cursor?: string;
 }
 
-const appLogEntrySchema = z.object({
-  time: z.string(),
+// Raw v2 RuntimeLog entry shape. Note `timestamp` (v1 used `time`) and that
+// `region` is optional in v2.
+const runtimeLogSchema = z.object({
+  timestamp: z.string(),
   level: z.string(),
   message: z.string(),
-  region: z.string(),
+  region: z.string().optional(),
+  revision_id: z.string().optional(),
 });
 
-export type AppLogEntry = z.infer<typeof appLogEntrySchema>;
+// v2 wraps logs in an object with body-level pagination (v1 used a Link header).
+const runtimeLogsResponseSchema = z.object({
+  logs: z.array(runtimeLogSchema),
+  next_cursor: z.string().nullable().optional(),
+});
 
-const appLogResponseSchema = z.array(appLogEntrySchema);
+// Normalized entry returned to callers (stable across the v1→v2 migration so
+// log.service doesn't need to know the wire shape).
+export interface AppLogEntry {
+  time: string;
+  level: string;
+  message: string;
+  region: string;
+}
 
 export interface AppLogResult {
   logs: AppLogEntry[];
@@ -247,24 +261,30 @@ export interface BuildLogEntry {
   message: string;
 }
 
-// Schema for Deno Subhosting API response
-// Note: Deno doesn't return error details in deployment response
-// Error info comes from build logs endpoint
-const denoSubhostingApiResponseSchema = z.object({
+// v2 Revision response (POST /v2/apps/{app}/deploy, GET /v2/revisions/{id}).
+// Renamed from v1's `deployment`; snake_case; no `domains`/`projectId` fields.
+// Deno still doesn't return error details here — they come from build logs.
+const revisionResponseSchema = z.object({
   id: z.string(),
-  projectId: z.string(),
-  status: z.string().transform((s) => {
-    if (s === 'success') {
-      return 'success' as const;
-    }
-    if (s === 'failed') {
-      return 'failed' as const;
-    }
-    return 'pending' as const;
-  }),
-  domains: z.array(z.string()).default([]),
-  createdAt: z.string(),
+  status: z.enum(['skipped', 'queued', 'building', 'succeeded', 'failed']),
+  failure_reason: z.string().nullable().optional(),
+  created_at: z.string(),
 });
+
+type RevisionStatus = z.infer<typeof revisionResponseSchema>['status'];
+
+// Collapse the v2 revision lifecycle to the coarse status our DB and callers
+// use ('pending' | 'success' | 'failed'), keeping the provider's public contract
+// stable. `skipped` means "no changes to deploy" — treat as a successful no-op.
+function mapRevisionStatus(status: RevisionStatus): 'pending' | 'success' | 'failed' {
+  if (status === 'succeeded' || status === 'skipped') {
+    return 'success';
+  }
+  if (status === 'failed') {
+    return 'failed';
+  }
+  return 'pending'; // queued | building
+}
 
 export class DenoSubhostingProvider {
   private static instance: DenoSubhostingProvider;
@@ -303,21 +323,22 @@ export class DenoSubhostingProvider {
   }
 
   /**
-   * Ensure project exists, create if not
+   * Ensure the Deno app exists, creating it if not.
+   *
+   * The app slug = APP_KEY. Combined with our org slug (`insforge`), Deno serves
+   * the app at `{slug}.insforge.deno.net`; the public function URL is the
+   * CloudFront proxy in front of that (see docs/deno-subhosting.md §4.1).
    */
-  private async ensureProject(projectId: string): Promise<void> {
+  private async ensureApp(slug: string): Promise<void> {
     const credentials = this.getCredentials();
 
-    // Check if project exists
-    const checkResponse = await fetchWithTimeout(
-      `${DENO_SUBHOSTING_API_BASE}/projects/${projectId}`,
-      {
-        headers: { Authorization: `Bearer ${credentials.token}` },
-      }
-    );
+    // Check if the app exists
+    const checkResponse = await fetchWithTimeout(`${DENO_SUBHOSTING_API_BASE}/apps/${slug}`, {
+      headers: { Authorization: `Bearer ${credentials.token}` },
+    });
 
     if (checkResponse.ok) {
-      return; // Project exists
+      return; // App exists
     }
 
     if (checkResponse.status !== 404) {
@@ -329,24 +350,22 @@ export class DenoSubhostingProvider {
             data: await checkResponse.text(),
           },
         },
-        'Failed to check project'
+        'Failed to check app'
       );
     }
 
-    // Create project
-    logger.info('Creating Deno Subhosting project', { projectId });
+    // Create the app. v2 binds the token to one org, so there is no org in the
+    // path; the slug travels in the body.
+    logger.info('Creating Deno Deploy app', { slug });
 
-    const createResponse = await fetchWithTimeout(
-      `${DENO_SUBHOSTING_API_BASE}/organizations/${credentials.organizationId}/projects`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${credentials.token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name: projectId }),
-      }
-    );
+    const createResponse = await fetchWithTimeout(`${DENO_SUBHOSTING_API_BASE}/apps`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${credentials.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ slug }),
+    });
 
     if (!createResponse.ok) {
       throw new UpstreamError(
@@ -357,11 +376,20 @@ export class DenoSubhostingProvider {
             data: await createResponse.text(),
           },
         },
-        'Failed to create project'
+        'Failed to create app'
       );
     }
 
-    logger.info('Deno Subhosting project created', { projectId });
+    logger.info('Deno Deploy app created', { slug });
+  }
+
+  /**
+   * Build the public function URL for an app slug. Points at the CloudFront
+   * proxy domain (config.denoSubhosting.domain, e.g. `function2.insforge.app`),
+   * which forwards to `{slug}.insforge.deno.net`.
+   */
+  private getFunctionUrl(slug: string): string {
+    return `https://${slug}.${config.denoSubhosting.domain}`;
   }
 
   /**
@@ -437,8 +465,8 @@ export class DenoSubhostingProvider {
     const credentials = this.getCredentials();
 
     try {
-      // Ensure project exists
-      await this.ensureProject(projectId);
+      // Ensure the app exists
+      await this.ensureApp(projectId);
 
       // Build assets map
       const assets: Record<string, DenoSubhostingAsset> = {
@@ -474,16 +502,20 @@ export class DenoSubhostingProvider {
       });
 
       const payload = {
-        entryPointUrl: 'main.ts',
         assets,
-        // Pass secrets directly as env vars - accessible via Deno.env.get('KEY')
-        envVars: secrets,
-        // Use template variable for stable subdomain (Subhosting resolves this)
-        domains: [`{project.name}.${config.denoSubhosting.domain}`],
+        // v2 moves the entrypoint into config.runtime; `dynamic` runs a Deno
+        // process (vs. `static` file serving). No `domains` field exists in v2 —
+        // custom-domain routing is handled by the CloudFront proxy instead.
+        config: {
+          runtime: { type: 'dynamic', entrypoint: 'main.ts' },
+        },
+        // v2 takes env vars as an array of {key, value} (was a Record in v1).
+        // Accessible via Deno.env.get('KEY').
+        env_vars: Object.entries(secrets).map(([key, value]) => ({ key, value })),
       };
 
       const response = await fetchWithTimeout(
-        `${DENO_SUBHOSTING_API_BASE}/projects/${projectId}/deployments`,
+        `${DENO_SUBHOSTING_API_BASE}/apps/${projectId}/deploy`,
         {
           method: 'POST',
           headers: {
@@ -513,24 +545,22 @@ export class DenoSubhostingProvider {
         );
       }
 
-      const data = denoSubhostingApiResponseSchema.parse(await response.json());
+      const data = revisionResponseSchema.parse(await response.json());
+      const status = mapRevisionStatus(data.status);
 
       logger.info('Deno Subhosting deployment created', {
-        deploymentId: data.id,
-        projectId: data.projectId,
-        status: data.status,
-        domains: data.domains,
+        revisionId: data.id,
+        projectId,
+        status,
+        denoStatus: data.status,
       });
 
       return {
         id: data.id,
-        projectId: data.projectId,
-        status: data.status,
-        url:
-          data.domains.length > 0
-            ? `https://${data.domains[0]}`
-            : `https://${projectId}.${config.denoSubhosting.domain}`,
-        createdAt: new Date(data.createdAt),
+        projectId,
+        status,
+        url: this.getFunctionUrl(projectId),
+        createdAt: new Date(data.created_at),
       };
     } catch (error) {
       if (error instanceof AppError) {
@@ -553,7 +583,7 @@ export class DenoSubhostingProvider {
 
     try {
       const response = await fetchWithTimeout(
-        `${DENO_SUBHOSTING_API_BASE}/deployments/${deploymentId}`,
+        `${DENO_SUBHOSTING_API_BASE}/revisions/${deploymentId}`,
         {
           headers: {
             Authorization: `Bearer ${credentials.token}`,
@@ -581,14 +611,19 @@ export class DenoSubhostingProvider {
         );
       }
 
-      const data = denoSubhostingApiResponseSchema.parse(await response.json());
+      const data = revisionResponseSchema.parse(await response.json());
+      const status = mapRevisionStatus(data.status);
+
+      // v2 revisions carry no app slug or domain; the URL is deterministic from
+      // our app slug (= APP_KEY). Only surface it once the revision succeeds.
+      const slug = config.cloud.appKey;
 
       return {
         id: data.id,
-        projectId: data.projectId,
-        status: data.status,
-        url: data.domains.length > 0 ? `https://${data.domains[0]}` : null,
-        createdAt: new Date(data.createdAt),
+        projectId: slug,
+        status,
+        url: status === 'success' ? this.getFunctionUrl(slug) : null,
+        createdAt: new Date(data.created_at),
       };
     } catch (error) {
       if (error instanceof AppError) {
@@ -615,43 +650,40 @@ export class DenoSubhostingProvider {
     const credentials = this.getCredentials();
 
     try {
+      // v2 logs are app-scoped (`/apps/{slug}/logs`) and filtered by revision.
+      // `deploymentId` is the revision id; the app slug is our APP_KEY.
+      const slug = config.cloud.appKey;
+
+      // v2 requires a `start`. Default to a 24h window ending at `end` (or now)
+      // so "latest logs" requests keep working without the caller computing it.
+      const end = options.end ?? new Date().toISOString();
+      const start = options.start ?? new Date(Date.parse(end) - 24 * 60 * 60 * 1000).toISOString();
+
       const params = new URLSearchParams();
-      if (options.q) {
-        params.set('q', options.q);
+      params.set('start', start);
+      params.set('end', end);
+      params.set('revision_id', deploymentId);
+      if (options.query) {
+        params.set('query', options.query);
       }
       if (options.level) {
         params.set('level', options.level);
       }
-      if (options.region) {
-        params.set('region', options.region);
-      }
-      if (options.since) {
-        params.set('since', options.since);
-      }
-      if (options.until) {
-        params.set('until', options.until);
-      }
       if (options.limit !== undefined) {
         params.set('limit', String(options.limit));
-      }
-      if (options.order) {
-        params.set('order', options.order);
       }
       if (options.cursor) {
         params.set('cursor', options.cursor);
       }
 
-      const queryString = params.toString();
-      const url = `${DENO_SUBHOSTING_API_BASE}/deployments/${deploymentId}/app_logs${
-        queryString ? `?${queryString}` : ''
-      }`;
+      const url = `${DENO_SUBHOSTING_API_BASE}/apps/${slug}/logs?${params.toString()}`;
 
       const response = await fetchWithTimeout(
         url,
         {
           headers: {
             Authorization: `Bearer ${credentials.token}`,
-            Accept: 'application/x-ndjson',
+            Accept: 'application/json',
           },
         },
         6000
@@ -677,18 +709,17 @@ export class DenoSubhostingProvider {
         );
       }
 
-      // Parse NDJSON format (newline-delimited JSON)
-      const text = await response.text();
-      const logs = text
-        .split('\n')
-        .filter((line) => line.trim())
-        .map((line) => JSON.parse(line));
-      const data = appLogResponseSchema.parse(logs);
-      const linkHeader = response.headers.get('link');
-      const cursor = this.parseCursorFromLinkHeader(linkHeader);
+      const data = runtimeLogsResponseSchema.parse(await response.json());
+      const logs: AppLogEntry[] = data.logs.map((entry) => ({
+        time: entry.timestamp,
+        level: entry.level,
+        message: entry.message,
+        region: entry.region ?? '',
+      }));
+      const cursor = data.next_cursor ?? null;
 
       return {
-        logs: data,
+        logs,
         cursor,
         hasMore: cursor !== null,
       };
@@ -713,7 +744,7 @@ export class DenoSubhostingProvider {
 
     try {
       const response = await fetchWithTimeout(
-        `${DENO_SUBHOSTING_API_BASE}/deployments/${deploymentId}/build_logs`,
+        `${DENO_SUBHOSTING_API_BASE}/revisions/${deploymentId}/build_logs`,
         {
           headers: {
             Authorization: `Bearer ${credentials.token}`,
@@ -1009,23 +1040,6 @@ globalThis.__insforge_dispatch__ = dispatch;
 
 Deno.serve(dispatch);
 `;
-  }
-
-  /**
-   * Parse cursor from RFC 8288 Link header
-   * Expected format: <url?cursor=abc123>; rel="next"
-   */
-  private parseCursorFromLinkHeader(linkHeader: string | null): string | null {
-    if (!linkHeader) {
-      return null;
-    }
-
-    const nextMatch = linkHeader.match(/<[^>]*[?&]cursor=([^&>]+)[^>]*>;\s*rel="next"/);
-    if (nextMatch && nextMatch[1]) {
-      return decodeURIComponent(nextMatch[1]);
-    }
-
-    return null;
   }
 
   /**
