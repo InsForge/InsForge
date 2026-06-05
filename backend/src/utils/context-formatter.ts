@@ -12,8 +12,11 @@ export function formatContextAsMarkdown(metadata: AppMetadataSchema): string {
     String(s ?? '')
       .replace(/\|/g, '\\|')
       .replace(/\n/g, ' ');
-  /** Strip newlines for inline code spans (pipes are safe inside backticks). */
-  const code = (s: unknown) => String(s ?? '').replace(/\n/g, ' ');
+  /** Strip backticks and newlines for inline code spans. */
+  const code = (s: unknown) =>
+    String(s ?? '')
+      .replace(/`/g, '')
+      .replace(/\n/g, ' ');
 
   lines.push('# Project Metadata');
   if (metadata.version) {

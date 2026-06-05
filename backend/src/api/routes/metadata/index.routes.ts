@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { Router, Response, NextFunction } from 'express';
 import { DatabaseAdvanceService } from '@/services/database/database-advance.service.js';
 import { AuthService } from '@/services/auth/auth.service.js';
@@ -29,10 +30,14 @@ const deploymentService = DeploymentService.getInstance();
 
 router.use(verifyAdmin);
 
+const metadataQuerySchema = z.object({
+  format: z.enum(['json', 'markdown']).optional().default('json'),
+});
+
 // Get full metadata (default endpoint)
 router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    // Gather metadata from all modules
+    const { format } = metadataQuerySchema.parse(req.query);
 
     // Fetch all metadata in parallel for better performance
     const [auth, database, storage, functions, deployments] = await Promise.all([
@@ -60,7 +65,7 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
       version,
     };
 
-    if (req.query.format === 'markdown') {
+    if (format === 'markdown') {
       res
         .set('Content-Type', 'text/markdown; charset=utf-8')
         .send(formatContextAsMarkdown(metadata));
