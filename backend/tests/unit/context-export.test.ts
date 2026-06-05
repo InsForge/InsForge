@@ -36,10 +36,14 @@ const sampleMetadata: AppMetadataSchema = {
     totalSizeInGB: 0.3,
   },
   storage: {
-    buckets: [{ name: 'avatars', public: true, createdAt: '2026-01-01T00:00:00Z', objectCount: 42 }],
+    buckets: [
+      { name: 'avatars', public: true, createdAt: '2026-01-01T00:00:00Z', objectCount: 42 },
+    ],
     totalSizeInGB: 0.5,
   },
-  functions: [{ slug: 'hello-world', name: 'hello-world', status: 'active', description: 'Test function' }],
+  functions: [
+    { slug: 'hello-world', name: 'hello-world', status: 'active', description: 'Test function' },
+  ],
   realtime: {
     channels: [
       {
