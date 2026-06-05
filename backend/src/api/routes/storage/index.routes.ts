@@ -71,7 +71,7 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
     const config = await storageConfigService.updateStorageConfig(validation.data);
 
     await auditService.log({
-      actor: req.user?.email || 'api-key',
+      actor: req.hasApiKey ? 'api-key' : req.user?.id,
       action: 'UPDATE_STORAGE_CONFIG',
       module: 'STORAGE',
       details: { updatedFields: Object.keys(validation.data) },
@@ -118,7 +118,7 @@ router.post(
 
       // Log audit for bucket creation
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'CREATE_BUCKET',
         module: 'STORAGE',
         details: {
@@ -192,7 +192,7 @@ router.patch(
 
       // Log audit for bucket update
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'UPDATE_BUCKET',
         module: 'STORAGE',
         details: {
@@ -539,7 +539,7 @@ router.delete(
 
       // Log audit for bucket deletion
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'DELETE_BUCKET',
         module: 'STORAGE',
         details: {
@@ -733,7 +733,7 @@ router.post(
       }
       const result = await s3AccessKeyService.create(validation.data);
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'CREATE_S3_ACCESS_KEY',
         module: 'STORAGE',
         details: { accessKeyId: result.accessKeyId },
@@ -770,7 +770,7 @@ router.delete(
     try {
       await s3AccessKeyService.delete(req.params.id);
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'DELETE_S3_ACCESS_KEY',
         module: 'STORAGE',
         details: { id: req.params.id },

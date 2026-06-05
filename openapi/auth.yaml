@@ -619,9 +619,10 @@ paths:
 
   /api/auth/sessions/current:
     get:
-      summary: Get current user
+      summary: Get current session
       description: |
         Returns the currently authenticated user's basic info from the access token.
+        Project admin tokens return a projectAdmin session object instead of an auth.users row.
 
         This endpoint does not refresh expired access tokens by itself.
         For browser apps using the TypeScript SDK, call `auth.getCurrentUser()`
@@ -634,24 +635,25 @@ paths:
         - bearerAuth: []
       responses:
         '200':
-          description: Current user info
+          description: Current session info
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  user:
-                    type: object
+                oneOf:
+                  - type: object
+                    required:
+                      - user
+                    additionalProperties: false
                     properties:
-                      id:
-                        type: string
-                        format: uuid
-                      email:
-                        type: string
-                        format: email
-                      role:
-                        type: string
-                        enum: [authenticated, project_admin]
+                      user:
+                        $ref: '#/components/schemas/UserResponse'
+                  - type: object
+                    required:
+                      - projectAdmin
+                    additionalProperties: false
+                    properties:
+                      projectAdmin:
+                        $ref: '#/components/schemas/ProjectAdminResponse'
         '401':
           description: Unauthorized
 
@@ -668,12 +670,12 @@ paths:
             schema:
               type: object
               required:
-                - email
+                - username
                 - password
               properties:
-                email:
+                username:
                   type: string
-                  format: email
+                  example: admin
                 password:
                   type: string
       responses:
@@ -684,8 +686,8 @@ paths:
               schema:
                 type: object
                 properties:
-                  user:
-                    $ref: '#/components/schemas/UserResponse'
+                  projectAdmin:
+                    $ref: '#/components/schemas/ProjectAdminResponse'
                   accessToken:
                     type: string
                   csrfToken:
@@ -723,8 +725,8 @@ paths:
               schema:
                 type: object
                 properties:
-                  user:
-                    $ref: '#/components/schemas/UserResponse'
+                  projectAdmin:
+                    $ref: '#/components/schemas/ProjectAdminResponse'
                   accessToken:
                     type: string
                     description: Internal JWT for admin authentication
@@ -759,8 +761,8 @@ paths:
               schema:
                 type: object
                 properties:
-                  user:
-                    $ref: '#/components/schemas/UserResponse'
+                  projectAdmin:
+                    $ref: '#/components/schemas/ProjectAdminResponse'
                   accessToken:
                     type: string
                   csrfToken:
@@ -1864,6 +1866,19 @@ components:
       name: x-api-key
 
   schemas:
+    ProjectAdminResponse:
+      type: object
+      required:
+        - subject
+        - username
+      properties:
+        subject:
+          type: string
+          example: local:admin
+        username:
+          type: string
+          example: admin
+
     UserResponse:
       type: object
       properties:

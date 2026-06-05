@@ -1,6 +1,7 @@
 import { TokenManager } from '../../src/infra/security/token.manager';
 import { jwtVerify } from 'jose';
 import { AppError } from '../../src/utils/errors';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
 
 // Mock jose.jwtVerify
@@ -44,5 +45,14 @@ describe('TokenManager.verifyCloudToken', () => {
     });
 
     await expect(tokenManager.verifyCloudToken('token')).rejects.toThrow(AppError);
+  });
+
+  it('wraps JWT verification failures as unauthorized AppError', async () => {
+    (jwtVerify as unknown as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('JWT expired'));
+
+    await expect(tokenManager.verifyCloudToken('expired-token')).rejects.toMatchObject({
+      statusCode: 401,
+      code: ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+    });
   });
 });

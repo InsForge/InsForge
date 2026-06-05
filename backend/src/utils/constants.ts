@@ -1,4 +1,3 @@
-export const ADMIN_ID = '00000000-0000-0000-0000-000000000001';
 export const ANON_ID = '12345678-1234-5678-90ab-cdef12345678';
 
 /** PostgreSQL data types that should preserve empty strings instead of stripping them. */

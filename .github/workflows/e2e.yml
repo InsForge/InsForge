@@ -22,8 +22,8 @@ jobs:
           POSTGRES_DB=insforge
           DATABASE_URL=postgresql://postgres:postgres@postgres:5432/insforge
           JWT_SECRET=test-secret-key-for-ci-cd-pipeline
-          ADMIN_EMAIL=admin@example.com
-          ADMIN_PASSWORD=test-admin-password-for-ci
+          ROOT_ADMIN_USERNAME=admin
+          ROOT_ADMIN_PASSWORD=test-admin-password-for-ci
           TEST_API_BASE=http://localhost:7130/api
           INSFORGE_DISABLE_WRITE_RATE_LIMIT=1
           EOF
