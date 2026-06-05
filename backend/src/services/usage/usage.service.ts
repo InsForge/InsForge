@@ -107,11 +107,12 @@ export class UsageService {
         `SELECT COALESCE(SUM(size), 0) as total_size FROM storage.objects`
       );
 
-      // Get total user count (exclude anonymous accounts)
+      // Get total user count (exclude anonymous and legacy project-admin accounts)
       const userCountResult = await this.getPool().query(
         `SELECT COUNT(*) as count
          FROM auth.users
-         WHERE is_anonymous = false`
+         WHERE is_anonymous = false
+           AND is_project_admin = false`
       );
 
       return {

@@ -1274,6 +1274,7 @@ export class AuthService {
       FROM auth.users u
       LEFT JOIN auth.user_providers a ON u.id = a.user_id
       WHERE u.is_anonymous = false
+        AND u.is_project_admin = false
     `;
     const params: (string | number)[] = [];
 
@@ -1291,8 +1292,9 @@ export class AuthService {
     // Transform users
     const users = dbUsers.map((dbUser) => this.transformUserRecordToSchema(dbUser));
 
-    // Get total count (exclude anonymous users)
-    let countQuery = 'SELECT COUNT(*) as count FROM auth.users WHERE is_anonymous = false';
+    // Get total count (exclude anonymous and legacy project-admin users)
+    let countQuery =
+      'SELECT COUNT(*) as count FROM auth.users WHERE is_anonymous = false AND is_project_admin = false';
     const countParams: string[] = [];
     if (search) {
       countQuery += ` AND (email LIKE $1 OR profile->>'name' LIKE $2)`;
