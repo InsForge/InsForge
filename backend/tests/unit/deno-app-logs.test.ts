@@ -126,8 +126,18 @@ describe('DenoSubhostingProvider.getDeploymentAppLogs', () => {
 
   it('fetches app logs and normalizes timestamp -> time', async () => {
     const entries = [
-      { timestamp: '2025-01-15T10:00:00Z', level: 'info', message: 'Hello from function', region: 'us-east1' },
-      { timestamp: '2025-01-15T10:00:01Z', level: 'error', message: 'Something failed', region: 'us-east1' },
+      {
+        timestamp: '2025-01-15T10:00:00Z',
+        level: 'info',
+        message: 'Hello from function',
+        region: 'us-east1',
+      },
+      {
+        timestamp: '2025-01-15T10:00:01Z',
+        level: 'error',
+        message: 'Something failed',
+        region: 'us-east1',
+      },
     ];
 
     mockFetch.mockResolvedValue(logsResponse(entries));
@@ -177,7 +187,14 @@ describe('DenoSubhostingProvider.getDeploymentAppLogs', () => {
   it('extracts cursor from next_cursor', async () => {
     mockFetch.mockResolvedValue(
       logsResponse(
-        [{ timestamp: '2025-01-15T10:00:00Z', level: 'info', message: 'Log entry', region: 'us-east1' }],
+        [
+          {
+            timestamp: '2025-01-15T10:00:00Z',
+            level: 'info',
+            message: 'Log entry',
+            region: 'us-east1',
+          },
+        ],
         'abc123'
       )
     );
@@ -280,8 +297,18 @@ describe('LogService.getLogsBySource with Deno Subhosting', () => {
 
     mockFetch.mockResolvedValue(
       logsResponse([
-        { timestamp: '2025-01-15T10:00:00Z', level: 'info', message: 'Function executed', region: 'us-east1' },
-        { timestamp: '2025-01-15T10:00:05Z', level: 'warning', message: 'Slow query', region: 'us-east1' },
+        {
+          timestamp: '2025-01-15T10:00:00Z',
+          level: 'info',
+          message: 'Function executed',
+          region: 'us-east1',
+        },
+        {
+          timestamp: '2025-01-15T10:00:05Z',
+          level: 'warning',
+          message: 'Slow query',
+          region: 'us-east1',
+        },
       ])
     );
 
@@ -346,8 +373,18 @@ describe('LogService.getLogsBySource with Deno Subhosting', () => {
 
     mockFetch.mockResolvedValue(
       logsResponse([
-        { timestamp: '2025-01-15T10:00:00Z', level: 'debug', message: 'isolate start time', region: 'us-east1' },
-        { timestamp: '2025-01-15T10:00:01Z', level: 'info', message: 'request handled', region: 'us-east1' },
+        {
+          timestamp: '2025-01-15T10:00:00Z',
+          level: 'debug',
+          message: 'isolate start time',
+          region: 'us-east1',
+        },
+        {
+          timestamp: '2025-01-15T10:00:01Z',
+          level: 'info',
+          message: 'request handled',
+          region: 'us-east1',
+        },
         { timestamp: '2025-01-15T10:00:02Z', level: 'error', message: 'boom', region: 'us-east1' },
       ])
     );

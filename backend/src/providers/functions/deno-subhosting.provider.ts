@@ -464,9 +464,14 @@ export class DenoSubhostingProvider {
   ): Promise<FunctionDeploymentResult> {
     const credentials = this.getCredentials();
 
+    // Single source of truth for the Deno app slug (= APP_KEY). deployFunctions,
+    // getDeployment, and getDeploymentAppLogs must all resolve it the same way,
+    // otherwise we deploy to one app and poll status/logs/URL for another.
+    const slug = config.cloud.appKey;
+
     try {
       // Ensure the app exists
-      await this.ensureApp(projectId);
+      await this.ensureApp(slug);
 
       // Build assets map
       const assets: Record<string, DenoSubhostingAsset> = {
@@ -515,7 +520,7 @@ export class DenoSubhostingProvider {
       };
 
       const response = await fetchWithTimeout(
-        `${DENO_SUBHOSTING_API_BASE}/apps/${projectId}/deploy`,
+        `${DENO_SUBHOSTING_API_BASE}/apps/${slug}/deploy`,
         {
           method: 'POST',
           headers: {
@@ -550,16 +555,19 @@ export class DenoSubhostingProvider {
 
       logger.info('Deno Subhosting deployment created', {
         revisionId: data.id,
-        projectId,
+        projectId: slug,
         status,
         denoStatus: data.status,
       });
 
       return {
         id: data.id,
-        projectId,
+        projectId: slug,
         status,
-        url: this.getFunctionUrl(projectId),
+        // Gate the URL on success to match getDeployment(); the initial revision
+        // is typically `pending`, and callers use `url !== null` to decide
+        // whether the endpoint is live.
+        url: status === 'success' ? this.getFunctionUrl(slug) : null,
         createdAt: new Date(data.created_at),
       };
     } catch (error) {
@@ -657,7 +665,13 @@ export class DenoSubhostingProvider {
       // v2 requires a `start`. Default to a 24h window ending at `end` (or now)
       // so "latest logs" requests keep working without the caller computing it.
       const end = options.end ?? new Date().toISOString();
-      const start = options.start ?? new Date(Date.parse(end) - 24 * 60 * 60 * 1000).toISOString();
+      const endMs = Date.parse(end);
+      if (isNaN(endMs)) {
+        // Guard before `new Date(NaN).toISOString()` throws a RangeError that the
+        // outer catch would misclassify as an upstream failure.
+        throw new AppError(`Invalid end timestamp: "${end}"`, 400, ERROR_CODES.INVALID_INPUT);
+      }
+      const start = options.start ?? new Date(endMs - 24 * 60 * 60 * 1000).toISOString();
 
       const params = new URLSearchParams();
       params.set('start', start);
