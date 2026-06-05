@@ -34,21 +34,29 @@ const MIGRATION_FILE = /^(\d+)_.*\.sql$/;
  *             grandfathered: Array<{prefix:string, files:string[]}>, nextPrefix: string }}
  */
 export function findDuplicateMigrations(dir = MIGRATIONS_DIR) {
-  const byPrefix = new Map();
+  const byPrefix = new Map<string, string[]>();
 
   for (const name of readdirSync(dir)) {
     const match = MIGRATION_FILE.exec(name);
-    if (!match) continue;
+    if (!match) {
+      continue;
+    }
     const prefix = match[1];
-    if (!byPrefix.has(prefix)) byPrefix.set(prefix, []);
-    byPrefix.get(prefix).push(name);
+    let list = byPrefix.get(prefix);
+    if (!list) {
+      list = [];
+      byPrefix.set(prefix, list);
+    }
+    list.push(name);
   }
 
-  const newDuplicates = [];
-  const grandfathered = [];
+  const newDuplicates: Array<{ prefix: string; files: string[] }> = [];
+  const grandfathered: Array<{ prefix: string; files: string[] }> = [];
 
   for (const [prefix, files] of byPrefix) {
-    if (files.length < 2) continue;
+    if (files.length < 2) {
+      continue;
+    }
     files.sort();
     (ALLOWED_DUPLICATES.has(prefix) ? grandfathered : newDuplicates).push({ prefix, files });
   }
