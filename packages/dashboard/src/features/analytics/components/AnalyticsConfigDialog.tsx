@@ -30,7 +30,7 @@ type Section = 'general' | 'setup-prompt';
 interface AnalyticsConfigDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  connection: PosthogConnection;
+  connection: PosthogConnection | null;
   projectId: string;
 }
 
@@ -44,7 +44,7 @@ export function AnalyticsConfigDialog({
   const [revealed, setRevealed] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
 
-  const { onOpenPosthog } = useDashboardHost();
+  const { onOpenPosthog, onConnectPosthog } = useDashboardHost();
   const { showToast } = useToast();
 
   const handleOpenChange = (nextOpen: boolean) => {
@@ -55,16 +55,20 @@ export function AnalyticsConfigDialog({
     onOpenChange(nextOpen);
   };
 
-  const maskedKey =
-    connection.apiKey.length > 8
+  const maskedKey = connection
+    ? connection.apiKey.length > 8
       ? `${connection.apiKey.slice(0, 4)}${'•'.repeat(connection.apiKey.length - 8)}${connection.apiKey.slice(-4)}`
-      : '•'.repeat(connection.apiKey.length);
+      : '•'.repeat(connection.apiKey.length)
+    : '';
 
   const title = section === 'general' ? 'General' : 'Setup Prompt';
 
-  const directUrl = `${connection.host}/project/${connection.posthogProjectId}`;
+  const directUrl = connection ? `${connection.host}/project/${connection.posthogProjectId}` : '';
 
   const handleOpenPosthog = () => {
+    if (!connection) {
+      return;
+    }
     if (!onOpenPosthog) {
       window.open(directUrl, '_blank', 'noopener,noreferrer');
       return;
@@ -132,80 +136,98 @@ export function AnalyticsConfigDialog({
 
             <MenuDialogBody>
               {section === 'general' ? (
-                <div className="flex flex-col gap-2">
-                  {/* Project info row + actions */}
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex min-w-0 flex-col">
-                      <p className="truncate text-base font-normal leading-7 text-foreground">
-                        {connection.projectName}
-                      </p>
-                      <div className="flex items-center gap-2 text-sm leading-5 text-muted-foreground">
-                        <span>{connection.region}</span>
-                        {connection.organizationName && (
-                          <>
-                            <span aria-hidden className="size-1 rounded-full bg-muted-foreground" />
-                            <span className="truncate">{connection.organizationName}</span>
-                          </>
-                        )}
+                connection ? (
+                  <div className="flex flex-col gap-2">
+                    {/* Project info row + actions */}
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex min-w-0 flex-col">
+                        <p className="truncate text-base font-normal leading-7 text-foreground">
+                          {connection.projectName}
+                        </p>
+                        <div className="flex items-center gap-2 text-sm leading-5 text-muted-foreground">
+                          <span>{connection.region}</span>
+                          {connection.organizationName && (
+                            <>
+                              <span
+                                aria-hidden
+                                className="size-1 rounded-full bg-muted-foreground"
+                              />
+                              <span className="truncate">{connection.organizationName}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Button variant="secondary" onClick={handleOpenPosthog}>
+                          Open in PostHog
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          className="border-warning bg-warning/10 text-warning hover:bg-warning/20"
+                          onClick={() => setDisconnecting(true)}
+                        >
+                          Disconnect
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <Button variant="secondary" onClick={handleOpenPosthog}>
-                        Open in PostHog
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        className="border-warning bg-warning/10 text-warning hover:bg-warning/20"
-                        onClick={() => setDisconnecting(true)}
-                      >
-                        Disconnect
-                      </Button>
-                    </div>
-                  </div>
 
-                  <div className="h-px w-full bg-[var(--alpha-8)]" />
+                    <div className="h-px w-full bg-[var(--alpha-8)]" />
 
-                  <FieldRow label="Project API Key">
-                    <div className="relative flex-1">
-                      <Input
-                        readOnly
-                        value={revealed ? connection.apiKey : maskedKey}
-                        className="pr-9 font-mono"
+                    <FieldRow label="Project API Key">
+                      <div className="relative flex-1">
+                        <Input
+                          readOnly
+                          value={revealed ? connection.apiKey : maskedKey}
+                          className="pr-9 font-mono"
+                        />
+                        <button
+                          type="button"
+                          aria-label={revealed ? 'Hide API key' : 'Reveal API key'}
+                          onClick={() => setRevealed((v) => !v)}
+                          className="absolute right-1.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-[var(--alpha-8)] hover:text-foreground"
+                        >
+                          {revealed ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                      <CopyButton
+                        text={connection.apiKey}
+                        showText={false}
+                        aria-label="Copy API key"
                       />
-                      <button
-                        type="button"
-                        aria-label={revealed ? 'Hide API key' : 'Reveal API key'}
-                        onClick={() => setRevealed((v) => !v)}
-                        className="absolute right-1.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-[var(--alpha-8)] hover:text-foreground"
-                      >
-                        {revealed ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                    <CopyButton
-                      text={connection.apiKey}
-                      showText={false}
-                      aria-label="Copy API key"
-                    />
-                  </FieldRow>
+                    </FieldRow>
 
-                  <div className="h-px w-full bg-[var(--alpha-8)]" />
+                    <div className="h-px w-full bg-[var(--alpha-8)]" />
 
-                  <FieldRow label="Host">
-                    <Input readOnly value={connection.host} className="font-mono" />
-                    <CopyButton text={connection.host} showText={false} aria-label="Copy host" />
-                  </FieldRow>
+                    <FieldRow label="Host">
+                      <Input readOnly value={connection.host} className="font-mono" />
+                      <CopyButton text={connection.host} showText={false} aria-label="Copy host" />
+                    </FieldRow>
 
-                  <div className="h-px w-full bg-[var(--alpha-8)]" />
+                    <div className="h-px w-full bg-[var(--alpha-8)]" />
 
-                  <FieldRow label="Project ID">
-                    <Input readOnly value={connection.posthogProjectId} className="font-mono" />
-                    <CopyButton
-                      text={connection.posthogProjectId}
-                      showText={false}
-                      aria-label="Copy Project ID"
-                    />
-                  </FieldRow>
-                </div>
+                    <FieldRow label="Project ID">
+                      <Input readOnly value={connection.posthogProjectId} className="font-mono" />
+                      <CopyButton
+                        text={connection.posthogProjectId}
+                        showText={false}
+                        aria-label="Copy Project ID"
+                      />
+                    </FieldRow>
+                  </div>
+                ) : (
+                  <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 text-center">
+                    <p className="text-sm leading-6 text-foreground">
+                      You haven&apos;t connected PostHog yet.
+                    </p>
+                    <Button
+                      variant="primary"
+                      disabled={!onConnectPosthog}
+                      onClick={() => onConnectPosthog?.(projectId)}
+                    >
+                      Connect PostHog
+                    </Button>
+                  </div>
+                )
               ) : (
                 <div className="flex flex-col gap-3">
                   <p className="text-sm leading-6 text-muted-foreground">
@@ -235,13 +257,15 @@ export function AnalyticsConfigDialog({
         </MenuDialogContent>
       </MenuDialog>
 
-      <DisconnectDialog
-        open={disconnecting}
-        onClose={() => {
-          setDisconnecting(false);
-          onOpenChange(false);
-        }}
-      />
+      {connection && (
+        <DisconnectDialog
+          open={disconnecting}
+          onClose={() => {
+            setDisconnecting(false);
+            onOpenChange(false);
+          }}
+        />
+      )}
     </>
   );
 }

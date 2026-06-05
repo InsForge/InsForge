@@ -17,6 +17,7 @@
     "test:ui": "vitest --ui",
     "test:e2e": "./tests/run-all-tests.sh",
     "migrate:bootstrap": "tsx src/infra/database/migrations/bootstrap/bootstrap-migrations.js",
+    "migrate:baseline": "tsx src/infra/database/migrations/bootstrap/baseline-migrations.js",
     "migrate:up": "npm run migrate:bootstrap && node-pg-migrate up --migrations-dir src/infra/database/migrations --migrations-schema system --migrations-table migrations",
     "migrate:down": "node-pg-migrate down --migrations-dir src/infra/database/migrations --migrations-schema system --migrations-table migrations",
     "migrate:create": "node-pg-migrate create --migrations-dir src/infra/database/migrations --migrations-schema system --migrations-table migrations",
@@ -45,7 +46,7 @@
     "@types/multer": "^1.4.13",
     "@types/pg": "^8.15.4",
     "adm-zip": "^0.5.16",
-    "axios": "^1.15.0",
+    "axios": "^1.16.1",
     "bcryptjs": "^3.0.2",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -91,6 +92,6 @@
     "tsx": "^4.7.1",
     "typescript": "^5.3.3",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^3.2.4"
+    "vitest": "^4.1.8"
   }
 }

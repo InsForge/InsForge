@@ -70,13 +70,11 @@ export class TokenManager {
   }
 
   /**
-   * Generate API key token (never expires)
-   * Used for internal API key authenticated requests to PostgREST
+   * Generate PostgREST project admin token (never expires)
+   * Used only for internal PostgREST proxy requests
    */
-  generateApiKeyToken(): string {
+  generatePostgrestAdminToken(): string {
     const payload = {
-      sub: 'project-admin-with-api-key',
-      email: 'project-admin@email.com',
       role: 'project_admin',
     };
     return jwt.sign(payload, JWT_SECRET, {
@@ -167,6 +165,9 @@ export class TokenManager {
   verifyToken(token: string): TokenPayloadSchema {
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as TokenPayloadSchema;
+      if (!decoded.sub) {
+        throw new AppError('Invalid token subject', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+      }
       return {
         sub: decoded.sub,
         email: decoded.email,

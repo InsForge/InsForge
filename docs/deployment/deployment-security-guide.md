@@ -226,8 +226,8 @@ These **must** be changed from defaults before going to production:
 # ── Security (CRITICAL — generate unique values) ──────────────
 JWT_SECRET=<output of: openssl rand -base64 32>
 ENCRYPTION_KEY=<output of: openssl rand -base64 24>
-ADMIN_EMAIL=you@yourdomain.com
-ADMIN_PASSWORD=<strong-unique-password>
+ROOT_ADMIN_USERNAME=admin
+ROOT_ADMIN_PASSWORD=<strong-unique-password>
 
 # ── Public URL (must match your domain/IP) ────────────────────
 API_BASE_URL=https://insforge.yourdomain.com
@@ -1111,7 +1111,7 @@ docker compose down && docker compose up -d   # Apply update
 - [ ] Fail2Ban installed and active
 - [ ] `JWT_SECRET` changed from default (32+ chars)
 - [ ] `ENCRYPTION_KEY` set (separate from `JWT_SECRET`)
-- [ ] `ADMIN_PASSWORD` changed from default
+- [ ] `ROOT_ADMIN_PASSWORD` changed from default
 - [ ] `POSTGRES_PASSWORD` changed from default
 - [ ] `.env` file permissions set to `600`
 - [ ] HTTPS enabled via Certbot or Caddy

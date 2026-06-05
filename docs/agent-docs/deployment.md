@@ -165,5 +165,5 @@ Do not add this rewrite to frameworks that already own routing, such as Next.js.
 | Deploy app | `create-deployment` MCP tool |
 | Check latest runs | Dashboard or `SELECT * FROM deployments.runs ORDER BY created_at DESC` |
 | Inspect direct file upload state | `SELECT * FROM deployments.files WHERE deployment_id = '...'` |
-| Manage env vars | Dashboard Deployments -> Environment Variables |
-| Manage domains | Dashboard Deployments -> Domains |
+| Manage env vars | Dashboard Sites -> Environment Variables |
+| Manage domains | Dashboard Sites -> Domains |

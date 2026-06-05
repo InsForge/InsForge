@@ -26,7 +26,10 @@ export class XOAuthProvider implements OAuthProvider {
   /**
    * Generate X OAuth authorization URL
    */
-  async generateOAuthUrl(state?: string): Promise<string> {
+  async generateOAuthUrl(
+    state?: string,
+    additionalParams?: Record<string, string>
+  ): Promise<string> {
     const oauthConfigService = OAuthConfigService.getInstance();
     const config = await oauthConfigService.getConfigByProvider('x');
     const verifier = crypto.randomBytes(32).toString('base64url');
@@ -58,7 +61,17 @@ export class XOAuthProvider implements OAuthProvider {
           },
         }
       );
-      return response.data.auth_url || response.data.url || '';
+      const sharedAuthUrl = response.data.auth_url || response.data.url;
+      if (!sharedAuthUrl) {
+        throw new Error('Shared X OAuth did not return an authorization URL');
+      }
+      const authUrl = new URL(sharedAuthUrl);
+      Object.entries(additionalParams ?? {}).forEach(([key, value]) => {
+        if (!authUrl.searchParams.has(key)) {
+          authUrl.searchParams.set(key, value);
+        }
+      });
+      return authUrl.toString();
     }
 
     logger.debug('X OAuth Config (fresh from DB):', {
@@ -76,6 +89,11 @@ export class XOAuthProvider implements OAuthProvider {
     authUrl.searchParams.set('state', state ?? '');
     authUrl.searchParams.set('code_challenge', challenge);
     authUrl.searchParams.set('code_challenge_method', 'S256');
+    Object.entries(additionalParams ?? {}).forEach(([key, value]) => {
+      if (!authUrl.searchParams.has(key)) {
+        authUrl.searchParams.set(key, value);
+      }
+    });
 
     return authUrl.toString();
   }

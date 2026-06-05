@@ -306,27 +306,42 @@ export class FunctionService {
    * Delete a function
    */
   async deleteFunction(slug: string): Promise<boolean> {
+    const client = await this.getPool().connect();
     try {
-      const result = await this.getPool().query(
-        'DELETE FROM functions.definitions WHERE slug = $1',
-        [slug]
-      );
+      await client.query('BEGIN');
+
+      const result = await client.query('DELETE FROM functions.definitions WHERE slug = $1', [
+        slug,
+      ]);
 
       if (result.rowCount === 0) {
+        await client.query('ROLLBACK');
         return false;
       }
+
+      // Remove the deleted slug from deployment records' functions array,
+      // preserving shared deployment history for other functions.
+      await client.query(
+        'UPDATE functions.deployments SET functions = functions - $1 WHERE functions @> $2::jsonb',
+        [slug, JSON.stringify([slug])]
+      );
+
+      await client.query('COMMIT');
 
       // Trigger redeployment without the deleted function
       this.scheduleDeployment();
 
       return true;
     } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
       logger.error('Failed to delete function', {
         error: error instanceof Error ? error.message : String(error),
         operation: 'deleteFunction',
         slug,
       });
       throw error;
+    } finally {
+      client.release();
     }
   }
 

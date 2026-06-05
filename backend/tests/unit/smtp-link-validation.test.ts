@@ -33,7 +33,7 @@ vi.mock('../../src/services/email/email-template.service', () => ({
   EmailTemplateService: {
     getInstance: () => ({
       getTemplate: vi.fn().mockResolvedValue({
-        id: '00000000-0000-0000-0000-000000000001',
+        id: '11111111-1111-4111-8111-111111111111',
         templateType: 'email-verification-link',
         subject: 'Verify your email',
         bodyHtml: '<a href="{{ link }}">Click here</a>',
@@ -52,7 +52,7 @@ describe('SmtpEmailProvider — link URL validation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getRawSmtpConfigMock.mockResolvedValue({
-      id: '00000000-0000-0000-0000-000000000001',
+      id: '11111111-1111-4111-8111-111111111111',
       enabled: true,
       host: 'smtp.example.com',
       port: 465,

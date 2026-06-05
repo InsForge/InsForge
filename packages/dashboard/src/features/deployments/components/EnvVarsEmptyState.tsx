@@ -10,7 +10,7 @@ export default function EnvVarsEmptyState() {
         No environment variables yet
       </h3>
       <p className="text-sm text-neutral-500 dark:text-neutral-400 max-w-md">
-        Add environment variables to configure your deployment. These will be available to your
+        Add environment variables to configure your site. These will be available to your
         application at runtime.
       </p>
     </div>

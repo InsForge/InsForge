@@ -3,6 +3,7 @@ import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import type { PoolClient } from 'pg';
 import type { DatabaseRecord } from '@/types/database.js';
+import { TEXT_LIKE_DATA_TYPES } from '@/utils/constants.js';
 import { escapeSqlLikePattern, validateTableName } from '@/utils/validations.js';
 import { quoteIdentifier, quoteQualifiedName } from './helpers.js';
 import { withAdminContext } from './user-context.service.js';
@@ -26,8 +27,6 @@ interface TableColumnMetadata {
   nullableColumns: Set<string>;
   searchableColumns: string[];
 }
-
-const TEXT_LIKE_DATA_TYPES = new Set(['text', 'character varying', 'character', 'citext']);
 
 export class AdminRecordService {
   private static instance: AdminRecordService;

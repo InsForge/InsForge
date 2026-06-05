@@ -25,6 +25,7 @@ import {
 import { parseClientType } from '@/utils/utils.js';
 import {
   ERROR_CODES,
+  roleSchema,
   userIdSchema,
   createUserRequestSchema,
   createSessionRequestSchema,
@@ -317,7 +318,7 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
     const config: GetAuthConfigResponse = await authConfigService.updateAuthConfig(input);
 
     await auditService.log({
-      actor: req.user?.email || 'api-key',
+      actor: req.hasApiKey ? 'api-key' : req.user?.id,
       action: 'UPDATE_AUTH_CONFIG',
       module: 'AUTH',
       details: {
@@ -566,7 +567,7 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
       }
     }
 
-    // Fetch current user data from DB (raw record includes is_project_admin)
+    // Fetch current user data from DB.
     const dbUser = await authService.getUserById(payload.sub);
 
     if (!dbUser) {
@@ -578,13 +579,12 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
     }
 
     const user = authService.transformUserRecordToSchema(dbUser);
-    const role = dbUser.is_project_admin ? 'project_admin' : 'authenticated';
 
     // Generate new access token
     const newAccessToken = tokenManager.generateAccessToken({
       sub: user.id,
       email: user.email,
-      role,
+      role: roleSchema.enum.authenticated,
     });
 
     if (clientType === 'web') {
@@ -648,7 +648,7 @@ router.get(
   verifyToken,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      if (!req.user?.id) {
+      if (req.user?.role !== roleSchema.enum.authenticated || !req.user.id) {
         throw new AppError('User not authenticated', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
       }
 
@@ -746,7 +746,7 @@ router.delete(
 
       // Log audit for user deletion
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'DELETE_USERS',
         module: 'AUTH',
         details: {
@@ -1071,7 +1071,7 @@ router.put(
       const config = await smtpConfigService.upsertSmtpConfig(input);
 
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'UPDATE_SMTP_CONFIG',
         module: 'EMAIL',
         details: {
@@ -1133,7 +1133,7 @@ router.put(
       );
 
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'UPDATE_EMAIL_TEMPLATE',
         module: 'EMAIL',
         details: {

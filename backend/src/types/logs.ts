@@ -1,6 +1,6 @@
 // Audit log types
 export interface AuditLogEntry {
-  actor: string;
+  actor?: string;
   action: string;
   module: string;
   details?: Record<string, unknown>;

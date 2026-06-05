@@ -51,7 +51,7 @@ router.post(
       const result = await migrationService.createMigration(validation.data);
 
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'CREATE_CUSTOM_MIGRATION',
         module: 'DATABASE',
         details: {
