@@ -1,67 +1,67 @@
 import { describe, expect, it } from 'vitest';
 import { formatContextAsMarkdown } from '../../src/utils/context-formatter.js';
+import type { AppMetadataSchema } from '@insforge/shared-schemas';
 
-const sampleContext = {
-  exportedAt: '2026-06-01T12:00:00.000Z',
+const sampleMetadata: AppMetadataSchema = {
   version: '1.2.3',
   auth: {
     oAuthProviders: ['google', 'github'],
     customOAuthProviders: [],
+    smtpConfig: {
+      enabled: false,
+      host: '',
+      port: 587,
+      username: '',
+      hasPassword: false,
+      senderEmail: '',
+      senderName: '',
+      minIntervalSeconds: 60,
+    },
     requireEmailVerification: true,
     disableSignup: false,
+    passwordMinLength: 8,
+    requireNumber: false,
+    requireLowercase: false,
+    requireUppercase: false,
+    requireSpecialChar: false,
+    verifyEmailMethod: 'otp',
+    resetPasswordMethod: 'otp',
+    allowedRedirectUrls: [],
   },
   database: {
-    schemas: [
-      { name: 'public', isProtected: false },
-      { name: 'auth', isProtected: true },
+    tables: [
+      { tableName: 'users', recordCount: 150 },
+      { tableName: 'posts', recordCount: 1200 },
     ],
-    tables: {
-      users: {
-        schema: [
-          {
-            columnName: 'id',
-            dataType: 'uuid',
-            isNullable: 'NO',
-            columnDefault: 'gen_random_uuid()',
-          },
-          { columnName: 'email', dataType: 'text', isNullable: 'NO', columnDefault: null },
-        ],
-        indexes: [{ indexname: 'users_pkey', isPrimary: true, isUnique: true }],
-        foreignKeys: [
-          {
-            columnName: 'org_id',
-            foreignTableName: 'orgs',
-            foreignColumnName: 'id',
-          },
-        ],
-        rlsEnabled: true,
-        policies: [{ policyname: 'users_select', cmd: 'SELECT', roles: '{authenticated}' }],
-        triggers: [
-          { triggerName: 'audit_trigger', actionTiming: 'AFTER', eventManipulation: 'INSERT' },
-        ],
-        rows: [],
-      },
-    },
-    dbFunctions: [{ functionName: 'notify_changes', kind: 'f' }],
-    views: [{ viewName: 'active_users' }],
+    totalSizeInGB: 0.3,
   },
   storage: {
-    buckets: [{ name: 'avatars', public: true, objectCount: 42 }],
+    buckets: [{ name: 'avatars', public: true, createdAt: '2026-01-01T00:00:00Z', objectCount: 42 }],
     totalSizeInGB: 0.5,
   },
-  functions: [{ slug: 'hello-world', status: 'active', description: 'Test function' }],
+  functions: [{ slug: 'hello-world', name: 'hello-world', status: 'active', description: 'Test function' }],
   realtime: {
-    channels: [{ name: 'chat' }],
+    channels: [
+      {
+        id: '00000000-0000-0000-0000-000000000001',
+        pattern: 'chat',
+        description: null,
+        webhookUrls: null,
+        enabled: true,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+    ],
+    permissions: { tables: {} },
   },
 };
 
 describe('formatContextAsMarkdown', () => {
-  it('renders a complete markdown document from context', () => {
-    const md = formatContextAsMarkdown(sampleContext);
+  it('renders a complete markdown document from metadata', () => {
+    const md = formatContextAsMarkdown(sampleMetadata);
 
     // Header
-    expect(md).toContain('# Project Context Export');
-    expect(md).toContain('2026-06-01T12:00:00.000Z');
+    expect(md).toContain('# Project Metadata');
     expect(md).toContain('v1.2.3');
 
     // Auth
@@ -70,37 +70,10 @@ describe('formatContextAsMarkdown', () => {
     expect(md).toContain('required');
     expect(md).toContain('enabled');
 
-    // Database schemas
-    expect(md).toContain('`public`');
-    expect(md).toContain('`auth` (protected)');
-
-    // Table columns
-    expect(md).toContain('| id | uuid | no | gen_random_uuid() |');
-    expect(md).toContain('| email | text | no | - |');
-
-    // Foreign keys
-    expect(md).toContain('`org_id` → `orgs.id`');
-
-    // RLS + policies
-    expect(md).toContain('**RLS**: enabled');
-    expect(md).toContain('`users_select`');
-
-    // Per-table indexes
-    expect(md).toContain('**Indexes:**');
-    expect(md).toContain('`users_pkey`');
-    expect(md).toContain('(PK, UNIQUE)');
-
-    // Per-table triggers
-    expect(md).toContain('**Triggers:**');
-    expect(md).toContain('`audit_trigger`');
-    expect(md).toContain('AFTER INSERT');
-
-    // DB functions
-    expect(md).toContain('`notify_changes`');
-    expect(md).toContain('(function)');
-
-    // Views
-    expect(md).toContain('`active_users`');
+    // Database tables
+    expect(md).toContain('| users | 150 |');
+    expect(md).toContain('| posts | 1200 |');
+    expect(md).toContain('0.3 GB');
 
     // Storage
     expect(md).toContain('`avatars`');
@@ -117,57 +90,65 @@ describe('formatContextAsMarkdown', () => {
     expect(md).toContain('`chat`');
   });
 
-  it('handles empty/missing sections gracefully', () => {
-    const minimal = {
-      exportedAt: '2026-01-01T00:00:00Z',
-      version: '0.0.1',
-      auth: null,
-      database: null,
-      storage: null,
+  it('handles missing optional sections gracefully', () => {
+    const minimal: AppMetadataSchema = {
+      auth: {
+        oAuthProviders: [],
+        customOAuthProviders: [],
+        smtpConfig: {
+          enabled: false,
+          host: '',
+          port: 587,
+          username: '',
+          hasPassword: false,
+          senderEmail: '',
+          senderName: '',
+          minIntervalSeconds: 60,
+        },
+        requireEmailVerification: false,
+        disableSignup: false,
+        passwordMinLength: 8,
+        requireNumber: false,
+        requireLowercase: false,
+        requireUppercase: false,
+        requireSpecialChar: false,
+        verifyEmailMethod: 'otp',
+        resetPasswordMethod: 'otp',
+        allowedRedirectUrls: [],
+      },
+      database: {
+        tables: [],
+        totalSizeInGB: 0,
+      },
+      storage: {
+        buckets: [],
+        totalSizeInGB: 0,
+      },
       functions: [],
-      realtime: null,
     };
 
     const md = formatContextAsMarkdown(minimal);
 
-    expect(md).toContain('# Project Context Export');
-    expect(md).toContain('No edge functions deployed.');
-    // Should not throw
-  });
-
-  it('handles tables with no foreign keys or policies', () => {
-    const context = {
-      exportedAt: '2026-01-01T00:00:00Z',
-      version: '1.0.0',
-      auth: { oAuthProviders: [] },
-      database: {
-        tables: {
-          logs: {
-            schema: [
-              { columnName: 'id', dataType: 'integer', isNullable: 'NO', columnDefault: null },
-            ],
-            indexes: [],
-            foreignKeys: [],
-            rlsEnabled: false,
-            policies: [],
-            triggers: [],
-            rows: [],
-          },
-        },
-      },
-      storage: { buckets: [] },
-      functions: null,
-      realtime: { channels: [] },
-    };
-
-    const md = formatContextAsMarkdown(context);
-
-    expect(md).toContain('#### logs');
-    expect(md).toContain('| id | integer | no | - |');
-    expect(md).not.toContain('**RLS**: enabled');
-    expect(md).not.toContain('**Foreign keys:**');
+    expect(md).toContain('# Project Metadata');
     expect(md).toContain('No storage buckets configured.');
     expect(md).toContain('No edge functions deployed.');
-    expect(md).toContain('No realtime channels configured.');
+    // Realtime section omitted entirely when undefined
+    expect(md).not.toContain('## Realtime');
+  });
+
+  it('renders database hint when present', () => {
+    const withHint: AppMetadataSchema = {
+      ...sampleMetadata,
+      database: {
+        tables: [{ tableName: 'users', recordCount: 10 }],
+        totalSizeInGB: 0.1,
+        hint: 'Consider adding indexes',
+      },
+    };
+
+    const md = formatContextAsMarkdown(withHint);
+
+    expect(md).toContain('| users | 10 |');
+    expect(md).toContain('Consider adding indexes');
   });
 });
