@@ -82,7 +82,7 @@ function main() {
     }
     console.error(
       `\nEach migration needs a unique number. Renumber the new file to the next ` +
-        `available prefix (currently ${nextPrefix}_).`
+      `available prefix (currently ${nextPrefix}_).`
     );
     process.exit(1);
   }

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   findDuplicateMigrations,
   ALLOWED_DUPLICATES,
-} from '../../scripts/check-migration-duplicates.js';
+} from '../../scripts/check-migration-duplicates.ts';
 
 describe('migration numbers', () => {
   it('has no duplicate numbers except the grandfathered 033 and 047', () => {
