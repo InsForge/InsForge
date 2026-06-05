@@ -760,9 +760,20 @@ export class DatabaseAdvanceService {
 
             for (const row of tablesResult.rows) {
               try {
+                // Use a SAVEPOINT before each TRUNCATE so that a failure only rolls back
+                // this single statement and does NOT abort the entire transaction (PG 25P02).
+                // Without this, a failed TRUNCATE inside a transaction permanently poisons
+                // the transaction and causes every subsequent query to fail with:
+                // "ERROR: current transaction is aborted, commands ignored until end of transaction block"
+                await client.query('SAVEPOINT truncate_attempt');
                 await client.query(pgFormat('TRUNCATE TABLE %I CASCADE', row.tablename));
+                await client.query('RELEASE SAVEPOINT truncate_attempt');
                 logger.info(`Truncated table: ${row.tablename}`);
               } catch (err) {
+                // Roll back to the savepoint to restore the transaction to a healthy state,
+                // then release it to clean up the savepoint and prevent accumulation, then log and continue with the next table.
+                await client.query('ROLLBACK TO SAVEPOINT truncate_attempt');
+                await client.query('RELEASE SAVEPOINT truncate_attempt');
                 logger.warn(`Could not truncate table ${row.tablename}:`, err);
               }
             }
