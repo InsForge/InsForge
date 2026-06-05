@@ -372,6 +372,34 @@ describe('FlyProvider', () => {
       expect(result.nextToken).toBe('1780608313161890637');
     });
 
+    it('forwards the requested limit as a Fly query param', async () => {
+      const mockFetch = vi.fn().mockResolvedValue(okText('{"data":[],"meta":{}}'));
+      vi.stubGlobal('fetch', mockFetch);
+
+      await provider.getLogs('my-app', 'machine-123', { limit: 200 });
+
+      expect(mockFetch.mock.calls[0][0]).toContain('limit=200');
+    });
+
+    it('falls back to the parsed string cursor for a non-numeric next_token', async () => {
+      const raw = '{"data":[],"meta":{"next_token":"abc-cursor"}}';
+      const mockFetch = vi.fn().mockResolvedValue(okText(raw));
+      vi.stubGlobal('fetch', mockFetch);
+
+      const result = await provider.getLogs('my-app', 'machine-123');
+
+      expect(result.nextToken).toBe('abc-cursor');
+    });
+
+    it('times out the upstream Fly request (passes an abort signal)', async () => {
+      const mockFetch = vi.fn().mockResolvedValue(okText('{"data":[],"meta":{}}'));
+      vi.stubGlobal('fetch', mockFetch);
+
+      await provider.getLogs('my-app', 'machine-123');
+
+      expect(mockFetch.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
+    });
+
     it('forwards the nextToken cursor as the Fly next_token query param', async () => {
       const mockFetch = vi.fn().mockResolvedValue(okText('{"data":[],"meta":{}}'));
       vi.stubGlobal('fetch', mockFetch);

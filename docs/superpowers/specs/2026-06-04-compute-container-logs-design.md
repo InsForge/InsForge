@@ -14,7 +14,7 @@ see container **stdout/stderr** ("application logs") from the dashboard or CLI. 
 Fly exposes an HTTP REST logs endpoint (the same one `flyctl logs` and Fly's dashboard use).
 Tested live against a throwaway Fly container on 2026-06-04:
 
-```
+```text
 GET https://api.fly.io/api/v1/apps/{app}/logs
   Auth:   Authorization: FlyV1 <org-macaroon>        # NOT "Bearer"
   Query:  instance=<machineId>  next_token=<ns-unix-cursor>
@@ -34,7 +34,7 @@ GET https://api.fly.io/api/v1/apps/{app}/logs
 
 ## Auth boundary (org token never leaves the backend)
 
-```
+```text
 CLI       ──Bearer ik_<project key>──┐
 Dashboard ──user access token────────┤──▶ Backend ──FlyV1 <org token>──▶ Fly
 (browser)        (withAccessToken)   ┘     (sole holder of the org token)

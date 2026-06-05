@@ -79,6 +79,10 @@ class ComputeServicesApiService {
       : ((response as { events: EventEntry[] })?.events ?? []);
   }
 
+  /**
+   * Fetch container logs for a service. Pass `nextToken` (returned in the
+   * response) to page forward when live-tailing; `limit` caps the window.
+   */
   async logs(id: string, opts?: { limit?: number; nextToken?: string }): Promise<LogsResponse> {
     const params = new URLSearchParams();
     if (opts?.limit) {

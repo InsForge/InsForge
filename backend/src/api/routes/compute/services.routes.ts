@@ -1,6 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
-import { computeWriteLimiter } from '@/api/middlewares/rate-limiters.js';
+import { computeWriteLimiter, computeLogsRateLimiter } from '@/api/middlewares/rate-limiters.js';
 import { ComputeServicesService } from '@/services/compute/services.service.js';
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/utils/errors.js';
@@ -353,10 +353,12 @@ router.get(
 
 // Get container stdout/stderr ("application logs") from Fly's logs API.
 // Backfills from Fly's ~7-day retention; pass `next_token` (returned in the
-// response) to page forward for live tailing.
+// response) to page forward for live tailing. Rate-limited because the
+// dashboard polls this every ~2s while live.
 router.get(
   '/:id/logs',
   verifyAdmin,
+  computeLogsRateLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const svc = ComputeServicesService.getInstance();

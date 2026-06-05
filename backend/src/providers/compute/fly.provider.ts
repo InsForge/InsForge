@@ -399,17 +399,32 @@ export class FlyProvider implements ComputeProvider {
     if (machineId) {
       params.set('instance', machineId);
     }
+    if (options?.limit) {
+      // Best-effort: forward the page size so Fly returns enough lines rather
+      // than relying solely on the local slice below (Fly's default is ~100;
+      // unknown params are ignored, so this is safe if unsupported).
+      params.set('limit', String(options.limit));
+    }
     if (options?.nextToken) {
       params.set('next_token', options.nextToken);
     }
     const url = `${FLY_LOGS_API_BASE}/apps/${appId}/logs?${params.toString()}`;
 
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `FlyV1 ${config.fly.apiToken}`,
-        'Content-Type': 'application/json',
-      },
-    });
+    let response: Response;
+    try {
+      // Time-box the upstream call — this endpoint is polled live, so a stalled
+      // Fly request must not pile up and degrade API responsiveness.
+      response = await fetch(url, {
+        headers: {
+          Authorization: `FlyV1 ${config.fly.apiToken}`,
+          'Content-Type': 'application/json',
+        },
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch (error) {
+      logger.error('Fly logs API request failed', { url, error });
+      throw new Error(`Fly logs API request failed: ${(error as Error).message}`);
+    }
 
     if (!response.ok) {
       const text = await response.text();
@@ -439,9 +454,16 @@ export class FlyProvider implements ComputeProvider {
 
     // `next_token` is a nanosecond Unix timestamp — it exceeds
     // Number.MAX_SAFE_INTEGER, so JSON.parse() would silently round it and
-    // corrupt the cursor. Pull the exact digits from the raw text instead.
+    // corrupt the cursor. Pull the exact digits from the raw text for numeric
+    // tokens. If Fly ever issues a non-numeric (string) cursor, the JSON-parsed
+    // value is already safe, so fall back to it rather than dropping the cursor.
     const tokenMatch = raw.match(/"next_token"\s*:\s*"?(\d+)"?/);
-    const nextToken = tokenMatch ? tokenMatch[1] : null;
+    const parsedToken = body.meta?.next_token;
+    const nextToken = tokenMatch
+      ? tokenMatch[1]
+      : typeof parsedToken === 'string'
+        ? parsedToken
+        : null;
 
     return { lines: bounded, nextToken };
   }

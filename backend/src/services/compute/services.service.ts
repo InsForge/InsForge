@@ -922,6 +922,11 @@ export class ComputeServicesService {
     return this.getCompute().getEvents(svc.flyAppId, svc.flyMachineId, options);
   }
 
+  /**
+   * Fetch container stdout/stderr ("application logs") for a service. Resolves
+   * the service's Fly app + machine, then delegates to the active compute
+   * provider. Throws 404 if the service has not been launched yet.
+   */
   async getServiceLogs(
     id: string,
     options?: { limit?: number; nextToken?: string }

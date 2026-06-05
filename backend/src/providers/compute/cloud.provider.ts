@@ -190,6 +190,11 @@ export class CloudComputeProvider implements ComputeProvider {
     );
   }
 
+  /**
+   * Fetch container logs by delegating to the cloud control plane's
+   * `GET /machines/:id/logs`, which holds the Fly org token and proxies to Fly.
+   * Returns empty results if the control plane responds with no body.
+   */
   async getLogs(
     appId: string,
     machineId: string,
