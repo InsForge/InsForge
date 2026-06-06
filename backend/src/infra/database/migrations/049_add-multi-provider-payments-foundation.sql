@@ -738,7 +738,7 @@ BEGIN
         AND rel.relname = item.table_name
         AND con.contype = 'u'
         AND (
-          SELECT array_agg(att.attname ORDER BY keys.ordinality)
+          SELECT array_agg(att.attname::text ORDER BY keys.ordinality)
           FROM unnest(con.conkey) WITH ORDINALITY AS keys(attnum, ordinality)
           JOIN pg_attribute att
             ON att.attrelid = con.conrelid

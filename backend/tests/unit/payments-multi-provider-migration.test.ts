@@ -225,4 +225,9 @@ describe('payments multi-provider migration', () => {
     expect(sql).toMatch(/chk_payments_%s_provider_format/i);
     expect(sql).toMatch(/CREATE UNIQUE INDEX IF NOT EXISTS/i);
   });
+
+  it('casts PostgreSQL name columns before comparing unique constraint column arrays', () => {
+    expect(sql).toMatch(/array_agg\(att\.attname::text ORDER BY keys\.ordinality\)/i);
+    expect(sql).not.toMatch(/array_agg\(att\.attname ORDER BY keys\.ordinality\)/i);
+  });
 });
