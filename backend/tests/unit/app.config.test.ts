@@ -328,21 +328,37 @@ describe('config.database', () => {
 
 describe('config.auth', () => {
   it('uses defaults when no env vars are set', () => {
-    unsetEnvKeys('ADMIN_EMAIL', 'ADMIN_PASSWORD', 'ACCESS_API_KEY');
+    unsetEnvKeys(
+      'ROOT_ADMIN_USERNAME',
+      'ROOT_ADMIN_PASSWORD',
+      'ADMIN_EMAIL',
+      'ADMIN_PASSWORD',
+      'ACCESS_API_KEY'
+    );
     const c = loadConfig();
 
-    expect(c.auth.adminEmail).toBe('');
-    expect(c.auth.adminPassword).toBe('');
+    expect(c.auth.rootAdminUsername).toBe('');
+    expect(c.auth.rootAdminPassword).toBe('');
     expect(c.auth.accessApiKey).toBeUndefined();
   });
 
-  it('overrides admin credentials', () => {
+  it('overrides root admin credentials', () => {
+    process.env.ROOT_ADMIN_USERNAME = 'root-admin';
+    process.env.ROOT_ADMIN_PASSWORD = 'ultrasecure!99';
+    const c = loadConfig();
+
+    expect(c.auth.rootAdminUsername).toBe('root-admin');
+    expect(c.auth.rootAdminPassword).toBe('ultrasecure!99');
+  });
+
+  it('keeps ADMIN_EMAIL and ADMIN_PASSWORD as legacy fallbacks', () => {
+    unsetEnvKeys('ROOT_ADMIN_USERNAME', 'ROOT_ADMIN_PASSWORD');
     process.env.ADMIN_EMAIL = 'superadmin@company.com';
     process.env.ADMIN_PASSWORD = 'ultrasecure!99';
     const c = loadConfig();
 
-    expect(c.auth.adminEmail).toBe('superadmin@company.com');
-    expect(c.auth.adminPassword).toBe('ultrasecure!99');
+    expect(c.auth.rootAdminUsername).toBe('superadmin@company.com');
+    expect(c.auth.rootAdminPassword).toBe('ultrasecure!99');
   });
 
   it('accessApiKey is set when ACCESS_API_KEY env var is present', () => {

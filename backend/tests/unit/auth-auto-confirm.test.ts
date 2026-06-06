@@ -126,8 +126,8 @@ vi.mock('../../src/infra/config/app.config', () => {
       projectId: null,
     },
     auth: {
-      adminEmail: 'admin@test.com',
-      adminPassword: 'admin-password',
+      rootAdminUsername: 'admin@test.com',
+      rootAdminPassword: 'admin-password',
     },
   };
   return {

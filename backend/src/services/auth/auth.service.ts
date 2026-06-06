@@ -70,8 +70,8 @@ export class AuthService {
   private appleOAuthProvider: AppleOAuthProvider;
 
   private constructor() {
-    this.adminUsername = appConfig.auth.adminEmail;
-    this.adminPassword = appConfig.auth.adminPassword;
+    this.adminUsername = appConfig.auth.rootAdminUsername;
+    this.adminPassword = appConfig.auth.rootAdminPassword;
 
     if (!this.adminUsername || !this.adminPassword) {
       throw new Error(

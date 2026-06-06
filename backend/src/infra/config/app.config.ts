@@ -65,8 +65,8 @@ export interface AppConfig {
     postgrestBaseUrl: string;
   };
   auth: {
-    adminEmail: string;
-    adminPassword: string;
+    rootAdminUsername: string;
+    rootAdminPassword: string;
     accessApiKey: string | undefined;
   };
   storage: {
@@ -157,8 +157,8 @@ export function loadConfig(): AppConfig {
       postgrestBaseUrl: process.env.POSTGREST_BASE_URL || 'http://localhost:5430',
     },
     auth: {
-      adminEmail: process.env.ROOT_ADMIN_USERNAME || process.env.ADMIN_EMAIL || '',
-      adminPassword: process.env.ROOT_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD || '',
+      rootAdminUsername: process.env.ROOT_ADMIN_USERNAME || process.env.ADMIN_EMAIL || '',
+      rootAdminPassword: process.env.ROOT_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD || '',
       accessApiKey: process.env.ACCESS_API_KEY || undefined,
     },
     storage: {
