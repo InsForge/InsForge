@@ -29,10 +29,9 @@ import type {
   StripeWebhookEndpointCreateResult,
 } from '@/types/payments.js';
 
-const KEY_PREFIX_BY_ENVIRONMENT: Record<StripeEnvironment, string> = {
-  test: 'sk_test_',
-  live: 'sk_live_',
-};
+function getExpectedStripeKeyPrefix(environment: StripeEnvironment): string {
+  return environment === 'live' ? 'sk_live_' : 'sk_test_';
+}
 
 type StripeProductCreateParams = Parameters<StripeClient['products']['create']>[0];
 type StripeProductUpdateParams = NonNullable<Parameters<StripeClient['products']['update']>[1]>;
@@ -68,7 +67,7 @@ export class StripeKeyValidationError extends Error {
 
 export function validateStripeSecretKey(environment: StripeEnvironment, value: string): void {
   const secretKeyName = `STRIPE_${environment.toUpperCase()}_SECRET_KEY`;
-  const expectedPrefix = KEY_PREFIX_BY_ENVIRONMENT[environment];
+  const expectedPrefix = getExpectedStripeKeyPrefix(environment);
   if (!value.startsWith(expectedPrefix)) {
     throw new StripeKeyValidationError(`${secretKeyName} must start with ${expectedPrefix}`);
   }
@@ -172,7 +171,7 @@ export class StripeProvider {
     const params: StripeCheckoutSessionCreateParams = {
       mode: input.mode,
       line_items: input.lineItems.map((lineItem) => ({
-        price: lineItem.stripePriceId,
+        price: lineItem.priceId,
         quantity: lineItem.quantity,
       })),
       success_url: input.successUrl,
@@ -375,7 +374,7 @@ export class StripeProvider {
 
   async createPrice(input: StripePriceCreateInput): Promise<StripePrice> {
     const params: StripePriceCreateParams = {
-      product: input.stripeProductId,
+      product: input.productId,
       currency: input.currency,
       unit_amount: input.unitAmount,
     };

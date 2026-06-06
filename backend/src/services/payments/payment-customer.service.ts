@@ -1,23 +1,21 @@
 import type { Pool, PoolClient } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import type { StripeProvider } from '@/providers/payments/stripe.provider.js';
-import {
-  fromStripeTimestamp,
-  toISOString,
-  toISOStringOrNull,
-} from '@/services/payments/helpers.js';
+import { fromStripeTimestamp } from '@/services/payments/helpers.js';
+import { toISOString, toISOStringOrNull } from '@/utils/dates.js';
 import type {
   PaymentCustomerListRow,
+  PaymentCustomerRow,
+  PaymentProvider,
   StripeCustomer,
   StripeCustomerListItem,
-  StripeCustomerRow,
   StripeEnvironment,
 } from '@/types/payments.js';
 import type {
   ListPaymentCustomersRequest,
   ListPaymentCustomersResponse,
+  PaymentCustomer,
   PaymentCustomerListItem,
-  StripeCustomer as SharedStripeCustomer,
 } from '@insforge/shared-schemas';
 
 type StripeCustomerLike =
@@ -55,28 +53,65 @@ export class PaymentCustomerService {
     return this.pool;
   }
 
-  async listCustomers(input: ListPaymentCustomersRequest): Promise<ListPaymentCustomersResponse> {
+  async listCustomers(
+    input: ListPaymentCustomersRequest,
+    provider: PaymentProvider = 'stripe'
+  ): Promise<ListPaymentCustomersResponse> {
     const result = await this.getPool().query(
       `WITH unique_customer_emails AS (
          SELECT
            environment,
+           provider,
            LOWER(email) AS customer_email,
-           MIN(stripe_customer_id) AS stripe_customer_id
+           MIN(provider_customer_id) AS provider_customer_id
          FROM payments.customers
          WHERE environment = $1
+           AND provider = $3
            AND email IS NOT NULL
-         GROUP BY environment, LOWER(email)
+         GROUP BY environment, provider, LOWER(email)
          HAVING COUNT(*) = 1
+       ),
+       payment_activity_projection AS (
+         SELECT
+           environment,
+           'stripe'::TEXT AS provider,
+           customer_id AS provider_customer_id,
+           customer_email_snapshot,
+           type,
+           status,
+           amount,
+           amount_refunded,
+           currency,
+           paid_at,
+           provider_created_at AS provider_created_at,
+           created_at
+         FROM payments.stripe_payment_activity
+         UNION ALL
+         SELECT
+           environment,
+           'razorpay'::TEXT AS provider,
+           customer_id AS provider_customer_id,
+           customer_email_snapshot,
+           type,
+           status,
+           amount,
+           amount_refunded,
+           currency,
+           paid_at,
+           provider_created_at AS provider_created_at,
+           created_at
+         FROM payments.razorpay_payment_activity
        ),
        payment_totals_by_customer AS (
          SELECT
            environment,
-           stripe_customer_id,
+           provider,
+           provider_customer_id,
            COUNT(*) FILTER (
              WHERE type <> 'refund'
                AND status IN ('succeeded', 'refunded', 'partially_refunded')
            )::INT AS payments_count,
-           MAX(COALESCE(paid_at, stripe_created_at, created_at)) FILTER (
+           MAX(COALESCE(paid_at, provider_created_at, created_at)) FILTER (
              WHERE type <> 'refund'
                AND status IN ('succeeded', 'refunded', 'partially_refunded')
            ) AS last_payment_at
@@ -106,20 +141,22 @@ export class PaymentCustomerService {
              )
              ELSE NULL
            END AS total_spend_currency
-         FROM payments.payment_history
+         FROM payment_activity_projection
          WHERE environment = $1
-           AND stripe_customer_id IS NOT NULL
-         GROUP BY environment, stripe_customer_id
+           AND provider = $3
+           AND provider_customer_id IS NOT NULL
+         GROUP BY environment, provider, provider_customer_id
        ),
        payment_totals_by_email AS (
          SELECT
            environment,
+           provider,
            LOWER(customer_email_snapshot) AS customer_email,
            COUNT(*) FILTER (
              WHERE type <> 'refund'
                AND status IN ('succeeded', 'refunded', 'partially_refunded')
            )::INT AS payments_count,
-           MAX(COALESCE(paid_at, stripe_created_at, created_at)) FILTER (
+           MAX(COALESCE(paid_at, provider_created_at, created_at)) FILTER (
              WHERE type <> 'refund'
                AND status IN ('succeeded', 'refunded', 'partially_refunded')
            ) AS last_payment_at,
@@ -148,23 +185,24 @@ export class PaymentCustomerService {
              )
              ELSE NULL
            END AS total_spend_currency
-         FROM payments.payment_history
+         FROM payment_activity_projection
          WHERE environment = $1
-           AND stripe_customer_id IS NULL
+           AND provider = $3
+           AND provider_customer_id IS NULL
            AND customer_email_snapshot IS NOT NULL
-         GROUP BY environment, LOWER(customer_email_snapshot)
+         GROUP BY environment, provider, LOWER(customer_email_snapshot)
        )
        SELECT
          customers.environment,
          customers.provider,
-         customers.stripe_customer_id AS "stripeCustomerId",
+         customers.provider_customer_id AS "providerCustomerId",
          customers.email,
          customers.name,
          customers.phone,
          customers.deleted,
          customers.metadata,
          customers.raw,
-         customers.stripe_created_at AS "stripeCreatedAt",
+         customers.provider_created_at AS "providerCreatedAt",
          customers.synced_at AS "syncedAt",
          COALESCE(payment_totals_by_customer.payments_count, 0)
            + COALESCE(payment_totals_by_email.payments_count, 0) AS "paymentsCount",
@@ -203,17 +241,21 @@ export class PaymentCustomerService {
        FROM payments.customers AS customers
        LEFT JOIN payment_totals_by_customer
          ON payment_totals_by_customer.environment = customers.environment
-        AND payment_totals_by_customer.stripe_customer_id = customers.stripe_customer_id
+        AND payment_totals_by_customer.provider = customers.provider
+        AND payment_totals_by_customer.provider_customer_id = customers.provider_customer_id
        LEFT JOIN unique_customer_emails
          ON unique_customer_emails.environment = customers.environment
-        AND unique_customer_emails.stripe_customer_id = customers.stripe_customer_id
+        AND unique_customer_emails.provider = customers.provider
+        AND unique_customer_emails.provider_customer_id = customers.provider_customer_id
        LEFT JOIN payment_totals_by_email
          ON payment_totals_by_email.environment = unique_customer_emails.environment
+        AND payment_totals_by_email.provider = unique_customer_emails.provider
         AND payment_totals_by_email.customer_email = unique_customer_emails.customer_email
        WHERE customers.environment = $1
-       ORDER BY customers.deleted ASC, COALESCE(customers.email, customers.name, customers.stripe_customer_id), customers.stripe_customer_id
+         AND customers.provider = $3
+       ORDER BY customers.deleted ASC, customers.provider, COALESCE(customers.email, customers.name, customers.provider_customer_id), customers.provider_customer_id
        LIMIT $2`,
-      [input.environment, input.limit]
+      [input.environment, input.limit, provider]
     );
 
     return {
@@ -304,8 +346,9 @@ export class PaymentCustomerService {
            synced_at = $2,
            updated_at = NOW()
        WHERE environment = $1
+         AND provider = 'stripe'
          AND deleted = false
-         AND NOT (stripe_customer_id = ANY($3::TEXT[]))`,
+         AND NOT (provider_customer_id = ANY($3::TEXT[]))`,
       [environment, syncedAt, syncedCustomerIds]
     );
   }
@@ -313,58 +356,60 @@ export class PaymentCustomerService {
   private buildBulkUpsertCustomerSql(customerCount: number): string {
     const values = Array.from({ length: customerCount }, (_, index) => {
       const offset = index * 10;
-      return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10})`;
+      return `('stripe', $${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10})`;
     }).join(',\n    ');
 
     return `INSERT INTO payments.customers (
+      provider,
       environment,
-      stripe_customer_id,
+      provider_customer_id,
       email,
       name,
       phone,
       deleted,
       metadata,
       raw,
-      stripe_created_at,
+      provider_created_at,
       synced_at
     )
     VALUES ${values}
-    ON CONFLICT (environment, stripe_customer_id) DO UPDATE SET
+    ON CONFLICT (provider, environment, provider_customer_id) DO UPDATE SET
       email = EXCLUDED.email,
       name = EXCLUDED.name,
       phone = EXCLUDED.phone,
       deleted = EXCLUDED.deleted,
       metadata = EXCLUDED.metadata,
       raw = EXCLUDED.raw,
-      stripe_created_at = EXCLUDED.stripe_created_at,
+      provider_created_at = EXCLUDED.provider_created_at,
       synced_at = EXCLUDED.synced_at,
       updated_at = NOW()`;
   }
 
   private buildUpsertCustomerSql(): string {
     return `INSERT INTO payments.customers (
+      provider,
       environment,
-      stripe_customer_id,
+      provider_customer_id,
       email,
       name,
       phone,
       deleted,
       metadata,
       raw,
-      stripe_created_at,
+      provider_created_at,
       synced_at
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-    ON CONFLICT (environment, stripe_customer_id) DO UPDATE SET
+    VALUES ('stripe', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    ON CONFLICT (provider, environment, provider_customer_id) DO UPDATE SET
       email = CASE WHEN $11 THEN payments.customers.email ELSE EXCLUDED.email END,
       name = CASE WHEN $11 THEN payments.customers.name ELSE EXCLUDED.name END,
       phone = CASE WHEN $11 THEN payments.customers.phone ELSE EXCLUDED.phone END,
       deleted = EXCLUDED.deleted,
       metadata = CASE WHEN $11 THEN payments.customers.metadata ELSE EXCLUDED.metadata END,
       raw = CASE WHEN $11 THEN payments.customers.raw ELSE EXCLUDED.raw END,
-      stripe_created_at = CASE
-        WHEN $11 THEN COALESCE(payments.customers.stripe_created_at, EXCLUDED.stripe_created_at)
-        ELSE EXCLUDED.stripe_created_at
+      provider_created_at = CASE
+        WHEN $11 THEN COALESCE(payments.customers.provider_created_at, EXCLUDED.provider_created_at)
+        ELSE EXCLUDED.provider_created_at
       END,
       synced_at = EXCLUDED.synced_at,
       updated_at = NOW()`;
@@ -416,17 +461,17 @@ export class PaymentCustomerService {
     ];
   }
 
-  private normalizeCustomerRow(row: StripeCustomerRow): SharedStripeCustomer {
+  private normalizeCustomerRow(row: PaymentCustomerRow): PaymentCustomer {
     return {
       environment: row.environment,
       provider: row.provider ?? 'stripe',
-      stripeCustomerId: row.stripeCustomerId,
+      providerCustomerId: row.providerCustomerId,
       email: row.email ?? null,
       name: row.name ?? null,
       phone: row.phone ?? null,
       deleted: row.deleted,
       metadata: row.metadata ?? {},
-      stripeCreatedAt: toISOStringOrNull(row.stripeCreatedAt),
+      providerCreatedAt: toISOStringOrNull(row.providerCreatedAt),
       syncedAt: toISOString(row.syncedAt),
     };
   }

@@ -5,12 +5,15 @@ import {
   checkoutSessionSchema,
   customerPortalSessionSchema,
   paymentCustomerListItemSchema,
-  paymentHistorySchema,
-  stripeConnectionSchema,
-  stripeEnvironmentSchema,
+  paymentActivitySchema,
+  razorpayItemSchema,
+  razorpaySubscriptionSchema,
+  razorpayPlanSchema,
+  stripeSubscriptionSchema,
   stripePriceSchema,
   stripeProductSchema,
-  stripeSubscriptionSchema,
+  stripeConnectionSchema,
+  stripeEnvironmentSchema,
   stripeWebhookEventSchema,
   razorpayConnectionSchema,
   razorpayEnvironmentSchema,
@@ -20,13 +23,17 @@ export const syncPaymentsRequestSchema = z.object({
   environment: z.union([stripeEnvironmentSchema, z.literal('all')]).default('all'),
 });
 
+export const syncRazorpayPaymentsRequestSchema = z.object({
+  environment: z.union([razorpayEnvironmentSchema, z.literal('all')]).default('all'),
+});
+
 export const paymentEnvironmentParamsSchema = z
   .object({
     environment: stripeEnvironmentSchema,
   })
   .strict();
 
-export const listPaymentCatalogRequestSchema = z.object({
+export const listStripeCatalogRequestSchema = z.object({
   environment: stripeEnvironmentSchema.optional(),
 });
 
@@ -36,36 +43,44 @@ export const paymentEnvironmentRequestSchema = z
   })
   .strict();
 
-export const listPaymentCatalogQuerySchema = z.object({}).strict();
+export const listStripeCatalogQuerySchema = z.object({}).strict();
 
-export const listPaymentProductsRequestSchema = paymentEnvironmentRequestSchema;
+export const listStripeProductsRequestSchema = paymentEnvironmentRequestSchema;
 
-export const listPaymentProductsQuerySchema = z.object({}).strict();
+export const listStripeProductsQuerySchema = z.object({}).strict();
 
-export const listPaymentPricesRequestSchema = z
+export const listStripePricesRequestSchema = z
   .object({
     environment: stripeEnvironmentSchema,
-    stripeProductId: z.string().trim().min(1, 'Stripe product id is required').optional(),
+    productId: z.string().trim().min(1, 'Stripe product id is required').optional(),
   })
   .strict();
 
-export const listPaymentPricesQuerySchema = z
+export const listStripePricesQuerySchema = z
   .object({
-    stripeProductId: z.string().trim().min(1, 'Stripe product id is required').optional(),
+    productId: z.string().trim().min(1, 'Stripe product id is required').optional(),
   })
   .strict();
 
-export const paymentProductParamsSchema = z.object({
+export const stripeProductParamsSchema = z.object({
   productId: z.string().trim().min(1, 'Stripe product id is required'),
 });
 
-export const paymentPriceParamsSchema = z.object({
+export const stripePriceParamsSchema = z.object({
   priceId: z.string().trim().min(1, 'Stripe price id is required'),
 });
 
 export const stripeWebhookParamsSchema = z.object({
   environment: stripeEnvironmentSchema,
 });
+
+export const razorpayEnvironmentParamsSchema = z
+  .object({
+    environment: razorpayEnvironmentSchema,
+  })
+  .strict();
+
+export const razorpayWebhookParamsSchema = razorpayEnvironmentParamsSchema;
 
 export const stripePriceRecurringIntervalSchema = z.enum(['day', 'week', 'month', 'year']);
 export const stripePriceTaxBehaviorSchema = z.enum(['exclusive', 'inclusive', 'unspecified']);
@@ -79,7 +94,7 @@ function hasNoReservedInsForgeMetadata(metadata: Record<string, string> | undefi
   return !Object.keys(metadata ?? {}).some((key) => key.startsWith('insforge_'));
 }
 
-export const createPaymentProductBodySchema = z
+export const createStripeProductBodySchema = z
   .object({
     name: z.string().trim().min(1, 'Product name is required'),
     description: z.string().trim().max(5000).nullable().optional(),
@@ -89,14 +104,14 @@ export const createPaymentProductBodySchema = z
   })
   .strict();
 
-export const createPaymentProductRequestSchema = z
+export const createStripeProductRequestSchema = z
   .object({
     environment: stripeEnvironmentSchema,
-    ...createPaymentProductBodySchema.shape,
+    ...createStripeProductBodySchema.shape,
   })
   .strict();
 
-const updatePaymentProductFields = {
+const updateStripeProductFields = {
   name: z.string().trim().min(1, 'Product name is required').optional(),
   description: z.string().trim().max(5000).nullable().optional(),
   active: z.boolean().optional(),
@@ -107,26 +122,26 @@ function hasAtLeastOneValue(value: Record<string, unknown>) {
   return Object.keys(value).length > 0;
 }
 
-export const updatePaymentProductBodySchema = z
-  .object(updatePaymentProductFields)
+export const updateStripeProductBodySchema = z
+  .object(updateStripeProductFields)
   .strict()
   .refine(hasAtLeastOneValue, {
     message: 'At least one product field is required',
   });
 
-export const updatePaymentProductRequestSchema = z
+export const updateStripeProductRequestSchema = z
   .object({
     environment: stripeEnvironmentSchema,
-    ...updatePaymentProductFields,
+    ...updateStripeProductFields,
   })
   .strict()
   .refine(({ environment: _environment, ...value }) => hasAtLeastOneValue(value), {
     message: 'At least one product field is required',
   });
 
-export const createPaymentPriceBodySchema = z
+export const createStripePriceBodySchema = z
   .object({
-    stripeProductId: z.string().trim().min(1, 'Stripe product id is required'),
+    productId: z.string().trim().min(1, 'Stripe product id is required'),
     currency: z
       .string()
       .trim()
@@ -148,31 +163,31 @@ export const createPaymentPriceBodySchema = z
   })
   .strict();
 
-export const createPaymentPriceRequestSchema = z
+export const createStripePriceRequestSchema = z
   .object({
     environment: stripeEnvironmentSchema,
-    ...createPaymentPriceBodySchema.shape,
+    ...createStripePriceBodySchema.shape,
   })
   .strict();
 
-const updatePaymentPriceFields = {
+const updateStripePriceFields = {
   active: z.boolean().optional(),
   lookupKey: z.string().trim().min(1).max(200).nullable().optional(),
   taxBehavior: stripePriceTaxBehaviorSchema.optional(),
   metadata: z.record(z.string()).optional(),
 };
 
-export const updatePaymentPriceBodySchema = z
-  .object(updatePaymentPriceFields)
+export const updateStripePriceBodySchema = z
+  .object(updateStripePriceFields)
   .strict()
   .refine(hasAtLeastOneValue, {
     message: 'At least one price field is required',
   });
 
-export const updatePaymentPriceRequestSchema = z
+export const updateStripePriceRequestSchema = z
   .object({
     environment: stripeEnvironmentSchema,
-    ...updatePaymentPriceFields,
+    ...updateStripePriceFields,
   })
   .strict()
   .refine(({ environment: _environment, ...value }) => hasAtLeastOneValue(value), {
@@ -181,12 +196,16 @@ export const updatePaymentPriceRequestSchema = z
 
 export const getPaymentsStatusResponseSchema = z.object({
   connections: z.array(stripeConnectionSchema),
-  razorpayConnections: z.array(razorpayConnectionSchema).optional(),
 });
 
-export const listPaymentCatalogResponseSchema = z.object({
+export const listStripeCatalogResponseSchema = z.object({
   products: z.array(stripeProductSchema),
   prices: z.array(stripePriceSchema),
+});
+
+export const listRazorpayCatalogResponseSchema = z.object({
+  items: z.array(razorpayItemSchema),
+  plans: z.array(razorpayPlanSchema),
 });
 
 export const listPaymentCustomersQuerySchema = z
@@ -206,44 +225,44 @@ export const listPaymentCustomersResponseSchema = z.object({
   customers: z.array(paymentCustomerListItemSchema),
 });
 
-export const listPaymentProductsResponseSchema = z.object({
+export const listStripeProductsResponseSchema = z.object({
   products: z.array(stripeProductSchema),
 });
 
-export const listPaymentPricesResponseSchema = z.object({
+export const listStripePricesResponseSchema = z.object({
   prices: z.array(stripePriceSchema),
 });
 
-export const getPaymentProductResponseSchema = z.object({
+export const getStripeProductResponseSchema = z.object({
   product: stripeProductSchema,
   prices: z.array(stripePriceSchema),
 });
 
-export const getPaymentPriceResponseSchema = z.object({
+export const getStripePriceResponseSchema = z.object({
   price: stripePriceSchema,
 });
 
-export const mutatePaymentProductResponseSchema = z.object({
+export const mutateStripeProductResponseSchema = z.object({
   product: stripeProductSchema,
 });
 
-export const mutatePaymentPriceResponseSchema = z.object({
+export const mutateStripePriceResponseSchema = z.object({
   price: stripePriceSchema,
 });
 
-export const archivePaymentPriceResponseSchema = z.object({
+export const archiveStripePriceResponseSchema = z.object({
   price: stripePriceSchema,
   archived: z.boolean(),
 });
 
-export const deletePaymentProductResponseSchema = z.object({
-  stripeProductId: z.string(),
+export const deleteStripeProductResponseSchema = z.object({
+  productId: z.string(),
   deleted: z.boolean(),
 });
 
 export const createCheckoutSessionLineItemSchema = z
   .object({
-    stripePriceId: z.string().trim().min(1, 'Stripe price id is required'),
+    priceId: z.string().trim().min(1, 'Stripe price id is required'),
     quantity: z.number().int().positive().max(999).default(1),
   })
   .strict();
@@ -318,7 +337,7 @@ function hasCompleteSubjectFilter(value: { subjectType?: string; subjectId?: str
   return (value.subjectType === undefined) === (value.subjectId === undefined);
 }
 
-export const listPaymentHistoryRequestSchema = z
+export const listPaymentActivityRequestSchema = z
   .object({
     ...subjectFilterFields,
     environment: stripeEnvironmentSchema,
@@ -329,7 +348,7 @@ export const listPaymentHistoryRequestSchema = z
     message: 'subjectType and subjectId must be provided together',
   });
 
-export const listPaymentHistoryQuerySchema = z
+export const listPaymentActivityQuerySchema = z
   .object({
     ...subjectFilterFields,
     limit: z.coerce.number().int().min(1).max(100).default(50),
@@ -339,7 +358,7 @@ export const listPaymentHistoryQuerySchema = z
     message: 'subjectType and subjectId must be provided together',
   });
 
-export const listSubscriptionsRequestSchema = z
+export const listStripeSubscriptionsRequestSchema = z
   .object({
     ...subjectFilterFields,
     environment: stripeEnvironmentSchema,
@@ -350,7 +369,7 @@ export const listSubscriptionsRequestSchema = z
     message: 'subjectType and subjectId must be provided together',
   });
 
-export const listSubscriptionsQuerySchema = z
+export const listStripeSubscriptionsQuerySchema = z
   .object({
     ...subjectFilterFields,
     limit: z.coerce.number().int().min(1).max(100).default(50),
@@ -360,12 +379,37 @@ export const listSubscriptionsQuerySchema = z
     message: 'subjectType and subjectId must be provided together',
   });
 
-export const listPaymentHistoryResponseSchema = z.object({
-  paymentHistory: z.array(paymentHistorySchema),
+export const listRazorpaySubscriptionsRequestSchema = z
+  .object({
+    ...subjectFilterFields,
+    environment: razorpayEnvironmentSchema,
+    limit: z.coerce.number().int().min(1).max(100).default(50),
+  })
+  .strict()
+  .refine(hasCompleteSubjectFilter, {
+    message: 'subjectType and subjectId must be provided together',
+  });
+
+export const listRazorpaySubscriptionsQuerySchema = z
+  .object({
+    ...subjectFilterFields,
+    limit: z.coerce.number().int().min(1).max(100).default(50),
+  })
+  .strict()
+  .refine(hasCompleteSubjectFilter, {
+    message: 'subjectType and subjectId must be provided together',
+  });
+
+export const listPaymentActivityResponseSchema = z.object({
+  paymentActivity: z.array(paymentActivitySchema),
 });
 
-export const listSubscriptionsResponseSchema = z.object({
+export const listStripeSubscriptionsResponseSchema = z.object({
   subscriptions: z.array(stripeSubscriptionSchema),
+});
+
+export const listRazorpaySubscriptionsResponseSchema = z.object({
+  subscriptions: z.array(razorpaySubscriptionSchema),
 });
 
 export const syncPaymentsSubscriptionsSummarySchema = z.object({
@@ -410,7 +454,38 @@ export const razorpayKeyConfigSchema = z.object({
 
 export const getPaymentsConfigResponseSchema = z.object({
   keys: z.array(stripeKeyConfigSchema),
-  razorpayKeys: z.array(razorpayKeyConfigSchema).optional(),
+});
+
+export const getRazorpayStatusResponseSchema = z.object({
+  razorpayConnections: z.array(razorpayConnectionSchema),
+});
+
+export const getRazorpayConfigResponseSchema = z.object({
+  razorpayKeys: z.array(razorpayKeyConfigSchema),
+});
+
+export const razorpaySyncCountsSchema = z
+  .object({
+    plans: z.number().int().nonnegative(),
+    items: z.number().int().nonnegative(),
+    customers: z.number().int().nonnegative(),
+    subscriptions: z.number().int().nonnegative(),
+    payments: z.number().int().nonnegative(),
+  })
+  .strict();
+
+export const syncRazorpayPaymentsEnvironmentResultSchema = z
+  .object({
+    environment: razorpayEnvironmentSchema,
+    status: z.enum(['succeeded', 'failed']),
+    connection: razorpayConnectionSchema,
+    syncCounts: razorpaySyncCountsSchema,
+    error: z.string().nullable(),
+  })
+  .strict();
+
+export const syncRazorpayPaymentsResponseSchema = z.object({
+  results: z.array(syncRazorpayPaymentsEnvironmentResultSchema),
 });
 
 export const upsertPaymentsConfigBodySchema = z
@@ -426,26 +501,73 @@ export const upsertPaymentsConfigRequestSchema = z
   })
   .strict();
 
+export const upsertRazorpayConfigBodySchema = z
+  .object({
+    keyId: z.string().trim().min(1, 'Razorpay key ID is required'),
+    keySecret: z.string().trim().min(1, 'Razorpay key secret is required'),
+    webhookSecret: z.string().trim().optional(),
+  })
+  .strict();
+
+export const upsertRazorpayConfigRequestSchema = z
+  .object({
+    environment: razorpayEnvironmentSchema,
+    ...upsertRazorpayConfigBodySchema.shape,
+  })
+  .strict();
+
+export const upsertRazorpayWebhookSecretBodySchema = z
+  .object({
+    webhookSecret: z.string().trim().min(1, 'Webhook secret is required'),
+  })
+  .strict();
+
+export const upsertRazorpayWebhookSecretRequestSchema = z
+  .object({
+    environment: razorpayEnvironmentSchema,
+    ...upsertRazorpayWebhookSecretBodySchema.shape,
+  })
+  .strict();
+
+export const upsertRazorpayWebhookSecretResponseSchema = z.object({
+  ok: z.boolean(),
+});
+
+export const configureRazorpayWebhookResponseSchema = z.object({
+  connection: razorpayConnectionSchema,
+  webhookUrl: z.string().trim().min(1),
+  webhookSecret: z.string().trim().min(1),
+  manualSetupRequired: z.literal(true),
+});
+
+export const razorpayWebhookResponseSchema = z.object({
+  received: z.boolean(),
+  handled: z.boolean(),
+});
+
 export type SyncPaymentsRequest = z.infer<typeof syncPaymentsRequestSchema>;
-export type ListPaymentCatalogRequest = z.infer<typeof listPaymentCatalogRequestSchema>;
+export type SyncRazorpayPaymentsRequest = z.infer<typeof syncRazorpayPaymentsRequestSchema>;
+export type ListStripeCatalogRequest = z.infer<typeof listStripeCatalogRequestSchema>;
 export type ListPaymentCustomersRequest = z.infer<typeof listPaymentCustomersRequestSchema>;
 export type PaymentEnvironmentParams = z.infer<typeof paymentEnvironmentParamsSchema>;
 export type PaymentEnvironmentRequest = z.infer<typeof paymentEnvironmentRequestSchema>;
-export type ListPaymentProductsRequest = z.infer<typeof listPaymentProductsRequestSchema>;
-export type ListPaymentPricesRequest = z.infer<typeof listPaymentPricesRequestSchema>;
-export type PaymentProductParams = z.infer<typeof paymentProductParamsSchema>;
-export type PaymentPriceParams = z.infer<typeof paymentPriceParamsSchema>;
+export type ListStripeProductsRequest = z.infer<typeof listStripeProductsRequestSchema>;
+export type ListStripePricesRequest = z.infer<typeof listStripePricesRequestSchema>;
+export type StripeProductParams = z.infer<typeof stripeProductParamsSchema>;
+export type StripePriceParams = z.infer<typeof stripePriceParamsSchema>;
 export type StripeWebhookParams = z.infer<typeof stripeWebhookParamsSchema>;
+export type RazorpayEnvironmentParams = z.infer<typeof razorpayEnvironmentParamsSchema>;
+export type RazorpayWebhookParams = z.infer<typeof razorpayWebhookParamsSchema>;
 export type StripePriceRecurringInterval = z.infer<typeof stripePriceRecurringIntervalSchema>;
 export type StripePriceTaxBehavior = z.infer<typeof stripePriceTaxBehaviorSchema>;
-export type CreatePaymentProductBody = z.infer<typeof createPaymentProductBodySchema>;
-export type CreatePaymentProductRequest = z.infer<typeof createPaymentProductRequestSchema>;
-export type UpdatePaymentProductBody = z.infer<typeof updatePaymentProductBodySchema>;
-export type UpdatePaymentProductRequest = z.infer<typeof updatePaymentProductRequestSchema>;
-export type CreatePaymentPriceBody = z.infer<typeof createPaymentPriceBodySchema>;
-export type CreatePaymentPriceRequest = z.infer<typeof createPaymentPriceRequestSchema>;
-export type UpdatePaymentPriceBody = z.infer<typeof updatePaymentPriceBodySchema>;
-export type UpdatePaymentPriceRequest = z.infer<typeof updatePaymentPriceRequestSchema>;
+export type CreateStripeProductBody = z.infer<typeof createStripeProductBodySchema>;
+export type CreateStripeProductRequest = z.infer<typeof createStripeProductRequestSchema>;
+export type UpdateStripeProductBody = z.infer<typeof updateStripeProductBodySchema>;
+export type UpdateStripeProductRequest = z.infer<typeof updateStripeProductRequestSchema>;
+export type CreateStripePriceBody = z.infer<typeof createStripePriceBodySchema>;
+export type CreateStripePriceRequest = z.infer<typeof createStripePriceRequestSchema>;
+export type UpdateStripePriceBody = z.infer<typeof updateStripePriceBodySchema>;
+export type UpdateStripePriceRequest = z.infer<typeof updateStripePriceRequestSchema>;
 export type CreateCheckoutSessionLineItem = z.infer<typeof createCheckoutSessionLineItemSchema>;
 export type CreateCheckoutSessionBody = z.infer<typeof createCheckoutSessionBodySchema>;
 export type CreateCheckoutSessionRequest = z.infer<typeof createCheckoutSessionRequestSchema>;
@@ -457,12 +579,19 @@ export type CreateCustomerPortalSessionRequest = z.infer<
 export type CreateCustomerPortalSessionResponse = z.infer<
   typeof createCustomerPortalSessionResponseSchema
 >;
-export type ListPaymentHistoryQuery = z.infer<typeof listPaymentHistoryQuerySchema>;
-export type ListPaymentHistoryRequest = z.infer<typeof listPaymentHistoryRequestSchema>;
-export type ListSubscriptionsQuery = z.infer<typeof listSubscriptionsQuerySchema>;
-export type ListSubscriptionsRequest = z.infer<typeof listSubscriptionsRequestSchema>;
-export type ListPaymentHistoryResponse = z.infer<typeof listPaymentHistoryResponseSchema>;
-export type ListSubscriptionsResponse = z.infer<typeof listSubscriptionsResponseSchema>;
+export type ListPaymentActivityQuery = z.infer<typeof listPaymentActivityQuerySchema>;
+export type ListPaymentActivityRequest = z.infer<typeof listPaymentActivityRequestSchema>;
+export type ListStripeSubscriptionsQuery = z.infer<typeof listStripeSubscriptionsQuerySchema>;
+export type ListStripeSubscriptionsRequest = z.infer<typeof listStripeSubscriptionsRequestSchema>;
+export type ListRazorpaySubscriptionsQuery = z.infer<typeof listRazorpaySubscriptionsQuerySchema>;
+export type ListRazorpaySubscriptionsRequest = z.infer<
+  typeof listRazorpaySubscriptionsRequestSchema
+>;
+export type ListPaymentActivityResponse = z.infer<typeof listPaymentActivityResponseSchema>;
+export type ListStripeSubscriptionsResponse = z.infer<typeof listStripeSubscriptionsResponseSchema>;
+export type ListRazorpaySubscriptionsResponse = z.infer<
+  typeof listRazorpaySubscriptionsResponseSchema
+>;
 export type SyncPaymentsSubscriptionsSummary = z.infer<
   typeof syncPaymentsSubscriptionsSummarySchema
 >;
@@ -471,18 +600,39 @@ export type SyncPaymentsResponse = z.infer<typeof syncPaymentsResponseSchema>;
 export type ConfigurePaymentWebhookResponse = z.infer<typeof configurePaymentWebhookResponseSchema>;
 export type StripeWebhookResponse = z.infer<typeof stripeWebhookResponseSchema>;
 export type GetPaymentsStatusResponse = z.infer<typeof getPaymentsStatusResponseSchema>;
-export type ListPaymentCatalogResponse = z.infer<typeof listPaymentCatalogResponseSchema>;
+export type ListStripeCatalogResponse = z.infer<typeof listStripeCatalogResponseSchema>;
+export type ListRazorpayCatalogResponse = z.infer<typeof listRazorpayCatalogResponseSchema>;
 export type ListPaymentCustomersResponse = z.infer<typeof listPaymentCustomersResponseSchema>;
-export type ListPaymentProductsResponse = z.infer<typeof listPaymentProductsResponseSchema>;
-export type ListPaymentPricesResponse = z.infer<typeof listPaymentPricesResponseSchema>;
-export type GetPaymentProductResponse = z.infer<typeof getPaymentProductResponseSchema>;
-export type GetPaymentPriceResponse = z.infer<typeof getPaymentPriceResponseSchema>;
-export type MutatePaymentProductResponse = z.infer<typeof mutatePaymentProductResponseSchema>;
-export type MutatePaymentPriceResponse = z.infer<typeof mutatePaymentPriceResponseSchema>;
-export type ArchivePaymentPriceResponse = z.infer<typeof archivePaymentPriceResponseSchema>;
-export type DeletePaymentProductResponse = z.infer<typeof deletePaymentProductResponseSchema>;
+export type ListStripeProductsResponse = z.infer<typeof listStripeProductsResponseSchema>;
+export type ListStripePricesResponse = z.infer<typeof listStripePricesResponseSchema>;
+export type GetStripeProductResponse = z.infer<typeof getStripeProductResponseSchema>;
+export type GetStripePriceResponse = z.infer<typeof getStripePriceResponseSchema>;
+export type MutateStripeProductResponse = z.infer<typeof mutateStripeProductResponseSchema>;
+export type MutateStripePriceResponse = z.infer<typeof mutateStripePriceResponseSchema>;
+export type ArchiveStripePriceResponse = z.infer<typeof archiveStripePriceResponseSchema>;
+export type DeleteStripeProductResponse = z.infer<typeof deleteStripeProductResponseSchema>;
 export type StripeKeyConfig = z.infer<typeof stripeKeyConfigSchema>;
 export type RazorpayKeyConfig = z.infer<typeof razorpayKeyConfigSchema>;
 export type GetPaymentsConfigResponse = z.infer<typeof getPaymentsConfigResponseSchema>;
+export type GetRazorpayStatusResponse = z.infer<typeof getRazorpayStatusResponseSchema>;
+export type GetRazorpayConfigResponse = z.infer<typeof getRazorpayConfigResponseSchema>;
+export type RazorpaySyncCounts = z.infer<typeof razorpaySyncCountsSchema>;
+export type SyncRazorpayPaymentsEnvironmentResult = z.infer<
+  typeof syncRazorpayPaymentsEnvironmentResultSchema
+>;
+export type SyncRazorpayPaymentsResponse = z.infer<typeof syncRazorpayPaymentsResponseSchema>;
 export type UpsertPaymentsConfigBody = z.infer<typeof upsertPaymentsConfigBodySchema>;
 export type UpsertPaymentsConfigRequest = z.infer<typeof upsertPaymentsConfigRequestSchema>;
+export type UpsertRazorpayConfigBody = z.infer<typeof upsertRazorpayConfigBodySchema>;
+export type UpsertRazorpayConfigRequest = z.infer<typeof upsertRazorpayConfigRequestSchema>;
+export type UpsertRazorpayWebhookSecretBody = z.infer<typeof upsertRazorpayWebhookSecretBodySchema>;
+export type UpsertRazorpayWebhookSecretRequest = z.infer<
+  typeof upsertRazorpayWebhookSecretRequestSchema
+>;
+export type UpsertRazorpayWebhookSecretResponse = z.infer<
+  typeof upsertRazorpayWebhookSecretResponseSchema
+>;
+export type ConfigureRazorpayWebhookResponse = z.infer<
+  typeof configureRazorpayWebhookResponseSchema
+>;
+export type RazorpayWebhookResponse = z.infer<typeof razorpayWebhookResponseSchema>;

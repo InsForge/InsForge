@@ -1,52 +1,36 @@
 import type {
-  RazorpayConnection,
   RazorpayEnvironment,
-  RazorpayKeyConfig,
+  ConfigureRazorpayWebhookResponse,
+  GetRazorpayConfigResponse,
+  GetRazorpayStatusResponse,
+  ListRazorpayCatalogResponse,
+  ListPaymentCustomersRequest,
+  ListPaymentCustomersResponse,
+  ListPaymentActivityRequest,
+  ListPaymentActivityResponse,
+  ListRazorpaySubscriptionsRequest,
+  ListRazorpaySubscriptionsResponse,
+  SyncRazorpayPaymentsRequest,
+  SyncRazorpayPaymentsResponse,
+  UpsertRazorpayConfigRequest,
 } from '@insforge/shared-schemas';
 import { apiClient } from '#lib/api/client';
 
-export interface GetRazorpayStatusResponse {
-  razorpayConnections: RazorpayConnection[];
-}
-
-export interface GetRazorpayConfigResponse {
-  razorpayKeys: RazorpayKeyConfig[];
-}
-
-export interface UpsertRazorpayConfigRequest {
-  environment: RazorpayEnvironment;
-  keyId: string;
-  keySecret: string;
-  webhookSecret?: string;
-}
-
-export interface ConfigureRazorpayWebhookResponse {
-  connection: RazorpayConnection;
-}
-
-export interface SyncRazorpayPaymentsRequest {
-  environment: RazorpayEnvironment | 'all';
-}
-
-export interface SyncRazorpayPaymentsResponse {
-  connection: RazorpayConnection;
-  syncCounts: {
-    plans: number;
-    items: number;
-    customers: number;
-    subscriptions: number;
-    payments: number;
-  };
-}
-
-export interface SyncRazorpayPaymentsMultiResponse {
-  results: {
-    environment: RazorpayEnvironment;
-    status: 'fulfilled' | 'rejected';
-    value?: SyncRazorpayPaymentsResponse;
-    reason?: any;
-  }[];
-}
+export type {
+  ConfigureRazorpayWebhookResponse,
+  GetRazorpayConfigResponse,
+  GetRazorpayStatusResponse,
+  ListRazorpayCatalogResponse,
+  ListPaymentCustomersRequest,
+  ListPaymentCustomersResponse,
+  ListPaymentActivityRequest,
+  ListPaymentActivityResponse,
+  ListRazorpaySubscriptionsRequest,
+  ListRazorpaySubscriptionsResponse,
+  SyncRazorpayPaymentsRequest,
+  SyncRazorpayPaymentsResponse,
+  UpsertRazorpayConfigRequest,
+} from '@insforge/shared-schemas';
 
 export class RazorpayService {
   async getStatus(): Promise<GetRazorpayStatusResponse> {
@@ -83,36 +67,83 @@ export class RazorpayService {
   async configureWebhook(
     environment: RazorpayEnvironment
   ): Promise<ConfigureRazorpayWebhookResponse> {
-    return apiClient.request(`/payments/razorpay/${environment}/webhook-configure`, {
+    return apiClient.request(`/payments/razorpay/${environment}/webhook`, {
       method: 'POST',
       headers: apiClient.withAccessToken(),
     });
   }
 
-  async syncPayments(
-    input: SyncRazorpayPaymentsRequest
-  ): Promise<SyncRazorpayPaymentsResponse | SyncRazorpayPaymentsMultiResponse> {
+  async syncPayments(input: SyncRazorpayPaymentsRequest): Promise<SyncRazorpayPaymentsResponse> {
     if (input.environment === 'all') {
-      const environments: RazorpayEnvironment[] = ['test', 'live'];
-      const results = await Promise.allSettled(
-        environments.map((env) => this.syncPayments({ environment: env }))
-      );
-
-      return {
-        results: results.map((r, i) => ({
-          environment: environments[i],
-          status: r.status,
-          ...(r.status === 'fulfilled'
-            ? { value: r.value as SyncRazorpayPaymentsResponse }
-            : { reason: r.reason }),
-        })),
-      };
+      return apiClient.request('/payments/razorpay/sync', {
+        method: 'POST',
+        headers: apiClient.withAccessToken(),
+      });
     }
 
     return apiClient.request(`/payments/razorpay/${input.environment}/sync`, {
       method: 'POST',
       headers: apiClient.withAccessToken(),
     });
+  }
+
+  async listCatalog(environment: RazorpayEnvironment): Promise<ListRazorpayCatalogResponse> {
+    return apiClient.request(`/payments/razorpay/${environment}/catalog`, {
+      headers: apiClient.withAccessToken(),
+    });
+  }
+
+  async listCustomers(input: ListPaymentCustomersRequest): Promise<ListPaymentCustomersResponse> {
+    const searchParams = new URLSearchParams({
+      limit: String(input.limit),
+    });
+
+    return apiClient.request(
+      `/payments/razorpay/${input.environment}/customers?${searchParams.toString()}`,
+      {
+        headers: apiClient.withAccessToken(),
+      }
+    );
+  }
+
+  async listPaymentActivity(
+    input: ListPaymentActivityRequest
+  ): Promise<ListPaymentActivityResponse> {
+    const searchParams = new URLSearchParams({
+      limit: String(input.limit),
+    });
+
+    if (input.subjectType && input.subjectId) {
+      searchParams.set('subjectType', input.subjectType);
+      searchParams.set('subjectId', input.subjectId);
+    }
+
+    return apiClient.request(
+      `/payments/razorpay/${input.environment}/payment-activity?${searchParams.toString()}`,
+      {
+        headers: apiClient.withAccessToken(),
+      }
+    );
+  }
+
+  async listSubscriptions(
+    input: ListRazorpaySubscriptionsRequest
+  ): Promise<ListRazorpaySubscriptionsResponse> {
+    const searchParams = new URLSearchParams({
+      limit: String(input.limit),
+    });
+
+    if (input.subjectType && input.subjectId) {
+      searchParams.set('subjectType', input.subjectType);
+      searchParams.set('subjectId', input.subjectId);
+    }
+
+    return apiClient.request(
+      `/payments/razorpay/${input.environment}/subscriptions?${searchParams.toString()}`,
+      {
+        headers: apiClient.withAccessToken(),
+      }
+    );
   }
 }
 

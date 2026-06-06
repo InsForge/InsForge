@@ -22,7 +22,7 @@ export function useRazorpayWebhook() {
     mutationFn: (environment: RazorpayEnvironment) => razorpayService.configureWebhook(environment),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: RAZORPAY_STATUS_QUERY_KEY });
-      showToast('Razorpay webhook configured successfully', 'success');
+      showToast('Razorpay webhook setup values generated', 'success');
     },
     onError: (err: Error) => {
       showToast(err.message || 'Failed to configure Razorpay webhook', 'error');

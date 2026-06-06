@@ -28,6 +28,7 @@ type CustomerBadgeVariant = 'deleted' | 'guest' | null;
 interface CustomerGridRow extends DataGridRowType {
   id: string;
   customerId: string;
+  provider: PaymentCustomerListItem['provider'];
   customer: string;
   email: string | null;
   paymentMethodBrand: string | null;
@@ -90,7 +91,7 @@ const CUSTOMER_COLUMNS: DataGridColumn<CustomerGridRow>[] = [
     minWidth: 120,
     sortable: false,
     renderCell: ({ row }) => (
-      <ProviderBadge provider={row.customerId.startsWith('cust_') ? 'Razorpay' : 'Stripe'} />
+      <ProviderBadge provider={row.provider === 'razorpay' ? 'Razorpay' : 'Stripe'} />
     ),
   },
   {
@@ -203,7 +204,7 @@ function formatCurrencyAmount(amount: number | null, currency: string | null) {
 }
 
 function getCustomerLabel(customer: PaymentCustomerListItem) {
-  return customer.name ?? customer.email ?? customer.stripeCustomerId;
+  return customer.name ?? customer.email ?? customer.providerCustomerId;
 }
 
 function getCustomerBadgeVariant(customer: PaymentCustomerListItem): CustomerBadgeVariant {
@@ -404,6 +405,7 @@ export default function CustomersPage() {
 
   const {
     activeConnection,
+    activeRazorpayConnection,
 
     hasActiveKey,
     customers,
@@ -420,7 +422,7 @@ export default function CustomersPage() {
 
     return customers.filter((customer) =>
       [
-        customer.stripeCustomerId,
+        customer.providerCustomerId,
         customer.email,
         customer.name,
         customer.phone,
@@ -438,8 +440,9 @@ export default function CustomersPage() {
   const customerRows = useMemo<CustomerGridRow[]>(
     () =>
       filteredCustomers.map((customer) => ({
-        id: `${customer.environment}:${customer.stripeCustomerId}`,
-        customerId: customer.stripeCustomerId,
+        id: `${customer.environment}:${customer.providerCustomerId}`,
+        customerId: customer.providerCustomerId,
+        provider: customer.provider,
         customer: getCustomerLabel(customer),
         email: customer.email,
         paymentMethodBrand: customer.paymentMethodBrand,
@@ -448,7 +451,7 @@ export default function CustomersPage() {
         countryName: getCountryName(customer.countryCode),
         totalSpend: customer.totalSpend,
         totalSpendCurrency: customer.totalSpendCurrency,
-        createdAt: customer.stripeCreatedAt,
+        createdAt: customer.providerCreatedAt,
         paymentsCount: customer.paymentsCount,
         lastPaymentAt: customer.lastPaymentAt,
         badgeVariant: getCustomerBadgeVariant(customer),
@@ -514,9 +517,20 @@ export default function CustomersPage() {
               <div className="px-3 py-3">
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Latest sync failed</AlertTitle>
+                  <AlertTitle>Latest Stripe sync failed</AlertTitle>
                   <AlertDescription className="mt-2">
                     {activeConnection.lastSyncError}
+                  </AlertDescription>
+                </Alert>
+              </div>
+            )}
+            {activeRazorpayConnection?.lastSyncError && (
+              <div className="px-3 py-3">
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Latest Razorpay sync failed</AlertTitle>
+                  <AlertDescription className="mt-2">
+                    {activeRazorpayConnection.lastSyncError}
                   </AlertDescription>
                 </Alert>
               </div>

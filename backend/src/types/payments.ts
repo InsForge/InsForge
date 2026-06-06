@@ -3,14 +3,17 @@ import type Stripe from 'stripe';
 type AsyncIterableItem<T> = T extends AsyncIterable<infer Item> ? Item : never;
 type StripeResourceData<T> = Omit<T, 'lastResponse'>;
 
-export const STRIPE_ENVIRONMENTS = ['test', 'live'] as const;
-export type StripeEnvironment = (typeof STRIPE_ENVIRONMENTS)[number];
+export const DEFAULT_PAYMENT_ENVIRONMENTS = ['test', 'live'] as const;
+export type PaymentEnvironment = (typeof DEFAULT_PAYMENT_ENVIRONMENTS)[number];
+export type StripeEnvironment = PaymentEnvironment;
+export type PaymentProvider = 'stripe' | 'razorpay';
 
 export type StripeConnectionStatus = 'unconfigured' | 'connected' | 'error';
 export type StripeLatestSyncStatus = 'succeeded' | 'failed';
 
-export const RAZORPAY_ENVIRONMENTS = ['test', 'live'] as const;
-export type RazorpayEnvironment = (typeof RAZORPAY_ENVIRONMENTS)[number];
+export const STRIPE_ENVIRONMENTS = DEFAULT_PAYMENT_ENVIRONMENTS;
+export const RAZORPAY_ENVIRONMENTS = DEFAULT_PAYMENT_ENVIRONMENTS;
+export type RazorpayEnvironment = PaymentEnvironment;
 
 export type RazorpayConnectionStatus = 'unconfigured' | 'connected' | 'error';
 export type RazorpayLatestSyncStatus = 'succeeded' | 'failed';
@@ -101,7 +104,7 @@ export type StripePriceRecurringInterval = 'day' | 'week' | 'month' | 'year';
 export type StripePriceTaxBehavior = 'exclusive' | 'inclusive' | 'unspecified';
 
 export interface StripePriceCreateInput {
-  stripeProductId: string;
+  productId: string;
   currency: string;
   unitAmount: number;
   lookupKey?: string | null;
@@ -128,7 +131,7 @@ export type StripeCheckoutCustomerCreation = 'always' | 'if_required';
 export interface StripeCheckoutSessionCreateInput {
   mode: StripeCheckoutMode;
   lineItems: Array<{
-    stripePriceId: string;
+    priceId: string;
     quantity: number;
   }>;
   successUrl: string;
@@ -150,8 +153,8 @@ export interface StripeCustomerPortalSessionCreateInput {
 export interface StripeConnectionRow {
   environment: StripeEnvironment;
   status: StripeConnectionStatus;
-  stripeAccountId: string | null;
-  stripeAccountEmail: string | null;
+  accountId: string | null;
+  accountEmail: string | null;
   accountLivemode: boolean | null;
   webhookEndpointId: string | null;
   webhookEndpointUrl: string | null;
@@ -167,8 +170,8 @@ export interface RazorpayConnectionRow {
   id: string;
   environment: RazorpayEnvironment;
   status: RazorpayConnectionStatus;
-  razorpayAccountId: string | null;
-  razorpayMerchantName: string | null;
+  accountId: string | null;
+  merchantName: string | null;
   accountLivemode: boolean | null;
   webhookEndpointId: string | null;
   webhookEndpointUrl: string | null;
@@ -187,8 +190,7 @@ export interface RazorpayConnectionRow {
 
 export interface StripeProductRow {
   environment: StripeEnvironment;
-  provider: 'stripe' | 'razorpay';
-  stripeProductId: string;
+  productId: string;
   name: string;
   description: string | null;
   active: boolean;
@@ -199,9 +201,8 @@ export interface StripeProductRow {
 
 export interface StripePriceRow {
   environment: StripeEnvironment;
-  provider: 'stripe' | 'razorpay';
-  stripePriceId: string;
-  stripeProductId: string | null;
+  priceId: string;
+  productId: string | null;
   active: boolean;
   currency: string;
   unitAmount: number | string | null;
@@ -216,20 +217,50 @@ export interface StripePriceRow {
   syncedAt: Date | string;
 }
 
-export interface StripeCustomerRow {
+export interface RazorpayItemRow {
+  environment: RazorpayEnvironment;
+  itemId: string;
+  name: string;
+  description: string | null;
+  active: boolean;
+  amount: number | string | null;
+  unitAmount: number | string | null;
+  currency: string;
+  type: string | null;
+  metadata: Record<string, string>;
+  providerCreatedAt: Date | string | null;
+  syncedAt: Date | string;
+}
+
+export interface RazorpayPlanRow {
+  environment: RazorpayEnvironment;
+  planId: string;
+  itemId: string;
+  period: string;
+  interval: number | string;
+  amount: number | string | null;
+  unitAmount: number | string | null;
+  currency: string;
+  active: boolean;
+  metadata: Record<string, string>;
+  providerCreatedAt: Date | string | null;
+  syncedAt: Date | string;
+}
+
+export interface PaymentCustomerRow {
   environment: StripeEnvironment;
-  provider: 'stripe' | 'razorpay';
-  stripeCustomerId: string;
+  provider: PaymentProvider;
+  providerCustomerId: string;
   email: string | null;
   name: string | null;
   phone: string | null;
   deleted: boolean;
   metadata: Record<string, string>;
-  stripeCreatedAt: Date | string | null;
+  providerCreatedAt: Date | string | null;
   syncedAt: Date | string;
 }
 
-export interface PaymentCustomerListRow extends StripeCustomerRow {
+export interface PaymentCustomerListRow extends PaymentCustomerRow {
   raw: unknown;
   paymentsCount: number;
   lastPaymentAt: Date | string | null;
@@ -250,10 +281,10 @@ export interface CheckoutSessionRow {
   subjectType: string | null;
   subjectId: string | null;
   customerEmail: string | null;
-  stripeCheckoutSessionId: string | null;
-  stripeCustomerId: string | null;
-  stripePaymentIntentId: string | null;
-  stripeSubscriptionId: string | null;
+  checkoutSessionId: string | null;
+  customerId: string | null;
+  paymentIntentId: string | null;
+  subscriptionId: string | null;
   url: string | null;
   lastError: string | null;
   createdAt: Date | string;
@@ -268,7 +299,7 @@ export interface CustomerPortalSessionRow {
   status: CustomerPortalSessionStatus;
   subjectType: string;
   subjectId: string;
-  stripeCustomerId: string | null;
+  customerId: string | null;
   returnUrl: string | null;
   configuration: string | null;
   url: string | null;
@@ -279,10 +310,11 @@ export interface CustomerPortalSessionRow {
 
 export interface StripeWebhookEventRow {
   environment: StripeEnvironment;
-  stripeEventId: string;
+  provider: PaymentProvider;
+  eventId: string;
   eventType: string;
   livemode: boolean;
-  stripeAccountId: string | null;
+  accountId: string | null;
   objectType: string | null;
   objectId: string | null;
   processingStatus: 'pending' | 'processed' | 'failed' | 'ignored';
@@ -294,22 +326,17 @@ export interface StripeWebhookEventRow {
   updatedAt: Date | string;
 }
 
-export interface PaymentHistoryRow {
+export interface PaymentActivityRow {
   environment: StripeEnvironment;
+  provider: PaymentProvider;
   type: 'one_time_payment' | 'subscription_invoice' | 'refund' | 'failed_payment';
   status: 'succeeded' | 'failed' | 'pending' | 'refunded' | 'partially_refunded';
   subjectType: string | null;
   subjectId: string | null;
-  stripeCustomerId: string | null;
+  providerCustomerId: string | null;
   customerEmailSnapshot: string | null;
-  stripeCheckoutSessionId: string | null;
-  stripePaymentIntentId: string | null;
-  stripeInvoiceId: string | null;
-  stripeChargeId: string | null;
-  stripeRefundId: string | null;
-  stripeSubscriptionId: string | null;
-  stripeProductId: string | null;
-  stripePriceId: string | null;
+  providerReferenceId: string | null;
+  providerReferenceType: string | null;
   amount: number | string | null;
   amountRefunded: number | string | null;
   currency: string | null;
@@ -317,15 +344,15 @@ export interface PaymentHistoryRow {
   paidAt: Date | string | null;
   failedAt: Date | string | null;
   refundedAt: Date | string | null;
-  stripeCreatedAt: Date | string | null;
+  providerCreatedAt: Date | string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
 }
 
 export interface StripeSubscriptionRow {
   environment: StripeEnvironment;
-  stripeSubscriptionId: string;
-  stripeCustomerId: string | null;
+  subscriptionId: string;
+  customerId: string | null;
   subjectType: string | null;
   subjectId: string | null;
   status:
@@ -353,12 +380,50 @@ export interface StripeSubscriptionRow {
 
 export interface StripeSubscriptionItemRow {
   environment: StripeEnvironment;
-  stripeSubscriptionItemId: string;
-  stripeSubscriptionId: string;
-  stripeProductId: string | null;
-  stripePriceId: string | null;
+  subscriptionItemId: string;
+  subscriptionId: string;
+  productId: string | null;
+  priceId: string | null;
   quantity: number | string | null;
   metadata: Record<string, string>;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export interface RazorpaySubscriptionRow {
+  environment: RazorpayEnvironment;
+  subscriptionId: string;
+  planId: string;
+  customerId: string | null;
+  subjectType: string | null;
+  subjectId: string | null;
+  status:
+    | 'created'
+    | 'authenticated'
+    | 'active'
+    | 'pending'
+    | 'halted'
+    | 'cancelled'
+    | 'completed'
+    | 'expired'
+    | 'paused';
+  currentStart: Date | string | null;
+  currentEnd: Date | string | null;
+  endedAt: Date | string | null;
+  quantity: number | string | null;
+  chargeAt: Date | string | null;
+  startAt: Date | string | null;
+  endAt: Date | string | null;
+  totalCount: number | string | null;
+  paidCount: number | string | null;
+  remainingCount: number | string | null;
+  shortUrl: string | null;
+  hasScheduledChanges: boolean;
+  changeScheduledAt: Date | string | null;
+  offerId: string | null;
+  metadata: Record<string, string>;
+  providerCreatedAt: Date | string | null;
+  syncedAt: Date | string;
   createdAt: Date | string;
   updatedAt: Date | string;
 }

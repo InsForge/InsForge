@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { StripeEnvironment } from '@insforge/shared-schemas';
+import type { RazorpayConnection, StripeEnvironment } from '@insforge/shared-schemas';
 import { paymentsService } from '#features/payments/services/payments.service';
+import { razorpayService } from '#features/payments/services/razorpay.service';
 
 export const PAYMENT_CUSTOMERS_LIMIT = 100;
 
@@ -18,20 +19,37 @@ export function usePaymentCustomers(environment: StripeEnvironment) {
     staleTime: 30 * 1000,
   });
 
+  const {
+    data: razorpayStatusData,
+    isLoading: isLoadingRazorpayStatus,
+    error: razorpayStatusError,
+    refetch: refetchRazorpayStatus,
+    isFetching: isFetchingRazorpayStatus,
+  } = useQuery({
+    queryKey: ['payments', 'razorpay', 'status'],
+    queryFn: () => razorpayService.getStatus(),
+    staleTime: 30 * 1000,
+  });
+
   const connections = useMemo(() => statusData?.connections ?? [], [statusData]);
-  const razorpayConnections = useMemo(() => statusData?.razorpayConnections ?? [], [statusData]);
+  const razorpayConnections = useMemo(
+    () => razorpayStatusData?.razorpayConnections ?? [],
+    [razorpayStatusData]
+  );
 
   const activeConnection = useMemo(
     () => connections.find((connection) => connection.environment === environment) ?? null,
     [connections, environment]
   );
 
-  const activeRazorpayConnection = useMemo(
+  const activeRazorpayConnection = useMemo<RazorpayConnection | null>(
     () => razorpayConnections.find((connection) => connection.environment === environment) ?? null,
-    [razorpayConnections, environment]
+    [environment, razorpayConnections]
   );
 
-  const hasActiveKey = !!activeConnection?.maskedKey || !!activeRazorpayConnection?.maskedKey;
+  const hasStripeKey = !!activeConnection?.maskedKey;
+  const hasRazorpayKey = !!activeRazorpayConnection?.maskedKey;
+  const hasActiveKey = hasStripeKey || hasRazorpayKey;
 
   const {
     data: customersData,
@@ -40,13 +58,30 @@ export function usePaymentCustomers(environment: StripeEnvironment) {
     refetch: refetchCustomers,
     isFetching: isFetchingCustomers,
   } = useQuery({
-    queryKey: ['payments', 'customers', environment],
+    queryKey: ['payments', 'stripe', 'customers', environment],
     queryFn: () =>
       paymentsService.listCustomers({
         environment,
         limit: PAYMENT_CUSTOMERS_LIMIT,
       }),
-    enabled: hasActiveKey,
+    enabled: hasStripeKey,
+    staleTime: 30 * 1000,
+  });
+
+  const {
+    data: razorpayCustomersData,
+    isLoading: isLoadingRazorpayCustomers,
+    error: razorpayCustomersError,
+    refetch: refetchRazorpayCustomers,
+    isFetching: isFetchingRazorpayCustomers,
+  } = useQuery({
+    queryKey: ['payments', 'razorpay', 'customers', environment],
+    queryFn: () =>
+      razorpayService.listCustomers({
+        environment,
+        limit: PAYMENT_CUSTOMERS_LIMIT,
+      }),
+    enabled: hasRazorpayKey,
     staleTime: 30 * 1000,
   });
 
@@ -56,10 +91,26 @@ export function usePaymentCustomers(environment: StripeEnvironment) {
     activeConnection,
     activeRazorpayConnection,
     hasActiveKey,
-    customers: customersData?.customers ?? [],
-    isLoading: isLoadingStatus || (hasActiveKey && isLoadingCustomers),
-    isRefreshing: isFetchingStatus || (hasActiveKey && isFetchingCustomers),
-    error: statusError ?? customersError,
-    refetch: () => Promise.all([refetchStatus(), hasActiveKey ? refetchCustomers() : null]),
+    customers: hasActiveKey
+      ? [...(customersData?.customers ?? []), ...(razorpayCustomersData?.customers ?? [])]
+      : [],
+    isLoading:
+      isLoadingStatus ||
+      isLoadingRazorpayStatus ||
+      (hasStripeKey && isLoadingCustomers) ||
+      (hasRazorpayKey && isLoadingRazorpayCustomers),
+    isRefreshing:
+      isFetchingStatus ||
+      isFetchingRazorpayStatus ||
+      (hasStripeKey && isFetchingCustomers) ||
+      (hasRazorpayKey && isFetchingRazorpayCustomers),
+    error: statusError ?? razorpayStatusError ?? customersError ?? razorpayCustomersError,
+    refetch: () =>
+      Promise.all([
+        refetchStatus(),
+        refetchRazorpayStatus(),
+        hasStripeKey ? refetchCustomers() : null,
+        hasRazorpayKey ? refetchRazorpayCustomers() : null,
+      ]),
   };
 }

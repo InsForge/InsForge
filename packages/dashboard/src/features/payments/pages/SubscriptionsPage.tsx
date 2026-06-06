@@ -1,14 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
-import type {
-  StripeCustomer,
-  StripePrice,
-  StripeProduct,
-  StripeSubscriptionItem,
-  StripeSubscription,
-  StripeSubscriptionStatus,
-} from '@insforge/shared-schemas';
+import type { PaymentCustomer } from '@insforge/shared-schemas';
 import {
   Alert,
   AlertDescription,
@@ -23,10 +16,16 @@ import { ProviderBadge } from '#features/payments/components/ProviderBadge';
 import type { PaymentsOutletContext } from '#features/payments/components/PaymentsLayout';
 import { usePaymentCatalog } from '#features/payments/hooks/usePaymentCatalog';
 import { usePaymentCustomers } from '#features/payments/hooks/usePaymentCustomers';
+import type { CatalogPrice, CatalogProduct } from '#features/payments/types/catalog';
 import { usePaymentSubscriptions } from '#features/payments/hooks/usePaymentSubscriptions';
+import type {
+  PaymentSubscription,
+  PaymentSubscriptionItem,
+  PaymentSubscriptionStatus,
+} from '#features/payments/types/subscriptions';
 import { cn } from '#lib/utils/utils';
 
-const SUBSCRIPTION_STATUS_CLASSES: Record<StripeSubscriptionStatus, string> = {
+const SUBSCRIPTION_STATUS_CLASSES: Record<PaymentSubscriptionStatus, string> = {
   incomplete: 'bg-[var(--alpha-8)] text-amber-400',
   incomplete_expired: 'bg-[var(--alpha-8)] text-muted-foreground',
   trialing: 'bg-[var(--alpha-8)] text-sky-400',
@@ -79,14 +78,14 @@ function formatShortDate(value: string | null) {
   }).format(date);
 }
 
-function formatStatusLabel(status: StripeSubscriptionStatus) {
+function formatStatusLabel(status: PaymentSubscriptionStatus) {
   return status
     .split('_')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
 }
 
-function formatPeriod(subscription: StripeSubscription) {
+function formatPeriod(subscription: PaymentSubscription) {
   if (!subscription.currentPeriodStart && !subscription.currentPeriodEnd) {
     return 'No active period';
   }
@@ -106,7 +105,7 @@ function getCurrencyFractionDigits(currency: string) {
   );
 }
 
-function formatPriceAmount(price: StripePrice) {
+function formatPriceAmount(price: CatalogPrice) {
   const rawAmount =
     price.unitAmount ?? (price.unitAmountDecimal ? Number(price.unitAmountDecimal) : null);
 
@@ -124,22 +123,22 @@ function formatPriceAmount(price: StripePrice) {
   }).format(rawAmount / 10 ** fractionDigits);
 }
 
-function getCustomerLabel(customer: StripeCustomer | null, subscription: StripeSubscription) {
-  return customer?.email ?? customer?.name ?? subscription.stripeCustomerId ?? 'Unknown Customer';
+function getCustomerLabel(customer: PaymentCustomer | null, subscription: PaymentSubscription) {
+  return customer?.email ?? customer?.name ?? subscription.providerCustomerId ?? 'Unknown Customer';
 }
 
 function getSubscriptionItemProductLabel(
-  item: StripeSubscriptionItem,
-  product: StripeProduct | null
+  item: PaymentSubscriptionItem,
+  product: CatalogProduct | null
 ) {
-  return product?.name ?? item.stripeProductId ?? '-';
+  return product?.name ?? item.providerProductId ?? '-';
 }
 
-function getSubscriptionItemPriceLabel(item: StripeSubscriptionItem, price: StripePrice | null) {
-  return price ? formatPriceAmount(price) : (item.stripePriceId ?? '-');
+function getSubscriptionItemPriceLabel(item: PaymentSubscriptionItem, price: CatalogPrice | null) {
+  return price ? formatPriceAmount(price) : (item.providerPriceId ?? '-');
 }
 
-function SubscriptionStatus({ status }: { status: StripeSubscriptionStatus }) {
+function SubscriptionStatus({ status }: { status: PaymentSubscriptionStatus }) {
   return (
     <span
       className={cn(
@@ -172,9 +171,9 @@ function SubscriptionItemsTable({
   productsById,
   pricesById,
 }: {
-  items: StripeSubscriptionItem[];
-  productsById: Map<string, StripeProduct>;
-  pricesById: Map<string, StripePrice>;
+  items: PaymentSubscriptionItem[];
+  productsById: Map<string, CatalogProduct>;
+  pricesById: Map<string, CatalogPrice>;
 }) {
   if (items.length === 0) {
     return (
@@ -200,30 +199,30 @@ function SubscriptionItemsTable({
       </div>
 
       {items.map((item) => {
-        const product = item.stripeProductId
-          ? (productsById.get(item.stripeProductId) ?? null)
+        const product = item.providerProductId
+          ? (productsById.get(item.providerProductId) ?? null)
           : null;
-        const price = item.stripePriceId ? (pricesById.get(item.stripePriceId) ?? null) : null;
+        const price = item.providerPriceId ? (pricesById.get(item.providerPriceId) ?? null) : null;
 
         return (
           <div
-            key={`${item.environment}:${item.stripeSubscriptionItemId}`}
+            key={`${item.environment}:${item.providerSubscriptionItemId}`}
             className="grid items-center border-b border-[var(--alpha-8)] px-4 py-3 text-sm last:border-0"
             style={{ gridTemplateColumns: SUBSCRIPTION_ITEM_GRID_TEMPLATE }}
           >
             <div className="min-w-0">
               <p
                 className="truncate font-mono text-xs text-foreground"
-                title={item.stripeSubscriptionItemId}
+                title={item.providerSubscriptionItemId}
               >
-                {item.stripeSubscriptionItemId}
+                {item.providerSubscriptionItemId}
               </p>
             </div>
 
             <div className="min-w-0">
               <p
                 className="truncate text-foreground"
-                title={product?.stripeProductId ?? item.stripeProductId ?? undefined}
+                title={product?.providerProductId ?? item.providerProductId ?? undefined}
               >
                 {getSubscriptionItemProductLabel(item, product)}
               </p>
@@ -232,7 +231,7 @@ function SubscriptionItemsTable({
             <div className="min-w-0">
               <p
                 className="truncate text-foreground"
-                title={price?.stripePriceId ?? item.stripePriceId ?? undefined}
+                title={price?.providerPriceId ?? item.providerPriceId ?? undefined}
               >
                 {getSubscriptionItemPriceLabel(item, price)}
               </p>
@@ -254,15 +253,15 @@ function SubscriptionRow({
   expanded,
   onToggle,
 }: {
-  subscription: StripeSubscription;
-  customer: StripeCustomer | null;
-  productsById: Map<string, StripeProduct>;
-  pricesById: Map<string, StripePrice>;
+  subscription: PaymentSubscription;
+  customer: PaymentCustomer | null;
+  productsById: Map<string, CatalogProduct>;
+  pricesById: Map<string, CatalogPrice>;
   expanded: boolean;
   onToggle: () => void;
 }) {
   const items = subscription.items ?? [];
-  const detailsId = `subscription-details-${subscription.stripeSubscriptionId}`;
+  const detailsId = `subscription-details-${subscription.providerSubscriptionId}`;
 
   return (
     <div className="overflow-hidden rounded border border-[var(--alpha-8)] bg-card">
@@ -284,9 +283,9 @@ function SubscriptionRow({
           <div className="min-w-0 px-2 py-3">
             <span
               className="block truncate font-mono text-xs text-foreground"
-              title={subscription.stripeSubscriptionId}
+              title={subscription.providerSubscriptionId}
             >
-              {subscription.stripeSubscriptionId}
+              {subscription.providerSubscriptionId}
             </span>
           </div>
 
@@ -314,12 +313,12 @@ function SubscriptionRow({
           </div>
 
           <div className="min-w-0 px-2 py-3">
-            {subscription.latestInvoiceId ? (
+            {subscription.providerLatestInvoiceId ? (
               <span
                 className="block truncate font-mono text-xs text-foreground"
-                title={subscription.latestInvoiceId}
+                title={subscription.providerLatestInvoiceId}
               >
-                {subscription.latestInvoiceId}
+                {subscription.providerLatestInvoiceId}
               </span>
             ) : (
               <span className="text-muted-foreground">-</span>
@@ -373,27 +372,27 @@ export default function SubscriptionsPage() {
   }, [environment]);
 
   const customersById = useMemo(() => {
-    const nextCustomersById = new Map<string, StripeCustomer>();
+    const nextCustomersById = new Map<string, PaymentCustomer>();
     for (const customer of customers) {
-      nextCustomersById.set(customer.stripeCustomerId, customer);
+      nextCustomersById.set(customer.providerCustomerId, customer);
     }
 
     return nextCustomersById;
   }, [customers]);
 
   const productsById = useMemo(() => {
-    const nextProductsById = new Map<string, StripeProduct>();
+    const nextProductsById = new Map<string, CatalogProduct>();
     for (const product of products) {
-      nextProductsById.set(product.stripeProductId, product);
+      nextProductsById.set(product.providerProductId, product);
     }
 
     return nextProductsById;
   }, [products]);
 
   const pricesById = useMemo(() => {
-    const nextPricesById = new Map<string, StripePrice>();
+    const nextPricesById = new Map<string, CatalogPrice>();
     for (const price of prices) {
-      nextPricesById.set(price.stripePriceId, price);
+      nextPricesById.set(price.providerPriceId, price);
     }
 
     return nextPricesById;
@@ -406,31 +405,31 @@ export default function SubscriptionsPage() {
     }
 
     return subscriptions.filter((subscription) => {
-      const customer = subscription.stripeCustomerId
-        ? (customersById.get(subscription.stripeCustomerId) ?? null)
+      const customer = subscription.providerCustomerId
+        ? (customersById.get(subscription.providerCustomerId) ?? null)
         : null;
       const itemValues = (subscription.items ?? []).flatMap((item) => {
-        const product = item.stripeProductId
-          ? (productsById.get(item.stripeProductId) ?? null)
+        const product = item.providerProductId
+          ? (productsById.get(item.providerProductId) ?? null)
           : null;
-        const price = item.stripePriceId ? (pricesById.get(item.stripePriceId) ?? null) : null;
+        const price = item.providerPriceId ? (pricesById.get(item.providerPriceId) ?? null) : null;
 
         return [
-          item.stripeSubscriptionItemId,
-          item.stripeProductId,
-          item.stripePriceId,
+          item.providerSubscriptionItemId,
+          item.providerProductId,
+          item.providerPriceId,
           product?.name,
           price ? formatPriceAmount(price) : null,
         ];
       });
 
       return [
-        subscription.stripeSubscriptionId,
-        subscription.stripeCustomerId,
+        subscription.providerSubscriptionId,
+        subscription.providerCustomerId,
         customer?.email,
         customer?.name,
         subscription.status,
-        subscription.latestInvoiceId,
+        subscription.providerLatestInvoiceId,
         formatPeriod(subscription),
         ...itemValues,
       ]
@@ -443,7 +442,7 @@ export default function SubscriptionsPage() {
     if (
       expandedSubscriptionId &&
       !filteredSubscriptions.some(
-        (subscription) => subscription.stripeSubscriptionId === expandedSubscriptionId
+        (subscription) => subscription.providerSubscriptionId === expandedSubscriptionId
       )
     ) {
       setExpandedSubscriptionId(null);
@@ -497,9 +496,18 @@ export default function SubscriptionsPage() {
                 {activeConnection?.lastSyncError && (
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Latest sync failed</AlertTitle>
+                    <AlertTitle>Latest Stripe sync failed</AlertTitle>
                     <AlertDescription className="mt-2">
                       {activeConnection.lastSyncError}
+                    </AlertDescription>
+                  </Alert>
+                )}
+                {activeRazorpayConnection?.lastSyncError && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Latest Razorpay sync failed</AlertTitle>
+                    <AlertDescription className="mt-2">
+                      {activeRazorpayConnection.lastSyncError}
                     </AlertDescription>
                   </Alert>
                 )}
@@ -523,21 +531,21 @@ export default function SubscriptionsPage() {
                   <div className="flex flex-col gap-2">
                     {filteredSubscriptions.map((subscription) => (
                       <SubscriptionRow
-                        key={`${subscription.environment}:${subscription.stripeSubscriptionId}`}
+                        key={`${subscription.environment}:${subscription.providerSubscriptionId}`}
                         subscription={subscription}
                         customer={
-                          subscription.stripeCustomerId
-                            ? (customersById.get(subscription.stripeCustomerId) ?? null)
+                          subscription.providerCustomerId
+                            ? (customersById.get(subscription.providerCustomerId) ?? null)
                             : null
                         }
                         productsById={productsById}
                         pricesById={pricesById}
-                        expanded={expandedSubscriptionId === subscription.stripeSubscriptionId}
+                        expanded={expandedSubscriptionId === subscription.providerSubscriptionId}
                         onToggle={() =>
                           setExpandedSubscriptionId((current) =>
-                            current === subscription.stripeSubscriptionId
+                            current === subscription.providerSubscriptionId
                               ? null
-                              : subscription.stripeSubscriptionId
+                              : subscription.providerSubscriptionId
                           )
                         }
                       />

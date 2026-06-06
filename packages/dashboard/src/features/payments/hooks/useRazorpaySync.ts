@@ -1,8 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import type { RazorpayEnvironment } from '@insforge/shared-schemas';
+import type {
+  RazorpayEnvironment,
+  SyncRazorpayPaymentsEnvironmentResult,
+} from '@insforge/shared-schemas';
 import {
   razorpayService,
-  type SyncRazorpayPaymentsMultiResponse,
   type SyncRazorpayPaymentsRequest,
   type SyncRazorpayPaymentsResponse,
 } from '#features/payments/services/razorpay.service';
@@ -17,57 +19,28 @@ function formatEnvironments(environments: RazorpayEnvironment[]) {
   return environments.map((environment) => ENVIRONMENT_LABEL[environment]).join(', ');
 }
 
-function isMultiResponse(
-  result: SyncRazorpayPaymentsResponse | SyncRazorpayPaymentsMultiResponse
-): result is SyncRazorpayPaymentsMultiResponse {
-  return 'results' in result;
-}
-
-function isFailedSyncResult(result: SyncRazorpayPaymentsResponse) {
+function isFailedSyncResult(result: SyncRazorpayPaymentsEnvironmentResult) {
   return result.connection.status === 'error' || result.connection.lastSyncStatus === 'failed';
 }
 
-function getRazorpaySyncToast(
-  result: SyncRazorpayPaymentsResponse | SyncRazorpayPaymentsMultiResponse
-) {
-  // Normalise to a flat list of individual results
-  let singleResults: SyncRazorpayPaymentsResponse[];
-  let apiFailedEnvironments: RazorpayEnvironment[] = [];
-
-  if (isMultiResponse(result)) {
-    singleResults = result.results
-      .filter(
-        (r): r is typeof r & { status: 'fulfilled'; value: SyncRazorpayPaymentsResponse } =>
-          r.status === 'fulfilled'
-      )
-      .map((r) => r.value);
-
-    apiFailedEnvironments = result.results
-      .filter((r) => r.status === 'rejected')
-      .map((r) => r.environment);
-  } else {
-    singleResults = [result];
-  }
-
-  const attemptedResults = singleResults.filter(
+function getRazorpaySyncToast(result: SyncRazorpayPaymentsResponse) {
+  const attemptedResults = result.results.filter(
     (item) => item.connection.status !== 'unconfigured'
   );
   const syncFailedResults = attemptedResults.filter(isFailedSyncResult);
   const syncFailedEnvironments = syncFailedResults.map((item) => item.connection.environment);
 
-  const allFailedEnvironments = [...apiFailedEnvironments, ...syncFailedEnvironments];
-
-  if (attemptedResults.length === 0 && apiFailedEnvironments.length === 0) {
+  if (attemptedResults.length === 0) {
     return {
       type: 'info' as const,
       message: 'No configured Razorpay environments to sync.',
     };
   }
 
-  if (allFailedEnvironments.length > 0) {
+  if (syncFailedEnvironments.length > 0) {
     return {
       type: 'error' as const,
-      message: `Razorpay sync failed for ${formatEnvironments(allFailedEnvironments)}.`,
+      message: `Razorpay sync failed for ${formatEnvironments(syncFailedEnvironments)}.`,
     };
   }
 

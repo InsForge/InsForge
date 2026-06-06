@@ -7,8 +7,8 @@ const STRIPE_KEY_NAMES: Record<StripeEnvironment, string> = {
 };
 
 const RAZORPAY_KEY_NAMES: Record<StripeEnvironment, string> = {
-  test: 'RZP_TEST_KEY_SECRET',
-  live: 'RZP_LIVE_KEY_SECRET',
+  test: 'RAZORPAY_TEST_KEY_SECRET',
+  live: 'RAZORPAY_LIVE_KEY_SECRET',
 };
 
 const MODE_LABELS: Record<StripeEnvironment, string> = {

@@ -191,18 +191,18 @@ if (data?.customerPortalSession.url) {
 }
 ```
 
-Customer portal sessions require an authenticated user and an existing Stripe customer mapping for the subject. The mapping is usually created after a Checkout Session completes and Stripe returns a customer. The synced customer data shown in the Payments dashboard can help you verify what happened, but portal creation relies on `payments.stripe_customer_mappings`.
+Customer portal sessions require an authenticated user and an existing customer mapping for the subject. The mapping is usually created after a Checkout Session completes and Stripe returns a customer. The synced customer data shown in the Payments dashboard can help you verify what happened, but portal creation relies on `payments.customer_mappings`.
 
 ## Authorization And RLS
 
 The SDK methods call runtime routes using the current InsForge token. The backend inserts local session rows using the caller context:
 
-- `payments.checkout_sessions` for Checkout attempts
-- `payments.customer_portal_sessions` for Billing Portal attempts
+- `payments.stripe_checkout_sessions` for Checkout attempts
+- `payments.stripe_customer_portal_sessions` for Billing Portal attempts
 
 In practice, one-time checkout can support guest or signed-in flows when the client has an InsForge user token. Customer portal creation requires an authenticated user because it operates on an existing billing subject mapping.
 
-The backend does not infer membership from arbitrary `subject` values. If users can pass shared subjects such as teams or organizations, add an authorization boundary before exposing subscription checkout or customer portal UI. For example, enable RLS on `payments.checkout_sessions` and `payments.customer_portal_sessions` with policies that check team membership, or call Payments through your own server endpoint that checks membership first.
+The backend does not infer membership from arbitrary `subject` values. If users can pass shared subjects such as teams or organizations, add an authorization boundary before exposing subscription checkout or customer portal UI. For example, enable RLS on `payments.stripe_checkout_sessions` and `payments.stripe_customer_portal_sessions` with policies that check team membership, or call Payments through your own server endpoint that checks membership first.
 
 <Warning>
   Do not let users submit arbitrary `subject.type` and `subject.id` values unless your app checks that they can manage that billing subject.
@@ -210,7 +210,7 @@ The backend does not infer membership from arbitrary `subject` values. If users 
 
 ## Reading Payment State
 
-The Payments SDK does not expose generic end-user reads for `payments.customers`, `payments.subscriptions`, or `payments.payment_history`. Those tables are operational records used for dashboard visibility and fulfillment workflows.
+The Payments SDK does not expose generic end-user reads for `payments.customers`, provider subscription tables, or provider payment activity tables such as `payments.stripe_payment_activity` and `payments.razorpay_payment_activity`. Those tables are operational records used for dashboard visibility and fulfillment workflows.
 
 Refunds, disputes, and other sensitive financial operations should still be handled in the Stripe Dashboard.
 
@@ -257,7 +257,7 @@ if (data?.checkoutSession.url) {
 }
 ```
 
-Then add a database trigger that listens to `payments.payment_history` and updates `public.orders` when the matching row becomes `type = 'one_time_payment'` and `status = 'succeeded'`. The success page can read the order and show `pending`, `paid`, or `fulfilled`.
+Then add a database trigger that listens to the relevant provider activity table, such as `payments.stripe_payment_activity`, and updates `public.orders` when the matching row becomes `type = 'one_time_payment'` and `status = 'succeeded'`. If the app accepts multiple payment providers, reuse one trigger function and attach it to each provider activity table. The success page can read the order and show `pending`, `paid`, or `fulfilled`.
 
 ## Live/Test Environment
 

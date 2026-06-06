@@ -9,16 +9,12 @@ export class RazorpayKeyValidationError extends Error {
   }
 }
 
-/**
- * Razorpay test keys start with "rzp_test_", live keys start with "rzp_live_".
- */
-const KEY_PREFIX_BY_ENVIRONMENT: Record<RazorpayEnvironment, string> = {
-  test: 'rzp_test_',
-  live: 'rzp_live_',
-};
+function getExpectedRazorpayKeyPrefix(environment: RazorpayEnvironment): string {
+  return environment === 'live' ? 'rzp_live_' : 'rzp_test_';
+}
 
 export function validateRazorpayKey(environment: RazorpayEnvironment, keyId: string): void {
-  const expectedPrefix = KEY_PREFIX_BY_ENVIRONMENT[environment];
+  const expectedPrefix = getExpectedRazorpayKeyPrefix(environment);
   if (!keyId.startsWith(expectedPrefix)) {
     throw new RazorpayKeyValidationError(
       `Razorpay key ID must start with "${expectedPrefix}" for the ${environment} environment`
@@ -198,16 +194,6 @@ export interface RazorpayWebhookPayload {
   created_at: number;
 }
 
-export interface RazorpayWebhookEndpointCreateResult {
-  id: string;
-  entity: string;
-  active: boolean;
-  url: string;
-  secret: string | null;
-  alert_email: string;
-  events: Record<string, boolean>;
-}
-
 export class RazorpayProvider {
   private readonly client: Razorpay;
 
@@ -236,15 +222,19 @@ export class RazorpayProvider {
   /**
    * Fetch basic account info using the /orders or /items call to confirm key validity.
    * Razorpay does not have a dedicated "retrieve account" endpoint in the OSS SDK,
-   * so we use a lightweight probe — list plans with limit=1.
+   * so we use a lightweight Orders probe.
    */
-  retrieveAccount(): Promise<RazorpayAccountInfo> {
+  async retrieveAccount(): Promise<RazorpayAccountInfo> {
+    // Razorpay does not expose account metadata through the OSS SDK. Use a
+    // lightweight authenticated Orders call so invalid key secrets fail before saving.
+    await this.client.orders.all({ count: 1, skip: 0 });
+
     // Razorpay key ID encodes the environment implicitly (rzp_test_ / rzp_live_)
-    return Promise.resolve({
+    return {
       id: this.keyId,
       merchantName: null, // requires dashboard API not available in OSS SDK
       livemode: this.environment === 'live',
-    });
+    };
   }
 
   async listPlans(): Promise<RazorpayPlan[]> {
@@ -306,7 +296,7 @@ export class RazorpayProvider {
     let skip = 0;
     const count = 100;
 
-    // Paginate — Razorpay returns max 100 per call
+    // Razorpay returns at most 100 records per call.
     while (true) {
       const response = (await this.client.subscriptions.all({ count, skip })) as unknown as {
         items: RazorpaySubscription[];
@@ -385,36 +375,6 @@ export class RazorpayProvider {
       params.notes = input.notes;
     }
     return this.client.customers.create(params) as Promise<RazorpayCustomer>;
-  }
-
-  async createWebhook(input: {
-    url: string;
-    secret: string;
-    events: Record<string, boolean>;
-    alertEmail?: string;
-  }): Promise<RazorpayWebhookEndpointCreateResult> {
-    // Razorpay webhook management via REST API (not available in OSS SDK directly)
-    // We call the Razorpay accounts API endpoint manually
-    const response = await fetch(`https://api.razorpay.com/v1/accounts/me/webhooks`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: 'Basic ' + Buffer.from(`${this.keyId}:${this.keySecret}`).toString('base64'),
-      },
-      body: JSON.stringify({
-        url: input.url,
-        secret: input.secret,
-        events: input.events,
-        ...(input.alertEmail ? { alert_email: input.alertEmail } : {}),
-      }),
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Failed to create Razorpay webhook: ${response.status} ${text}`);
-    }
-
-    return response.json() as Promise<RazorpayWebhookEndpointCreateResult>;
   }
 
   async syncCatalog(): Promise<{

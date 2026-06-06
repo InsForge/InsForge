@@ -24,9 +24,9 @@ const PAYMENTS_SIDEBAR_ITEMS: FeatureSidebarListItem[] = [
     href: '/dashboard/payments/subscriptions',
   },
   {
-    id: 'payment-history',
-    label: 'Payment History',
-    href: '/dashboard/payments/payment-history',
+    id: 'payment-activity',
+    label: 'Payment Activity',
+    href: '/dashboard/payments/payment-activity',
   },
 ];
 

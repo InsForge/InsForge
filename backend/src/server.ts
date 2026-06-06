@@ -176,14 +176,7 @@ export async function createApp() {
   const jsonLimit = appConfig.server.maxJsonBodySize;
   const urlencodedLimit = appConfig.server.maxUrlencodedBodySize;
 
-  app.use(
-    express.json({
-      limit: jsonLimit,
-      verify: (req, _res, buf) => {
-        (req as any).rawBody = buf;
-      },
-    })
-  );
+  app.use(express.json({ limit: jsonLimit }));
   app.use(express.urlencoded({ extended: true, limit: urlencodedLimit }));
 
   // Create API router and mount all API routes under /api

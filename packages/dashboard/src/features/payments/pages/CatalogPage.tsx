@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
-import type { StripePrice, StripeProduct } from '@insforge/shared-schemas';
+import type { CatalogPrice, CatalogProduct } from '#features/payments/types/catalog';
 import {
   Alert,
   AlertDescription,
@@ -46,7 +46,7 @@ function getCurrencyFractionDigits(currency: string) {
   );
 }
 
-function formatAmount(price: StripePrice) {
+function formatAmount(price: CatalogPrice) {
   const rawAmount =
     price.unitAmount ?? (price.unitAmountDecimal ? Number(price.unitAmountDecimal) : null);
 
@@ -64,7 +64,7 @@ function formatAmount(price: StripePrice) {
   }).format(rawAmount / 10 ** fractionDigits);
 }
 
-function formatBilling(price: StripePrice) {
+function formatBilling(price: CatalogPrice) {
   if (price.type !== 'recurring' || !price.recurringInterval) {
     return 'One time';
   }
@@ -75,10 +75,10 @@ function formatBilling(price: StripePrice) {
     : `Every ${intervalCount} ${price.recurringInterval}s`;
 }
 
-function sortProductPrices(prices: StripePrice[], defaultPriceId: string | null) {
+function sortProductPrices(prices: CatalogPrice[], defaultPriceId: string | null) {
   return [...prices].sort((left, right) => {
-    const leftIsDefault = left.stripePriceId === defaultPriceId;
-    const rightIsDefault = right.stripePriceId === defaultPriceId;
+    const leftIsDefault = left.providerPriceId === defaultPriceId;
+    const rightIsDefault = right.providerPriceId === defaultPriceId;
 
     if (leftIsDefault !== rightIsDefault) {
       return leftIsDefault ? -1 : 1;
@@ -96,7 +96,7 @@ function sortProductPrices(prices: StripePrice[], defaultPriceId: string | null)
       return left.lookupKey ? -1 : 1;
     }
 
-    return left.stripePriceId.localeCompare(right.stripePriceId);
+    return left.providerPriceId.localeCompare(right.providerPriceId);
   });
 }
 
@@ -142,8 +142,8 @@ function ProductPricesTable({
   product,
   prices,
 }: {
-  product: StripeProduct;
-  prices: StripePrice[];
+  product: CatalogProduct;
+  prices: CatalogPrice[];
 }) {
   if (prices.length === 0) {
     return (
@@ -156,7 +156,7 @@ function ProductPricesTable({
     );
   }
 
-  const sortedPrices = sortProductPrices(prices, product.defaultPriceId);
+  const sortedPrices = sortProductPrices(prices, product.providerDefaultPriceId);
 
   return (
     <div className="overflow-x-auto">
@@ -170,11 +170,11 @@ function ProductPricesTable({
         </div>
 
         {sortedPrices.map((price) => {
-          const isDefault = price.stripePriceId === product.defaultPriceId;
+          const isDefault = price.providerPriceId === product.providerDefaultPriceId;
 
           return (
             <div
-              key={`${price.environment}:${price.stripePriceId}`}
+              key={`${price.environment}:${price.providerPriceId}`}
               className="grid grid-cols-[160px_120px_140px_minmax(220px,1fr)_minmax(180px,1fr)] items-center border-b border-[var(--alpha-8)] px-4 py-3 text-sm last:border-0"
             >
               <div className="min-w-0">
@@ -196,9 +196,9 @@ function ProductPricesTable({
               <div className="min-w-0">
                 <p
                   className="truncate font-mono text-xs text-foreground"
-                  title={price.stripePriceId}
+                  title={price.providerPriceId}
                 >
-                  {price.stripePriceId}
+                  {price.providerPriceId}
                 </p>
               </div>
 
@@ -226,9 +226,9 @@ function CatalogRow({
   expanded,
   onToggle,
 }: {
-  product: StripeProduct;
-  productPrices: StripePrice[];
-  defaultPrice: StripePrice | null;
+  product: CatalogProduct;
+  productPrices: CatalogPrice[];
+  defaultPrice: CatalogPrice | null;
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -264,9 +264,9 @@ function CatalogRow({
           <div className="min-w-0 px-2 py-3">
             {defaultPrice ? (
               <span className="truncate text-foreground">{formatAmount(defaultPrice)}</span>
-            ) : product.defaultPriceId ? (
+            ) : product.providerDefaultPriceId ? (
               <span className="truncate font-mono text-xs text-muted-foreground">
-                {product.defaultPriceId}
+                {product.providerDefaultPriceId}
               </span>
             ) : (
               <span className="text-muted-foreground">-</span>
@@ -276,9 +276,9 @@ function CatalogRow({
           <div className="min-w-0 px-2 py-3">
             <span
               className="block truncate font-mono text-xs text-muted-foreground"
-              title={product.stripeProductId}
+              title={product.providerProductId}
             >
-              {product.stripeProductId}
+              {product.providerProductId}
             </span>
           </div>
         </div>
@@ -334,24 +334,24 @@ export default function CatalogPage() {
   }, [environment]);
 
   const pricesByProductId = useMemo(() => {
-    const nextPricesByProductId = new Map<string, StripePrice[]>();
+    const nextPricesByProductId = new Map<string, CatalogPrice[]>();
     for (const price of prices) {
-      if (!price.stripeProductId) {
+      if (!price.providerProductId) {
         continue;
       }
 
-      const productPrices = nextPricesByProductId.get(price.stripeProductId) ?? [];
+      const productPrices = nextPricesByProductId.get(price.providerProductId) ?? [];
       productPrices.push(price);
-      nextPricesByProductId.set(price.stripeProductId, productPrices);
+      nextPricesByProductId.set(price.providerProductId, productPrices);
     }
 
     return nextPricesByProductId;
   }, [prices]);
 
   const pricesById = useMemo(() => {
-    const nextPricesById = new Map<string, StripePrice>();
+    const nextPricesById = new Map<string, CatalogPrice>();
     for (const price of prices) {
-      nextPricesById.set(price.stripePriceId, price);
+      nextPricesById.set(price.providerPriceId, price);
     }
 
     return nextPricesById;
@@ -364,7 +364,7 @@ export default function CatalogPage() {
 
     const normalizedSearch = searchQuery.toLowerCase();
     return products.filter((product) =>
-      [product.name, product.description, product.stripeProductId, product.defaultPriceId]
+      [product.name, product.description, product.providerProductId, product.providerDefaultPriceId]
         .filter(Boolean)
         .some((value) => value?.toLowerCase().includes(normalizedSearch))
     );
@@ -373,7 +373,7 @@ export default function CatalogPage() {
   useEffect(() => {
     if (
       expandedProductId &&
-      !filteredProducts.some((product) => product.stripeProductId === expandedProductId)
+      !filteredProducts.some((product) => product.providerProductId === expandedProductId)
     ) {
       setExpandedProductId(null);
     }
@@ -384,11 +384,11 @@ export default function CatalogPage() {
   const lastSyncedTimes = [
     activeConnection?.lastSyncedAt,
     activeRazorpayConnection?.lastSyncedAt,
-  ].filter(Boolean);
+  ].filter((value): value is string => Boolean(value));
 
   const mostRecentSync =
     (lastSyncedTimes.length > 0
-      ? lastSyncedTimes.sort((a, b) => new Date(b!).getTime() - new Date(a!).getTime())[0]
+      ? [...lastSyncedTimes].sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0]
       : null) ?? null;
 
   return (
@@ -433,9 +433,18 @@ export default function CatalogPage() {
                 {activeConnection?.lastSyncError && (
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Latest sync failed</AlertTitle>
+                    <AlertTitle>Latest Stripe sync failed</AlertTitle>
                     <AlertDescription className="mt-2">
                       {activeConnection.lastSyncError}
+                    </AlertDescription>
+                  </Alert>
+                )}
+                {activeRazorpayConnection?.lastSyncError && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Latest Razorpay sync failed</AlertTitle>
+                    <AlertDescription className="mt-2">
+                      {activeRazorpayConnection.lastSyncError}
                     </AlertDescription>
                   </Alert>
                 )}
@@ -455,21 +464,23 @@ export default function CatalogPage() {
                 ) : (
                   <div className="flex flex-col gap-2">
                     {filteredProducts.map((product) => {
-                      const productPrices = pricesByProductId.get(product.stripeProductId) ?? [];
-                      const defaultPrice = product.defaultPriceId
-                        ? (pricesById.get(product.defaultPriceId) ?? null)
+                      const productPrices = pricesByProductId.get(product.providerProductId) ?? [];
+                      const defaultPrice = product.providerDefaultPriceId
+                        ? (pricesById.get(product.providerDefaultPriceId) ?? null)
                         : null;
 
                       return (
                         <CatalogRow
-                          key={`${product.environment}:${product.stripeProductId}`}
+                          key={`${product.environment}:${product.providerProductId}`}
                           product={product}
                           productPrices={productPrices}
                           defaultPrice={defaultPrice}
-                          expanded={expandedProductId === product.stripeProductId}
+                          expanded={expandedProductId === product.providerProductId}
                           onToggle={() =>
                             setExpandedProductId((current) =>
-                              current === product.stripeProductId ? null : product.stripeProductId
+                              current === product.providerProductId
+                                ? null
+                                : product.providerProductId
                             )
                           }
                         />

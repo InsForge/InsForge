@@ -100,7 +100,7 @@ if (data?.checkoutSession.url) {
 }
 ```
 
-Checkout inserts a row in `payments.checkout_sessions` using the caller's InsForge token. Add RLS policies so users can only create Checkout Sessions for subjects they are allowed to bill, such as their own user, team, workspace, or organization. If your app uses idempotency keys, retries also need a matching `SELECT` policy for the same subject.
+Checkout inserts a row in `payments.stripe_checkout_sessions` using the caller's InsForge token. Add RLS policies so users can only create Checkout Sessions for subjects they are allowed to bill, such as their own user, team, workspace, or organization. If your app uses idempotency keys, retries also need a matching `SELECT` policy for the same subject.
 
 ### Billing Portal
 
@@ -119,7 +119,7 @@ if (data?.customerPortalSession.url) {
 }
 ```
 
-Billing Portal inserts a row in `payments.customer_portal_sessions`. It requires an authenticated user and an existing Stripe customer mapping for the subject. Protect portal creation with RLS or a server-side membership check so users cannot open billing settings for a team or organization they do not manage.
+Billing Portal inserts a row in `payments.stripe_customer_portal_sessions`. It requires an authenticated user and an existing Stripe customer mapping for the subject. Protect portal creation with RLS or a server-side membership check so users cannot open billing settings for a team or organization they do not manage.
 
 ### Managed webhooks
 
@@ -127,7 +127,7 @@ After a Stripe key is connected, InsForge automatically tries to create the mana
 
 ### Payment projections
 
-Synced payment state gives your app structured records for checkout sessions, customer mappings, customers, subscriptions, payment history, refunds, and webhook delivery. Use those rows as operational inputs for dashboards, automation, and fulfillment, not as your public end-user billing API.
+Synced payment state gives your app structured records for checkout sessions, customer mappings, customers, subscriptions, payment activity, refunds, and webhook delivery. Use those rows as operational inputs for dashboards, automation, and fulfillment, not as your public end-user billing API.
 
 ### Fulfillment model
 
@@ -137,10 +137,12 @@ For durable fulfillment, attach triggers to payment state changes and update tab
 
 ```sql
 CREATE TRIGGER sync_team_entitlement_from_subscription
-  AFTER INSERT OR UPDATE ON payments.subscriptions
+  AFTER INSERT OR UPDATE ON payments.stripe_subscriptions
   FOR EACH ROW
   EXECUTE FUNCTION public.sync_team_entitlement();
 ```
+
+If an app accepts multiple payment providers, keep the trigger function idempotent and attach provider-specific triggers to the relevant subscription or payment activity tables.
 
 ### Platform boundaries
 

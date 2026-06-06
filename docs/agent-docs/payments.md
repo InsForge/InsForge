@@ -5,7 +5,7 @@
 - Stripe Checkout for one-time payments.
 - Stripe Checkout for subscriptions.
 - Stripe Billing Portal links for existing customers.
-- Webhook-projected payment history, subscriptions, customers, and refunds.
+- Webhook-projected payment activity, subscriptions, customers, and refunds.
 - Admin setup for Stripe keys, catalog visibility, and managed webhooks.
 
 Do not build raw card collection UI. Use Stripe Checkout and Billing Portal. Handle refunds, disputes, unusual invoice changes, and account-level financial operations in Stripe Dashboard.
@@ -39,7 +39,7 @@ const insforge = createClient({
 });
 ```
 
-Checkout requires an InsForge user token. Guest one-time checkout can use an anonymous InsForge token. API keys are not a replacement for runtime checkout because the backend needs a user context for `payments.checkout_sessions`.
+Checkout requires an InsForge user token. Guest one-time checkout can use an anonymous InsForge token. API keys are not a replacement for runtime checkout because the backend needs a user context for `payments.stripe_checkout_sessions`.
 
 ### One-Time Payment
 
@@ -122,7 +122,7 @@ if (data?.customerPortalSession.url) {
 }
 ```
 
-Portal creation requires an authenticated user and an existing `payments.stripe_customer_mappings` row for the subject.
+Portal creation requires an authenticated user and an existing `payments.customer_mappings` row for the subject.
 
 ## Fulfillment
 
@@ -132,10 +132,10 @@ Good app-owned tables:
 
 | App table | Projection source |
 |-----------|-------------------|
-| `orders` | `payments.payment_history` where `type = 'one_time_payment'` and `status = 'succeeded'`. |
+| `orders` | `payments.stripe_payment_activity` or `payments.razorpay_payment_activity` where `type = 'one_time_payment'` and `status = 'succeeded'`. |
 | `credit_ledger` | Succeeded payment or invoice rows that buy credits. |
-| `team_entitlements` | `payments.subscriptions` where `status` is `active` or `trialing`. |
-| `billing_events` | Normalized rows copied from payment history and subscription changes. |
+| `team_entitlements` | Provider subscription tables such as `payments.stripe_subscriptions` or `payments.razorpay_subscriptions`. |
+| `billing_events` | Normalized rows copied from payment activity and subscription changes. |
 
 Create triggers from payments projections into app-owned tables when you need durable fulfillment:
 
@@ -157,19 +157,19 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-CREATE TRIGGER fulfill_paid_order_from_payment_history
-  AFTER INSERT OR UPDATE ON payments.payment_history
+CREATE TRIGGER fulfill_paid_order_from_stripe_payment_activity
+  AFTER INSERT OR UPDATE ON payments.stripe_payment_activity
   FOR EACH ROW
   EXECUTE FUNCTION public.fulfill_paid_order();
 ```
 
-Adapt the metadata lookup to the app schema. Protect app-owned billing tables with RLS.
+Adapt the metadata lookup to the app schema. If the app accepts multiple payment providers, reuse the same trigger function and attach it to each provider activity table. Protect app-owned billing tables with RLS.
 
 ## Security
 
 - Use app-owned RLS or server-side membership checks before creating checkout or portal sessions for shared subjects.
-- Consider enabling RLS on `payments.checkout_sessions` and `payments.customer_portal_sessions` with `INSERT` policies that check app membership.
-- Do not expose `payments.customers`, `payments.payment_history`, or `payments.subscriptions` directly to end users.
+- Consider enabling RLS on `payments.stripe_checkout_sessions` and `payments.stripe_customer_portal_sessions` with `INSERT` policies that check app membership.
+- Do not expose `payments.customers`, `payments.stripe_payment_activity`, `payments.razorpay_payment_activity`, or provider subscription tables directly to end users.
 - Do not write Stripe-managed payments tables directly. Use the Payments API, Stripe webhooks, or app-owned trigger targets.
 - Metadata keys starting with `insforge_` are reserved.
 
@@ -181,7 +181,7 @@ Check recent checkout attempts:
 SELECT id, environment, mode, status, payment_status, subject_type, subject_id,
        stripe_checkout_session_id, stripe_customer_id, stripe_subscription_id,
        last_error, created_at, updated_at
-FROM payments.checkout_sessions
+FROM payments.stripe_checkout_sessions
 ORDER BY created_at DESC
 LIMIT 20;
 ```
@@ -190,18 +190,18 @@ Check customer mappings:
 
 ```sql
 SELECT environment, subject_type, subject_id, stripe_customer_id, created_at, updated_at
-FROM payments.stripe_customer_mappings
+FROM payments.customer_mappings
 ORDER BY updated_at DESC
 LIMIT 20;
 ```
 
-Check payment projections:
+Check Stripe payment activity:
 
 ```sql
 SELECT environment, type, status, subject_type, subject_id, amount, currency,
        stripe_payment_intent_id, stripe_invoice_id, stripe_subscription_id,
        paid_at, failed_at, refunded_at, created_at
-FROM payments.payment_history
+FROM payments.stripe_payment_activity
 ORDER BY created_at DESC
 LIMIT 20;
 ```
