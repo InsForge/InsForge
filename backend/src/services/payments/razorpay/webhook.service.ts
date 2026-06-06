@@ -1,7 +1,7 @@
 import type { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { RazorpayConfigService } from '@/services/payments/razorpay/config.service.js';
-import { RazorpaySyncService } from '@/services/payments/razorpay/sync.service.js';
+import { RazorpayWebhookHandlerService } from '@/services/payments/razorpay/webhook-handlers.service.js';
 import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
 import type { RazorpayWebhookPayload } from '@/providers/payments/razorpay.provider.js';
@@ -31,7 +31,7 @@ export class RazorpayWebhookService {
   private static instance: RazorpayWebhookService;
   private pool: Pool | null = null;
   private readonly configService = RazorpayConfigService.getInstance();
-  private readonly syncService = RazorpaySyncService.getInstance();
+  private readonly handlerService = RazorpayWebhookHandlerService.getInstance();
 
   static getInstance(): RazorpayWebhookService {
     if (!RazorpayWebhookService.instance) {
@@ -82,13 +82,13 @@ export class RazorpayWebhookService {
       return { received: true, handled: false };
     }
 
-    const handled = this.isHandledEvent(payload.event);
-    if (!handled) {
+    if (!this.isHandledEvent(payload.event)) {
       await this.markWebhookEvent(environment, eventId, 'ignored', null);
       return { received: true, handled: false };
     }
 
-    this.syncAfterAcknowledgement(environment, eventId);
+    // Dispatch per-event handler in the background so we can return 200 fast.
+    this.dispatchAfterAcknowledgement(environment, eventId, payload);
     return { received: true, handled: true };
   }
 
@@ -267,27 +267,24 @@ export class RazorpayWebhookService {
     return HANDLED_RAZORPAY_EVENTS.has(event);
   }
 
-  private syncAfterAcknowledgement(environment: RazorpayEnvironment, eventId: string): void {
+  private dispatchAfterAcknowledgement(
+    environment: RazorpayEnvironment,
+    eventId: string,
+    payload: RazorpayWebhookPayload
+  ): void {
     setImmediate(() => {
-      this.syncService
-        .syncAll(environment)
-        .then(async ({ results }) => {
-          const result = results.find((item) => item.environment === environment);
-          if (result && result.status === 'failed') {
-            await this.markWebhookEvent(
-              environment,
-              eventId,
-              'failed',
-              result.error || 'Sync failed'
-            );
-          } else {
-            await this.markWebhookEvent(environment, eventId, 'processed', null);
-          }
+      this.handlerService
+        .dispatch(environment, payload)
+        .then(async (handled) => {
+          const status = handled ? 'processed' : 'ignored';
+          await this.markWebhookEvent(environment, eventId, status, null);
         })
         .catch(async (error: unknown) => {
           const message = error instanceof Error ? error.message : String(error);
-          logger.error('[Razorpay Webhook] Background sync failed', {
+          logger.error('[Razorpay Webhook] Per-event handler failed', {
             environment,
+            eventId,
+            event: payload.event,
             error: message,
           });
           await this.markWebhookEvent(environment, eventId, 'failed', message);
@@ -308,6 +305,8 @@ const HANDLED_RAZORPAY_EVENTS = new Set([
   'subscription.paused',
   'subscription.resumed',
   'subscription.halted',
+  'subscription.completed',
+  'subscription.expired',
   'refund.created',
   'refund.failed',
   'invoice.paid',
