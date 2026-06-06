@@ -10,6 +10,22 @@ vi.mock('jose', () => ({
   createRemoteJWKSet: vi.fn(() => 'mockedJwks'),
 }));
 
+vi.mock('../../src/infra/config/app.config', () => {
+  const c = {
+    cloud: {
+      projectId: 'project_123',
+      apiHost: 'https://mock-api.dev',
+    },
+    app: {
+      jwtSecret: 'test-secret-key',
+    },
+  };
+  return {
+    config: c,
+    appConfig: c,
+  };
+});
+
 describe('TokenManager.verifyCloudToken', () => {
   const oldEnv = process.env;
   let tokenManager: TokenManager;

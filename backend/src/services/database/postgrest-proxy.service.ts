@@ -3,8 +3,9 @@ import http from 'http';
 import https from 'https';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import logger from '@/utils/logger.js';
+import { appConfig } from '@/infra/config/app.config.js';
 
-const postgrestUrl = process.env.POSTGREST_BASE_URL || 'http://localhost:5430';
+const postgrestUrl = appConfig.database.postgrestBaseUrl;
 
 // Connection pooling for PostgREST
 const httpAgent = new http.Agent({

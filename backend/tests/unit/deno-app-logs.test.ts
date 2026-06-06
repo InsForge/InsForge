@@ -25,15 +25,19 @@ vi.mock('../../src/utils/logger', () => ({
 }));
 
 // Mock config
-vi.mock('../../src/infra/config/app.config', () => ({
-  config: {
+vi.mock('../../src/infra/config/app.config', () => {
+  const c = {
     denoSubhosting: {
       token: 'test-deno-token',
       organizationId: 'test-org-id',
       domain: 'deno.dev',
     },
-  },
-}));
+  };
+  return {
+    config: c,
+    appConfig: c,
+  };
+});
 
 // Mock pool — use vi.hoisted so it's available in the hoisted vi.mock factory
 const { mockPool } = vi.hoisted(() => ({

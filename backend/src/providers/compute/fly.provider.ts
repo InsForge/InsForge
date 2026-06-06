@@ -1,4 +1,4 @@
-import { config } from '@/infra/config/app.config.js';
+import { appConfig } from '@/infra/config/app.config.js';
 import logger from '@/utils/logger.js';
 import type { ComputeProvider } from './compute.provider.js';
 
@@ -30,12 +30,12 @@ export class FlyProvider implements ComputeProvider {
   // Cloud-managed mode (CloudComputeProvider) detects itself implicitly from
   // PROJECT_ID + JWT_SECRET + CLOUD_API_HOST and bypasses this check.
   isConfigured(): boolean {
-    return !!config.fly.apiToken && !!config.fly.org;
+    return !!appConfig.fly.apiToken && !!appConfig.fly.org;
   }
 
   private headers(): Record<string, string> {
     return {
-      Authorization: `Bearer ${config.fly.apiToken}`,
+      Authorization: `Bearer ${appConfig.fly.apiToken}`,
       'Content-Type': 'application/json',
     };
   }
@@ -111,7 +111,7 @@ export class FlyProvider implements ComputeProvider {
       const response = await fetch(graphqlEndpoint, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${config.fly.apiToken}`,
+          Authorization: `Bearer ${appConfig.fly.apiToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ query: mutation, variables: { input: { appId, type } } }),
@@ -154,7 +154,7 @@ export class FlyProvider implements ComputeProvider {
     const response = await fetch('https://api.fly.io/graphql', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${config.fly.apiToken}`,
+        Authorization: `Bearer ${appConfig.fly.apiToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
