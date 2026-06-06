@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RazorpayWebhookEventRow } from '../../src/services/payments/razorpay/webhook.service';
 
-const { mockConfigService, mockProvider, mockSyncService } = vi.hoisted(() => ({
+const { mockConfigService, mockProvider, mockHandlerService } = vi.hoisted(() => ({
   mockConfigService: {
     getRazorpayWebhookSecret: vi.fn(),
     createRazorpayProvider: vi.fn(),
@@ -9,8 +9,8 @@ const { mockConfigService, mockProvider, mockSyncService } = vi.hoisted(() => ({
   mockProvider: {
     verifyWebhookSignature: vi.fn(),
   },
-  mockSyncService: {
-    syncAll: vi.fn(),
+  mockHandlerService: {
+    dispatch: vi.fn(),
   },
 }));
 
@@ -20,9 +20,9 @@ vi.mock('../../src/services/payments/razorpay/config.service', () => ({
   },
 }));
 
-vi.mock('../../src/services/payments/razorpay/sync.service', () => ({
-  RazorpaySyncService: {
-    getInstance: () => mockSyncService,
+vi.mock('../../src/services/payments/razorpay/webhook-handlers.service', () => ({
+  RazorpayWebhookHandlerService: {
+    getInstance: () => mockHandlerService,
   },
 }));
 
@@ -77,40 +77,10 @@ describe('RazorpayWebhookService', () => {
     mockConfigService.getRazorpayWebhookSecret.mockResolvedValue('whsec_123');
     mockConfigService.createRazorpayProvider.mockResolvedValue(mockProvider);
     mockProvider.verifyWebhookSignature.mockReturnValue(true);
-    mockSyncService.syncAll.mockResolvedValue({
-      results: [
-        {
-          environment: 'test',
-          status: 'succeeded',
-          connection: {
-            environment: 'test',
-            status: 'connected',
-            accountId: 'rzp_test_123',
-            merchantName: null,
-            accountLivemode: false,
-            webhookEndpointId: 'manual',
-            webhookEndpointUrl: 'https://example.test/api/webhooks/razorpay/test',
-            webhookConfiguredAt: null,
-            maskedKey: 'rzp_test_****1234',
-            lastSyncedAt: null,
-            lastSyncStatus: 'succeeded',
-            lastSyncError: null,
-            lastSyncCounts: {},
-          },
-          syncCounts: {
-            plans: 0,
-            items: 0,
-            customers: 0,
-            subscriptions: 0,
-            payments: 0,
-          },
-          error: null,
-        },
-      ],
-    });
+    mockHandlerService.dispatch.mockResolvedValue(true);
   });
 
-  it('acknowledges handled Razorpay events and syncs after acknowledgement', async () => {
+  it('acknowledges handled Razorpay events and dispatches after acknowledgement', async () => {
     const service = RazorpayWebhookService.getInstance();
     const recordSpy = vi
       .spyOn(service, 'recordWebhookEventStart')
@@ -139,7 +109,10 @@ describe('RazorpayWebhookService', () => {
 
     await flushImmediateTasks();
 
-    expect(mockSyncService.syncAll).toHaveBeenCalledWith('test');
+    expect(mockHandlerService.dispatch).toHaveBeenCalledWith(
+      'test',
+      expect.objectContaining({ event: 'payment.captured' })
+    );
     expect(markSpy).toHaveBeenCalledWith('test', 'evt_header_123', 'processed', null);
   });
 
@@ -160,6 +133,6 @@ describe('RazorpayWebhookService', () => {
 
     expect(result).toEqual({ received: true, handled: false });
     expect(markSpy).toHaveBeenCalledWith('test', 'evt_header_456', 'ignored', null);
-    expect(mockSyncService.syncAll).not.toHaveBeenCalled();
+    expect(mockHandlerService.dispatch).not.toHaveBeenCalled();
   });
 });

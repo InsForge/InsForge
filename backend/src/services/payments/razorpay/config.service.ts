@@ -430,6 +430,7 @@ export class RazorpayConfigService {
   async configureWebhook(
     environment: RazorpayEnvironment
   ): Promise<ConfigureRazorpayWebhookResponse> {
+    // Validate that keys are configured and can authenticate before proceeding
     await this.createRazorpayProvider(environment);
 
     let webhookSecret = await this.getRazorpayWebhookSecret(environment);
@@ -437,27 +438,31 @@ export class RazorpayConfigService {
     if (!webhookSecret) {
       // Auto-generate a secure random secret for Razorpay webhooks
       webhookSecret = generateSecureToken(32);
-
       await this.setRazorpayWebhookSecret(environment, webhookSecret);
     }
 
     const webhookUrl = `${getApiBaseUrl()}/api/webhooks/razorpay/${environment}`;
 
-    // Standard Razorpay integrations do not support creating webhooks via API.
-    // We generate the secret and URL locally so the user can copy them into the Razorpay Dashboard.
+    // Razorpay's webhook creation API is restricted to Razorpay Partners only.
+    // Standard merchant integrations must configure webhooks manually via the
+    // Razorpay Dashboard. We generate and persist the URL and secret here so
+    // the developer can copy them in without leaving InsForge.
     await this.getPool().query(
       `INSERT INTO payments.provider_connections
          (provider, environment, webhook_endpoint_id, webhook_endpoint_url, webhook_configured_at, updated_at)
-       VALUES ('razorpay', $2, 'manual', $1, NOW(), NOW())
+       VALUES ('razorpay', $1, 'manual', $2, NOW(), NOW())
        ON CONFLICT (provider, environment) DO UPDATE SET
-         webhook_endpoint_id   = EXCLUDED.webhook_endpoint_id,
+         webhook_endpoint_id   = 'manual',
          webhook_endpoint_url  = EXCLUDED.webhook_endpoint_url,
          webhook_configured_at = EXCLUDED.webhook_configured_at,
          updated_at            = EXCLUDED.updated_at`,
-      [webhookUrl, environment]
+      [environment, webhookUrl]
     );
 
-    logger.info('Razorpay webhook configured locally', { environment, webhookUrl });
+    logger.info('Razorpay webhook configured (manual dashboard setup required)', {
+      environment,
+      webhookUrl,
+    });
 
     const connection = await this.getConnection(environment);
 

@@ -1185,8 +1185,9 @@ export function PaymentsSettingsDialog({ open, onOpenChange }: PaymentsSettingsD
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-8">
+              <div className="flex flex-col gap-12">
                 <div>
+                  <h3 className="mb-4 text-base font-medium text-foreground">Stripe Webhooks</h3>
                   <WebhooksTabContent
                     keys={keys}
                     connections={connections}
@@ -1200,7 +1201,9 @@ export function PaymentsSettingsDialog({ open, onOpenChange }: PaymentsSettingsD
                     provider="stripe"
                   />
                 </div>
+                <div className="h-px bg-[var(--alpha-8)]" />
                 <div>
+                  <h3 className="mb-4 text-base font-medium text-foreground">Razorpay Webhooks</h3>
                   <WebhooksTabContent
                     keys={rzpKeys.filter((k) => k.keyType === 'api_key')}
                     connections={rzpConnections}
