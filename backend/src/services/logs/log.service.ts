@@ -10,7 +10,10 @@ import {
   type GetBuildLogsResponseSchema,
 } from '@insforge/shared-schemas';
 import { isCloudEnvironment } from '@/utils/environment.js';
-import { DenoSubhostingProvider } from '@/providers/functions/deno-subhosting.provider.js';
+import {
+  DenoSubhostingProvider,
+  type AppLogEntry,
+} from '@/providers/functions/deno-subhosting.provider.js';
 import { FunctionService } from '@/services/functions/function.service.js';
 
 // Re-export the type for backward compatibility
@@ -134,16 +137,15 @@ export class LogService {
         // info, debug); passing `debug` would return ONLY debug-level entries.
       });
 
-      const logs: LogSchema[] = result.logs.map((entry, index) => ({
-        id: `deno-${deploymentId}-${entry.time}-${index}`,
-        timestamp: entry.time,
-        eventMessage: entry.message,
-        body: {
-          level: entry.level,
-          region: entry.region,
-          message: entry.message,
-        },
-      }));
+      const logs: LogSchema[] = result.logs.map((entry, index) => {
+        const body = this.normalizeFunctionLogBody(entry);
+        return {
+          id: `deno-${deploymentId}-${entry.time}-${index}`,
+          timestamp: entry.time,
+          eventMessage: (body.event_message as string) ?? '',
+          body,
+        };
+      });
 
       return {
         logs,
@@ -158,6 +160,77 @@ export class LogService {
       });
       return { logs: [], total: 0, tableName: 'deno-subhosting' };
     }
+  }
+
+  /**
+   * Reshape a Deno runtime log entry into the Vector-style body the dashboard
+   * consumes. The dashboard derives the severity badge from
+   * `body.metadata.level` and the message column from `body.event_message`, so a
+   * flat `{ level, region, message }` body renders every line as "Info" with the
+   * raw message text.
+   *
+   * Deno captures stdout/stderr verbatim via the console API, so the
+   * auto-generated router's `console.log(JSON.stringify({ slug, method, status,
+   * duration }))` arrives as a JSON string with a trailing newline. Parse it,
+   * lift the level into `metadata`, and synthesize a readable access line.
+   */
+  private normalizeFunctionLogBody(entry: AppLogEntry): Record<string, unknown> {
+    const raw = (entry.message ?? '').replace(/\s+$/, '');
+
+    let parsed: Record<string, unknown> | null = null;
+    try {
+      const obj: unknown = JSON.parse(raw);
+      if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+        parsed = obj as Record<string, unknown>;
+      }
+    } catch {
+      parsed = null;
+    }
+
+    // Level precedence: a `level` embedded in the structured log wins, otherwise
+    // the level Deno reports for the line; default to 'info'.
+    const structuredLevel =
+      parsed && typeof parsed.level === 'string' ? parsed.level.toLowerCase() : undefined;
+    const metadata: Record<string, unknown> = { level: structuredLevel ?? entry.level ?? 'info' };
+    if (entry.region) {
+      metadata.region = entry.region;
+    }
+
+    // Non-JSON line (e.g. `console.error("Function error:", err)`): surface the
+    // trimmed text as-is.
+    if (!parsed) {
+      return { event_message: raw, metadata };
+    }
+
+    // Keep the parsed fields in the body for the detail panel, minus the ones we
+    // hoist into metadata / event_message.
+    const { level: _level, metadata: _meta, message: _message, msg: _msg, ...rest } = parsed;
+
+    const fmt = (v: unknown) => (v === undefined || v === null ? '' : String(v));
+
+    // Router request logs carry { slug, method, status, duration }. Synthesize an
+    // access line so the column shows `GET my-fn 200 1ms` instead of raw JSON.
+    if (
+      parsed.method !== undefined ||
+      parsed.status !== undefined ||
+      parsed.duration !== undefined
+    ) {
+      const target = typeof parsed.slug === 'string' ? parsed.slug : fmt(parsed.path);
+      const requestLine = [fmt(parsed.method), target, fmt(parsed.status), fmt(parsed.duration)]
+        .filter((part) => part !== '')
+        .join(' ');
+      return { ...rest, event_message: requestLine || raw, metadata };
+    }
+
+    // Other structured logs: surface the `message`/`msg` field when present,
+    // otherwise fall back to the cleaned JSON so nothing is lost.
+    const msgField =
+      typeof parsed.message === 'string'
+        ? parsed.message
+        : typeof parsed.msg === 'string'
+          ? parsed.msg
+          : raw;
+    return { ...rest, event_message: msgField, metadata };
   }
 
   getLogSourceStats(): Promise<LogStatsSchema[]> {

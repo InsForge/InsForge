@@ -316,14 +316,63 @@ describe('LogService.getLogsBySource with Deno Subhosting', () => {
 
     expect(result.tableName).toBe('deno-subhosting');
     expect(result.logs).toHaveLength(2);
+    // Plain-text lines surface as event_message; severity comes from
+    // body.metadata.level (the shape the dashboard reads).
     expect(result.logs[0].eventMessage).toBe('Function executed');
     expect(result.logs[0].timestamp).toBe('2025-01-15T10:00:00Z');
     expect(result.logs[0].body).toEqual({
-      level: 'info',
-      region: 'us-east1',
-      message: 'Function executed',
+      event_message: 'Function executed',
+      metadata: { level: 'info', region: 'us-east1' },
     });
     expect(result.logs[1].eventMessage).toBe('Slow query');
+    expect(result.logs[1].body.metadata).toEqual({ level: 'warning', region: 'us-east1' });
+  });
+
+  it('parses structured router request logs into an access line', async () => {
+    mockPool.query.mockResolvedValue({ rows: [{ id: 'rev-latest' }] });
+
+    // The auto-generated router emits this via console.log(JSON.stringify(...));
+    // Deno captures it verbatim with a trailing newline.
+    mockFetch.mockResolvedValue(
+      logsResponse([
+        {
+          timestamp: '2025-01-15T10:00:00Z',
+          level: 'info',
+          message:
+            '{"timestamp":"2025-01-15T10:00:00Z","slug":"server-timestamp","method":"GET","status":200,"duration":"1ms"}\n',
+          region: '',
+        },
+      ])
+    );
+
+    const result = await logService.getLogsBySource('function.logs', 100);
+
+    expect(result.logs[0].eventMessage).toBe('GET server-timestamp 200 1ms');
+    expect(result.logs[0].body.event_message).toBe('GET server-timestamp 200 1ms');
+    expect(result.logs[0].body.metadata).toEqual({ level: 'info' });
+    // Parsed fields stay in the body for the detail panel.
+    expect(result.logs[0].body.slug).toBe('server-timestamp');
+    expect(result.logs[0].body.status).toBe(200);
+  });
+
+  it('lifts a structured log level into metadata and uses its message', async () => {
+    mockPool.query.mockResolvedValue({ rows: [{ id: 'rev-latest' }] });
+
+    mockFetch.mockResolvedValue(
+      logsResponse([
+        {
+          timestamp: '2025-01-15T10:00:00Z',
+          level: 'info', // Deno's line level…
+          message: '{"level":"error","message":"cache miss"}', // …overridden by the structured level
+          region: 'us-east1',
+        },
+      ])
+    );
+
+    const result = await logService.getLogsBySource('function.logs', 100);
+
+    expect(result.logs[0].eventMessage).toBe('cache miss');
+    expect(result.logs[0].body.metadata).toEqual({ level: 'error', region: 'us-east1' });
   });
 
   it('also works with deno-relay-logs source name', async () => {
@@ -394,7 +443,11 @@ describe('LogService.getLogsBySource with Deno Subhosting', () => {
     const calledUrl = mockFetch.mock.calls[0][0] as string;
     expect(calledUrl).not.toContain('level=');
     // All severities flow through, not just debug
-    expect(result.logs.map((l) => l.body.level)).toEqual(['debug', 'info', 'error']);
+    expect(result.logs.map((l) => (l.body.metadata as { level: string }).level)).toEqual([
+      'debug',
+      'info',
+      'error',
+    ]);
   });
 
   it('generates unique log IDs from deployment ID and timestamp', async () => {
