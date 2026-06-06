@@ -7,6 +7,7 @@ import { AppError, UpstreamError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import logger from '@/utils/logger.js';
+import { appConfig } from '@/infra/config/app.config.js';
 
 const VERCEL_UPLOAD_TIMEOUT_MS = 120_000;
 
@@ -250,9 +251,9 @@ export class VercelProvider {
       return await this.fetchCloudCredentials();
     }
 
-    const token = process.env.VERCEL_TOKEN;
-    const teamId = process.env.VERCEL_TEAM_ID;
-    const projectId = process.env.VERCEL_PROJECT_ID;
+    const token = appConfig.deployments.vercelToken;
+    const teamId = appConfig.deployments.vercelTeamId;
+    const projectId = appConfig.deployments.vercelProjectId;
 
     if (!token) {
       throw new AppError(
@@ -287,9 +288,9 @@ export class VercelProvider {
       return true;
     }
     return !!(
-      process.env.VERCEL_TOKEN &&
-      process.env.VERCEL_TEAM_ID &&
-      process.env.VERCEL_PROJECT_ID
+      appConfig.deployments.vercelToken &&
+      appConfig.deployments.vercelTeamId &&
+      appConfig.deployments.vercelProjectId
     );
   }
 
@@ -304,12 +305,12 @@ export class VercelProvider {
 
     this.fetchPromise = (async () => {
       try {
-        const projectId = process.env.PROJECT_ID;
+        const projectId = appConfig.cloud.projectId;
         if (!projectId) {
           throw new Error('PROJECT_ID not found in environment variables');
         }
 
-        const jwtSecret = process.env.JWT_SECRET;
+        const jwtSecret = appConfig.app.jwtSecret;
         if (!jwtSecret) {
           throw new Error('JWT_SECRET not found in environment variables');
         }
@@ -317,7 +318,7 @@ export class VercelProvider {
         const signature = jwt.sign({ projectId }, jwtSecret, { expiresIn: '1h' });
 
         const response = await fetch(
-          `${process.env.CLOUD_API_HOST || 'https://api.insforge.dev'}/sites/v1/credentials/${projectId}?sign=${signature}`
+          `${appConfig.cloud.apiHost}/sites/v1/credentials/${projectId}?sign=${signature}`
         );
 
         if (!response.ok) {

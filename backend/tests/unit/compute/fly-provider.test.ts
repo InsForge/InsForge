@@ -1,15 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('@/infra/config/app.config.js', () => ({
-  config: {
+vi.mock('@/infra/config/app.config.js', () => {
+  const c = {
     fly: {
       enabled: true,
       apiToken: 'test-token',
       org: 'test-org',
       domain: 'compute.test.dev',
     },
-  },
-}));
+  };
+  return {
+    config: c,
+    appConfig: c,
+  };
+});
 
 vi.mock('@/utils/logger.js', () => ({
   default: { error: vi.fn(), info: vi.fn(), warn: vi.fn(), debug: vi.fn() },

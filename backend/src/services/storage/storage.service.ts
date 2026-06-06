@@ -18,6 +18,7 @@ import { StorageConfigService } from '@/services/storage/storage-config.service.
 import logger from '@/utils/logger.js';
 import { escapeSqlLikePattern, escapeRegexPattern } from '@/utils/validations.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
+import { appConfig } from '@/infra/config/app.config.js';
 
 const DEFAULT_LIST_LIMIT = 100;
 const GIGABYTE_IN_BYTES = 1024 * 1024 * 1024;
@@ -35,19 +36,19 @@ export class StorageService {
   private pool: Pool | null = null;
 
   private constructor() {
-    const s3Bucket = process.env.AWS_S3_BUCKET;
-    const appKey = process.env.APP_KEY || 'local';
+    const s3Bucket = appConfig.storage.s3Bucket;
+    const appKey = appConfig.storage.appKey;
     // PARENT_APP_KEY is set by cloud-backend at branch EC2 startup. When
     // present, the S3 provider runs in branch mode: read paths fall back to
     // parent's S3 prefix on 404, write paths target the branch's prefix only.
-    const parentAppKey = process.env.PARENT_APP_KEY?.trim() || undefined;
+    const parentAppKey = appConfig.storage.parentAppKey;
 
     if (s3Bucket) {
       // Use S3 backend
       this.provider = new S3StorageProvider(
         s3Bucket,
         appKey,
-        process.env.AWS_REGION || 'us-east-2',
+        appConfig.storage.awsRegion,
         parentAppKey
       );
       if (parentAppKey) {
@@ -55,8 +56,7 @@ export class StorageService {
       }
     } else {
       // Use local filesystem backend (no fallback support — local installs aren't branched)
-      const baseDir = process.env.STORAGE_DIR || path.resolve(process.cwd(), 'insforge-storage');
-      this.provider = new LocalStorageProvider(baseDir);
+      this.provider = new LocalStorageProvider(appConfig.storage.storageDir);
     }
   }
 

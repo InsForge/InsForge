@@ -34,6 +34,7 @@ import { EmailService } from '@/services/email/email.service.js';
 import { XOAuthProvider } from '@/providers/oauth/x.provider.js';
 import { AppleOAuthProvider } from '@/providers/oauth/apple.provider.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
+import { appConfig } from '@/infra/config/app.config.js';
 import {
   ERROR_CODES,
   type AuthMetadataSchema,
@@ -69,8 +70,8 @@ export class AuthService {
   private appleOAuthProvider: AppleOAuthProvider;
 
   private constructor() {
-    this.adminUsername = process.env.ROOT_ADMIN_USERNAME ?? process.env.ADMIN_EMAIL ?? '';
-    this.adminPassword = process.env.ROOT_ADMIN_PASSWORD ?? process.env.ADMIN_PASSWORD ?? '';
+    this.adminUsername = appConfig.auth.adminEmail;
+    this.adminPassword = appConfig.auth.adminPassword;
 
     if (!this.adminUsername || !this.adminPassword) {
       throw new Error(
