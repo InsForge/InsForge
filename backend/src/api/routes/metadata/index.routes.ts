@@ -37,7 +37,11 @@ const metadataQuerySchema = z.object({
 // Get full metadata (default endpoint)
 router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { format } = metadataQuerySchema.parse(req.query);
+    const queryValidation = metadataQuerySchema.safeParse(req.query);
+    if (!queryValidation.success) {
+      throw new AppError('Invalid format parameter', 400, ERROR_CODES.INVALID_INPUT);
+    }
+    const { format } = queryValidation.data;
 
     // Fetch all metadata in parallel for better performance
     const [auth, database, storage, functions, deployments] = await Promise.all([
