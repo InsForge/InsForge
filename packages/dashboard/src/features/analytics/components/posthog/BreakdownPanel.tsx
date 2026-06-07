@@ -1,4 +1,5 @@
-import { EmptyState, ErrorState, LoadingState } from '#components';
+import { EmptyState, LoadingState } from '#components';
+import { ErrorState } from '#components/ErrorState';
 import { useTimeframe } from '#features/analytics/context/TimeRangeContext';
 import { useWebStats } from '#features/analytics/hooks/useWebStats';
 import { type Breakdown } from '#features/analytics/services/analytics.service';

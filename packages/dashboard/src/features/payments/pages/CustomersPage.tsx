@@ -11,12 +11,12 @@ import {
   AlertTitle,
   DataGrid,
   DataGridEmptyState,
-  ErrorState,
   LoadingState,
   TableHeader,
   type DataGridColumn,
   type DataGridRowType,
 } from '#components';
+import { ErrorState } from '#components/ErrorState';
 import { PaymentsKeyMissingState } from '#features/payments/components/PaymentsKeyMissingState';
 import type { PaymentsOutletContext } from '#features/payments/components/PaymentsLayout';
 import { usePaymentCustomers } from '#features/payments/hooks/usePaymentCustomers';

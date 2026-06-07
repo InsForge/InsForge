@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@insforge/ui';
-import { ErrorState } from '#components';
+import { ErrorState } from '#components/ErrorState';
 import {
   generateProviderTabs,
   filterModelsByProvider,
