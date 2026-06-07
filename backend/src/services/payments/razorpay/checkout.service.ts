@@ -203,13 +203,15 @@ export class RazorpayCheckoutService {
       const provider = await this.configService.createRazorpayProvider(input.environment);
       const db = DatabaseManager.getInstance().getPool();
 
+      const resolvedIdempotencyKey = input.idempotencyKey ?? randomUUID();
+
       // 1. Guard idempotency at the DB level
       const attemptRes = await db.query(
         `INSERT INTO payments.razorpay_subscription_attempts (environment, idempotency_key)
          VALUES ($1, $2)
          ON CONFLICT (environment, idempotency_key) DO NOTHING
          RETURNING id, subscription_id`,
-        [input.environment, input.idempotencyKey]
+        [input.environment, resolvedIdempotencyKey]
       );
 
       if (attemptRes.rowCount === 0) {
@@ -217,7 +219,7 @@ export class RazorpayCheckoutService {
         const existing = await db.query(
           `SELECT id, subscription_id FROM payments.razorpay_subscription_attempts
            WHERE environment = $1 AND idempotency_key = $2`,
-          [input.environment, input.idempotencyKey]
+          [input.environment, resolvedIdempotencyKey]
         );
         const subId = existing.rows[0]?.subscription_id;
         const attemptRecordId = existing.rows[0]?.id;
@@ -252,14 +254,22 @@ export class RazorpayCheckoutService {
 
       const notes = this.buildNotes(input.metadata, input.subject);
 
-      const razorpaySub = await provider.createSubscription({
-        planId: input.planId,
-        totalCount: input.totalCount,
-        quantity: input.quantity,
-        startAt: input.startAt,
-        customerId: customerId ?? undefined,
-        notes,
-      });
+      let razorpaySub;
+      try {
+        razorpaySub = await provider.createSubscription({
+          planId: input.planId,
+          totalCount: input.totalCount,
+          quantity: input.quantity,
+          startAt: input.startAt,
+          customerId: customerId ?? undefined,
+          notes,
+        });
+      } catch (err) {
+        await db.query(`DELETE FROM payments.razorpay_subscription_attempts WHERE id = $1`, [
+          attemptRecordId,
+        ]);
+        throw err;
+      }
 
       if (customerId) {
         // Persist / update the customer mapping for future lookups.

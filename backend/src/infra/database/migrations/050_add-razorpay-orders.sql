@@ -71,7 +71,7 @@ ALTER TABLE payments.razorpay_orders ENABLE ROW LEVEL SECURITY;
 CREATE TABLE IF NOT EXISTS payments.razorpay_subscription_attempts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   environment TEXT NOT NULL CHECK (environment IN ('test', 'live')),
-  idempotency_key TEXT NOT NULL,
+  idempotency_key TEXT,
   subscription_id TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (environment, idempotency_key)
@@ -81,4 +81,5 @@ GRANT INSERT, SELECT, UPDATE ON payments.razorpay_subscription_attempts TO authe
 ALTER TABLE payments.razorpay_subscription_attempts ENABLE ROW LEVEL SECURITY;
 
 -- Down Migration
+DROP TABLE IF EXISTS payments.razorpay_subscription_attempts;
 DROP TABLE IF EXISTS payments.razorpay_orders;

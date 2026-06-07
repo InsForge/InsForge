@@ -570,11 +570,11 @@ const createRazorpayOrderFields = {
   customerEmail: z.string().trim().email().nullable().optional(),
   /** Optional idempotency key to prevent duplicate orders. */
   idempotencyKey: stripeIdempotencyKeySchema.optional(),
-  /** Optional metadata forwarded to Razorpay as order notes (max 15 keys). */
+  /** Optional metadata forwarded to Razorpay as order notes (max 12 keys). */
   metadata: z
     .record(z.string())
-    .refine((m) => Object.keys(m).length <= 15, {
-      message: 'Razorpay notes support a maximum of 15 key-value pairs',
+    .refine((m) => Object.keys(m).length <= 12, {
+      message: 'Razorpay notes support a maximum of 12 key-value pairs (3 reserved)',
     })
     .optional(),
 };
@@ -653,11 +653,11 @@ const createRazorpaySubscriptionFields = {
   customerEmail: z.string().trim().email().nullable().optional(),
   /** Optional idempotency key to prevent duplicate subscriptions. */
   idempotencyKey: stripeIdempotencyKeySchema.optional(),
-  /** Optional metadata forwarded to Razorpay as subscription notes (max 15 keys). */
+  /** Optional metadata forwarded to Razorpay as subscription notes (max 12 keys). */
   metadata: z
     .record(z.string())
-    .refine((m) => Object.keys(m).length <= 15, {
-      message: 'Razorpay notes support a maximum of 15 key-value pairs',
+    .refine((m) => Object.keys(m).length <= 12, {
+      message: 'Razorpay notes support a maximum of 12 key-value pairs (3 reserved)',
     })
     .optional(),
 };
