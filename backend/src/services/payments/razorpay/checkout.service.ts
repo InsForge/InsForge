@@ -267,7 +267,13 @@ export class RazorpayCheckoutService {
       } catch (err) {
         await db.query(`DELETE FROM payments.razorpay_subscription_attempts WHERE id = $1`, [
           attemptRecordId,
-        ]);
+        ]).catch((deleteErr) => {
+          logger.warn('Failed to clean up Razorpay subscription attempt after provider error', {
+            environment: input.environment,
+            attemptId: attemptRecordId,
+            error: deleteErr instanceof Error ? deleteErr.message : String(deleteErr),
+          });
+        });
         throw err;
       }
 
