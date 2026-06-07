@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS payments.razorpay_subscription_attempts (
   UNIQUE (environment, idempotency_key)
 );
 
-GRANT INSERT, SELECT, UPDATE ON payments.razorpay_subscription_attempts TO authenticated, project_admin;
+GRANT INSERT, SELECT, UPDATE, DELETE ON payments.razorpay_subscription_attempts TO authenticated, project_admin;
 ALTER TABLE payments.razorpay_subscription_attempts ENABLE ROW LEVEL SECURITY;
 
 -- Down Migration
