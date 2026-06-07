@@ -545,6 +545,156 @@ export const razorpayWebhookResponseSchema = z.object({
   handled: z.boolean(),
 });
 
+// ---------------------------------------------------------------------------
+// Razorpay Runtime Checkout Schemas
+// ---------------------------------------------------------------------------
+
+const createRazorpayOrderFields = {
+  /**
+   * Amount in the smallest currency unit (e.g., paise for INR).
+   * Must be a positive integer.
+   */
+  amount: z.number().int().positive('Amount must be a positive integer'),
+  /** ISO 4217 three-letter currency code. Defaults to INR. */
+  currency: z
+    .string()
+    .trim()
+    .length(3, 'Currency must be a three-letter ISO currency code')
+    .transform((v) => v.toUpperCase())
+    .default('INR'),
+  /** Optional human-readable description of the payment. */
+  description: z.string().trim().max(255).optional(),
+  /** Optional billing subject for linking the payment to a resource. */
+  subject: billingSubjectSchema.optional(),
+  /** Optional customer email. Used to pre-fill the checkout form. */
+  customerEmail: z.string().trim().email().nullable().optional(),
+  /** Optional idempotency key to prevent duplicate orders. */
+  idempotencyKey: stripeIdempotencyKeySchema.optional(),
+  /** Optional metadata forwarded to Razorpay as order notes (max 15 keys). */
+  metadata: z
+    .record(z.string())
+    .refine((m) => Object.keys(m).length <= 15, {
+      message: 'Razorpay notes support a maximum of 15 key-value pairs',
+    })
+    .optional(),
+};
+
+/**
+ * Request body for creating a Razorpay Order (one-time payment).
+ * The returned order_id and key_id are used by the developer's frontend
+ * to open the Razorpay checkout modal via the Razorpay JS SDK.
+ */
+export const createRazorpayOrderBodySchema = z
+  .object(createRazorpayOrderFields)
+  .strict()
+  .refine((v) => hasNoReservedInsForgeMetadata(v.metadata), {
+    path: ['metadata'],
+    message: 'Metadata keys starting with insforge_ are reserved',
+  });
+
+export const createRazorpayOrderRequestSchema = z
+  .object({
+    environment: razorpayEnvironmentSchema,
+    ...createRazorpayOrderFields,
+  })
+  .strict()
+  .refine((v) => hasNoReservedInsForgeMetadata(v.metadata), {
+    path: ['metadata'],
+    message: 'Metadata keys starting with insforge_ are reserved',
+  });
+
+/** Shape of a persisted Razorpay order record returned by the API. */
+export const razorpayOrderSchema = z.object({
+  id: z.string(),
+  environment: razorpayEnvironmentSchema,
+  status: z.enum(['initialized', 'created', 'paid', 'attempted', 'failed']),
+  subjectType: z.string().nullable(),
+  subjectId: z.string().nullable(),
+  customerId: z.string().nullable(),
+  customerEmail: z.string().nullable(),
+  /** Razorpay order ID (order_XXX). Null until the Razorpay API call succeeds. */
+  orderId: z.string().nullable(),
+  amount: z.number(),
+  amountPaid: z.number(),
+  amountDue: z.number(),
+  currency: z.string(),
+  description: z.string().nullable(),
+  metadata: z.record(z.string()),
+  lastError: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type RazorpayOrder = z.infer<typeof razorpayOrderSchema>;
+
+export const createRazorpayOrderResponseSchema = z.object({
+  order: razorpayOrderSchema,
+  /** Razorpay key ID — safe to expose; needed by the frontend to open the modal. */
+  keyId: z.string(),
+});
+
+const createRazorpaySubscriptionFields = {
+  /** Razorpay Plan ID (plan_XXX) from the catalog. */
+  planId: z.string().trim().min(1, 'Razorpay plan ID is required'),
+  /**
+   * Total number of billing cycles for the subscription.
+   * Must be between 1 and 1000.
+   */
+  totalCount: z.number().int().min(1).max(1000),
+  /** Number of plan quantities to subscribe to. Defaults to 1. */
+  quantity: z.number().int().positive().default(1),
+  /** Optional Unix timestamp for when the subscription billing should start. */
+  startAt: z.number().int().positive().optional(),
+  /** Optional billing subject for linking the subscription to a resource. */
+  subject: billingSubjectSchema.optional(),
+  /** Optional customer email used for customer lookup or creation. */
+  customerEmail: z.string().trim().email().nullable().optional(),
+  /** Optional idempotency key to prevent duplicate subscriptions. */
+  idempotencyKey: stripeIdempotencyKeySchema.optional(),
+  /** Optional metadata forwarded to Razorpay as subscription notes (max 15 keys). */
+  metadata: z
+    .record(z.string())
+    .refine((m) => Object.keys(m).length <= 15, {
+      message: 'Razorpay notes support a maximum of 15 key-value pairs',
+    })
+    .optional(),
+};
+
+/**
+ * Request body for creating a Razorpay Subscription (recurring billing).
+ * The returned subscription_id and short_url are used by the developer's
+ * frontend to redirect the user to the hosted Razorpay payment page.
+ */
+export const createRazorpaySubscriptionBodySchema = z
+  .object(createRazorpaySubscriptionFields)
+  .strict()
+  .refine((v) => hasNoReservedInsForgeMetadata(v.metadata), {
+    path: ['metadata'],
+    message: 'Metadata keys starting with insforge_ are reserved',
+  });
+
+export const createRazorpaySubscriptionRequestSchema = z
+  .object({
+    environment: razorpayEnvironmentSchema,
+    ...createRazorpaySubscriptionFields,
+  })
+  .strict()
+  .refine((v) => hasNoReservedInsForgeMetadata(v.metadata), {
+    path: ['metadata'],
+    message: 'Metadata keys starting with insforge_ are reserved',
+  });
+
+export const createRazorpaySubscriptionResponseSchema = z.object({
+  subscription: razorpaySubscriptionSchema,
+  /** Razorpay key ID — safe to expose; needed by the frontend. */
+  keyId: z.string(),
+  /**
+   * Razorpay-hosted payment page URL. Redirect the user here to complete
+   * the first billing cycle. Null if Razorpay did not return a short_url
+   * (e.g. subscription is in 'created' state and auth is pending via SDK).
+   */
+  shortUrl: z.string().nullable(),
+});
+
 export type SyncPaymentsRequest = z.infer<typeof syncPaymentsRequestSchema>;
 export type SyncRazorpayPaymentsRequest = z.infer<typeof syncRazorpayPaymentsRequestSchema>;
 export type ListStripeCatalogRequest = z.infer<typeof listStripeCatalogRequestSchema>;
@@ -636,3 +786,13 @@ export type ConfigureRazorpayWebhookResponse = z.infer<
   typeof configureRazorpayWebhookResponseSchema
 >;
 export type RazorpayWebhookResponse = z.infer<typeof razorpayWebhookResponseSchema>;
+export type CreateRazorpayOrderBody = z.infer<typeof createRazorpayOrderBodySchema>;
+export type CreateRazorpayOrderRequest = z.infer<typeof createRazorpayOrderRequestSchema>;
+export type CreateRazorpayOrderResponse = z.infer<typeof createRazorpayOrderResponseSchema>;
+export type CreateRazorpaySubscriptionBody = z.infer<typeof createRazorpaySubscriptionBodySchema>;
+export type CreateRazorpaySubscriptionRequest = z.infer<
+  typeof createRazorpaySubscriptionRequestSchema
+>;
+export type CreateRazorpaySubscriptionResponse = z.infer<
+  typeof createRazorpaySubscriptionResponseSchema
+>;

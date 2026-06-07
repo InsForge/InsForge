@@ -427,3 +427,26 @@ export interface RazorpaySubscriptionRow {
   createdAt: Date | string;
   updatedAt: Date | string;
 }
+
+export type RazorpayOrderStatus = 'initialized' | 'created' | 'paid' | 'attempted' | 'failed';
+
+export interface RazorpayOrderRow {
+  id: string;
+  environment: RazorpayEnvironment;
+  status: RazorpayOrderStatus;
+  subjectType: string | null;
+  subjectId: string | null;
+  customerId: string | null;
+  customerEmail: string | null;
+  idempotencyKey: string | null;
+  orderId: string | null;
+  amount: number | string;
+  amountPaid: number | string;
+  amountDue: number | string;
+  currency: string;
+  description: string | null;
+  metadata: Record<string, string>;
+  lastError: string | null;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}

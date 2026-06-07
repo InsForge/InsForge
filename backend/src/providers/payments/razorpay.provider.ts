@@ -185,6 +185,20 @@ export interface RazorpayInvoice {
   created_at: number;
 }
 
+export interface RazorpayOrder {
+  id: string;
+  entity: string;
+  amount: number;
+  amount_paid: number;
+  amount_due: number;
+  currency: string;
+  receipt: string | null;
+  status: 'created' | 'attempted' | 'paid';
+  attempts: number;
+  notes: Record<string, string | number>;
+  created_at: number;
+}
+
 export interface RazorpayWebhookPayload {
   entity: string;
   account_id: string;
@@ -377,6 +391,93 @@ export class RazorpayProvider {
     return this.client.customers.create(params) as Promise<RazorpayCustomer>;
   }
 
+  /**
+   * Fetch a single Razorpay customer by ID.
+   */
+  async fetchCustomer(customerId: string): Promise<RazorpayCustomer> {
+    return this.client.customers.fetch(customerId) as Promise<RazorpayCustomer>;
+  }
+
+  /**
+   * Create a Razorpay Order for a one-time payment.
+   * The developer's frontend uses the returned order_id to open the checkout
+   * modal via the Razorpay JS SDK.
+   */
+  async createOrder(input: {
+    amount: number; // in smallest currency unit (e.g., paise for INR)
+    currency: string;
+    receipt?: string;
+    notes?: Record<string, string>;
+  }): Promise<RazorpayOrder> {
+    const params: Record<string, unknown> = {
+      amount: input.amount,
+      currency: input.currency,
+    };
+    if (input.receipt) {
+      params.receipt = input.receipt;
+    }
+    if (input.notes && Object.keys(input.notes).length > 0) {
+      params.notes = input.notes;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response = (await this.client.orders.create(params as any)) as unknown;
+    if (
+      !response ||
+      typeof response !== 'object' ||
+      !('id' in response) ||
+      typeof (response as { id: unknown }).id !== 'string'
+    ) {
+      throw new Error(
+        `Unexpected Razorpay order response: ${JSON.stringify(response)}`
+      );
+    }
+    return response as RazorpayOrder;
+  }
+
+  /**
+   * Create a Razorpay Subscription for recurring billing.
+   * The developer's frontend uses the returned subscription_id and short_url
+   * to redirect the user to the hosted payment page.
+   */
+  async createSubscription(input: {
+    planId: string;
+    totalCount: number;
+    quantity?: number;
+    startAt?: number; // Unix timestamp
+    customerId?: string;
+    notes?: Record<string, string>;
+  }): Promise<RazorpaySubscription> {
+    const params: Record<string, unknown> = {
+      plan_id: input.planId,
+      total_count: input.totalCount,
+    };
+    if (input.quantity !== undefined) {
+      params.quantity = input.quantity;
+    }
+    if (input.startAt !== undefined) {
+      params.start_at = input.startAt;
+    }
+    if (input.customerId) {
+      params.customer_id = input.customerId;
+    }
+    if (input.notes && Object.keys(input.notes).length > 0) {
+      params.notes = input.notes;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response = (await this.client.subscriptions.create(params as any)) as unknown;
+    if (
+      !response ||
+      typeof response !== 'object' ||
+      !('id' in response) ||
+      typeof (response as { id: unknown }).id !== 'string'
+    ) {
+      throw new Error(
+        `Unexpected Razorpay subscription response: ${JSON.stringify(response)}`
+      );
+    }
+    return response as RazorpaySubscription;
+  }
+
   async syncCatalog(): Promise<{
     account: RazorpayAccountInfo;
     plans: RazorpayPlan[];
@@ -390,3 +491,4 @@ export class RazorpayProvider {
     return { account, plans, items };
   }
 }
+
