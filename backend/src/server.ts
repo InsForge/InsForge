@@ -1,7 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import rateLimit from 'express-rate-limit';
+import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
@@ -43,14 +43,13 @@ import { appConfig } from '@/infra/config/app.config.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-function shouldSkipGlobalRateLimit(req: Request): boolean {
-  if (req.path === '/api/health') {
-    return true;
-  }
-
-  return (
-    req.method === 'PUT' && /^\/api\/deployments\/[^/]+\/files\/[^/]+\/content$/.test(req.path)
-  );
+// Load .env file from the root directory (parent of backend)
+const envPath = path.resolve(__dirname, '../../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath });
+} else {
+  // Fallback to default behavior (looks in current working directory)
+  dotenv.config();
 }
 
 export async function createApp() {
@@ -74,13 +73,6 @@ export async function createApp() {
   // Enable trust proxy setting for rate limiting behind proxies/load balancers.
   app.set('trust proxy', appConfig.server.trustProxy);
 
-  const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 3000,
-    message: 'Too many requests from this IP',
-    skip: shouldSkipGlobalRateLimit,
-  });
-
   // Basic middleware
   app.use(
     cors({
@@ -90,7 +82,6 @@ export async function createApp() {
     })
   );
   app.use(cookieParser()); // Parse cookies for refresh token handling
-  app.use(limiter);
   app.use((req: Request, res: Response, next: NextFunction) => {
     const startTime = Date.now();
     const originalSend = res.send;
