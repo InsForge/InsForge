@@ -151,6 +151,7 @@ export class RazorpayCheckoutService {
           amount: input.amount,
           currency: input.currency,
           notes,
+          receipt: id,
         });
 
         const order = await this.markOrderCreated(id, razorpayOrder);
@@ -200,9 +201,49 @@ export class RazorpayCheckoutService {
   ): Promise<CreateRazorpaySubscriptionResponse> {
     const runSubscription = async (): Promise<CreateRazorpaySubscriptionResponse> => {
       const provider = await this.configService.createRazorpayProvider(input.environment);
+      const db = DatabaseManager.getInstance().getPool();
 
-      // Resolve customer: look up an existing mapping for the billing subject,
-      // or create a new Razorpay customer from the supplied email.
+      // 1. Guard idempotency at the DB level
+      const attemptRes = await db.query(
+        `INSERT INTO payments.razorpay_subscription_attempts (environment, idempotency_key)
+         VALUES ($1, $2)
+         ON CONFLICT (environment, idempotency_key) DO NOTHING
+         RETURNING id, subscription_id`,
+        [input.environment, input.idempotencyKey]
+      );
+
+      if (attemptRes.rowCount === 0) {
+        // Attempt already exists; find the existing subscription
+        const existing = await db.query(
+          `SELECT id, subscription_id FROM payments.razorpay_subscription_attempts
+           WHERE environment = $1 AND idempotency_key = $2`,
+          [input.environment, input.idempotencyKey]
+        );
+        const subId = existing.rows[0]?.subscription_id;
+        const attemptRecordId = existing.rows[0]?.id;
+        if (!subId || !attemptRecordId) {
+          throw new Error('Concurrent subscription attempt in progress or failed.');
+        }
+        const subRow = await db.query(
+          `SELECT * FROM payments.razorpay_subscriptions WHERE environment = $1 AND subscription_id = $2`,
+          [input.environment, subId]
+        );
+        if (subRow.rowCount === 0) {
+          throw new Error('Existing subscription attempt found but subscription record is missing.');
+        }
+        const existingSub = this.normalizeSubscriptionRow(subRow.rows[0] as Record<string, unknown>);
+        const keyId = await this.resolveKeyId(input.environment);
+        return {
+          attemptId: attemptRecordId,
+          subscription: existingSub,
+          keyId,
+          shortUrl: existingSub.shortUrl ?? null,
+        };
+      }
+
+      const attemptRecordId = (attemptRes.rows[0] as { id: string }).id;
+
+      // 2. Resolve/Create customer
       const customerId = await this.resolveOrCreateCustomer(input, provider);
 
       const notes = this.buildNotes(input.metadata, input.subject);
@@ -230,9 +271,17 @@ export class RazorpayCheckoutService {
         input.subject
       );
 
+      // Record the created subscription ID in the attempt record
+      await db.query(
+        `UPDATE payments.razorpay_subscription_attempts
+         SET subscription_id = $2
+         WHERE id = $1`,
+        [attemptRecordId, razorpaySub.id]
+      );
+
       const keyId = await this.resolveKeyId(input.environment);
       return {
-        attemptId: razorpaySub.id,
+        attemptId: attemptRecordId,
         subscription,
         keyId,
         shortUrl: razorpaySub.short_url ?? null,
@@ -333,6 +382,7 @@ export class RazorpayCheckoutService {
            amount_paid  = $4,
            amount_due   = $5,
            currency     = $6,
+           raw          = $7::JSONB,
            last_error   = NULL,
            updated_at   = NOW()
        WHERE id = $1
@@ -344,6 +394,7 @@ export class RazorpayCheckoutService {
         razorpayOrder.amount_paid,
         razorpayOrder.amount_due,
         razorpayOrder.currency,
+        JSON.stringify(razorpayOrder),
       ]
     );
 

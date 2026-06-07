@@ -64,8 +64,21 @@ CREATE INDEX IF NOT EXISTS idx_payments_razorpay_orders_environment_status
   ON payments.razorpay_orders(environment, status);
 
 -- Runtime RLS: project_admin can insert and read orders (needed for SDK route)
-GRANT INSERT, SELECT ON payments.razorpay_orders TO anon, authenticated, project_admin;
+GRANT INSERT, SELECT, UPDATE ON payments.razorpay_orders TO authenticated, project_admin;
 GRANT TRIGGER ON TABLE payments.razorpay_orders TO project_admin;
+ALTER TABLE payments.razorpay_orders ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS payments.razorpay_subscription_attempts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  environment TEXT NOT NULL CHECK (environment IN ('test', 'live')),
+  idempotency_key TEXT NOT NULL,
+  subscription_id TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (environment, idempotency_key)
+);
+
+GRANT INSERT, SELECT, UPDATE ON payments.razorpay_subscription_attempts TO authenticated, project_admin;
+ALTER TABLE payments.razorpay_subscription_attempts ENABLE ROW LEVEL SECURITY;
 
 -- Down Migration
 DROP TABLE IF EXISTS payments.razorpay_orders;

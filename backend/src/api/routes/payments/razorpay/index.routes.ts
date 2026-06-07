@@ -71,14 +71,6 @@ environmentRouter.post(
       const environment = getPaymentEnvironment(req.params);
       const body = parseZodSchema(createRazorpayOrderBodySchema, req.body);
 
-      if (!req.user) {
-        throw new AppError(
-          'Order creation requires a user token',
-          401,
-          ERROR_CODES.AUTH_INVALID_CREDENTIALS
-        );
-      }
-
       const result = await checkoutService.createOrder({ environment, ...body });
       successResponse(res, result, 201);
     } catch (error) {
@@ -98,14 +90,6 @@ environmentRouter.post(
     try {
       const environment = getPaymentEnvironment(req.params);
       const body = parseZodSchema(createRazorpaySubscriptionBodySchema, req.body);
-
-      if (!req.user) {
-        throw new AppError(
-          'Subscription creation requires a user token',
-          401,
-          ERROR_CODES.AUTH_INVALID_CREDENTIALS
-        );
-      }
 
       const result = await checkoutService.createSubscription({ environment, ...body });
       successResponse(res, result, 201);
