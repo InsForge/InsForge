@@ -142,7 +142,7 @@ export class RazorpayCheckoutService {
           throw new AppError(
             'Previous order attempt failed. Please generate a new idempotency key to try again.',
             409,
-            ERROR_CODES.CONFLICT
+            ERROR_CODES.PAYMENT_CHECKOUT_ALREADY_EXISTS
           );
         }
         // Idempotent replay: return the already-created order.
@@ -234,7 +234,7 @@ export class RazorpayCheckoutService {
           throw new AppError(
             'Concurrent subscription attempt in progress or failed.',
             409,
-            ERROR_CODES.CONFLICT
+            ERROR_CODES.PAYMENT_CHECKOUT_ALREADY_EXISTS
           );
         }
         const subRow = await db.query(
