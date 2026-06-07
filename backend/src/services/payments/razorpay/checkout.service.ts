@@ -150,7 +150,7 @@ export class RazorpayCheckoutService {
       if (existingOrder) {
         // Idempotent replay: return the already-created order.
         const keyId = await this.resolveKeyId(input.environment);
-        return { order: existingOrder, keyId };
+        return { attemptId: existingOrder.id, order: existingOrder, keyId };
       }
 
       const notes = this.buildNotes(input.metadata, input.subject, id);
@@ -165,7 +165,7 @@ export class RazorpayCheckoutService {
 
         const order = await this.markOrderCreated(id, razorpayOrder);
         const keyId = await this.resolveKeyId(input.environment);
-        return { order, keyId };
+        return { attemptId: id, order, keyId };
       } catch (error) {
         await this.markOrderFailed(id, error).catch((markError) => {
           logger.warn('Failed to mark Razorpay order as failed', {
@@ -243,6 +243,7 @@ export class RazorpayCheckoutService {
 
       const keyId = await this.resolveKeyId(input.environment);
       return {
+        attemptId: razorpaySub.id,
         subscription,
         keyId,
         shortUrl: razorpaySub.short_url ?? null,

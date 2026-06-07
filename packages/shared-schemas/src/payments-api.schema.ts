@@ -627,9 +627,12 @@ export const razorpayOrderSchema = z.object({
 export type RazorpayOrder = z.infer<typeof razorpayOrderSchema>;
 
 export const createRazorpayOrderResponseSchema = z.object({
-  order: razorpayOrderSchema,
+  /** InsForge-internal attempt ID (razorpay_orders.id). Use this to poll
+   * for status or reconcile abandoned/failed payments in recovery flows. */
+  attemptId: z.string(),
   /** Razorpay key ID — safe to expose; needed by the frontend to open the modal. */
   keyId: z.string(),
+  order: razorpayOrderSchema,
 });
 
 const createRazorpaySubscriptionFields = {
@@ -684,9 +687,13 @@ export const createRazorpaySubscriptionRequestSchema = z
   });
 
 export const createRazorpaySubscriptionResponseSchema = z.object({
-  subscription: razorpaySubscriptionSchema,
+  /** InsForge-internal attempt ID. For subscriptions this equals
+   * subscription.subscriptionId; exposed at the top level for API consistency
+   * so frontends can use the same recovery pattern as one-time orders. */
+  attemptId: z.string(),
   /** Razorpay key ID — safe to expose; needed by the frontend. */
   keyId: z.string(),
+  subscription: razorpaySubscriptionSchema,
   /**
    * Razorpay-hosted payment page URL. Redirect the user here to complete
    * the first billing cycle. Null if Razorpay did not return a short_url
