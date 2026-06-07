@@ -59,6 +59,7 @@ const mockStopMachine = vi.fn();
 const mockStartMachine = vi.fn();
 const mockDestroyMachine = vi.fn();
 const mockGetEvents = vi.fn();
+const mockGetLogs = vi.fn();
 const mockListMachines = vi.fn();
 const mockIsConfigured = vi.fn(() => true);
 
@@ -71,6 +72,7 @@ const mockFlyInstance = {
   startMachine: mockStartMachine,
   destroyMachine: mockDestroyMachine,
   getEvents: mockGetEvents,
+  getLogs: mockGetLogs,
   listMachines: mockListMachines,
   isConfigured: mockIsConfigured,
 };
@@ -1243,6 +1245,49 @@ describe('ComputeServicesService', () => {
       // No DB write should have happened — the guard rejects before any
       // mutation. Only the initial getService SELECT ran.
       expect(mockUpdateMachine).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getServiceLogs', () => {
+    const serviceRow = {
+      id: 'svc-logs-1',
+      project_id: 'proj-123',
+      name: 'my-api',
+      image_url: 'nginx:latest',
+      port: 8080,
+      cpu: 'shared-1x',
+      memory: 256,
+      region: 'iad',
+      fly_app_id: 'my-api-proj-123',
+      fly_machine_id: 'machine-1',
+      status: 'running',
+      endpoint_url: 'https://my-api-proj-123.fly.dev',
+      env_vars_encrypted: null,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    };
+
+    it('delegates to provider.getLogs with the app, machine, and options', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [serviceRow] }); // getService
+      const payload = { lines: [{ timestamp: 1, message: 'hi' }], nextToken: '42' };
+      mockGetLogs.mockResolvedValue(payload);
+
+      const result = await service.getServiceLogs('svc-logs-1', { limit: 200, nextToken: 'cur' });
+
+      expect(mockGetLogs).toHaveBeenCalledWith('my-api-proj-123', 'machine-1', {
+        limit: 200,
+        nextToken: 'cur',
+      });
+      expect(result).toEqual(payload);
+    });
+
+    it('throws COMPUTE_SERVICE_NOT_FOUND when the service has no machine yet', async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ ...serviceRow, fly_app_id: null, fly_machine_id: null }],
+      });
+
+      await expect(service.getServiceLogs('svc-logs-1')).rejects.toThrow('Service not found');
+      expect(mockGetLogs).not.toHaveBeenCalled();
     });
   });
 });
