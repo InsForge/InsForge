@@ -229,9 +229,13 @@ export class RazorpayCheckoutService {
           [input.environment, subId]
         );
         if (subRow.rowCount === 0) {
-          throw new Error('Existing subscription attempt found but subscription record is missing.');
+          throw new Error(
+            'Existing subscription attempt found but subscription record is missing.'
+          );
         }
-        const existingSub = this.normalizeSubscriptionRow(subRow.rows[0] as Record<string, unknown>);
+        const existingSub = this.normalizeSubscriptionRow(
+          subRow.rows[0] as Record<string, unknown>
+        );
         const keyId = await this.resolveKeyId(input.environment);
         return {
           attemptId: attemptRecordId,

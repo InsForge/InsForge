@@ -1,7 +1,6 @@
 import { Router, type Response, type NextFunction } from 'express';
 import { verifyAdmin, verifyUser, type AuthRequest } from '@/api/middlewares/auth.js';
 import { successResponse } from '@/utils/response.js';
-import { AppError } from '@/utils/errors.js';
 import { RazorpayConfigService } from '@/services/payments/razorpay/config.service.js';
 import { RazorpaySyncService } from '@/services/payments/razorpay/sync.service.js';
 import { RazorpayCatalogService } from '@/services/payments/razorpay/catalog.service.js';
@@ -18,7 +17,6 @@ import {
   listRazorpaySubscriptionsQuerySchema,
   createRazorpayOrderBodySchema,
   createRazorpaySubscriptionBodySchema,
-  ERROR_CODES,
 } from '@insforge/shared-schemas';
 
 const router = Router();
