@@ -173,8 +173,6 @@ environmentRouter.get(
   }
 );
 
-
 router.use('/:environment', environmentRouter);
 
 export { router as razorpayRouter };
-

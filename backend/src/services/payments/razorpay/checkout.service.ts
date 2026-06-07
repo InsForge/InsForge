@@ -88,11 +88,7 @@ export class RazorpayCheckoutService {
     environment: RazorpayEnvironment,
     task: () => Promise<T>
   ): Promise<T> {
-    return this.withSessionAdvisoryLock(
-      `razorpay_environment_${environment}`,
-      task,
-      'shared'
-    );
+    return this.withSessionAdvisoryLock(`razorpay_environment_${environment}`, task, 'shared');
   }
 
   private async withOrderIdempotencyLock<T>(
@@ -103,10 +99,7 @@ export class RazorpayCheckoutService {
     if (!idempotencyKey) {
       return task();
     }
-    return this.withSessionAdvisoryLock(
-      `razorpay_order_${environment}_${idempotencyKey}`,
-      task
-    );
+    return this.withSessionAdvisoryLock(`razorpay_order_${environment}_${idempotencyKey}`, task);
   }
 
   private async withSubscriptionIdempotencyLock<T>(
@@ -117,10 +110,7 @@ export class RazorpayCheckoutService {
     if (!idempotencyKey) {
       return task();
     }
-    return this.withSessionAdvisoryLock(
-      `razorpay_sub_${environment}_${idempotencyKey}`,
-      task
-    );
+    return this.withSessionAdvisoryLock(`razorpay_sub_${environment}_${idempotencyKey}`, task);
   }
 
   // =========================================================================
@@ -171,8 +161,7 @@ export class RazorpayCheckoutService {
           logger.warn('Failed to mark Razorpay order as failed', {
             environment: input.environment,
             orderId: id,
-            error:
-              markError instanceof Error ? markError.message : String(markError),
+            error: markError instanceof Error ? markError.message : String(markError),
           });
         });
         throw error;
@@ -251,11 +240,7 @@ export class RazorpayCheckoutService {
     };
 
     return this.withEnvironmentSharedLock(input.environment, () =>
-      this.withSubscriptionIdempotencyLock(
-        input.environment,
-        input.idempotencyKey,
-        runSubscription
-      )
+      this.withSubscriptionIdempotencyLock(input.environment, input.idempotencyKey, runSubscription)
     );
   }
 
@@ -550,7 +535,11 @@ export class RazorpayCheckoutService {
    * nor an email was provided.
    */
   private async resolveOrCreateCustomer(
-    input: { environment: RazorpayEnvironment; subject?: BillingSubject; customerEmail?: string | null },
+    input: {
+      environment: RazorpayEnvironment;
+      subject?: BillingSubject;
+      customerEmail?: string | null;
+    },
     provider: RazorpayProvider
   ): Promise<string | null> {
     if (!input.subject) {
@@ -645,9 +634,15 @@ export class RazorpayCheckoutService {
 
   private normalizeSubscriptionRow(row: Record<string, unknown>): RazorpaySubscription {
     const toStr = (v: unknown): string | null => {
-      if (!v) return null;
-      if (v instanceof Date) return v.toISOString();
-      if (typeof v === 'string') return v;
+      if (!v) {
+        return null;
+      }
+      if (v instanceof Date) {
+        return v.toISOString();
+      }
+      if (typeof v === 'string') {
+        return v;
+      }
       return null;
     };
 

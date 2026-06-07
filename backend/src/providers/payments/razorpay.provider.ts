@@ -427,9 +427,7 @@ export class RazorpayProvider {
       !('id' in response) ||
       typeof (response as { id: unknown }).id !== 'string'
     ) {
-      throw new Error(
-        `Unexpected Razorpay order response: ${JSON.stringify(response)}`
-      );
+      throw new Error(`Unexpected Razorpay order response: ${JSON.stringify(response)}`);
     }
     return response as RazorpayOrder;
   }
@@ -471,9 +469,7 @@ export class RazorpayProvider {
       !('id' in response) ||
       typeof (response as { id: unknown }).id !== 'string'
     ) {
-      throw new Error(
-        `Unexpected Razorpay subscription response: ${JSON.stringify(response)}`
-      );
+      throw new Error(`Unexpected Razorpay subscription response: ${JSON.stringify(response)}`);
     }
     return response as RazorpaySubscription;
   }
@@ -491,4 +487,3 @@ export class RazorpayProvider {
     return { account, plans, items };
   }
 }
-
