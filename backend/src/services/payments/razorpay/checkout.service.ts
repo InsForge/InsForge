@@ -138,6 +138,13 @@ export class RazorpayCheckoutService {
       const { id, existingOrder } = await this.insertInitializedOrder(input);
 
       if (existingOrder) {
+        if (existingOrder.status === 'failed') {
+          throw new AppError(
+            'Previous order attempt failed. Please generate a new idempotency key to try again.',
+            409,
+            ERROR_CODES.CONFLICT
+          );
+        }
         // Idempotent replay: return the already-created order.
         const keyId = await this.resolveKeyId(input.environment);
         return { attemptId: existingOrder.id, order: existingOrder, keyId };
@@ -224,15 +231,21 @@ export class RazorpayCheckoutService {
         const subId = existing.rows[0]?.subscription_id;
         const attemptRecordId = existing.rows[0]?.id;
         if (!subId || !attemptRecordId) {
-          throw new Error('Concurrent subscription attempt in progress or failed.');
+          throw new AppError(
+            'Concurrent subscription attempt in progress or failed.',
+            409,
+            ERROR_CODES.CONFLICT
+          );
         }
         const subRow = await db.query(
           `SELECT * FROM payments.razorpay_subscriptions WHERE environment = $1 AND subscription_id = $2`,
           [input.environment, subId]
         );
         if (subRow.rowCount === 0) {
-          throw new Error(
-            'Existing subscription attempt found but subscription record is missing.'
+          throw new AppError(
+            'Existing subscription attempt found but subscription record is missing.',
+            500,
+            ERROR_CODES.INTERNAL_ERROR
           );
         }
         const existingSub = this.normalizeSubscriptionRow(
