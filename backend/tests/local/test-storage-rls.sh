@@ -77,7 +77,7 @@ PATH_BUCKET="rls-path-$TS"
 # the same state the migration left it: RLS enabled, zero policies.
 cleanup_storage_policies() {
   psql "$DATABASE_URL" >/dev/null 2>&1 <<'SQL' || true
-ALTER TABLE storage.objects DISABLE ROW LEVEL SECURITY;
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS storage_objects_public_read_test ON storage.objects;
 DROP POLICY IF EXISTS storage_objects_path_select ON storage.objects;
 DROP POLICY IF EXISTS storage_objects_owner_select ON storage.objects;
