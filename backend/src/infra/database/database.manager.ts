@@ -123,83 +123,38 @@ export class DatabaseManager {
   }
 
   async getMetadata(): Promise<DatabaseMetadataSchema> {
+    const [allTables, databaseSize] = await Promise.all([
+      this.getUserTables(),
+      this.getDatabaseSizeInGB(),
+    ]);
+
     const client = await this.pool.connect();
     try {
-      // Fetch all tables, database size, and record counts in parallel
-      const [allTables, databaseSize, countResults] = await Promise.all([
-        this.getUserTables(),
-        this.getDatabaseSizeInGB(),
-        // Get all counts from system.table_metadata_counters in a single query
-        (async () => {
-          let tableNames: string[] = [];
-          try {
-            const tablesResult = await client.query(
-              `
-              SELECT table_name as name
-              FROM information_schema.tables
-              WHERE table_schema = 'public'
-              AND table_type = 'BASE TABLE'
-              ORDER BY table_name
-            `
-            );
-            tableNames = tablesResult.rows.map((row: { name: string }) => row.name);
+      // Get all counts from system.table_metadata_counters in a single query
+      const countResults = await (async () => {
+        if (allTables.length === 0) {
+          return [];
+        }
 
-            if (tableNames.length === 0) {
-              return [];
-            }
+        try {
+          const placeholders = allTables.map((_, i) => `$${i + 2}`).join(', ');
+          const result = await client.query(
+            `SELECT table_name, row_count as count 
+             FROM system.table_metadata_counters 
+             WHERE schema_name = $1 AND table_name IN (${placeholders})`,
+            ['public', ...allTables]
+          );
 
-            const placeholders = tableNames.map((_, i) => `$${i + 2}`).join(', ');
-            const result = await client.query(
-              `SELECT table_name, row_count as count 
-               FROM system.table_metadata_counters 
-               WHERE schema_name = $1 AND table_name IN (${placeholders})`,
-              ['public', ...tableNames]
-            );
+          const rowMap = new Map<string, number>();
+          for (const row of result.rows) {
+            rowMap.set(row.table_name, Number(row.count));
+          }
 
-            const rowMap = new Map<string, number>();
-            for (const row of result.rows) {
-              rowMap.set(row.table_name, Number(row.count));
-            }
-
-            // Batch the fallback COUNT(*) queries in a single UNION ALL query for all missing tables to prevent sequential round-trip latency
-            const missingTables = tableNames.filter((name) => !rowMap.has(name));
-            if (missingTables.length > 0) {
-              try {
-                const unionQuery = missingTables
-                  .map((tableName) =>
-                    pgFormat(
-                      'SELECT %L as table_name, COUNT(*) as count FROM %I.%I',
-                      tableName,
-                      'public',
-                      tableName
-                    )
-                  )
-                  .join(' UNION ALL ');
-                const fallbackResults = await client.query(unionQuery);
-                for (const row of fallbackResults.rows) {
-                  rowMap.set(row.table_name, Number(row.count));
-                }
-              } catch (fallbackErr) {
-                console.warn('Failed fallback batch COUNT(*) for missing tables:', fallbackErr);
-              }
-            }
-
-            const finalResults: { table_name: string; count: number }[] = [];
-            for (const tableName of tableNames) {
-              finalResults.push({
-                table_name: tableName,
-                count: rowMap.get(tableName) ?? 0,
-              });
-            }
-            return finalResults;
-          } catch (error) {
-            console.warn(
-              'Failed to retrieve counts from system.table_metadata_counters, falling back to batch COUNT(*):',
-              error
-            );
-            // Global counter-table query failure fallback: execute standard counts in a single batch query for all tables
+          // Batch the fallback COUNT(*) queries in a single UNION ALL query for all missing tables to prevent sequential round-trip latency
+          const missingTables = allTables.filter((name) => !rowMap.has(name));
+          if (missingTables.length > 0) {
             try {
-              const unionQuery = tableNames
+              const unionQuery = missingTables
                 .map((tableName) =>
                   pgFormat(
                     'SELECT %L as table_name, COUNT(*) as count FROM %I.%I',
@@ -210,19 +165,52 @@ export class DatabaseManager {
                 )
                 .join(' UNION ALL ');
               const fallbackResults = await client.query(unionQuery);
-              return fallbackResults.rows.map(
-                (row: { table_name: string; count: string | number }) => ({
-                  table_name: row.table_name,
-                  count: Number(row.count),
-                })
-              );
-            } catch (fallbackError) {
-              console.error('Failed complete fallback batch COUNT(*) as well:', fallbackError);
-              return [];
+              for (const row of fallbackResults.rows) {
+                rowMap.set(row.table_name, Number(row.count));
+              }
+            } catch (fallbackErr) {
+              console.warn('Failed fallback batch COUNT(*) for missing tables:', fallbackErr);
             }
           }
-        })(),
-      ]);
+
+          const finalResults: { table_name: string; count: number }[] = [];
+          for (const tableName of allTables) {
+            finalResults.push({
+              table_name: tableName,
+              count: rowMap.get(tableName) ?? 0,
+            });
+          }
+          return finalResults;
+        } catch (error) {
+          console.warn(
+            'Failed to retrieve counts from system.table_metadata_counters, falling back to batch COUNT(*):',
+            error
+          );
+          // Global counter-table query failure fallback: execute standard counts in a single batch query for all tables
+          try {
+            const unionQuery = allTables
+              .map((tableName) =>
+                pgFormat(
+                  'SELECT %L as table_name, COUNT(*) as count FROM %I.%I',
+                  tableName,
+                  'public',
+                  tableName
+                )
+              )
+              .join(' UNION ALL ');
+            const fallbackResults = await client.query(unionQuery);
+            return fallbackResults.rows.map(
+              (row: { table_name: string; count: string | number }) => ({
+                table_name: row.table_name,
+                count: Number(row.count),
+              })
+            );
+          } catch (fallbackError) {
+            console.error('Failed complete fallback batch COUNT(*) as well:', fallbackError);
+            return [];
+          }
+        }
+      })();
 
       // Map the count results to a lookup object
       const countMap = new Map(countResults.map((r) => [r.table_name, Number(r.count)]));

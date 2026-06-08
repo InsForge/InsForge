@@ -778,19 +778,18 @@ export class DatabaseTableService {
 
           // Clean up counter row if it exists
           try {
-            await client.query('SAVEPOINT cleanup_counter_attempt');
+            await client.query('SAVEPOINT delete_counter');
             await client.query(
               'DELETE FROM system.table_metadata_counters WHERE schema_name = $1 AND table_name = $2',
               [schemaName, table]
             );
-            await client.query('RELEASE SAVEPOINT cleanup_counter_attempt');
-          } catch (error) {
-            await client.query('ROLLBACK TO SAVEPOINT cleanup_counter_attempt');
-            await client.query('RELEASE SAVEPOINT cleanup_counter_attempt');
-            console.warn(
-              `Failed to cleanup metadata counter for deleted table ${schemaName}.${table}:`,
-              error
-            );
+            await client.query('RELEASE SAVEPOINT delete_counter');
+          } catch {
+            try {
+              await client.query('ROLLBACK TO SAVEPOINT delete_counter');
+            } catch {
+              // Ignore failure to rollback if savepoint was not established
+            }
           }
 
           // Update metadata

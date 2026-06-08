@@ -38,7 +38,7 @@ BEGIN
     INSERT INTO system.table_metadata_counters (schema_name, table_name, row_count)
     VALUES (v_schema_name, v_table_name, 0)
     ON CONFLICT (schema_name, table_name)
-    DO UPDATE SET row_count = GREATEST(0, system.table_metadata_counters.row_count - 1);
+    DO UPDATE SET row_count = GREATEST(row_count - 1, 0);
   ELSIF TG_OP = 'TRUNCATE' THEN
     INSERT INTO system.table_metadata_counters (schema_name, table_name, row_count)
     VALUES (v_schema_name, v_table_name, 0)
