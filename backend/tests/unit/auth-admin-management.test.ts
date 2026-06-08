@@ -118,7 +118,7 @@ describe('AuthService - Database-Backed Admin Management', () => {
   });
 
   describe('listAdmins', () => {
-    it('returns a list of admins ordered by username', async () => {
+    it('returns a list of admins ordered by creation date', async () => {
       const created1 = new Date('2026-06-08T00:00:00Z');
       const updated1 = new Date('2026-06-08T00:00:00Z');
       const created2 = new Date('2026-06-08T01:00:00Z');
@@ -196,17 +196,23 @@ describe('AuthService - Database-Backed Admin Management', () => {
         .mockResolvedValueOnce({
           rows: [{ id: 'operator1-id', username: 'operator1', is_root: false }],
         }) // getAdminByUsername (check existing & root)
-        .mockResolvedValueOnce({ rowCount: 1 }); // DELETE query
+        .mockResolvedValueOnce({ rows: [{ id: 'operator1-id' }] }); // UPDATE query
 
-      await authService.deleteAdmin('operator1');
+      await authService.deleteAdmin('operator1', 'current-admin-id');
 
       expect(queryMock.mock.calls[0][0]).toContain('SELECT id, username');
       expect(queryMock.mock.calls[0][1]).toEqual(['operator1']);
 
       expect(queryMock.mock.calls[1][0]).toContain(
-        'DELETE FROM auth.project_admins WHERE username = $1 AND is_root = false'
+        'UPDATE auth.project_admins'
       );
-      expect(queryMock.mock.calls[1][1]).toEqual(['operator1']);
+      expect(queryMock.mock.calls[1][0]).toContain(
+        'SET deleted_at = NOW(), updated_at = NOW()'
+      );
+      expect(queryMock.mock.calls[1][0]).toContain(
+        'WHERE id = $1 AND deleted_at IS NULL AND is_root = false AND id != $2'
+      );
+      expect(queryMock.mock.calls[1][1]).toEqual(['operator1-id', 'current-admin-id']);
     });
 
     it('throws error when deleting a non-existent admin', async () => {

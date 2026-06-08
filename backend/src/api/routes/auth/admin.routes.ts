@@ -103,7 +103,7 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
 router.get(
   '/sessions/current',
   verifyToken,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       if (req.user?.role !== 'project_admin' || !req.user.id) {
         throw new AppError('Admin access required', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
@@ -182,70 +182,89 @@ router.post('/logout', (_req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-// NEW ADMIN MANAGEMENT ROUTES 
+// NEW ADMIN MANAGEMENT ROUTES
 
 // GET /api/auth/admin - List all admins (root only)
-router.get('/', requireRoot, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const admins = await authService.listAdmins();
-    successResponse(res, { admins });
-  } catch (error) {
-    next(error);
+router.get(
+  '/',
+  verifyAdmin,
+  requireRoot,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const admins = await authService.listAdmins();
+      successResponse(res, { admins });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // POST /api/auth/admin - Create new admin (root only)
-router.post('/', requireRoot, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const validation = createAdminSchema.safeParse(req.body);
-    if (!validation.success) {
-      return res.status(400).json({ error: validation.error.errors });
-    }
+router.post(
+  '/',
+  verifyAdmin,
+  requireRoot,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validation = createAdminSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: validation.error.errors });
+      }
 
-    const { username, password } = validation.data;
-    const admin = await authService.createAdmin(username, password, req.user?.id);
-    successResponse(res, { admin }, 201);
-  } catch (error) {
-    next(error);
+      const { username, password } = validation.data;
+      const admin = await authService.createAdmin(username, password, req.user?.id);
+      successResponse(res, { admin }, 201);
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // DELETE /api/auth/admin/:username - Delete admin (root only, with self-deletion prevention)
-router.delete('/:username', requireRoot, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const { username } = req.params;
+router.delete(
+  '/:username',
+  verifyAdmin,
+  requireRoot,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { username } = req.params;
 
-    // Prevent self-deletion
-    if (username === req.user?.username) {
-      throw new AppError('Cannot delete your own admin account', 400, ERROR_CODES.FORBIDDEN);
+      // Prevent self-deletion
+      if (username === req.user?.username) {
+        throw new AppError('Cannot delete your own admin account', 400, ERROR_CODES.FORBIDDEN);
+      }
+
+      await authService.deleteAdmin(username, req.user?.id || '');
+      res.status(204).send();
+    } catch (error) {
+      next(error);
     }
-
-    await authService.deleteAdmin(username);
-    res.status(204).send();
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // POST /api/auth/admin/change-password - Change own password (any admin)
-router.post('/change-password', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const validation = changePasswordSchema.safeParse(req.body);
-    if (!validation.success) {
-      return res.status(400).json({ error: validation.error.errors });
-    }
+router.post(
+  '/change-password',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validation = changePasswordSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: validation.error.errors });
+      }
 
-    const username = req.user?.username;
-    if (!username) {
-      throw new AppError('Unauthorized', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
-    }
+      const username = req.user?.username;
+      if (!username) {
+        throw new AppError('Unauthorized', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+      }
 
-    const { oldPassword, newPassword } = validation.data;
-    await authService.changeAdminPassword(username, oldPassword, newPassword);
-    successResponse(res, { message: 'Password changed successfully' });
-  } catch (error) {
-    next(error);
+      const { oldPassword, newPassword } = validation.data;
+      await authService.changeAdminPassword(username, oldPassword, newPassword);
+      successResponse(res, { message: 'Password changed successfully' });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 export default router;

@@ -67,19 +67,40 @@ async function seedRootAdmin(): Promise<void> {
 
     // Check if the root admin exists
     const result = await client.query(
-      'SELECT id, is_root FROM auth.project_admins WHERE username = $1',
+      'SELECT id, is_root, password_hash FROM auth.project_admins WHERE username = $1 AND deleted_at IS NULL',
       [rootUsername]
     );
 
     if (result.rows.length > 0) {
       const admin = result.rows[0];
+      let needsUpdate = false;
+      const updates = [];
+      const values = [];
+
       if (!admin.is_root) {
-        await client.query('UPDATE auth.project_admins SET is_root = TRUE WHERE id = $1', [
-          admin.id,
-        ]);
-        logger.info('✅ Updated existing admin user to be root admin');
+        needsUpdate = true;
+        updates.push('is_root = TRUE');
       }
-      logger.info('✅ Root admin configured');
+
+      // Check if password hash matches current ROOT_ADMIN_PASSWORD
+      const isPasswordSame = await bcrypt.compare(rootPassword, admin.password_hash);
+      if (!isPasswordSame) {
+        needsUpdate = true;
+        const newPasswordHash = await bcrypt.hash(rootPassword, 10);
+        values.push(newPasswordHash);
+        updates.push(`password_hash = $${values.length}`);
+      }
+
+      if (needsUpdate) {
+        values.push(admin.id);
+        await client.query(
+          `UPDATE auth.project_admins SET ${updates.join(', ')} WHERE id = $${values.length}`,
+          values
+        );
+        logger.info('✅ Updated root admin configuration/credentials');
+      } else {
+        logger.info('✅ Root admin configured');
+      }
     } else {
       const passwordHash = await bcrypt.hash(rootPassword, 10);
       await client.query(

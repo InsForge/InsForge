@@ -721,7 +721,7 @@ export class AuthService {
   /**
    * Delete a project administrator (root only)
    */
-  async deleteAdmin(username: string): Promise<void> {
+  async deleteAdmin(username: string, currentAdminId: string): Promise<void> {
     const admin = await adminService.getAdminByUsername(username);
     if (!admin) {
       throw new AppError('Admin user not found', 404, ERROR_CODES.AUTH_USER_NOT_FOUND);
@@ -732,21 +732,11 @@ export class AuthService {
       throw new AppError('Cannot delete root admin', 403, ERROR_CODES.FORBIDDEN);
     }
 
-    // Use soft delete via UPDATE instead of hard DELETE
-    const pool = this.getPool();
-    const result = await pool.query(
-      `UPDATE auth.project_admins 
-         SET deleted_at = NOW(), updated_at = NOW() 
-         WHERE username = $1 AND is_root = false AND deleted_at IS NULL
-         RETURNING id`,
-      [username]
-    );
-
-    if (result.rowCount === 0) {
-      throw new AppError('Admin user not found or cannot be deleted', 404, ERROR_CODES.AUTH_USER_NOT_FOUND);
+    const success = await adminService.deleteAdmin(admin.id, currentAdminId, true);
+    if (!success) {
+      throw new AppError('Admin user not found or cannot be deleted', 400, ERROR_CODES.FORBIDDEN);
     }
   }
-
 
   /**
    * Change current admin's password
