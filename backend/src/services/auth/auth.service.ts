@@ -751,7 +751,7 @@ export class AuthService {
 
     try {
       const result = await client.query(`delete from auth.project_admins where id=$1 AND created_by is not null`, [adminId])
-      if (result.rows.length === 0) {
+      if (result.rowCount === 0) {
         throw new Error('Admin not found');
       }
       logger.info('Admin deleted', { adminId });
@@ -784,7 +784,7 @@ export class AuthService {
       const isRoot = admin.username === process.env.ROOT_ADMIN_USERNAME;
       const accessToken = this.tokenManager.generateAccessToken({
         sub: admin.id,
-        name,
+        username: admin.username,
         role: 'project_admin',
         isRoot
       });
@@ -792,7 +792,7 @@ export class AuthService {
       return {
         user: {
           id: admin.id,
-          name,
+          username: admin.username,
           createdAt: admin.created_at,
           updatedAt: admin.updated_at,
         },
