@@ -8,8 +8,10 @@
 
 -- 1. Create the counter table
 CREATE TABLE IF NOT EXISTS system.table_metadata_counters (
-  table_name TEXT PRIMARY KEY,
-  row_count BIGINT DEFAULT 0 NOT NULL
+  schema_name TEXT NOT NULL,
+  table_name TEXT NOT NULL,
+  row_count BIGINT DEFAULT 0 NOT NULL,
+  PRIMARY KEY (schema_name, table_name)
 );
 
 -- Grant appropriate permissions
@@ -19,22 +21,24 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON system.table_metadata_counters TO projec
 CREATE OR REPLACE FUNCTION system.maintain_table_row_count()
 RETURNS TRIGGER AS $$
 DECLARE
+  v_schema_name TEXT;
   v_table_name TEXT;
 BEGIN
+  v_schema_name := TG_TABLE_SCHEMA;
   v_table_name := TG_TABLE_NAME;
 
   IF TG_OP = 'INSERT' THEN
     UPDATE system.table_metadata_counters
     SET row_count = row_count + 1
-    WHERE table_name = v_table_name;
+    WHERE schema_name = v_schema_name AND table_name = v_table_name;
   ELSIF TG_OP = 'DELETE' THEN
     UPDATE system.table_metadata_counters
     SET row_count = row_count - 1
-    WHERE table_name = v_table_name;
+    WHERE schema_name = v_schema_name AND table_name = v_table_name;
   ELSIF TG_OP = 'TRUNCATE' THEN
     UPDATE system.table_metadata_counters
     SET row_count = 0
-    WHERE table_name = v_table_name;
+    WHERE schema_name = v_schema_name AND table_name = v_table_name;
   END IF;
 
   RETURN NULL;
@@ -56,13 +60,16 @@ BEGIN
     RAISE EXCEPTION 'Table %.% does not exist', target_schema, target_table;
   END IF;
 
+  -- Prevent concurrent inserts/deletes from drifting the counter before trigger is attached
+  EXECUTE format('LOCK TABLE %I.%I IN SHARE ROW EXCLUSIVE MODE', target_schema, target_table);
+
   -- 1. Initialize counter with a one-time COUNT(*)
   EXECUTE format('SELECT COUNT(*) FROM %I.%I', target_schema, target_table) INTO v_initial_count;
 
   -- Insert or update the counter value in our table
-  INSERT INTO system.table_metadata_counters (table_name, row_count)
-  VALUES (target_table, v_initial_count)
-  ON CONFLICT (table_name) 
+  INSERT INTO system.table_metadata_counters (schema_name, table_name, row_count)
+  VALUES (target_schema, target_table, v_initial_count)
+  ON CONFLICT (schema_name, table_name) 
   DO UPDATE SET row_count = EXCLUDED.row_count;
 
   -- 2. Attach row-level trigger (INSERT and DELETE)

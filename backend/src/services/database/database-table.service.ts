@@ -279,10 +279,18 @@ export class DatabaseTableService {
           );
 
           // Enable metadata counter trigger-backed row counting
-          await client.query('SELECT system.enable_table_counter($1, $2)', [
-            schemaName,
-            table_name,
-          ]);
+          try {
+            await client.query('SELECT system.enable_table_counter($1, $2)', [
+              schemaName,
+              table_name,
+            ]);
+          } catch (error) {
+            // Log warning but DO NOT throw
+            console.warn(
+              `Failed to enable O(1) table counter for ${schemaName}.${table_name}:`,
+              error
+            );
+          }
 
           // Update metadata
           // Metadata is now updated on-demand
@@ -426,8 +434,8 @@ export class DatabaseTableService {
       let row_count = 0;
       try {
         const counterResult = await client.query(
-          'SELECT row_count FROM system.table_metadata_counters WHERE table_name = $1',
-          [table]
+          'SELECT row_count FROM system.table_metadata_counters WHERE schema_name = $1 AND table_name = $2',
+          [schemaName, table]
         );
         if (counterResult.rows.length > 0) {
           row_count = Number(counterResult.rows[0].row_count);
@@ -435,8 +443,8 @@ export class DatabaseTableService {
           // Self-heal: Enable counter for this table
           await client.query('SELECT system.enable_table_counter($1, $2)', [schemaName, table]);
           const fallbackResult = await client.query(
-            'SELECT row_count FROM system.table_metadata_counters WHERE table_name = $1',
-            [table]
+            'SELECT row_count FROM system.table_metadata_counters WHERE schema_name = $1 AND table_name = $2',
+            [schemaName, table]
           );
           row_count = fallbackResult.rows[0] ? Number(fallbackResult.rows[0].row_count) : 0;
         }

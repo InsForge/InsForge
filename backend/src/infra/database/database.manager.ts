@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { DatabaseMetadataSchema } from '@insforge/shared-schemas';
+import pgFormat from 'pg-format';
 import { buildQualifiedTableKey, DEFAULT_DATABASE_SCHEMA } from '@/services/database/helpers.js';
 import { appConfig } from '@/infra/config/app.config.js';
 
@@ -146,12 +147,12 @@ export class DatabaseManager {
               return [];
             }
 
-            const placeholders = tableNames.map((_, i) => `$${i + 1}`).join(', ');
+            const placeholders = tableNames.map((_, i) => `$${i + 2}`).join(', ');
             const result = await client.query(
               `SELECT table_name, row_count as count 
                FROM system.table_metadata_counters 
-               WHERE table_name IN (${placeholders})`,
-              tableNames
+               WHERE schema_name = $1 AND table_name IN (${placeholders})`,
+              ['public', ...tableNames]
             );
 
             const rowMap = new Map<string, number>();
@@ -171,8 +172,8 @@ export class DatabaseManager {
                     tableName,
                   ]);
                   const fallbackResult = await client.query(
-                    'SELECT row_count as count FROM system.table_metadata_counters WHERE table_name = $1',
-                    [tableName]
+                    'SELECT row_count as count FROM system.table_metadata_counters WHERE schema_name = $1 AND table_name = $2',
+                    ['public', tableName]
                   );
                   const count = fallbackResult.rows[0]?.count
                     ? Number(fallbackResult.rows[0].count)
@@ -182,7 +183,7 @@ export class DatabaseManager {
                   // Gracefully fallback to standard count
                   try {
                     const fallbackCountResult = await client.query(
-                      `SELECT COUNT(*) as row_count FROM "public"."${tableName}"`
+                      pgFormat('SELECT COUNT(*) as row_count FROM %I.%I', 'public', tableName)
                     );
                     const count = Number(fallbackCountResult.rows[0].row_count);
                     finalResults.push({ table_name: tableName, count });
