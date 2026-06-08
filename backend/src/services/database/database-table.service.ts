@@ -443,11 +443,27 @@ export class DatabaseTableService {
         if (counterResult.rows.length > 0) {
           row_count = Number(counterResult.rows[0].row_count);
         } else {
-          // Fallback to standard count directly if missing from counters table (avoids lock contention on read-hot path)
-          const fallbackCountResult = await client.query(
-            pgFormat('SELECT COUNT(*) as row_count FROM %I.%I', schemaName, table)
-          );
-          row_count = Number(fallbackCountResult.rows[0].row_count);
+          // Self-heal: Enable counter for this table, protected by a SAVEPOINT
+          try {
+            await client.query('SAVEPOINT get_schema_enable_counter');
+            await client.query('SELECT system.enable_table_counter($1, $2)', [schemaName, table]);
+            await client.query('RELEASE SAVEPOINT get_schema_enable_counter');
+
+            const fallbackResult = await client.query(
+              'SELECT row_count FROM system.table_metadata_counters WHERE schema_name = $1 AND table_name = $2',
+              [schemaName, table]
+            );
+            row_count = fallbackResult.rows[0] ? Number(fallbackResult.rows[0].row_count) : 0;
+          } catch {
+            await client.query('ROLLBACK TO SAVEPOINT get_schema_enable_counter');
+            await client.query('RELEASE SAVEPOINT get_schema_enable_counter');
+
+            // Fallback to standard count directly if self-healing fails
+            const fallbackCountResult = await client.query(
+              pgFormat('SELECT COUNT(*) as row_count FROM %I.%I', schemaName, table)
+            );
+            row_count = Number(fallbackCountResult.rows[0].row_count);
+          }
         }
       } catch {
         // Safe fallback to exact count if the counter schema query errors (e.g. during migration setup)

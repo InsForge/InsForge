@@ -131,6 +131,7 @@ export class DatabaseManager {
         this.getDatabaseSizeInGB(),
         // Get all counts from system.table_metadata_counters in a single query
         (async () => {
+          let tableNames: string[] = [];
           try {
             const tablesResult = await client.query(
               `
@@ -141,7 +142,7 @@ export class DatabaseManager {
               ORDER BY table_name
             `
             );
-            const tableNames = tablesResult.rows.map((row: { name: string }) => row.name);
+            tableNames = tablesResult.rows.map((row: { name: string }) => row.name);
 
             if (tableNames.length === 0) {
               return [];
@@ -160,30 +161,65 @@ export class DatabaseManager {
               rowMap.set(row.table_name, Number(row.count));
             }
 
+            // Batch the fallback COUNT(*) queries in a single UNION ALL query for all missing tables to prevent sequential round-trip latency
+            const missingTables = tableNames.filter((name) => !rowMap.has(name));
+            if (missingTables.length > 0) {
+              try {
+                const unionQuery = missingTables
+                  .map((tableName) =>
+                    pgFormat(
+                      'SELECT %L as table_name, COUNT(*) as count FROM %I.%I',
+                      tableName,
+                      'public',
+                      tableName
+                    )
+                  )
+                  .join(' UNION ALL ');
+                const fallbackResults = await client.query(unionQuery);
+                for (const row of fallbackResults.rows) {
+                  rowMap.set(row.table_name, Number(row.count));
+                }
+              } catch (fallbackErr) {
+                console.warn('Failed fallback batch COUNT(*) for missing tables:', fallbackErr);
+              }
+            }
+
             const finalResults: { table_name: string; count: number }[] = [];
             for (const tableName of tableNames) {
-              if (rowMap.has(tableName)) {
-                finalResults.push({ table_name: tableName, count: rowMap.get(tableName) ?? 0 });
-              } else {
-                // Fallback to standard count directly if missing from counters table (avoids lock contention on read-hot path)
-                try {
-                  const fallbackCountResult = await client.query(
-                    pgFormat('SELECT COUNT(*) as row_count FROM %I.%I', 'public', tableName)
-                  );
-                  const count = Number(fallbackCountResult.rows[0].row_count);
-                  finalResults.push({ table_name: tableName, count });
-                } catch {
-                  finalResults.push({ table_name: tableName, count: 0 });
-                }
-              }
+              finalResults.push({
+                table_name: tableName,
+                count: rowMap.get(tableName) ?? 0,
+              });
             }
             return finalResults;
           } catch (error) {
             console.warn(
-              'Failed to retrieve counts from system.table_metadata_counters, falling back to empty list:',
+              'Failed to retrieve counts from system.table_metadata_counters, falling back to batch COUNT(*):',
               error
             );
-            return [];
+            // Global counter-table query failure fallback: execute standard counts in a single batch query for all tables
+            try {
+              const unionQuery = tableNames
+                .map((tableName) =>
+                  pgFormat(
+                    'SELECT %L as table_name, COUNT(*) as count FROM %I.%I',
+                    tableName,
+                    'public',
+                    tableName
+                  )
+                )
+                .join(' UNION ALL ');
+              const fallbackResults = await client.query(unionQuery);
+              return fallbackResults.rows.map(
+                (row: { table_name: string; count: string | number }) => ({
+                  table_name: row.table_name,
+                  count: Number(row.count),
+                })
+              );
+            } catch (fallbackError) {
+              console.error('Failed complete fallback batch COUNT(*) as well:', fallbackError);
+              return [];
+            }
           }
         })(),
       ]);
