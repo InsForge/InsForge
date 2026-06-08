@@ -203,12 +203,8 @@ describe('AuthService - Database-Backed Admin Management', () => {
       expect(queryMock.mock.calls[0][0]).toContain('SELECT id, username');
       expect(queryMock.mock.calls[0][1]).toEqual(['operator1']);
 
-      expect(queryMock.mock.calls[1][0]).toContain(
-        'UPDATE auth.project_admins'
-      );
-      expect(queryMock.mock.calls[1][0]).toContain(
-        'SET deleted_at = NOW(), updated_at = NOW()'
-      );
+      expect(queryMock.mock.calls[1][0]).toContain('UPDATE auth.project_admins');
+      expect(queryMock.mock.calls[1][0]).toContain('SET deleted_at = NOW(), updated_at = NOW()');
       expect(queryMock.mock.calls[1][0]).toContain(
         'WHERE id = $1 AND deleted_at IS NULL AND is_root = false AND id != $2'
       );
