@@ -122,7 +122,8 @@ describe('Storage routes', () => {
     expect(response.statusCode, response.body).toBe(200);
     expect(storageMocks.getDownloadStrategy).toHaveBeenCalledWith(
       'product-images',
-      'products/prod_123/main.jpg'
+      'products/prod_123/main.jpg',
+      undefined
     );
     expect(authMocks.verifyUser).not.toHaveBeenCalled();
   });
@@ -188,7 +189,46 @@ describe('Storage routes', () => {
     expect(authMocks.verifyUser).toHaveBeenCalledOnce();
     expect(storageMocks.getDownloadStrategy).toHaveBeenCalledWith(
       'product-images',
-      'products/prod_123/main.jpg'
+      'products/prod_123/main.jpg',
+      undefined
+    );
+  });
+
+  test('download strategy route forwards a caller-supplied expiresIn', async () => {
+    vi.resetModules();
+    storageMocks.isBucketPublic.mockResolvedValue(false);
+    storageMocks.objectIsVisible.mockResolvedValue(true);
+    storageMocks.getDownloadStrategy.mockResolvedValue({
+      method: 'presigned',
+      url: 'https://cdn.example.com/product-images/products%2Fprod_123%2Fmain.jpg?Signature=abc',
+      expiresAt: new Date('2026-01-01T00:00:00.000Z'),
+    });
+
+    const { storageRouter } = await import('../../src/api/routes/storage/index.routes.js');
+    const app = express();
+    app.use(express.json());
+    app.use('/api/storage', storageRouter);
+    app.use(routeErrorHandler);
+
+    await new Promise<void>((resolve) => {
+      server = app.listen(0, resolve);
+    });
+    const address = server?.address();
+
+    if (!address || typeof address === 'string') {
+      throw new Error('Test server did not bind to a TCP port');
+    }
+
+    const response = await post(
+      address.port,
+      '/api/storage/buckets/product-images/objects/products/prod_123/main.jpg/download-strategy?expiresIn=120'
+    );
+
+    expect(response.statusCode, response.body).toBe(200);
+    expect(storageMocks.getDownloadStrategy).toHaveBeenCalledWith(
+      'product-images',
+      'products/prod_123/main.jpg',
+      120
     );
   });
 });

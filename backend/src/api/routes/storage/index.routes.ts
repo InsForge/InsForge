@@ -432,7 +432,18 @@ const downloadStrategyHandler = async (
       throw new AppError('Object not found', 404, ERROR_CODES.STORAGE_NOT_FOUND);
     }
 
-    const strategy = await storageService.getDownloadStrategy(bucketName, objectKey);
+    // Optional caller-supplied TTL (seconds) for the signed URL. Accepted from
+    // the query string (canonical GET) or body (deprecated POST alias). The
+    // service clamps it to a safe range and applies it to private buckets only.
+    const rawExpiresIn = req.query.expiresIn ?? authReq.body?.expiresIn;
+    const requestedExpiresIn =
+      rawExpiresIn !== undefined && rawExpiresIn !== '' ? Number(rawExpiresIn) : undefined;
+
+    const strategy = await storageService.getDownloadStrategy(
+      bucketName,
+      objectKey,
+      requestedExpiresIn
+    );
 
     // Strategy responses embed presigned URLs with short, server-decided
     // expiries. Prevent intermediaries (proxies, CDNs) from caching this
