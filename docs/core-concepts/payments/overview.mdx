@@ -76,7 +76,7 @@ Stripe and Razorpay catalog concepts are provider-native.
 
 Products and prices sync from Stripe so your dashboard and app can reason about the catalog without making every request call Stripe. You can manage catalog objects in Stripe, the dashboard, or admin CLI/API flows. Product and price mutations call Stripe first, then sync the result into InsForge.
 
-Razorpay uses Items and Plans instead of Stripe Products and Prices. An Item is the amount-bearing sellable unit. A Plan is a recurring subscription definition built around an item. Razorpay catalog mutations call Razorpay first, then sync the result into InsForge.
+Razorpay uses Items and Plans instead of Stripe Products and Prices. An Item is the amount-bearing unit being sold. A Plan is a recurring subscription definition built around an item. Razorpay catalog mutations call Razorpay first, then sync the result into InsForge.
 
 ```bash
 npx @insforge/cli payments sync --environment test
@@ -152,7 +152,7 @@ POST /api/payments/razorpay/test/subscriptions
 POST /api/payments/razorpay/test/subscriptions/verify
 ```
 
-Subscription creation first checks the caller against `payments.razorpay_subscriptions` RLS `INSERT` policies, so your app can decide who can start a subscription for a team, workspace, or organization. Cancel, pause, and resume check the same table's `UPDATE` policies through a rollbacked `updated_at` probe.
+Subscription creation first checks the caller against `payments.razorpay_subscriptions` RLS `INSERT` policies, so your app can decide who can start a subscription for a team, workspace, or organization. Cancel, pause, and resume check the same table's `UPDATE` policies.
 
 Signature verification protects the immediate client return path. Durable fulfillment should still come from verified Razorpay webhook events because customers can complete or change payment state without returning to your app.
 

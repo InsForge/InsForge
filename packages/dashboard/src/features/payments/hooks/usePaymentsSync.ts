@@ -62,9 +62,9 @@ export function usePaymentsSync() {
     onSuccess: async (result) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['payments', 'status'] }),
-        queryClient.invalidateQueries({ queryKey: ['payments', 'catalog'] }),
-        queryClient.invalidateQueries({ queryKey: ['payments', 'customers'] }),
-        queryClient.invalidateQueries({ queryKey: ['payments', 'subscriptions'] }),
+        queryClient.invalidateQueries({ queryKey: ['payments', 'stripe', 'catalog'] }),
+        queryClient.invalidateQueries({ queryKey: ['payments', 'stripe', 'customers'] }),
+        queryClient.invalidateQueries({ queryKey: ['payments', 'stripe', 'subscriptions'] }),
       ]);
 
       const toast = getPaymentsSyncToast(result);

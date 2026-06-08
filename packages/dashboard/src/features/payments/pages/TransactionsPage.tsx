@@ -13,9 +13,9 @@ import {
   ErrorState,
   LoadingState,
   PaginationControls,
-  TableHeader,
 } from '#components';
 import { PaymentsKeyMissingState } from '#features/payments/components/PaymentsKeyMissingState';
+import { PaymentsPageHeader } from '#features/payments/components/PaymentsPageHeader';
 import { ProviderBadge } from '#features/payments/components/ProviderBadge';
 import type { PaymentsOutletContext } from '#features/payments/components/PaymentsLayout';
 import { usePaymentTransactions } from '#features/payments/hooks/usePaymentTransactions';
@@ -244,7 +244,8 @@ function TransactionRow({ payment }: { payment: PaymentTransaction }) {
 }
 
 export default function TransactionsPage() {
-  const { openPaymentsSettings, environment } = useOutletContext<PaymentsOutletContext>();
+  const { openPaymentsSettings, provider, setProvider, environment, setEnvironment } =
+    useOutletContext<PaymentsOutletContext>();
   const [searchQuery, setSearchQuery] = useState('');
   const {
     activeConnection,
@@ -254,7 +255,7 @@ export default function TransactionsPage() {
     isLoading,
     error,
     refetch,
-  } = usePaymentTransactions(environment);
+  } = usePaymentTransactions(provider, environment);
 
   const filteredTransactions = useMemo(() => {
     const normalizedSearch = searchQuery.trim().toLowerCase();
@@ -284,11 +285,12 @@ export default function TransactionsPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
-      <TableHeader
+      <PaymentsPageHeader
         title="Transactions"
-        className="h-14 min-h-14"
-        leftClassName="py-0"
-        rightClassName="py-0"
+        provider={provider}
+        setProvider={setProvider}
+        environment={environment}
+        setEnvironment={setEnvironment}
         showSearch={hasActiveKey}
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}
@@ -304,6 +306,7 @@ export default function TransactionsPage() {
           <LoadingState message="Loading transactions..." />
         ) : !hasActiveKey ? (
           <PaymentsKeyMissingState
+            provider={provider}
             environment={environment}
             resourceLabel="transactions"
             onConfigure={openPaymentsSettings}

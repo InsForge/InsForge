@@ -9,9 +9,9 @@ import {
   ErrorState,
   LoadingState,
   PaginationControls,
-  TableHeader,
 } from '#components';
 import { PaymentsKeyMissingState } from '#features/payments/components/PaymentsKeyMissingState';
+import { PaymentsPageHeader } from '#features/payments/components/PaymentsPageHeader';
 import { ProviderBadge } from '#features/payments/components/ProviderBadge';
 import type { PaymentsOutletContext } from '#features/payments/components/PaymentsLayout';
 import { usePaymentCatalog } from '#features/payments/hooks/usePaymentCatalog';
@@ -315,7 +315,8 @@ function CatalogRow({
 }
 
 export default function CatalogPage() {
-  const { openPaymentsSettings, environment } = useOutletContext<PaymentsOutletContext>();
+  const { openPaymentsSettings, provider, setProvider, environment, setEnvironment } =
+    useOutletContext<PaymentsOutletContext>();
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedProductId, setExpandedProductId] = useState<string | null>(null);
   const {
@@ -327,11 +328,11 @@ export default function CatalogPage() {
     isLoading,
     error,
     refetch,
-  } = usePaymentCatalog(environment);
+  } = usePaymentCatalog(provider, environment);
 
   useEffect(() => {
     setExpandedProductId(null);
-  }, [environment]);
+  }, [environment, provider]);
 
   const pricesByProductId = useMemo(() => {
     const nextPricesByProductId = new Map<string, CatalogPrice[]>();
@@ -393,11 +394,12 @@ export default function CatalogPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
-      <TableHeader
+      <PaymentsPageHeader
         title="Catalog"
-        className="h-14 min-h-14"
-        leftClassName="py-0"
-        rightClassName="py-0"
+        provider={provider}
+        setProvider={setProvider}
+        environment={environment}
+        setEnvironment={setEnvironment}
         showDividerAfterTitle
         leftSlot={
           hasActiveKey ? (
@@ -406,7 +408,6 @@ export default function CatalogPage() {
             </span>
           ) : null
         }
-        rightActions={null}
         showSearch={hasActiveKey}
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}
@@ -422,6 +423,7 @@ export default function CatalogPage() {
           <LoadingState message="Loading catalog..." />
         ) : !hasActiveKey ? (
           <PaymentsKeyMissingState
+            provider={provider}
             environment={environment}
             resourceLabel="catalog"
             onConfigure={openPaymentsSettings}

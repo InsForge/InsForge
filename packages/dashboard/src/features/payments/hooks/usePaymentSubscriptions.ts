@@ -1,6 +1,10 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { RazorpayConnection, StripeEnvironment } from '@insforge/shared-schemas';
+import type {
+  PaymentEnvironment,
+  PaymentProvider,
+  RazorpayConnection,
+} from '@insforge/shared-schemas';
 import { paymentsService } from '#features/payments/services/payments.service';
 import { razorpayService } from '#features/payments/services/razorpay.service';
 import {
@@ -10,7 +14,13 @@ import {
 
 const SUBSCRIPTIONS_LIMIT = 100;
 
-export function usePaymentSubscriptions(environment: StripeEnvironment) {
+export function usePaymentSubscriptions(
+  provider: PaymentProvider,
+  environment: PaymentEnvironment
+) {
+  const isStripeProvider = provider === 'stripe';
+  const isRazorpayProvider = provider === 'razorpay';
+
   const {
     data: statusData,
     isLoading: isLoadingStatus,
@@ -20,6 +30,7 @@ export function usePaymentSubscriptions(environment: StripeEnvironment) {
   } = useQuery({
     queryKey: ['payments', 'status'],
     queryFn: () => paymentsService.getStatus(),
+    enabled: isStripeProvider,
     staleTime: 30 * 1000,
   });
 
@@ -32,13 +43,17 @@ export function usePaymentSubscriptions(environment: StripeEnvironment) {
   } = useQuery({
     queryKey: ['payments', 'razorpay', 'status'],
     queryFn: () => razorpayService.getStatus(),
+    enabled: isRazorpayProvider,
     staleTime: 30 * 1000,
   });
 
-  const connections = useMemo(() => statusData?.connections ?? [], [statusData]);
+  const connections = useMemo(
+    () => (isStripeProvider ? (statusData?.connections ?? []) : []),
+    [isStripeProvider, statusData]
+  );
   const razorpayConnections = useMemo(
-    () => razorpayStatusData?.razorpayConnections ?? [],
-    [razorpayStatusData]
+    () => (isRazorpayProvider ? (razorpayStatusData?.razorpayConnections ?? []) : []),
+    [isRazorpayProvider, razorpayStatusData]
   );
 
   const activeConnection = useMemo(
@@ -53,7 +68,7 @@ export function usePaymentSubscriptions(environment: StripeEnvironment) {
 
   const hasStripeKey = !!activeConnection?.maskedKey;
   const hasRazorpayKey = !!activeRazorpayConnection?.maskedKey;
-  const hasActiveKey = hasStripeKey || hasRazorpayKey;
+  const hasActiveKey = isStripeProvider ? hasStripeKey : hasRazorpayKey;
 
   const {
     data: subscriptionsData,
@@ -68,7 +83,7 @@ export function usePaymentSubscriptions(environment: StripeEnvironment) {
         environment,
         limit: SUBSCRIPTIONS_LIMIT,
       }),
-    enabled: hasStripeKey,
+    enabled: isStripeProvider && hasStripeKey,
     staleTime: 30 * 1000,
   });
 
@@ -85,7 +100,7 @@ export function usePaymentSubscriptions(environment: StripeEnvironment) {
         environment,
         limit: SUBSCRIPTIONS_LIMIT,
       }),
-    enabled: hasRazorpayKey,
+    enabled: isRazorpayProvider && hasRazorpayKey,
     staleTime: 30 * 1000,
   });
 
@@ -96,28 +111,27 @@ export function usePaymentSubscriptions(environment: StripeEnvironment) {
     activeRazorpayConnection,
     hasActiveKey,
     subscriptions: hasActiveKey
-      ? [
-          ...(subscriptionsData?.subscriptions.map(normalizeStripeSubscription) ?? []),
-          ...(razorpaySubscriptionsData?.subscriptions.map(normalizeRazorpaySubscription) ?? []),
-        ]
+      ? isStripeProvider
+        ? (subscriptionsData?.subscriptions.map(normalizeStripeSubscription) ?? [])
+        : (razorpaySubscriptionsData?.subscriptions.map(normalizeRazorpaySubscription) ?? [])
       : [],
     isLoading:
-      isLoadingStatus ||
-      isLoadingRazorpayStatus ||
-      (hasStripeKey && isLoadingSubscriptions) ||
-      (hasRazorpayKey && isLoadingRazorpaySubscriptions),
+      (isStripeProvider && (isLoadingStatus || (hasStripeKey && isLoadingSubscriptions))) ||
+      (isRazorpayProvider &&
+        (isLoadingRazorpayStatus || (hasRazorpayKey && isLoadingRazorpaySubscriptions))),
     isRefreshing:
-      isFetchingStatus ||
-      isFetchingRazorpayStatus ||
-      (hasStripeKey && isFetchingSubscriptions) ||
-      (hasRazorpayKey && isFetchingRazorpaySubscriptions),
-    error: statusError ?? razorpayStatusError ?? subscriptionsError ?? razorpaySubscriptionsError,
+      (isStripeProvider && (isFetchingStatus || (hasStripeKey && isFetchingSubscriptions))) ||
+      (isRazorpayProvider &&
+        (isFetchingRazorpayStatus || (hasRazorpayKey && isFetchingRazorpaySubscriptions))),
+    error: isStripeProvider
+      ? (statusError ?? subscriptionsError)
+      : (razorpayStatusError ?? razorpaySubscriptionsError),
     refetch: () =>
       Promise.all([
-        refetchStatus(),
-        refetchRazorpayStatus(),
-        hasStripeKey ? refetchSubscriptions() : null,
-        hasRazorpayKey ? refetchRazorpaySubscriptions() : null,
+        isStripeProvider ? refetchStatus() : null,
+        isRazorpayProvider ? refetchRazorpayStatus() : null,
+        isStripeProvider && hasStripeKey ? refetchSubscriptions() : null,
+        isRazorpayProvider && hasRazorpayKey ? refetchRazorpaySubscriptions() : null,
       ]),
   };
 }

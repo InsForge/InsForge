@@ -21,7 +21,7 @@ import {
 } from '@/types/payments.js';
 import {
   ERROR_CODES,
-  type ConfigureRazorpayWebhookResponse,
+  type GetRazorpayWebhookSetupResponse,
   type RazorpayConnection,
   type RazorpayKeyConfig,
 } from '@insforge/shared-schemas';
@@ -136,11 +136,13 @@ export class RazorpayConfigService {
       const webhookSecretKey = getRazorpayWebhookSecretName(environment);
       const secretService = SecretService.getInstance();
 
-      const [existingKeyId, existingKeySecret, currentRazorpayAccountId] = await Promise.all([
-        secretService.getSecretByKey(keyIdKey),
-        secretService.getSecretByKey(keySecretKey),
-        this.getCurrentRazorpayAccountId(environment),
-      ]);
+      const [existingKeyId, existingKeySecret, existingWebhookSecret, currentRazorpayAccountId] =
+        await Promise.all([
+          secretService.getSecretByKey(keyIdKey),
+          secretService.getSecretByKey(keySecretKey),
+          secretService.getSecretByKey(webhookSecretKey),
+          this.getCurrentRazorpayAccountId(environment),
+        ]);
 
       const provider = new RazorpayProvider(trimmedKeyId, trimmedKeySecret, environment);
       const account = await provider.retrieveAccount();
@@ -184,8 +186,10 @@ export class RazorpayConfigService {
           [keySecretKey, encryptedKeySecret]
         );
 
-        if (trimmedWebhookSecret) {
-          const encryptedWebhookSecret = EncryptionManager.encrypt(trimmedWebhookSecret);
+        if (trimmedWebhookSecret || !existingWebhookSecret) {
+          const encryptedWebhookSecret = EncryptionManager.encrypt(
+            trimmedWebhookSecret || generateSecureToken(32)
+          );
           await client.query(
             `INSERT INTO system.secrets (key, value_ciphertext, is_active, is_reserved)
              VALUES ($1, $2, true, true)
@@ -540,26 +544,64 @@ export class RazorpayConfigService {
     await client.query('DELETE FROM payments.razorpay_items WHERE environment = $1', [environment]);
   }
 
-  async configureWebhook(
+  async getWebhookSetup(
     environment: RazorpayEnvironment
-  ): Promise<ConfigureRazorpayWebhookResponse> {
-    // Validate that keys are configured and can authenticate before proceeding
+  ): Promise<GetRazorpayWebhookSetupResponse> {
+    await this.createRazorpayProvider(environment);
+    const webhookSecret = await this.ensureRazorpayWebhookSecret(environment);
+    const webhookUrl = this.getWebhookUrl(environment);
+
+    await this.upsertManualWebhookConnection(environment, webhookUrl);
+
+    return {
+      connection: await this.getConnection(environment),
+      webhookUrl,
+      webhookSecret,
+    };
+  }
+
+  async regenerateWebhookSecret(
+    environment: RazorpayEnvironment
+  ): Promise<GetRazorpayWebhookSetupResponse> {
     await this.createRazorpayProvider(environment);
 
-    let webhookSecret = await this.getRazorpayWebhookSecret(environment);
+    const webhookSecret = generateSecureToken(32);
+    await this.setRazorpayWebhookSecret(environment, webhookSecret);
 
-    if (!webhookSecret) {
-      // Auto-generate a secure random secret for Razorpay webhooks
-      webhookSecret = generateSecureToken(32);
-      await this.setRazorpayWebhookSecret(environment, webhookSecret);
+    const webhookUrl = this.getWebhookUrl(environment);
+    await this.upsertManualWebhookConnection(environment, webhookUrl);
+
+    logger.info('Razorpay webhook secret regenerated', {
+      environment,
+      webhookUrl,
+    });
+
+    return {
+      connection: await this.getConnection(environment),
+      webhookUrl,
+      webhookSecret,
+    };
+  }
+
+  private getWebhookUrl(environment: RazorpayEnvironment): string {
+    return `${getApiBaseUrl()}/api/webhooks/razorpay/${environment}`;
+  }
+
+  private async ensureRazorpayWebhookSecret(environment: RazorpayEnvironment): Promise<string> {
+    const existingSecret = await this.getRazorpayWebhookSecret(environment);
+    if (existingSecret) {
+      return existingSecret;
     }
 
-    const webhookUrl = `${getApiBaseUrl()}/api/webhooks/razorpay/${environment}`;
+    const webhookSecret = generateSecureToken(32);
+    await this.setRazorpayWebhookSecret(environment, webhookSecret);
+    return webhookSecret;
+  }
 
-    // Razorpay's webhook creation API is restricted to Razorpay Partners only.
-    // Standard merchant integrations must configure webhooks manually via the
-    // Razorpay Dashboard. We generate and persist the URL and secret here so
-    // the developer can copy them in without leaving InsForge.
+  private async upsertManualWebhookConnection(
+    environment: RazorpayEnvironment,
+    webhookUrl: string
+  ): Promise<void> {
     await this.getPool().query(
       `INSERT INTO payments.provider_connections
          (provider, environment, webhook_endpoint_id, webhook_endpoint_url, webhook_configured_at, updated_at)
@@ -572,19 +614,10 @@ export class RazorpayConfigService {
       [environment, webhookUrl]
     );
 
-    logger.info('Razorpay webhook configured (manual dashboard setup required)', {
+    logger.info('Razorpay webhook setup values prepared', {
       environment,
       webhookUrl,
     });
-
-    const connection = await this.getConnection(environment);
-
-    return {
-      connection,
-      webhookUrl,
-      webhookSecret,
-      manualSetupRequired: true,
-    };
   }
 
   private normalizeConnectionRow(

@@ -1,7 +1,7 @@
-import type { PaymentProvider, StripeEnvironment } from '@insforge/shared-schemas';
+import type { PaymentEnvironment, PaymentProvider } from '@insforge/shared-schemas';
 
 export interface CatalogProduct {
-  environment: StripeEnvironment;
+  environment: PaymentEnvironment;
   provider: PaymentProvider;
   providerProductId: string;
   name: string;
@@ -13,7 +13,7 @@ export interface CatalogProduct {
 }
 
 export interface CatalogPrice {
-  environment: StripeEnvironment;
+  environment: PaymentEnvironment;
   provider: PaymentProvider;
   providerPriceId: string;
   providerProductId: string | null;

@@ -1,86 +1,88 @@
-import { Settings, CreditCard } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import { Button } from '@insforge/ui';
-import type { StripeEnvironment } from '@insforge/shared-schemas';
-const STRIPE_KEY_NAMES: Record<StripeEnvironment, string> = {
-  test: 'STRIPE_TEST_SECRET_KEY',
-  live: 'STRIPE_LIVE_SECRET_KEY',
+import type { PaymentEnvironment, PaymentProvider } from '@insforge/shared-schemas';
+import RazorpayLogo from '#assets/logos/razorpay-logo.svg?react';
+import StripeWordmark from '#assets/logos/stripe-wordmark.svg';
+
+const KEY_NAMES: Record<PaymentProvider, Record<PaymentEnvironment, string>> = {
+  stripe: {
+    test: 'STRIPE_TEST_SECRET_KEY',
+    live: 'STRIPE_LIVE_SECRET_KEY',
+  },
+  razorpay: {
+    test: 'RAZORPAY_TEST_KEY_ID and RAZORPAY_TEST_KEY_SECRET',
+    live: 'RAZORPAY_LIVE_KEY_ID and RAZORPAY_LIVE_KEY_SECRET',
+  },
 };
 
-const RAZORPAY_KEY_NAMES: Record<StripeEnvironment, string> = {
-  test: 'RAZORPAY_TEST_KEY_SECRET',
-  live: 'RAZORPAY_LIVE_KEY_SECRET',
+const PROVIDER_LABELS: Record<PaymentProvider, string> = {
+  stripe: 'Stripe',
+  razorpay: 'Razorpay',
 };
 
-const MODE_LABELS: Record<StripeEnvironment, string> = {
+const MODE_LABELS: Record<PaymentEnvironment, string> = {
   test: 'Test',
   live: 'Live',
 };
 
 interface PaymentsKeyMissingStateProps {
-  environment: StripeEnvironment;
+  provider: PaymentProvider;
+  environment: PaymentEnvironment;
   resourceLabel: string;
   onConfigure: () => void;
 }
 
+function PaymentProviderLogo({ provider, label }: { provider: PaymentProvider; label: string }) {
+  if (provider === 'stripe') {
+    return <img alt={label} src={StripeWordmark} className="h-20 w-20 object-contain" />;
+  }
+
+  return (
+    <RazorpayLogo
+      role="img"
+      aria-label={label}
+      className="h-16 w-36"
+      style={{ fill: 'rgb(var(--foreground))' }}
+    />
+  );
+}
+
 export function PaymentsKeyMissingState({
+  provider,
   environment,
   resourceLabel,
   onConfigure,
 }: PaymentsKeyMissingStateProps) {
-  const stripeKeyName = STRIPE_KEY_NAMES[environment];
-  const razorpayKeyName = RAZORPAY_KEY_NAMES[environment];
+  const providerLabel = PROVIDER_LABELS[provider];
+  const keyName = KEY_NAMES[provider][environment];
   const modeLabel = MODE_LABELS[environment];
+  const keyLabel = provider === 'stripe' ? 'Key' : 'Keys';
 
   return (
     <div className="flex h-full min-h-[320px] items-center justify-center px-6">
-      <div className="flex w-full max-w-[800px] flex-col items-center gap-8 text-center">
-        <div className="flex flex-col items-center gap-2">
-          <h2 className="text-lg font-medium leading-7 text-foreground">
-            Configure a Payment Provider
+      <div className="flex w-full max-w-[420px] flex-col items-center gap-6 text-center">
+        <div className="flex h-20 items-center justify-center">
+          <PaymentProviderLogo provider={provider} label={providerLabel} />
+        </div>
+
+        <div className="flex w-full flex-col items-center gap-2">
+          <h2 className="text-sm font-medium leading-6 text-foreground">
+            Configure Your {providerLabel} {modeLabel} {keyLabel}
           </h2>
-          <p className="max-w-[400px] text-sm leading-5 text-muted-foreground">
-            To view {environment} {resourceLabel}, you need to configure either Stripe or Razorpay
-            API keys.
+          <p className="max-w-[320px] text-xs leading-4 text-muted-foreground">
+            Add {keyName} before viewing {environment} {resourceLabel}.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
-          {/* Stripe Card */}
-          <div className="flex flex-col items-center gap-4 rounded-xl border border-[var(--alpha-8)] bg-muted/20 p-6">
-            <div className="flex h-12 items-center justify-center">
-              <div className="flex items-center gap-2 text-foreground/80 font-bold tracking-tight text-xl">
-                <CreditCard className="h-6 w-6 text-indigo-500" />
-                Stripe
-              </div>
-            </div>
-            <div className="flex w-full flex-col items-center gap-1">
-              <h3 className="text-sm font-medium text-foreground">Stripe {modeLabel} Keys</h3>
-              <p className="text-xs text-muted-foreground">Add {stripeKeyName}</p>
-            </div>
-            <Button variant="outline" size="sm" onClick={onConfigure} className="mt-2 w-full">
-              <Settings className="mr-2 h-4 w-4" />
-              Configure Stripe
-            </Button>
-          </div>
-
-          {/* Razorpay Card */}
-          <div className="flex flex-col items-center gap-4 rounded-xl border border-[var(--alpha-8)] bg-muted/20 p-6">
-            <div className="flex h-12 items-center justify-center">
-              <div className="flex items-center gap-2 text-foreground/80 font-bold tracking-tight text-xl">
-                <CreditCard className="h-6 w-6 text-blue-500" />
-                Razorpay
-              </div>
-            </div>
-            <div className="flex w-full flex-col items-center gap-1">
-              <h3 className="text-sm font-medium text-foreground">Razorpay {modeLabel} Keys</h3>
-              <p className="text-xs text-muted-foreground">Add {razorpayKeyName}</p>
-            </div>
-            <Button variant="outline" size="sm" onClick={onConfigure} className="mt-2 w-full">
-              <Settings className="mr-2 h-4 w-4" />
-              Configure Razorpay
-            </Button>
-          </div>
-        </div>
+        <Button
+          variant="outline"
+          size="default"
+          onClick={onConfigure}
+          className="h-8 rounded px-2.5"
+        >
+          <Settings className="h-4 w-4" />
+          Configure {providerLabel} API keys
+        </Button>
       </div>
     </div>
   );

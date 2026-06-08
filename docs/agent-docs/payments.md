@@ -235,7 +235,7 @@ Legacy `payments.payment_history` rows are migrated into `payments.transactions`
 ## Security
 
 - Use app-owned RLS or server-side membership checks before creating checkout, order, subscription, or portal sessions for shared subjects.
-- Consider enabling RLS on `payments.stripe_checkout_sessions`, `payments.stripe_customer_portal_sessions`, `payments.razorpay_orders`, and `payments.razorpay_subscriptions` with policies that check app membership. Razorpay subscription creation evaluates the caller's `INSERT` policy before the provider Subscription is created; cancel, pause, and resume evaluate the same table's `UPDATE` policies through a rollbacked `updated_at` probe.
+- Consider enabling RLS on `payments.stripe_checkout_sessions`, `payments.stripe_customer_portal_sessions`, `payments.razorpay_orders`, and `payments.razorpay_subscriptions` with policies that check app membership. Razorpay subscription creation evaluates the caller's `INSERT` policy before the provider Subscription is created; cancel, pause, and resume evaluate the same table's `UPDATE` policies.
 - Do not expose `payments.customers`, `payments.transactions`, or provider subscription tables directly to end users.
 - Do not write provider-managed payments tables directly. Use the Payments API, provider webhooks, or app-owned trigger targets.
 - Metadata keys starting with `insforge_` are reserved.

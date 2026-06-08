@@ -13,11 +13,11 @@ import {
   DataGridEmptyState,
   ErrorState,
   LoadingState,
-  TableHeader,
   type DataGridColumn,
   type DataGridRowType,
 } from '#components';
 import { PaymentsKeyMissingState } from '#features/payments/components/PaymentsKeyMissingState';
+import { PaymentsPageHeader } from '#features/payments/components/PaymentsPageHeader';
 import { ProviderBadge } from '#features/payments/components/ProviderBadge';
 import type { PaymentsOutletContext } from '#features/payments/components/PaymentsLayout';
 import { usePaymentCustomers } from '#features/payments/hooks/usePaymentCustomers';
@@ -397,7 +397,8 @@ function CountryCell({ code, name }: { code: string | null; name: string | null 
 }
 
 export default function CustomersPage() {
-  const { openPaymentsSettings, environment } = useOutletContext<PaymentsOutletContext>();
+  const { openPaymentsSettings, provider, setProvider, environment, setEnvironment } =
+    useOutletContext<PaymentsOutletContext>();
   const [searchQuery, setSearchQuery] = useState('');
   const [sortColumns, setSortColumns] = useState<SortColumn[]>([
     { columnKey: 'lastPaymentAt', direction: 'DESC' },
@@ -412,7 +413,7 @@ export default function CustomersPage() {
     isLoading,
     error,
     refetch,
-  } = usePaymentCustomers(environment);
+  } = usePaymentCustomers(provider, environment);
 
   const filteredCustomers = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -487,11 +488,12 @@ export default function CustomersPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
-      <TableHeader
+      <PaymentsPageHeader
         title="Customers"
-        className="h-14 min-h-14"
-        leftClassName="py-0"
-        rightClassName="py-0"
+        provider={provider}
+        setProvider={setProvider}
+        environment={environment}
+        setEnvironment={setEnvironment}
         showSearch={hasActiveKey}
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}
@@ -507,6 +509,7 @@ export default function CustomersPage() {
           <LoadingState message="Loading customers..." />
         ) : !hasActiveKey ? (
           <PaymentsKeyMissingState
+            provider={provider}
             environment={environment}
             resourceLabel="customers"
             onConfigure={openPaymentsSettings}

@@ -25,9 +25,10 @@ export function usePaymentsConfig() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: PAYMENTS_CONFIG_QUERY_KEY }),
         queryClient.invalidateQueries({ queryKey: ['payments', 'status'] }),
-        queryClient.invalidateQueries({ queryKey: ['payments', 'catalog'] }),
-        queryClient.invalidateQueries({ queryKey: ['payments', 'customers'] }),
-        queryClient.invalidateQueries({ queryKey: ['payments', 'subscriptions'] }),
+        queryClient.invalidateQueries({ queryKey: ['payments', 'stripe', 'catalog'] }),
+        queryClient.invalidateQueries({ queryKey: ['payments', 'stripe', 'customers'] }),
+        queryClient.invalidateQueries({ queryKey: ['payments', 'stripe', 'subscriptions'] }),
+        queryClient.invalidateQueries({ queryKey: ['payments', 'stripe', 'transactions'] }),
       ]);
       showToast('Stripe key saved successfully', 'success');
     },
@@ -42,9 +43,10 @@ export function usePaymentsConfig() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: PAYMENTS_CONFIG_QUERY_KEY }),
         queryClient.invalidateQueries({ queryKey: ['payments', 'status'] }),
-        queryClient.invalidateQueries({ queryKey: ['payments', 'catalog'] }),
-        queryClient.invalidateQueries({ queryKey: ['payments', 'customers'] }),
-        queryClient.invalidateQueries({ queryKey: ['payments', 'subscriptions'] }),
+        queryClient.invalidateQueries({ queryKey: ['payments', 'stripe', 'catalog'] }),
+        queryClient.invalidateQueries({ queryKey: ['payments', 'stripe', 'customers'] }),
+        queryClient.invalidateQueries({ queryKey: ['payments', 'stripe', 'subscriptions'] }),
+        queryClient.invalidateQueries({ queryKey: ['payments', 'stripe', 'transactions'] }),
       ]);
       showToast('Stripe key removed', 'success');
     },

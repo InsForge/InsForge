@@ -760,7 +760,7 @@ paths:
   /api/payments/razorpay/{environment}/config:
     put:
       summary: Configure Razorpay Keys
-      description: Validate and store Razorpay API keys, optionally with a webhook secret, for one environment.
+      description: Validate and store Razorpay API keys for one environment. A webhook secret is generated automatically when one does not already exist.
       tags:
         - Admin
       security:
@@ -877,9 +877,9 @@ paths:
           $ref: '#/components/responses/Forbidden'
 
   /api/payments/razorpay/{environment}/webhook:
-    post:
-      summary: Configure Razorpay Webhook Settings
-      description: Generate or refresh the local Razorpay webhook URL and signing secret for one environment. Copy the returned URL into the Razorpay Dashboard.
+    get:
+      summary: Get Razorpay Webhook Setup Values
+      description: Return the Razorpay webhook URL and signing secret that must be copied into the Razorpay Dashboard for manual webhook setup.
       tags:
         - Admin
       security:
@@ -889,11 +889,36 @@ paths:
         - $ref: '#/components/parameters/EnvironmentPath'
       responses:
         '200':
-          description: Razorpay webhook configuration result
+          description: Razorpay webhook setup values
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ConfigureRazorpayWebhookResponse'
+                $ref: '#/components/schemas/GetRazorpayWebhookSetupResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/payments/razorpay/{environment}/webhook/regenerate-secret:
+    post:
+      summary: Regenerate Razorpay Webhook Secret
+      description: Generate a new Razorpay webhook signing secret. Update the webhook secret in the Razorpay Dashboard after calling this endpoint.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentPath'
+      responses:
+        '200':
+          description: Razorpay webhook setup values with the regenerated secret
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegenerateRazorpayWebhookSecretResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -3667,13 +3692,12 @@ components:
         connection:
           $ref: '#/components/schemas/StripeConnection'
 
-    ConfigureRazorpayWebhookResponse:
+    GetRazorpayWebhookSetupResponse:
       type: object
       required:
         - connection
         - webhookUrl
         - webhookSecret
-        - manualSetupRequired
       properties:
         connection:
           $ref: '#/components/schemas/RazorpayConnection'
@@ -3685,11 +3709,10 @@ components:
           type: string
           description: Raw signing secret to copy into the Razorpay Dashboard.
           example: "webhook_secret_xxx"
-        manualSetupRequired:
-          type: boolean
-          enum:
-            - true
-          description: Razorpay webhooks must be created manually in the Razorpay Dashboard.
+
+    RegenerateRazorpayWebhookSecretResponse:
+      allOf:
+        - $ref: '#/components/schemas/GetRazorpayWebhookSetupResponse'
 
     ListStripeCatalogResponse:
       type: object

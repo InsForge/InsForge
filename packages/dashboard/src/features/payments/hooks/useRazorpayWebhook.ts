@@ -7,6 +7,12 @@ import {
 import { useToast } from '#lib/hooks/useToast';
 
 const RAZORPAY_STATUS_QUERY_KEY = ['payments', 'razorpay', 'status'];
+const getRazorpayWebhookSetupQueryKey = (environment: RazorpayEnvironment) => [
+  'payments',
+  'razorpay',
+  environment,
+  'webhook-setup',
+];
 
 export function useRazorpayWebhook() {
   const queryClient = useQueryClient();
@@ -18,14 +24,16 @@ export function useRazorpayWebhook() {
     staleTime: 30 * 1000,
   });
 
-  const configureWebhook = useMutation({
-    mutationFn: (environment: RazorpayEnvironment) => razorpayService.configureWebhook(environment),
+  const regenerateWebhookSecret = useMutation({
+    mutationFn: (environment: RazorpayEnvironment) =>
+      razorpayService.regenerateWebhookSecret(environment),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: RAZORPAY_STATUS_QUERY_KEY });
-      showToast('Razorpay webhook setup values generated', 'success');
+      await queryClient.invalidateQueries({ queryKey: ['payments', 'razorpay'] });
+      showToast('Razorpay webhook secret regenerated', 'success');
     },
     onError: (err: Error) => {
-      showToast(err.message || 'Failed to configure Razorpay webhook', 'error');
+      showToast(err.message || 'Failed to regenerate Razorpay webhook secret', 'error');
     },
   });
 
@@ -33,6 +41,15 @@ export function useRazorpayWebhook() {
     connections: data?.razorpayConnections ?? [],
     isLoading,
     error,
-    configureWebhook,
+    regenerateWebhookSecret,
   };
+}
+
+export function useRazorpayWebhookSetup(environment: RazorpayEnvironment, enabled: boolean) {
+  return useQuery({
+    queryKey: getRazorpayWebhookSetupQueryKey(environment),
+    queryFn: () => razorpayService.getWebhookSetup(environment),
+    enabled,
+    staleTime: 30 * 1000,
+  });
 }

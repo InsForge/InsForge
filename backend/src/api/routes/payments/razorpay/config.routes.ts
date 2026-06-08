@@ -79,14 +79,27 @@ router.post('/sync', async (req: AuthRequest, res: Response, next: NextFunction)
   }
 });
 
-router.post('/webhook', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/webhook', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { environment } = parseZodSchema(razorpayEnvironmentParamsSchema, req.params);
-    const result = await configService.configureWebhook(environment);
+    const result = await configService.getWebhookSetup(environment);
     successResponse(res, result);
   } catch (error) {
     next(error);
   }
 });
+
+router.post(
+  '/webhook/regenerate-secret',
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { environment } = parseZodSchema(razorpayEnvironmentParamsSchema, req.params);
+      const result = await configService.regenerateWebhookSecret(environment);
+      successResponse(res, result);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 export { router as razorpayConfigRouter };
