@@ -21,6 +21,7 @@ import {
   OnUpdateActionSchema,
   ForeignKeySchema,
 } from '@insforge/shared-schemas';
+import pgFormat from 'pg-format';
 import { validateIdentifier, validateSchemaName } from '@/utils/validations.js';
 import { convertSqlTypeToColumnType } from '@/utils/utils.js';
 import {
@@ -280,11 +281,15 @@ export class DatabaseTableService {
 
           // Enable metadata counter trigger-backed row counting
           try {
+            await client.query('SAVEPOINT enable_counter_attempt');
             await client.query('SELECT system.enable_table_counter($1, $2)', [
               schemaName,
               table_name,
             ]);
+            await client.query('RELEASE SAVEPOINT enable_counter_attempt');
           } catch (error) {
+            await client.query('ROLLBACK TO SAVEPOINT enable_counter_attempt');
+            await client.query('RELEASE SAVEPOINT enable_counter_attempt');
             // Log warning but DO NOT throw
             console.warn(
               `Failed to enable O(1) table counter for ${schemaName}.${table_name}:`,
@@ -357,8 +362,6 @@ export class DatabaseTableService {
     validateIdentifier(table, 'table');
     const client = await this.getPool().connect();
     try {
-      const safeQualifiedTableName = quoteQualifiedName(schemaName, table);
-
       // Get column information from information_schema
       const columnsResult = await client.query(
         `
@@ -440,20 +443,22 @@ export class DatabaseTableService {
         if (counterResult.rows.length > 0) {
           row_count = Number(counterResult.rows[0].row_count);
         } else {
-          // Self-heal: Enable counter for this table
-          await client.query('SELECT system.enable_table_counter($1, $2)', [schemaName, table]);
-          const fallbackResult = await client.query(
-            'SELECT row_count FROM system.table_metadata_counters WHERE schema_name = $1 AND table_name = $2',
-            [schemaName, table]
+          // Fallback to standard count directly if missing from counters table (avoids lock contention on read-hot path)
+          const fallbackCountResult = await client.query(
+            pgFormat('SELECT COUNT(*) as row_count FROM %I.%I', schemaName, table)
           );
-          row_count = fallbackResult.rows[0] ? Number(fallbackResult.rows[0].row_count) : 0;
+          row_count = Number(fallbackCountResult.rows[0].row_count);
         }
       } catch {
         // Safe fallback to exact count if the counter schema query errors (e.g. during migration setup)
-        const fallbackCountResult = await client.query(
-          `SELECT COUNT(*) as row_count FROM ${safeQualifiedTableName}`
-        );
-        row_count = Number(fallbackCountResult.rows[0].row_count);
+        try {
+          const fallbackCountResult = await client.query(
+            pgFormat('SELECT COUNT(*) as row_count FROM %I.%I', schemaName, table)
+          );
+          row_count = Number(fallbackCountResult.rows[0].row_count);
+        } catch {
+          row_count = 0;
+        }
       }
 
       return {
@@ -759,6 +764,23 @@ export class DatabaseTableService {
           await client.query(
             `DROP TABLE IF EXISTS ${quoteQualifiedName(schemaName, table)} CASCADE`
           );
+
+          // Clean up counter row if it exists
+          try {
+            await client.query('SAVEPOINT cleanup_counter_attempt');
+            await client.query(
+              'DELETE FROM system.table_metadata_counters WHERE schema_name = $1 AND table_name = $2',
+              [schemaName, table]
+            );
+            await client.query('RELEASE SAVEPOINT cleanup_counter_attempt');
+          } catch (error) {
+            await client.query('ROLLBACK TO SAVEPOINT cleanup_counter_attempt');
+            await client.query('RELEASE SAVEPOINT cleanup_counter_attempt');
+            console.warn(
+              `Failed to cleanup metadata counter for deleted table ${schemaName}.${table}:`,
+              error
+            );
+          }
 
           // Update metadata
           // Metadata is now updated on-demand

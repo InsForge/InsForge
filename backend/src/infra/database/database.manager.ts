@@ -165,36 +165,24 @@ export class DatabaseManager {
               if (rowMap.has(tableName)) {
                 finalResults.push({ table_name: tableName, count: rowMap.get(tableName) ?? 0 });
               } else {
-                // Self-healing: If a table is missing, initialize its counter dynamically
+                // Fallback to standard count directly if missing from counters table (avoids lock contention on read-hot path)
                 try {
-                  await client.query('SELECT system.enable_table_counter($1, $2)', [
-                    'public',
-                    tableName,
-                  ]);
-                  const fallbackResult = await client.query(
-                    'SELECT row_count as count FROM system.table_metadata_counters WHERE schema_name = $1 AND table_name = $2',
-                    ['public', tableName]
+                  const fallbackCountResult = await client.query(
+                    pgFormat('SELECT COUNT(*) as row_count FROM %I.%I', 'public', tableName)
                   );
-                  const count = fallbackResult.rows[0]?.count
-                    ? Number(fallbackResult.rows[0].count)
-                    : 0;
+                  const count = Number(fallbackCountResult.rows[0].row_count);
                   finalResults.push({ table_name: tableName, count });
                 } catch {
-                  // Gracefully fallback to standard count
-                  try {
-                    const fallbackCountResult = await client.query(
-                      pgFormat('SELECT COUNT(*) as row_count FROM %I.%I', 'public', tableName)
-                    );
-                    const count = Number(fallbackCountResult.rows[0].row_count);
-                    finalResults.push({ table_name: tableName, count });
-                  } catch {
-                    finalResults.push({ table_name: tableName, count: 0 });
-                  }
+                  finalResults.push({ table_name: tableName, count: 0 });
                 }
               }
             }
             return finalResults;
-          } catch {
+          } catch (error) {
+            console.warn(
+              'Failed to retrieve counts from system.table_metadata_counters, falling back to empty list:',
+              error
+            );
             return [];
           }
         })(),

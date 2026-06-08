@@ -28,22 +28,27 @@ BEGIN
   v_table_name := TG_TABLE_NAME;
 
   IF TG_OP = 'INSERT' THEN
-    UPDATE system.table_metadata_counters
-    SET row_count = row_count + 1
-    WHERE schema_name = v_schema_name AND table_name = v_table_name;
+    -- Self-healing: use UPSERT to handle missing counter rows
+    INSERT INTO system.table_metadata_counters (schema_name, table_name, row_count)
+    VALUES (v_schema_name, v_table_name, 1)
+    ON CONFLICT (schema_name, table_name)
+    DO UPDATE SET row_count = system.table_metadata_counters.row_count + 1;
   ELSIF TG_OP = 'DELETE' THEN
-    UPDATE system.table_metadata_counters
-    SET row_count = row_count - 1
-    WHERE schema_name = v_schema_name AND table_name = v_table_name;
+    -- Self-healing: use UPSERT to handle missing counter rows (guarantee row count >= 0)
+    INSERT INTO system.table_metadata_counters (schema_name, table_name, row_count)
+    VALUES (v_schema_name, v_table_name, 0)
+    ON CONFLICT (schema_name, table_name)
+    DO UPDATE SET row_count = GREATEST(0, system.table_metadata_counters.row_count - 1);
   ELSIF TG_OP = 'TRUNCATE' THEN
-    UPDATE system.table_metadata_counters
-    SET row_count = 0
-    WHERE schema_name = v_schema_name AND table_name = v_table_name;
+    INSERT INTO system.table_metadata_counters (schema_name, table_name, row_count)
+    VALUES (v_schema_name, v_table_name, 0)
+    ON CONFLICT (schema_name, table_name)
+    DO UPDATE SET row_count = 0;
   END IF;
 
   RETURN NULL;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = system, pg_catalog, public;
 
 -- 3. Create the enablement utility function
 CREATE OR REPLACE FUNCTION system.enable_table_counter(target_schema TEXT, target_table TEXT)
@@ -60,8 +65,9 @@ BEGIN
     RAISE EXCEPTION 'Table %.% does not exist', target_schema, target_table;
   END IF;
 
-  -- Prevent concurrent inserts/deletes from drifting the counter before trigger is attached
-  EXECUTE format('LOCK TABLE %I.%I IN SHARE ROW EXCLUSIVE MODE', target_schema, target_table);
+  -- Prevent concurrent inserts/deletes from drifting the counter before trigger is attached.
+  -- Use NOWAIT to throw immediately instead of blocking the migration/application indefinitely.
+  EXECUTE format('LOCK TABLE %I.%I IN SHARE ROW EXCLUSIVE MODE NOWAIT', target_schema, target_table);
 
   -- 1. Initialize counter with a one-time COUNT(*)
   EXECUTE format('SELECT COUNT(*) FROM %I.%I', target_schema, target_table) INTO v_initial_count;
@@ -96,7 +102,16 @@ BEGIN
   ', target_schema, target_table);
   EXECUTE v_sql;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = system, pg_catalog, public;
+
+-- Hardening Security Definer functions:
+-- 1. Revoke public execution
+REVOKE EXECUTE ON FUNCTION system.maintain_table_row_count() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION system.enable_table_counter(TEXT, TEXT) FROM PUBLIC;
+
+-- 2. Grant execution to project_admin explicitly for backend service access
+GRANT EXECUTE ON FUNCTION system.maintain_table_row_count() TO project_admin;
+GRANT EXECUTE ON FUNCTION system.enable_table_counter(TEXT, TEXT) TO project_admin;
 
 -- 4. Automatically register all existing tables in the 'public' schema
 DO $$
