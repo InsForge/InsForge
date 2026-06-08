@@ -38,7 +38,16 @@ export const getConnections = (
   getInsforgeConnections(opts, [
     // 1. Bootstrap roles and event triggers
     seed.sqlfile([path.join(ROOT, 'deploy/docker-init/db/db-init.sql')]),
-    // 2. Install real extensions + stub pg_cron (database-name restricted)
+    // 2. Install real extensions + stub pg_cron
+    //
+    //    pgcrypto and http are real extensions from the Docker image.
+    //
+    //    pg_cron cannot be installed here because CREATE EXTENSION pg_cron
+    //    only works in the database named by cron.database_name (hardcoded
+    //    to "insforge" in postgresql.conf), and pgsql-test creates isolated
+    //    databases with random names. We stub the cron schema because
+    //    migrations 024 and 041 execute DO $$ blocks at migration time
+    //    that SELECT FROM cron.job and PERFORM cron.schedule()/unschedule().
     seed.fn(async (ctx) => {
       await ctx.pg.query(`
         CREATE EXTENSION IF NOT EXISTS pgcrypto;
