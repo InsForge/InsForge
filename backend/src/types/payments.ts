@@ -248,7 +248,7 @@ export interface RazorpayPlanRow {
 }
 
 export interface PaymentCustomerRow {
-  environment: StripeEnvironment;
+  environment: PaymentEnvironment;
   provider: PaymentProvider;
   providerCustomerId: string;
   email: string | null;
@@ -308,8 +308,33 @@ export interface CustomerPortalSessionRow {
   updatedAt: Date | string;
 }
 
+export type RazorpayOrderStatus = 'initialized' | 'created' | 'attempted' | 'paid' | 'failed';
+
+export interface RazorpayOrderRow {
+  id: string;
+  environment: RazorpayEnvironment;
+  status: RazorpayOrderStatus;
+  subjectType: string | null;
+  subjectId: string | null;
+  customerName: string | null;
+  customerEmail: string | null;
+  customerContact: string | null;
+  orderId: string | null;
+  receipt: string | null;
+  amount: number | string;
+  amountPaid: number | string | null;
+  amountDue: number | string | null;
+  currency: string;
+  attempts: number | string | null;
+  verifiedPaymentId: string | null;
+  verifiedAt: Date | string | null;
+  lastError: string | null;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
 export interface StripeWebhookEventRow {
-  environment: StripeEnvironment;
+  environment: PaymentEnvironment;
   provider: PaymentProvider;
   eventId: string;
   eventType: string;
@@ -326,8 +351,8 @@ export interface StripeWebhookEventRow {
   updatedAt: Date | string;
 }
 
-export interface PaymentActivityRow {
-  environment: StripeEnvironment;
+export interface PaymentTransactionRow {
+  environment: PaymentEnvironment;
   provider: PaymentProvider;
   type: 'one_time_payment' | 'subscription_invoice' | 'refund' | 'failed_payment';
   status: 'succeeded' | 'failed' | 'pending' | 'refunded' | 'partially_refunded';
@@ -421,6 +446,8 @@ export interface RazorpaySubscriptionRow {
   hasScheduledChanges: boolean;
   changeScheduledAt: Date | string | null;
   offerId: string | null;
+  authorizationPaymentId: string | null;
+  authorizationVerifiedAt: Date | string | null;
   metadata: Record<string, string>;
   providerCreatedAt: Date | string | null;
   syncedAt: Date | string;

@@ -7,7 +7,7 @@ import { successResponse } from '@/utils/response.js';
 import { parseZodSchema } from '@/utils/zod.js';
 import { getPaymentEnvironment } from '@/services/payments/helpers.js';
 import { normalizeStripeError } from '@/providers/payments/stripe-errors.js';
-import { ERROR_CODES, upsertPaymentsConfigBodySchema } from '@insforge/shared-schemas';
+import { ERROR_CODES, upsertStripeConfigBodySchema } from '@insforge/shared-schemas';
 
 const router = Router({ mergeParams: true });
 const configService = StripeConfigService.getInstance();
@@ -16,7 +16,7 @@ const syncService = StripeSyncService.getInstance();
 router.put('/config', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const environment = getPaymentEnvironment(req.params);
-    const body = parseZodSchema(upsertPaymentsConfigBodySchema, req.body);
+    const body = parseZodSchema(upsertStripeConfigBodySchema, req.body);
 
     await configService.setStripeSecretKey(
       environment,

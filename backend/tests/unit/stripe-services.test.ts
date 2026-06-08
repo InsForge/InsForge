@@ -107,11 +107,25 @@ function expectStripeRuntimeDelete(
   );
 }
 
+function expectProviderRuntimeDelete(
+  queryMock: typeof mockPool.query,
+  tableName: string,
+  environment: string,
+  provider: string
+) {
+  expect(queryMock).toHaveBeenCalledWith(
+    expect.stringMatching(
+      new RegExp(`DELETE FROM payments\\.${tableName}[\\s\\S]*provider\\s*=\\s*\\$1`, 'i')
+    ),
+    [provider, environment]
+  );
+}
+
 import { PaymentCustomerService } from '../../src/services/payments/payment-customer.service';
 import { StripeCheckoutService } from '../../src/services/payments/stripe/checkout.service';
 import { StripeConfigService } from '../../src/services/payments/stripe/config.service';
 import { StripeCustomerPortalService } from '../../src/services/payments/stripe/customer-portal.service';
-import { StripePaymentActivityService } from '../../src/services/payments/stripe/payment-activity.service';
+import { PaymentTransactionService } from '../../src/services/payments/transaction.service';
 import { StripePriceService } from '../../src/services/payments/stripe/price.service';
 import { StripeProductService } from '../../src/services/payments/stripe/product.service';
 import { StripeSubscriptionService } from '../../src/services/payments/stripe/subscription.service';
@@ -170,9 +184,8 @@ const stripeServices = {
   ) => StripeCustomerPortalService.getInstance().createCustomerPortalSession(input, user),
   handleStripeWebhook: (environment: 'test' | 'live', rawBody: Buffer, signature: string) =>
     StripeWebhookService.getInstance().handleStripeWebhook(environment, rawBody, signature),
-  listPaymentActivity: (
-    input: Parameters<StripePaymentActivityService['listPaymentActivity']>[0]
-  ) => StripePaymentActivityService.getInstance().listPaymentActivity(input),
+  listTransactions: (input: Parameters<PaymentTransactionService['listTransactions']>[0]) =>
+    PaymentTransactionService.getInstance().listTransactions(input, 'stripe'),
   listCustomers: (input: Parameters<PaymentCustomerService['listCustomers']>[0]) =>
     PaymentCustomerService.getInstance().listCustomers(input),
   listSubscriptions: (input: Parameters<StripeSubscriptionService['listSubscriptions']>[0]) =>
@@ -696,7 +709,7 @@ describe('Stripe payment services', () => {
 
     expectStripeRuntimeDelete(mockClient.query, 'stripe_subscription_items', 'test');
     expectStripeRuntimeDelete(mockClient.query, 'stripe_subscriptions', 'test');
-    expectStripeRuntimeDelete(mockClient.query, 'stripe_payment_activity', 'test');
+    expectProviderRuntimeDelete(mockClient.query, 'transactions', 'test', 'stripe');
     expectStripeRuntimeDelete(mockClient.query, 'stripe_checkout_sessions', 'test');
     expectStripeRuntimeDelete(mockClient.query, 'stripe_customer_portal_sessions', 'test');
     expectStripeScopedDelete(mockClient.query, 'customers', 'test');
@@ -1231,7 +1244,7 @@ describe('Stripe payment services', () => {
       ],
     });
 
-    expectStripeRuntimeDelete(mockSyncClient.query, 'stripe_payment_activity', 'test');
+    expectProviderRuntimeDelete(mockSyncClient.query, 'transactions', 'test', 'stripe');
     expectStripeRuntimeDelete(mockSyncClient.query, 'stripe_checkout_sessions', 'test');
     expectStripeRuntimeDelete(mockSyncClient.query, 'stripe_customer_portal_sessions', 'test');
     expectStripeScopedDelete(mockSyncClient.query, 'customers', 'test');
@@ -2394,12 +2407,12 @@ describe('Stripe payment services', () => {
     });
 
     expect(mockPool.query).not.toHaveBeenCalledWith(
-      expect.stringMatching(/INSERT INTO payments\.stripe_payment_activity/i),
+      expect.stringMatching(/INSERT INTO payments\.transactions/i),
       expect.any(Array)
     );
   });
 
-  it('records one-time payment activity from checkout.session.completed webhooks', async () => {
+  it('records one-time transactions from checkout.session.completed webhooks', async () => {
     mockGetSecretByKey
       .mockResolvedValueOnce('whsec_test_123')
       .mockResolvedValueOnce('sk_test_1234567890');
@@ -2487,30 +2500,27 @@ describe('Stripe payment services', () => {
 
     expect(mockPool.query).toHaveBeenCalledWith(
       expect.stringMatching(
-        /INSERT INTO payments\.stripe_payment_activity[\s\S]*ON CONFLICT \(environment, payment_intent_id\)[\s\S]*AND type <> 'refund'/i
+        /INSERT INTO payments\.transactions[\s\S]*ON CONFLICT \(provider, environment, provider_object_type, provider_object_id\)/i
       ),
-      [
+      expect.arrayContaining([
         'test',
+        'payment_intent',
+        'pi_123',
+        'one_time_payment',
         'succeeded',
         'team',
         'team_123',
         'cus_123',
         'buyer@example.com',
-        'cs_test_123',
-        'pi_123',
-        null,
         4500,
         'usd',
-        null,
         new Date('2026-04-28T00:05:00.000Z'),
         new Date('2026-04-28T00:00:00.000Z'),
         expect.objectContaining({ id: 'cs_test_123' }),
-      ]
+      ])
     );
     expect(mockPool.query).toHaveBeenCalledWith(
-      expect.stringMatching(
-        /WITH refund_totals[\s\S]*UPDATE payments\.stripe_payment_activity original/i
-      ),
+      expect.stringMatching(/WITH refund_totals[\s\S]*UPDATE payments\.transactions original/i),
       ['test', 'pi_123', null]
     );
     expect(mockPool.query).toHaveBeenCalledWith(
@@ -2763,7 +2773,7 @@ describe('Stripe payment services', () => {
     );
     expect(mockPool.query).toHaveBeenCalledWith(
       expect.stringMatching(
-        /INSERT INTO payments\.stripe_payment_activity[\s\S]*ON CONFLICT \(environment, payment_intent_id\)[\s\S]*AND type <> 'refund'/i
+        /INSERT INTO payments\.transactions[\s\S]*ON CONFLICT \(provider, environment, provider_object_type, provider_object_id\)/i
       ),
       expect.arrayContaining(['test', 'pending', 'team', 'team_123', 'cus_123'])
     );
@@ -2852,25 +2862,23 @@ describe('Stripe payment services', () => {
 
     expect(mockPool.query).toHaveBeenCalledWith(
       expect.stringMatching(
-        /INSERT INTO payments\.stripe_payment_activity[\s\S]*ON CONFLICT \(environment, checkout_session_id\)[\s\S]*AND type <> 'refund'/i
+        /INSERT INTO payments\.transactions[\s\S]*ON CONFLICT \(provider, environment, provider_object_type, provider_object_id\)/i
       ),
-      [
+      expect.arrayContaining([
         'test',
+        'checkout_session',
+        'cs_test_no_payment_required_123',
+        'one_time_payment',
         'pending',
         'team',
         'team_123',
         'cus_123',
         'buyer@example.com',
-        'cs_test_no_payment_required_123',
-        null,
-        null,
         0,
         'usd',
-        null,
-        null,
         new Date('2026-04-28T00:00:00.000Z'),
         expect.objectContaining({ id: 'cs_test_no_payment_required_123' }),
-      ]
+      ])
     );
   });
 
@@ -2956,29 +2964,27 @@ describe('Stripe payment services', () => {
 
     expect(mockPool.query).toHaveBeenCalledWith(
       expect.stringMatching(
-        /INSERT INTO payments\.stripe_payment_activity[\s\S]*ON CONFLICT \(environment, payment_intent_id\)[\s\S]*AND type <> 'refund'/i
+        /INSERT INTO payments\.transactions[\s\S]*ON CONFLICT \(provider, environment, provider_object_type, provider_object_id\)/i
       ),
-      [
+      expect.arrayContaining([
         'test',
+        'payment_intent',
+        'pi_async_123',
+        'one_time_payment',
         'failed',
         'team',
         'team_123',
         'cus_123',
         'buyer@example.com',
-        'cs_test_async_123',
-        'pi_async_123',
-        null,
         4500,
         'usd',
-        null,
-        null,
         new Date('2026-04-28T00:00:00.000Z'),
         expect.objectContaining({ id: 'cs_test_async_123' }),
-      ]
+      ])
     );
   });
 
-  it('records subscription invoice payment activity from invoice webhooks', async () => {
+  it('records subscription invoice transactions from invoice webhooks', async () => {
     mockGetSecretByKey
       .mockResolvedValueOnce('whsec_test_123')
       .mockResolvedValueOnce('sk_test_1234567890');
@@ -3086,33 +3092,29 @@ describe('Stripe payment services', () => {
 
     expect(mockPool.query).toHaveBeenCalledWith(
       expect.stringMatching(
-        /INSERT INTO payments\.stripe_payment_activity[\s\S]*ON CONFLICT \(environment, invoice_id\)[\s\S]*AND type <> 'refund'/i
+        /INSERT INTO payments\.transactions[\s\S]*ON CONFLICT \(provider, environment, provider_object_type, provider_object_id\)/i
       ),
-      [
+      expect.arrayContaining([
         'test',
+        'payment_intent',
+        'pi_invoice_123',
         'subscription_invoice',
         'succeeded',
         'organization',
         'org_123',
         'cus_123',
         'buyer@example.com',
-        'pi_invoice_123',
-        'in_123',
-        'sub_123',
-        'prod_123',
-        'price_123',
         9900,
         'usd',
         'Subscription invoice',
         new Date('2026-04-28T00:01:40.000Z'),
-        null,
         new Date('2026-04-28T00:00:00.000Z'),
         expect.objectContaining({ id: 'in_123' }),
-      ]
+      ])
     );
     expect(mockPool.query).toHaveBeenCalledWith(
       expect.stringMatching(
-        /payment_intent_id = COALESCE\(EXCLUDED\.payment_intent_id, payment_activity\.payment_intent_id\)/i
+        /related_object_ids = tx\.related_object_ids \|\| EXCLUDED\.related_object_ids/i
       ),
       expect.any(Array)
     );
@@ -3197,7 +3199,7 @@ describe('Stripe payment services', () => {
     });
 
     expect(mockPool.query).not.toHaveBeenCalledWith(
-      expect.stringMatching(/INSERT INTO payments\.stripe_payment_activity/i),
+      expect.stringMatching(/INSERT INTO payments\.transactions/i),
       expect.any(Array)
     );
   });
@@ -3284,26 +3286,25 @@ describe('Stripe payment services', () => {
 
     expect(mockPool.query).toHaveBeenCalledWith(
       expect.stringMatching(
-        /INSERT INTO payments\.stripe_payment_activity[\s\S]*ON CONFLICT \(environment, payment_intent_id\)[\s\S]*AND type <> 'refund'/i
+        /INSERT INTO payments\.transactions[\s\S]*ON CONFLICT \(provider, environment, provider_object_type, provider_object_id\)/i
       ),
-      [
+      expect.arrayContaining([
         'test',
+        'payment_intent',
+        'pi_checkout_123',
         'one_time_payment',
         'succeeded',
         'team',
         'team_123',
         'cus_123',
         'buyer@example.com',
-        'pi_checkout_123',
-        'ch_123',
         4500,
         'usd',
         'One-time checkout',
         new Date('2026-04-28T00:00:00.000Z'),
-        null,
         new Date('2026-04-28T00:00:00.000Z'),
         expect.objectContaining({ id: 'pi_checkout_123' }),
-      ]
+      ])
     );
   });
 
@@ -3396,40 +3397,35 @@ describe('Stripe payment services', () => {
 
     expect(mockPool.query).toHaveBeenCalledWith(
       expect.stringMatching(
-        /INSERT INTO payments\.stripe_payment_activity[\s\S]*ON CONFLICT \(environment, refund_id\)/i
+        /INSERT INTO payments\.transactions[\s\S]*ON CONFLICT \(provider, environment, provider_object_type, provider_object_id\)/i
       ),
-      [
+      expect.arrayContaining([
         'test',
+        'refund',
+        're_123',
+        'payment_intent',
+        'pi_invoice_123',
+        'refund',
         'refunded',
         'organization',
         'org_123',
-        'cus_123',
         'buyer@example.com',
-        'pi_invoice_123',
-        'in_123',
-        'ch_123',
-        're_123',
-        'sub_123',
-        'prod_123',
-        'price_123',
         2500,
         'usd',
         'requested_by_customer',
         new Date('2026-04-28T00:03:20.000Z'),
         new Date('2026-04-28T00:03:20.000Z'),
         expect.objectContaining({ id: 're_123' }),
-      ]
+      ])
     );
     expect(mockPool.query).toHaveBeenCalledWith(
       expect.stringMatching(
-        /DO UPDATE SET[\s\S]*subject_type = COALESCE\(EXCLUDED\.subject_type, payment_activity\.subject_type\)[\s\S]*invoice_id = COALESCE\(EXCLUDED\.invoice_id, payment_activity\.invoice_id\)[\s\S]*price_id = COALESCE\(EXCLUDED\.price_id, payment_activity\.price_id\)/i
+        /DO UPDATE SET[\s\S]*subject_type = COALESCE\(EXCLUDED\.subject_type, tx\.subject_type\)[\s\S]*related_object_ids = tx\.related_object_ids \|\| EXCLUDED\.related_object_ids/i
       ),
       expect.any(Array)
     );
     expect(mockPool.query).toHaveBeenCalledWith(
-      expect.stringMatching(
-        /WITH refund_totals[\s\S]*UPDATE payments\.stripe_payment_activity original/i
-      ),
+      expect.stringMatching(/WITH refund_totals[\s\S]*UPDATE payments\.transactions original/i),
       ['test', 'pi_invoice_123', 'ch_123']
     );
   });
@@ -3564,39 +3560,41 @@ describe('Stripe payment services', () => {
     expect(mockProvider.retrieveInvoiceByPaymentIntent).toHaveBeenCalledWith('pi_early_123');
     expect(mockPool.query).toHaveBeenCalledWith(
       expect.stringMatching(
-        /INSERT INTO payments\.stripe_payment_activity[\s\S]*ON CONFLICT \(environment, payment_intent_id\)/i
+        /INSERT INTO payments\.transactions[\s\S]*ON CONFLICT \(provider, environment, provider_object_type, provider_object_id\)/i
       ),
-      [
+      expect.arrayContaining([
         'test',
+        'payment_intent',
+        'pi_early_123',
         'one_time_payment',
         'succeeded',
         'team',
         'team_early_123',
         'cus_early_123',
         'early@example.com',
-        'pi_early_123',
-        'ch_early_123',
         4500,
         'usd',
         'Early checkout',
         new Date('2026-04-28T00:00:00.000Z'),
-        null,
         new Date('2026-04-28T00:00:00.000Z'),
         expect.objectContaining({ id: 'pi_early_123' }),
-      ]
+      ])
     );
     expect(mockPool.query).toHaveBeenCalledWith(
-      expect.stringMatching(/INSERT INTO payments\.stripe_payment_activity[\s\S]*refund_id/i),
+      expect.stringMatching(
+        /INSERT INTO payments\.transactions[\s\S]*provider_parent_object_type/i
+      ),
       expect.arrayContaining([
         'test',
+        'refund',
+        're_early_123',
+        'payment_intent',
+        'pi_early_123',
+        'refund',
         'refunded',
         'team',
         'team_early_123',
-        'cus_early_123',
         'early@example.com',
-        'pi_early_123',
-        'ch_early_123',
-        're_early_123',
       ])
     );
   });
@@ -3758,39 +3756,36 @@ describe('Stripe payment services', () => {
     expect(mockProvider.retrieveInvoiceByPaymentIntent).toHaveBeenCalledWith('pi_sub_early_123');
     expect(mockPool.query).toHaveBeenCalledWith(
       expect.stringMatching(
-        /INSERT INTO payments\.stripe_payment_activity[\s\S]*ON CONFLICT \(environment, invoice_id\)/i
+        /INSERT INTO payments\.transactions[\s\S]*ON CONFLICT \(provider, environment, provider_object_type, provider_object_id\)/i
       ),
       expect.arrayContaining([
         'test',
+        'payment_intent',
+        'pi_sub_early_123',
         'subscription_invoice',
         'succeeded',
         'organization',
         'org_early_123',
         'cus_sub_early_123',
         'subscription@example.com',
-        'pi_sub_early_123',
-        'in_sub_early_123',
-        'sub_early_123',
-        'prod_sub_early_123',
-        'price_sub_early_123',
       ])
     );
     expect(mockPool.query).toHaveBeenCalledWith(
-      expect.stringMatching(/INSERT INTO payments\.stripe_payment_activity[\s\S]*refund_id/i),
+      expect.stringMatching(
+        /INSERT INTO payments\.transactions[\s\S]*provider_parent_object_type/i
+      ),
       expect.arrayContaining([
         'test',
+        'refund',
+        're_sub_early_123',
+        'payment_intent',
+        'pi_sub_early_123',
+        'refund',
         'refunded',
         'organization',
         'org_early_123',
         'cus_sub_early_123',
         'subscription@example.com',
-        'pi_sub_early_123',
-        'in_sub_early_123',
-        'ch_sub_early_123',
-        're_sub_early_123',
-        'sub_early_123',
-        'prod_sub_early_123',
-        'price_sub_early_123',
       ])
     );
   });
@@ -4033,7 +4028,7 @@ describe('Stripe payment services', () => {
     );
   });
 
-  it('lists payment activity for an environment and billing subject', async () => {
+  it('lists transactions for an environment and billing subject', async () => {
     mockPool.query.mockResolvedValueOnce({
       rows: [
         {
@@ -4062,14 +4057,14 @@ describe('Stripe payment services', () => {
     });
 
     await expect(
-      stripeServices.listPaymentActivity({
+      stripeServices.listTransactions({
         environment: 'test',
         subjectType: 'team',
         subjectId: 'team_123',
         limit: 25,
       })
     ).resolves.toEqual({
-      paymentActivity: [
+      transactions: [
         {
           environment: 'test',
           provider: 'stripe',
@@ -4096,8 +4091,8 @@ describe('Stripe payment services', () => {
     });
 
     expect(mockPool.query).toHaveBeenCalledWith(
-      expect.stringMatching(/FROM payments\.stripe_payment_activity/i),
-      ['test', 'team', 'team_123', 25]
+      expect.stringMatching(/FROM payments\.transactions/i),
+      ['test', 'stripe', 'team', 'team_123', 25]
     );
   });
 

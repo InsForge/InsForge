@@ -25,7 +25,10 @@ router.put('/config', async (req: AuthRequest, res: Response, next: NextFunction
       environment,
       body.keyId,
       body.keySecret,
-      body.webhookSecret
+      body.webhookSecret,
+      async (syncEnvironment, provider) => {
+        await syncService.syncEnvironmentAfterKeyChange(syncEnvironment, provider);
+      }
     );
 
     const keys = await configService.getKeyConfig();

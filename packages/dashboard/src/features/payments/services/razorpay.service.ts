@@ -6,8 +6,8 @@ import type {
   ListRazorpayCatalogResponse,
   ListPaymentCustomersRequest,
   ListPaymentCustomersResponse,
-  ListPaymentActivityRequest,
-  ListPaymentActivityResponse,
+  ListPaymentTransactionsRequest,
+  ListPaymentTransactionsResponse,
   ListRazorpaySubscriptionsRequest,
   ListRazorpaySubscriptionsResponse,
   SyncRazorpayPaymentsRequest,
@@ -23,8 +23,8 @@ export type {
   ListRazorpayCatalogResponse,
   ListPaymentCustomersRequest,
   ListPaymentCustomersResponse,
-  ListPaymentActivityRequest,
-  ListPaymentActivityResponse,
+  ListPaymentTransactionsRequest,
+  ListPaymentTransactionsResponse,
   ListRazorpaySubscriptionsRequest,
   ListRazorpaySubscriptionsResponse,
   SyncRazorpayPaymentsRequest,
@@ -106,9 +106,9 @@ export class RazorpayService {
     );
   }
 
-  async listPaymentActivity(
-    input: ListPaymentActivityRequest
-  ): Promise<ListPaymentActivityResponse> {
+  async listTransactions(
+    input: ListPaymentTransactionsRequest
+  ): Promise<ListPaymentTransactionsResponse> {
     const searchParams = new URLSearchParams({
       limit: String(input.limit),
     });
@@ -119,7 +119,7 @@ export class RazorpayService {
     }
 
     return apiClient.request(
-      `/payments/razorpay/${input.environment}/payment-activity?${searchParams.toString()}`,
+      `/payments/razorpay/${input.environment}/transactions?${searchParams.toString()}`,
       {
         headers: apiClient.withAccessToken(),
       }

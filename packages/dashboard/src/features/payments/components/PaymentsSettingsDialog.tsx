@@ -667,8 +667,8 @@ function WebhooksTabContent({
     <div className="flex flex-col gap-6">
       <div>
         <p className="text-sm leading-6 text-muted-foreground">
-          Configure {providerName} webhook endpoints for customer, payment activity, and
-          subscription updates.
+          Configure {providerName} webhook endpoints for customer, transaction, and subscription
+          updates.
         </p>
       </div>
 

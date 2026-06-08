@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RazorpayConnection, RazorpayEnvironment } from '@insforge/shared-schemas';
+import type { RazorpayProvider } from '../../src/providers/payments/razorpay.provider';
 
 const { mockConfigService, mockPool, mockWithPaymentSessionAdvisoryLock } = vi.hoisted(() => ({
   mockConfigService: {
@@ -184,6 +185,59 @@ describe('RazorpaySyncService', () => {
           payments: 0,
         },
         error: 'customers: customer API unavailable',
+      })
+    );
+  });
+
+  it('syncs after key changes with the already-validated Razorpay provider', async () => {
+    const provider = {
+      syncCatalog: vi.fn().mockResolvedValue({
+        account: {
+          id: 'acc_123',
+          merchantName: 'Example Merchant',
+          livemode: false,
+        },
+        plans: [],
+        items: [],
+      }),
+      listCustomers: vi.fn().mockResolvedValue([]),
+      listSubscriptions: vi.fn().mockResolvedValue([]),
+      listPayments: vi.fn().mockResolvedValue([]),
+    };
+
+    const result = await RazorpaySyncService.getInstance().syncEnvironmentAfterKeyChange(
+      'test',
+      provider as unknown as RazorpayProvider
+    );
+
+    expect(mockConfigService.createRazorpayProvider).not.toHaveBeenCalled();
+    expect(provider.syncCatalog).toHaveBeenCalled();
+    expect(mockConfigService.writeSnapshot).toHaveBeenCalledWith(
+      'test',
+      'acc_123',
+      'Example Merchant',
+      false,
+      {
+        plans: 0,
+        items: 0,
+        customers: 0,
+        subscriptions: 0,
+        payments: 0,
+      },
+      expect.any(Date)
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        environment: 'test',
+        status: 'succeeded',
+        syncCounts: {
+          plans: 0,
+          items: 0,
+          customers: 0,
+          subscriptions: 0,
+          payments: 0,
+        },
+        error: null,
       })
     );
   });

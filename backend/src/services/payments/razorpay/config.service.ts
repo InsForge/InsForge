@@ -1,4 +1,4 @@
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
@@ -13,6 +13,7 @@ import { getApiBaseUrl } from '@/utils/environment.js';
 import { toISOStringOrNull } from '@/utils/dates.js';
 import logger from '@/utils/logger.js';
 import { generateSecureToken } from '@/utils/utils.js';
+import { withPaymentSessionAdvisoryLock } from '@/services/payments/payments-advisory-lock.js';
 import {
   RAZORPAY_ENVIRONMENTS,
   type RazorpayEnvironment,
@@ -39,6 +40,11 @@ const RAZORPAY_WEBHOOK_SECRET_BY_ENVIRONMENT: Record<RazorpayEnvironment, string
   test: 'RAZORPAY_TEST_WEBHOOK_SECRET',
   live: 'RAZORPAY_LIVE_WEBHOOK_SECRET',
 };
+
+type SyncRazorpayAfterKeyChange = (
+  environment: RazorpayEnvironment,
+  provider: RazorpayProvider
+) => Promise<void>;
 
 function getRazorpayKeyIdName(environment: RazorpayEnvironment): string {
   return RAZORPAY_KEY_ID_BY_ENVIRONMENT[environment];
@@ -70,6 +76,17 @@ export class RazorpayConfigService {
     return this.pool;
   }
 
+  private async withEnvironmentLock<T>(
+    environment: RazorpayEnvironment,
+    task: () => Promise<T>
+  ): Promise<T> {
+    return withPaymentSessionAdvisoryLock(
+      this.getPool(),
+      `payments_razorpay_environment_${environment}`,
+      task
+    );
+  }
+
   listRazorpayEnvironments(): RazorpayEnvironment[] {
     return [...RAZORPAY_ENVIRONMENTS];
   }
@@ -97,61 +114,54 @@ export class RazorpayConfigService {
     environment: RazorpayEnvironment,
     keyId: string,
     keySecret: string,
-    webhookSecret?: string
+    webhookSecret?: string,
+    syncAfterKeyChange?: SyncRazorpayAfterKeyChange
   ): Promise<void> {
-    const trimmedKeyId = keyId.trim();
-    const trimmedKeySecret = keySecret.trim();
-    const trimmedWebhookSecret = webhookSecret?.trim();
+    return this.withEnvironmentLock(environment, async () => {
+      const trimmedKeyId = keyId.trim();
+      const trimmedKeySecret = keySecret.trim();
+      const trimmedWebhookSecret = webhookSecret?.trim();
 
-    validateRazorpayKey(environment, trimmedKeyId);
-    if (!trimmedKeySecret) {
-      throw new AppError(
-        'Razorpay key secret is required',
-        400,
-        ERROR_CODES.PAYMENT_CONFIG_INVALID
-      );
-    }
+      validateRazorpayKey(environment, trimmedKeyId);
+      if (!trimmedKeySecret) {
+        throw new AppError(
+          'Razorpay key secret is required',
+          400,
+          ERROR_CODES.PAYMENT_CONFIG_INVALID
+        );
+      }
 
-    const provider = new RazorpayProvider(trimmedKeyId, trimmedKeySecret, environment);
-    const account = await provider.retrieveAccount();
+      const keyIdKey = getRazorpayKeyIdName(environment);
+      const keySecretKey = getRazorpayKeySecretName(environment);
+      const webhookSecretKey = getRazorpayWebhookSecretName(environment);
+      const secretService = SecretService.getInstance();
 
-    const keyIdKey = getRazorpayKeyIdName(environment);
-    const keySecretKey = getRazorpayKeySecretName(environment);
-    const webhookSecretKey = getRazorpayWebhookSecretName(environment);
+      const [existingKeyId, existingKeySecret, currentRazorpayAccountId] = await Promise.all([
+        secretService.getSecretByKey(keyIdKey),
+        secretService.getSecretByKey(keySecretKey),
+        this.getCurrentRazorpayAccountId(environment),
+      ]);
 
-    const encryptedKeyId = EncryptionManager.encrypt(trimmedKeyId);
-    const encryptedKeySecret = EncryptionManager.encrypt(trimmedKeySecret);
+      const provider = new RazorpayProvider(trimmedKeyId, trimmedKeySecret, environment);
+      const account = await provider.retrieveAccount();
+      const keysChanged = existingKeyId !== trimmedKeyId || existingKeySecret !== trimmedKeySecret;
+      const shouldClearPaymentData =
+        currentRazorpayAccountId !== null && currentRazorpayAccountId !== account.id;
 
-    const client = await this.getPool().connect();
-    try {
-      await client.query('BEGIN');
+      const encryptedKeyId = EncryptionManager.encrypt(trimmedKeyId);
+      const encryptedKeySecret = EncryptionManager.encrypt(trimmedKeySecret);
 
-      // Save Key ID
-      await client.query(
-        `INSERT INTO system.secrets (key, value_ciphertext, is_active, is_reserved)
-         VALUES ($1, $2, true, true)
-         ON CONFLICT (key) DO UPDATE SET
-           value_ciphertext = EXCLUDED.value_ciphertext,
-           is_active        = true,
-           is_reserved      = true,
-           updated_at       = NOW()`,
-        [keyIdKey, encryptedKeyId]
-      );
+      const client = await this.getPool().connect();
+      try {
+        await client.query('BEGIN');
 
-      // Save Key Secret
-      await client.query(
-        `INSERT INTO system.secrets (key, value_ciphertext, is_active, is_reserved)
-         VALUES ($1, $2, true, true)
-         ON CONFLICT (key) DO UPDATE SET
-           value_ciphertext = EXCLUDED.value_ciphertext,
-           is_active        = true,
-           is_reserved      = true,
-           updated_at       = NOW()`,
-        [keySecretKey, encryptedKeySecret]
-      );
+        if (shouldClearPaymentData) {
+          await this.clearPaymentData(client, environment);
+          logger.info('Cleared synced Razorpay payment data after account key change', {
+            environment,
+          });
+        }
 
-      if (trimmedWebhookSecret) {
-        const encryptedWebhookSecret = EncryptionManager.encrypt(trimmedWebhookSecret);
         await client.query(
           `INSERT INTO system.secrets (key, value_ciphertext, is_active, is_reserved)
            VALUES ($1, $2, true, true)
@@ -160,40 +170,113 @@ export class RazorpayConfigService {
              is_active        = true,
              is_reserved      = true,
              updated_at       = NOW()`,
-          [webhookSecretKey, encryptedWebhookSecret]
+          [keyIdKey, encryptedKeyId]
         );
+
+        await client.query(
+          `INSERT INTO system.secrets (key, value_ciphertext, is_active, is_reserved)
+           VALUES ($1, $2, true, true)
+           ON CONFLICT (key) DO UPDATE SET
+             value_ciphertext = EXCLUDED.value_ciphertext,
+             is_active        = true,
+             is_reserved      = true,
+             updated_at       = NOW()`,
+          [keySecretKey, encryptedKeySecret]
+        );
+
+        if (trimmedWebhookSecret) {
+          const encryptedWebhookSecret = EncryptionManager.encrypt(trimmedWebhookSecret);
+          await client.query(
+            `INSERT INTO system.secrets (key, value_ciphertext, is_active, is_reserved)
+             VALUES ($1, $2, true, true)
+             ON CONFLICT (key) DO UPDATE SET
+               value_ciphertext = EXCLUDED.value_ciphertext,
+               is_active        = true,
+               is_reserved      = true,
+               updated_at       = NOW()`,
+            [webhookSecretKey, encryptedWebhookSecret]
+          );
+        }
+
+        await client.query(
+          `INSERT INTO payments.provider_connections (
+             provider,
+             environment,
+             status,
+             provider_account_id,
+             account_name,
+             account_livemode,
+             webhook_endpoint_id,
+             webhook_endpoint_url,
+             webhook_configured_at,
+             last_synced_at,
+             last_sync_status,
+             last_sync_error,
+             last_sync_counts
+           )
+           VALUES ('razorpay', $1, 'connected', $2, $3, $4, NULL, NULL, NULL, NULL, NULL, NULL, '{}'::JSONB)
+           ON CONFLICT (provider, environment) DO UPDATE SET
+             status = 'connected',
+             provider_account_id = EXCLUDED.provider_account_id,
+             account_name = EXCLUDED.account_name,
+             account_livemode = EXCLUDED.account_livemode,
+             webhook_endpoint_id = CASE
+               WHEN $5 THEN NULL
+               ELSE payments.provider_connections.webhook_endpoint_id
+             END,
+             webhook_endpoint_url = CASE
+               WHEN $5 THEN NULL
+               ELSE payments.provider_connections.webhook_endpoint_url
+             END,
+             webhook_configured_at = CASE
+               WHEN $5 THEN NULL
+               ELSE payments.provider_connections.webhook_configured_at
+             END,
+             last_synced_at = CASE
+               WHEN $5 THEN NULL
+               ELSE payments.provider_connections.last_synced_at
+             END,
+             last_sync_status = CASE
+               WHEN $5 THEN NULL
+               ELSE payments.provider_connections.last_sync_status
+             END,
+             last_sync_error = CASE
+               WHEN $5 THEN NULL
+               ELSE payments.provider_connections.last_sync_error
+             END,
+             last_sync_counts = CASE
+               WHEN $5 THEN '{}'::JSONB
+               ELSE payments.provider_connections.last_sync_counts
+             END,
+             updated_at = NOW()`,
+          [environment, account.id, account.merchantName, account.livemode, shouldClearPaymentData]
+        );
+
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
       }
 
-      await client.query(
-        `INSERT INTO payments.provider_connections (
-           provider,
-           environment,
-           status,
-           provider_account_id,
-           account_name,
-           account_livemode,
-           last_sync_status,
-           last_sync_error
-         )
-         VALUES ('razorpay', $1, 'connected', $2, $3, $4, NULL, NULL)
-         ON CONFLICT (provider, environment) DO UPDATE SET
-           status = 'connected',
-           provider_account_id = EXCLUDED.provider_account_id,
-           account_name = EXCLUDED.account_name,
-           account_livemode = EXCLUDED.account_livemode,
-           last_sync_status = NULL,
-           last_sync_error = NULL,
-           updated_at = NOW()`,
-        [environment, account.id, account.merchantName, account.livemode]
-      );
+      if (syncAfterKeyChange && (keysChanged || !currentRazorpayAccountId)) {
+        await syncAfterKeyChange(environment, provider);
+      }
+    });
+  }
 
-      await client.query('COMMIT');
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
+  async getCurrentRazorpayAccountId(environment: RazorpayEnvironment): Promise<string | null> {
+    const result = await this.getPool().query(
+      `SELECT provider_account_id AS "accountId"
+       FROM payments.provider_connections
+       WHERE provider = 'razorpay'
+         AND environment = $1`,
+      [environment]
+    );
+
+    const row = result.rows[0] as { accountId: string | null } | undefined;
+    return row?.accountId ?? null;
   }
 
   async setRazorpayWebhookSecret(
@@ -425,6 +508,36 @@ export class RazorpayConfigService {
          updated_at            = NOW()`,
       [environment, accountId, merchantName, livemode, syncedAt, syncCounts, errorMessage]
     );
+  }
+
+  private async clearPaymentData(
+    client: PoolClient,
+    environment: RazorpayEnvironment
+  ): Promise<void> {
+    await client.query('DELETE FROM payments.razorpay_subscriptions WHERE environment = $1', [
+      environment,
+    ]);
+    await client.query(
+      'DELETE FROM payments.transactions WHERE provider = $1 AND environment = $2',
+      ['razorpay', environment]
+    );
+    await client.query('DELETE FROM payments.razorpay_orders WHERE environment = $1', [
+      environment,
+    ]);
+    await client.query('DELETE FROM payments.customers WHERE environment = $1 AND provider = $2', [
+      environment,
+      'razorpay',
+    ]);
+    await client.query(
+      'DELETE FROM payments.customer_mappings WHERE environment = $1 AND provider = $2',
+      [environment, 'razorpay']
+    );
+    await client.query(
+      'DELETE FROM payments.webhook_events WHERE environment = $1 AND provider = $2',
+      [environment, 'razorpay']
+    );
+    await client.query('DELETE FROM payments.razorpay_plans WHERE environment = $1', [environment]);
+    await client.query('DELETE FROM payments.razorpay_items WHERE environment = $1', [environment]);
   }
 
   async configureWebhook(

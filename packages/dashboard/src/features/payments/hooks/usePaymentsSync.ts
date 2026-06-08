@@ -1,9 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type {
   StripeEnvironment,
-  SyncPaymentsEnvironmentResult,
-  SyncPaymentsRequest,
-  SyncPaymentsResponse,
+  SyncStripePaymentsEnvironmentResult,
+  SyncStripePaymentsRequest,
+  SyncStripePaymentsResponse,
 } from '@insforge/shared-schemas';
 import { paymentsService } from '#features/payments/services/payments.service';
 import { useToast } from '#lib/hooks/useToast';
@@ -22,11 +22,11 @@ function formatEnvironments(environments: StripeEnvironment[]) {
   return environments.map((environment) => ENVIRONMENT_LABEL[environment]).join(', ');
 }
 
-function isFailedSyncResult(result: SyncPaymentsEnvironmentResult) {
+function isFailedSyncResult(result: SyncStripePaymentsEnvironmentResult) {
   return result.connection.status === 'error' || result.connection.lastSyncStatus === 'failed';
 }
 
-function getPaymentsSyncToast(result: SyncPaymentsResponse): PaymentsSyncToast {
+function getPaymentsSyncToast(result: SyncStripePaymentsResponse): PaymentsSyncToast {
   const attemptedResults = result.results.filter(
     (item) => item.connection.status !== 'unconfigured'
   );
@@ -58,7 +58,7 @@ export function usePaymentsSync() {
   const { showToast } = useToast();
 
   const syncPayments = useMutation({
-    mutationFn: (input: SyncPaymentsRequest) => paymentsService.syncPayments(input),
+    mutationFn: (input: SyncStripePaymentsRequest) => paymentsService.syncPayments(input),
     onSuccess: async (result) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['payments', 'status'] }),

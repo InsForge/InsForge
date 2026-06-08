@@ -31,8 +31,8 @@ import {
 } from '@/types/payments.js';
 import {
   ERROR_CODES,
-  type GetPaymentsConfigResponse,
-  type GetPaymentsStatusResponse,
+  type GetStripeConfigResponse,
+  type GetStripeStatusResponse,
   type StripeConnection,
 } from '@insforge/shared-schemas';
 
@@ -79,7 +79,7 @@ export class StripeConfigService {
     return [...STRIPE_ENVIRONMENTS];
   }
 
-  async getConfig(): Promise<GetPaymentsConfigResponse> {
+  async getConfig(): Promise<GetStripeConfigResponse> {
     const environments = this.listStripeEnvironments();
     const keys = await Promise.all(
       environments.map((environment) => this.getStripeKeyConfig(environment))
@@ -187,7 +187,7 @@ export class StripeConfigService {
     }
   }
 
-  async getStatus(): Promise<GetPaymentsStatusResponse> {
+  async getStatus(): Promise<GetStripeStatusResponse> {
     const environments = this.listStripeEnvironments();
     const result = await this.getPool().query(
       `SELECT
@@ -615,9 +615,10 @@ export class StripeConfigService {
     await client.query('DELETE FROM payments.stripe_subscriptions WHERE environment = $1', [
       environment,
     ]);
-    await client.query('DELETE FROM payments.stripe_payment_activity WHERE environment = $1', [
-      environment,
-    ]);
+    await client.query(
+      'DELETE FROM payments.transactions WHERE provider = $1 AND environment = $2',
+      ['stripe', environment]
+    );
     await client.query('DELETE FROM payments.stripe_checkout_sessions WHERE environment = $1', [
       environment,
     ]);

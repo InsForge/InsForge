@@ -16,6 +16,8 @@ The Payments SDK exposes runtime methods for generated app frontends:
 
 Stripe secret keys, catalog management, webhook setup, and payment monitoring in the InsForge dashboard are admin operations. Configure them from the Dashboard or CLI before using the SDK.
 
+Razorpay native Orders and Subscriptions are available through the Payments REST API. The TypeScript SDK runtime helpers on this page currently cover Stripe Checkout and Billing Portal flows.
+
 ```bash
 npx @insforge/cli payments status
 npx @insforge/cli payments catalog --environment test
@@ -37,7 +39,7 @@ Create a Stripe Checkout Session through the InsForge backend.
 |-----------|------|----------|-------------|
 | `environment` | `'test' \| 'live'` | Yes | Stripe environment to target |
 | `mode` | `'payment' \| 'subscription'` | Yes | Checkout mode |
-| `lineItems` | `{ stripePriceId: string; quantity?: number }[]` | Yes | Stripe price IDs and quantities. Quantity defaults to `1` |
+| `lineItems` | `{ priceId: string; quantity?: number }[]` | Yes | Stripe price IDs and quantities. Quantity defaults to `1` |
 | `successUrl` | `string` | Yes | URL Stripe redirects to after Checkout completes |
 | `cancelUrl` | `string` | Yes | URL Stripe redirects to if the customer cancels |
 | `subject` | `{ type: string; id: string }` | Required for subscriptions | App-defined billing owner |
@@ -63,10 +65,10 @@ Create a Stripe Checkout Session through the InsForge backend.
       subjectType: string | null
       subjectId: string | null
       customerEmail: string | null
-      stripeCheckoutSessionId: string | null
-      stripeCustomerId: string | null
-      stripePaymentIntentId: string | null
-      stripeSubscriptionId: string | null
+      checkoutSessionId: string | null
+      customerId: string | null
+      paymentIntentId: string | null
+      subscriptionId: string | null
       url: string | null
       lastError: string | null
       createdAt: string
@@ -83,7 +85,7 @@ Create a Stripe Checkout Session through the InsForge backend.
 const { data, error } = await insforge.payments.createCheckoutSession({
   environment: 'test',
   mode: 'payment',
-  lineItems: [{ stripePriceId: 'price_123', quantity: 1 }],
+  lineItems: [{ priceId: 'price_123', quantity: 1 }],
   successUrl: `${window.location.origin}/checkout/success`,
   cancelUrl: `${window.location.origin}/pricing`,
   customerEmail: user?.email ?? null,
@@ -112,7 +114,7 @@ const { data, error } = await insforge.payments.createCheckoutSession({
   environment: 'test',
   mode: 'subscription',
   subject: { type: 'team', id: teamId },
-  lineItems: [{ stripePriceId: 'price_monthly_123', quantity: 1 }],
+  lineItems: [{ priceId: 'price_monthly_123', quantity: 1 }],
   successUrl: `${window.location.origin}/billing/success`,
   cancelUrl: `${window.location.origin}/billing`,
   customerEmail: user.email,
@@ -155,7 +157,7 @@ Create a Stripe Billing Portal Session for a mapped billing subject.
       status: 'initialized' | 'created' | 'failed'
       subjectType: string
       subjectId: string
-      stripeCustomerId: string | null
+      customerId: string | null
       returnUrl: string | null
       configuration: string | null
       url: string | null
@@ -199,10 +201,12 @@ The SDK methods call runtime routes using the current InsForge token. The backen
 
 - `payments.stripe_checkout_sessions` for Checkout attempts
 - `payments.stripe_customer_portal_sessions` for Billing Portal attempts
+- `payments.razorpay_orders` for Razorpay one-time Order attempts
+- `payments.razorpay_subscriptions` for Razorpay Subscription creation authorization
 
 In practice, one-time checkout can support guest or signed-in flows when the client has an InsForge user token. Customer portal creation requires an authenticated user because it operates on an existing billing subject mapping.
 
-The backend does not infer membership from arbitrary `subject` values. If users can pass shared subjects such as teams or organizations, add an authorization boundary before exposing subscription checkout or customer portal UI. For example, enable RLS on `payments.stripe_checkout_sessions` and `payments.stripe_customer_portal_sessions` with policies that check team membership, or call Payments through your own server endpoint that checks membership first.
+The backend does not infer membership from arbitrary `subject` values. If users can pass shared subjects such as teams or organizations, add an authorization boundary before exposing checkout, subscription, or customer portal UI. For example, enable RLS on the payments runtime tables above with policies that check team membership, or call Payments through your own server endpoint that checks membership first.
 
 <Warning>
   Do not let users submit arbitrary `subject.type` and `subject.id` values unless your app checks that they can manage that billing subject.
@@ -210,18 +214,18 @@ The backend does not infer membership from arbitrary `subject` values. If users 
 
 ## Reading Payment State
 
-The Payments SDK does not expose generic end-user reads for `payments.customers`, provider subscription tables, or provider payment activity tables such as `payments.stripe_payment_activity` and `payments.razorpay_payment_activity`. Those tables are operational records used for dashboard visibility and fulfillment workflows.
+The Payments SDK does not expose generic end-user reads for `payments.customers`, provider subscription tables, or `payments.transactions`. Those tables are operational records used for dashboard visibility and reporting.
 
 Refunds, disputes, and other sensitive financial operations should still be handled in the Stripe Dashboard.
 
-For user-facing billing state, create app-owned tables with RLS and populate them from payment projection triggers:
+For user-facing billing state, create app-owned tables with RLS and populate them from provider webhook event triggers:
 
 - `public.orders`
 - `public.credit_ledger`
 - `public.user_entitlements`
 - `public.team_billing_status`
 
-Populate those tables from webhook-projected payment state. See [Payments overview](/core-concepts/payments/overview) for the fulfillment model.
+Populate those tables from verified provider webhook events. See [Payments overview](/core-concepts/payments/overview) for the fulfillment model.
 
 <Warning>
   Do not mark an order paid, grant credits, or activate a subscription from the success URL alone. Stripe recommends webhooks for reliable fulfillment because customers might complete payment without returning to your app.
@@ -243,7 +247,7 @@ if (orderError) throw orderError;
 const { data, error } = await insforge.payments.createCheckoutSession({
   environment: 'test',
   mode: 'payment',
-  lineItems: [{ stripePriceId: 'price_123', quantity: 1 }],
+  lineItems: [{ priceId: 'price_123', quantity: 1 }],
   successUrl: `${window.location.origin}/orders/${order.id}`,
   cancelUrl: `${window.location.origin}/pricing`,
   customerEmail: user.email,
@@ -257,7 +261,9 @@ if (data?.checkoutSession.url) {
 }
 ```
 
-Then add a database trigger that listens to the relevant provider activity table, such as `payments.stripe_payment_activity`, and updates `public.orders` when the matching row becomes `type = 'one_time_payment'` and `status = 'succeeded'`. If the app accepts multiple payment providers, reuse one trigger function and attach it to each provider activity table. The success page can read the order and show `pending`, `paid`, or `fulfilled`.
+Then add a database trigger that listens to verified provider webhook events in `payments.webhook_events` and updates `public.orders` when the matching payment event is processed. If the app accepts multiple payment providers, reuse one idempotent trigger function and branch on `provider` and `event_type`. The success page can read the order and show `pending`, `paid`, or `fulfilled`.
+
+Legacy `payments.payment_history` rows are migrated into `payments.transactions` for dashboard/reporting, but payment-history triggers are not automatically migrated. Recreate fulfillment triggers on `payments.webhook_events`.
 
 ## Live/Test Environment
 
@@ -279,10 +285,10 @@ Use `environment: 'test'` while developing. Only switch to `live` after the deve
   </Card>
 
   <Card title="Fulfill from Webhooks" icon="webhook">
-    Success and return URLs are UX only. Grant access from payment projections.
+    Success and return URLs are UX only. Grant access from verified provider events.
   </Card>
 
   <Card title="Protect Billing Subjects" icon="shield-check">
-    Add RLS or server-side membership checks before exposing subscription or portal flows.
+    Add RLS or server-side membership checks before exposing checkout, subscription, or portal flows.
   </Card>
 </CardGroup>

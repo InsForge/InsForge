@@ -2,7 +2,7 @@ import type { Pool, PoolClient } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { getBillingSubjectFromMetadata } from '@/services/payments/helpers.js';
 import { RazorpayConfigService } from '@/services/payments/razorpay/config.service.js';
-import { RazorpayPaymentActivityService } from '@/services/payments/razorpay/payment-activity.service.js';
+import { RazorpayTransactionService } from '@/services/payments/razorpay/transaction.service.js';
 import { withPaymentSessionAdvisoryLock } from '@/services/payments/payments-advisory-lock.js';
 import type {
   RazorpayProvider,
@@ -68,7 +68,7 @@ export class RazorpaySyncService {
   private static instance: RazorpaySyncService;
   private pool: Pool | null = null;
   private readonly configService = RazorpayConfigService.getInstance();
-  private readonly paymentActivityService = RazorpayPaymentActivityService.getInstance();
+  private readonly transactionService = RazorpayTransactionService.getInstance();
 
   static getInstance(): RazorpaySyncService {
     if (!RazorpaySyncService.instance) {
@@ -101,6 +101,13 @@ export class RazorpaySyncService {
     return { results };
   }
 
+  async syncEnvironmentAfterKeyChange(
+    environment: RazorpayEnvironment,
+    provider: RazorpayProvider
+  ): Promise<SyncRazorpayPaymentsEnvironmentResult> {
+    return this.performSyncEnvironment(environment, provider);
+  }
+
   private syncEnvironment(
     environment: RazorpayEnvironment
   ): Promise<SyncRazorpayPaymentsEnvironmentResult> {
@@ -112,26 +119,29 @@ export class RazorpaySyncService {
   }
 
   private async performSyncEnvironment(
-    environment: RazorpayEnvironment
+    environment: RazorpayEnvironment,
+    providerOverride?: RazorpayProvider
   ): Promise<SyncRazorpayPaymentsEnvironmentResult> {
-    let provider: RazorpayProvider;
-    try {
-      provider = await this.configService.createRazorpayProvider(environment);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      logger.warn('Razorpay sync skipped: keys not configured', { environment, error: message });
-      const connection = await this.configService.recordConnectionStatus(
-        environment,
-        'unconfigured',
-        message
-      );
-      return this.buildSyncResult(
-        environment,
-        'failed',
-        connection,
-        EMPTY_RAZORPAY_SYNC_COUNTS,
-        message
-      );
+    let provider = providerOverride;
+    if (!provider) {
+      try {
+        provider = await this.configService.createRazorpayProvider(environment);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        logger.warn('Razorpay sync skipped: keys not configured', { environment, error: message });
+        const connection = await this.configService.recordConnectionStatus(
+          environment,
+          'unconfigured',
+          message
+        );
+        return this.buildSyncResult(
+          environment,
+          'failed',
+          connection,
+          EMPTY_RAZORPAY_SYNC_COUNTS,
+          message
+        );
+      }
     }
 
     try {
@@ -181,11 +191,11 @@ export class RazorpaySyncService {
       let payments: RazorpayPayment[] = [];
       try {
         payments = await provider.listPayments();
-        await this.paymentActivityService.upsertPayments(environment, payments);
+        await this.transactionService.upsertPayments(environment, payments);
       } catch (err) {
         const error = getErrorMessage(err);
         stageFailures.push({ stage: 'payments', error });
-        logger.warn('Razorpay payment activity sync failed', {
+        logger.warn('Razorpay transaction sync failed', {
           environment,
           error,
         });
@@ -591,6 +601,10 @@ export class RazorpaySyncService {
             sub.created_at ? new Date(sub.created_at * 1000) : null,
           ]
         );
+
+        if (subject && sub.customer_id) {
+          await this.upsertCustomerMapping(client, environment, subject, sub.customer_id);
+        }
       }
 
       const syncedIds = subscriptions.map((s) => s.id);
@@ -648,5 +662,27 @@ export class RazorpaySyncService {
     }
 
     return { type: row.subjectType, id: row.subjectId };
+  }
+
+  private async upsertCustomerMapping(
+    client: PoolClient,
+    environment: RazorpayEnvironment,
+    subject: BillingSubject,
+    customerId: string
+  ): Promise<void> {
+    await client.query(
+      `INSERT INTO payments.customer_mappings (
+         provider,
+         environment,
+         subject_type,
+         subject_id,
+         provider_customer_id
+       )
+       VALUES ('razorpay', $1, $2, $3, $4)
+       ON CONFLICT (provider, environment, subject_type, subject_id) DO UPDATE SET
+         provider_customer_id = EXCLUDED.provider_customer_id,
+         updated_at = NOW()`,
+      [environment, subject.type, subject.id, customerId]
+    );
   }
 }

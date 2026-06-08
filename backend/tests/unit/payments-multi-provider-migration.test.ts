@@ -43,6 +43,14 @@ describe('payments multi-provider migration', () => {
         path.resolve(currentDir, '../../src/infra/database/migrations/054_add-provider-column.sql')
       )
     ).toBe(false);
+    expect(
+      fs.existsSync(
+        path.resolve(
+          currentDir,
+          '../../src/infra/database/migrations/050_add-razorpay-native-checkout-orders.sql'
+        )
+      )
+    ).toBe(false);
   });
 
   it('creates shared provider-scoped connection and customer mapping tables', () => {
@@ -52,6 +60,7 @@ describe('payments multi-provider migration', () => {
     expect(sql).toMatch(/UNIQUE \(provider, environment, subject_type, subject_id\)/i);
     expect(sql).toMatch(/provider_customer_id TEXT NOT NULL/i);
     expect(sql).toMatch(/UNIQUE \(provider, environment, provider_customer_id\)/i);
+    expect(sql).toMatch(/GRANT SELECT ON payments\.customer_mappings TO project_admin/i);
     expect(sql).not.toMatch(/stripe_customer_id TEXT,/i);
     expect(sql).not.toMatch(/razorpay_customer_id TEXT/i);
     expect(sql).not.toMatch(/idx_payments_customer_mappings_stripe_customer/i);
@@ -70,8 +79,12 @@ describe('payments multi-provider migration', () => {
 
     expect(sql).toMatch(/provider_event_id TEXT/i);
     expect(sql).toMatch(/provider_created_at TIMESTAMPTZ/i);
-    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS payments\.stripe_payment_activity/i);
-    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS payments\.razorpay_payment_activity/i);
+    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS payments\.transactions/i);
+    expect(sql).toMatch(/provider_object_type TEXT/i);
+    expect(sql).toMatch(/provider_object_id TEXT/i);
+    expect(sql).toMatch(/related_object_ids JSONB NOT NULL DEFAULT '\{\}'::JSONB/i);
+    expect(sql).not.toMatch(/CREATE TABLE IF NOT EXISTS payments\.stripe_payment_activity/i);
+    expect(sql).not.toMatch(/CREATE TABLE IF NOT EXISTS payments\.razorpay_payment_activity/i);
     expect(sql).not.toMatch(/ALTER TABLE payments\.products\s+ADD COLUMN IF NOT EXISTS provider/i);
     expect(sql).not.toMatch(/ALTER TABLE payments\.prices\s+ADD COLUMN IF NOT EXISTS provider/i);
     expect(sql).not.toMatch(
@@ -82,15 +95,18 @@ describe('payments multi-provider migration', () => {
     );
   });
 
-  it('renames published payment history to the Stripe payment activity source table', () => {
-    expect(sql).toMatch(/to_regclass\('payments\.stripe_payment_activity'\) IS NULL/i);
+  it('migrates published payment history into the shared transaction projection', () => {
     expect(sql).toMatch(/to_regclass\('payments\.payment_history'\) IS NOT NULL/i);
-    expect(sql).toMatch(/ALTER TABLE payments\.payment_history RENAME TO stripe_payment_activity/i);
-    expect(sql).toMatch(/DROP TRIGGER IF EXISTS trg_payments_payment_history_updated_at/i);
-    expect(sql).toMatch(/CREATE TRIGGER trg_payments_stripe_payment_activity_updated_at/i);
-    expect(sql).toMatch(
-      /DROP INDEX IF EXISTS payments\.idx_payments_payment_history_environment_payment_intent/i
-    );
+    expect(sql).toMatch(/INSERT INTO payments\.transactions/i);
+    expect(sql).toMatch(/'stripe',\s+environment/i);
+    expect(sql).toMatch(/stripe_payment_intent_id/i);
+    expect(sql).toMatch(/jsonb_strip_nulls\(jsonb_build_object/i);
+    expect(sql).toMatch(/DROP TABLE IF EXISTS payments\.payment_history/i);
+    expect(sql).toMatch(/DROP TABLE IF EXISTS payments\.stripe_payment_activity/i);
+    expect(sql).toMatch(/DROP TABLE IF EXISTS payments\.razorpay_payment_activity/i);
+    expect(sql).not.toMatch(/CREATE TRIGGER[\s\S]*ON payments\.payment_history/i);
+    expect(sql).not.toMatch(/ALTER TABLE payments\.payment_history RENAME TO/i);
+    expect(sql).not.toMatch(/idx_payments_payment_activity_environment/i);
   });
 
   it('renames Stripe-native runtime, catalog, and subscription tables', () => {
@@ -157,6 +173,9 @@ describe('payments multi-provider migration', () => {
     expect(sql).toMatch(
       /CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_razorpay_subscriptions_environment_subscription/i
     );
+    expect(sql).toMatch(
+      /GRANT SELECT ON payments\.razorpay_items, payments\.razorpay_plans TO project_admin/i
+    );
     expect(sql).not.toMatch(/idx_payments_products_provider_product_id/i);
     expect(sql).not.toMatch(/idx_payments_prices_provider_price_id/i);
     expect(sql).not.toMatch(/idx_payments_subscription_items_provider_item_id/i);
@@ -165,20 +184,20 @@ describe('payments multi-provider migration', () => {
 
   it('replaces shared environment-only uniqueness with provider-native indexes', () => {
     expect(sql).toMatch(
-      /CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_stripe_payment_activity_environment_payment_intent[\s\S]*payment_intent_id IS NOT NULL[\s\S]*type <> 'refund'/i
+      /CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_transactions_provider_object[\s\S]*provider_object_type IS NOT NULL[\s\S]*provider_object_id IS NOT NULL/i
     );
     expect(sql).toMatch(
-      /CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_razorpay_payment_activity_environment_payment[\s\S]*payment_id IS NOT NULL[\s\S]*type <> 'refund'/i
+      /CREATE INDEX IF NOT EXISTS idx_payments_transactions_provider_subject[\s\S]*provider, environment, subject_type, subject_id/i
     );
     expect(sql).toMatch(
-      /CREATE INDEX IF NOT EXISTS idx_payments_stripe_payment_activity_environment_subject[\s\S]*environment, subject_type, subject_id/i
-    );
-    expect(sql).toMatch(
-      /CREATE INDEX IF NOT EXISTS idx_payments_razorpay_payment_activity_environment_order[\s\S]*order_id/i
+      /CREATE INDEX IF NOT EXISTS idx_payments_transactions_related_object_ids[\s\S]*USING GIN \(related_object_ids\)/i
     );
     expect(sql).toMatch(
       /CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_webhook_events_provider_event/i
     );
+    expect(sql).toMatch(/GRANT TRIGGER ON payments\.webhook_events TO project_admin/i);
+    expect(sql).toMatch(/GRANT SELECT ON payments\.transactions TO project_admin/i);
+    expect(sql).not.toMatch(/GRANT SELECT, TRIGGER ON payments\.transactions TO project_admin/i);
     expect(sql).toMatch(
       /DROP INDEX IF EXISTS payments\.idx_payments_checkout_sessions_environment_idempotency/i
     );
@@ -189,7 +208,7 @@ describe('payments multi-provider migration', () => {
   it('removes Stripe-era alias columns from shared provider tables after copying data', () => {
     expect(sql).toMatch(/DROP COLUMN IF EXISTS stripe_customer_id/i);
     expect(sql).toMatch(/DROP COLUMN IF EXISTS stripe_event_id/i);
-    expect(sql).not.toMatch(/ALTER TABLE payments\.stripe_payment_activity[^;]*DROP COLUMN/i);
+    expect(sql).not.toMatch(/ALTER TABLE payments\.transactions[^;]*DROP COLUMN/i);
     expect(sql).not.toMatch(
       /ALTER TABLE payments\.stripe_products[^;]*DROP COLUMN IF EXISTS product_id/i
     );
@@ -229,5 +248,43 @@ describe('payments multi-provider migration', () => {
   it('casts PostgreSQL name columns before comparing unique constraint column arrays', () => {
     expect(sql).toMatch(/array_agg\(att\.attname::text ORDER BY keys\.ordinality\)/i);
     expect(sql).not.toMatch(/array_agg\(att\.attname ORDER BY keys\.ordinality\)/i);
+  });
+
+  it('adds provider-native Razorpay order checkout state in the 049 foundation', () => {
+    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS payments\.razorpay_orders/i);
+    expect(sql).toMatch(/status IN \('initialized', 'created', 'attempted', 'paid', 'failed'\)/i);
+    expect(sql).toMatch(/DROP TRIGGER IF EXISTS trg_payments_razorpay_orders_updated_at/i);
+    expect(sql).toMatch(/CREATE TRIGGER trg_payments_razorpay_orders_updated_at/i);
+    expect(sql).toMatch(
+      /GRANT INSERT, SELECT ON payments\.razorpay_orders TO anon, authenticated, project_admin/i
+    );
+    expect(sql).toMatch(
+      /GRANT INSERT, UPDATE, TRIGGER ON payments\.razorpay_orders TO project_admin/i
+    );
+    expect(sql).toMatch(
+      /CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_razorpay_orders_environment_order[\s\S]*WHERE order_id IS NOT NULL/i
+    );
+    expect(sql).not.toMatch(
+      /CREATE TABLE IF NOT EXISTS payments\.razorpay_orders[\s\S]*?idempotency_key TEXT[\s\S]*?\);/i
+    );
+    expect(sql).not.toMatch(/idx_payments_razorpay_orders_environment_idempotency/i);
+    expect(sql).not.toMatch(/GRANT INSERT, SELECT, UPDATE ON payments\.razorpay_orders TO anon/i);
+    expect(sql).not.toMatch(/payment_link/i);
+  });
+
+  it('keeps Razorpay subscriptions as the native provider mirror', () => {
+    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS payments\.razorpay_subscriptions/i);
+    expect(sql).toMatch(/authorization_payment_id TEXT/i);
+    expect(sql).toMatch(/authorization_verified_at TIMESTAMPTZ/i);
+    expect(sql).toMatch(/idx_payments_razorpay_subscriptions_environment_authorization_payment/i);
+    expect(sql).toMatch(
+      /GRANT INSERT, SELECT, UPDATE ON payments\.razorpay_subscriptions TO anon, authenticated, project_admin/i
+    );
+    expect(sql).toMatch(/GRANT TRIGGER ON payments\.razorpay_subscriptions TO project_admin/i);
+    expect(sql).not.toMatch(
+      /CREATE TABLE IF NOT EXISTS payments\.razorpay_subscription_checkouts/i
+    );
+    expect(sql).not.toMatch(/CREATE TABLE IF NOT EXISTS payments\.payment_links/i);
+    expect(sql).not.toMatch(/CREATE TABLE IF NOT EXISTS payments\.line_items/i);
   });
 });

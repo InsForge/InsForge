@@ -10,10 +10,10 @@ import logger from '@/utils/logger.js';
 import type { StripeEnvironment } from '@/types/payments.js';
 import type {
   StripeConnection,
-  SyncPaymentsEnvironmentResult,
-  SyncPaymentsRequest,
-  SyncPaymentsResponse,
-  SyncPaymentsSubscriptionsSummary,
+  SyncStripePaymentsEnvironmentResult,
+  SyncStripePaymentsRequest,
+  SyncStripePaymentsResponse,
+  SyncStripePaymentsSubscriptionsSummary,
 } from '@insforge/shared-schemas';
 
 export class StripeSyncService {
@@ -56,7 +56,7 @@ export class StripeSyncService {
     });
   }
 
-  async syncPayments(input: SyncPaymentsRequest): Promise<SyncPaymentsResponse> {
+  async syncPayments(input: SyncStripePaymentsRequest): Promise<SyncStripePaymentsResponse> {
     const environments =
       input.environment === 'all'
         ? this.configService.listStripeEnvironments()
@@ -73,7 +73,7 @@ export class StripeSyncService {
   async syncPaymentsEnvironmentAfterKeyChange(
     environment: StripeEnvironment,
     provider: StripeProvider
-  ): Promise<SyncPaymentsEnvironmentResult> {
+  ): Promise<SyncStripePaymentsEnvironmentResult> {
     return this.syncPaymentsEnvironment(environment, provider, false);
   }
 
@@ -81,7 +81,7 @@ export class StripeSyncService {
     environment: StripeEnvironment,
     providerOverride?: StripeProvider,
     checkAccountChange = true
-  ): Promise<SyncPaymentsEnvironmentResult> {
+  ): Promise<SyncStripePaymentsEnvironmentResult> {
     let provider = providerOverride;
 
     if (!provider) {
@@ -150,7 +150,7 @@ export class StripeSyncService {
   private async syncSubscriptionsWithProvider(
     environment: StripeEnvironment,
     provider: StripeProvider
-  ): Promise<SyncPaymentsSubscriptionsSummary> {
+  ): Promise<SyncStripePaymentsSubscriptionsSummary> {
     return this.subscriptionService.syncSubscriptionsWithProvider(environment, provider);
   }
 

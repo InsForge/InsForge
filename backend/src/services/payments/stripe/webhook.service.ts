@@ -4,7 +4,7 @@ import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { StripeConfigService } from '@/services/payments/stripe/config.service.js';
 import { StripeCheckoutService } from '@/services/payments/stripe/checkout.service.js';
 import { PaymentCustomerService } from '@/services/payments/payment-customer.service.js';
-import { StripePaymentActivityService } from '@/services/payments/stripe/payment-activity.service.js';
+import { StripeTransactionService } from '@/services/payments/stripe/transaction.service.js';
 import { StripeSubscriptionService } from '@/services/payments/stripe/subscription.service.js';
 import { getStripeWebhookSecretName } from '@/services/payments/stripe/constants.js';
 import {
@@ -40,7 +40,7 @@ export class StripeWebhookService {
   private readonly configService = StripeConfigService.getInstance();
   private readonly checkoutService = StripeCheckoutService.getInstance();
   private readonly customerService = PaymentCustomerService.getInstance();
-  private readonly stripeActivityService = StripePaymentActivityService.getInstance();
+  private readonly stripeTransactionService = StripeTransactionService.getInstance();
   private readonly subscriptionService = StripeSubscriptionService.getInstance();
 
   static getInstance(): StripeWebhookService {
@@ -378,14 +378,14 @@ export class StripeWebhookService {
       }
       case 'checkout.session.completed': {
         const checkoutSession = event.data.object as StripeCheckoutSession;
-        const [checkoutRow, mapped, activityHandled] = await Promise.all([
+        const [checkoutRow, mapped, transactionHandled] = await Promise.all([
           this.checkoutService.updateCheckoutSessionFromStripe(
             environment,
             checkoutSession,
             'completed'
           ),
           this.upsertStripeCustomerMappingFromCheckout(environment, checkoutSession),
-          this.stripeActivityService.processCheckoutSessionCompleted(
+          this.stripeTransactionService.processCheckoutSessionCompleted(
             environment,
             checkoutSession,
             undefined,
@@ -393,18 +393,18 @@ export class StripeWebhookService {
           ),
         ]);
 
-        return Boolean(checkoutRow) || mapped || activityHandled;
+        return Boolean(checkoutRow) || mapped || transactionHandled;
       }
       case 'checkout.session.async_payment_succeeded': {
         const checkoutSession = event.data.object as StripeCheckoutSession;
-        const [checkoutRow, mapped, activityHandled] = await Promise.all([
+        const [checkoutRow, mapped, transactionHandled] = await Promise.all([
           this.checkoutService.updateCheckoutSessionFromStripe(
             environment,
             checkoutSession,
             'completed'
           ),
           this.upsertStripeCustomerMappingFromCheckout(environment, checkoutSession),
-          this.stripeActivityService.processCheckoutSessionCompleted(
+          this.stripeTransactionService.processCheckoutSessionCompleted(
             environment,
             checkoutSession,
             'succeeded',
@@ -412,7 +412,7 @@ export class StripeWebhookService {
           ),
         ]);
 
-        return Boolean(checkoutRow) || mapped || activityHandled;
+        return Boolean(checkoutRow) || mapped || transactionHandled;
       }
       case 'checkout.session.async_payment_failed': {
         const checkoutSession = event.data.object as StripeCheckoutSession;
@@ -421,13 +421,14 @@ export class StripeWebhookService {
           checkoutSession,
           'completed'
         );
-        const activityHandled = await this.stripeActivityService.processCheckoutSessionCompleted(
-          environment,
-          checkoutSession,
-          'failed'
-        );
+        const transactionHandled =
+          await this.stripeTransactionService.processCheckoutSessionCompleted(
+            environment,
+            checkoutSession,
+            'failed'
+          );
 
-        return Boolean(checkoutRow) || activityHandled;
+        return Boolean(checkoutRow) || transactionHandled;
       }
       case 'checkout.session.expired':
         return Boolean(
@@ -439,33 +440,33 @@ export class StripeWebhookService {
         );
       case 'invoice.paid':
       case 'invoice.payment_succeeded':
-        await this.stripeActivityService.upsertInvoicePaymentActivity(
+        await this.stripeTransactionService.upsertInvoiceTransaction(
           environment,
           event.data.object as StripeInvoice,
           'succeeded'
         );
         return true;
       case 'invoice.payment_failed':
-        await this.stripeActivityService.upsertInvoicePaymentActivity(
+        await this.stripeTransactionService.upsertInvoiceTransaction(
           environment,
           event.data.object as StripeInvoice,
           'failed'
         );
         return true;
       case 'payment_intent.succeeded':
-        return this.stripeActivityService.processPaymentIntentActivity(
+        return this.stripeTransactionService.processPaymentIntentTransaction(
           environment,
           event.data.object as StripePaymentIntent,
           'succeeded'
         );
       case 'payment_intent.payment_failed':
-        return this.stripeActivityService.processPaymentIntentActivity(
+        return this.stripeTransactionService.processPaymentIntentTransaction(
           environment,
           event.data.object as StripePaymentIntent,
           'failed'
         );
       case 'charge.refunded':
-        await this.stripeActivityService.updatePaymentActivityFromRefundedCharge(
+        await this.stripeTransactionService.updateTransactionFromRefundedCharge(
           environment,
           event.data.object as StripeCharge
         );
@@ -473,7 +474,7 @@ export class StripeWebhookService {
       case 'refund.created':
       case 'refund.updated':
       case 'refund.failed':
-        await this.stripeActivityService.upsertRefundPaymentActivity(
+        await this.stripeTransactionService.upsertRefundTransaction(
           environment,
           event.data.object as StripeRefund,
           () => this.loadRefundStripeContext(provider, event.data.object as StripeRefund)

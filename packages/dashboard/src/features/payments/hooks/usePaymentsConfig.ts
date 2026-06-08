@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
-  GetPaymentsConfigResponse,
+  GetStripeConfigResponse,
   StripeEnvironment,
-  UpsertPaymentsConfigRequest,
+  UpsertStripeConfigRequest,
 } from '@insforge/shared-schemas';
 import { paymentsService } from '#features/payments/services/payments.service';
 import { useToast } from '#lib/hooks/useToast';
@@ -13,14 +13,14 @@ export function usePaymentsConfig() {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
-  const { data, isLoading, error } = useQuery<GetPaymentsConfigResponse>({
+  const { data, isLoading, error } = useQuery<GetStripeConfigResponse>({
     queryKey: PAYMENTS_CONFIG_QUERY_KEY,
     queryFn: () => paymentsService.getConfig(),
     staleTime: 30 * 1000,
   });
 
   const saveKey = useMutation({
-    mutationFn: (input: UpsertPaymentsConfigRequest) => paymentsService.upsertConfig(input),
+    mutationFn: (input: UpsertStripeConfigRequest) => paymentsService.upsertConfig(input),
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: PAYMENTS_CONFIG_QUERY_KEY }),

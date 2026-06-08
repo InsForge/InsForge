@@ -4,9 +4,9 @@ import type { RazorpayConnection, StripeEnvironment } from '@insforge/shared-sch
 import { paymentsService } from '#features/payments/services/payments.service';
 import { razorpayService } from '#features/payments/services/razorpay.service';
 
-const PAYMENT_HISTORY_LIMIT = 100;
+const TRANSACTIONS_LIMIT = 100;
 
-export function usePaymentActivity(environment: StripeEnvironment) {
+export function usePaymentTransactions(environment: StripeEnvironment) {
   const {
     data: statusData,
     isLoading: isLoadingStatus,
@@ -52,34 +52,34 @@ export function usePaymentActivity(environment: StripeEnvironment) {
   const hasActiveKey = hasStripeKey || hasRazorpayKey;
 
   const {
-    data: paymentActivityData,
-    isLoading: isLoadingPaymentActivity,
-    error: paymentActivityError,
-    refetch: refetchPaymentActivity,
-    isFetching: isFetchingPaymentActivity,
+    data: stripeTransactionsData,
+    isLoading: isLoadingStripeTransactions,
+    error: stripeTransactionsError,
+    refetch: refetchStripeTransactions,
+    isFetching: isFetchingStripeTransactions,
   } = useQuery({
-    queryKey: ['payments', 'stripe', 'payment-activity', environment],
+    queryKey: ['payments', 'stripe', 'transactions', environment],
     queryFn: () =>
-      paymentsService.listPaymentActivity({
+      paymentsService.listTransactions({
         environment,
-        limit: PAYMENT_HISTORY_LIMIT,
+        limit: TRANSACTIONS_LIMIT,
       }),
     enabled: hasStripeKey,
     staleTime: 30 * 1000,
   });
 
   const {
-    data: razorpayPaymentActivityData,
-    isLoading: isLoadingRazorpayPaymentActivity,
-    error: razorpayPaymentActivityError,
-    refetch: refetchRazorpayPaymentActivity,
-    isFetching: isFetchingRazorpayPaymentActivity,
+    data: razorpayTransactionsData,
+    isLoading: isLoadingRazorpayTransactions,
+    error: razorpayTransactionsError,
+    refetch: refetchRazorpayTransactions,
+    isFetching: isFetchingRazorpayTransactions,
   } = useQuery({
-    queryKey: ['payments', 'razorpay', 'payment-activity', environment],
+    queryKey: ['payments', 'razorpay', 'transactions', environment],
     queryFn: () =>
-      razorpayService.listPaymentActivity({
+      razorpayService.listTransactions({
         environment,
-        limit: PAYMENT_HISTORY_LIMIT,
+        limit: TRANSACTIONS_LIMIT,
       }),
     enabled: hasRazorpayKey,
     staleTime: 30 * 1000,
@@ -91,30 +91,30 @@ export function usePaymentActivity(environment: StripeEnvironment) {
     activeConnection,
     activeRazorpayConnection,
     hasActiveKey,
-    paymentActivity: hasActiveKey
+    transactions: hasActiveKey
       ? [
-          ...(paymentActivityData?.paymentActivity ?? []),
-          ...(razorpayPaymentActivityData?.paymentActivity ?? []),
+          ...(stripeTransactionsData?.transactions ?? []),
+          ...(razorpayTransactionsData?.transactions ?? []),
         ]
       : [],
     isLoading:
       isLoadingStatus ||
       isLoadingRazorpayStatus ||
-      (hasStripeKey && isLoadingPaymentActivity) ||
-      (hasRazorpayKey && isLoadingRazorpayPaymentActivity),
+      (hasStripeKey && isLoadingStripeTransactions) ||
+      (hasRazorpayKey && isLoadingRazorpayTransactions),
     isRefreshing:
       isFetchingStatus ||
       isFetchingRazorpayStatus ||
-      (hasStripeKey && isFetchingPaymentActivity) ||
-      (hasRazorpayKey && isFetchingRazorpayPaymentActivity),
+      (hasStripeKey && isFetchingStripeTransactions) ||
+      (hasRazorpayKey && isFetchingRazorpayTransactions),
     error:
-      statusError ?? razorpayStatusError ?? paymentActivityError ?? razorpayPaymentActivityError,
+      statusError ?? razorpayStatusError ?? stripeTransactionsError ?? razorpayTransactionsError,
     refetch: () =>
       Promise.all([
         refetchStatus(),
         refetchRazorpayStatus(),
-        hasStripeKey ? refetchPaymentActivity() : null,
-        hasRazorpayKey ? refetchRazorpayPaymentActivity() : null,
+        hasStripeKey ? refetchStripeTransactions() : null,
+        hasRazorpayKey ? refetchRazorpayTransactions() : null,
       ]),
   };
 }
