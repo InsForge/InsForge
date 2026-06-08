@@ -14,6 +14,7 @@ import type {
   AuthMetadataSchema,
   OAuthProvidersSchema,
   GetPublicAuthConfigResponse,
+  ListUsersResponse,
 } from '@insforge/shared-schemas';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { CustomOAuthConfigService } from '@/services/auth/custom-oauth-config.service.js';
@@ -54,7 +55,7 @@ import { getApiBaseUrl } from '@/utils/environment.js';
  */
 export class AuthService {
   private static instance: AuthService;
-  private adminEmail: string;
+  private adminName: string;
   private adminPassword: string;
   private pool: Pool | null = null;
   private tokenManager: TokenManager;
@@ -70,11 +71,11 @@ export class AuthService {
   private appleOAuthProvider: AppleOAuthProvider;
 
   private constructor() {
-    this.adminEmail = process.env.ADMIN_EMAIL ?? '';
-    this.adminPassword = process.env.ADMIN_PASSWORD ?? '';
+    this.adminName = process.env.ROOT_ADMIN_USERNAME || process.env.ADMIN_EMAIL?.split('@')[0] || '';
+    this.adminPassword = process.env.ROOT_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD || '';
 
-    if (!this.adminEmail || !this.adminPassword) {
-      throw new Error('ADMIN_EMAIL and ADMIN_PASSWORD environment variables are required');
+    if (!this.adminName || !this.adminPassword) {
+      throw new Error('ROOT_ADMIN_USERNAME or ROOT_ADMIN_PASSWORD environment variables are required');
     }
 
     // Initialize token manager
@@ -651,36 +652,158 @@ export class AuthService {
     }
   }
 
+  //reset password using old password (only available for project admin)
+  async resetPasswordUsingOldPassword(newPassword: string, oldPassword: string, userId: string): Promise<ResetPasswordResponse> {
+    const dbManager = DatabaseManager.getInstance();
+    const pool = dbManager.getPool();
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Verify old password
+      const result = await client.query(
+        `SELECT password_hash FROM auth.project_admins WHERE id = $1`,
+        [userId]
+      );
+
+      if (result.rows.length === 0) {
+        throw new Error('User not found');
+      }
+
+      const hashedPassword = result.rows[0].password_hash;
+      if (!bcrypt.compareSync(oldPassword, hashedPassword)) {
+        throw new AppError('Invalid old password', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+      }
+
+      // Hash the new password
+      const newHashedPassword = await bcrypt.hash(newPassword, 10);
+
+      // Update password in the database
+      await client.query(
+        `UPDATE auth.project_admins
+         SET password_hash = $1, updated_at = NOW()
+         WHERE id = $2`,
+        [newHashedPassword, userId]
+      );
+
+      await client.query('COMMIT');
+
+      logger.info('Password reset successfully with old password', { userId });
+
+      return {
+        message: 'Password reset successfully. Please login with your new password.',
+      };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  //get all admins
+  async getAllAdmins(): Promise<ListUsersResponse> {
+    const dbManager = DatabaseManager.getInstance();
+    const pool = dbManager.getPool();
+    const result = await pool.query(`SELECT id, username, created_at, updated_at FROM auth.project_admins WHERE created_by IS NOT NULL`);
+    if (result.rows.length === 0) {
+      return [];
+    }
+    return result.rows;
+  }
+
+  //adding admin function
+  async addAdmin(name: string, password: string, createdBy: string): Promise<CreateAdminSessionResponse> {
+    const dbManager = DatabaseManager.getInstance();
+    const pool = dbManager.getPool();
+    const client = await pool.connect();
+
+    try {
+      const existted = await client.query(`select * from auth.project_admins where username=$1`, [name])
+      if (existted.rows.length > 0) {
+        throw new AppError('Admin already exists', 400, ERROR_CODES.INVALID_INPUT);
+      }
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const result = await client.query(`insert into auth.project_admins (username, password_hash, created_by) values ($1, $2, $3) RETURNING *`, [name, hashedPassword, createdBy])
+      const admin = result.rows[0];
+      logger.info('Admin added', { admin });
+      return {
+        user: {
+          id: admin.id,
+          name,
+          createdAt: admin.created_at,
+          updatedAt: admin.updated_at,
+        }
+      };
+    } catch (error) {
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  //admin deleting sub admin
+  async deleteSubAdmin(adminId: string): Promise<void> {
+    const dbManager = DatabaseManager.getInstance();
+    const pool = dbManager.getPool();
+    const client = await pool.connect();
+
+    try {
+      const result = await client.query(`delete from auth.project_admins where id=$1 AND created_by is not null`, [adminId])
+      if (result.rows.length === 0) {
+        throw new Error('Admin not found');
+      }
+      logger.info('Admin deleted', { adminId });
+    } catch (error) {
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   /**
    * Admin login (validates against env variables only)
    */
-  adminLogin(email: string, password: string): CreateAdminSessionResponse {
+  async adminLogin(name: string, password: string): Promise<CreateAdminSessionResponse> {
     // Simply validate against environment variables
-    if (email !== this.adminEmail || password !== this.adminPassword) {
-      throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+    const dbManager = DatabaseManager.getInstance();
+    const pool = dbManager.getPool();
+    const client = await pool.connect();
+
+    try {
+      const result = await client.query(`select * from auth.project_admins where username=$1`, [name])
+      if (result.rows.length === 0) {
+        throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+      }
+      const admin = result.rows[0];
+      logger.info('Admin found', { admin });
+      if (!bcrypt.compareSync(password, admin.password_hash)) {
+        throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+      }
+      const isRoot = admin.username === process.env.ROOT_ADMIN_USERNAME;
+      const accessToken = this.tokenManager.generateAccessToken({
+        sub: admin.id,
+        name,
+        role: 'project_admin',
+        isRoot
+      });
+      await client.query('update auth.project_admins set last_login_at=$1 where id=$2', [new Date(), admin.id])
+      return {
+        user: {
+          id: admin.id,
+          name,
+          createdAt: admin.created_at,
+          updatedAt: admin.updated_at,
+        },
+        accessToken,
+      };
+    } catch (error) {
+      throw error;
+    } finally {
+      client.release();
     }
 
-    // Use a fixed admin ID for the system administrator
-
-    // Return admin user with JWT token (24h expiration) - no database interaction
-    const accessToken = this.tokenManager.generateAccessToken({
-      sub: ADMIN_ID,
-      email,
-      role: 'project_admin',
-    });
-
-    return {
-      user: {
-        id: ADMIN_ID,
-        email: email,
-        emailVerified: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        profile: { name: 'Administrator' },
-        metadata: null,
-      },
-      accessToken,
-    };
   }
 
   /**

@@ -28,6 +28,7 @@ import {
   createUserRequestSchema,
   createSessionRequestSchema,
   createAdminSessionRequestSchema,
+  changePasswordUsingOldPasswordRequestSchema,
   refreshSessionRequestSchema,
   deleteUsersRequestSchema,
   listUsersRequestSchema,
@@ -669,7 +670,7 @@ router.post('/admin/sessions/exchange', async (req: Request, res: Response, next
 });
 
 // POST /api/auth/admin/sessions - Create admin session (web only)
-router.post('/admin/sessions', (req: Request, res: Response, next: NextFunction) => {
+router.post('/admin/sessions', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validationResult = createAdminSessionRequestSchema.safeParse(req.body);
     if (!validationResult.success) {
@@ -680,8 +681,8 @@ router.post('/admin/sessions', (req: Request, res: Response, next: NextFunction)
       );
     }
 
-    const { email, password } = validationResult.data;
-    const result: CreateAdminSessionResponse = authService.adminLogin(email, password);
+    const { name, password } = validationResult.data;
+    const result: CreateAdminSessionResponse = await authService.adminLogin(name, password);
 
     // Set refresh token as httpOnly cookie + CSRF token for web clients
     const tokenManager = TokenManager.getInstance();
@@ -694,6 +695,19 @@ router.post('/admin/sessions', (req: Request, res: Response, next: NextFunction)
     next(error);
   }
 });
+
+//GET admin Session
+router.get('/admin/sessions/current', verifyToken, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) {
+      throw new AppError('User not authenticated', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
+    }
+    const result: boolean = req.user.isRoot
+    successResponse(res, result);
+  } catch (error) {
+    next(error);
+  }
+})
 
 // GET /api/auth/sessions/current - Get current session user
 router.get(
@@ -720,6 +734,96 @@ router.get(
     }
   }
 );
+
+//POST /admin/addAdmin
+router.post('/admin/addAdmin', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user?.isRoot) {
+      throw new AppError('Forbidden: Only root admin can add other admins', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
+    }
+    const validationResult = createAdminSessionRequestSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      throw new AppError(
+        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    const { name, password } = validationResult.data;
+
+    const result: CreateAdminSessionResponse = await authService.addAdmin(name, password, req.user.id);
+
+    // Set refresh token as httpOnly cookie + CSRF token for web clients
+    const tokenManager = TokenManager.getInstance();
+    const refreshToken = tokenManager.generateRefreshToken(result.user.id);
+    setRefreshTokenCookie(res, refreshToken);
+    const csrfToken = tokenManager.generateCsrfToken(refreshToken);
+
+    successResponse(res, { ...result, csrfToken });
+
+  } catch (error) {
+    next(error);
+  }
+});
+
+//change Password using old password
+router.put("/admin/resetPassword", verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const valiDateSchema = changePasswordUsingOldPasswordRequestSchema.safeParse(req.body);
+    if (!valiDateSchema.success) {
+      throw new AppError(
+        valiDateSchema.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+    const { oldPassword, newPassword } = req.body;
+
+    if (!req.user) {
+      throw new AppError('User not authenticated', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
+    }
+    const result: ResetPasswordResponse = await authService.resetPasswordUsingOldPassword(
+      newPassword,
+      oldPassword,
+      req.user.id
+    );
+    successResponse(res, result);
+  } catch (error) {
+    next(error);
+  }
+})
+
+//GET all admins to show
+router.get("/admin/allAdmins", verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result: ListUsersResponse = await authService.getAllAdmins();
+    successResponse(res, result);
+  } catch (error) {
+    next(error);
+  }
+})
+
+router.delete("/admin/deleteAdmin", verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user?.isRoot) {
+      throw new AppError('Forbidden: Only root admin can delete other admins', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
+    }
+    const validationResult = userIdSchema.safeParse(req.body.id);
+    if (!validationResult.success) {
+      throw new AppError(
+        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+    const adminId = validationResult.data;
+    await authService.deleteSubAdmin(adminId);
+    successResponse(res, {});
+  } catch (error) {
+    next(error);
+  }
+})
 
 // GET /api/auth/users - List all users (admin only)
 router.get('/users', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {

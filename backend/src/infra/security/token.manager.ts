@@ -140,6 +140,7 @@ export class TokenManager {
         sub: decoded.sub,
         email: decoded.email,
         role: decoded.role || 'authenticated',
+        isRoot: decoded.isRoot || false
       };
     } catch {
       throw new AppError('Invalid token', 401, ERROR_CODES.AUTH_UNAUTHORIZED);

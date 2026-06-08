@@ -32,8 +32,8 @@ export default function LoginPage() {
   const form = useForm<LoginForm>({
     resolver: zodResolver(loginFormSchema),
     defaultValues: {
-      email: 'admin@example.com',
-      password: 'change-this-password',
+      email: 'admin',
+      password: 'password',
     },
   });
 
@@ -45,7 +45,7 @@ export default function LoginPage() {
       const success = await loginWithPassword(data.email, data.password);
 
       if (!success) {
-        throw new Error('Invalid email or password');
+        throw new Error('Invalid username or password');
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'An error occurred';
@@ -87,16 +87,16 @@ export default function LoginPage() {
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Email</FormLabel>
+                      <FormLabel>Username</FormLabel>
                       <FormControl>
                         <div className="relative">
                           <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                           <Input
                             {...field}
-                            type="email"
-                            placeholder="admin@example.com"
+                            type="text"
+                            placeholder="admin"
                             className="pl-10"
-                            autoComplete="email"
+                            autoComplete="username"
                           />
                         </div>
                       </FormControl>

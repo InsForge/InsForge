@@ -20,7 +20,7 @@ services:
     networks:
       - insforge-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -73,6 +73,8 @@ services:
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-change-this-password}
+      - ROOT_ADMIN_USERNAME=${ROOT_ADMIN_USERNAME:-admin}
+      - ROOT_ADMIN_PASSWORD=${ROOT_ADMIN_PASSWORD:-password}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
       # S3-specific credentials (for Wasabi, MinIO, etc. — falls back to AWS_* if not set)

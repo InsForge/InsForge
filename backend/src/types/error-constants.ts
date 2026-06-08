@@ -81,6 +81,7 @@ export enum ERROR_CODES {
   TOO_MANY_REQUESTS = 'TOO_MANY_REQUESTS',
   FORBIDDEN = 'FORBIDDEN',
   RATE_LIMITED = 'RATE_LIMITED',
+  AUTH_USER_NOT_FOUND = "AUTH_USER_NOT_FOUND",
 }
 
 // Next actions - what the user should do

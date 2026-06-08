@@ -1,13 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { LogOut, ChevronDown, Plug } from 'lucide-react';
+import { LogOut, ChevronDown, Plug, Plus, User, Trash } from 'lucide-react';
 import {
   Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
 } from '@insforge/ui';
+import { apiClient } from '#lib/api/client';
 import { Avatar, AvatarFallback, Separator, ThemeSelect } from '#components';
 import { cn } from '#lib/utils/utils';
 import { useTheme } from '#lib/contexts/ThemeContext';
@@ -28,8 +33,72 @@ export default function AppHeader() {
   const dashboardVariant = getFeatureFlag('dashboard-v4-experiment');
   const { pathname } = useLocation();
   const navigate = useNavigate();
+  const [isAddAdminOpen, setIsAddAdminOpen] = useState(false);
+  const [newUsername, setNewUsername] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRootAdmin, setIsRootAdmin] = useState(false);
+  const [getAllAdmins, setAllAdmins] = useState<any[]>([]);
   const isDTest = dashboardVariant === 'd_test';
+  const [setPasswordOpen, setIsSetPasswordOpen] = useState(false);
+  const [oldPassword, setOldPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const isConnectDisabled = isDTest && pathname === '/dashboard/install';
+
+  const handleAddAdmin = async () => {
+    setIsSubmitting(true);
+    try {
+      await apiClient.request('/auth/admin/addAdmin', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: newUsername,
+          password: newPassword,
+        })
+      })
+      setIsAddAdminOpen(false);
+    } catch (error) {
+      console.error('Failed to add admin', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      setIsSubmitting(true);
+      await apiClient.request(`/auth/admin/deleteAdmin`, {
+        method: 'DELETE',
+        body: JSON.stringify({
+          id,
+        })
+      })
+    } catch (error) {
+      console.error('Failed to delete admin', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  const changePassword = async () => {
+    setIsSubmitting(true);
+    try {
+      if (confirmPassword !== newPassword) {
+        throw new Error('Passwords do not match');
+      }
+      await apiClient.request('/auth/admin/resetPassword', {
+        method: 'PUT',
+        body: JSON.stringify({
+          oldPassword,
+          newPassword,
+        })
+      })
+      setIsSetPasswordOpen(false);
+    } catch (error) {
+      console.error('Failed to change password', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleConnectClick = () => {
     if (isDTest) {
@@ -54,6 +123,19 @@ export default function AppHeader() {
         console.error('Failed to fetch GitHub stars:', err);
       });
   }, []);
+  useEffect(() => {
+    apiClient.request('/auth/admin/allAdmins', {
+      method: "GET",
+    }).then((result) => {
+      setAllAdmins(result);
+    })
+
+  }, [isSubmitting])
+  useEffect(() => {
+    apiClient.request('/auth/admin/sessions/current').then((response) => {
+      setIsRootAdmin(response);
+    })
+  }, [])
 
   const formatStars = (count: number): string => {
     if (count >= 1000) {
@@ -169,6 +251,26 @@ export default function AppHeader() {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48" sideOffset={8} collisionPadding={16}>
+              {isRootAdmin &&
+                (<DropdownMenuItem
+                  onClick={() => { setIsAddAdminOpen(true) }}
+                  className="cursor-pointer dark:text-zinc-400"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  <span>Add Admin</span>
+                </DropdownMenuItem>)}
+              {(getAllAdmins ?? []).map((admin: any, idx: any) => (
+                <DropdownMenuItem
+                  key={idx}
+                  className="cursor-pointer flex justify-normal dark:text-zinc-400"
+                >
+                  <User className="mr-2 h-4 w-4" />
+                  <span>{admin.username}</span>
+                  {isRootAdmin && (<div className="bg-red-400 p-1 rounded-md" onClick={() => void handleDelete(admin.id)}>
+                    <Trash className="h-4 w-4" />
+                  </div>)}
+                </DropdownMenuItem>
+              ))}
               <DropdownMenuItem
                 onClick={() => void logout()}
                 className="cursor-pointer text-red-600 dark:text-red-400"
@@ -176,8 +278,69 @@ export default function AppHeader() {
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Sign Out</span>
               </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => { setIsSetPasswordOpen(true); }}
+                className="cursor-pointer dark:text-blue-400"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                <span>change password</span>
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <Dialog open={isAddAdminOpen} onOpenChange={setIsAddAdminOpen}>
+            <DialogContent className='w-80'>
+              <DialogHeader>
+                <DialogTitle>Add Admin</DialogTitle>
+              </DialogHeader>
+              <div className="flex flex-col p-10 gap-4 text-white">
+                <input
+                  placeholder="Username"
+                  className="border-[var(--alpha-8)] border"
+                  value={newUsername}
+                  onChange={(e) => setNewUsername(e.target.value)}
+                />
+                <input
+                  type="password"
+                  className="border-[var(--alpha-8)] border"
+                  placeholder="Password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
+                <Button onClick={() => void handleAddAdmin()}>Add</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+          <Dialog open={setPasswordOpen} onOpenChange={setIsSetPasswordOpen}>
+            <DialogContent className='w-80'>
+              <DialogHeader>
+                <DialogTitle>change password</DialogTitle>
+              </DialogHeader>
+              <div className="flex flex-col p-10 gap-4 text-white">
+                <input
+                  placeholder="old password"
+                  type="password"
+                  className="border-[var(--alpha-8)] border"
+                  value={oldPassword}
+                  onChange={(e) => setOldPassword(e.target.value)}
+                />
+                <input
+                  type="password"
+                  className="border-[var(--alpha-8)] border"
+                  placeholder="new password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
+                <input
+                  type="password"
+                  className="border-[var(--alpha-8)] border"
+                  placeholder="confirm password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+                <Button onClick={() => void changePassword()}>change password</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     </>

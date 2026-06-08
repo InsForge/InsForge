@@ -43,7 +43,7 @@ export const createUserRequestSchema = z.object({
  * POST /api/auth/sessions - Create session
  */
 export const createSessionRequestSchema = z.object({
-  email: emailSchema,
+  name: nameSchema,
   password: passwordSchema,
 });
 
@@ -123,6 +123,11 @@ export const exchangeResetPasswordTokenRequestSchema = z.object({
   email: emailSchema,
   code: z.string().regex(/^\d{6}$/, 'Reset password code must be a 6-digit numeric code'),
 });
+
+export const changePasswordUsingOldPasswordRequestSchema = z.object({
+  oldPassword: passwordSchema,
+  newPassword: passwordSchema,
+})
 
 /**
  * POST /api/auth/email/reset-password - Reset password with token

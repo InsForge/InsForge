@@ -13,35 +13,34 @@ import { ADMIN_ID, ANON_ID } from '@/utils/constants.js';
 /**
  * Seeds system users (admin and anon) if they don't exist in the database
  */
-async function seedSystemUsers(adminEmail: string, adminPassword: string): Promise<void> {
+async function seedSystemUsers(adminName: string, adminPassword: string): Promise<void> {
   const dbManager = DatabaseManager.getInstance();
   const pool = dbManager.getPool();
   const client = await pool.connect();
 
   try {
     // Seed admin user
-    if (adminEmail && adminPassword) {
-      const existingAdmin = await client.query('SELECT id FROM auth.users WHERE id = $1', [
-        ADMIN_ID,
+    if (adminName && adminPassword) {
+      const existingAdmin = await client.query('SELECT id FROM auth.project_admins WHERE username = $1', [
+        adminName,
       ]);
 
       if (existingAdmin.rows.length > 0) {
-        logger.info(`✅ Admin configured: ${adminEmail}`);
+        logger.info(`✅ Admin configured: ${adminName}`);
       } else {
         const hashedPassword = await bcrypt.hash(adminPassword, 10);
-        const profile = JSON.stringify({ name: 'Administrator' });
 
         await client.query(
-          `INSERT INTO auth.users (id, email, password, profile, email_verified, is_project_admin, is_anonymous, created_at, updated_at)
-           VALUES ($1, $2, $3, $4::jsonb, true, true, false, NOW(), NOW())
+          `INSERT INTO auth.project_admins (username, password_hash, created_by, created_at, updated_at)
+           VALUES ($1, $2, NULL, NOW(), NOW())
            ON CONFLICT (id) DO NOTHING`,
-          [ADMIN_ID, adminEmail, hashedPassword, profile]
+          [adminName, hashedPassword]
         );
 
-        logger.info(`✅ Admin user seeded: ${adminEmail}`);
+        logger.info(`✅ Admin user seeded: ${adminName}`);
       }
     } else {
-      logger.warn('⚠️ Admin credentials not configured - check ADMIN_EMAIL and ADMIN_PASSWORD');
+      logger.warn('⚠️ Admin credentials not configured - check ADMIN_NAME and ADMIN_PASSWORD');
     }
 
     // Seed anon user
@@ -174,42 +173,42 @@ async function seedLocalOAuthConfigs(): Promise<void> {
       clientIdEnv: string;
       clientSecretEnv: string;
     }> = [
-      {
-        provider: 'google',
-        clientIdEnv: 'GOOGLE_CLIENT_ID',
-        clientSecretEnv: 'GOOGLE_CLIENT_SECRET',
-      },
-      {
-        provider: 'github',
-        clientIdEnv: 'GITHUB_CLIENT_ID',
-        clientSecretEnv: 'GITHUB_CLIENT_SECRET',
-      },
-      {
-        provider: 'discord',
-        clientIdEnv: 'DISCORD_CLIENT_ID',
-        clientSecretEnv: 'DISCORD_CLIENT_SECRET',
-      },
-      {
-        provider: 'linkedin',
-        clientIdEnv: 'LINKEDIN_CLIENT_ID',
-        clientSecretEnv: 'LINKEDIN_CLIENT_SECRET',
-      },
-      {
-        provider: 'microsoft',
-        clientIdEnv: 'MICROSOFT_CLIENT_ID',
-        clientSecretEnv: 'MICROSOFT_CLIENT_SECRET',
-      },
-      {
-        provider: 'x',
-        clientIdEnv: 'X_CLIENT_ID',
-        clientSecretEnv: 'X_CLIENT_SECRET',
-      },
-      {
-        provider: 'apple',
-        clientIdEnv: 'APPLE_CLIENT_ID',
-        clientSecretEnv: 'APPLE_CLIENT_SECRET',
-      },
-    ];
+        {
+          provider: 'google',
+          clientIdEnv: 'GOOGLE_CLIENT_ID',
+          clientSecretEnv: 'GOOGLE_CLIENT_SECRET',
+        },
+        {
+          provider: 'github',
+          clientIdEnv: 'GITHUB_CLIENT_ID',
+          clientSecretEnv: 'GITHUB_CLIENT_SECRET',
+        },
+        {
+          provider: 'discord',
+          clientIdEnv: 'DISCORD_CLIENT_ID',
+          clientSecretEnv: 'DISCORD_CLIENT_SECRET',
+        },
+        {
+          provider: 'linkedin',
+          clientIdEnv: 'LINKEDIN_CLIENT_ID',
+          clientSecretEnv: 'LINKEDIN_CLIENT_SECRET',
+        },
+        {
+          provider: 'microsoft',
+          clientIdEnv: 'MICROSOFT_CLIENT_ID',
+          clientSecretEnv: 'MICROSOFT_CLIENT_SECRET',
+        },
+        {
+          provider: 'x',
+          clientIdEnv: 'X_CLIENT_ID',
+          clientSecretEnv: 'X_CLIENT_SECRET',
+        },
+        {
+          provider: 'apple',
+          clientIdEnv: 'APPLE_CLIENT_ID',
+          clientSecretEnv: 'APPLE_CLIENT_SECRET',
+        },
+      ];
 
     for (const { provider, clientIdEnv, clientSecretEnv } of envMappings) {
       const clientId = process.env[clientIdEnv];
@@ -237,15 +236,14 @@ export async function seedBackend(): Promise<void> {
   const secretService = SecretService.getInstance();
 
   const dbManager = DatabaseManager.getInstance();
-
-  const adminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
-  const adminPassword = process.env.ADMIN_PASSWORD || 'change-this-password';
+  const adminName = process.env.ROOT_ADMIN_USERNAME ?? process.env.ADMIN_EMAIL?.split('@')[0] ?? 'admin@example.com';
+  const adminPassword = process.env.ROOT_ADMIN_PASSWORD ?? process.env.ADMIN_PASSWORD ?? 'change-this-password';
 
   try {
     logger.info(`\n🚀 Insforge Backend Starting...`);
 
     // Seed system users (admin and anon) if not exists
-    await seedSystemUsers(adminEmail, adminPassword);
+    await seedSystemUsers(adminName, adminPassword);
 
     // Initialize API key (from env or generate)
     const apiKey = await secretService.initializeApiKey();

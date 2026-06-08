@@ -8,10 +8,35 @@ interface LoginResult {
 }
 
 export class LoginService {
-  async loginWithPassword(email: string, password: string): Promise<LoginResult> {
+  async loginWithPassword(name: string, password: string): Promise<LoginResult> {
     const response = await apiClient.request('/auth/admin/sessions', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ name, password }),
+      skipRefresh: true,
+    });
+
+    if (!response.user || !response.accessToken) {
+      throw new Error('Invalid login response');
+    }
+
+    apiClient.setAccessToken(response.accessToken);
+    if (response.csrfToken) {
+      apiClient.setCsrfToken(response.csrfToken);
+    } else {
+      apiClient.clearCsrfToken();
+    }
+
+    return {
+      user: response.user,
+      accessToken: response.accessToken,
+      csrfToken: response.csrfToken ?? undefined,
+    };
+  }
+
+  async addAdmin(name: string, password: string): Promise<LoginResult> {
+    const response = await apiClient.request('/auth/admin/addAdmin', {
+      method: 'POST',
+      body: JSON.stringify({ name, password }),
       skipRefresh: true,
     });
 

@@ -11,6 +11,7 @@ export interface AuthRequest extends Request {
     id: string;
     email: string;
     role: RoleSchema;
+    isRoot: boolean;
   };
   authenticated?: boolean;
   apiKey?: string;
@@ -60,12 +61,13 @@ export function getUserContextFromReq(req: AuthRequest): UserContext {
 // Helper function to set user on request
 function setRequestUser(
   req: AuthRequest,
-  payload: { sub: string; email: string; role: RoleSchema }
+  payload: { sub: string; email: string; role: RoleSchema; isRoot: boolean }
 ) {
   req.user = {
     id: payload.sub,
     email: payload.email,
     role: payload.role,
+    isRoot: payload.isRoot,
   };
 }
 
