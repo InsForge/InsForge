@@ -5,19 +5,14 @@ import { AuthService } from '@/services/auth/auth.service.js';
 import { StorageService } from '@/services/storage/storage.service.js';
 import { FunctionService } from '@/services/functions/function.service.js';
 import { RealtimeChannelService } from '@/services/realtime/realtime-channel.service.js';
-import { DeploymentService } from '@/services/deployments/deployment.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/utils/errors.js';
-import {
-  ERROR_CODES,
-  type AppMetadataSchema,
-  type ProjectIdResponse,
-} from '@insforge/shared-schemas';
+import { ERROR_CODES, type ProjectIdResponse } from '@insforge/shared-schemas';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { CloudDatabaseProvider } from '@/providers/database/cloud.provider.js';
-import { formatContextAsMarkdown } from '@/utils/context-formatter.js';
+import { MetadataService } from '@/services/metadata/metadata.service.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
@@ -26,7 +21,7 @@ const functionService = FunctionService.getInstance();
 const realtimeChannelService = RealtimeChannelService.getInstance();
 const dbManager = DatabaseManager.getInstance();
 const dbAdvanceService = DatabaseAdvanceService.getInstance();
-const deploymentService = DeploymentService.getInstance();
+const metadataService = MetadataService.getInstance();
 
 router.use(verifyAdmin);
 
@@ -43,36 +38,12 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
     }
     const { format } = queryValidation.data;
 
-    // Fetch all metadata in parallel for better performance
-    const [auth, database, storage, functions, deployments] = await Promise.all([
-      authService.getMetadata(),
-      dbManager.getMetadata(),
-      storageService.getMetadata(),
-      functionService.getMetadata(),
-      deploymentService.getConfigMetadata(),
-    ]);
-
-    // Get version from package.json or default
-    const version = process.env.npm_package_version || '1.0.0';
-
-    const metadata: AppMetadataSchema = {
-      auth,
-      database,
-      storage,
-      functions,
-      // Deployments slice is omitted entirely on self-hosted backends
-      // (deploymentService.getConfigMetadata returns undefined). Cloud
-      // projects see { customSlug: string | null }. The CLI capability
-      // probe depends on this presence/absence signal to gate
-      // [deployments] TOML sections.
-      ...(deployments ? { deployments } : {}),
-      version,
-    };
+    const metadata = await metadataService.getAppMetadata();
 
     if (format === 'markdown') {
       res
         .set('Content-Type', 'text/markdown; charset=utf-8')
-        .send(formatContextAsMarkdown(metadata));
+        .send(metadataService.formatAsMarkdown(metadata));
     } else {
       successResponse(res, metadata);
     }

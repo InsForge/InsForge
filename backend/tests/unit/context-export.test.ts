@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { formatContextAsMarkdown } from '../../src/utils/context-formatter.js';
+import { MetadataService } from '../../src/services/metadata/metadata.service.js';
 import type { AppMetadataSchema } from '@insforge/shared-schemas';
+
+const metadataService = MetadataService.getInstance();
 
 const sampleMetadata: AppMetadataSchema = {
   version: '1.2.3',
@@ -60,9 +62,9 @@ const sampleMetadata: AppMetadataSchema = {
   },
 };
 
-describe('formatContextAsMarkdown', () => {
+describe('MetadataService.formatAsMarkdown', () => {
   it('renders a complete markdown document from metadata', () => {
-    const md = formatContextAsMarkdown(sampleMetadata);
+    const md = metadataService.formatAsMarkdown(sampleMetadata);
 
     // Header
     expect(md).toContain('# Project Metadata');
@@ -131,13 +133,15 @@ describe('formatContextAsMarkdown', () => {
       functions: [],
     };
 
-    const md = formatContextAsMarkdown(minimal);
+    const md = metadataService.formatAsMarkdown(minimal);
 
     expect(md).toContain('# Project Metadata');
     expect(md).toContain('No storage buckets configured.');
     expect(md).toContain('No edge functions deployed.');
     // Realtime section omitted entirely when undefined
     expect(md).not.toContain('## Realtime');
+    // Deployments section omitted for self-hosted
+    expect(md).not.toContain('## Deployments');
   });
 
   it('renders database hint when present', () => {
@@ -150,9 +154,82 @@ describe('formatContextAsMarkdown', () => {
       },
     };
 
-    const md = formatContextAsMarkdown(withHint);
+    const md = metadataService.formatAsMarkdown(withHint);
 
     expect(md).toContain('| users | 10 |');
     expect(md).toContain('Consider adding indexes');
+  });
+
+  it('renders deployments section for cloud projects', () => {
+    const withDeployments: AppMetadataSchema = {
+      ...sampleMetadata,
+      deployments: { customSlug: 'my-app' },
+    };
+
+    const md = metadataService.formatAsMarkdown(withDeployments);
+
+    expect(md).toContain('## Deployments');
+    expect(md).toContain('`my-app`');
+  });
+
+  it('renders deployments with null slug', () => {
+    const withNullSlug: AppMetadataSchema = {
+      ...sampleMetadata,
+      deployments: { customSlug: null },
+    };
+
+    const md = metadataService.formatAsMarkdown(withNullSlug);
+
+    expect(md).toContain('## Deployments');
+    expect(md).toContain('not set');
+  });
+
+  it('preserves backticks in values using double-backtick code spans', () => {
+    const withBackticks: AppMetadataSchema = {
+      ...sampleMetadata,
+      database: {
+        tables: [{ tableName: 'users', recordCount: 10 }],
+        totalSizeInGB: 0.1,
+        hint: 'Use `auth.uid()` for RLS policies',
+      },
+      functions: [
+        {
+          slug: 'check-`role`',
+          name: 'check-role',
+          status: 'active',
+          description: 'Validates `admin` access',
+        },
+      ],
+    };
+
+    const md = metadataService.formatAsMarkdown(withBackticks);
+
+    // Hint is plain text — backticks preserved as-is
+    expect(md).toContain('Use `auth.uid()` for RLS policies');
+    // Slug with backticks uses double-backtick code span
+    expect(md).toContain('`` check-`role` ``');
+    // Description is plain text — backticks preserved
+    expect(md).toContain('Validates `admin` access');
+  });
+
+  it('escapes pipes in table cells without affecting code spans', () => {
+    const withPipes: AppMetadataSchema = {
+      ...sampleMetadata,
+      database: {
+        tables: [{ tableName: 'public|users', recordCount: 5 }],
+        totalSizeInGB: 0.1,
+      },
+      storage: {
+        buckets: [{ name: 'a|b', public: true, createdAt: '2026-01-01T00:00:00Z', objectCount: 1 }],
+        totalSizeInGB: 0,
+      },
+    };
+
+    const md = metadataService.formatAsMarkdown(withPipes);
+
+    // Pipes escaped in table cells
+    expect(md).toContain('| public\\|users | 5 |');
+    // Bucket name in code span — pipes not escaped
+    expect(md).toContain('`a|b`');
   });
 });

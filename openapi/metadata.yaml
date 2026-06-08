@@ -7,11 +7,26 @@ paths:
   /api/metadata:
     get:
       summary: Get app metadata
+      description: >-
+        Returns aggregated application metadata (auth, database, storage,
+        functions, realtime, deployments). Use the `format` query parameter
+        to choose between JSON and Markdown output.
       tags:
         - Admin
       security:
         - bearerAuth: []
         - apiKey: []
+      parameters:
+        - in: query
+          name: format
+          schema:
+            type: string
+            enum: [json, markdown]
+            default: json
+          description: >-
+            Response format. `json` returns structured JSON (default).
+            `markdown` returns a human-readable Markdown document suitable
+            for AI coding tools and developer onboarding.
       responses:
         '200':
           description: Application metadata
@@ -54,6 +69,23 @@ paths:
                   ssl: true
                 uptime: 86400
                 timestamp: "2024-01-21T10:30:00Z"
+            text/markdown:
+              schema:
+                type: string
+              example: |
+                # Project Metadata
+                > v2.0.0
+
+                ## Auth
+                - **OAuth providers**: google, github
+                - **Email verification**: required
+                - **Signup**: enabled
+        '400':
+          description: Invalid format parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/metadata/database:
     get:
