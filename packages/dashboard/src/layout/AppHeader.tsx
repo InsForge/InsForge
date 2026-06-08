@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { LogOut, ChevronDown, Plug } from 'lucide-react';
+import { LogOut, ChevronDown, Plug, Settings } from 'lucide-react';
 import {
   Button,
   DropdownMenu,
@@ -14,6 +14,8 @@ import { useTheme } from '#lib/contexts/ThemeContext';
 import { useAuth } from '#lib/contexts/AuthContext';
 import { useOpenConnectDialog } from './ConnectDialogContext';
 import { getFeatureFlag } from '#lib/analytics/posthog';
+import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
+import AccountSettingsDialog from './AccountSettingsDialog';
 import { FEATURE_FLAGS, FEATURE_FLAG_VARIANTS } from '#lib/analytics/constants';
 
 // Import SVG icons
@@ -24,14 +26,20 @@ import InsForgeLogoDark from '#assets/logos/insforge_dark.svg';
 
 export default function AppHeader() {
   const { resolvedTheme } = useTheme();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
+  const isCloudHosting = useIsCloudHostingMode();
   const openConnectDialog = useOpenConnectDialog();
   const dashboardVariant = getFeatureFlag(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT);
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const isDTest = dashboardVariant === FEATURE_FLAG_VARIANTS.D_TEST;
   const isConnectDisabled = isDTest && pathname === '/dashboard/install';
-  const adminLabel = 'Administrator';
+
+  const displayName = user?.username || user?.sub || 'Admin';
+  const isRoot = user?.isRoot === true;
+  const adminLabel = isRoot ? 'Root Administrator' : 'Administrator';
+
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const handleConnectClick = () => {
     if (isDTest) {
@@ -151,14 +159,14 @@ export default function AppHeader() {
               <button className="w-50 flex items-center gap-3 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[8px] pr-3 transition-all duration-200 group">
                 <Avatar className="h-8 w-8 ring-2 ring-white dark:ring-gray-700 shadow-sm">
                   <AvatarFallback
-                    className={cn('text-white font-medium text-sm', getAvatarColor(adminLabel))}
+                    className={cn('text-white font-medium text-sm', getAvatarColor(displayName))}
                   >
-                    {getUserInitials(adminLabel)}
+                    {getUserInitials(displayName)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="text-left hidden md:block">
                   <p className="text-sm font-medium text-zinc-950 dark:text-zinc-100 leading-tight">
-                    Admin
+                    {displayName}
                   </p>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">{adminLabel}</p>
                 </div>
@@ -166,6 +174,15 @@ export default function AppHeader() {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48" sideOffset={8} collisionPadding={16}>
+              {!isCloudHosting && (
+                <DropdownMenuItem
+                  onClick={() => setIsSettingsOpen(true)}
+                  className="cursor-pointer"
+                >
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Account Settings</span>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem
                 onClick={() => void logout()}
                 className="cursor-pointer text-red-600 dark:text-red-400"
@@ -177,6 +194,9 @@ export default function AppHeader() {
           </DropdownMenu>
         </div>
       </div>
+      {!isCloudHosting && (
+        <AccountSettingsDialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
+      )}
     </>
   );
 }

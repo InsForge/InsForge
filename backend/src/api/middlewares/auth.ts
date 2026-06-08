@@ -4,6 +4,7 @@ import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES, type RoleSchema } from '@insforge/shared-schemas';
 import { NEXT_ACTIONS } from '../../utils/next-actions.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
+import { adminService } from '@/services/admin/admin.service.js';
 
 export type UserContext = {
   /**
@@ -16,6 +17,8 @@ export type UserContext = {
   id: string;
   email?: string;
   role: RoleSchema;
+  username?: string;
+  isRoot?: boolean;
 };
 
 export interface AuthRequest extends Request {
@@ -67,13 +70,24 @@ export function extractAnonKey(req: AuthRequest): string | null {
 // Helper function to set user on request
 function setRequestUser(
   req: AuthRequest,
-  payload: { sub: string; email?: string; role: RoleSchema }
+  payload: { sub: string; email?: string; role: RoleSchema; username?: string; isRoot?: boolean }
 ) {
   req.user = {
     id: payload.sub,
     email: payload.email,
     role: payload.role,
+    username: payload.username,
+    isRoot: payload.isRoot,
   };
+}
+
+// Helper to extract admin info from token sub claim
+// Token sub format: "local:username" or "cloud:userId"
+function extractUsernameFromSub(sub: string): string | null {
+  if (sub.startsWith('local:')) {
+    return sub.substring(6);
+  }
+  return null;
 }
 
 /**
@@ -138,7 +152,22 @@ export async function verifyAdmin(req: AuthRequest, res: Response, next: NextFun
       );
     }
 
-    setRequestUser(req, payload);
+    // Extract username from sub (format: "local:username")
+    const username = extractUsernameFromSub(payload.sub);
+    let isRoot = false;
+
+    if (username) {
+      const admin = await adminService.getAdminByUsername(username);
+      if (admin) {
+        isRoot = admin.is_root || false;
+      }
+    }
+
+    setRequestUser(req, {
+      ...payload,
+      username: username || undefined,
+      isRoot,
+    });
     next();
   } catch (error) {
     if (error instanceof AppError) {
@@ -154,6 +183,47 @@ export async function verifyAdmin(req: AuthRequest, res: Response, next: NextFun
       );
     }
   }
+}
+
+/**
+ * Verifies that the authenticated admin has root privileges
+ * Must be used after verifyAdmin
+ */
+export function requireRoot(req: AuthRequest, res: Response, next: NextFunction) {
+  if (!req.user) {
+    return next(
+      new AppError(
+        'Authentication required',
+        401,
+        ERROR_CODES.AUTH_UNAUTHORIZED,
+        NEXT_ACTIONS.CHECK_TOKEN
+      )
+    );
+  }
+
+  if (req.user.role !== 'project_admin') {
+    return next(
+      new AppError(
+        'Admin access required',
+        403,
+        ERROR_CODES.AUTH_UNAUTHORIZED,
+        NEXT_ACTIONS.CHECK_ADMIN_TOKEN
+      )
+    );
+  }
+
+  if (!req.user.isRoot) {
+    return next(
+      new AppError(
+        'Root admin access required',
+        403,
+        ERROR_CODES.AUTH_UNAUTHORIZED,
+        NEXT_ACTIONS.CHECK_ADMIN_TOKEN
+      )
+    );
+  }
+
+  next();
 }
 
 /**
