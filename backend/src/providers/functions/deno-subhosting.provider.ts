@@ -1,6 +1,6 @@
 import { AppError, UpstreamError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
-import { config } from '@/infra/config/app.config.js';
+import { appConfig } from '@/infra/config/app.config.js';
 import logger from '@/utils/logger.js';
 import { z } from 'zod';
 import fetch, { RequestInit, Response } from 'node-fetch';
@@ -302,7 +302,7 @@ export class DenoSubhostingProvider {
    * Check if Deno Subhosting is properly configured
    */
   isConfigured(): boolean {
-    const { token, organizationId } = config.denoSubhosting;
+    const { token, organizationId } = appConfig.denoSubhosting;
     return !!(token && organizationId);
   }
 
@@ -310,7 +310,7 @@ export class DenoSubhostingProvider {
    * Get Deno Subhosting credentials from config
    */
   getCredentials(): DenoSubhostingCredentials {
-    const { token, organizationId } = config.denoSubhosting;
+    const { token, organizationId } = appConfig.denoSubhosting;
 
     if (!token) {
       throw new AppError('DENO_SUBHOSTING_TOKEN not configured', 500, ERROR_CODES.INTERNAL_ERROR);

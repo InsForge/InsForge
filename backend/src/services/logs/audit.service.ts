@@ -32,13 +32,14 @@ export class AuditService {
    */
   async log(entry: AuditLogEntry): Promise<AuditLogSchema> {
     try {
+      const actor = entry.actor ?? '';
       const pool = this.getPool();
       const result = await pool.query(
         `INSERT INTO system.audit_logs (actor, action, module, details, ip_address)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING *`,
         [
-          entry.actor,
+          actor,
           entry.action,
           entry.module,
           entry.details ? JSON.stringify(entry.details) : null,
@@ -49,7 +50,7 @@ export class AuditService {
       const row = result.rows[0];
 
       logger.info('Audit log created', {
-        actor: entry.actor,
+        actor,
         action: entry.action,
         module: entry.module,
       });

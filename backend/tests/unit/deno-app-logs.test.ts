@@ -36,8 +36,12 @@ vi.mock('../../src/infra/config/app.config', () => ({
     cloud: {
       appKey: 'test-app-key',
     },
-  },
-}));
+  };
+  return {
+    config: c,
+    appConfig: c,
+  };
+});
 
 // Mock pool — use vi.hoisted so it's available in the hoisted vi.mock factory
 const { mockPool } = vi.hoisted(() => ({

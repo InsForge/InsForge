@@ -57,12 +57,12 @@ echo ""
 # Export API configuration for all tests
 export TEST_API_BASE="${TEST_API_BASE:-http://localhost:7130/api}"
 
-# Check if admin credentials are set
-if [ -z "$ADMIN_EMAIL" ] || [ -z "$ADMIN_PASSWORD" ]; then
-    echo -e "${YELLOW}Warning: Admin credentials not set. Using defaults.${NC}"
-    echo "Set with: export ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD=your_password"
-    export ADMIN_EMAIL="admin@example.com"
-    export ADMIN_PASSWORD="change-this-password"
+# Check if root admin credentials are set
+if [ -z "$ROOT_ADMIN_USERNAME" ] || [ -z "$ROOT_ADMIN_PASSWORD" ]; then
+    echo -e "${YELLOW}Warning: Root admin credentials not set. Using defaults.${NC}"
+    echo "Set with: export ROOT_ADMIN_USERNAME=admin ROOT_ADMIN_PASSWORD=your_password"
+    export ROOT_ADMIN_USERNAME="${ROOT_ADMIN_USERNAME:-admin}"
+    export ROOT_ADMIN_PASSWORD="${ROOT_ADMIN_PASSWORD:-change-this-password}"
     echo ""
 fi
 
@@ -72,9 +72,9 @@ if [ -z "$AWS_S3_BUCKET" ]; then
     echo ""
 fi
 
-# Export admin credentials for tests
-export TEST_ADMIN_EMAIL="$ADMIN_EMAIL"
-export TEST_ADMIN_PASSWORD="$ADMIN_PASSWORD"
+# Export root admin credentials for tests
+export TEST_ADMIN_USERNAME="$ROOT_ADMIN_USERNAME"
+export TEST_ADMIN_PASSWORD="$ROOT_ADMIN_PASSWORD"
 
 . "$SCRIPT_DIR/preflight.sh"
 

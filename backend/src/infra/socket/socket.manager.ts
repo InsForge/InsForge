@@ -81,8 +81,7 @@ export class SocketManager {
           const isValid = await secretService.verifyApiKey(apiKey);
           if (isValid) {
             socket.data.user = {
-              id: 'api-key-client',
-              email: 'api-key@client',
+              id: 'api-key',
               role: 'project_admin',
             };
             socket.data.presenceType = 'anonymous';

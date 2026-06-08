@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ERROR_CODES } from '@insforge/shared-schemas';
+import type { AppError } from '@/utils/errors.js';
 
 // --- Mocks ---
 
@@ -21,8 +22,8 @@ vi.mock('@/infra/security/encryption.manager.js', () => ({
   },
 }));
 
-vi.mock('@/infra/config/app.config.js', () => ({
-  config: {
+vi.mock('@/infra/config/app.config.js', () => {
+  const c = {
     fly: {
       enabled: true,
       apiToken: 'test-token',
@@ -36,8 +37,15 @@ vi.mock('@/infra/config/app.config.js', () => ({
     app: {
       jwtSecret: 'test-secret',
     },
-  },
-}));
+    storage: {
+      appKey: 'testkey1',
+    },
+  };
+  return {
+    config: c,
+    appConfig: c,
+  };
+});
 
 vi.mock('@/utils/logger.js', () => ({
   default: { error: vi.fn(), info: vi.fn(), warn: vi.fn(), debug: vi.fn() },
@@ -78,11 +86,21 @@ import { ComputeServicesService } from '@/services/compute/services.service.js';
 describe('ComputeServicesService', () => {
   let service: ComputeServicesService;
 
+  const oldEnvAppKey = process.env.APP_KEY;
+
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     process.env.APP_KEY = 'testkey1';
     service = ComputeServicesService.getInstance();
     mockIsConfigured.mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    if (oldEnvAppKey === undefined) {
+      delete process.env.APP_KEY;
+    } else {
+      process.env.APP_KEY = oldEnvAppKey;
+    }
   });
 
   describe('createService', () => {
@@ -1244,39 +1262,51 @@ describe('selectComputeProvider factory', () => {
   });
 
   it('returns FlyProvider when FLY_API_TOKEN is set', async () => {
-    vi.doMock('@/infra/config/app.config.js', () => ({
-      config: {
+    vi.doMock('@/infra/config/app.config.js', () => {
+      const c = {
         fly: { apiToken: 'tok', org: 'o', enabled: true, domain: 'd' },
         cloud: { projectId: 'local', apiHost: '' },
         app: { jwtSecret: 'x' },
-      },
-    }));
+      };
+      return {
+        config: c,
+        appConfig: c,
+      };
+    });
     const { selectComputeProvider } = await import('@/services/compute/services.service.js');
     const { FlyProvider } = await import('@/providers/compute/fly.provider.js');
     expect(selectComputeProvider()).toBe(FlyProvider.getInstance());
   });
 
   it('returns CloudComputeProvider when PROJECT_ID is provisioned and no FLY_API_TOKEN', async () => {
-    vi.doMock('@/infra/config/app.config.js', () => ({
-      config: {
+    vi.doMock('@/infra/config/app.config.js', () => {
+      const c = {
         fly: { apiToken: '', org: '', enabled: false, domain: '' },
         cloud: { projectId: 'p', apiHost: 'https://x' },
         app: { jwtSecret: 'x' },
-      },
-    }));
+      };
+      return {
+        config: c,
+        appConfig: c,
+      };
+    });
     const { selectComputeProvider } = await import('@/services/compute/services.service.js');
     const { CloudComputeProvider } = await import('@/providers/compute/cloud.provider.js');
     expect(selectComputeProvider()).toBe(CloudComputeProvider.getInstance());
   });
 
   it('throws COMPUTE_NOT_CONFIGURED when neither is set', async () => {
-    vi.doMock('@/infra/config/app.config.js', () => ({
-      config: {
+    vi.doMock('@/infra/config/app.config.js', () => {
+      const c = {
         fly: { apiToken: '', org: '', enabled: false, domain: '' },
         cloud: { projectId: 'local', apiHost: '' },
         app: { jwtSecret: 'x' },
-      },
-    }));
+      };
+      return {
+        config: c,
+        appConfig: c,
+      };
+    });
     const { selectComputeProvider } = await import('@/services/compute/services.service.js');
     expect(() => selectComputeProvider()).toThrow(/COMPUTE_NOT_CONFIGURED|not configured/);
   });

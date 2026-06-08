@@ -6,7 +6,7 @@ import { NEXT_ACTIONS } from '../../utils/next-actions.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 
 export type UserContext = {
-  id?: string;
+  id: string;
   email?: string;
   role: RoleSchema;
 };
@@ -48,7 +48,7 @@ export function extractApiKey(req: AuthRequest): string | null {
 // Helper function to set user on request
 function setRequestUser(
   req: AuthRequest,
-  payload: { sub: string; email: string; role: RoleSchema }
+  payload: { sub: string; email?: string; role: RoleSchema }
 ) {
   req.user = {
     id: payload.sub,

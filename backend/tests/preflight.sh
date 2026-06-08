@@ -11,8 +11,8 @@ print_setup_help() {
     echo ""
     echo "If your backend runs elsewhere, set:"
     echo "  export TEST_API_BASE=http://localhost:7130/api"
-    echo "  export ADMIN_EMAIL=admin@example.com"
-    echo "  export ADMIN_PASSWORD=change-this-password"
+    echo "  export ROOT_ADMIN_USERNAME=admin"
+    echo "  export ROOT_ADMIN_PASSWORD=change-this-password"
     echo "  export ACCESS_API_KEY=ik_..."
 }
 
@@ -40,16 +40,16 @@ json_escape() {
 
 build_admin_login_body() {
     if command -v jq >/dev/null 2>&1; then
-        jq -n --arg email "$TEST_ADMIN_EMAIL" --arg password "$TEST_ADMIN_PASSWORD" \
-            '{email: $email, password: $password}'
+        jq -n --arg username "$TEST_ADMIN_USERNAME" --arg password "$TEST_ADMIN_PASSWORD" \
+            '{username: $username, password: $password}'
         return
     fi
 
-    local escaped_email
+    local escaped_username
     local escaped_password
-    escaped_email=$(json_escape "$TEST_ADMIN_EMAIL")
+    escaped_username=$(json_escape "$TEST_ADMIN_USERNAME")
     escaped_password=$(json_escape "$TEST_ADMIN_PASSWORD")
-    printf '{"email":"%s","password":"%s"}' "$escaped_email" "$escaped_password"
+    printf '{"username":"%s","password":"%s"}' "$escaped_username" "$escaped_password"
 }
 
 preflight_curl() {
@@ -105,7 +105,7 @@ run_preflight() {
     if [ -z "$admin_token" ]; then
         echo -e "${RED}Preflight failed: admin login did not return an access token.${NC}"
         echo "Checked: $TEST_API_BASE/auth/admin/sessions"
-        echo "Admin email: $TEST_ADMIN_EMAIL"
+        echo "Admin username: $TEST_ADMIN_USERNAME"
         print_setup_help
         return 1
     fi

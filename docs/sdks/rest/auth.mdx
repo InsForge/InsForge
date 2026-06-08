@@ -988,13 +988,29 @@ curl -X POST "https://your-app.insforge.app/api/auth/admin/sessions/exchange" \
 
 ```json
 {
-  "user": {
-    "id": "123e4567-e89b-12d3-a456-426614174000",
-    "email": "admin@example.com",
-    "role": "project_admin"
+  "admin": {
+    "sub": "cloud:user_123"
   },
   "accessToken": "eyJhbGciOiJIUzI1NiIs...",
   "csrfToken": "abc123..."
+}
+```
+
+### Get Current Admin Session
+
+Get the current dashboard admin session from a project admin access token.
+
+```
+GET /api/auth/admin/sessions/current
+```
+
+#### Response
+
+```json
+{
+  "admin": {
+    "sub": "local:admin"
+  }
 }
 ```
 

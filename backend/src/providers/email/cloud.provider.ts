@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import axios from 'axios';
-import { config } from '@/infra/config/app.config.js';
+import { appConfig } from '@/infra/config/app.config.js';
 import logger from '@/utils/logger.js';
 import { AppError } from '@/utils/errors.js';
 import { EmailTemplate } from '@/types/email.js';
@@ -16,8 +16,8 @@ export class CloudEmailProvider implements EmailProvider {
    * @returns JWT token signed with project secret
    */
   private generateSignToken(): string {
-    const projectId = config.cloud.projectId;
-    const jwtSecret = config.app.jwtSecret;
+    const projectId = appConfig.cloud.projectId;
+    const jwtSecret = appConfig.app.jwtSecret;
 
     if (!projectId || projectId === 'local') {
       throw new AppError(
@@ -66,8 +66,8 @@ export class CloudEmailProvider implements EmailProvider {
     variables?: Record<string, string>
   ): Promise<void> {
     try {
-      const projectId = config.cloud.projectId;
-      const apiHost = config.cloud.apiHost;
+      const projectId = appConfig.cloud.projectId;
+      const apiHost = appConfig.cloud.apiHost;
       const signToken = this.generateSignToken();
 
       // Validate inputs
@@ -130,7 +130,7 @@ export class CloudEmailProvider implements EmailProvider {
         const message = error.response?.data?.message || error.message;
 
         logger.error('Failed to send email via cloud backend', {
-          projectId: config.cloud.projectId,
+          projectId: appConfig.cloud.projectId,
           template,
           status,
           message,
@@ -172,7 +172,7 @@ export class CloudEmailProvider implements EmailProvider {
 
       // Handle other errors
       logger.error('Unexpected error sending email', {
-        projectId: config.cloud.projectId,
+        projectId: appConfig.cloud.projectId,
         template,
         error: error instanceof Error ? error.message : 'Unknown error',
       });
@@ -190,8 +190,8 @@ export class CloudEmailProvider implements EmailProvider {
    */
   async sendRaw(options: SendRawEmailRequest): Promise<void> {
     try {
-      const projectId = config.cloud.projectId;
-      const apiHost = config.cloud.apiHost;
+      const projectId = appConfig.cloud.projectId;
+      const apiHost = appConfig.cloud.apiHost;
       const signToken = this.generateSignToken();
 
       const url = `${apiHost}/email/v1/${projectId}/send-on-demand`;
@@ -218,7 +218,7 @@ export class CloudEmailProvider implements EmailProvider {
         const message = error.response?.data?.message || error.message;
 
         logger.error('Failed to send raw email via cloud backend', {
-          projectId: config.cloud.projectId,
+          projectId: appConfig.cloud.projectId,
           status,
           message,
         });
