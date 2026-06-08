@@ -435,9 +435,22 @@ const downloadStrategyHandler = async (
     // Optional caller-supplied TTL (seconds) for the signed URL. Accepted from
     // the query string (canonical GET) or body (deprecated POST alias). The
     // service clamps it to a safe range and applies it to private buckets only.
+    // Reject malformed input (e.g. `?expiresIn=abc`) rather than silently
+    // coercing it: `Number('abc')` is NaN and `Number(null)` is 0, either of
+    // which would otherwise hand back a URL with a TTL the caller never asked for.
     const rawExpiresIn = req.query.expiresIn ?? authReq.body?.expiresIn;
-    const requestedExpiresIn =
-      rawExpiresIn !== undefined && rawExpiresIn !== '' ? Number(rawExpiresIn) : undefined;
+    let requestedExpiresIn: number | undefined;
+    if (rawExpiresIn !== undefined && rawExpiresIn !== null && rawExpiresIn !== '') {
+      const parsed = Number(rawExpiresIn);
+      if (!Number.isFinite(parsed)) {
+        throw new AppError(
+          'expiresIn must be a finite number of seconds',
+          400,
+          ERROR_CODES.STORAGE_INVALID_PARAMETER
+        );
+      }
+      requestedExpiresIn = parsed;
+    }
 
     const strategy = await storageService.getDownloadStrategy(
       bucketName,
