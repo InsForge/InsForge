@@ -2,6 +2,8 @@ import Razorpay from 'razorpay';
 import crypto from 'crypto';
 import type { RazorpayEnvironment } from '@/types/payments.js';
 
+const RAZORPAY_SHA256_SIGNATURE_HEX = /^[0-9a-f]{64}$/i;
+
 export class RazorpayKeyValidationError extends Error {
   constructor(message: string) {
     super(message);
@@ -144,6 +146,10 @@ export interface RazorpaySubscriptionCreateInput {
   notes?: Record<string, string>;
 }
 
+export interface RazorpaySubscriptionCancelInput {
+  cancelAtCycleEnd?: boolean;
+}
+
 export interface RazorpaySubscription {
   id: string;
   entity: string;
@@ -168,6 +174,7 @@ export interface RazorpaySubscription {
   start_at: number | null;
   end_at: number | null;
   total_count: number | null;
+  auth_attempts: number | null;
   paid_count: number | null;
   remaining_count: number | null;
   short_url: string | null;
@@ -207,6 +214,17 @@ export interface RazorpayPayment {
   error_step: string | null;
   error_reason: string | null;
   created_at: number;
+}
+
+export interface RazorpayRefund {
+  id: string;
+  entity?: string;
+  payment_id: string;
+  amount: number;
+  currency: string;
+  status?: 'pending' | 'processed' | 'failed';
+  created_at: number;
+  processed_at?: number | null;
 }
 
 export interface RazorpayInvoice {
@@ -270,6 +288,12 @@ interface RazorpayMutationClient {
   };
   subscriptions: {
     create(params: Record<string, unknown>): Promise<RazorpaySubscription>;
+    cancel(
+      subscriptionId: string,
+      cancelAtCycleEnd?: boolean | number
+    ): Promise<RazorpaySubscription>;
+    pause(subscriptionId: string, params?: { pause_at: 'now' }): Promise<RazorpaySubscription>;
+    resume(subscriptionId: string, params?: { resume_at: 'now' }): Promise<RazorpaySubscription>;
   };
 }
 
@@ -293,6 +317,10 @@ export class RazorpayProvider {
    * Razorpay signs webhooks using HMAC-SHA256 of the raw body.
    */
   verifyWebhookSignature(rawBody: string, signature: string, webhookSecret: string): boolean {
+    if (!RAZORPAY_SHA256_SIGNATURE_HEX.test(signature)) {
+      return false;
+    }
+
     const expected = crypto.createHmac('sha256', webhookSecret).update(rawBody).digest('hex');
     const expectedBuf = Buffer.from(expected, 'hex');
     const signatureBuf = Buffer.from(signature, 'hex');
@@ -517,6 +545,24 @@ export class RazorpayProvider {
     return this.getMutationClient().subscriptions.create(params);
   }
 
+  async cancelSubscription(
+    subscriptionId: string,
+    input: RazorpaySubscriptionCancelInput = {}
+  ): Promise<RazorpaySubscription> {
+    return this.getMutationClient().subscriptions.cancel(
+      subscriptionId,
+      input.cancelAtCycleEnd ?? false
+    );
+  }
+
+  async pauseSubscription(subscriptionId: string): Promise<RazorpaySubscription> {
+    return this.getMutationClient().subscriptions.pause(subscriptionId, { pause_at: 'now' });
+  }
+
+  async resumeSubscription(subscriptionId: string): Promise<RazorpaySubscription> {
+    return this.getMutationClient().subscriptions.resume(subscriptionId, { resume_at: 'now' });
+  }
+
   async listPayments(): Promise<RazorpayPayment[]> {
     const all: RazorpayPayment[] = [];
     let skip = 0;
@@ -595,6 +641,10 @@ export class RazorpayProvider {
   }
 
   private verifyCheckoutSignature(payload: string, signature: string): boolean {
+    if (!RAZORPAY_SHA256_SIGNATURE_HEX.test(signature)) {
+      return false;
+    }
+
     const expected = crypto.createHmac('sha256', this.keySecret).update(payload).digest('hex');
     const expectedBuf = Buffer.from(expected, 'hex');
     const signatureBuf = Buffer.from(signature, 'hex');

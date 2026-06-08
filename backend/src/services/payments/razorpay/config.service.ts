@@ -423,7 +423,7 @@ export class RazorpayConfigService {
 
   async recordConnectionStatus(
     environment: RazorpayEnvironment,
-    status: 'unconfigured' | 'connected' | 'error',
+    status: 'unconfigured' | 'error',
     errorMessage?: string | null
   ): Promise<RazorpayConnection> {
     await this.getPool().query(

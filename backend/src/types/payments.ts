@@ -440,6 +440,7 @@ export interface RazorpaySubscriptionRow {
   startAt: Date | string | null;
   endAt: Date | string | null;
   totalCount: number | string | null;
+  authAttempts: number | string | null;
   paidCount: number | string | null;
   remainingCount: number | string | null;
   shortUrl: string | null;

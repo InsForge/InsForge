@@ -152,7 +152,7 @@ POST /api/payments/razorpay/test/subscriptions
 POST /api/payments/razorpay/test/subscriptions/verify
 ```
 
-Subscription creation first checks the caller against `payments.razorpay_subscriptions` RLS `INSERT` policies, so your app can decide who can start a subscription for a team, workspace, or organization. Future manage/cancel flows should use the same table's `UPDATE` policies.
+Subscription creation first checks the caller against `payments.razorpay_subscriptions` RLS `INSERT` policies, so your app can decide who can start a subscription for a team, workspace, or organization. Cancel, pause, and resume check the same table's `UPDATE` policies through a rollbacked `updated_at` probe.
 
 Signature verification protects the immediate client return path. Durable fulfillment should still come from verified Razorpay webhook events because customers can complete or change payment state without returning to your app.
 

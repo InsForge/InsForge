@@ -15,10 +15,16 @@ import type { RazorpayEnvironment, RazorpaySubscriptionRow } from '@/types/payme
 import {
   ERROR_CODES,
   type BillingSubject,
+  type CancelRazorpaySubscriptionRequest,
+  type CancelRazorpaySubscriptionResponse,
   type CreateRazorpaySubscriptionRequest,
   type CreateRazorpaySubscriptionResponse,
   type ListRazorpaySubscriptionsRequest,
   type ListRazorpaySubscriptionsResponse,
+  type PauseRazorpaySubscriptionRequest,
+  type PauseRazorpaySubscriptionResponse,
+  type ResumeRazorpaySubscriptionRequest,
+  type ResumeRazorpaySubscriptionResponse,
   type RoleSchema,
   type VerifyRazorpaySubscriptionRequest,
   type VerifyRazorpaySubscriptionResponse,
@@ -40,6 +46,7 @@ const RAZORPAY_SUBSCRIPTION_COLUMNS = `
   start_at AS "startAt",
   end_at AS "endAt",
   total_count AS "totalCount",
+  auth_attempts AS "authAttempts",
   paid_count AS "paidCount",
   remaining_count AS "remainingCount",
   short_url AS "shortUrl",
@@ -55,7 +62,12 @@ const RAZORPAY_SUBSCRIPTION_COLUMNS = `
   updated_at AS "updatedAt"
 `;
 
-const SUBSCRIPTION_CREATE_ROLES = new Set<RoleSchema>(['anon', 'authenticated', 'project_admin']);
+const SUBSCRIPTION_USER_ACTION_ROLES = new Set<RoleSchema>(['authenticated', 'project_admin']);
+
+type RazorpaySubscriptionManagementInput = {
+  environment: RazorpayEnvironment;
+  subscriptionId: string;
+};
 
 export class RazorpaySubscriptionService {
   private static instance: RazorpaySubscriptionService;
@@ -200,6 +212,59 @@ export class RazorpaySubscriptionService {
     };
   }
 
+  async cancelSubscription(
+    input: CancelRazorpaySubscriptionRequest,
+    user: UserContext
+  ): Promise<CancelRazorpaySubscriptionResponse> {
+    this.assertCanManageSubscription(user);
+    const subject = await this.assertSubscriptionManagementAllowed(input, user);
+    const provider = await this.configService.createRazorpayProvider(input.environment);
+    const subscription = await provider.cancelSubscription(input.subscriptionId, {
+      cancelAtCycleEnd: input.cancelAtCycleEnd,
+    });
+    const storedSubscription = await this.upsertSubscriptionFromProvider(
+      input.environment,
+      subscription,
+      subject
+    );
+
+    return { subscription: storedSubscription };
+  }
+
+  async pauseSubscription(
+    input: PauseRazorpaySubscriptionRequest,
+    user: UserContext
+  ): Promise<PauseRazorpaySubscriptionResponse> {
+    this.assertCanManageSubscription(user);
+    const subject = await this.assertSubscriptionManagementAllowed(input, user);
+    const provider = await this.configService.createRazorpayProvider(input.environment);
+    const subscription = await provider.pauseSubscription(input.subscriptionId);
+    const storedSubscription = await this.upsertSubscriptionFromProvider(
+      input.environment,
+      subscription,
+      subject
+    );
+
+    return { subscription: storedSubscription };
+  }
+
+  async resumeSubscription(
+    input: ResumeRazorpaySubscriptionRequest,
+    user: UserContext
+  ): Promise<ResumeRazorpaySubscriptionResponse> {
+    this.assertCanManageSubscription(user);
+    const subject = await this.assertSubscriptionManagementAllowed(input, user);
+    const provider = await this.configService.createRazorpayProvider(input.environment);
+    const subscription = await provider.resumeSubscription(input.subscriptionId);
+    const storedSubscription = await this.upsertSubscriptionFromProvider(
+      input.environment,
+      subscription,
+      subject
+    );
+
+    return { subscription: storedSubscription };
+  }
+
   async upsertSubscriptionFromProvider(
     environment: RazorpayEnvironment,
     subscription: RazorpaySubscription,
@@ -217,11 +282,11 @@ export class RazorpaySubscriptionService {
          subject_type, subject_id, status,
          current_start, current_end, ended_at,
          quantity, charge_at, start_at, end_at,
-         total_count, paid_count, remaining_count,
+         total_count, auth_attempts, paid_count, remaining_count,
          short_url, has_scheduled_changes, change_scheduled_at,
          offer_id, metadata, raw, provider_created_at, synced_at
        )
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,NOW())
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,NOW())
        ON CONFLICT (environment, subscription_id) DO UPDATE SET
          plan_id = EXCLUDED.plan_id,
          customer_id = EXCLUDED.customer_id,
@@ -236,6 +301,7 @@ export class RazorpaySubscriptionService {
          start_at = EXCLUDED.start_at,
          end_at = EXCLUDED.end_at,
          total_count = EXCLUDED.total_count,
+         auth_attempts = EXCLUDED.auth_attempts,
          paid_count = EXCLUDED.paid_count,
          remaining_count = EXCLUDED.remaining_count,
          short_url = EXCLUDED.short_url,
@@ -264,6 +330,7 @@ export class RazorpaySubscriptionService {
         this.fromRazorpayTimestamp(subscription.start_at),
         this.fromRazorpayTimestamp(subscription.end_at),
         subscription.total_count ?? null,
+        subscription.auth_attempts ?? null,
         subscription.paid_count ?? null,
         subscription.remaining_count ?? null,
         subscription.short_url ?? null,
@@ -302,6 +369,7 @@ export class RazorpaySubscriptionService {
       startAt: toISOStringOrNull(row.startAt),
       endAt: toISOStringOrNull(row.endAt),
       totalCount: row.totalCount === null ? null : Number(row.totalCount),
+      authAttempts: row.authAttempts === null ? null : Number(row.authAttempts),
       paidCount: row.paidCount === null ? null : Number(row.paidCount),
       remainingCount: row.remainingCount === null ? null : Number(row.remainingCount),
       shortUrl: row.shortUrl ?? null,
@@ -328,9 +396,19 @@ export class RazorpaySubscriptionService {
   }
 
   private assertCanCreateSubscription(user: UserContext): void {
-    if (!SUBSCRIPTION_CREATE_ROLES.has(user.role)) {
+    if (!SUBSCRIPTION_USER_ACTION_ROLES.has(user.role)) {
       throw new AppError(
         'Razorpay subscription creation requires a user token',
+        401,
+        ERROR_CODES.AUTH_INVALID_CREDENTIALS
+      );
+    }
+  }
+
+  private assertCanManageSubscription(user: UserContext): void {
+    if (!SUBSCRIPTION_USER_ACTION_ROLES.has(user.role)) {
+      throw new AppError(
+        'Razorpay subscription management requires a user token',
         401,
         ERROR_CODES.AUTH_INVALID_CREDENTIALS
       );
@@ -380,7 +458,44 @@ export class RazorpaySubscriptionService {
         }
       });
     } catch (error) {
-      throw this.normalizeSubscriptionAuthorizationError(error);
+      throw this.normalizeSubscriptionAuthorizationError(error, 'creation');
+    }
+  }
+
+  private async assertSubscriptionManagementAllowed(
+    input: RazorpaySubscriptionManagementInput,
+    user: UserContext
+  ): Promise<BillingSubject | null> {
+    try {
+      return await withUserContext(this.getPool(), user, async (client) => {
+        await client.query('SAVEPOINT razorpay_subscription_rls_probe');
+        try {
+          const result = await client.query(
+            `UPDATE payments.razorpay_subscriptions
+             SET updated_at = updated_at
+             WHERE environment = $1
+               AND subscription_id = $2
+             RETURNING subject_type AS "type", subject_id AS "id"`,
+            [input.environment, input.subscriptionId]
+          );
+          const row = result.rows[0] as { type: string | null; id: string | null } | undefined;
+
+          if (!row) {
+            throw new AppError(
+              `Razorpay ${input.environment} subscription not found or not manageable: ${input.subscriptionId}`,
+              404,
+              ERROR_CODES.PAYMENT_NOT_FOUND
+            );
+          }
+
+          return row.type && row.id ? { type: row.type, id: row.id } : null;
+        } finally {
+          await client.query('ROLLBACK TO SAVEPOINT razorpay_subscription_rls_probe');
+          await client.query('RELEASE SAVEPOINT razorpay_subscription_rls_probe');
+        }
+      });
+    } catch (error) {
+      throw this.normalizeSubscriptionAuthorizationError(error, 'management');
     }
   }
 
@@ -388,10 +503,13 @@ export class RazorpaySubscriptionService {
     return `sub_rls_probe_${randomUUID().replaceAll('-', '')}`;
   }
 
-  private normalizeSubscriptionAuthorizationError(error: unknown): Error {
+  private normalizeSubscriptionAuthorizationError(
+    error: unknown,
+    action: 'creation' | 'management'
+  ): Error {
     if (error instanceof Error && 'code' in error && error.code === '42501') {
       return new AppError(
-        'Razorpay subscription creation is not allowed by payments.razorpay_subscriptions RLS policies',
+        `Razorpay subscription ${action} is not allowed by payments.razorpay_subscriptions RLS policies`,
         403,
         ERROR_CODES.AUTH_UNAUTHORIZED
       );

@@ -1,7 +1,11 @@
 import type { Pool, PoolClient } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { getBillingSubjectFromMetadata } from '@/services/payments/helpers.js';
-import type { RazorpayInvoice, RazorpayPayment } from '@/providers/payments/razorpay.provider.js';
+import type {
+  RazorpayInvoice,
+  RazorpayPayment,
+  RazorpayRefund,
+} from '@/providers/payments/razorpay.provider.js';
 import type { RazorpayEnvironment } from '@/types/payments.js';
 import type { BillingSubject } from '@insforge/shared-schemas';
 
@@ -18,17 +22,18 @@ type RazorpayTransactionType =
   | 'refund'
   | 'failed_payment';
 
-interface RazorpayRefund {
-  id: string;
-  payment_id: string;
-  amount: number;
-  currency: string;
-  created_at: number;
-}
-
 interface TransactionObjectRef {
   type: string;
   id: string | null;
+}
+
+interface ExistingRazorpayTransactionContext {
+  type: RazorpayTransactionType;
+  subject: BillingSubject | null;
+  providerCustomerId: string | null;
+  customerEmailSnapshot: string | null;
+  relatedObjectIds: Record<string, string>;
+  description: string | null;
 }
 
 interface UpsertRazorpayTransactionInput {
@@ -105,6 +110,28 @@ export class RazorpayTransactionService {
     }
   }
 
+  async upsertInvoices(
+    environment: RazorpayEnvironment,
+    invoices: RazorpayInvoice[]
+  ): Promise<void> {
+    const client = await this.getPool().connect();
+
+    try {
+      await client.query('BEGIN');
+
+      for (const invoice of invoices) {
+        await this.upsertInvoiceWithClient(client, environment, invoice, 'sync');
+      }
+
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
   async upsertPaymentTransaction(
     environment: RazorpayEnvironment,
     payment: RazorpayPayment,
@@ -139,7 +166,10 @@ export class RazorpayTransactionService {
       description: null,
       paidAt: null,
       failedAt: status === 'failed' ? this.fromRazorpayTimestamp(refund.created_at) : null,
-      refundedAt: status === 'refunded' ? this.fromRazorpayTimestamp(refund.created_at) : null,
+      refundedAt:
+        status === 'refunded'
+          ? this.fromRazorpayTimestamp(refund.processed_at ?? refund.created_at)
+          : null,
       providerCreatedAt: this.fromRazorpayTimestamp(refund.created_at),
       raw: refund,
       matchObjectRefs: [{ type: 'refund', id: refund.id }],
@@ -153,11 +183,20 @@ export class RazorpayTransactionService {
     invoice: RazorpayInvoice,
     event: string
   ): Promise<void> {
+    await this.upsertInvoiceWithClient(this.getPool(), environment, invoice, event);
+  }
+
+  private async upsertInvoiceWithClient(
+    client: Pool | PoolClient,
+    environment: RazorpayEnvironment,
+    invoice: RazorpayInvoice,
+    event: string
+  ): Promise<void> {
     const metadata = this.normalizeMetadata(invoice.notes);
     const customerId = invoice.customer_id ?? invoice.customer_details?.id ?? null;
     const subject =
       getBillingSubjectFromMetadata(metadata) ??
-      (await this.resolveSubjectFromCustomerMapping(this.getPool(), environment, customerId));
+      (await this.resolveSubjectFromCustomerMapping(client, environment, customerId));
     const status = this.mapInvoiceStatus(invoice.status, event);
     const amount =
       status === 'succeeded' && invoice.amount_paid > 0 ? invoice.amount_paid : invoice.amount;
@@ -171,17 +210,21 @@ export class RazorpayTransactionService {
       : status === 'failed'
         ? 'failed_payment'
         : 'one_time_payment';
+    const primaryObject = invoice.payment_id
+      ? { type: 'payment', id: invoice.payment_id }
+      : { type: 'invoice', id: invoice.id };
 
-    await this.upsertTransaction(this.getPool(), {
+    await this.upsertTransaction(client, {
       environment,
       type,
       status,
       subject,
       providerCustomerId: customerId,
       customerEmailSnapshot: invoice.customer_details?.email ?? null,
-      providerObjectType: 'invoice',
-      providerObjectId: invoice.id,
+      providerObjectType: primaryObject.type,
+      providerObjectId: primaryObject.id,
       relatedObjectIds: {
+        payment: invoice.payment_id,
         invoice: invoice.id,
         order: invoice.order_id,
         subscription: invoice.subscription_id,
@@ -205,6 +248,7 @@ export class RazorpayTransactionService {
       providerCreatedAt: this.fromRazorpayTimestamp(invoice.created_at),
       raw: invoice,
       matchObjectRefs: [
+        { type: 'payment', id: invoice.payment_id ?? null },
         { type: 'invoice', id: invoice.id },
         { type: 'order', id: invoice.order_id ?? null },
       ],
@@ -219,27 +263,42 @@ export class RazorpayTransactionService {
   ): Promise<RazorpayTransactionStatus> {
     const status = this.mapPaymentStatus(payment.status);
     const metadata = this.normalizeMetadata(payment.notes);
-    const invoiceId = payment.invoice_id ?? options.invoiceId ?? null;
-    const orderId = payment.order_id ?? options.orderId ?? null;
-    const subscriptionId = options.subscriptionId ?? null;
+    const lookupRefs = this.compactObjectRefs([
+      { type: 'payment', id: payment.id },
+      { type: 'order', id: payment.order_id ?? options.orderId ?? null },
+      { type: 'invoice', id: payment.invoice_id ?? options.invoiceId ?? null },
+    ]);
+    const existingContext = await this.findExistingTransactionContext(
+      client,
+      environment,
+      lookupRefs
+    );
+    const invoiceId =
+      payment.invoice_id ?? options.invoiceId ?? existingContext?.relatedObjectIds.invoice ?? null;
+    const orderId =
+      payment.order_id ?? options.orderId ?? existingContext?.relatedObjectIds.order ?? null;
+    const subscriptionId =
+      options.subscriptionId ?? existingContext?.relatedObjectIds.subscription ?? null;
     const subject =
       getBillingSubjectFromMetadata(metadata) ??
       options.subjectFallback ??
+      existingContext?.subject ??
       (await this.resolveSubjectFromOrder(client, environment, orderId)) ??
       (await this.resolveSubjectFromCustomerMapping(client, environment, payment.customer_id));
-    const type = invoiceId || subscriptionId
-      ? 'subscription_invoice'
-      : status === 'failed'
-        ? 'failed_payment'
-        : 'one_time_payment';
+    const type =
+      invoiceId || subscriptionId || existingContext?.type === 'subscription_invoice'
+        ? 'subscription_invoice'
+        : status === 'failed'
+          ? 'failed_payment'
+          : 'one_time_payment';
 
     await this.upsertTransaction(client, {
       environment,
       type,
       status,
       subject,
-      providerCustomerId: payment.customer_id ?? null,
-      customerEmailSnapshot: payment.email ?? null,
+      providerCustomerId: payment.customer_id ?? existingContext?.providerCustomerId ?? null,
+      customerEmailSnapshot: payment.email ?? existingContext?.customerEmailSnapshot ?? null,
       providerObjectType: 'payment',
       providerObjectId: payment.id,
       relatedObjectIds: {
@@ -251,7 +310,8 @@ export class RazorpayTransactionService {
       amount: payment.amount,
       amountRefunded: payment.amount_refunded ?? 0,
       currency: payment.currency.toLowerCase(),
-      description: payment.description ?? options.descriptionFallback ?? null,
+      description:
+        payment.description ?? options.descriptionFallback ?? existingContext?.description ?? null,
       paidAt: status === 'succeeded' ? this.fromRazorpayTimestamp(payment.created_at) : null,
       failedAt: status === 'failed' ? this.fromRazorpayTimestamp(payment.created_at) : null,
       refundedAt:
@@ -306,7 +366,12 @@ export class RazorpayTransactionService {
        updated AS (
          UPDATE payments.transactions AS tx
          SET type = $6,
-             status = $7,
+             status = CASE
+               WHEN tx.status IN ('succeeded', 'failed', 'refunded', 'partially_refunded')
+                 AND $7 = 'pending'
+                 THEN tx.status
+               ELSE $7
+             END,
              subject_type = COALESCE($8, tx.subject_type),
              subject_id = COALESCE($9, tx.subject_id),
              provider_customer_id = COALESCE($10, tx.provider_customer_id),
@@ -383,7 +448,12 @@ export class RazorpayTransactionService {
            AND provider_object_id IS NOT NULL
        DO UPDATE SET
          type = EXCLUDED.type,
-         status = EXCLUDED.status,
+         status = CASE
+           WHEN tx.status IN ('succeeded', 'failed', 'refunded', 'partially_refunded')
+             AND EXCLUDED.status = 'pending'
+             THEN tx.status
+           ELSE EXCLUDED.status
+         END,
          subject_type = COALESCE(EXCLUDED.subject_type, tx.subject_type),
          subject_id = COALESCE(EXCLUDED.subject_id, tx.subject_id),
          provider_customer_id = COALESCE(EXCLUDED.provider_customer_id, tx.provider_customer_id),
@@ -514,6 +584,74 @@ export class RazorpayTransactionService {
     );
   }
 
+  private async findExistingTransactionContext(
+    client: Pool | PoolClient,
+    environment: RazorpayEnvironment,
+    refs: TransactionObjectRef[]
+  ): Promise<ExistingRazorpayTransactionContext | null> {
+    const compactRefs = this.compactObjectRefs(refs);
+    if (compactRefs.length === 0) {
+      return null;
+    }
+
+    const result = await client.query(
+      `WITH refs AS (
+         SELECT type, id
+         FROM jsonb_to_recordset($2::JSONB) AS ref(type TEXT, id TEXT)
+       )
+       SELECT
+         type,
+         subject_type AS "subjectType",
+         subject_id AS "subjectId",
+         provider_customer_id AS "providerCustomerId",
+         customer_email_snapshot AS "customerEmailSnapshot",
+         related_object_ids AS "relatedObjectIds",
+         description
+       FROM payments.transactions AS tx
+       WHERE tx.provider = 'razorpay'
+         AND tx.environment = $1
+         AND tx.type <> 'refund'
+         AND EXISTS (
+           SELECT 1
+           FROM refs
+           WHERE refs.id IS NOT NULL
+             AND (
+               (tx.provider_object_type = refs.type AND tx.provider_object_id = refs.id)
+               OR tx.related_object_ids->>refs.type = refs.id
+             )
+         )
+       ORDER BY tx.updated_at DESC, tx.created_at DESC
+       LIMIT 1`,
+      [environment, JSON.stringify(compactRefs)]
+    );
+
+    const row = result.rows[0] as
+      | {
+          type: RazorpayTransactionType;
+          subjectType: string | null;
+          subjectId: string | null;
+          providerCustomerId: string | null;
+          customerEmailSnapshot: string | null;
+          relatedObjectIds: unknown;
+          description: string | null;
+        }
+      | undefined;
+
+    if (!row) {
+      return null;
+    }
+
+    return {
+      type: row.type,
+      subject:
+        row.subjectType && row.subjectId ? { type: row.subjectType, id: row.subjectId } : null,
+      providerCustomerId: row.providerCustomerId,
+      customerEmailSnapshot: row.customerEmailSnapshot,
+      relatedObjectIds: this.normalizeRelatedObjectIds(row.relatedObjectIds),
+      description: row.description,
+    };
+  }
+
   private async resolveSubjectFromOrder(
     client: Pool | PoolClient,
     environment: RazorpayEnvironment,
@@ -613,6 +751,19 @@ export class RazorpayTransactionService {
       Object.entries(input).filter((entry): entry is [string, string] => {
         const [, value] = entry;
         return typeof value === 'string' && value.length > 0;
+      })
+    );
+  }
+
+  private normalizeRelatedObjectIds(value: unknown): Record<string, string> {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      return {};
+    }
+
+    return Object.fromEntries(
+      Object.entries(value).filter((entry): entry is [string, string] => {
+        const [, entryValue] = entry;
+        return typeof entryValue === 'string' && entryValue.length > 0;
       })
     );
   }

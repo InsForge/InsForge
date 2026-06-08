@@ -11,6 +11,7 @@ import logger from '@/utils/logger.js';
 import type {
   RazorpayInvoice,
   RazorpayPayment,
+  RazorpayRefund,
   RazorpaySubscription,
   RazorpayWebhookPayload,
 } from '@/providers/payments/razorpay.provider.js';
@@ -34,14 +35,6 @@ export interface RazorpayWebhookEventRow {
 interface ShouldProcessResult {
   shouldProcess: boolean;
   row: RazorpayWebhookEventRow;
-}
-
-interface RazorpayRefund {
-  id: string;
-  payment_id: string;
-  amount: number;
-  currency: string;
-  created_at: number;
 }
 
 interface RazorpayPaymentContext {
@@ -314,8 +307,9 @@ export class RazorpayWebhookService {
       case 'payment.captured':
         return this.handlePaymentUpsert(environment, payload, payload.event);
       case 'payment.failed':
-        return this.handlePaymentFailed(environment, payload);
+        return this.handlePaymentUpsert(environment, payload, payload.event);
       case 'refund.created':
+      case 'refund.processed':
       case 'refund.failed':
         return this.handleRefund(environment, payload, payload.event);
       case 'subscription.created':
@@ -347,13 +341,13 @@ export class RazorpayWebhookService {
   ): Promise<boolean> {
     const payment = this.getEntity<RazorpayPayment>(payload, 'payment');
     if (!payment) {
-      logger.warn('[Razorpay Webhook] payment.authorized/captured: no payment entity', { event });
+      logger.warn('[Razorpay Webhook] payment event: no payment entity', { event });
       return false;
     }
 
     const subscription =
       context.subscription ?? this.getEntity<RazorpaySubscription>(payload, 'subscription');
-    const invoice = context.invoice ?? null;
+    const invoice = context.invoice ?? this.getEntity<RazorpayInvoice>(payload, 'invoice') ?? null;
     if (subscription && event.startsWith('payment.')) {
       await this.upsertSubscription(environment, subscription);
     }
@@ -387,27 +381,6 @@ export class RazorpayWebhookService {
     return true;
   }
 
-  private async handlePaymentFailed(
-    environment: RazorpayEnvironment,
-    payload: RazorpayWebhookPayload
-  ): Promise<boolean> {
-    const payment = this.getEntity<RazorpayPayment>(payload, 'payment');
-    if (!payment) {
-      logger.warn('[Razorpay Webhook] payment.failed: no payment entity');
-      return false;
-    }
-
-    const status = await this.transactionService.upsertPaymentTransaction(environment, payment);
-
-    await this.updateOrderFromPayment(environment, payment, status);
-
-    logger.info('[Razorpay Webhook] Payment marked failed', {
-      environment,
-      paymentId: payment.id,
-    });
-    return true;
-  }
-
   private async handleRefund(
     environment: RazorpayEnvironment,
     payload: RazorpayWebhookPayload,
@@ -419,8 +392,7 @@ export class RazorpayWebhookService {
       return false;
     }
 
-    const refundStatus: RazorpayTransactionStatus =
-      event === 'refund.created' ? 'refunded' : 'failed';
+    const refundStatus = this.mapRefundStatus(refund, event);
     await this.transactionService.upsertRefundTransaction(environment, refund, refundStatus);
 
     logger.info('[Razorpay Webhook] Refund processed', {
@@ -430,6 +402,18 @@ export class RazorpayWebhookService {
       event,
     });
     return true;
+  }
+
+  private mapRefundStatus(refund: RazorpayRefund, event: string): RazorpayTransactionStatus {
+    if (event === 'refund.failed' || refund.status === 'failed') {
+      return 'failed';
+    }
+
+    if (event === 'refund.processed' || refund.status === 'processed') {
+      return 'refunded';
+    }
+
+    return 'pending';
   }
 
   private async handleSubscriptionUpsert(
@@ -477,11 +461,11 @@ export class RazorpayWebhookService {
          subject_type, subject_id, status,
          current_start, current_end, ended_at,
          quantity, charge_at, start_at, end_at,
-         total_count, paid_count, remaining_count,
+         total_count, auth_attempts, paid_count, remaining_count,
          short_url, has_scheduled_changes, change_scheduled_at,
          offer_id, metadata, raw, provider_created_at, synced_at
        )
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,NOW())
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,NOW())
        ON CONFLICT (environment, subscription_id) DO UPDATE SET
          plan_id = EXCLUDED.plan_id,
          customer_id = EXCLUDED.customer_id,
@@ -496,6 +480,7 @@ export class RazorpayWebhookService {
          start_at = EXCLUDED.start_at,
          end_at = EXCLUDED.end_at,
          total_count = EXCLUDED.total_count,
+         auth_attempts = EXCLUDED.auth_attempts,
          paid_count = EXCLUDED.paid_count,
          remaining_count = EXCLUDED.remaining_count,
          short_url = EXCLUDED.short_url,
@@ -523,6 +508,7 @@ export class RazorpayWebhookService {
         this.fromRazorpayTimestamp(subscription.start_at),
         this.fromRazorpayTimestamp(subscription.end_at),
         subscription.total_count ?? null,
+        subscription.auth_attempts ?? null,
         subscription.paid_count ?? null,
         subscription.remaining_count ?? null,
         subscription.short_url ?? null,
@@ -699,6 +685,7 @@ const HANDLED_RAZORPAY_EVENTS = new Set([
   'subscription.completed',
   'subscription.expired',
   'refund.created',
+  'refund.processed',
   'refund.failed',
   'invoice.paid',
   'invoice.expired',

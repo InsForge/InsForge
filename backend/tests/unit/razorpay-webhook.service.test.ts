@@ -350,6 +350,7 @@ describe('RazorpayWebhookService', () => {
             start_at: null,
             end_at: null,
             total_count: 12,
+            auth_attempts: 0,
             paid_count: 1,
             remaining_count: 11,
             short_url: null,
@@ -398,7 +399,111 @@ describe('RazorpayWebhookService', () => {
     );
   });
 
-  it('refreshes Razorpay refund totals from refund rows instead of incrementing blindly', async () => {
+  it('preserves existing subscription invoice context when later payment events are sparse', async () => {
+    const service = RazorpayWebhookService.getInstance();
+    mockPool.query.mockImplementation(async (sql: string) => {
+      if (/SELECT\s+type,\s+subject_type AS "subjectType"/i.test(sql)) {
+        return {
+          rows: [
+            {
+              type: 'subscription_invoice',
+              subjectType: 'team',
+              subjectId: 'team_123',
+              providerCustomerId: 'cust_123',
+              customerEmailSnapshot: 'buyer@example.com',
+              relatedObjectIds: {
+                payment: 'pay_123',
+                invoice: 'inv_123',
+                order: 'order_123',
+                subscription: 'sub_123',
+              },
+              description: 'Pro monthly',
+            },
+          ],
+          rowCount: 1,
+        };
+      }
+
+      return { rows: [], rowCount: 0 };
+    });
+
+    const handled = await getServiceInternals(service).applyRazorpayWebhookEvent('test', {
+      entity: 'event',
+      account_id: 'acc_123',
+      event: 'payment.captured',
+      contains: ['payment'],
+      payload: {
+        payment: {
+          entity: {
+            id: 'pay_123',
+            entity: 'payment',
+            amount: 5000,
+            currency: 'INR',
+            status: 'captured',
+            order_id: null,
+            invoice_id: null,
+            international: false,
+            method: 'card',
+            amount_refunded: 0,
+            refund_status: null,
+            captured: true,
+            description: null,
+            card_id: null,
+            bank: null,
+            wallet: null,
+            vpa: null,
+            email: null,
+            contact: null,
+            customer_id: null,
+            notes: {},
+            fee: null,
+            tax: null,
+            error_code: null,
+            error_description: null,
+            error_source: null,
+            error_step: null,
+            error_reason: null,
+            created_at: 1780617600,
+          },
+        },
+      },
+      created_at: 1780617600,
+    });
+
+    expect(handled).toBe(true);
+    const transactionCall = mockPool.query.mock.calls.find(([sql]) =>
+      /WITH refs[\s\S]*INSERT INTO payments\.transactions/i.test(String(sql))
+    );
+    expect(transactionCall).toBeDefined();
+
+    const params = transactionCall?.[1] as unknown[];
+    expect(params).toEqual(
+      expect.arrayContaining([
+        'test',
+        'payment',
+        'pay_123',
+        'subscription_invoice',
+        'succeeded',
+        'team',
+        'team_123',
+        'cust_123',
+        'buyer@example.com',
+        5000,
+        'inr',
+        'Pro monthly',
+      ])
+    );
+    expect(JSON.parse(String(params[11]))).toEqual(
+      expect.objectContaining({
+        payment: 'pay_123',
+        invoice: 'inv_123',
+        order: 'order_123',
+        subscription: 'sub_123',
+      })
+    );
+  });
+
+  it('records Razorpay refund creation as pending without incrementing blindly', async () => {
     const service = RazorpayWebhookService.getInstance();
 
     const handled = await getServiceInternals(service).applyRazorpayWebhookEvent('test', {
@@ -410,14 +515,65 @@ describe('RazorpayWebhookService', () => {
         refund: {
           entity: {
             id: 'rfnd_123',
+            entity: 'refund',
             payment_id: 'pay_123',
             amount: 1200,
             currency: 'INR',
+            status: 'pending',
             created_at: 1780617600,
           },
         },
       },
       created_at: 1780617600,
+    });
+
+    expect(handled).toBe(true);
+    expect(mockPool.query).toHaveBeenCalledWith(
+      expect.stringMatching(/INSERT INTO payments\.transactions/i),
+      expect.arrayContaining([
+        'test',
+        'refund',
+        'rfnd_123',
+        'payment',
+        'pay_123',
+        'pending',
+        1200,
+        1200,
+        'inr',
+      ])
+    );
+    expect(mockPool.query).toHaveBeenCalledWith(
+      expect.stringMatching(/WITH refund_totals[\s\S]*UPDATE payments\.transactions original/i),
+      ['test', 'pay_123']
+    );
+    const executedSql = mockPool.query.mock.calls.map(([sql]) => String(sql)).join('\n');
+    expect(executedSql).not.toContain('amount_refunded = COALESCE(amount_refunded, 0) +');
+    expect(executedSql).toContain("AND $7 = 'pending'");
+  });
+
+  it('marks Razorpay refunds as refunded only after refund.processed', async () => {
+    const service = RazorpayWebhookService.getInstance();
+
+    const handled = await getServiceInternals(service).applyRazorpayWebhookEvent('test', {
+      entity: 'event',
+      account_id: 'acc_123',
+      event: 'refund.processed',
+      contains: ['refund'],
+      payload: {
+        refund: {
+          entity: {
+            id: 'rfnd_123',
+            entity: 'refund',
+            payment_id: 'pay_123',
+            amount: 1200,
+            currency: 'INR',
+            status: 'processed',
+            created_at: 1780617600,
+            processed_at: 1780617900,
+          },
+        },
+      },
+      created_at: 1780617900,
     });
 
     expect(handled).toBe(true);
@@ -435,11 +591,5 @@ describe('RazorpayWebhookService', () => {
         'inr',
       ])
     );
-    expect(mockPool.query).toHaveBeenCalledWith(
-      expect.stringMatching(/WITH refund_totals[\s\S]*UPDATE payments\.transactions original/i),
-      ['test', 'pay_123']
-    );
-    const executedSql = mockPool.query.mock.calls.map(([sql]) => String(sql)).join('\n');
-    expect(executedSql).not.toContain('amount_refunded = COALESCE(amount_refunded, 0) +');
   });
 });

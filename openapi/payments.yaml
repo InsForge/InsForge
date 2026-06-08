@@ -1216,6 +1216,107 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /api/payments/razorpay/{environment}/subscriptions/{subscriptionId}/cancel:
+    post:
+      summary: Cancel Razorpay Subscription
+      description: Cancel a Razorpay subscription after evaluating the caller's UPDATE policy on payments.razorpay_subscriptions.
+      tags:
+        - Client
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentPath'
+        - $ref: '#/components/parameters/RazorpaySubscriptionIdPath'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelRazorpaySubscriptionBody'
+            example:
+              cancelAtCycleEnd: true
+      responses:
+        '200':
+          description: Razorpay subscription cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MutateRazorpaySubscriptionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/payments/razorpay/{environment}/subscriptions/{subscriptionId}/pause:
+    post:
+      summary: Pause Razorpay Subscription
+      description: Pause a Razorpay subscription immediately after evaluating the caller's UPDATE policy on payments.razorpay_subscriptions.
+      tags:
+        - Client
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentPath'
+        - $ref: '#/components/parameters/RazorpaySubscriptionIdPath'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PauseRazorpaySubscriptionBody'
+      responses:
+        '200':
+          description: Razorpay subscription paused
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MutateRazorpaySubscriptionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/payments/razorpay/{environment}/subscriptions/{subscriptionId}/resume:
+    post:
+      summary: Resume Razorpay Subscription
+      description: Resume a paused Razorpay subscription immediately after evaluating the caller's UPDATE policy on payments.razorpay_subscriptions.
+      tags:
+        - Client
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentPath'
+        - $ref: '#/components/parameters/RazorpaySubscriptionIdPath'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResumeRazorpaySubscriptionBody'
+      responses:
+        '200':
+          description: Razorpay subscription resumed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MutateRazorpaySubscriptionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /api/payments/razorpay/{environment}/customers:
     get:
       summary: List Razorpay Customers
@@ -1386,6 +1487,15 @@ components:
         minLength: 1
       description: Razorpay item ID.
       example: "item_123"
+    RazorpaySubscriptionIdPath:
+      name: subscriptionId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+      description: Razorpay subscription ID.
+      example: "sub_123"
     SubjectTypeQuery:
       name: subjectType
       in: query
@@ -1796,6 +1906,7 @@ components:
         unitAmount:
           type: integer
           nullable: true
+          description: Razorpay per-unit amount mirror. Usually equals amount for catalog items.
           example: 290000
         currency:
           type: string
@@ -1856,6 +1967,7 @@ components:
         unitAmount:
           type: integer
           nullable: true
+          description: Razorpay nested item per-unit amount mirror. Usually equals amount.
           example: 290000
         currency:
           type: string
@@ -2299,6 +2411,7 @@ components:
         - startAt
         - endAt
         - totalCount
+        - authAttempts
         - paidCount
         - remainingCount
         - shortUrl
@@ -2361,6 +2474,9 @@ components:
           format: date-time
           nullable: true
         totalCount:
+          type: integer
+          nullable: true
+        authAttempts:
           type: integer
           nullable: true
         paidCount:
@@ -3279,6 +3395,31 @@ components:
         subscription:
           $ref: '#/components/schemas/RazorpaySubscription'
 
+    CancelRazorpaySubscriptionBody:
+      type: object
+      additionalProperties: false
+      properties:
+        cancelAtCycleEnd:
+          type: boolean
+          default: false
+          description: When true, cancels at the end of the current billing cycle. Defaults to immediate cancellation.
+
+    PauseRazorpaySubscriptionBody:
+      type: object
+      additionalProperties: false
+
+    ResumeRazorpaySubscriptionBody:
+      type: object
+      additionalProperties: false
+
+    MutateRazorpaySubscriptionResponse:
+      type: object
+      required:
+        - subscription
+      properties:
+        subscription:
+          $ref: '#/components/schemas/RazorpaySubscription'
+
     CreateCustomerPortalSessionBody:
       type: object
       required:
@@ -3460,6 +3601,7 @@ components:
         - items
         - customers
         - subscriptions
+        - invoices
         - payments
       additionalProperties: false
       properties:
@@ -3473,6 +3615,9 @@ components:
           type: integer
           minimum: 0
         subscriptions:
+          type: integer
+          minimum: 0
+        invoices:
           type: integer
           minimum: 0
         payments:

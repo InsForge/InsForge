@@ -14,11 +14,15 @@ import { razorpayCatalogRouter } from './catalog.routes.js';
 import { razorpayConfigRouter } from './config.routes.js';
 import {
   ERROR_CODES,
+  cancelRazorpaySubscriptionBodySchema,
   createRazorpayOrderBodySchema,
   createRazorpaySubscriptionBodySchema,
   listPaymentCustomersQuerySchema,
   listPaymentTransactionsQuerySchema,
   listRazorpaySubscriptionsQuerySchema,
+  pauseRazorpaySubscriptionBodySchema,
+  razorpaySubscriptionParamsSchema,
+  resumeRazorpaySubscriptionBodySchema,
   verifyRazorpayOrderBodySchema,
   verifyRazorpaySubscriptionBodySchema,
 } from '@insforge/shared-schemas';
@@ -166,6 +170,84 @@ environmentRouter.post(
         environment,
         ...body,
       });
+      successResponse(res, result);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+environmentRouter.post(
+  '/subscriptions/:subscriptionId/cancel',
+  verifyUser,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const params = parseZodSchema(razorpaySubscriptionParamsSchema, req.params);
+      const body = parseZodSchema(cancelRazorpaySubscriptionBodySchema, req.body ?? {});
+
+      if (!req.user) {
+        throw new AppError(
+          'Razorpay subscription cancellation requires a user token',
+          401,
+          ERROR_CODES.AUTH_INVALID_CREDENTIALS
+        );
+      }
+
+      const result = await subscriptionService.cancelSubscription(
+        {
+          ...params,
+          ...body,
+        },
+        req.user
+      );
+      successResponse(res, result);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+environmentRouter.post(
+  '/subscriptions/:subscriptionId/pause',
+  verifyUser,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const params = parseZodSchema(razorpaySubscriptionParamsSchema, req.params);
+      parseZodSchema(pauseRazorpaySubscriptionBodySchema, req.body ?? {});
+
+      if (!req.user) {
+        throw new AppError(
+          'Razorpay subscription pause requires a user token',
+          401,
+          ERROR_CODES.AUTH_INVALID_CREDENTIALS
+        );
+      }
+
+      const result = await subscriptionService.pauseSubscription(params, req.user);
+      successResponse(res, result);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+environmentRouter.post(
+  '/subscriptions/:subscriptionId/resume',
+  verifyUser,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const params = parseZodSchema(razorpaySubscriptionParamsSchema, req.params);
+      parseZodSchema(resumeRazorpaySubscriptionBodySchema, req.body ?? {});
+
+      if (!req.user) {
+        throw new AppError(
+          'Razorpay subscription resume requires a user token',
+          401,
+          ERROR_CODES.AUTH_INVALID_CREDENTIALS
+        );
+      }
+
+      const result = await subscriptionService.resumeSubscription(params, req.user);
       successResponse(res, result);
     } catch (error) {
       next(error);

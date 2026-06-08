@@ -304,6 +304,7 @@ export const razorpaySubscriptionSchema = z.object({
   startAt: z.string().nullable(),
   endAt: z.string().nullable(),
   totalCount: z.number().nullable(),
+  authAttempts: z.number().nullable(),
   paidCount: z.number().nullable(),
   remainingCount: z.number().nullable(),
   shortUrl: z.string().nullable(),
@@ -376,7 +377,10 @@ export const razorpayItemSchema = z.object({
   description: z.string().nullable(),
   active: z.boolean(),
   amount: z.number().nullable(),
-  unitAmount: z.number().nullable(),
+  unitAmount: z
+    .number()
+    .nullable()
+    .describe('Razorpay per-unit amount mirror; usually equals amount for catalog items.'),
   currency: z.string(),
   type: z.string().nullable(),
   metadata: z.record(z.string()),
@@ -392,7 +396,10 @@ export const razorpayPlanSchema = z.object({
   period: z.string(),
   interval: z.number(),
   amount: z.number().nullable(),
-  unitAmount: z.number().nullable(),
+  unitAmount: z
+    .number()
+    .nullable()
+    .describe('Razorpay nested item per-unit amount mirror; usually equals amount.'),
   currency: z.string(),
   active: z.boolean(),
   metadata: z.record(z.string()),

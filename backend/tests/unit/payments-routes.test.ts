@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import {
+  cancelRazorpaySubscriptionBodySchema,
   createCheckoutSessionBodySchema,
   createCustomerPortalSessionBodySchema,
   createRazorpayItemBodySchema,
@@ -19,10 +20,13 @@ import {
   listRazorpaySubscriptionsQuerySchema,
   listStripeSubscriptionsQuerySchema,
   paymentEnvironmentParamsSchema,
+  pauseRazorpaySubscriptionBodySchema,
   razorpayEnvironmentParamsSchema,
+  razorpaySubscriptionParamsSchema,
   getRazorpayConfigResponseSchema,
   getRazorpayStatusResponseSchema,
   razorpayWebhookParamsSchema,
+  resumeRazorpaySubscriptionBodySchema,
   syncRazorpayPaymentsResponseSchema,
   updateStripePriceBodySchema,
   updateStripeProductBodySchema,
@@ -197,6 +201,9 @@ describe('payments route schemas', () => {
       "'/orders/verify'",
       "'/subscriptions'",
       "'/subscriptions/verify'",
+      "'/subscriptions/:subscriptionId/cancel'",
+      "'/subscriptions/:subscriptionId/pause'",
+      "'/subscriptions/:subscriptionId/resume'",
     ]) {
       expect(razorpayRouteSource.indexOf(route)).toBeGreaterThan(-1);
       expect(razorpayRouteSource.indexOf(route)).toBeLessThan(adminGuardIndex);
@@ -217,6 +224,15 @@ describe('payments route schemas', () => {
     expect(razorpayRouteSource).toMatch(
       /environmentRouter\.post\(\s*'\/subscriptions\/verify'[\s\S]*verifyUser[\s\S]*verifyRazorpaySubscriptionBodySchema/
     );
+    expect(razorpayRouteSource).toMatch(
+      /environmentRouter\.post\(\s*'\/subscriptions\/:subscriptionId\/cancel'[\s\S]*verifyUser[\s\S]*cancelRazorpaySubscriptionBodySchema/
+    );
+    expect(razorpayRouteSource).toMatch(
+      /environmentRouter\.post\(\s*'\/subscriptions\/:subscriptionId\/pause'[\s\S]*verifyUser[\s\S]*pauseRazorpaySubscriptionBodySchema/
+    );
+    expect(razorpayRouteSource).toMatch(
+      /environmentRouter\.post\(\s*'\/subscriptions\/:subscriptionId\/resume'[\s\S]*verifyUser[\s\S]*resumeRazorpaySubscriptionBodySchema/
+    );
     expect(razorpayRouteSource).toContain('RazorpayOrderService');
     expect(razorpayRouteSource).not.toContain('checkout-sessions');
     expect(razorpayRouteSource).not.toContain('payment-links');
@@ -234,6 +250,9 @@ describe('payments route schemas', () => {
     expect(paymentsApiSchemaSource).toContain('verifyRazorpayOrderBodySchema');
     expect(paymentsApiSchemaSource).toContain('createRazorpaySubscriptionBodySchema');
     expect(paymentsApiSchemaSource).toContain('verifyRazorpaySubscriptionBodySchema');
+    expect(paymentsApiSchemaSource).toContain('cancelRazorpaySubscriptionBodySchema');
+    expect(paymentsApiSchemaSource).toContain('pauseRazorpaySubscriptionBodySchema');
+    expect(paymentsApiSchemaSource).toContain('resumeRazorpaySubscriptionBodySchema');
     expect(paymentsApiSchemaSource).toContain('createRazorpayItemBodySchema');
     expect(paymentsApiSchemaSource).toContain('createRazorpayPlanBodySchema');
     expect(razorpayConfigRouteSource).toContain('parseZodSchema');
@@ -506,6 +525,7 @@ describe('payments route schemas', () => {
               items: 0,
               customers: 0,
               subscriptions: 0,
+              invoices: 0,
               payments: 0,
             },
             error: 'missing keys',
@@ -667,6 +687,25 @@ describe('payments route schemas', () => {
       subscriptionId: 'sub_123',
       paymentId: 'pay_123',
       signature: 'signature',
+    });
+
+    expect(cancelRazorpaySubscriptionBodySchema.parse({})).toEqual({
+      cancelAtCycleEnd: false,
+    });
+    expect(cancelRazorpaySubscriptionBodySchema.parse({ cancelAtCycleEnd: true })).toEqual({
+      cancelAtCycleEnd: true,
+    });
+    expect(pauseRazorpaySubscriptionBodySchema.parse({})).toEqual({});
+    expect(resumeRazorpaySubscriptionBodySchema.parse({})).toEqual({});
+    expect(() => pauseRazorpaySubscriptionBodySchema.parse({ planId: 'plan_456' })).toThrow();
+    expect(
+      razorpaySubscriptionParamsSchema.parse({
+        environment: 'test',
+        subscriptionId: 'sub_123',
+      })
+    ).toEqual({
+      environment: 'test',
+      subscriptionId: 'sub_123',
     });
   });
 

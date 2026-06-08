@@ -269,6 +269,8 @@ CREATE TABLE IF NOT EXISTS payments.razorpay_items (
   description TEXT,
   active BOOLEAN NOT NULL DEFAULT true,
   amount BIGINT,
+  -- Razorpay response mirror. Usually equals amount for catalog items, but
+  -- Razorpay API responses can include unit_amount separately.
   unit_amount BIGINT,
   currency TEXT NOT NULL,
   type TEXT,
@@ -294,6 +296,7 @@ CREATE TABLE IF NOT EXISTS payments.razorpay_plans (
   period TEXT NOT NULL,
   interval INTEGER NOT NULL,
   amount BIGINT,
+  -- Razorpay nested item response mirror. Usually equals amount.
   unit_amount BIGINT,
   currency TEXT NOT NULL,
   active BOOLEAN NOT NULL DEFAULT true,
@@ -340,6 +343,7 @@ CREATE TABLE IF NOT EXISTS payments.razorpay_subscriptions (
   start_at TIMESTAMPTZ,
   end_at TIMESTAMPTZ,
   total_count BIGINT,
+  auth_attempts BIGINT,
   paid_count BIGINT,
   remaining_count BIGINT,
   short_url TEXT,
@@ -357,18 +361,27 @@ CREATE TABLE IF NOT EXISTS payments.razorpay_subscriptions (
   UNIQUE (environment, subscription_id)
 );
 
+ALTER TABLE payments.razorpay_subscriptions
+  ADD COLUMN IF NOT EXISTS auth_attempts BIGINT;
+
 DROP TRIGGER IF EXISTS trg_payments_razorpay_subscriptions_updated_at
   ON payments.razorpay_subscriptions;
 CREATE TRIGGER trg_payments_razorpay_subscriptions_updated_at
 BEFORE UPDATE ON payments.razorpay_subscriptions
 FOR EACH ROW EXECUTE FUNCTION system.update_updated_at();
 
-GRANT INSERT, SELECT, UPDATE ON payments.razorpay_subscriptions TO anon, authenticated, project_admin;
-GRANT TRIGGER ON payments.razorpay_subscriptions TO project_admin;
+GRANT INSERT, SELECT ON payments.razorpay_subscriptions TO authenticated, project_admin;
+-- End-user subscription management routes use a rollbacked no-op update on
+-- updated_at to evaluate developer-defined UPDATE RLS policies without
+-- granting direct write access to subscription state columns.
+GRANT UPDATE (updated_at) ON payments.razorpay_subscriptions TO authenticated;
+GRANT UPDATE, TRIGGER ON payments.razorpay_subscriptions TO project_admin;
 
 CREATE TABLE IF NOT EXISTS payments.razorpay_orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   environment TEXT NOT NULL CHECK (environment IN ('test', 'live')),
+  -- initialized and failed are InsForge-local lifecycle states; created,
+  -- attempted, and paid mirror Razorpay order statuses.
   status TEXT NOT NULL DEFAULT 'initialized' CHECK (
     status IN ('initialized', 'created', 'attempted', 'paid', 'failed')
   ),
@@ -377,6 +390,8 @@ CREATE TABLE IF NOT EXISTS payments.razorpay_orders (
   customer_name TEXT,
   customer_email TEXT,
   customer_contact TEXT,
+  -- Nullable until provider order creation succeeds. Unique only when non-null;
+  -- the create flow updates rows by the local UUID id.
   order_id TEXT,
   receipt TEXT,
   amount BIGINT NOT NULL,
@@ -603,6 +618,39 @@ BEGIN
       created_at,
       updated_at
     )
+    WITH payment_history_source AS (
+      SELECT
+        ph.*,
+        CASE
+          WHEN type = 'refund' AND stripe_refund_id IS NOT NULL THEN 'refund'
+          WHEN type <> 'refund' AND stripe_payment_intent_id IS NOT NULL THEN 'payment_intent'
+          WHEN type <> 'refund' AND stripe_charge_id IS NOT NULL THEN 'charge'
+          WHEN type <> 'refund' AND stripe_invoice_id IS NOT NULL THEN 'invoice'
+          WHEN type <> 'refund' AND stripe_checkout_session_id IS NOT NULL THEN 'checkout_session'
+          ELSE NULL
+        END AS candidate_provider_object_type,
+        CASE
+          WHEN type = 'refund' AND stripe_refund_id IS NOT NULL THEN stripe_refund_id
+          WHEN type <> 'refund' AND stripe_payment_intent_id IS NOT NULL THEN stripe_payment_intent_id
+          WHEN type <> 'refund' AND stripe_charge_id IS NOT NULL THEN stripe_charge_id
+          WHEN type <> 'refund' AND stripe_invoice_id IS NOT NULL THEN stripe_invoice_id
+          WHEN type <> 'refund' AND stripe_checkout_session_id IS NOT NULL THEN stripe_checkout_session_id
+          ELSE NULL
+        END AS candidate_provider_object_id
+      FROM payments.payment_history ph
+    ),
+    ranked_payment_history AS (
+      SELECT
+        *,
+        CASE
+          WHEN candidate_provider_object_type IS NULL OR candidate_provider_object_id IS NULL THEN NULL
+          ELSE ROW_NUMBER() OVER (
+            PARTITION BY environment, candidate_provider_object_type, candidate_provider_object_id
+            ORDER BY stripe_created_at DESC NULLS LAST, updated_at DESC, created_at DESC, id
+          )
+        END AS provider_object_rank
+      FROM payment_history_source
+    )
     SELECT
       id,
       'stripe',
@@ -613,22 +661,8 @@ BEGIN
       subject_id,
       stripe_customer_id,
       customer_email_snapshot,
-      CASE
-        WHEN type = 'refund' AND stripe_refund_id IS NOT NULL THEN 'refund'
-        WHEN stripe_payment_intent_id IS NOT NULL THEN 'payment_intent'
-        WHEN stripe_charge_id IS NOT NULL THEN 'charge'
-        WHEN stripe_invoice_id IS NOT NULL THEN 'invoice'
-        WHEN stripe_checkout_session_id IS NOT NULL THEN 'checkout_session'
-        ELSE NULL
-      END,
-      CASE
-        WHEN type = 'refund' AND stripe_refund_id IS NOT NULL THEN stripe_refund_id
-        WHEN stripe_payment_intent_id IS NOT NULL THEN stripe_payment_intent_id
-        WHEN stripe_charge_id IS NOT NULL THEN stripe_charge_id
-        WHEN stripe_invoice_id IS NOT NULL THEN stripe_invoice_id
-        WHEN stripe_checkout_session_id IS NOT NULL THEN stripe_checkout_session_id
-        ELSE NULL
-      END,
+      CASE WHEN provider_object_rank = 1 THEN candidate_provider_object_type ELSE NULL END,
+      CASE WHEN provider_object_rank = 1 THEN candidate_provider_object_id ELSE NULL END,
       CASE
         WHEN type = 'refund' AND stripe_payment_intent_id IS NOT NULL THEN 'payment_intent'
         WHEN type = 'refund' AND stripe_charge_id IS NOT NULL THEN 'charge'
@@ -660,7 +694,7 @@ BEGIN
       COALESCE(raw, '{}'::JSONB),
       created_at,
       updated_at
-    FROM payments.payment_history
+    FROM ranked_payment_history
     ON CONFLICT (id) DO UPDATE SET
       provider = EXCLUDED.provider,
       environment = EXCLUDED.environment,

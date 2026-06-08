@@ -84,6 +84,13 @@ export const razorpayEnvironmentParamsSchema = z
 
 export const razorpayWebhookParamsSchema = razorpayEnvironmentParamsSchema;
 
+export const razorpaySubscriptionParamsSchema = z
+  .object({
+    environment: razorpayEnvironmentSchema,
+    subscriptionId: z.string().trim().min(1, 'Razorpay subscription id is required'),
+  })
+  .strict();
+
 export const stripePriceRecurringIntervalSchema = z.enum(['day', 'week', 'month', 'year']);
 export const stripePriceTaxBehaviorSchema = z.enum(['exclusive', 'inclusive', 'unspecified']);
 export const stripeIdempotencyKeySchema = z
@@ -584,6 +591,40 @@ export const verifyRazorpaySubscriptionResponseSchema = z.object({
   subscription: razorpaySubscriptionSchema,
 });
 
+export const cancelRazorpaySubscriptionBodySchema = z
+  .object({
+    cancelAtCycleEnd: z.boolean().default(false),
+  })
+  .strict();
+
+export const cancelRazorpaySubscriptionRequestSchema = z
+  .object({
+    environment: razorpayEnvironmentSchema,
+    subscriptionId: z.string().trim().min(1, 'Razorpay subscription id is required'),
+    ...cancelRazorpaySubscriptionBodySchema.shape,
+  })
+  .strict();
+
+export const cancelRazorpaySubscriptionResponseSchema = z.object({
+  subscription: razorpaySubscriptionSchema,
+});
+
+export const pauseRazorpaySubscriptionBodySchema = z.object({}).strict();
+
+export const pauseRazorpaySubscriptionRequestSchema = razorpaySubscriptionParamsSchema;
+
+export const pauseRazorpaySubscriptionResponseSchema = z.object({
+  subscription: razorpaySubscriptionSchema,
+});
+
+export const resumeRazorpaySubscriptionBodySchema = z.object({}).strict();
+
+export const resumeRazorpaySubscriptionRequestSchema = razorpaySubscriptionParamsSchema;
+
+export const resumeRazorpaySubscriptionResponseSchema = z.object({
+  subscription: razorpaySubscriptionSchema,
+});
+
 export const createCustomerPortalSessionBodySchema = z
   .object({
     subject: billingSubjectSchema,
@@ -745,6 +786,7 @@ export const razorpaySyncCountsSchema = z
     items: z.number().int().nonnegative(),
     customers: z.number().int().nonnegative(),
     subscriptions: z.number().int().nonnegative(),
+    invoices: z.number().int().nonnegative(),
     payments: z.number().int().nonnegative(),
   })
   .strict();
@@ -833,6 +875,7 @@ export type StripePriceParams = z.infer<typeof stripePriceParamsSchema>;
 export type StripeWebhookParams = z.infer<typeof stripeWebhookParamsSchema>;
 export type RazorpayEnvironmentParams = z.infer<typeof razorpayEnvironmentParamsSchema>;
 export type RazorpayWebhookParams = z.infer<typeof razorpayWebhookParamsSchema>;
+export type RazorpaySubscriptionParams = z.infer<typeof razorpaySubscriptionParamsSchema>;
 export type StripePriceRecurringInterval = z.infer<typeof stripePriceRecurringIntervalSchema>;
 export type StripePriceTaxBehavior = z.infer<typeof stripePriceTaxBehaviorSchema>;
 export type RazorpayItemParams = z.infer<typeof razorpayItemParamsSchema>;
@@ -876,6 +919,27 @@ export type VerifyRazorpaySubscriptionRequest = z.infer<
 >;
 export type VerifyRazorpaySubscriptionResponse = z.infer<
   typeof verifyRazorpaySubscriptionResponseSchema
+>;
+export type CancelRazorpaySubscriptionBody = z.infer<typeof cancelRazorpaySubscriptionBodySchema>;
+export type CancelRazorpaySubscriptionRequest = z.infer<
+  typeof cancelRazorpaySubscriptionRequestSchema
+>;
+export type CancelRazorpaySubscriptionResponse = z.infer<
+  typeof cancelRazorpaySubscriptionResponseSchema
+>;
+export type PauseRazorpaySubscriptionBody = z.infer<typeof pauseRazorpaySubscriptionBodySchema>;
+export type PauseRazorpaySubscriptionRequest = z.infer<
+  typeof pauseRazorpaySubscriptionRequestSchema
+>;
+export type PauseRazorpaySubscriptionResponse = z.infer<
+  typeof pauseRazorpaySubscriptionResponseSchema
+>;
+export type ResumeRazorpaySubscriptionBody = z.infer<typeof resumeRazorpaySubscriptionBodySchema>;
+export type ResumeRazorpaySubscriptionRequest = z.infer<
+  typeof resumeRazorpaySubscriptionRequestSchema
+>;
+export type ResumeRazorpaySubscriptionResponse = z.infer<
+  typeof resumeRazorpaySubscriptionResponseSchema
 >;
 export type CreateCustomerPortalSessionBody = z.infer<typeof createCustomerPortalSessionBodySchema>;
 export type CreateCustomerPortalSessionRequest = z.infer<
