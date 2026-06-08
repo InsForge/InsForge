@@ -43,50 +43,46 @@ export default function AccountSettingsDialog({ open, onOpenChange }: AccountSet
         setConfirmPassword('');
         onOpenChange(false);
       }, 1500);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to change password');
+    } catch (err: unknown) {
+      const errorResponse = err as { response?: { data?: { error?: string } } };
+      setError(errorResponse.response?.data?.error || 'Failed to change password');
     } finally {
       setLoading(false);
     }
   };
 
-  if (!open) return null;
+  if (!open) {
+    return null;
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black bg-opacity-50" onClick={() => onOpenChange(false)} />
+      <div
+        className="absolute inset-0 bg-black bg-opacity-50"
+        onClick={() => onOpenChange(false)}
+      />
       <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
         <h2 className="text-xl font-semibold mb-4">Account Settings</h2>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="bg-red-50 text-red-600 p-3 rounded text-sm">
-              {error}
-            </div>
-          )}
+        <form
+          onSubmit={(e) => {
+            void handleSubmit(e);
+          }}
+          className="space-y-4"
+        >
+          {error && <div className="bg-red-50 text-red-600 p-3 rounded text-sm">{error}</div>}
           {success && (
-            <div className="bg-green-50 text-green-600 p-3 rounded text-sm">
-              {success}
-            </div>
+            <div className="bg-green-50 text-green-600 p-3 rounded text-sm">{success}</div>
           )}
 
           <div>
-            <label className="block text-sm font-medium mb-1">
-              Username
-            </label>
-            <Input
-              type="text"
-              value={user?.username || ''}
-              disabled
-              className="bg-gray-100"
-            />
+            <label className="block text-sm font-medium mb-1">Username</label>
+            <Input type="text" value={user?.username || ''} disabled className="bg-gray-100" />
             <p className="text-xs text-gray-500 mt-1">Username cannot be changed</p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">
-              Current Password
-            </label>
+            <label className="block text-sm font-medium mb-1">Current Password</label>
             <Input
               type="password"
               value={oldPassword}
@@ -97,9 +93,7 @@ export default function AccountSettingsDialog({ open, onOpenChange }: AccountSet
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">
-              New Password
-            </label>
+            <label className="block text-sm font-medium mb-1">New Password</label>
             <Input
               type="password"
               value={newPassword}
@@ -110,9 +104,7 @@ export default function AccountSettingsDialog({ open, onOpenChange }: AccountSet
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">
-              Confirm New Password
-            </label>
+            <label className="block text-sm font-medium mb-1">Confirm New Password</label>
             <Input
               type="password"
               value={confirmPassword}
@@ -131,11 +123,7 @@ export default function AccountSettingsDialog({ open, onOpenChange }: AccountSet
             >
               Cancel
             </Button>
-            <Button
-              type="submit"
-              disabled={loading}
-              className="flex-1"
-            >
+            <Button type="submit" disabled={loading} className="flex-1">
               {loading ? 'Updating...' : 'Update Password'}
             </Button>
           </div>
