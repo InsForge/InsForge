@@ -5,6 +5,9 @@ on:
     branches: [main, master, develop]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   integration-tests:
     name: Integration Tests
@@ -34,6 +37,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install Postgres client
         run: |

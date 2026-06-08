@@ -12,13 +12,18 @@ const ROOT = path.resolve(__dirname, '..', '..', '..');
 /**
  * Pre-configured getConnections() for InsForge integration tests.
  *
- * Seeds the test database with:
- *   1. deploy/docker-init/db/db-init.sql  – roles + auto-RLS event triggers
+ * Seeds the test database to match the current InsForge database model:
+ *   1. deploy/docker-init/db/db-init.sql  – roles + legacy event triggers
  *   2. migrations/001 – public uid(), role(), email()
  *   3. migrations/013 – auth schema + auth.uid(), auth.role(), auth.email()
- *   4. auth schema grants – mirrors grants from migrations 018 and 045
- *      (full migrations can't run in isolation because they move/rename
- *       tables and reference schemas that don't exist in the test DB)
+ *   4. migrations/044 – JSON-only JWT claims (drops dotted GUC fallback)
+ *   5. seed.fn() – applies key parts of migrations 018 and 045:
+ *        • auth schema grants (from 018)
+ *        • ALTER ROLE project_admin BYPASSRLS (from 045)
+ *        • drop legacy auto-policy event triggers (from 045)
+ *      Full migrations can't run in isolation because they reference
+ *      schemas (compute, deployments, email, etc.) that don't exist
+ *      in the test DB.
  *
  * No pgpm workspace required — uses seed.sqlfile() with InsForge's own SQL.
  */
@@ -30,17 +35,23 @@ export const getConnections = (
       path.join(ROOT, 'deploy/docker-init/db/db-init.sql'),
       path.join(ROOT, 'backend/src/infra/database/migrations/001_create-helper-functions.sql'),
       path.join(ROOT, 'backend/src/infra/database/migrations/013_create-auth-schema-functions.sql'),
+      path.join(ROOT, 'backend/src/infra/database/migrations/044_prefer-request-jwt-claims.sql'),
     ]),
-    // Grants from 018_schema-rework.sql (GRANT USAGE ON SCHEMA auth TO PUBLIC)
-    // and 045_project-admin-public-privileges.sql (auth grants to project_admin).
-    // These migrations are too large to run in isolation (they ALTER/RENAME
-    // tables and reference schemas that don't exist in a fresh test DB),
-    // so we apply only the relevant grants here.
     seed.fn(async (ctx) => {
       await ctx.pg.query(`
+        -- Auth schema grants (from 018 + 045)
         GRANT USAGE ON SCHEMA auth TO PUBLIC;
         GRANT USAGE ON SCHEMA auth TO project_admin;
         GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA auth TO authenticated, anon, project_admin;
+
+        -- project_admin uses BYPASSRLS instead of per-table policies (from 045)
+        ALTER ROLE project_admin BYPASSRLS;
+
+        -- Drop legacy auto-policy event triggers and functions (from 045)
+        DROP EVENT TRIGGER IF EXISTS create_policies_on_table_create;
+        DROP EVENT TRIGGER IF EXISTS create_policies_on_rls_enable;
+        DROP FUNCTION IF EXISTS public.create_default_policies() CASCADE;
+        DROP FUNCTION IF EXISTS public.create_policies_after_rls() CASCADE;
       `);
     }),
   ]);

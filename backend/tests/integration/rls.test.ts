@@ -149,15 +149,23 @@ describe('role access control', () => {
     expect(rows).toHaveLength(0);
   });
 
-  it('should allow project_admin to bypass RLS via auto-generated policy', async () => {
+  it('should allow project_admin to bypass RLS via BYPASSRLS role attribute', async () => {
     db.setContext(asUser(USER_A));
     await db.one(`INSERT INTO todos (title) VALUES ($1) RETURNING id`, ['Admin can see me']);
 
     db.setContext(asUser(USER_B));
     await db.one(`INSERT INTO todos (title) VALUES ($1) RETURNING id`, ['Admin sees this too']);
 
+    // project_admin has BYPASSRLS — no per-table policy needed
     db.setContext({ role: 'project_admin' });
     const rows = await db.many(`SELECT * FROM todos`);
     expect(rows.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('should confirm no project_admin_policy exists on the table', async () => {
+    const { rows } = await db.query(
+      `SELECT policyname FROM pg_policies WHERE tablename = 'todos' AND policyname = 'project_admin_policy'`
+    );
+    expect(rows).toHaveLength(0);
   });
 });
