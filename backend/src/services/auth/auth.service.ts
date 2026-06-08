@@ -686,9 +686,7 @@ export class AuthService {
   /**
    * List all project administrators (root only)
    */
-  /**
-   * List all project administrators (root only)
-   */
+
   async listAdmins(): Promise<{ username: string; createdAt: string; updatedAt: string }[]> {
     const admins = await adminService.listAdmins();
     return admins.map((admin) => ({
@@ -703,14 +701,15 @@ export class AuthService {
    */
   async createAdmin(
     username: string,
-    password: string
+    password: string,
+    createdBy?: string
   ): Promise<{ username: string; createdAt: string; updatedAt: string }> {
     const existing = await adminService.getAdminByUsername(username);
     if (existing) {
       throw new AppError('Admin user already exists', 409, ERROR_CODES.AUTH_EMAIL_EXISTS);
     }
 
-    const admin = await adminService.createAdmin(username, password, undefined, false);
+    const admin = await adminService.createAdmin(username, password, createdBy, false);
 
     return {
       username: admin.username,
@@ -733,22 +732,22 @@ export class AuthService {
       throw new AppError('Cannot delete root admin', 403, ERROR_CODES.FORBIDDEN);
     }
 
-    // For delete, we need current admin ID - this will be passed from controller
-    // For now, we'll implement a simpler version
+    // Use soft delete via UPDATE instead of hard DELETE
     const pool = this.getPool();
     const result = await pool.query(
-      'DELETE FROM auth.project_admins WHERE username = $1 AND is_root = false',
+      `UPDATE auth.project_admins 
+         SET deleted_at = NOW(), updated_at = NOW() 
+         WHERE username = $1 AND is_root = false AND deleted_at IS NULL
+         RETURNING id`,
       [username]
     );
 
     if (result.rowCount === 0) {
-      throw new AppError(
-        'Admin user not found or cannot be deleted',
-        404,
-        ERROR_CODES.AUTH_USER_NOT_FOUND
-      );
+      throw new AppError('Admin user not found or cannot be deleted', 404, ERROR_CODES.AUTH_USER_NOT_FOUND);
     }
   }
+
+
   /**
    * Change current admin's password
    */
