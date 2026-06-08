@@ -416,7 +416,7 @@ export class FlyProvider implements ComputeProvider {
       // Fly request must not pile up and degrade API responsiveness.
       response = await fetch(url, {
         headers: {
-          Authorization: `FlyV1 ${config.fly.apiToken}`,
+          Authorization: `FlyV1 ${appConfig.fly.apiToken}`,
           'Content-Type': 'application/json',
         },
         signal: AbortSignal.timeout(15_000),
