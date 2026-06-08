@@ -754,13 +754,7 @@ router.post('/admin/addAdmin', verifyAdmin, async (req: AuthRequest, res: Respon
 
     const result: CreateAdminSessionResponse = await authService.addAdmin(name, password, req.user.id);
 
-    // Set refresh token as httpOnly cookie + CSRF token for web clients
-    const tokenManager = TokenManager.getInstance();
-    const refreshToken = tokenManager.generateRefreshToken(result.user.id);
-    setRefreshTokenCookie(res, refreshToken);
-    const csrfToken = tokenManager.generateCsrfToken(refreshToken);
-
-    successResponse(res, { ...result, csrfToken });
+    successResponse(res, result);
 
   } catch (error) {
     next(error);
