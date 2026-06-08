@@ -63,7 +63,12 @@ export class AdminService {
       [username]
     );
 
+    // dummy hash to prevent timing attacks
+    const dummyHash = await bcrypt.hash('dummy', 10);
+
     if (result.rows.length === 0) {
+      // comparing dummy 
+      await bcrypt.compare(password, dummyHash);
       return null;
     }
 
