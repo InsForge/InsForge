@@ -3,55 +3,77 @@ import {
   seed,
   type GetConnectionResult,
 } from 'insforge-test';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..', '..', '..');
+const MIGRATIONS = path.join(ROOT, 'backend/src/infra/database/migrations');
+
+const migrationFiles = fs
+  .readdirSync(MIGRATIONS)
+  .filter((f) => f.endsWith('.sql'))
+  .sort()
+  .map((f) => path.join(MIGRATIONS, f));
 
 /**
  * Pre-configured getConnections() for InsForge integration tests.
  *
- * Seeds the test database to match the current InsForge database model:
- *   1. deploy/docker-init/db/db-init.sql  – roles + legacy event triggers
- *   2. migrations/001 – public uid(), role(), email()
- *   3. migrations/013 – auth schema + auth.uid(), auth.role(), auth.email()
- *   4. migrations/044 – JSON-only JWT claims (drops dotted GUC fallback)
- *   5. seed.fn() – applies key parts of migrations 018 and 045:
- *        • auth schema grants (from 018)
- *        • ALTER ROLE project_admin BYPASSRLS (from 045)
- *        • drop legacy auto-policy event triggers (from 045)
- *      Full migrations can't run in isolation because they reference
- *      schemas (compute, deployments, email, etc.) that don't exist
- *      in the test DB.
+ * Seeds the test database by running the full InsForge migration chain
+ * (db-init.sql + migrations 000–048) so the test schema matches production.
  *
- * No pgpm workspace required — uses seed.sqlfile() with InsForge's own SQL.
+ * pg_cron can only be installed in the database named by cron.database_name
+ * (the Docker image hardcodes "insforge"), but pgsql-test creates isolated
+ * databases with random names. A stub cron schema provides the table and
+ * function signatures that later migrations reference. The real pgcrypto
+ * and http extensions are installed normally.
+ *
+ * CREATE EXTENSION statements are stripped from migration files because
+ * extensions are handled in the pre-seed step above.
  */
 export const getConnections = (
   opts: Parameters<typeof getInsforgeConnections>[0] = {}
 ): Promise<GetConnectionResult> =>
   getInsforgeConnections(opts, [
-    seed.sqlfile([
-      path.join(ROOT, 'deploy/docker-init/db/db-init.sql'),
-      path.join(ROOT, 'backend/src/infra/database/migrations/001_create-helper-functions.sql'),
-      path.join(ROOT, 'backend/src/infra/database/migrations/013_create-auth-schema-functions.sql'),
-      path.join(ROOT, 'backend/src/infra/database/migrations/044_prefer-request-jwt-claims.sql'),
-    ]),
+    // 1. Bootstrap roles and event triggers
+    seed.sqlfile([path.join(ROOT, 'deploy/docker-init/db/db-init.sql')]),
+    // 2. Install real extensions + stub pg_cron (database-name restricted)
     seed.fn(async (ctx) => {
       await ctx.pg.query(`
-        -- Auth schema grants (from 018 + 045)
-        GRANT USAGE ON SCHEMA auth TO PUBLIC;
-        GRANT USAGE ON SCHEMA auth TO project_admin;
-        GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA auth TO authenticated, anon, project_admin;
+        CREATE EXTENSION IF NOT EXISTS pgcrypto;
+        CREATE EXTENSION IF NOT EXISTS http;
 
-        -- project_admin uses BYPASSRLS instead of per-table policies (from 045)
-        ALTER ROLE project_admin BYPASSRLS;
-
-        -- Drop legacy auto-policy event triggers and functions (from 045)
-        DROP EVENT TRIGGER IF EXISTS create_policies_on_table_create;
-        DROP EVENT TRIGGER IF EXISTS create_policies_on_rls_enable;
-        DROP FUNCTION IF EXISTS public.create_default_policies() CASCADE;
-        DROP FUNCTION IF EXISTS public.create_policies_after_rls() CASCADE;
+        CREATE SCHEMA IF NOT EXISTS cron;
+        CREATE TABLE IF NOT EXISTS cron.job (
+          jobid bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+          schedule text NOT NULL,
+          command text NOT NULL,
+          nodename text DEFAULT 'localhost',
+          nodeport int DEFAULT 5432,
+          database text DEFAULT current_database(),
+          username text DEFAULT current_user,
+          active boolean DEFAULT true,
+          jobname text
+        );
+        CREATE FUNCTION cron.schedule(cron_schedule text, command text)
+          RETURNS bigint LANGUAGE sql AS $$ SELECT 0::bigint $$;
+        CREATE FUNCTION cron.schedule(job_name text, cron_schedule text, command text)
+          RETURNS bigint LANGUAGE sql AS $$ SELECT 0::bigint $$;
+        CREATE FUNCTION cron.unschedule(job_id bigint)
+          RETURNS boolean LANGUAGE sql AS $$ SELECT true $$;
+        CREATE FUNCTION cron.unschedule(job_name text)
+          RETURNS boolean LANGUAGE sql AS $$ SELECT true $$;
       `);
+    }),
+    // 3. Run the full migration chain (000–048), stripping CREATE EXTENSION
+    //    statements since extensions are already installed or stubbed above.
+    seed.fn(async (ctx) => {
+      for (const file of migrationFiles) {
+        const sql = fs
+          .readFileSync(file, 'utf8')
+          .replace(/^CREATE EXTENSION IF NOT EXISTS \S+;$/gm, '');
+        await ctx.pg.query(sql);
+      }
     }),
   ]);
