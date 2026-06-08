@@ -77,7 +77,9 @@ export class MetadataService {
      */
     const codeSpan = (s: unknown) => {
       const str = String(s ?? '').replace(/\n/g, ' ');
-      if (!str.includes('`')) return `\`${str}\``;
+      if (!str.includes('`')) {
+        return `\`${str}\``;
+      }
       return `\`\` ${str} \`\``;
     };
 
