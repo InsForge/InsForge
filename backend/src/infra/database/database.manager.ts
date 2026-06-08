@@ -129,7 +129,7 @@ export class DatabaseManager {
       const [allTables, databaseSize, countResults] = await Promise.all([
         this.getUserTables(),
         this.getDatabaseSizeInGB(),
-        // Get all counts in a single query using UNION ALL
+        // Get all counts from system.table_metadata_counters in a single query
         (async () => {
           try {
             const tablesResult = await client.query(
@@ -147,15 +147,48 @@ export class DatabaseManager {
               return [];
             }
 
-            // Build a UNION ALL query to get all counts in one query
-            const unionQuery = tableNames
-              .map((tableName) =>
-                pgFormat('SELECT %L as table_name, COUNT(*) as count FROM %I', tableName, tableName)
-              )
-              .join(' UNION ALL ');
+            const placeholders = tableNames.map((_, i) => `$${i + 1}`).join(', ');
+            const result = await client.query(
+              `SELECT table_name, row_count as count 
+               FROM system.table_metadata_counters 
+               WHERE table_name IN (${placeholders})`,
+              tableNames
+            );
 
-            const result = await client.query(unionQuery);
-            return result.rows as { table_name: string; count: number }[];
+            const rowMap = new Map<string, number>();
+            for (const row of result.rows) {
+              rowMap.set(row.table_name, Number(row.count));
+            }
+
+            const finalResults: { table_name: string; count: number }[] = [];
+            for (const tableName of tableNames) {
+              if (rowMap.has(tableName)) {
+                finalResults.push({ table_name: tableName, count: rowMap.get(tableName)! });
+              } else {
+                // Self-healing: If a table is missing, initialize its counter dynamically
+                try {
+                  await client.query('SELECT system.enable_table_counter($1, $2)', ['public', tableName]);
+                  const fallbackResult = await client.query(
+                    'SELECT row_count as count FROM system.table_metadata_counters WHERE table_name = $1',
+                    [tableName]
+                  );
+                  const count = fallbackResult.rows[0]?.count ? Number(fallbackResult.rows[0].count) : 0;
+                  finalResults.push({ table_name: tableName, count });
+                } catch {
+                  // Gracefully fallback to standard count
+                  try {
+                    const fallbackCountResult = await client.query(
+                      `SELECT COUNT(*) as row_count FROM "public"."${tableName}"`
+                    );
+                    const count = Number(fallbackCountResult.rows[0].row_count);
+                    finalResults.push({ table_name: tableName, count });
+                  } catch {
+                    finalResults.push({ table_name: tableName, count: 0 });
+                  }
+                }
+              }
+            }
+            return finalResults;
           } catch {
             return [];
           }

@@ -278,6 +278,9 @@ export class DatabaseTableService {
           `
           );
 
+          // Enable metadata counter trigger-backed row counting
+          await client.query('SELECT system.enable_table_counter($1, $2)', [schemaName, table_name]);
+
           // Update metadata
           // Metadata is now updated on-demand
 
@@ -416,10 +419,29 @@ export class DatabaseTableService {
       const uniqueColumns = uniqueColumnsResult.rows;
       const uniqueSet = new Set(uniqueColumns.map((u: { column_name: string }) => u.column_name));
 
-      // Get row count
-      const sql = `SELECT COUNT(*) as row_count FROM ${safeQualifiedTableName}`;
-      const rowCountResult = await client.query(sql);
-      const row_count = rowCountResult.rows[0].row_count;
+      // Get row count from system.table_metadata_counters with a fallback
+      let row_count = 0;
+      try {
+        const counterResult = await client.query(
+          'SELECT row_count FROM system.table_metadata_counters WHERE table_name = $1',
+          [table]
+        );
+        if (counterResult.rows.length > 0) {
+          row_count = Number(counterResult.rows[0].row_count);
+        } else {
+          // Self-heal: Enable counter for this table
+          await client.query('SELECT system.enable_table_counter($1, $2)', [schemaName, table]);
+          const fallbackResult = await client.query(
+            'SELECT row_count FROM system.table_metadata_counters WHERE table_name = $1',
+            [table]
+          );
+          row_count = fallbackResult.rows[0] ? Number(fallbackResult.rows[0].row_count) : 0;
+        }
+      } catch {
+        // Safe fallback to exact count if the counter schema query errors (e.g. during migration setup)
+        const fallbackCountResult = await client.query(`SELECT COUNT(*) as row_count FROM ${safeQualifiedTableName}`);
+        row_count = Number(fallbackCountResult.rows[0].row_count);
+      }
 
       return {
         schemaName,
