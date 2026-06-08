@@ -777,7 +777,7 @@ export class AuthService {
         throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
       }
       const admin = result.rows[0];
-      logger.info('Admin found', { admin });
+      logger.info('Admin found', { adminId: admin.id, username: admin.username });
       if (!bcrypt.compareSync(password, admin.password_hash)) {
         throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
       }
