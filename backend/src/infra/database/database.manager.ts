@@ -3,7 +3,6 @@ import path from 'path';
 import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { DatabaseMetadataSchema } from '@insforge/shared-schemas';
-import pgFormat from 'pg-format';
 import { buildQualifiedTableKey, DEFAULT_DATABASE_SCHEMA } from '@/services/database/helpers.js';
 import { appConfig } from '@/infra/config/app.config.js';
 
@@ -163,16 +162,21 @@ export class DatabaseManager {
             const finalResults: { table_name: string; count: number }[] = [];
             for (const tableName of tableNames) {
               if (rowMap.has(tableName)) {
-                finalResults.push({ table_name: tableName, count: rowMap.get(tableName)! });
+                finalResults.push({ table_name: tableName, count: rowMap.get(tableName) ?? 0 });
               } else {
                 // Self-healing: If a table is missing, initialize its counter dynamically
                 try {
-                  await client.query('SELECT system.enable_table_counter($1, $2)', ['public', tableName]);
+                  await client.query('SELECT system.enable_table_counter($1, $2)', [
+                    'public',
+                    tableName,
+                  ]);
                   const fallbackResult = await client.query(
                     'SELECT row_count as count FROM system.table_metadata_counters WHERE table_name = $1',
                     [tableName]
                   );
-                  const count = fallbackResult.rows[0]?.count ? Number(fallbackResult.rows[0].count) : 0;
+                  const count = fallbackResult.rows[0]?.count
+                    ? Number(fallbackResult.rows[0].count)
+                    : 0;
                   finalResults.push({ table_name: tableName, count });
                 } catch {
                   // Gracefully fallback to standard count

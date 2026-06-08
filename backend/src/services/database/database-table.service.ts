@@ -279,7 +279,10 @@ export class DatabaseTableService {
           );
 
           // Enable metadata counter trigger-backed row counting
-          await client.query('SELECT system.enable_table_counter($1, $2)', [schemaName, table_name]);
+          await client.query('SELECT system.enable_table_counter($1, $2)', [
+            schemaName,
+            table_name,
+          ]);
 
           // Update metadata
           // Metadata is now updated on-demand
@@ -439,7 +442,9 @@ export class DatabaseTableService {
         }
       } catch {
         // Safe fallback to exact count if the counter schema query errors (e.g. during migration setup)
-        const fallbackCountResult = await client.query(`SELECT COUNT(*) as row_count FROM ${safeQualifiedTableName}`);
+        const fallbackCountResult = await client.query(
+          `SELECT COUNT(*) as row_count FROM ${safeQualifiedTableName}`
+        );
         row_count = Number(fallbackCountResult.rows[0].row_count);
       }
 
