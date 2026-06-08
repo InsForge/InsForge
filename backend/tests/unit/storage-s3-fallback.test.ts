@@ -336,4 +336,23 @@ describe('S3StorageProvider — branch fallback', () => {
       expect(sendMock).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe('getDownloadStrategy expiry', () => {
+    // Uses the real presigner (signs locally with the dummy creds), so the
+    // returned URL actually carries `X-Amz-Expires` — proving the caller's
+    // expiresIn reaches the signature, not just the function arguments.
+    it('private bucket: caller expiresIn flows into the S3 presigned signature', async () => {
+      const p = makeProvider(); // no parent -> no HEAD round-trip, pure S3 presign
+      const strat = await p.getDownloadStrategy('photos', 'a.txt', 120, false);
+      expect(strat.method).toBe('presigned');
+      expect(new URL(strat.url).searchParams.get('X-Amz-Expires')).toBe('120');
+    });
+
+    it('public bucket: expiry is overridden to 7 days regardless of caller value', async () => {
+      const p = makeProvider();
+      const strat = await p.getDownloadStrategy('photos', 'a.txt', 120, true);
+      expect(strat.method).toBe('presigned');
+      expect(new URL(strat.url).searchParams.get('X-Amz-Expires')).toBe('604800');
+    });
+  });
 });
