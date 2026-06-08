@@ -13,6 +13,7 @@ import {
   customOAuthKeySchema,
   smtpConfigSchema,
   emailTemplateSchema,
+  adminSchema,
 } from './auth.schema.js';
 
 // ============================================================================
@@ -43,14 +44,18 @@ export const createUserRequestSchema = z.object({
  * POST /api/auth/sessions - Create session
  */
 export const createSessionRequestSchema = z.object({
-  name: nameSchema,
+  email: emailSchema,
   password: passwordSchema,
 });
+
 
 /**
  * POST /api/auth/admin/sessions - Create admin session
  */
-export const createAdminSessionRequestSchema = createSessionRequestSchema;
+export const createAdminSessionRequestSchema = z.object({
+  username: nameSchema,
+  password: passwordSchema,
+});
 
 /**
  * POST /api/auth/refresh - Refresh session
@@ -213,7 +218,10 @@ export const resetPasswordResponseSchema = z.object({
 /**
  * Response for POST /api/auth/admin/sessions
  */
-export const createAdminSessionResponseSchema = createSessionResponseSchema;
+export const createAdminSessionResponseSchema = z.object({
+  user: adminSchema,
+  accessToken: z.string()
+});
 
 /**
  * Response for GET /api/auth/sessions/current

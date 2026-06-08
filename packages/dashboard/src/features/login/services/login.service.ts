@@ -8,10 +8,10 @@ interface LoginResult {
 }
 
 export class LoginService {
-  async loginWithPassword(name: string, password: string): Promise<LoginResult> {
+  async loginWithPassword(username: string, password: string): Promise<LoginResult> {
     const response = await apiClient.request('/auth/admin/sessions', {
       method: 'POST',
-      body: JSON.stringify({ name, password }),
+      body: JSON.stringify({ username, password }),
       skipRefresh: true,
     });
 
@@ -33,10 +33,10 @@ export class LoginService {
     };
   }
 
-  async addAdmin(name: string, password: string): Promise<LoginResult> {
+  async addAdmin(username: string, password: string): Promise<LoginResult> {
     const response = await apiClient.request('/auth/admin/addAdmin', {
       method: 'POST',
-      body: JSON.stringify({ name, password }),
+      body: JSON.stringify({ username, password }),
       skipRefresh: true,
     });
 

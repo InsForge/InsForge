@@ -55,6 +55,14 @@ export const userSchema = z.object({
   metadata: z.record(z.unknown()).nullable(), // System metadata (device ID, login IP, etc.)
 });
 
+// admin schema
+export const adminSchema = z.object({
+  id: userIdSchema,
+  username: nameSchema,
+  createdAt: z.string(), // PostgreSQL timestamp
+  updatedAt: z.string(), // PostgreSQL timestamp
+});
+
 /**
  * OAuth state for redirect handling
  */
@@ -164,8 +172,9 @@ export const emailTemplateSchema = z.object({
 export const tokenPayloadSchema = z.object({
   sub: userIdSchema, // Subject (user ID)
   email: emailSchema,
-  username: nameSchema,
+  username: nameSchema.optional(),
   role: roleSchema,
+  isRoot: z.boolean().optional(),
   iat: z.number().optional(), // Issued at
   exp: z.number().optional(), // Expiration
 });

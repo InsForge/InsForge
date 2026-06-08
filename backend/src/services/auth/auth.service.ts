@@ -703,7 +703,7 @@ export class AuthService {
   }
 
   //get all admins
-  async getAllAdmins(): Promise<ListUsersResponse> {
+  async getAllAdmins(): Promise<any> {
     const dbManager = DatabaseManager.getInstance();
     const pool = dbManager.getPool();
     const result = await pool.query(`SELECT id, username, created_at, updated_at FROM auth.project_admins WHERE created_by IS NOT NULL`);
@@ -731,10 +731,11 @@ export class AuthService {
       return {
         user: {
           id: admin.id,
-          name,
+          username: admin.username,
           createdAt: admin.created_at,
           updatedAt: admin.updated_at,
-        }
+        },
+        accessToken: '',
       };
     } catch (error) {
       throw error;
@@ -786,7 +787,8 @@ export class AuthService {
         sub: admin.id,
         username: admin.username,
         role: 'project_admin',
-        isRoot
+        isRoot,
+        email: ''
       });
       await client.query('update auth.project_admins set last_login_at=$1 where id=$2', [new Date(), admin.id])
       return {
@@ -809,7 +811,7 @@ export class AuthService {
   /**
    * Admin login with authorization token (validates JWT from external issuer)
    */
-  async adminLoginWithAuthorizationCode(code: string): Promise<CreateAdminSessionResponse> {
+  async adminLoginWithAuthorizationCode(code: string): Promise<CreateSessionResponse> {
     try {
       // Use TokenManager to verify cloud token
       const { payload } = await this.tokenManager.verifyCloudToken(code);
@@ -1361,7 +1363,7 @@ export class AuthService {
       const now = new Date().toISOString();
       return {
         id: ADMIN_ID,
-        email: this.adminEmail,
+        email: this.adminName,
         profile: { name: 'Administrator' },
         metadata: {},
         email_verified: true,

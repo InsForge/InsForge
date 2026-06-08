@@ -643,7 +643,7 @@ router.post('/admin/sessions/exchange', async (req: Request, res: Response, next
     }
 
     const { code } = validationResult.data;
-    const result: CreateAdminSessionResponse =
+    const result: CreateSessionResponse =
       await authService.adminLoginWithAuthorizationCode(code);
 
     // Set refresh token as httpOnly cookie + CSRF token for web clients
@@ -681,8 +681,8 @@ router.post('/admin/sessions', async (req: Request, res: Response, next: NextFun
       );
     }
 
-    const { name, password } = validationResult.data;
-    const result: CreateAdminSessionResponse = await authService.adminLogin(name, password);
+    const { username, password } = validationResult.data;
+    const result: CreateAdminSessionResponse = await authService.adminLogin(username, password);
 
     // Set refresh token as httpOnly cookie + CSRF token for web clients
     const tokenManager = TokenManager.getInstance();
@@ -750,9 +750,9 @@ router.post('/admin/addAdmin', verifyAdmin, async (req: AuthRequest, res: Respon
       );
     }
 
-    const { name, password } = validationResult.data;
+    const { username, password } = validationResult.data;
 
-    const result: CreateAdminSessionResponse = await authService.addAdmin(name, password, req.user.id);
+    const result: CreateAdminSessionResponse = await authService.addAdmin(username, password, req.user.id);
 
     successResponse(res, result);
 

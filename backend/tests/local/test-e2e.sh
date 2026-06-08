@@ -230,6 +230,70 @@ response=$(curl -s -w "\n%{http_code}" -X DELETE "$TEST_API_BASE/storage/buckets
   -H "Authorization: Bearer $API_KEY")
 test_endpoint "Delete file" "$response" "200"
 
+
+TEST_SUB_ADMIN_USERNAME="test_subadmin_$(date +%s)"
+TEST_SUB_ADMIN_PASSWORD="SubAdmin123!"
+SUB_ADMIN_ID=""
+
+# 15. Test Admin Login with username
+print_info "15. Testing Admin Login with username"
+response=$(curl -s -w "\n%{http_code}" -X POST "$TEST_API_BASE/auth/admin/sessions" \
+  -H "Content-Type: application/json" \
+  -d "{\"username\":\"$TEST_ADMIN_USERNAME\",\"password\":\"$TEST_ADMIN_PASSWORD\"}")
+test_endpoint "Admin login with username" "$response" "200"
+
+# 16. Test Add Sub-Admin (root only)
+print_info "16. Testing Add Sub-Admin"
+response=$(curl -s -w "\n%{http_code}" -X POST "$TEST_API_BASE/auth/admin/addAdmin" \
+  -H "Authorization: Bearer $admin_token" \
+  -H "Content-Type: application/json" \
+  -d "{\"name\":\"$TEST_SUB_ADMIN_USERNAME\",\"password\":\"$TEST_SUB_ADMIN_PASSWORD\"}")
+test_endpoint "Add sub-admin" "$response" "200"
+
+# Extract sub-admin ID
+SUB_ADMIN_ID=$(echo "$response" | sed '$d' | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+echo "Sub-admin ID: $SUB_ADMIN_ID"
+
+# 17. Test Sub-Admin Login
+print_info "17. Testing Sub-Admin Login"
+response=$(curl -s -w "\n%{http_code}" -X POST "$TEST_API_BASE/auth/admin/sessions" \
+  -H "Content-Type: application/json" \
+  -d "{\"username\":\"$TEST_SUB_ADMIN_USERNAME\",\"password\":\"$TEST_SUB_ADMIN_PASSWORD\"}")
+test_endpoint "Sub-admin login" "$response" "200"
+
+# 18. Test Sub-Admin cannot add admin (non-root)
+print_info "18. Testing Sub-Admin cannot add another admin"
+sub_admin_token=$(echo "$response" | sed '$d' | grep -o '"accessToken":"[^"]*"' | cut -d'"' -f4)
+response=$(curl -s -w "\n%{http_code}" -X POST "$TEST_API_BASE/auth/admin/addAdmin" \
+  -H "Authorization: Bearer $sub_admin_token" \
+  -H "Content-Type: application/json" \
+  -d "{\"name\":\"should_fail\",\"password\":\"ShouldFail123!\"}")
+test_endpoint "Non-root cannot add admin" "$response" "403"
+
+# 19. Test Change Password
+print_info "19. Testing Change Password"
+response=$(curl -s -w "\n%{http_code}" -X PUT "$TEST_API_BASE/auth/admin/resetPassword" \
+  -H "Authorization: Bearer $admin_token" \
+  -H "Content-Type: application/json" \
+  -d "{\"oldPassword\":\"$TEST_ADMIN_PASSWORD\",\"newPassword\":\"NewPassword123!\"}")
+test_endpoint "Change password" "$response" "200"
+
+# Reset password back so other tests don't break
+curl -s -X PUT "$TEST_API_BASE/auth/admin/resetPassword" \
+  -H "Authorization: Bearer $admin_token" \
+  -H "Content-Type: application/json" \
+  -d "{\"oldPassword\":\"NewPassword123!\",\"newPassword\":\"$TEST_ADMIN_PASSWORD\"}" > /dev/null
+
+# 20. Test Delete Sub-Admin (root only)
+if [ -n "$SUB_ADMIN_ID" ]; then
+    print_info "20. Testing Delete Sub-Admin"
+    response=$(curl -s -w "\n%{http_code}" -X DELETE "$TEST_API_BASE/auth/admin/deleteAdmin/$SUB_ADMIN_ID" \
+      -H "Authorization: Bearer $admin_token")
+    test_endpoint "Delete sub-admin" "$response" "200"
+else
+    print_info "20. Skipping Delete Sub-Admin - no sub-admin ID"
+fi
+
 # Clean up temp files
 rm -f /tmp/test-upload.txt
 

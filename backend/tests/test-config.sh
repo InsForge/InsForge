@@ -7,8 +7,10 @@
 export TEST_API_BASE="${TEST_API_BASE:-http://localhost:7130/api}"
 
 # Admin credentials - can be overridden by environment variables
-export TEST_ADMIN_EMAIL="${TEST_ADMIN_EMAIL:-${ADMIN_EMAIL:-admin@example.com}}"
-export TEST_ADMIN_PASSWORD="${TEST_ADMIN_PASSWORD:-${ADMIN_PASSWORD:-change-this-password}}"
+
+export TEST_ADMIN_USERNAME="${TEST_ADMIN_USERNAME:-${ROOT_ADMIN_USERNAME:-admin}}"
+export TEST_ADMIN_PASSWORD="${TEST_ADMIN_PASSWORD:-${ROOT_ADMIN_PASSWORD:-password}}"
+export TEST_ADMIN_EMAIL="${TEST_ADMIN_EMAIL:-${TEST_ADMIN_USERNAME:-admin}}
 
 # User test credentials
 export TEST_USER_EMAIL_PREFIX="${TEST_USER_EMAIL_PREFIX:-testuser_}"
@@ -43,7 +45,7 @@ get_admin_token() {
     # Use JWT admin endpoint
     local response=$(curl -s -X POST "$TEST_API_BASE/auth/admin/sessions" \
         -H "Content-Type: application/json" \
-        -d "{\"email\":\"$TEST_ADMIN_EMAIL\",\"password\":\"$TEST_ADMIN_PASSWORD\"}")
+        -d "{\"username\":\"$TEST_ADMIN_USERNAME\",\"password\":\"$TEST_ADMIN_PASSWORD\"}")
     
     if echo "$response" | grep -q '"accessToken"'; then
             echo "$response" | grep -o '"accessToken":"[^"]*"' | cut -d'"' -f4
@@ -206,7 +208,7 @@ cleanup_test_data() {
                 local user_id=$(echo "$users_json" | grep -B2 -A2 "\"email\":\"$test_email\"" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
                 if [ -n "$user_id" ]; then
                     user_ids+=("$user_id")
-                    print_info "  - Found test user: $test_email (ID: $user_id)"
+                    echo "  - Found test user: $test_email (ID: $user_id)"
                 fi
             done
             
