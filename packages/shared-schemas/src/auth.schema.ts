@@ -164,6 +164,7 @@ export const emailTemplateSchema = z.object({
 export const tokenPayloadSchema = z.object({
   sub: userIdSchema, // Subject (user ID)
   email: emailSchema,
+  username: nameSchema,
   role: roleSchema,
   iat: z.number().optional(), // Issued at
   exp: z.number().optional(), // Expiration

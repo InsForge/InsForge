@@ -139,6 +139,7 @@ export class TokenManager {
       return {
         sub: decoded.sub,
         email: decoded.email,
+        username: decoded.username,
         role: decoded.role || 'authenticated',
         isRoot: decoded.isRoot || false
       };

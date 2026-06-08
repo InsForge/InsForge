@@ -702,7 +702,7 @@ router.get('/admin/sessions/current', verifyToken, async (req: AuthRequest, res:
     if (!req.user) {
       throw new AppError('User not authenticated', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
     }
-    const result: boolean = req.user.isRoot
+    const result: boolean = req.user.isRoot;
     successResponse(res, result);
   } catch (error) {
     next(error);
@@ -772,7 +772,7 @@ router.put("/admin/resetPassword", verifyAdmin, async (req: AuthRequest, res: Re
         ERROR_CODES.INVALID_INPUT
       );
     }
-    const { oldPassword, newPassword } = req.body;
+    const { oldPassword, newPassword } = valiDateSchema.data;
 
     if (!req.user) {
       throw new AppError('User not authenticated', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
@@ -791,7 +791,7 @@ router.put("/admin/resetPassword", verifyAdmin, async (req: AuthRequest, res: Re
 //GET all admins to show
 router.get("/admin/allAdmins", verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result: ListUsersResponse = await authService.getAllAdmins();
+    const result = await authService.getAllAdmins();
     successResponse(res, result);
   } catch (error) {
     next(error);

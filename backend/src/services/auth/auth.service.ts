@@ -672,7 +672,7 @@ export class AuthService {
       }
 
       const hashedPassword = result.rows[0].password_hash;
-      if (!bcrypt.compareSync(oldPassword, hashedPassword)) {
+      if (!await bcrypt.compare(oldPassword, hashedPassword)) {
         throw new AppError('Invalid old password', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
       }
 
@@ -778,7 +778,7 @@ export class AuthService {
       }
       const admin = result.rows[0];
       logger.info('Admin found', { adminId: admin.id, username: admin.username });
-      if (!bcrypt.compareSync(password, admin.password_hash)) {
+      if (!await bcrypt.compare(password, admin.password_hash)) {
         throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
       }
       const isRoot = admin.username === process.env.ROOT_ADMIN_USERNAME;
