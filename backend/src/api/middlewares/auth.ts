@@ -155,16 +155,25 @@ export async function verifyAdmin(req: AuthRequest, res: Response, next: NextFun
     // Extract username from sub (format: "local:username")
     const username = extractUsernameFromSub(payload.sub);
     let isRoot = false;
+    let dbAdminId = payload.sub;
 
     if (username) {
       const admin = await adminService.getAdminByUsername(username);
-      if (admin) {
-        isRoot = admin.is_root || false;
+      if (!admin) {
+        throw new AppError(
+          'Admin account not found',
+          401,
+          ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+          NEXT_ACTIONS.CHECK_ADMIN_TOKEN
+        );
       }
+      isRoot = admin.is_root || false;
+      dbAdminId = admin.id;
     }
 
     setRequestUser(req, {
       ...payload,
+      sub: dbAdminId,
       username: username || undefined,
       isRoot,
     });

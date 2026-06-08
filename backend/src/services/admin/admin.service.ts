@@ -67,7 +67,7 @@ export class AdminService {
     const dummyHash = await bcrypt.hash('dummy', 10);
 
     if (result.rows.length === 0) {
-      // comparing dummy 
+      // comparing dummy
       await bcrypt.compare(password, dummyHash);
       return null;
     }
@@ -160,19 +160,13 @@ export class AdminService {
       return false;
     }
 
-    // Cannot delete root admin
-    const admin = await this.getAdminById(adminId);
-    if (admin?.is_root) {
-      return false;
-    }
-
     const pool = await this.getPool();
     const result = await pool.query(
       `UPDATE auth.project_admins
              SET deleted_at = NOW(), updated_at = NOW()
-             WHERE id = $1 AND deleted_at IS NULL
+             WHERE id = $1 AND deleted_at IS NULL AND is_root = false AND id != $2
              RETURNING id`,
-      [adminId]
+      [adminId, currentAdminId]
     );
 
     return result.rows.length > 0;
