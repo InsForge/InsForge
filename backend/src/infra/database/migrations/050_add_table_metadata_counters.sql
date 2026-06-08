@@ -27,24 +27,28 @@ BEGIN
   v_schema_name := TG_TABLE_SCHEMA;
   v_table_name := TG_TABLE_NAME;
 
-  IF TG_OP = 'INSERT' THEN
-    -- Self-healing: use UPSERT to handle missing counter rows
-    INSERT INTO system.table_metadata_counters (schema_name, table_name, row_count)
-    VALUES (v_schema_name, v_table_name, 1)
-    ON CONFLICT (schema_name, table_name)
-    DO UPDATE SET row_count = system.table_metadata_counters.row_count + 1;
-  ELSIF TG_OP = 'DELETE' THEN
-    -- Self-healing: use UPSERT to handle missing counter rows (guarantee row count >= 0)
-    INSERT INTO system.table_metadata_counters (schema_name, table_name, row_count)
-    VALUES (v_schema_name, v_table_name, 0)
-    ON CONFLICT (schema_name, table_name)
-    DO UPDATE SET row_count = GREATEST(system.table_metadata_counters.row_count - 1, 0);
-  ELSIF TG_OP = 'TRUNCATE' THEN
-    INSERT INTO system.table_metadata_counters (schema_name, table_name, row_count)
-    VALUES (v_schema_name, v_table_name, 0)
-    ON CONFLICT (schema_name, table_name)
-    DO UPDATE SET row_count = 0;
-  END IF;
+  BEGIN
+    IF TG_OP = 'INSERT' THEN
+      -- Self-healing: use UPSERT to handle missing counter rows
+      INSERT INTO system.table_metadata_counters (schema_name, table_name, row_count)
+      VALUES (v_schema_name, v_table_name, 1)
+      ON CONFLICT (schema_name, table_name)
+      DO UPDATE SET row_count = system.table_metadata_counters.row_count + 1;
+    ELSIF TG_OP = 'DELETE' THEN
+      -- Self-healing: use UPSERT to handle missing counter rows (guarantee row count >= 0)
+      INSERT INTO system.table_metadata_counters (schema_name, table_name, row_count)
+      VALUES (v_schema_name, v_table_name, 0)
+      ON CONFLICT (schema_name, table_name)
+      DO UPDATE SET row_count = GREATEST(system.table_metadata_counters.row_count - 1, 0);
+    ELSIF TG_OP = 'TRUNCATE' THEN
+      INSERT INTO system.table_metadata_counters (schema_name, table_name, row_count)
+      VALUES (v_schema_name, v_table_name, 0)
+      ON CONFLICT (schema_name, table_name)
+      DO UPDATE SET row_count = 0;
+    END IF;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'Failed to update row counter for %.%: %', v_schema_name, v_table_name, SQLERRM;
+  END;
 
   RETURN NULL;
 END;
