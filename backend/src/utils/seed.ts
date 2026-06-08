@@ -8,6 +8,8 @@ import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { OAuthProvidersSchema } from '@insforge/shared-schemas';
 import { AuthConfigService } from '@/services/auth/auth-config.service.js';
 import { ANON_ID } from '@/utils/constants.js';
+import bcrypt from 'bcryptjs';
+import { appConfig } from '@/infra/config/app.config.js';
 
 /**
  * Seeds the anonymous system user if it doesn't exist in the database.
@@ -37,6 +39,57 @@ async function seedAnonUser(): Promise<void> {
     }
   } catch (error) {
     logger.error('Failed to seed anonymous user', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Seeds the root admin into auth.project_admins if it doesn't exist.
+ */
+async function seedRootAdmin(): Promise<void> {
+  const dbManager = DatabaseManager.getInstance();
+  const pool = dbManager.getPool();
+  const client = await pool.connect();
+
+  try {
+    const rootUsername = appConfig.auth.rootAdminUsername;
+    const rootPassword = appConfig.auth.rootAdminPassword;
+
+    if (!rootUsername || !rootPassword) {
+      logger.warn(
+        'ROOT_ADMIN_USERNAME or ROOT_ADMIN_PASSWORD not set, skipping root admin seeding'
+      );
+      return;
+    }
+
+    // Check if the root admin exists
+    const result = await client.query(
+      'SELECT id, is_root FROM auth.project_admins WHERE username = $1',
+      [rootUsername]
+    );
+
+    if (result.rows.length > 0) {
+      const admin = result.rows[0];
+      if (!admin.is_root) {
+        await client.query('UPDATE auth.project_admins SET is_root = TRUE WHERE id = $1', [
+          admin.id,
+        ]);
+        logger.info('✅ Updated existing admin user to be root admin');
+      }
+      logger.info('✅ Root admin configured');
+    } else {
+      const passwordHash = await bcrypt.hash(rootPassword, 10);
+      await client.query(
+        'INSERT INTO auth.project_admins (username, password_hash, is_root) VALUES ($1, $2, TRUE) ON CONFLICT DO NOTHING',
+        [rootUsername, passwordHash]
+      );
+      logger.info('✅ Root admin seeded successfully');
+    }
+  } catch (error) {
+    logger.error('Failed to seed root admin', {
       error: error instanceof Error ? error.message : String(error),
     });
   } finally {
@@ -217,6 +270,9 @@ export async function seedBackend(): Promise<void> {
 
     // Seed anonymous user if it doesn't exist. Project admins are env/cloud token sessions.
     await seedAnonUser();
+
+    // Seed root admin user in database-backed auth.project_admins table
+    await seedRootAdmin();
 
     // Initialize API key (from env or generate)
     const apiKey = await secretService.initializeApiKey();

@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { Pool } from 'pg';
+import { adminService } from '../admin/admin.service.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import logger from '@/utils/logger.js';
@@ -654,24 +655,117 @@ export class AuthService {
   }
 
   /**
-   * Admin login (validates against env variables only)
+   * Admin login (validates against database auth.project_admins)
    */
-  adminLogin(username: string, password: string): CreateAdminSessionResponse {
-    // Simply validate against environment variables
-    if (username !== this.adminUsername || password !== this.adminPassword) {
+  async adminLogin(username: string, password: string): Promise<CreateAdminSessionResponse> {
+    // Use AdminService for verification
+    const admin = await adminService.verifyCredentials(username, password);
+
+    if (!admin) {
       throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
-    const sub = `local:${username}`;
+    const sub = `local:${admin.username}`;
     const accessToken = this.tokenManager.generateAccessToken({
       sub,
       role: 'project_admin',
     });
 
+    const isRoot = admin.is_root || false;
+
     return {
-      admin: { sub },
+      admin: {
+        sub,
+        username: admin.username,
+        isRoot,
+      },
       accessToken,
     };
+  }
+
+  /**
+   * List all project administrators (root only)
+   */
+  /**
+   * List all project administrators (root only)
+   */
+  async listAdmins(): Promise<{ username: string; createdAt: string; updatedAt: string }[]> {
+    const admins = await adminService.listAdmins();
+    return admins.map((admin) => ({
+      username: admin.username,
+      createdAt: admin.created_at.toISOString(),
+      updatedAt: admin.updated_at.toISOString(),
+    }));
+  }
+
+  /**
+   * Create a new project administrator (root only)
+   */
+  async createAdmin(
+    username: string,
+    password: string
+  ): Promise<{ username: string; createdAt: string; updatedAt: string }> {
+    const existing = await adminService.getAdminByUsername(username);
+    if (existing) {
+      throw new AppError('Admin user already exists', 409, ERROR_CODES.AUTH_EMAIL_EXISTS);
+    }
+
+    const admin = await adminService.createAdmin(username, password, undefined, false);
+
+    return {
+      username: admin.username,
+      createdAt: admin.created_at.toISOString(),
+      updatedAt: admin.updated_at.toISOString(),
+    };
+  }
+
+  /**
+   * Delete a project administrator (root only)
+   */
+  async deleteAdmin(username: string): Promise<void> {
+    const admin = await adminService.getAdminByUsername(username);
+    if (!admin) {
+      throw new AppError('Admin user not found', 404, ERROR_CODES.AUTH_USER_NOT_FOUND);
+    }
+
+    // Don't allow deleting root admin
+    if (admin.is_root) {
+      throw new AppError('Cannot delete root admin', 403, ERROR_CODES.FORBIDDEN);
+    }
+
+    // For delete, we need current admin ID - this will be passed from controller
+    // For now, we'll implement a simpler version
+    const pool = this.getPool();
+    const result = await pool.query(
+      'DELETE FROM auth.project_admins WHERE username = $1 AND is_root = false',
+      [username]
+    );
+
+    if (result.rowCount === 0) {
+      throw new AppError(
+        'Admin user not found or cannot be deleted',
+        404,
+        ERROR_CODES.AUTH_USER_NOT_FOUND
+      );
+    }
+  }
+  /**
+   * Change current admin's password
+   */
+  async changeAdminPassword(
+    username: string,
+    oldPassword: string,
+    newPassword: string
+  ): Promise<void> {
+    const admin = await adminService.getAdminByUsername(username);
+    if (!admin) {
+      throw new AppError('Admin user not found', 404, ERROR_CODES.AUTH_USER_NOT_FOUND);
+    }
+
+    const success = await adminService.changePassword(admin.id, oldPassword, newPassword);
+    if (!success) {
+      throw new AppError('Invalid old password', 400, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
+    }
   }
 
   /**
