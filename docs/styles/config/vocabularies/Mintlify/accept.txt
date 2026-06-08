@@ -39,6 +39,7 @@ dev
 docker
 dockerfile
 env
+flyctl
 github
 hardcoding
 healthchecks
@@ -59,6 +60,7 @@ linode
 localStorage
 loopback
 mcp
+monorepo
 Multiplatform
 namespace
 nginx
