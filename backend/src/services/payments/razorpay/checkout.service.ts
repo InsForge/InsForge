@@ -6,6 +6,8 @@ import type { RazorpayProvider } from '@/providers/payments/razorpay.provider.js
 import { AppError } from '@/utils/errors.js';
 import { toISOString } from '@/utils/dates.js';
 import { addBillingSubjectToMetadata } from '@/services/payments/helpers.js';
+import { withUserContext } from '@/services/database/user-context.service.js';
+import { type UserContext } from '@/api/middlewares/auth.js';
 import {
   withPaymentSessionAdvisoryLock,
   type PaymentSessionAdvisoryLockMode,
@@ -131,11 +133,14 @@ export class RazorpayCheckoutService {
    *   rzp.open();
    *   ```
    */
-  async createOrder(input: CreateRazorpayOrderRequest): Promise<CreateRazorpayOrderResponse> {
+  async createOrder(
+    input: CreateRazorpayOrderRequest,
+    user: UserContext
+  ): Promise<CreateRazorpayOrderResponse> {
     const runOrder = async (): Promise<CreateRazorpayOrderResponse> => {
       // 1. Insert a placeholder record so we have a stable InsForge ID even
       //    before the Razorpay API call completes.
-      const { id, existingOrder } = await this.insertInitializedOrder(input);
+      const { id, existingOrder } = await this.insertInitializedOrder(input, user);
 
       if (existingOrder) {
         if (existingOrder.status === 'failed') {
@@ -185,7 +190,7 @@ export class RazorpayCheckoutService {
           receipt: id,
         });
 
-        const order = await this.markOrderCreated(id, razorpayOrder);
+        const order = await this.markOrderCreated(id, razorpayOrder, user);
         const keyId = await this.resolveKeyId(input.environment);
         if (!order.orderId) {
           throw new AppError('Razorpay order was not created', 500, ERROR_CODES.INTERNAL_ERROR);
@@ -208,7 +213,7 @@ export class RazorpayCheckoutService {
           },
         };
       } catch (error) {
-        await this.markOrderFailed(id, error).catch((markError) => {
+        await this.markOrderFailed(id, error, user).catch((markError) => {
           logger.warn('Failed to mark Razorpay order as failed', {
             environment: input.environment,
             orderId: id,
@@ -247,7 +252,8 @@ export class RazorpayCheckoutService {
    *   ```
    */
   async createSubscription(
-    input: CreateRazorpaySubscriptionRequest
+    input: CreateRazorpaySubscriptionRequest,
+    user: UserContext
   ): Promise<CreateRazorpaySubscriptionResponse> {
     const runSubscription = async (): Promise<CreateRazorpaySubscriptionResponse> => {
       const provider = await this.configService.createRazorpayProvider(input.environment);
@@ -314,7 +320,7 @@ export class RazorpayCheckoutService {
       const attemptRecordId = (attemptRes.rows[0] as { id: string }).id;
 
       // 2. Resolve/Create customer
-      const customerId = await this.resolveOrCreateCustomer(input, provider);
+      const customerId = await this.resolveOrCreateCustomer(input, provider, user);
 
       const notes = this.buildNotes(input.metadata, input.subject);
 
@@ -329,23 +335,23 @@ export class RazorpayCheckoutService {
           notes,
         });
       } catch (err) {
-        await db
-          .query(`DELETE FROM payments.razorpay_subscription_attempts WHERE id = $1`, [
+        await withUserContext(db, user, async (client) =>
+          client.query(`DELETE FROM payments.razorpay_subscription_attempts WHERE id = $1`, [
             attemptRecordId,
           ])
-          .catch((deleteErr) => {
-            logger.warn('Failed to clean up Razorpay subscription attempt after provider error', {
-              environment: input.environment,
-              attemptId: attemptRecordId,
-              error: deleteErr instanceof Error ? deleteErr.message : String(deleteErr),
-            });
+        ).catch((deleteErr) => {
+          logger.warn('Failed to clean up Razorpay subscription attempt after provider error', {
+            environment: input.environment,
+            attemptId: attemptRecordId,
+            error: deleteErr instanceof Error ? deleteErr.message : String(deleteErr),
           });
+        });
         throw err;
       }
 
       if (customerId) {
         // Persist / update the customer mapping for future lookups.
-        await this.upsertCustomerMapping(input.environment, customerId, input.subject);
+        await this.upsertCustomerMapping(input.environment, customerId, input.subject, user);
       }
 
       // Persist the subscription in our DB mirror so the admin UI and
@@ -354,15 +360,18 @@ export class RazorpayCheckoutService {
       const subscription = await this.upsertSubscriptionRecord(
         input.environment,
         razorpaySub,
-        input.subject
+        input.subject,
+        user
       );
 
       // Record the created subscription ID in the attempt record
-      await db.query(
-        `UPDATE payments.razorpay_subscription_attempts
+      await withUserContext(db, user, async (client) =>
+        client.query(
+          `UPDATE payments.razorpay_subscription_attempts
          SET subscription_id = $2
          WHERE id = $1`,
-        [attemptRecordId, razorpaySub.id]
+          [attemptRecordId, razorpaySub.id]
+        )
       );
 
       const keyId = await this.resolveKeyId(input.environment);
@@ -392,12 +401,14 @@ export class RazorpayCheckoutService {
   // =========================================================================
 
   private async insertInitializedOrder(
-    input: CreateRazorpayOrderRequest
+    input: CreateRazorpayOrderRequest,
+    user: UserContext
   ): Promise<{ id: string; existingOrder: RazorpayOrder | null }> {
     const id = randomUUID();
 
-    const result = await this.getPool().query(
-      `INSERT INTO payments.razorpay_orders (
+    const result = await withUserContext(this.getPool(), user, async (client) =>
+      client.query(
+        `INSERT INTO payments.razorpay_orders (
          id,
          environment,
          status,
@@ -416,18 +427,19 @@ export class RazorpayCheckoutService {
        ON CONFLICT (environment, idempotency_key)
          WHERE idempotency_key IS NOT NULL
        DO NOTHING`,
-      [
-        id,
-        input.environment,
-        input.subject?.type ?? null,
-        input.subject?.id ?? null,
-        input.customerEmail ?? null,
-        input.amount,
-        input.currency,
-        input.description ?? null,
-        input.idempotencyKey ?? null,
-        JSON.stringify(input.metadata ?? {}),
-      ]
+        [
+          id,
+          input.environment,
+          input.subject?.type ?? null,
+          input.subject?.id ?? null,
+          input.customerEmail ?? null,
+          input.amount,
+          input.currency,
+          input.description ?? null,
+          input.idempotencyKey ?? null,
+          JSON.stringify(input.metadata ?? {}),
+        ]
+      )
     );
 
     if (result.rowCount !== 0) {
@@ -436,13 +448,15 @@ export class RazorpayCheckoutService {
     }
 
     // ON CONFLICT DO NOTHING fired — find the existing record.
-    const existing = await this.getPool().query(
-      `SELECT ${ORDER_COLUMNS}
+    const existing = await withUserContext(this.getPool(), user, async (client) =>
+      client.query(
+        `SELECT ${ORDER_COLUMNS}
        FROM payments.razorpay_orders
        WHERE environment = $1
          AND idempotency_key = $2
        LIMIT 1`,
-      [input.environment, input.idempotencyKey]
+        [input.environment, input.idempotencyKey]
+      )
     );
 
     const row = existing.rows[0] as RazorpayOrderRow | undefined;
@@ -466,10 +480,12 @@ export class RazorpayCheckoutService {
       amount_paid: number;
       amount_due: number;
       currency: string;
-    }
+    },
+    user: UserContext
   ): Promise<RazorpayOrder> {
-    const result = await this.getPool().query(
-      `UPDATE payments.razorpay_orders
+    const result = await withUserContext(this.getPool(), user, async (client) =>
+      client.query(
+        `UPDATE payments.razorpay_orders
        SET status       = 'created',
            order_id     = $2,
            amount       = $3,
@@ -481,30 +497,37 @@ export class RazorpayCheckoutService {
            updated_at   = NOW()
        WHERE id = $1
        RETURNING ${ORDER_COLUMNS}`,
-      [
-        id,
-        razorpayOrder.id,
-        razorpayOrder.amount,
-        razorpayOrder.amount_paid,
-        razorpayOrder.amount_due,
-        razorpayOrder.currency,
-        JSON.stringify(razorpayOrder),
-      ]
+        [
+          id,
+          razorpayOrder.id,
+          razorpayOrder.amount,
+          razorpayOrder.amount_paid,
+          razorpayOrder.amount_due,
+          razorpayOrder.currency,
+          JSON.stringify(razorpayOrder),
+        ]
+      )
     );
 
     return this.normalizeOrderRow(this.requireOrderRow(result.rows[0]));
   }
 
-  private async markOrderFailed(id: string, error: unknown): Promise<RazorpayOrder | null> {
+  private async markOrderFailed(
+    id: string,
+    error: unknown,
+    user: UserContext
+  ): Promise<RazorpayOrder | null> {
     const message = error instanceof Error ? error.message : String(error);
-    const result = await this.getPool().query(
-      `UPDATE payments.razorpay_orders
+    const result = await withUserContext(this.getPool(), user, async (client) =>
+      client.query(
+        `UPDATE payments.razorpay_orders
        SET status     = 'failed',
            last_error = $2,
            updated_at = NOW()
        WHERE id = $1
        RETURNING ${ORDER_COLUMNS}`,
-      [id, message]
+        [id, message]
+      )
     );
 
     const row = result.rows[0] as RazorpayOrderRow | undefined;
@@ -545,7 +568,8 @@ export class RazorpayCheckoutService {
       notes: Record<string, string | number>;
       created_at: number;
     },
-    subject: BillingSubject | undefined
+    subject: BillingSubject | undefined,
+    user: UserContext
   ): Promise<RazorpaySubscription> {
     const ts = (epochSeconds: number | null): Date | null =>
       epochSeconds ? new Date(epochSeconds * 1000) : null;
@@ -555,8 +579,9 @@ export class RazorpayCheckoutService {
       metadata[k] = String(v);
     }
 
-    const result = await this.getPool().query(
-      `INSERT INTO payments.razorpay_subscriptions (
+    const result = await withUserContext(this.getPool(), user, async (client) =>
+      client.query(
+        `INSERT INTO payments.razorpay_subscriptions (
          environment,
          subscription_id,
          plan_id,
@@ -636,32 +661,33 @@ export class RazorpayCheckoutService {
          synced_at              AS "syncedAt",
          created_at             AS "createdAt",
          updated_at             AS "updatedAt"`,
-      [
-        environment,
-        sub.id,
-        sub.plan_id,
-        sub.customer_id ?? null,
-        subject?.type ?? null,
-        subject?.id ?? null,
-        sub.status,
-        sub.quantity,
-        sub.total_count ?? null,
-        sub.paid_count ?? null,
-        sub.remaining_count ?? null,
-        ts(sub.current_start),
-        ts(sub.current_end),
-        ts(sub.ended_at),
-        ts(sub.charge_at),
-        ts(sub.start_at),
-        ts(sub.end_at),
-        sub.short_url ?? null,
-        sub.has_scheduled_changes,
-        ts(sub.change_scheduled_at),
-        sub.offer_id ?? null,
-        JSON.stringify(metadata),
-        JSON.stringify(sub),
-        ts(sub.created_at),
-      ]
+        [
+          environment,
+          sub.id,
+          sub.plan_id,
+          sub.customer_id ?? null,
+          subject?.type ?? null,
+          subject?.id ?? null,
+          sub.status,
+          sub.quantity,
+          sub.total_count ?? null,
+          sub.paid_count ?? null,
+          sub.remaining_count ?? null,
+          ts(sub.current_start),
+          ts(sub.current_end),
+          ts(sub.ended_at),
+          ts(sub.charge_at),
+          ts(sub.start_at),
+          ts(sub.end_at),
+          sub.short_url ?? null,
+          sub.has_scheduled_changes,
+          ts(sub.change_scheduled_at),
+          sub.offer_id ?? null,
+          JSON.stringify(metadata),
+          JSON.stringify(sub),
+          ts(sub.created_at),
+        ]
+      )
     );
 
     const row = result.rows[0] as Record<string, unknown>;
@@ -685,14 +711,15 @@ export class RazorpayCheckoutService {
       subject?: BillingSubject;
       customerEmail?: string | null;
     },
-    provider: RazorpayProvider
+    provider: RazorpayProvider,
+    user: UserContext
   ): Promise<string | null> {
     if (!input.subject) {
       return null;
     }
 
     // 1. Check for an existing customer mapping for this billing subject.
-    const existing = await this.findCustomerMapping(input.environment, input.subject);
+    const existing = await this.findCustomerMapping(input.environment, input.subject, user);
     if (existing) {
       return existing;
     }
@@ -715,17 +742,20 @@ export class RazorpayCheckoutService {
 
   private async findCustomerMapping(
     environment: RazorpayEnvironment,
-    subject: BillingSubject
+    subject: BillingSubject,
+    user: UserContext
   ): Promise<string | null> {
-    const result = await this.getPool().query(
-      `SELECT provider_customer_id AS "providerCustomerId"
+    const result = await withUserContext(this.getPool(), user, async (client) =>
+      client.query(
+        `SELECT provider_customer_id AS "providerCustomerId"
        FROM payments.customer_mappings
        WHERE provider = 'razorpay'
          AND environment = $1
          AND subject_type = $2
          AND subject_id = $3
        LIMIT 1`,
-      [environment, subject.type, subject.id]
+        [environment, subject.type, subject.id]
+      )
     );
 
     const row = result.rows[0] as { providerCustomerId: string } | undefined;
@@ -735,19 +765,22 @@ export class RazorpayCheckoutService {
   private async upsertCustomerMapping(
     environment: RazorpayEnvironment,
     customerId: string,
-    subject: BillingSubject | undefined
+    subject: BillingSubject | undefined,
+    user: UserContext
   ): Promise<void> {
     if (!subject) {
       return;
     }
 
-    await this.getPool().query(
-      `INSERT INTO payments.customer_mappings (provider, environment, subject_type, subject_id, provider_customer_id)
+    await withUserContext(this.getPool(), user, async (client) =>
+      client.query(
+        `INSERT INTO payments.customer_mappings (provider, environment, subject_type, subject_id, provider_customer_id)
        VALUES ('razorpay', $1, $2, $3, $4)
        ON CONFLICT (provider, environment, subject_type, subject_id) DO UPDATE SET
          provider_customer_id = EXCLUDED.provider_customer_id,
          updated_at           = NOW()`,
-      [environment, subject.type, subject.id, customerId]
+        [environment, subject.type, subject.id, customerId]
+      )
     );
   }
 
