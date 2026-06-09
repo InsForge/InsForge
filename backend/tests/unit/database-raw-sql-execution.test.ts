@@ -257,12 +257,14 @@ describe('DatabaseAdvanceService - admin SQL execution', () => {
     const releaseMock = vi.fn();
     const queryMock = vi
       .fn()
-      .mockResolvedValueOnce({}) // SET ROLE project_admin
-      .mockResolvedValueOnce({}) // set request.jwt.claims
-      .mockResolvedValueOnce({ rowCount: 1, rows: [] }) // execute bulk upsert
-      .mockResolvedValueOnce({}) // RESET ROLE
-      .mockResolvedValueOnce({}) // reset request.jwt.claims
-      .mockResolvedValueOnce({}); // NOTIFY pgrst
+      .mockResolvedValueOnce({}) // 1. SET ROLE project_admin
+      .mockResolvedValueOnce({}) // 2. set request.jwt.claims
+      .mockResolvedValueOnce({}) // 3. BEGIN
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] }) // 4. execute bulk upsert
+      .mockResolvedValueOnce({}) // 5. NOTIFY pgrst
+      .mockResolvedValueOnce({}) // 6. COMMIT
+      .mockResolvedValueOnce({}) // 7. RESET ROLE
+      .mockResolvedValueOnce({}); // 8. reset request.jwt.claims
 
     connectMock.mockResolvedValue({
       query: queryMock,
@@ -285,15 +287,17 @@ describe('DatabaseAdvanceService - admin SQL execution', () => {
       JSON.stringify({ role: 'project_admin' }),
       false,
     ]);
-    expect(String(queryMock.mock.calls[2][0])).toContain('INSERT INTO public.profiles');
-    expect(String(queryMock.mock.calls[2][0])).toContain('ON CONFLICT (id) DO UPDATE');
-    expect(queryMock).toHaveBeenNthCalledWith(4, 'RESET ROLE');
-    expect(queryMock).toHaveBeenNthCalledWith(5, 'SELECT set_config($1, $2, $3)', [
+    expect(queryMock).toHaveBeenNthCalledWith(3, 'BEGIN');
+    expect(String(queryMock.mock.calls[3][0])).toContain('INSERT INTO public.profiles');
+    expect(String(queryMock.mock.calls[3][0])).toContain('ON CONFLICT (id) DO UPDATE');
+    expect(queryMock).toHaveBeenNthCalledWith(5, `NOTIFY pgrst, 'reload schema';`);
+    expect(queryMock).toHaveBeenNthCalledWith(6, 'COMMIT');
+    expect(queryMock).toHaveBeenNthCalledWith(7, 'RESET ROLE');
+    expect(queryMock).toHaveBeenNthCalledWith(8, 'SELECT set_config($1, $2, $3)', [
       'request.jwt.claims',
       '{}',
       false,
     ]);
-    expect(queryMock).toHaveBeenNthCalledWith(6, `NOTIFY pgrst, 'reload schema';`);
     expect(releaseMock).toHaveBeenCalled();
   });
 });
