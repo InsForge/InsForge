@@ -1,16 +1,34 @@
 const fs = require('fs');
 
 // Resolve index.routes.ts
-let indexContent = fs.readFileSync('backend/src/api/routes/payments/razorpay/index.routes.ts', 'utf8');
-indexContent = indexContent.replace(/<<<<<<< HEAD\n=======\nimport { AppError } from '@\/utils\/errors\.js';\n>>>>>>> [^\n]+\n/, "import { AppError } from '@/utils/errors.js';\n");
+let indexContent = fs.readFileSync(
+  'backend/src/api/routes/payments/razorpay/index.routes.ts',
+  'utf8'
+);
+indexContent = indexContent.replace(
+  /<<<<<<< HEAD\n=======\nimport { AppError } from '@\/utils\/errors\.js';\n>>>>>>> [^\n]+\n/,
+  "import { AppError } from '@/utils/errors.js';\n"
+);
 
-indexContent = indexContent.replace(/<<<<<<< HEAD\nimport { RazorpayPaymentActivityService } from '@\/services\/payments\/razorpay\/payment-activity\.service\.js';\nimport { RazorpayCheckoutService } from '@\/services\/payments\/razorpay\/checkout\.service\.js';\n=======\n>>>>>>> [^\n]+\n/, "import { RazorpayPaymentActivityService } from '@/services/payments/razorpay/payment-activity.service.js';\nimport { RazorpayCheckoutService } from '@/services/payments/razorpay/checkout.service.js';\n");
+indexContent = indexContent.replace(
+  /<<<<<<< HEAD\nimport { RazorpayPaymentActivityService } from '@\/services\/payments\/razorpay\/payment-activity\.service\.js';\nimport { RazorpayCheckoutService } from '@\/services\/payments\/razorpay\/checkout\.service\.js';\n=======\n>>>>>>> [^\n]+\n/,
+  "import { RazorpayPaymentActivityService } from '@/services/payments/razorpay/payment-activity.service.js';\nimport { RazorpayCheckoutService } from '@/services/payments/razorpay/checkout.service.js';\n"
+);
 
-indexContent = indexContent.replace(/<<<<<<< HEAD\n  createRazorpayOrderBodySchema,\n  createRazorpaySubscriptionBodySchema,\n=======\n  pauseRazorpaySubscriptionBodySchema,\n  razorpaySubscriptionParamsSchema,\n  resumeRazorpaySubscriptionBodySchema,\n  verifyRazorpayOrderBodySchema,\n  verifyRazorpaySubscriptionBodySchema,\n>>>>>>> [^\n]+\n/, "  createRazorpayOrderBodySchema,\n  createRazorpaySubscriptionBodySchema,\n  pauseRazorpaySubscriptionBodySchema,\n  razorpaySubscriptionParamsSchema,\n  resumeRazorpaySubscriptionBodySchema,\n  verifyRazorpayOrderBodySchema,\n  verifyRazorpaySubscriptionBodySchema,\n");
+indexContent = indexContent.replace(
+  /<<<<<<< HEAD\n  createRazorpayOrderBodySchema,\n  createRazorpaySubscriptionBodySchema,\n=======\n  pauseRazorpaySubscriptionBodySchema,\n  razorpaySubscriptionParamsSchema,\n  resumeRazorpaySubscriptionBodySchema,\n  verifyRazorpayOrderBodySchema,\n  verifyRazorpaySubscriptionBodySchema,\n>>>>>>> [^\n]+\n/,
+  '  createRazorpayOrderBodySchema,\n  createRazorpaySubscriptionBodySchema,\n  pauseRazorpaySubscriptionBodySchema,\n  razorpaySubscriptionParamsSchema,\n  resumeRazorpaySubscriptionBodySchema,\n  verifyRazorpayOrderBodySchema,\n  verifyRazorpaySubscriptionBodySchema,\n'
+);
 
-indexContent = indexContent.replace(/<<<<<<< HEAD\nconst paymentActivityService = RazorpayPaymentActivityService\.getInstance\(\);\nconst checkoutService = RazorpayCheckoutService\.getInstance\(\);\n=======\n>>>>>>> [^\n]+\n/, "const paymentActivityService = RazorpayPaymentActivityService.getInstance();\nconst checkoutService = RazorpayCheckoutService.getInstance();\n");
+indexContent = indexContent.replace(
+  /<<<<<<< HEAD\nconst paymentActivityService = RazorpayPaymentActivityService\.getInstance\(\);\nconst checkoutService = RazorpayCheckoutService\.getInstance\(\);\n=======\n>>>>>>> [^\n]+\n/,
+  'const paymentActivityService = RazorpayPaymentActivityService.getInstance();\nconst checkoutService = RazorpayCheckoutService.getInstance();\n'
+);
 
-indexContent = indexContent.replace(/<<<<<<< HEAD\n\/\/ ---------------------------------------------------------------------------\n\/\/ Runtime: POST \/orders  \(one-time payment\)\n\/\/ Requires a valid user token — the developer's server-side SDK calls this on\n\/\/ behalf of the end-user who clicked "Buy"\.\n\/\/ ---------------------------------------------------------------------------\n=======\n>>>>>>> [^\n]+\n/, "// ---------------------------------------------------------------------------\n// Runtime: POST /orders  (one-time payment)\n// Requires a valid user token — the developer's server-side SDK calls this on\n// behalf of the end-user who clicked \"Buy\".\n// ---------------------------------------------------------------------------\n");
+indexContent = indexContent.replace(
+  /<<<<<<< HEAD\n\/\/ ---------------------------------------------------------------------------\n\/\/ Runtime: POST \/orders  \(one-time payment\)\n\/\/ Requires a valid user token — the developer's server-side SDK calls this on\n\/\/ behalf of the end-user who clicked "Buy"\.\n\/\/ ---------------------------------------------------------------------------\n=======\n>>>>>>> [^\n]+\n/,
+  '// ---------------------------------------------------------------------------\n// Runtime: POST /orders  (one-time payment)\n// Requires a valid user token — the developer\'s server-side SDK calls this on\n// behalf of the end-user who clicked "Buy".\n// ---------------------------------------------------------------------------\n'
+);
 
 // Fix the big block with orders
 const block1 = `<<<<<<< HEAD
@@ -62,8 +80,10 @@ environmentRouter.post(
       successResponse(res, result);
 >>>>>>>`;
 
-const regex1 = new RegExp(block1.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + " [^\\n]+\\n");
-indexContent = indexContent.replace(regex1, `      if (!req.user) {
+const regex1 = new RegExp(block1.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ' [^\\n]+\\n');
+indexContent = indexContent.replace(
+  regex1,
+  `      if (!req.user) {
         throw new AppError(
           'Razorpay order creation requires a user token',
           401,
@@ -99,9 +119,13 @@ environmentRouter.post(
         ...body,
       });
       successResponse(res, result);
-`);
+`
+);
 
-indexContent = indexContent.replace(/<<<<<<< HEAD\n\/\/ ---------------------------------------------------------------------------\n\/\/ Runtime: POST \/subscriptions  \(recurring billing\)\n\/\/ Requires a valid user token\.\n\/\/ ---------------------------------------------------------------------------\n=======\n>>>>>>> [^\n]+\n/, "// ---------------------------------------------------------------------------\n// Runtime: POST /subscriptions  (recurring billing)\n// Requires a valid user token.\n// ---------------------------------------------------------------------------\n");
+indexContent = indexContent.replace(
+  /<<<<<<< HEAD\n\/\/ ---------------------------------------------------------------------------\n\/\/ Runtime: POST \/subscriptions  \(recurring billing\)\n\/\/ Requires a valid user token\.\n\/\/ ---------------------------------------------------------------------------\n=======\n>>>>>>> [^\n]+\n/,
+  '// ---------------------------------------------------------------------------\n// Runtime: POST /subscriptions  (recurring billing)\n// Requires a valid user token.\n// ---------------------------------------------------------------------------\n'
+);
 
 // Fix subscriptions block
 const block2 = `<<<<<<< HEAD
@@ -230,8 +254,10 @@ environmentRouter.post(
       const result = await subscriptionService.resumeSubscription(params, req.user);
       successResponse(res, result);
 >>>>>>>`;
-const regex2 = new RegExp(block2.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + " [^\\n]+\\n");
-indexContent = indexContent.replace(regex2, `      if (!req.user) {
+const regex2 = new RegExp(block2.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ' [^\\n]+\\n');
+indexContent = indexContent.replace(
+  regex2,
+  `      if (!req.user) {
         throw new AppError(
           'Razorpay subscription creation requires a user token',
           401,
@@ -345,12 +371,15 @@ environmentRouter.post(
 
       const result = await subscriptionService.resumeSubscription(params, req.user);
       successResponse(res, result);
-`);
+`
+);
 
-indexContent = indexContent.replace(/<<<<<<< HEAD\n\/\/ ---------------------------------------------------------------------------\n\/\/ Admin-only routes\n\/\/ ---------------------------------------------------------------------------\n=======\n>>>>>>> [^\n]+\n/, "// ---------------------------------------------------------------------------\n// Admin-only routes\n// ---------------------------------------------------------------------------\n");
+indexContent = indexContent.replace(
+  /<<<<<<< HEAD\n\/\/ ---------------------------------------------------------------------------\n\/\/ Admin-only routes\n\/\/ ---------------------------------------------------------------------------\n=======\n>>>>>>> [^\n]+\n/,
+  '// ---------------------------------------------------------------------------\n// Admin-only routes\n// ---------------------------------------------------------------------------\n'
+);
 
 fs.writeFileSync('backend/src/api/routes/payments/razorpay/index.routes.ts', indexContent);
-
 
 // Resolve packages/shared-schemas/src/payments-api.schema.ts
 let schemaContent = fs.readFileSync('packages/shared-schemas/src/payments-api.schema.ts', 'utf8');
@@ -362,11 +391,15 @@ const schemaBlock = `<<<<<<< HEAD
 // Razorpay Runtime Checkout Schemas
 // ---------------------------------------------------------------------------`;
 
-schemaContent = schemaContent.replace(/<<<<<<< HEAD[\s\S]*?=======\nexport type SyncStripePaymentsRequest = z\.infer<typeof syncStripePaymentsRequestSchema>;\n>>>>>>> [^\n]+\n/, 
+schemaContent = schemaContent.replace(
+  /<<<<<<< HEAD[\s\S]*?=======\nexport type SyncStripePaymentsRequest = z\.infer<typeof syncStripePaymentsRequestSchema>;\n>>>>>>> [^\n]+\n/,
   (match) => {
     // Extract everything from HEAD
-    const headContent = match.split("=======")[0].replace("<<<<<<< HEAD\n", "");
-    return headContent + "export type SyncStripePaymentsRequest = z.infer<typeof syncStripePaymentsRequestSchema>;\n";
+    const headContent = match.split('=======')[0].replace('<<<<<<< HEAD\n', '');
+    return (
+      headContent +
+      'export type SyncStripePaymentsRequest = z.infer<typeof syncStripePaymentsRequestSchema>;\n'
+    );
   }
 );
 
