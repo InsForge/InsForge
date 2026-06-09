@@ -36,8 +36,7 @@ describe('DatabaseTableService - SQL Injection Verification (Fixed)', () => {
       .mockResolvedValueOnce({ rows: [] }) // 2. Fkey constraints (pooled query)
       .mockResolvedValueOnce({ rows: [{ column_name: 'id' }] }) // 3. Primary keys
       .mockResolvedValueOnce({ rows: [] }) // 4. Unique columns
-      .mockRejectedValueOnce(new Error('Counter table not found')) // 5. Counter query fails
-      .mockResolvedValueOnce({ rows: [{ row_count: 0 }] }); // 6. Fallback COUNT(*) query
+      .mockResolvedValueOnce({ rows: [{ row_count: 0 }] }); // 5. COUNT(*) query
   });
 
   test('getTableSchema correctly escapes table names to prevent SQL injection', async () => {

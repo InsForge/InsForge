@@ -279,23 +279,7 @@ export class DatabaseTableService {
           `
           );
 
-          // Enable metadata counter trigger-backed row counting
-          try {
-            await client.query('SAVEPOINT enable_counter_attempt');
-            await client.query('SELECT system.enable_table_counter($1, $2)', [
-              schemaName,
-              table_name,
-            ]);
-            await client.query('RELEASE SAVEPOINT enable_counter_attempt');
-          } catch (error) {
-            await client.query('ROLLBACK TO SAVEPOINT enable_counter_attempt');
-            await client.query('RELEASE SAVEPOINT enable_counter_attempt');
-            // Log warning but DO NOT throw
-            console.warn(
-              `Failed to enable O(1) table counter for ${schemaName}.${table_name}:`,
-              error
-            );
-          }
+
 
           // Update metadata
           // Metadata is now updated on-demand
@@ -433,43 +417,15 @@ export class DatabaseTableService {
       const uniqueColumns = uniqueColumnsResult.rows;
       const uniqueSet = new Set(uniqueColumns.map((u: { column_name: string }) => u.column_name));
 
-      // Get row count from system.table_metadata_counters with a fallback
+      // Get exact row count using standard COUNT(*)
       let row_count = 0;
       try {
-        const counterResult = await client.query(
-          'SELECT row_count FROM system.table_metadata_counters WHERE schema_name = $1 AND table_name = $2',
-          [schemaName, table]
+        const countResult = await client.query(
+          pgFormat('SELECT COUNT(*) as row_count FROM %I.%I', schemaName, table)
         );
-        if (counterResult.rows.length > 0) {
-          row_count = Number(counterResult.rows[0].row_count);
-        } else {
-          // Self-heal: Enable counter for this table
-          try {
-            await client.query('SELECT system.enable_table_counter($1, $2)', [schemaName, table]);
-
-            const fallbackResult = await client.query(
-              'SELECT row_count FROM system.table_metadata_counters WHERE schema_name = $1 AND table_name = $2',
-              [schemaName, table]
-            );
-            row_count = fallbackResult.rows[0] ? Number(fallbackResult.rows[0].row_count) : 0;
-          } catch {
-            // Fallback to standard count directly if self-healing fails
-            const fallbackCountResult = await client.query(
-              pgFormat('SELECT COUNT(*) as row_count FROM %I.%I', schemaName, table)
-            );
-            row_count = Number(fallbackCountResult.rows[0].row_count);
-          }
-        }
+        row_count = Number(countResult.rows[0]?.row_count || 0);
       } catch {
-        // Safe fallback to exact count if the counter schema query errors (e.g. during migration setup)
-        try {
-          const fallbackCountResult = await client.query(
-            pgFormat('SELECT COUNT(*) as row_count FROM %I.%I', schemaName, table)
-          );
-          row_count = Number(fallbackCountResult.rows[0].row_count);
-        } catch {
-          row_count = 0;
-        }
+        row_count = 0;
       }
 
       return {
@@ -776,21 +732,7 @@ export class DatabaseTableService {
             `DROP TABLE IF EXISTS ${quoteQualifiedName(schemaName, table)} CASCADE`
           );
 
-          // Clean up counter row if it exists
-          try {
-            await client.query('SAVEPOINT delete_counter');
-            await client.query(
-              'DELETE FROM system.table_metadata_counters WHERE schema_name = $1 AND table_name = $2',
-              [schemaName, table]
-            );
-            await client.query('RELEASE SAVEPOINT delete_counter');
-          } catch {
-            try {
-              await client.query('ROLLBACK TO SAVEPOINT delete_counter');
-            } catch {
-              // Ignore failure to rollback if savepoint was not established
-            }
-          }
+
 
           // Update metadata
           // Metadata is now updated on-demand

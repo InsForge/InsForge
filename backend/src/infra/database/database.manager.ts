@@ -23,6 +23,8 @@ export class DatabaseManager {
   private static readonly COLUMN_TYPE_CACHE_TTL = 5 * 60 * 1000;
   private static columnTypeCache = new Map<string, CacheEntry<Record<string, string>>>();
   private static readonly MAX_CACHE_SIZE = 100;
+  private static readonly TABLE_COUNT_CACHE_TTL = 60 * 1000;
+  private static tableCountCache = new Map<string, { count: number; timestamp: number }>();
 
   private constructor() {
     this.dataDir = appConfig.database.dir;
@@ -128,106 +130,60 @@ export class DatabaseManager {
       this.getDatabaseSizeInGB(),
     ]);
 
-    const client = await this.pool.connect();
-    try {
-      // Get all counts from system.table_metadata_counters in a single query
-      const countResults = await (async () => {
-        if (allTables.length === 0) {
-          return [];
-        }
-
-        try {
-          const placeholders = allTables.map((_, i) => `$${i + 2}`).join(', ');
-          const result = await client.query(
-            `SELECT table_name, row_count as count 
-             FROM system.table_metadata_counters 
-             WHERE schema_name = $1 AND table_name IN (${placeholders})`,
-            ['public', ...allTables]
-          );
-
-          const rowMap = new Map<string, number>();
-          for (const row of result.rows) {
-            rowMap.set(row.table_name, Number(row.count));
-          }
-
-          // Batch the fallback COUNT(*) queries in a single UNION ALL query for all missing tables to prevent sequential round-trip latency
-          const missingTables = allTables.filter((name) => !rowMap.has(name));
-          if (missingTables.length > 0) {
-            try {
-              const unionQuery = missingTables
-                .map((tableName) =>
-                  pgFormat(
-                    'SELECT %L as table_name, COUNT(*) as count FROM %I.%I',
-                    tableName,
-                    'public',
-                    tableName
-                  )
-                )
-                .join(' UNION ALL ');
-              const fallbackResults = await client.query(unionQuery);
-              for (const row of fallbackResults.rows) {
-                rowMap.set(row.table_name, Number(row.count));
-              }
-            } catch (fallbackErr) {
-              console.warn('Failed fallback batch COUNT(*) for missing tables:', fallbackErr);
-            }
-          }
-
-          const finalResults: { table_name: string; count: number }[] = [];
-          for (const tableName of allTables) {
-            finalResults.push({
-              table_name: tableName,
-              count: rowMap.get(tableName) ?? 0,
-            });
-          }
-          return finalResults;
-        } catch (error) {
-          console.warn(
-            'Failed to retrieve counts from system.table_metadata_counters, falling back to batch COUNT(*):',
-            error
-          );
-          // Global counter-table query failure fallback: execute standard counts in a single batch query for all tables
-          try {
-            const unionQuery = allTables
-              .map((tableName) =>
-                pgFormat(
-                  'SELECT %L as table_name, COUNT(*) as count FROM %I.%I',
-                  tableName,
-                  'public',
-                  tableName
-                )
-              )
-              .join(' UNION ALL ');
-            const fallbackResults = await client.query(unionQuery);
-            return fallbackResults.rows.map(
-              (row: { table_name: string; count: string | number }) => ({
-                table_name: row.table_name,
-                count: Number(row.count),
-              })
-            );
-          } catch (fallbackError) {
-            console.error('Failed complete fallback batch COUNT(*) as well:', fallbackError);
-            return [];
-          }
-        }
-      })();
-
-      // Map the count results to a lookup object
-      const countMap = new Map(countResults.map((r) => [r.table_name, Number(r.count)]));
-
-      const tableMetadatas = allTables.map((tableName) => ({
-        tableName,
-        recordCount: countMap.get(tableName) || 0,
-      }));
-
-      return {
-        tables: tableMetadatas,
-        totalSizeInGB: databaseSize,
-        hint: 'To retrieve detailed schema information for a specific table, call the get-table-schema tool with the table name.',
-      };
-    } finally {
-      client.release();
+    const now = Date.now();
+    const missingOrExpired: string[] = [];
+    for (const tableName of allTables) {
+      const cacheKey = buildQualifiedTableKey(tableName, 'public');
+      const cached = DatabaseManager.tableCountCache.get(cacheKey);
+      if (!cached || now - cached.timestamp >= DatabaseManager.TABLE_COUNT_CACHE_TTL) {
+        missingOrExpired.push(tableName);
+      }
     }
+
+    if (missingOrExpired.length > 0) {
+      const client = await this.pool.connect();
+      try {
+        const unionQuery = missingOrExpired
+          .map((tableName) =>
+            pgFormat(
+              'SELECT %L as table_name, COUNT(*) as count FROM %I.%I',
+              tableName,
+              'public',
+              tableName
+            )
+          )
+          .join(' UNION ALL ');
+
+        const queryResult = await client.query(unionQuery);
+        const nowAfterQuery = Date.now();
+        for (const row of queryResult.rows) {
+          const cacheKey = buildQualifiedTableKey(row.table_name, 'public');
+          DatabaseManager.tableCountCache.set(cacheKey, {
+            count: Number(row.count),
+            timestamp: nowAfterQuery,
+          });
+        }
+      } catch (error) {
+        console.error('Failed to batch query exact table counts:', error);
+      } finally {
+        client.release();
+      }
+    }
+
+    const tableMetadatas = allTables.map((tableName) => {
+      const cacheKey = buildQualifiedTableKey(tableName, 'public');
+      const cached = DatabaseManager.tableCountCache.get(cacheKey);
+      return {
+        tableName,
+        recordCount: cached ? cached.count : 0,
+      };
+    });
+
+    return {
+      tables: tableMetadatas,
+      totalSizeInGB: databaseSize,
+      hint: 'To retrieve detailed schema information for a specific table, call the get-table-schema tool with the table name.',
+    };
   }
 
   async getDatabaseSizeInGB(): Promise<number> {
