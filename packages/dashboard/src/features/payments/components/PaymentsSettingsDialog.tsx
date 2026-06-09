@@ -539,15 +539,15 @@ function RazorpayKeysTabContent({
                                 ID: {envIdKey.maskedKey}
                               </span>
                               {envSecretKey?.hasKey && (
-                                <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                                  <CheckCircle2 className="h-3 w-3" />
-                                  Secret configured
+                                <span className="inline-flex items-center gap-1.5 text-[11px] font-mono text-muted-foreground">
+                                  <CheckCircle2 className="h-3 w-3 text-green-500" />
+                                  Secret: {envSecretKey.maskedKey}
                                 </span>
                               )}
                             </div>
                           ) : hasKeys ? (
                             <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                              <CheckCircle2 className="h-3 w-3" />
+                              <CheckCircle2 className="h-3 w-3 text-green-500" />
                               Configured in secret store
                             </span>
                           ) : null}
