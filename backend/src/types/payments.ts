@@ -316,9 +316,11 @@ export interface RazorpayOrderRow {
   status: RazorpayOrderStatus;
   subjectType: string | null;
   subjectId: string | null;
+  customerId: string | null;
   customerName: string | null;
   customerEmail: string | null;
   customerContact: string | null;
+  idempotencyKey: string | null;
   orderId: string | null;
   receipt: string | null;
   amount: number | string;
@@ -326,6 +328,8 @@ export interface RazorpayOrderRow {
   amountDue: number | string | null;
   currency: string;
   attempts: number | string | null;
+  description: string | null;
+  metadata: Record<string, string>;
   verifiedPaymentId: string | null;
   verifiedAt: Date | string | null;
   lastError: string | null;
@@ -452,29 +456,6 @@ export interface RazorpaySubscriptionRow {
   metadata: Record<string, string>;
   providerCreatedAt: Date | string | null;
   syncedAt: Date | string;
-  createdAt: Date | string;
-  updatedAt: Date | string;
-}
-
-export type RazorpayOrderStatus = 'initialized' | 'created' | 'paid' | 'attempted' | 'failed';
-
-export interface RazorpayOrderRow {
-  id: string;
-  environment: RazorpayEnvironment;
-  status: RazorpayOrderStatus;
-  subjectType: string | null;
-  subjectId: string | null;
-  customerId: string | null;
-  customerEmail: string | null;
-  idempotencyKey: string | null;
-  orderId: string | null;
-  amount: number | string;
-  amountPaid: number | string;
-  amountDue: number | string;
-  currency: string;
-  description: string | null;
-  metadata: Record<string, string>;
-  lastError: string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
 }

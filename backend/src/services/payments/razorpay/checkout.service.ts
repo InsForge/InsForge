@@ -149,7 +149,26 @@ export class RazorpayCheckoutService {
         // Return it for the idempotent replay.
         if (existingOrder.status !== 'initialized') {
           const keyId = await this.resolveKeyId(input.environment);
-          return { attemptId: existingOrder.id, order: existingOrder, keyId };
+          if (!existingOrder.orderId) {
+            throw new AppError('Razorpay order was not created', 500, ERROR_CODES.INTERNAL_ERROR);
+          }
+          return {
+            attemptId: existingOrder.id,
+            order: existingOrder,
+            checkoutOptions: {
+              keyId,
+              amount: existingOrder.amount,
+              currency: existingOrder.currency.toUpperCase(),
+              orderId: existingOrder.orderId,
+              description: input.description ?? null,
+              callbackUrl: input.callbackUrl ?? null,
+              prefill: {
+                name: input.customerName ?? null,
+                email: input.customerEmail ?? null,
+                contact: input.customerContact ?? null,
+              },
+            },
+          };
         }
         // If status is 'initialized', the previous request dropped before Razorpay
         // returned an order ID. We fall through to call Razorpay using the existing record.
@@ -168,7 +187,26 @@ export class RazorpayCheckoutService {
 
         const order = await this.markOrderCreated(id, razorpayOrder);
         const keyId = await this.resolveKeyId(input.environment);
-        return { attemptId: id, order, keyId };
+        if (!order.orderId) {
+          throw new AppError('Razorpay order was not created', 500, ERROR_CODES.INTERNAL_ERROR);
+        }
+        return {
+          attemptId: id,
+          order,
+          checkoutOptions: {
+            keyId,
+            amount: order.amount,
+            currency: order.currency.toUpperCase(),
+            orderId: order.orderId,
+            description: input.description ?? null,
+            callbackUrl: input.callbackUrl ?? null,
+            prefill: {
+              name: input.customerName ?? null,
+              email: input.customerEmail ?? null,
+              contact: input.customerContact ?? null,
+            },
+          },
+        };
       } catch (error) {
         await this.markOrderFailed(id, error).catch((markError) => {
           logger.warn('Failed to mark Razorpay order as failed', {
@@ -260,8 +298,16 @@ export class RazorpayCheckoutService {
         return {
           attemptId: attemptRecordId,
           subscription: existingSub,
-          keyId,
-          shortUrl: existingSub.shortUrl ?? null,
+          checkoutOptions: {
+            keyId,
+            subscriptionId: existingSub.subscriptionId,
+            callbackUrl: input.callbackUrl ?? null,
+            prefill: {
+              name: input.customerName ?? null,
+              email: input.customerEmail ?? null,
+              contact: input.customerContact ?? null,
+            },
+          },
         };
       }
 
@@ -276,7 +322,7 @@ export class RazorpayCheckoutService {
       try {
         razorpaySub = await provider.createSubscription({
           planId: input.planId,
-          totalCount: input.totalCount,
+          totalCount: input.totalCount ?? 1,
           quantity: input.quantity,
           startAt: input.startAt,
           customerId: customerId ?? undefined,
@@ -323,8 +369,16 @@ export class RazorpayCheckoutService {
       return {
         attemptId: attemptRecordId,
         subscription,
-        keyId,
-        shortUrl: razorpaySub.short_url ?? null,
+        checkoutOptions: {
+          keyId,
+          subscriptionId: razorpaySub.id,
+          callbackUrl: input.callbackUrl ?? null,
+          prefill: {
+            name: input.customerName ?? null,
+            email: input.customerEmail ?? null,
+            contact: input.customerContact ?? null,
+          },
+        },
       };
     };
 
@@ -709,14 +763,21 @@ export class RazorpayCheckoutService {
       subjectType: row.subjectType ?? null,
       subjectId: row.subjectId ?? null,
       customerId: row.customerId ?? null,
+      customerName: row.customerName ?? null,
       customerEmail: row.customerEmail ?? null,
+      customerContact: row.customerContact ?? null,
+      idempotencyKey: row.idempotencyKey ?? null,
       orderId: row.orderId ?? null,
+      receipt: row.receipt ?? null,
       amount: Number(row.amount),
-      amountPaid: Number(row.amountPaid),
-      amountDue: Number(row.amountDue),
+      amountPaid: row.amountPaid === null ? null : Number(row.amountPaid),
+      amountDue: row.amountDue === null ? null : Number(row.amountDue),
       currency: row.currency,
+      attempts: row.attempts === null ? null : Number(row.attempts),
       description: row.description ?? null,
       metadata: row.metadata ?? {},
+      verifiedPaymentId: row.verifiedPaymentId ?? null,
+      verifiedAt: row.verifiedAt ? toISOString(row.verifiedAt) : null,
       lastError: row.lastError ?? null,
       createdAt: toISOString(row.createdAt),
       updatedAt: toISOString(row.updatedAt),
@@ -753,12 +814,15 @@ export class RazorpayCheckoutService {
       startAt: toStr(row.startAt),
       endAt: toStr(row.endAt),
       totalCount: row.totalCount === null ? null : Number(row.totalCount),
+      authAttempts: row.authAttempts === null ? null : Number(row.authAttempts),
       paidCount: row.paidCount === null ? null : Number(row.paidCount),
       remainingCount: row.remainingCount === null ? null : Number(row.remainingCount),
       shortUrl: (row.shortUrl as string | null) ?? null,
       hasScheduledChanges: Boolean(row.hasScheduledChanges),
       changeScheduledAt: toStr(row.changeScheduledAt),
       offerId: (row.offerId as string | null) ?? null,
+      authorizationPaymentId: (row.authorizationPaymentId as string | null) ?? null,
+      authorizationVerifiedAt: toStr(row.authorizationVerifiedAt),
       metadata: (row.metadata as Record<string, string>) ?? {},
       providerCreatedAt: toStr(row.providerCreatedAt),
       syncedAt: toStr(row.syncedAt) ?? new Date().toISOString(),

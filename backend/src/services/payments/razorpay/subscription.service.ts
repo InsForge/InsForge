@@ -132,7 +132,7 @@ export class RazorpaySubscriptionService {
     const provider = await this.configService.createRazorpayProvider(input.environment);
     const subscription = await provider.createSubscription({
       planId: input.planId,
-      totalCount: input.totalCount,
+      totalCount: input.totalCount ?? 1,
       endAt: input.endAt,
       quantity: input.quantity,
       startAt: input.startAt,
@@ -156,6 +156,7 @@ export class RazorpaySubscriptionService {
     input: CreateRazorpaySubscriptionRequest
   ): CreateRazorpaySubscriptionResponse {
     return {
+      attemptId: storedSubscription.subscriptionId,
       subscription: storedSubscription,
       checkoutOptions: {
         keyId,

@@ -143,6 +143,7 @@ export interface RazorpaySubscriptionCreateInput {
   expireBy?: number;
   customerNotify?: boolean;
   offerId?: string | null;
+  customerId?: string;
   notes?: Record<string, string>;
 }
 
@@ -263,20 +264,6 @@ export interface RazorpayInvoice {
   cancelled_at: number | null;
   expired_at: number | null;
   issued_at: number | null;
-  created_at: number;
-}
-
-export interface RazorpayOrder {
-  id: string;
-  entity: string;
-  amount: number;
-  amount_paid: number;
-  amount_due: number;
-  currency: string;
-  receipt: string | null;
-  status: 'created' | 'attempted' | 'paid';
-  attempts: number;
-  notes: Record<string, string | number>;
   created_at: number;
 }
 
@@ -510,55 +497,6 @@ export class RazorpayProvider {
     return all;
   }
 
-  async createOrder(input: RazorpayOrderCreateInput): Promise<RazorpayOrder> {
-    const params: Record<string, unknown> = {
-      amount: input.amount,
-      currency: input.currency,
-    };
-
-    if (input.receipt) {
-      params.receipt = input.receipt;
-    }
-    if (input.notes) {
-      params.notes = input.notes;
-    }
-
-    return this.getMutationClient().orders.create(params);
-  }
-
-  async createSubscription(input: RazorpaySubscriptionCreateInput): Promise<RazorpaySubscription> {
-    const params: Record<string, unknown> = {
-      plan_id: input.planId,
-    };
-
-    if (input.totalCount !== undefined) {
-      params.total_count = input.totalCount;
-    }
-    if (input.endAt !== undefined) {
-      params.end_at = input.endAt;
-    }
-    if (input.quantity !== undefined) {
-      params.quantity = input.quantity;
-    }
-    if (input.startAt !== undefined) {
-      params.start_at = input.startAt;
-    }
-    if (input.expireBy !== undefined) {
-      params.expire_by = input.expireBy;
-    }
-    if (input.customerNotify !== undefined) {
-      params.customer_notify = input.customerNotify;
-    }
-    if (input.offerId) {
-      params.offer_id = input.offerId;
-    }
-    if (input.notes) {
-      params.notes = input.notes;
-    }
-
-    return this.getMutationClient().subscriptions.create(params);
-  }
-
   async cancelSubscription(
     subscriptionId: string,
     input: RazorpaySubscriptionCancelInput = {}
@@ -687,23 +625,30 @@ export class RazorpayProvider {
    * The developer's frontend uses the returned subscription_id and short_url
    * to redirect the user to the hosted payment page.
    */
-  async createSubscription(input: {
-    planId: string;
-    totalCount: number;
-    quantity?: number;
-    startAt?: number; // Unix timestamp
-    customerId?: string;
-    notes?: Record<string, string>;
-  }): Promise<RazorpaySubscription> {
+  async createSubscription(input: RazorpaySubscriptionCreateInput): Promise<RazorpaySubscription> {
     const params: Record<string, unknown> = {
       plan_id: input.planId,
-      total_count: input.totalCount,
     };
+    if (input.totalCount !== undefined) {
+      params.total_count = input.totalCount;
+    }
+    if (input.endAt !== undefined) {
+      params.end_at = input.endAt;
+    }
     if (input.quantity !== undefined) {
       params.quantity = input.quantity;
     }
     if (input.startAt !== undefined) {
       params.start_at = input.startAt;
+    }
+    if (input.expireBy !== undefined) {
+      params.expire_by = input.expireBy;
+    }
+    if (input.customerNotify !== undefined) {
+      params.customer_notify = input.customerNotify;
+    }
+    if (input.offerId) {
+      params.offer_id = input.offerId;
     }
     if (input.customerId) {
       params.customer_id = input.customerId;

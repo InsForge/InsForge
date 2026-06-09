@@ -276,6 +276,7 @@ export class RazorpayOrderService {
     }
 
     return {
+      attemptId: order.id,
       order,
       checkoutOptions: {
         keyId,
@@ -346,9 +347,11 @@ export class RazorpayOrderService {
       status: row.status,
       subjectType: row.subjectType ?? null,
       subjectId: row.subjectId ?? null,
+      customerId: row.customerId ?? null,
       customerName: row.customerName ?? null,
       customerEmail: row.customerEmail ?? null,
       customerContact: row.customerContact ?? null,
+      idempotencyKey: row.idempotencyKey ?? null,
       orderId: row.orderId ?? null,
       receipt: row.receipt ?? null,
       amount: Number(row.amount),
@@ -356,6 +359,8 @@ export class RazorpayOrderService {
       amountDue: row.amountDue === null ? null : Number(row.amountDue),
       currency: row.currency,
       attempts: row.attempts === null ? null : Number(row.attempts),
+      description: row.description ?? null,
+      metadata: row.metadata ?? {},
       verifiedPaymentId: row.verifiedPaymentId ?? null,
       verifiedAt: toISOStringOrNull(row.verifiedAt),
       lastError: row.lastError ?? null,

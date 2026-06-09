@@ -465,6 +465,7 @@ const createRazorpayOrderFields = {
   customerContact: z.string().trim().min(1).max(32).nullable().optional(),
   callbackUrl: z.string().trim().url('Callback URL must be a valid URL').nullable().optional(),
   metadata: z.record(z.string()).optional(),
+  idempotencyKey: z.string().trim().min(1).max(255).nullable().optional(),
 };
 
 export const createRazorpayOrderBodySchema = z
@@ -487,6 +488,7 @@ export const createRazorpayOrderRequestSchema = z
   });
 
 export const createRazorpayOrderResponseSchema = z.object({
+  attemptId: z.string().uuid(),
   order: razorpayOrderSchema,
   checkoutOptions: razorpayCheckoutOptionsSchema.extend({
     amount: z.number().int().positive(),
@@ -531,6 +533,7 @@ const createRazorpaySubscriptionFields = {
   customerContact: z.string().trim().min(1).max(32).nullable().optional(),
   callbackUrl: z.string().trim().url('Callback URL must be a valid URL').nullable().optional(),
   metadata: z.record(z.string()).optional(),
+  idempotencyKey: z.string().trim().min(1).max(255).nullable().optional(),
 };
 
 function hasSubscriptionEnd(value: { totalCount?: number; endAt?: number }) {
@@ -563,6 +566,7 @@ export const createRazorpaySubscriptionRequestSchema = z
   });
 
 export const createRazorpaySubscriptionResponseSchema = z.object({
+  attemptId: z.string(),
   subscription: razorpaySubscriptionSchema,
   checkoutOptions: razorpayCheckoutOptionsSchema.extend({
     subscriptionId: z.string(),
