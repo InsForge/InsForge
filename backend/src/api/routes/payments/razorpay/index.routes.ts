@@ -6,7 +6,6 @@ import { RazorpayConfigService } from '@/services/payments/razorpay/config.servi
 import { RazorpaySyncService } from '@/services/payments/razorpay/sync.service.js';
 import { RazorpayOrderService } from '@/services/payments/razorpay/order.service.js';
 import { RazorpaySubscriptionService } from '@/services/payments/razorpay/subscription.service.js';
-import { RazorpayPaymentActivityService } from '@/services/payments/razorpay/payment-activity.service.js';
 import { RazorpayCheckoutService } from '@/services/payments/razorpay/checkout.service.js';
 import { PaymentCustomerService } from '@/services/payments/payment-customer.service.js';
 import { PaymentTransactionService } from '@/services/payments/transaction.service.js';
@@ -22,8 +21,6 @@ import {
   listPaymentCustomersQuerySchema,
   listPaymentTransactionsQuerySchema,
   listRazorpaySubscriptionsQuerySchema,
-  createRazorpayOrderBodySchema,
-  createRazorpaySubscriptionBodySchema,
   pauseRazorpaySubscriptionBodySchema,
   razorpaySubscriptionParamsSchema,
   resumeRazorpaySubscriptionBodySchema,
@@ -37,7 +34,6 @@ const configService = RazorpayConfigService.getInstance();
 const syncService = RazorpaySyncService.getInstance();
 const orderService = RazorpayOrderService.getInstance();
 const subscriptionService = RazorpaySubscriptionService.getInstance();
-const paymentActivityService = RazorpayPaymentActivityService.getInstance();
 const checkoutService = RazorpayCheckoutService.getInstance();
 const customerService = PaymentCustomerService.getInstance();
 const transactionService = PaymentTransactionService.getInstance();
