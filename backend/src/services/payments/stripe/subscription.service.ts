@@ -18,7 +18,7 @@ import type {
   BillingSubject,
   ListStripeSubscriptionsRequest,
   ListStripeSubscriptionsResponse,
-  SyncPaymentsSubscriptionsSummary,
+  SyncStripePaymentsSubscriptionsSummary,
 } from '@insforge/shared-schemas';
 
 export interface SubscriptionProjectionResult {
@@ -132,7 +132,7 @@ export class StripeSubscriptionService {
   async syncSubscriptionsWithProvider(
     environment: StripeEnvironment,
     provider: StripeProvider
-  ): Promise<SyncPaymentsSubscriptionsSummary> {
+  ): Promise<SyncStripePaymentsSubscriptionsSummary> {
     const subscriptions = await provider.listSubscriptions();
     let synced = 0;
     let unmapped = 0;

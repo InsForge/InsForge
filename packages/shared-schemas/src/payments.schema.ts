@@ -67,7 +67,7 @@ export const stripePriceSchema = z.object({
 export type StripePrice = z.infer<typeof stripePriceSchema>;
 
 export const paymentCustomerSchema = z.object({
-  environment: stripeEnvironmentSchema,
+  environment: paymentEnvironmentSchema,
   provider: paymentProviderSchema,
   providerCustomerId: z.string(),
   email: z.string().nullable(),
@@ -134,6 +134,39 @@ export const checkoutSessionSchema = z.object({
 });
 export type CheckoutSession = z.infer<typeof checkoutSessionSchema>;
 
+export const razorpayOrderStatusSchema = z.enum([
+  'initialized',
+  'created',
+  'attempted',
+  'paid',
+  'failed',
+]);
+export type RazorpayOrderStatus = z.infer<typeof razorpayOrderStatusSchema>;
+
+export const razorpayOrderSchema = z.object({
+  id: z.string(),
+  environment: razorpayEnvironmentSchema,
+  status: razorpayOrderStatusSchema,
+  subjectType: z.string().nullable(),
+  subjectId: z.string().nullable(),
+  customerName: z.string().nullable(),
+  customerEmail: z.string().nullable(),
+  customerContact: z.string().nullable(),
+  orderId: z.string().nullable(),
+  receipt: z.string().nullable(),
+  amount: z.number(),
+  amountPaid: z.number().nullable(),
+  amountDue: z.number().nullable(),
+  currency: z.string(),
+  attempts: z.number().int().nonnegative().nullable(),
+  verifiedPaymentId: z.string().nullable(),
+  verifiedAt: z.string().nullable(),
+  lastError: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type RazorpayOrder = z.infer<typeof razorpayOrderSchema>;
+
 export const customerPortalSessionStatusSchema = z.enum(['initialized', 'created', 'failed']);
 export type CustomerPortalSessionStatus = z.infer<typeof customerPortalSessionStatusSchema>;
 
@@ -153,28 +186,28 @@ export const customerPortalSessionSchema = z.object({
 });
 export type CustomerPortalSession = z.infer<typeof customerPortalSessionSchema>;
 
-export const paymentActivityTypeSchema = z.enum([
+export const paymentTransactionTypeSchema = z.enum([
   'one_time_payment',
   'subscription_invoice',
   'refund',
   'failed_payment',
 ]);
-export type PaymentActivityType = z.infer<typeof paymentActivityTypeSchema>;
+export type PaymentTransactionType = z.infer<typeof paymentTransactionTypeSchema>;
 
-export const paymentActivityStatusSchema = z.enum([
+export const paymentTransactionStatusSchema = z.enum([
   'succeeded',
   'failed',
   'pending',
   'refunded',
   'partially_refunded',
 ]);
-export type PaymentActivityStatus = z.infer<typeof paymentActivityStatusSchema>;
+export type PaymentTransactionStatus = z.infer<typeof paymentTransactionStatusSchema>;
 
-export const paymentActivitySchema = z.object({
-  environment: stripeEnvironmentSchema,
+export const paymentTransactionSchema = z.object({
+  environment: paymentEnvironmentSchema,
   provider: paymentProviderSchema,
-  type: paymentActivityTypeSchema,
-  status: paymentActivityStatusSchema,
+  type: paymentTransactionTypeSchema,
+  status: paymentTransactionStatusSchema,
   subjectType: z.string().nullable(),
   subjectId: z.string().nullable(),
   providerCustomerId: z.string().nullable(),
@@ -192,7 +225,7 @@ export const paymentActivitySchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
 });
-export type PaymentActivity = z.infer<typeof paymentActivitySchema>;
+export type PaymentTransaction = z.infer<typeof paymentTransactionSchema>;
 
 export const stripeSubscriptionStatusSchema = z.enum([
   'incomplete',
@@ -271,12 +304,15 @@ export const razorpaySubscriptionSchema = z.object({
   startAt: z.string().nullable(),
   endAt: z.string().nullable(),
   totalCount: z.number().nullable(),
+  authAttempts: z.number().nullable(),
   paidCount: z.number().nullable(),
   remainingCount: z.number().nullable(),
   shortUrl: z.string().nullable(),
   hasScheduledChanges: z.boolean(),
   changeScheduledAt: z.string().nullable(),
   offerId: z.string().nullable(),
+  authorizationPaymentId: z.string().nullable(),
+  authorizationVerifiedAt: z.string().nullable(),
   metadata: z.record(z.string()),
   providerCreatedAt: z.string().nullable(),
   syncedAt: z.string(),
@@ -341,7 +377,10 @@ export const razorpayItemSchema = z.object({
   description: z.string().nullable(),
   active: z.boolean(),
   amount: z.number().nullable(),
-  unitAmount: z.number().nullable(),
+  unitAmount: z
+    .number()
+    .nullable()
+    .describe('Razorpay per-unit amount mirror; usually equals amount for catalog items.'),
   currency: z.string(),
   type: z.string().nullable(),
   metadata: z.record(z.string()),
@@ -357,7 +396,10 @@ export const razorpayPlanSchema = z.object({
   period: z.string(),
   interval: z.number(),
   amount: z.number().nullable(),
-  unitAmount: z.number().nullable(),
+  unitAmount: z
+    .number()
+    .nullable()
+    .describe('Razorpay nested item per-unit amount mirror; usually equals amount.'),
   currency: z.string(),
   active: z.boolean(),
   metadata: z.record(z.string()),

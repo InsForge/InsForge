@@ -1,13 +1,14 @@
 import type {
   RazorpayEnvironment,
-  ConfigureRazorpayWebhookResponse,
+  GetRazorpayWebhookSetupResponse,
+  RegenerateRazorpayWebhookSecretResponse,
   GetRazorpayConfigResponse,
   GetRazorpayStatusResponse,
   ListRazorpayCatalogResponse,
   ListPaymentCustomersRequest,
   ListPaymentCustomersResponse,
-  ListPaymentActivityRequest,
-  ListPaymentActivityResponse,
+  ListPaymentTransactionsRequest,
+  ListPaymentTransactionsResponse,
   ListRazorpaySubscriptionsRequest,
   ListRazorpaySubscriptionsResponse,
   SyncRazorpayPaymentsRequest,
@@ -17,14 +18,15 @@ import type {
 import { apiClient } from '#lib/api/client';
 
 export type {
-  ConfigureRazorpayWebhookResponse,
+  GetRazorpayWebhookSetupResponse,
+  RegenerateRazorpayWebhookSecretResponse,
   GetRazorpayConfigResponse,
   GetRazorpayStatusResponse,
   ListRazorpayCatalogResponse,
   ListPaymentCustomersRequest,
   ListPaymentCustomersResponse,
-  ListPaymentActivityRequest,
-  ListPaymentActivityResponse,
+  ListPaymentTransactionsRequest,
+  ListPaymentTransactionsResponse,
   ListRazorpaySubscriptionsRequest,
   ListRazorpaySubscriptionsResponse,
   SyncRazorpayPaymentsRequest,
@@ -64,10 +66,18 @@ export class RazorpayService {
     });
   }
 
-  async configureWebhook(
+  async getWebhookSetup(
     environment: RazorpayEnvironment
-  ): Promise<ConfigureRazorpayWebhookResponse> {
+  ): Promise<GetRazorpayWebhookSetupResponse> {
     return apiClient.request(`/payments/razorpay/${environment}/webhook`, {
+      headers: apiClient.withAccessToken(),
+    });
+  }
+
+  async regenerateWebhookSecret(
+    environment: RazorpayEnvironment
+  ): Promise<RegenerateRazorpayWebhookSecretResponse> {
+    return apiClient.request(`/payments/razorpay/${environment}/webhook/regenerate-secret`, {
       method: 'POST',
       headers: apiClient.withAccessToken(),
     });
@@ -106,9 +116,9 @@ export class RazorpayService {
     );
   }
 
-  async listPaymentActivity(
-    input: ListPaymentActivityRequest
-  ): Promise<ListPaymentActivityResponse> {
+  async listTransactions(
+    input: ListPaymentTransactionsRequest
+  ): Promise<ListPaymentTransactionsResponse> {
     const searchParams = new URLSearchParams({
       limit: String(input.limit),
     });
@@ -119,7 +129,7 @@ export class RazorpayService {
     }
 
     return apiClient.request(
-      `/payments/razorpay/${input.environment}/payment-activity?${searchParams.toString()}`,
+      `/payments/razorpay/${input.environment}/transactions?${searchParams.toString()}`,
       {
         headers: apiClient.withAccessToken(),
       }

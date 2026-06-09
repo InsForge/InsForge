@@ -22,11 +22,7 @@ export function useRazorpayConfig() {
   const saveKey = useMutation({
     mutationFn: (input: UpsertRazorpayConfigRequest) => razorpayService.upsertConfig(input),
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: RAZORPAY_CONFIG_QUERY_KEY }),
-        queryClient.invalidateQueries({ queryKey: ['payments', 'razorpay', 'status'] }),
-        queryClient.invalidateQueries({ queryKey: ['payments', 'catalog'] }), // general invalidation
-      ]);
+      await queryClient.invalidateQueries({ queryKey: ['payments', 'razorpay'] });
       showToast('Razorpay keys saved successfully', 'success');
     },
     onError: (err: Error) => {
@@ -37,11 +33,7 @@ export function useRazorpayConfig() {
   const removeKey = useMutation({
     mutationFn: (environment: RazorpayEnvironment) => razorpayService.removeConfig(environment),
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: RAZORPAY_CONFIG_QUERY_KEY }),
-        queryClient.invalidateQueries({ queryKey: ['payments', 'razorpay', 'status'] }),
-        queryClient.invalidateQueries({ queryKey: ['payments', 'catalog'] }),
-      ]);
+      await queryClient.invalidateQueries({ queryKey: ['payments', 'razorpay'] });
       showToast('Razorpay keys removed', 'success');
     },
     onError: (err: Error) => {

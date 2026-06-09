@@ -2,9 +2,9 @@ import { useCallback, useMemo, useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
 import type {
-  PaymentActivity,
-  PaymentActivityStatus,
-  PaymentActivityType,
+  PaymentTransaction,
+  PaymentTransactionStatus,
+  PaymentTransactionType,
 } from '@insforge/shared-schemas';
 import {
   Alert,
@@ -13,18 +13,18 @@ import {
   ErrorState,
   LoadingState,
   PaginationControls,
-  TableHeader,
 } from '#components';
 import { PaymentsKeyMissingState } from '#features/payments/components/PaymentsKeyMissingState';
+import { PaymentsPageHeader } from '#features/payments/components/PaymentsPageHeader';
 import { ProviderBadge } from '#features/payments/components/ProviderBadge';
 import type { PaymentsOutletContext } from '#features/payments/components/PaymentsLayout';
-import { usePaymentActivity } from '#features/payments/hooks/usePaymentActivity';
+import { usePaymentTransactions } from '#features/payments/hooks/usePaymentTransactions';
 import { cn } from '#lib/utils/utils';
 
-const PAYMENT_HISTORY_GRID_TEMPLATE =
+const TRANSACTIONS_GRID_TEMPLATE =
   'minmax(0,1.45fr) 120px 100px minmax(0,1.1fr) 120px minmax(0,1fr) 180px';
 
-const PAYMENT_STATUS_CLASS_NAMES: Record<PaymentActivityStatus, string> = {
+const PAYMENT_STATUS_CLASS_NAMES: Record<PaymentTransactionStatus, string> = {
   succeeded: 'bg-[var(--alpha-8)] text-emerald-400',
   failed: 'bg-[var(--alpha-8)] text-rose-400',
   pending: 'bg-[var(--alpha-8)] text-amber-400',
@@ -32,7 +32,7 @@ const PAYMENT_STATUS_CLASS_NAMES: Record<PaymentActivityStatus, string> = {
   partially_refunded: 'bg-[var(--alpha-8)] text-sky-400',
 };
 
-const PAYMENT_TYPE_LABELS: Record<PaymentActivityType, string> = {
+const PAYMENT_TYPE_LABELS: Record<PaymentTransactionType, string> = {
   one_time_payment: 'One-Time Payment',
   subscription_invoice: 'Subscription Invoice',
   refund: 'Refund',
@@ -78,7 +78,7 @@ function formatEventDate(value: string | null) {
   }).format(date);
 }
 
-function getEventDate(payment: PaymentActivity) {
+function getEventDate(payment: PaymentTransaction) {
   return (
     payment.paidAt ??
     payment.failedAt ??
@@ -99,11 +99,11 @@ function formatProviderReferenceType(value: string | null) {
     .join(' ');
 }
 
-function getProviderReferenceId(payment: PaymentActivity) {
+function getProviderReferenceId(payment: PaymentTransaction) {
   return payment.providerReferenceId ?? '-';
 }
 
-function getProviderReferenceTitle(payment: PaymentActivity) {
+function getProviderReferenceTitle(payment: PaymentTransaction) {
   const referenceId = getProviderReferenceId(payment);
   if (referenceId === '-') {
     return undefined;
@@ -113,7 +113,7 @@ function getProviderReferenceTitle(payment: PaymentActivity) {
   return referenceType ? `${referenceType}: ${referenceId}` : referenceId;
 }
 
-function getPaymentKey(payment: PaymentActivity) {
+function getPaymentKey(payment: PaymentTransaction) {
   return [
     payment.environment,
     payment.type,
@@ -125,7 +125,7 @@ function getPaymentKey(payment: PaymentActivity) {
     .join(':');
 }
 
-function getCustomerLabel(payment: PaymentActivity) {
+function getCustomerLabel(payment: PaymentTransaction) {
   return (
     payment.customerEmailSnapshot ??
     payment.providerCustomerId ??
@@ -135,11 +135,11 @@ function getCustomerLabel(payment: PaymentActivity) {
   );
 }
 
-function isMutedCustomer(payment: PaymentActivity) {
+function isMutedCustomer(payment: PaymentTransaction) {
   return !payment.customerEmailSnapshot;
 }
 
-function formatStatusLabel(status: PaymentActivityStatus) {
+function formatStatusLabel(status: PaymentTransactionStatus) {
   if (status === 'pending') {
     return 'Delayed';
   }
@@ -150,7 +150,7 @@ function formatStatusLabel(status: PaymentActivityStatus) {
     .join(' ');
 }
 
-function PaymentStatusBadge({ status }: { status: PaymentActivityStatus }) {
+function PaymentStatusBadge({ status }: { status: PaymentTransactionStatus }) {
   return (
     <span
       className={cn(
@@ -163,31 +163,31 @@ function PaymentStatusBadge({ status }: { status: PaymentActivityStatus }) {
   );
 }
 
-function getPaymentProvider(payment: PaymentActivity) {
+function getPaymentProvider(payment: PaymentTransaction) {
   return payment.provider === 'razorpay' ? 'Razorpay' : 'Stripe';
 }
 
-function EmptyPaymentActivityState({ hasSearchQuery }: { hasSearchQuery: boolean }) {
+function EmptyTransactionsState({ hasSearchQuery }: { hasSearchQuery: boolean }) {
   return (
     <div className="rounded border border-dashed border-[var(--alpha-8)] bg-card p-8 text-center">
       <p className="text-sm font-medium text-foreground">
-        {hasSearchQuery ? 'No payments match your search' : 'No payment activity found'}
+        {hasSearchQuery ? 'No transactions match your search' : 'No transactions found'}
       </p>
       <p className="mt-1 text-sm text-muted-foreground">
         {hasSearchQuery
           ? 'Try a different payment type, customer, payment intent, or invoice reference.'
-          : 'Checkout, invoice, and refund events will appear here after payment activity is recorded.'}
+          : 'Checkout, invoice, and refund events will appear here after transactions are recorded.'}
       </p>
     </div>
   );
 }
 
-function PaymentActivityRow({ payment }: { payment: PaymentActivity }) {
+function TransactionRow({ payment }: { payment: PaymentTransaction }) {
   return (
     <div className="overflow-hidden rounded border border-[var(--alpha-8)] bg-card">
       <div
         className="grid min-h-12 items-center gap-0 px-2 text-sm transition-colors hover:bg-alpha-4"
-        style={{ gridTemplateColumns: PAYMENT_HISTORY_GRID_TEMPLATE }}
+        style={{ gridTemplateColumns: TRANSACTIONS_GRID_TEMPLATE }}
       >
         <div className="min-w-0 px-2 py-3">
           <span className="block truncate text-foreground">
@@ -243,26 +243,27 @@ function PaymentActivityRow({ payment }: { payment: PaymentActivity }) {
   );
 }
 
-export default function PaymentActivityPage() {
-  const { openPaymentsSettings, environment } = useOutletContext<PaymentsOutletContext>();
+export default function TransactionsPage() {
+  const { openPaymentsSettings, provider, setProvider, environment, setEnvironment } =
+    useOutletContext<PaymentsOutletContext>();
   const [searchQuery, setSearchQuery] = useState('');
   const {
     activeConnection,
     activeRazorpayConnection,
     hasActiveKey,
-    paymentActivity,
+    transactions,
     isLoading,
     error,
     refetch,
-  } = usePaymentActivity(environment);
+  } = usePaymentTransactions(provider, environment);
 
-  const filteredPaymentActivity = useMemo(() => {
+  const filteredTransactions = useMemo(() => {
     const normalizedSearch = searchQuery.trim().toLowerCase();
     if (!normalizedSearch) {
-      return paymentActivity;
+      return transactions;
     }
 
-    return paymentActivity.filter((payment) =>
+    return transactions.filter((payment) =>
       [
         PAYMENT_TYPE_LABELS[payment.type],
         payment.status,
@@ -278,17 +279,18 @@ export default function PaymentActivityPage() {
         .filter((value): value is string => typeof value === 'string' && value.length > 0)
         .some((value) => value.toLowerCase().includes(normalizedSearch))
     );
-  }, [paymentActivity, searchQuery]);
+  }, [transactions, searchQuery]);
 
   const handlePageChange = useCallback((_page: number) => {}, []);
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
-      <TableHeader
-        title="Payment Activity"
-        className="h-14 min-h-14"
-        leftClassName="py-0"
-        rightClassName="py-0"
+      <PaymentsPageHeader
+        title="Transactions"
+        provider={provider}
+        setProvider={setProvider}
+        environment={environment}
+        setEnvironment={setEnvironment}
         showSearch={hasActiveKey}
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}
@@ -301,11 +303,12 @@ export default function PaymentActivityPage() {
         {error ? (
           <ErrorState error={error as Error} onRetry={() => void refetch()} />
         ) : isLoading ? (
-          <LoadingState message="Loading payment activity..." />
+          <LoadingState message="Loading transactions..." />
         ) : !hasActiveKey ? (
           <PaymentsKeyMissingState
+            provider={provider}
             environment={environment}
-            resourceLabel="payment activity"
+            resourceLabel="transactions"
             onConfigure={openPaymentsSettings}
           />
         ) : (
@@ -333,7 +336,7 @@ export default function PaymentActivityPage() {
 
                 <div
                   className="grid gap-0 px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"
-                  style={{ gridTemplateColumns: PAYMENT_HISTORY_GRID_TEMPLATE }}
+                  style={{ gridTemplateColumns: TRANSACTIONS_GRID_TEMPLATE }}
                 >
                   <div className="px-2 py-1.5">Payment</div>
                   <div className="px-2 py-1.5">Status</div>
@@ -344,12 +347,12 @@ export default function PaymentActivityPage() {
                   <div className="px-2 py-1.5">Date</div>
                 </div>
 
-                {filteredPaymentActivity.length === 0 ? (
-                  <EmptyPaymentActivityState hasSearchQuery={searchQuery.trim().length > 0} />
+                {filteredTransactions.length === 0 ? (
+                  <EmptyTransactionsState hasSearchQuery={searchQuery.trim().length > 0} />
                 ) : (
                   <div className="flex flex-col gap-1">
-                    {filteredPaymentActivity.map((payment) => (
-                      <PaymentActivityRow key={getPaymentKey(payment)} payment={payment} />
+                    {filteredTransactions.map((payment) => (
+                      <TransactionRow key={getPaymentKey(payment)} payment={payment} />
                     ))}
                   </div>
                 )}
@@ -361,9 +364,9 @@ export default function PaymentActivityPage() {
                 currentPage={1}
                 totalPages={1}
                 onPageChange={handlePageChange}
-                totalRecords={filteredPaymentActivity.length}
-                pageSize={Math.max(filteredPaymentActivity.length, 1)}
-                recordLabel="payments"
+                totalRecords={filteredTransactions.length}
+                pageSize={Math.max(filteredTransactions.length, 1)}
+                recordLabel="transactions"
               />
             </div>
           </div>

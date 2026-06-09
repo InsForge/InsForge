@@ -1,23 +1,23 @@
 import type {
-  ConfigurePaymentWebhookResponse,
-  GetPaymentsConfigResponse,
-  GetPaymentsStatusResponse,
+  ConfigureStripeWebhookResponse,
+  GetStripeConfigResponse,
+  GetStripeStatusResponse,
   ListPaymentCustomersRequest,
   ListPaymentCustomersResponse,
-  ListPaymentActivityRequest,
-  ListPaymentActivityResponse,
+  ListPaymentTransactionsRequest,
+  ListPaymentTransactionsResponse,
   ListStripeCatalogResponse,
   ListStripeSubscriptionsRequest,
   ListStripeSubscriptionsResponse,
-  SyncPaymentsRequest,
-  SyncPaymentsResponse,
+  SyncStripePaymentsRequest,
+  SyncStripePaymentsResponse,
   StripeEnvironment,
-  UpsertPaymentsConfigRequest,
+  UpsertStripeConfigRequest,
 } from '@insforge/shared-schemas';
 import { apiClient } from '#lib/api/client';
 
 export class PaymentsService {
-  async getStatus(): Promise<GetPaymentsStatusResponse> {
+  async getStatus(): Promise<GetStripeStatusResponse> {
     return apiClient.request('/payments/stripe/status', {
       headers: apiClient.withAccessToken(),
     });
@@ -29,7 +29,7 @@ export class PaymentsService {
     });
   }
 
-  async syncPayments(input: SyncPaymentsRequest): Promise<SyncPaymentsResponse> {
+  async syncPayments(input: SyncStripePaymentsRequest): Promise<SyncStripePaymentsResponse> {
     if (input.environment === 'all') {
       return apiClient.request('/payments/stripe/sync', {
         method: 'POST',
@@ -43,13 +43,13 @@ export class PaymentsService {
     });
   }
 
-  async getConfig(): Promise<GetPaymentsConfigResponse> {
+  async getConfig(): Promise<GetStripeConfigResponse> {
     return apiClient.request('/payments/stripe/config', {
       headers: apiClient.withAccessToken(),
     });
   }
 
-  async upsertConfig(input: UpsertPaymentsConfigRequest): Promise<GetPaymentsConfigResponse> {
+  async upsertConfig(input: UpsertStripeConfigRequest): Promise<GetStripeConfigResponse> {
     return apiClient.request(`/payments/stripe/${input.environment}/config`, {
       method: 'PUT',
       headers: apiClient.withAccessToken(),
@@ -57,14 +57,14 @@ export class PaymentsService {
     });
   }
 
-  async removeConfig(environment: StripeEnvironment): Promise<GetPaymentsConfigResponse> {
+  async removeConfig(environment: StripeEnvironment): Promise<GetStripeConfigResponse> {
     return apiClient.request(`/payments/stripe/${environment}/config`, {
       method: 'DELETE',
       headers: apiClient.withAccessToken(),
     });
   }
 
-  async configureWebhook(environment: StripeEnvironment): Promise<ConfigurePaymentWebhookResponse> {
+  async configureWebhook(environment: StripeEnvironment): Promise<ConfigureStripeWebhookResponse> {
     return apiClient.request(`/payments/stripe/${environment}/webhook`, {
       method: 'POST',
       headers: apiClient.withAccessToken(),
@@ -104,9 +104,9 @@ export class PaymentsService {
     );
   }
 
-  async listPaymentActivity(
-    input: ListPaymentActivityRequest
-  ): Promise<ListPaymentActivityResponse> {
+  async listTransactions(
+    input: ListPaymentTransactionsRequest
+  ): Promise<ListPaymentTransactionsResponse> {
     const searchParams = new URLSearchParams({
       limit: String(input.limit),
     });
@@ -117,7 +117,7 @@ export class PaymentsService {
     }
 
     return apiClient.request(
-      `/payments/stripe/${input.environment}/payment-activity?${searchParams.toString()}`,
+      `/payments/stripe/${input.environment}/transactions?${searchParams.toString()}`,
       {
         headers: apiClient.withAccessToken(),
       }

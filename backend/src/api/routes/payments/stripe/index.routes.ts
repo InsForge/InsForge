@@ -5,9 +5,9 @@ import { StripeConfigService } from '@/services/payments/stripe/config.service.j
 import { StripeSyncService } from '@/services/payments/stripe/sync.service.js';
 import { StripeCheckoutService } from '@/services/payments/stripe/checkout.service.js';
 import { StripeCustomerPortalService } from '@/services/payments/stripe/customer-portal.service.js';
-import { StripePaymentActivityService } from '@/services/payments/stripe/payment-activity.service.js';
 import { StripeSubscriptionService } from '@/services/payments/stripe/subscription.service.js';
 import { PaymentCustomerService } from '@/services/payments/payment-customer.service.js';
+import { PaymentTransactionService } from '@/services/payments/transaction.service.js';
 import { successResponse } from '@/utils/response.js';
 import { parseZodSchema } from '@/utils/zod.js';
 import { getPaymentEnvironment } from '@/services/payments/helpers.js';
@@ -19,7 +19,7 @@ import {
   createCheckoutSessionBodySchema,
   createCustomerPortalSessionBodySchema,
   listPaymentCustomersQuerySchema,
-  listPaymentActivityQuerySchema,
+  listPaymentTransactionsQuerySchema,
   listStripeSubscriptionsQuerySchema,
 } from '@insforge/shared-schemas';
 
@@ -29,9 +29,9 @@ const configService = StripeConfigService.getInstance();
 const syncService = StripeSyncService.getInstance();
 const checkoutService = StripeCheckoutService.getInstance();
 const customerPortalService = StripeCustomerPortalService.getInstance();
-const paymentActivityService = StripePaymentActivityService.getInstance();
 const subscriptionService = StripeSubscriptionService.getInstance();
 const customerService = PaymentCustomerService.getInstance();
+const transactionService = PaymentTransactionService.getInstance();
 
 router.get('/status', verifyAdmin, async (_req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -125,17 +125,20 @@ environmentRouter.use(stripeConfigRouter);
 environmentRouter.use('/catalog', stripeCatalogRouter);
 
 environmentRouter.get(
-  '/payment-activity',
+  '/transactions',
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const environment = getPaymentEnvironment(req.params);
-      const query = parseZodSchema(listPaymentActivityQuerySchema, req.query);
+      const query = parseZodSchema(listPaymentTransactionsQuerySchema, req.query);
 
-      const paymentActivity = await paymentActivityService.listPaymentActivity({
-        environment,
-        ...query,
-      });
-      successResponse(res, paymentActivity);
+      const transactions = await transactionService.listTransactions(
+        {
+          environment,
+          ...query,
+        },
+        'stripe'
+      );
+      successResponse(res, transactions);
     } catch (error) {
       next(error);
     }

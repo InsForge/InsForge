@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RazorpayConnection, RazorpayEnvironment } from '@insforge/shared-schemas';
+import type { RazorpayProvider } from '../../src/providers/payments/razorpay.provider';
 
 const { mockConfigService, mockPool, mockWithPaymentSessionAdvisoryLock } = vi.hoisted(() => ({
   mockConfigService: {
@@ -111,6 +112,7 @@ describe('RazorpaySyncService', () => {
             items: 0,
             customers: 0,
             subscriptions: 0,
+            invoices: 0,
             payments: 0,
           },
           error: 'missing keys',
@@ -150,6 +152,7 @@ describe('RazorpaySyncService', () => {
       }),
       listCustomers: vi.fn().mockRejectedValue(new Error('customer API unavailable')),
       listSubscriptions: vi.fn().mockResolvedValue([]),
+      listInvoices: vi.fn().mockResolvedValue([]),
       listPayments: vi.fn().mockResolvedValue([]),
     };
     mockConfigService.createRazorpayProvider.mockResolvedValue(provider);
@@ -167,6 +170,7 @@ describe('RazorpaySyncService', () => {
         items: 0,
         customers: 0,
         subscriptions: 0,
+        invoices: 0,
         payments: 0,
       },
       'customers: customer API unavailable',
@@ -181,9 +185,66 @@ describe('RazorpaySyncService', () => {
           items: 0,
           customers: 0,
           subscriptions: 0,
+          invoices: 0,
           payments: 0,
         },
         error: 'customers: customer API unavailable',
+      })
+    );
+  });
+
+  it('syncs after key changes with the already-validated Razorpay provider', async () => {
+    const provider = {
+      syncCatalog: vi.fn().mockResolvedValue({
+        account: {
+          id: 'acc_123',
+          merchantName: 'Example Merchant',
+          livemode: false,
+        },
+        plans: [],
+        items: [],
+      }),
+      listCustomers: vi.fn().mockResolvedValue([]),
+      listSubscriptions: vi.fn().mockResolvedValue([]),
+      listInvoices: vi.fn().mockResolvedValue([]),
+      listPayments: vi.fn().mockResolvedValue([]),
+    };
+
+    const result = await RazorpaySyncService.getInstance().syncEnvironmentAfterKeyChange(
+      'test',
+      provider as unknown as RazorpayProvider
+    );
+
+    expect(mockConfigService.createRazorpayProvider).not.toHaveBeenCalled();
+    expect(provider.syncCatalog).toHaveBeenCalled();
+    expect(mockConfigService.writeSnapshot).toHaveBeenCalledWith(
+      'test',
+      'acc_123',
+      'Example Merchant',
+      false,
+      {
+        plans: 0,
+        items: 0,
+        customers: 0,
+        subscriptions: 0,
+        invoices: 0,
+        payments: 0,
+      },
+      expect.any(Date)
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        environment: 'test',
+        status: 'succeeded',
+        syncCounts: {
+          plans: 0,
+          items: 0,
+          customers: 0,
+          subscriptions: 0,
+          invoices: 0,
+          payments: 0,
+        },
+        error: null,
       })
     );
   });
@@ -236,6 +297,7 @@ describe('RazorpaySyncService', () => {
       }),
       listCustomers: vi.fn().mockResolvedValue([]),
       listSubscriptions: vi.fn().mockResolvedValue([]),
+      listInvoices: vi.fn().mockResolvedValue([]),
       listPayments: vi.fn().mockResolvedValue([]),
     };
     mockConfigService.createRazorpayProvider.mockResolvedValue(provider);
@@ -248,6 +310,112 @@ describe('RazorpaySyncService', () => {
     expect(executedSql).not.toMatch(/INSERT INTO payments\.products/i);
     expect(executedSql).not.toMatch(/INSERT INTO payments\.prices/i);
     expect(executedSql).not.toMatch(/INSERT INTO payments\.subscription_items/i);
+  });
+
+  it('syncs Razorpay invoices before payments so transaction context is provider-native', async () => {
+    const mockClient = {
+      query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+      release: vi.fn(),
+    };
+    mockPool.connect.mockResolvedValue(mockClient);
+    const provider = {
+      syncCatalog: vi.fn().mockResolvedValue({
+        account: {
+          id: 'acc_123',
+          merchantName: 'Example Merchant',
+          livemode: false,
+        },
+        plans: [],
+        items: [],
+      }),
+      listCustomers: vi.fn().mockResolvedValue([]),
+      listSubscriptions: vi.fn().mockResolvedValue([]),
+      listInvoices: vi.fn().mockResolvedValue([
+        {
+          id: 'inv_123',
+          entity: 'invoice',
+          type: 'invoice',
+          description: 'Pro monthly',
+          customer_id: 'cust_123',
+          customer_details: {
+            id: 'cust_123',
+            name: 'Buyer',
+            email: 'buyer@example.com',
+            contact: null,
+          },
+          order_id: 'order_123',
+          subscription_id: 'sub_123',
+          payment_id: 'pay_123',
+          status: 'paid',
+          amount: 5000,
+          amount_paid: 5000,
+          amount_due: 0,
+          currency: 'INR',
+          short_url: null,
+          notes: {
+            insforge_subject_type: 'team',
+            insforge_subject_id: 'team_123',
+          },
+          line_items: [],
+          paid_at: 1780617600,
+          cancelled_at: null,
+          expired_at: null,
+          issued_at: 1780531200,
+          created_at: 1780531200,
+        },
+      ]),
+      listPayments: vi.fn().mockResolvedValue([]),
+    };
+    mockConfigService.createRazorpayProvider.mockResolvedValue(provider);
+
+    await RazorpaySyncService.getInstance().syncAll('test');
+
+    expect(provider.listInvoices.mock.invocationCallOrder[0]).toBeLessThan(
+      provider.listPayments.mock.invocationCallOrder[0]
+    );
+    expect(mockConfigService.writeSnapshot).toHaveBeenCalledWith(
+      'test',
+      'acc_123',
+      'Example Merchant',
+      false,
+      {
+        plans: 0,
+        items: 0,
+        customers: 0,
+        subscriptions: 0,
+        invoices: 1,
+        payments: 0,
+      },
+      expect.any(Date)
+    );
+
+    const transactionCall = mockClient.query.mock.calls.find(([sql]) =>
+      /WITH refs[\s\S]*INSERT INTO payments\.transactions/i.test(String(sql))
+    );
+    expect(transactionCall).toBeDefined();
+
+    const params = transactionCall?.[1] as unknown[];
+    expect(params).toEqual(
+      expect.arrayContaining([
+        'test',
+        'payment',
+        'pay_123',
+        'subscription_invoice',
+        'succeeded',
+        'team',
+        'team_123',
+        'cust_123',
+        'buyer@example.com',
+      ])
+    );
+    expect(JSON.parse(String(params[11]))).toEqual(
+      expect.objectContaining({
+        payment: 'pay_123',
+        invoice: 'inv_123',
+        order: 'order_123',
+        subscription: 'sub_123',
+      })
+    );
   });
 
   it('stores Razorpay subscriptions in the provider-native subscription table', async () => {
@@ -283,6 +451,7 @@ describe('RazorpaySyncService', () => {
           start_at: 1777248000,
           end_at: null,
           total_count: 12,
+          auth_attempts: 1,
           paid_count: 1,
           remaining_count: 11,
           short_url: 'https://rzp.io/i/sub_123',
@@ -292,6 +461,7 @@ describe('RazorpaySyncService', () => {
           created_at: 1777248000,
         },
       ]),
+      listInvoices: vi.fn().mockResolvedValue([]),
       listPayments: vi.fn().mockResolvedValue([]),
     };
     mockConfigService.createRazorpayProvider.mockResolvedValue(provider);
@@ -311,9 +481,18 @@ describe('RazorpaySyncService', () => {
       ])
     );
     expect(mockClient.query).toHaveBeenCalledWith(
-      expect.stringMatching(/DELETE FROM payments\.razorpay_subscriptions/i),
-      ['test', ['sub_123']]
+      expect.stringMatching(
+        /DELETE FROM payments\.razorpay_subscriptions[\s\S]*synced_at IS NULL OR synced_at < \$3[\s\S]*updated_at < \$3/i
+      ),
+      ['test', ['sub_123'], expect.any(Date)]
     );
+    const subscriptionUpsertCall = mockClient.query.mock.calls.find(([sql]) =>
+      /INSERT INTO payments\.razorpay_subscriptions/i.test(String(sql))
+    );
+    const subscriptionDeleteCall = mockClient.query.mock.calls.find(([sql]) =>
+      /DELETE FROM payments\.razorpay_subscriptions/i.test(String(sql))
+    );
+    expect(subscriptionUpsertCall?.[1]?.[25]).toBe(subscriptionDeleteCall?.[1]?.[2]);
 
     const executedSql = mockClient.query.mock.calls.map(([sql]) => String(sql)).join('\n');
     expect(executedSql).not.toMatch(/INSERT INTO payments\.subscriptions/i);

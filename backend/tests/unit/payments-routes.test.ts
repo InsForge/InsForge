@@ -2,30 +2,41 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import {
+  cancelRazorpaySubscriptionBodySchema,
   createCheckoutSessionBodySchema,
   createCustomerPortalSessionBodySchema,
+  createRazorpayItemBodySchema,
+  createRazorpayOrderBodySchema,
+  createRazorpayPlanBodySchema,
+  createRazorpaySubscriptionBodySchema,
   createStripePriceBodySchema,
   createStripeProductBodySchema,
-  configureRazorpayWebhookResponseSchema,
+  getRazorpayWebhookSetupResponseSchema,
   listStripeCatalogQuerySchema,
   listPaymentCustomersQuerySchema,
-  listPaymentActivityQuerySchema,
+  listPaymentTransactionsQuerySchema,
   listStripePricesQuerySchema,
   listStripeProductsQuerySchema,
   listRazorpaySubscriptionsQuerySchema,
   listStripeSubscriptionsQuerySchema,
   paymentEnvironmentParamsSchema,
+  pauseRazorpaySubscriptionBodySchema,
   razorpayEnvironmentParamsSchema,
+  razorpaySubscriptionParamsSchema,
   getRazorpayConfigResponseSchema,
   getRazorpayStatusResponseSchema,
   razorpayWebhookParamsSchema,
+  resumeRazorpaySubscriptionBodySchema,
   syncRazorpayPaymentsResponseSchema,
   updateStripePriceBodySchema,
   updateStripeProductBodySchema,
-  upsertPaymentsConfigBodySchema,
+  upsertStripeConfigBodySchema,
   upsertRazorpayConfigBodySchema,
   upsertRazorpayWebhookSecretResponseSchema,
   upsertRazorpayWebhookSecretBodySchema,
+  updateRazorpayItemBodySchema,
+  verifyRazorpayOrderBodySchema,
+  verifyRazorpaySubscriptionBodySchema,
 } from '@insforge/shared-schemas';
 
 const FAKE_LIVE_SECRET_KEY = 'stripe_live_secret_placeholder';
@@ -61,6 +72,10 @@ describe('payments route schemas', () => {
   );
   const razorpayConfigRouteSource = readFileSync(
     resolve(__dirname, '../../src/api/routes/payments/razorpay/config.routes.ts'),
+    'utf-8'
+  );
+  const razorpayCatalogRouteSource = readFileSync(
+    resolve(__dirname, '../../src/api/routes/payments/razorpay/catalog.routes.ts'),
     'utf-8'
   );
   const webhooksRouteSource = readFileSync(
@@ -150,24 +165,77 @@ describe('payments route schemas', () => {
   it('mounts Razorpay admin reads under provider-specific services', () => {
     const adminGuardIndex = razorpayRouteSource.indexOf('environmentRouter.use(verifyAdmin)');
     expect(adminGuardIndex).toBeGreaterThan(-1);
-    expect(razorpayRouteSource.indexOf("'/catalog'")).toBeGreaterThan(adminGuardIndex);
+    expect(
+      razorpayRouteSource.indexOf("environmentRouter.use('/catalog', razorpayCatalogRouter)")
+    ).toBeGreaterThan(adminGuardIndex);
     expect(razorpayRouteSource.indexOf("'/customers'")).toBeGreaterThan(adminGuardIndex);
-    expect(razorpayRouteSource.indexOf("'/payment-activity'")).toBeGreaterThan(adminGuardIndex);
-    expect(razorpayRouteSource.indexOf("'/subscriptions'")).toBeGreaterThan(adminGuardIndex);
-    expect(razorpayRouteSource).toContain('RazorpayCatalogService');
+    expect(razorpayRouteSource.indexOf("'/transactions'")).toBeGreaterThan(adminGuardIndex);
+    expect(
+      razorpayRouteSource.match(/environmentRouter\.get\(\s*'\/subscriptions'/)?.index
+    ).toBeGreaterThan(adminGuardIndex);
+    expect(razorpayCatalogRouteSource).toContain('RazorpayCatalogService');
     expect(razorpayRouteSource).toContain('RazorpaySubscriptionService');
-    expect(razorpayRouteSource).toContain('RazorpayPaymentActivityService');
+    expect(razorpayRouteSource).toContain('PaymentTransactionService');
     expect(razorpayRouteSource).not.toContain('ProjectionService');
-    expect(razorpayRouteSource).toMatch(/catalogService\.listCatalog\(environment\)/);
+    expect(razorpayCatalogRouteSource).toMatch(/catalogService\.listCatalog\(environment\)/);
+    expect(razorpayCatalogRouteSource).toMatch(/router\.post\(\s*'\/items'/);
+    expect(razorpayCatalogRouteSource).toMatch(/router\.patch\(\s*'\/items\/:itemId'/);
+    expect(razorpayCatalogRouteSource).toMatch(/router\.post\(\s*'\/plans'/);
     expect(razorpayRouteSource).toMatch(
       /customerService\.listCustomers\(\{ environment, \.\.\.query \},\s*'razorpay'\)/
     );
     expect(razorpayRouteSource).toMatch(
-      /paymentActivityService\.listPaymentActivity\(\{[\s\S]*environment,[\s\S]*\.\.\.query,[\s\S]*\}\)/
+      /transactionService\.listTransactions\(\s*\{[\s\S]*environment,[\s\S]*\.\.\.query,[\s\S]*\},\s*'razorpay'/
     );
     expect(razorpayRouteSource).toMatch(
       /subscriptionService\.listSubscriptions\(\{ environment, \.\.\.query \}\)/
     );
+  });
+
+  it('mounts Razorpay native checkout flows under user auth before admin routes', () => {
+    const adminGuardIndex = razorpayRouteSource.indexOf('environmentRouter.use(verifyAdmin)');
+    expect(adminGuardIndex).toBeGreaterThan(-1);
+
+    for (const route of [
+      "'/orders'",
+      "'/orders/verify'",
+      "'/subscriptions'",
+      "'/subscriptions/verify'",
+      "'/subscriptions/:subscriptionId/cancel'",
+      "'/subscriptions/:subscriptionId/pause'",
+      "'/subscriptions/:subscriptionId/resume'",
+    ]) {
+      expect(razorpayRouteSource.indexOf(route)).toBeGreaterThan(-1);
+      expect(razorpayRouteSource.indexOf(route)).toBeLessThan(adminGuardIndex);
+    }
+
+    expect(razorpayRouteSource).toMatch(
+      /environmentRouter\.post\(\s*'\/orders'[\s\S]*verifyUser[\s\S]*createRazorpayOrderBodySchema/
+    );
+    expect(razorpayRouteSource).toMatch(
+      /environmentRouter\.post\(\s*'\/orders\/verify'[\s\S]*verifyUser[\s\S]*verifyRazorpayOrderBodySchema/
+    );
+    expect(razorpayRouteSource).toMatch(
+      /environmentRouter\.post\(\s*'\/subscriptions'[\s\S]*verifyUser[\s\S]*createRazorpaySubscriptionBodySchema/
+    );
+    expect(razorpayRouteSource).toMatch(
+      /subscriptionService\.createSubscription\(\s*\{[\s\S]*environment,[\s\S]*\.\.\.body,[\s\S]*\},\s*req\.user\s*\)/
+    );
+    expect(razorpayRouteSource).toMatch(
+      /environmentRouter\.post\(\s*'\/subscriptions\/verify'[\s\S]*verifyUser[\s\S]*verifyRazorpaySubscriptionBodySchema/
+    );
+    expect(razorpayRouteSource).toMatch(
+      /environmentRouter\.post\(\s*'\/subscriptions\/:subscriptionId\/cancel'[\s\S]*verifyUser[\s\S]*cancelRazorpaySubscriptionBodySchema/
+    );
+    expect(razorpayRouteSource).toMatch(
+      /environmentRouter\.post\(\s*'\/subscriptions\/:subscriptionId\/pause'[\s\S]*verifyUser[\s\S]*pauseRazorpaySubscriptionBodySchema/
+    );
+    expect(razorpayRouteSource).toMatch(
+      /environmentRouter\.post\(\s*'\/subscriptions\/:subscriptionId\/resume'[\s\S]*verifyUser[\s\S]*resumeRazorpaySubscriptionBodySchema/
+    );
+    expect(razorpayRouteSource).toContain('RazorpayOrderService');
+    expect(razorpayRouteSource).not.toContain('checkout-sessions');
+    expect(razorpayRouteSource).not.toContain('payment-links');
   });
 
   it('keeps Razorpay route validation schemas in shared-schemas', () => {
@@ -175,12 +243,26 @@ describe('payments route schemas', () => {
     expect(paymentsApiSchemaSource).toContain('razorpayWebhookParamsSchema');
     expect(paymentsApiSchemaSource).toContain('upsertRazorpayConfigBodySchema');
     expect(paymentsApiSchemaSource).toContain('upsertRazorpayWebhookSecretBodySchema');
+    expect(paymentsApiSchemaSource).toContain('getRazorpayWebhookSetupResponseSchema');
+    expect(paymentsApiSchemaSource).toContain('regenerateRazorpayWebhookSecretResponseSchema');
     expect(paymentsApiSchemaSource).toContain('getRazorpayStatusResponseSchema');
     expect(paymentsApiSchemaSource).toContain('getRazorpayConfigResponseSchema');
     expect(paymentsApiSchemaSource).toContain('syncRazorpayPaymentsResponseSchema');
+    expect(paymentsApiSchemaSource).toContain('createRazorpayOrderBodySchema');
+    expect(paymentsApiSchemaSource).toContain('verifyRazorpayOrderBodySchema');
+    expect(paymentsApiSchemaSource).toContain('createRazorpaySubscriptionBodySchema');
+    expect(paymentsApiSchemaSource).toContain('verifyRazorpaySubscriptionBodySchema');
+    expect(paymentsApiSchemaSource).toContain('cancelRazorpaySubscriptionBodySchema');
+    expect(paymentsApiSchemaSource).toContain('pauseRazorpaySubscriptionBodySchema');
+    expect(paymentsApiSchemaSource).toContain('resumeRazorpaySubscriptionBodySchema');
+    expect(paymentsApiSchemaSource).toContain('createRazorpayItemBodySchema');
+    expect(paymentsApiSchemaSource).toContain('createRazorpayPlanBodySchema');
     expect(razorpayConfigRouteSource).toContain('parseZodSchema');
     expect(razorpayConfigRouteSource).toContain('upsertRazorpayConfigBodySchema');
     expect(razorpayConfigRouteSource).toContain('upsertRazorpayWebhookSecretBodySchema');
+    expect(razorpayRouteSource).toContain('createRazorpayOrderBodySchema');
+    expect(razorpayCatalogRouteSource).toContain('createRazorpayItemBodySchema');
+    expect(razorpayCatalogRouteSource).toContain('createRazorpayPlanBodySchema');
     expect(razorpayConfigRouteSource).not.toContain("from 'zod'");
     expect(razorpayConfigRouteSource).not.toContain('paymentEnvironmentSchema');
     expect(razorpayConfigRouteSource).not.toContain('function getEnvironment');
@@ -195,7 +277,7 @@ describe('payments route schemas', () => {
     expect(
       stripeRouteSource.indexOf("environmentRouter.use('/catalog', stripeCatalogRouter)")
     ).toBeGreaterThan(adminGuardIndex);
-    expect(stripeRouteSource.indexOf("'/payment-activity'")).toBeGreaterThan(adminGuardIndex);
+    expect(stripeRouteSource.indexOf("'/transactions'")).toBeGreaterThan(adminGuardIndex);
     expect(stripeRouteSource.indexOf("'/subscriptions'")).toBeGreaterThan(adminGuardIndex);
     expect(stripeRouteSource.indexOf("'/customers'")).toBeGreaterThan(adminGuardIndex);
     expect(stripeRouteSource).toMatch(
@@ -206,7 +288,7 @@ describe('payments route schemas', () => {
   it('keeps environment-scoped config routes in the dedicated Stripe config router', () => {
     expect(stripeConfigRouteSource).toContain('const router = Router({ mergeParams: true });');
     expect(stripeConfigRouteSource).toMatch(
-      /router\.put\(\s*'\/config'[\s\S]*upsertPaymentsConfigBodySchema/
+      /router\.put\(\s*'\/config'[\s\S]*upsertStripeConfigBodySchema/
     );
     expect(stripeConfigRouteSource).toMatch(/router\.delete\(\s*'\/config'/);
     expect(stripeConfigRouteSource).toMatch(/router\.post\(\s*'\/sync'/);
@@ -223,9 +305,13 @@ describe('payments route schemas', () => {
     expect(stripeRouteSource).toContain("from '@/services/payments/helpers.js'");
     expect(stripeConfigRouteSource).toContain("from '@/services/payments/helpers.js'");
     expect(stripeCatalogRouteSource).toContain("from '@/services/payments/helpers.js'");
+    expect(razorpayRouteSource).toContain("from '@/services/payments/helpers.js'");
+    expect(razorpayCatalogRouteSource).toContain("from '@/services/payments/helpers.js'");
     expect(stripeRouteSource).not.toContain('function getEnvironment');
     expect(stripeConfigRouteSource).not.toContain('function getEnvironment');
     expect(stripeCatalogRouteSource).not.toContain('function getEnvironment');
+    expect(razorpayRouteSource).not.toContain('function getEnvironment');
+    expect(razorpayCatalogRouteSource).not.toContain('function getEnvironment');
     expect(stripeRouteSource).not.toContain("from './route-params.js'");
     expect(stripeConfigRouteSource).not.toContain("from './route-params.js'");
     expect(stripeCatalogRouteSource).not.toContain("from './route-params.js'");
@@ -254,9 +340,13 @@ describe('payments route schemas', () => {
     expect(razorpayConfigRouteSource).toMatch(/router\.delete\(\s*'\/config'/);
     expect(razorpayConfigRouteSource).toMatch(/router\.put\(\s*'\/webhook-secret'/);
     expect(razorpayConfigRouteSource).toMatch(/router\.post\(\s*'\/sync'/);
-    expect(razorpayConfigRouteSource).toMatch(
-      /router\.post\(\s*'\/webhook'[\s\S]*configureWebhook/
+    expect(razorpayConfigRouteSource).toMatch(/router\.get\(\s*'\/webhook'/);
+    expect(razorpayConfigRouteSource).toContain('configService.getWebhookSetup(environment)');
+    expect(razorpayConfigRouteSource).toMatch(/router\.post\(\s*'\/webhook\/regenerate-secret'/);
+    expect(razorpayConfigRouteSource).toContain(
+      'configService.regenerateWebhookSecret(environment)'
     );
+    expect(razorpayConfigRouteSource).not.toMatch(/router\.post\(\s*'\/webhook'/);
     expect(razorpayConfigRouteSource).toContain('successResponse(res, result)');
     expect(razorpayRouteSource).not.toContain('webhook-configure');
     expect(razorpayConfigRouteSource).not.toContain('webhook-configure');
@@ -270,6 +360,7 @@ describe('payments route schemas', () => {
     expect(razorpayRouteSource).toMatch(/router\.post\(\s*'\/sync',\s*verifyAdmin/);
     expect(razorpayConfigRouteSource).toMatch(/router\.post\(\s*'\/sync'/);
     expect(razorpayConfigRouteSource).toContain('syncService.syncAll(environment)');
+    expect(razorpayConfigRouteSource).toContain('syncService.syncEnvironmentAfterKeyChange');
     expect(razorpayConfigRouteSource).not.toContain("result.status === 'failed'");
     expect(razorpaySyncServiceSource).toContain('withPaymentSessionAdvisoryLock');
     expect(razorpaySyncServiceSource).toContain('payments_razorpay_environment_');
@@ -278,12 +369,13 @@ describe('payments route schemas', () => {
   });
 
   it('keeps Razorpay webhooks manual rather than half-managed through a provider API', () => {
-    expect(razorpayConfigRouteSource).toContain('configureWebhook(environment)');
+    expect(razorpayConfigRouteSource).toContain('getWebhookSetup(environment)');
+    expect(razorpayConfigRouteSource).toContain('regenerateWebhookSecret(environment)');
     expect(razorpayProviderSource).not.toContain('createWebhook(');
     expect(razorpayProviderSource).not.toContain('/v1/accounts/me/webhooks');
     expect(razorpayConfigServiceSource).toContain('manual');
     expect(razorpayConfigServiceSource).toContain('webhookSecret');
-    expect(razorpayConfigServiceSource).toContain('manualSetupRequired');
+    expect(razorpayConfigServiceSource).not.toContain('manualSetupRequired');
   });
 
   it('mounts Razorpay inbound webhooks under the dedicated webhook router', () => {
@@ -387,7 +479,7 @@ describe('payments route schemas', () => {
     );
     expect(upsertRazorpayWebhookSecretResponseSchema.parse({ ok: true })).toEqual({ ok: true });
     expect(
-      configureRazorpayWebhookResponseSchema.parse({
+      getRazorpayWebhookSetupResponseSchema.parse({
         connection: {
           environment: 'test',
           status: 'connected',
@@ -405,13 +497,11 @@ describe('payments route schemas', () => {
         },
         webhookUrl: 'https://api.example.com/api/webhooks/razorpay/test',
         webhookSecret: 'manual_secret',
-        manualSetupRequired: true,
       })
     ).toEqual(
       expect.objectContaining({
         webhookUrl: 'https://api.example.com/api/webhooks/razorpay/test',
         webhookSecret: 'manual_secret',
-        manualSetupRequired: true,
       })
     );
     expect(
@@ -440,6 +530,7 @@ describe('payments route schemas', () => {
               items: 0,
               customers: 0,
               subscriptions: 0,
+              invoices: 0,
               payments: 0,
             },
             error: 'missing keys',
@@ -461,15 +552,15 @@ describe('payments route schemas', () => {
 
   it('accepts Stripe key configuration bodies without embedding environment in the body', () => {
     expect(
-      upsertPaymentsConfigBodySchema.parse({
+      upsertStripeConfigBodySchema.parse({
         secretKey: FAKE_LIVE_SECRET_KEY,
       })
     ).toEqual({
       secretKey: FAKE_LIVE_SECRET_KEY,
     });
-    expect(() => upsertPaymentsConfigBodySchema.parse({ secretKey: '' })).toThrow();
+    expect(() => upsertStripeConfigBodySchema.parse({ secretKey: '' })).toThrow();
     expect(() =>
-      upsertPaymentsConfigBodySchema.parse({
+      upsertStripeConfigBodySchema.parse({
         environment: 'live',
         secretKey: FAKE_LIVE_SECRET_KEY,
       })
@@ -539,6 +630,157 @@ describe('payments route schemas', () => {
     expect(() => updateStripePriceBodySchema.parse({})).toThrow();
     expect(updateStripePriceBodySchema.parse({ active: false })).toEqual({ active: false });
     expect(() => updateStripePriceBodySchema.parse({ environment: 'live' })).toThrow();
+  });
+
+  it('accepts Razorpay native order and subscription checkout bodies', () => {
+    expect(
+      createRazorpayOrderBodySchema.parse({
+        amount: 50000,
+        currency: 'inr',
+        receipt: 'order_123',
+        subject: { type: 'team', id: 'team_123' },
+        customerEmail: 'buyer@example.com',
+      })
+    ).toEqual({
+      amount: 50000,
+      currency: 'INR',
+      receipt: 'order_123',
+      subject: { type: 'team', id: 'team_123' },
+      customerEmail: 'buyer@example.com',
+    });
+
+    expect(
+      verifyRazorpayOrderBodySchema.parse({
+        orderId: 'order_123',
+        paymentId: 'pay_123',
+        signature: 'signature',
+      })
+    ).toEqual({
+      orderId: 'order_123',
+      paymentId: 'pay_123',
+      signature: 'signature',
+    });
+
+    expect(
+      createRazorpaySubscriptionBodySchema.parse({
+        planId: 'plan_123',
+        totalCount: 12,
+        subject: { type: 'team', id: 'team_123' },
+        customerContact: '+919999999999',
+      })
+    ).toEqual({
+      planId: 'plan_123',
+      totalCount: 12,
+      subject: { type: 'team', id: 'team_123' },
+      customerContact: '+919999999999',
+    });
+
+    expect(() =>
+      createRazorpaySubscriptionBodySchema.parse({
+        planId: 'plan_123',
+        subject: { type: 'team', id: 'team_123' },
+      })
+    ).toThrow(/totalCount or endAt/i);
+
+    expect(
+      verifyRazorpaySubscriptionBodySchema.parse({
+        subscriptionId: 'sub_123',
+        paymentId: 'pay_123',
+        signature: 'signature',
+      })
+    ).toEqual({
+      subscriptionId: 'sub_123',
+      paymentId: 'pay_123',
+      signature: 'signature',
+    });
+
+    expect(cancelRazorpaySubscriptionBodySchema.parse({})).toEqual({
+      cancelAtCycleEnd: false,
+    });
+    expect(cancelRazorpaySubscriptionBodySchema.parse({ cancelAtCycleEnd: true })).toEqual({
+      cancelAtCycleEnd: true,
+    });
+    expect(pauseRazorpaySubscriptionBodySchema.parse({})).toEqual({});
+    expect(resumeRazorpaySubscriptionBodySchema.parse({})).toEqual({});
+    expect(() => pauseRazorpaySubscriptionBodySchema.parse({ planId: 'plan_456' })).toThrow();
+    expect(
+      razorpaySubscriptionParamsSchema.parse({
+        environment: 'test',
+        subscriptionId: 'sub_123',
+      })
+    ).toEqual({
+      environment: 'test',
+      subscriptionId: 'sub_123',
+    });
+  });
+
+  it('accepts Razorpay item and plan mutation bodies without pretending plans are editable', () => {
+    expect(
+      createRazorpayItemBodySchema.parse({
+        name: 'Invoice item',
+        amount: 25000,
+        currency: 'inr',
+        metadata: { tier: 'starter' },
+      })
+    ).toEqual({
+      name: 'Invoice item',
+      amount: 25000,
+      currency: 'INR',
+      metadata: { tier: 'starter' },
+    });
+
+    expect(updateRazorpayItemBodySchema.parse({ active: false })).toEqual({ active: false });
+    expect(() => updateRazorpayItemBodySchema.parse({})).toThrow();
+
+    expect(
+      createRazorpayPlanBodySchema.parse({
+        period: 'monthly',
+        interval: 1,
+        item: {
+          name: 'Pro monthly',
+          amount: 199900,
+          currency: 'inr',
+        },
+      })
+    ).toEqual({
+      period: 'monthly',
+      interval: 1,
+      item: {
+        name: 'Pro monthly',
+        amount: 199900,
+        currency: 'INR',
+      },
+    });
+
+    expect(razorpayCatalogRouteSource).not.toMatch(/router\.patch\(\s*'\/plans/);
+    expect(razorpayCatalogRouteSource).not.toMatch(/router\.delete\(\s*'\/plans/);
+  });
+
+  it('rejects caller-provided InsForge-reserved Razorpay metadata', () => {
+    expect(() =>
+      createRazorpayOrderBodySchema.parse({
+        amount: 50000,
+        currency: 'INR',
+        metadata: {
+          insforge_subject_type: 'team',
+        },
+      })
+    ).toThrow(/reserved/i);
+
+    expect(() =>
+      createRazorpayPlanBodySchema.parse({
+        period: 'monthly',
+        interval: 1,
+        item: {
+          name: 'Pro monthly',
+          amount: 199900,
+          currency: 'INR',
+        },
+        metadata: {
+          insforge_subject_id: 'team_123',
+        },
+      })
+    ).toThrow(/reserved/i);
   });
 
   it('allows anonymous one-time checkout sessions without embedding environment in the body', () => {
@@ -636,7 +878,7 @@ describe('payments route schemas', () => {
   });
 
   it('requires runtime list query filters to omit environment and keep complete subject filters', () => {
-    expect(listPaymentActivityQuerySchema.parse({})).toEqual({ limit: 50 });
+    expect(listPaymentTransactionsQuerySchema.parse({})).toEqual({ limit: 50 });
     expect(
       listStripeSubscriptionsQuerySchema.parse({
         subjectType: 'organization',
@@ -660,7 +902,7 @@ describe('payments route schemas', () => {
       limit: 25,
     });
 
-    expect(() => listPaymentActivityQuerySchema.parse({ environment: 'live' })).toThrow();
+    expect(() => listPaymentTransactionsQuerySchema.parse({ environment: 'live' })).toThrow();
     expect(() => listStripeSubscriptionsQuerySchema.parse({ subjectType: 'team' })).toThrow(
       /provided together/i
     );

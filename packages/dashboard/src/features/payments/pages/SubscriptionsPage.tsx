@@ -9,9 +9,9 @@ import {
   ErrorState,
   LoadingState,
   PaginationControls,
-  TableHeader,
 } from '#components';
 import { PaymentsKeyMissingState } from '#features/payments/components/PaymentsKeyMissingState';
+import { PaymentsPageHeader } from '#features/payments/components/PaymentsPageHeader';
 import { ProviderBadge } from '#features/payments/components/ProviderBadge';
 import type { PaymentsOutletContext } from '#features/payments/components/PaymentsLayout';
 import { usePaymentCatalog } from '#features/payments/hooks/usePaymentCatalog';
@@ -351,7 +351,8 @@ function SubscriptionRow({
 }
 
 export default function SubscriptionsPage() {
-  const { openPaymentsSettings, environment } = useOutletContext<PaymentsOutletContext>();
+  const { openPaymentsSettings, provider, setProvider, environment, setEnvironment } =
+    useOutletContext<PaymentsOutletContext>();
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<string | null>(null);
 
@@ -363,13 +364,13 @@ export default function SubscriptionsPage() {
     isLoading,
     error,
     refetch,
-  } = usePaymentSubscriptions(environment);
-  const { customers } = usePaymentCustomers(environment);
-  const { products, prices } = usePaymentCatalog(environment);
+  } = usePaymentSubscriptions(provider, environment);
+  const { customers } = usePaymentCustomers(provider, environment);
+  const { products, prices } = usePaymentCatalog(provider, environment);
 
   useEffect(() => {
     setExpandedSubscriptionId(null);
-  }, [environment]);
+  }, [environment, provider]);
 
   const customersById = useMemo(() => {
     const nextCustomersById = new Map<string, PaymentCustomer>();
@@ -453,11 +454,12 @@ export default function SubscriptionsPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
-      <TableHeader
+      <PaymentsPageHeader
         title="Subscriptions"
-        className="h-14 min-h-14"
-        leftClassName="py-0"
-        rightClassName="py-0"
+        provider={provider}
+        setProvider={setProvider}
+        environment={environment}
+        setEnvironment={setEnvironment}
         showDividerAfterTitle
         leftSlot={
           hasActiveKey ? (
@@ -469,7 +471,6 @@ export default function SubscriptionsPage() {
             </span>
           ) : null
         }
-        rightActions={null}
         showSearch={hasActiveKey}
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}
@@ -485,6 +486,7 @@ export default function SubscriptionsPage() {
           <LoadingState message="Loading subscriptions..." />
         ) : !hasActiveKey ? (
           <PaymentsKeyMissingState
+            provider={provider}
             environment={environment}
             resourceLabel="subscriptions"
             onConfigure={openPaymentsSettings}

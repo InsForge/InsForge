@@ -71,11 +71,11 @@ export class PaymentCustomerService {
          GROUP BY environment, provider, LOWER(email)
          HAVING COUNT(*) = 1
        ),
-       payment_activity_projection AS (
+       transaction_projection AS (
          SELECT
            environment,
-           'stripe'::TEXT AS provider,
-           customer_id AS provider_customer_id,
+           provider,
+           provider_customer_id,
            customer_email_snapshot,
            type,
            status,
@@ -85,22 +85,7 @@ export class PaymentCustomerService {
            paid_at,
            provider_created_at AS provider_created_at,
            created_at
-         FROM payments.stripe_payment_activity
-         UNION ALL
-         SELECT
-           environment,
-           'razorpay'::TEXT AS provider,
-           customer_id AS provider_customer_id,
-           customer_email_snapshot,
-           type,
-           status,
-           amount,
-           amount_refunded,
-           currency,
-           paid_at,
-           provider_created_at AS provider_created_at,
-           created_at
-         FROM payments.razorpay_payment_activity
+         FROM payments.transactions
        ),
        payment_totals_by_customer AS (
          SELECT
@@ -141,7 +126,7 @@ export class PaymentCustomerService {
              )
              ELSE NULL
            END AS total_spend_currency
-         FROM payment_activity_projection
+         FROM transaction_projection
          WHERE environment = $1
            AND provider = $3
            AND provider_customer_id IS NOT NULL
@@ -185,7 +170,7 @@ export class PaymentCustomerService {
              )
              ELSE NULL
            END AS total_spend_currency
-         FROM payment_activity_projection
+         FROM transaction_projection
          WHERE environment = $1
            AND provider = $3
            AND provider_customer_id IS NULL

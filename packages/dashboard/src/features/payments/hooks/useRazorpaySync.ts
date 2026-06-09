@@ -59,7 +59,10 @@ export function useRazorpaySync() {
     onSuccess: async (result) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['payments', 'razorpay', 'status'] }),
-        queryClient.invalidateQueries({ queryKey: ['payments', 'catalog'] }),
+        queryClient.invalidateQueries({ queryKey: ['payments', 'razorpay', 'catalog'] }),
+        queryClient.invalidateQueries({ queryKey: ['payments', 'razorpay', 'customers'] }),
+        queryClient.invalidateQueries({ queryKey: ['payments', 'razorpay', 'subscriptions'] }),
+        queryClient.invalidateQueries({ queryKey: ['payments', 'razorpay', 'transactions'] }),
       ]);
 
       const toast = getRazorpaySyncToast(result);

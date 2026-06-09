@@ -1,7 +1,7 @@
 import { toISOString, toISOStringOrNull } from '@/utils/dates.js';
 import { AppError } from '@/utils/errors.js';
 import type {
-  PaymentActivityRow,
+  PaymentTransactionRow,
   StripePriceRow,
   StripeProductRow,
   StripeEnvironment,
@@ -13,7 +13,7 @@ import {
   paymentEnvironmentParamsSchema,
   type PaymentEnvironment,
   BillingSubject,
-  PaymentActivity,
+  PaymentTransaction,
   StripePrice as StripePriceResponse,
   StripeProduct as StripeProductResponse,
 } from '@insforge/shared-schemas';
@@ -153,7 +153,7 @@ export function normalizePriceRow(row: StripePriceRow): StripePriceResponse {
   };
 }
 
-export function normalizePaymentActivityRow(row: PaymentActivityRow): PaymentActivity {
+export function normalizePaymentTransactionRow(row: PaymentTransactionRow): PaymentTransaction {
   return {
     environment: row.environment,
     provider: row.provider,

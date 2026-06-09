@@ -1,16 +1,28 @@
 import type { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
+import {
+  type RazorpayItem as RazorpayProviderItem,
+  type RazorpayPlan as RazorpayProviderPlan,
+} from '@/providers/payments/razorpay.provider.js';
+import { RazorpayConfigService } from '@/services/payments/razorpay/config.service.js';
+import { withPaymentSessionAdvisoryLock } from '@/services/payments/payments-advisory-lock.js';
 import type { RazorpayEnvironment, RazorpayItemRow, RazorpayPlanRow } from '@/types/payments.js';
 import { toISOString, toISOStringOrNull } from '@/utils/dates.js';
 import type {
+  CreateRazorpayItemRequest,
+  CreateRazorpayPlanRequest,
   ListRazorpayCatalogResponse,
+  MutateRazorpayItemResponse,
+  MutateRazorpayPlanResponse,
   RazorpayItem,
   RazorpayPlan,
+  UpdateRazorpayItemRequest,
 } from '@insforge/shared-schemas';
 
 export class RazorpayCatalogService {
   private static instance: RazorpayCatalogService;
   private pool: Pool | null = null;
+  private readonly configService = RazorpayConfigService.getInstance();
 
   static getInstance(): RazorpayCatalogService {
     if (!RazorpayCatalogService.instance) {
@@ -76,6 +88,185 @@ export class RazorpayCatalogService {
     };
   }
 
+  async createItem(input: CreateRazorpayItemRequest): Promise<MutateRazorpayItemResponse> {
+    return this.withEnvironmentLock(input.environment, async () => {
+      const provider = await this.configService.createRazorpayProvider(input.environment);
+      const item = await provider.createItem({
+        name: input.name,
+        amount: input.amount,
+        currency: input.currency,
+        description: input.description ?? null,
+        notes: input.metadata,
+      });
+
+      await this.upsertItemRecord(input.environment, item, input.metadata ?? {});
+
+      return {
+        item: this.normalizeProviderItem(item, input.environment, input.metadata ?? {}),
+      };
+    });
+  }
+
+  async updateItem(
+    itemId: string,
+    input: UpdateRazorpayItemRequest
+  ): Promise<MutateRazorpayItemResponse> {
+    return this.withEnvironmentLock(input.environment, async () => {
+      const provider = await this.configService.createRazorpayProvider(input.environment);
+      const item = await provider.updateItem(itemId, {
+        name: input.name,
+        amount: input.amount,
+        currency: input.currency,
+        description: input.description,
+        active: input.active,
+        notes: input.metadata,
+      });
+
+      await this.upsertItemRecord(input.environment, item, input.metadata ?? null);
+
+      return {
+        item: this.normalizeProviderItem(item, input.environment, input.metadata ?? {}),
+      };
+    });
+  }
+
+  async createPlan(input: CreateRazorpayPlanRequest): Promise<MutateRazorpayPlanResponse> {
+    return this.withEnvironmentLock(input.environment, async () => {
+      const provider = await this.configService.createRazorpayProvider(input.environment);
+      const plan = await provider.createPlan({
+        period: input.period,
+        interval: input.interval,
+        item: input.item,
+        notes: input.metadata,
+      });
+
+      await this.upsertItemRecord(input.environment, plan.item, null);
+      await this.upsertPlanRecord(input.environment, plan, input.metadata ?? {});
+
+      return {
+        plan: this.normalizeProviderPlan(plan, input.environment, input.metadata ?? {}),
+      };
+    });
+  }
+
+  private async withEnvironmentLock<T>(
+    environment: RazorpayEnvironment,
+    task: () => Promise<T>
+  ): Promise<T> {
+    return withPaymentSessionAdvisoryLock(
+      this.getPool(),
+      `payments_razorpay_environment_${environment}`,
+      task
+    );
+  }
+
+  private async upsertItemRecord(
+    environment: RazorpayEnvironment,
+    item: RazorpayProviderItem | RazorpayProviderPlan['item'],
+    metadata: Record<string, string> | null
+  ): Promise<void> {
+    await this.getPool().query(
+      `INSERT INTO payments.razorpay_items (
+         environment,
+         item_id,
+         name,
+         description,
+         active,
+         amount,
+         unit_amount,
+         currency,
+         type,
+         metadata,
+         raw,
+         provider_created_at,
+         synced_at
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, COALESCE($10::JSONB, '{}'::JSONB), $11, $12, NOW())
+       ON CONFLICT (environment, item_id) DO UPDATE SET
+         name = EXCLUDED.name,
+         description = EXCLUDED.description,
+         active = EXCLUDED.active,
+         amount = EXCLUDED.amount,
+         unit_amount = EXCLUDED.unit_amount,
+         currency = EXCLUDED.currency,
+         type = COALESCE(EXCLUDED.type, payments.razorpay_items.type),
+         metadata = CASE
+           WHEN $10::JSONB IS NULL THEN payments.razorpay_items.metadata
+           ELSE EXCLUDED.metadata
+         END,
+         raw = EXCLUDED.raw,
+         provider_created_at = COALESCE(EXCLUDED.provider_created_at, payments.razorpay_items.provider_created_at),
+         synced_at = NOW(),
+         updated_at = NOW()`,
+      [
+        environment,
+        item.id,
+        item.name,
+        item.description ?? null,
+        item.active !== false,
+        item.amount ?? null,
+        item.unit_amount ?? item.amount ?? null,
+        item.currency.toLowerCase(),
+        'type' in item ? item.type : null,
+        metadata,
+        item,
+        'created_at' in item && item.created_at ? new Date(item.created_at * 1000) : null,
+      ]
+    );
+  }
+
+  private async upsertPlanRecord(
+    environment: RazorpayEnvironment,
+    plan: RazorpayProviderPlan,
+    metadata: Record<string, string>
+  ): Promise<void> {
+    await this.getPool().query(
+      `INSERT INTO payments.razorpay_plans (
+         environment,
+         plan_id,
+         item_id,
+         period,
+         interval,
+         amount,
+         unit_amount,
+         currency,
+         active,
+         metadata,
+         raw,
+         provider_created_at,
+         synced_at
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
+       ON CONFLICT (environment, plan_id) DO UPDATE SET
+         item_id = EXCLUDED.item_id,
+         period = EXCLUDED.period,
+         interval = EXCLUDED.interval,
+         amount = EXCLUDED.amount,
+         unit_amount = EXCLUDED.unit_amount,
+         currency = EXCLUDED.currency,
+         active = EXCLUDED.active,
+         metadata = EXCLUDED.metadata,
+         raw = EXCLUDED.raw,
+         provider_created_at = EXCLUDED.provider_created_at,
+         synced_at = NOW(),
+         updated_at = NOW()`,
+      [
+        environment,
+        plan.id,
+        plan.item.id,
+        plan.period,
+        plan.interval,
+        plan.item.amount ?? null,
+        plan.item.unit_amount ?? plan.item.amount ?? null,
+        plan.item.currency.toLowerCase(),
+        plan.item.active !== false,
+        metadata,
+        plan,
+        plan.created_at ? new Date(plan.created_at * 1000) : null,
+      ]
+    );
+  }
+
   private normalizeItemRow(row: RazorpayItemRow): RazorpayItem {
     return {
       ...row,
@@ -94,6 +285,48 @@ export class RazorpayCatalogService {
       unitAmount: row.unitAmount === null ? null : Number(row.unitAmount),
       providerCreatedAt: toISOStringOrNull(row.providerCreatedAt),
       syncedAt: toISOString(row.syncedAt),
+    };
+  }
+
+  private normalizeProviderItem(
+    item: RazorpayProviderItem,
+    environment: RazorpayEnvironment,
+    metadata: Record<string, string>
+  ): RazorpayItem {
+    return {
+      environment,
+      itemId: item.id,
+      name: item.name,
+      description: item.description ?? null,
+      active: item.active !== false,
+      amount: item.amount ?? null,
+      unitAmount: item.unit_amount ?? item.amount ?? null,
+      currency: item.currency.toLowerCase(),
+      type: item.type ?? null,
+      metadata,
+      providerCreatedAt: item.created_at ? new Date(item.created_at * 1000).toISOString() : null,
+      syncedAt: new Date().toISOString(),
+    };
+  }
+
+  private normalizeProviderPlan(
+    plan: RazorpayProviderPlan,
+    environment: RazorpayEnvironment,
+    metadata: Record<string, string>
+  ): RazorpayPlan {
+    return {
+      environment,
+      planId: plan.id,
+      itemId: plan.item.id,
+      period: plan.period,
+      interval: plan.interval,
+      amount: plan.item.amount ?? null,
+      unitAmount: plan.item.unit_amount ?? plan.item.amount ?? null,
+      currency: plan.item.currency.toLowerCase(),
+      active: plan.item.active !== false,
+      metadata,
+      providerCreatedAt: plan.created_at ? new Date(plan.created_at * 1000).toISOString() : null,
+      syncedAt: new Date().toISOString(),
     };
   }
 }

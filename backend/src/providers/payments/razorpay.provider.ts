@@ -2,6 +2,8 @@ import Razorpay from 'razorpay';
 import crypto from 'crypto';
 import type { RazorpayEnvironment } from '@/types/payments.js';
 
+const RAZORPAY_SHA256_SIGNATURE_HEX = /^[0-9a-f]{64}$/i;
+
 export class RazorpayKeyValidationError extends Error {
   constructor(message: string) {
     super(message);
@@ -40,6 +42,27 @@ export interface RazorpayAccountInfo {
   livemode: boolean;
 }
 
+export interface RazorpayOrder {
+  id: string;
+  entity: string;
+  amount: number;
+  amount_paid: number;
+  amount_due: number;
+  currency: string;
+  receipt: string | null;
+  status: 'created' | 'attempted' | 'paid';
+  attempts: number;
+  notes: Record<string, string | number>;
+  created_at: number;
+}
+
+export interface RazorpayOrderCreateInput {
+  amount: number;
+  currency: string;
+  receipt?: string | null;
+  notes?: Record<string, string>;
+}
+
 export interface RazorpayPlan {
   id: string;
   entity: string;
@@ -58,6 +81,18 @@ export interface RazorpayPlan {
   created_at: number;
 }
 
+export interface RazorpayPlanCreateInput {
+  period: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  interval: number;
+  item: {
+    name: string;
+    amount: number;
+    currency: string;
+    description?: string | null;
+  };
+  notes?: Record<string, string>;
+}
+
 export interface RazorpayItem {
   id: string;
   active: boolean;
@@ -67,7 +102,25 @@ export interface RazorpayItem {
   name: string;
   description: string | null;
   type: 'invoice';
+  notes?: Record<string, string | number>;
   created_at: number;
+}
+
+export interface RazorpayItemCreateInput {
+  name: string;
+  amount: number;
+  currency: string;
+  description?: string | null;
+  notes?: Record<string, string>;
+}
+
+export interface RazorpayItemUpdateInput {
+  name?: string;
+  amount?: number;
+  currency?: string;
+  description?: string | null;
+  active?: boolean;
+  notes?: Record<string, string>;
 }
 
 export interface RazorpayCustomer {
@@ -79,6 +132,22 @@ export interface RazorpayCustomer {
   gstin: string | null;
   notes: Record<string, string | number>;
   created_at: number;
+}
+
+export interface RazorpaySubscriptionCreateInput {
+  planId: string;
+  totalCount?: number;
+  endAt?: number;
+  quantity?: number;
+  startAt?: number;
+  expireBy?: number;
+  customerNotify?: boolean;
+  offerId?: string | null;
+  notes?: Record<string, string>;
+}
+
+export interface RazorpaySubscriptionCancelInput {
+  cancelAtCycleEnd?: boolean;
 }
 
 export interface RazorpaySubscription {
@@ -105,6 +174,7 @@ export interface RazorpaySubscription {
   start_at: number | null;
   end_at: number | null;
   total_count: number | null;
+  auth_attempts: number | null;
   paid_count: number | null;
   remaining_count: number | null;
   short_url: string | null;
@@ -144,6 +214,17 @@ export interface RazorpayPayment {
   error_step: string | null;
   error_reason: string | null;
   created_at: number;
+}
+
+export interface RazorpayRefund {
+  id: string;
+  entity?: string;
+  payment_id: string;
+  amount: number;
+  currency: string;
+  status?: 'pending' | 'processed' | 'failed';
+  created_at: number;
+  processed_at?: number | null;
 }
 
 export interface RazorpayInvoice {
@@ -208,6 +289,28 @@ export interface RazorpayWebhookPayload {
   created_at: number;
 }
 
+interface RazorpayMutationClient {
+  orders: {
+    create(params: Record<string, unknown>): Promise<RazorpayOrder>;
+  };
+  items: {
+    create(params: Record<string, unknown>): Promise<RazorpayItem>;
+    edit(itemId: string, params: Record<string, unknown>): Promise<RazorpayItem>;
+  };
+  plans: {
+    create(params: Record<string, unknown>): Promise<RazorpayPlan>;
+  };
+  subscriptions: {
+    create(params: Record<string, unknown>): Promise<RazorpaySubscription>;
+    cancel(
+      subscriptionId: string,
+      cancelAtCycleEnd?: boolean | number
+    ): Promise<RazorpaySubscription>;
+    pause(subscriptionId: string, params?: { pause_at: 'now' }): Promise<RazorpaySubscription>;
+    resume(subscriptionId: string, params?: { resume_at: 'now' }): Promise<RazorpaySubscription>;
+  };
+}
+
 export class RazorpayProvider {
   private readonly client: Razorpay;
 
@@ -219,11 +322,19 @@ export class RazorpayProvider {
     this.client = new Razorpay({ key_id: keyId, key_secret: keySecret });
   }
 
+  getKeyId(): string {
+    return this.keyId;
+  }
+
   /**
    * Verify Razorpay webhook signature.
    * Razorpay signs webhooks using HMAC-SHA256 of the raw body.
    */
   verifyWebhookSignature(rawBody: string, signature: string, webhookSecret: string): boolean {
+    if (!RAZORPAY_SHA256_SIGNATURE_HEX.test(signature)) {
+      return false;
+    }
+
     const expected = crypto.createHmac('sha256', webhookSecret).update(rawBody).digest('hex');
     const expectedBuf = Buffer.from(expected, 'hex');
     const signatureBuf = Buffer.from(signature, 'hex');
@@ -231,6 +342,18 @@ export class RazorpayProvider {
       return false;
     }
     return crypto.timingSafeEqual(expectedBuf, signatureBuf);
+  }
+
+  verifyOrderPaymentSignature(orderId: string, paymentId: string, signature: string): boolean {
+    return this.verifyCheckoutSignature(`${orderId}|${paymentId}`, signature);
+  }
+
+  verifySubscriptionPaymentSignature(
+    subscriptionId: string,
+    paymentId: string,
+    signature: string
+  ): boolean {
+    return this.verifyCheckoutSignature(`${paymentId}|${subscriptionId}`, signature);
   }
 
   /**
@@ -269,6 +392,25 @@ export class RazorpayProvider {
     return all;
   }
 
+  async createPlan(input: RazorpayPlanCreateInput): Promise<RazorpayPlan> {
+    const params: Record<string, unknown> = {
+      period: input.period,
+      interval: input.interval,
+      item: {
+        name: input.item.name,
+        amount: input.item.amount,
+        currency: input.item.currency,
+        ...(input.item.description ? { description: input.item.description } : {}),
+      },
+    };
+
+    if (input.notes) {
+      params.notes = input.notes;
+    }
+
+    return this.getMutationClient().plans.create(params);
+  }
+
   async listItems(): Promise<RazorpayItem[]> {
     const all: RazorpayItem[] = [];
     let skip = 0;
@@ -285,6 +427,47 @@ export class RazorpayProvider {
       skip += count;
     }
     return all;
+  }
+
+  async createItem(input: RazorpayItemCreateInput): Promise<RazorpayItem> {
+    const params: Record<string, unknown> = {
+      name: input.name,
+      amount: input.amount,
+      currency: input.currency,
+    };
+
+    if (input.description !== undefined) {
+      params.description = input.description;
+    }
+    if (input.notes) {
+      params.notes = input.notes;
+    }
+
+    return this.getMutationClient().items.create(params);
+  }
+
+  async updateItem(itemId: string, input: RazorpayItemUpdateInput): Promise<RazorpayItem> {
+    const params: Record<string, unknown> = {};
+    if (input.name !== undefined) {
+      params.name = input.name;
+    }
+    if (input.amount !== undefined) {
+      params.amount = input.amount;
+    }
+    if (input.currency !== undefined) {
+      params.currency = input.currency;
+    }
+    if (input.description !== undefined) {
+      params.description = input.description;
+    }
+    if (input.active !== undefined) {
+      params.active = input.active;
+    }
+    if (input.notes) {
+      params.notes = input.notes;
+    }
+
+    return this.getMutationClient().items.edit(itemId, params);
   }
 
   async listCustomers(): Promise<RazorpayCustomer[]> {
@@ -325,6 +508,73 @@ export class RazorpayProvider {
     }
 
     return all;
+  }
+
+  async createOrder(input: RazorpayOrderCreateInput): Promise<RazorpayOrder> {
+    const params: Record<string, unknown> = {
+      amount: input.amount,
+      currency: input.currency,
+    };
+
+    if (input.receipt) {
+      params.receipt = input.receipt;
+    }
+    if (input.notes) {
+      params.notes = input.notes;
+    }
+
+    return this.getMutationClient().orders.create(params);
+  }
+
+  async createSubscription(input: RazorpaySubscriptionCreateInput): Promise<RazorpaySubscription> {
+    const params: Record<string, unknown> = {
+      plan_id: input.planId,
+    };
+
+    if (input.totalCount !== undefined) {
+      params.total_count = input.totalCount;
+    }
+    if (input.endAt !== undefined) {
+      params.end_at = input.endAt;
+    }
+    if (input.quantity !== undefined) {
+      params.quantity = input.quantity;
+    }
+    if (input.startAt !== undefined) {
+      params.start_at = input.startAt;
+    }
+    if (input.expireBy !== undefined) {
+      params.expire_by = input.expireBy;
+    }
+    if (input.customerNotify !== undefined) {
+      params.customer_notify = input.customerNotify;
+    }
+    if (input.offerId) {
+      params.offer_id = input.offerId;
+    }
+    if (input.notes) {
+      params.notes = input.notes;
+    }
+
+    return this.getMutationClient().subscriptions.create(params);
+  }
+
+  async cancelSubscription(
+    subscriptionId: string,
+    input: RazorpaySubscriptionCancelInput = {}
+  ): Promise<RazorpaySubscription> {
+    return this.getMutationClient().subscriptions.cancel(
+      subscriptionId,
+      input.cancelAtCycleEnd ?? false
+    );
+  }
+
+  async pauseSubscription(subscriptionId: string): Promise<RazorpaySubscription> {
+    return this.getMutationClient().subscriptions.pause(subscriptionId, { pause_at: 'now' });
+  }
+
+  async resumeSubscription(subscriptionId: string): Promise<RazorpaySubscription> {
+    return this.getMutationClient().subscriptions.resume(subscriptionId, { resume_at: 'now' });
   }
 
   async listPayments(): Promise<RazorpayPayment[]> {
@@ -485,5 +735,23 @@ export class RazorpayProvider {
       this.listItems(),
     ]);
     return { account, plans, items };
+  }
+
+  private verifyCheckoutSignature(payload: string, signature: string): boolean {
+    if (!RAZORPAY_SHA256_SIGNATURE_HEX.test(signature)) {
+      return false;
+    }
+
+    const expected = crypto.createHmac('sha256', this.keySecret).update(payload).digest('hex');
+    const expectedBuf = Buffer.from(expected, 'hex');
+    const signatureBuf = Buffer.from(signature, 'hex');
+    if (expectedBuf.length !== signatureBuf.length) {
+      return false;
+    }
+    return crypto.timingSafeEqual(expectedBuf, signatureBuf);
+  }
+
+  private getMutationClient(): RazorpayMutationClient {
+    return this.client as unknown as RazorpayMutationClient;
   }
 }
