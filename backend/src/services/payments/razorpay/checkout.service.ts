@@ -335,17 +335,17 @@ export class RazorpayCheckoutService {
           notes,
         });
       } catch (err) {
-        await withUserContext(db, user, async (client) =>
-          client.query(`DELETE FROM payments.razorpay_subscription_attempts WHERE id = $1`, [
+        await db
+          .query(`DELETE FROM payments.razorpay_subscription_attempts WHERE id = $1`, [
             attemptRecordId,
           ])
-        ).catch((deleteErr) => {
-          logger.warn('Failed to clean up Razorpay subscription attempt after provider error', {
-            environment: input.environment,
-            attemptId: attemptRecordId,
-            error: deleteErr instanceof Error ? deleteErr.message : String(deleteErr),
+          .catch((deleteErr) => {
+            logger.warn('Failed to clean up Razorpay subscription attempt after provider error', {
+              environment: input.environment,
+              attemptId: attemptRecordId,
+              error: deleteErr instanceof Error ? deleteErr.message : String(deleteErr),
+            });
           });
-        });
         throw err;
       }
 
@@ -365,13 +365,11 @@ export class RazorpayCheckoutService {
       );
 
       // Record the created subscription ID in the attempt record
-      await withUserContext(db, user, async (client) =>
-        client.query(
-          `UPDATE payments.razorpay_subscription_attempts
+      await db.query(
+        `UPDATE payments.razorpay_subscription_attempts
          SET subscription_id = $2
          WHERE id = $1`,
-          [attemptRecordId, razorpaySub.id]
-        )
+        [attemptRecordId, razorpaySub.id]
       );
 
       const keyId = await this.resolveKeyId(input.environment);
