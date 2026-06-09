@@ -118,10 +118,10 @@ export async function verifyAdmin(req: AuthRequest, res: Response, next: NextFun
 
     // Extract username from sub (format: "local:username")
     const username = extractUsernameFromSub(payload.sub);
-    let isRoot = false;
-    let dbAdminId = payload.sub;
+    let isRoot = payload.isRoot || false;
+    let dbAdminId = payload.adminId || payload.sub;
 
-    if (username) {
+    if (username && (payload.isRoot === undefined || payload.adminId === undefined)) {
       const admin = await adminService.getAdminByUsername(username);
       if (!admin) {
         throw new AppError(
@@ -264,7 +264,16 @@ export function verifyToken(req: AuthRequest, _res: Response, next: NextFunction
     }
 
     // Set user info on request
-    setRequestUser(req, payload);
+    if (payload.role === 'project_admin') {
+      const username = extractUsernameFromSub(payload.sub);
+      setRequestUser(req, {
+        ...payload,
+        sub: payload.adminId || payload.sub,
+        username: username || undefined,
+      });
+    } else {
+      setRequestUser(req, payload);
+    }
 
     next();
   } catch (error) {

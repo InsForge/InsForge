@@ -1,6 +1,8 @@
 import { DatabaseManager } from '../../infra/database/database.manager';
 import bcrypt from 'bcryptjs';
 
+const DUMMY_HASH = '$2b$10$yB2g7h1EscFY9Y37H64SzOCEjYu1GkfAiwkViVv.3lRn8jkIol9B6';
+
 export interface ProjectAdmin {
   id: string;
   username: string;
@@ -63,12 +65,9 @@ export class AdminService {
       [username]
     );
 
-    // dummy hash to prevent timing attacks
-    const dummyHash = await bcrypt.hash('dummy', 10);
-
     if (result.rows.length === 0) {
-      // comparing dummy
-      await bcrypt.compare(password, dummyHash);
+      // comparing dummy to prevent timing attacks
+      await bcrypt.compare(password, DUMMY_HASH);
       return null;
     }
 

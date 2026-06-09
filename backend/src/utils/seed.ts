@@ -24,7 +24,7 @@ async function seedAnonUser(): Promise<void> {
     const existingAnon = await client.query('SELECT id FROM auth.users WHERE id = $1', [ANON_ID]);
 
     if (existingAnon.rows.length > 0) {
-      logger.info(`✅ Anon user configured`);
+      logger.info(`Anon user configured`);
     } else {
       const profile = JSON.stringify({ name: 'Anonymous' });
 
@@ -35,7 +35,7 @@ async function seedAnonUser(): Promise<void> {
         [ANON_ID, 'anon@example.com', profile]
       );
 
-      logger.info(`✅ Anon user seeded`);
+      logger.info(`Anon user seeded`);
     }
   } catch (error) {
     logger.error('Failed to seed anonymous user', {
@@ -82,24 +82,15 @@ async function seedRootAdmin(): Promise<void> {
         updates.push('is_root = TRUE');
       }
 
-      // Check if password hash matches current ROOT_ADMIN_PASSWORD
-      const isPasswordSame = await bcrypt.compare(rootPassword, admin.password_hash);
-      if (!isPasswordSame) {
-        needsUpdate = true;
-        const newPasswordHash = await bcrypt.hash(rootPassword, 10);
-        values.push(newPasswordHash);
-        updates.push(`password_hash = $${values.length}`);
-      }
-
       if (needsUpdate) {
         values.push(admin.id);
         await client.query(
           `UPDATE auth.project_admins SET ${updates.join(', ')} WHERE id = $${values.length}`,
           values
         );
-        logger.info('✅ Updated root admin configuration/credentials');
+        logger.info(' Updated root admin configuration');
       } else {
-        logger.info('✅ Root admin configured');
+        logger.info(' Root admin configured');
       }
     } else {
       const passwordHash = await bcrypt.hash(rootPassword, 10);
@@ -107,7 +98,7 @@ async function seedRootAdmin(): Promise<void> {
         'INSERT INTO auth.project_admins (username, password_hash, is_root) VALUES ($1, $2, TRUE) ON CONFLICT DO NOTHING',
         [rootUsername, passwordHash]
       );
-      logger.info('✅ Root admin seeded successfully');
+      logger.info('Root admin seeded successfully');
     }
   } catch (error) {
     logger.error('Failed to seed root admin', {
@@ -136,7 +127,7 @@ async function seedDefaultAuthConfig(): Promise<void> {
       const authConfigService = AuthConfigService.getInstance();
       const currentConfig = await authConfigService.getAuthConfig();
       logger.info(
-        '✅ Email verification configured:',
+        'Email verification configured:',
         currentConfig.requireEmailVerification ? 'enabled' : 'disabled'
       );
       return;
@@ -163,7 +154,7 @@ async function seedDefaultAuthConfig(): Promise<void> {
       ]
     );
 
-    logger.info('✅ Email verification enabled (cloud environment)');
+    logger.info('Email verification enabled (cloud environment)');
   } catch (error) {
     logger.error('Failed to seed default auth config', {
       error: error instanceof Error ? error.message : String(error),
@@ -194,7 +185,7 @@ async function seedDefaultOAuthConfigs(): Promise<void> {
           provider,
           useSharedKey: true,
         });
-        logger.info(`✅ Default ${provider} OAuth config created`);
+        logger.info(`Default ${provider} OAuth config created`);
       }
     }
   } catch (error) {
@@ -270,7 +261,7 @@ async function seedLocalOAuthConfigs(): Promise<void> {
           clientSecret,
           useSharedKey: false,
         });
-        logger.info(`✅ ${provider} OAuth config loaded from environment variables`);
+        logger.info(`${provider} OAuth config loaded from environment variables`);
       }
     }
   } catch (error) {
@@ -304,7 +295,7 @@ export async function seedBackend(): Promise<void> {
     // Get database stats
     const tables = await dbManager.getUserTables();
 
-    logger.info(`✅ Database connected to PostgreSQL`, {
+    logger.info(`Database connected to PostgreSQL`, {
       host: process.env.POSTGRES_HOST || 'localhost',
       port: process.env.POSTGRES_PORT || '5432',
       database: process.env.POSTGRES_DB || 'insforge',
@@ -312,7 +303,7 @@ export async function seedBackend(): Promise<void> {
     // Database connection info is already logged above
 
     if (tables.length) {
-      logger.info(`✅ Found ${tables.length} user tables`);
+      logger.info(`Found ${tables.length} user tables`);
     }
 
     // seed default configs for cloud environment
@@ -335,7 +326,7 @@ export async function seedBackend(): Promise<void> {
           isReserved: true,
           value: insforgInternalUrl,
         });
-        logger.info('✅ INSFORGE_INTERNAL_URL secret initialized');
+        logger.info('INSFORGE_INTERNAL_URL secret initialized');
       }
     }
 
@@ -351,7 +342,7 @@ export async function seedBackend(): Promise<void> {
         isReserved: true,
         value: anonToken,
       });
-      logger.info('✅ ANON_KEY secret initialized');
+      logger.info('ANON_KEY secret initialized');
     }
 
     // Add INSFORGE_BASE_URL for edge functions to call back to API
@@ -363,7 +354,7 @@ export async function seedBackend(): Promise<void> {
         isReserved: true,
         value: getApiBaseUrl(),
       });
-      logger.info('✅ INSFORGE_BASE_URL secret initialized');
+      logger.info('INSFORGE_BASE_URL secret initialized');
     }
 
     // Add JWT_SECRET so CLI/SDK can access it via secrets API
@@ -377,7 +368,7 @@ export async function seedBackend(): Promise<void> {
           isReserved: true,
           value: jwtSecret,
         });
-        logger.info('✅ JWT_SECRET secret initialized');
+        logger.info('JWT_SECRET secret initialized');
       }
     }
 
