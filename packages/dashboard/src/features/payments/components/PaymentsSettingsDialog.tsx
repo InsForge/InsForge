@@ -540,7 +540,6 @@ function RazorpayKeysTabContent({
                               </span>
                               {envSecretKey?.hasKey && (
                                 <span className="inline-flex items-center gap-1.5 text-[11px] font-mono text-muted-foreground">
-                                  <CheckCircle2 className="h-3 w-3 text-green-500" />
                                   Secret: {envSecretKey.maskedKey}
                                 </span>
                               )}
