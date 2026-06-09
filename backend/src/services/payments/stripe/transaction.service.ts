@@ -431,7 +431,7 @@ export class StripeTransactionService {
              updated_at = NOW()
          FROM matched
          WHERE tx.id = matched.id
-         RETURNING id
+         RETURNING tx.id
        )
        INSERT INTO payments.transactions AS tx (
          provider,

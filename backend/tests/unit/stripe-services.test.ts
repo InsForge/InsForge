@@ -2519,6 +2519,10 @@ describe('Stripe payment services', () => {
         expect.objectContaining({ id: 'cs_test_123' }),
       ])
     );
+    const transactionCall = mockPool.query.mock.calls.find(([sql]) =>
+      /WITH refs[\s\S]*INSERT INTO payments\.transactions/i.test(String(sql))
+    );
+    expect(String(transactionCall?.[0])).toMatch(/RETURNING\s+tx\.id/i);
     expect(mockPool.query).toHaveBeenCalledWith(
       expect.stringMatching(/WITH refund_totals[\s\S]*UPDATE payments\.transactions original/i),
       ['test', 'pi_123', null]

@@ -96,6 +96,7 @@ runtimes
 sdk
 SDKs
 select_account
+sellable
 serverless
 Sinch
 skipBrowserRedirect

@@ -393,6 +393,7 @@ describe('RazorpaySyncService', () => {
       /WITH refs[\s\S]*INSERT INTO payments\.transactions/i.test(String(sql))
     );
     expect(transactionCall).toBeDefined();
+    expect(String(transactionCall?.[0])).toMatch(/RETURNING\s+tx\.id/i);
 
     const params = transactionCall?.[1] as unknown[];
     expect(params).toEqual(
