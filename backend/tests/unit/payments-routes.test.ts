@@ -32,8 +32,6 @@ import {
   updateStripeProductBodySchema,
   upsertStripeConfigBodySchema,
   upsertRazorpayConfigBodySchema,
-  upsertRazorpayWebhookSecretResponseSchema,
-  upsertRazorpayWebhookSecretBodySchema,
   updateRazorpayItemBodySchema,
   verifyRazorpayOrderBodySchema,
   verifyRazorpaySubscriptionBodySchema,
@@ -242,7 +240,6 @@ describe('payments route schemas', () => {
     expect(paymentsApiSchemaSource).toContain('razorpayEnvironmentParamsSchema');
     expect(paymentsApiSchemaSource).toContain('razorpayWebhookParamsSchema');
     expect(paymentsApiSchemaSource).toContain('upsertRazorpayConfigBodySchema');
-    expect(paymentsApiSchemaSource).toContain('upsertRazorpayWebhookSecretBodySchema');
     expect(paymentsApiSchemaSource).toContain('getRazorpayWebhookSetupResponseSchema');
     expect(paymentsApiSchemaSource).toContain('regenerateRazorpayWebhookSecretResponseSchema');
     expect(paymentsApiSchemaSource).toContain('getRazorpayStatusResponseSchema');
@@ -259,7 +256,6 @@ describe('payments route schemas', () => {
     expect(paymentsApiSchemaSource).toContain('createRazorpayPlanBodySchema');
     expect(razorpayConfigRouteSource).toContain('parseZodSchema');
     expect(razorpayConfigRouteSource).toContain('upsertRazorpayConfigBodySchema');
-    expect(razorpayConfigRouteSource).toContain('upsertRazorpayWebhookSecretBodySchema');
     expect(razorpayRouteSource).toContain('createRazorpayOrderBodySchema');
     expect(razorpayCatalogRouteSource).toContain('createRazorpayItemBodySchema');
     expect(razorpayCatalogRouteSource).toContain('createRazorpayPlanBodySchema');
@@ -338,7 +334,6 @@ describe('payments route schemas', () => {
     expect(razorpayConfigRouteSource).toContain('const router = Router({ mergeParams: true });');
     expect(razorpayConfigRouteSource).toMatch(/router\.put\(\s*'\/config'/);
     expect(razorpayConfigRouteSource).toMatch(/router\.delete\(\s*'\/config'/);
-    expect(razorpayConfigRouteSource).toMatch(/router\.put\(\s*'\/webhook-secret'/);
     expect(razorpayConfigRouteSource).toMatch(/router\.post\(\s*'\/sync'/);
     expect(razorpayConfigRouteSource).toMatch(/router\.get\(\s*'\/webhook'/);
     expect(razorpayConfigRouteSource).toContain('configService.getWebhookSetup(environment)');
@@ -350,6 +345,7 @@ describe('payments route schemas', () => {
     expect(razorpayConfigRouteSource).toContain('successResponse(res, result)');
     expect(razorpayRouteSource).not.toContain('webhook-configure');
     expect(razorpayConfigRouteSource).not.toContain('webhook-configure');
+    expect(razorpayConfigRouteSource).not.toContain('/webhook-secret');
     expect(razorpayConfigRouteSource).not.toContain('verifyAdmin');
     expect(razorpayRouteSource).not.toContain('x-razorpay-signature');
     expect(razorpayRouteSource).not.toContain('verifyWebhookSignature');
@@ -432,10 +428,6 @@ describe('payments route schemas', () => {
     expect(() =>
       upsertRazorpayConfigBodySchema.parse({ keyId: '', keySecret: 'secret' })
     ).toThrow();
-    expect(upsertRazorpayWebhookSecretBodySchema.parse({ webhookSecret: 'secret' })).toEqual({
-      webhookSecret: 'secret',
-    });
-    expect(() => upsertRazorpayWebhookSecretBodySchema.parse({ webhookSecret: '' })).toThrow();
     expect(
       getRazorpayStatusResponseSchema.parse({
         razorpayConnections: [
@@ -477,7 +469,6 @@ describe('payments route schemas', () => {
         razorpayKeys: expect.any(Array),
       })
     );
-    expect(upsertRazorpayWebhookSecretResponseSchema.parse({ ok: true })).toEqual({ ok: true });
     expect(
       getRazorpayWebhookSetupResponseSchema.parse({
         connection: {

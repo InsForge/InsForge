@@ -1,0 +1,145 @@
+---
+title: "Stripe Payments"
+sidebarTitle: "Stripe"
+description: "Integrate Stripe Checkout, Billing Portal, catalog sync, and webhook fulfillment with InsForge."
+---
+
+Use the Stripe integration when you want Stripe-hosted Checkout, Stripe Products and Prices, Stripe Subscriptions, and the hosted Billing Portal.
+
+InsForge stores Stripe secret keys server-side, creates Checkout and Billing Portal sessions from your app, automatically manages the Stripe webhook endpoint when your backend is reachable, mirrors Stripe state into the `payments` schema, and records verified webhook events.
+
+## Stripe model
+
+| Stripe concept | InsForge table or API |
+|----------------|-----------------------|
+| Product | `payments.stripe_products` |
+| Price | `payments.stripe_prices` |
+| Checkout Session | `POST /api/payments/stripe/{environment}/checkout-sessions` and `payments.stripe_checkout_sessions` |
+| Billing Portal Session | `POST /api/payments/stripe/{environment}/customer-portal-sessions` and `payments.stripe_customer_portal_sessions` |
+| Subscription | `payments.stripe_subscriptions` and `payments.stripe_subscription_items` |
+| Customer mapping | `payments.customer_mappings` with `provider = 'stripe'` |
+| Webhook event | `payments.webhook_events` with `provider = 'stripe'` |
+| Dashboard transaction row | `payments.transactions` with `provider = 'stripe'` |
+
+## Setup
+
+Configure `test` and `live` Stripe secret keys in Dashboard -> Payments -> Settings, the CLI, or the admin API.
+
+```bash
+npx @insforge/cli payments stripe status
+npx @insforge/cli payments stripe config set --environment test sk_test_xxx
+npx @insforge/cli payments stripe sync --environment test
+npx @insforge/cli payments stripe webhooks configure --environment test
+```
+
+After a key is connected, InsForge validates the account, stores the key in the secret store, tries to create the managed Stripe webhook endpoint, and runs sync for Products, Prices, Customers, and Subscriptions.
+
+## Checkout
+
+Create Checkout Sessions from frontend code with the current InsForge user token.
+
+```typescript
+const { data, error } = await insforge.payments.stripe.createCheckoutSession('test', {
+  mode: 'payment',
+  lineItems: [{ priceId: 'price_123', quantity: 1 }],
+  successUrl: `${window.location.origin}/checkout/success`,
+  cancelUrl: `${window.location.origin}/pricing`,
+  customerEmail: user?.email ?? null,
+  metadata: { order_id: orderId },
+  idempotencyKey: `order:${orderId}`
+});
+
+if (error) throw error;
+if (data?.checkoutSession.url) {
+  window.location.assign(data.checkoutSession.url);
+}
+```
+
+For subscription Checkout, pass a billing subject. The subject is your app-owned billing owner, such as a user, team, workspace, organization, tenant, or group.
+
+```typescript
+const { data, error } = await insforge.payments.stripe.createCheckoutSession('test', {
+  mode: 'subscription',
+  subject: { type: 'team', id: teamId },
+  lineItems: [{ priceId: 'price_monthly_123', quantity: 1 }],
+  successUrl: `${window.location.origin}/billing/success`,
+  cancelUrl: `${window.location.origin}/billing`,
+  customerEmail: user.email,
+  idempotencyKey: `team:${teamId}:pro-monthly`
+});
+
+if (error) throw error;
+if (data?.checkoutSession.url) {
+  window.location.assign(data.checkoutSession.url);
+}
+```
+
+Checkout inserts a row in `payments.stripe_checkout_sessions` using the caller's InsForge token. Add RLS policies so users can only create sessions for subjects they are allowed to bill. If you use `idempotencyKey`, retries also need a matching `SELECT` policy for the same subject.
+
+## Billing Portal
+
+Use the hosted Billing Portal for an existing Stripe customer mapping.
+
+```typescript
+const { data, error } = await insforge.payments.stripe.createCustomerPortalSession('test', {
+  subject: { type: 'team', id: teamId },
+  returnUrl: `${window.location.origin}/billing`
+});
+
+if (error) {
+  if ('statusCode' in error && error.statusCode === 404) {
+    return;
+  }
+
+  throw error;
+}
+
+if (data?.customerPortalSession.url) {
+  window.location.assign(data.customerPortalSession.url);
+}
+```
+
+Portal creation requires an authenticated user and an existing `payments.customer_mappings` row for the subject. Protect portal creation with RLS or a server-side membership check so users cannot open billing settings for a team or organization they do not manage.
+
+## Webhooks and fulfillment
+
+Stripe webhooks are managed automatically when the backend has a public URL. InsForge listens for the events needed to keep checkout attempts, customers, subscriptions, refunds, and transaction projections current.
+
+Stripe also recommends fulfilling Checkout orders from webhooks instead of the success URL. In InsForge, attach fulfillment triggers to `payments.webhook_events`.
+
+```sql
+CREATE OR REPLACE FUNCTION public.fulfill_stripe_order()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.provider = 'stripe'
+     AND NEW.event_type = 'checkout.session.completed'
+     AND NEW.processing_status = 'processed'
+     AND (NEW.payload -> 'data' -> 'object' -> 'metadata' ->> 'order_id') IS NOT NULL THEN
+    UPDATE public.orders
+    SET status = 'paid',
+        paid_at = COALESCE(NEW.processed_at, NOW())
+    WHERE id::text = NEW.payload -> 'data' -> 'object' -> 'metadata' ->> 'order_id'
+      AND status = 'pending';
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER fulfill_stripe_order_from_webhook
+  AFTER INSERT OR UPDATE ON payments.webhook_events
+  FOR EACH ROW
+  EXECUTE FUNCTION public.fulfill_stripe_order();
+```
+
+## Sync and dashboard state
+
+Stripe sync mirrors Products, Prices, Customers, and Subscriptions. Webhooks maintain session, subscription, customer, refund, and transaction state as Stripe emits events.
+
+`payments.transactions` is a reporting projection for the dashboard. It gives you provider reference IDs such as payment intent, charge, invoice, checkout session, and refund IDs so you can look up details in the Stripe Dashboard. Keep user-facing order, credit, or entitlement state in your own tables.
+
+## References
+
+- [Stripe Checkout fulfillment](https://docs.stripe.com/checkout/fulfillment)
+- [Stripe Billing Portal Sessions API](https://docs.stripe.com/api/customer_portal/sessions/create)
+- [TypeScript Stripe payments guide](/sdks/typescript/payments-stripe)

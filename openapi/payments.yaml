@@ -2,23 +2,23 @@ openapi: 3.0.3
 info:
   title: Insforge Payments API
   version: 1.0.0
-  description: Payment provider setup, catalog management, Stripe runtime sessions, and webhook projections
+  description: Provider-specific Stripe and Razorpay payment setup, runtime flows, catalog management, sync, and webhook projections
 
 tags:
-  - name: Client
-    description: Runtime routes used by applications with a user token
-  - name: Admin
-    description: Project-admin routes for provider keys, catalog management, sync, and projections
-  - name: Webhooks
-    description: Payment provider webhook ingestion routes
+  - name: Stripe Payments
+    description: Stripe Checkout, Billing Portal, catalog, sync, customer, subscription, and transaction routes
+  - name: Razorpay Payments
+    description: Razorpay Orders, Subscriptions, catalog, manual webhook setup, sync, customer, and transaction routes
+  - name: Payment Webhooks
+    description: Provider webhook ingestion routes
 
 paths:
   /api/payments/stripe/{environment}/checkout-sessions:
     post:
-      summary: Create Checkout Session
+      summary: Create Stripe Checkout Session
       description: Create a local checkout attempt with the caller's user context and then create a Stripe Checkout Session. Subscription mode requires a billing subject.
       tags:
-        - Client
+        - Stripe Payments
       security:
         - bearerAuth: []
       parameters:
@@ -59,10 +59,10 @@ paths:
 
   /api/payments/stripe/{environment}/customer-portal-sessions:
     post:
-      summary: Create Customer Portal Session
+      summary: Create Stripe Customer Portal Session
       description: Create a Stripe Billing Portal Session for an authenticated user's mapped billing subject.
       tags:
-        - Client
+        - Stripe Payments
       security:
         - bearerAuth: []
       parameters:
@@ -98,16 +98,16 @@ paths:
 
   /api/payments/stripe/status:
     get:
-      summary: Get Payments Status
+      summary: Get Stripe Payments Status
       description: Return Stripe connection, sync, and managed webhook status for each environment.
       tags:
-        - Admin
+        - Stripe Payments
       security:
         - bearerAuth: []
         - apiKey: []
       responses:
         '200':
-          description: Payments status
+          description: Stripe payments status
           content:
             application/json:
               schema:
@@ -122,7 +122,7 @@ paths:
       summary: Get Stripe Key Configuration
       description: Return masked Stripe key configuration for test and live environments.
       tags:
-        - Admin
+        - Stripe Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -143,7 +143,7 @@ paths:
       summary: Configure Stripe Secret Key
       description: Validate and store a Stripe secret key. New Stripe accounts attempt managed webhook setup and then run a unified sync.
       tags:
-        - Admin
+        - Stripe Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -174,7 +174,7 @@ paths:
       summary: Remove Stripe Secret Key
       description: Remove the configured Stripe secret key for one environment and best-effort remove managed webhook endpoints.
       tags:
-        - Admin
+        - Stripe Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -201,7 +201,7 @@ paths:
       summary: Sync Stripe Payments State
       description: Sync products, prices, customers, and subscriptions for every configured Stripe environment. Stripe remains the source of truth.
       tags:
-        - Admin
+        - Stripe Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -224,7 +224,7 @@ paths:
       summary: Sync Stripe Payments State For One Environment
       description: Sync products, prices, customers, and subscriptions for one Stripe environment. Stripe remains the source of truth.
       tags:
-        - Admin
+        - Stripe Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -249,7 +249,7 @@ paths:
       summary: Configure Managed Stripe Webhook
       description: Create or recreate the InsForge-managed Stripe webhook endpoint for one environment.
       tags:
-        - Admin
+        - Stripe Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -271,10 +271,10 @@ paths:
 
   /api/payments/stripe/{environment}/catalog:
     get:
-      summary: List Payment Catalog
+      summary: List Stripe Catalog
       description: Return mirrored Stripe products and prices for one environment.
       tags:
-        - Admin
+        - Stripe Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -296,10 +296,10 @@ paths:
 
   /api/payments/stripe/{environment}/catalog/products:
     get:
-      summary: List Products
+      summary: List Stripe Products
       description: List mirrored Stripe products for one environment.
       tags:
-        - Admin
+        - Stripe Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -307,7 +307,7 @@ paths:
         - $ref: '#/components/parameters/EnvironmentPath'
       responses:
         '200':
-          description: Products
+          description: Stripe products
           content:
             application/json:
               schema:
@@ -320,10 +320,10 @@ paths:
           $ref: '#/components/responses/Forbidden'
 
     post:
-      summary: Create Product
+      summary: Create Stripe Product
       description: Create a Stripe product in the requested environment, then mirror it locally after Stripe succeeds.
       tags:
-        - Admin
+        - Stripe Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -358,10 +358,10 @@ paths:
 
   /api/payments/stripe/{environment}/catalog/products/{productId}:
     get:
-      summary: Get Product
+      summary: Get Stripe Product
       description: Get one mirrored Stripe product and its associated prices.
       tags:
-        - Admin
+        - Stripe Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -385,10 +385,10 @@ paths:
           $ref: '#/components/responses/NotFound'
 
     patch:
-      summary: Update Product
+      summary: Update Stripe Product
       description: Update a Stripe product, then mirror it locally after Stripe succeeds.
       tags:
-        - Admin
+        - Stripe Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -421,10 +421,10 @@ paths:
           $ref: '#/components/responses/NotFound'
 
     delete:
-      summary: Delete Product
+      summary: Delete Stripe Product
       description: Delete a Stripe product from one environment, then remove it from the local mirror.
       tags:
-        - Admin
+        - Stripe Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -449,10 +449,10 @@ paths:
 
   /api/payments/stripe/{environment}/catalog/prices:
     get:
-      summary: List Prices
+      summary: List Stripe Prices
       description: List mirrored Stripe prices for one environment, optionally filtered by product.
       tags:
-        - Admin
+        - Stripe Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -468,7 +468,7 @@ paths:
           example: "prod_123"
       responses:
         '200':
-          description: Prices
+          description: Stripe prices
           content:
             application/json:
               schema:
@@ -481,10 +481,10 @@ paths:
           $ref: '#/components/responses/Forbidden'
 
     post:
-      summary: Create Price
+      summary: Create Stripe Price
       description: Create a Stripe price in the requested environment, then mirror it locally after Stripe succeeds.
       tags:
-        - Admin
+        - Stripe Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -521,10 +521,10 @@ paths:
 
   /api/payments/stripe/{environment}/catalog/prices/{priceId}:
     get:
-      summary: Get Price
+      summary: Get Stripe Price
       description: Get one mirrored Stripe price.
       tags:
-        - Admin
+        - Stripe Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -548,10 +548,10 @@ paths:
           $ref: '#/components/responses/NotFound'
 
     patch:
-      summary: Update Price
+      summary: Update Stripe Price
       description: Update mutable Stripe price fields, then mirror the price locally after Stripe succeeds.
       tags:
-        - Admin
+        - Stripe Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -584,10 +584,10 @@ paths:
           $ref: '#/components/responses/NotFound'
 
     delete:
-      summary: Archive Price
+      summary: Archive Stripe Price
       description: Archive a Stripe price in one environment, then mirror the archived state locally.
       tags:
-        - Admin
+        - Stripe Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -612,10 +612,10 @@ paths:
 
   /api/payments/stripe/{environment}/subscriptions:
     get:
-      summary: List Subscriptions
+      summary: List Stripe Subscriptions
       description: Admin/debug read for mirrored Stripe subscriptions. Use app-owned tables with RLS for end-user payment state.
       tags:
-        - Admin
+        - Stripe Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -626,7 +626,7 @@ paths:
         - $ref: '#/components/parameters/LimitQuery'
       responses:
         '200':
-          description: Subscriptions
+          description: Stripe subscriptions
           content:
             application/json:
               schema:
@@ -640,10 +640,10 @@ paths:
 
   /api/payments/stripe/{environment}/customers:
     get:
-      summary: List Customers
+      summary: List Stripe Customers
       description: Admin/debug read for mirrored Stripe customers. This is a display mirror only and should not replace app-owned billing tables.
       tags:
-        - Admin
+        - Stripe Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -652,7 +652,7 @@ paths:
         - $ref: '#/components/parameters/LimitQuery'
       responses:
         '200':
-          description: Customers
+          description: Stripe customers
           content:
             application/json:
               schema:
@@ -669,7 +669,7 @@ paths:
       summary: List Stripe Transactions
       description: Admin/debug read for InsForge's Stripe transaction projection. Use app-owned fulfillment tables with RLS for end-user order, credit, or entitlement state.
       tags:
-        - Admin
+        - Stripe Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -697,7 +697,7 @@ paths:
       summary: Get Razorpay Payments Status
       description: Return Razorpay connection and sync status for each environment.
       tags:
-        - Admin
+        - Razorpay Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -718,7 +718,7 @@ paths:
       summary: Get Razorpay Key Configuration
       description: Return masked Razorpay key configuration for test and live environments.
       tags:
-        - Admin
+        - Razorpay Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -737,9 +737,9 @@ paths:
   /api/payments/razorpay/sync:
     post:
       summary: Sync Razorpay Payments State
-      description: Sync plans, items, customers, subscriptions, and payments for every configured Razorpay environment. Razorpay remains the source of truth.
+      description: Sync items, plans, customers, subscriptions, invoices, and payments for every configured Razorpay environment. Razorpay remains the source of truth.
       tags:
-        - Admin
+        - Razorpay Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -762,7 +762,7 @@ paths:
       summary: Configure Razorpay Keys
       description: Validate and store Razorpay API keys for one environment. A webhook secret is generated automatically when one does not already exist.
       tags:
-        - Admin
+        - Razorpay Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -796,7 +796,7 @@ paths:
       summary: Remove Razorpay Keys
       description: Remove the configured Razorpay keys for one environment.
       tags:
-        - Admin
+        - Razorpay Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -818,45 +818,12 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /api/payments/razorpay/{environment}/webhook-secret:
-    put:
-      summary: Configure Razorpay Webhook Secret
-      description: Store the Razorpay webhook signing secret for one environment.
-      tags:
-        - Admin
-      security:
-        - bearerAuth: []
-        - apiKey: []
-      parameters:
-        - $ref: '#/components/parameters/EnvironmentPath'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpsertRazorpayWebhookSecretBody'
-            example:
-              webhookSecret: "webhook_secret_xxx"
-      responses:
-        '200':
-          description: Webhook secret stored
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UpsertRazorpayWebhookSecretResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-
   /api/payments/razorpay/{environment}/sync:
     post:
       summary: Sync Razorpay Payments State For One Environment
-      description: Sync plans, items, customers, subscriptions, and payments for one Razorpay environment. Razorpay remains the source of truth.
+      description: Sync items, plans, customers, subscriptions, invoices, and payments for one Razorpay environment. Razorpay remains the source of truth.
       tags:
-        - Admin
+        - Razorpay Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -881,7 +848,7 @@ paths:
       summary: Get Razorpay Webhook Setup Values
       description: Return the Razorpay webhook URL and signing secret that must be copied into the Razorpay Dashboard for manual webhook setup.
       tags:
-        - Admin
+        - Razorpay Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -906,7 +873,7 @@ paths:
       summary: Regenerate Razorpay Webhook Secret
       description: Generate a new Razorpay webhook signing secret. Update the webhook secret in the Razorpay Dashboard after calling this endpoint.
       tags:
-        - Admin
+        - Razorpay Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -931,7 +898,7 @@ paths:
       summary: Create Razorpay Order
       description: Create a local Razorpay Order record with the caller's user context, create a Razorpay Order, and return Checkout options for the client-side Razorpay Checkout script.
       tags:
-        - Client
+        - Razorpay Payments
       security:
         - bearerAuth: []
       parameters:
@@ -972,7 +939,7 @@ paths:
       summary: Verify Razorpay Order Payment
       description: Verify the Razorpay Checkout signature for an order payment before recording the verified payment ID locally.
       tags:
-        - Client
+        - Razorpay Payments
       security:
         - bearerAuth: []
       parameters:
@@ -1008,7 +975,7 @@ paths:
       summary: List Razorpay Payment Catalog
       description: Return mirrored Razorpay items and plans for one environment.
       tags:
-        - Admin
+        - Razorpay Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -1033,7 +1000,7 @@ paths:
       summary: Create Razorpay Item
       description: Create a Razorpay Item, then mirror it locally after Razorpay succeeds.
       tags:
-        - Admin
+        - Razorpay Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -1070,7 +1037,7 @@ paths:
       summary: Update Razorpay Item
       description: Update mutable Razorpay Item fields, then mirror the item locally after Razorpay succeeds.
       tags:
-        - Admin
+        - Razorpay Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -1106,7 +1073,7 @@ paths:
       summary: Create Razorpay Plan
       description: Create a Razorpay Plan with its amount-bearing item definition, then mirror it locally after Razorpay succeeds.
       tags:
-        - Admin
+        - Razorpay Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -1144,7 +1111,7 @@ paths:
       summary: Create Razorpay Subscription
       description: Create a Razorpay Subscription and mirror it locally, then return Checkout options for authorization. The backend first evaluates the caller's INSERT policy on payments.razorpay_subscriptions so apps can restrict which subjects can start subscriptions.
       tags:
-        - Client
+        - Razorpay Payments
       security:
         - bearerAuth: []
       parameters:
@@ -1182,7 +1149,7 @@ paths:
       summary: List Razorpay Subscriptions
       description: Admin/debug read for mirrored Razorpay subscriptions. Use app-owned tables with RLS for end-user payment state.
       tags:
-        - Admin
+        - Razorpay Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -1210,7 +1177,7 @@ paths:
       summary: Verify Razorpay Subscription Authorization
       description: Verify the Razorpay Checkout signature for the subscription authorization payment before recording the authorization payment ID locally.
       tags:
-        - Client
+        - Razorpay Payments
       security:
         - bearerAuth: []
       parameters:
@@ -1246,7 +1213,7 @@ paths:
       summary: Cancel Razorpay Subscription
       description: Cancel a Razorpay subscription after evaluating the caller's UPDATE policy on payments.razorpay_subscriptions.
       tags:
-        - Client
+        - Razorpay Payments
       security:
         - bearerAuth: []
       parameters:
@@ -1266,7 +1233,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MutateRazorpaySubscriptionResponse'
+                $ref: '#/components/schemas/CancelRazorpaySubscriptionResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1281,7 +1248,7 @@ paths:
       summary: Pause Razorpay Subscription
       description: Pause a Razorpay subscription immediately after evaluating the caller's UPDATE policy on payments.razorpay_subscriptions.
       tags:
-        - Client
+        - Razorpay Payments
       security:
         - bearerAuth: []
       parameters:
@@ -1299,7 +1266,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MutateRazorpaySubscriptionResponse'
+                $ref: '#/components/schemas/PauseRazorpaySubscriptionResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1314,7 +1281,7 @@ paths:
       summary: Resume Razorpay Subscription
       description: Resume a paused Razorpay subscription immediately after evaluating the caller's UPDATE policy on payments.razorpay_subscriptions.
       tags:
-        - Client
+        - Razorpay Payments
       security:
         - bearerAuth: []
       parameters:
@@ -1332,7 +1299,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MutateRazorpaySubscriptionResponse'
+                $ref: '#/components/schemas/ResumeRazorpaySubscriptionResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1347,7 +1314,7 @@ paths:
       summary: List Razorpay Customers
       description: Admin/debug read for mirrored Razorpay customers. This is a display mirror only and should not replace app-owned billing tables.
       tags:
-        - Admin
+        - Razorpay Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -1373,7 +1340,7 @@ paths:
       summary: List Razorpay Transactions
       description: Admin/debug read for InsForge's Razorpay transaction projection. Use app-owned fulfillment tables with RLS for end-user order, credit, or entitlement state.
       tags:
-        - Admin
+        - Razorpay Payments
       security:
         - bearerAuth: []
         - apiKey: []
@@ -1401,7 +1368,7 @@ paths:
       summary: Receive Stripe Webhook
       description: Receive Stripe events for one environment. The request body must be the raw Stripe JSON body and must include the Stripe signature header.
       tags:
-        - Webhooks
+        - Payment Webhooks
       security:
         - stripeSignature: []
       parameters:
@@ -1432,7 +1399,7 @@ paths:
       summary: Receive Razorpay Webhook
       description: Receive Razorpay events for one environment. The request body must be the raw Razorpay JSON body and must include the Razorpay signature header.
       tags:
-        - Webhooks
+        - Payment Webhooks
       security:
         - razorpaySignature: []
       parameters:
@@ -1753,7 +1720,7 @@ components:
         webhookEndpointId:
           type: string
           nullable: true
-          example: "webhook_123"
+          example: "manual"
         webhookEndpointUrl:
           type: string
           nullable: true
@@ -3132,6 +3099,9 @@ components:
             orderId:
               type: string
               example: "order_123"
+            name:
+              type: string
+              nullable: true
             description:
               type: string
               nullable: true
@@ -3380,6 +3350,9 @@ components:
             subscriptionId:
               type: string
               example: "sub_123"
+            name:
+              type: string
+              nullable: true
             description:
               type: string
               nullable: true
@@ -3437,7 +3410,23 @@ components:
       type: object
       additionalProperties: false
 
-    MutateRazorpaySubscriptionResponse:
+    CancelRazorpaySubscriptionResponse:
+      type: object
+      required:
+        - subscription
+      properties:
+        subscription:
+          $ref: '#/components/schemas/RazorpaySubscription'
+
+    PauseRazorpaySubscriptionResponse:
+      type: object
+      required:
+        - subscription
+      properties:
+        subscription:
+          $ref: '#/components/schemas/RazorpaySubscription'
+
+    ResumeRazorpaySubscriptionResponse:
       type: object
       required:
         - subscription
@@ -3541,26 +3530,6 @@ components:
           type: string
           writeOnly: true
           example: "webhook_secret_xxx"
-
-    UpsertRazorpayWebhookSecretBody:
-      type: object
-      required:
-        - webhookSecret
-      additionalProperties: false
-      properties:
-        webhookSecret:
-          type: string
-          minLength: 1
-          writeOnly: true
-          example: "webhook_secret_xxx"
-
-    UpsertRazorpayWebhookSecretResponse:
-      type: object
-      required:
-        - ok
-      properties:
-        ok:
-          type: boolean
 
     SyncStripePaymentsRequest:
       type: object

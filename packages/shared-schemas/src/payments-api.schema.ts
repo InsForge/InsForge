@@ -833,23 +833,6 @@ export const upsertRazorpayConfigRequestSchema = z
   })
   .strict();
 
-export const upsertRazorpayWebhookSecretBodySchema = z
-  .object({
-    webhookSecret: z.string().trim().min(1, 'Webhook secret is required'),
-  })
-  .strict();
-
-export const upsertRazorpayWebhookSecretRequestSchema = z
-  .object({
-    environment: razorpayEnvironmentSchema,
-    ...upsertRazorpayWebhookSecretBodySchema.shape,
-  })
-  .strict();
-
-export const upsertRazorpayWebhookSecretResponseSchema = z.object({
-  ok: z.boolean(),
-});
-
 export const getRazorpayWebhookSetupResponseSchema = z.object({
   connection: razorpayConnectionSchema,
   webhookUrl: z.string().trim().min(1),
@@ -922,6 +905,9 @@ export type VerifyRazorpaySubscriptionResponse = z.infer<
   typeof verifyRazorpaySubscriptionResponseSchema
 >;
 export type CancelRazorpaySubscriptionBody = z.infer<typeof cancelRazorpaySubscriptionBodySchema>;
+export type CancelRazorpaySubscriptionBodyInput = z.input<
+  typeof cancelRazorpaySubscriptionBodySchema
+>;
 export type CancelRazorpaySubscriptionRequest = z.infer<
   typeof cancelRazorpaySubscriptionRequestSchema
 >;
@@ -997,13 +983,6 @@ export type UpsertStripeConfigBody = z.infer<typeof upsertStripeConfigBodySchema
 export type UpsertStripeConfigRequest = z.infer<typeof upsertStripeConfigRequestSchema>;
 export type UpsertRazorpayConfigBody = z.infer<typeof upsertRazorpayConfigBodySchema>;
 export type UpsertRazorpayConfigRequest = z.infer<typeof upsertRazorpayConfigRequestSchema>;
-export type UpsertRazorpayWebhookSecretBody = z.infer<typeof upsertRazorpayWebhookSecretBodySchema>;
-export type UpsertRazorpayWebhookSecretRequest = z.infer<
-  typeof upsertRazorpayWebhookSecretRequestSchema
->;
-export type UpsertRazorpayWebhookSecretResponse = z.infer<
-  typeof upsertRazorpayWebhookSecretResponseSchema
->;
 export type GetRazorpayWebhookSetupResponse = z.infer<typeof getRazorpayWebhookSetupResponseSchema>;
 export type RegenerateRazorpayWebhookSecretResponse = z.infer<
   typeof regenerateRazorpayWebhookSecretResponseSchema

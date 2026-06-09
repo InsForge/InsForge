@@ -9,7 +9,6 @@ import {
   ERROR_CODES,
   razorpayEnvironmentParamsSchema,
   upsertRazorpayConfigBodySchema,
-  upsertRazorpayWebhookSecretBodySchema,
 } from '@insforge/shared-schemas';
 
 const router = Router({ mergeParams: true });
@@ -51,19 +50,6 @@ router.delete('/config', async (req: AuthRequest, res: Response, next: NextFunct
     }
     const keys = await configService.getKeyConfig();
     successResponse(res, { razorpayKeys: keys });
-  } catch (error) {
-    next(error);
-  }
-});
-
-router.put('/webhook-secret', async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const { environment } = parseZodSchema(razorpayEnvironmentParamsSchema, req.params);
-    const body = parseZodSchema(upsertRazorpayWebhookSecretBodySchema, req.body);
-
-    await configService.setRazorpayWebhookSecret(environment, body.webhookSecret);
-
-    successResponse(res, { ok: true });
   } catch (error) {
     next(error);
   }
