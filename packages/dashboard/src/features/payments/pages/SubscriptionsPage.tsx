@@ -387,7 +387,7 @@ function SubscriptionRow({
 }
 
 export default function SubscriptionsPage() {
-  const { openPaymentsSettings, provider, setProvider, environment, setEnvironment } =
+  const { openPaymentsSettings, provider, setProvider, environment } =
     useOutletContext<PaymentsOutletContext>();
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<string | null>(null);
@@ -492,30 +492,26 @@ export default function SubscriptionsPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
-      <PaymentsPageHeader
-        title="Subscriptions"
-        provider={provider}
-        setProvider={setProvider}
-        environment={environment}
-        setEnvironment={setEnvironment}
-        showDividerAfterTitle
-        leftSlot={
-          hasActiveKey ? (
+      {hasActiveKey && (
+        <PaymentsPageHeader
+          title="Subscriptions"
+          showDividerAfterTitle
+          leftSlot={
             <span className="text-xs text-muted-foreground">
               Last synced:{' '}
               {formatLastSynced(
                 activeConnection?.lastSyncedAt ?? activeRazorpayConnection?.lastSyncedAt ?? null
               )}
             </span>
-          ) : null
-        }
-        showSearch={hasActiveKey}
-        searchValue={searchQuery}
-        onSearchChange={setSearchQuery}
-        searchDebounceTime={300}
-        searchPlaceholder="Search subscription"
-        searchInputClassName="w-[280px]"
-      />
+          }
+          showSearch
+          searchValue={searchQuery}
+          onSearchChange={setSearchQuery}
+          searchDebounceTime={300}
+          searchPlaceholder="Search subscription"
+          searchInputClassName="w-[280px]"
+        />
+      )}
 
       <div className="relative min-h-0 flex-1 overflow-y-auto">
         {error ? (
@@ -526,8 +522,8 @@ export default function SubscriptionsPage() {
           <PaymentsKeyMissingState
             provider={provider}
             environment={environment}
-            resourceLabel="subscriptions"
             onConfigure={openPaymentsSettings}
+            onProviderChange={setProvider}
           />
         ) : (
           <div className="flex h-full flex-col">

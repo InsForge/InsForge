@@ -397,7 +397,7 @@ function CountryCell({ code, name }: { code: string | null; name: string | null 
 }
 
 export default function CustomersPage() {
-  const { openPaymentsSettings, provider, setProvider, environment, setEnvironment } =
+  const { openPaymentsSettings, provider, setProvider, environment } =
     useOutletContext<PaymentsOutletContext>();
   const [searchQuery, setSearchQuery] = useState('');
   const [sortColumns, setSortColumns] = useState<SortColumn[]>([
@@ -488,19 +488,17 @@ export default function CustomersPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
-      <PaymentsPageHeader
-        title="Customers"
-        provider={provider}
-        setProvider={setProvider}
-        environment={environment}
-        setEnvironment={setEnvironment}
-        showSearch={hasActiveKey}
-        searchValue={searchQuery}
-        onSearchChange={setSearchQuery}
-        searchDebounceTime={300}
-        searchPlaceholder="Search customer"
-        searchInputClassName="w-[280px]"
-      />
+      {hasActiveKey && (
+        <PaymentsPageHeader
+          title="Customers"
+          showSearch
+          searchValue={searchQuery}
+          onSearchChange={setSearchQuery}
+          searchDebounceTime={300}
+          searchPlaceholder="Search customer"
+          searchInputClassName="w-[280px]"
+        />
+      )}
 
       <div className="relative min-h-0 flex-1 overflow-hidden">
         {error ? (
@@ -511,8 +509,8 @@ export default function CustomersPage() {
           <PaymentsKeyMissingState
             provider={provider}
             environment={environment}
-            resourceLabel="customers"
             onConfigure={openPaymentsSettings}
+            onProviderChange={setProvider}
           />
         ) : (
           <div className="flex h-full flex-col">

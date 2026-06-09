@@ -58,7 +58,17 @@ export default function PaymentsLayout() {
 
   return (
     <div className="flex h-full min-h-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
-      <PaymentsSidebar onOpenSettings={() => setIsSettingsOpen(true)} />
+      <PaymentsSidebar
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        provider={selection.provider}
+        setProvider={(provider: PaymentProvider) =>
+          setSelection((current) => ({ ...current, provider }))
+        }
+        environment={selection.environment}
+        setEnvironment={(environment: PaymentEnvironment) =>
+          setSelection((current) => ({ ...current, environment }))
+        }
+      />
       <div className="min-w-0 flex-1 overflow-hidden">
         <Outlet
           context={{
@@ -75,7 +85,10 @@ export default function PaymentsLayout() {
       <PaymentsSettingsDialog
         open={isSettingsOpen}
         onOpenChange={setIsSettingsOpen}
-        initialProvider={selection.provider}
+        provider={selection.provider}
+        setProvider={(provider: PaymentProvider) =>
+          setSelection((current) => ({ ...current, provider }))
+        }
       />
     </div>
   );

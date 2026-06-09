@@ -315,7 +315,7 @@ function CatalogRow({
 }
 
 export default function CatalogPage() {
-  const { openPaymentsSettings, provider, setProvider, environment, setEnvironment } =
+  const { openPaymentsSettings, provider, setProvider, environment } =
     useOutletContext<PaymentsOutletContext>();
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedProductId, setExpandedProductId] = useState<string | null>(null);
@@ -394,27 +394,23 @@ export default function CatalogPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
-      <PaymentsPageHeader
-        title="Catalog"
-        provider={provider}
-        setProvider={setProvider}
-        environment={environment}
-        setEnvironment={setEnvironment}
-        showDividerAfterTitle
-        leftSlot={
-          hasActiveKey ? (
+      {hasActiveKey && (
+        <PaymentsPageHeader
+          title="Catalog"
+          showDividerAfterTitle
+          leftSlot={
             <span className="text-xs text-muted-foreground">
               Last synced: {formatLastSynced(mostRecentSync)}
             </span>
-          ) : null
-        }
-        showSearch={hasActiveKey}
-        searchValue={searchQuery}
-        onSearchChange={setSearchQuery}
-        searchDebounceTime={300}
-        searchPlaceholder="Search product"
-        searchInputClassName="w-[280px]"
-      />
+          }
+          showSearch
+          searchValue={searchQuery}
+          onSearchChange={setSearchQuery}
+          searchDebounceTime={300}
+          searchPlaceholder="Search product"
+          searchInputClassName="w-[280px]"
+        />
+      )}
 
       <div className="relative min-h-0 flex-1 overflow-y-auto">
         {error ? (
@@ -425,8 +421,8 @@ export default function CatalogPage() {
           <PaymentsKeyMissingState
             provider={provider}
             environment={environment}
-            resourceLabel="catalog"
             onConfigure={openPaymentsSettings}
+            onProviderChange={setProvider}
           />
         ) : (
           <div className="flex h-full flex-col">

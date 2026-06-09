@@ -420,8 +420,7 @@ export class RazorpayConfigService {
     return {
       environment,
       keyType,
-      hasKey: Boolean(raw),
-      maskedKey: raw ? maskRazorpayKey(raw) : null,
+      value: raw,
     };
   }
 

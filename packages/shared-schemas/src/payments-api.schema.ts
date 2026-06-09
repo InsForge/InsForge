@@ -759,15 +759,13 @@ export const stripeWebhookResponseSchema = z.object({
 
 export const stripeKeyConfigSchema = z.object({
   environment: stripeEnvironmentSchema,
-  hasKey: z.boolean(),
-  maskedKey: z.string().nullable(),
+  value: z.string().nullable(),
 });
 
 export const razorpayKeyConfigSchema = z.object({
   environment: razorpayEnvironmentSchema,
   keyType: z.enum(['api_key', 'api_secret', 'webhook_secret']),
-  hasKey: z.boolean(),
-  maskedKey: z.string().nullable(),
+  value: z.string().nullable(),
 });
 
 export const getStripeConfigResponseSchema = z.object({

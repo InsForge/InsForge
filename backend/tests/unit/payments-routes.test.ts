@@ -459,8 +459,7 @@ describe('payments route schemas', () => {
           {
             environment: 'test',
             keyType: 'api_key',
-            hasKey: true,
-            maskedKey: 'rzp_test_****1234',
+            value: 'rzp_test_key1234',
           },
         ],
       })

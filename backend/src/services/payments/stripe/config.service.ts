@@ -214,10 +214,10 @@ export class StripeConfigService {
 
     const connections = await Promise.all(
       environments.map(async (environment) => {
-        const keyConfig = await this.getStripeKeyConfig(environment);
+        const maskedKey = await this.getStripeMaskedKey(environment);
         return this.normalizeConnectionRow(
           rowsByEnvironment.get(environment) ?? this.createEmptyConnection(environment),
-          keyConfig.maskedKey
+          maskedKey
         );
       })
     );
@@ -263,11 +263,11 @@ export class StripeConfigService {
       [environment]
     );
 
-    const keyConfig = await this.getStripeKeyConfig(environment);
+    const maskedKey = await this.getStripeMaskedKey(environment);
     return this.normalizeConnectionRow(
       (result.rows[0] as StripeConnectionRow | undefined) ??
         this.createEmptyConnection(environment),
-      keyConfig.maskedKey
+      maskedKey
     );
   }
 
@@ -335,8 +335,8 @@ export class StripeConfigService {
       [environment, status, error]
     );
 
-    const keyConfig = await this.getStripeKeyConfig(environment);
-    return this.normalizeConnectionRow(result.rows[0] as StripeConnectionRow, keyConfig.maskedKey);
+    const maskedKey = await this.getStripeMaskedKey(environment);
+    return this.normalizeConnectionRow(result.rows[0] as StripeConnectionRow, maskedKey);
   }
 
   async tryRecreateManagedStripeWebhook(
@@ -720,9 +720,13 @@ export class StripeConfigService {
 
     return {
       environment,
-      hasKey: !!secretKey,
-      maskedKey: secretKey ? maskStripeKey(secretKey) : null,
+      value: secretKey,
     };
+  }
+
+  private async getStripeMaskedKey(environment: StripeEnvironment): Promise<string | null> {
+    const secretKey = await this.getStripeSecretKey(environment);
+    return secretKey ? maskStripeKey(secretKey) : null;
   }
 
   private async persistSameAccountStripeSecretKey(
@@ -987,11 +991,8 @@ export class StripeConfigService {
 
       await client.query('COMMIT');
 
-      const keyConfig = await this.getStripeKeyConfig(environment);
-      return this.normalizeConnectionRow(
-        result.rows[0] as StripeConnectionRow,
-        keyConfig.maskedKey
-      );
+      const maskedKey = await this.getStripeMaskedKey(environment);
+      return this.normalizeConnectionRow(result.rows[0] as StripeConnectionRow, maskedKey);
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;

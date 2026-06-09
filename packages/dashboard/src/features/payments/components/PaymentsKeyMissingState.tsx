@@ -1,17 +1,97 @@
 import { Settings } from 'lucide-react';
 import { Button } from '@insforge/ui';
 import type { PaymentEnvironment, PaymentProvider } from '@insforge/shared-schemas';
-import RazorpayLogo from '#assets/logos/razorpay-logo.svg?react';
-import StripeWordmark from '#assets/logos/stripe-wordmark.svg';
+import RazorpayWordmark from '#assets/logos/razorpay-wordmark.svg?react';
+import StripeWordmark from '#assets/logos/stripe-wordmark.svg?react';
+import { cn } from '#lib/utils/utils';
 
-const KEY_NAMES: Record<PaymentProvider, Record<PaymentEnvironment, string>> = {
+interface QuickGuideStep {
+  title: string;
+  description: string;
+}
+
+const PAYMENT_QUICK_GUIDES: Record<
+  PaymentProvider,
+  Record<PaymentEnvironment, QuickGuideStep[]>
+> = {
   stripe: {
-    test: 'STRIPE_TEST_SECRET_KEY',
-    live: 'STRIPE_LIVE_SECRET_KEY',
+    test: [
+      {
+        title: 'Go to Stripe',
+        description: 'Log in to the Stripe Dashboard.',
+      },
+      {
+        title: "Make sure you're in test/sandbox mode",
+        description: 'Turn on View test data, or choose the Sandbox that should own this key.',
+      },
+      {
+        title: 'Go to Developers -> API keys',
+        description: 'Under Standard keys, copy a secret key that starts with sk_test_.',
+      },
+      {
+        title: 'Come back here',
+        description: 'Click the button below to open Payments Settings, then paste the secret key.',
+      },
+    ],
+    live: [
+      {
+        title: 'Go to Stripe',
+        description: 'Log in to the Stripe Dashboard.',
+      },
+      {
+        title: 'Make sure live mode is selected',
+        description: 'Use the live account or mode that should process production payments.',
+      },
+      {
+        title: 'Go to Developers -> API keys',
+        description: 'Under Standard keys, copy an sk_live_ key. New secret keys are shown once.',
+      },
+      {
+        title: 'Come back here',
+        description: 'Click the button below to open Payments Settings, then paste the secret key.',
+      },
+    ],
   },
   razorpay: {
-    test: 'RAZORPAY_TEST_KEY_ID and RAZORPAY_TEST_KEY_SECRET',
-    live: 'RAZORPAY_LIVE_KEY_ID and RAZORPAY_LIVE_KEY_SECRET',
+    test: [
+      {
+        title: 'Go to Razorpay',
+        description: 'Log in to the Razorpay Dashboard.',
+      },
+      {
+        title: 'Switch to Test Mode',
+        description: 'Use the Test Mode toggle before generating test API keys.',
+      },
+      {
+        title: 'Go to Account & Settings -> API Keys',
+        description: 'Under Website and app settings, click Generate Key and save both values.',
+      },
+      {
+        title: 'Come back here',
+        description:
+          'Click the button below to open Payments Settings, then paste the Key ID and Key Secret.',
+      },
+    ],
+    live: [
+      {
+        title: 'Go to Razorpay',
+        description: 'Log in to the Razorpay Dashboard.',
+      },
+      {
+        title: 'Switch to Live Mode',
+        description:
+          'Use the Live Mode toggle. If keys are unavailable, add website details first.',
+      },
+      {
+        title: 'Go to Account & Settings -> API Keys',
+        description: 'Under Website and app settings, generate the keys and save both values.',
+      },
+      {
+        title: 'Come back here',
+        description:
+          'Click the button below to open Payments Settings, then paste the Key ID and Key Secret.',
+      },
+    ],
   },
 };
 
@@ -28,61 +108,159 @@ const MODE_LABELS: Record<PaymentEnvironment, string> = {
 interface PaymentsKeyMissingStateProps {
   provider: PaymentProvider;
   environment: PaymentEnvironment;
-  resourceLabel: string;
   onConfigure: () => void;
+  onProviderChange?: (provider: PaymentProvider) => void;
 }
 
-function PaymentProviderLogo({ provider, label }: { provider: PaymentProvider; label: string }) {
+type WordmarkTone = 'muted' | 'color';
+type WordmarkPlacement = 'guide' | 'switcher';
+
+const WORDMARK_SIZE_CLASSES: Record<PaymentProvider, Record<WordmarkPlacement, string>> = {
+  stripe: {
+    guide: 'w-24',
+    switcher: 'w-14',
+  },
+  razorpay: {
+    guide: 'w-32',
+    switcher: 'w-16',
+  },
+};
+
+function PaymentProviderWordmark({
+  provider,
+  tone,
+  placement,
+}: {
+  provider: PaymentProvider;
+  tone: WordmarkTone;
+  placement: WordmarkPlacement;
+}) {
+  const label = PROVIDER_LABELS[provider];
+  const sizeClassName = WORDMARK_SIZE_CLASSES[provider][placement];
+  const mutedClassName = 'text-[#525252] [&_path]:fill-current [&_polygon]:fill-current';
+
   if (provider === 'stripe') {
-    return <img alt={label} src={StripeWordmark} className="h-20 w-20 object-contain" />;
+    return (
+      <StripeWordmark
+        role="img"
+        aria-label={label}
+        className={cn(
+          'block h-auto',
+          sizeClassName,
+          tone === 'muted' ? 'text-[#525252]' : 'text-[#635BFF]'
+        )}
+      />
+    );
   }
 
   return (
-    <RazorpayLogo
+    <RazorpayWordmark
       role="img"
       aria-label={label}
-      className="h-16 w-36"
-      style={{ fill: 'rgb(var(--foreground))' }}
+      className={cn('block h-auto', sizeClassName, tone === 'muted' ? mutedClassName : undefined)}
     />
+  );
+}
+
+function PaymentProviderCard({
+  provider,
+  onClick,
+}: {
+  provider: PaymentProvider;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="flex h-10 w-20 items-center justify-center rounded bg-white px-2 py-1 transition-opacity hover:opacity-90"
+      onClick={onClick}
+    >
+      <PaymentProviderWordmark provider={provider} tone="color" placement="switcher" />
+    </button>
+  );
+}
+
+function QuickGuideStepItem({
+  step,
+  index,
+  isLast,
+}: {
+  step: QuickGuideStep;
+  index: number;
+  isLast: boolean;
+}) {
+  return (
+    <div className="flex gap-2">
+      <div className="flex shrink-0 flex-col items-center pt-0.5">
+        <div className="flex h-5 min-w-5 items-center justify-center rounded-full bg-alpha-8 px-1.5 text-xs font-medium leading-4 text-foreground">
+          {index + 1}
+        </div>
+        {!isLast && <div className="mt-0.5 w-px flex-1 bg-alpha-8" />}
+      </div>
+      <div className={isLast ? 'min-w-0 flex-1 text-left' : 'min-w-0 flex-1 pb-6 text-left'}>
+        <p className="text-sm font-medium leading-6 text-foreground">{step.title}</p>
+        <p className="mt-1 text-sm leading-6 text-muted-foreground">{step.description}</p>
+      </div>
+    </div>
   );
 }
 
 export function PaymentsKeyMissingState({
   provider,
   environment,
-  resourceLabel,
   onConfigure,
+  onProviderChange,
 }: PaymentsKeyMissingStateProps) {
   const providerLabel = PROVIDER_LABELS[provider];
-  const keyName = KEY_NAMES[provider][environment];
   const modeLabel = MODE_LABELS[environment];
   const keyLabel = provider === 'stripe' ? 'Key' : 'Keys';
+  const quickGuideSteps = PAYMENT_QUICK_GUIDES[provider][environment];
+  const alternativeProvider: PaymentProvider = provider === 'stripe' ? 'razorpay' : 'stripe';
 
   return (
-    <div className="flex h-full min-h-[320px] items-center justify-center px-6">
-      <div className="flex w-full max-w-[420px] flex-col items-center gap-6 text-center">
-        <div className="flex h-20 items-center justify-center">
-          <PaymentProviderLogo provider={provider} label={providerLabel} />
+    <div className="flex h-full min-h-[560px] items-start justify-center overflow-y-auto px-6 py-20">
+      <div className="flex w-full max-w-[520px] flex-col items-center gap-6 text-center">
+        <div className="flex h-10 items-center justify-center">
+          <PaymentProviderWordmark provider={provider} tone="muted" placement="guide" />
         </div>
 
-        <div className="flex w-full flex-col items-center gap-2">
-          <h2 className="text-sm font-medium leading-6 text-foreground">
+        <div className="flex w-full flex-col items-center gap-4">
+          <h2 className="text-xl font-medium leading-7 text-foreground">
             Configure Your {providerLabel} {modeLabel} {keyLabel}
           </h2>
-          <p className="max-w-[320px] text-xs leading-4 text-muted-foreground">
-            Add {keyName} before viewing {environment} {resourceLabel}.
-          </p>
         </div>
 
-        <Button
-          variant="outline"
-          size="default"
-          onClick={onConfigure}
-          className="h-8 rounded px-2.5"
-        >
-          <Settings className="h-4 w-4" />
-          Configure {providerLabel} API keys
-        </Button>
+        <div className="w-full rounded-lg border border-[var(--alpha-8)] bg-card px-6 pb-8 pt-6">
+          {quickGuideSteps.map((step, index) => (
+            <QuickGuideStepItem
+              key={step.title}
+              step={step}
+              index={index}
+              isLast={index === quickGuideSteps.length - 1}
+            />
+          ))}
+          <div className="mt-4 pl-7 text-left">
+            <Button
+              variant="outline"
+              size="default"
+              onClick={onConfigure}
+              className="h-8 rounded px-2.5"
+            >
+              <Settings className="h-4 w-4" />
+              Configure {providerLabel} API keys
+            </Button>
+          </div>
+        </div>
+
+        {onProviderChange ? (
+          <div className="flex flex-col items-center gap-4">
+            <p className="text-xs leading-4 text-muted-foreground">or change a payment provider</p>
+            <PaymentProviderCard
+              provider={alternativeProvider}
+              onClick={() => onProviderChange(alternativeProvider)}
+            />
+          </div>
+        ) : null}
       </div>
     </div>
   );

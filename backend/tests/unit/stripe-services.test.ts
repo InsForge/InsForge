@@ -421,13 +421,11 @@ describe('Stripe payment services', () => {
       keys: [
         {
           environment: 'test',
-          hasKey: true,
-          maskedKey: 'masked:1234',
+          value: 'sk_test_secret1234',
         },
         {
           environment: 'live',
-          hasKey: true,
-          maskedKey: 'masked:5678',
+          value: 'sk_live_secret5678',
         },
       ],
     });

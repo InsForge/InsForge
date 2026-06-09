@@ -244,7 +244,7 @@ function TransactionRow({ payment }: { payment: PaymentTransaction }) {
 }
 
 export default function TransactionsPage() {
-  const { openPaymentsSettings, provider, setProvider, environment, setEnvironment } =
+  const { openPaymentsSettings, provider, setProvider, environment } =
     useOutletContext<PaymentsOutletContext>();
   const [searchQuery, setSearchQuery] = useState('');
   const {
@@ -285,19 +285,17 @@ export default function TransactionsPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
-      <PaymentsPageHeader
-        title="Transactions"
-        provider={provider}
-        setProvider={setProvider}
-        environment={environment}
-        setEnvironment={setEnvironment}
-        showSearch={hasActiveKey}
-        searchValue={searchQuery}
-        onSearchChange={setSearchQuery}
-        searchDebounceTime={300}
-        searchPlaceholder="Search payment"
-        searchInputClassName="w-[280px]"
-      />
+      {hasActiveKey && (
+        <PaymentsPageHeader
+          title="Transactions"
+          showSearch
+          searchValue={searchQuery}
+          onSearchChange={setSearchQuery}
+          searchDebounceTime={300}
+          searchPlaceholder="Search payment"
+          searchInputClassName="w-[280px]"
+        />
+      )}
 
       <div className="relative min-h-0 flex-1 overflow-y-auto">
         {error ? (
@@ -308,8 +306,8 @@ export default function TransactionsPage() {
           <PaymentsKeyMissingState
             provider={provider}
             environment={environment}
-            resourceLabel="transactions"
             onConfigure={openPaymentsSettings}
+            onProviderChange={setProvider}
           />
         ) : (
           <div className="flex h-full flex-col">

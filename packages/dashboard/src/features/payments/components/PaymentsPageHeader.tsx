@@ -1,27 +1,7 @@
-import {
-  SearchInput,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@insforge/ui';
-import type { PaymentEnvironment } from '@insforge/shared-schemas';
+import { SearchInput } from '@insforge/ui';
 import { TableHeader } from '#components';
-import { PaymentProviderSelect } from './PaymentProviderSelect';
-import type { PaymentsOutletContext } from './PaymentsLayout';
 
-const PAYMENT_ENVIRONMENT_LABELS: Record<PaymentEnvironment, string> = {
-  test: 'Test',
-  live: 'Live',
-};
-
-const PAYMENT_ENVIRONMENTS: PaymentEnvironment[] = ['test', 'live'];
-
-interface PaymentsPageHeaderProps extends Pick<
-  PaymentsOutletContext,
-  'provider' | 'setProvider' | 'environment' | 'setEnvironment'
-> {
+interface PaymentsPageHeaderProps {
   title: string;
   leftSlot?: React.ReactNode;
   showDividerAfterTitle?: boolean;
@@ -43,10 +23,6 @@ export function PaymentsPageHeader({
   searchPlaceholder,
   searchInputClassName,
   searchDebounceTime,
-  provider,
-  setProvider,
-  environment,
-  setEnvironment,
 }: PaymentsPageHeaderProps) {
   const shouldShowSearch = showSearch && !!onSearchChange;
 
@@ -70,30 +46,6 @@ export function PaymentsPageHeader({
               className={searchInputClassName ?? 'w-64'}
             />
           )}
-
-          <div className="flex items-center gap-1.5">
-            <span className="text-sm font-medium text-muted-foreground">Provider:</span>
-            <PaymentProviderSelect value={provider} onValueChange={setProvider} />
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <span className="text-sm font-medium text-muted-foreground">Environment:</span>
-            <Select
-              value={environment}
-              onValueChange={(value) => setEnvironment(value as PaymentEnvironment)}
-            >
-              <SelectTrigger className="h-9 w-[108px]" aria-label="Payment environment">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent align="end" className="w-[108px]">
-                {PAYMENT_ENVIRONMENTS.map((item) => (
-                  <SelectItem key={item} value={item}>
-                    {PAYMENT_ENVIRONMENT_LABELS[item]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
         </>
       }
     />

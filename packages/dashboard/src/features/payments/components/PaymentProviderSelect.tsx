@@ -2,6 +2,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { PaymentProvider } from '@insforge/shared-schemas';
 import RazorpayIcon from '#assets/logos/razorpay-icon.png';
 import StripeIcon from '#assets/logos/stripe-icon.svg';
+import { cn } from '#lib/utils/utils';
 
 export const PAYMENT_PROVIDER_LABELS: Record<PaymentProvider, string> = {
   stripe: 'Stripe',
@@ -22,13 +23,37 @@ interface PaymentProviderSelectProps {
   ariaLabel?: string;
 }
 
-function PaymentProviderSelectIcon({ provider }: { provider: PaymentProvider }) {
+function PaymentProviderSelectIcon({
+  provider,
+  className,
+}: {
+  provider: PaymentProvider;
+  className?: string;
+}) {
+  if (provider === 'razorpay') {
+    return (
+      <span
+        className={cn(
+          'flex size-5 shrink-0 items-center justify-center rounded bg-white p-0.5',
+          className
+        )}
+      >
+        <img
+          src={PAYMENT_PROVIDER_ICONS[provider]}
+          alt=""
+          aria-hidden="true"
+          className="size-4 object-contain"
+        />
+      </span>
+    );
+  }
+
   return (
     <img
       src={PAYMENT_PROVIDER_ICONS[provider]}
       alt=""
       aria-hidden="true"
-      className="size-4 shrink-0 rounded-[3px] object-contain"
+      className={cn('size-5 shrink-0 rounded-[3px] object-contain', className)}
     />
   );
 }
@@ -46,7 +71,7 @@ export function PaymentProviderSelect({
       onValueChange={(nextValue) => onValueChange(nextValue as PaymentProvider)}
     >
       <SelectTrigger className={triggerClassName} aria-label={ariaLabel}>
-        <span className="!flex min-w-0 items-center gap-2">
+        <span className="!flex min-w-0 items-center gap-2.5">
           <PaymentProviderSelectIcon provider={value} />
           <SelectValue />
         </span>
@@ -56,7 +81,7 @@ export function PaymentProviderSelect({
           <SelectItem
             key={provider}
             value={provider}
-            icon={<PaymentProviderSelectIcon provider={provider} />}
+            icon={<PaymentProviderSelectIcon provider={provider} className="mr-1.5" />}
           >
             {PAYMENT_PROVIDER_LABELS[provider]}
           </SelectItem>

@@ -58,6 +58,7 @@ KPIs
 linode
 localStorage
 loopback
+lookups
 mcp
 Multiplatform
 namespace
