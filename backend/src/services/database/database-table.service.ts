@@ -279,8 +279,6 @@ export class DatabaseTableService {
           `
           );
 
-
-
           // Update metadata
           // Metadata is now updated on-demand
 
@@ -731,8 +729,6 @@ export class DatabaseTableService {
           await client.query(
             `DROP TABLE IF EXISTS ${quoteQualifiedName(schemaName, table)} CASCADE`
           );
-
-
 
           // Update metadata
           // Metadata is now updated on-demand
