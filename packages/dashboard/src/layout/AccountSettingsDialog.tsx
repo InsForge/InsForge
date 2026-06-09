@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button, Input } from '@insforge/ui';
 import { adminService } from '#features/login/services/admin-management.service';
 import { useAuth } from '#lib/contexts/AuthContext';
@@ -16,6 +16,34 @@ export default function AccountSettingsDialog({ open, onOpenChange }: AccountSet
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!open) {
+      setOldPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setError('');
+      setSuccess('');
+      setLoading(false);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    }
+  }, [open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,18 +64,29 @@ export default function AccountSettingsDialog({ open, onOpenChange }: AccountSet
 
     try {
       await adminService.changePassword({ oldPassword, newPassword });
+      if (!isMountedRef.current) {
+        return;
+      }
       setSuccess('Password changed successfully!');
-      setTimeout(() => {
+      timeoutRef.current = setTimeout(() => {
+        if (!isMountedRef.current) {
+          return;
+        }
         setOldPassword('');
         setNewPassword('');
         setConfirmPassword('');
         onOpenChange(false);
       }, 1500);
     } catch (err: unknown) {
+      if (!isMountedRef.current) {
+        return;
+      }
       const errorResponse = err as { response?: { data?: { error?: string } } };
       setError(errorResponse.response?.data?.error || 'Failed to change password');
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 

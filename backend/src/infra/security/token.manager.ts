@@ -21,6 +21,8 @@ export interface RefreshTokenPayload {
   iss: string;
   csrfNonce: string;
   sessionType: RefreshSessionType;
+  isRoot?: boolean;
+  adminId?: string;
 }
 
 export interface RefreshTokenWithCsrf {
@@ -89,9 +91,17 @@ export class TokenManager {
   generateRefreshToken(
     userId: string,
     sessionType: RefreshSessionType,
-    csrfNonce = this.generateCsrfNonce()
+    csrfNonce = this.generateCsrfNonce(),
+    isRoot?: boolean,
+    adminId?: string
   ): string {
-    const refreshPayload = this.createRefreshTokenPayload(userId, sessionType, csrfNonce);
+    const refreshPayload = this.createRefreshTokenPayload(
+      userId,
+      sessionType,
+      csrfNonce,
+      isRoot,
+      adminId
+    );
     return jwt.sign(refreshPayload, JWT_SECRET, {
       algorithm: 'HS256',
       expiresIn: REFRESH_TOKEN_EXPIRES_IN,
@@ -101,9 +111,17 @@ export class TokenManager {
   generateRefreshTokenWithCsrf(
     userId: string,
     sessionType: RefreshSessionType,
-    csrfNonce = this.generateCsrfNonce()
+    csrfNonce = this.generateCsrfNonce(),
+    isRoot?: boolean,
+    adminId?: string
   ): RefreshTokenWithCsrf {
-    const refreshPayload = this.createRefreshTokenPayload(userId, sessionType, csrfNonce);
+    const refreshPayload = this.createRefreshTokenPayload(
+      userId,
+      sessionType,
+      csrfNonce,
+      isRoot,
+      adminId
+    );
     return {
       refreshToken: jwt.sign(refreshPayload, JWT_SECRET, {
         algorithm: 'HS256',
@@ -181,6 +199,8 @@ export class TokenManager {
         sub: decoded.sub,
         email: decoded.email,
         role: decoded.role || 'authenticated',
+        isRoot: decoded.isRoot,
+        adminId: decoded.adminId,
       };
     } catch {
       throw new AppError('Invalid token', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
@@ -265,7 +285,9 @@ export class TokenManager {
   private createRefreshTokenPayload(
     userId: string,
     sessionType: RefreshSessionType,
-    csrfNonce: string
+    csrfNonce: string,
+    isRoot?: boolean,
+    adminId?: string
   ): RefreshTokenPayload {
     return {
       sub: userId,
@@ -273,6 +295,8 @@ export class TokenManager {
       iss: 'insforge',
       csrfNonce,
       sessionType,
+      ...(isRoot !== undefined ? { isRoot } : {}),
+      ...(adminId !== undefined ? { adminId } : {}),
     };
   }
 }

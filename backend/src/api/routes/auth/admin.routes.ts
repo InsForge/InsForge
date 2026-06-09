@@ -53,7 +53,10 @@ router.post('/sessions/exchange', async (req: Request, res: Response, next: Next
     const tokenManager = TokenManager.getInstance();
     const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
       result.admin.sub,
-      'admin'
+      'admin',
+      undefined,
+      result.admin.isRoot,
+      result.admin.id
     );
     setAdminRefreshTokenCookie(res, refreshToken);
 
@@ -88,7 +91,10 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
     const tokenManager = TokenManager.getInstance();
     const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
       result.admin.sub,
-      'admin'
+      'admin',
+      undefined,
+      result.admin.isRoot,
+      result.admin.id
     );
     setAdminRefreshTokenCookie(res, refreshToken);
 
@@ -148,14 +154,24 @@ router.post('/refresh', (req: Request, res: Response, next: NextFunction) => {
     const newAccessToken = tokenManager.generateAccessToken({
       sub: payload.sub,
       role: 'project_admin',
+      isRoot: payload.isRoot,
+      adminId: payload.adminId,
     });
     const { refreshToken: newRefreshToken, csrfToken: newCsrfToken } =
-      tokenManager.generateRefreshTokenWithCsrf(payload.sub, 'admin', payload.csrfNonce);
+      tokenManager.generateRefreshTokenWithCsrf(
+        payload.sub,
+        'admin',
+        payload.csrfNonce,
+        payload.isRoot,
+        payload.adminId
+      );
     setAdminRefreshTokenCookie(res, newRefreshToken);
 
     successResponse(res, {
       admin: {
         sub: payload.sub,
+        isRoot: payload.isRoot,
+        id: payload.adminId,
       },
       accessToken: newAccessToken,
       csrfToken: newCsrfToken,

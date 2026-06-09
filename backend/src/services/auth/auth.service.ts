@@ -666,18 +666,20 @@ export class AuthService {
     }
 
     const sub = `local:${admin.username}`;
+    const isRoot = admin.is_root || false;
     const accessToken = this.tokenManager.generateAccessToken({
       sub,
       role: 'project_admin',
+      isRoot,
+      adminId: admin.id,
     });
-
-    const isRoot = admin.is_root || false;
 
     return {
       admin: {
         sub,
         username: admin.username,
         isRoot,
+        id: admin.id,
       },
       accessToken,
     };
