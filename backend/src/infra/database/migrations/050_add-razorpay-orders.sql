@@ -34,5 +34,8 @@ GRANT INSERT, SELECT, UPDATE, DELETE ON payments.razorpay_subscription_attempts 
 ALTER TABLE payments.razorpay_subscription_attempts ENABLE ROW LEVEL SECURITY;
 
 -- Down Migration
+ALTER TABLE payments.razorpay_orders DROP COLUMN IF EXISTS idempotency_key;
+ALTER TABLE payments.razorpay_orders DROP COLUMN IF EXISTS customer_id;
+DROP INDEX IF EXISTS idx_payments_razorpay_orders_environment_idempotency;
+DROP INDEX IF EXISTS idx_payments_razorpay_orders_environment_customer;
 DROP TABLE IF EXISTS payments.razorpay_subscription_attempts;
-DROP TABLE IF EXISTS payments.razorpay_orders;
