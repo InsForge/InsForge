@@ -145,9 +145,14 @@ export class RazorpayCheckoutService {
             ERROR_CODES.PAYMENT_CHECKOUT_ALREADY_EXISTS
           );
         }
-        // Idempotent replay: return the already-created order.
-        const keyId = await this.resolveKeyId(input.environment);
-        return { attemptId: existingOrder.id, order: existingOrder, keyId };
+        // If status is not initialized, the order was successfully created with Razorpay.
+        // Return it for the idempotent replay.
+        if (existingOrder.status !== 'initialized') {
+          const keyId = await this.resolveKeyId(input.environment);
+          return { attemptId: existingOrder.id, order: existingOrder, keyId };
+        }
+        // If status is 'initialized', the previous request dropped before Razorpay
+        // returned an order ID. We fall through to call Razorpay using the existing record.
       }
 
       const notes = this.buildNotes(input.metadata, input.subject, id);
