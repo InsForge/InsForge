@@ -529,48 +529,51 @@ function RazorpayKeysTabContent({
                   )}
 
                   {(hasKeys || hasPendingInput) && (
-                    <div className="flex flex-wrap items-center justify-between gap-2 mt-2">
-                      <div className="min-w-0 flex-1">
-                        {envIdKey?.maskedKey ? (
-                          <span className="truncate font-mono text-xs text-muted-foreground">
-                            Key ID {envIdKey.maskedKey}
-                            {envSecretKey?.hasKey ? ' / Key Secret configured' : ''}
-                          </span>
-                        ) : hasKeys ? (
-                          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <CheckCircle2 className="h-3 w-3" />
-                            Configured in InsForge secret store
-                          </span>
-                        ) : null}
-                      </div>
+                    <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-3 mt-2">
+                      <div /> {/* Empty spacer for the label column */}
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          {envIdKey?.maskedKey ? (
+                            <span className="truncate font-mono text-xs text-muted-foreground">
+                              Key ID {envIdKey.maskedKey}
+                              {envSecretKey?.hasKey ? ' / Key Secret configured' : ''}
+                            </span>
+                          ) : hasKeys ? (
+                            <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                              <CheckCircle2 className="h-3 w-3" />
+                              Configured in InsForge secret store
+                            </span>
+                          ) : null}
+                        </div>
 
-                      <div className="flex items-center gap-2">
-                        {hasKeys && (
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => onRemove(environment)}
-                            disabled={isBusy}
-                            className="h-7 px-2"
-                          >
-                            Remove
-                          </Button>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {hasKeys && (
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => onRemove(environment)}
+                              disabled={isBusy}
+                              className="h-7 px-2"
+                            >
+                              Remove
+                            </Button>
+                          )}
 
-                        {hasPendingInput && (
-                          <Button
-                            type="button"
-                            variant="primary"
-                            size="sm"
-                            onClick={() => onSave(environment)}
-                            disabled={isBusy}
-                            className="h-7 px-2"
-                          >
-                            {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                            Save
-                          </Button>
-                        )}
+                          {hasPendingInput && (
+                            <Button
+                              type="button"
+                              variant="primary"
+                              size="sm"
+                              onClick={() => onSave(environment)}
+                              disabled={isBusy}
+                              className="h-7 px-2"
+                            >
+                              {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                              Save
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )}
