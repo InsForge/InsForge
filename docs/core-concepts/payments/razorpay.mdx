@@ -19,6 +19,8 @@ Use the Razorpay integration when you want Razorpay Orders, Razorpay Checkout, I
 
 Razorpay does not have a Stripe Billing Portal equivalent. InsForge exposes backend routes to cancel, pause, and resume subscriptions after checking the caller against `payments.razorpay_subscriptions` RLS `UPDATE` policies.
 
+For one-time products, Razorpay Orders can be created with only an amount, currency, and receipt. Still, prefer creating Razorpay Items for sellable products so the catalog is visible in InsForge and Razorpay after sync. Treat Orders as payment attempts, not as your product catalog.
+
 ## Setup
 
 Configure `test` and `live` Razorpay Key ID and Key Secret in Dashboard -> Payments -> Settings or through the admin API. InsForge generates a webhook signing secret if one does not already exist.
@@ -72,7 +74,9 @@ const { data, error } = await insforge.payments.razorpay.createOrder('test', {
 if (error) throw error;
 ```
 
-The SDK wraps `POST /api/payments/razorpay/{environment}/orders`. The response includes `checkoutOptions`. Load `https://checkout.razorpay.com/v1/checkout.js` in the frontend and pass those options to `new Razorpay(options).open()`.
+The SDK wraps `POST /api/payments/razorpay/{environment}/orders`. The response includes `checkoutOptions` with Razorpay Checkout-native fields such as `key` and `order_id`. Load `https://checkout.razorpay.com/v1/checkout.js` in the frontend and pass those options to `new Razorpay(options).open()`.
+
+InsForge copies request `metadata` to Razorpay `notes`. If your fulfillment trigger reads `notes.order_id`, pass `metadata: { order_id: ... }` when creating the Order or Subscription.
 
 After Razorpay Checkout returns `razorpay_order_id`, `razorpay_payment_id`, and `razorpay_signature`, verify the signature on the backend:
 
@@ -101,7 +105,7 @@ const { data, error } = await insforge.payments.razorpay.createSubscription('tes
 if (error) throw error;
 ```
 
-The SDK wraps `POST /api/payments/razorpay/{environment}/subscriptions`. The response includes `checkoutOptions.subscriptionId`. Open Razorpay Checkout with that subscription ID. After Checkout returns `razorpay_subscription_id`, `razorpay_payment_id`, and `razorpay_signature`, verify the authorization payment:
+The SDK wraps `POST /api/payments/razorpay/{environment}/subscriptions`. The response includes `checkoutOptions.subscription_id`. Open Razorpay Checkout with that subscription ID. After Checkout returns `razorpay_subscription_id`, `razorpay_payment_id`, and `razorpay_signature`, verify the authorization payment:
 
 ```typescript
 await insforge.payments.razorpay.verifySubscription('test', {
@@ -122,11 +126,11 @@ await insforge.payments.razorpay.pauseSubscription('test', 'sub_123');
 await insforge.payments.razorpay.resumeSubscription('test', 'sub_123');
 ```
 
-Subscription creation evaluates `INSERT` policies on `payments.razorpay_subscriptions`. Cancel, pause, and resume evaluate `UPDATE` policies on the same table. Grant users only the table access needed for policy checks; provider mutations still run through the backend.
+Subscription creation evaluates `INSERT` policies on `payments.razorpay_subscriptions`. Cancel, pause, and resume evaluate `UPDATE` policies on the same table. PostgreSQL also applies `SELECT` policies to rows returned by `INSERT/UPDATE ... RETURNING`, so make the same subject visible to the caller when a policy probe needs to return the row. Grant users only the table access needed for policy checks; provider mutations still run through the backend.
 
 ## Webhooks and fulfillment
 
-Razorpay's Checkout callback and signature verification are not a replacement for webhooks. Use `payments.webhook_events` for fulfillment triggers.
+Razorpay's Checkout callback and signature verification are not a replacement for webhooks. Use `payments.webhook_events` for fulfillment triggers. Do not attach fulfillment triggers to provider mirror tables such as `payments.razorpay_subscriptions`; sync and webhook projection can update those rows independently of provider event delivery.
 
 ```sql
 CREATE OR REPLACE FUNCTION public.fulfill_razorpay_order()

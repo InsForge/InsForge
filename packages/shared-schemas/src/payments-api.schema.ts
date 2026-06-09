@@ -119,15 +119,11 @@ const razorpayCheckoutPrefillSchema = z
 
 const razorpayCheckoutOptionsSchema = z
   .object({
-    keyId: z.string(),
-    amount: z.number().int().positive().optional(),
-    currency: z.string().optional(),
-    orderId: z.string().nullable().optional(),
-    subscriptionId: z.string().nullable().optional(),
+    key: z.string(),
     name: z.string().nullable().optional(),
     description: z.string().nullable().optional(),
     prefill: razorpayCheckoutPrefillSchema,
-    callbackUrl: z.string().nullable().optional(),
+    callback_url: z.string().nullable().optional(),
   })
   .strict();
 
@@ -464,7 +460,10 @@ const createRazorpayOrderFields = {
   customerEmail: z.string().trim().email().nullable().optional(),
   customerContact: z.string().trim().min(1).max(32).nullable().optional(),
   callbackUrl: z.string().trim().url('Callback URL must be a valid URL').nullable().optional(),
-  metadata: z.record(z.string()).optional(),
+  metadata: z
+    .record(z.string())
+    .describe('Copied to Razorpay notes for webhook fulfillment lookup.')
+    .optional(),
 };
 
 export const createRazorpayOrderBodySchema = z
@@ -491,7 +490,7 @@ export const createRazorpayOrderResponseSchema = z.object({
   checkoutOptions: razorpayCheckoutOptionsSchema.extend({
     amount: z.number().int().positive(),
     currency: z.string(),
-    orderId: z.string(),
+    order_id: z.string(),
   }),
 });
 
@@ -530,7 +529,10 @@ const createRazorpaySubscriptionFields = {
   customerEmail: z.string().trim().email().nullable().optional(),
   customerContact: z.string().trim().min(1).max(32).nullable().optional(),
   callbackUrl: z.string().trim().url('Callback URL must be a valid URL').nullable().optional(),
-  metadata: z.record(z.string()).optional(),
+  metadata: z
+    .record(z.string())
+    .describe('Copied to Razorpay subscription notes for webhook fulfillment lookup.')
+    .optional(),
 };
 
 function hasSubscriptionEnd(value: { totalCount?: number; endAt?: number }) {
@@ -565,7 +567,7 @@ export const createRazorpaySubscriptionRequestSchema = z
 export const createRazorpaySubscriptionResponseSchema = z.object({
   subscription: razorpaySubscriptionSchema,
   checkoutOptions: razorpayCheckoutOptionsSchema.extend({
-    subscriptionId: z.string(),
+    subscription_id: z.string(),
   }),
 });
 

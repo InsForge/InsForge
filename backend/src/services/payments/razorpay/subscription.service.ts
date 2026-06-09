@@ -6,6 +6,7 @@ import { AppError } from '@/utils/errors.js';
 import {
   addBillingSubjectToMetadata,
   getBillingSubjectFromMetadata,
+  isPostgresPermissionError,
 } from '@/services/payments/helpers.js';
 import { withUserContext } from '@/services/database/user-context.service.js';
 import { RazorpayConfigService } from '@/services/payments/razorpay/config.service.js';
@@ -155,18 +156,25 @@ export class RazorpaySubscriptionService {
     storedSubscription: ListRazorpaySubscriptionsResponse['subscriptions'][number],
     input: CreateRazorpaySubscriptionRequest
   ): CreateRazorpaySubscriptionResponse {
+    const prefill: { name?: string; email?: string; contact?: string } = {};
+    if (input.customerName) {
+      prefill.name = input.customerName;
+    }
+    if (input.customerEmail) {
+      prefill.email = input.customerEmail;
+    }
+    if (input.customerContact) {
+      prefill.contact = input.customerContact;
+    }
+
     return {
       subscription: storedSubscription,
       checkoutOptions: {
-        keyId,
-        subscriptionId: storedSubscription.subscriptionId,
-        description: input.description ?? null,
-        callbackUrl: input.callbackUrl ?? null,
-        prefill: {
-          name: input.customerName ?? null,
-          email: input.customerEmail ?? null,
-          contact: input.customerContact ?? null,
-        },
+        key: keyId,
+        subscription_id: storedSubscription.subscriptionId,
+        ...(input.description ? { description: input.description } : {}),
+        ...(input.callbackUrl ? { callback_url: input.callbackUrl } : {}),
+        prefill,
       },
     };
   }
@@ -507,7 +515,7 @@ export class RazorpaySubscriptionService {
     error: unknown,
     action: 'creation' | 'management'
   ): Error {
-    if (error instanceof Error && 'code' in error && error.code === '42501') {
+    if (isPostgresPermissionError(error)) {
       return new AppError(
         `Razorpay subscription ${action} is not allowed by payments.razorpay_subscriptions RLS policies`,
         403,

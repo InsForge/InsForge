@@ -156,6 +156,7 @@ Use `payments.transactions` for dashboard/reporting only.
 
 - Add RLS or server-side membership checks before exposing checkout or portal flows for shared subjects.
 - Consider RLS on `payments.stripe_checkout_sessions` and `payments.stripe_customer_portal_sessions`.
+- PostgreSQL applies `SELECT` policies to rows returned by `INSERT ... RETURNING` and idempotent retry lookups. If checkout creation is denied even though an `INSERT` policy exists, add matching `SELECT` visibility for the same billing subject and idempotency key.
 - Do not expose `payments.customers`, `payments.transactions`, `payments.stripe_subscriptions`, or `payments.stripe_subscription_items` directly to end users.
 - Do not write Stripe-managed payments tables directly. Use the Payments API, Stripe webhooks, or app-owned trigger targets.
 - Metadata keys starting with `insforge_` are reserved.

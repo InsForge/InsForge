@@ -78,13 +78,21 @@ export class RazorpayWebhookService {
     }
 
     const provider = await this.configService.createRazorpayProvider(environment);
-    const rawBody = rawBodyBuffer.toString('utf8');
-    const isValid = provider.verifyWebhookSignature(rawBody, signature, webhookSecret);
+    const isValid = provider.verifyWebhookSignature(rawBodyBuffer, signature, webhookSecret);
     if (!isValid) {
-      throw new AppError('Invalid Razorpay webhook signature', 400, ERROR_CODES.INVALID_INPUT);
+      logger.warn('Invalid Razorpay webhook signature', {
+        environment,
+        rawBodyBytes: rawBodyBuffer.length,
+        signatureLength: signature.length,
+      });
+      throw new AppError(
+        `Invalid Razorpay webhook signature. Confirm the Razorpay Dashboard webhook secret matches the ${environment} InsForge webhook setup and the webhook URL points to /api/webhooks/razorpay/${environment}.`,
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
     }
 
-    const payload = this.parseWebhookPayload(rawBody);
+    const payload = this.parseWebhookPayload(rawBodyBuffer.toString('utf8'));
     const eventId = this.getWebhookEventId(payload, headerEventId);
     const eventStart = await this.recordWebhookEventStart(
       environment,

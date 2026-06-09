@@ -314,9 +314,10 @@ export class RazorpayProvider {
 
   /**
    * Verify Razorpay webhook signature.
-   * Razorpay signs webhooks using HMAC-SHA256 of the raw body.
+   * Razorpay signs webhooks using HMAC-SHA256 of the raw body, so the
+   * undecoded request bytes must be hashed as-is.
    */
-  verifyWebhookSignature(rawBody: string, signature: string, webhookSecret: string): boolean {
+  verifyWebhookSignature(rawBody: Buffer, signature: string, webhookSecret: string): boolean {
     if (!RAZORPAY_SHA256_SIGNATURE_HEX.test(signature)) {
       return false;
     }

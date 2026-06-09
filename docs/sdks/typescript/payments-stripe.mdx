@@ -200,6 +200,8 @@ The SDK methods call runtime routes using the current InsForge token. The backen
 
 If users can pass shared subjects such as teams or organizations, add an authorization boundary before exposing checkout, subscription, or customer portal UI. For example, enable RLS on the Stripe runtime tables with policies that check team membership, or call Payments through your own server endpoint that checks membership first.
 
+PostgreSQL applies `SELECT` policies to rows returned by `INSERT ... RETURNING` and to idempotent retry lookups. If an RLS error appears even though an `INSERT` policy exists, add a matching `SELECT` policy for the same billing subject and idempotency key.
+
 <Warning>
   Do not let users submit arbitrary `subject.type` and `subject.id` values unless
   your app checks that they can manage that billing subject.

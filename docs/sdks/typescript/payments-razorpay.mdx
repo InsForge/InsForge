@@ -69,6 +69,8 @@ function loadRazorpayCheckout(): Promise<void> {
 
 Create an app-owned pending order first. Then create the Razorpay Order through InsForge:
 
+Razorpay Orders can be amount-only, but creating Razorpay Items for one-time sellable products is a good practice because synced Items make the catalog visible in InsForge and Razorpay. Treat Orders as payment attempts.
+
 ```typescript
 type CreateRazorpayOrderResponse = {
   order: {
@@ -77,13 +79,13 @@ type CreateRazorpayOrderResponse = {
     status: string;
   };
   checkoutOptions: {
-    keyId: string;
+    key: string;
     amount: number;
     currency: string;
-    orderId: string;
+    order_id: string;
     name?: string | null;
     description?: string | null;
-    callbackUrl?: string | null;
+    callback_url?: string | null;
     prefill: {
       name?: string | null;
       email?: string | null;
@@ -106,6 +108,8 @@ if (error) throw error;
 if (!orderResponse) throw new Error('Razorpay order creation returned no data');
 ```
 
+InsForge copies `metadata` to Razorpay `notes`. If your webhook trigger reads `notes.order_id`, pass `metadata: { order_id: ... }` when creating the Order.
+
 Open Razorpay Checkout and verify the returned signature:
 
 ```typescript
@@ -117,12 +121,7 @@ if (!RazorpayCheckout) {
 }
 
 const checkout = new RazorpayCheckout({
-  key: orderResponse.checkoutOptions.keyId,
-  amount: orderResponse.checkoutOptions.amount,
-  currency: orderResponse.checkoutOptions.currency,
-  order_id: orderResponse.checkoutOptions.orderId,
-  description: orderResponse.checkoutOptions.description ?? undefined,
-  prefill: orderResponse.checkoutOptions.prefill,
+  ...orderResponse.checkoutOptions,
   handler: async (response: {
     razorpay_order_id: string;
     razorpay_payment_id: string;
@@ -154,11 +153,11 @@ type CreateRazorpaySubscriptionResponse = {
     status: string;
   };
   checkoutOptions: {
-    keyId: string;
-    subscriptionId: string;
+    key: string;
+    subscription_id: string;
     name?: string | null;
     description?: string | null;
-    callbackUrl?: string | null;
+    callback_url?: string | null;
     prefill: {
       name?: string | null;
       email?: string | null;
@@ -179,6 +178,8 @@ if (error) throw error;
 if (!subscriptionResponse) throw new Error('Razorpay subscription creation returned no data');
 ```
 
+InsForge copies `metadata` to Razorpay subscription `notes`, which webhook triggers can read later.
+
 Open Razorpay Checkout with the returned subscription ID:
 
 ```typescript
@@ -190,10 +191,7 @@ if (!RazorpayCheckout) {
 }
 
 const checkout = new RazorpayCheckout({
-  key: subscriptionResponse.checkoutOptions.keyId,
-  subscription_id: subscriptionResponse.checkoutOptions.subscriptionId,
-  description: subscriptionResponse.checkoutOptions.description ?? undefined,
-  prefill: subscriptionResponse.checkoutOptions.prefill,
+  ...subscriptionResponse.checkoutOptions,
   handler: async (response: {
     razorpay_subscription_id: string;
     razorpay_payment_id: string;
@@ -226,11 +224,11 @@ await insforge.payments.razorpay.pauseSubscription('test', 'sub_123');
 await insforge.payments.razorpay.resumeSubscription('test', 'sub_123');
 ```
 
-Subscription creation checks `INSERT` policies on `payments.razorpay_subscriptions`. Cancel, pause, and resume check `UPDATE` policies on the same table. Add app-specific RLS or server-side membership checks before exposing these controls for shared subjects.
+Subscription creation checks `INSERT` policies on `payments.razorpay_subscriptions`. Cancel, pause, and resume check `UPDATE` policies on the same table. PostgreSQL also applies `SELECT` policies to rows returned by `INSERT/UPDATE ... RETURNING`, so add matching `SELECT` visibility for the same billing subject when a policy probe needs to return the row. Add app-specific RLS or server-side membership checks before exposing these controls for shared subjects.
 
 ## Fulfillment
 
-Do not mark orders paid, grant credits, or activate subscriptions from the Checkout handler alone. Use verified Razorpay webhook events in `payments.webhook_events`.
+Do not mark orders paid, grant credits, or activate subscriptions from the Checkout handler alone. Use verified Razorpay webhook events in `payments.webhook_events`. Do not attach fulfillment triggers to provider mirror tables such as `payments.razorpay_subscriptions`.
 
 Create app-owned fulfillment tables with RLS, then update them from webhook triggers. See [Razorpay Payments](/core-concepts/payments/razorpay) for a trigger example.
 
@@ -240,5 +238,5 @@ Pass `'test'` as the first SDK argument while developing. Only switch to `'live'
 
 <Warning>
   Never put Razorpay Key Secret or webhook secret in frontend code. The frontend
-  only receives the Razorpay Key ID inside `checkoutOptions`.
+  only receives the public Razorpay Key ID as `checkoutOptions.key`.
 </Warning>

@@ -139,10 +139,10 @@ describe('RazorpayOrderService', () => {
     );
     expect(result.checkoutOptions).toEqual(
       expect.objectContaining({
-        keyId: 'rzp_test_key',
+        key: 'rzp_test_key',
         amount: 50000,
         currency: 'INR',
-        orderId: 'order_123',
+        order_id: 'order_123',
         description: 'Pro upgrade',
       })
     );

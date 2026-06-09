@@ -3067,7 +3067,9 @@ components:
           format: uri
           nullable: true
         metadata:
-          $ref: '#/components/schemas/Metadata'
+          description: Copied to Razorpay `notes`. Use stable app identifiers such as `order_id` for webhook fulfillment triggers.
+          allOf:
+            - $ref: '#/components/schemas/Metadata'
 
     CreateRazorpayOrderResponse:
       type: object
@@ -3080,14 +3082,14 @@ components:
         checkoutOptions:
           type: object
           required:
-            - keyId
+            - key
             - amount
             - currency
-            - orderId
+            - order_id
             - prefill
           additionalProperties: false
           properties:
-            keyId:
+            key:
               type: string
               example: "rzp_test_xxx"
             amount:
@@ -3096,7 +3098,7 @@ components:
             currency:
               type: string
               example: "INR"
-            orderId:
+            order_id:
               type: string
               example: "order_123"
             name:
@@ -3105,7 +3107,7 @@ components:
             description:
               type: string
               nullable: true
-            callbackUrl:
+            callback_url:
               type: string
               nullable: true
             prefill:
@@ -3326,7 +3328,9 @@ components:
           format: uri
           nullable: true
         metadata:
-          $ref: '#/components/schemas/Metadata'
+          description: Copied to Razorpay subscription `notes` and available in webhook payloads.
+          allOf:
+            - $ref: '#/components/schemas/Metadata'
 
     CreateRazorpaySubscriptionResponse:
       type: object
@@ -3339,15 +3343,15 @@ components:
         checkoutOptions:
           type: object
           required:
-            - keyId
-            - subscriptionId
+            - key
+            - subscription_id
             - prefill
           additionalProperties: false
           properties:
-            keyId:
+            key:
               type: string
               example: "rzp_test_xxx"
-            subscriptionId:
+            subscription_id:
               type: string
               example: "sub_123"
             name:
@@ -3356,7 +3360,7 @@ components:
             description:
               type: string
               nullable: true
-            callbackUrl:
+            callback_url:
               type: string
               nullable: true
             prefill:

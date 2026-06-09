@@ -148,6 +148,10 @@ describe('payments multi-provider migration', () => {
     expect(sql).toMatch(/payments\.stripe_prices/i);
     expect(sql).toMatch(/payments\.stripe_subscriptions/i);
     expect(sql).toMatch(/payments\.stripe_subscription_items/i);
+    expect(sql).not.toMatch(
+      /GRANT SELECT ON payments\.stripe_subscriptions, payments\.stripe_subscription_items\s+TO project_admin/i
+    );
+    expect(sql).toMatch(/REVOKE TRIGGER ON payments\.stripe_subscriptions FROM project_admin/i);
   });
 
   it('creates provider-native catalog and subscription indexes without shared catalog indexes', () => {
@@ -216,6 +220,7 @@ describe('payments multi-provider migration', () => {
     expect(sql).toMatch(
       /CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_webhook_events_provider_event/i
     );
+    expect(sql).not.toMatch(/GRANT SELECT ON payments\.webhook_events TO project_admin/i);
     expect(sql).toMatch(/GRANT TRIGGER ON payments\.webhook_events TO project_admin/i);
     expect(sql).toMatch(/GRANT SELECT ON payments\.transactions TO project_admin/i);
     expect(sql).not.toMatch(/GRANT SELECT, TRIGGER ON payments\.transactions TO project_admin/i);
@@ -284,8 +289,9 @@ describe('payments multi-provider migration', () => {
     expect(sql).toMatch(
       /GRANT INSERT, SELECT ON payments\.razorpay_orders TO anon, authenticated, project_admin/i
     );
-    expect(sql).toMatch(
-      /GRANT INSERT, UPDATE, TRIGGER ON payments\.razorpay_orders TO project_admin/i
+    expect(sql).toMatch(/GRANT INSERT, UPDATE ON payments\.razorpay_orders TO project_admin/i);
+    expect(sql).not.toMatch(
+      /GRANT [^;]*TRIGGER[^;]*ON payments\.razorpay_orders TO project_admin/i
     );
     expect(sql).toMatch(
       /CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_razorpay_orders_environment_order[\s\S]*WHERE order_id IS NOT NULL/i
@@ -309,8 +315,9 @@ describe('payments multi-provider migration', () => {
     expect(sql).toMatch(
       /GRANT UPDATE \(updated_at\) ON payments\.razorpay_subscriptions TO authenticated/i
     );
-    expect(sql).toMatch(
-      /GRANT UPDATE, TRIGGER ON payments\.razorpay_subscriptions TO project_admin/i
+    expect(sql).toMatch(/GRANT UPDATE ON payments\.razorpay_subscriptions TO project_admin/i);
+    expect(sql).not.toMatch(
+      /GRANT [^;]*TRIGGER[^;]*ON payments\.razorpay_subscriptions TO project_admin/i
     );
     expect(sql).not.toMatch(
       /GRANT INSERT, SELECT, UPDATE ON payments\.razorpay_subscriptions TO anon/i

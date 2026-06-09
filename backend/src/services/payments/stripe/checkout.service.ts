@@ -12,6 +12,7 @@ import {
   addBillingSubjectToMetadata,
   buildStripeIdempotencyKey,
   getStripeObjectId,
+  isPostgresPermissionError,
 } from '@/services/payments/helpers.js';
 import {
   withPaymentSessionAdvisoryLock,
@@ -475,7 +476,7 @@ export class StripeCheckoutService {
   }
 
   private normalizeCheckoutInsertError(error: unknown): Error {
-    if (this.isPostgresPermissionError(error)) {
+    if (isPostgresPermissionError(error)) {
       return new AppError(
         'Checkout session creation is not allowed by payments.stripe_checkout_sessions RLS policies',
         403,
@@ -484,15 +485,6 @@ export class StripeCheckoutService {
     }
 
     return error instanceof Error ? error : new Error(String(error));
-  }
-
-  private isPostgresPermissionError(error: unknown): boolean {
-    return (
-      typeof error === 'object' &&
-      error !== null &&
-      'code' in error &&
-      (error as { code?: unknown }).code === '42501'
-    );
   }
 
   private mapStripeCheckoutStatus(

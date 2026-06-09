@@ -3810,8 +3810,8 @@ describe('Stripe payment services', () => {
           status: 'active',
           current_period_start: 1777334400,
           current_period_end: 1779926400,
-          cancel_at_period_end: false,
-          cancel_at: null,
+          cancel_at_period_end: true,
+          cancel_at: 1779926400,
           canceled_at: null,
           trial_start: null,
           trial_end: null,
@@ -3891,6 +3891,10 @@ describe('Stripe payment services', () => {
     expect(mockClient.query).toHaveBeenCalledWith(
       expect.stringMatching(/INSERT INTO payments\.stripe_subscriptions/i),
       expect.arrayContaining(['test', 'sub_123', 'cus_123', 'organization', 'org_123', 'active'])
+    );
+    expect(mockClient.query).toHaveBeenCalledWith(
+      expect.stringMatching(/INSERT INTO payments\.stripe_subscriptions/i),
+      expect.arrayContaining([true, new Date(1779926400 * 1000)])
     );
     expect(mockClient.query).toHaveBeenCalledWith(
       expect.stringMatching(/INSERT INTO payments\.stripe_subscription_items/i),

@@ -4,7 +4,10 @@ import { AppError } from '@/utils/errors.js';
 import type { UserContext } from '@/api/middlewares/auth.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { RazorpayConfigService } from '@/services/payments/razorpay/config.service.js';
-import { addBillingSubjectToMetadata } from '@/services/payments/helpers.js';
+import {
+  addBillingSubjectToMetadata,
+  isPostgresPermissionError,
+} from '@/services/payments/helpers.js';
 import { withUserContext } from '@/services/database/user-context.service.js';
 import { toISOString, toISOStringOrNull } from '@/utils/dates.js';
 import logger from '@/utils/logger.js';
@@ -275,20 +278,27 @@ export class RazorpayOrderService {
       throw new AppError('Razorpay order was not created', 500, ERROR_CODES.PAYMENT_CONFIG_INVALID);
     }
 
+    const prefill: { name?: string; email?: string; contact?: string } = {};
+    if (input.customerName) {
+      prefill.name = input.customerName;
+    }
+    if (input.customerEmail) {
+      prefill.email = input.customerEmail;
+    }
+    if (input.customerContact) {
+      prefill.contact = input.customerContact;
+    }
+
     return {
       order,
       checkoutOptions: {
-        keyId,
+        key: keyId,
         amount: order.amount,
         currency: order.currency.toUpperCase(),
-        orderId: order.orderId,
-        description: input.description ?? null,
-        callbackUrl: input.callbackUrl ?? null,
-        prefill: {
-          name: input.customerName ?? null,
-          email: input.customerEmail ?? null,
-          contact: input.customerContact ?? null,
-        },
+        order_id: order.orderId,
+        ...(input.description ? { description: input.description } : {}),
+        ...(input.callbackUrl ? { callback_url: input.callbackUrl } : {}),
+        prefill,
       },
     };
   }
@@ -328,11 +338,11 @@ export class RazorpayOrderService {
   }
 
   private normalizeOrderInsertError(error: unknown): Error {
-    if (error instanceof Error && 'code' in error && error.code === '42501') {
+    if (isPostgresPermissionError(error)) {
       return new AppError(
-        'Not allowed to create Razorpay order for this user',
+        'Razorpay order creation is not allowed by payments.razorpay_orders RLS policies',
         403,
-        ERROR_CODES.AUTH_INVALID_CREDENTIALS
+        ERROR_CODES.AUTH_UNAUTHORIZED
       );
     }
 

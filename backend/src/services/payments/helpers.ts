@@ -121,6 +121,15 @@ export function buildStripeIdempotencyKey(
   return `insforge:${environment}:${operation}:${callerKey}`;
 }
 
+export function isPostgresPermissionError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: unknown }).code === '42501'
+  );
+}
+
 export function normalizeProductRow(row: StripeProductRow): StripeProductResponse {
   return {
     ...row,

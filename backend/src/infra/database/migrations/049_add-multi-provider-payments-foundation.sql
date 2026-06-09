@@ -371,11 +371,11 @@ BEFORE UPDATE ON payments.razorpay_subscriptions
 FOR EACH ROW EXECUTE FUNCTION system.update_updated_at();
 
 GRANT INSERT, SELECT ON payments.razorpay_subscriptions TO authenticated, project_admin;
--- End-user subscription management routes use a rollbacked no-op update on
+-- End-user subscription management routes use a rolled-back no-op update on
 -- updated_at to evaluate developer-defined UPDATE RLS policies without
 -- granting direct write access to subscription state columns.
 GRANT UPDATE (updated_at) ON payments.razorpay_subscriptions TO authenticated;
-GRANT UPDATE, TRIGGER ON payments.razorpay_subscriptions TO project_admin;
+GRANT UPDATE ON payments.razorpay_subscriptions TO project_admin;
 
 CREATE TABLE IF NOT EXISTS payments.razorpay_orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -417,7 +417,7 @@ BEFORE UPDATE ON payments.razorpay_orders
 FOR EACH ROW EXECUTE FUNCTION system.update_updated_at();
 
 GRANT INSERT, SELECT ON payments.razorpay_orders TO anon, authenticated, project_admin;
-GRANT INSERT, UPDATE, TRIGGER ON payments.razorpay_orders TO project_admin;
+GRANT INSERT, UPDATE ON payments.razorpay_orders TO project_admin;
 
 -- Stripe subscription mirror.
 ALTER TABLE payments.stripe_subscriptions
@@ -440,6 +440,10 @@ DROP TRIGGER IF EXISTS trg_payments_stripe_subscriptions_updated_at
 CREATE TRIGGER trg_payments_stripe_subscriptions_updated_at
 BEFORE UPDATE ON payments.stripe_subscriptions
 FOR EACH ROW EXECUTE FUNCTION system.update_updated_at();
+
+-- Fulfillment triggers should be attached to payments.webhook_events. Stripe
+-- subscription rows are provider projections and may also be changed by sync.
+REVOKE TRIGGER ON payments.stripe_subscriptions FROM project_admin;
 
 -- Shared customer mirror.
 ALTER TABLE payments.customers

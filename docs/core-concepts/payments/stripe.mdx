@@ -74,7 +74,7 @@ if (data?.checkoutSession.url) {
 }
 ```
 
-Checkout inserts a row in `payments.stripe_checkout_sessions` using the caller's InsForge token. Add RLS policies so users can only create sessions for subjects they are allowed to bill. If you use `idempotencyKey`, retries also need a matching `SELECT` policy for the same subject.
+Checkout inserts a row in `payments.stripe_checkout_sessions` using the caller's InsForge token. Add RLS policies so users can only create sessions for subjects they are allowed to bill. PostgreSQL applies `SELECT` policies to rows returned by `INSERT ... RETURNING` and idempotent lookups, so retries also need a matching `SELECT` policy for the same subject and idempotency key.
 
 ## Billing Portal
 

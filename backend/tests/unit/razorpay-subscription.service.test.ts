@@ -217,8 +217,8 @@ describe('RazorpaySubscriptionService', () => {
     );
     expect(result.checkoutOptions).toEqual(
       expect.objectContaining({
-        keyId: 'rzp_test_key',
-        subscriptionId: 'sub_123',
+        key: 'rzp_test_key',
+        subscription_id: 'sub_123',
         description: 'Pro monthly',
       })
     );

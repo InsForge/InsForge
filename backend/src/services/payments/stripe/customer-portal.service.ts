@@ -4,6 +4,7 @@ import { AppError } from '@/utils/errors.js';
 import type { UserContext } from '@/api/middlewares/auth.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { StripeConfigService } from '@/services/payments/stripe/config.service.js';
+import { isPostgresPermissionError } from '@/services/payments/helpers.js';
 import { toISOString } from '@/utils/dates.js';
 import { withUserContext } from '@/services/database/user-context.service.js';
 import logger from '@/utils/logger.js';
@@ -206,7 +207,7 @@ export class StripeCustomerPortalService {
   }
 
   private normalizeCustomerPortalInsertError(error: unknown): Error {
-    if (this.isPostgresPermissionError(error)) {
+    if (isPostgresPermissionError(error)) {
       return new AppError(
         'Customer portal session creation is not allowed by payments.stripe_customer_portal_sessions RLS policies',
         403,
@@ -215,15 +216,6 @@ export class StripeCustomerPortalService {
     }
 
     return error instanceof Error ? error : new Error(String(error));
-  }
-
-  private isPostgresPermissionError(error: unknown): boolean {
-    return (
-      typeof error === 'object' &&
-      error !== null &&
-      'code' in error &&
-      (error as { code?: unknown }).code === '42501'
-    );
   }
 
   private normalizeCustomerPortalSessionRow(row: CustomerPortalSessionRow): CustomerPortalSession {

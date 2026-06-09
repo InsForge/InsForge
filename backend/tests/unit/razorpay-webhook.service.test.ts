@@ -106,7 +106,7 @@ describe('RazorpayWebhookService', () => {
 
     expect(result).toEqual({ received: true, handled: true });
     expect(mockProvider.verifyWebhookSignature).toHaveBeenCalledWith(
-      expect.any(String),
+      expect.any(Buffer),
       'signature',
       'whsec_123'
     );

@@ -26,8 +26,8 @@ describe('RazorpayProvider', () => {
 
   it('strictly validates webhook signatures as 64-character hex digests', () => {
     const provider = new RazorpayProvider(TEST_RAZORPAY_KEY_ID, TEST_RAZORPAY_KEY_SECRET, 'test');
-    const rawBody = '{"event":"payment.captured"}';
-    const signature = sign(rawBody, 'webhook_secret');
+    const rawBody = Buffer.from('{"event":"payment.captured"}');
+    const signature = sign(rawBody.toString('utf8'), 'webhook_secret');
 
     expect(provider.verifyWebhookSignature(rawBody, signature, 'webhook_secret')).toBe(true);
     expect(provider.verifyWebhookSignature(rawBody, `${signature}zz`, 'webhook_secret')).toBe(

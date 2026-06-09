@@ -35,6 +35,7 @@ const SUBSCRIPTION_STATUS_CLASSES: Record<PaymentSubscriptionStatus, string> = {
   unpaid: 'bg-[var(--alpha-8)] text-rose-400',
   paused: 'bg-[var(--alpha-8)] text-muted-foreground',
 };
+const SUBSCRIPTION_CANCELING_CLASS = 'bg-[var(--alpha-8)] text-amber-400';
 
 const SUBSCRIPTION_ROW_GRID_TEMPLATE =
   '32px minmax(0, 1.3fr) minmax(0, 1fr) 100px 100px minmax(0, 1.2fr) minmax(0, 0.75fr)';
@@ -83,6 +84,32 @@ function formatStatusLabel(status: PaymentSubscriptionStatus) {
     .split('_')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
+}
+
+function getSubscriptionStatusDisplay(subscription: PaymentSubscription) {
+  const isCanceling = subscription.status !== 'canceled' && !!subscription.cancelAt;
+
+  if (isCanceling) {
+    return {
+      label: 'Canceling',
+      className: SUBSCRIPTION_CANCELING_CLASS,
+      detail: `Cancels ${formatShortDate(subscription.cancelAt)}`,
+    };
+  }
+
+  if (subscription.status === 'canceled' && subscription.canceledAt) {
+    return {
+      label: formatStatusLabel(subscription.status),
+      className: SUBSCRIPTION_STATUS_CLASSES[subscription.status],
+      detail: `Canceled ${formatShortDate(subscription.canceledAt)}`,
+    };
+  }
+
+  return {
+    label: formatStatusLabel(subscription.status),
+    className: SUBSCRIPTION_STATUS_CLASSES[subscription.status],
+    detail: null,
+  };
 }
 
 function formatPeriod(subscription: PaymentSubscription) {
@@ -138,16 +165,25 @@ function getSubscriptionItemPriceLabel(item: PaymentSubscriptionItem, price: Cat
   return price ? formatPriceAmount(price) : (item.providerPriceId ?? '-');
 }
 
-function SubscriptionStatus({ status }: { status: PaymentSubscriptionStatus }) {
+function SubscriptionStatus({ subscription }: { subscription: PaymentSubscription }) {
+  const display = getSubscriptionStatusDisplay(subscription);
+
   return (
-    <span
-      className={cn(
-        'inline-flex items-center rounded px-2 py-0.5 text-xs font-medium',
-        SUBSCRIPTION_STATUS_CLASSES[status]
-      )}
-    >
-      {formatStatusLabel(status)}
-    </span>
+    <div className="flex min-w-0 flex-col items-start gap-1">
+      <span
+        className={cn(
+          'inline-flex items-center rounded px-2 py-0.5 text-xs font-medium',
+          display.className
+        )}
+      >
+        {display.label}
+      </span>
+      {display.detail ? (
+        <span className="max-w-full truncate text-xs text-muted-foreground" title={display.detail}>
+          {display.detail}
+        </span>
+      ) : null}
+    </div>
   );
 }
 
@@ -305,7 +341,7 @@ function SubscriptionRow({
           </div>
 
           <div className="px-2 py-3">
-            <SubscriptionStatus status={subscription.status} />
+            <SubscriptionStatus subscription={subscription} />
           </div>
 
           <div className="min-w-0 px-2 py-3">
@@ -430,6 +466,8 @@ export default function SubscriptionsPage() {
         customer?.email,
         customer?.name,
         subscription.status,
+        getSubscriptionStatusDisplay(subscription).label,
+        getSubscriptionStatusDisplay(subscription).detail,
         subscription.providerLatestInvoiceId,
         formatPeriod(subscription),
         ...itemValues,
