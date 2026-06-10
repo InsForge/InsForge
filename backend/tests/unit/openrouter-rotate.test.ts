@@ -93,6 +93,84 @@ describe('OpenRouterProvider.rotateManagedApiKey', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('propagates upstream rotation failures as AppError with the upstream status', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+      statusText: 'Service Unavailable',
+      text: () => Promise.resolve('rotation backend down'),
+    });
+
+    await expect(provider.rotateManagedApiKey()).rejects.toMatchObject({
+      statusCode: 503,
+      code: ERROR_CODES.AI_UPSTREAM_UNAVAILABLE,
+      message: 'rotation backend down',
+    });
+  });
+
+  it('dedupes concurrent rotation requests into a single cloud call', async () => {
+    const rotatedKey = 'sk-or-rotated-1234567890';
+    let resolveFetch!: (value: unknown) => void;
+    fetchMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveFetch = resolve;
+      })
+    );
+
+    const first = provider.rotateManagedApiKey();
+    const second = provider.rotateManagedApiKey();
+
+    resolveFetch({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          openrouter: { api_key: rotatedKey, limit_remaining: 42 },
+        }),
+    });
+
+    const expected = {
+      apiKey: rotatedKey,
+      maskedKey: `${rotatedKey.slice(0, 8)}••••••••${rotatedKey.slice(-4)}`,
+    };
+    await expect(first).resolves.toEqual(expected);
+    await expect(second).resolves.toEqual(expected);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('waits for an in-flight renewal to settle before rotating', async () => {
+    const rotatedKey = 'sk-or-rotated-1234567890';
+    const state = provider as unknown as ProviderState;
+    let resolveRenewal!: (value: string) => void;
+    state.renewalPromise = new Promise<string>((resolve) => {
+      resolveRenewal = resolve;
+    });
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          openrouter: { api_key: rotatedKey, limit_remaining: 42 },
+        }),
+    });
+
+    const rotation = provider.rotateManagedApiKey();
+    await Promise.resolve();
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    resolveRenewal('sk-or-stale-pre-rotation-key');
+    await expect(rotation).resolves.toMatchObject({ apiKey: rotatedKey });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns the in-flight rotation result instead of renewing concurrently', async () => {
+    const rotatedKey = 'sk-or-rotated-1234567890';
+    const state = provider as unknown as ProviderState;
+    state.rotationPromise = Promise.resolve(rotatedKey);
+
+    await expect(provider.renewCloudApiKey()).resolves.toBe(rotatedKey);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('rejects rotation for self-hosted environment keys', async () => {
     environmentMock.isCloud = false;
 

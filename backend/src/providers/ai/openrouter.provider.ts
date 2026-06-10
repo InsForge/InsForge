@@ -480,14 +480,22 @@ export class OpenRouterProvider {
   private createCloudProjectToken(projectId: string): string {
     const jwtSecret = process.env.JWT_SECRET;
     if (!jwtSecret) {
-      throw new Error('JWT_SECRET not found in environment variables');
+      throw new AppError(
+        'JWT_SECRET not found in environment variables',
+        500,
+        ERROR_CODES.INTERNAL_ERROR
+      );
     }
     return jwt.sign({ projectId }, jwtSecret, { expiresIn: '1h' });
   }
 
   private applyCloudCredentials(data: CloudCredentialsResponse): string {
     if (!data.openrouter?.api_key) {
-      throw new Error('Invalid response: missing openrouter API Key');
+      throw new AppError(
+        'Invalid cloud credentials response: missing openrouter API key',
+        502,
+        ERROR_CODES.AI_UPSTREAM_UNAVAILABLE
+      );
     }
 
     this.cloudCredentials = {
@@ -503,6 +511,13 @@ export class OpenRouterProvider {
    * Uses promise memoization to prevent duplicate fetch requests
    */
   private async fetchCloudApiKey(): Promise<string> {
+    // A rotation in flight will refresh cloudCredentials with the newest key;
+    // fetching concurrently could land a stale pre-rotation key after it.
+    if (this.rotationPromise) {
+      logger.info('Rotation in progress, waiting for the rotated key...');
+      return this.rotationPromise;
+    }
+
     // If fetch is already in progress, wait for it
     if (this.fetchPromise) {
       logger.info('Fetch already in progress, waiting for completion...');
@@ -514,7 +529,11 @@ export class OpenRouterProvider {
       try {
         const projectId = process.env.PROJECT_ID;
         if (!projectId) {
-          throw new Error('PROJECT_ID not found in environment variables');
+          throw new AppError(
+            'PROJECT_ID not found in environment variables',
+            500,
+            ERROR_CODES.INTERNAL_ERROR
+          );
         }
         const token = this.createCloudProjectToken(projectId);
 
@@ -524,7 +543,11 @@ export class OpenRouterProvider {
         );
 
         if (!response.ok) {
-          throw new Error(`Failed to fetch cloud API key: ${response.statusText}`);
+          throw new AppError(
+            `Failed to fetch cloud API key: ${response.statusText}`,
+            response.status,
+            ERROR_CODES.AI_UPSTREAM_UNAVAILABLE
+          );
         }
 
         const data = (await response.json()) as CloudCredentialsResponse;
@@ -554,6 +577,14 @@ export class OpenRouterProvider {
    * Uses promise memoization to prevent duplicate renewal requests
    */
   async renewCloudApiKey(): Promise<string> {
+    // A rotation in flight just minted a fresh key — return it instead of
+    // racing a renew response that reflects the pre-rotation credential. If
+    // the rotated key is still out of credits, the next 402/403 renews it.
+    if (this.rotationPromise) {
+      logger.info('Rotation in progress, waiting for the rotated key...');
+      return this.rotationPromise;
+    }
+
     // If renewal is already in progress, wait for it
     if (this.renewalPromise) {
       logger.info('Renewal already in progress, waiting for completion...');
@@ -565,7 +596,11 @@ export class OpenRouterProvider {
       try {
         const projectId = process.env.PROJECT_ID;
         if (!projectId) {
-          throw new Error('PROJECT_ID not found in environment variables');
+          throw new AppError(
+            'PROJECT_ID not found in environment variables',
+            500,
+            ERROR_CODES.INTERNAL_ERROR
+          );
         }
         const token = this.createCloudProjectToken(projectId);
 
@@ -582,7 +617,11 @@ export class OpenRouterProvider {
         );
 
         if (!response.ok) {
-          throw new Error(`Failed to renew cloud API key: ${response.statusText}`);
+          throw new AppError(
+            `Failed to renew cloud API key: ${response.statusText}`,
+            response.status,
+            ERROR_CODES.AI_UPSTREAM_UNAVAILABLE
+          );
         }
 
         const data = (await response.json()) as CloudCredentialsResponse;
@@ -618,9 +657,21 @@ export class OpenRouterProvider {
 
     this.rotationPromise = (async () => {
       try {
+        // Let any in-flight fetch/renewal settle before rotating: their response
+        // carries the pre-rotation key, and if it landed after the rotated key it
+        // would clobber cloudCredentials with a just-revoked key — which then
+        // 401s, and 401 never triggers a renewal.
+        await Promise.allSettled(
+          [this.fetchPromise, this.renewalPromise].filter((promise) => promise !== null)
+        );
+
         const projectId = process.env.PROJECT_ID;
         if (!projectId) {
-          throw new Error('PROJECT_ID not found in environment variables');
+          throw new AppError(
+            'PROJECT_ID not found in environment variables',
+            500,
+            ERROR_CODES.INTERNAL_ERROR
+          );
         }
         const token = this.createCloudProjectToken(projectId);
 

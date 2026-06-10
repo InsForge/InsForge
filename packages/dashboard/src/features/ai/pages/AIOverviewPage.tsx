@@ -709,7 +709,7 @@ export default function AIOverviewPage() {
           )}
         </section>
       </div>
-      <ConfirmDialog {...confirmDialogProps} isLoading={rotateOpenRouterKey.isPending} />
+      <ConfirmDialog {...confirmDialogProps} />
     </div>
   );
 }
