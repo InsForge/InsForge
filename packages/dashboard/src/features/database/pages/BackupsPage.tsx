@@ -15,10 +15,11 @@ import { DatabaseEmptyState } from '#features/database/components/DatabaseEmptyS
 import { DatabaseStudioSidebarPanel } from '#features/database/components/DatabaseSidebar';
 import { RenameBackupDialog } from '#features/database/components/RenameBackupDialog';
 import {
+  useDatabaseBackupActions,
   useDatabaseBackupInfo,
   useDatabaseBackupInstanceInfo,
 } from '#features/database/hooks/useDatabaseBackup';
-import { useDashboardHost } from '#lib/config/DashboardHostContext';
+import { useDashboardHost, useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
 import { useConfirm } from '#lib/hooks/useConfirm';
 import { useToast } from '#lib/hooks/useToast';
 
@@ -43,10 +44,12 @@ export default function BackupsPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const host = useDashboardHost();
+  const isCloudHostingMode = useIsCloudHostingMode();
   const { showToast } = useToast();
   const { confirm, confirmDialogProps } = useConfirm();
   const { backupInfo, refetch } = useDatabaseBackupInfo();
   const { instanceInfo } = useDatabaseBackupInstanceInfo();
+  const backupActions = useDatabaseBackupActions();
   const [createBackupDialogOpen, setCreateBackupDialogOpen] = useState(false);
   const [renameBackupDialogState, setRenameBackupDialogState] = useState<{
     id: string;
@@ -57,7 +60,12 @@ export default function BackupsPage() {
     timestampLabel: string;
   } | null>(null);
 
-  const isFreePlan = (instanceInfo?.planName?.toLowerCase() ?? 'free') === 'free';
+  // Self-hosting has no plans, quotas, or backup scheduler — only the
+  // cloud-hosting control plane does.
+  const isFreePlan =
+    isCloudHostingMode && (instanceInfo?.planName?.toLowerCase() ?? 'free') === 'free';
+  const hasManualBackupQuota = isCloudHostingMode;
+  const showScheduledBackups = isCloudHostingMode && !isFreePlan;
   const manualBackups = backupInfo?.manualBackups ?? [];
   const scheduledBackups = backupInfo?.scheduledBackups ?? [];
 
@@ -82,12 +90,18 @@ export default function BackupsPage() {
   };
 
   const handleRestoreBackupClick = async (backupId: string) => {
-    if (!host.onRestoreBackup) {
+    if (!backupActions.restoreBackup) {
       showToast('Backup restore is not available in the current dashboard mode.', 'info');
       return;
     }
 
-    await host.onRestoreBackup(backupId);
+    await backupActions.restoreBackup(backupId);
+
+    if (!isCloudHostingMode) {
+      // The cloud host surfaces its own restore notifications.
+      showToast('Database restored successfully.', 'success');
+      await refetch();
+    }
   };
 
   const handleRenameBackupClick = (backupId: string, backupLabel: string) => {
@@ -98,11 +112,11 @@ export default function BackupsPage() {
   };
 
   const handleCreateBackup = async (backupName: string) => {
-    if (!host.onCreateBackup) {
+    if (!backupActions.createBackup) {
       throw new Error('Backup creation is not available in the current dashboard mode.');
     }
 
-    await host.onCreateBackup(backupName);
+    await backupActions.createBackup(backupName);
     await refetch();
   };
 
@@ -119,16 +133,19 @@ export default function BackupsPage() {
       return;
     }
 
-    if (!host.onDeleteBackup) {
+    if (!backupActions.deleteBackup) {
       showToast('Backup deletion is not available in the current dashboard mode.', 'info');
       return;
     }
 
     try {
-      await host.onDeleteBackup(backupId);
+      await backupActions.deleteBackup(backupId);
       await refetch();
-    } catch {
+    } catch (error) {
       // The cloud host is responsible for delete failure toasts.
+      if (!isCloudHostingMode) {
+        showToast(error instanceof Error ? error.message : 'Failed to delete the backup.', 'error');
+      }
     }
   };
 
@@ -158,12 +175,16 @@ export default function BackupsPage() {
               >
                 <div className="min-w-0">
                   <h2 className="text-xl font-medium leading-7 text-foreground">
-                    Manual Backups ({manualBackups.length}/{isFreePlan ? 1 : 5})
+                    {hasManualBackupQuota
+                      ? `Manual Backups (${manualBackups.length}/${isFreePlan ? 1 : 5})`
+                      : `Manual Backups (${manualBackups.length})`}
                   </h2>
                   <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                    {isFreePlan && manualBackups.length === 0
-                      ? 'Create a manual backup. Free plan allows 1 manual backup.'
-                      : 'You can create up to 5 backups manually and can be restored at any time.'}
+                    {!hasManualBackupQuota
+                      ? 'Create manual backups of your database and restore them at any time.'
+                      : isFreePlan && manualBackups.length === 0
+                        ? 'Create a manual backup. Free plan allows 1 manual backup.'
+                        : 'You can create up to 5 backups manually and can be restored at any time.'}
                   </p>
                 </div>
                 {isFreePlan && manualBackups.length >= 1 ? (
@@ -271,7 +292,7 @@ export default function BackupsPage() {
               )}
             </div>
 
-            {!isFreePlan && (
+            {showScheduledBackups && (
               <div className="overflow-hidden rounded-lg border border-[var(--alpha-8)] bg-card">
                 <div className="px-6 py-6">
                   <div className="min-w-0">
@@ -384,13 +405,14 @@ export default function BackupsPage() {
             return Promise.resolve();
           }
 
-          if (!host.onRenameBackup) {
+          const renameBackup = backupActions.renameBackup;
+          if (!renameBackup) {
             return Promise.reject(
               new Error('Backup rename is not available in the current dashboard mode.')
             );
           }
 
-          return host.onRenameBackup(renameBackupDialogState.id, backupName).then(async () => {
+          return renameBackup(renameBackupDialogState.id, backupName).then(async () => {
             await refetch();
           });
         }}
