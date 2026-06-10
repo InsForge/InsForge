@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { AuthService } from '@/services/auth/auth.service.js';
+import { AuthRequest, verifyToken } from '@/api/middlewares/auth.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from '@/utils/errors.js';
 import { successResponse } from '@/utils/response.js';
@@ -13,6 +14,7 @@ import {
   createAdminSessionRequestSchema,
   exchangeAdminSessionRequestSchema,
   type CreateAdminSessionResponse,
+  type GetCurrentAdminSessionResponse,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 
@@ -38,7 +40,7 @@ router.post('/sessions/exchange', async (req: Request, res: Response, next: Next
     // Set refresh token as httpOnly cookie + CSRF token for web clients
     const tokenManager = TokenManager.getInstance();
     const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
-      result.user.id,
+      result.admin.sub,
       'admin'
     );
     setAdminRefreshTokenCookie(res, refreshToken);
@@ -66,13 +68,13 @@ router.post('/sessions', (req: Request, res: Response, next: NextFunction) => {
       );
     }
 
-    const { email, password } = validationResult.data;
-    const result: CreateAdminSessionResponse = authService.adminLogin(email, password);
+    const { username, password } = validationResult.data;
+    const result: CreateAdminSessionResponse = authService.adminLogin(username, password);
 
     // Set refresh token as httpOnly cookie + CSRF token for web clients
     const tokenManager = TokenManager.getInstance();
     const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
-      result.user.id,
+      result.admin.sub,
       'admin'
     );
     setAdminRefreshTokenCookie(res, refreshToken);
@@ -83,9 +85,32 @@ router.post('/sessions', (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
+// GET /api/auth/admin/sessions/current - Get current dashboard admin session
+router.get(
+  '/sessions/current',
+  verifyToken,
+  (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      if (req.user?.role !== 'project_admin' || !req.user.id) {
+        throw new AppError('Admin access required', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
+      }
+
+      const response: GetCurrentAdminSessionResponse = {
+        admin: {
+          sub: req.user.id,
+        },
+      };
+
+      successResponse(res, response);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // POST /api/auth/admin/refresh - Refresh admin dashboard access token
 // Uses a dashboard-specific httpOnly cookie + X-CSRF-Token header.
-router.post('/refresh', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/refresh', (req: Request, res: Response, next: NextFunction) => {
   try {
     const tokenManager = TokenManager.getInstance();
     const refreshToken = req.cookies?.[ADMIN_REFRESH_TOKEN_COOKIE_NAME];
@@ -105,28 +130,19 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
       throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
-    const dbUser = await authService.getUserById(payload.sub);
-    if (!dbUser || !dbUser.is_project_admin) {
-      logger.warn('[Auth:AdminRefresh] Project admin not found for valid refresh token', {
-        userId: payload.sub,
-      });
-      clearAdminRefreshTokenCookie(res);
-      throw new AppError('Project admin not found', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
-    }
-
-    const user = authService.transformUserRecordToSchema(dbUser);
     const newAccessToken = tokenManager.generateAccessToken({
-      sub: user.id,
-      email: user.email,
+      sub: payload.sub,
       role: 'project_admin',
     });
     const { refreshToken: newRefreshToken, csrfToken: newCsrfToken } =
-      tokenManager.generateRefreshTokenWithCsrf(user.id, 'admin', payload.csrfNonce);
+      tokenManager.generateRefreshTokenWithCsrf(payload.sub, 'admin', payload.csrfNonce);
     setAdminRefreshTokenCookie(res, newRefreshToken);
 
     successResponse(res, {
+      admin: {
+        sub: payload.sub,
+      },
       accessToken: newAccessToken,
-      user,
       csrfToken: newCsrfToken,
     });
   } catch (error) {

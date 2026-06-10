@@ -104,8 +104,8 @@ This guide provides comprehensive, step-by-step instructions for deploying, mana
     ```ini
     # Required
     JWT_SECRET=your-secret-key-here-must-be-32-char-or-above
-    ADMIN_EMAIL=admin@example.com
-    ADMIN_PASSWORD=change-this-password
+    ROOT_ADMIN_USERNAME=admin
+    ROOT_ADMIN_PASSWORD=change-this-password
     POSTGRES_PASSWORD=change-this-password
 
     # API URLs (replace with your VM public IP or domain)
@@ -151,7 +151,7 @@ This guide provides comprehensive, step-by-step instructions for deploying, mana
 
 2.  **Access Dashboard:**
     Open your browser and navigate to: `http://<your-vm-public-ip>:7130`
-    Log in with the `ADMIN_EMAIL` and `ADMIN_PASSWORD` you set in your `.env` file.
+    Log in with the `ROOT_ADMIN_USERNAME` and `ROOT_ADMIN_PASSWORD` you set in your `.env` file.
 
 ---
 

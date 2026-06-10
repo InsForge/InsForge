@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { PosthogRecordingItem } from '@insforge/shared-schemas';
-import { EmptyState } from '#components';
+import { EmptyState, ErrorState, LoadingState } from '#components';
 import { formatDuration, formatRelativeTime, truncateId } from '#features/analytics/lib/format';
 import { ReplayModal } from './ReplayModal';
 
@@ -16,11 +16,11 @@ export function RecentReplaysCard({
   const [openId, setOpenId] = useState<string | null>(null);
 
   if (isLoading) {
-    return <div className="px-4 py-6 text-sm text-muted-foreground">Loading…</div>;
+    return <LoadingState className="py-6" message="Loading replays…" />;
   }
 
   if (error) {
-    return <div className="px-4 py-6 text-sm text-destructive">Failed to load replays.</div>;
+    return <ErrorState title="Failed to load replays" error="Please try again." />;
   }
 
   if (items.length === 0) {

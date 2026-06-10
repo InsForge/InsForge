@@ -66,7 +66,7 @@ router.post(
       await vercelProvider.upsertEnvironmentVariables(envVars);
 
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'UPSERT_ENV_VARS',
         module: 'DEPLOYMENTS',
         details: { count: envVars.length, keys: envVars.map((envVar) => envVar.key) },
@@ -136,7 +136,7 @@ router.delete(
 
       // Log audit
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'DELETE_ENV_VAR',
         module: 'DEPLOYMENTS',
         details: { envId: id },

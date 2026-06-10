@@ -29,7 +29,9 @@ export async function withUserContext<T>(
   settings: Record<string, string | undefined> = {}
 ): Promise<T> {
   const claims: Record<string, string> = { role: ctx.role };
-  if (ctx.id) {
+  // Project admin subjects are intentionally not exposed as JWT sub in
+  // database context: auth.uid() is UUID-based, while admin subjects are not.
+  if (ctx.id && ctx.role !== 'project_admin') {
     claims.sub = ctx.id;
   }
   if (ctx.email) {

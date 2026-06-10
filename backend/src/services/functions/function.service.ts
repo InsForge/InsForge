@@ -15,6 +15,7 @@ import { AppError, hasPgErrorCode } from '@/utils/errors.js';
 import { DenoSubhostingProvider } from '@/providers/functions/deno-subhosting.provider.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
+import { appConfig } from '@/infra/config/app.config.js';
 
 export class FunctionService {
   private static instance: FunctionService;
@@ -72,7 +73,7 @@ export class FunctionService {
         runtimeHealthy = true;
       } else {
         try {
-          const denoUrl = process.env.DENO_RUNTIME_URL || 'http://localhost:7133';
+          const denoUrl = appConfig.functions.denoRuntimeUrl;
           const healthResponse = await fetch(`${denoUrl}/health`, {
             method: 'GET',
             signal: AbortSignal.timeout(2000), // 2 second timeout
@@ -305,27 +306,42 @@ export class FunctionService {
    * Delete a function
    */
   async deleteFunction(slug: string): Promise<boolean> {
+    const client = await this.getPool().connect();
     try {
-      const result = await this.getPool().query(
-        'DELETE FROM functions.definitions WHERE slug = $1',
-        [slug]
-      );
+      await client.query('BEGIN');
+
+      const result = await client.query('DELETE FROM functions.definitions WHERE slug = $1', [
+        slug,
+      ]);
 
       if (result.rowCount === 0) {
+        await client.query('ROLLBACK');
         return false;
       }
+
+      // Remove the deleted slug from deployment records' functions array,
+      // preserving shared deployment history for other functions.
+      await client.query(
+        'UPDATE functions.deployments SET functions = functions - $1 WHERE functions @> $2::jsonb',
+        [slug, JSON.stringify([slug])]
+      );
+
+      await client.query('COMMIT');
 
       // Trigger redeployment without the deleted function
       this.scheduleDeployment();
 
       return true;
     } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
       logger.error('Failed to delete function', {
         error: error instanceof Error ? error.message : String(error),
         operation: 'deleteFunction',
         slug,
       });
       throw error;
+    } finally {
+      client.release();
     }
   }
 
@@ -370,7 +386,7 @@ export class FunctionService {
    * Get the Deno Subhosting project ID for this InsForge instance
    */
   private getDenoProjectId(): string {
-    return process.env.APP_KEY || 'local';
+    return appConfig.storage.appKey;
   }
 
   /**

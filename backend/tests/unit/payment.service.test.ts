@@ -50,7 +50,9 @@ vi.mock('../../src/infra/database/database.manager', () => ({
 }));
 
 vi.mock('../../src/providers/payments/stripe.provider', () => ({
-  StripeProvider: vi.fn(() => mockProvider),
+  StripeProvider: vi.fn(function () {
+    return mockProvider;
+  }),
   maskStripeKey: (apiKey: string) => `masked:${apiKey.slice(-4)}`,
   validateStripeSecretKey: (environment: 'test' | 'live', value: string) => {
     const prefix = environment === 'test' ? 'sk_test_' : 'sk_live_';
@@ -99,8 +101,6 @@ describe('PaymentService', () => {
     role: 'authenticated' as const,
   };
   const anonCheckoutUser = {
-    id: '12345678-1234-5678-90ab-cdef12345678',
-    email: 'anon@insforge.com',
     role: 'anon' as const,
   };
   const checkoutSessionRow = {

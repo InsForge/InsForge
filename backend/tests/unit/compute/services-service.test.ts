@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ERROR_CODES } from '@insforge/shared-schemas';
+import type { AppError } from '@/utils/errors.js';
 
 // --- Mocks ---
 
@@ -21,8 +22,8 @@ vi.mock('@/infra/security/encryption.manager.js', () => ({
   },
 }));
 
-vi.mock('@/infra/config/app.config.js', () => ({
-  config: {
+vi.mock('@/infra/config/app.config.js', () => {
+  const c = {
     fly: {
       enabled: true,
       apiToken: 'test-token',
@@ -36,8 +37,15 @@ vi.mock('@/infra/config/app.config.js', () => ({
     app: {
       jwtSecret: 'test-secret',
     },
-  },
-}));
+    storage: {
+      appKey: 'testkey1',
+    },
+  };
+  return {
+    config: c,
+    appConfig: c,
+  };
+});
 
 vi.mock('@/utils/logger.js', () => ({
   default: { error: vi.fn(), info: vi.fn(), warn: vi.fn(), debug: vi.fn() },
@@ -51,6 +59,7 @@ const mockStopMachine = vi.fn();
 const mockStartMachine = vi.fn();
 const mockDestroyMachine = vi.fn();
 const mockGetEvents = vi.fn();
+const mockGetLogs = vi.fn();
 const mockListMachines = vi.fn();
 const mockIsConfigured = vi.fn(() => true);
 
@@ -63,6 +72,7 @@ const mockFlyInstance = {
   startMachine: mockStartMachine,
   destroyMachine: mockDestroyMachine,
   getEvents: mockGetEvents,
+  getLogs: mockGetLogs,
   listMachines: mockListMachines,
   isConfigured: mockIsConfigured,
 };
@@ -78,11 +88,21 @@ import { ComputeServicesService } from '@/services/compute/services.service.js';
 describe('ComputeServicesService', () => {
   let service: ComputeServicesService;
 
+  const oldEnvAppKey = process.env.APP_KEY;
+
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     process.env.APP_KEY = 'testkey1';
     service = ComputeServicesService.getInstance();
     mockIsConfigured.mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    if (oldEnvAppKey === undefined) {
+      delete process.env.APP_KEY;
+    } else {
+      process.env.APP_KEY = oldEnvAppKey;
+    }
   });
 
   describe('createService', () => {
@@ -1227,6 +1247,49 @@ describe('ComputeServicesService', () => {
       expect(mockUpdateMachine).not.toHaveBeenCalled();
     });
   });
+
+  describe('getServiceLogs', () => {
+    const serviceRow = {
+      id: 'svc-logs-1',
+      project_id: 'proj-123',
+      name: 'my-api',
+      image_url: 'nginx:latest',
+      port: 8080,
+      cpu: 'shared-1x',
+      memory: 256,
+      region: 'iad',
+      fly_app_id: 'my-api-proj-123',
+      fly_machine_id: 'machine-1',
+      status: 'running',
+      endpoint_url: 'https://my-api-proj-123.fly.dev',
+      env_vars_encrypted: null,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    };
+
+    it('delegates to provider.getLogs with the app, machine, and options', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [serviceRow] }); // getService
+      const payload = { lines: [{ timestamp: 1, message: 'hi' }], nextToken: '42' };
+      mockGetLogs.mockResolvedValue(payload);
+
+      const result = await service.getServiceLogs('svc-logs-1', { limit: 200, nextToken: 'cur' });
+
+      expect(mockGetLogs).toHaveBeenCalledWith('my-api-proj-123', 'machine-1', {
+        limit: 200,
+        nextToken: 'cur',
+      });
+      expect(result).toEqual(payload);
+    });
+
+    it('throws COMPUTE_SERVICE_NOT_FOUND when the service has no machine yet', async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ ...serviceRow, fly_app_id: null, fly_machine_id: null }],
+      });
+
+      await expect(service.getServiceLogs('svc-logs-1')).rejects.toThrow('Service not found');
+      expect(mockGetLogs).not.toHaveBeenCalled();
+    });
+  });
 });
 
 // NOTE: Route-level integration tests for compute endpoints are deferred —
@@ -1244,39 +1307,51 @@ describe('selectComputeProvider factory', () => {
   });
 
   it('returns FlyProvider when FLY_API_TOKEN is set', async () => {
-    vi.doMock('@/infra/config/app.config.js', () => ({
-      config: {
+    vi.doMock('@/infra/config/app.config.js', () => {
+      const c = {
         fly: { apiToken: 'tok', org: 'o', enabled: true, domain: 'd' },
         cloud: { projectId: 'local', apiHost: '' },
         app: { jwtSecret: 'x' },
-      },
-    }));
+      };
+      return {
+        config: c,
+        appConfig: c,
+      };
+    });
     const { selectComputeProvider } = await import('@/services/compute/services.service.js');
     const { FlyProvider } = await import('@/providers/compute/fly.provider.js');
     expect(selectComputeProvider()).toBe(FlyProvider.getInstance());
   });
 
   it('returns CloudComputeProvider when PROJECT_ID is provisioned and no FLY_API_TOKEN', async () => {
-    vi.doMock('@/infra/config/app.config.js', () => ({
-      config: {
+    vi.doMock('@/infra/config/app.config.js', () => {
+      const c = {
         fly: { apiToken: '', org: '', enabled: false, domain: '' },
         cloud: { projectId: 'p', apiHost: 'https://x' },
         app: { jwtSecret: 'x' },
-      },
-    }));
+      };
+      return {
+        config: c,
+        appConfig: c,
+      };
+    });
     const { selectComputeProvider } = await import('@/services/compute/services.service.js');
     const { CloudComputeProvider } = await import('@/providers/compute/cloud.provider.js');
     expect(selectComputeProvider()).toBe(CloudComputeProvider.getInstance());
   });
 
   it('throws COMPUTE_NOT_CONFIGURED when neither is set', async () => {
-    vi.doMock('@/infra/config/app.config.js', () => ({
-      config: {
+    vi.doMock('@/infra/config/app.config.js', () => {
+      const c = {
         fly: { apiToken: '', org: '', enabled: false, domain: '' },
         cloud: { projectId: 'local', apiHost: '' },
         app: { jwtSecret: 'x' },
-      },
-    }));
+      };
+      return {
+        config: c,
+        appConfig: c,
+      };
+    });
     const { selectComputeProvider } = await import('@/services/compute/services.service.js');
     expect(() => selectComputeProvider()).toThrow(/COMPUTE_NOT_CONFIGURED|not configured/);
   });

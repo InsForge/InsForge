@@ -760,9 +760,20 @@ export class DatabaseAdvanceService {
 
             for (const row of tablesResult.rows) {
               try {
+                // Use a SAVEPOINT before each TRUNCATE so that a failure only rolls back
+                // this single statement and does NOT abort the entire transaction (PG 25P02).
+                // Without this, a failed TRUNCATE inside a transaction permanently poisons
+                // the transaction and causes every subsequent query to fail with:
+                // "ERROR: current transaction is aborted, commands ignored until end of transaction block"
+                await client.query('SAVEPOINT truncate_attempt');
                 await client.query(pgFormat('TRUNCATE TABLE %I CASCADE', row.tablename));
+                await client.query('RELEASE SAVEPOINT truncate_attempt');
                 logger.info(`Truncated table: ${row.tablename}`);
               } catch (err) {
+                // Roll back to the savepoint to restore the transaction to a healthy state,
+                // then release it to clean up the savepoint and prevent accumulation, then log and continue with the next table.
+                await client.query('ROLLBACK TO SAVEPOINT truncate_attempt');
+                await client.query('RELEASE SAVEPOINT truncate_attempt');
                 logger.warn(`Could not truncate table ${row.tablename}:`, err);
               }
             }
@@ -914,83 +925,131 @@ export class DatabaseAdvanceService {
     const pool = this.dbManager.getPool();
 
     try {
-      // Get column names from first record
-      const columns = Object.keys(records[0]);
+      // Group records by their key shape (sorted keys signature) to prevent data loss
+      // and avoid overwriting existing non-null columns with NULL during upserts.
+      const groupsMap = new Map<
+        string,
+        { columns: string[]; records: Record<string, unknown>[] }
+      >();
 
-      // Convert records to array format for pg-format
-      const values = records.map((record) =>
-        columns.map((col) => {
-          const value = record[col];
-          // pg-format handles NULL, dates, JSON automatically
-          // Convert empty strings to NULL for consistency
-          return value === '' ? null : value;
-        })
-      );
-
-      let query: string;
-
-      if (upsertKey) {
-        // Validate upsert key exists in columns
-        if (!columns.includes(upsertKey)) {
-          throw new AppError(
-            `Upsert key '${upsertKey}' not found in record columns`,
-            400,
-            ERROR_CODES.INVALID_INPUT
-          );
+      for (const record of records) {
+        const keys: string[] = [];
+        for (const key of Object.keys(record)) {
+          keys.push(key);
         }
+        keys.sort();
+        const signature = keys.join(',');
 
-        // Build upsert query with pg-format
-        const updateColumns = columns.filter((c) => c !== upsertKey);
-
-        if (updateColumns.length) {
-          // Build UPDATE SET clause
-          const updateClause = updateColumns
-            .map((col) => pgFormat('%I = EXCLUDED.%I', col, col))
-            .join(', ');
-
-          query = pgFormat(
-            'INSERT INTO %I.%I (%I) VALUES %L ON CONFLICT (%I) DO UPDATE SET %s',
-            schemaName,
-            table,
-            columns,
-            values,
-            upsertKey,
-            updateClause
-          );
-        } else {
-          // No columns to update, just do nothing on conflict
-          query = pgFormat(
-            'INSERT INTO %I.%I (%I) VALUES %L ON CONFLICT (%I) DO NOTHING',
-            schemaName,
-            table,
-            columns,
-            values,
-            upsertKey
-          );
+        let group = groupsMap.get(signature);
+        if (!group) {
+          group = {
+            columns: keys,
+            records: [],
+          };
+          groupsMap.set(signature, group);
         }
-      } else {
-        // Simple insert
-        query = pgFormat('INSERT INTO %I.%I (%I) VALUES %L', schemaName, table, columns, values);
+        group.records.push(record);
       }
 
       const client = await pool.connect();
       let releaseError: Error | undefined;
+      let totalRowCount = 0;
+      const allRows: unknown[] = [];
+
       try {
-        const result = await withAdminContext(
+        await withAdminContext(
           client,
-          () => client.query(query),
+          async () => {
+            await client.query('BEGIN');
+            try {
+              for (const { columns, records: groupRecords } of groupsMap.values()) {
+                // Convert records to array format for pg-format.
+                const values = groupRecords.map((record) =>
+                  columns.map((col) => {
+                    const value = record[col];
+                    // pg-format handles NULL, dates, JSON automatically.
+                    // Convert empty strings and undefined to NULL for consistency (preserving original behaviour).
+                    return value === '' || value === undefined ? null : value;
+                  })
+                );
+
+                let query: string;
+
+                if (upsertKey) {
+                  // Validate upsert key exists in columns
+                  if (!columns.includes(upsertKey)) {
+                    throw new AppError(
+                      `Upsert key '${upsertKey}' not found in record columns`,
+                      400,
+                      ERROR_CODES.INVALID_INPUT
+                    );
+                  }
+
+                  // Build upsert query with pg-format
+                  const updateColumns = columns.filter((c) => c !== upsertKey);
+
+                  if (updateColumns.length) {
+                    // Build UPDATE SET clause
+                    const updateClause = updateColumns
+                      .map((col) => pgFormat('%I = EXCLUDED.%I', col, col))
+                      .join(', ');
+
+                    query = pgFormat(
+                      'INSERT INTO %I.%I (%I) VALUES %L ON CONFLICT (%I) DO UPDATE SET %s',
+                      schemaName,
+                      table,
+                      columns,
+                      values,
+                      upsertKey,
+                      updateClause
+                    );
+                  } else {
+                    // No columns to update, just do nothing on conflict
+                    query = pgFormat(
+                      'INSERT INTO %I.%I (%I) VALUES %L ON CONFLICT (%I) DO NOTHING',
+                      schemaName,
+                      table,
+                      columns,
+                      values,
+                      upsertKey
+                    );
+                  }
+                } else {
+                  // Simple insert
+                  query = pgFormat(
+                    'INSERT INTO %I.%I (%I) VALUES %L',
+                    schemaName,
+                    table,
+                    columns,
+                    values
+                  );
+                }
+
+                const result = await client.query(query);
+
+                totalRowCount += result.rowCount || 0;
+                if (result.rows) {
+                  allRows.push(...result.rows);
+                }
+              }
+
+              // Refresh schema cache if needed
+              await client.query(`NOTIFY pgrst, 'reload schema';`);
+              await client.query('COMMIT');
+            } catch (err) {
+              await client.query('ROLLBACK').catch(() => {});
+              throw err;
+            }
+          },
           false,
           (error) => {
             releaseError = error;
           }
         );
 
-        // Refresh schema cache if needed
-        await client.query(`NOTIFY pgrst, 'reload schema';`);
-
         return {
-          rowCount: result.rowCount || 0,
-          rows: result.rows,
+          rowCount: totalRowCount,
+          rows: allRows,
         };
       } finally {
         client.release(releaseError);
