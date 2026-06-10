@@ -3487,9 +3487,9 @@ components:
     GetRazorpayConfigResponse:
       type: object
       required:
-        - razorpayKeys
+        - keys
       properties:
-        razorpayKeys:
+        keys:
           type: array
           items:
             $ref: '#/components/schemas/RazorpayKeyConfig'

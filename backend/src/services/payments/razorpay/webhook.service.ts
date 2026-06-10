@@ -100,26 +100,19 @@ export class RazorpayWebhookService {
       return { received: true, handled: false };
     }
 
-    void this.processRecordedRazorpayWebhookEvent(environment, eventId, payload).catch((error) => {
-      logger.error('Unexpected Razorpay webhook background processing failure', {
-        environment,
-        eventId,
-        event: payload.event,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    });
+    const handled = await this.processRecordedRazorpayWebhookEvent(environment, eventId, payload);
 
-    return { received: true, handled: this.isHandledEvent(payload.event) };
+    return { received: true, handled };
   }
 
   private async processRecordedRazorpayWebhookEvent(
     environment: RazorpayEnvironment,
     eventId: string,
     payload: RazorpayWebhookPayload
-  ): Promise<void> {
+  ): Promise<boolean> {
     if (!this.isHandledEvent(payload.event)) {
       await this.markWebhookEvent(environment, eventId, 'ignored', null);
-      return;
+      return false;
     }
 
     let handled: boolean;
@@ -139,7 +132,18 @@ export class RazorpayWebhookService {
       throw error;
     }
 
-    await this.markWebhookEvent(environment, eventId, handled ? 'processed' : 'ignored', null);
+    try {
+      await this.markWebhookEvent(environment, eventId, handled ? 'processed' : 'ignored', null);
+      return handled;
+    } catch (error) {
+      logger.error('Failed to finalize Razorpay webhook event after processing', {
+        environment,
+        eventId,
+        handled,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   }
 
   /**
@@ -631,7 +635,11 @@ export class RazorpayWebhookService {
 
     await this.getPool().query(
       `UPDATE payments.razorpay_orders
-       SET status = CASE WHEN $3 THEN 'paid' ELSE 'attempted' END,
+       SET status = CASE
+             WHEN $3 THEN 'paid'
+             WHEN status = 'paid' THEN status
+             ELSE 'attempted'
+           END,
            amount_paid = CASE WHEN $3 THEN $4 ELSE amount_paid END,
            amount_due = CASE WHEN $3 THEN GREATEST(amount - $4, 0) ELSE amount_due END,
            verified_payment_id = CASE

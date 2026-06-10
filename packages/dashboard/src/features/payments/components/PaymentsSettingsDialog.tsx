@@ -29,10 +29,10 @@ import {
   MenuDialogTitle,
 } from '@insforge/ui';
 import type {
+  PaymentEnvironment,
   PaymentProvider,
   RazorpayKeyConfig,
   StripeConnection,
-  StripeEnvironment,
   StripeKeyConfig,
 } from '@insforge/shared-schemas';
 import { usePaymentsConfig } from '#features/payments/hooks/usePaymentsConfig';
@@ -46,17 +46,16 @@ import {
 } from '#features/payments/hooks/useRazorpayWebhook';
 import { PaymentProviderSelect, PAYMENT_PROVIDER_LABELS } from './PaymentProviderSelect';
 
-const ENVIRONMENTS: StripeEnvironment[] = ['test', 'live'];
+const ENVIRONMENTS: PaymentEnvironment[] = ['test', 'live'];
 type PaymentsSettingsTab = 'keys' | 'webhooks' | 'sync';
 type PaymentKeyConfig = StripeKeyConfig | RazorpayKeyConfig;
-type PaymentConnection = StripeConnection;
 
-const KEY_PREFIX_BY_ENVIRONMENT: Record<StripeEnvironment, string> = {
+const KEY_PREFIX_BY_ENVIRONMENT: Record<PaymentEnvironment, string> = {
   test: 'sk_test_',
   live: 'sk_live_',
 };
 
-const RAZORPAY_PREFIX_BY_ENVIRONMENT: Record<StripeEnvironment, string> = {
+const RAZORPAY_PREFIX_BY_ENVIRONMENT: Record<PaymentEnvironment, string> = {
   test: 'rzp_test_',
   live: 'rzp_live_',
 };
@@ -97,15 +96,15 @@ function getConfiguredRazorpayApiKeys(keys: RazorpayKeyConfig[]): RazorpayKeyCon
   );
 }
 
-function createEmptyEnvironmentValues(): Record<StripeEnvironment, string> {
+function createEmptyEnvironmentValues(): Record<PaymentEnvironment, string> {
   return { test: '', live: '' };
 }
 
-function getStripeKeyValue(keys: StripeKeyConfig[], environment: StripeEnvironment): string {
+function getStripeKeyValue(keys: StripeKeyConfig[], environment: PaymentEnvironment): string {
   return keys.find((key) => key.environment === environment)?.value ?? '';
 }
 
-function getStripeKeyValues(keys: StripeKeyConfig[]): Record<StripeEnvironment, string> {
+function getStripeKeyValues(keys: StripeKeyConfig[]): Record<PaymentEnvironment, string> {
   return {
     test: getStripeKeyValue(keys, 'test'),
     live: getStripeKeyValue(keys, 'live'),
@@ -114,7 +113,7 @@ function getStripeKeyValues(keys: StripeKeyConfig[]): Record<StripeEnvironment, 
 
 function getRazorpayKeyValue(
   keys: RazorpayKeyConfig[],
-  environment: StripeEnvironment,
+  environment: PaymentEnvironment,
   keyType: RazorpayKeyConfig['keyType']
 ): string {
   return (
@@ -125,7 +124,7 @@ function getRazorpayKeyValue(
 function getRazorpayKeyValues(
   keys: RazorpayKeyConfig[],
   keyType: RazorpayKeyConfig['keyType']
-): Record<StripeEnvironment, string> {
+): Record<PaymentEnvironment, string> {
   return {
     test: getRazorpayKeyValue(keys, 'test', keyType),
     live: getRazorpayKeyValue(keys, 'live', keyType),
@@ -133,10 +132,10 @@ function getRazorpayKeyValues(
 }
 
 function hydrateEnvironmentValues(
-  current: Record<StripeEnvironment, string>,
-  previousSaved: Record<StripeEnvironment, string>,
-  nextSaved: Record<StripeEnvironment, string>
-): Record<StripeEnvironment, string> {
+  current: Record<PaymentEnvironment, string>,
+  previousSaved: Record<PaymentEnvironment, string>,
+  nextSaved: Record<PaymentEnvironment, string>
+): Record<PaymentEnvironment, string> {
   let changed = false;
   const next = { ...current };
 
@@ -252,7 +251,7 @@ function isPublicHttpsWebhookUrl(value: string) {
 }
 
 interface EnvironmentKeySectionProps {
-  environment: StripeEnvironment;
+  environment: PaymentEnvironment;
   config?: StripeKeyConfig;
   savedValue: string;
   inputValue: string;
@@ -380,13 +379,13 @@ function StripeKeysTabContent({
   isLoading: boolean;
   error: unknown;
   isBusy: boolean;
-  keyInputs: Record<StripeEnvironment, string>;
-  visibleKeys: Record<StripeEnvironment, boolean>;
-  errors: Partial<Record<StripeEnvironment, string>>;
-  onInputChange: (environment: StripeEnvironment, value: string) => void;
-  onToggleShowKey: (environment: StripeEnvironment) => void;
-  onSave: (environment: StripeEnvironment) => void;
-  onRemove: (environment: StripeEnvironment) => void;
+  keyInputs: Record<PaymentEnvironment, string>;
+  visibleKeys: Record<PaymentEnvironment, boolean>;
+  errors: Partial<Record<PaymentEnvironment, string>>;
+  onInputChange: (environment: PaymentEnvironment, value: string) => void;
+  onToggleShowKey: (environment: PaymentEnvironment) => void;
+  onSave: (environment: PaymentEnvironment) => void;
+  onRemove: (environment: PaymentEnvironment) => void;
 }) {
   if (isLoading && !error) {
     return (
@@ -457,15 +456,15 @@ function RazorpayKeysTabContent({
   isLoading: boolean;
   error: unknown;
   isBusy: boolean;
-  keyIdInputs: Record<StripeEnvironment, string>;
-  keySecretInputs: Record<StripeEnvironment, string>;
-  visibleKeys: Record<StripeEnvironment, boolean>;
-  errors: Partial<Record<StripeEnvironment, string>>;
-  onIdInputChange: (environment: StripeEnvironment, value: string) => void;
-  onSecretInputChange: (environment: StripeEnvironment, value: string) => void;
-  onToggleShowKey: (environment: StripeEnvironment) => void;
-  onSave: (environment: StripeEnvironment) => void;
-  onRemove: (environment: StripeEnvironment) => void;
+  keyIdInputs: Record<PaymentEnvironment, string>;
+  keySecretInputs: Record<PaymentEnvironment, string>;
+  visibleKeys: Record<PaymentEnvironment, boolean>;
+  errors: Partial<Record<PaymentEnvironment, string>>;
+  onIdInputChange: (environment: PaymentEnvironment, value: string) => void;
+  onSecretInputChange: (environment: PaymentEnvironment, value: string) => void;
+  onToggleShowKey: (environment: PaymentEnvironment) => void;
+  onSave: (environment: PaymentEnvironment) => void;
+  onRemove: (environment: PaymentEnvironment) => void;
 }) {
   if (isLoading && !error) {
     return (
@@ -724,14 +723,14 @@ function StripeWebhooksTabContent({
   onConfigure,
 }: {
   keys: StripeKeyConfig[];
-  connections: PaymentConnection[];
+  connections: StripeConnection[];
   isLoading: boolean;
   isLoadingWebhooks: boolean;
   error: unknown;
   webhooksError: unknown;
   configureWebhook: ReturnType<typeof usePaymentsWebhook>['configureWebhook'];
   isBusy: boolean;
-  onConfigure: (environment: StripeEnvironment) => void;
+  onConfigure: (environment: PaymentEnvironment) => void;
 }) {
   if ((isLoading || isLoadingWebhooks) && !error && !webhooksError) {
     return (
@@ -782,9 +781,9 @@ function StripeWebhooksTabContent({
 }
 
 interface StripeWebhookEnvironmentSectionProps {
-  environment: StripeEnvironment;
+  environment: PaymentEnvironment;
   config?: StripeKeyConfig;
-  connection?: PaymentConnection;
+  connection?: StripeConnection;
   isConfiguring: boolean;
   isBusy: boolean;
   onConfigure: () => void;
@@ -962,7 +961,7 @@ function RazorpayWebhookEnvironmentSection({
   isBusy,
   onGoToKeys,
 }: {
-  environment: StripeEnvironment;
+  environment: PaymentEnvironment;
   keys: RazorpayKeyConfig[];
   regenerateWebhookSecret: ReturnType<typeof useRazorpayWebhook>['regenerateWebhookSecret'];
   isBusy: boolean;
@@ -1094,34 +1093,34 @@ export function PaymentsSettingsDialog({
   const [activeTab, setActiveTab] = useState<PaymentsSettingsTab>('keys');
 
   // Stripe state
-  const [keyInputs, setKeyInputs] = useState<Record<StripeEnvironment, string>>(
+  const [keyInputs, setKeyInputs] = useState<Record<PaymentEnvironment, string>>(
     createEmptyEnvironmentValues
   );
-  const [visibleKeys, setVisibleKeys] = useState<Record<StripeEnvironment, boolean>>({
+  const [visibleKeys, setVisibleKeys] = useState<Record<PaymentEnvironment, boolean>>({
     test: false,
     live: false,
   });
-  const [errors, setErrors] = useState<Partial<Record<StripeEnvironment, string>>>({});
-  const previousSavedStripeKeys = useRef<Record<StripeEnvironment, string>>(
+  const [errors, setErrors] = useState<Partial<Record<PaymentEnvironment, string>>>({});
+  const previousSavedStripeKeys = useRef<Record<PaymentEnvironment, string>>(
     createEmptyEnvironmentValues()
   );
 
   // Razorpay state
-  const [rzpKeyIdInputs, setRzpKeyIdInputs] = useState<Record<StripeEnvironment, string>>(
+  const [rzpKeyIdInputs, setRzpKeyIdInputs] = useState<Record<PaymentEnvironment, string>>(
     createEmptyEnvironmentValues
   );
-  const [rzpKeySecretInputs, setRzpKeySecretInputs] = useState<Record<StripeEnvironment, string>>(
+  const [rzpKeySecretInputs, setRzpKeySecretInputs] = useState<Record<PaymentEnvironment, string>>(
     createEmptyEnvironmentValues
   );
-  const [rzpVisibleKeys, setRzpVisibleKeys] = useState<Record<StripeEnvironment, boolean>>({
+  const [rzpVisibleKeys, setRzpVisibleKeys] = useState<Record<PaymentEnvironment, boolean>>({
     test: false,
     live: false,
   });
-  const [rzpErrors, setRzpErrors] = useState<Partial<Record<StripeEnvironment, string>>>({});
-  const previousSavedRazorpayKeyIds = useRef<Record<StripeEnvironment, string>>(
+  const [rzpErrors, setRzpErrors] = useState<Partial<Record<PaymentEnvironment, string>>>({});
+  const previousSavedRazorpayKeyIds = useRef<Record<PaymentEnvironment, string>>(
     createEmptyEnvironmentValues()
   );
-  const previousSavedRazorpayKeySecrets = useRef<Record<StripeEnvironment, string>>(
+  const previousSavedRazorpayKeySecrets = useRef<Record<PaymentEnvironment, string>>(
     createEmptyEnvironmentValues()
   );
 
@@ -1207,7 +1206,7 @@ export function PaymentsSettingsDialog({
     onOpenChange(nextOpen);
   };
 
-  const handleSave = async (environment: StripeEnvironment) => {
+  const handleSave = async (environment: PaymentEnvironment) => {
     const secretKey = keyInputs[environment].trim();
     const expectedPrefix = KEY_PREFIX_BY_ENVIRONMENT[environment];
 
@@ -1236,7 +1235,7 @@ export function PaymentsSettingsDialog({
     }
   };
 
-  const handleRzpSave = (environment: StripeEnvironment) => {
+  const handleRzpSave = (environment: PaymentEnvironment) => {
     const keyId = rzpKeyIdInputs[environment].trim();
     const secretKey = rzpKeySecretInputs[environment].trim();
     const expectedPrefix = RAZORPAY_PREFIX_BY_ENVIRONMENT[environment];
@@ -1261,7 +1260,7 @@ export function PaymentsSettingsDialog({
     rzpSaveKey.mutate({ environment, keyId, keySecret: secretKey });
   };
 
-  const handleRemove = async (environment: StripeEnvironment) => {
+  const handleRemove = async (environment: PaymentEnvironment) => {
     setErrors((current) => ({ ...current, [environment]: undefined }));
     try {
       await removeKey.mutateAsync(environment);
@@ -1275,7 +1274,7 @@ export function PaymentsSettingsDialog({
     }
   };
 
-  const handleRzpRemove = async (environment: StripeEnvironment) => {
+  const handleRzpRemove = async (environment: PaymentEnvironment) => {
     setRzpErrors((current) => ({ ...current, [environment]: undefined }));
     try {
       await rzpRemoveKey.mutateAsync(environment);
@@ -1290,7 +1289,7 @@ export function PaymentsSettingsDialog({
     }
   };
 
-  const handleConfigureWebhook = async (environment: StripeEnvironment) => {
+  const handleConfigureWebhook = async (environment: PaymentEnvironment) => {
     try {
       await configureWebhook.mutateAsync(environment);
     } catch {

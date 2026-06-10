@@ -455,7 +455,7 @@ describe('payments route schemas', () => {
     );
     expect(
       getRazorpayConfigResponseSchema.parse({
-        razorpayKeys: [
+        keys: [
           {
             environment: 'test',
             keyType: 'api_key',
@@ -465,7 +465,7 @@ describe('payments route schemas', () => {
       })
     ).toEqual(
       expect.objectContaining({
-        razorpayKeys: expect.any(Array),
+        keys: expect.any(Array),
       })
     );
     expect(

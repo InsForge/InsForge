@@ -31,7 +31,7 @@ router.put('/config', async (req: AuthRequest, res: Response, next: NextFunction
     );
 
     const keys = await configService.getKeyConfig();
-    successResponse(res, { razorpayKeys: keys });
+    successResponse(res, { keys });
   } catch (error) {
     next(error);
   }
@@ -49,7 +49,7 @@ router.delete('/config', async (req: AuthRequest, res: Response, next: NextFunct
       );
     }
     const keys = await configService.getKeyConfig();
-    successResponse(res, { razorpayKeys: keys });
+    successResponse(res, { keys });
   } catch (error) {
     next(error);
   }

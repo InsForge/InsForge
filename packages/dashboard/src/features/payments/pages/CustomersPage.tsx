@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { SortColumn } from 'react-data-grid';
 import { AlertCircle, Mail } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
@@ -18,8 +18,8 @@ import {
 } from '#components';
 import { PaymentsKeyMissingState } from '#features/payments/components/PaymentsKeyMissingState';
 import { PaymentsPageHeader } from '#features/payments/components/PaymentsPageHeader';
-import { ProviderBadge } from '#features/payments/components/ProviderBadge';
 import type { PaymentsOutletContext } from '#features/payments/components/PaymentsLayout';
+import { usePaymentClientPagination } from '#features/payments/hooks/usePaymentClientPagination';
 import { usePaymentCustomers } from '#features/payments/hooks/usePaymentCustomers';
 import { cn } from '#lib/utils/utils';
 
@@ -28,7 +28,6 @@ type CustomerBadgeVariant = 'deleted' | 'guest' | null;
 interface CustomerGridRow extends DataGridRowType {
   id: string;
   customerId: string;
-  provider: PaymentCustomerListItem['provider'];
   customer: string;
   email: string | null;
   paymentMethodBrand: string | null;
@@ -82,16 +81,6 @@ const CUSTOMER_COLUMNS: DataGridColumn<CustomerGridRow>[] = [
         </span>
         <CustomerBadge variant={row.badgeVariant} />
       </div>
-    ),
-  },
-  {
-    key: 'provider',
-    name: 'Provider',
-    width: 120,
-    minWidth: 120,
-    sortable: false,
-    renderCell: ({ row }) => (
-      <ProviderBadge provider={row.provider === 'razorpay' ? 'Razorpay' : 'Stripe'} />
     ),
   },
   {
@@ -443,7 +432,6 @@ export default function CustomersPage() {
       filteredCustomers.map((customer) => ({
         id: `${customer.environment}:${customer.providerCustomerId}`,
         customerId: customer.providerCustomerId,
-        provider: customer.provider,
         customer: getCustomerLabel(customer),
         email: customer.email,
         paymentMethodBrand: customer.paymentMethodBrand,
@@ -484,7 +472,24 @@ export default function CustomersPage() {
     });
   }, [customerRows, sortColumns]);
 
-  const handlePageChange = useCallback((_page: number) => {}, []);
+  const {
+    currentPage,
+    setCurrentPage,
+    totalPages,
+    pageSize,
+    startIndex,
+    endIndex,
+    showPagination,
+  } = usePaymentClientPagination(sortedCustomerRows.length);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [environment, provider, searchQuery, setCurrentPage, sortColumns]);
+
+  const paginatedCustomerRows = useMemo(
+    () => sortedCustomerRows.slice(startIndex, endIndex),
+    [endIndex, sortedCustomerRows, startIndex]
+  );
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
@@ -539,16 +544,17 @@ export default function CustomersPage() {
 
             <div className="min-h-0 flex-1 overflow-hidden">
               <DataGrid<CustomerGridRow>
-                data={sortedCustomerRows}
+                data={paginatedCustomerRows}
                 columns={CUSTOMER_COLUMNS}
                 sortColumns={sortColumns}
                 onSortColumnsChange={setSortColumns}
-                currentPage={1}
-                totalPages={1}
-                pageSize={Math.max(sortedCustomerRows.length, 1)}
+                currentPage={currentPage}
+                totalPages={totalPages}
+                pageSize={pageSize}
                 totalRecords={sortedCustomerRows.length}
-                onPageChange={handlePageChange}
+                onPageChange={setCurrentPage}
                 paginationRecordLabel="customers"
+                showPagination={showPagination}
                 showSelection={false}
                 showTypeBadge={false}
                 headerRowHeight={32}

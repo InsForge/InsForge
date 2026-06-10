@@ -11,6 +11,155 @@ const migrationPath = path.resolve(
 );
 const sql = fs.readFileSync(migrationPath, 'utf8');
 
+interface LegacyPaymentHistoryRow {
+  id: string;
+  environment: 'test' | 'live';
+  type: 'one_time_payment' | 'subscription_invoice' | 'refund' | 'failed_payment';
+  stripeCheckoutSessionId?: string | null;
+  stripePaymentIntentId?: string | null;
+  stripeInvoiceId?: string | null;
+  stripeChargeId?: string | null;
+  stripeRefundId?: string | null;
+  stripeSubscriptionId?: string | null;
+  stripeProductId?: string | null;
+  stripePriceId?: string | null;
+  stripeCreatedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface SimulatedTransactionProjection {
+  id: string;
+  providerObjectType: string | null;
+  providerObjectId: string | null;
+  providerParentObjectType: string | null;
+  providerParentObjectId: string | null;
+  relatedObjectIds: Record<string, string>;
+}
+
+interface LegacyWebhookEventRow {
+  id: string;
+  providerEventId?: string | null;
+  stripeEventId?: string | null;
+}
+
+function getCandidateProviderObject(row: LegacyPaymentHistoryRow): {
+  type: string | null;
+  id: string | null;
+} {
+  if (row.type === 'refund' && row.stripeRefundId) {
+    return { type: 'refund', id: row.stripeRefundId };
+  }
+  if (row.type !== 'refund' && row.stripePaymentIntentId) {
+    return { type: 'payment_intent', id: row.stripePaymentIntentId };
+  }
+  if (row.type !== 'refund' && row.stripeChargeId) {
+    return { type: 'charge', id: row.stripeChargeId };
+  }
+  if (row.type !== 'refund' && row.stripeInvoiceId) {
+    return { type: 'invoice', id: row.stripeInvoiceId };
+  }
+  if (row.type !== 'refund' && row.stripeCheckoutSessionId) {
+    return { type: 'checkout_session', id: row.stripeCheckoutSessionId };
+  }
+  return { type: null, id: null };
+}
+
+function compareNullableDateDesc(a: string | null | undefined, b: string | null | undefined) {
+  if (!a && !b) {
+    return 0;
+  }
+  if (!a) {
+    return 1;
+  }
+  if (!b) {
+    return -1;
+  }
+  return b.localeCompare(a);
+}
+
+function compareLegacyPaymentHistoryRows(a: LegacyPaymentHistoryRow, b: LegacyPaymentHistoryRow) {
+  return (
+    compareNullableDateDesc(a.stripeCreatedAt, b.stripeCreatedAt) ||
+    b.updatedAt.localeCompare(a.updatedAt) ||
+    b.createdAt.localeCompare(a.createdAt) ||
+    a.id.localeCompare(b.id)
+  );
+}
+
+function compactRelatedObjectIds(
+  values: Record<string, string | null | undefined>
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(values).filter((entry): entry is [string, string] => entry[1] != null)
+  );
+}
+
+function simulatePaymentHistoryBackfill(
+  rows: LegacyPaymentHistoryRow[]
+): SimulatedTransactionProjection[] {
+  const primaryIds = new Set<string>();
+  const groups = new Map<string, LegacyPaymentHistoryRow[]>();
+
+  for (const row of rows) {
+    const candidate = getCandidateProviderObject(row);
+    const key =
+      candidate.type && candidate.id
+        ? `${row.environment}:${candidate.type}:${candidate.id}`
+        : `null:${row.id}`;
+    groups.set(key, [...(groups.get(key) ?? []), row]);
+  }
+
+  for (const group of groups.values()) {
+    const ranked = [...group].sort(compareLegacyPaymentHistoryRows);
+    const first = ranked[0];
+    if (first) {
+      const candidate = getCandidateProviderObject(first);
+      if (candidate.type && candidate.id) {
+        primaryIds.add(first.id);
+      }
+    }
+  }
+
+  return rows.map((row) => {
+    const candidate = getCandidateProviderObject(row);
+    const isPrimary = primaryIds.has(row.id);
+    const parentObject =
+      row.type === 'refund' && row.stripePaymentIntentId
+        ? { type: 'payment_intent', id: row.stripePaymentIntentId }
+        : row.type === 'refund' && row.stripeChargeId
+          ? { type: 'charge', id: row.stripeChargeId }
+          : { type: null, id: null };
+
+    return {
+      id: row.id,
+      providerObjectType: isPrimary ? candidate.type : null,
+      providerObjectId: isPrimary ? candidate.id : null,
+      providerParentObjectType: parentObject.type,
+      providerParentObjectId: parentObject.id,
+      relatedObjectIds: compactRelatedObjectIds({
+        checkout_session: row.stripeCheckoutSessionId,
+        payment_intent: row.stripePaymentIntentId,
+        invoice: row.stripeInvoiceId,
+        charge: row.stripeChargeId,
+        refund: row.stripeRefundId,
+        subscription: row.stripeSubscriptionId,
+        product: row.stripeProductId,
+        price: row.stripePriceId,
+      }),
+    };
+  });
+}
+
+function simulateWebhookEventBackfillAndCleanup(rows: LegacyWebhookEventRow[]) {
+  return rows
+    .map((row) => ({
+      id: row.id,
+      providerEventId: row.providerEventId ?? row.stripeEventId ?? null,
+    }))
+    .filter((row) => row.providerEventId !== null);
+}
+
 describe('payments multi-provider migration', () => {
   it('condenses branch-local Razorpay migrations into the next 049 multi-provider foundation', () => {
     expect(fs.existsSync(migrationPath)).toBe(true);
@@ -123,6 +272,89 @@ describe('payments multi-provider migration', () => {
     expect(sql).not.toMatch(/idx_payments_payment_activity_environment/i);
   });
 
+  it('deduplicates dirty payment history provider objects before creating transaction uniqueness', () => {
+    const projections = simulatePaymentHistoryBackfill([
+      {
+        id: 'charge-old',
+        environment: 'test',
+        type: 'one_time_payment',
+        stripeChargeId: 'ch_duplicate',
+        stripeCreatedAt: '2026-04-01T00:00:00.000Z',
+        createdAt: '2026-04-01T00:00:00.000Z',
+        updatedAt: '2026-04-01T00:00:00.000Z',
+      },
+      {
+        id: 'charge-new',
+        environment: 'test',
+        type: 'one_time_payment',
+        stripeChargeId: 'ch_duplicate',
+        stripeCreatedAt: '2026-04-02T00:00:00.000Z',
+        createdAt: '2026-04-02T00:00:00.000Z',
+        updatedAt: '2026-04-02T00:00:00.000Z',
+      },
+      {
+        id: 'payment-with-pi',
+        environment: 'test',
+        type: 'one_time_payment',
+        stripePaymentIntentId: 'pi_shared',
+        stripeCreatedAt: '2026-04-03T00:00:00.000Z',
+        createdAt: '2026-04-03T00:00:00.000Z',
+        updatedAt: '2026-04-03T00:00:00.000Z',
+      },
+      {
+        id: 'refund-without-refund-id',
+        environment: 'test',
+        type: 'refund',
+        stripePaymentIntentId: 'pi_shared',
+        stripeChargeId: 'ch_refund',
+        stripeCreatedAt: '2026-04-04T00:00:00.000Z',
+        createdAt: '2026-04-04T00:00:00.000Z',
+        updatedAt: '2026-04-04T00:00:00.000Z',
+      },
+    ]);
+
+    expect(projections.find((row) => row.id === 'charge-new')).toMatchObject({
+      providerObjectType: 'charge',
+      providerObjectId: 'ch_duplicate',
+    });
+    expect(projections.find((row) => row.id === 'charge-old')).toMatchObject({
+      providerObjectType: null,
+      providerObjectId: null,
+      relatedObjectIds: { charge: 'ch_duplicate' },
+    });
+    expect(projections.find((row) => row.id === 'payment-with-pi')).toMatchObject({
+      providerObjectType: 'payment_intent',
+      providerObjectId: 'pi_shared',
+    });
+    expect(projections.find((row) => row.id === 'refund-without-refund-id')).toMatchObject({
+      providerObjectType: null,
+      providerObjectId: null,
+      providerParentObjectType: 'payment_intent',
+      providerParentObjectId: 'pi_shared',
+      relatedObjectIds: {
+        payment_intent: 'pi_shared',
+        charge: 'ch_refund',
+      },
+    });
+  });
+
+  it('drops webhook rows that still cannot satisfy provider_event_id before SET NOT NULL', () => {
+    expect(
+      simulateWebhookEventBackfillAndCleanup([
+        {
+          id: 'existing-provider-event',
+          providerEventId: 'evt_provider',
+          stripeEventId: 'evt_old',
+        },
+        { id: 'backfilled-provider-event', providerEventId: null, stripeEventId: 'evt_stripe' },
+        { id: 'unrecoverable-provider-event', providerEventId: null, stripeEventId: null },
+      ])
+    ).toEqual([
+      { id: 'existing-provider-event', providerEventId: 'evt_provider' },
+      { id: 'backfilled-provider-event', providerEventId: 'evt_stripe' },
+    ]);
+  });
+
   it('renames Stripe-native runtime, catalog, and subscription tables', () => {
     expect(sql).toMatch(
       /ALTER TABLE payments\.checkout_sessions RENAME TO stripe_checkout_sessions/i
@@ -167,8 +399,12 @@ describe('payments multi-provider migration', () => {
     expect(sql).not.toMatch(
       /ALTER TABLE payments\.razorpay_subscriptions[\s\S]*ADD COLUMN IF NOT EXISTS auth_attempts BIGINT/i
     );
-    expect(sql).toMatch(/Razorpay response mirror\. Usually equals amount/i);
-    expect(sql).toMatch(/Razorpay nested item response mirror\. Usually equals amount/i);
+    expect(sql).toMatch(
+      /CREATE TABLE IF NOT EXISTS payments\.razorpay_items[\s\S]*unit_amount BIGINT/i
+    );
+    expect(sql).toMatch(
+      /CREATE TABLE IF NOT EXISTS payments\.razorpay_plans[\s\S]*unit_amount BIGINT/i
+    );
     expect(sql).not.toMatch(/COMMENT ON COLUMN payments\.razorpay_items\.unit_amount/i);
     expect(sql).not.toMatch(/COMMENT ON COLUMN payments\.razorpay_plans\.unit_amount/i);
     expect(sql).toMatch(
@@ -274,8 +510,6 @@ describe('payments multi-provider migration', () => {
 
   it('adds provider-native Razorpay order checkout state in the 049 foundation', () => {
     expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS payments\.razorpay_orders/i);
-    expect(sql).toMatch(/initialized and failed are InsForge-local lifecycle states/i);
-    expect(sql).toMatch(/Nullable until provider order creation succeeds/i);
     expect(sql).not.toMatch(/COMMENT ON TABLE payments\.razorpay_orders/i);
     expect(sql).not.toMatch(/COMMENT ON COLUMN payments\.razorpay_orders\.status/i);
     expect(sql).not.toMatch(/COMMENT ON COLUMN payments\.razorpay_orders\.order_id/i);

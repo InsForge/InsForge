@@ -755,7 +755,7 @@ export const getRazorpayStatusResponseSchema = z.object({
 });
 
 export const getRazorpayConfigResponseSchema = z.object({
-  razorpayKeys: z.array(razorpayKeyConfigSchema),
+  keys: z.array(razorpayKeyConfigSchema),
 });
 
 export const razorpaySyncCountsSchema = z

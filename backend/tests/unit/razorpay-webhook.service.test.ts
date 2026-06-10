@@ -77,6 +77,10 @@ function makeRawWebhookBody(event: string): Buffer {
   );
 }
 
+function makeWebhookPayload(event: string): RazorpayWebhookPayload {
+  return JSON.parse(makeRawWebhookBody(event).toString('utf8')) as RazorpayWebhookPayload;
+}
+
 describe('RazorpayWebhookService', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -87,7 +91,7 @@ describe('RazorpayWebhookService', () => {
     mockPool.query.mockResolvedValue({ rows: [], rowCount: 0 });
   });
 
-  it('acknowledges handled Razorpay events before processing them in the background', async () => {
+  it('processes handled Razorpay events before acknowledging them', async () => {
     const service = RazorpayWebhookService.getInstance();
     const recordSpy = vi
       .spyOn(service, 'recordWebhookEventStart')
@@ -116,13 +120,11 @@ describe('RazorpayWebhookService', () => {
       'payment.captured',
       expect.objectContaining({ event: 'payment.captured' })
     );
-    await vi.waitFor(() => {
-      expect(applySpy).toHaveBeenCalledWith(
-        'test',
-        expect.objectContaining({ event: 'payment.captured' })
-      );
-      expect(markSpy).toHaveBeenCalledWith('test', 'evt_header_123', 'processed', null);
-    });
+    expect(applySpy).toHaveBeenCalledWith(
+      'test',
+      expect.objectContaining({ event: 'payment.captured' })
+    );
+    expect(markSpy).toHaveBeenCalledWith('test', 'evt_header_123', 'processed', null);
   });
 
   it('marks unhandled Razorpay events ignored without syncing', async () => {
@@ -144,13 +146,11 @@ describe('RazorpayWebhookService', () => {
     );
 
     expect(result).toEqual({ received: true, handled: false });
-    await vi.waitFor(() => {
-      expect(markSpy).toHaveBeenCalledWith('test', 'evt_header_456', 'ignored', null);
-      expect(applySpy).not.toHaveBeenCalled();
-    });
+    expect(markSpy).toHaveBeenCalledWith('test', 'evt_header_456', 'ignored', null);
+    expect(applySpy).not.toHaveBeenCalled();
   });
 
-  it('acknowledges handled Razorpay events and records background processing failures', async () => {
+  it('marks handled Razorpay events failed and rethrows processing failures', async () => {
     const service = RazorpayWebhookService.getInstance();
     vi.spyOn(service, 'recordWebhookEventStart').mockResolvedValue({
       shouldProcess: true,
@@ -168,11 +168,127 @@ describe('RazorpayWebhookService', () => {
         'signature',
         'evt_header_789'
       )
-    ).resolves.toEqual({ received: true, handled: true });
+    ).rejects.toThrow('handler failed');
 
-    await vi.waitFor(() => {
-      expect(markSpy).toHaveBeenCalledWith('test', 'evt_header_789', 'failed', 'handler failed');
+    expect(markSpy).toHaveBeenCalledWith('test', 'evt_header_789', 'failed', 'handler failed');
+  });
+
+  it('records new Razorpay webhook events for processing', async () => {
+    const service = RazorpayWebhookService.getInstance();
+    mockPool.query.mockResolvedValueOnce({
+      rows: [makeWebhookRow({ eventId: 'evt_new_123', eventType: 'payment.captured' })],
+      rowCount: 1,
     });
+
+    const result = await service.recordWebhookEventStart(
+      'test',
+      'evt_new_123',
+      'payment.captured',
+      makeWebhookPayload('payment.captured')
+    );
+
+    expect(result).toMatchObject({
+      shouldProcess: true,
+      row: {
+        eventId: 'evt_new_123',
+        processingStatus: 'pending',
+      },
+    });
+    expect(mockPool.query).toHaveBeenCalledTimes(1);
+    expect(mockPool.query).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /INSERT INTO payments\.webhook_events[\s\S]*ON CONFLICT \(provider, environment, provider_event_id\) DO NOTHING/i
+      ),
+      [
+        'test',
+        'evt_new_123',
+        'payment.captured',
+        false,
+        expect.objectContaining({
+          event: 'payment.captured',
+        }),
+      ]
+    );
+  });
+
+  it('does not reprocess fresh pending Razorpay webhook duplicates', async () => {
+    const service = RazorpayWebhookService.getInstance();
+    mockPool.query
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+      .mockResolvedValueOnce({
+        rows: [
+          makeWebhookRow({
+            eventId: 'evt_pending_123',
+            eventType: 'payment.captured',
+            processingStatus: 'pending',
+          }),
+        ],
+        rowCount: 1,
+      });
+
+    const result = await service.recordWebhookEventStart(
+      'test',
+      'evt_pending_123',
+      'payment.captured',
+      makeWebhookPayload('payment.captured')
+    );
+
+    expect(result).toMatchObject({
+      shouldProcess: false,
+      row: {
+        eventId: 'evt_pending_123',
+        processingStatus: 'pending',
+      },
+    });
+    expect(mockPool.query).toHaveBeenCalledTimes(3);
+    expect(mockPool.query).toHaveBeenNthCalledWith(
+      2,
+      expect.stringMatching(
+        /UPDATE payments\.webhook_events[\s\S]*processing_status = 'failed'[\s\S]*OR \(processing_status = 'pending' AND updated_at < \$3\)/i
+      ),
+      [
+        'test',
+        'evt_pending_123',
+        expect.any(Date),
+        expect.objectContaining({
+          event: 'payment.captured',
+        }),
+      ]
+    );
+  });
+
+  it('reclaims failed or stale Razorpay webhook events for retry', async () => {
+    const service = RazorpayWebhookService.getInstance();
+    mockPool.query.mockResolvedValueOnce({ rows: [], rowCount: 0 }).mockResolvedValueOnce({
+      rows: [
+        makeWebhookRow({
+          eventId: 'evt_retry_123',
+          eventType: 'payment.captured',
+          processingStatus: 'pending',
+          attemptCount: 2,
+          lastError: null,
+        }),
+      ],
+      rowCount: 1,
+    });
+
+    const result = await service.recordWebhookEventStart(
+      'test',
+      'evt_retry_123',
+      'payment.captured',
+      makeWebhookPayload('payment.captured')
+    );
+
+    expect(result).toMatchObject({
+      shouldProcess: true,
+      row: {
+        eventId: 'evt_retry_123',
+        processingStatus: 'pending',
+        attemptCount: 2,
+      },
+    });
+    expect(mockPool.query).toHaveBeenCalledTimes(2);
   });
 
   it('materializes invoice-only events into Razorpay transactions', async () => {
@@ -549,7 +665,9 @@ describe('RazorpayWebhookService', () => {
       ])
     );
     expect(mockPool.query).toHaveBeenCalledWith(
-      expect.stringMatching(/WITH refund_totals[\s\S]*UPDATE payments\.transactions original/i),
+      expect.stringMatching(
+        /WITH refund_totals[\s\S]*UPDATE payments\.transactions original[\s\S]*related_object_ids = original_context\.related_object_ids \|\| refund\.related_object_ids/i
+      ),
       ['test', 'pay_123']
     );
     const executedSql = mockPool.query.mock.calls.map(([sql]) => String(sql)).join('\n');
@@ -624,9 +742,15 @@ describe('RazorpayWebhookService', () => {
         'inr',
       ])
     );
+    const transactionSql = mockPool.query.mock.calls.find(([sql]) =>
+      /WITH refs[\s\S]*INSERT INTO payments\.transactions/i.test(String(sql))
+    )?.[0];
+    expect(String(transactionSql)).toMatch(
+      /ORDER BY\s+CASE WHEN tx\.provider_object_type = \$2 AND tx\.provider_object_id = \$3 THEN 0 ELSE 1 END,\s+tx\.created_at DESC/i
+    );
     expect(mockPool.query).toHaveBeenCalledWith(
       expect.stringMatching(
-        /UPDATE payments\.razorpay_orders[\s\S]*verified_payment_id = CASE[\s\S]*WHEN \$3 THEN COALESCE\(verified_payment_id, \$5\)[\s\S]*ELSE verified_payment_id/i
+        /UPDATE payments\.razorpay_orders[\s\S]*SET status = CASE[\s\S]*WHEN \$3 THEN 'paid'[\s\S]*WHEN status = 'paid' THEN status[\s\S]*ELSE 'attempted'[\s\S]*verified_payment_id = CASE[\s\S]*WHEN \$3 THEN COALESCE\(verified_payment_id, \$5\)[\s\S]*ELSE verified_payment_id/i
       ),
       expect.arrayContaining(['test', 'order_123', true, 5000, 'pay_partial_123'])
     );
@@ -681,9 +805,64 @@ describe('RazorpayWebhookService', () => {
     expect(handled).toBe(true);
     expect(mockPool.query).toHaveBeenCalledWith(
       expect.stringMatching(
-        /UPDATE payments\.razorpay_orders[\s\S]*verified_payment_id = CASE[\s\S]*WHEN \$3 THEN COALESCE\(verified_payment_id, \$5\)[\s\S]*ELSE verified_payment_id/i
+        /UPDATE payments\.razorpay_orders[\s\S]*SET status = CASE[\s\S]*WHEN \$3 THEN 'paid'[\s\S]*WHEN status = 'paid' THEN status[\s\S]*ELSE 'attempted'[\s\S]*verified_payment_id = CASE[\s\S]*WHEN \$3 THEN COALESCE\(verified_payment_id, \$5\)[\s\S]*ELSE verified_payment_id/i
       ),
       expect.arrayContaining(['test', 'order_123', false, 5000, 'pay_failed_123'])
+    );
+  });
+
+  it('preserves a paid Razorpay order when a late authorized payment event arrives', async () => {
+    const service = RazorpayWebhookService.getInstance();
+
+    const handled = await getServiceInternals(service).applyRazorpayWebhookEvent('test', {
+      entity: 'event',
+      account_id: 'acc_123',
+      event: 'payment.authorized',
+      contains: ['payment'],
+      payload: {
+        payment: {
+          entity: {
+            id: 'pay_authorized_123',
+            entity: 'payment',
+            amount: 5000,
+            currency: 'INR',
+            status: 'authorized',
+            order_id: 'order_123',
+            invoice_id: null,
+            international: false,
+            method: 'card',
+            amount_refunded: 0,
+            refund_status: null,
+            captured: false,
+            description: null,
+            card_id: null,
+            bank: null,
+            wallet: null,
+            vpa: null,
+            email: 'buyer@example.com',
+            contact: null,
+            customer_id: 'cust_123',
+            notes: {},
+            fee: null,
+            tax: null,
+            error_code: null,
+            error_description: null,
+            error_source: null,
+            error_step: null,
+            error_reason: null,
+            created_at: 1780617600,
+          },
+        },
+      },
+      created_at: 1780617600,
+    });
+
+    expect(handled).toBe(true);
+    expect(mockPool.query).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /UPDATE payments\.razorpay_orders[\s\S]*SET status = CASE[\s\S]*WHEN \$3 THEN 'paid'[\s\S]*WHEN status = 'paid' THEN status[\s\S]*ELSE 'attempted'/i
+      ),
+      expect.arrayContaining(['test', 'order_123', false, 5000, 'pay_authorized_123'])
     );
   });
 

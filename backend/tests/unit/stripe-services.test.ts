@@ -3322,6 +3322,17 @@ describe('Stripe payment services', () => {
         expect.objectContaining({ id: 'pi_checkout_123' }),
       ])
     );
+    const transactionSql = mockPool.query.mock.calls.find(([sql]) =>
+      /INSERT INTO payments\.transactions[\s\S]*ON CONFLICT \(provider, environment, provider_object_type, provider_object_id\)/i.test(
+        String(sql)
+      )
+    )?.[0];
+    expect(String(transactionSql)).toMatch(
+      /ORDER BY\s+CASE WHEN tx\.provider_object_type = \$2 AND tx\.provider_object_id = \$3 THEN 0 ELSE 1 END,\s+tx\.created_at DESC/i
+    );
+    expect(String(transactionSql)).toMatch(
+      /ON CONFLICT \(provider, environment, provider_object_type, provider_object_id\)[\s\S]*DO UPDATE SET[\s\S]*amount_refunded = COALESCE\(\$14, tx\.amount_refunded, 0\)/i
+    );
   });
 
   it('records refund activity and copies context from the original payment', async () => {
@@ -3441,7 +3452,9 @@ describe('Stripe payment services', () => {
       expect.any(Array)
     );
     expect(mockPool.query).toHaveBeenCalledWith(
-      expect.stringMatching(/WITH refund_totals[\s\S]*UPDATE payments\.transactions original/i),
+      expect.stringMatching(
+        /WITH refund_totals[\s\S]*UPDATE payments\.transactions original[\s\S]*related_object_ids = original_context\.related_object_ids \|\| refund\.related_object_ids/i
+      ),
       ['test', 'pi_invoice_123', 'ch_123']
     );
   });

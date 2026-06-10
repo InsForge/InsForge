@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
 import type { PaymentCustomer } from '@insforge/shared-schemas';
@@ -13,9 +13,9 @@ import {
 } from '#components';
 import { PaymentsKeyMissingState } from '#features/payments/components/PaymentsKeyMissingState';
 import { PaymentsPageHeader } from '#features/payments/components/PaymentsPageHeader';
-import { ProviderBadge } from '#features/payments/components/ProviderBadge';
 import type { PaymentsOutletContext } from '#features/payments/components/PaymentsLayout';
 import { usePaymentCatalog } from '#features/payments/hooks/usePaymentCatalog';
+import { usePaymentClientPagination } from '#features/payments/hooks/usePaymentClientPagination';
 import { usePaymentCustomers } from '#features/payments/hooks/usePaymentCustomers';
 import type { CatalogPrice, CatalogProduct } from '#features/payments/types/catalog';
 import { usePaymentSubscriptions } from '#features/payments/hooks/usePaymentSubscriptions';
@@ -41,7 +41,7 @@ const SUBSCRIPTION_STATUS_CLASSES: Record<SubscriptionDisplayStatus, string> = {
 };
 
 const SUBSCRIPTION_ROW_GRID_TEMPLATE =
-  '32px minmax(0, 1.3fr) minmax(0, 1fr) 100px 100px minmax(0, 1.2fr) minmax(0, 0.75fr)';
+  '32px minmax(0, 1.3fr) minmax(0, 1fr) 100px minmax(0, 1.2fr) minmax(0, 0.75fr)';
 
 const SUBSCRIPTION_ITEM_GRID_TEMPLATE = 'minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) 100px';
 
@@ -347,12 +347,6 @@ function SubscriptionRow({
           </div>
 
           <div className="px-2 py-3">
-            <ProviderBadge
-              provider={subscription.provider === 'razorpay' ? 'Razorpay' : 'Stripe'}
-            />
-          </div>
-
-          <div className="px-2 py-3">
             <SubscriptionStatus subscription={subscription} />
           </div>
 
@@ -502,7 +496,24 @@ export default function SubscriptionsPage() {
     }
   }, [expandedSubscriptionId, filteredSubscriptions]);
 
-  const handlePageChange = useCallback((_page: number) => {}, []);
+  const {
+    currentPage,
+    setCurrentPage,
+    totalPages,
+    pageSize,
+    startIndex,
+    endIndex,
+    showPagination,
+  } = usePaymentClientPagination(filteredSubscriptions.length);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [environment, provider, searchQuery, setCurrentPage]);
+
+  const paginatedSubscriptions = useMemo(
+    () => filteredSubscriptions.slice(startIndex, endIndex),
+    [endIndex, filteredSubscriptions, startIndex]
+  );
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
@@ -569,7 +580,6 @@ export default function SubscriptionsPage() {
                   <div />
                   <div className="px-2 py-1.5">Subscription</div>
                   <div className="px-2 py-1.5">Customer</div>
-                  <div className="px-2 py-1.5">Provider</div>
                   <div className="px-2 py-1.5">Status</div>
                   <div className="px-2 py-1.5">Current Period</div>
                   <div className="px-2 py-1.5">Latest Invoice</div>
@@ -579,7 +589,7 @@ export default function SubscriptionsPage() {
                   <EmptySubscriptionsState hasSearchQuery={searchQuery.trim().length > 0} />
                 ) : (
                   <div className="flex flex-col gap-2">
-                    {filteredSubscriptions.map((subscription) => (
+                    {paginatedSubscriptions.map((subscription) => (
                       <SubscriptionRow
                         key={`${subscription.environment}:${subscription.providerSubscriptionId}`}
                         subscription={subscription}
@@ -605,16 +615,18 @@ export default function SubscriptionsPage() {
               </div>
             </div>
 
-            <div className="border-t border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))]">
-              <PaginationControls
-                currentPage={1}
-                totalPages={1}
-                onPageChange={handlePageChange}
-                totalRecords={filteredSubscriptions.length}
-                pageSize={Math.max(filteredSubscriptions.length, 1)}
-                recordLabel="subscriptions"
-              />
-            </div>
+            {showPagination && (
+              <div className="border-t border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))]">
+                <PaginationControls
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  totalRecords={filteredSubscriptions.length}
+                  pageSize={pageSize}
+                  recordLabel="subscriptions"
+                />
+              </div>
+            )}
           </div>
         )}
       </div>

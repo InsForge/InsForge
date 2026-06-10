@@ -42,7 +42,7 @@ export function useRazorpayConfig() {
   });
 
   return {
-    keys: data?.razorpayKeys ?? [],
+    keys: data?.keys ?? [],
     isLoading,
     error,
     saveKey,

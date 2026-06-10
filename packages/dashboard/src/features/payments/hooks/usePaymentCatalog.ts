@@ -55,9 +55,7 @@ function toStripeDisplayPrice(price: StripePrice): CatalogPrice {
   };
 }
 
-function toRazorpayDisplayProduct(item: RazorpayItem, plans: RazorpayPlan[]): CatalogProduct {
-  const defaultPlan = plans.find((plan) => plan.itemId === item.itemId);
-
+function toRazorpayDisplayProduct(item: RazorpayItem): CatalogProduct {
   return {
     environment: item.environment,
     provider: 'razorpay',
@@ -65,7 +63,7 @@ function toRazorpayDisplayProduct(item: RazorpayItem, plans: RazorpayPlan[]): Ca
     name: item.name,
     description: item.description,
     active: item.active,
-    providerDefaultPriceId: defaultPlan?.planId ?? item.itemId,
+    providerDefaultPriceId: null,
     metadata: {},
     syncedAt: item.syncedAt,
   };
@@ -202,7 +200,7 @@ export function usePaymentCatalog(provider: PaymentProvider, environment: Paymen
     const plannedItemIds = new Set(plans.map((plan) => plan.itemId));
 
     return {
-      products: items.map((item) => toRazorpayDisplayProduct(item, plans)),
+      products: items.map((item) => toRazorpayDisplayProduct(item)),
       prices: [
         ...items
           .filter((item) => !plannedItemIds.has(item.itemId))

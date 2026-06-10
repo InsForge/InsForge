@@ -48,7 +48,7 @@ router.get('/status', verifyAdmin, async (_req: AuthRequest, res: Response, next
 router.get('/config', verifyAdmin, async (_req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const keys = await configService.getKeyConfig();
-    successResponse(res, { razorpayKeys: keys });
+    successResponse(res, { keys });
   } catch (error) {
     next(error);
   }

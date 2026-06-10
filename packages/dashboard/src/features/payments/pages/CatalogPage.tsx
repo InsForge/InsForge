@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
 import type { CatalogPrice, CatalogProduct } from '#features/payments/types/catalog';
@@ -12,9 +12,11 @@ import {
 } from '#components';
 import { PaymentsKeyMissingState } from '#features/payments/components/PaymentsKeyMissingState';
 import { PaymentsPageHeader } from '#features/payments/components/PaymentsPageHeader';
-import { ProviderBadge } from '#features/payments/components/ProviderBadge';
 import type { PaymentsOutletContext } from '#features/payments/components/PaymentsLayout';
 import { usePaymentCatalog } from '#features/payments/hooks/usePaymentCatalog';
+import { usePaymentClientPagination } from '#features/payments/hooks/usePaymentClientPagination';
+
+const CATALOG_ROW_GRID_TEMPLATE = '32px minmax(240px,1.5fr) 100px 90px 140px minmax(220px,1fr)';
 
 function formatDate(value: string | null) {
   if (!value) {
@@ -131,7 +133,7 @@ function EmptyCatalogState({ hasSearchQuery }: { hasSearchQuery: boolean }) {
       </p>
       <p className="mt-1 text-sm text-muted-foreground">
         {hasSearchQuery
-          ? 'Try a different product name, ID, or default price reference.'
+          ? 'Try a different product name, ID, or pricing reference.'
           : 'Open Payments Settings and sync after creating products in your provider dashboard.'}
       </p>
     </div>
@@ -170,7 +172,9 @@ function ProductPricesTable({
         </div>
 
         {sortedPrices.map((price) => {
-          const isDefault = price.providerPriceId === product.providerDefaultPriceId;
+          const isDefault =
+            product.provider === 'stripe' &&
+            price.providerPriceId === product.providerDefaultPriceId;
 
           return (
             <div
@@ -222,13 +226,13 @@ function ProductPricesTable({
 function CatalogRow({
   product,
   productPrices,
-  defaultPrice,
+  summaryPrice,
   expanded,
   onToggle,
 }: {
   product: CatalogProduct;
   productPrices: CatalogPrice[];
-  defaultPrice: CatalogPrice | null;
+  summaryPrice: CatalogPrice | null;
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -239,17 +243,16 @@ function CatalogRow({
         onClick={onToggle}
         className="w-full text-left transition-colors hover:bg-alpha-4"
       >
-        <div className="grid min-h-12 grid-cols-[32px_minmax(240px,1.5fr)_100px_100px_90px_140px_minmax(220px,1fr)] items-center gap-0 px-2 text-sm">
+        <div
+          className="grid min-h-12 items-center gap-0 px-2 text-sm"
+          style={{ gridTemplateColumns: CATALOG_ROW_GRID_TEMPLATE }}
+        >
           <div className="flex items-center justify-center text-muted-foreground">
             {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </div>
 
           <div className="min-w-0 px-2 py-3">
             <p className="truncate text-foreground">{product.name}</p>
-          </div>
-
-          <div className="px-2 py-3">
-            <ProviderBadge provider={product.provider === 'razorpay' ? 'Razorpay' : 'Stripe'} />
           </div>
 
           <div className="px-2 py-3">
@@ -262,12 +265,8 @@ function CatalogRow({
           <div className="px-2 py-3 text-foreground">{productPrices.length}</div>
 
           <div className="min-w-0 px-2 py-3">
-            {defaultPrice ? (
-              <span className="truncate text-foreground">{formatAmount(defaultPrice)}</span>
-            ) : product.providerDefaultPriceId ? (
-              <span className="truncate font-mono text-xs text-muted-foreground">
-                {product.providerDefaultPriceId}
-              </span>
+            {summaryPrice ? (
+              <span className="truncate text-foreground">{formatAmount(summaryPrice)}</span>
             ) : (
               <span className="text-muted-foreground">-</span>
             )}
@@ -380,7 +379,24 @@ export default function CatalogPage() {
     }
   }, [expandedProductId, filteredProducts]);
 
-  const handlePageChange = useCallback((_page: number) => {}, []);
+  const {
+    currentPage,
+    setCurrentPage,
+    totalPages,
+    pageSize,
+    startIndex,
+    endIndex,
+    showPagination,
+  } = usePaymentClientPagination(filteredProducts.length);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [environment, provider, searchQuery, setCurrentPage]);
+
+  const paginatedProducts = useMemo(
+    () => filteredProducts.slice(startIndex, endIndex),
+    [endIndex, filteredProducts, startIndex]
+  );
 
   const lastSyncedTimes = [
     activeConnection?.lastSyncedAt,
@@ -447,13 +463,17 @@ export default function CatalogPage() {
                   </Alert>
                 )}
 
-                <div className="grid grid-cols-[32px_minmax(240px,1.5fr)_100px_100px_90px_140px_minmax(220px,1fr)] gap-0 px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <div
+                  className="grid gap-0 px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                  style={{ gridTemplateColumns: CATALOG_ROW_GRID_TEMPLATE }}
+                >
                   <div />
                   <div className="px-2 py-1.5">Product</div>
-                  <div className="px-2 py-1.5">Provider</div>
                   <div className="px-2 py-1.5">Status</div>
                   <div className="px-2 py-1.5">Prices</div>
-                  <div className="px-2 py-1.5">Default Price</div>
+                  <div className="px-2 py-1.5">
+                    {provider === 'stripe' ? 'Default Price' : 'Amount'}
+                  </div>
                   <div className="px-2 py-1.5">Product ID</div>
                 </div>
 
@@ -461,18 +481,21 @@ export default function CatalogPage() {
                   <EmptyCatalogState hasSearchQuery={searchQuery.trim().length > 0} />
                 ) : (
                   <div className="flex flex-col gap-2">
-                    {filteredProducts.map((product) => {
+                    {paginatedProducts.map((product) => {
                       const productPrices = pricesByProductId.get(product.providerProductId) ?? [];
-                      const defaultPrice = product.providerDefaultPriceId
-                        ? (pricesById.get(product.providerDefaultPriceId) ?? null)
-                        : null;
+                      const summaryPrice =
+                        product.provider === 'stripe'
+                          ? product.providerDefaultPriceId
+                            ? (pricesById.get(product.providerDefaultPriceId) ?? null)
+                            : null
+                          : (sortProductPrices(productPrices, null)[0] ?? null);
 
                       return (
                         <CatalogRow
                           key={`${product.environment}:${product.providerProductId}`}
                           product={product}
                           productPrices={productPrices}
-                          defaultPrice={defaultPrice}
+                          summaryPrice={summaryPrice}
                           expanded={expandedProductId === product.providerProductId}
                           onToggle={() =>
                             setExpandedProductId((current) =>
@@ -489,16 +512,18 @@ export default function CatalogPage() {
               </div>
             </div>
 
-            <div className="border-t border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))]">
-              <PaginationControls
-                currentPage={1}
-                totalPages={1}
-                onPageChange={handlePageChange}
-                totalRecords={filteredProducts.length}
-                pageSize={Math.max(filteredProducts.length, 1)}
-                recordLabel="products"
-              />
-            </div>
+            {showPagination && (
+              <div className="border-t border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))]">
+                <PaginationControls
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  totalRecords={filteredProducts.length}
+                  pageSize={pageSize}
+                  recordLabel="products"
+                />
+              </div>
+            )}
           </div>
         )}
       </div>

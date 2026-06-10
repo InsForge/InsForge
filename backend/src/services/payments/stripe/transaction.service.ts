@@ -407,7 +407,9 @@ export class StripeTransactionService {
                  OR tx.related_object_ids->>refs.type = refs.id
                )
            )
-         ORDER BY tx.created_at DESC
+         ORDER BY
+          CASE WHEN tx.provider_object_type = $2 AND tx.provider_object_id = $3 THEN 0 ELSE 1 END,
+          tx.created_at DESC
          LIMIT 1
        ),
        updated AS (
@@ -499,7 +501,7 @@ export class StripeTransactionService {
          provider_parent_object_id = COALESCE(EXCLUDED.provider_parent_object_id, tx.provider_parent_object_id),
          related_object_ids = tx.related_object_ids || EXCLUDED.related_object_ids,
          amount = EXCLUDED.amount,
-         amount_refunded = EXCLUDED.amount_refunded,
+         amount_refunded = COALESCE($14, tx.amount_refunded, 0),
          currency = EXCLUDED.currency,
          description = COALESCE(EXCLUDED.description, tx.description),
          paid_at = COALESCE(EXCLUDED.paid_at, tx.paid_at),
@@ -617,7 +619,7 @@ export class StripeTransactionService {
            subject_id = COALESCE(refund.subject_id, original_context.subject_id),
            provider_customer_id = COALESCE(refund.provider_customer_id, original_context.provider_customer_id),
            customer_email_snapshot = COALESCE(refund.customer_email_snapshot, original_context.customer_email_snapshot),
-           related_object_ids = refund.related_object_ids || original_context.related_object_ids,
+           related_object_ids = original_context.related_object_ids || refund.related_object_ids,
            description = COALESCE(refund.description, original_context.description),
            updated_at = NOW()
        FROM original_context

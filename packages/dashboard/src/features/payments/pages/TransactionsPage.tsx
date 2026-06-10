@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
 import type {
@@ -16,13 +16,13 @@ import {
 } from '#components';
 import { PaymentsKeyMissingState } from '#features/payments/components/PaymentsKeyMissingState';
 import { PaymentsPageHeader } from '#features/payments/components/PaymentsPageHeader';
-import { ProviderBadge } from '#features/payments/components/ProviderBadge';
 import type { PaymentsOutletContext } from '#features/payments/components/PaymentsLayout';
+import { usePaymentClientPagination } from '#features/payments/hooks/usePaymentClientPagination';
 import { usePaymentTransactions } from '#features/payments/hooks/usePaymentTransactions';
 import { cn } from '#lib/utils/utils';
 
 const TRANSACTIONS_GRID_TEMPLATE =
-  'minmax(0,1.45fr) 120px 100px minmax(0,1.1fr) 120px minmax(0,1fr) 180px';
+  'minmax(0,1.45fr) 120px minmax(0,1.1fr) 120px minmax(0,1fr) 180px';
 
 const PAYMENT_STATUS_CLASS_NAMES: Record<PaymentTransactionStatus, string> = {
   succeeded: 'bg-[var(--alpha-8)] text-emerald-400',
@@ -163,10 +163,6 @@ function PaymentStatusBadge({ status }: { status: PaymentTransactionStatus }) {
   );
 }
 
-function getPaymentProvider(payment: PaymentTransaction) {
-  return payment.provider === 'razorpay' ? 'Razorpay' : 'Stripe';
-}
-
 function EmptyTransactionsState({ hasSearchQuery }: { hasSearchQuery: boolean }) {
   return (
     <div className="rounded border border-dashed border-[var(--alpha-8)] bg-card p-8 text-center">
@@ -197,10 +193,6 @@ function TransactionRow({ payment }: { payment: PaymentTransaction }) {
 
         <div className="px-2 py-3">
           <PaymentStatusBadge status={payment.status} />
-        </div>
-
-        <div className="px-2 py-3">
-          <ProviderBadge provider={getPaymentProvider(payment)} />
         </div>
 
         <div className="min-w-0 px-2 py-3">
@@ -281,7 +273,24 @@ export default function TransactionsPage() {
     );
   }, [transactions, searchQuery]);
 
-  const handlePageChange = useCallback((_page: number) => {}, []);
+  const {
+    currentPage,
+    setCurrentPage,
+    totalPages,
+    pageSize,
+    startIndex,
+    endIndex,
+    showPagination,
+  } = usePaymentClientPagination(filteredTransactions.length);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [environment, provider, searchQuery, setCurrentPage]);
+
+  const paginatedTransactions = useMemo(
+    () => filteredTransactions.slice(startIndex, endIndex),
+    [endIndex, filteredTransactions, startIndex]
+  );
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
@@ -338,7 +347,6 @@ export default function TransactionsPage() {
                 >
                   <div className="px-2 py-1.5">Payment</div>
                   <div className="px-2 py-1.5">Status</div>
-                  <div className="px-2 py-1.5">Provider</div>
                   <div className="px-2 py-1.5">Customer</div>
                   <div className="px-2 py-1.5">Amount</div>
                   <div className="px-2 py-1.5">Provider ID</div>
@@ -349,7 +357,7 @@ export default function TransactionsPage() {
                   <EmptyTransactionsState hasSearchQuery={searchQuery.trim().length > 0} />
                 ) : (
                   <div className="flex flex-col gap-1">
-                    {filteredTransactions.map((payment) => (
+                    {paginatedTransactions.map((payment) => (
                       <TransactionRow key={getPaymentKey(payment)} payment={payment} />
                     ))}
                   </div>
@@ -357,16 +365,18 @@ export default function TransactionsPage() {
               </div>
             </div>
 
-            <div className="border-t border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))]">
-              <PaginationControls
-                currentPage={1}
-                totalPages={1}
-                onPageChange={handlePageChange}
-                totalRecords={filteredTransactions.length}
-                pageSize={Math.max(filteredTransactions.length, 1)}
-                recordLabel="transactions"
-              />
-            </div>
+            {showPagination && (
+              <div className="border-t border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))]">
+                <PaginationControls
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  totalRecords={filteredTransactions.length}
+                  pageSize={pageSize}
+                  recordLabel="transactions"
+                />
+              </div>
+            )}
           </div>
         )}
       </div>
