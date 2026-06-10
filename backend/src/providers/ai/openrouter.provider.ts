@@ -86,7 +86,6 @@ export class OpenRouterProvider {
   private cloudCredentials: CloudCredentials | undefined;
   private openRouterClient: OpenAI | null = null;
   private currentApiKey: string | undefined;
-  private renewalPromise: Promise<string> | null = null;
   private fetchPromise: Promise<string> | null = null;
   private rotationPromise: Promise<string> | null = null;
 
@@ -572,83 +571,6 @@ export class OpenRouterProvider {
     return this.fetchPromise;
   }
 
-  /**
-   * Renew API key from cloud service when credits are exhausted
-   * Uses promise memoization to prevent duplicate renewal requests
-   */
-  async renewCloudApiKey(): Promise<string> {
-    // A rotation in flight just minted a fresh key — return it instead of
-    // racing a renew response that reflects the pre-rotation credential. If
-    // the rotated key is still out of credits, the next 402/403 renews it.
-    if (this.rotationPromise) {
-      logger.info('Rotation in progress, waiting for the rotated key...');
-      return this.rotationPromise;
-    }
-
-    // If renewal is already in progress, wait for it
-    if (this.renewalPromise) {
-      logger.info('Renewal already in progress, waiting for completion...');
-      return this.renewalPromise;
-    }
-
-    // Start new renewal and store the promise
-    this.renewalPromise = (async () => {
-      try {
-        const projectId = process.env.PROJECT_ID;
-        if (!projectId) {
-          throw new AppError(
-            'PROJECT_ID not found in environment variables',
-            500,
-            ERROR_CODES.INTERNAL_ERROR
-          );
-        }
-        const token = this.createCloudProjectToken(projectId);
-
-        // Renew API key from cloud service with sign token in request body
-        const response = await fetch(
-          `${process.env.CLOUD_API_HOST || 'https://api.insforge.dev'}/ai/v1/credentials/${projectId}/renew`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ sign: token }),
-          }
-        );
-
-        if (!response.ok) {
-          throw new AppError(
-            `Failed to renew cloud API key: ${response.statusText}`,
-            response.status,
-            ERROR_CODES.AI_UPSTREAM_UNAVAILABLE
-          );
-        }
-
-        const data = (await response.json()) as CloudCredentialsResponse;
-
-        const apiKey = this.applyCloudCredentials(data);
-
-        logger.info('Successfully renewed cloud API key');
-
-        // Wait for OpenRouter to propagate the updated credits
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-
-        return apiKey;
-      } catch (error) {
-        logger.error('Failed to renew cloud API key', {
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-        });
-        throw error;
-      } finally {
-        // Clear the promise after completion (success or failure)
-        this.renewalPromise = null;
-      }
-    })();
-
-    return this.renewalPromise;
-  }
-
   private async rotateCloudApiKey(): Promise<string> {
     if (this.rotationPromise) {
       logger.info('Rotation already in progress, waiting for completion...');
@@ -657,13 +579,13 @@ export class OpenRouterProvider {
 
     this.rotationPromise = (async () => {
       try {
-        // Let any in-flight fetch/renewal settle before rotating: their response
-        // carries the pre-rotation key, and if it landed after the rotated key it
-        // would clobber cloudCredentials with a just-revoked key — which then
-        // 401s, and 401 never triggers a renewal.
-        await Promise.allSettled(
-          [this.fetchPromise, this.renewalPromise].filter((promise) => promise !== null)
-        );
+        // Let an in-flight fetch settle before rotating: its response carries
+        // the pre-rotation key, and if it landed after the rotated key it would
+        // clobber cloudCredentials with a just-revoked key — which then 401s
+        // on every request until a restart.
+        if (this.fetchPromise) {
+          await this.fetchPromise.catch(() => undefined);
+        }
 
         const projectId = process.env.PROJECT_ID;
         if (!projectId) {
@@ -715,8 +637,10 @@ export class OpenRouterProvider {
   }
 
   /**
-   * Send a request to OpenRouter with automatic renewal and retry logic
-   * Handles 403 insufficient credits errors by renewing the API key and retrying
+   * Send a request to OpenRouter and convert upstream errors to actionable responses.
+   * Cloud-managed keys are minted unlimited for paid orgs and hard-capped for free
+   * orgs, so a 402 means the plan's AI credit is exhausted — there is no renewal
+   * to attempt (the legacy /renew top-up flow only serves old project images).
    * @param request - Function that takes an OpenAI client and returns a Promise
    * @returns The result of the request
    */
@@ -730,43 +654,18 @@ export class OpenRouterProvider {
     try {
       return { result: await request(client), source };
     } catch (error) {
-      // Only renew cloud-managed keys on 402/403; self-hosted env keys are never renewed.
-      if (
-        source === 'cloud' &&
-        error instanceof OpenAI.APIError &&
-        (error.status === 402 || error.status === 403)
-      ) {
-        logger.info(`Received ${error.status} insufficient credits, renewing API key...`);
-        const renewedApiKey = await this.renewCloudApiKey();
-
-        // Get fresh client with the renewed key — pass it directly to avoid re-resolution
-        const renewedClient = await this.getClient(renewedApiKey);
-
-        // Retry with exponential backoff (3 attempts)
-        const maxRetries = 3;
-
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-          try {
-            const backoffMs = Math.pow(2, attempt - 1) * 1000; // 1s, 2s, 4s
-            logger.info(
-              `Retrying request after renewal (attempt ${attempt}/${maxRetries}), waiting ${backoffMs}ms...`
-            );
-            await new Promise((resolve) => setTimeout(resolve, backoffMs));
-
-            const result = await request(renewedClient);
-            logger.info('Request succeeded after API key renewal');
-            return { result, source };
-          } catch (retryError) {
-            if (attempt === maxRetries) {
-              logger.error(`All ${maxRetries} retry attempts failed after API key renewal`);
-              throw retryError;
-            }
-          }
-        }
-      }
-
       // Convert upstream API errors to actionable responses
       if (error instanceof OpenAI.APIError) {
+        if (error.status === 402) {
+          throw new AppError(
+            'AI credit limit reached.',
+            402,
+            ERROR_CODES.BILLING_INSUFFICIENT_BALANCE,
+            source === 'cloud'
+              ? 'This project has used all of its AI credits. Upgrade your plan to continue using AI.'
+              : 'Add credits to your OpenRouter account.'
+          );
+        }
         if (error.status === 401 || error.status === 403) {
           throw new AppError(
             'AI provider authentication failed. Check your API key configuration.',

@@ -21,7 +21,6 @@ type ProviderState = OpenRouterProvider & {
   cloudCredentials?: unknown;
   openRouterClient: unknown | null;
   currentApiKey?: string;
-  renewalPromise: Promise<string> | null;
   fetchPromise: Promise<string> | null;
   rotationPromise: Promise<string> | null;
 };
@@ -31,7 +30,6 @@ function resetProviderState(provider: OpenRouterProvider) {
   state.cloudCredentials = undefined;
   state.openRouterClient = null;
   state.currentApiKey = undefined;
-  state.renewalPromise = null;
   state.fetchPromise = null;
   state.rotationPromise = null;
 }
@@ -137,12 +135,12 @@ describe('OpenRouterProvider.rotateManagedApiKey', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('waits for an in-flight renewal to settle before rotating', async () => {
+  it('waits for an in-flight credentials fetch to settle before rotating', async () => {
     const rotatedKey = 'sk-or-rotated-1234567890';
     const state = provider as unknown as ProviderState;
-    let resolveRenewal!: (value: string) => void;
-    state.renewalPromise = new Promise<string>((resolve) => {
-      resolveRenewal = resolve;
+    let resolveInFlightFetch!: (value: string) => void;
+    state.fetchPromise = new Promise<string>((resolve) => {
+      resolveInFlightFetch = resolve;
     });
 
     fetchMock.mockResolvedValueOnce({
@@ -157,17 +155,17 @@ describe('OpenRouterProvider.rotateManagedApiKey', () => {
     await Promise.resolve();
     expect(fetchMock).not.toHaveBeenCalled();
 
-    resolveRenewal('sk-or-stale-pre-rotation-key');
+    resolveInFlightFetch('sk-or-stale-pre-rotation-key');
     await expect(rotation).resolves.toMatchObject({ apiKey: rotatedKey });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('returns the in-flight rotation result instead of renewing concurrently', async () => {
+  it('resolves key lookups from the in-flight rotation instead of fetching concurrently', async () => {
     const rotatedKey = 'sk-or-rotated-1234567890';
     const state = provider as unknown as ProviderState;
     state.rotationPromise = Promise.resolve(rotatedKey);
 
-    await expect(provider.renewCloudApiKey()).resolves.toBe(rotatedKey);
+    await expect(provider.getApiKey()).resolves.toBe(rotatedKey);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
