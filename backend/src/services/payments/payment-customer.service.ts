@@ -12,6 +12,7 @@ import type {
   StripeEnvironment,
 } from '@/types/payments.js';
 import type {
+  BillingSubject,
   ListPaymentCustomersRequest,
   ListPaymentCustomersResponse,
   PaymentCustomer,
@@ -285,6 +286,29 @@ export class PaymentCustomerService {
     } finally {
       client.release();
     }
+  }
+
+  async backfillCustomerMapping(
+    provider: PaymentProvider,
+    environment: StripeEnvironment,
+    subject: BillingSubject,
+    providerCustomerId: string
+  ): Promise<void> {
+    // ON CONFLICT DO NOTHING covers both unique constraints (subject and
+    // provider_customer_id): backfill fills missing mappings from webhook
+    // event metadata but never overrides a checkout-written mapping.
+    await this.getPool().query(
+      `INSERT INTO payments.customer_mappings (
+         provider,
+         environment,
+         subject_type,
+         subject_id,
+         provider_customer_id
+       )
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT DO NOTHING`,
+      [provider, environment, subject.type, subject.id, providerCustomerId]
+    );
   }
 
   async upsertCustomerProjection(

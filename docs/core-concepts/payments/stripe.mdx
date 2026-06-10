@@ -132,6 +132,61 @@ CREATE TRIGGER fulfill_stripe_order_from_webhook
   EXECUTE FUNCTION public.fulfill_stripe_order();
 ```
 
+### Event ordering
+
+Webhook events are verified and processed independently. InsForge commits every row derived from an event before marking that event `processed`, but Stripe gives no ordering guarantee across events: `invoice.paid` can be processed before `checkout.session.completed`, so rows created by another event (such as `payments.customer_mappings`) may not exist yet when your trigger fires.
+
+For subscription events, resolve the billing subject from the event payload first — InsForge stamps `insforge_subject_type` and `insforge_subject_id` into subscription metadata at checkout, and Stripe copies it onto every invoice — and fall back to `payments.customer_mappings`:
+
+```sql
+CREATE OR REPLACE FUNCTION public.grant_subscription_access()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_subject_type TEXT;
+  v_subject_id TEXT;
+BEGIN
+  IF NEW.provider = 'stripe'
+     AND NEW.event_type = 'invoice.paid'
+     AND NEW.processing_status = 'processed' THEN
+    v_subject_type := NEW.payload -> 'data' -> 'object' -> 'parent'
+                      -> 'subscription_details' -> 'metadata' ->> 'insforge_subject_type';
+    v_subject_id := NEW.payload -> 'data' -> 'object' -> 'parent'
+                    -> 'subscription_details' -> 'metadata' ->> 'insforge_subject_id';
+
+    IF v_subject_id IS NULL THEN
+      SELECT m.subject_type, m.subject_id
+      INTO v_subject_type, v_subject_id
+      FROM payments.customer_mappings m
+      WHERE m.provider = NEW.provider
+        AND m.environment = NEW.environment
+        AND m.provider_customer_id = NEW.payload -> 'data' -> 'object' ->> 'customer';
+    END IF;
+
+    IF v_subject_id IS NULL THEN
+      RAISE WARNING 'Stripe event % has no resolvable billing subject', NEW.provider_event_id;
+      RETURN NEW;
+    END IF;
+
+    INSERT INTO public.team_entitlements (team_id, plan, active, updated_at)
+    VALUES (v_subject_id::uuid, 'pro', true, NOW())
+    ON CONFLICT (team_id) DO UPDATE SET
+      plan = EXCLUDED.plan,
+      active = true,
+      updated_at = NOW();
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER grant_subscription_access_from_stripe_webhook
+  AFTER INSERT OR UPDATE ON payments.webhook_events
+  FOR EACH ROW
+  EXECUTE FUNCTION public.grant_subscription_access();
+```
+
+Never let fulfillment skip silently — log or dead-letter events you cannot resolve so they can be replayed.
+
 ## Sync and dashboard state
 
 Stripe sync mirrors Products, Prices, Customers, and Subscriptions. Webhooks maintain session, subscription, customer, refund, and transaction state as Stripe emits events.

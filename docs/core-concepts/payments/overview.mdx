@@ -63,6 +63,8 @@ CREATE TRIGGER fulfill_from_payment_webhook
 
 If your app accepts multiple providers, keep the trigger idempotent and branch on `NEW.provider` and `NEW.event_type`. Protect your app-owned fulfillment tables with your own RLS policies.
 
+Webhook events are processed independently and providers give no ordering guarantee across events. Rows derived from an event are committed before that event is marked `processed`, but rows owned by other events — such as `payments.customer_mappings`, which checkout completion creates — may not exist yet when your trigger fires. Resolve billing subjects from the event payload first and treat lookups into other tables as fallbacks. See the provider guides for subscription fulfillment examples.
+
 <Warning>
   Older Stripe-only `payments.payment_history` rows are migrated into
   `payments.transactions` for dashboard and reporting. Triggers on

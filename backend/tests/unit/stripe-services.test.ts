@@ -3079,6 +3079,7 @@ describe('Stripe payment services', () => {
           },
         ],
       })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
@@ -3132,6 +3133,119 @@ describe('Stripe payment services', () => {
       expect.stringMatching(
         /related_object_ids = tx\.related_object_ids \|\| EXCLUDED\.related_object_ids/i
       ),
+      expect.any(Array)
+    );
+    expect(mockPool.query).toHaveBeenCalledWith(
+      expect.stringMatching(/INSERT INTO payments\.customer_mappings[\s\S]*ON CONFLICT DO NOTHING/i),
+      ['stripe', 'test', 'organization', 'org_123', 'cus_123']
+    );
+  });
+
+  it('resolves invoice subjects from existing customer mappings without backfilling', async () => {
+    mockGetSecretByKey
+      .mockResolvedValueOnce('whsec_test_123')
+      .mockResolvedValueOnce('sk_test_1234567890');
+    mockProvider.constructWebhookEvent.mockReturnValueOnce({
+      id: 'evt_invoice_456',
+      type: 'invoice.paid',
+      livemode: false,
+      data: {
+        object: {
+          id: 'in_456',
+          object: 'invoice',
+          amount_due: 9900,
+          amount_paid: 9900,
+          currency: 'usd',
+          created: 1777334400,
+          customer: 'cus_456',
+          customer_email: 'buyer@example.com',
+          description: 'Subscription invoice',
+          number: 'INV-456',
+          metadata: {},
+          status_transitions: { paid_at: 1777334500 },
+          parent: {
+            type: 'subscription_details',
+            quote_details: null,
+            subscription_details: {
+              subscription: 'sub_456',
+              metadata: {},
+            },
+          },
+          payments: {
+            data: [
+              {
+                payment: {
+                  type: 'payment_intent',
+                  payment_intent: 'pi_invoice_456',
+                },
+              },
+            ],
+          },
+          lines: { data: [] },
+        },
+      },
+    });
+    mockPool.query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            environment: 'test',
+            eventId: 'evt_invoice_456',
+            eventType: 'invoice.paid',
+            livemode: false,
+            accountId: null,
+            objectType: 'invoice',
+            objectId: 'in_456',
+            processingStatus: 'pending',
+            attemptCount: 1,
+            lastError: null,
+            receivedAt: new Date('2026-04-28T00:00:00.000Z'),
+            processedAt: null,
+            createdAt: new Date('2026-04-28T00:00:00.000Z'),
+            updatedAt: new Date('2026-04-28T00:00:00.000Z'),
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [{ subjectType: 'user', subjectId: 'user_456' }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            environment: 'test',
+            eventId: 'evt_invoice_456',
+            eventType: 'invoice.paid',
+            livemode: false,
+            accountId: null,
+            objectType: 'invoice',
+            objectId: 'in_456',
+            processingStatus: 'processed',
+            attemptCount: 1,
+            lastError: null,
+            receivedAt: new Date('2026-04-28T00:00:00.000Z'),
+            processedAt: new Date('2026-04-28T00:00:01.000Z'),
+            createdAt: new Date('2026-04-28T00:00:00.000Z'),
+            updatedAt: new Date('2026-04-28T00:00:01.000Z'),
+          },
+        ],
+      });
+
+    await expect(
+      stripeServices.handleStripeWebhook('test', Buffer.from('{"id":"evt_invoice_456"}'), 'sig_123')
+    ).resolves.toMatchObject({ received: true, handled: true });
+
+    expect(mockPool.query).toHaveBeenCalledWith(
+      expect.stringMatching(/FROM payments\.customer_mappings/i),
+      ['test', 'cus_456']
+    );
+    expect(mockPool.query).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /INSERT INTO payments\.transactions[\s\S]*ON CONFLICT \(provider, environment, provider_object_type, provider_object_id\)/i
+      ),
+      expect.arrayContaining(['test', 'payment_intent', 'pi_invoice_456', 'user', 'user_456'])
+    );
+    expect(mockPool.query).not.toHaveBeenCalledWith(
+      expect.stringMatching(/INSERT INTO payments\.customer_mappings/i),
       expect.any(Array)
     );
   });
@@ -3753,6 +3867,7 @@ describe('Stripe payment services', () => {
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
         rows: [
           {
@@ -3888,6 +4003,7 @@ describe('Stripe payment services', () => {
           },
         ],
       })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] })
       .mockResolvedValueOnce({
         rows: [
           {
@@ -3926,6 +4042,10 @@ describe('Stripe payment services', () => {
       expect.arrayContaining(['test', 'si_123', 'sub_123', 'prod_123', 'price_123', 1])
     );
     expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
+    expect(mockPool.query).toHaveBeenCalledWith(
+      expect.stringMatching(/INSERT INTO payments\.customer_mappings[\s\S]*ON CONFLICT DO NOTHING/i),
+      ['stripe', 'test', 'organization', 'org_123', 'cus_123']
+    );
   });
 
   it('syncs existing Stripe subscriptions as unmapped when no billing subject exists', async () => {

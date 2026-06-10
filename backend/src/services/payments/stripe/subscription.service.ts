@@ -1,5 +1,6 @@
 import type { Pool, PoolClient } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
+import { PaymentCustomerService } from '@/services/payments/payment-customer.service.js';
 import type { StripeProvider } from '@/providers/payments/stripe.provider.js';
 import {
   fromStripeTimestamp,
@@ -29,6 +30,7 @@ export interface SubscriptionProjectionResult {
 export class StripeSubscriptionService {
   private static instance: StripeSubscriptionService;
   private pool: Pool | null = null;
+  private readonly customerService = PaymentCustomerService.getInstance();
 
   static getInstance(): StripeSubscriptionService {
     if (!StripeSubscriptionService.instance) {
@@ -170,7 +172,9 @@ export class StripeSubscriptionService {
       return { synced: false, unmapped: false };
     }
 
-    const subject = await this.resolveSubscriptionSubject(environment, subscription, customerId);
+    const metadataSubject = getBillingSubjectFromProviderAttributes(subscription.metadata);
+    const subject =
+      metadataSubject ?? (await this.resolveSubjectFromCustomerMapping(environment, customerId));
 
     const subscriptionItems = await this.resolveSubscriptionItems(subscription, provider);
     const client = await this.getPool().connect();
@@ -252,13 +256,26 @@ export class StripeSubscriptionService {
       );
 
       await client.query('COMMIT');
-      return { synced: true, unmapped: !subject };
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
     } finally {
       client.release();
     }
+
+    if (metadataSubject) {
+      // Stripe delivers customer.subscription.* and checkout.session.completed
+      // in no guaranteed order; backfill the mapping so fulfillment triggers
+      // on this event can resolve the subject regardless of arrival order.
+      await this.customerService.backfillCustomerMapping(
+        'stripe',
+        environment,
+        metadataSubject,
+        customerId
+      );
+    }
+
+    return { synced: true, unmapped: !subject };
   }
 
   private async deleteMissingSyncedSubscriptions(
@@ -344,17 +361,6 @@ export class StripeSubscriptionService {
     }
 
     return provider.listSubscriptionItems(subscription.id);
-  }
-
-  private async resolveSubscriptionSubject(
-    environment: StripeEnvironment,
-    subscription: StripeSubscription,
-    customerId: string
-  ): Promise<BillingSubject | null> {
-    return (
-      getBillingSubjectFromProviderAttributes(subscription.metadata) ??
-      (await this.resolveSubjectFromCustomerMapping(environment, customerId))
-    );
   }
 
   private async findStripeCustomerMappingByCustomerId(
