@@ -173,8 +173,11 @@ router.get('/:docType', async (req: Request, res: Response, next: NextFunction) 
     const resolvedPath = path.resolve(filePath);
     const resolvedDocsRoot = path.resolve(docsRoot);
     const resolvedAgentsRoot = path.resolve(projectRoot, '.agents/docs');
-    
-    if (!resolvedPath.startsWith(resolvedDocsRoot) && !resolvedPath.startsWith(resolvedAgentsRoot)) {
+
+    if (
+      !resolvedPath.startsWith(resolvedDocsRoot) &&
+      !resolvedPath.startsWith(resolvedAgentsRoot)
+    ) {
       throw new AppError('Invalid documentation path', 403, ERROR_CODES.FORBIDDEN);
     }
 
@@ -230,8 +233,11 @@ router.get('/:docFeature/:docLanguage', async (req: Request, res: Response, next
     const resolvedPath = path.resolve(filePath);
     const resolvedDocsRoot = path.resolve(docsRoot);
     const resolvedAgentsRoot = path.resolve(projectRoot, '.agents/docs');
-    
-    if (!resolvedPath.startsWith(resolvedDocsRoot) && !resolvedPath.startsWith(resolvedAgentsRoot)) {
+
+    if (
+      !resolvedPath.startsWith(resolvedDocsRoot) &&
+      !resolvedPath.startsWith(resolvedAgentsRoot)
+    ) {
       throw new AppError('Invalid documentation path', 403, ERROR_CODES.FORBIDDEN);
     }
 
