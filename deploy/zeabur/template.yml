@@ -164,7 +164,7 @@ spec:
 
                     shared_preload_libraries = 'pg_cron,http,pgcrypto,insforge_pg_utils'
                     insforge.policy_grant_role = 'project_admin'
-                    insforge.policy_grant_tables = 'storage.objects,realtime.channels,realtime.messages,payments.checkout_sessions,payments.customer_portal_sessions'
+                    insforge.policy_grant_tables = 'storage.objects,realtime.channels,realtime.messages,payments.stripe_checkout_sessions,payments.stripe_customer_portal_sessions,payments.razorpay_orders,payments.razorpay_subscriptions'
                     cron.database_name = 'insforge'
                 - path: /docker-entrypoint-initdb.d/01-init.sql
                   template: |

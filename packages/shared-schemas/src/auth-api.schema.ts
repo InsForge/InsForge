@@ -312,9 +312,7 @@ const pkceRegex = /^[A-Za-z0-9._~-]+$/;
  */
 export const oAuthInitRequestSchema = z
   .object({
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     redirect_uri: z.string({ required_error: 'Redirect URI is required' }).url(),
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     code_challenge: z
       .string()
       .min(43, 'Code challenge must be at least 43 characters')
@@ -329,7 +327,6 @@ export const oAuthInitRequestSchema = z
  */
 export const oAuthCodeExchangeRequestSchema = z.object({
   code: z.string().min(1, 'Exchange code is required'),
-  // eslint-disable-next-line @typescript-eslint/naming-convention
   code_verifier: z
     .string()
     .min(43, 'Code verifier must be at least 43 characters')

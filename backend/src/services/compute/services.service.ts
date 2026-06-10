@@ -4,7 +4,7 @@ import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 import { FlyProvider } from '@/providers/compute/fly.provider.js';
 import { CloudComputeProvider } from '@/providers/compute/cloud.provider.js';
-import type { ComputeProvider } from '@/providers/compute/compute.provider.js';
+import type { ComputeProvider, ComputeLogsResult } from '@/providers/compute/compute.provider.js';
 import { appConfig } from '@/infra/config/app.config.js';
 import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
@@ -920,6 +920,29 @@ export class ComputeServicesService {
     }
 
     return this.getCompute().getEvents(svc.flyAppId, svc.flyMachineId, options);
+  }
+
+  /**
+   * Fetch container stdout/stderr ("application logs") for a service. Resolves
+   * the service's Fly app + machine, then delegates to the active compute
+   * provider. Throws 404 if the service has not been launched yet.
+   */
+  async getServiceLogs(
+    id: string,
+    options?: { limit?: number; nextToken?: string }
+  ): Promise<ComputeLogsResult> {
+    const svc = await this.getService(id);
+
+    if (!svc.flyAppId || !svc.flyMachineId) {
+      throw new AppError(
+        'Service not found',
+        404,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
+        NEXT_ACTIONS.CHECK_COMPUTE_SERVICE_EXISTS
+      );
+    }
+
+    return this.getCompute().getLogs(svc.flyAppId, svc.flyMachineId, options);
   }
 
   private decryptEnvVars(encrypted: string | null): Record<string, string> {

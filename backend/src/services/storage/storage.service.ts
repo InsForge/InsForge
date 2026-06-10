@@ -24,6 +24,8 @@ const DEFAULT_LIST_LIMIT = 100;
 const GIGABYTE_IN_BYTES = 1024 * 1024 * 1024;
 const PUBLIC_BUCKET_EXPIRY = 0; // Public buckets don't expire
 const PRIVATE_BUCKET_EXPIRY = 3600; // Private buckets expire in 1 hour
+const MIN_SIGNED_URL_EXPIRY = 1; // 1 second
+const MAX_SIGNED_URL_EXPIRY = 604800; // 7 days — S3 SigV4 presign ceiling
 
 type StorageObjectResult = {
   file: Buffer;
@@ -561,15 +563,25 @@ export class StorageService {
     return this.provider.getUploadStrategy(bucket, key, metadata, maxFileSizeBytes);
   }
 
-  async getDownloadStrategy(bucket: string, key: string) {
+  async getDownloadStrategy(bucket: string, key: string, requestedExpiresIn?: number) {
     this.validateBucketName(bucket);
     this.validateKey(key);
 
     // Check if bucket is public
     const isPublic = await this.isBucketPublic(bucket);
 
-    // Auto-calculate expiry based on bucket visibility if not provided
-    const expiresIn = isPublic ? PUBLIC_BUCKET_EXPIRY : PRIVATE_BUCKET_EXPIRY;
+    // Auto-calculate expiry based on bucket visibility if not provided.
+    // Private buckets honor a caller-supplied TTL (clamped to a safe range) so
+    // `createSignedUrl(key, expiresIn)` can mint short-lived links; public
+    // buckets keep their long, server-decided expiry regardless (the provider
+    // also forces 7 days for public objects).
+    let expiresIn = isPublic ? PUBLIC_BUCKET_EXPIRY : PRIVATE_BUCKET_EXPIRY;
+    if (!isPublic && requestedExpiresIn !== undefined && Number.isFinite(requestedExpiresIn)) {
+      expiresIn = Math.min(
+        Math.max(Math.floor(requestedExpiresIn), MIN_SIGNED_URL_EXPIRY),
+        MAX_SIGNED_URL_EXPIRY
+      );
+    }
 
     // Fetch the version stamp (etag preferred, uploaded_at fallback) and pass
     // it to the provider, which knows whether its URL flavor tolerates an

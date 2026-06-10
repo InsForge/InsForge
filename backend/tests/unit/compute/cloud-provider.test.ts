@@ -145,6 +145,34 @@ describe('CloudComputeProvider', () => {
     expect(call[0]).toContain('limit=50');
   });
 
+  it('getLogs GETs /machines/:id/logs forwarding appId, limit, next_token and returns the payload', async () => {
+    const payload = { lines: [{ timestamp: 1, message: 'hi' }], nextToken: '42' };
+    fetchMock.mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify(payload),
+    } as Response);
+    const provider = CloudComputeProvider.getInstance();
+
+    const result = await provider.getLogs('myapp', 'machine-1', { limit: 200, nextToken: 'cur' });
+
+    const call = fetchMock.mock.calls[0];
+    expect(call[0]).toContain('/compute/machines/machine-1/logs');
+    expect(call[0]).toContain('appId=myapp');
+    expect(call[0]).toContain('limit=200');
+    expect(call[0]).toContain('next_token=cur');
+    expect((call[1] as RequestInit).method).toBe('GET');
+    expect(result).toEqual(payload);
+  });
+
+  it('getLogs returns empty result when the cloud responds with no body', async () => {
+    fetchMock.mockResolvedValue({ ok: true, text: async () => '' } as Response);
+    const provider = CloudComputeProvider.getInstance();
+
+    const result = await provider.getLogs('myapp', 'machine-1');
+
+    expect(result).toEqual({ lines: [], nextToken: null });
+  });
+
   it('throws COMPUTE_CLOUD_UNAVAILABLE on AbortError (timeout)', async () => {
     const abortError = new DOMException('The operation was aborted', 'AbortError');
     fetchMock.mockRejectedValue(abortError);

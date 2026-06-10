@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
-import type { StripePrice, StripeProduct } from '@insforge/shared-schemas';
+import type { CatalogPrice, CatalogProduct } from '#features/payments/types/catalog';
 import {
   Alert,
   AlertDescription,
@@ -9,11 +9,14 @@ import {
   ErrorState,
   LoadingState,
   PaginationControls,
-  TableHeader,
 } from '#components';
 import { PaymentsKeyMissingState } from '#features/payments/components/PaymentsKeyMissingState';
+import { PaymentsPageHeader } from '#features/payments/components/PaymentsPageHeader';
 import type { PaymentsOutletContext } from '#features/payments/components/PaymentsLayout';
 import { usePaymentCatalog } from '#features/payments/hooks/usePaymentCatalog';
+import { usePaymentClientPagination } from '#features/payments/hooks/usePaymentClientPagination';
+
+const CATALOG_ROW_GRID_TEMPLATE = '32px minmax(240px,1.5fr) 100px 90px 140px minmax(220px,1fr)';
 
 function formatDate(value: string | null) {
   if (!value) {
@@ -45,7 +48,7 @@ function getCurrencyFractionDigits(currency: string) {
   );
 }
 
-function formatAmount(price: StripePrice) {
+function formatAmount(price: CatalogPrice) {
   const rawAmount =
     price.unitAmount ?? (price.unitAmountDecimal ? Number(price.unitAmountDecimal) : null);
 
@@ -63,7 +66,7 @@ function formatAmount(price: StripePrice) {
   }).format(rawAmount / 10 ** fractionDigits);
 }
 
-function formatBilling(price: StripePrice) {
+function formatBilling(price: CatalogPrice) {
   if (price.type !== 'recurring' || !price.recurringInterval) {
     return 'One time';
   }
@@ -74,10 +77,10 @@ function formatBilling(price: StripePrice) {
     : `Every ${intervalCount} ${price.recurringInterval}s`;
 }
 
-function sortProductPrices(prices: StripePrice[], defaultPriceId: string | null) {
+function sortProductPrices(prices: CatalogPrice[], defaultPriceId: string | null) {
   return [...prices].sort((left, right) => {
-    const leftIsDefault = left.stripePriceId === defaultPriceId;
-    const rightIsDefault = right.stripePriceId === defaultPriceId;
+    const leftIsDefault = left.providerPriceId === defaultPriceId;
+    const rightIsDefault = right.providerPriceId === defaultPriceId;
 
     if (leftIsDefault !== rightIsDefault) {
       return leftIsDefault ? -1 : 1;
@@ -95,7 +98,7 @@ function sortProductPrices(prices: StripePrice[], defaultPriceId: string | null)
       return left.lookupKey ? -1 : 1;
     }
 
-    return left.stripePriceId.localeCompare(right.stripePriceId);
+    return left.providerPriceId.localeCompare(right.providerPriceId);
   });
 }
 
@@ -130,8 +133,8 @@ function EmptyCatalogState({ hasSearchQuery }: { hasSearchQuery: boolean }) {
       </p>
       <p className="mt-1 text-sm text-muted-foreground">
         {hasSearchQuery
-          ? 'Try a different product name, ID, or default price reference.'
-          : 'Open Payments Settings and sync after creating products in your Stripe dashboard.'}
+          ? 'Try a different product name, ID, or pricing reference.'
+          : 'Open Payments Settings and sync after creating products in your provider dashboard.'}
       </p>
     </div>
   );
@@ -141,21 +144,21 @@ function ProductPricesTable({
   product,
   prices,
 }: {
-  product: StripeProduct;
-  prices: StripePrice[];
+  product: CatalogProduct;
+  prices: CatalogPrice[];
 }) {
   if (prices.length === 0) {
     return (
       <div className="rounded border border-dashed border-[var(--alpha-8)] bg-card p-6 text-center">
         <p className="text-sm font-medium text-foreground">No prices synced for this product</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Prices attached to this Stripe product will appear after the next sync.
+          Prices attached to this product will appear after the next sync.
         </p>
       </div>
     );
   }
 
-  const sortedPrices = sortProductPrices(prices, product.defaultPriceId);
+  const sortedPrices = sortProductPrices(prices, product.providerDefaultPriceId);
 
   return (
     <div className="overflow-x-auto">
@@ -169,11 +172,13 @@ function ProductPricesTable({
         </div>
 
         {sortedPrices.map((price) => {
-          const isDefault = price.stripePriceId === product.defaultPriceId;
+          const isDefault =
+            product.provider === 'stripe' &&
+            price.providerPriceId === product.providerDefaultPriceId;
 
           return (
             <div
-              key={`${price.environment}:${price.stripePriceId}`}
+              key={`${price.environment}:${price.providerPriceId}`}
               className="grid grid-cols-[160px_120px_140px_minmax(220px,1fr)_minmax(180px,1fr)] items-center border-b border-[var(--alpha-8)] px-4 py-3 text-sm last:border-0"
             >
               <div className="min-w-0">
@@ -195,9 +200,9 @@ function ProductPricesTable({
               <div className="min-w-0">
                 <p
                   className="truncate font-mono text-xs text-foreground"
-                  title={price.stripePriceId}
+                  title={price.providerPriceId}
                 >
-                  {price.stripePriceId}
+                  {price.providerPriceId}
                 </p>
               </div>
 
@@ -221,13 +226,13 @@ function ProductPricesTable({
 function CatalogRow({
   product,
   productPrices,
-  defaultPrice,
+  summaryPrice,
   expanded,
   onToggle,
 }: {
-  product: StripeProduct;
-  productPrices: StripePrice[];
-  defaultPrice: StripePrice | null;
+  product: CatalogProduct;
+  productPrices: CatalogPrice[];
+  summaryPrice: CatalogPrice | null;
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -238,7 +243,10 @@ function CatalogRow({
         onClick={onToggle}
         className="w-full text-left transition-colors hover:bg-alpha-4"
       >
-        <div className="grid min-h-12 grid-cols-[32px_minmax(240px,1.5fr)_120px_90px_140px_minmax(220px,1fr)] items-center gap-0 px-2 text-sm">
+        <div
+          className="grid min-h-12 items-center gap-0 px-2 text-sm"
+          style={{ gridTemplateColumns: CATALOG_ROW_GRID_TEMPLATE }}
+        >
           <div className="flex items-center justify-center text-muted-foreground">
             {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </div>
@@ -257,12 +265,8 @@ function CatalogRow({
           <div className="px-2 py-3 text-foreground">{productPrices.length}</div>
 
           <div className="min-w-0 px-2 py-3">
-            {defaultPrice ? (
-              <span className="truncate text-foreground">{formatAmount(defaultPrice)}</span>
-            ) : product.defaultPriceId ? (
-              <span className="truncate font-mono text-xs text-muted-foreground">
-                {product.defaultPriceId}
-              </span>
+            {summaryPrice ? (
+              <span className="truncate text-foreground">{formatAmount(summaryPrice)}</span>
             ) : (
               <span className="text-muted-foreground">-</span>
             )}
@@ -271,9 +275,9 @@ function CatalogRow({
           <div className="min-w-0 px-2 py-3">
             <span
               className="block truncate font-mono text-xs text-muted-foreground"
-              title={product.stripeProductId}
+              title={product.providerProductId}
             >
-              {product.stripeProductId}
+              {product.providerProductId}
             </span>
           </div>
         </div>
@@ -297,7 +301,7 @@ function CatalogRow({
               <div>
                 <h2 className="text-sm font-medium text-foreground">Prices</h2>
                 <p className="text-sm text-muted-foreground">
-                  Active prices, Stripe price IDs, and Stripe lookup keys are shown here.
+                  Active prices, price IDs, and lookup keys are shown here.
                 </p>
               </div>
               <ProductPricesTable product={product} prices={productPrices} />
@@ -310,35 +314,44 @@ function CatalogRow({
 }
 
 export default function CatalogPage() {
-  const { openPaymentsSettings, environment } = useOutletContext<PaymentsOutletContext>();
+  const { openPaymentsSettings, provider, setProvider, environment } =
+    useOutletContext<PaymentsOutletContext>();
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedProductId, setExpandedProductId] = useState<string | null>(null);
-  const { activeConnection, products, prices, isLoading, error, refetch } =
-    usePaymentCatalog(environment);
+  const {
+    activeConnection,
+    activeRazorpayConnection,
+    hasActiveKey,
+    products,
+    prices,
+    isLoading,
+    error,
+    refetch,
+  } = usePaymentCatalog(provider, environment);
 
   useEffect(() => {
     setExpandedProductId(null);
-  }, [environment]);
+  }, [environment, provider]);
 
   const pricesByProductId = useMemo(() => {
-    const nextPricesByProductId = new Map<string, StripePrice[]>();
+    const nextPricesByProductId = new Map<string, CatalogPrice[]>();
     for (const price of prices) {
-      if (!price.stripeProductId) {
+      if (!price.providerProductId) {
         continue;
       }
 
-      const productPrices = nextPricesByProductId.get(price.stripeProductId) ?? [];
+      const productPrices = nextPricesByProductId.get(price.providerProductId) ?? [];
       productPrices.push(price);
-      nextPricesByProductId.set(price.stripeProductId, productPrices);
+      nextPricesByProductId.set(price.providerProductId, productPrices);
     }
 
     return nextPricesByProductId;
   }, [prices]);
 
   const pricesById = useMemo(() => {
-    const nextPricesById = new Map<string, StripePrice>();
+    const nextPricesById = new Map<string, CatalogPrice>();
     for (const price of prices) {
-      nextPricesById.set(price.stripePriceId, price);
+      nextPricesById.set(price.providerPriceId, price);
     }
 
     return nextPricesById;
@@ -351,7 +364,7 @@ export default function CatalogPage() {
 
     const normalizedSearch = searchQuery.toLowerCase();
     return products.filter((product) =>
-      [product.name, product.description, product.stripeProductId, product.defaultPriceId]
+      [product.name, product.description, product.providerProductId, product.providerDefaultPriceId]
         .filter(Boolean)
         .some((value) => value?.toLowerCase().includes(normalizedSearch))
     );
@@ -360,50 +373,72 @@ export default function CatalogPage() {
   useEffect(() => {
     if (
       expandedProductId &&
-      !filteredProducts.some((product) => product.stripeProductId === expandedProductId)
+      !filteredProducts.some((product) => product.providerProductId === expandedProductId)
     ) {
       setExpandedProductId(null);
     }
   }, [expandedProductId, filteredProducts]);
 
-  const handlePageChange = useCallback((_page: number) => {}, []);
+  const {
+    currentPage,
+    setCurrentPage,
+    totalPages,
+    pageSize,
+    startIndex,
+    endIndex,
+    showPagination,
+  } = usePaymentClientPagination(filteredProducts.length);
 
-  const hasActiveKey = !!activeConnection?.maskedKey;
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [environment, provider, searchQuery, setCurrentPage]);
+
+  const paginatedProducts = useMemo(
+    () => filteredProducts.slice(startIndex, endIndex),
+    [endIndex, filteredProducts, startIndex]
+  );
+
+  const lastSyncedTimes = [
+    activeConnection?.lastSyncedAt,
+    activeRazorpayConnection?.lastSyncedAt,
+  ].filter((value): value is string => Boolean(value));
+
+  const mostRecentSync =
+    (lastSyncedTimes.length > 0
+      ? [...lastSyncedTimes].sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0]
+      : null) ?? null;
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
-      <TableHeader
-        title="Catalog"
-        className="h-14 min-h-14"
-        leftClassName="py-0"
-        rightClassName="py-0"
-        showDividerAfterTitle
-        leftSlot={
-          hasActiveKey ? (
+      {hasActiveKey && (
+        <PaymentsPageHeader
+          title="Catalog"
+          showDividerAfterTitle
+          leftSlot={
             <span className="text-xs text-muted-foreground">
-              Last synced: {formatLastSynced(activeConnection?.lastSyncedAt ?? null)}
+              Last synced: {formatLastSynced(mostRecentSync)}
             </span>
-          ) : null
-        }
-        rightActions={null}
-        showSearch={hasActiveKey}
-        searchValue={searchQuery}
-        onSearchChange={setSearchQuery}
-        searchDebounceTime={300}
-        searchPlaceholder="Search product"
-        searchInputClassName="w-[280px]"
-      />
+          }
+          showSearch
+          searchValue={searchQuery}
+          onSearchChange={setSearchQuery}
+          searchDebounceTime={300}
+          searchPlaceholder="Search product"
+          searchInputClassName="w-[280px]"
+        />
+      )}
 
       <div className="relative min-h-0 flex-1 overflow-y-auto">
         {error ? (
           <ErrorState error={error as Error} onRetry={() => void refetch()} />
         ) : isLoading ? (
-          <LoadingState message="Loading Stripe catalog..." />
+          <LoadingState message="Loading catalog..." />
         ) : !hasActiveKey ? (
           <PaymentsKeyMissingState
+            provider={provider}
             environment={environment}
-            resourceLabel="catalog"
             onConfigure={openPaymentsSettings}
+            onProviderChange={setProvider}
           />
         ) : (
           <div className="flex h-full flex-col">
@@ -412,19 +447,33 @@ export default function CatalogPage() {
                 {activeConnection?.lastSyncError && (
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Latest sync failed</AlertTitle>
+                    <AlertTitle>Latest Stripe sync failed</AlertTitle>
                     <AlertDescription className="mt-2">
                       {activeConnection.lastSyncError}
                     </AlertDescription>
                   </Alert>
                 )}
+                {activeRazorpayConnection?.lastSyncError && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Latest Razorpay sync failed</AlertTitle>
+                    <AlertDescription className="mt-2">
+                      {activeRazorpayConnection.lastSyncError}
+                    </AlertDescription>
+                  </Alert>
+                )}
 
-                <div className="grid grid-cols-[32px_minmax(240px,1.5fr)_120px_90px_140px_minmax(220px,1fr)] gap-0 px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <div
+                  className="grid gap-0 px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                  style={{ gridTemplateColumns: CATALOG_ROW_GRID_TEMPLATE }}
+                >
                   <div />
                   <div className="px-2 py-1.5">Product</div>
                   <div className="px-2 py-1.5">Status</div>
                   <div className="px-2 py-1.5">Prices</div>
-                  <div className="px-2 py-1.5">Default Price</div>
+                  <div className="px-2 py-1.5">
+                    {provider === 'stripe' ? 'Default Price' : 'Amount'}
+                  </div>
                   <div className="px-2 py-1.5">Product ID</div>
                 </div>
 
@@ -432,22 +481,27 @@ export default function CatalogPage() {
                   <EmptyCatalogState hasSearchQuery={searchQuery.trim().length > 0} />
                 ) : (
                   <div className="flex flex-col gap-2">
-                    {filteredProducts.map((product) => {
-                      const productPrices = pricesByProductId.get(product.stripeProductId) ?? [];
-                      const defaultPrice = product.defaultPriceId
-                        ? (pricesById.get(product.defaultPriceId) ?? null)
-                        : null;
+                    {paginatedProducts.map((product) => {
+                      const productPrices = pricesByProductId.get(product.providerProductId) ?? [];
+                      const summaryPrice =
+                        product.provider === 'stripe'
+                          ? product.providerDefaultPriceId
+                            ? (pricesById.get(product.providerDefaultPriceId) ?? null)
+                            : null
+                          : (sortProductPrices(productPrices, null)[0] ?? null);
 
                       return (
                         <CatalogRow
-                          key={`${product.environment}:${product.stripeProductId}`}
+                          key={`${product.environment}:${product.providerProductId}`}
                           product={product}
                           productPrices={productPrices}
-                          defaultPrice={defaultPrice}
-                          expanded={expandedProductId === product.stripeProductId}
+                          summaryPrice={summaryPrice}
+                          expanded={expandedProductId === product.providerProductId}
                           onToggle={() =>
                             setExpandedProductId((current) =>
-                              current === product.stripeProductId ? null : product.stripeProductId
+                              current === product.providerProductId
+                                ? null
+                                : product.providerProductId
                             )
                           }
                         />
@@ -458,16 +512,18 @@ export default function CatalogPage() {
               </div>
             </div>
 
-            <div className="border-t border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))]">
-              <PaginationControls
-                currentPage={1}
-                totalPages={1}
-                onPageChange={handlePageChange}
-                totalRecords={filteredProducts.length}
-                pageSize={Math.max(filteredProducts.length, 1)}
-                recordLabel="products"
-              />
-            </div>
+            {showPagination && (
+              <div className="border-t border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))]">
+                <PaginationControls
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  totalRecords={filteredProducts.length}
+                  pageSize={pageSize}
+                  recordLabel="products"
+                />
+              </div>
+            )}
           </div>
         )}
       </div>

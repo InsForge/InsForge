@@ -3,7 +3,7 @@ import { TokenManager } from '@/infra/security/token.manager.js';
 import { isCloudEnvironment, getApiBaseUrl } from '@/utils/environment.js';
 import logger from '@/utils/logger.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
-import { PaymentService } from '@/services/payments/payment.service.js';
+import { StripeSyncService } from '@/services/payments/stripe/sync.service.js';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { OAuthProvidersSchema } from '@insforge/shared-schemas';
 import { AuthConfigService } from '@/services/auth/auth-config.service.js';
@@ -222,7 +222,7 @@ export async function seedBackend(): Promise<void> {
     const apiKey = await secretService.initializeApiKey();
 
     // Seed Stripe secret keys into the secret store so payment code has one lookup path.
-    await PaymentService.getInstance().seedStripeKeysFromEnv();
+    await StripeSyncService.getInstance().seedStripeKeysFromEnv();
 
     // Get database stats
     const tables = await dbManager.getUserTables();
