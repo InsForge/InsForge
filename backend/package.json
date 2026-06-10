@@ -17,6 +17,7 @@
     "test:ui": "vitest --ui",
     "test:e2e": "./tests/run-all-tests.sh",
     "migrate:bootstrap": "tsx src/infra/database/migrations/bootstrap/bootstrap-migrations.js",
+    "migrate:baseline": "tsx src/infra/database/migrations/bootstrap/baseline-migrations.js",
     "migrate:up": "npm run migrate:bootstrap && node-pg-migrate up --migrations-dir src/infra/database/migrations --migrations-schema system --migrations-table migrations",
     "migrate:down": "node-pg-migrate down --migrations-dir src/infra/database/migrations --migrations-schema system --migrations-table migrations",
     "migrate:create": "node-pg-migrate create --migrations-dir src/infra/database/migrations --migrations-schema system --migrations-table migrations",

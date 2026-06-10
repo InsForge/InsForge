@@ -264,13 +264,9 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
       );
     }
 
-    const { redirect_uri, code_challenge } = queryValidation.data;
+    const { redirect_uri, code_challenge, ...additionalParams } = queryValidation.data;
     const validatedProvider = providerValidation.data;
     const redirectUri = redirect_uri;
-
-    if (!redirectUri) {
-      throw new AppError('Redirect URI is required', 400, ERROR_CODES.INVALID_INPUT);
-    }
 
     if (!(await authConfigService.validateRedirectUrl(redirectUri))) {
       throw new AppError(
@@ -293,7 +289,7 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
       expiresIn: '1h', // Set expiration time for the state token
     });
 
-    const authUrl = await authService.generateOAuthUrl(validatedProvider, state);
+    const authUrl = await authService.generateOAuthUrl(validatedProvider, state, additionalParams);
     successResponse(res, { authUrl });
   } catch (error) {
     logger.error(`${req.params.provider} OAuth error`, { error });

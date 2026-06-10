@@ -988,24 +988,28 @@ export class AuthService {
   /**
    * Generate OAuth authorization URL for any supported provider
    */
-  async generateOAuthUrl(provider: OAuthProvidersSchema, state?: string): Promise<string> {
+  async generateOAuthUrl(
+    provider: OAuthProvidersSchema,
+    state?: string,
+    additionalParams?: Record<string, string>
+  ): Promise<string> {
     switch (provider) {
       case 'google':
-        return this.googleOAuthProvider.generateOAuthUrl(state);
+        return this.googleOAuthProvider.generateOAuthUrl(state, additionalParams);
       case 'github':
-        return this.githubOAuthProvider.generateOAuthUrl(state);
+        return this.githubOAuthProvider.generateOAuthUrl(state, additionalParams);
       case 'discord':
-        return this.discordOAuthProvider.generateOAuthUrl(state);
+        return this.discordOAuthProvider.generateOAuthUrl(state, additionalParams);
       case 'linkedin':
-        return this.linkedinOAuthProvider.generateOAuthUrl(state);
+        return this.linkedinOAuthProvider.generateOAuthUrl(state, additionalParams);
       case 'facebook':
-        return this.facebookOAuthProvider.generateOAuthUrl(state);
+        return this.facebookOAuthProvider.generateOAuthUrl(state, additionalParams);
       case 'microsoft':
-        return this.microsoftOAuthProvider.generateOAuthUrl(state);
+        return this.microsoftOAuthProvider.generateOAuthUrl(state, additionalParams);
       case 'x':
-        return this.xOAuthProvider.generateOAuthUrl(state);
+        return this.xOAuthProvider.generateOAuthUrl(state, additionalParams);
       case 'apple':
-        return this.appleOAuthProvider.generateOAuthUrl(state);
+        return this.appleOAuthProvider.generateOAuthUrl(state, additionalParams);
       default:
         throw new Error(`OAuth provider ${provider} is not implemented yet.`);
     }
