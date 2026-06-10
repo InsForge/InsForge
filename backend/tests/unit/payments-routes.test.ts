@@ -241,7 +241,7 @@ describe('payments route schemas', () => {
     expect(paymentsApiSchemaSource).toContain('razorpayWebhookParamsSchema');
     expect(paymentsApiSchemaSource).toContain('upsertRazorpayConfigBodySchema');
     expect(paymentsApiSchemaSource).toContain('getRazorpayWebhookSetupResponseSchema');
-    expect(paymentsApiSchemaSource).toContain('regenerateRazorpayWebhookSecretResponseSchema');
+    expect(paymentsApiSchemaSource).toContain('rotateRazorpayWebhookSecretResponseSchema');
     expect(paymentsApiSchemaSource).toContain('getRazorpayStatusResponseSchema');
     expect(paymentsApiSchemaSource).toContain('getRazorpayConfigResponseSchema');
     expect(paymentsApiSchemaSource).toContain('syncRazorpayPaymentsResponseSchema');
@@ -337,10 +337,8 @@ describe('payments route schemas', () => {
     expect(razorpayConfigRouteSource).toMatch(/router\.post\(\s*'\/sync'/);
     expect(razorpayConfigRouteSource).toMatch(/router\.get\(\s*'\/webhook'/);
     expect(razorpayConfigRouteSource).toContain('configService.getWebhookSetup(environment)');
-    expect(razorpayConfigRouteSource).toMatch(/router\.post\(\s*'\/webhook\/regenerate-secret'/);
-    expect(razorpayConfigRouteSource).toContain(
-      'configService.regenerateWebhookSecret(environment)'
-    );
+    expect(razorpayConfigRouteSource).toMatch(/router\.post\(\s*'\/webhook\/rotate-secret'/);
+    expect(razorpayConfigRouteSource).toContain('configService.rotateWebhookSecret(environment)');
     expect(razorpayConfigRouteSource).not.toMatch(/router\.post\(\s*'\/webhook'/);
     expect(razorpayConfigRouteSource).toContain('successResponse(res, result)');
     expect(razorpayRouteSource).not.toContain('webhook-configure');
@@ -366,7 +364,7 @@ describe('payments route schemas', () => {
 
   it('keeps Razorpay webhooks manual rather than half-managed through a provider API', () => {
     expect(razorpayConfigRouteSource).toContain('getWebhookSetup(environment)');
-    expect(razorpayConfigRouteSource).toContain('regenerateWebhookSecret(environment)');
+    expect(razorpayConfigRouteSource).toContain('rotateWebhookSecret(environment)');
     expect(razorpayProviderSource).not.toContain('createWebhook(');
     expect(razorpayProviderSource).not.toContain('/v1/accounts/me/webhooks');
     expect(razorpayConfigServiceSource).toContain('manual');

@@ -817,7 +817,7 @@ export const getRazorpayWebhookSetupResponseSchema = z.object({
   webhookSecret: z.string().trim().min(1),
 });
 
-export const regenerateRazorpayWebhookSecretResponseSchema = getRazorpayWebhookSetupResponseSchema;
+export const rotateRazorpayWebhookSecretResponseSchema = getRazorpayWebhookSetupResponseSchema;
 
 export const razorpayWebhookResponseSchema = z.object({
   received: z.boolean(),
@@ -962,7 +962,7 @@ export type UpsertStripeConfigRequest = z.infer<typeof upsertStripeConfigRequest
 export type UpsertRazorpayConfigBody = z.infer<typeof upsertRazorpayConfigBodySchema>;
 export type UpsertRazorpayConfigRequest = z.infer<typeof upsertRazorpayConfigRequestSchema>;
 export type GetRazorpayWebhookSetupResponse = z.infer<typeof getRazorpayWebhookSetupResponseSchema>;
-export type RegenerateRazorpayWebhookSecretResponse = z.infer<
-  typeof regenerateRazorpayWebhookSecretResponseSchema
+export type RotateRazorpayWebhookSecretResponse = z.infer<
+  typeof rotateRazorpayWebhookSecretResponseSchema
 >;
 export type RazorpayWebhookResponse = z.infer<typeof razorpayWebhookResponseSchema>;

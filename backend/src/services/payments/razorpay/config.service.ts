@@ -561,7 +561,7 @@ export class RazorpayConfigService {
     };
   }
 
-  async regenerateWebhookSecret(
+  async rotateWebhookSecret(
     environment: RazorpayEnvironment
   ): Promise<GetRazorpayWebhookSetupResponse> {
     await this.createRazorpayProvider(environment);
@@ -572,7 +572,7 @@ export class RazorpayConfigService {
     const webhookUrl = this.getWebhookUrl(environment);
     await this.upsertManualWebhookConnection(environment, webhookUrl);
 
-    logger.info('Razorpay webhook secret regenerated', {
+    logger.info('Razorpay webhook secret rotated', {
       environment,
       webhookUrl,
     });

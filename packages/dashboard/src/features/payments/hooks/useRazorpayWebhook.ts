@@ -24,16 +24,16 @@ export function useRazorpayWebhook() {
     staleTime: 30 * 1000,
   });
 
-  const regenerateWebhookSecret = useMutation({
+  const rotateWebhookSecret = useMutation({
     mutationFn: (environment: RazorpayEnvironment) =>
-      razorpayService.regenerateWebhookSecret(environment),
+      razorpayService.rotateWebhookSecret(environment),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: RAZORPAY_STATUS_QUERY_KEY });
       await queryClient.invalidateQueries({ queryKey: ['payments', 'razorpay'] });
-      showToast('Razorpay webhook secret regenerated', 'success');
+      showToast('Razorpay webhook secret rotated', 'success');
     },
     onError: (err: Error) => {
-      showToast(err.message || 'Failed to regenerate Razorpay webhook secret', 'error');
+      showToast(err.message || 'Failed to rotate Razorpay webhook secret', 'error');
     },
   });
 
@@ -41,7 +41,7 @@ export function useRazorpayWebhook() {
     connections: data?.razorpayConnections ?? [],
     isLoading,
     error,
-    regenerateWebhookSecret,
+    rotateWebhookSecret,
   };
 }
 
