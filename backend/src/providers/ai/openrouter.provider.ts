@@ -506,6 +506,44 @@ export class OpenRouterProvider {
   }
 
   /**
+   * Map a non-ok cloud credentials response to a client-safe AppError.
+   * Only statuses whose semantics are meaningful to the caller pass through
+   * (trial denial, rotation conflict, rate limit); everything else — notably
+   * the cloud's 401 for an invalid project token — becomes a 502 so the
+   * dashboard cannot mistake it for the admin's own session expiring (its
+   * apiClient retries and logs out on 401). The raw body is logged here and
+   * never surfaced to the client; only the cloud's structured JSON `message`
+   * field is, length-capped.
+   */
+  private async cloudCredentialsError(response: Response, action: string): Promise<AppError> {
+    const rawBody = await response.text().catch(() => '');
+    logger.error(`Failed to ${action} cloud OpenRouter credentials`, {
+      status: response.status,
+      body: rawBody.slice(0, 2000),
+    });
+
+    let upstreamMessage: string | undefined;
+    try {
+      const parsed = JSON.parse(rawBody) as { message?: unknown };
+      if (typeof parsed.message === 'string') {
+        upstreamMessage = parsed.message;
+      }
+    } catch {
+      // Non-JSON body — keep it out of the client-facing message.
+    }
+
+    const message =
+      upstreamMessage?.slice(0, 300) ||
+      `Failed to ${action} cloud OpenRouter credentials (upstream status ${response.status})`;
+
+    if (response.status === 429) {
+      return new AppError(message, 429, ERROR_CODES.RATE_LIMITED);
+    }
+    const status = response.status === 403 || response.status === 409 ? response.status : 502;
+    return new AppError(message, status, ERROR_CODES.AI_UPSTREAM_UNAVAILABLE);
+  }
+
+  /**
    * Fetch API key from cloud service
    * Uses promise memoization to prevent duplicate fetch requests
    */
@@ -542,11 +580,7 @@ export class OpenRouterProvider {
         );
 
         if (!response.ok) {
-          throw new AppError(
-            `Failed to fetch cloud API key: ${response.statusText}`,
-            response.status,
-            ERROR_CODES.AI_UPSTREAM_UNAVAILABLE
-          );
+          throw await this.cloudCredentialsError(response, 'fetch');
         }
 
         const data = (await response.json()) as CloudCredentialsResponse;
@@ -609,11 +643,7 @@ export class OpenRouterProvider {
         );
 
         if (!response.ok) {
-          const message =
-            (await response.text()) ||
-            response.statusText ||
-            'Cloud OpenRouter key rotation failed';
-          throw new AppError(message, response.status, ERROR_CODES.AI_UPSTREAM_UNAVAILABLE);
+          throw await this.cloudCredentialsError(response, 'rotate');
         }
 
         const data = (await response.json()) as CloudCredentialsResponse;

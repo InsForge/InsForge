@@ -91,18 +91,84 @@ describe('OpenRouterProvider.rotateManagedApiKey', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('propagates upstream rotation failures as AppError with the upstream status', async () => {
+  it('surfaces the cloud JSON message on rotation failure but remaps the status to 502', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error',
+      text: () =>
+        Promise.resolve(
+          JSON.stringify({ error: 'INTERNAL_ERROR', message: 'Failed to rotate credentials' })
+        ),
+    });
+
+    await expect(provider.rotateManagedApiKey()).rejects.toMatchObject({
+      statusCode: 502,
+      code: ERROR_CODES.AI_UPSTREAM_UNAVAILABLE,
+      message: 'Failed to rotate credentials',
+    });
+  });
+
+  it('remaps a cloud 401 to 502 so the dashboard does not treat it as session expiry', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      statusText: 'Unauthorized',
+      text: () =>
+        Promise.resolve(JSON.stringify({ error: 'INVALID_TOKEN', message: 'Invalid token' })),
+    });
+
+    await expect(provider.rotateManagedApiKey()).rejects.toMatchObject({
+      statusCode: 502,
+      code: ERROR_CODES.AI_UPSTREAM_UNAVAILABLE,
+      message: 'Invalid token',
+    });
+  });
+
+  it('passes a cloud 429 through as RATE_LIMITED with its message', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      statusText: 'Too Many Requests',
+      text: () =>
+        Promise.resolve(JSON.stringify({ message: 'Too many rotate requests for this project' })),
+    });
+
+    await expect(provider.rotateManagedApiKey()).rejects.toMatchObject({
+      statusCode: 429,
+      code: ERROR_CODES.RATE_LIMITED,
+      message: 'Too many rotate requests for this project',
+    });
+  });
+
+  it('keeps non-JSON upstream bodies out of the client-facing message', async () => {
     fetchMock.mockResolvedValueOnce({
       ok: false,
       status: 503,
       statusText: 'Service Unavailable',
-      text: () => Promise.resolve('rotation backend down'),
+      text: () => Promise.resolve('<html>nginx stack trace</html>'),
     });
 
     await expect(provider.rotateManagedApiKey()).rejects.toMatchObject({
-      statusCode: 503,
+      statusCode: 502,
       code: ERROR_CODES.AI_UPSTREAM_UNAVAILABLE,
-      message: 'rotation backend down',
+      message: 'Failed to rotate cloud OpenRouter credentials (upstream status 503)',
+    });
+  });
+
+  it('remaps a cloud 401 on credentials fetch to 502 as well', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      statusText: 'Unauthorized',
+      text: () =>
+        Promise.resolve(JSON.stringify({ error: 'INVALID_TOKEN', message: 'Invalid token' })),
+    });
+
+    await expect(provider.getApiKey()).rejects.toMatchObject({
+      statusCode: 502,
+      code: ERROR_CODES.AI_UPSTREAM_UNAVAILABLE,
+      message: 'Invalid token',
     });
   });
 
