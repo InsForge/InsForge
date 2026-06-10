@@ -213,9 +213,10 @@ Return JSON {"action":"ADD"|"UPDATE"|"NOOP","target_id"?:string,"title"?:string,
       const newEmbedding = await this.embed(`${title}\n${content}`);
       await pool.query(
         `UPDATE memory.memories
-            SET title = $1, content = $2, embedding = $3::vector, source = $4
-          WHERE id = $5 AND scope = $6`,
+            SET kind = $1, title = $2, content = $3, embedding = $4::vector, source = $5
+          WHERE id = $6 AND scope = $7`,
         [
+          candidate.kind,
           title,
           content,
           this.toVectorLiteral(newEmbedding),

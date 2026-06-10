@@ -13,10 +13,10 @@ export const rememberRequestSchema = z
     source: z.string().optional(),
     // explicit single-memory form
     kind: memoryKindSchema.optional(),
-    title: z.string().min(1).optional(),
-    content: z.string().min(1).optional(),
-    // transcript form
-    transcript: z.string().min(1).optional(),
+    title: z.string().min(1).max(2_000).optional(),
+    content: z.string().min(1).max(20_000).optional(),
+    // transcript form — capped to bound extraction LLM cost on huge inputs
+    transcript: z.string().min(1).max(50_000).optional(),
   })
   .refine((v) => Boolean(v.transcript) || Boolean(v.title && v.content), {
     message: 'Provide either { transcript } or { title, content }',

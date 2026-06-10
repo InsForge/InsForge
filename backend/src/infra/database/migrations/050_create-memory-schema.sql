@@ -38,6 +38,7 @@ CREATE INDEX IF NOT EXISTS idx_memories_content_tsv
   ON memory.memories USING gin (content_tsv);
 
 -- Keep updated_at fresh on UPDATE (reconcile path).
+DROP TRIGGER IF EXISTS trg_memories_updated_at ON memory.memories;
 CREATE TRIGGER trg_memories_updated_at
 BEFORE UPDATE ON memory.memories
 FOR EACH ROW EXECUTE FUNCTION system.update_updated_at();
