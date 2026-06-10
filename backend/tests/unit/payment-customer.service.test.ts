@@ -40,7 +40,8 @@ describe('PaymentCustomerService', () => {
       rows: [
         {
           environment: 'test',
-          stripeCustomerId: 'cus_123',
+          provider: 'stripe',
+          providerCustomerId: 'cus_123',
           email: 'buyer@example.com',
           name: 'Buyer Example',
           phone: '+1 555-0100',
@@ -57,7 +58,7 @@ describe('PaymentCustomerService', () => {
               },
             },
           },
-          stripeCreatedAt: new Date('2026-05-01T00:00:00.000Z'),
+          providerCreatedAt: new Date('2026-05-01T00:00:00.000Z'),
           syncedAt: new Date('2026-05-02T00:00:00.000Z'),
           paymentsCount: 3,
           lastPaymentAt: new Date('2026-05-03T12:30:00.000Z'),
@@ -76,13 +77,14 @@ describe('PaymentCustomerService', () => {
       customers: [
         {
           environment: 'test',
-          stripeCustomerId: 'cus_123',
+          provider: 'stripe',
+          providerCustomerId: 'cus_123',
           email: 'buyer@example.com',
           name: 'Buyer Example',
           phone: '+1 555-0100',
           deleted: false,
           metadata: { segment: 'pro' },
-          stripeCreatedAt: '2026-05-01T00:00:00.000Z',
+          providerCreatedAt: '2026-05-01T00:00:00.000Z',
           syncedAt: '2026-05-02T00:00:00.000Z',
           paymentsCount: 3,
           lastPaymentAt: '2026-05-03T12:30:00.000Z',
@@ -97,11 +99,11 @@ describe('PaymentCustomerService', () => {
 
     expect(mockPool.query).toHaveBeenCalledWith(
       expect.stringMatching(/FROM payments\.customers/i),
-      ['test', 25]
+      ['test', 25, 'stripe']
     );
   });
 
-  it('builds customer payment stats by combining Stripe-customer and email-only history', async () => {
+  it('builds customer payment stats by combining Stripe-customer and email-only activity', async () => {
     mockPool.query.mockResolvedValueOnce({ rows: [] });
 
     await PaymentCustomerService.getInstance().listCustomers({
@@ -190,7 +192,9 @@ describe('PaymentCustomerService', () => {
       ],
     ]);
     expect(mockClient.query).toHaveBeenCalledWith(
-      expect.stringMatching(/UPDATE payments\.customers[\s\S]*NOT \(stripe_customer_id = ANY/i),
+      expect.stringMatching(
+        /UPDATE payments\.customers[\s\S]*provider = 'stripe'[\s\S]*NOT \(provider_customer_id = ANY/i
+      ),
       ['test', expect.any(Date), ['cus_123', 'cus_456']]
     );
     expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
