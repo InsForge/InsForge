@@ -3136,7 +3136,9 @@ describe('Stripe payment services', () => {
       expect.any(Array)
     );
     expect(mockPool.query).toHaveBeenCalledWith(
-      expect.stringMatching(/INSERT INTO payments\.customer_mappings[\s\S]*ON CONFLICT DO NOTHING/i),
+      expect.stringMatching(
+        /INSERT INTO payments\.customer_mappings[\s\S]*ON CONFLICT DO NOTHING/i
+      ),
       ['stripe', 'test', 'organization', 'org_123', 'cus_123']
     );
   });
@@ -4043,7 +4045,9 @@ describe('Stripe payment services', () => {
     );
     expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
     expect(mockPool.query).toHaveBeenCalledWith(
-      expect.stringMatching(/INSERT INTO payments\.customer_mappings[\s\S]*ON CONFLICT DO NOTHING/i),
+      expect.stringMatching(
+        /INSERT INTO payments\.customer_mappings[\s\S]*ON CONFLICT DO NOTHING/i
+      ),
       ['stripe', 'test', 'organization', 'org_123', 'cus_123']
     );
   });
