@@ -21,6 +21,13 @@ export class AIService {
       headers: apiClient.withAccessToken(),
     });
   }
+
+  rotateProviderApiKey(provider: AIProvider): Promise<OpenRouterKey> {
+    return apiClient.request(`/ai/${provider}/api-key/rotate`, {
+      method: 'POST',
+      headers: apiClient.withAccessToken(),
+    });
+  }
 }
 
 export const aiService = new AIService();
