@@ -66,7 +66,7 @@ function toRazorpayDisplayProduct(item: RazorpayItem, plans: RazorpayPlan[]): Ca
     description: item.description,
     active: item.active,
     providerDefaultPriceId: defaultPlan?.planId ?? item.itemId,
-    metadata: item.metadata,
+    metadata: {},
     syncedAt: item.syncedAt,
   };
 }
@@ -89,7 +89,7 @@ function toRazorpayDisplayItemPrice(item: RazorpayItem): CatalogPrice {
     taxBehavior: null,
     recurringInterval: null,
     recurringIntervalCount: null,
-    metadata: item.metadata,
+    metadata: {},
     syncedAt: item.syncedAt,
   };
 }
@@ -112,7 +112,7 @@ function toRazorpayDisplayPrice(plan: RazorpayPlan): CatalogPrice {
     taxBehavior: null,
     recurringInterval: RAZORPAY_RECURRING_INTERVAL_MAP[plan.period] ?? plan.period,
     recurringIntervalCount: plan.interval,
-    metadata: plan.metadata,
+    metadata: plan.notes,
     syncedAt: plan.syncedAt,
   };
 }

@@ -68,7 +68,7 @@ const { data, error } = await insforge.payments.razorpay.createOrder('test', {
   receipt: 'order_123',
   subject: { type: 'team', id: 'team_123' },
   customerEmail: 'buyer@example.com',
-  metadata: { order_id: 'order_123' }
+  notes: { order_id: 'order_123' }
 });
 
 if (error) throw error;
@@ -76,7 +76,7 @@ if (error) throw error;
 
 The SDK wraps `POST /api/payments/razorpay/{environment}/orders`. The response includes `checkoutOptions` with Razorpay Checkout-native fields such as `key` and `order_id`. Load `https://checkout.razorpay.com/v1/checkout.js` in the frontend and pass those options to `new Razorpay(options).open()`.
 
-InsForge copies request `metadata` to Razorpay `notes`. If your fulfillment trigger reads `notes.order_id`, pass `metadata: { order_id: ... }` when creating the Order or Subscription.
+If your fulfillment trigger reads `notes.order_id`, pass `notes: { order_id: ... }` when creating the Order or Subscription.
 
 After Razorpay Checkout returns `razorpay_order_id`, `razorpay_payment_id`, and `razorpay_signature`, verify the signature on the backend:
 

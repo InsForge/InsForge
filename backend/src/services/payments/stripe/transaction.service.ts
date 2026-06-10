@@ -3,7 +3,7 @@ import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { STRIPE_CHECKOUT_MODE_METADATA_KEY } from '@/services/payments/stripe/constants.js';
 import {
   fromStripeTimestamp,
-  getBillingSubjectFromMetadata,
+  getBillingSubjectFromProviderAttributes,
   getStripeObjectId,
 } from '@/services/payments/helpers.js';
 import type {
@@ -289,7 +289,7 @@ export class StripeTransactionService {
     statusOverride?: StripeTransactionStatus,
     paidAtOverride?: Date | null
   ): Promise<void> {
-    const subject = getBillingSubjectFromMetadata(checkoutSession.metadata);
+    const subject = getBillingSubjectFromProviderAttributes(checkoutSession.metadata);
     const paymentIntentId = getStripeObjectId(checkoutSession.payment_intent);
     const subscriptionId = getStripeObjectId(checkoutSession.subscription);
     const customerId = getStripeObjectId(checkoutSession.customer);
@@ -341,7 +341,7 @@ export class StripeTransactionService {
     paymentIntent: StripePaymentIntent,
     status: 'succeeded' | 'failed'
   ): Promise<void> {
-    const subject = getBillingSubjectFromMetadata(paymentIntent.metadata);
+    const subject = getBillingSubjectFromProviderAttributes(paymentIntent.metadata);
     const chargeId = getStripeObjectId(paymentIntent.latest_charge);
 
     await this.upsertTransaction({
@@ -658,8 +658,8 @@ export class StripeTransactionService {
       getStripeObjectId(paymentIntent?.customer) ??
       getStripeObjectId(charge?.customer);
     const subject =
-      getBillingSubjectFromMetadata(paymentIntent?.metadata) ??
-      getBillingSubjectFromMetadata(charge?.metadata) ??
+      getBillingSubjectFromProviderAttributes(paymentIntent?.metadata) ??
+      getBillingSubjectFromProviderAttributes(charge?.metadata) ??
       (invoice ? await this.resolveInvoiceSubject(environment, invoice, customerId) : null) ??
       (customerId ? await this.findSubjectForStripeCustomer(environment, customerId) : null);
     const firstLine = invoice?.lines?.data?.[0] ?? null;
@@ -771,8 +771,8 @@ export class StripeTransactionService {
     const parentMetadata = invoice.parent?.subscription_details?.metadata;
 
     return (
-      getBillingSubjectFromMetadata(parentMetadata) ??
-      getBillingSubjectFromMetadata(invoice.metadata) ??
+      getBillingSubjectFromProviderAttributes(parentMetadata) ??
+      getBillingSubjectFromProviderAttributes(invoice.metadata) ??
       (customerId ? await this.findSubjectForStripeCustomer(environment, customerId) : null)
     );
   }

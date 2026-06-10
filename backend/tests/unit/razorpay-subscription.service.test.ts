@@ -73,7 +73,7 @@ function buildSubscriptionRow(overrides: Record<string, unknown> = {}) {
     offerId: null,
     authorizationPaymentId: null,
     authorizationVerifiedAt: null,
-    metadata: {
+    notes: {
       insforge_subject_type: 'team',
       insforge_subject_id: 'team_123',
     },

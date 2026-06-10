@@ -4,8 +4,8 @@ import type { UserContext } from '@/api/middlewares/auth.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { AppError } from '@/utils/errors.js';
 import {
-  addBillingSubjectToMetadata,
-  getBillingSubjectFromMetadata,
+  addBillingSubjectToProviderAttributes,
+  getBillingSubjectFromProviderAttributes,
   isPostgresPermissionError,
 } from '@/services/payments/helpers.js';
 import { withUserContext } from '@/services/database/user-context.service.js';
@@ -56,7 +56,7 @@ const RAZORPAY_SUBSCRIPTION_COLUMNS = `
   offer_id AS "offerId",
   authorization_payment_id AS "authorizationPaymentId",
   authorization_verified_at AS "authorizationVerifiedAt",
-  metadata,
+  notes,
   provider_created_at AS "providerCreatedAt",
   synced_at AS "syncedAt",
   created_at AS "createdAt",
@@ -127,8 +127,8 @@ export class RazorpaySubscriptionService {
   ): Promise<CreateRazorpaySubscriptionResponse> {
     this.assertCanCreateSubscription(user);
 
-    const metadata = this.buildMetadata(input.metadata, input.subject);
-    await this.assertSubscriptionCreationAllowed(input, metadata, user);
+    const notes = this.buildNotes(input.notes, input.subject);
+    await this.assertSubscriptionCreationAllowed(input, notes, user);
 
     const provider = await this.configService.createRazorpayProvider(input.environment);
     const subscription = await provider.createSubscription({
@@ -140,7 +140,7 @@ export class RazorpaySubscriptionService {
       expireBy: input.expireBy,
       customerNotify: input.customerNotify,
       offerId: input.offerId ?? null,
-      notes: metadata,
+      notes,
     });
     const storedSubscription = await this.upsertSubscriptionFromProvider(
       input.environment,
@@ -278,10 +278,10 @@ export class RazorpaySubscriptionService {
     subscription: RazorpaySubscription,
     subjectOverride?: BillingSubject | null
   ): Promise<ListRazorpaySubscriptionsResponse['subscriptions'][number]> {
-    const metadata = this.normalizeMetadata(subscription.notes);
+    const notes = this.normalizeNotes(subscription.notes);
     const subject =
       subjectOverride ??
-      getBillingSubjectFromMetadata(metadata) ??
+      getBillingSubjectFromProviderAttributes(notes) ??
       (await this.resolveSubjectFromCustomerMapping(environment, subscription.customer_id));
 
     const result = await this.getPool().query(
@@ -292,7 +292,7 @@ export class RazorpaySubscriptionService {
          quantity, charge_at, start_at, end_at,
          total_count, auth_attempts, paid_count, remaining_count,
          short_url, has_scheduled_changes, change_scheduled_at,
-         offer_id, metadata, raw, provider_created_at, synced_at
+         offer_id, notes, raw, provider_created_at, synced_at
        )
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,NOW())
        ON CONFLICT (environment, subscription_id) DO UPDATE SET
@@ -316,7 +316,7 @@ export class RazorpaySubscriptionService {
          has_scheduled_changes = EXCLUDED.has_scheduled_changes,
          change_scheduled_at = EXCLUDED.change_scheduled_at,
          offer_id = EXCLUDED.offer_id,
-         metadata = EXCLUDED.metadata,
+         notes = EXCLUDED.notes,
          raw = EXCLUDED.raw,
          provider_created_at = EXCLUDED.provider_created_at,
          synced_at = NOW(),
@@ -345,7 +345,7 @@ export class RazorpaySubscriptionService {
         subscription.has_scheduled_changes,
         this.fromRazorpayTimestamp(subscription.change_scheduled_at),
         subscription.offer_id ?? null,
-        metadata,
+        notes,
         subscription,
         this.fromRazorpayTimestamp(subscription.created_at),
       ]
@@ -386,7 +386,7 @@ export class RazorpaySubscriptionService {
       offerId: row.offerId ?? null,
       authorizationPaymentId: row.authorizationPaymentId ?? null,
       authorizationVerifiedAt: toISOStringOrNull(row.authorizationVerifiedAt),
-      metadata: row.metadata ?? {},
+      notes: row.notes ?? {},
       providerCreatedAt: toISOStringOrNull(row.providerCreatedAt),
       syncedAt: toISOString(row.syncedAt),
       createdAt: toISOString(row.createdAt),
@@ -394,13 +394,13 @@ export class RazorpaySubscriptionService {
     };
   }
 
-  private buildMetadata(
-    metadata: Record<string, string> | undefined,
+  private buildNotes(
+    notes: Record<string, string> | undefined,
     subject: BillingSubject
   ): Record<string, string> {
-    const razorpayMetadata = { ...(metadata ?? {}) };
-    addBillingSubjectToMetadata(razorpayMetadata, subject);
-    return razorpayMetadata;
+    const razorpayNotes = { ...(notes ?? {}) };
+    addBillingSubjectToProviderAttributes(razorpayNotes, subject);
+    return razorpayNotes;
   }
 
   private assertCanCreateSubscription(user: UserContext): void {
@@ -425,7 +425,7 @@ export class RazorpaySubscriptionService {
 
   private async assertSubscriptionCreationAllowed(
     input: CreateRazorpaySubscriptionRequest,
-    metadata: Record<string, string>,
+    notes: Record<string, string>,
     user: UserContext
   ): Promise<void> {
     try {
@@ -444,7 +444,7 @@ export class RazorpaySubscriptionService {
                start_at,
                end_at,
                total_count,
-               metadata
+               notes
              )
              VALUES ($1, $2, $3, $4, $5, 'created', $6, $7, $8, $9, $10::JSONB)`,
             [
@@ -457,7 +457,7 @@ export class RazorpaySubscriptionService {
               this.fromRazorpayTimestamp(input.startAt),
               this.fromRazorpayTimestamp(input.endAt),
               input.totalCount ?? null,
-              JSON.stringify(metadata),
+              JSON.stringify(notes),
             ]
           );
         } finally {
@@ -526,7 +526,7 @@ export class RazorpaySubscriptionService {
     return error instanceof Error ? error : new Error(String(error));
   }
 
-  private normalizeMetadata(
+  private normalizeNotes(
     notes: Record<string, string | number | boolean> | undefined | null
   ): Record<string, string> {
     return Object.fromEntries(

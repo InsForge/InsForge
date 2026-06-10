@@ -102,7 +102,6 @@ export interface RazorpayItem {
   name: string;
   description: string | null;
   type: 'invoice';
-  notes?: Record<string, string | number>;
   created_at: number;
 }
 
@@ -111,7 +110,6 @@ export interface RazorpayItemCreateInput {
   amount: number;
   currency: string;
   description?: string | null;
-  notes?: Record<string, string>;
 }
 
 export interface RazorpayItemUpdateInput {
@@ -120,7 +118,6 @@ export interface RazorpayItemUpdateInput {
   currency?: string;
   description?: string | null;
   active?: boolean;
-  notes?: Record<string, string>;
 }
 
 export interface RazorpayCustomer {
@@ -349,7 +346,7 @@ export class RazorpayProvider {
    * so we use a lightweight Orders probe.
    */
   async retrieveAccount(): Promise<RazorpayAccountInfo> {
-    // Razorpay does not expose account metadata through the OSS SDK. Use a
+    // Razorpay does not expose account details through the OSS SDK. Use a
     // lightweight authenticated Orders call so invalid key secrets fail before saving.
     await this.client.orders.all({ count: 1, skip: 0 });
 
@@ -426,10 +423,6 @@ export class RazorpayProvider {
     if (input.description !== undefined) {
       params.description = input.description;
     }
-    if (input.notes) {
-      params.notes = input.notes;
-    }
-
     return this.getMutationClient().items.create(params);
   }
 
@@ -450,10 +443,6 @@ export class RazorpayProvider {
     if (input.active !== undefined) {
       params.active = input.active;
     }
-    if (input.notes) {
-      params.notes = input.notes;
-    }
-
     return this.getMutationClient().items.edit(itemId, params);
   }
 

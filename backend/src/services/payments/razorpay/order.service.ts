@@ -5,7 +5,7 @@ import type { UserContext } from '@/api/middlewares/auth.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { RazorpayConfigService } from '@/services/payments/razorpay/config.service.js';
 import {
-  addBillingSubjectToMetadata,
+  addBillingSubjectToProviderAttributes,
   isPostgresPermissionError,
 } from '@/services/payments/helpers.js';
 import { withUserContext } from '@/services/database/user-context.service.js';
@@ -27,7 +27,7 @@ import {
   type VerifyRazorpayOrderResponse,
 } from '@insforge/shared-schemas';
 
-const RAZORPAY_ORDER_METADATA_KEY = 'insforge_order_id';
+const RAZORPAY_ORDER_NOTES_KEY = 'insforge_order_id';
 
 const RAZORPAY_ORDER_COLUMNS = `
   id,
@@ -47,6 +47,7 @@ const RAZORPAY_ORDER_COLUMNS = `
   attempts,
   verified_payment_id AS "verifiedPaymentId",
   verified_at AS "verifiedAt",
+  notes,
   last_error AS "lastError",
   created_at AS "createdAt",
   updated_at AS "updatedAt"
@@ -79,11 +80,11 @@ export class RazorpayOrderService {
     input: CreateRazorpayOrderRequest,
     user: UserContext
   ): Promise<CreateRazorpayOrderResponse> {
-    const metadata = this.buildMetadata(input.metadata, input.subject);
-    const initialized = await this.insertInitializedOrder(input, metadata, user);
-    const providerMetadata = {
-      ...metadata,
-      [RAZORPAY_ORDER_METADATA_KEY]: initialized.id,
+    const notes = this.buildNotes(input.notes, input.subject);
+    const initialized = await this.insertInitializedOrder(input, notes, user);
+    const providerNotes = {
+      ...notes,
+      [RAZORPAY_ORDER_NOTES_KEY]: initialized.id,
     };
 
     try {
@@ -92,9 +93,9 @@ export class RazorpayOrderService {
         amount: input.amount,
         currency: input.currency,
         receipt: initialized.receipt,
-        notes: providerMetadata,
+        notes: providerNotes,
       });
-      const storedOrder = await this.markOrderCreated(initialized.id, order, providerMetadata);
+      const storedOrder = await this.markOrderCreated(initialized.id, order, providerNotes);
       return this.buildCreateOrderResponse(provider.getKeyId(), storedOrder, input);
     } catch (error) {
       await this.markOrderFailed(initialized.id, error).catch((markError) => {
@@ -122,7 +123,7 @@ export class RazorpayOrderService {
 
   private async insertInitializedOrder(
     input: CreateRazorpayOrderRequest,
-    metadata: Record<string, string>,
+    notes: Record<string, string>,
     user: UserContext
   ): Promise<{ id: string; receipt: string }> {
     const id = randomUUID();
@@ -142,15 +143,15 @@ export class RazorpayOrderService {
              subject_id,
              customer_name,
              customer_email,
-	             customer_contact,
-	             receipt,
-	             amount,
-	             currency,
-	             description,
-	             callback_url,
-	             metadata
-	           )
-	           VALUES ($1, $2, 'initialized', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::JSONB)`,
+             customer_contact,
+             receipt,
+             amount,
+             currency,
+             description,
+             callback_url,
+             notes
+           )
+           VALUES ($1, $2, 'initialized', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::JSONB)`,
             [
               id,
               input.environment,
@@ -164,7 +165,7 @@ export class RazorpayOrderService {
               input.currency.toLowerCase(),
               input.description ?? null,
               input.callbackUrl ?? null,
-              JSON.stringify(metadata),
+              JSON.stringify(notes),
             ]
           );
 
@@ -187,7 +188,7 @@ export class RazorpayOrderService {
   private async markOrderCreated(
     id: string,
     order: RazorpayOrder,
-    metadata: Record<string, string>
+    notes: Record<string, string>
   ): Promise<RazorpayOrderResponse> {
     const result = await this.getPool().query(
       `UPDATE payments.razorpay_orders
@@ -199,7 +200,7 @@ export class RazorpayOrderService {
            amount_due = $7,
            currency = $8,
            attempts = $9,
-           metadata = $10,
+           notes = $10,
            raw = $11,
            last_error = NULL,
            updated_at = NOW()
@@ -215,7 +216,7 @@ export class RazorpayOrderService {
         order.amount_due ?? null,
         order.currency.toLowerCase(),
         order.attempts ?? null,
-        metadata,
+        notes,
         order,
       ]
     );
@@ -303,15 +304,15 @@ export class RazorpayOrderService {
     };
   }
 
-  private buildMetadata(
-    metadata: Record<string, string> | undefined,
+  private buildNotes(
+    notes: Record<string, string> | undefined,
     subject: CreateRazorpayOrderRequest['subject']
   ): Record<string, string> {
-    const razorpayMetadata = { ...(metadata ?? {}) };
+    const razorpayNotes = { ...(notes ?? {}) };
     if (subject) {
-      addBillingSubjectToMetadata(razorpayMetadata, subject);
+      addBillingSubjectToProviderAttributes(razorpayNotes, subject);
     }
-    return razorpayMetadata;
+    return razorpayNotes;
   }
 
   private getSafeUserContext(user: UserContext): UserContext {
@@ -368,6 +369,7 @@ export class RazorpayOrderService {
       attempts: row.attempts === null ? null : Number(row.attempts),
       verifiedPaymentId: row.verifiedPaymentId ?? null,
       verifiedAt: toISOStringOrNull(row.verifiedAt),
+      notes: row.notes ?? {},
       lastError: row.lastError ?? null,
       createdAt: toISOString(row.createdAt),
       updatedAt: toISOString(row.updatedAt),

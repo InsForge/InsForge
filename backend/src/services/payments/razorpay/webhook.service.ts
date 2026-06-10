@@ -1,6 +1,6 @@
 import type { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
-import { getBillingSubjectFromMetadata } from '@/services/payments/helpers.js';
+import { getBillingSubjectFromProviderAttributes } from '@/services/payments/helpers.js';
 import { RazorpayConfigService } from '@/services/payments/razorpay/config.service.js';
 import {
   RazorpayTransactionService,
@@ -355,11 +355,11 @@ export class RazorpayWebhookService {
       await this.upsertSubscription(environment, subscription);
     }
 
-    const invoiceMetadata = invoice ? this.normalizeMetadata(invoice.notes) : null;
-    const subscriptionMetadata = subscription ? this.normalizeMetadata(subscription.notes) : null;
+    const invoiceNotes = invoice ? this.normalizeNotes(invoice.notes) : null;
+    const subscriptionNotes = subscription ? this.normalizeNotes(subscription.notes) : null;
     const subjectFallback =
-      (invoiceMetadata ? getBillingSubjectFromMetadata(invoiceMetadata) : null) ??
-      (subscriptionMetadata ? getBillingSubjectFromMetadata(subscriptionMetadata) : null);
+      (invoiceNotes ? getBillingSubjectFromProviderAttributes(invoiceNotes) : null) ??
+      (subscriptionNotes ? getBillingSubjectFromProviderAttributes(subscriptionNotes) : null);
     const descriptionFallback =
       invoice?.description ??
       invoice?.line_items?.[0]?.name ??
@@ -453,9 +453,9 @@ export class RazorpayWebhookService {
     environment: RazorpayEnvironment,
     subscription: RazorpaySubscription
   ): Promise<void> {
-    const metadata = this.normalizeMetadata(subscription.notes);
+    const notes = this.normalizeNotes(subscription.notes);
     const subject =
-      getBillingSubjectFromMetadata(metadata) ??
+      getBillingSubjectFromProviderAttributes(notes) ??
       (await this.resolveSubjectFromCustomerMapping(environment, subscription.customer_id));
 
     await this.getPool().query(
@@ -466,7 +466,7 @@ export class RazorpayWebhookService {
          quantity, charge_at, start_at, end_at,
          total_count, auth_attempts, paid_count, remaining_count,
          short_url, has_scheduled_changes, change_scheduled_at,
-         offer_id, metadata, raw, provider_created_at, synced_at
+         offer_id, notes, raw, provider_created_at, synced_at
        )
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,NOW())
        ON CONFLICT (environment, subscription_id) DO UPDATE SET
@@ -490,7 +490,7 @@ export class RazorpayWebhookService {
          has_scheduled_changes = EXCLUDED.has_scheduled_changes,
          change_scheduled_at = EXCLUDED.change_scheduled_at,
          offer_id = EXCLUDED.offer_id,
-         metadata = EXCLUDED.metadata,
+         notes = EXCLUDED.notes,
          raw = EXCLUDED.raw,
          provider_created_at = EXCLUDED.provider_created_at,
          synced_at = NOW(),
@@ -518,7 +518,7 @@ export class RazorpayWebhookService {
         subscription.has_scheduled_changes,
         this.fromRazorpayTimestamp(subscription.change_scheduled_at),
         subscription.offer_id ?? null,
-        metadata,
+        notes,
         subscription,
         this.fromRazorpayTimestamp(subscription.created_at),
       ]
@@ -660,7 +660,7 @@ export class RazorpayWebhookService {
     return entity as T;
   }
 
-  private normalizeMetadata(
+  private normalizeNotes(
     notes: Record<string, string | number | boolean> | undefined | null
   ): Record<string, string> {
     return Object.fromEntries(

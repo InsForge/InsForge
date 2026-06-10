@@ -65,13 +65,13 @@ const { data, error } = await insforge.payments.razorpay.createOrder('test', {
   receipt: 'order_123',
   subject: { type: 'team', id: 'team_123' },
   customerEmail: 'buyer@example.com',
-  metadata: { order_id: 'order_123' }
+  notes: { order_id: 'order_123' }
 });
 
 if (error) throw error;
 ```
 
-`metadata` is copied to Razorpay `notes`. If a fulfillment trigger reads `notes.order_id`, pass `metadata: { order_id: ... }` when creating the Order or Subscription.
+If a fulfillment trigger reads `notes.order_id`, pass `notes: { order_id: ... }` when creating the Order or Subscription.
 
 Open Razorpay Checkout in the frontend with `data.checkoutOptions`. After Checkout returns `razorpay_order_id`, `razorpay_payment_id`, and `razorpay_signature`, verify through the SDK:
 
@@ -168,7 +168,7 @@ Adapt the payload lookup to the app schema and event shape. Protect app-owned bi
 - Consider RLS on `payments.razorpay_orders` and `payments.razorpay_subscriptions`.
 - Do not expose `payments.customers`, `payments.transactions`, or `payments.razorpay_subscriptions` directly to end users.
 - Do not write provider-managed payments tables directly. Use the Payments API, Razorpay webhooks, or app-owned trigger targets.
-- Metadata keys starting with `insforge_` are reserved.
+- Notes keys starting with `insforge_` are reserved.
 
 ## Debugging
 

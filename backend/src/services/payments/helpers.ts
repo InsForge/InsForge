@@ -18,7 +18,7 @@ import {
   StripeProduct as StripeProductResponse,
 } from '@insforge/shared-schemas';
 
-const BILLING_SUBJECT_METADATA_KEYS = {
+const BILLING_SUBJECT_PROVIDER_ATTRIBUTE_KEYS = {
   type: 'insforge_subject_type',
   id: 'insforge_subject_id',
 } as const;
@@ -49,11 +49,11 @@ export function getPaymentEnvironment(params: unknown): PaymentEnvironment {
   return validation.data.environment;
 }
 
-export function getBillingSubjectFromMetadata(
-  metadata: Record<string, string> | null | undefined
+export function getBillingSubjectFromProviderAttributes(
+  attributes: Record<string, string> | null | undefined
 ): BillingSubject | null {
-  const subjectType = metadata?.[BILLING_SUBJECT_METADATA_KEYS.type];
-  const subjectId = metadata?.[BILLING_SUBJECT_METADATA_KEYS.id];
+  const subjectType = attributes?.[BILLING_SUBJECT_PROVIDER_ATTRIBUTE_KEYS.type];
+  const subjectId = attributes?.[BILLING_SUBJECT_PROVIDER_ATTRIBUTE_KEYS.id];
 
   if (!subjectType || !subjectId) {
     return null;
@@ -62,12 +62,12 @@ export function getBillingSubjectFromMetadata(
   return { type: subjectType, id: subjectId };
 }
 
-export function addBillingSubjectToMetadata(
-  metadata: Record<string, string>,
+export function addBillingSubjectToProviderAttributes(
+  attributes: Record<string, string>,
   subject: BillingSubject
 ): void {
-  metadata[BILLING_SUBJECT_METADATA_KEYS.type] = subject.type;
-  metadata[BILLING_SUBJECT_METADATA_KEYS.id] = subject.id;
+  attributes[BILLING_SUBJECT_PROVIDER_ATTRIBUTE_KEYS.type] = subject.type;
+  attributes[BILLING_SUBJECT_PROVIDER_ATTRIBUTE_KEYS.id] = subject.id;
 }
 
 export function getStripeObjectId(value: unknown): string | null {

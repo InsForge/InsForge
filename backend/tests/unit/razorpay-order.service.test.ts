@@ -79,7 +79,7 @@ describe('RazorpayOrderService', () => {
     });
   });
 
-  it('creates a native Razorpay order with subject metadata for Checkout', async () => {
+  it('creates a native Razorpay order with subject notes for Checkout', async () => {
     mockUserClientQuery.mockResolvedValueOnce({ rowCount: 1, rows: [] });
     mockCreateOrder.mockResolvedValue({
       id: 'order_123',

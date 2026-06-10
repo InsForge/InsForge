@@ -3,7 +3,7 @@ import { DatabaseManager } from '@/infra/database/database.manager.js';
 import type { StripeProvider } from '@/providers/payments/stripe.provider.js';
 import {
   fromStripeTimestamp,
-  getBillingSubjectFromMetadata,
+  getBillingSubjectFromProviderAttributes,
   getStripeObjectId,
 } from '@/services/payments/helpers.js';
 import { toISOString, toISOStringOrNull } from '@/utils/dates.js';
@@ -352,7 +352,7 @@ export class StripeSubscriptionService {
     customerId: string
   ): Promise<BillingSubject | null> {
     return (
-      getBillingSubjectFromMetadata(subscription.metadata) ??
+      getBillingSubjectFromProviderAttributes(subscription.metadata) ??
       (await this.resolveSubjectFromCustomerMapping(environment, customerId))
     );
   }

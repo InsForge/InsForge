@@ -101,14 +101,14 @@ const { data: orderResponse, error } =
     receipt: order.id,
     subject: { type: 'team', id: teamId },
     customerEmail: user.email,
-    metadata: { order_id: order.id }
+    notes: { order_id: order.id }
   });
 
 if (error) throw error;
 if (!orderResponse) throw new Error('Razorpay order creation returned no data');
 ```
 
-InsForge copies `metadata` to Razorpay `notes`. If your webhook trigger reads `notes.order_id`, pass `metadata: { order_id: ... }` when creating the Order.
+If your webhook trigger reads `notes.order_id`, pass `notes: { order_id: ... }` when creating the Order.
 
 Open Razorpay Checkout and verify the returned signature:
 
@@ -178,7 +178,7 @@ if (error) throw error;
 if (!subscriptionResponse) throw new Error('Razorpay subscription creation returned no data');
 ```
 
-InsForge copies `metadata` to Razorpay subscription `notes`, which webhook triggers can read later.
+Pass Razorpay subscription `notes` when webhook triggers need app identifiers later.
 
 Open Razorpay Checkout with the returned subscription ID:
 

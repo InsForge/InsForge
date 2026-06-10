@@ -70,7 +70,6 @@ describe('RazorpayCatalogService', () => {
       name: 'Invoice item',
       amount: 25000,
       currency: 'INR',
-      metadata: { tier: 'starter' },
     });
 
     expect(mockCreateItem).toHaveBeenCalledWith(
@@ -78,7 +77,6 @@ describe('RazorpayCatalogService', () => {
         name: 'Invoice item',
         amount: 25000,
         currency: 'INR',
-        notes: { tier: 'starter' },
       })
     );
     expect(mockPoolQuery).toHaveBeenCalledWith(
@@ -89,7 +87,6 @@ describe('RazorpayCatalogService', () => {
       expect.objectContaining({
         itemId: 'item_123',
         currency: 'inr',
-        metadata: { tier: 'starter' },
       })
     );
   });
@@ -125,7 +122,7 @@ describe('RazorpayCatalogService', () => {
         amount: 199900,
         currency: 'INR',
       },
-      metadata: { tier: 'pro' },
+      notes: { tier: 'pro' },
     });
 
     expect(mockCreatePlan).toHaveBeenCalledWith(
@@ -154,7 +151,7 @@ describe('RazorpayCatalogService', () => {
       expect.objectContaining({
         planId: 'plan_123',
         itemId: 'item_plan_123',
-        metadata: { tier: 'pro' },
+        notes: { tier: 'pro' },
       })
     );
   });

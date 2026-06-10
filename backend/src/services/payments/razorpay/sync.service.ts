@@ -1,6 +1,6 @@
 import type { Pool, PoolClient } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
-import { getBillingSubjectFromMetadata } from '@/services/payments/helpers.js';
+import { getBillingSubjectFromProviderAttributes } from '@/services/payments/helpers.js';
 import { RazorpayConfigService } from '@/services/payments/razorpay/config.service.js';
 import { RazorpayTransactionService } from '@/services/payments/razorpay/transaction.service.js';
 import { withPaymentSessionAdvisoryLock } from '@/services/payments/payments-advisory-lock.js';
@@ -58,11 +58,11 @@ function formatStageFailures(failures: RazorpaySyncStageFailure[]): string {
   return failures.map((failure) => `${failure.stage}: ${failure.error}`).join('; ');
 }
 
-function normalizeRazorpayMetadata(
-  metadata: Record<string, string | number | boolean> | undefined
+function normalizeRazorpayNotes(
+  notes: Record<string, string | number | boolean> | undefined
 ): Record<string, string> {
   return Object.fromEntries(
-    Object.entries(metadata ?? {}).map(([key, value]) => [key, String(value)])
+    Object.entries(notes ?? {}).map(([key, value]) => [key, String(value)])
   );
 }
 
@@ -345,7 +345,7 @@ export class RazorpaySyncService {
            unit_amount,
            currency,
            active,
-           metadata,
+           notes,
            raw,
            provider_created_at,
            synced_at
@@ -359,7 +359,7 @@ export class RazorpaySyncService {
            unit_amount = EXCLUDED.unit_amount,
            currency = EXCLUDED.currency,
            active = EXCLUDED.active,
-           metadata = EXCLUDED.metadata,
+           notes = EXCLUDED.notes,
            raw = EXCLUDED.raw,
            provider_created_at = EXCLUDED.provider_created_at,
            synced_at = NOW(),
@@ -374,7 +374,7 @@ export class RazorpaySyncService {
           plan.item.unit_amount ?? plan.item.amount ?? null,
           plan.item.currency.toLowerCase(),
           plan.item.active !== false,
-          normalizeRazorpayMetadata(plan.notes),
+          normalizeRazorpayNotes(plan.notes),
           plan,
           plan.created_at ? new Date(plan.created_at * 1000) : null,
         ]
@@ -398,12 +398,11 @@ export class RazorpaySyncService {
          unit_amount,
          currency,
          type,
-         metadata,
          raw,
          provider_created_at,
          synced_at
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, '{}'::JSONB, $10, $11, NOW())
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
        ON CONFLICT (environment, item_id) DO UPDATE SET
          name = EXCLUDED.name,
          description = EXCLUDED.description,
@@ -529,12 +528,12 @@ export class RazorpaySyncService {
       await client.query('BEGIN');
 
       for (const sub of subscriptions) {
-        const metadata = normalizeRazorpayMetadata(sub.notes);
+        const notes = normalizeRazorpayNotes(sub.notes);
         const subject = await this.resolveSubscriptionSubject(
           client,
           environment,
           sub.customer_id,
-          metadata
+          notes
         );
 
         await client.query(
@@ -561,7 +560,7 @@ export class RazorpaySyncService {
              has_scheduled_changes,
              change_scheduled_at,
              offer_id,
-             metadata,
+             notes,
              raw,
              provider_created_at,
              synced_at
@@ -588,7 +587,7 @@ export class RazorpaySyncService {
              has_scheduled_changes = EXCLUDED.has_scheduled_changes,
              change_scheduled_at = EXCLUDED.change_scheduled_at,
              offer_id = EXCLUDED.offer_id,
-             metadata = EXCLUDED.metadata,
+             notes = EXCLUDED.notes,
              raw = EXCLUDED.raw,
              provider_created_at = EXCLUDED.provider_created_at,
              synced_at = EXCLUDED.synced_at,
@@ -616,7 +615,7 @@ export class RazorpaySyncService {
             sub.has_scheduled_changes,
             sub.change_scheduled_at ? new Date(sub.change_scheduled_at * 1000) : null,
             sub.offer_id ?? null,
-            metadata,
+            notes,
             sub,
             sub.created_at ? new Date(sub.created_at * 1000) : null,
             syncStartedAt,
@@ -651,10 +650,10 @@ export class RazorpaySyncService {
     client: PoolClient,
     environment: RazorpayEnvironment,
     customerId: string | null,
-    metadata: Record<string, string>
+    notes: Record<string, string>
   ): Promise<BillingSubject | null> {
     return (
-      getBillingSubjectFromMetadata(metadata) ??
+      getBillingSubjectFromProviderAttributes(notes) ??
       (await this.resolveSubjectFromCustomerMapping(client, environment, customerId))
     );
   }

@@ -710,13 +710,11 @@ describe('payments route schemas', () => {
         name: 'Invoice item',
         amount: 25000,
         currency: 'inr',
-        metadata: { tier: 'starter' },
       })
     ).toEqual({
       name: 'Invoice item',
       amount: 25000,
       currency: 'INR',
-      metadata: { tier: 'starter' },
     });
 
     expect(updateRazorpayItemBodySchema.parse({ active: false })).toEqual({ active: false });
@@ -731,6 +729,7 @@ describe('payments route schemas', () => {
           amount: 199900,
           currency: 'inr',
         },
+        notes: { tier: 'pro' },
       })
     ).toEqual({
       period: 'monthly',
@@ -740,18 +739,19 @@ describe('payments route schemas', () => {
         amount: 199900,
         currency: 'INR',
       },
+      notes: { tier: 'pro' },
     });
 
     expect(razorpayCatalogRouteSource).not.toMatch(/router\.patch\(\s*'\/plans/);
     expect(razorpayCatalogRouteSource).not.toMatch(/router\.delete\(\s*'\/plans/);
   });
 
-  it('rejects caller-provided InsForge-reserved Razorpay metadata', () => {
+  it('rejects caller-provided InsForge-reserved Razorpay notes', () => {
     expect(() =>
       createRazorpayOrderBodySchema.parse({
         amount: 50000,
         currency: 'INR',
-        metadata: {
+        notes: {
           insforge_subject_type: 'team',
         },
       })
@@ -766,7 +766,7 @@ describe('payments route schemas', () => {
           amount: 199900,
           currency: 'INR',
         },
-        metadata: {
+        notes: {
           insforge_subject_id: 'team_123',
         },
       })

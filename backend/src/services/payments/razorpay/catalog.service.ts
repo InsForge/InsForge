@@ -53,7 +53,6 @@ export class RazorpayCatalogService {
            unit_amount AS "unitAmount",
            currency,
            type,
-           metadata,
            provider_created_at AS "providerCreatedAt",
            synced_at AS "syncedAt"
          FROM payments.razorpay_items
@@ -72,7 +71,7 @@ export class RazorpayCatalogService {
            unit_amount AS "unitAmount",
            currency,
            active,
-           metadata,
+           notes,
            provider_created_at AS "providerCreatedAt",
            synced_at AS "syncedAt"
          FROM payments.razorpay_plans
@@ -96,13 +95,12 @@ export class RazorpayCatalogService {
         amount: input.amount,
         currency: input.currency,
         description: input.description ?? null,
-        notes: input.metadata,
       });
 
-      await this.upsertItemRecord(input.environment, item, input.metadata ?? {});
+      await this.upsertItemRecord(input.environment, item);
 
       return {
-        item: this.normalizeProviderItem(item, input.environment, input.metadata ?? {}),
+        item: this.normalizeProviderItem(item, input.environment),
       };
     });
   }
@@ -119,13 +117,12 @@ export class RazorpayCatalogService {
         currency: input.currency,
         description: input.description,
         active: input.active,
-        notes: input.metadata,
       });
 
-      await this.upsertItemRecord(input.environment, item, input.metadata ?? null);
+      await this.upsertItemRecord(input.environment, item);
 
       return {
-        item: this.normalizeProviderItem(item, input.environment, input.metadata ?? {}),
+        item: this.normalizeProviderItem(item, input.environment),
       };
     });
   }
@@ -137,14 +134,14 @@ export class RazorpayCatalogService {
         period: input.period,
         interval: input.interval,
         item: input.item,
-        notes: input.metadata,
+        notes: input.notes,
       });
 
-      await this.upsertItemRecord(input.environment, plan.item, null);
-      await this.upsertPlanRecord(input.environment, plan, input.metadata ?? {});
+      await this.upsertItemRecord(input.environment, plan.item);
+      await this.upsertPlanRecord(input.environment, plan, input.notes ?? {});
 
       return {
-        plan: this.normalizeProviderPlan(plan, input.environment, input.metadata ?? {}),
+        plan: this.normalizeProviderPlan(plan, input.environment, input.notes ?? {}),
       };
     });
   }
@@ -162,8 +159,7 @@ export class RazorpayCatalogService {
 
   private async upsertItemRecord(
     environment: RazorpayEnvironment,
-    item: RazorpayProviderItem | RazorpayProviderPlan['item'],
-    metadata: Record<string, string> | null
+    item: RazorpayProviderItem | RazorpayProviderPlan['item']
   ): Promise<void> {
     await this.getPool().query(
       `INSERT INTO payments.razorpay_items (
@@ -176,12 +172,11 @@ export class RazorpayCatalogService {
          unit_amount,
          currency,
          type,
-         metadata,
          raw,
          provider_created_at,
          synced_at
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, COALESCE($10::JSONB, '{}'::JSONB), $11, $12, NOW())
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
        ON CONFLICT (environment, item_id) DO UPDATE SET
          name = EXCLUDED.name,
          description = EXCLUDED.description,
@@ -190,10 +185,6 @@ export class RazorpayCatalogService {
          unit_amount = EXCLUDED.unit_amount,
          currency = EXCLUDED.currency,
          type = COALESCE(EXCLUDED.type, payments.razorpay_items.type),
-         metadata = CASE
-           WHEN $10::JSONB IS NULL THEN payments.razorpay_items.metadata
-           ELSE EXCLUDED.metadata
-         END,
          raw = EXCLUDED.raw,
          provider_created_at = COALESCE(EXCLUDED.provider_created_at, payments.razorpay_items.provider_created_at),
          synced_at = NOW(),
@@ -208,7 +199,6 @@ export class RazorpayCatalogService {
         item.unit_amount ?? item.amount ?? null,
         item.currency.toLowerCase(),
         'type' in item ? item.type : null,
-        metadata,
         item,
         'created_at' in item && item.created_at ? new Date(item.created_at * 1000) : null,
       ]
@@ -218,7 +208,7 @@ export class RazorpayCatalogService {
   private async upsertPlanRecord(
     environment: RazorpayEnvironment,
     plan: RazorpayProviderPlan,
-    metadata: Record<string, string>
+    notes: Record<string, string>
   ): Promise<void> {
     await this.getPool().query(
       `INSERT INTO payments.razorpay_plans (
@@ -231,7 +221,7 @@ export class RazorpayCatalogService {
          unit_amount,
          currency,
          active,
-         metadata,
+         notes,
          raw,
          provider_created_at,
          synced_at
@@ -245,7 +235,7 @@ export class RazorpayCatalogService {
          unit_amount = EXCLUDED.unit_amount,
          currency = EXCLUDED.currency,
          active = EXCLUDED.active,
-         metadata = EXCLUDED.metadata,
+         notes = EXCLUDED.notes,
          raw = EXCLUDED.raw,
          provider_created_at = EXCLUDED.provider_created_at,
          synced_at = NOW(),
@@ -260,7 +250,7 @@ export class RazorpayCatalogService {
         plan.item.unit_amount ?? plan.item.amount ?? null,
         plan.item.currency.toLowerCase(),
         plan.item.active !== false,
-        metadata,
+        notes,
         plan,
         plan.created_at ? new Date(plan.created_at * 1000) : null,
       ]
@@ -290,8 +280,7 @@ export class RazorpayCatalogService {
 
   private normalizeProviderItem(
     item: RazorpayProviderItem,
-    environment: RazorpayEnvironment,
-    metadata: Record<string, string>
+    environment: RazorpayEnvironment
   ): RazorpayItem {
     return {
       environment,
@@ -303,7 +292,6 @@ export class RazorpayCatalogService {
       unitAmount: item.unit_amount ?? item.amount ?? null,
       currency: item.currency.toLowerCase(),
       type: item.type ?? null,
-      metadata,
       providerCreatedAt: item.created_at ? new Date(item.created_at * 1000).toISOString() : null,
       syncedAt: new Date().toISOString(),
     };
@@ -312,7 +300,7 @@ export class RazorpayCatalogService {
   private normalizeProviderPlan(
     plan: RazorpayProviderPlan,
     environment: RazorpayEnvironment,
-    metadata: Record<string, string>
+    notes: Record<string, string>
   ): RazorpayPlan {
     return {
       environment,
@@ -324,7 +312,7 @@ export class RazorpayCatalogService {
       unitAmount: plan.item.unit_amount ?? plan.item.amount ?? null,
       currency: plan.item.currency.toLowerCase(),
       active: plan.item.active !== false,
-      metadata,
+      notes,
       providerCreatedAt: plan.created_at ? new Date(plan.created_at * 1000).toISOString() : null,
       syncedAt: new Date().toISOString(),
     };

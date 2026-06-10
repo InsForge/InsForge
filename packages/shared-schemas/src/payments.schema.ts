@@ -161,6 +161,7 @@ export const razorpayOrderSchema = z.object({
   attempts: z.number().int().nonnegative().nullable(),
   verifiedPaymentId: z.string().nullable(),
   verifiedAt: z.string().nullable(),
+  notes: z.record(z.string()),
   lastError: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -313,7 +314,7 @@ export const razorpaySubscriptionSchema = z.object({
   offerId: z.string().nullable(),
   authorizationPaymentId: z.string().nullable(),
   authorizationVerifiedAt: z.string().nullable(),
-  metadata: z.record(z.string()),
+  notes: z.record(z.string()),
   providerCreatedAt: z.string().nullable(),
   syncedAt: z.string(),
   createdAt: z.string(),
@@ -383,7 +384,6 @@ export const razorpayItemSchema = z.object({
     .describe('Razorpay per-unit amount mirror; usually equals amount for catalog items.'),
   currency: z.string(),
   type: z.string().nullable(),
-  metadata: z.record(z.string()),
   providerCreatedAt: z.string().nullable(),
   syncedAt: z.string(),
 });
@@ -402,7 +402,7 @@ export const razorpayPlanSchema = z.object({
     .describe('Razorpay nested item per-unit amount mirror; usually equals amount.'),
   currency: z.string(),
   active: z.boolean(),
-  metadata: z.record(z.string()),
+  notes: z.record(z.string()),
   providerCreatedAt: z.string().nullable(),
   syncedAt: z.string(),
 });

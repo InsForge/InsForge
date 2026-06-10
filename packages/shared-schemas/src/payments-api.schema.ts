@@ -103,6 +103,10 @@ function hasNoReservedInsForgeMetadata(metadata: Record<string, string> | undefi
   return !Object.keys(metadata ?? {}).some((key) => key.startsWith('insforge_'));
 }
 
+function hasNoReservedInsForgeNotes(notes: Record<string, string> | undefined) {
+  return !Object.keys(notes ?? {}).some((key) => key.startsWith('insforge_'));
+}
+
 const currencySchema = z
   .string()
   .trim()
@@ -304,27 +308,16 @@ const createRazorpayItemFields = {
   description: z.string().trim().max(2048).nullable().optional(),
   amount: z.number().int().positive(),
   currency: currencySchema,
-  metadata: z.record(z.string()).optional(),
 };
 
-export const createRazorpayItemBodySchema = z
-  .object(createRazorpayItemFields)
-  .strict()
-  .refine((value) => hasNoReservedInsForgeMetadata(value.metadata), {
-    path: ['metadata'],
-    message: 'Metadata keys starting with insforge_ are reserved',
-  });
+export const createRazorpayItemBodySchema = z.object(createRazorpayItemFields).strict();
 
 export const createRazorpayItemRequestSchema = z
   .object({
     environment: razorpayEnvironmentSchema,
     ...createRazorpayItemFields,
   })
-  .strict()
-  .refine((value) => hasNoReservedInsForgeMetadata(value.metadata), {
-    path: ['metadata'],
-    message: 'Metadata keys starting with insforge_ are reserved',
-  });
+  .strict();
 
 const updateRazorpayItemFields = {
   name: z.string().trim().min(1, 'Item name is required').max(255).optional(),
@@ -332,7 +325,6 @@ const updateRazorpayItemFields = {
   amount: z.number().int().positive().optional(),
   currency: currencySchema.optional(),
   active: z.boolean().optional(),
-  metadata: z.record(z.string()).optional(),
 };
 
 export const updateRazorpayItemBodySchema = z
@@ -340,10 +332,6 @@ export const updateRazorpayItemBodySchema = z
   .strict()
   .refine(hasAtLeastOneValue, {
     message: 'At least one item field is required',
-  })
-  .refine((value) => hasNoReservedInsForgeMetadata(value.metadata), {
-    path: ['metadata'],
-    message: 'Metadata keys starting with insforge_ are reserved',
   });
 
 export const updateRazorpayItemRequestSchema = z
@@ -354,10 +342,6 @@ export const updateRazorpayItemRequestSchema = z
   .strict()
   .refine(({ environment: _environment, ...value }) => hasAtLeastOneValue(value), {
     message: 'At least one item field is required',
-  })
-  .refine((value) => hasNoReservedInsForgeMetadata(value.metadata), {
-    path: ['metadata'],
-    message: 'Metadata keys starting with insforge_ are reserved',
   });
 
 const createRazorpayPlanFields = {
@@ -371,15 +355,15 @@ const createRazorpayPlanFields = {
       currency: currencySchema,
     })
     .strict(),
-  metadata: z.record(z.string()).optional(),
+  notes: z.record(z.string()).optional(),
 };
 
 export const createRazorpayPlanBodySchema = z
   .object(createRazorpayPlanFields)
   .strict()
-  .refine((value) => hasNoReservedInsForgeMetadata(value.metadata), {
-    path: ['metadata'],
-    message: 'Metadata keys starting with insforge_ are reserved',
+  .refine((value) => hasNoReservedInsForgeNotes(value.notes), {
+    path: ['notes'],
+    message: 'Notes keys starting with insforge_ are reserved',
   });
 
 export const createRazorpayPlanRequestSchema = z
@@ -388,9 +372,9 @@ export const createRazorpayPlanRequestSchema = z
     ...createRazorpayPlanFields,
   })
   .strict()
-  .refine((value) => hasNoReservedInsForgeMetadata(value.metadata), {
-    path: ['metadata'],
-    message: 'Metadata keys starting with insforge_ are reserved',
+  .refine((value) => hasNoReservedInsForgeNotes(value.notes), {
+    path: ['notes'],
+    message: 'Notes keys starting with insforge_ are reserved',
   });
 
 export const mutateRazorpayItemResponseSchema = z.object({
@@ -460,18 +444,15 @@ const createRazorpayOrderFields = {
   customerEmail: z.string().trim().email().nullable().optional(),
   customerContact: z.string().trim().min(1).max(32).nullable().optional(),
   callbackUrl: z.string().trim().url('Callback URL must be a valid URL').nullable().optional(),
-  metadata: z
-    .record(z.string())
-    .describe('Copied to Razorpay notes for webhook fulfillment lookup.')
-    .optional(),
+  notes: z.record(z.string()).optional(),
 };
 
 export const createRazorpayOrderBodySchema = z
   .object(createRazorpayOrderFields)
   .strict()
-  .refine((value) => hasNoReservedInsForgeMetadata(value.metadata), {
-    path: ['metadata'],
-    message: 'Metadata keys starting with insforge_ are reserved',
+  .refine((value) => hasNoReservedInsForgeNotes(value.notes), {
+    path: ['notes'],
+    message: 'Notes keys starting with insforge_ are reserved',
   });
 
 export const createRazorpayOrderRequestSchema = z
@@ -480,9 +461,9 @@ export const createRazorpayOrderRequestSchema = z
     ...createRazorpayOrderFields,
   })
   .strict()
-  .refine((value) => hasNoReservedInsForgeMetadata(value.metadata), {
-    path: ['metadata'],
-    message: 'Metadata keys starting with insforge_ are reserved',
+  .refine((value) => hasNoReservedInsForgeNotes(value.notes), {
+    path: ['notes'],
+    message: 'Notes keys starting with insforge_ are reserved',
   });
 
 export const createRazorpayOrderResponseSchema = z.object({
@@ -529,10 +510,7 @@ const createRazorpaySubscriptionFields = {
   customerEmail: z.string().trim().email().nullable().optional(),
   customerContact: z.string().trim().min(1).max(32).nullable().optional(),
   callbackUrl: z.string().trim().url('Callback URL must be a valid URL').nullable().optional(),
-  metadata: z
-    .record(z.string())
-    .describe('Copied to Razorpay subscription notes for webhook fulfillment lookup.')
-    .optional(),
+  notes: z.record(z.string()).optional(),
 };
 
 function hasSubscriptionEnd(value: { totalCount?: number; endAt?: number }) {
@@ -545,9 +523,9 @@ export const createRazorpaySubscriptionBodySchema = z
   .refine(hasSubscriptionEnd, {
     message: 'Either totalCount or endAt is required',
   })
-  .refine((value) => hasNoReservedInsForgeMetadata(value.metadata), {
-    path: ['metadata'],
-    message: 'Metadata keys starting with insforge_ are reserved',
+  .refine((value) => hasNoReservedInsForgeNotes(value.notes), {
+    path: ['notes'],
+    message: 'Notes keys starting with insforge_ are reserved',
   });
 
 export const createRazorpaySubscriptionRequestSchema = z
@@ -559,9 +537,9 @@ export const createRazorpaySubscriptionRequestSchema = z
   .refine(hasSubscriptionEnd, {
     message: 'Either totalCount or endAt is required',
   })
-  .refine((value) => hasNoReservedInsForgeMetadata(value.metadata), {
-    path: ['metadata'],
-    message: 'Metadata keys starting with insforge_ are reserved',
+  .refine((value) => hasNoReservedInsForgeNotes(value.notes), {
+    path: ['notes'],
+    message: 'Notes keys starting with insforge_ are reserved',
   });
 
 export const createRazorpaySubscriptionResponseSchema = z.object({

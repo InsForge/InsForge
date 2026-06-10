@@ -1,6 +1,6 @@
 import type { Pool, PoolClient } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
-import { getBillingSubjectFromMetadata } from '@/services/payments/helpers.js';
+import { getBillingSubjectFromProviderAttributes } from '@/services/payments/helpers.js';
 import type {
   RazorpayInvoice,
   RazorpayPayment,
@@ -192,10 +192,10 @@ export class RazorpayTransactionService {
     invoice: RazorpayInvoice,
     event: string
   ): Promise<void> {
-    const metadata = this.normalizeMetadata(invoice.notes);
+    const notes = this.normalizeNotes(invoice.notes);
     const customerId = invoice.customer_id ?? invoice.customer_details?.id ?? null;
     const subject =
-      getBillingSubjectFromMetadata(metadata) ??
+      getBillingSubjectFromProviderAttributes(notes) ??
       (await this.resolveSubjectFromCustomerMapping(client, environment, customerId));
     const status = this.mapInvoiceStatus(invoice.status, event);
     const amount =
@@ -262,7 +262,7 @@ export class RazorpayTransactionService {
     options: UpsertRazorpayPaymentOptions = {}
   ): Promise<RazorpayTransactionStatus> {
     const status = this.mapPaymentStatus(payment.status);
-    const metadata = this.normalizeMetadata(payment.notes);
+    const notes = this.normalizeNotes(payment.notes);
     const lookupRefs = this.compactObjectRefs([
       { type: 'payment', id: payment.id },
       { type: 'order', id: payment.order_id ?? options.orderId ?? null },
@@ -280,7 +280,7 @@ export class RazorpayTransactionService {
     const subscriptionId =
       options.subscriptionId ?? existingContext?.relatedObjectIds.subscription ?? null;
     const subject =
-      getBillingSubjectFromMetadata(metadata) ??
+      getBillingSubjectFromProviderAttributes(notes) ??
       options.subjectFallback ??
       existingContext?.subject ??
       (await this.resolveSubjectFromOrder(client, environment, orderId)) ??
@@ -697,7 +697,7 @@ export class RazorpayTransactionService {
     return (result.rows[0] as BillingSubject | undefined) ?? null;
   }
 
-  private normalizeMetadata(
+  private normalizeNotes(
     notes: Record<string, string | number | boolean> | undefined | null
   ): Record<string, string> {
     return Object.fromEntries(

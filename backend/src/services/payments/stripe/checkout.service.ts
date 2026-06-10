@@ -9,7 +9,7 @@ import {
   STRIPE_CHECKOUT_SESSION_METADATA_KEY,
 } from '@/services/payments/stripe/constants.js';
 import {
-  addBillingSubjectToMetadata,
+  addBillingSubjectToProviderAttributes,
   buildStripeIdempotencyKey,
   getStripeObjectId,
   isPostgresPermissionError,
@@ -404,7 +404,7 @@ export class StripeCheckoutService {
     }
 
     if (subject) {
-      addBillingSubjectToMetadata(stripeMetadata, subject);
+      addBillingSubjectToProviderAttributes(stripeMetadata, subject);
     }
 
     return stripeMetadata;

@@ -1016,8 +1016,6 @@ paths:
               name: "One-time setup"
               amount: 50000
               currency: "INR"
-              metadata:
-                tier: "pro"
       responses:
         '201':
           description: Razorpay item created
@@ -1874,7 +1872,6 @@ components:
         - unitAmount
         - currency
         - type
-        - metadata
         - providerCreatedAt
         - syncedAt
       properties:
@@ -1907,8 +1904,6 @@ components:
           type: string
           nullable: true
           example: "invoice"
-        metadata:
-          $ref: '#/components/schemas/Metadata'
         providerCreatedAt:
           type: string
           format: date-time
@@ -1929,7 +1924,7 @@ components:
         - unitAmount
         - currency
         - active
-        - metadata
+        - notes
         - providerCreatedAt
         - syncedAt
       properties:
@@ -1966,7 +1961,7 @@ components:
           example: "inr"
         active:
           type: boolean
-        metadata:
+        notes:
           $ref: '#/components/schemas/Metadata'
         providerCreatedAt:
           type: string
@@ -2412,7 +2407,7 @@ components:
         - offerId
         - authorizationPaymentId
         - authorizationVerifiedAt
-        - metadata
+        - notes
         - providerCreatedAt
         - syncedAt
         - createdAt
@@ -2497,7 +2492,7 @@ components:
           type: string
           format: date-time
           nullable: true
-        metadata:
+        notes:
           $ref: '#/components/schemas/Metadata'
         providerCreatedAt:
           type: string
@@ -2938,6 +2933,7 @@ components:
         - attempts
         - verifiedPaymentId
         - verifiedAt
+        - notes
         - lastError
         - createdAt
         - updatedAt
@@ -2995,6 +2991,8 @@ components:
           type: string
           format: date-time
           nullable: true
+        notes:
+          $ref: '#/components/schemas/Metadata'
         lastError:
           type: string
           nullable: true
@@ -3026,7 +3024,7 @@ components:
         - amount
         - currency
       additionalProperties: false
-      description: Metadata keys starting with insforge_ are reserved and rejected.
+      description: Notes keys starting with insforge_ are reserved and rejected.
       properties:
         amount:
           type: integer
@@ -3066,8 +3064,8 @@ components:
           type: string
           format: uri
           nullable: true
-        metadata:
-          description: Copied to Razorpay `notes`. Use stable app identifiers such as `order_id` for webhook fulfillment triggers.
+        notes:
+          description: Native Razorpay notes. Use stable app identifiers such as `order_id` for webhook fulfillment triggers.
           allOf:
             - $ref: '#/components/schemas/Metadata'
 
@@ -3151,7 +3149,6 @@ components:
         - amount
         - currency
       additionalProperties: false
-      description: Metadata keys starting with insforge_ are reserved and rejected.
       properties:
         name:
           type: string
@@ -3169,14 +3166,11 @@ components:
           minLength: 3
           maxLength: 3
           example: "INR"
-        metadata:
-          $ref: '#/components/schemas/Metadata'
 
     UpdateRazorpayItemBody:
       type: object
       minProperties: 1
       additionalProperties: false
-      description: Metadata keys starting with insforge_ are reserved and rejected.
       properties:
         name:
           type: string
@@ -3196,8 +3190,6 @@ components:
           example: "INR"
         active:
           type: boolean
-        metadata:
-          $ref: '#/components/schemas/Metadata'
 
     CreateRazorpayPlanBody:
       type: object
@@ -3206,7 +3198,7 @@ components:
         - interval
         - item
       additionalProperties: false
-      description: Metadata keys starting with insforge_ are reserved and rejected.
+      description: Notes keys starting with insforge_ are reserved and rejected.
       properties:
         period:
           type: string
@@ -3242,7 +3234,7 @@ components:
               minLength: 3
               maxLength: 3
               example: "INR"
-        metadata:
+        notes:
           $ref: '#/components/schemas/Metadata'
 
     MutateRazorpayItemResponse:
@@ -3272,7 +3264,7 @@ components:
         - required:
             - endAt
       additionalProperties: false
-      description: Metadata keys starting with insforge_ are reserved and rejected. Either totalCount or endAt is required.
+      description: Notes keys starting with insforge_ are reserved and rejected. Either totalCount or endAt is required.
       properties:
         planId:
           type: string
@@ -3327,8 +3319,8 @@ components:
           type: string
           format: uri
           nullable: true
-        metadata:
-          description: Copied to Razorpay subscription `notes` and available in webhook payloads.
+        notes:
+          description: Native Razorpay subscription notes, available in webhook payloads.
           allOf:
             - $ref: '#/components/schemas/Metadata'
 

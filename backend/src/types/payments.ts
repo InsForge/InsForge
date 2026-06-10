@@ -227,7 +227,6 @@ export interface RazorpayItemRow {
   unitAmount: number | string | null;
   currency: string;
   type: string | null;
-  metadata: Record<string, string>;
   providerCreatedAt: Date | string | null;
   syncedAt: Date | string;
 }
@@ -242,7 +241,7 @@ export interface RazorpayPlanRow {
   unitAmount: number | string | null;
   currency: string;
   active: boolean;
-  metadata: Record<string, string>;
+  notes: Record<string, string>;
   providerCreatedAt: Date | string | null;
   syncedAt: Date | string;
 }
@@ -328,6 +327,7 @@ export interface RazorpayOrderRow {
   attempts: number | string | null;
   verifiedPaymentId: string | null;
   verifiedAt: Date | string | null;
+  notes: Record<string, string>;
   lastError: string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
@@ -449,7 +449,7 @@ export interface RazorpaySubscriptionRow {
   offerId: string | null;
   authorizationPaymentId: string | null;
   authorizationVerifiedAt: Date | string | null;
-  metadata: Record<string, string>;
+  notes: Record<string, string>;
   providerCreatedAt: Date | string | null;
   syncedAt: Date | string;
   createdAt: Date | string;

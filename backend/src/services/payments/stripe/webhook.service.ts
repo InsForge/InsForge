@@ -9,7 +9,7 @@ import { StripeSubscriptionService } from '@/services/payments/stripe/subscripti
 import { getStripeWebhookSecretName } from '@/services/payments/stripe/constants.js';
 import {
   fromStripeTimestamp,
-  getBillingSubjectFromMetadata,
+  getBillingSubjectFromProviderAttributes,
   getStripeObjectId,
 } from '@/services/payments/helpers.js';
 import { toISOString, toISOStringOrNull } from '@/utils/dates.js';
@@ -305,7 +305,7 @@ export class StripeWebhookService {
     environment: StripeEnvironment,
     checkoutSession: StripeCheckoutSession
   ): Promise<boolean> {
-    const subject = getBillingSubjectFromMetadata(checkoutSession.metadata);
+    const subject = getBillingSubjectFromProviderAttributes(checkoutSession.metadata);
     const customerId = getStripeObjectId(checkoutSession.customer);
     if (!subject || !customerId) {
       return false;
