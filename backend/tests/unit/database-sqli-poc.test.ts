@@ -61,10 +61,7 @@ describe('DatabaseTableService - SQL Injection Verification (Fixed)', () => {
     console.log('Captured SQL Query:', capturedQuery);
 
     // Assert that the table name stays inside a schema-qualified quoted identifier.
-    const isQuotedCorrectly =
-      capturedQuery.includes(`FROM public."users; DROP TABLE secrets; --"`) ||
-      capturedQuery.includes(`FROM "public"."users; DROP TABLE secrets; --"`);
-    expect(isQuotedCorrectly).toBe(true);
+    expect(capturedQuery).toContain(`FROM "public"."users; DROP TABLE secrets; --"`);
 
     // This proves that the DROP TABLE command is now safely inside the identifier
     // string and will NOT be executed as a separate SQL command.

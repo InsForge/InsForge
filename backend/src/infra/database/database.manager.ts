@@ -6,6 +6,7 @@ import { DatabaseMetadataSchema } from '@insforge/shared-schemas';
 import pgFormat from 'pg-format';
 import { buildQualifiedTableKey, DEFAULT_DATABASE_SCHEMA } from '@/services/database/helpers.js';
 import { appConfig } from '@/infra/config/app.config.js';
+import logger from '@/utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -164,7 +165,7 @@ export class DatabaseManager {
           });
         }
       } catch (error) {
-        console.error('Failed to batch query exact table counts:', error);
+        logger.error('Failed to batch query exact table counts:', { error });
       } finally {
         client.release();
       }

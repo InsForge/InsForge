@@ -21,7 +21,6 @@ import {
   OnUpdateActionSchema,
   ForeignKeySchema,
 } from '@insforge/shared-schemas';
-import pgFormat from 'pg-format';
 import { validateIdentifier, validateSchemaName } from '@/utils/validations.js';
 import { convertSqlTypeToColumnType } from '@/utils/utils.js';
 import {
@@ -419,7 +418,7 @@ export class DatabaseTableService {
       let row_count = 0;
       try {
         const countResult = await client.query(
-          pgFormat('SELECT COUNT(*) as row_count FROM %I.%I', schemaName, table)
+          `SELECT COUNT(*) as row_count FROM ${quoteQualifiedName(schemaName, table)}`
         );
         row_count = Number(countResult.rows[0]?.row_count || 0);
       } catch {
