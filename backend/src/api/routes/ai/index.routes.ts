@@ -7,6 +7,8 @@ import { AIModelService } from '@/services/ai/ai-model.service.js';
 import { AppError } from '@/utils/errors.js';
 import { errorResponse, successResponse } from '@/utils/response.js';
 import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
+import { SecretService } from '@/services/secrets/secret.service.js';
+import { FunctionService } from '@/services/functions/function.service.js';
 import logger from '@/utils/logger.js';
 import {
   ERROR_CODES,
@@ -91,6 +93,7 @@ router.post(
       const provider = parseAIProvider(req.params.provider);
       const openRouterProvider = OpenRouterProvider.getInstance();
       const key = await rotateProviderApiKey(provider, openRouterProvider);
+      await syncRotatedOpenRouterSecret(key.apiKey);
       successResponse(res, key);
     } catch (error) {
       next(error);
@@ -122,6 +125,34 @@ function getProviderApiKey(provider: AIProvider, openRouterProvider: OpenRouterP
         ERROR_CODES.INVALID_INPUT
       );
     }
+  }
+}
+
+const OPENROUTER_SECRET_KEY = 'OPENROUTER_API_KEY';
+
+/**
+ * Keep the OPENROUTER_API_KEY secret in sync after a rotation: secrets are
+ * injected into edge functions as env vars, so a stale copy keeps calling
+ * OpenRouter with the revoked key. Best-effort — the upstream key has already
+ * rotated, so a sync failure must not fail the request.
+ */
+async function syncRotatedOpenRouterSecret(apiKey: string): Promise<void> {
+  try {
+    const updated = await SecretService.getInstance().updateSecretByKey(OPENROUTER_SECRET_KEY, {
+      value: apiKey,
+    });
+    if (!updated) {
+      // No OPENROUTER_API_KEY secret configured; nothing to sync.
+      return;
+    }
+    const functionService = FunctionService.getInstance();
+    if (functionService.isSubhostingConfigured()) {
+      functionService.redeploy();
+    }
+  } catch (error) {
+    logger.error('Failed to sync rotated OpenRouter API key to secrets', {
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 }
 
