@@ -548,8 +548,8 @@ export default function AIOverviewPage() {
         </div>
 
         <section className="grid min-h-[280px] grid-cols-[360px_1fr] overflow-hidden rounded border border-[var(--alpha-8)] bg-card">
-          <div className="grid grid-rows-[1fr_32px] p-5">
-            <div className="flex flex-col gap-5">
+          <div className="grid min-w-0 grid-rows-[1fr_32px] p-5">
+            <div className="flex min-w-0 flex-col gap-5">
               <div className="flex flex-col gap-3">
                 <h2 className="text-base font-medium leading-6 text-foreground">
                   Start using Model Gateway
