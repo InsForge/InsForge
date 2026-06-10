@@ -134,7 +134,9 @@ describe('payments multi-provider migration', () => {
     expect(sql).toMatch(/payments\.stripe_customer_portal_sessions/i);
     expect(sql).not.toMatch(/ALTER TABLE payments\.checkout_sessions\s+ADD COLUMN/i);
     expect(sql).not.toMatch(/ALTER TABLE payments\.customer_portal_sessions\s+ADD COLUMN/i);
-    expect(sql).not.toMatch(/ALTER TABLE payments\.stripe_checkout_sessions/i);
+    expect(sql).toMatch(
+      /ALTER TABLE payments\.stripe_checkout_sessions\s+ADD COLUMN IF NOT EXISTS request_hash TEXT/i
+    );
     expect(sql).not.toMatch(/ALTER TABLE payments\.stripe_customer_portal_sessions/i);
     expect(sql).toMatch(/idx_payments_stripe_checkout_sessions_environment_idempotency/i);
     expect(sql).toMatch(/idx_payments_stripe_customer_portal_sessions_environment_customer/i);
@@ -162,7 +164,7 @@ describe('payments multi-provider migration', () => {
     expect(sql).toMatch(/plan_id TEXT NOT NULL/i);
     expect(sql).toMatch(/subscription_id TEXT NOT NULL/i);
     expect(sql).toMatch(/auth_attempts BIGINT/i);
-    expect(sql).toMatch(
+    expect(sql).not.toMatch(
       /ALTER TABLE payments\.razorpay_subscriptions[\s\S]*ADD COLUMN IF NOT EXISTS auth_attempts BIGINT/i
     );
     expect(sql).toMatch(/Razorpay response mirror\. Usually equals amount/i);
@@ -189,15 +191,9 @@ describe('payments multi-provider migration', () => {
     expect(sql).toMatch(
       /'stripe_subscription_items', ARRAY\['environment', 'subscription_item_id'\]/i
     );
-    expect(sql).toMatch(
-      /CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_razorpay_items_environment_item/i
-    );
-    expect(sql).toMatch(
-      /CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_razorpay_plans_environment_plan/i
-    );
-    expect(sql).toMatch(
-      /CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_razorpay_subscriptions_environment_subscription/i
-    );
+    expect(sql).not.toMatch(/idx_payments_razorpay_items_environment_item/i);
+    expect(sql).not.toMatch(/idx_payments_razorpay_plans_environment_plan/i);
+    expect(sql).not.toMatch(/idx_payments_razorpay_subscriptions_environment_subscription/i);
     expect(sql).toMatch(
       /GRANT SELECT ON payments\.razorpay_items, payments\.razorpay_plans TO project_admin/i
     );

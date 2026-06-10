@@ -261,7 +261,7 @@ export class RazorpayTransactionService {
     payment: RazorpayPayment,
     options: UpsertRazorpayPaymentOptions = {}
   ): Promise<RazorpayTransactionStatus> {
-    const status = this.mapPaymentStatus(payment.status);
+    const status = this.mapPaymentStatus(payment);
     const notes = this.normalizeNotes(payment.notes);
     const lookupRefs = this.compactObjectRefs([
       { type: 'payment', id: payment.id },
@@ -709,8 +709,28 @@ export class RazorpayTransactionService {
     return unixSeconds ? new Date(unixSeconds * 1000) : null;
   }
 
-  private mapPaymentStatus(status: RazorpayPayment['status']): RazorpayTransactionStatus {
-    switch (status) {
+  private mapPaymentStatus(payment: RazorpayPayment): RazorpayTransactionStatus {
+    const amountRefunded = payment.amount_refunded ?? 0;
+    const refundStatus = payment.refund_status?.toLowerCase() ?? null;
+
+    if (
+      payment.status === 'refunded' ||
+      (payment.status === 'captured' &&
+        amountRefunded > 0 &&
+        (refundStatus === 'full' || amountRefunded >= payment.amount))
+    ) {
+      return 'refunded';
+    }
+
+    if (
+      payment.status === 'captured' &&
+      amountRefunded > 0 &&
+      (refundStatus === 'partial' || amountRefunded < payment.amount)
+    ) {
+      return 'partially_refunded';
+    }
+
+    switch (payment.status) {
       case 'captured':
         return 'succeeded';
       case 'authorized':
@@ -718,8 +738,6 @@ export class RazorpayTransactionService {
         return 'pending';
       case 'failed':
         return 'failed';
-      case 'refunded':
-        return 'refunded';
       default:
         return 'pending';
     }

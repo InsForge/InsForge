@@ -12,7 +12,9 @@ type ZodErrorLike = {
 };
 
 function formatZodIssues(error: ZodErrorLike): string {
-  return error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join(', ');
+  return error.issues
+    .map((issue) => `${issue.path.length > 0 ? issue.path.join('.') : '(root)'}: ${issue.message}`)
+    .join(', ');
 }
 
 export function invalidInputFromZod(error: ZodErrorLike): AppError {

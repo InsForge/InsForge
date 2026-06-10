@@ -182,7 +182,7 @@ export interface RazorpayConnectionRow {
   lastSyncedAt: Date | string | null;
   lastSyncStatus: RazorpayLatestSyncStatus | null;
   lastSyncError: string | null;
-  lastSyncCounts: Record<string, number>;
+  lastSyncCounts: Record<string, number> | null;
   raw: Record<string, unknown>;
   createdAt: Date | string;
   updatedAt: Date | string;

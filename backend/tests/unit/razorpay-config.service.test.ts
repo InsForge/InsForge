@@ -100,6 +100,7 @@ function expectRazorpayTransactionDelete() {
 describe('RazorpayConfigService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    delete process.env.API_BASE_URL;
     mockPool.query.mockResolvedValue({ rows: [], rowCount: 0 });
     mockPool.connect.mockResolvedValue(mockClient);
     mockClient.query.mockResolvedValue({ rows: [], rowCount: 0 });
@@ -191,5 +192,60 @@ describe('RazorpayConfigService', () => {
       ['test', 'rzp_test_same', 'Same Merchant', false, false]
     );
     expect(syncAfterKeyChange).not.toHaveBeenCalled();
+  });
+
+  it('serializes Razorpay key removal with the environment advisory lock', async () => {
+    mockClient.query.mockResolvedValue({ rows: [], rowCount: 0 });
+
+    await RazorpayConfigService.getInstance().removeRazorpayKeys('test');
+
+    expect(mockWithPaymentSessionAdvisoryLock).toHaveBeenCalledWith(
+      mockPool,
+      'payments_razorpay_environment_test',
+      expect.any(Function)
+    );
+  });
+
+  it('normalizes trailing slashes when preparing the Razorpay webhook URL', async () => {
+    process.env.API_BASE_URL = 'https://api.example.test/';
+    mockGetSecretByKey.mockImplementation(async (key: string) => {
+      if (key === 'RAZORPAY_TEST_KEY_ID') {
+        return 'rzp_test_key';
+      }
+      if (key === 'RAZORPAY_TEST_KEY_SECRET') {
+        return 'secret';
+      }
+      if (key === 'RAZORPAY_TEST_WEBHOOK_SECRET') {
+        return 'whsec_123';
+      }
+      return null;
+    });
+    mockPool.query.mockResolvedValueOnce({ rows: [], rowCount: 0 }).mockResolvedValueOnce({
+      rows: [
+        {
+          environment: 'test',
+          status: 'connected',
+          accountId: 'acc_123',
+          merchantName: 'Merchant',
+          accountLivemode: false,
+          webhookEndpointId: 'manual',
+          webhookEndpointUrl: 'https://api.example.test/api/webhooks/razorpay/test',
+          webhookConfiguredAt: new Date('2026-06-10T00:00:00.000Z'),
+          lastSyncedAt: null,
+          lastSyncStatus: null,
+          lastSyncError: null,
+          lastSyncCounts: null,
+        },
+      ],
+      rowCount: 1,
+    });
+
+    const setup = await RazorpayConfigService.getInstance().getWebhookSetup('test');
+
+    expect(setup.webhookUrl).toBe('https://api.example.test/api/webhooks/razorpay/test');
+    expect(mockPool.query).toHaveBeenCalledWith(
+      expect.stringMatching(/INSERT INTO payments\.provider_connections/i),
+      ['test', 'https://api.example.test/api/webhooks/razorpay/test']
+    );
   });
 });

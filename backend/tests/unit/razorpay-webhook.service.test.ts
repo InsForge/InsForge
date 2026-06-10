@@ -87,7 +87,7 @@ describe('RazorpayWebhookService', () => {
     mockPool.query.mockResolvedValue({ rows: [], rowCount: 0 });
   });
 
-  it('processes handled Razorpay events before marking them processed', async () => {
+  it('acknowledges handled Razorpay events before processing them in the background', async () => {
     const service = RazorpayWebhookService.getInstance();
     const recordSpy = vi
       .spyOn(service, 'recordWebhookEventStart')
@@ -116,11 +116,13 @@ describe('RazorpayWebhookService', () => {
       'payment.captured',
       expect.objectContaining({ event: 'payment.captured' })
     );
-    expect(applySpy).toHaveBeenCalledWith(
-      'test',
-      expect.objectContaining({ event: 'payment.captured' })
-    );
-    expect(markSpy).toHaveBeenCalledWith('test', 'evt_header_123', 'processed', null);
+    await vi.waitFor(() => {
+      expect(applySpy).toHaveBeenCalledWith(
+        'test',
+        expect.objectContaining({ event: 'payment.captured' })
+      );
+      expect(markSpy).toHaveBeenCalledWith('test', 'evt_header_123', 'processed', null);
+    });
   });
 
   it('marks unhandled Razorpay events ignored without syncing', async () => {
@@ -142,11 +144,13 @@ describe('RazorpayWebhookService', () => {
     );
 
     expect(result).toEqual({ received: true, handled: false });
-    expect(markSpy).toHaveBeenCalledWith('test', 'evt_header_456', 'ignored', null);
-    expect(applySpy).not.toHaveBeenCalled();
+    await vi.waitFor(() => {
+      expect(markSpy).toHaveBeenCalledWith('test', 'evt_header_456', 'ignored', null);
+      expect(applySpy).not.toHaveBeenCalled();
+    });
   });
 
-  it('marks handled Razorpay events failed when processing throws', async () => {
+  it('acknowledges handled Razorpay events and records background processing failures', async () => {
     const service = RazorpayWebhookService.getInstance();
     vi.spyOn(service, 'recordWebhookEventStart').mockResolvedValue({
       shouldProcess: true,
@@ -164,9 +168,11 @@ describe('RazorpayWebhookService', () => {
         'signature',
         'evt_header_789'
       )
-    ).rejects.toThrow('handler failed');
+    ).resolves.toEqual({ received: true, handled: true });
 
-    expect(markSpy).toHaveBeenCalledWith('test', 'evt_header_789', 'failed', 'handler failed');
+    await vi.waitFor(() => {
+      expect(markSpy).toHaveBeenCalledWith('test', 'evt_header_789', 'failed', 'handler failed');
+    });
   });
 
   it('materializes invoice-only events into Razorpay transactions', async () => {
@@ -549,6 +555,136 @@ describe('RazorpayWebhookService', () => {
     const executedSql = mockPool.query.mock.calls.map(([sql]) => String(sql)).join('\n');
     expect(executedSql).not.toContain('amount_refunded = COALESCE(amount_refunded, 0) +');
     expect(executedSql).toContain("AND $7 = 'pending'");
+  });
+
+  it('records partially refunded Razorpay payments as partially_refunded', async () => {
+    const service = RazorpayWebhookService.getInstance();
+
+    const handled = await getServiceInternals(service).applyRazorpayWebhookEvent('test', {
+      entity: 'event',
+      account_id: 'acc_123',
+      event: 'payment.captured',
+      contains: ['payment'],
+      payload: {
+        payment: {
+          entity: {
+            id: 'pay_partial_123',
+            entity: 'payment',
+            amount: 5000,
+            currency: 'INR',
+            status: 'captured',
+            order_id: 'order_123',
+            invoice_id: null,
+            international: false,
+            method: 'card',
+            amount_refunded: 1200,
+            refund_status: 'partial',
+            captured: true,
+            description: null,
+            card_id: null,
+            bank: null,
+            wallet: null,
+            vpa: null,
+            email: 'buyer@example.com',
+            contact: null,
+            customer_id: 'cust_123',
+            notes: {
+              insforge_subject_type: 'team',
+              insforge_subject_id: 'team_123',
+            },
+            fee: null,
+            tax: null,
+            error_code: null,
+            error_description: null,
+            error_source: null,
+            error_step: null,
+            error_reason: null,
+            created_at: 1780617600,
+          },
+        },
+      },
+      created_at: 1780617600,
+    });
+
+    expect(handled).toBe(true);
+    expect(mockPool.query).toHaveBeenCalledWith(
+      expect.stringMatching(/WITH refs[\s\S]*INSERT INTO payments\.transactions/i),
+      expect.arrayContaining([
+        'test',
+        'payment',
+        'pay_partial_123',
+        'one_time_payment',
+        'partially_refunded',
+        'team',
+        'team_123',
+        'cust_123',
+        'buyer@example.com',
+        5000,
+        1200,
+        'inr',
+      ])
+    );
+    expect(mockPool.query).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /UPDATE payments\.razorpay_orders[\s\S]*verified_payment_id = CASE[\s\S]*WHEN \$3 THEN COALESCE\(verified_payment_id, \$5\)[\s\S]*ELSE verified_payment_id/i
+      ),
+      expect.arrayContaining(['test', 'order_123', true, 5000, 'pay_partial_123'])
+    );
+  });
+
+  it('does not mark a Razorpay order verified from a non-succeeded payment', async () => {
+    const service = RazorpayWebhookService.getInstance();
+
+    const handled = await getServiceInternals(service).applyRazorpayWebhookEvent('test', {
+      entity: 'event',
+      account_id: 'acc_123',
+      event: 'payment.failed',
+      contains: ['payment'],
+      payload: {
+        payment: {
+          entity: {
+            id: 'pay_failed_123',
+            entity: 'payment',
+            amount: 5000,
+            currency: 'INR',
+            status: 'failed',
+            order_id: 'order_123',
+            invoice_id: null,
+            international: false,
+            method: 'card',
+            amount_refunded: 0,
+            refund_status: null,
+            captured: false,
+            description: null,
+            card_id: null,
+            bank: null,
+            wallet: null,
+            vpa: null,
+            email: 'buyer@example.com',
+            contact: null,
+            customer_id: 'cust_123',
+            notes: {},
+            fee: null,
+            tax: null,
+            error_code: 'BAD_REQUEST_ERROR',
+            error_description: 'Payment failed',
+            error_source: 'customer',
+            error_step: 'payment_authentication',
+            error_reason: 'payment_failed',
+            created_at: 1780617600,
+          },
+        },
+      },
+      created_at: 1780617600,
+    });
+
+    expect(handled).toBe(true);
+    expect(mockPool.query).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /UPDATE payments\.razorpay_orders[\s\S]*verified_payment_id = CASE[\s\S]*WHEN \$3 THEN COALESCE\(verified_payment_id, \$5\)[\s\S]*ELSE verified_payment_id/i
+      ),
+      expect.arrayContaining(['test', 'order_123', false, 5000, 'pay_failed_123'])
+    );
   });
 
   it('marks Razorpay refunds as refunded only after refund.processed', async () => {

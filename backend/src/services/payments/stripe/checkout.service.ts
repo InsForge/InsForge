@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { AppError } from '@/utils/errors.js';
 import type { UserContext } from '@/api/middlewares/auth.js';
@@ -128,7 +128,7 @@ export class StripeCheckoutService {
         return { checkoutSession: checkoutRecord.existingCheckoutSession };
       }
 
-      const metadata = {
+      const providerMetadata = {
         ...baseMetadata,
         [STRIPE_CHECKOUT_SESSION_METADATA_KEY]: checkoutRecord.id,
       };
@@ -147,7 +147,7 @@ export class StripeCheckoutService {
           customerEmail: customerId ? null : input.customerEmail,
           ...(customerCreation ? { customerCreation } : {}),
           clientReferenceId: checkoutRecord.id,
-          metadata,
+          metadata: providerMetadata,
           idempotencyKey: buildStripeIdempotencyKey(
             input.environment,
             'checkout_session',
@@ -159,7 +159,7 @@ export class StripeCheckoutService {
           checkoutSession: await this.markCheckoutSessionOpen(
             checkoutRecord.id,
             checkoutSession,
-            metadata
+            baseMetadata
           ),
         };
       } catch (error) {
@@ -185,6 +185,7 @@ export class StripeCheckoutService {
     user: UserContext
   ): Promise<{ id: string; existingCheckoutSession: CheckoutSession | null }> {
     const id = randomUUID();
+    const requestHash = this.buildCheckoutRequestHash(input, metadata);
 
     try {
       return await withUserContext(
@@ -204,9 +205,10 @@ export class StripeCheckoutService {
              success_url,
              cancel_url,
              idempotency_key,
+             request_hash,
              metadata
            )
-           VALUES ($1, $2, $3, 'initialized', $4, $5, $6, $7::JSONB, $8, $9, $10, $11::JSONB)
+           VALUES ($1, $2, $3, 'initialized', $4, $5, $6, $7::JSONB, $8, $9, $10, $11, $12::JSONB)
            ON CONFLICT (environment, idempotency_key)
              WHERE idempotency_key IS NOT NULL
            DO NOTHING`,
@@ -221,6 +223,7 @@ export class StripeCheckoutService {
               input.successUrl,
               input.cancelUrl,
               input.idempotencyKey ?? null,
+              requestHash,
               JSON.stringify(metadata),
             ]
           );
@@ -232,7 +235,8 @@ export class StripeCheckoutService {
           const existingCheckoutSession = await this.findMatchingIdempotentCheckoutSession(
             client,
             input,
-            metadata
+            metadata,
+            requestHash
           );
           return { id: existingCheckoutSession.id, existingCheckoutSession };
         }
@@ -413,7 +417,8 @@ export class StripeCheckoutService {
   private async findMatchingIdempotentCheckoutSession(
     client: PoolClient,
     input: CreateCheckoutSessionRequest,
-    metadata: Record<string, string>
+    metadata: Record<string, string>,
+    requestHash: string
   ): Promise<CheckoutSession> {
     if (!input.idempotencyKey) {
       throw new AppError('Checkout session was not created', 500, ERROR_CODES.INTERNAL_ERROR);
@@ -424,18 +429,25 @@ export class StripeCheckoutService {
        FROM payments.stripe_checkout_sessions
        WHERE environment = $1
          AND idempotency_key = $2
-         AND mode = $3
-         AND subject_type IS NOT DISTINCT FROM $4
-         AND subject_id IS NOT DISTINCT FROM $5
-         AND customer_email IS NOT DISTINCT FROM $6
-         AND line_items = $7::JSONB
-         AND success_url = $8
-         AND cancel_url = $9
-         AND metadata = $10::JSONB
+         AND (
+           request_hash = $3
+           OR (
+             request_hash IS NULL
+             AND mode = $4
+             AND subject_type IS NOT DISTINCT FROM $5
+             AND subject_id IS NOT DISTINCT FROM $6
+             AND customer_email IS NOT DISTINCT FROM $7
+             AND line_items = $8::JSONB
+             AND success_url = $9
+             AND cancel_url = $10
+             AND metadata - $11::TEXT = $12::JSONB
+           )
+         )
        LIMIT 1`,
       [
         input.environment,
         input.idempotencyKey,
+        requestHash,
         input.mode,
         input.subject?.type ?? null,
         input.subject?.id ?? null,
@@ -443,6 +455,7 @@ export class StripeCheckoutService {
         JSON.stringify(input.lineItems),
         input.successUrl,
         input.cancelUrl,
+        STRIPE_CHECKOUT_SESSION_METADATA_KEY,
         JSON.stringify(metadata),
       ]
     );
@@ -457,6 +470,42 @@ export class StripeCheckoutService {
     }
 
     return this.normalizeCheckoutSessionRow(row);
+  }
+
+  private buildCheckoutRequestHash(
+    input: CreateCheckoutSessionRequest,
+    metadata: Record<string, string>
+  ): string {
+    return createHash('sha256')
+      .update(
+        this.stableStringify({
+          environment: input.environment,
+          mode: input.mode,
+          lineItems: input.lineItems,
+          successUrl: input.successUrl,
+          cancelUrl: input.cancelUrl,
+          subject: input.subject ?? null,
+          customerEmail: input.customerEmail ?? null,
+          metadata,
+        })
+      )
+      .digest('hex');
+  }
+
+  private stableStringify(value: unknown): string {
+    if (Array.isArray(value)) {
+      return `[${value.map((item) => this.stableStringify(item)).join(',')}]`;
+    }
+
+    if (value !== null && typeof value === 'object') {
+      const record = value as Record<string, unknown>;
+      return `{${Object.keys(record)
+        .sort()
+        .map((key) => `${JSON.stringify(key)}:${this.stableStringify(record[key])}`)
+        .join(',')}}`;
+    }
+
+    return JSON.stringify(value) ?? 'null';
   }
 
   private getSafeUserContext(user: UserContext): UserContext {

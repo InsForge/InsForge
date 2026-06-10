@@ -183,6 +183,9 @@ BEGIN
   END LOOP;
 END $$;
 
+ALTER TABLE payments.stripe_checkout_sessions
+  ADD COLUMN IF NOT EXISTS request_hash TEXT;
+
 DROP TRIGGER IF EXISTS trg_payments_checkout_sessions_updated_at
   ON payments.stripe_checkout_sessions;
 DROP TRIGGER IF EXISTS trg_payments_stripe_checkout_sessions_updated_at
@@ -360,9 +363,6 @@ CREATE TABLE IF NOT EXISTS payments.razorpay_subscriptions (
   UNIQUE (environment, subscription_id)
 );
 
-ALTER TABLE payments.razorpay_subscriptions
-  ADD COLUMN IF NOT EXISTS auth_attempts BIGINT;
-
 DROP TRIGGER IF EXISTS trg_payments_razorpay_subscriptions_updated_at
   ON payments.razorpay_subscriptions;
 CREATE TRIGGER trg_payments_razorpay_subscriptions_updated_at
@@ -537,9 +537,6 @@ DROP TRIGGER IF EXISTS trg_payments_customer_mappings_updated_at ON payments.cus
 CREATE TRIGGER trg_payments_customer_mappings_updated_at
 BEFORE UPDATE ON payments.customer_mappings
 FOR EACH ROW EXECUTE FUNCTION system.update_updated_at();
-
-CREATE INDEX IF NOT EXISTS idx_payments_customer_mappings_provider_subject
-  ON payments.customer_mappings(provider, environment, subject_type, subject_id);
 
 GRANT SELECT ON payments.customer_mappings TO project_admin;
 
@@ -968,20 +965,11 @@ CREATE INDEX IF NOT EXISTS idx_payments_stripe_subscription_items_environment_pr
   ON payments.stripe_subscription_items(environment, price_id)
   WHERE price_id IS NOT NULL;
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_razorpay_items_environment_item
-  ON payments.razorpay_items(environment, item_id);
-
 CREATE INDEX IF NOT EXISTS idx_payments_razorpay_items_environment_active
   ON payments.razorpay_items(environment, active);
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_razorpay_plans_environment_plan
-  ON payments.razorpay_plans(environment, plan_id);
-
 CREATE INDEX IF NOT EXISTS idx_payments_razorpay_plans_environment_item
   ON payments.razorpay_plans(environment, item_id);
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_razorpay_subscriptions_environment_subscription
-  ON payments.razorpay_subscriptions(environment, subscription_id);
 
 CREATE INDEX IF NOT EXISTS idx_payments_razorpay_subscriptions_environment_plan
   ON payments.razorpay_subscriptions(environment, plan_id);

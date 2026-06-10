@@ -300,51 +300,53 @@ export class RazorpayConfigService {
   }
 
   async removeRazorpayKeys(environment: RazorpayEnvironment): Promise<boolean> {
-    const client = await this.getPool().connect();
-    try {
-      await client.query('BEGIN');
-      const resultId = await client.query(
-        `UPDATE system.secrets SET is_active = false, updated_at = NOW()
-         WHERE key = $1 AND is_active = true`,
-        [getRazorpayKeyIdName(environment)]
-      );
-      const resultSecret = await client.query(
-        `UPDATE system.secrets SET is_active = false, updated_at = NOW()
-         WHERE key = $1 AND is_active = true`,
-        [getRazorpayKeySecretName(environment)]
-      );
-      await client.query(
-        `UPDATE system.secrets SET is_active = false, updated_at = NOW()
-         WHERE key = $1 AND is_active = true`,
-        [getRazorpayWebhookSecretName(environment)]
-      );
-
-      const removed = (resultId.rowCount ?? 0) > 0 || (resultSecret.rowCount ?? 0) > 0;
-      if (removed) {
-        await client.query(
-          `UPDATE payments.provider_connections
-           SET status = 'unconfigured',
-               webhook_endpoint_id = NULL,
-               webhook_endpoint_url = NULL,
-               webhook_configured_at = NULL,
-               last_synced_at = NULL,
-               last_sync_status = 'failed',
-               last_sync_error = $2,
-               last_sync_counts = '{}'::JSONB,
-               updated_at = NOW()
-           WHERE provider = 'razorpay'
-             AND environment = $1`,
-          [environment, `Razorpay ${environment} keys are not configured`]
+    return this.withEnvironmentLock(environment, async () => {
+      const client = await this.getPool().connect();
+      try {
+        await client.query('BEGIN');
+        const resultId = await client.query(
+          `UPDATE system.secrets SET is_active = false, updated_at = NOW()
+           WHERE key = $1 AND is_active = true`,
+          [getRazorpayKeyIdName(environment)]
         );
+        const resultSecret = await client.query(
+          `UPDATE system.secrets SET is_active = false, updated_at = NOW()
+           WHERE key = $1 AND is_active = true`,
+          [getRazorpayKeySecretName(environment)]
+        );
+        await client.query(
+          `UPDATE system.secrets SET is_active = false, updated_at = NOW()
+           WHERE key = $1 AND is_active = true`,
+          [getRazorpayWebhookSecretName(environment)]
+        );
+
+        const removed = (resultId.rowCount ?? 0) > 0 || (resultSecret.rowCount ?? 0) > 0;
+        if (removed) {
+          await client.query(
+            `UPDATE payments.provider_connections
+             SET status = 'unconfigured',
+                 webhook_endpoint_id = NULL,
+                 webhook_endpoint_url = NULL,
+                 webhook_configured_at = NULL,
+                 last_synced_at = NULL,
+                 last_sync_status = 'failed',
+                 last_sync_error = $2,
+                 last_sync_counts = '{}'::JSONB,
+                 updated_at = NOW()
+             WHERE provider = 'razorpay'
+               AND environment = $1`,
+            [environment, `Razorpay ${environment} keys are not configured`]
+          );
+        }
+        await client.query('COMMIT');
+        return removed;
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
       }
-      await client.query('COMMIT');
-      return removed;
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
+    });
   }
 
   async createRazorpayProvider(environment: RazorpayEnvironment): Promise<RazorpayProvider> {
@@ -583,7 +585,7 @@ export class RazorpayConfigService {
   }
 
   private getWebhookUrl(environment: RazorpayEnvironment): string {
-    return `${getApiBaseUrl()}/api/webhooks/razorpay/${environment}`;
+    return `${getApiBaseUrl().replace(/\/+$/, '')}/api/webhooks/razorpay/${environment}`;
   }
 
   private async ensureRazorpayWebhookSecret(environment: RazorpayEnvironment): Promise<string> {

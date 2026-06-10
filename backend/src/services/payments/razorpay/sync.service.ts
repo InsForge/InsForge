@@ -10,8 +10,6 @@ import type {
   RazorpayItem,
   RazorpayCustomer,
   RazorpaySubscription,
-  RazorpayPayment,
-  RazorpayInvoice,
 } from '@/providers/payments/razorpay.provider.js';
 import type { RazorpayEnvironment } from '@/types/payments.js';
 import logger from '@/utils/logger.js';
@@ -164,10 +162,19 @@ export class RazorpaySyncService {
       }
 
       const stageFailures: RazorpaySyncStageFailure[] = [];
-      let customers: RazorpayCustomer[] = [];
+      const syncCounts: RazorpaySyncCounts = {
+        plans: plans.length,
+        items: items.length,
+        customers: 0,
+        subscriptions: 0,
+        invoices: 0,
+        payments: 0,
+      };
+
       try {
-        customers = await provider.listCustomers();
+        const customers = await provider.listCustomers();
         await this.upsertCustomers(environment, customers);
+        syncCounts.customers = customers.length;
       } catch (err) {
         const error = getErrorMessage(err);
         stageFailures.push({ stage: 'customers', error });
@@ -177,10 +184,10 @@ export class RazorpaySyncService {
         });
       }
 
-      let subscriptions: RazorpaySubscription[] = [];
       try {
-        subscriptions = await provider.listSubscriptions();
+        const subscriptions = await provider.listSubscriptions();
         await this.upsertSubscriptions(environment, subscriptions);
+        syncCounts.subscriptions = subscriptions.length;
       } catch (err) {
         const error = getErrorMessage(err);
         stageFailures.push({ stage: 'subscriptions', error });
@@ -190,10 +197,10 @@ export class RazorpaySyncService {
         });
       }
 
-      let invoices: RazorpayInvoice[] = [];
       try {
-        invoices = await provider.listInvoices();
+        const invoices = await provider.listInvoices();
         await this.transactionService.upsertInvoices(environment, invoices);
+        syncCounts.invoices = invoices.length;
       } catch (err) {
         const error = getErrorMessage(err);
         stageFailures.push({ stage: 'invoices', error });
@@ -203,10 +210,10 @@ export class RazorpaySyncService {
         });
       }
 
-      let payments: RazorpayPayment[] = [];
       try {
-        payments = await provider.listPayments();
+        const payments = await provider.listPayments();
         await this.transactionService.upsertPayments(environment, payments);
+        syncCounts.payments = payments.length;
       } catch (err) {
         const error = getErrorMessage(err);
         stageFailures.push({ stage: 'payments', error });
@@ -215,15 +222,6 @@ export class RazorpaySyncService {
           error,
         });
       }
-
-      const syncCounts: RazorpaySyncCounts = {
-        plans: plans.length,
-        items: items.length,
-        customers: customers.length,
-        subscriptions: subscriptions.length,
-        invoices: invoices.length,
-        payments: payments.length,
-      };
 
       if (stageFailures.length > 0) {
         const errorMessage = formatStageFailures(stageFailures);

@@ -1767,6 +1767,15 @@ describe('Stripe payment services', () => {
       },
       idempotencyKey: 'insforge:test:checkout_session:checkout-123',
     });
+    const checkoutUpdateCall = mockPool.query.mock.calls.find(([sql]) =>
+      /UPDATE payments\.stripe_checkout_sessions/i.test(String(sql))
+    );
+    expect(checkoutUpdateCall?.[1]?.[8]).toEqual({
+      plan: 'pro',
+      insforge_checkout_mode: 'subscription',
+      insforge_subject_type: 'team',
+      insforge_subject_id: 'team_123',
+    });
   });
 
   it('returns an existing checkout session for matching caller idempotency retries', async () => {
@@ -1822,6 +1831,7 @@ describe('Stripe payment services', () => {
       [
         'test',
         'checkout-123',
+        expect.stringMatching(/^[a-f0-9]{64}$/),
         'subscription',
         'team',
         'team_123',
@@ -1829,6 +1839,7 @@ describe('Stripe payment services', () => {
         JSON.stringify([{ priceId: 'price_123', quantity: 1 }]),
         'https://example.com/success',
         'https://example.com/cancel',
+        'insforge_checkout_session_id',
         JSON.stringify({
           insforge_checkout_mode: 'subscription',
           insforge_subject_type: 'team',
@@ -1967,6 +1978,7 @@ describe('Stripe payment services', () => {
       [
         'test',
         'checkout-123',
+        expect.stringMatching(/^[a-f0-9]{64}$/),
         'subscription',
         'team',
         'team_123',
@@ -1974,6 +1986,7 @@ describe('Stripe payment services', () => {
         JSON.stringify([{ priceId: 'price_123', quantity: 1 }]),
         'https://example.com/success',
         'https://example.com/cancel',
+        'insforge_checkout_session_id',
         JSON.stringify({
           insforge_checkout_mode: 'subscription',
           insforge_subject_type: 'team',
@@ -2891,6 +2904,7 @@ describe('Stripe payment services', () => {
     mockProvider.constructWebhookEvent.mockReturnValueOnce({
       id: 'evt_async_failed_123',
       type: 'checkout.session.async_payment_failed',
+      created: 1777335000,
       livemode: false,
       data: {
         object: {
@@ -2980,7 +2994,7 @@ describe('Stripe payment services', () => {
         'buyer@example.com',
         4500,
         'usd',
-        new Date('2026-04-28T00:00:00.000Z'),
+        new Date('2026-04-28T00:10:00.000Z'),
         expect.objectContaining({ id: 'cs_test_async_123' }),
       ])
     );

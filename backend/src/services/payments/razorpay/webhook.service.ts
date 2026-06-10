@@ -100,9 +100,26 @@ export class RazorpayWebhookService {
       return { received: true, handled: false };
     }
 
+    void this.processRecordedRazorpayWebhookEvent(environment, eventId, payload).catch((error) => {
+      logger.error('Unexpected Razorpay webhook background processing failure', {
+        environment,
+        eventId,
+        event: payload.event,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+
+    return { received: true, handled: this.isHandledEvent(payload.event) };
+  }
+
+  private async processRecordedRazorpayWebhookEvent(
+    environment: RazorpayEnvironment,
+    eventId: string,
+    payload: RazorpayWebhookPayload
+  ): Promise<void> {
     if (!this.isHandledEvent(payload.event)) {
       await this.markWebhookEvent(environment, eventId, 'ignored', null);
-      return { received: true, handled: false };
+      return;
     }
 
     let handled: boolean;
@@ -123,7 +140,6 @@ export class RazorpayWebhookService {
     }
 
     await this.markWebhookEvent(environment, eventId, handled ? 'processed' : 'ignored', null);
-    return { received: true, handled };
   }
 
   /**
@@ -374,7 +390,7 @@ export class RazorpayWebhookService {
       descriptionFallback,
     });
 
-    await this.updateOrderFromPayment(environment, payment, status);
+    await this.updateOrderFromPayment(environment, payment);
 
     logger.info('[Razorpay Webhook] Payment upserted', {
       environment,
@@ -604,24 +620,36 @@ export class RazorpayWebhookService {
 
   private async updateOrderFromPayment(
     environment: RazorpayEnvironment,
-    payment: RazorpayPayment,
-    status: RazorpayTransactionStatus
+    payment: RazorpayPayment
   ): Promise<void> {
     if (!payment.order_id) {
       return;
     }
 
+    const isCapturedPayment =
+      payment.captured || payment.status === 'captured' || payment.status === 'refunded';
+
     await this.getPool().query(
       `UPDATE payments.razorpay_orders
-       SET status = CASE WHEN $3 = 'succeeded' THEN 'paid' ELSE 'attempted' END,
-           amount_paid = CASE WHEN $3 = 'succeeded' THEN $4 ELSE amount_paid END,
-           amount_due = CASE WHEN $3 = 'succeeded' THEN GREATEST(amount - $4, 0) ELSE amount_due END,
-           verified_payment_id = COALESCE(verified_payment_id, $5),
+       SET status = CASE WHEN $3 THEN 'paid' ELSE 'attempted' END,
+           amount_paid = CASE WHEN $3 THEN $4 ELSE amount_paid END,
+           amount_due = CASE WHEN $3 THEN GREATEST(amount - $4, 0) ELSE amount_due END,
+           verified_payment_id = CASE
+             WHEN $3 THEN COALESCE(verified_payment_id, $5)
+             ELSE verified_payment_id
+           END,
            raw = jsonb_set(COALESCE(NULLIF(raw, '{}'::JSONB), '{}'::JSONB), '{latest_payment}', $6::JSONB, true),
            updated_at = NOW()
        WHERE environment = $1
          AND order_id = $2`,
-      [environment, payment.order_id, status, payment.amount, payment.id, JSON.stringify(payment)]
+      [
+        environment,
+        payment.order_id,
+        isCapturedPayment,
+        payment.amount,
+        payment.id,
+        JSON.stringify(payment),
+      ]
     );
   }
 

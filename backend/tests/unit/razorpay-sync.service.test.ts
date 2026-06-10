@@ -193,6 +193,79 @@ describe('RazorpaySyncService', () => {
     );
   });
 
+  it('does not count fetched Razorpay records when the stage fails to persist them', async () => {
+    const mockClient = {
+      query: vi.fn().mockImplementation(async (sql: string) => {
+        if (/INSERT INTO payments\.customers/i.test(sql)) {
+          throw new Error('customer upsert failed');
+        }
+
+        return { rows: [], rowCount: 0 };
+      }),
+      release: vi.fn(),
+    };
+    mockPool.connect.mockResolvedValue(mockClient);
+    const provider = {
+      syncCatalog: vi.fn().mockResolvedValue({
+        account: {
+          id: 'acc_123',
+          merchantName: 'Example Merchant',
+          livemode: false,
+        },
+        plans: [],
+        items: [],
+      }),
+      listCustomers: vi.fn().mockResolvedValue([
+        {
+          id: 'cust_123',
+          entity: 'customer',
+          name: 'Buyer',
+          email: 'buyer@example.com',
+          contact: null,
+          notes: {},
+          created_at: 1780617600,
+        },
+      ]),
+      listSubscriptions: vi.fn().mockResolvedValue([]),
+      listInvoices: vi.fn().mockResolvedValue([]),
+      listPayments: vi.fn().mockResolvedValue([]),
+    };
+    mockConfigService.createRazorpayProvider.mockResolvedValue(provider);
+
+    const result = await RazorpaySyncService.getInstance().syncAll('test');
+
+    expect(mockConfigService.writeFailedSnapshot).toHaveBeenCalledWith(
+      'test',
+      'acc_123',
+      'Example Merchant',
+      false,
+      {
+        plans: 0,
+        items: 0,
+        customers: 0,
+        subscriptions: 0,
+        invoices: 0,
+        payments: 0,
+      },
+      'customers: customer upsert failed',
+      expect.any(Date)
+    );
+    expect(result.results[0]).toEqual(
+      expect.objectContaining({
+        status: 'failed',
+        syncCounts: {
+          plans: 0,
+          items: 0,
+          customers: 0,
+          subscriptions: 0,
+          invoices: 0,
+          payments: 0,
+        },
+        error: 'customers: customer upsert failed',
+      })
+    );
+  });
+
   it('syncs after key changes with the already-validated Razorpay provider', async () => {
     const provider = {
       syncCatalog: vi.fn().mockResolvedValue({

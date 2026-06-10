@@ -425,7 +425,8 @@ export class StripeWebhookService {
           await this.stripeTransactionService.processCheckoutSessionCompleted(
             environment,
             checkoutSession,
-            'failed'
+            'failed',
+            eventCreatedAt
           );
 
         return Boolean(checkoutRow) || transactionHandled;

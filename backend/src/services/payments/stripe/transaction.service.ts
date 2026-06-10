@@ -99,7 +99,7 @@ export class StripeTransactionService {
     environment: StripeEnvironment,
     checkoutSession: StripeCheckoutSession,
     statusOverride?: StripeTransactionStatus,
-    paidAtOverride?: Date | null
+    eventAtOverride?: Date | null
   ): Promise<boolean> {
     if (checkoutSession.mode !== 'payment') {
       return false;
@@ -109,7 +109,7 @@ export class StripeTransactionService {
       environment,
       checkoutSession,
       statusOverride,
-      paidAtOverride
+      eventAtOverride
     );
     return true;
   }
@@ -287,7 +287,7 @@ export class StripeTransactionService {
     environment: StripeEnvironment,
     checkoutSession: StripeCheckoutSession,
     statusOverride?: StripeTransactionStatus,
-    paidAtOverride?: Date | null
+    eventAtOverride?: Date | null
   ): Promise<void> {
     const subject = getBillingSubjectFromProviderAttributes(checkoutSession.metadata);
     const paymentIntentId = getStripeObjectId(checkoutSession.payment_intent);
@@ -297,7 +297,11 @@ export class StripeTransactionService {
       statusOverride ?? (checkoutSession.payment_status === 'paid' ? 'succeeded' : 'pending');
     const paidAt =
       status === 'succeeded'
-        ? (paidAtOverride ?? fromStripeTimestamp(checkoutSession.created))
+        ? (eventAtOverride ?? fromStripeTimestamp(checkoutSession.created))
+        : null;
+    const failedAt =
+      status === 'failed'
+        ? (eventAtOverride ?? fromStripeTimestamp(checkoutSession.created))
         : null;
     const primaryObject = paymentIntentId
       ? { type: 'payment_intent', id: paymentIntentId }
@@ -321,7 +325,7 @@ export class StripeTransactionService {
       currency: checkoutSession.currency ?? null,
       description: null,
       paidAt,
-      failedAt: status === 'failed' ? fromStripeTimestamp(checkoutSession.created) : null,
+      failedAt,
       refundedAt: null,
       providerCreatedAt: fromStripeTimestamp(checkoutSession.created),
       raw: checkoutSession,
