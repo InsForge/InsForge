@@ -88,6 +88,7 @@ export class OpenRouterProvider {
   private currentApiKey: string | undefined;
   private renewalPromise: Promise<string> | null = null;
   private fetchPromise: Promise<string> | null = null;
+  private rotationPromise: Promise<string> | null = null;
 
   private constructor() {}
 
@@ -183,6 +184,23 @@ export class OpenRouterProvider {
       return true;
     }
     return !!process.env.OPENROUTER_API_KEY;
+  }
+
+  async rotateManagedApiKey(): Promise<{ apiKey: string; maskedKey: string }> {
+    if (!isCloudEnvironment()) {
+      throw new AppError(
+        'OpenRouter API key rotation is only available for InsForge Cloud-managed keys.',
+        400,
+        ERROR_CODES.INVALID_INPUT,
+        'For self-hosted projects, update OPENROUTER_API_KEY in the backend environment.'
+      );
+    }
+
+    const apiKey = await this.rotateCloudApiKey();
+    return {
+      apiKey,
+      maskedKey: this.maskApiKey(apiKey),
+    };
   }
 
   /**
@@ -467,6 +485,19 @@ export class OpenRouterProvider {
     return jwt.sign({ projectId }, jwtSecret, { expiresIn: '1h' });
   }
 
+  private applyCloudCredentials(data: CloudCredentialsResponse): string {
+    if (!data.openrouter?.api_key) {
+      throw new Error('Invalid response: missing openrouter API Key');
+    }
+
+    this.cloudCredentials = {
+      apiKey: data.openrouter.api_key,
+      limitRemaining: data.openrouter.limit_remaining,
+    };
+
+    return data.openrouter.api_key;
+  }
+
   /**
    * Fetch API key from cloud service
    * Uses promise memoization to prevent duplicate fetch requests
@@ -498,20 +529,11 @@ export class OpenRouterProvider {
 
         const data = (await response.json()) as CloudCredentialsResponse;
 
-        // Extract API key from the openrouter object in response
-        if (!data.openrouter?.api_key) {
-          throw new Error('Invalid response: missing openrouter API Key');
-        }
-
-        // Store credentials with metadata
-        this.cloudCredentials = {
-          apiKey: data.openrouter.api_key,
-          limitRemaining: data.openrouter.limit_remaining,
-        };
+        const apiKey = this.applyCloudCredentials(data);
 
         logger.info('Successfully fetched cloud API key');
 
-        return data.openrouter.api_key;
+        return apiKey;
       } catch (error) {
         logger.error('Failed to fetch cloud API key', {
           error: error instanceof Error ? error.message : String(error),
@@ -565,23 +587,14 @@ export class OpenRouterProvider {
 
         const data = (await response.json()) as CloudCredentialsResponse;
 
-        // Extract API key from the openrouter object in response
-        if (!data.openrouter?.api_key) {
-          throw new Error('Invalid response: missing openrouter API Key');
-        }
-
-        // Store credentials with metadata
-        this.cloudCredentials = {
-          apiKey: data.openrouter.api_key,
-          limitRemaining: data.openrouter.limit_remaining,
-        };
+        const apiKey = this.applyCloudCredentials(data);
 
         logger.info('Successfully renewed cloud API key');
 
         // Wait for OpenRouter to propagate the updated credits
         await new Promise((resolve) => setTimeout(resolve, 1000));
 
-        return data.openrouter.api_key;
+        return apiKey;
       } catch (error) {
         logger.error('Failed to renew cloud API key', {
           error: error instanceof Error ? error.message : String(error),
@@ -595,6 +608,59 @@ export class OpenRouterProvider {
     })();
 
     return this.renewalPromise;
+  }
+
+  private async rotateCloudApiKey(): Promise<string> {
+    if (this.rotationPromise) {
+      logger.info('Rotation already in progress, waiting for completion...');
+      return this.rotationPromise;
+    }
+
+    this.rotationPromise = (async () => {
+      try {
+        const projectId = process.env.PROJECT_ID;
+        if (!projectId) {
+          throw new Error('PROJECT_ID not found in environment variables');
+        }
+        const token = this.createCloudProjectToken(projectId);
+
+        const response = await fetch(
+          `${process.env.CLOUD_API_HOST || 'https://api.insforge.dev'}/ai/v1/credentials/${projectId}/rotate`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ sign: token }),
+          }
+        );
+
+        if (!response.ok) {
+          const message =
+            (await response.text()) ||
+            response.statusText ||
+            'Cloud OpenRouter key rotation failed';
+          throw new AppError(message, response.status, ERROR_CODES.AI_UPSTREAM_UNAVAILABLE);
+        }
+
+        const data = (await response.json()) as CloudCredentialsResponse;
+        const apiKey = this.applyCloudCredentials(data);
+
+        logger.info('Successfully rotated cloud OpenRouter API key');
+
+        return apiKey;
+      } catch (error) {
+        logger.error('Failed to rotate cloud OpenRouter API key', {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        });
+        throw error;
+      } finally {
+        this.rotationPromise = null;
+      }
+    })();
+
+    return this.rotationPromise;
   }
 
   /**

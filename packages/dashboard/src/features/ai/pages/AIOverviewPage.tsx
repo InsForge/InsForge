@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowUpCircle, Loader2, StopCircle } from 'lucide-react';
+import { ArrowUpCircle, Loader2, RotateCcw, StopCircle } from 'lucide-react';
 import {
   Button,
+  ConfirmDialog,
   CopyButton,
   Tab,
   Tabs,
@@ -15,8 +16,9 @@ import type { AIOverviewMetricPoint } from '@insforge/shared-schemas';
 import { CodeEditor } from '#components';
 import { useAIModelCredits } from '#features/ai/hooks/useAIModelCredits';
 import { useAIOverview } from '#features/ai/hooks/useAIOverview';
-import { useOpenRouterKey } from '#features/ai/hooks/useOpenRouterKey';
+import { useOpenRouterKey, useRotateOpenRouterKey } from '#features/ai/hooks/useOpenRouterKey';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
+import { useConfirm } from '#lib/hooks/useConfirm';
 import { useToast } from '#lib/hooks/useToast';
 import type { DashboardModelCreditUsage } from '#types';
 import {
@@ -474,6 +476,7 @@ export default function AIOverviewPage() {
   const [selectedModelId, setSelectedModelId] = useState<
     (typeof OVERVIEW_QUICK_START_MODELS)[number]['id']
   >(OVERVIEW_QUICK_START_MODELS[0].id);
+  const { confirm, confirmDialogProps } = useConfirm();
   const {
     data: usageData,
     isLoading: isUsageLoading,
@@ -485,13 +488,36 @@ export default function AIOverviewPage() {
     isLoading: isOpenRouterKeyLoading,
     error: openRouterKeyError,
   } = useOpenRouterKey();
+  const rotateOpenRouterKey = useRotateOpenRouterKey();
   const {
     data: modelCredits,
     isLoading: isModelCreditsLoading,
     error: modelCreditsError,
   } = useAIModelCredits();
   const shouldShowModelCredits = host.mode === 'cloud-hosting' && !!host.onRequestModelCredits;
+  const canRotateOpenRouterKey = host.mode === 'cloud-hosting';
   const codeSnippets = useMemo(() => getOverviewCodeSnippets(selectedModelId), [selectedModelId]);
+
+  const handleRotateOpenRouterKey = async () => {
+    const confirmed = await confirm({
+      title: 'Rotate OpenRouter key?',
+      description:
+        'The current API key will stop working immediately. Update any apps or services that use it as soon as the new key appears.',
+      confirmText: 'Rotate key',
+      cancelText: 'Cancel',
+      destructive: true,
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await rotateOpenRouterKey.mutateAsync();
+    } catch {
+      // Toast feedback is handled by the mutation hook.
+    }
+  };
 
   const totals = useMemo(
     () => ({
@@ -537,12 +563,37 @@ export default function AIOverviewPage() {
                 <span className="text-[12px] leading-4 text-muted-foreground">
                   Active OpenRouter key
                 </span>
-                <OpenRouterKeyBox
-                  apiKey={openRouterKey?.apiKey}
-                  maskedKey={openRouterKey?.maskedKey}
-                  isLoading={isOpenRouterKeyLoading}
-                  error={openRouterKeyError}
-                />
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <OpenRouterKeyBox
+                      apiKey={openRouterKey?.apiKey}
+                      maskedKey={openRouterKey?.maskedKey}
+                      isLoading={isOpenRouterKeyLoading}
+                      error={openRouterKeyError}
+                    />
+                  </div>
+                  {canRotateOpenRouterKey && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="h-8 shrink-0 px-2.5"
+                      onClick={() => {
+                        void handleRotateOpenRouterKey();
+                      }}
+                      disabled={
+                        isOpenRouterKeyLoading || rotateOpenRouterKey.isPending || !openRouterKey
+                      }
+                    >
+                      {rotateOpenRouterKey.isPending ? (
+                        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                      ) : (
+                        <RotateCcw className="size-4" aria-hidden="true" />
+                      )}
+                      <span>Rotate</span>
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -658,6 +709,7 @@ export default function AIOverviewPage() {
           )}
         </section>
       </div>
+      <ConfirmDialog {...confirmDialogProps} isLoading={rotateOpenRouterKey.isPending} />
     </div>
   );
 }
