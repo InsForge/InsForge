@@ -35,7 +35,9 @@ describe('create memory schema migration', () => {
 
   it('constrains kind to the four memory kinds', () => {
     const sql = readMigration();
-    expect(sql).toMatch(/kind\s+TEXT\s+NOT NULL\s+CHECK\s*\(kind IN \('fact', 'decision', 'preference', 'reference'\)\)/i);
+    expect(sql).toMatch(
+      /kind\s+TEXT\s+NOT NULL\s+CHECK\s*\(kind IN \('fact', 'decision', 'preference', 'reference'\)\)/i
+    );
   });
 
   it('creates the HNSW vector index and the GIN full-text index for hybrid recall', () => {

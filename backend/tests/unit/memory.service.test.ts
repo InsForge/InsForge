@@ -21,7 +21,13 @@ vi.mock('../../src/services/ai/chat-completion.service', () => ({
 import { MemoryService } from '../../src/services/memory/memory.service';
 
 // Route pool.query by SQL shape so each test controls the "similar" rows.
-let similarRows: Array<{ id: string; kind: string; title: string; content: string; similarity: number }> = [];
+let similarRows: Array<{
+  id: string;
+  kind: string;
+  title: string;
+  content: string;
+  similarity: number;
+}> = [];
 function installPool() {
   poolQueryMock.mockImplementation(async (sql: string) => {
     if (sql.includes('INSERT INTO memory.memories')) return { rows: [{ id: 'new-id-0000' }] };
@@ -45,7 +51,9 @@ describe('MemoryService.remember — reconcile', () => {
   it('ADDs a new memory when nothing similar exists', async () => {
     const res = await service.remember({ scope: 's', kind: 'fact', title: 't', content: 'c' });
     expect(res).toEqual([{ action: 'ADD', id: 'new-id-0000', title: 't' }]);
-    expect(poolQueryMock.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO'))).toBe(true);
+    expect(poolQueryMock.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO'))).toBe(
+      true
+    );
   });
 
   it('NOOPs when the reconciler says the fact is already known', async () => {
@@ -53,7 +61,9 @@ describe('MemoryService.remember — reconcile', () => {
     chatMock.mockResolvedValue({ text: '{"action":"NOOP"}' });
     const res = await service.remember({ scope: 's', kind: 'fact', title: 't', content: 'c' });
     expect(res[0].action).toBe('NOOP');
-    expect(poolQueryMock.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO'))).toBe(false);
+    expect(poolQueryMock.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO'))).toBe(
+      false
+    );
   });
 
   it('UPDATEs in place (and sets kind) when the reconciler targets a real matched id', async () => {
@@ -64,7 +74,9 @@ describe('MemoryService.remember — reconcile', () => {
     });
     const res = await service.remember({ scope: 's', kind: 'decision', title: 't', content: 'c' });
     expect(res[0]).toEqual({ action: 'UPDATE', id: matchId, title: 'new' });
-    const updateCall = poolQueryMock.mock.calls.find(([sql]) => String(sql).includes('UPDATE memory.memories'));
+    const updateCall = poolQueryMock.mock.calls.find(([sql]) =>
+      String(sql).includes('UPDATE memory.memories')
+    );
     expect(updateCall).toBeDefined();
     expect(updateCall![1][0]).toBe('decision'); // kind is updated, not retained
   });
@@ -74,7 +86,9 @@ describe('MemoryService.remember — reconcile', () => {
     chatMock.mockResolvedValue({ text: '{"action":"UPDATE","target_id":"does-not-exist"}' });
     const res = await service.remember({ scope: 's', kind: 'fact', title: 't', content: 'c' });
     expect(res[0].action).toBe('ADD');
-    expect(poolQueryMock.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO'))).toBe(true);
+    expect(poolQueryMock.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO'))).toBe(
+      true
+    );
   });
 });
 
@@ -136,7 +150,9 @@ describe('MemoryService.recall / index', () => {
 
   it('returns the title index for a scope', async () => {
     poolQueryMock.mockImplementationOnce(async () => ({
-      rows: [{ id: 'i1', kind: 'decision', title: 'D', updated_at: new Date('2026-02-02T00:00:00Z') }],
+      rows: [
+        { id: 'i1', kind: 'decision', title: 'D', updated_at: new Date('2026-02-02T00:00:00Z') },
+      ],
     }));
     const res = await service.index('s');
     expect(res).toEqual([
