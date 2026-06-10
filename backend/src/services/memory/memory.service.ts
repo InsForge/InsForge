@@ -25,6 +25,28 @@ interface Candidate {
   content: string;
 }
 
+const VALID_KINDS: ReadonlySet<string> = new Set(['fact', 'decision', 'preference', 'reference']);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// LLM output is untrusted — coerce each candidate to a valid shape, dropping
+// anything malformed, so a bad model response can never reach the DB.
+function sanitizeCandidates(raw: unknown): Candidate[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const out: Candidate[] = [];
+  for (const m of raw) {
+    const title = typeof m?.title === 'string' ? m.title.trim() : '';
+    const content = typeof m?.content === 'string' ? m.content.trim() : '';
+    if (!title || !content) {
+      continue;
+    }
+    const kind = VALID_KINDS.has(m?.kind) ? (m.kind as MemoryKind) : 'fact';
+    out.push({ kind, title, content });
+  }
+  return out;
+}
+
 interface SimilarRow {
   id: string;
   kind: MemoryKind;
@@ -102,7 +124,7 @@ export class MemoryService {
   // ---- write path: extract -> reconcile -> store --------------------------
 
   private async extract(transcript: string): Promise<Candidate[]> {
-    const parsed = await this.chatJSON<{ memories: Candidate[] }>(
+    const parsed = await this.chatJSON<{ memories: unknown }>(
       `Extract durable memories from an agent's task transcript.
 Return JSON: {"memories":[{"kind":"fact"|"decision"|"preference"|"reference","title":"<one line>","content":"<atomic, self-contained fact>"}]}
 
@@ -118,7 +140,7 @@ Examples:
 ❌ {"title":"fixed test","content":"Fixed a flaky test by adding a retry."}            // transient, recoverable from code`,
       transcript
     );
-    return parsed?.memories ?? [];
+    return sanitizeCandidates(parsed?.memories);
   }
 
   // Always-loadable index tier: every memory title for a scope, no embedding,
@@ -184,8 +206,16 @@ Return JSON {"action":"ADD"|"UPDATE"|"NOOP","target_id"?:string,"title"?:string,
         JSON.stringify({ candidate, existing: similar })
       );
       const a = decision?.action;
-      if (a === 'UPDATE' || a === 'NOOP') {
-        action = a;
+      // Only honor UPDATE if the model referenced a real id from the matched
+      // set — never trust a hallucinated/foreign target_id to hit the DB.
+      const targetIsValid =
+        typeof decision?.target_id === 'string' &&
+        UUID_RE.test(decision.target_id) &&
+        similar.some((s) => s.id === decision?.target_id);
+      if (a === 'UPDATE' && targetIsValid) {
+        action = 'UPDATE';
+      } else if (a === 'NOOP') {
+        action = 'NOOP';
       }
     }
 
@@ -248,9 +278,20 @@ Return JSON {"action":"ADD"|"UPDATE"|"NOOP","target_id"?:string,"title"?:string,
         ? [{ kind: params.kind ?? 'fact', title: params.title, content: params.content }]
         : [];
 
+    // Isolate failures per candidate: one bad row (e.g. an embedding hiccup
+    // mid-batch) must not discard the memories already stored before it.
     const results: RememberResult[] = [];
     for (const c of candidates) {
-      results.push(await this.rememberOne(params.scope, c, params.source));
+      try {
+        results.push(await this.rememberOne(params.scope, c, params.source));
+      } catch (err) {
+        logger.warn('memory.remember candidate failed', {
+          scope: params.scope,
+          title: c.title,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        results.push({ action: 'NOOP', title: c.title });
+      }
     }
     logger.debug('memory.remember', { scope: params.scope, stored: results.length });
     return results;

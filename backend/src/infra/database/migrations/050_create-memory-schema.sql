@@ -30,6 +30,10 @@ CREATE TABLE IF NOT EXISTS memory.memories (
 CREATE INDEX IF NOT EXISTS idx_memories_scope ON memory.memories (scope);
 
 -- HNSW index for cosine similarity (safe on empty tables).
+-- Note: pgvector 0.7.x HNSW applies the scope/threshold WHERE filter *after*
+-- the ANN scan (post-filtering), so a highly selective scope may return fewer
+-- than `ef_search` rows. Memory scopes are small, so this is acceptable; revisit
+-- with iterative scan / partitioning if a single scope ever grows very large.
 CREATE INDEX IF NOT EXISTS idx_memories_embedding_cosine
   ON memory.memories USING hnsw (embedding vector_cosine_ops);
 

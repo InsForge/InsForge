@@ -41,7 +41,8 @@ export type RememberResponse = z.infer<typeof rememberResponseSchema>;
 // POST /api/memory/recall
 export const recallRequestSchema = z.object({
   scope: z.string().min(1).default('default'),
-  query: z.string().min(1),
+  // capped — the query is embedded, so an unbounded string burns embedding tokens
+  query: z.string().min(1).max(4_000),
   limit: z.number().int().positive().max(50).default(5),
   threshold: z.number().min(0).max(1).optional(),
 });
