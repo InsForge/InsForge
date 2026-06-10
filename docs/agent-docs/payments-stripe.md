@@ -156,7 +156,7 @@ CREATE TRIGGER fulfill_paid_order_from_stripe_webhook
 
 ### Subscriptions
 
-Subscription events do not carry your app's `metadata`. Resolve the billing subject from the subscription metadata embedded in the event payload (InsForge stamps `insforge_subject_type` and `insforge_subject_id` at checkout), then fall back to `payments.customer_mappings`:
+Subscription events do not carry your app's `metadata`. Resolve the billing subject from the subscription metadata embedded in the event payload — InsForge stamps `insforge_subject_type` and `insforge_subject_id` at checkout, and Stripe snapshots it onto subscription-generated invoices as `parent.subscription_details.metadata`. Check `invoice.metadata` next, then fall back to `payments.customer_mappings` (the same order InsForge uses internally):
 
 ```sql
 CREATE OR REPLACE FUNCTION public.grant_subscription_access()
@@ -168,10 +168,16 @@ BEGIN
   IF NEW.provider = 'stripe'
      AND NEW.event_type = 'invoice.paid'
      AND NEW.processing_status = 'processed' THEN
-    v_subject_type := NEW.payload -> 'data' -> 'object' -> 'parent'
-                      -> 'subscription_details' -> 'metadata' ->> 'insforge_subject_type';
-    v_subject_id := NEW.payload -> 'data' -> 'object' -> 'parent'
-                    -> 'subscription_details' -> 'metadata' ->> 'insforge_subject_id';
+    v_subject_type := COALESCE(
+      NEW.payload -> 'data' -> 'object' -> 'parent'
+        -> 'subscription_details' -> 'metadata' ->> 'insforge_subject_type',
+      NEW.payload -> 'data' -> 'object' -> 'metadata' ->> 'insforge_subject_type'
+    );
+    v_subject_id := COALESCE(
+      NEW.payload -> 'data' -> 'object' -> 'parent'
+        -> 'subscription_details' -> 'metadata' ->> 'insforge_subject_id',
+      NEW.payload -> 'data' -> 'object' -> 'metadata' ->> 'insforge_subject_id'
+    );
 
     IF v_subject_id IS NULL THEN
       SELECT m.subject_type, m.subject_id
@@ -187,6 +193,7 @@ BEGIN
       RETURN NEW;
     END IF;
 
+    -- team_id is a UUID here; match the type of the subject id sent at checkout
     INSERT INTO public.team_entitlements (team_id, plan, active, updated_at)
     VALUES (v_subject_id::uuid, 'pro', true, NOW())
     ON CONFLICT (team_id) DO UPDATE SET
