@@ -63,6 +63,9 @@ export const userSchema = z.object({
 
 export const adminSchema = z.object({
   sub: z.string().min(1),
+  username: z.string().optional(),
+  isRoot: z.boolean().optional(),
+  id: z.string().optional(),
 });
 
 /**
@@ -175,6 +178,8 @@ export const tokenPayloadSchema = z.object({
   sub: z.string().min(1), // Subject: user ID for users, namespaced subject for project admins
   email: emailSchema.optional(),
   role: roleSchema,
+  isRoot: z.boolean().optional(),
+  adminId: z.string().optional(),
   iat: z.number().optional(), // Issued at
   exp: z.number().optional(), // Expiration
 });

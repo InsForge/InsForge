@@ -70,9 +70,9 @@ export class LoginService {
 
   async getCurrentUser(): Promise<AdminSchema | null> {
     try {
-      const response = (await apiClient.request(
-        '/auth/admin/sessions/current'
-      )) as GetCurrentAdminSessionResponse;
+      const response = (await apiClient.request('/auth/admin/sessions/current', {
+        skipRefresh: true,
+      })) as GetCurrentAdminSessionResponse;
       return response.admin ?? null;
     } catch {
       return null;
