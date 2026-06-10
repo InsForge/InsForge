@@ -58,7 +58,11 @@ export class MemoryService {
     });
     const vec = res.data[0]?.embedding;
     if (!Array.isArray(vec)) {
-      throw new AppError('Embedding provider returned no vector', 502, ERROR_CODES.AI_UPSTREAM_UNAVAILABLE);
+      throw new AppError(
+        'Embedding provider returned no vector',
+        502,
+        ERROR_CODES.AI_UPSTREAM_UNAVAILABLE
+      );
     }
     return vec;
   }
@@ -75,7 +79,9 @@ export class MemoryService {
       const raw = fenced ? fenced[1] : text;
       const start = raw.indexOf('{');
       const end = raw.lastIndexOf('}');
-      if (start === -1 || end === -1) return null;
+      if (start === -1 || end === -1) {
+        return null;
+      }
       return JSON.parse(raw.slice(start, end + 1)) as T;
     } catch {
       return null;
@@ -118,7 +124,9 @@ Examples:
   // Always-loadable index tier: every memory title for a scope, no embedding,
   // no LLM — cheap enough to load at session start so the agent knows what
   // it knows, then recall() full content on demand.
-  async index(scope: string): Promise<Array<{ id: string; kind: MemoryKind; title: string; updated_at: string }>> {
+  async index(
+    scope: string
+  ): Promise<Array<{ id: string; kind: MemoryKind; title: string; updated_at: string }>> {
     const pool = this.dbManager.getPool();
     const result = await pool.query(
       `SELECT id, kind, title, updated_at FROM memory.memories WHERE scope = $1 ORDER BY updated_at DESC`,
@@ -132,7 +140,12 @@ Examples:
     }));
   }
 
-  private async findSimilar(scope: string, embedding: number[], k: number, threshold: number): Promise<SimilarRow[]> {
+  private async findSimilar(
+    scope: string,
+    embedding: number[],
+    k: number,
+    threshold: number
+  ): Promise<SimilarRow[]> {
     const pool = this.dbManager.getPool();
     const lit = this.toVectorLiteral(embedding);
     const result = await pool.query(
@@ -148,13 +161,18 @@ Examples:
     return result.rows as SimilarRow[];
   }
 
-  private async rememberOne(scope: string, candidate: Candidate, source?: string): Promise<RememberResult> {
+  private async rememberOne(
+    scope: string,
+    candidate: Candidate,
+    source?: string
+  ): Promise<RememberResult> {
     const pool = this.dbManager.getPool();
     const embedding = await this.embed(`${candidate.title}\n${candidate.content}`);
     const similar = await this.findSimilar(scope, embedding, 3, RECONCILE_THRESHOLD);
 
     let action: 'ADD' | 'UPDATE' | 'NOOP' = 'ADD';
-    let decision: { action: string; target_id?: string; title?: string; content?: string } | null = null;
+    let decision: { action: string; target_id?: string; title?: string; content?: string } | null =
+      null;
 
     if (similar.length > 0) {
       decision = await this.chatJSON(
@@ -166,7 +184,9 @@ Return JSON {"action":"ADD"|"UPDATE"|"NOOP","target_id"?:string,"title"?:string,
         JSON.stringify({ candidate, existing: similar })
       );
       const a = decision?.action;
-      if (a === 'UPDATE' || a === 'NOOP') action = a;
+      if (a === 'UPDATE' || a === 'NOOP') {
+        action = a;
+      }
     }
 
     if (action === 'ADD') {
@@ -174,7 +194,15 @@ Return JSON {"action":"ADD"|"UPDATE"|"NOOP","target_id"?:string,"title"?:string,
         `INSERT INTO memory.memories (scope, kind, title, content, embedding, embedding_model, source)
          VALUES ($1, $2, $3, $4, $5::vector, $6, $7)
          RETURNING id`,
-        [scope, candidate.kind, candidate.title, candidate.content, this.toVectorLiteral(embedding), EMBED_MODEL, source ?? null]
+        [
+          scope,
+          candidate.kind,
+          candidate.title,
+          candidate.content,
+          this.toVectorLiteral(embedding),
+          EMBED_MODEL,
+          source ?? null,
+        ]
       );
       return { action, id: res.rows[0].id, title: candidate.title };
     }
@@ -187,7 +215,14 @@ Return JSON {"action":"ADD"|"UPDATE"|"NOOP","target_id"?:string,"title"?:string,
         `UPDATE memory.memories
             SET title = $1, content = $2, embedding = $3::vector, source = $4
           WHERE id = $5 AND scope = $6`,
-        [title, content, this.toVectorLiteral(newEmbedding), source ?? null, decision.target_id, scope]
+        [
+          title,
+          content,
+          this.toVectorLiteral(newEmbedding),
+          source ?? null,
+          decision.target_id,
+          scope,
+        ]
       );
       return { action, id: decision.target_id, title };
     }
@@ -208,7 +243,9 @@ Return JSON {"action":"ADD"|"UPDATE"|"NOOP","target_id"?:string,"title"?:string,
   }): Promise<RememberResult[]> {
     const candidates: Candidate[] = params.transcript
       ? await this.extract(params.transcript)
-      : [{ kind: params.kind ?? 'fact', title: params.title!, content: params.content! }];
+      : params.title && params.content
+        ? [{ kind: params.kind ?? 'fact', title: params.title, content: params.content }]
+        : [];
 
     const results: RememberResult[] = [];
     for (const c of candidates) {
@@ -218,7 +255,12 @@ Return JSON {"action":"ADD"|"UPDATE"|"NOOP","target_id"?:string,"title"?:string,
     return results;
   }
 
-  async recall(params: { scope: string; query: string; limit: number; threshold?: number }): Promise<RecalledMemory[]> {
+  async recall(params: {
+    scope: string;
+    query: string;
+    limit: number;
+    threshold?: number;
+  }): Promise<RecalledMemory[]> {
     const embedding = await this.embed(params.query);
     const pool = this.dbManager.getPool();
     const threshold = params.threshold ?? DEFAULT_RECALL_THRESHOLD;
