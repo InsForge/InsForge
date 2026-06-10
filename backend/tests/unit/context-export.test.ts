@@ -212,6 +212,25 @@ describe('MetadataService.formatAsMarkdown', () => {
     expect(md).toContain('Validates `admin` access');
   });
 
+  it('handles consecutive backtick runs with wider delimiters', () => {
+    const withDoubleBackticks: AppMetadataSchema = {
+      ...sampleMetadata,
+      functions: [
+        {
+          slug: 'a``b',
+          name: 'a-b',
+          status: 'active',
+          description: '',
+        },
+      ],
+    };
+
+    const md = metadataService.formatAsMarkdown(withDoubleBackticks);
+
+    // Double-backtick run in value requires triple-backtick delimiter
+    expect(md).toContain('``` a``b ```');
+  });
+
   it('escapes pipes in table cells without affecting code spans', () => {
     const withPipes: AppMetadataSchema = {
       ...sampleMetadata,

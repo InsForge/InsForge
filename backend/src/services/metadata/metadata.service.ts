@@ -71,16 +71,26 @@ export class MetadataService {
     const text = (s: unknown) => String(s ?? '').replace(/\n/g, ' ');
 
     /**
-     * Wrap a value in a Markdown code span, using double-backtick
-     * delimiters when the value itself contains backticks so that
-     * no content characters are lost.
+     * Wrap a value in a Markdown code span.  The delimiter is always
+     * one backtick longer than the longest consecutive backtick run
+     * inside the value, so content is never corrupted.
      */
     const codeSpan = (s: unknown) => {
       const str = String(s ?? '').replace(/\n/g, ' ');
-      if (!str.includes('`')) {
-        return `\`${str}\``;
+      let maxRun = 0;
+      const runs = str.match(/`+/g);
+      if (runs) {
+        for (const r of runs) {
+          if (r.length > maxRun) {
+            maxRun = r.length;
+          }
+        }
       }
-      return `\`\` ${str} \`\``;
+      const fence = '`'.repeat(maxRun + 1);
+      if (maxRun === 0) {
+        return `${fence}${str}${fence}`;
+      }
+      return `${fence} ${str} ${fence}`;
     };
 
     lines.push('# Project Metadata');
