@@ -7,15 +7,21 @@ import { ERROR_CODES } from '@insforge/shared-schemas';
 
 const STORAGE_DIR = '/tmp/insforge-backup-service-tests';
 
-const { queryMock, connectMock, clientQueryMock, releaseMock, spawnMock, clearColumnTypeCacheMock } =
-  vi.hoisted(() => ({
-    queryMock: vi.fn(),
-    connectMock: vi.fn(),
-    clientQueryMock: vi.fn(),
-    releaseMock: vi.fn(),
-    spawnMock: vi.fn(),
-    clearColumnTypeCacheMock: vi.fn(),
-  }));
+const {
+  queryMock,
+  connectMock,
+  clientQueryMock,
+  releaseMock,
+  spawnMock,
+  clearColumnTypeCacheMock,
+} = vi.hoisted(() => ({
+  queryMock: vi.fn(),
+  connectMock: vi.fn(),
+  clientQueryMock: vi.fn(),
+  releaseMock: vi.fn(),
+  spawnMock: vi.fn(),
+  clearColumnTypeCacheMock: vi.fn(),
+}));
 
 vi.mock('../../src/infra/database/database.manager', () => ({
   DatabaseManager: {
