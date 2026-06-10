@@ -76,11 +76,11 @@ router.get('/webhook', async (req: AuthRequest, res: Response, next: NextFunctio
 });
 
 router.post(
-  '/webhook/regenerate-secret',
+  '/webhook/rotate-secret',
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { environment } = parseZodSchema(razorpayEnvironmentParamsSchema, req.params);
-      const result = await configService.regenerateWebhookSecret(environment);
+      const result = await configService.rotateWebhookSecret(environment);
       successResponse(res, result);
     } catch (error) {
       next(error);

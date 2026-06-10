@@ -877,12 +877,12 @@ function StripeWebhookEnvironmentSection({
 
 function RazorpayWebhooksTabContent({
   keys,
-  regenerateWebhookSecret,
+  rotateWebhookSecret,
   isBusy,
   onGoToKeys,
 }: {
   keys: RazorpayKeyConfig[];
-  regenerateWebhookSecret: ReturnType<typeof useRazorpayWebhook>['regenerateWebhookSecret'];
+  rotateWebhookSecret: ReturnType<typeof useRazorpayWebhook>['rotateWebhookSecret'];
   isBusy: boolean;
   onGoToKeys: () => void;
 }) {
@@ -899,7 +899,7 @@ function RazorpayWebhooksTabContent({
           <RazorpayWebhookEnvironmentSection
             environment={environment}
             keys={keys}
-            regenerateWebhookSecret={regenerateWebhookSecret}
+            rotateWebhookSecret={rotateWebhookSecret}
             isBusy={isBusy}
             onGoToKeys={onGoToKeys}
           />
@@ -957,17 +957,17 @@ function RazorpayWebhookManualSetupGuidance() {
 function RazorpayWebhookEnvironmentSection({
   environment,
   keys,
-  regenerateWebhookSecret,
+  rotateWebhookSecret,
   isBusy,
   onGoToKeys,
 }: {
   environment: PaymentEnvironment;
   keys: RazorpayKeyConfig[];
-  regenerateWebhookSecret: ReturnType<typeof useRazorpayWebhook>['regenerateWebhookSecret'];
+  rotateWebhookSecret: ReturnType<typeof useRazorpayWebhook>['rotateWebhookSecret'];
   isBusy: boolean;
   onGoToKeys: () => void;
 }) {
-  const [isRegenerateConfirmOpen, setIsRegenerateConfirmOpen] = useState(false);
+  const [isRotateConfirmOpen, setIsRotateConfirmOpen] = useState(false);
   const environmentLabel = environment === 'test' ? 'Test mode' : 'Live mode';
   const hasKeyId = keys.some(
     (key) => key.environment === environment && key.keyType === 'api_key' && Boolean(key.value)
@@ -979,8 +979,7 @@ function RazorpayWebhookEnvironmentSection({
   const setupQuery = useRazorpayWebhookSetup(environment, isKeyConfigured);
   const setup = setupQuery.data ?? null;
   const isWebhookUrlPublic = setup ? isPublicHttpsWebhookUrl(setup.webhookUrl) : true;
-  const isRegenerating =
-    regenerateWebhookSecret.isPending && regenerateWebhookSecret.variables === environment;
+  const isRotating = rotateWebhookSecret.isPending && rotateWebhookSecret.variables === environment;
 
   return (
     <SettingRow
@@ -1036,26 +1035,26 @@ function RazorpayWebhookEnvironmentSection({
                   size="sm"
                   className="h-7 px-2"
                   disabled={isBusy}
-                  onClick={() => setIsRegenerateConfirmOpen(true)}
+                  onClick={() => setIsRotateConfirmOpen(true)}
                 >
-                  {isRegenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                  Regenerate
+                  {isRotating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                  Rotate
                 </Button>
               </div>
             </div>
           </div>
 
           <ConfirmDialog
-            open={isRegenerateConfirmOpen}
-            onOpenChange={setIsRegenerateConfirmOpen}
-            title="Regenerate Razorpay webhook secret?"
-            description="Regenerating the webhook secret will break existing Razorpay webhook deliveries until you update the secret in Razorpay Dashboard."
+            open={isRotateConfirmOpen}
+            onOpenChange={setIsRotateConfirmOpen}
+            title="Rotate Razorpay webhook secret?"
+            description="Rotating the webhook secret will break existing Razorpay webhook deliveries until you update the secret in Razorpay Dashboard."
             cancelText="Cancel"
-            confirmText="Regenerate"
+            confirmText="Rotate"
             destructive
-            isLoading={isRegenerating}
+            isLoading={isRotating}
             onConfirm={async () => {
-              await regenerateWebhookSecret.mutateAsync(environment);
+              await rotateWebhookSecret.mutateAsync(environment);
             }}
           />
         </div>
@@ -1088,7 +1087,7 @@ export function PaymentsSettingsDialog({
     removeKey: rzpRemoveKey,
   } = useRazorpayConfig();
   const { syncPayments: rzpSyncPayments } = useRazorpaySync();
-  const { regenerateWebhookSecret } = useRazorpayWebhook();
+  const { rotateWebhookSecret } = useRazorpayWebhook();
 
   const [activeTab, setActiveTab] = useState<PaymentsSettingsTab>('keys');
 
@@ -1132,7 +1131,7 @@ export function PaymentsSettingsDialog({
     rzpSaveKey.isPending ||
     rzpRemoveKey.isPending ||
     rzpSyncPayments.isPending ||
-    regenerateWebhookSecret.isPending;
+    rotateWebhookSecret.isPending;
 
   const canClose = !isBusy;
   const configuredKeys = keys.filter((key) => Boolean(key.value));
@@ -1198,7 +1197,7 @@ export function PaymentsSettingsDialog({
       rzpSaveKey.reset();
       rzpRemoveKey.reset();
       rzpSyncPayments.reset();
-      regenerateWebhookSecret.reset();
+      rotateWebhookSecret.reset();
 
       setActiveTab('keys');
     }
@@ -1412,7 +1411,7 @@ export function PaymentsSettingsDialog({
               ) : (
                 <RazorpayWebhooksTabContent
                   keys={rzpKeys}
-                  regenerateWebhookSecret={regenerateWebhookSecret}
+                  rotateWebhookSecret={rotateWebhookSecret}
                   isBusy={isBusy}
                   onGoToKeys={() => setActiveTab('keys')}
                 />

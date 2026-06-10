@@ -1,7 +1,7 @@
 import type {
   RazorpayEnvironment,
   GetRazorpayWebhookSetupResponse,
-  RegenerateRazorpayWebhookSecretResponse,
+  RotateRazorpayWebhookSecretResponse,
   GetRazorpayConfigResponse,
   GetRazorpayStatusResponse,
   ListRazorpayCatalogResponse,
@@ -19,7 +19,7 @@ import { apiClient } from '#lib/api/client';
 
 export type {
   GetRazorpayWebhookSetupResponse,
-  RegenerateRazorpayWebhookSecretResponse,
+  RotateRazorpayWebhookSecretResponse,
   GetRazorpayConfigResponse,
   GetRazorpayStatusResponse,
   ListRazorpayCatalogResponse,
@@ -74,10 +74,10 @@ export class RazorpayService {
     });
   }
 
-  async regenerateWebhookSecret(
+  async rotateWebhookSecret(
     environment: RazorpayEnvironment
-  ): Promise<RegenerateRazorpayWebhookSecretResponse> {
-    return apiClient.request(`/payments/razorpay/${environment}/webhook/regenerate-secret`, {
+  ): Promise<RotateRazorpayWebhookSecretResponse> {
+    return apiClient.request(`/payments/razorpay/${environment}/webhook/rotate-secret`, {
       method: 'POST',
       headers: apiClient.withAccessToken(),
     });

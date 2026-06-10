@@ -27,7 +27,7 @@ Use these backend routes for admin tooling:
 
 ```http
 GET /api/payments/razorpay/test/webhook
-POST /api/payments/razorpay/test/webhook/regenerate-secret
+POST /api/payments/razorpay/test/webhook/rotate-secret
 ```
 
 Recommended active events are the events InsForge handles:

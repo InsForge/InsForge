@@ -868,9 +868,9 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
-  /api/payments/razorpay/{environment}/webhook/regenerate-secret:
+  /api/payments/razorpay/{environment}/webhook/rotate-secret:
     post:
-      summary: Regenerate Razorpay Webhook Secret
+      summary: Rotate Razorpay Webhook Secret
       description: Generate a new Razorpay webhook signing secret. Update the webhook secret in the Razorpay Dashboard after calling this endpoint.
       tags:
         - Razorpay Payments
@@ -881,11 +881,11 @@ paths:
         - $ref: '#/components/parameters/EnvironmentPath'
       responses:
         '200':
-          description: Razorpay webhook setup values with the regenerated secret
+          description: Razorpay webhook setup values with the rotated secret
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RegenerateRazorpayWebhookSecretResponse'
+                $ref: '#/components/schemas/RotateRazorpayWebhookSecretResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -3675,7 +3675,7 @@ components:
           description: Raw signing secret to copy into the Razorpay Dashboard.
           example: "webhook_secret_xxx"
 
-    RegenerateRazorpayWebhookSecretResponse:
+    RotateRazorpayWebhookSecretResponse:
       allOf:
         - $ref: '#/components/schemas/GetRazorpayWebhookSetupResponse'
 
