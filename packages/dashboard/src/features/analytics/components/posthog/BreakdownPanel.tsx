@@ -23,18 +23,26 @@ function renderLabel(breakdown: Breakdown, value: string | null) {
     const flag = flagEmoji(value);
     const name = countryName(value);
     return (
-      <span className="flex items-center gap-2">
+      <span className="flex min-w-0 items-center gap-2" title={name}>
         <span aria-hidden="true">{flag}</span>
-        <span className="truncate">{name}</span>
+        <span className="min-w-0 truncate">{name}</span>
       </span>
     );
   }
   if (breakdown === 'DeviceType') {
     const lower = value.toLowerCase();
     const display = lower.charAt(0).toUpperCase() + lower.slice(1);
-    return <span className="truncate">{display}</span>;
+    return (
+      <span className="block truncate" title={display}>
+        {display}
+      </span>
+    );
   }
-  return <span className="truncate font-mono text-xs">{value}</span>;
+  return (
+    <span className="block truncate font-mono text-xs" title={value}>
+      {value}
+    </span>
+  );
 }
 
 export function BreakdownPanel({ breakdown, enabled }: Props) {
