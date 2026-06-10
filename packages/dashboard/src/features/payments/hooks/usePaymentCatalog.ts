@@ -55,7 +55,9 @@ function toStripeDisplayPrice(price: StripePrice): CatalogPrice {
   };
 }
 
-function toRazorpayDisplayProduct(item: RazorpayItem): CatalogProduct {
+function toRazorpayDisplayProduct(item: RazorpayItem, plans: RazorpayPlan[]): CatalogProduct {
+  const defaultPlan = plans.find((plan) => plan.itemId === item.itemId);
+
   return {
     environment: item.environment,
     provider: 'razorpay',
@@ -63,7 +65,7 @@ function toRazorpayDisplayProduct(item: RazorpayItem): CatalogProduct {
     name: item.name,
     description: item.description,
     active: item.active,
-    providerDefaultPriceId: item.itemId,
+    providerDefaultPriceId: defaultPlan?.planId ?? item.itemId,
     metadata: item.metadata,
     syncedAt: item.syncedAt,
   };
@@ -197,10 +199,14 @@ export function usePaymentCatalog(provider: PaymentProvider, environment: Paymen
   const razorpayDisplayCatalog = useMemo(() => {
     const items = razorpayCatalogData?.items ?? [];
     const plans = razorpayCatalogData?.plans ?? [];
+    const plannedItemIds = new Set(plans.map((plan) => plan.itemId));
+
     return {
-      products: items.map((item) => toRazorpayDisplayProduct(item)),
+      products: items.map((item) => toRazorpayDisplayProduct(item, plans)),
       prices: [
-        ...items.map((item) => toRazorpayDisplayItemPrice(item)),
+        ...items
+          .filter((item) => !plannedItemIds.has(item.itemId))
+          .map((item) => toRazorpayDisplayItemPrice(item)),
         ...plans.map((plan) => toRazorpayDisplayPrice(plan)),
       ],
     };

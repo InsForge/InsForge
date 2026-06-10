@@ -1,5 +1,4 @@
 import type { Pool } from 'pg';
-import crypto from 'crypto';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { getBillingSubjectFromMetadata } from '@/services/payments/helpers.js';
 import { RazorpayConfigService } from '@/services/payments/razorpay/config.service.js';
@@ -9,20 +8,17 @@ import {
 } from '@/services/payments/razorpay/transaction.service.js';
 import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
-import {
-  computeRazorpayWebhookSignature,
-  type RazorpayInvoice,
-  type RazorpayPayment,
-  type RazorpayRefund,
-  type RazorpaySubscription,
-  type RazorpayWebhookPayload,
+import type {
+  RazorpayInvoice,
+  RazorpayPayment,
+  RazorpayRefund,
+  RazorpaySubscription,
+  RazorpayWebhookPayload,
 } from '@/providers/payments/razorpay.provider.js';
 import type { RazorpayEnvironment } from '@/types/payments.js';
 import { ERROR_CODES, type RazorpayWebhookResponse } from '@insforge/shared-schemas';
 
 export type RazorpayWebhookProcessingStatus = 'pending' | 'processed' | 'failed' | 'ignored';
-
-const HEX_STRING_PATTERN = /^[0-9a-f]+$/i;
 
 export interface RazorpayWebhookEventRow {
   id: string;
@@ -44,14 +40,6 @@ interface ShouldProcessResult {
 interface RazorpayPaymentContext {
   invoice?: RazorpayInvoice | null;
   subscription?: RazorpaySubscription | null;
-}
-
-interface RazorpayWebhookRequestDebugContext {
-  contentLength?: string;
-  contentType?: string;
-  host?: string;
-  headerEventId?: string;
-  userAgent?: string;
 }
 
 export class RazorpayWebhookService {
@@ -78,8 +66,7 @@ export class RazorpayWebhookService {
     environment: RazorpayEnvironment,
     rawBodyBuffer: Buffer,
     signature: string,
-    headerEventId?: string,
-    requestDebugContext: RazorpayWebhookRequestDebugContext = {}
+    headerEventId?: string
   ): Promise<RazorpayWebhookResponse> {
     const webhookSecret = await this.configService.getRazorpayWebhookSecret(environment);
     if (!webhookSecret) {
@@ -93,19 +80,6 @@ export class RazorpayWebhookService {
     const provider = await this.configService.createRazorpayProvider(environment);
     const isValid = provider.verifyWebhookSignature(rawBodyBuffer, signature, webhookSecret);
     if (!isValid) {
-      logger.warn(
-        'Invalid Razorpay webhook signature',
-        this.buildInvalidSignatureDebugPayload(
-          environment,
-          rawBodyBuffer,
-          signature,
-          webhookSecret,
-          {
-            ...requestDebugContext,
-            headerEventId,
-          }
-        )
-      );
       throw new AppError(
         `Invalid Razorpay webhook signature. Confirm the Razorpay Dashboard webhook secret matches the ${environment} InsForge webhook setup and the webhook URL points to /api/webhooks/razorpay/${environment}.`,
         400,
@@ -150,74 +124,6 @@ export class RazorpayWebhookService {
 
     await this.markWebhookEvent(environment, eventId, handled ? 'processed' : 'ignored', null);
     return { received: true, handled };
-  }
-
-  private buildInvalidSignatureDebugPayload(
-    environment: RazorpayEnvironment,
-    rawBodyBuffer: Buffer,
-    signature: string,
-    webhookSecret: string,
-    requestDebugContext: RazorpayWebhookRequestDebugContext
-  ) {
-    const rawBodyText = rawBodyBuffer.toString('utf8');
-    const expectedSignature = computeRazorpayWebhookSignature(rawBodyBuffer, webhookSecret);
-    const parsedPayload = this.tryParseWebhookPayload(rawBodyText);
-    const trimmedBody = rawBodyText.trim();
-    const jsonStringifiedBody = parsedPayload ? JSON.stringify(parsedPayload) : null;
-    const hexDecodedSecret =
-      webhookSecret.length % 2 === 0 && HEX_STRING_PATTERN.test(webhookSecret)
-        ? Buffer.from(webhookSecret, 'hex')
-        : null;
-
-    // TEMP DEBUG: keep this verbose until Razorpay webhook signature failures are diagnosed.
-    return {
-      environment,
-      contentLength: requestDebugContext.contentLength ?? null,
-      contentType: requestDebugContext.contentType ?? null,
-      host: requestDebugContext.host ?? null,
-      headerEventId: requestDebugContext.headerEventId ?? null,
-      userAgent: requestDebugContext.userAgent ?? null,
-      rawBodyBytes: rawBodyBuffer.length,
-      rawBodySha256: crypto.createHash('sha256').update(rawBodyBuffer).digest('hex'),
-      rawBodyBase64: rawBodyBuffer.toString('base64'),
-      rawBodyText,
-      signature,
-      signatureLength: signature.length,
-      expectedSignature,
-      expectedSignatureLength: expectedSignature.length,
-      webhookSecretLength: webhookSecret.length,
-      webhookSecretSha256: crypto.createHash('sha256').update(webhookSecret).digest('hex'),
-      parsedEvent: parsedPayload?.event ?? null,
-      parsedAccountId: parsedPayload?.account_id ?? null,
-      parsedContains: parsedPayload?.contains ?? null,
-      parsedCreatedAt: parsedPayload?.created_at ?? null,
-      signatureVariantMatches: {
-        rawBody: expectedSignature === signature,
-        trimmedBody:
-          trimmedBody !== rawBodyText
-            ? computeRazorpayWebhookSignature(Buffer.from(trimmedBody, 'utf8'), webhookSecret) ===
-              signature
-            : false,
-        jsonStringifiedBody: jsonStringifiedBody
-          ? computeRazorpayWebhookSignature(
-              Buffer.from(jsonStringifiedBody, 'utf8'),
-              webhookSecret
-            ) === signature
-          : false,
-        hexDecodedSecret: hexDecodedSecret
-          ? crypto.createHmac('sha256', hexDecodedSecret).update(rawBodyBuffer).digest('hex') ===
-            signature
-          : false,
-      },
-    };
-  }
-
-  private tryParseWebhookPayload(rawBody: string): RazorpayWebhookPayload | null {
-    try {
-      return JSON.parse(rawBody) as RazorpayWebhookPayload;
-    } catch {
-      return null;
-    }
   }
 
   /**
