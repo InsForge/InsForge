@@ -160,6 +160,62 @@ CREATE TRIGGER fulfill_razorpay_order_from_webhook
   EXECUTE FUNCTION public.fulfill_razorpay_order();
 ```
 
+For subscriptions, resolve the billing subject from the subscription entity's `notes` in the event payload — InsForge stamps `insforge_subject_type` and `insforge_subject_id` into notes at subscription creation (and creates the `payments.customer_mappings` row at the same time, so the mapping is also a safe fallback):
+
+```sql
+CREATE OR REPLACE FUNCTION public.grant_razorpay_subscription_access()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_subject_type TEXT;
+  v_subject_id TEXT;
+BEGIN
+  IF NEW.provider = 'razorpay'
+     AND NEW.event_type = 'subscription.charged'
+     AND NEW.processing_status = 'processed' THEN
+    v_subject_type := NEW.payload -> 'payload' -> 'subscription' -> 'entity'
+                      -> 'notes' ->> 'insforge_subject_type';
+    v_subject_id := NEW.payload -> 'payload' -> 'subscription' -> 'entity'
+                    -> 'notes' ->> 'insforge_subject_id';
+
+    IF v_subject_id IS NULL THEN
+      SELECT m.subject_type, m.subject_id
+      INTO v_subject_type, v_subject_id
+      FROM payments.customer_mappings m
+      WHERE m.provider = NEW.provider
+        AND m.environment = NEW.environment
+        AND m.provider_customer_id = NEW.payload -> 'payload' -> 'subscription'
+                                     -> 'entity' ->> 'customer_id';
+    END IF;
+
+    IF v_subject_id IS NULL THEN
+      RAISE WARNING 'Razorpay event % has no resolvable billing subject', NEW.provider_event_id;
+      RETURN NEW;
+    END IF;
+
+    -- Branch on the subject type sent at creation; team_id is a UUID here,
+    -- so the type check also guards the cast.
+    IF v_subject_type = 'team' THEN
+      INSERT INTO public.team_entitlements (team_id, plan, active, updated_at)
+      VALUES (v_subject_id::uuid, 'pro', true, NOW())
+      ON CONFLICT (team_id) DO UPDATE SET
+        plan = EXCLUDED.plan,
+        active = true,
+        updated_at = NOW();
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER grant_razorpay_subscription_access_from_webhook
+  AFTER INSERT OR UPDATE ON payments.webhook_events
+  FOR EACH ROW
+  EXECUTE FUNCTION public.grant_razorpay_subscription_access();
+```
+
+Handle revocation the same way from `subscription.cancelled`, `subscription.halted`, and `subscription.expired`.
+
 Adapt the payload lookup to the app schema and event shape. Protect app-owned billing tables with RLS. Use `payments.transactions` for dashboard/reporting only.
 
 ## Security

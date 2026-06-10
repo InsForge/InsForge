@@ -123,7 +123,11 @@ Portal creation requires an authenticated user and an existing `payments.custome
 
 ## Fulfillment
 
-Create triggers from verified Stripe webhook events into app-owned tables:
+Create triggers from verified Stripe webhook events into app-owned tables.
+
+Webhook events are verified and processed independently. InsForge commits all rows derived from an event before marking that event `processed`, but there is no ordering guarantee across events: Stripe can deliver `invoice.paid` before `checkout.session.completed`, so rows created by another event (such as `payments.customer_mappings`) may not exist yet when your trigger fires. Resolve the billing subject from the event payload first and use `payments.customer_mappings` as a fallback, exactly as the examples below do. Never let fulfillment skip silently: log or dead-letter events you cannot resolve.
+
+### One-time payments
 
 ```sql
 CREATE OR REPLACE FUNCTION public.fulfill_paid_order()
@@ -149,6 +153,69 @@ CREATE TRIGGER fulfill_paid_order_from_stripe_webhook
   FOR EACH ROW
   EXECUTE FUNCTION public.fulfill_paid_order();
 ```
+
+### Subscriptions
+
+Subscription events do not carry your app's `metadata`. Resolve the billing subject from the subscription metadata embedded in the event payload — InsForge stamps `insforge_subject_type` and `insforge_subject_id` at checkout, and Stripe snapshots it onto subscription-generated invoices as `parent.subscription_details.metadata`. Check `invoice.metadata` next, then fall back to `payments.customer_mappings` (the same order InsForge uses internally):
+
+```sql
+CREATE OR REPLACE FUNCTION public.grant_subscription_access()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_subject_type TEXT;
+  v_subject_id TEXT;
+BEGIN
+  IF NEW.provider = 'stripe'
+     AND NEW.event_type = 'invoice.paid'
+     AND NEW.processing_status = 'processed' THEN
+    v_subject_type := COALESCE(
+      NEW.payload -> 'data' -> 'object' -> 'parent'
+        -> 'subscription_details' -> 'metadata' ->> 'insforge_subject_type',
+      NEW.payload -> 'data' -> 'object' -> 'metadata' ->> 'insforge_subject_type'
+    );
+    v_subject_id := COALESCE(
+      NEW.payload -> 'data' -> 'object' -> 'parent'
+        -> 'subscription_details' -> 'metadata' ->> 'insforge_subject_id',
+      NEW.payload -> 'data' -> 'object' -> 'metadata' ->> 'insforge_subject_id'
+    );
+
+    IF v_subject_id IS NULL THEN
+      SELECT m.subject_type, m.subject_id
+      INTO v_subject_type, v_subject_id
+      FROM payments.customer_mappings m
+      WHERE m.provider = NEW.provider
+        AND m.environment = NEW.environment
+        AND m.provider_customer_id = NEW.payload -> 'data' -> 'object' ->> 'customer';
+    END IF;
+
+    IF v_subject_id IS NULL THEN
+      RAISE WARNING 'Stripe event % has no resolvable billing subject', NEW.provider_event_id;
+      RETURN NEW;
+    END IF;
+
+    -- Branch on the subject type sent at checkout; team_id is a UUID here,
+    -- so the type check also guards the cast.
+    IF v_subject_type = 'team' THEN
+      INSERT INTO public.team_entitlements (team_id, plan, active, updated_at)
+      VALUES (v_subject_id::uuid, 'pro', true, NOW())
+      ON CONFLICT (team_id) DO UPDATE SET
+        plan = EXCLUDED.plan,
+        active = true,
+        updated_at = NOW();
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER grant_subscription_access_from_stripe_webhook
+  AFTER INSERT OR UPDATE ON payments.webhook_events
+  FOR EACH ROW
+  EXECUTE FUNCTION public.grant_subscription_access();
+```
+
+Adjust the trigger target to the app-owned entitlement table for the billing subject type used at checkout. Handle revocation the same way from `customer.subscription.deleted` and `customer.subscription.updated` events (`payload -> 'data' -> 'object' -> 'metadata'` holds the subject keys on subscription events).
 
 Use `payments.transactions` for dashboard/reporting only.
 

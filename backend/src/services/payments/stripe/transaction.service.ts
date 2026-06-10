@@ -1,5 +1,6 @@
 import type { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
+import { PaymentCustomerService } from '@/services/payments/payment-customer.service.js';
 import { STRIPE_CHECKOUT_MODE_METADATA_KEY } from '@/services/payments/stripe/constants.js';
 import {
   fromStripeTimestamp,
@@ -78,6 +79,7 @@ type RefundStripeContextLoader = () => Promise<RefundStripeContext>;
 export class StripeTransactionService {
   private static instance: StripeTransactionService;
   private pool: Pool | null = null;
+  private readonly customerService = PaymentCustomerService.getInstance();
 
   static getInstance(): StripeTransactionService {
     if (!StripeTransactionService.instance) {
@@ -121,7 +123,10 @@ export class StripeTransactionService {
   ): Promise<void> {
     const customerId = getStripeObjectId(invoice.customer);
     const subscriptionId = this.getInvoiceSubscriptionId(invoice);
-    const subject = await this.resolveInvoiceSubject(environment, invoice, customerId);
+    const metadataSubject = this.getInvoiceMetadataSubject(invoice);
+    const subject =
+      metadataSubject ??
+      (customerId ? await this.findSubjectForStripeCustomer(environment, customerId) : null);
     const paymentIntentId = this.getInvoicePaymentIntentId(invoice);
     const firstLine = invoice.lines?.data?.[0] ?? null;
     const productId = this.getInvoiceLineItemProductId(firstLine);
@@ -165,6 +170,18 @@ export class StripeTransactionService {
         { type: 'payment_intent', id: paymentIntentId },
       ],
     });
+
+    if (metadataSubject && customerId) {
+      // Stripe delivers invoice.* and checkout.session.completed in no
+      // guaranteed order; backfill the mapping so fulfillment triggers on
+      // this event can resolve the subject regardless of arrival order.
+      await this.customerService.backfillCustomerMapping(
+        'stripe',
+        environment,
+        metadataSubject,
+        customerId
+      );
+    }
 
     if (status === 'succeeded') {
       await this.refreshOriginalTransactionRefundState(environment, paymentIntentId, null);
@@ -769,16 +786,20 @@ export class StripeTransactionService {
     return { type: mapping.subjectType, id: mapping.subjectId };
   }
 
+  private getInvoiceMetadataSubject(invoice: StripeInvoice): BillingSubject | null {
+    return (
+      getBillingSubjectFromProviderAttributes(invoice.parent?.subscription_details?.metadata) ??
+      getBillingSubjectFromProviderAttributes(invoice.metadata)
+    );
+  }
+
   private async resolveInvoiceSubject(
     environment: StripeEnvironment,
     invoice: StripeInvoice,
     customerId: string | null
   ): Promise<BillingSubject | null> {
-    const parentMetadata = invoice.parent?.subscription_details?.metadata;
-
     return (
-      getBillingSubjectFromProviderAttributes(parentMetadata) ??
-      getBillingSubjectFromProviderAttributes(invoice.metadata) ??
+      this.getInvoiceMetadataSubject(invoice) ??
       (customerId ? await this.findSubjectForStripeCustomer(environment, customerId) : null)
     );
   }

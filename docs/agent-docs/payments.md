@@ -15,6 +15,7 @@ Use a provider-specific guide before coding. Stripe and Razorpay have different 
 4. Fulfillment should run from verified rows in `payments.webhook_events`.
 5. Keep user-facing order, credit, and entitlement state in app-owned tables with app-owned RLS.
 6. Use `payments.transactions` for dashboard and reporting queries, not as the primary fulfillment contract.
+7. Webhook events are processed independently with no cross-event ordering guarantee. Rows derived from an event are committed before that event is marked `processed`, but rows derived from other events (such as `payments.customer_mappings` or provider mirrors) may not exist yet. Fulfillment triggers must resolve billing subjects from the event payload first and treat lookups into rows owned by other events as fallbacks.
 
 ## Shared tables
 
