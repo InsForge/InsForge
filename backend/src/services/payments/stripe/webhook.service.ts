@@ -440,7 +440,6 @@ export class StripeWebhookService {
           )
         );
       case 'invoice.paid':
-      case 'invoice.payment_succeeded':
         await this.stripeTransactionService.upsertInvoiceTransaction(
           environment,
           event.data.object as StripeInvoice,
