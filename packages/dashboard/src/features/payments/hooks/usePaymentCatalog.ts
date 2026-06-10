@@ -55,7 +55,7 @@ function toStripeDisplayPrice(price: StripePrice): CatalogPrice {
   };
 }
 
-function toRazorpayDisplayProduct(item: RazorpayItem, plans: RazorpayPlan[]): CatalogProduct {
+function toRazorpayDisplayProduct(item: RazorpayItem): CatalogProduct {
   return {
     environment: item.environment,
     provider: 'razorpay',
@@ -63,7 +63,30 @@ function toRazorpayDisplayProduct(item: RazorpayItem, plans: RazorpayPlan[]): Ca
     name: item.name,
     description: item.description,
     active: item.active,
-    providerDefaultPriceId: plans.find((plan) => plan.itemId === item.itemId)?.planId ?? null,
+    providerDefaultPriceId: item.itemId,
+    metadata: item.metadata,
+    syncedAt: item.syncedAt,
+  };
+}
+
+function toRazorpayDisplayItemPrice(item: RazorpayItem): CatalogPrice {
+  const unitAmountDecimal = item.unitAmount ?? item.amount;
+
+  return {
+    environment: item.environment,
+    provider: 'razorpay',
+    providerPriceId: item.itemId,
+    providerProductId: item.itemId,
+    active: item.active,
+    currency: item.currency,
+    unitAmount: item.amount,
+    unitAmountDecimal: unitAmountDecimal === null ? null : String(unitAmountDecimal),
+    type: 'one_time',
+    lookupKey: null,
+    billingScheme: 'per_unit',
+    taxBehavior: null,
+    recurringInterval: null,
+    recurringIntervalCount: null,
     metadata: item.metadata,
     syncedAt: item.syncedAt,
   };
@@ -172,12 +195,14 @@ export function usePaymentCatalog(provider: PaymentProvider, environment: Paymen
   });
 
   const razorpayDisplayCatalog = useMemo(() => {
+    const items = razorpayCatalogData?.items ?? [];
     const plans = razorpayCatalogData?.plans ?? [];
     return {
-      products: (razorpayCatalogData?.items ?? []).map((item) =>
-        toRazorpayDisplayProduct(item, plans)
-      ),
-      prices: plans.map((plan) => toRazorpayDisplayPrice(plan)),
+      products: items.map((item) => toRazorpayDisplayProduct(item)),
+      prices: [
+        ...items.map((item) => toRazorpayDisplayItemPrice(item)),
+        ...plans.map((plan) => toRazorpayDisplayPrice(plan)),
+      ],
     };
   }, [razorpayCatalogData]);
 

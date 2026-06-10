@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
 import type { PaymentCustomer } from '@insforge/shared-schemas';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import {
   Alert,
   AlertDescription,
@@ -25,7 +26,9 @@ import type {
 } from '#features/payments/types/subscriptions';
 import { cn } from '#lib/utils/utils';
 
-const SUBSCRIPTION_STATUS_CLASSES: Record<PaymentSubscriptionStatus, string> = {
+type SubscriptionDisplayStatus = PaymentSubscriptionStatus | 'cancelling';
+
+const SUBSCRIPTION_STATUS_CLASSES: Record<SubscriptionDisplayStatus, string> = {
   incomplete: 'bg-[var(--alpha-8)] text-amber-400',
   incomplete_expired: 'bg-[var(--alpha-8)] text-muted-foreground',
   trialing: 'bg-[var(--alpha-8)] text-sky-400',
@@ -34,8 +37,8 @@ const SUBSCRIPTION_STATUS_CLASSES: Record<PaymentSubscriptionStatus, string> = {
   canceled: 'bg-[var(--alpha-8)] text-muted-foreground',
   unpaid: 'bg-[var(--alpha-8)] text-rose-400',
   paused: 'bg-[var(--alpha-8)] text-muted-foreground',
+  cancelling: 'bg-[var(--alpha-8)] text-amber-400',
 };
-const SUBSCRIPTION_CANCELING_CLASS = 'bg-[var(--alpha-8)] text-amber-400';
 
 const SUBSCRIPTION_ROW_GRID_TEMPLATE =
   '32px minmax(0, 1.3fr) minmax(0, 1fr) 100px 100px minmax(0, 1.2fr) minmax(0, 0.75fr)';
@@ -87,28 +90,30 @@ function formatStatusLabel(status: PaymentSubscriptionStatus) {
 }
 
 function getSubscriptionStatusDisplay(subscription: PaymentSubscription) {
-  const isCanceling = subscription.status !== 'canceled' && !!subscription.cancelAt;
+  const isCancelling = subscription.status !== 'canceled' && !!subscription.cancelAt;
 
-  if (isCanceling) {
+  if (isCancelling) {
     return {
-      label: 'Canceling',
-      className: SUBSCRIPTION_CANCELING_CLASS,
-      detail: `Cancels ${formatShortDate(subscription.cancelAt)}`,
+      label: 'Cancelling',
+      className: SUBSCRIPTION_STATUS_CLASSES.cancelling,
+      tooltip: `Cancels on ${formatDate(subscription.cancelAt)}`,
     };
   }
 
-  if (subscription.status === 'canceled' && subscription.canceledAt) {
+  if (subscription.status === 'canceled') {
+    const canceledAt = subscription.canceledAt ?? subscription.cancelAt;
+
     return {
       label: formatStatusLabel(subscription.status),
       className: SUBSCRIPTION_STATUS_CLASSES[subscription.status],
-      detail: `Canceled ${formatShortDate(subscription.canceledAt)}`,
+      tooltip: canceledAt ? `Canceled on ${formatDate(canceledAt)}` : null,
     };
   }
 
   return {
     label: formatStatusLabel(subscription.status),
     className: SUBSCRIPTION_STATUS_CLASSES[subscription.status],
-    detail: null,
+    tooltip: null,
   };
 }
 
@@ -167,23 +172,30 @@ function getSubscriptionItemPriceLabel(item: PaymentSubscriptionItem, price: Cat
 
 function SubscriptionStatus({ subscription }: { subscription: PaymentSubscription }) {
   const display = getSubscriptionStatusDisplay(subscription);
+  const badge = (
+    <span
+      className={cn(
+        'inline-flex items-center rounded px-2 py-0.5 text-xs font-medium',
+        display.className
+      )}
+    >
+      {display.label}
+    </span>
+  );
+
+  if (!display.tooltip) {
+    return badge;
+  }
 
   return (
-    <div className="flex min-w-0 flex-col items-start gap-1">
-      <span
-        className={cn(
-          'inline-flex items-center rounded px-2 py-0.5 text-xs font-medium',
-          display.className
-        )}
-      >
-        {display.label}
-      </span>
-      {display.detail ? (
-        <span className="max-w-full truncate text-xs text-muted-foreground" title={display.detail}>
-          {display.detail}
-        </span>
-      ) : null}
-    </div>
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>{badge}</TooltipTrigger>
+        <TooltipContent side="top" align="center">
+          {display.tooltip}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
@@ -460,14 +472,16 @@ export default function SubscriptionsPage() {
         ];
       });
 
+      const statusDisplay = getSubscriptionStatusDisplay(subscription);
+
       return [
         subscription.providerSubscriptionId,
         subscription.providerCustomerId,
         customer?.email,
         customer?.name,
         subscription.status,
-        getSubscriptionStatusDisplay(subscription).label,
-        getSubscriptionStatusDisplay(subscription).detail,
+        statusDisplay.label,
+        statusDisplay.tooltip,
         subscription.providerLatestInvoiceId,
         formatPeriod(subscription),
         ...itemValues,

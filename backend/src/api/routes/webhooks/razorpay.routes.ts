@@ -7,6 +7,10 @@ import { ERROR_CODES, razorpayWebhookParamsSchema } from '@insforge/shared-schem
 const router = Router();
 const webhookService = RazorpayWebhookService.getInstance();
 
+function getHeaderValue(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value.join(', ') : value;
+}
+
 router.post('/:environment', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { environment } = parseZodSchema(razorpayWebhookParamsSchema, req.params);
@@ -26,7 +30,13 @@ router.post('/:environment', async (req: Request, res: Response, next: NextFunct
       environment,
       rawBodyBuffer,
       signature,
-      typeof headerEventId === 'string' ? headerEventId : undefined
+      typeof headerEventId === 'string' ? headerEventId : undefined,
+      {
+        contentLength: getHeaderValue(req.headers['content-length']),
+        contentType: getHeaderValue(req.headers['content-type']),
+        host: getHeaderValue(req.headers.host),
+        userAgent: getHeaderValue(req.headers['user-agent']),
+      }
     );
     res.status(200).json(result);
   } catch (error) {

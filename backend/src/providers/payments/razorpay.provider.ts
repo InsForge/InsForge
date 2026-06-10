@@ -4,6 +4,10 @@ import type { RazorpayEnvironment } from '@/types/payments.js';
 
 const RAZORPAY_SHA256_SIGNATURE_HEX = /^[0-9a-f]{64}$/i;
 
+export function computeRazorpayWebhookSignature(rawBody: Buffer, webhookSecret: string): string {
+  return crypto.createHmac('sha256', webhookSecret).update(rawBody).digest('hex');
+}
+
 export class RazorpayKeyValidationError extends Error {
   constructor(message: string) {
     super(message);
@@ -322,7 +326,7 @@ export class RazorpayProvider {
       return false;
     }
 
-    const expected = crypto.createHmac('sha256', webhookSecret).update(rawBody).digest('hex');
+    const expected = computeRazorpayWebhookSignature(rawBody, webhookSecret);
     const expectedBuf = Buffer.from(expected, 'hex');
     const signatureBuf = Buffer.from(signature, 'hex');
     if (expectedBuf.length !== signatureBuf.length) {

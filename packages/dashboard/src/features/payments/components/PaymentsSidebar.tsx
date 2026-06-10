@@ -38,7 +38,7 @@ function getPaymentsSidebarItems(disabled: boolean): FeatureSidebarListItem[] {
   return [
     {
       id: 'catalog',
-      label: 'Products',
+      label: 'Catalog',
       href: '/dashboard/payments/catalog',
       disabled,
     },
@@ -49,15 +49,15 @@ function getPaymentsSidebarItems(disabled: boolean): FeatureSidebarListItem[] {
       disabled,
     },
     {
-      id: 'transactions',
-      label: 'Payment History',
-      href: '/dashboard/payments/transactions',
+      id: 'customers',
+      label: 'Customers',
+      href: '/dashboard/payments/customers',
       disabled,
     },
     {
-      id: 'customers',
-      label: 'Customer',
-      href: '/dashboard/payments/customers',
+      id: 'transactions',
+      label: 'Transactions',
+      href: '/dashboard/payments/transactions',
       disabled,
     },
   ];
@@ -66,7 +66,7 @@ function getPaymentsSidebarItems(disabled: boolean): FeatureSidebarListItem[] {
 const PAYMENTS_FALLBACK_SIDEBAR_ITEMS: FeatureSidebarListItem[] = [
   {
     id: 'catalog',
-    label: 'Products',
+    label: 'Catalog',
     href: '/dashboard/payments/catalog',
   },
   {
@@ -75,14 +75,14 @@ const PAYMENTS_FALLBACK_SIDEBAR_ITEMS: FeatureSidebarListItem[] = [
     href: '/dashboard/payments/subscriptions',
   },
   {
-    id: 'transactions',
-    label: 'Payment History',
-    href: '/dashboard/payments/transactions',
+    id: 'customers',
+    label: 'Customers',
+    href: '/dashboard/payments/customers',
   },
   {
-    id: 'customers',
-    label: 'Customer',
-    href: '/dashboard/payments/customers',
+    id: 'transactions',
+    label: 'Transactions',
+    href: '/dashboard/payments/transactions',
   },
 ];
 
