@@ -193,13 +193,16 @@ BEGIN
       RETURN NEW;
     END IF;
 
-    -- team_id is a UUID here; match the type of the subject id sent at checkout
-    INSERT INTO public.team_entitlements (team_id, plan, active, updated_at)
-    VALUES (v_subject_id::uuid, 'pro', true, NOW())
-    ON CONFLICT (team_id) DO UPDATE SET
-      plan = EXCLUDED.plan,
-      active = true,
-      updated_at = NOW();
+    -- Branch on the subject type sent at checkout; team_id is a UUID here,
+    -- so the type check also guards the cast.
+    IF v_subject_type = 'team' THEN
+      INSERT INTO public.team_entitlements (team_id, plan, active, updated_at)
+      VALUES (v_subject_id::uuid, 'pro', true, NOW())
+      ON CONFLICT (team_id) DO UPDATE SET
+        plan = EXCLUDED.plan,
+        active = true,
+        updated_at = NOW();
+    END IF;
   END IF;
 
   RETURN NEW;

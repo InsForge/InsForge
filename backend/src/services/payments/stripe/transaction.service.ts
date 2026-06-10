@@ -127,18 +127,6 @@ export class StripeTransactionService {
     const subject =
       metadataSubject ??
       (customerId ? await this.findSubjectForStripeCustomer(environment, customerId) : null);
-
-    if (metadataSubject && customerId) {
-      // Stripe delivers invoice.* and checkout.session.completed in no
-      // guaranteed order; backfill the mapping so fulfillment triggers on
-      // this event can resolve the subject regardless of arrival order.
-      await this.customerService.backfillCustomerMapping(
-        'stripe',
-        environment,
-        metadataSubject,
-        customerId
-      );
-    }
     const paymentIntentId = this.getInvoicePaymentIntentId(invoice);
     const firstLine = invoice.lines?.data?.[0] ?? null;
     const productId = this.getInvoiceLineItemProductId(firstLine);
@@ -182,6 +170,18 @@ export class StripeTransactionService {
         { type: 'payment_intent', id: paymentIntentId },
       ],
     });
+
+    if (metadataSubject && customerId) {
+      // Stripe delivers invoice.* and checkout.session.completed in no
+      // guaranteed order; backfill the mapping so fulfillment triggers on
+      // this event can resolve the subject regardless of arrival order.
+      await this.customerService.backfillCustomerMapping(
+        'stripe',
+        environment,
+        metadataSubject,
+        customerId
+      );
+    }
 
     if (status === 'succeeded') {
       await this.refreshOriginalTransactionRefundState(environment, paymentIntentId, null);

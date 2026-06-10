@@ -166,17 +166,20 @@ For subscriptions, resolve the billing subject from the subscription entity's `n
 CREATE OR REPLACE FUNCTION public.grant_razorpay_subscription_access()
 RETURNS TRIGGER AS $$
 DECLARE
+  v_subject_type TEXT;
   v_subject_id TEXT;
 BEGIN
   IF NEW.provider = 'razorpay'
      AND NEW.event_type = 'subscription.charged'
      AND NEW.processing_status = 'processed' THEN
+    v_subject_type := NEW.payload -> 'payload' -> 'subscription' -> 'entity'
+                      -> 'notes' ->> 'insforge_subject_type';
     v_subject_id := NEW.payload -> 'payload' -> 'subscription' -> 'entity'
                     -> 'notes' ->> 'insforge_subject_id';
 
     IF v_subject_id IS NULL THEN
-      SELECT m.subject_id
-      INTO v_subject_id
+      SELECT m.subject_type, m.subject_id
+      INTO v_subject_type, v_subject_id
       FROM payments.customer_mappings m
       WHERE m.provider = NEW.provider
         AND m.environment = NEW.environment
@@ -189,13 +192,16 @@ BEGIN
       RETURN NEW;
     END IF;
 
-    -- team_id is a UUID here; match the type of the subject id sent at creation
-    INSERT INTO public.team_entitlements (team_id, plan, active, updated_at)
-    VALUES (v_subject_id::uuid, 'pro', true, NOW())
-    ON CONFLICT (team_id) DO UPDATE SET
-      plan = EXCLUDED.plan,
-      active = true,
-      updated_at = NOW();
+    -- Branch on the subject type sent at creation; team_id is a UUID here,
+    -- so the type check also guards the cast.
+    IF v_subject_type = 'team' THEN
+      INSERT INTO public.team_entitlements (team_id, plan, active, updated_at)
+      VALUES (v_subject_id::uuid, 'pro', true, NOW())
+      ON CONFLICT (team_id) DO UPDATE SET
+        plan = EXCLUDED.plan,
+        active = true,
+        updated_at = NOW();
+    END IF;
   END IF;
 
   RETURN NEW;
