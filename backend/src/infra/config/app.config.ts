@@ -127,9 +127,17 @@ export function loadConfig(): AppConfig {
       cloudFrontPrivateKey: process.env.AWS_CLOUDFRONT_PRIVATE_KEY || undefined,
     },
     denoSubhosting: {
-      token: process.env.DENO_SUBHOSTING_TOKEN || '',
-      organizationId: process.env.DENO_SUBHOSTING_ORG_ID || '',
-      domain: 'functions.insforge.app',
+      // Deno Deploy (v2) credentials. Renamed from DENO_SUBHOSTING_* so an
+      // instance's .env can carry both the legacy Subhosting pair (for older
+      // OSS versions) and this pair side by side during the v1→v2 migration.
+      token: process.env.DENO_DEPLOY_TOKEN || '',
+      organizationId: process.env.DENO_DEPLOY_ORG_ID || '',
+      // Public function domain. On Deno v2 this is the CloudFront proxy domain
+      // (`function2.insforge.app`) that forwards `{appkey}.function2.insforge.app`
+      // → `{appkey}.insforge.deno.net`. Overridable so the cloud control-plane can
+      // pin v1 (`functions.insforge.app`) vs v2 per deployment. See
+      // docs/deno-subhosting.md §4.1.
+      domain: process.env.FUNCTIONS_DOMAIN || 'function2.insforge.app',
     },
     fly: {
       apiToken: process.env.FLY_API_TOKEN || '',

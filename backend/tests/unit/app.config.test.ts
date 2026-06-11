@@ -135,26 +135,29 @@ describe('config.cloud', () => {
 
 describe('config.denoSubhosting', () => {
   it('uses empty-string defaults when tokens are absent', () => {
-    unsetEnvKeys('DENO_SUBHOSTING_TOKEN', 'DENO_SUBHOSTING_ORG_ID');
+    unsetEnvKeys('DENO_DEPLOY_TOKEN', 'DENO_DEPLOY_ORG_ID', 'FUNCTIONS_DOMAIN');
     const c = loadConfig();
 
     expect(c.denoSubhosting.token).toBe('');
     expect(c.denoSubhosting.organizationId).toBe('');
-    expect(c.denoSubhosting.domain).toBe('functions.insforge.app');
+    expect(c.denoSubhosting.domain).toBe('function2.insforge.app');
   });
 
-  it('reads DENO_SUBHOSTING_TOKEN and DENO_SUBHOSTING_ORG_ID', () => {
-    process.env.DENO_SUBHOSTING_TOKEN = 'dsh_token_test';
-    process.env.DENO_SUBHOSTING_ORG_ID = 'org-abc';
+  it('reads DENO_DEPLOY_TOKEN and DENO_DEPLOY_ORG_ID', () => {
+    process.env.DENO_DEPLOY_TOKEN = 'dsh_token_test';
+    process.env.DENO_DEPLOY_ORG_ID = 'org-abc';
     const c = loadConfig();
 
     expect(c.denoSubhosting.token).toBe('dsh_token_test');
     expect(c.denoSubhosting.organizationId).toBe('org-abc');
   });
 
-  it('domain is always the fixed constant', () => {
-    // domain is hardcoded, not from env
-    expect(loadConfig().denoSubhosting.domain).toBe('functions.insforge.app');
+  it('domain defaults to the v2 proxy domain and is overridable via FUNCTIONS_DOMAIN', () => {
+    unsetEnvKeys('FUNCTIONS_DOMAIN');
+    expect(loadConfig().denoSubhosting.domain).toBe('function2.insforge.app');
+
+    process.env.FUNCTIONS_DOMAIN = 'custom.functions.example.com';
+    expect(loadConfig().denoSubhosting.domain).toBe('custom.functions.example.com');
   });
 });
 
