@@ -120,6 +120,7 @@ export default function SQLEditorPage() {
   const [editingTabName, setEditingTabName] = useState('');
   const [resultView, setResultView] = useState<'result' | 'table'>('result');
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const [exportError, setExportError] = useState<Error | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
 
@@ -203,19 +204,35 @@ export default function SQLEditorPage() {
 
   const handleExportCSV = () => {
     const exportData = getExportTableData();
-    if (exportData) {
+    if (!exportData) {
+      return;
+    }
+
+    setExportError(null);
+
+    try {
       const filename = getExportFilename('query_results');
       convertToCSV(exportData, filename);
       setIsExportMenuOpen(false);
+    } catch (err) {
+      setExportError(err instanceof Error ? err : new Error('Failed to export CSV'));
     }
   };
 
   const handleExportJSON = () => {
     const exportData = getExportTableData();
-    if (exportData) {
+    if (!exportData) {
+      return;
+    }
+
+    setExportError(null);
+
+    try {
       const filename = getExportFilename('query_results');
       convertToJSON(exportData, filename);
       setIsExportMenuOpen(false);
+    } catch (err) {
+      setExportError(err instanceof Error ? err : new Error('Failed to export JSON'));
     }
   };
 
@@ -419,7 +436,11 @@ export default function SQLEditorPage() {
               resultView === 'result' && 'px-4 py-3'
             )}
           >
-            {isError && error ? (
+            {exportError ? (
+              <div className={resultView !== 'result' ? 'px-4 py-3' : ''}>
+                <ErrorViewer error={exportError} />
+              </div>
+            ) : isError && error ? (
               <div className={resultView !== 'result' ? 'px-4 py-3' : ''}>
                 <ErrorViewer error={error} />
               </div>

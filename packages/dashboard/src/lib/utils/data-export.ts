@@ -75,8 +75,8 @@ export function convertToCSV(data: unknown[], filename = 'export'): void {
   // Combine header and data
   const csvContent = [headerRow, ...dataRows].join('\n');
 
-  // Trigger download
-  downloadFile(csvContent, `${filename}.csv`, 'text/csv;charset=utf-8;');
+  // Trigger download with UTF-8 BOM so Excel auto-detects encoding
+  downloadFile('\uFEFF' + csvContent, `${filename}.csv`, 'text/csv;charset=utf-8;');
 }
 
 /**
