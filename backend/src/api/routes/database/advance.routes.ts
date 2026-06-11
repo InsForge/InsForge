@@ -99,6 +99,49 @@ router.post(
 );
 
 /**
+ * Explain SQL query with project_admin privileges.
+ * POST /api/database/advance/rawsql/explain
+ */
+router.post(
+  '/rawsql/explain',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validation = rawSQLRequestSchema.safeParse(req.body);
+      if (!validation.success) {
+        throw new AppError(
+          validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const { query, params = [] } = validation.data;
+
+      const response = await dbAdvanceService.explainSQL(query, params);
+
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'EXPLAIN_SQL',
+        module: 'DATABASE',
+        details: {
+          query: query.substring(0, 300),
+          paramCount: params.length,
+          rolledBack: response.rolledBack,
+          executionRole: 'project_admin',
+        },
+        ip_address: req.ip,
+      });
+
+      successResponse(res, response);
+    } catch (error: unknown) {
+      logger.warn('SQL explain error:', error);
+      next(error);
+    }
+  }
+);
+
+/**
  * Execute raw SQL query with project_admin privileges.
  * POST /api/database/advance/rawsql
  */

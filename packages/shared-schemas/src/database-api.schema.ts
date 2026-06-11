@@ -9,6 +9,7 @@ import {
   databasePolicySchema,
   databaseTriggerSchema,
   migrationSchema,
+  explainPlanNodeSchema,
 } from './database.schema.js';
 
 export const createTableRequestSchema = tableSchema
@@ -106,6 +107,14 @@ export const rawSQLResponseSchema = z.object({
       })
     )
     .optional(),
+});
+
+export const explainSQLResponseSchema = z.object({
+  plan: explainPlanNodeSchema,
+  planningTime: z.number().optional(),
+  executionTime: z.number().optional(),
+  totalQueryTime: z.number().optional(),
+  rolledBack: z.boolean(),
 });
 
 // Export Schemas
@@ -349,6 +358,7 @@ export type DeleteTableResponse = z.infer<typeof deleteTableResponse>;
 // Raw SQL Types
 export type RawSQLRequest = z.infer<typeof rawSQLRequestSchema>;
 export type RawSQLResponse = z.infer<typeof rawSQLResponseSchema>;
+export type ExplainSQLResponse = z.infer<typeof explainSQLResponseSchema>;
 
 // Export Types
 export type ExportDatabaseRequest = z.infer<typeof exportRequestSchema>;

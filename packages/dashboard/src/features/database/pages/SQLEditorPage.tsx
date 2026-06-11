@@ -1,10 +1,13 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
-import { useRawSQL } from '#features/database/hooks/useRawSQL';
+import { useExplainSQL, useRawSQL } from '#features/database/hooks/useRawSQL';
 import { useSQLEditorContext } from '#features/database/contexts/SQLEditorContext';
 import { Button, Tabs, Tab } from '@insforge/ui';
 import { CodeEditor, DataGrid, type DataGridColumn, type DataGridRow } from '#components';
+import { ExplainPlanTree } from '#features/database/components/ExplainPlanTree';
 import { X, Plus } from 'lucide-react';
 import { cn } from '#lib/utils/utils';
+
+type ResultView = 'result' | 'table' | 'explain';
 
 interface ResultsViewerProps {
   data: unknown;
@@ -117,13 +120,24 @@ export default function SQLEditorPage() {
 
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [editingTabName, setEditingTabName] = useState('');
-  const [resultView, setResultView] = useState<'result' | 'table'>('result');
+  const [resultView, setResultView] = useState<ResultView>('result');
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { executeSQL, isPending, data, isSuccess, error, isError } = useRawSQL({
     showSuccessToast: true,
     showErrorToast: false, // Don't show toast, we'll display in results
   });
+  const {
+    explainSQL,
+    isPending: isExplainPending,
+    data: explainData,
+    isSuccess: isExplainSuccess,
+    error: explainError,
+    isError: isExplainError,
+  } = useExplainSQL({
+    showErrorToast: false,
+  });
+  const isRunning = isPending || isExplainPending;
 
   useEffect(() => {
     if (editingTabId && inputRef.current) {
@@ -133,11 +147,22 @@ export default function SQLEditorPage() {
   }, [editingTabId]);
 
   const handleExecuteQuery = () => {
-    if (!activeTab?.query.trim() || isPending) {
+    if (!activeTab?.query.trim() || isRunning) {
+      return;
+    }
+
+    if (resultView === 'explain') {
+      explainSQL({ query: activeTab.query, params: [] });
       return;
     }
 
     executeSQL({ query: activeTab.query, params: [] });
+  };
+
+  const handleResultViewChange = (value: string) => {
+    if (value === 'result' || value === 'table' || value === 'explain') {
+      setResultView(value);
+    }
   };
 
   const handleQueryChange = (newQuery: string) => {
@@ -307,7 +332,7 @@ export default function SQLEditorPage() {
           {/* Tabs + Run Button */}
           <div className="flex px-4 py-3 justify-between items-start shrink-0 border-t border-b border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))]">
             {/* Tabs */}
-            <Tabs value={resultView} onValueChange={setResultView}>
+            <Tabs value={resultView} onValueChange={handleResultViewChange}>
               <Tab value="result">
                 Result
                 {isSuccess && data && isRowData(Array.isArray(data) ? data : data.rows) && (
@@ -317,10 +342,11 @@ export default function SQLEditorPage() {
                 )}
               </Tab>
               <Tab value="table">Table View</Tab>
+              <Tab value="explain">Explain</Tab>
             </Tabs>
             {/* Run Button */}
-            <Button onClick={handleExecuteQuery} disabled={isPending || !activeTab?.query.trim()}>
-              Run
+            <Button onClick={handleExecuteQuery} disabled={isRunning || !activeTab?.query.trim()}>
+              {resultView === 'explain' ? 'Explain' : 'Run'}
             </Button>
           </div>
 
@@ -328,10 +354,20 @@ export default function SQLEditorPage() {
           <div
             className={cn(
               'flex-1 min-h-0 w-full overflow-auto bg-[rgb(var(--semantic-0))]',
-              resultView === 'result' && 'px-4 py-3'
+              (resultView === 'result' || resultView === 'explain') && 'px-4 py-3'
             )}
           >
-            {isError && error ? (
+            {resultView === 'explain' ? (
+              isExplainError && explainError ? (
+                <ErrorViewer error={explainError} />
+              ) : isExplainSuccess && explainData ? (
+                <ExplainPlanTree data={explainData} />
+              ) : (
+                <p className="font-mono text-sm leading-5 text-foreground">
+                  {isExplainPending ? 'Explaining query...' : 'Click Explain to analyze your query'}
+                </p>
+              )
+            ) : isError && error ? (
               <div className={resultView !== 'result' ? 'px-4 py-3' : ''}>
                 <ErrorViewer error={error} />
               </div>

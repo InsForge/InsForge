@@ -122,6 +122,74 @@ export const migrationSchema = z.object({
   createdAt: z.string(),
 });
 
+export interface ExplainPlanNode {
+  nodeType: string;
+  relationName?: string;
+  alias?: string;
+  indexName?: string;
+  startupCost?: number;
+  totalCost?: number;
+  planRows?: number;
+  planWidth?: number;
+  actualStartupTime?: number;
+  actualTotalTime?: number;
+  actualRows?: number;
+  actualLoops?: number;
+  sharedHitBlocks?: number;
+  sharedReadBlocks?: number;
+  sharedDirtiedBlocks?: number;
+  sharedWrittenBlocks?: number;
+  localHitBlocks?: number;
+  localReadBlocks?: number;
+  localDirtiedBlocks?: number;
+  localWrittenBlocks?: number;
+  tempReadBlocks?: number;
+  tempWrittenBlocks?: number;
+  filter?: string;
+  indexCond?: string;
+  hashCond?: string;
+  joinFilter?: string;
+  recheckCond?: string;
+  groupKey?: string[];
+  sortKey?: string[];
+  plans: ExplainPlanNode[];
+}
+
+export const explainPlanNodeSchema: z.ZodType<ExplainPlanNode> = z.lazy(() =>
+  z.object({
+    nodeType: z.string(),
+    relationName: z.string().optional(),
+    alias: z.string().optional(),
+    indexName: z.string().optional(),
+    startupCost: z.number().optional(),
+    totalCost: z.number().optional(),
+    planRows: z.number().optional(),
+    planWidth: z.number().optional(),
+    actualStartupTime: z.number().optional(),
+    actualTotalTime: z.number().optional(),
+    actualRows: z.number().optional(),
+    actualLoops: z.number().optional(),
+    sharedHitBlocks: z.number().optional(),
+    sharedReadBlocks: z.number().optional(),
+    sharedDirtiedBlocks: z.number().optional(),
+    sharedWrittenBlocks: z.number().optional(),
+    localHitBlocks: z.number().optional(),
+    localReadBlocks: z.number().optional(),
+    localDirtiedBlocks: z.number().optional(),
+    localWrittenBlocks: z.number().optional(),
+    tempReadBlocks: z.number().optional(),
+    tempWrittenBlocks: z.number().optional(),
+    filter: z.string().optional(),
+    indexCond: z.string().optional(),
+    hashCond: z.string().optional(),
+    joinFilter: z.string().optional(),
+    recheckCond: z.string().optional(),
+    groupKey: z.array(z.string()).optional(),
+    sortKey: z.array(z.string()).optional(),
+    plans: z.array(explainPlanNodeSchema),
+  })
+);
+
 export type DatabaseFunction = z.infer<typeof databaseFunctionSchema>;
 export type DatabaseIndex = z.infer<typeof databaseIndexSchema>;
 export type DatabasePolicy = z.infer<typeof databasePolicySchema>;

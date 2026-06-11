@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { advanceService } from '#features/database/services/advance.service';
-import { RawSQLResponse } from '@insforge/shared-schemas';
+import { ExplainSQLResponse, RawSQLResponse } from '@insforge/shared-schemas';
 import { useToast } from '#lib/hooks/useToast';
 
 interface UseRawSQLOptions {
@@ -13,6 +13,12 @@ interface UseRawSQLOptions {
 interface RawSQLParams {
   query: string;
   params?: unknown[];
+}
+
+interface UseExplainSQLOptions {
+  onSuccess?: (data: ExplainSQLResponse) => void;
+  onError?: (error: Error) => void;
+  showErrorToast?: boolean;
 }
 
 export function useRawSQL(options?: UseRawSQLOptions) {
@@ -46,6 +52,37 @@ export function useRawSQL(options?: UseRawSQLOptions) {
   return {
     executeSQL: mutation.mutate,
     executeSQLAsync: mutation.mutateAsync,
+    reset: mutation.reset,
+    isPending: mutation.isPending,
+    isSuccess: mutation.isSuccess,
+    isError: mutation.isError,
+    error: mutation.error,
+    data: mutation.data,
+  };
+}
+
+export function useExplainSQL(options?: UseExplainSQLOptions) {
+  const { showToast } = useToast();
+
+  const mutation = useMutation({
+    mutationFn: async ({ query, params = [] }: RawSQLParams) => {
+      return advanceService.explainSQL(query, params);
+    },
+    onSuccess: (data) => {
+      options?.onSuccess?.(data);
+    },
+    onError: (error: Error) => {
+      if (options?.showErrorToast !== false) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to explain SQL query';
+        showToast(errorMessage, 'error');
+      }
+      options?.onError?.(error);
+    },
+  });
+
+  return {
+    explainSQL: mutation.mutate,
+    explainSQLAsync: mutation.mutateAsync,
     reset: mutation.reset,
     isPending: mutation.isPending,
     isSuccess: mutation.isSuccess,
