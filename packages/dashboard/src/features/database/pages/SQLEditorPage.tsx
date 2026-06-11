@@ -118,7 +118,7 @@ export default function SQLEditorPage() {
 
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [editingTabName, setEditingTabName] = useState('');
-  const [resultView, setResultView] = useState<'result' | 'chart'>('result');
+  const [resultView, setResultView] = useState<'result' | 'table'>('result');
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
