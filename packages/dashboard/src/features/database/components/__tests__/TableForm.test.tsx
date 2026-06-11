@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { ColumnType } from '@insforge/shared-schemas';
 import { getTableFormCreateDraftStorageKey } from '#features/database/components/TableForm';
 
 describe('TableForm draft storage', () => {
