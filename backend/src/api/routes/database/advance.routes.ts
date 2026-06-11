@@ -65,7 +65,7 @@ router.post(
       const response = await dbAdvanceService.executeRawSQL(query, params, true);
 
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'EXECUTE_RAW_SQL_UNRESTRICTED',
         module: 'DATABASE',
         details: {
@@ -162,7 +162,7 @@ router.post('/rawsql', verifyAdmin, async (req: AuthRequest, res: Response, next
     const response = await dbAdvanceService.executeRawSQL(query, params);
 
     await auditService.log({
-      actor: req.user?.email || 'api-key',
+      actor: req.hasApiKey ? 'api-key' : req.user?.id,
       action: 'EXECUTE_RAW_SQL',
       module: 'DATABASE',
       details: {
@@ -231,7 +231,7 @@ router.post('/export', verifyAdmin, async (req: AuthRequest, res: Response, next
 
     // Log audit for database export
     await auditService.log({
-      actor: req.user?.email || 'api-key',
+      actor: req.hasApiKey ? 'api-key' : req.user?.id,
       action: 'EXPORT_DATABASE',
       module: 'DATABASE',
       details: {
@@ -288,7 +288,7 @@ router.post(
 
       // Log audit
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'BULK_UPSERT',
         module: 'DATABASE',
         details: {
@@ -364,7 +364,7 @@ router.post(
 
       // Log audit for database import
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'IMPORT_DATABASE',
         module: 'DATABASE',
         details: {

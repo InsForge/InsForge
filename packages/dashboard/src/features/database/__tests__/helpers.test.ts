@@ -6,7 +6,6 @@ import {
   buildDynamicSchema,
   getDatabaseSchemaInfo,
   getInitialValues,
-  isInsForgeManagedDatabaseSchema,
   parseDatabaseTableReference,
 } from '#features/database/helpers';
 
@@ -22,11 +21,6 @@ function column(overrides: Partial<ColumnSchema>): ColumnSchema {
 }
 
 describe('database helpers', () => {
-  it('detects InsForge-managed schemas', () => {
-    expect(isInsForgeManagedDatabaseSchema('auth')).toBe(true);
-    expect(isInsForgeManagedDatabaseSchema('public')).toBe(false);
-  });
-
   it('builds schema query strings only for non-default schemas', () => {
     expect(buildDatabaseSchemaSearch(DEFAULT_DATABASE_SCHEMA)).toBe('');
     expect(buildDatabaseSchemaSearch('auth')).toBe('?schema=auth');
@@ -71,8 +65,12 @@ describe('database helpers', () => {
     expect(schema.safeParse({ id: 'ignored', name: 'Ada', age: 1 }).success).toBe(true);
   });
 
-  it('falls back schema info for unknown schemas', () => {
+  it('uses backend schema metadata for protection state and keeps unknown schemas writable by default', () => {
     expect(getDatabaseSchemaInfo(undefined, 'auth')).toEqual({
+      name: 'auth',
+      isProtected: false,
+    });
+    expect(getDatabaseSchemaInfo([{ name: 'auth', isProtected: true }], 'auth')).toEqual({
       name: 'auth',
       isProtected: true,
     });

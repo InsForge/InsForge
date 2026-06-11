@@ -27,6 +27,17 @@ BEGIN
       WHERE n.nspname = 'public'
         AND c.relkind IN ('r', 'p', 'v', 'm', 'S', 'f')
         AND pg_get_userbyid(c.relowner) <> 'project_admin'
+        -- Table-owned and identity sequences inherit ownership from ALTER TABLE.
+        -- PostgreSQL rejects changing them directly while linked to a table.
+        AND NOT (
+          c.relkind = 'S'
+          AND EXISTS (
+            SELECT 1
+            FROM pg_depend d
+            WHERE d.objid = c.oid
+              AND d.deptype IN ('a', 'i')
+          )
+        )
         AND NOT EXISTS (
           SELECT 1
           FROM pg_depend d
@@ -78,9 +89,13 @@ BEGIN
         t.typname AS object_name
       FROM pg_type t
       JOIN pg_namespace n ON n.oid = t.typnamespace
+      LEFT JOIN pg_class type_class ON type_class.oid = t.typrelid
       WHERE n.nspname = 'public'
         AND t.typtype IN ('c', 'd', 'e', 'm', 'r')
         AND pg_get_userbyid(t.typowner) <> 'project_admin'
+        -- Relation row types inherit ownership from ALTER TABLE/VIEW above.
+        -- User-created composite types are backed by relkind = 'c' and are safe.
+        AND (t.typrelid = 0 OR type_class.relkind = 'c')
         AND NOT EXISTS (
           SELECT 1
           FROM pg_depend d

@@ -15,26 +15,22 @@ interface AnalyticsSidebarProps {
 
 export function AnalyticsSidebar({ connection, projectId }: AnalyticsSidebarProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const connected = connection !== null;
 
   const items: FeatureSidebarListItem[] = [
     {
       id: 'traffic',
       label: 'Traffic',
       href: '/dashboard/analytics/traffic',
-      disabled: !connected,
     },
     {
       id: 'retention',
       label: 'User Retention',
       href: '/dashboard/analytics/retention',
-      disabled: !connected,
     },
     {
       id: 'session-replay',
       label: 'Session Replay',
       href: '/dashboard/analytics/session-replay',
-      disabled: !connected,
     },
   ];
 
@@ -44,21 +40,19 @@ export function AnalyticsSidebar({ connection, projectId }: AnalyticsSidebarProp
       label: 'Analytics Config',
       icon: Settings,
       onClick: () => setSettingsOpen(true),
-      disabled: !connected,
+      disabled: !projectId,
     },
   ];
 
   return (
     <>
       <FeatureSidebar title="Analytics" items={items} headerButtons={headerButtons} />
-      {connection && (
-        <AnalyticsConfigDialog
-          open={settingsOpen}
-          onOpenChange={setSettingsOpen}
-          connection={connection}
-          projectId={projectId}
-        />
-      )}
+      <AnalyticsConfigDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        connection={connection}
+        projectId={projectId}
+      />
     </>
   );
 }

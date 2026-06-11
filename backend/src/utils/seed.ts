@@ -1,49 +1,23 @@
-import bcrypt from 'bcryptjs';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { isCloudEnvironment, getApiBaseUrl } from '@/utils/environment.js';
 import logger from '@/utils/logger.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
-import { PaymentService } from '@/services/payments/payment.service.js';
+import { StripeSyncService } from '@/services/payments/stripe/sync.service.js';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { OAuthProvidersSchema } from '@insforge/shared-schemas';
 import { AuthConfigService } from '@/services/auth/auth-config.service.js';
-import { ADMIN_ID, ANON_ID } from '@/utils/constants.js';
+import { ANON_ID } from '@/utils/constants.js';
 
 /**
- * Seeds system users (admin and anon) if they don't exist in the database
+ * Seeds the anonymous system user if it doesn't exist in the database.
  */
-async function seedSystemUsers(adminEmail: string, adminPassword: string): Promise<void> {
+async function seedAnonUser(): Promise<void> {
   const dbManager = DatabaseManager.getInstance();
   const pool = dbManager.getPool();
   const client = await pool.connect();
 
   try {
-    // Seed admin user
-    if (adminEmail && adminPassword) {
-      const existingAdmin = await client.query('SELECT id FROM auth.users WHERE id = $1', [
-        ADMIN_ID,
-      ]);
-
-      if (existingAdmin.rows.length > 0) {
-        logger.info(`✅ Admin configured: ${adminEmail}`);
-      } else {
-        const hashedPassword = await bcrypt.hash(adminPassword, 10);
-        const profile = JSON.stringify({ name: 'Administrator' });
-
-        await client.query(
-          `INSERT INTO auth.users (id, email, password, profile, email_verified, is_project_admin, is_anonymous, created_at, updated_at)
-           VALUES ($1, $2, $3, $4::jsonb, true, true, false, NOW(), NOW())
-           ON CONFLICT (id) DO NOTHING`,
-          [ADMIN_ID, adminEmail, hashedPassword, profile]
-        );
-
-        logger.info(`✅ Admin user seeded: ${adminEmail}`);
-      }
-    } else {
-      logger.warn('⚠️ Admin credentials not configured - check ADMIN_EMAIL and ADMIN_PASSWORD');
-    }
-
     // Seed anon user
     const existingAnon = await client.query('SELECT id FROM auth.users WHERE id = $1', [ANON_ID]);
 
@@ -53,8 +27,8 @@ async function seedSystemUsers(adminEmail: string, adminPassword: string): Promi
       const profile = JSON.stringify({ name: 'Anonymous' });
 
       await client.query(
-        `INSERT INTO auth.users (id, email, password, profile, email_verified, is_project_admin, is_anonymous, created_at, updated_at)
-         VALUES ($1, $2, NULL, $3::jsonb, false, false, true, NOW(), NOW())
+        `INSERT INTO auth.users (id, email, password, profile, email_verified, is_anonymous, created_at, updated_at)
+         VALUES ($1, $2, NULL, $3::jsonb, false, true, NOW(), NOW())
          ON CONFLICT (id) DO NOTHING`,
         [ANON_ID, 'anon@example.com', profile]
       );
@@ -62,7 +36,7 @@ async function seedSystemUsers(adminEmail: string, adminPassword: string): Promi
       logger.info(`✅ Anon user seeded`);
     }
   } catch (error) {
-    logger.error('Failed to seed system users', {
+    logger.error('Failed to seed anonymous user', {
       error: error instanceof Error ? error.message : String(error),
     });
   } finally {
@@ -232,26 +206,23 @@ async function seedLocalOAuthConfigs(): Promise<void> {
   }
 }
 
-// Create api key and admin user
+// Create api key and seed startup defaults
 export async function seedBackend(): Promise<void> {
   const secretService = SecretService.getInstance();
 
   const dbManager = DatabaseManager.getInstance();
 
-  const adminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
-  const adminPassword = process.env.ADMIN_PASSWORD || 'change-this-password';
-
   try {
     logger.info(`\n🚀 Insforge Backend Starting...`);
 
-    // Seed system users (admin and anon) if not exists
-    await seedSystemUsers(adminEmail, adminPassword);
+    // Seed anonymous user if it doesn't exist. Project admins are env/cloud token sessions.
+    await seedAnonUser();
 
     // Initialize API key (from env or generate)
     const apiKey = await secretService.initializeApiKey();
 
     // Seed Stripe secret keys into the secret store so payment code has one lookup path.
-    await PaymentService.getInstance().seedStripeKeysFromEnv();
+    await StripeSyncService.getInstance().seedStripeKeysFromEnv();
 
     // Get database stats
     const tables = await dbManager.getUserTables();

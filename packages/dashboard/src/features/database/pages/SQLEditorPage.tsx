@@ -7,7 +7,7 @@ import { ExplainPlanTree } from '#features/database/components/ExplainPlanTree';
 import { X, Plus } from 'lucide-react';
 import { cn } from '#lib/utils/utils';
 
-type ResultView = 'result' | 'chart' | 'explain';
+type ResultView = 'result' | 'table' | 'explain';
 
 interface ResultsViewerProps {
   data: unknown;
@@ -160,7 +160,7 @@ export default function SQLEditorPage() {
   };
 
   const handleResultViewChange = (value: string) => {
-    if (value === 'result' || value === 'chart' || value === 'explain') {
+    if (value === 'result' || value === 'table' || value === 'explain') {
       setResultView(value);
     }
   };
@@ -341,7 +341,7 @@ export default function SQLEditorPage() {
                   </span>
                 )}
               </Tab>
-              <Tab value="chart">Chart</Tab>
+              <Tab value="table">Table View</Tab>
               <Tab value="explain">Explain</Tab>
             </Tabs>
             {/* Run Button */}
@@ -354,7 +354,7 @@ export default function SQLEditorPage() {
           <div
             className={cn(
               'flex-1 min-h-0 w-full overflow-auto bg-[rgb(var(--semantic-0))]',
-              resultView !== 'chart' && 'px-4 py-3'
+              (resultView === 'result' || resultView === 'explain') && 'px-4 py-3'
             )}
           >
             {resultView === 'explain' ? (

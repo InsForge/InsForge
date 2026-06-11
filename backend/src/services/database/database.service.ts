@@ -6,7 +6,7 @@ import type {
   DatabasePoliciesResponse,
   DatabaseTriggersResponse,
 } from '@insforge/shared-schemas';
-import { DEFAULT_DATABASE_SCHEMA, INSFORGE_MANAGED_DATABASE_SCHEMAS } from './helpers.js';
+import { DEFAULT_DATABASE_SCHEMA } from './helpers.js';
 
 export class DatabaseService {
   private static instance: DatabaseService;
@@ -22,36 +22,44 @@ export class DatabaseService {
   }
 
   /**
-   * List all non-internal schemas visible to the dashboard and flag the
-   * InsForge-managed ones as protected/read-only.
+   * List all non-internal schemas visible to the dashboard and flag schemas
+   * where project_admin cannot create objects as protected/read-only.
    */
   async getSchemas(): Promise<DatabaseSchemasResponse> {
     const pool = this.dbManager.getPool();
 
     const result = await pool.query(
       `
+        WITH visible_schemas AS (
+          SELECT
+            n.nspname AS name,
+            COALESCE(
+              has_schema_privilege(to_regrole('project_admin'), n.oid, 'CREATE'),
+              false
+            ) AS can_create
+          FROM pg_namespace n
+          WHERE n.nspname <> 'information_schema'
+            AND n.nspname NOT LIKE 'pg_%'
+        )
         SELECT
-          n.nspname AS name,
-          (n.nspname = ANY($1::text[])) AS "isProtected"
-        FROM pg_namespace n
-        WHERE n.nspname <> 'information_schema'
-          AND n.nspname NOT LIKE 'pg_%'
+          name,
+          NOT can_create AS "isProtected"
+        FROM visible_schemas
         ORDER BY
           CASE
-            WHEN n.nspname = $2 THEN 0
-            WHEN n.nspname = ANY($1::text[]) THEN 1
+            WHEN name = $1 THEN 0
+            WHEN can_create THEN 1
             ELSE 2
           END,
-          array_position($1::text[], n.nspname),
-          n.nspname
+          name
       `,
-      [INSFORGE_MANAGED_DATABASE_SCHEMAS, DEFAULT_DATABASE_SCHEMA]
+      [DEFAULT_DATABASE_SCHEMA]
     );
 
     return {
       schemas: result.rows.map((row: { name: string; isProtected: boolean }) => ({
         name: row.name,
-        isProtected: row.name !== DEFAULT_DATABASE_SCHEMA && row.isProtected,
+        isProtected: row.isProtected,
       })),
     };
   }

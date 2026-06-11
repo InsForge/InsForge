@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -15,6 +15,7 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     setupFiles: ['./tests/setup.ts'],
+    exclude: [...configDefaults.exclude, 'tests/integration/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
@@ -22,12 +23,14 @@ export default defineConfig({
     },
 
     testTimeout: 10000,
-    // Run tests sequentially to avoid database conflicts
+    // Run tests sequentially to avoid database conflicts. Vitest 4 removed
+    // poolOptions.forks.singleFork; `maxWorkers: 1` reproduces it here: a
+    // single worker runs test files one at a time. Isolation stays at its
+    // default (true) — matching v3 `singleFork: true`, which shared the fork
+    // process but still reset module state per file. (`isolate: false` is
+    // intentionally NOT set: it breaks tests that rely on per-file module
+    // resets, e.g. function-security and smtp-link-validation.)
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        singleFork: true,
-      },
-    },
+    maxWorkers: 1,
   },
 });

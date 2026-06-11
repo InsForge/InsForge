@@ -390,16 +390,67 @@ describe('DatabaseAdvanceService - admin SQL execution', () => {
     expect(releaseMock).toHaveBeenCalled();
   });
 
+  it('handles table truncate failures using savepoints in importDatabase', async () => {
+    const releaseMock = vi.fn();
+    const queryMock = vi
+      .fn()
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({}) // SET LOCAL ROLE project_admin
+      .mockResolvedValueOnce({}) // set local request.jwt.claims
+      // For the SELECT tablename query:
+      .mockResolvedValueOnce({
+        rows: [{ tablename: 'table1' }, { tablename: 'table2' }],
+      })
+      // Truncate table1:
+      .mockResolvedValueOnce({}) // SAVEPOINT truncate_attempt
+      .mockRejectedValueOnce(new Error('Truncate table1 failed (mock locked)')) // TRUNCATE TABLE table1 CASCADE (FAILS)
+      .mockResolvedValueOnce({}) // ROLLBACK TO SAVEPOINT truncate_attempt
+      .mockResolvedValueOnce({}) // RELEASE SAVEPOINT truncate_attempt (after rollback)
+      // Truncate table2:
+      .mockResolvedValueOnce({}) // SAVEPOINT truncate_attempt
+      .mockResolvedValueOnce({}) // TRUNCATE TABLE table2 CASCADE (SUCCEEDS)
+      .mockResolvedValueOnce({}) // RELEASE SAVEPOINT truncate_attempt
+      // SQL statements:
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] }) // execute imported SQL
+      // Reset context:
+      .mockResolvedValueOnce({}) // RESET ROLE
+      .mockResolvedValueOnce({}) // reset request.jwt.claims
+      .mockResolvedValueOnce({}) // NOTIFY pgrst
+      .mockResolvedValueOnce({}); // COMMIT
+
+    connectMock.mockResolvedValue({
+      query: queryMock,
+      release: releaseMock,
+    });
+
+    const service = DatabaseAdvanceService.getInstance();
+    const result = await service.importDatabase(
+      Buffer.from('INSERT INTO products (id) VALUES (1);'),
+      'seed.sql',
+      36,
+      true // truncate = true
+    );
+
+    expect(result.rowsImported).toBe(1);
+    expect(queryMock).toHaveBeenCalledWith('SAVEPOINT truncate_attempt');
+    expect(queryMock).toHaveBeenCalledWith('ROLLBACK TO SAVEPOINT truncate_attempt');
+    expect(queryMock).toHaveBeenCalledWith('RELEASE SAVEPOINT truncate_attempt');
+    expect(queryMock).toHaveBeenLastCalledWith('COMMIT');
+    expect(releaseMock).toHaveBeenCalled();
+  });
+
   it('bulk upserts under project_admin', async () => {
     const releaseMock = vi.fn();
     const queryMock = vi
       .fn()
-      .mockResolvedValueOnce({}) // SET ROLE project_admin
-      .mockResolvedValueOnce({}) // set request.jwt.claims
-      .mockResolvedValueOnce({ rowCount: 1, rows: [] }) // execute bulk upsert
-      .mockResolvedValueOnce({}) // RESET ROLE
-      .mockResolvedValueOnce({}) // reset request.jwt.claims
-      .mockResolvedValueOnce({}); // NOTIFY pgrst
+      .mockResolvedValueOnce({}) // 1. SET ROLE project_admin
+      .mockResolvedValueOnce({}) // 2. set request.jwt.claims
+      .mockResolvedValueOnce({}) // 3. BEGIN
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] }) // 4. execute bulk upsert
+      .mockResolvedValueOnce({}) // 5. NOTIFY pgrst
+      .mockResolvedValueOnce({}) // 6. COMMIT
+      .mockResolvedValueOnce({}) // 7. RESET ROLE
+      .mockResolvedValueOnce({}); // 8. reset request.jwt.claims
 
     connectMock.mockResolvedValue({
       query: queryMock,
@@ -422,15 +473,17 @@ describe('DatabaseAdvanceService - admin SQL execution', () => {
       JSON.stringify({ role: 'project_admin' }),
       false,
     ]);
-    expect(String(queryMock.mock.calls[2][0])).toContain('INSERT INTO public.profiles');
-    expect(String(queryMock.mock.calls[2][0])).toContain('ON CONFLICT (id) DO UPDATE');
-    expect(queryMock).toHaveBeenNthCalledWith(4, 'RESET ROLE');
-    expect(queryMock).toHaveBeenNthCalledWith(5, 'SELECT set_config($1, $2, $3)', [
+    expect(queryMock).toHaveBeenNthCalledWith(3, 'BEGIN');
+    expect(String(queryMock.mock.calls[3][0])).toContain('INSERT INTO public.profiles');
+    expect(String(queryMock.mock.calls[3][0])).toContain('ON CONFLICT (id) DO UPDATE');
+    expect(queryMock).toHaveBeenNthCalledWith(5, `NOTIFY pgrst, 'reload schema';`);
+    expect(queryMock).toHaveBeenNthCalledWith(6, 'COMMIT');
+    expect(queryMock).toHaveBeenNthCalledWith(7, 'RESET ROLE');
+    expect(queryMock).toHaveBeenNthCalledWith(8, 'SELECT set_config($1, $2, $3)', [
       'request.jwt.claims',
       '{}',
       false,
     ]);
-    expect(queryMock).toHaveBeenNthCalledWith(6, `NOTIFY pgrst, 'reload schema';`);
     expect(releaseMock).toHaveBeenCalled();
   });
 });

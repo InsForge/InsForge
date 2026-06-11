@@ -87,9 +87,8 @@ describe('withUserContext', () => {
     await withUserContext(
       pool,
       {
-        id: 'admin-sub',
+        id: 'local:admin',
         role: 'project_admin',
-        email: 'admin@example.com',
       },
       async () => {}
     );
@@ -98,8 +97,6 @@ describe('withUserContext', () => {
     expect(calls[2].params?.[0]).toBe('request.jwt.claims');
     expect(JSON.parse(calls[2].params![1] as string)).toEqual({
       role: 'project_admin',
-      sub: 'admin-sub',
-      email: 'admin@example.com',
     });
   });
 

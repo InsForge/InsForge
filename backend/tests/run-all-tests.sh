@@ -10,7 +10,30 @@
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+
+PREFLIGHT_ONLY=0
+
+for arg in "$@"; do
+    case "$arg" in
+        --preflight-only)
+            PREFLIGHT_ONLY=1
+            ;;
+        -h|--help)
+            echo "Usage: $0 [--preflight-only]"
+            echo ""
+            echo "Options:"
+            echo "  --preflight-only  Check local E2E prerequisites, then exit."
+            exit 0
+            ;;
+        *)
+            echo -e "${RED}Unknown option: $arg${NC}"
+            echo "Usage: $0 [--preflight-only]"
+            exit 1
+            ;;
+    esac
+done
 
 # Get the directory where this script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -34,19 +57,12 @@ echo ""
 # Export API configuration for all tests
 export TEST_API_BASE="${TEST_API_BASE:-http://localhost:7130/api}"
 
-# Check if admin credentials are set
-if [ -z "$ADMIN_EMAIL" ] || [ -z "$ADMIN_PASSWORD" ]; then
-    echo -e "${YELLOW}Warning: Admin credentials not set. Using defaults.${NC}"
-    echo "Set with: export ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD=your_password"
-    export ADMIN_EMAIL="admin@example.com"
-    export ADMIN_PASSWORD="change-this-password"
-    echo ""
-fi
-
-# Check if API key is set
-if [ -z "$ACCESS_API_KEY" ]; then
-    echo -e "${YELLOW}Warning: ACCESS_API_KEY not set. Some tests may fail.${NC}"
-    echo "Set with: export ACCESS_API_KEY=your_api_key"
+# Check if root admin credentials are set
+if [ -z "$ROOT_ADMIN_USERNAME" ] || [ -z "$ROOT_ADMIN_PASSWORD" ]; then
+    echo -e "${YELLOW}Warning: Root admin credentials not set. Using defaults.${NC}"
+    echo "Set with: export ROOT_ADMIN_USERNAME=admin ROOT_ADMIN_PASSWORD=your_password"
+    export ROOT_ADMIN_USERNAME="${ROOT_ADMIN_USERNAME:-admin}"
+    export ROOT_ADMIN_PASSWORD="${ROOT_ADMIN_PASSWORD:-change-this-password}"
     echo ""
 fi
 
@@ -56,9 +72,19 @@ if [ -z "$AWS_S3_BUCKET" ]; then
     echo ""
 fi
 
-# Export admin credentials for tests
-export TEST_ADMIN_EMAIL="$ADMIN_EMAIL"
-export TEST_ADMIN_PASSWORD="$ADMIN_PASSWORD"
+# Export root admin credentials for tests
+export TEST_ADMIN_USERNAME="$ROOT_ADMIN_USERNAME"
+export TEST_ADMIN_PASSWORD="$ROOT_ADMIN_PASSWORD"
+
+. "$SCRIPT_DIR/preflight.sh"
+
+if ! run_preflight; then
+    exit 1
+fi
+
+if [ "$PREFLIGHT_ONLY" -eq 1 ]; then
+    exit 0
+fi
 
 # Keep track of test results
 TOTAL_TESTS=0

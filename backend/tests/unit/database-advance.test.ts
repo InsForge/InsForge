@@ -1,4 +1,4 @@
-import { describe, test, expect } from 'vitest';
+import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { DatabaseAdvanceService } from '../../src/services/database/database-advance.service';
 import { AppError } from '../../src/utils/errors';
 import { ERROR_CODES } from '@insforge/shared-schemas';
@@ -91,5 +91,178 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
     for (const query of queries) {
       expect(() => service.sanitizeQuery(query)).not.toThrow();
     }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// bulkInsert — optional-column data-loss fix (issue #8)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const { mockClientQuery, mockRelease, mockConnect } = vi.hoisted(() => ({
+  mockClientQuery: vi.fn(),
+  mockRelease: vi.fn(),
+  mockConnect: vi.fn(),
+}));
+
+vi.mock('../../src/infra/database/database.manager', () => ({
+  DatabaseManager: {
+    getInstance: vi.fn(() => ({
+      getPool: vi.fn(() => ({
+        query: vi.fn(),
+        connect: mockConnect,
+      })),
+    })),
+  },
+}));
+
+describe('DatabaseAdvanceService - bulkInsert optional-column fix', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // pool.connect() returns a pg client with query + release
+    mockConnect.mockResolvedValue({
+      query: mockClientQuery,
+      release: mockRelease,
+    });
+    // Default: all queries succeed
+    mockClientQuery.mockResolvedValue({ rows: [], rowCount: 2 });
+  });
+
+  /** Helper: find all INSERT SQL queries executed */
+  function captureAllInsertSql(): string[] {
+    return mockClientQuery.mock.calls
+      .map(([sql]) => sql as string)
+      .filter((sql) => typeof sql === 'string' && sql.startsWith('INSERT INTO'));
+  }
+
+  test('groups records by shape and executes shape-coherent batch queries', async () => {
+    const svc = DatabaseAdvanceService.getInstance();
+
+    await svc.bulkInsert('public', 'contacts', [
+      { id: '1', name: 'Alice' },
+      { id: '2', name: 'Bob', phone: '555-0001' },
+      { id: '3', name: 'Carol', phone: '555-0002' },
+    ]);
+
+    const sqlQueries = captureAllInsertSql();
+    expect(sqlQueries).toHaveLength(2);
+
+    // First query (Alice) has no phone
+    const query1 = sqlQueries[0];
+    expect(query1).toContain('id');
+    expect(query1).toContain('name');
+    expect(query1).not.toContain('phone');
+    expect(query1).toContain('Alice');
+
+    // Second query (Bob and Carol) has phone
+    const query2 = sqlQueries[1];
+    expect(query2).toContain('id');
+    expect(query2).toContain('name');
+    expect(query2).toContain('phone');
+    expect(query2).toContain('555-0001');
+    expect(query2).toContain('555-0002');
+  });
+
+  test('explicit undefined values are converted to NULL', async () => {
+    const svc = DatabaseAdvanceService.getInstance();
+
+    await svc.bulkInsert('public', 'contacts', [{ id: '1', name: 'Alice', phone: undefined }]);
+
+    const sqlQueries = captureAllInsertSql();
+    expect(sqlQueries).toHaveLength(1);
+    expect(sqlQueries[0]).toContain('phone');
+    expect(sqlQueries[0]).not.toContain('undefined');
+    expect(sqlQueries[0]).toContain('NULL');
+  });
+
+  test('uniform records (all same columns) still work correctly', async () => {
+    const svc = DatabaseAdvanceService.getInstance();
+
+    await svc.bulkInsert('public', 'contacts', [
+      { id: '1', name: 'Alice', phone: '555-0001' },
+      { id: '2', name: 'Bob', phone: '555-0002' },
+    ]);
+
+    const sqlQueries = captureAllInsertSql();
+    expect(sqlQueries).toHaveLength(1);
+    const sql = sqlQueries[0];
+    expect(sql).toContain('id');
+    expect(sql).toContain('name');
+    expect(sql).toContain('phone');
+    expect(sql).toContain('555-0001');
+    expect(sql).toContain('555-0002');
+  });
+
+  test('throws AppError when records array is empty', async () => {
+    const svc = DatabaseAdvanceService.getInstance();
+    await expect(svc.bulkInsert('public', 'contacts', [])).rejects.toBeInstanceOf(AppError);
+  });
+
+  test('upsert: optional column from later records is included in ON CONFLICT SET for its group', async () => {
+    const svc = DatabaseAdvanceService.getInstance();
+
+    await svc.bulkInsert(
+      'public',
+      'contacts',
+      [
+        { id: '1', name: 'Alice' },
+        { id: '2', name: 'Bob', phone: '555-0001' },
+      ],
+      'id'
+    );
+
+    const sqlQueries = captureAllInsertSql();
+    expect(sqlQueries).toHaveLength(2);
+
+    const query1 = sqlQueries[0]; // Alice: keys ['id', 'name']
+    expect(query1).toContain('ON CONFLICT');
+    expect(query1).toContain('DO UPDATE SET');
+    expect(query1).toContain('name = EXCLUDED.name');
+    expect(query1).not.toContain('phone');
+
+    const query2 = sqlQueries[1]; // Bob: keys ['id', 'name', 'phone']
+    expect(query2).toContain('ON CONFLICT');
+    expect(query2).toContain('DO UPDATE SET');
+    expect(query2).toContain('name = EXCLUDED.name');
+    expect(query2).toContain('phone = EXCLUDED.phone');
+  });
+
+  test('explicit null values are preserved in the SQL', async () => {
+    const svc = DatabaseAdvanceService.getInstance();
+
+    await svc.bulkInsert('public', 'contacts', [{ id: '1', name: 'Alice', phone: null }]);
+
+    const sqlQueries = captureAllInsertSql();
+    expect(sqlQueries).toHaveLength(1);
+    expect(sqlQueries[0]).toContain('phone');
+    expect(sqlQueries[0]).toContain('NULL');
+  });
+
+  test('rolls back entire transaction if one shape group insert fails', async () => {
+    const svc = DatabaseAdvanceService.getInstance();
+
+    mockClientQuery.mockReset();
+    mockClientQuery
+      .mockResolvedValueOnce({}) // SET ROLE project_admin
+      .mockResolvedValueOnce({}) // set_config claims
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 }) // First INSERT (Alice)
+      .mockRejectedValueOnce(new Error('Constraint violation on second group')) // Second INSERT (Bob)
+      .mockResolvedValueOnce({}) // ROLLBACK
+      .mockResolvedValueOnce({}) // RESET ROLE
+      .mockResolvedValueOnce({}); // set_config empty claims
+
+    const records = [
+      { id: '1', name: 'Alice' },
+      { id: '2', name: 'Bob', phone: '555-0001' },
+    ];
+
+    await expect(svc.bulkInsert('public', 'contacts', records)).rejects.toThrow(
+      'Constraint violation on second group'
+    );
+
+    const calls = mockClientQuery.mock.calls.map(([sql]) => sql);
+    expect(calls).toContain('BEGIN');
+    expect(calls).toContain('ROLLBACK');
+    expect(calls).not.toContain('COMMIT');
   });
 });

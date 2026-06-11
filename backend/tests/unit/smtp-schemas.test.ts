@@ -187,7 +187,7 @@ describe('Email Template Request Schema', () => {
 describe('SMTP Config Response Schema', () => {
   it('validates a response with hasPassword boolean', () => {
     const result = smtpConfigSchema.safeParse({
-      id: '00000000-0000-0000-0000-000000000001',
+      id: '11111111-1111-4111-8111-111111111111',
       enabled: true,
       host: 'smtp.gmail.com',
       port: 465,
@@ -206,7 +206,7 @@ describe('SMTP Config Response Schema', () => {
 describe('Email Template Schema', () => {
   it('validates a template record', () => {
     const result = emailTemplateSchema.safeParse({
-      id: '00000000-0000-0000-0000-000000000001',
+      id: '11111111-1111-4111-8111-111111111111',
       templateType: 'email-verification-code',
       subject: 'Verify your email',
       bodyHtml: '<p>Code: {{ token }}</p>',
@@ -262,7 +262,7 @@ describe('SMTP in admin/public metadata response', () => {
   it('admin smtp slice has no id / createdAt / updatedAt (rendering metadata)', () => {
     const withRowMetadata = {
       ...adminSmtpSlice,
-      id: '00000000-0000-0000-0000-000000000001',
+      id: '11111111-1111-4111-8111-111111111111',
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: '2026-01-01T00:00:00Z',
     };

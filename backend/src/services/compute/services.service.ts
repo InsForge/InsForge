@@ -4,8 +4,8 @@ import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 import { FlyProvider } from '@/providers/compute/fly.provider.js';
 import { CloudComputeProvider } from '@/providers/compute/cloud.provider.js';
-import type { ComputeProvider } from '@/providers/compute/compute.provider.js';
-import { config } from '@/infra/config/app.config.js';
+import type { ComputeProvider, ComputeLogsResult } from '@/providers/compute/compute.provider.js';
+import { appConfig } from '@/infra/config/app.config.js';
 import { AppError } from '@/utils/errors.js';
 import logger from '@/utils/logger.js';
 import {
@@ -33,6 +33,12 @@ export interface CreateServiceInput {
   memory: number;
   region: string;
   envVars?: Record<string, string>;
+  /**
+   * Edge protocol — `'http'` (default) for HTTP/HTTPS edge handlers,
+   * `'tcp'` for raw TCP (Redis, Postgres wire protocol, etc.). Optional;
+   * the DB column defaults to `'http'`.
+   */
+  protocol?: 'http' | 'tcp';
 }
 
 export interface UpdateServiceInput {
@@ -53,6 +59,8 @@ export interface UpdateServiceInput {
    * GET path doesn't return env values, so the merge has to happen here).
    */
   envVarsPatch?: { set?: Record<string, string>; unset?: string[] };
+  /** Edge protocol — same semantics as CreateServiceInput.protocol. */
+  protocol?: 'http' | 'tcp';
 }
 
 /**
@@ -71,6 +79,7 @@ export interface DeletedServiceSnapshot {
   cpu: string;
   memory: number;
   region: string;
+  protocol: 'http' | 'tcp';
   flyAppId: string | null;
   flyMachineId: string | null;
   endpointUrl: string | null;
@@ -87,6 +96,11 @@ interface ServiceRow {
   cpu: string;
   memory: number;
   region: string;
+  // Backfilled to 'http' for pre-INS-271 rows by the 047 migration, NOT NULL
+  // going forward. Older self-hosters who somehow have a row without the
+  // column will see undefined here; mapRowToSchema normalizes to 'http' so the
+  // response shape's required `protocol` field never goes out as undefined.
+  protocol: 'http' | 'tcp';
   fly_app_id: string | null;
   fly_machine_id: string | null;
   status: string;
@@ -106,6 +120,11 @@ function mapRowToSchema(row: ServiceRow): ServiceSchema {
     cpu: row.cpu as ServiceSchema['cpu'],
     memory: row.memory,
     region: row.region,
+    // Defense-in-depth: the migration backfills + sets NOT NULL DEFAULT 'http',
+    // but if a downstream consumer fetches a row from a pre-migration DB the
+    // serviceSchema would reject `undefined`. Fall back to 'http' so a stale
+    // schema doesn't break the response.
+    protocol: (row.protocol ?? 'http') as ServiceSchema['protocol'],
     flyAppId: row.fly_app_id,
     flyMachineId: row.fly_machine_id,
     status: row.status as ServiceSchema['status'],
@@ -158,7 +177,7 @@ function makeNetwork(): string {
 // we return a URL that actually resolves instead of a vanity domain the operator
 // doesn't control.
 function makeEndpointUrl(flyAppName: string): string {
-  const domain = config.fly.domain || 'fly.dev';
+  const domain = appConfig.fly.domain || 'fly.dev';
   return `https://${flyAppName}.${domain}`;
 }
 
@@ -203,7 +222,7 @@ export function selectComputeProvider(): ComputeProvider {
   // (PROJECT_ID + CLOUD_API_HOST + JWT_SECRET all present).
   const fly = FlyProvider.getInstance();
   if (fly.isConfigured()) {
-    if (!config.fly.org) {
+    if (!appConfig.fly.org) {
       // FLY_ORG used to default to "insforge" — our internal org. Operators
       // who copied .env.example verbatim got opaque "unauthorized" errors
       // from Fly. Warn loudly at provider selection time instead.
@@ -329,8 +348,8 @@ export class ComputeServicesService {
     let insertResult;
     try {
       insertResult = await this.getPool().query(
-        `INSERT INTO compute.services (project_id, name, image_url, port, cpu, memory, region, env_vars_encrypted, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'creating')
+        `INSERT INTO compute.services (project_id, name, image_url, port, cpu, memory, region, protocol, env_vars_encrypted, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'creating')
          RETURNING *`,
         [
           input.projectId,
@@ -340,6 +359,7 @@ export class ComputeServicesService {
           input.cpu,
           input.memory,
           input.region,
+          input.protocol ?? 'http',
           envVarsEncrypted,
         ]
       );
@@ -365,7 +385,7 @@ export class ComputeServicesService {
       await fly.createApp({
         name: flyAppName,
         network,
-        org: config.fly.org,
+        org: appConfig.fly.org,
       });
 
       const { machineId } = await fly.launchMachine({
@@ -376,6 +396,7 @@ export class ComputeServicesService {
         memory: input.memory,
         envVars: input.envVars ?? {},
         region: input.region,
+        protocol: input.protocol,
       });
       flyMachineId = machineId;
 
@@ -444,8 +465,8 @@ export class ComputeServicesService {
     let insertResult;
     try {
       insertResult = await this.getPool().query(
-        `INSERT INTO compute.services (project_id, name, image_url, port, cpu, memory, region, env_vars_encrypted, fly_app_id, endpoint_url, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'deploying')
+        `INSERT INTO compute.services (project_id, name, image_url, port, cpu, memory, region, protocol, env_vars_encrypted, fly_app_id, endpoint_url, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'deploying')
          RETURNING *`,
         [
           input.projectId,
@@ -455,6 +476,7 @@ export class ComputeServicesService {
           input.cpu,
           input.memory,
           input.region,
+          input.protocol ?? 'http',
           envVarsEncrypted,
           flyAppName,
           endpointUrl,
@@ -473,7 +495,7 @@ export class ComputeServicesService {
 
     // Create Fly app (no machine — flyctl deploy will create it)
     try {
-      await fly.createApp({ name: flyAppName, network, org: config.fly.org });
+      await fly.createApp({ name: flyAppName, network, org: appConfig.fly.org });
     } catch (error) {
       // App might already exist from a previous deploy attempt — ignore "already exists"
       const msg = error instanceof Error ? error.message : '';
@@ -580,6 +602,10 @@ export class ComputeServicesService {
       updates.push(`env_vars_encrypted = $${paramIdx++}`);
       values.push(EncryptionManager.encrypt(JSON.stringify(data.envVars)));
     }
+    if (data.protocol !== undefined) {
+      updates.push(`protocol = $${paramIdx++}`);
+      values.push(data.protocol);
+    }
 
     if (updates.length === 0) {
       return existing;
@@ -587,7 +613,9 @@ export class ComputeServicesService {
 
     // If deployment-affecting fields changed and a machine exists, update Fly FIRST.
     // Only commit to DB after Fly accepts the new config to avoid stale DB state.
-    const deployFields = ['imageUrl', 'port', 'cpu', 'memory', 'envVars'] as const;
+    // `protocol` is a deploy field — switching http<->tcp swaps the Fly edge
+    // handlers entirely, so it has to propagate to Fly to take effect.
+    const deployFields = ['imageUrl', 'port', 'cpu', 'memory', 'envVars', 'protocol'] as const;
     const hasDeployChange = deployFields.some((f) => data[f] !== undefined);
 
     // env_vars merge is needed by both Fly-touching branches (updateMachine
@@ -622,6 +650,7 @@ export class ComputeServicesService {
           cpu: data.cpu ?? existing.cpu,
           memory: data.memory ?? existing.memory,
           envVars: mergedEnvVars ?? {},
+          protocol: data.protocol ?? existing.protocol,
         });
         logger.info('Compute service machine updated', { id });
       } catch (error) {
@@ -641,6 +670,7 @@ export class ComputeServicesService {
           memory: data.memory ?? existing.memory,
           envVars: mergedEnvVars ?? {},
           region: data.region ?? existing.region,
+          protocol: data.protocol ?? existing.protocol,
         });
         justLaunchedMachineId = machineId;
         // Persist machine id + flip status alongside the field updates below.
@@ -783,6 +813,7 @@ export class ComputeServicesService {
       cpu: row.cpu,
       memory: row.memory,
       region: row.region,
+      protocol: (row.protocol ?? 'http') as 'http' | 'tcp',
       flyAppId: row.fly_app_id,
       flyMachineId: row.fly_machine_id,
       endpointUrl: row.endpoint_url,
@@ -889,6 +920,29 @@ export class ComputeServicesService {
     }
 
     return this.getCompute().getEvents(svc.flyAppId, svc.flyMachineId, options);
+  }
+
+  /**
+   * Fetch container stdout/stderr ("application logs") for a service. Resolves
+   * the service's Fly app + machine, then delegates to the active compute
+   * provider. Throws 404 if the service has not been launched yet.
+   */
+  async getServiceLogs(
+    id: string,
+    options?: { limit?: number; nextToken?: string }
+  ): Promise<ComputeLogsResult> {
+    const svc = await this.getService(id);
+
+    if (!svc.flyAppId || !svc.flyMachineId) {
+      throw new AppError(
+        'Service not found',
+        404,
+        ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND,
+        NEXT_ACTIONS.CHECK_COMPUTE_SERVICE_EXISTS
+      );
+    }
+
+    return this.getCompute().getLogs(svc.flyAppId, svc.flyMachineId, options);
   }
 
   private decryptEnvVars(encrypted: string | null): Record<string, string> {

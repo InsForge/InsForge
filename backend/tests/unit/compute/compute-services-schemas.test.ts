@@ -89,6 +89,59 @@ describe('createServiceSchema', () => {
     });
     expect(result.success).toBe(false);
   });
+
+  // INS-271: --protocol tcp flag for raw TCP services (Redis,
+  // Postgres-wire-protocol). Without the schema accepting this field, the OSS
+  // would silently strip it before forwarding to the cloud-backend.
+  it('accepts protocol: tcp', () => {
+    const result = createServiceSchema.safeParse({
+      name: 'my-redis',
+      imageUrl: 'redis:7',
+      port: 6379,
+      protocol: 'tcp',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.protocol).toBe('tcp');
+    }
+  });
+
+  it('accepts protocol: http (explicit)', () => {
+    const result = createServiceSchema.safeParse({
+      name: 'my-api',
+      imageUrl: 'node:20',
+      port: 8080,
+      protocol: 'http',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.protocol).toBe('http');
+    }
+  });
+
+  it('omitting protocol is valid (back-compat default applied downstream)', () => {
+    const result = createServiceSchema.safeParse({
+      name: 'my-api',
+      imageUrl: 'node:20',
+      port: 8080,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      // The schema itself leaves it undefined; services.service.ts is what
+      // falls back to 'http' at INSERT/Fly-call time.
+      expect(result.data.protocol).toBeUndefined();
+    }
+  });
+
+  it('rejects unknown protocol values (udp, sctp, etc.)', () => {
+    const result = createServiceSchema.safeParse({
+      name: 'my-svc',
+      imageUrl: 'node:20',
+      port: 8080,
+      protocol: 'udp',
+    });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe('listServicesResponseSchema', () => {
@@ -150,6 +203,19 @@ describe('updateServiceSchema', () => {
       envVars: { ALL: 'replace' },
       envVarsPatch: { set: { ONE: 'merge' } },
     });
+    expect(result.success).toBe(false);
+  });
+
+  // INS-271: protocol is updateable on existing services (rare — usually you'd
+  // delete + redeploy — but the schema must accept it so CLI's update path
+  // doesn't strip it).
+  it('accepts protocol: tcp on update', () => {
+    const result = updateServiceSchema.safeParse({ protocol: 'tcp' });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects invalid protocol on update', () => {
+    const result = updateServiceSchema.safeParse({ protocol: 'quic' });
     expect(result.success).toBe(false);
   });
 });

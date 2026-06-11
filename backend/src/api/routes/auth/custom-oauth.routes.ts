@@ -105,7 +105,7 @@ router.post(
 
       const config = await customOAuthConfigService.createConfig(validationResult.data);
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'CREATE_CUSTOM_OAUTH_CONFIG',
         module: 'AUTH',
         details: {
@@ -149,7 +149,7 @@ router.put(
 
       const config = await customOAuthConfigService.updateConfig(key, validationResult.data);
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'UPDATE_CUSTOM_OAUTH_CONFIG',
         module: 'AUTH',
         details: {
@@ -184,7 +184,7 @@ router.delete(
         );
       }
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'DELETE_CUSTOM_OAUTH_CONFIG',
         module: 'AUTH',
         details: {
@@ -227,11 +227,8 @@ router.get('/:key', async (req: Request, res: Response, next: NextFunction) => {
       );
     }
 
-    const { redirect_uri, code_challenge } = queryValidation.data;
+    const { redirect_uri, code_challenge, ...additionalParams } = queryValidation.data;
     const redirectUri = redirect_uri;
-    if (!redirectUri) {
-      throw new AppError('Redirect URI is required', 400, ERROR_CODES.INVALID_INPUT);
-    }
 
     if (!(await authConfigService.validateRedirectUrl(redirectUri))) {
       throw new AppError(
@@ -253,7 +250,7 @@ router.get('/:key', async (req: Request, res: Response, next: NextFunction) => {
       { algorithm: 'HS256', expiresIn: '1h' }
     );
 
-    const authUrl = await customOAuthProvider.generateOAuthUrl(key, state);
+    const authUrl = await customOAuthProvider.generateOAuthUrl(key, state, additionalParams);
     successResponse(res, { authUrl });
   } catch (error) {
     logger.error('Custom OAuth init failed', { error, key: req.params.key });

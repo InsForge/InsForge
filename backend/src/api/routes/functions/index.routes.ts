@@ -70,10 +70,10 @@ router.post(
 
       // Log audit event
       logger.info(
-        `Function ${result.function.name} (${result.function.slug}) created by ${req.user?.email}`
+        `Function ${result.function.name} (${result.function.slug}) created by ${req.hasApiKey ? 'api-key' : req.user?.id}`
       );
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'CREATE_FUNCTION',
         module: 'FUNCTIONS',
         details: {
@@ -132,9 +132,9 @@ router.put(
       }
 
       // Log audit event
-      logger.info(`Function ${slug} updated by ${req.user?.email}`);
+      logger.info(`Function ${slug} updated by ${req.hasApiKey ? 'api-key' : req.user?.id}`);
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'UPDATE_FUNCTION',
         module: 'FUNCTIONS',
         details: {
@@ -181,9 +181,9 @@ router.delete(
       }
 
       // Log audit event
-      logger.info(`Function ${slug} deleted by ${req.user?.email}`);
+      logger.info(`Function ${slug} deleted by ${req.hasApiKey ? 'api-key' : req.user?.id}`);
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'DELETE_FUNCTION',
         module: 'FUNCTIONS',
         details: {

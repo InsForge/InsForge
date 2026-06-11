@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AppError } from '../../src/utils/errors';
 import {
-  assertWritableDatabaseSchema,
   buildQualifiedTableKey,
   isInternalDashboardSchema,
   normalizeDatabaseSchemaName,
@@ -39,13 +38,6 @@ describe('database helpers', () => {
 
   it('rejects malformed qualified table references', () => {
     expect(() => splitQualifiedTableReference('too.many.parts')).toThrow(AppError);
-  });
-
-  it('marks insforge managed schemas as read only', () => {
-    expect(() => assertWritableDatabaseSchema('auth')).toThrow(AppError);
-    expect(() => assertWritableDatabaseSchema('cron')).toThrow(AppError);
-    expect(() => assertWritableDatabaseSchema('payments')).toThrow(AppError);
-    expect(() => assertWritableDatabaseSchema('public')).not.toThrow();
   });
 
   it('formats qualified names and cache keys consistently', () => {

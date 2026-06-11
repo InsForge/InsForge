@@ -131,7 +131,7 @@ export default function DeploymentLogsPage() {
       <div className="flex flex-col gap-6 p-4">
         {/* Title */}
         <h1 className="text-xl font-semibold text-zinc-950 dark:text-white tracking-[-0.1px]">
-          Deployment Log
+          Deployment Logs
         </h1>
 
         {/* Filters Row */}
