@@ -102,36 +102,6 @@ const getRecordValue = (value: unknown, key: string): unknown => {
   return (value as Record<string, unknown>)[key];
 };
 
-const toColumnType = (value: unknown): ColumnType => {
-  const columnTypes = new Set<string>(Object.values(ColumnType));
-  return typeof value === 'string' && columnTypes.has(value)
-    ? (value as ColumnType)
-    : ColumnType.STRING;
-};
-
-const toOptionalString = (value: unknown): string => {
-  return typeof value === 'string' ? value : '';
-};
-
-const toOptionalBoolean = (value: unknown, fallback: boolean): boolean => {
-  return typeof value === 'boolean' ? value : fallback;
-};
-
-const toColumnFromSnapshot = (snapshot: unknown): TableFormColumnSchema => {
-  const columnType = getRecordValue(snapshot, 'type') ?? getRecordValue(snapshot, 'columnType');
-
-  return {
-    columnName: toOptionalString(getRecordValue(snapshot, 'columnName')),
-    type: toColumnType(columnType),
-    defaultValue: toOptionalString(getRecordValue(snapshot, 'defaultValue')),
-    isPrimaryKey: toOptionalBoolean(getRecordValue(snapshot, 'isPrimaryKey'), false),
-    isNullable: toOptionalBoolean(getRecordValue(snapshot, 'isNullable'), true),
-    isUnique: toOptionalBoolean(getRecordValue(snapshot, 'isUnique'), false),
-    isSystemColumn: false,
-    isNewColumn: true,
-  };
-};
-
 const hasColumnDraftData = (column: TableFormColumnSchema): boolean => {
   return (
     column.columnName.trim().length > 0 ||
@@ -163,18 +133,6 @@ const readTableFormCreateDraft = (
       getTableFormCreateDraftStorageKey(draftScope, schemaName)
     );
 
-    if (Array.isArray(parsedValue)) {
-      return {
-        schemaName: '',
-        tableName: '',
-        columns: [
-          ...createDefaultColumns().filter((column) => column.isSystemColumn),
-          ...parsedValue.map(toColumnFromSnapshot),
-        ],
-        foreignKeys: [],
-      };
-    }
-
     const schemaNameValue = getRecordValue(parsedValue, 'schemaName');
     const foreignKeysValue = getRecordValue(parsedValue, 'foreignKeys');
     const formDraft = tableFormSchema.safeParse(parsedValue);
@@ -197,23 +155,6 @@ const readTableFormCreateDraft = (
   } catch {
     return null;
   }
-};
-
-export const hasRestorableTableFormCreateDraft = (
-  draftScope?: string,
-  schemaName?: string
-): boolean => {
-  const draft = readTableFormCreateDraft(draftScope, schemaName);
-
-  if (!draft) {
-    return false;
-  }
-
-  if (schemaName && draft.schemaName && draft.schemaName !== schemaName) {
-    return false;
-  }
-
-  return hasCreateDraftData(draft);
 };
 
 export const clearTableFormCreateDraft = (draftScope?: string, schemaName?: string) => {

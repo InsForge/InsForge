@@ -1,9 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { ColumnType } from '@insforge/shared-schemas';
-import {
-  getTableFormCreateDraftStorageKey,
-  hasRestorableTableFormCreateDraft,
-} from '#features/database/components/TableForm';
+import { getTableFormCreateDraftStorageKey } from '#features/database/components/TableForm';
 
 const createDraft = (schemaName: string) =>
   JSON.stringify({
@@ -38,32 +35,5 @@ describe('TableForm draft storage', () => {
     expect(getTableFormCreateDraftStorageKey('project:project-a', 'public')).not.toBe(
       getTableFormCreateDraftStorageKey('project:project-a', 'custom')
     );
-  });
-
-  it('does not restore drafts written for another project with the same schema name', () => {
-    const projectADraftKey = getTableFormCreateDraftStorageKey('project:project-a', 'public');
-    if (!projectADraftKey) {
-      throw new Error('Expected project draft key');
-    }
-
-    window.localStorage.setItem(projectADraftKey, createDraft('public'));
-
-    expect(hasRestorableTableFormCreateDraft('project:project-a', 'public')).toBe(true);
-    expect(hasRestorableTableFormCreateDraft('project:project-b', 'public')).toBe(false);
-  });
-
-  it('does not restore drafts written for another schema in the same project', () => {
-    const publicDraftKey = getTableFormCreateDraftStorageKey('project:project-a', 'public');
-
-    window.localStorage.setItem(publicDraftKey, createDraft('public'));
-
-    expect(hasRestorableTableFormCreateDraft('project:project-a', 'public')).toBe(true);
-    expect(hasRestorableTableFormCreateDraft('project:project-a', 'custom')).toBe(false);
-  });
-
-  it('ignores the legacy unscoped draft key', () => {
-    window.localStorage.setItem('table-form-columns-draft', createDraft('public'));
-
-    expect(hasRestorableTableFormCreateDraft('project:project-a', 'public')).toBe(false);
   });
 });
