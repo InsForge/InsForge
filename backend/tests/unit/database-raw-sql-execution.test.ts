@@ -112,12 +112,13 @@ describe('DatabaseAdvanceService - admin SQL execution', () => {
     expect(queryMock).not.toHaveBeenCalledWith('RESET ROLE');
   });
 
-  it('executes read-only SQL explain under project_admin', async () => {
+  it('runs read-only SQL explain inside a rolled-back transaction', async () => {
     const queryMock = vi
       .fn()
       .mockResolvedValueOnce({}) // SET statement_timeout
-      .mockResolvedValueOnce({}) // SET ROLE project_admin
-      .mockResolvedValueOnce({}) // set request.jwt.claims
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({}) // SET LOCAL ROLE project_admin
+      .mockResolvedValueOnce({}) // set local request.jwt.claims
       .mockResolvedValueOnce({
         rows: [
           {
@@ -147,6 +148,7 @@ describe('DatabaseAdvanceService - admin SQL execution', () => {
       })
       .mockResolvedValueOnce({}) // RESET ROLE
       .mockResolvedValueOnce({}) // reset request.jwt.claims
+      .mockResolvedValueOnce({}) // ROLLBACK
       .mockResolvedValueOnce({}); // reset statement_timeout
 
     connectMock.mockResolvedValue({
@@ -175,13 +177,23 @@ describe('DatabaseAdvanceService - admin SQL execution', () => {
       planningTime: 0.25,
       executionTime: 0.5,
       totalQueryTime: 0.75,
-      rolledBack: false,
+      rolledBack: true,
     });
+    expect(queryMock).toHaveBeenNthCalledWith(1, 'SET statement_timeout = 30000');
+    expect(queryMock).toHaveBeenNthCalledWith(2, 'BEGIN');
+    expect(queryMock).toHaveBeenNthCalledWith(3, 'SET LOCAL ROLE project_admin');
+    expect(queryMock).toHaveBeenNthCalledWith(4, 'SELECT set_config($1, $2, $3)', [
+      'request.jwt.claims',
+      JSON.stringify({ role: 'project_admin' }),
+      true,
+    ]);
     expect(queryMock).toHaveBeenNthCalledWith(
-      4,
+      5,
       'EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) SELECT * FROM products',
       []
     );
+    expect(queryMock).toHaveBeenNthCalledWith(8, 'ROLLBACK');
+    expect(queryMock).toHaveBeenNthCalledWith(9, 'SET statement_timeout = 0');
   });
 
   it('runs mutating SQL explain inside a rolled-back transaction', async () => {
@@ -259,6 +271,68 @@ describe('DatabaseAdvanceService - admin SQL execution', () => {
     expect(queryMock).toHaveBeenNthCalledWith(9, 'SET statement_timeout = 0');
   });
 
+  it('runs writable CTE SQL explain inside a rolled-back transaction', async () => {
+    const queryMock = vi
+      .fn()
+      .mockResolvedValueOnce({}) // SET statement_timeout
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({}) // SET LOCAL ROLE project_admin
+      .mockResolvedValueOnce({}) // set local request.jwt.claims
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            'QUERY PLAN': [
+              {
+                Plan: {
+                  'Node Type': 'CTE Scan',
+                  'Startup Cost': 0,
+                  'Total Cost': 10,
+                  'Plan Rows': 1,
+                  'Actual Total Time': 0.04,
+                  'Actual Rows': 1,
+                },
+                'Execution Time': 0.07,
+              },
+            ],
+          },
+        ],
+        rowCount: 1,
+        fields: [],
+      })
+      .mockResolvedValueOnce({}) // RESET ROLE
+      .mockResolvedValueOnce({}) // reset request.jwt.claims
+      .mockResolvedValueOnce({}) // ROLLBACK
+      .mockResolvedValueOnce({}); // reset statement_timeout
+
+    connectMock.mockResolvedValue({
+      query: queryMock,
+      release: vi.fn(),
+    });
+
+    const service = DatabaseAdvanceService.getInstance();
+    const statement =
+      'WITH deleted AS (DELETE FROM products WHERE id = $1 RETURNING *) SELECT * FROM deleted';
+    const result = await service.explainSQL(statement, [1]);
+
+    expect(result.rolledBack).toBe(true);
+    expect(result.plan.nodeType).toBe('CTE Scan');
+    expect(queryMock).toHaveBeenNthCalledWith(1, 'SET statement_timeout = 30000');
+    expect(queryMock).toHaveBeenNthCalledWith(2, 'BEGIN');
+    expect(queryMock).toHaveBeenNthCalledWith(3, 'SET LOCAL ROLE project_admin');
+    expect(queryMock).toHaveBeenNthCalledWith(4, 'SELECT set_config($1, $2, $3)', [
+      'request.jwt.claims',
+      JSON.stringify({ role: 'project_admin' }),
+      true,
+    ]);
+    expect(queryMock).toHaveBeenNthCalledWith(
+      5,
+      `EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) ${statement}`,
+      [1]
+    );
+    expect(queryMock).toHaveBeenNthCalledWith(8, 'ROLLBACK');
+    expect(queryMock).toHaveBeenNthCalledWith(9, 'SET statement_timeout = 0');
+  });
+
   it('rejects multi-statement SQL explain before opening a database connection', async () => {
     const service = DatabaseAdvanceService.getInstance();
 
@@ -271,31 +345,15 @@ describe('DatabaseAdvanceService - admin SQL execution', () => {
     expect(connectMock).not.toHaveBeenCalled();
   });
 
-  it('surfaces postgres syntax errors from SQL explain', async () => {
-    const syntaxError = new Error('syntax error at or near "SELEC"');
-    const queryMock = vi
-      .fn()
-      .mockResolvedValueOnce({}) // SET statement_timeout
-      .mockResolvedValueOnce({}) // SET ROLE project_admin
-      .mockResolvedValueOnce({}) // set request.jwt.claims
-      .mockRejectedValueOnce(syntaxError) // execute EXPLAIN
-      .mockResolvedValueOnce({}) // RESET ROLE
-      .mockResolvedValueOnce({}) // reset request.jwt.claims
-      .mockResolvedValueOnce({}); // reset statement_timeout
-
-    connectMock.mockResolvedValue({
-      query: queryMock,
-      release: vi.fn(),
-    });
-
+  it('rejects unparseable SQL explain before opening a database connection', async () => {
     const service = DatabaseAdvanceService.getInstance();
-    await expect(service.explainSQL('SELEC * FROM products')).rejects.toBe(syntaxError);
 
-    expect(queryMock).toHaveBeenNthCalledWith(
-      4,
-      'EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) SELEC * FROM products',
-      []
-    );
+    await expect(service.explainSQL('SELEC * FROM products')).rejects.toMatchObject({
+      message: 'Query could not be parsed and was rejected for security reasons.',
+      statusCode: 403,
+      code: ERROR_CODES.FORBIDDEN,
+    });
+    expect(connectMock).not.toHaveBeenCalled();
   });
 
   it('returns healthy clients to the pool after ordinary SQL errors', async () => {

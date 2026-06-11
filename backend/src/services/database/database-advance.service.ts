@@ -18,11 +18,6 @@ import { parse } from 'csv-parse/sync';
 import { type PoolClient, type QueryResult } from 'pg';
 import { withAdminContext } from './user-context.service.js';
 
-const EXPLAIN_PARSE_GUARD_ERROR =
-  'Query could not be parsed and was rejected for security reasons.';
-const MUTATING_STATEMENT_PATTERN =
-  /^\s*(?:\/\*[\s\S]*?\*\/\s*|--[^\n]*(?:\n|$)\s*)*(insert|update|delete|merge|truncate|create|alter|drop|grant|revoke)\b/i;
-
 export class DatabaseAdvanceService {
   private static instance: DatabaseAdvanceService;
   private dbManager = DatabaseManager.getInstance();
@@ -160,7 +155,7 @@ export class DatabaseAdvanceService {
 
     const statement = statements[0];
     const guardError = checkSqlExecutionGuards(statement);
-    if (guardError && guardError !== EXPLAIN_PARSE_GUARD_ERROR) {
+    if (guardError) {
       throw new AppError(guardError, 403, ERROR_CODES.FORBIDDEN);
     }
 
@@ -169,7 +164,6 @@ export class DatabaseAdvanceService {
 
   async explainSQL(query: string, params: unknown[] = []): Promise<ExplainSQLResponse> {
     const statement = this.prepareExplainStatement(query);
-    const shouldRollback = isMutationLikeStatement(statement);
     const explainQuery = `EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) ${statement}`;
     const pool = this.dbManager.getPool();
     const client = await pool.connect();
@@ -178,25 +172,16 @@ export class DatabaseAdvanceService {
     try {
       await client.query('SET statement_timeout = 30000');
 
-      const result = shouldRollback
-        ? await this.executeExplainInRolledBackTransaction(
-            client,
-            explainQuery,
-            params,
-            (error) => {
-              releaseError = error;
-            }
-          )
-        : await withAdminContext(
-            client,
-            () => client.query<Record<string, unknown>>(explainQuery, params),
-            false,
-            (error) => {
-              releaseError = error;
-            }
-          );
+      const result = await this.executeExplainInRolledBackTransaction(
+        client,
+        explainQuery,
+        params,
+        (error) => {
+          releaseError = error;
+        }
+      );
 
-      return normalizeExplainResponse(result.rows, shouldRollback);
+      return normalizeExplainResponse(result.rows, true);
     } catch (error) {
       if (hasPgErrorCode(error, '57014')) {
         throw new Error('Query timeout: The query took longer than 30 seconds to execute');
@@ -1204,10 +1189,6 @@ function getStringArray(source: Record<string, unknown>, key: string): string[] 
   }
 
   return value.map((item) => String(item));
-}
-
-function isMutationLikeStatement(statement: string): boolean {
-  return MUTATING_STATEMENT_PATTERN.test(statement);
 }
 
 function normalizeExplainResponse(
