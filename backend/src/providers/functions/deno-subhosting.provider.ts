@@ -25,7 +25,7 @@ const DENO_SUBHOSTING_API_BASE = 'https://api.deno.com/v2';
 const DEFAULT_TIMEOUT_MS = 10000;
 
 // Exponential backoff schedule for 429 (rate-limited) responses, in ms.
-// Deno Subhosting doesn't always surface Retry-After, so we fall back to this
+// Deno Deploy doesn't always surface Retry-After, so we fall back to this
 // schedule. When Retry-After is present we honour it (taking the max of the
 // header value and the scheduled backoff), plus a small jitter.
 const DEFAULT_RATE_LIMIT_BACKOFF_MS = [1000, 2000, 4000];
@@ -111,7 +111,7 @@ async function fetchWithTimeout(
             ? Math.min(Math.max(retryAfterMs, rateLimitBackoffMs[r]), MAX_RETRY_AFTER_MS)
             : rateLimitBackoffMs[r];
           const delay = Math.min(baseMs + Math.floor(Math.random() * 250), MAX_RETRY_AFTER_MS);
-          logger.warn('Deno Subhosting 429 — retrying', {
+          logger.warn('Deno Deploy 429 — retrying', {
             url,
             attempt: r + 1,
             delayMs: delay,
@@ -141,7 +141,7 @@ async function fetchWithTimeout(
             currentResponse.body.resume();
           }
           throw new AppError(
-            'Deno Subhosting rate limit exceeded after retries. Please retry shortly.',
+            'Deno Deploy rate limit exceeded after retries. Please retry shortly.',
             429,
             ERROR_CODES.RATE_LIMITED
           );
@@ -299,7 +299,7 @@ export class DenoSubhostingProvider {
   }
 
   /**
-   * Check if Deno Subhosting is properly configured
+   * Check if Deno Deploy is properly configured
    */
   isConfigured(): boolean {
     const { token, organizationId } = appConfig.denoSubhosting;
@@ -307,16 +307,16 @@ export class DenoSubhostingProvider {
   }
 
   /**
-   * Get Deno Subhosting credentials from config
+   * Get Deno Deploy credentials from config
    */
   getCredentials(): DenoSubhostingCredentials {
     const { token, organizationId } = appConfig.denoSubhosting;
 
     if (!token) {
-      throw new AppError('DENO_SUBHOSTING_TOKEN not configured', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError('DENO_DEPLOY_TOKEN not configured', 500, ERROR_CODES.INTERNAL_ERROR);
     }
     if (!organizationId) {
-      throw new AppError('DENO_SUBHOSTING_ORG_ID not configured', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError('DENO_DEPLOY_ORG_ID not configured', 500, ERROR_CODES.INTERNAL_ERROR);
     }
 
     return { token, organizationId };
@@ -396,7 +396,7 @@ export class DenoSubhostingProvider {
    * Type-check a single function's code with `deno check`.
    * Runs the transformed code (after legacy conversion) so it catches
    * require(), bad imports, syntax errors, etc. before saving to DB.
-   * Only runs in cloud environments where Deno Subhosting is configured.
+   * Only runs in cloud environments where Deno Deploy is configured.
    * Skips gracefully if Deno is not installed.
    */
   async checkCode(userCode: string, slug: string): Promise<void> {
@@ -451,7 +451,7 @@ export class DenoSubhostingProvider {
   }
 
   /**
-   * Deploy functions to Deno Subhosting
+   * Deploy functions to Deno Deploy
    *
    * Creates a multi-file deployment with:
    * - main.ts: Router that handles path-based routing
@@ -499,7 +499,7 @@ export class DenoSubhostingProvider {
         };
       }
 
-      logger.info('Deploying to Deno Subhosting', {
+      logger.info('Deploying to Deno Deploy', {
         projectId,
         functionCount: functions.length,
         functions: functions.map((f) => f.slug),
@@ -533,7 +533,7 @@ export class DenoSubhostingProvider {
       );
 
       if (!response.ok) {
-        logger.error('Deno Subhosting API error', {
+        logger.error('Deno Deploy API error', {
           status: response.status,
           statusText: response.statusText,
           projectId,
@@ -546,14 +546,14 @@ export class DenoSubhostingProvider {
               data: await response.text(),
             },
           },
-          'Deno Subhosting failed'
+          'Deno Deploy failed'
         );
       }
 
       const data = revisionResponseSchema.parse(await response.json());
       const status = mapRevisionStatus(data.status);
 
-      logger.info('Deno Subhosting deployment created', {
+      logger.info('Deno Deploy deployment created', {
         revisionId: data.id,
         projectId: slug,
         status,
@@ -575,11 +575,11 @@ export class DenoSubhostingProvider {
         throw error;
       }
 
-      logger.error('Failed to deploy to Deno Subhosting', {
+      logger.error('Failed to deploy to Deno Deploy', {
         error: error instanceof Error ? error.message : String(error),
         projectId,
       });
-      throw new UpstreamError(error, 'Failed to deploy to Deno Subhosting');
+      throw new UpstreamError(error, 'Failed to deploy to Deno Deploy');
     }
   }
 
@@ -638,11 +638,11 @@ export class DenoSubhostingProvider {
         throw error;
       }
 
-      logger.error('Failed to get Deno Subhosting deployment', {
+      logger.error('Failed to get Deno Deploy deployment', {
         error: error instanceof Error ? error.message : String(error),
         deploymentId,
       });
-      throw new UpstreamError(error, 'Failed to get Deno Subhosting deployment');
+      throw new UpstreamError(error, 'Failed to get Deno Deploy deployment');
     }
   }
 
@@ -961,7 +961,7 @@ ${routes}
 };
 
 // Per-request call-depth tracking to catch recursive function invocations
-// (in-process dispatch bypasses Deno Subhosting's network-level 508 guard).
+// (in-process dispatch bypasses Deno Deploy's network-level 508 guard).
 const MAX_DEPTH = 8;
 const depthStore = new AsyncLocalStorage<number>();
 
@@ -1026,7 +1026,7 @@ const dispatch = async (req: Request): Promise<Response> => {
 
       // Structured JSON log — matches InsForge backend log format:
       // { timestamp, slug, method, status, duration }. Captured by the
-      // Deno Subhosting platform from stdout and surfaced as app logs.
+      // Deno Deploy platform from stdout and surfaced as app logs.
       console.log(JSON.stringify({
         timestamp: new Date().toISOString(),
         slug,

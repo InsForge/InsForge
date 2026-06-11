@@ -78,7 +78,7 @@ export class LogService {
     total: number;
     tableName: string;
   }> {
-    // When source is function.logs and Deno Subhosting is configured,
+    // When source is function.logs and Deno Deploy is configured,
     // fetch app logs from Deno API instead of CloudWatch/local
     const isFunctionLogs = sourceName === 'function.logs' || sourceName === 'deno-relay-logs';
     const denoProvider = DenoSubhostingProvider.getInstance();
@@ -98,7 +98,7 @@ export class LogService {
   }
 
   /**
-   * Fetch function runtime logs from Deno Subhosting API
+   * Fetch function runtime logs from Deno Deploy API
    * and convert to LogSchema format for consistent response
    */
   private async getFunctionLogsFromDeno(
@@ -117,7 +117,7 @@ export class LogService {
       logger.info('No successful deployment found, cannot fetch function logs from Deno');
       return { logs: [], total: 0, tableName: 'deno-subhosting' };
     }
-    logger.info('Fetching function logs from Deno Subhosting', {
+    logger.info('Fetching function logs from Deno Deploy', {
       deploymentId,
       limit,
       beforeTimestamp,
@@ -262,7 +262,7 @@ export class LogService {
     const denoProvider = DenoSubhostingProvider.getInstance();
 
     if (!denoProvider.isConfigured()) {
-      logger.info('Deno Subhosting not configured, cannot fetch build logs');
+      logger.info('Deno Deploy not configured, cannot fetch build logs');
       return null;
     }
 

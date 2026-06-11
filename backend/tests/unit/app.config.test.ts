@@ -135,7 +135,7 @@ describe('config.cloud', () => {
 
 describe('config.denoSubhosting', () => {
   it('uses empty-string defaults when tokens are absent', () => {
-    unsetEnvKeys('DENO_SUBHOSTING_TOKEN', 'DENO_SUBHOSTING_ORG_ID', 'FUNCTIONS_DOMAIN');
+    unsetEnvKeys('DENO_DEPLOY_TOKEN', 'DENO_DEPLOY_ORG_ID', 'FUNCTIONS_DOMAIN');
     const c = loadConfig();
 
     expect(c.denoSubhosting.token).toBe('');
@@ -143,9 +143,9 @@ describe('config.denoSubhosting', () => {
     expect(c.denoSubhosting.domain).toBe('function2.insforge.app');
   });
 
-  it('reads DENO_SUBHOSTING_TOKEN and DENO_SUBHOSTING_ORG_ID', () => {
-    process.env.DENO_SUBHOSTING_TOKEN = 'dsh_token_test';
-    process.env.DENO_SUBHOSTING_ORG_ID = 'org-abc';
+  it('reads DENO_DEPLOY_TOKEN and DENO_DEPLOY_ORG_ID', () => {
+    process.env.DENO_DEPLOY_TOKEN = 'dsh_token_test';
+    process.env.DENO_DEPLOY_ORG_ID = 'org-abc';
     const c = loadConfig();
 
     expect(c.denoSubhosting.token).toBe('dsh_token_test');

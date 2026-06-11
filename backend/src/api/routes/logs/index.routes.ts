@@ -94,7 +94,7 @@ router.get('/stats', async (_req: AuthRequest, res: Response, next: NextFunction
   }
 });
 
-// GET /logs/functions/build-logs - Get function build logs from Deno Subhosting
+// GET /logs/functions/build-logs - Get function build logs from Deno Deploy
 router.get('/functions/build-logs', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { deployment_id } = req.query;
@@ -104,7 +104,7 @@ router.get('/functions/build-logs', async (req: AuthRequest, res: Response, next
 
     if (!result) {
       throw new AppError(
-        'Build logs not available. Deno Subhosting may not be configured or no deployments found.',
+        'Build logs not available. Deno Deploy may not be configured or no deployments found.',
         404,
         ERROR_CODES.LOG_NOT_FOUND
       );
