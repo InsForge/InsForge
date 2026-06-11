@@ -27,7 +27,7 @@ vi.mock('../../src/utils/logger', () => ({
 // Mock config. `cloud.appKey` is the Deno app slug the v2 logs endpoint is
 // scoped to (GET /v2/apps/{slug}/logs).
 vi.mock('../../src/infra/config/app.config', () => ({
-  config: {
+  appConfig: {
     denoSubhosting: {
       token: 'test-deno-token',
       organizationId: 'test-org-id',
@@ -36,12 +36,8 @@ vi.mock('../../src/infra/config/app.config', () => ({
     cloud: {
       appKey: 'test-app-key',
     },
-  };
-  return {
-    config: c,
-    appConfig: c,
-  };
-});
+  },
+}));
 
 // Mock pool — use vi.hoisted so it's available in the hoisted vi.mock factory
 const { mockPool } = vi.hoisted(() => ({
