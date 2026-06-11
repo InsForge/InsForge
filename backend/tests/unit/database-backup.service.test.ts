@@ -203,7 +203,7 @@ describe('DatabaseBackupService', () => {
       );
       const [, params] = completedCall as [string, unknown[]];
       const storageKey = params[1] as string;
-      expect(storageKey).toMatch(/^\d{8}_\d{6}\.dump$/);
+      expect(storageKey).toMatch(/^\d{8}_\d{6}_[0-9a-f-]{36}\.dump$/);
       expect(params[2]).toBe(Buffer.from('dump-bytes').length);
 
       const artifact = await fs.readFile(
@@ -282,6 +282,29 @@ describe('DatabaseBackupService', () => {
       pending.finish();
       await waitForIdle(service);
     });
+
+    it('reserves the concurrency guard before the first await', async () => {
+      queryMock.mockImplementation((sql: string) => {
+        if (sql.includes('INSERT INTO system.database_backups')) {
+          return Promise.resolve({ rows: [backupRow()] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+      spawnMock.mockImplementation(() => makeFakeChild().child);
+
+      const service = DatabaseBackupService.getInstance();
+      // Fire both before either INSERT resolves; without a synchronous
+      // reservation both would pass the guard.
+      const first = service.createBackup({}, 'admin');
+      const second = service.createBackup({}, 'admin');
+
+      await expect(second).rejects.toMatchObject({
+        statusCode: 409,
+        code: ERROR_CODES.DATABASE_CONSTRAINT_VIOLATION,
+      });
+      await first;
+      await waitForIdle(service);
+    });
   });
 
   describe('restoreBackup', () => {
@@ -298,6 +321,40 @@ describe('DatabaseBackupService', () => {
         statusCode: 409,
         code: ERROR_CODES.DATABASE_CONSTRAINT_VIOLATION,
       });
+    });
+
+    it('blocks concurrent restores and metadata mutations while a restore runs', async () => {
+      const storageKey = '20260610_040506.dump';
+      const artifactDir = path.join(STORAGE_DIR, '_database_backups');
+      await fs.mkdir(artifactDir, { recursive: true });
+      await fs.writeFile(path.join(artifactDir, storageKey), 'archive-bytes');
+
+      queryMock.mockImplementation((sql: string) => {
+        if (sql.includes('WHERE id = $1')) {
+          return Promise.resolve({
+            rows: [backupRow({ status: 'completed', storageKey })],
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+      const pending = makeFakeChild({ stdoutData: null, autoClose: false });
+      spawnMock.mockImplementation(() => pending.child);
+
+      const service = DatabaseBackupService.getInstance();
+      const restore = service.restoreBackup('some-id');
+
+      const conflict = {
+        statusCode: 409,
+        code: ERROR_CODES.DATABASE_CONSTRAINT_VIOLATION,
+      };
+      await expect(service.restoreBackup('some-id')).rejects.toMatchObject(conflict);
+      await expect(service.deleteBackup('some-id')).rejects.toMatchObject(conflict);
+      await expect(service.renameBackup('some-id', 'x')).rejects.toMatchObject(conflict);
+      await expect(service.createBackup({}, 'admin')).rejects.toMatchObject(conflict);
+
+      await vi.waitFor(() => expect(spawnMock).toHaveBeenCalled());
+      pending.finish();
+      await restore;
     });
 
     it('restores the archive and reinstates the backup metadata snapshot', async () => {

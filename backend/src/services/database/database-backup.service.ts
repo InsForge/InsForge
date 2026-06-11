@@ -64,6 +64,9 @@ export class DatabaseBackupService {
   private dbManager = DatabaseManager.getInstance();
   private s3Provider: S3StorageProvider | null = null;
   private activeBackupId: string | null = null;
+  // Reserved synchronously before the first await in createBackup so two
+  // overlapping requests cannot both pass the concurrency guard.
+  private backupInFlight = false;
   private restoreInProgress = false;
 
   private constructor() {
@@ -100,20 +103,15 @@ export class DatabaseBackupService {
     input: CreateDatabaseBackupRequest,
     createdBy: string | null
   ): Promise<DatabaseBackup> {
-    if (this.restoreInProgress) {
-      throw new AppError(
-        'A restore is currently in progress. Try again once it finishes.',
-        409,
-        ERROR_CODES.DATABASE_CONSTRAINT_VIOLATION
-      );
-    }
-    if (this.activeBackupId) {
+    this.assertNoRestoreInProgress();
+    if (this.backupInFlight) {
       throw new AppError(
         'Another backup is already running. Try again once it finishes.',
         409,
         ERROR_CODES.DATABASE_CONSTRAINT_VIOLATION
       );
     }
+    this.backupInFlight = true;
 
     let row: BackupRow;
     try {
@@ -127,6 +125,7 @@ export class DatabaseBackupService {
       );
       row = result.rows[0] as BackupRow;
     } catch (error) {
+      this.backupInFlight = false;
       if (isPgErrorLike(error) && error.code === '23505') {
         throw new AppError(
           'A backup with this name already exists.',
@@ -147,12 +146,14 @@ export class DatabaseBackupService {
       })
       .finally(() => {
         this.activeBackupId = null;
+        this.backupInFlight = false;
       });
 
     return serializeBackup(row);
   }
 
   async renameBackup(id: string, name: string | null): Promise<DatabaseBackup> {
+    this.assertNoRestoreInProgress();
     try {
       const result = await this.dbManager.getPool().query(
         `
@@ -182,6 +183,7 @@ export class DatabaseBackupService {
   }
 
   async deleteBackup(id: string): Promise<void> {
+    this.assertNoRestoreInProgress();
     const backup = await this.getBackupRow(id);
 
     if (backup.status === 'running' && backup.id === this.activeBackupId) {
@@ -192,13 +194,14 @@ export class DatabaseBackupService {
       );
     }
 
+    // Remove the row first: a leaked artifact (logged below) is preferable to
+    // a row that survives an artifact delete and points at a missing file.
+    await this.dbManager.getPool().query(`DELETE FROM system.database_backups WHERE id = $1`, [id]);
+
     if (backup.storageKey) {
       try {
         await this.deleteArtifact(backup.storageKey);
       } catch (error) {
-        // Keep the metadata row consistent with reality: losing an orphaned
-        // file is preferable to a row that points at nothing, so log and
-        // continue with the row delete.
         logger.warn('Failed to delete backup artifact', {
           backupId: id,
           storageKey: backup.storageKey,
@@ -206,8 +209,6 @@ export class DatabaseBackupService {
         });
       }
     }
-
-    await this.dbManager.getPool().query(`DELETE FROM system.database_backups WHERE id = $1`, [id]);
   }
 
   /**
@@ -229,7 +230,7 @@ export class DatabaseBackupService {
         ERROR_CODES.DATABASE_CONSTRAINT_VIOLATION
       );
     }
-    if (this.activeBackupId) {
+    if (this.backupInFlight) {
       throw new AppError(
         'A backup is currently running. Try again once it finishes.',
         409,
@@ -237,17 +238,19 @@ export class DatabaseBackupService {
       );
     }
 
-    const backup = await this.getBackupRow(id);
-    if (backup.status !== 'completed' || !backup.storageKey) {
-      throw new AppError(
-        'This backup is not restorable. Only completed backups can be restored.',
-        409,
-        ERROR_CODES.DATABASE_CONSTRAINT_VIOLATION
-      );
-    }
-
+    // Reserve synchronously, before any await, so two overlapping restore
+    // requests cannot both pass the guards above.
     this.restoreInProgress = true;
     try {
+      const backup = await this.getBackupRow(id);
+      if (backup.status !== 'completed' || !backup.storageKey) {
+        throw new AppError(
+          'This backup is not restorable. Only completed backups can be restored.',
+          409,
+          ERROR_CODES.DATABASE_CONSTRAINT_VIOLATION
+        );
+      }
+
       const pool = this.dbManager.getPool();
       const snapshot = await pool.query(
         `SELECT id, name, trigger_source, status, storage_key, size_bytes,
@@ -309,7 +312,10 @@ export class DatabaseBackupService {
   }
 
   private async runBackup(id: string): Promise<void> {
-    const storageKey = `${formatTimestamp(new Date())}.dump`;
+    // Suffix with the backup id: the timestamp alone has second resolution,
+    // so two quick successive backups would otherwise share a key and the
+    // second archive would overwrite the first.
+    const storageKey = `${formatTimestamp(new Date())}_${id}.dump`;
     const tmpDir = await fs.mkdtemp(path.join(appConfig.storage.storageDir, '.backup-tmp-'));
     const tmpPath = path.join(tmpDir, storageKey);
 
@@ -335,6 +341,11 @@ export class DatabaseBackupService {
       );
       logger.info('Database backup completed', { backupId: id, storageKey, sizeBytes: size });
     } catch (error) {
+      // A failed row never gets a storage_key, so an artifact persisted just
+      // before a late failure (e.g. the completed-status update) would be
+      // orphaned — remove it best-effort.
+      await this.deleteArtifact(storageKey).catch(() => {});
+
       const message = error instanceof Error ? error.message : String(error);
       await this.dbManager
         .getPool()
@@ -446,6 +457,20 @@ export class DatabaseBackupService {
         settle();
       });
     });
+  }
+
+  /**
+   * Mutating backup metadata while a restore is running would be clobbered
+   * (or, for deletes, resurrected) by the post-restore snapshot write-back.
+   */
+  private assertNoRestoreInProgress(): void {
+    if (this.restoreInProgress) {
+      throw new AppError(
+        'A restore is currently in progress. Try again once it finishes.',
+        409,
+        ERROR_CODES.DATABASE_CONSTRAINT_VIOLATION
+      );
+    }
   }
 
   private async getBackupRow(id: string): Promise<BackupRow> {

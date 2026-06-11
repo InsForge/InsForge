@@ -95,7 +95,19 @@ export default function BackupsPage() {
       return;
     }
 
-    await backupActions.restoreBackup(backupId);
+    try {
+      await backupActions.restoreBackup(backupId);
+    } catch (error) {
+      // Rethrow so ConfirmRestoreDialog stays open; the cloud host surfaces
+      // its own restore error notifications.
+      if (!isCloudHostingMode) {
+        showToast(
+          error instanceof Error ? error.message : 'Failed to restore the backup.',
+          'error'
+        );
+      }
+      throw error;
+    }
 
     if (!isCloudHostingMode) {
       // The cloud host surfaces its own restore notifications.
@@ -116,7 +128,17 @@ export default function BackupsPage() {
       throw new Error('Backup creation is not available in the current dashboard mode.');
     }
 
-    await backupActions.createBackup(backupName);
+    try {
+      await backupActions.createBackup(backupName);
+    } catch (error) {
+      // Rethrow so CreateBackupDialog stays open; the cloud host surfaces its
+      // own error notifications.
+      if (!isCloudHostingMode) {
+        showToast(error instanceof Error ? error.message : 'Failed to create the backup.', 'error');
+      }
+      throw error;
+    }
+
     await refetch();
   };
 
@@ -412,9 +434,21 @@ export default function BackupsPage() {
             );
           }
 
-          return renameBackup(renameBackupDialogState.id, backupName).then(async () => {
-            await refetch();
-          });
+          return renameBackup(renameBackupDialogState.id, backupName)
+            .then(async () => {
+              await refetch();
+            })
+            .catch((error: unknown) => {
+              // Rethrow so RenameBackupDialog stays open; the cloud host
+              // surfaces its own error notifications.
+              if (!isCloudHostingMode) {
+                showToast(
+                  error instanceof Error ? error.message : 'Failed to rename the backup.',
+                  'error'
+                );
+              }
+              throw error;
+            });
         }}
       />
       <ConfirmRestoreDialog
