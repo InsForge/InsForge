@@ -2,24 +2,6 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { ColumnType } from '@insforge/shared-schemas';
 import { getTableFormCreateDraftStorageKey } from '#features/database/components/TableForm';
 
-const createDraft = (schemaName: string) =>
-  JSON.stringify({
-    schemaName,
-    tableName: 'contacts',
-    columns: [
-      {
-        columnName: 'name',
-        type: ColumnType.STRING,
-        defaultValue: '',
-        isNullable: true,
-        isUnique: false,
-        isSystemColumn: false,
-        isNewColumn: true,
-      },
-    ],
-    foreignKeys: [],
-  });
-
 describe('TableForm draft storage', () => {
   afterEach(() => {
     window.localStorage.clear();
