@@ -17,7 +17,7 @@ function escapeCSVField(field: unknown): string {
 
   let stringValue = String(field);
 
-  if (stringValue.match(/^[=@]/)) {
+  if (stringValue.match(/^[==+\-@@]/)) {
     stringValue = `'${stringValue}`;
   }
   // If field contains comma, quotes, or newline, wrap in quotes and escape quotes
@@ -52,14 +52,12 @@ function getAllHeaders(data: Record<string, unknown>[]): string[] {
  */
 export function convertToCSV(data: unknown[], filename = 'export'): void {
   if (!Array.isArray(data) || data.length === 0) {
-    console.warn('No data to export');
-    return;
+    throw new Error('No data to export');
   }
 
   // Ensure all items are objects
   if (typeof data[0] !== 'object' || data[0] === null || Array.isArray(data[0])) {
-    console.warn('Data must be an array of objects');
-    return;
+    throw new Error('Data must be an array of objects');
   }
 
   // Get all unique column headers from all rows
@@ -87,8 +85,7 @@ export function convertToCSV(data: unknown[], filename = 'export'): void {
  */
 export function convertToJSON(data: unknown[], filename = 'export'): void {
   if (!Array.isArray(data)) {
-    console.warn('Data must be an array');
-    return;
+    throw new Error('Data must be an array');
   }
 
   const jsonContent = JSON.stringify(data, null, 2);

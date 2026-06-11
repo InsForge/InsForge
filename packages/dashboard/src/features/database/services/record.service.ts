@@ -2,7 +2,7 @@ import { ConvertedValue } from '#components/datagrid/datagridTypes';
 import { DEFAULT_DATABASE_SCHEMA } from '#features/database/helpers';
 import { apiClient } from '#lib/api/client';
 import { BulkUpsertResponse } from '@insforge/shared-schemas';
-import { convertToCSV } from '#lib/utils/csv';
+import { convertToCSV, getExportFilename } from '#lib/utils/data-export';
 
 interface AdminRecordListResponse {
   data: { [key: string]: ConvertedValue }[];
@@ -313,13 +313,7 @@ export class RecordService {
       offset += limit;
     }
 
-    if (allRecords.length === 0) {
-      throw new Error('No records found in this table. Cannot export an empty table.');
-    }
-
-    // Generate filename with timestamp
-    const timestamp = new Date().toISOString().split('T')[0];
-    const filename = `${tableName}-${timestamp}.csv`;
+    const filename = getExportFilename(tableName + '_data');
 
     // Convert and download
     convertToCSV(allRecords, filename);
