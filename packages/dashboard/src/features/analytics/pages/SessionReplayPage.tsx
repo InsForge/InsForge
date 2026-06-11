@@ -1,5 +1,12 @@
 import { useMemo, useState } from 'react';
-import { PaginationControls, TableHeader } from '#components';
+import {
+  EmptyStateIllustration,
+  ErrorState,
+  LoadingState,
+  PaginationControls,
+  TableHeader,
+} from '#components';
+import { RequirePosthogConnection } from '#features/analytics/components/RequirePosthogConnection';
 import { useRecordings } from '#features/analytics/hooks/useRecordings';
 import { SessionRow } from '#features/analytics/components/posthog/SessionRow';
 import { ReplayModal } from '#features/analytics/components/posthog/ReplayModal';
@@ -8,6 +15,19 @@ const WINDOW_SIZE = 50;
 const PAGE_SIZE = 10;
 
 export function SessionReplayPage() {
+  return (
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-semantic-1">
+      <TableHeader title="Session Replay" showSearch={false} />
+      <div className="min-h-0 flex-1">
+        <RequirePosthogConnection>
+          <SessionReplayPageBody />
+        </RequirePosthogConnection>
+      </div>
+    </div>
+  );
+}
+
+function SessionReplayPageBody() {
   const { data, isLoading, error } = useRecordings(WINDOW_SIZE, true);
   const [page, setPage] = useState(1);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -21,9 +41,7 @@ export function SessionReplayPage() {
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-semantic-1">
-      <TableHeader title="Session Replay" showSearch={false} />
-
+    <div className="flex h-full min-h-0 flex-col">
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-4/5 max-w-[1024px] pb-10 pt-10">
           {/* Table header */}
@@ -45,12 +63,18 @@ export function SessionReplayPage() {
           {/* Table body */}
           <div className="mt-1 flex flex-col gap-1">
             {isLoading ? (
-              <div className="px-2.5 py-4 text-sm text-muted-foreground">Loading…</div>
+              <LoadingState message="Loading replays…" />
             ) : error ? (
-              <div className="px-2.5 py-4 text-sm text-destructive">Failed to load replays.</div>
+              <ErrorState title="Failed to load replays" error="Please try again." />
             ) : pageItems.length === 0 ? (
-              <div className="px-2.5 py-4 text-sm text-muted-foreground">
-                No replays yet. Make sure session_recording is enabled in your PostHog project.
+              <div className="flex flex-col items-center gap-2 pb-12 pt-6 text-center">
+                <EmptyStateIllustration />
+                <p className="text-sm font-medium leading-6 text-muted-foreground">
+                  No replays yet
+                </p>
+                <p className="text-xs leading-4 text-muted-foreground">
+                  Make sure session_recording is enabled in your PostHog project.
+                </p>
               </div>
             ) : (
               pageItems.map((rec) => <SessionRow key={rec.id} recording={rec} onOpen={setOpenId} />)

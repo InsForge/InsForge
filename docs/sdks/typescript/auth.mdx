@@ -155,14 +155,15 @@ Start OAuth authentication flow with configured providers (built-in providers li
 ### Parameters
 
 - `provider` (string, required) - OAuth provider key (e.g., `google`, `github`, or custom provider key like `okta-company`)
-- `redirectTo` (string, optional) - URL to redirect after authentication
-- `skipBrowserRedirect` (boolean, optional) - If true, returns OAuth URL without auto-redirecting (for mobile apps)
+- `redirectTo` (string, required) - URL to redirect after authentication
+- `additionalParams` (`Record<string, string>`, optional) - Provider-specific OAuth hints such as Google's `prompt=select_account`
+- `skipBrowserRedirect` (boolean, optional) - If true, returns OAuth URL without auto-redirecting (for server-rendered or mobile flows)
 
 ### Returns
 
 ```typescript
 {
-  data: { url?: string, provider?: string },
+  data: { url?: string, provider?: string, codeVerifier?: string },
   error: Error | null
 }
 ```
@@ -176,20 +177,26 @@ Start OAuth authentication flow with configured providers (built-in providers li
 
 ```javascript
 // Default: auto-redirect
-await insforge.auth.signInWithOAuth({
-  provider: 'google',
+await insforge.auth.signInWithOAuth('google', {
   redirectTo: 'http://localhost:3000/dashboard',
+  additionalParams: { prompt: 'select_account' },
 });
 // Browser immediately redirects to Google
 
 // skipBrowserRedirect: get URL for manual handling
-const { data } = await insforge.auth.signInWithOAuth({
-  provider: 'google',
+const { data } = await insforge.auth.signInWithOAuth('google', {
+  redirectTo: 'http://localhost:3000/dashboard',
   skipBrowserRedirect: true,
 });
 
 window.location.href = data.url; // Redirect when ready
 ```
+
+<Note>
+  `additionalParams` is for provider-specific optional hints only. Do not pass server-owned
+  OAuth fields such as `client_id`, `redirect_uri`, `code_challenge`, `state`, `response_type`,
+  or `scope`; InsForge sets those values on the server and ignores colliding client-provided keys.
+</Note>
 
 <Note>
   Custom providers must be configured first in the InsForge dashboard under `Auth Methods` with client credentials and an OIDC discovery URL.

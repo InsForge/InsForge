@@ -12,7 +12,7 @@ export const sdkFeatureSchema = z
     - "auth" - User authentication
     - "ai" - AI features
     - "realtime" - Real-time WebSockets
-    - "payments" - Stripe Checkout and Billing Portal
+    - "payments" - Stripe Checkout, Billing Portal, Razorpay Checkout, and webhooks
     `
   );
 
@@ -62,7 +62,7 @@ export const docTypeSchema = z
       "ai-integration-sdk" (AI features),
       "real-time" (real-time pub/sub through WebSockets),
       "deployment" (deploy frontend applications via MCP tool),
-      "payments" (Stripe Checkout, Billing Portal, and webhook-based fulfillment)
+      "payments" (Stripe Checkout, Billing Portal, Razorpay Checkout, and webhook-based fulfillment)
     `
   );
 

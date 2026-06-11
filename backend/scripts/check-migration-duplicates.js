@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Detects migration files that share the same numeric prefix.
  *

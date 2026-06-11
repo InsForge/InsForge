@@ -47,8 +47,8 @@ import MCPLogsPage from '#features/logs/pages/MCPLogsPage';
 import PaymentsLayout from '#features/payments/components/PaymentsLayout';
 import CatalogPage from '#features/payments/pages/CatalogPage';
 import CustomersPage from '#features/payments/pages/CustomersPage';
-import PaymentHistoryPage from '#features/payments/pages/PaymentHistoryPage';
 import SubscriptionsPage from '#features/payments/pages/SubscriptionsPage';
+import TransactionsPage from '#features/payments/pages/TransactionsPage';
 import RealtimeLayout from '#features/realtime/components/RealtimeLayout';
 import RealtimeChannelsPage from '#features/realtime/pages/RealtimeChannelsPage';
 import RealtimeMessagesPage from '#features/realtime/pages/RealtimeMessagesPage';
@@ -129,7 +129,7 @@ function AuthenticatedRoutes() {
           <Route path="catalog" element={<CatalogPage />} />
           <Route path="customers" element={<CustomersPage />} />
           <Route path="subscriptions" element={<SubscriptionsPage />} />
-          <Route path="payment-history" element={<PaymentHistoryPage />} />
+          <Route path="transactions" element={<TransactionsPage />} />
         </Route>
         <Route path="/dashboard/realtime" element={<RealtimeLayout />}>
           <Route index element={<Navigate to="channels" replace />} />

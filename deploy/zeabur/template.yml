@@ -12,14 +12,14 @@ spec:
           type: DOMAIN
           name: InsForge Domain
           description: The domain for accessing your InsForge application.
-        - key: ADMIN_EMAIL
+        - key: ROOT_ADMIN_USERNAME
           type: STRING
-          name: Admin Email
-          description: Email address for the admin user.
-        - key: ADMIN_PASSWORD
+          name: Root Admin Username
+          description: Username for the root admin.
+        - key: ROOT_ADMIN_PASSWORD
           type: STRING
-          name: Admin Password
-          description: Password for admin. Must be at least 8 characters.
+          name: Root Admin Password
+          description: Password for the root admin. Must be at least 8 characters.
         - key: OPENROUTER_API_KEY
           type: STRING
           name: OpenRouter API Key
@@ -164,7 +164,7 @@ spec:
 
                     shared_preload_libraries = 'pg_cron,http,pgcrypto,insforge_pg_utils'
                     insforge.policy_grant_role = 'project_admin'
-                    insforge.policy_grant_tables = 'storage.objects,realtime.channels,realtime.messages,payments.checkout_sessions,payments.customer_portal_sessions'
+                    insforge.policy_grant_tables = 'storage.objects,realtime.channels,realtime.messages,payments.stripe_checkout_sessions,payments.stripe_customer_portal_sessions,payments.razorpay_orders,payments.razorpay_subscriptions'
                     cron.database_name = 'insforge'
                 - path: /docker-entrypoint-initdb.d/01-init.sql
                   template: |
@@ -889,10 +889,10 @@ spec:
                     default: ${ZEABUR_WEB_URL}
                 JWT_SECRET:
                     default: ${PGRST_JWT_SECRET}
-                ADMIN_EMAIL:
-                    default: ${ADMIN_EMAIL}
-                ADMIN_PASSWORD:
-                    default: ${ADMIN_PASSWORD}
+                ROOT_ADMIN_USERNAME:
+                    default: ${ROOT_ADMIN_USERNAME}
+                ROOT_ADMIN_PASSWORD:
+                    default: ${ROOT_ADMIN_PASSWORD}
                 # PostgreSQL connection
                 POSTGRES_HOST:
                     default: postgres

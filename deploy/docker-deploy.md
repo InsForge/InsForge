@@ -59,7 +59,7 @@ AUTH_PORT=7231
 DENO_PORT=7233
 ```
 
-Make sure each project has its own `JWT_SECRET` and `ADMIN_PASSWORD`.
+Make sure each project has its own `JWT_SECRET` and `ROOT_ADMIN_PASSWORD`.
 
 ### Step 3: Start each project with a unique name
 

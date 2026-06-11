@@ -52,7 +52,7 @@ router.get('/:key', verifyAdmin, async (req: AuthRequest, res: Response, next: N
 
     // Log audit
     await auditService.log({
-      actor: req.user?.email || 'api-key',
+      actor: req.hasApiKey ? 'api-key' : req.user?.id,
       action: 'GET_SECRET',
       module: 'SECRETS',
       details: { key },
@@ -117,7 +117,7 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
 
     // Log audit
     await auditService.log({
-      actor: req.user?.email || 'api-key',
+      actor: req.hasApiKey ? 'api-key' : req.user?.id,
       action: 'CREATE_SECRET',
       module: 'SECRETS',
       details: { key, id: result.id },
@@ -171,7 +171,7 @@ router.put('/:key', verifyAdmin, async (req: AuthRequest, res: Response, next: N
 
     // Log audit
     await auditService.log({
-      actor: req.user?.email || 'api-key',
+      actor: req.hasApiKey ? 'api-key' : req.user?.id,
       action: 'UPDATE_SECRET',
       module: 'SECRETS',
       details: { key, updates: { hasNewValue: !!value, isActive, isReserved, expiresAt } },
@@ -215,7 +215,7 @@ router.post(
 
       // Log audit
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'ROTATE_API_KEY',
         module: 'SECRETS',
         details: {
@@ -267,7 +267,7 @@ router.delete('/:key', verifyAdmin, async (req: AuthRequest, res: Response, next
 
     // Log audit
     await auditService.log({
-      actor: req.user?.email || 'api-key',
+      actor: req.hasApiKey ? 'api-key' : req.user?.id,
       action: 'DELETE_SECRET',
       module: 'SECRETS',
       details: { key },

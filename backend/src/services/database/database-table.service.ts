@@ -343,8 +343,6 @@ export class DatabaseTableService {
     validateIdentifier(table, 'table');
     const client = await this.getPool().connect();
     try {
-      const safeQualifiedTableName = quoteQualifiedName(schemaName, table);
-
       // Get column information from information_schema
       const columnsResult = await client.query(
         `
@@ -416,10 +414,16 @@ export class DatabaseTableService {
       const uniqueColumns = uniqueColumnsResult.rows;
       const uniqueSet = new Set(uniqueColumns.map((u: { column_name: string }) => u.column_name));
 
-      // Get row count
-      const sql = `SELECT COUNT(*) as row_count FROM ${safeQualifiedTableName}`;
-      const rowCountResult = await client.query(sql);
-      const row_count = rowCountResult.rows[0].row_count;
+      // Get exact row count using standard COUNT(*)
+      let row_count = 0;
+      try {
+        const countResult = await client.query(
+          `SELECT COUNT(*) as row_count FROM ${quoteQualifiedName(schemaName, table)}`
+        );
+        row_count = Number(countResult.rows[0]?.row_count || 0);
+      } catch {
+        row_count = 0;
+      }
 
       return {
         schemaName,

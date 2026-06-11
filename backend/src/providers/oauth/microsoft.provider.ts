@@ -26,7 +26,10 @@ export class MicrosoftOAuthProvider implements OAuthProvider {
   /**
    * Generate Microsoft OAuth authorization URL
    */
-  async generateOAuthUrl(state?: string): Promise<string> {
+  async generateOAuthUrl(
+    state?: string,
+    additionalParams?: Record<string, string>
+  ): Promise<string> {
     const oAuthConfigService = OAuthConfigService.getInstance();
     const config = await oAuthConfigService.getConfigByProvider('microsoft');
     if (!config) {
@@ -53,6 +56,11 @@ export class MicrosoftOAuthProvider implements OAuthProvider {
     if (state) {
       authUrl.searchParams.set('state', state);
     }
+    Object.entries(additionalParams ?? {}).forEach(([key, value]) => {
+      if (!authUrl.searchParams.has(key)) {
+        authUrl.searchParams.set(key, value);
+      }
+    });
     return authUrl.toString();
   }
 

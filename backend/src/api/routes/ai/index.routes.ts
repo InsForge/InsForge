@@ -79,6 +79,25 @@ router.get(
   }
 );
 
+/**
+ * POST /api/ai/:provider/api-key/rotate
+ * Rotate the active provider API key for cloud-managed Model Gateway credentials.
+ */
+router.post(
+  '/:provider/api-key/rotate',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const provider = parseAIProvider(req.params.provider);
+      const openRouterProvider = OpenRouterProvider.getInstance();
+      const key = await rotateProviderApiKey(provider, openRouterProvider);
+      successResponse(res, key);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 function parseAIProvider(value: string | undefined): AIProvider {
   if (value === 'openrouter') {
     return value;
@@ -95,6 +114,21 @@ function getProviderApiKey(provider: AIProvider, openRouterProvider: OpenRouterP
   switch (provider) {
     case 'openrouter':
       return openRouterProvider.getMaskedApiKey();
+    default: {
+      const exhaustiveProvider: never = provider;
+      throw new AppError(
+        `Unsupported AI provider: ${exhaustiveProvider}`,
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+  }
+}
+
+function rotateProviderApiKey(provider: AIProvider, openRouterProvider: OpenRouterProvider) {
+  switch (provider) {
+    case 'openrouter':
+      return openRouterProvider.rotateManagedApiKey();
     default: {
       const exhaustiveProvider: never = provider;
       throw new AppError(

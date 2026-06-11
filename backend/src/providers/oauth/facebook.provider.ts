@@ -26,7 +26,10 @@ export class FacebookOAuthProvider implements OAuthProvider {
   /**
    * Generate Facebook OAuth authorization URL
    */
-  async generateOAuthUrl(state?: string): Promise<string> {
+  async generateOAuthUrl(
+    state?: string,
+    additionalParams?: Record<string, string>
+  ): Promise<string> {
     const oAuthConfigService = OAuthConfigService.getInstance();
     const config = await oAuthConfigService.getConfigByProvider('facebook');
 
@@ -51,7 +54,17 @@ export class FacebookOAuthProvider implements OAuthProvider {
           },
         }
       );
-      return response.data.auth_url || response.data.url || '';
+      const sharedAuthUrl = response.data.auth_url || response.data.url;
+      if (!sharedAuthUrl) {
+        throw new Error('Shared Facebook OAuth did not return an authorization URL');
+      }
+      const authUrl = new URL(sharedAuthUrl);
+      Object.entries(additionalParams ?? {}).forEach(([key, value]) => {
+        if (!authUrl.searchParams.has(key)) {
+          authUrl.searchParams.set(key, value);
+        }
+      });
+      return authUrl.toString();
     }
 
     logger.debug('Facebook OAuth Config (fresh from DB):', {
@@ -69,6 +82,11 @@ export class FacebookOAuthProvider implements OAuthProvider {
     if (state) {
       authUrl.searchParams.set('state', state);
     }
+    Object.entries(additionalParams ?? {}).forEach(([key, value]) => {
+      if (!authUrl.searchParams.has(key)) {
+        authUrl.searchParams.set(key, value);
+      }
+    });
 
     return authUrl.toString();
   }
