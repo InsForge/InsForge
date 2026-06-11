@@ -68,6 +68,7 @@ export class DatabaseBackupService {
   // overlapping requests cannot both pass the concurrency guard.
   private backupInFlight = false;
   private restoreInProgress = false;
+  private metadataMutationsInFlight = 0;
 
   private constructor() {
     if (appConfig.storage.s3Bucket) {
@@ -154,6 +155,7 @@ export class DatabaseBackupService {
 
   async renameBackup(id: string, name: string | null): Promise<DatabaseBackup> {
     this.assertNoRestoreInProgress();
+    this.metadataMutationsInFlight += 1;
     try {
       const result = await this.dbManager.getPool().query(
         `
@@ -179,35 +181,42 @@ export class DatabaseBackupService {
         );
       }
       throw error;
+    } finally {
+      this.metadataMutationsInFlight -= 1;
     }
   }
 
   async deleteBackup(id: string): Promise<void> {
     this.assertNoRestoreInProgress();
-    const backup = await this.getBackupRow(id);
+    this.metadataMutationsInFlight += 1;
+    try {
+      const backup = await this.getBackupRow(id);
 
-    if (backup.status === 'running' && backup.id === this.activeBackupId) {
-      throw new AppError(
-        'This backup is still running and cannot be deleted yet.',
-        409,
-        ERROR_CODES.DATABASE_CONSTRAINT_VIOLATION
-      );
-    }
-
-    // Remove the row first: a leaked artifact (logged below) is preferable to
-    // a row that survives an artifact delete and points at a missing file.
-    await this.dbManager.getPool().query(`DELETE FROM system.database_backups WHERE id = $1`, [id]);
-
-    if (backup.storageKey) {
-      try {
-        await this.deleteArtifact(backup.storageKey);
-      } catch (error) {
-        logger.warn('Failed to delete backup artifact', {
-          backupId: id,
-          storageKey: backup.storageKey,
-          error: error instanceof Error ? error.message : String(error),
-        });
+      if (backup.status === 'running' && backup.id === this.activeBackupId) {
+        throw new AppError(
+          'This backup is still running and cannot be deleted yet.',
+          409,
+          ERROR_CODES.DATABASE_CONSTRAINT_VIOLATION
+        );
       }
+
+      await this.dbManager
+        .getPool()
+        .query(`DELETE FROM system.database_backups WHERE id = $1`, [id]);
+
+      if (backup.storageKey) {
+        try {
+          await this.deleteArtifact(backup.storageKey);
+        } catch (error) {
+          logger.warn('Failed to delete backup artifact', {
+            backupId: id,
+            storageKey: backup.storageKey,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    } finally {
+      this.metadataMutationsInFlight -= 1;
     }
   }
 
@@ -233,6 +242,13 @@ export class DatabaseBackupService {
     if (this.backupInFlight) {
       throw new AppError(
         'A backup is currently running. Try again once it finishes.',
+        409,
+        ERROR_CODES.DATABASE_CONSTRAINT_VIOLATION
+      );
+    }
+    if (this.metadataMutationsInFlight > 0) {
+      throw new AppError(
+        'A backup is being renamed or deleted. Try again in a moment.',
         409,
         ERROR_CODES.DATABASE_CONSTRAINT_VIOLATION
       );
@@ -503,6 +519,32 @@ export class DatabaseBackupService {
       `,
       [this.activeBackupId]
     );
+    await this.cleanupStaleTmpDirs();
+  }
+
+  /**
+   * A backup interrupted by a process exit never reaches its finally-cleanup,
+   * leaving a partial dump in a `.backup-tmp-*` dir. Sweep dirs older than an
+   * hour — age-based so an in-flight backup's temp dir is never touched.
+   */
+  private async cleanupStaleTmpDirs(): Promise<void> {
+    const maxAgeMs = 60 * 60 * 1000;
+    try {
+      const entries = await fs.readdir(appConfig.storage.storageDir);
+      await Promise.all(
+        entries
+          .filter((name) => name.startsWith('.backup-tmp-'))
+          .map(async (name) => {
+            const dirPath = path.join(appConfig.storage.storageDir, name);
+            const stats = await fs.stat(dirPath).catch(() => null);
+            if (stats && Date.now() - stats.mtimeMs > maxAgeMs) {
+              await fs.rm(dirPath, { recursive: true, force: true }).catch(() => {});
+            }
+          })
+      );
+    } catch {
+      // The storage dir may not exist yet on a fresh install.
+    }
   }
 
   private localArtifactPath(key: string): string {

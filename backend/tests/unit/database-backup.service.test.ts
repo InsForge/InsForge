@@ -142,6 +142,23 @@ describe('DatabaseBackupService', () => {
   });
 
   describe('listBackups', () => {
+    it('sweeps stale backup temp dirs but keeps recent ones', async () => {
+      const staleDir = path.join(STORAGE_DIR, '.backup-tmp-stale');
+      const freshDir = path.join(STORAGE_DIR, '.backup-tmp-fresh');
+      await fs.mkdir(staleDir, { recursive: true });
+      await fs.mkdir(freshDir, { recursive: true });
+      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+      await fs.utimes(staleDir, twoHoursAgo, twoHoursAgo);
+
+      queryMock.mockResolvedValue({ rows: [] });
+      const service = DatabaseBackupService.getInstance();
+      await service.listBackups();
+
+      await expect(fs.stat(staleDir)).rejects.toMatchObject({ code: 'ENOENT' });
+      await expect(fs.stat(freshDir)).resolves.toBeTruthy();
+      await fs.rm(freshDir, { recursive: true, force: true });
+    });
+
     it('fails interrupted running rows, then returns serialized backups', async () => {
       queryMock.mockImplementation((sql: string) => {
         if (sql.includes("SET status = 'failed'")) {
@@ -321,6 +338,33 @@ describe('DatabaseBackupService', () => {
         statusCode: 409,
         code: ERROR_CODES.DATABASE_CONSTRAINT_VIOLATION,
       });
+    });
+
+    it('blocks a restore while a rename or delete is in flight', async () => {
+      let releaseDelete!: (value: { rows: unknown[] }) => void;
+      const gatedRow = new Promise<{ rows: unknown[] }>((resolve) => {
+        releaseDelete = resolve;
+      });
+      queryMock.mockImplementation((sql: string) => {
+        if (sql.includes('storage_key AS "storageKey"')) {
+          return gatedRow;
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const service = DatabaseBackupService.getInstance();
+      const deletion = service.deleteBackup('some-id');
+
+      // The delete has passed its guard but is still awaiting the row lookup;
+      // a restore starting now would snapshot metadata the delete is about to
+      // change, so it must be rejected.
+      await expect(service.restoreBackup('some-id')).rejects.toMatchObject({
+        statusCode: 409,
+        code: ERROR_CODES.DATABASE_CONSTRAINT_VIOLATION,
+      });
+
+      releaseDelete({ rows: [backupRow({ status: 'completed', storageKey: 'gone.dump' })] });
+      await deletion;
     });
 
     it('blocks concurrent restores and metadata mutations while a restore runs', async () => {
