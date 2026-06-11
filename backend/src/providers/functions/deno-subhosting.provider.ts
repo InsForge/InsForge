@@ -385,11 +385,11 @@ export class DenoSubhostingProvider {
 
   /**
    * Build the public function URL for an app slug. Points at the CloudFront
-   * proxy domain (config.denoSubhosting.domain, e.g. `function2.insforge.app`),
+   * proxy domain (appConfig.denoSubhosting.domain, e.g. `function2.insforge.app`),
    * which forwards to `{slug}.insforge.deno.net`.
    */
   private getFunctionUrl(slug: string): string {
-    return `https://${slug}.${config.denoSubhosting.domain}`;
+    return `https://${slug}.${appConfig.denoSubhosting.domain}`;
   }
 
   /**
@@ -467,7 +467,7 @@ export class DenoSubhostingProvider {
     // Single source of truth for the Deno app slug (= APP_KEY). deployFunctions,
     // getDeployment, and getDeploymentAppLogs must all resolve it the same way,
     // otherwise we deploy to one app and poll status/logs/URL for another.
-    const slug = config.cloud.appKey;
+    const slug = appConfig.cloud.appKey;
 
     try {
       // Ensure the app exists
@@ -624,7 +624,7 @@ export class DenoSubhostingProvider {
 
       // v2 revisions carry no app slug or domain; the URL is deterministic from
       // our app slug (= APP_KEY). Only surface it once the revision succeeds.
-      const slug = config.cloud.appKey;
+      const slug = appConfig.cloud.appKey;
 
       return {
         id: data.id,
@@ -660,7 +660,7 @@ export class DenoSubhostingProvider {
     try {
       // v2 logs are app-scoped (`/apps/{slug}/logs`) and filtered by revision.
       // `deploymentId` is the revision id; the app slug is our APP_KEY.
-      const slug = config.cloud.appKey;
+      const slug = appConfig.cloud.appKey;
 
       // v2 requires a `start`. Default to a 24h window ending at `end` (or now)
       // so "latest logs" requests keep working without the caller computing it.
