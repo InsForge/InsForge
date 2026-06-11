@@ -17,7 +17,7 @@ function escapeCSVField(field: unknown): string {
 
   let stringValue = String(field);
 
-  if (stringValue.match(/^[==+\-@@]/)) {
+  if (stringValue.match(/^[=+\-@]/)) {
     stringValue = `'${stringValue}`;
   }
   // If field contains comma, quotes, or newline, wrap in quotes and escape quotes
