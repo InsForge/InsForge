@@ -21,6 +21,9 @@ import logger from '@/utils/logger.js';
 // otherwise it is written to `<STORAGE_DIR>/_database_backups/<key>`.
 const BACKUP_BUCKET = '_database_backups';
 const MAX_STDERR_LENGTH = 4000;
+const RESTORE_APPLICATION_NAME = 'insforge-backup-restore';
+const RESTORE_LOCK_POLL_INTERVAL_MS = 5_000;
+const RESTORE_LOCK_WAIT_TIMEOUT_MS = 30_000;
 
 const BACKUP_COLUMNS = `
   id,
@@ -280,17 +283,113 @@ export class DatabaseBackupService {
       // acquire what it needs; if something does hold a lock, the
       // single-transaction restore fails and rolls back instead.
       const artifact = await this.openArtifactStream(backup.storageKey);
-      await this.runPgTool(
-        'pg_restore',
-        ['--clean', '--if-exists', '--single-transaction', '-d', appConfig.database.name],
-        artifact
-      );
+      const watchdog = this.startRestoreLockWatchdog();
+      try {
+        await this.runPgTool(
+          'pg_restore',
+          ['--clean', '--if-exists', '--single-transaction', '-d', appConfig.database.name],
+          artifact
+        );
+      } catch (error) {
+        if (watchdog.wasTriggered()) {
+          throw new AppError(
+            `Restore aborted after waiting more than ${RESTORE_LOCK_WAIT_TIMEOUT_MS / 1000}s for a database lock. Close open transactions and long-running queries, then retry.`,
+            409,
+            ERROR_CODES.DATABASE_CONSTRAINT_VIOLATION
+          );
+        }
+        throw error;
+      } finally {
+        watchdog.stop();
+      }
 
-      const client = await pool.connect();
+      await this.writeBackMetadataSnapshot(snapshot.rows as Record<string, unknown>[]);
+      await pool.query(`NOTIFY pgrst, 'reload schema';`).catch((error: unknown) => {
+        logger.warn('Failed to notify PostgREST after restore', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+
+      DatabaseManager.clearColumnTypeCache();
+      logger.info('Database restore completed', { backupId: id });
+    } finally {
+      this.restoreInProgress = false;
+    }
+  }
+
+  /**
+   * Bounds how long a restore may wait on a database lock. The dump preamble
+   * replays `SET lock_timeout = 0`, overriding any client-side setting, so
+   * this polls pg_stat_activity instead and terminates the restore session
+   * once it has been continuously lock-waiting past the timeout — the
+   * single-transaction restore then rolls back cleanly.
+   */
+  private startRestoreLockWatchdog(): { stop: () => void; wasTriggered: () => boolean } {
+    let lockWaitStartedAt: number | null = null;
+    let triggered = false;
+
+    const timer = setInterval(() => {
+      void (async () => {
+        try {
+          const result = await this.dbManager
+            .getPool()
+            .query(
+              `SELECT pid, wait_event_type AS "waitEventType" FROM pg_stat_activity WHERE application_name = $1`,
+              [RESTORE_APPLICATION_NAME]
+            );
+          const session = result.rows[0] as
+            | { pid: number; waitEventType: string | null }
+            | undefined;
+
+          if (!session || session.waitEventType !== 'Lock') {
+            lockWaitStartedAt = null;
+            return;
+          }
+
+          lockWaitStartedAt = lockWaitStartedAt ?? Date.now();
+          if (!triggered && Date.now() - lockWaitStartedAt > RESTORE_LOCK_WAIT_TIMEOUT_MS) {
+            triggered = true;
+            logger.warn('Terminating restore stuck waiting on a database lock', {
+              pid: session.pid,
+              waitedMs: Date.now() - lockWaitStartedAt,
+            });
+            await this.dbManager.getPool().query('SELECT pg_terminate_backend($1)', [session.pid]);
+          }
+        } catch {
+          // Transient monitoring failures must never break the restore.
+        }
+      })();
+    }, RESTORE_LOCK_POLL_INTERVAL_MS);
+    timer.unref();
+
+    return {
+      stop: () => clearInterval(timer),
+      wasTriggered: () => triggered,
+    };
+  }
+
+  /**
+   * Rewrites system.database_backups with the pre-restore snapshot. Retried
+   * because the table was just recreated by pg_restore; on final failure the
+   * restore is still reported as successful and the stale list is logged for
+   * the operator (it self-corrects on the next backup mutation).
+   */
+  private async writeBackMetadataSnapshot(rows: Record<string, unknown>[]): Promise<void> {
+    const pool = this.dbManager.getPool();
+    let lastError: unknown = null;
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const client = await pool.connect().catch((error: unknown) => {
+        lastError = error;
+        return null;
+      });
+      if (!client) {
+        continue;
+      }
       try {
         await client.query('BEGIN');
         await client.query('TRUNCATE system.database_backups');
-        for (const row of snapshot.rows as Record<string, unknown>[]) {
+        for (const row of rows) {
           await client.query(
             `INSERT INTO system.database_backups
                (id, name, trigger_source, status, storage_key, size_bytes,
@@ -311,20 +410,20 @@ export class DatabaseBackupService {
             ]
           );
         }
-        await client.query(`NOTIFY pgrst, 'reload schema';`);
         await client.query('COMMIT');
+        return;
       } catch (error) {
+        lastError = error;
         await client.query('ROLLBACK').catch(() => {});
-        throw error;
       } finally {
         client.release();
       }
-
-      DatabaseManager.clearColumnTypeCache();
-      logger.info('Database restore completed', { backupId: id });
-    } finally {
-      this.restoreInProgress = false;
     }
+
+    logger.error(
+      'Failed to write back backup metadata after restore; the backups list reflects the archived state until the next backup operation.',
+      { error: lastError instanceof Error ? lastError.message : String(lastError) }
+    );
   }
 
   private async runBackup(id: string): Promise<void> {
@@ -387,9 +486,14 @@ export class DatabaseBackupService {
     const { host, port, user, password } = appConfig.database;
     const args = ['-h', host, '-p', String(port), '-U', user, '--no-password', ...extraArgs];
 
+    const env: NodeJS.ProcessEnv = { ...process.env, PGPASSWORD: password };
+    if (tool === 'pg_restore') {
+      env.PGAPPNAME = RESTORE_APPLICATION_NAME;
+    }
+
     return new Promise((resolve, reject) => {
       const child = spawn(tool, args, {
-        env: { ...process.env, PGPASSWORD: password },
+        env,
         stdio: ['pipe', 'pipe', 'pipe'],
       });
 
@@ -524,24 +628,26 @@ export class DatabaseBackupService {
 
   /**
    * A backup interrupted by a process exit never reaches its finally-cleanup,
-   * leaving a partial dump in a `.backup-tmp-*` dir. Sweep dirs older than an
-   * hour — age-based so an in-flight backup's temp dir is never touched.
+   * leaving a partial dump in a `.backup-tmp-*` dir. With no backup in flight
+   * on this single-instance server, any such dir is an orphan. Directory
+   * mtime is NOT a safe liveness signal (appending to the dump file never
+   * touches it), so the guard is the in-memory flag, checked again before
+   * each removal in case a backup starts mid-sweep.
    */
   private async cleanupStaleTmpDirs(): Promise<void> {
-    const maxAgeMs = 60 * 60 * 1000;
+    if (this.backupInFlight) {
+      return;
+    }
     try {
       const entries = await fs.readdir(appConfig.storage.storageDir);
-      await Promise.all(
-        entries
-          .filter((name) => name.startsWith('.backup-tmp-'))
-          .map(async (name) => {
-            const dirPath = path.join(appConfig.storage.storageDir, name);
-            const stats = await fs.stat(dirPath).catch(() => null);
-            if (stats && Date.now() - stats.mtimeMs > maxAgeMs) {
-              await fs.rm(dirPath, { recursive: true, force: true }).catch(() => {});
-            }
-          })
-      );
+      for (const name of entries.filter((n) => n.startsWith('.backup-tmp-'))) {
+        if (this.backupInFlight) {
+          return;
+        }
+        await fs
+          .rm(path.join(appConfig.storage.storageDir, name), { recursive: true, force: true })
+          .catch(() => {});
+      }
     } catch {
       // The storage dir may not exist yet on a fresh install.
     }

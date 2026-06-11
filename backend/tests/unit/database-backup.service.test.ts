@@ -57,10 +57,11 @@ vi.mock('../../src/providers/storage/s3.provider', () => ({
   S3StorageProvider: vi.fn(),
 }));
 
-vi.mock('../../src/utils/logger', () => {
-  const noopLogger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
-  return { default: noopLogger, logger: noopLogger };
-});
+const { loggerMock } = vi.hoisted(() => ({
+  loggerMock: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+
+vi.mock('../../src/utils/logger', () => ({ default: loggerMock, logger: loggerMock }));
 
 vi.mock('node:child_process', () => ({
   spawn: spawnMock,
@@ -142,21 +143,40 @@ describe('DatabaseBackupService', () => {
   });
 
   describe('listBackups', () => {
-    it('sweeps stale backup temp dirs but keeps recent ones', async () => {
-      const staleDir = path.join(STORAGE_DIR, '.backup-tmp-stale');
-      const freshDir = path.join(STORAGE_DIR, '.backup-tmp-fresh');
-      await fs.mkdir(staleDir, { recursive: true });
-      await fs.mkdir(freshDir, { recursive: true });
-      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
-      await fs.utimes(staleDir, twoHoursAgo, twoHoursAgo);
+    it('sweeps orphaned backup temp dirs when no backup is in flight', async () => {
+      const orphanDir = path.join(STORAGE_DIR, '.backup-tmp-orphan');
+      await fs.mkdir(orphanDir, { recursive: true });
 
       queryMock.mockResolvedValue({ rows: [] });
       const service = DatabaseBackupService.getInstance();
       await service.listBackups();
 
-      await expect(fs.stat(staleDir)).rejects.toMatchObject({ code: 'ENOENT' });
-      await expect(fs.stat(freshDir)).resolves.toBeTruthy();
-      await fs.rm(freshDir, { recursive: true, force: true });
+      await expect(fs.stat(orphanDir)).rejects.toMatchObject({ code: 'ENOENT' });
+    });
+
+    it('never sweeps temp dirs while a backup is in flight', async () => {
+      const liveDir = path.join(STORAGE_DIR, '.backup-tmp-live');
+      await fs.mkdir(liveDir, { recursive: true });
+
+      queryMock.mockImplementation((sql: string) => {
+        if (sql.includes('INSERT INTO system.database_backups')) {
+          return Promise.resolve({ rows: [backupRow()] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+      const pending = makeFakeChild({ autoClose: false });
+      spawnMock.mockImplementation(() => pending.child);
+
+      const service = DatabaseBackupService.getInstance();
+      await service.createBackup({}, 'admin');
+
+      await service.listBackups();
+      await expect(fs.stat(liveDir)).resolves.toBeTruthy();
+
+      await vi.waitFor(() => expect(spawnMock).toHaveBeenCalled());
+      pending.finish();
+      await waitForIdle(service);
+      await fs.rm(liveDir, { recursive: true, force: true });
     });
 
     it('fails interrupted running rows, then returns serialized backups', async () => {
@@ -437,7 +457,9 @@ describe('DatabaseBackupService', () => {
       expect(spawnMock).toHaveBeenCalledWith(
         'pg_restore',
         expect.arrayContaining(['--clean', '--if-exists', '--single-transaction']),
-        expect.anything()
+        expect.objectContaining({
+          env: expect.objectContaining({ PGAPPNAME: 'insforge-backup-restore' }),
+        })
       );
       // Terminating other sessions would crash the backend's own long-lived
       // clients (realtime LISTEN), so the restore flow must never do it.
@@ -451,10 +473,109 @@ describe('DatabaseBackupService', () => {
       expect(clientSql.some((sql) => sql.includes('INSERT INTO system.database_backups'))).toBe(
         true
       );
-      expect(clientSql.some((sql) => sql.includes('NOTIFY pgrst'))).toBe(true);
       expect(clientSql).toContain('COMMIT');
+      // The PostgREST reload runs outside the write-back transaction so a
+      // write-back failure cannot leave PostgREST on a stale schema.
+      expect(queryMock.mock.calls.some(([sql]) => (sql as string).includes('NOTIFY pgrst'))).toBe(
+        true
+      );
       expect(clearColumnTypeCacheMock).toHaveBeenCalled();
       expect(releaseMock).toHaveBeenCalled();
+    });
+
+    it('terminates a restore stuck waiting on a database lock', async () => {
+      const storageKey = '20260611_050607.dump';
+      const artifactDir = path.join(STORAGE_DIR, '_database_backups');
+      await fs.mkdir(artifactDir, { recursive: true });
+      await fs.writeFile(path.join(artifactDir, storageKey), 'archive-bytes');
+
+      const terminateCalls: unknown[][] = [];
+      queryMock.mockImplementation((sql: string, params?: unknown[]) => {
+        if (sql.includes('WHERE id = $1') && !sql.includes('pg_terminate_backend')) {
+          return Promise.resolve({
+            rows: [backupRow({ status: 'completed', storageKey })],
+          });
+        }
+        if (sql.includes('pg_stat_activity')) {
+          return Promise.resolve({ rows: [{ pid: 4242, waitEventType: 'Lock' }] });
+        }
+        if (sql.includes('pg_terminate_backend')) {
+          terminateCalls.push(params ?? []);
+          return Promise.resolve({ rows: [] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+      const pending = makeFakeChild({
+        stdoutData: null,
+        autoClose: false,
+        exitCode: 1,
+        stderrData: 'FATAL: terminating connection due to administrator command',
+      });
+      spawnMock.mockImplementation(() => pending.child);
+
+      vi.useFakeTimers();
+      try {
+        const service = DatabaseBackupService.getInstance();
+        const restore = service.restoreBackup('some-id');
+        restore.catch(() => {});
+
+        // 5s polls; the session reports Lock-waiting every tick, so the
+        // watchdog should terminate it once 30s of continuous waiting passes.
+        await vi.advanceTimersByTimeAsync(45_000);
+        expect(terminateCalls).toHaveLength(1);
+        expect(terminateCalls[0]).toEqual([4242]);
+
+        vi.useRealTimers();
+        // The terminated pg_restore exits nonzero; the service maps it to a
+        // clear lock-timeout error instead of the raw stderr.
+        pending.finish();
+        await expect(restore).rejects.toMatchObject({
+          statusCode: 409,
+          message: expect.stringContaining('waiting more than 30s for a database lock'),
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('still reports success when the metadata write-back fails after retries', async () => {
+      const storageKey = '20260611_010203.dump';
+      const artifactDir = path.join(STORAGE_DIR, '_database_backups');
+      await fs.mkdir(artifactDir, { recursive: true });
+      await fs.writeFile(path.join(artifactDir, storageKey), 'archive-bytes');
+
+      queryMock.mockImplementation((sql: string) => {
+        if (sql.includes('WHERE id = $1')) {
+          return Promise.resolve({
+            rows: [backupRow({ status: 'completed', storageKey })],
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+      clientQueryMock.mockImplementation((sql: string) => {
+        if (sql.includes('TRUNCATE')) {
+          return Promise.reject(new Error('deadlock detected'));
+        }
+        return Promise.resolve({ rows: [] });
+      });
+      spawnMock.mockImplementation(() => makeFakeChild({ stdoutData: null }).child);
+
+      const service = DatabaseBackupService.getInstance();
+      await expect(service.restoreBackup('some-id')).resolves.toBeUndefined();
+
+      // Three attempts, each rolled back.
+      const truncates = clientQueryMock.mock.calls.filter(([sql]) =>
+        (sql as string).includes('TRUNCATE')
+      );
+      expect(truncates).toHaveLength(3);
+      expect(loggerMock.error).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to write back backup metadata'),
+        expect.objectContaining({ error: 'deadlock detected' })
+      );
+      // PostgREST is still reloaded even though the write-back failed.
+      expect(queryMock.mock.calls.some(([sql]) => (sql as string).includes('NOTIFY pgrst'))).toBe(
+        true
+      );
     });
   });
 });
