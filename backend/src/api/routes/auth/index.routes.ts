@@ -5,6 +5,7 @@ import { AuthConfigService } from '@/services/auth/auth-config.service.js';
 import { AuthOTPService, OTPPurpose } from '@/services/auth/auth-otp.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
+import { SecretService } from '@/services/secrets/secret.service.js';
 import { AppError } from '@/utils/errors.js';
 import { successResponse } from '@/utils/response.js';
 import {
@@ -768,20 +769,32 @@ router.delete(
   }
 );
 
-// POST /api/auth/tokens/anon - Generate anonymous JWT token (never expires)
-router.post('/tokens/anon', verifyAdmin, (_req: Request, res: Response, next: NextFunction) => {
-  try {
-    const tokenManager = TokenManager.getInstance();
-    const token = tokenManager.generateAnonToken();
+// POST /api/auth/tokens/anon - DEPRECATED: use GET /api/metadata/anon-key
+// Kept for backward compatibility; now returns the opaque anon key instead of
+// minting a non-revocable anon JWT. The opaque key is accepted everywhere the
+// legacy anon JWT was (Authorization: Bearer), so existing callers keep working.
+router.post(
+  '/tokens/anon',
+  verifyAdmin,
+  async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const secretService = SecretService.getInstance();
+      const anonKey = await secretService.getSecretByKey('ANON_KEY');
 
-    successResponse(res, {
-      accessToken: token,
-      message: 'Anonymous token generated successfully (never expires)',
-    });
-  } catch (error) {
-    next(error);
+      if (!anonKey) {
+        throw new AppError('Anon key not initialized', 404, ERROR_CODES.SECRET_NOT_FOUND);
+      }
+
+      successResponse(res, {
+        accessToken: anonKey,
+        message:
+          'Anon key retrieved successfully (deprecated route, use GET /api/metadata/anon-key)',
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // POST /api/auth/email/send-verification - Send email verification (code or link based on config)
 router.post(

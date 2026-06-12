@@ -256,6 +256,44 @@ paths:
                 statusCode: 403
                 nextAction: "Contact an administrator for API key access"
 
+  /api/metadata/anon-key:
+    get:
+      summary: Get anon key
+      description: >-
+        Admin-only endpoint to retrieve the project's opaque anon key
+        (`anon_...`). The anon key is a non-secret client identifier that maps
+        requests to the `anon` role - safe to embed in frontend bundles; row
+        level security is the security boundary. Rotatable via
+        POST /api/secrets/anon-key/rotate.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Anon key
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  anonKey:
+                    type: string
+              example:
+                anonKey: "anon_1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcd"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Anon key not initialized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
 components:
   securitySchemes:
     bearerAuth:

@@ -213,7 +213,7 @@ export class StorageService {
     // Raw-pool dedup sees all rows and avoids silent cross-user blob overwrite.
     const finalKey = await this.generateNextAvailableKey(bucket, originalKey, this.getPool());
 
-    const userId = ctx?.id ?? null;
+    const userId = ctx?.role === 'authenticated' ? ctx.id : null;
     const insertObject = async (db: PoolClient) => {
       // INSERT before provider write so UNIQUE (bucket, key) catches any
       // race-window collision before any blob is touched. Provider write
@@ -546,7 +546,7 @@ export class StorageService {
     if (!ctx) {
       throw new AppError('Forbidden', 403, ERROR_CODES.STORAGE_PERMISSION_DENIED);
     }
-    const userId = ctx.id ?? null;
+    const userId = ctx?.role === 'authenticated' ? ctx.id : null;
     await withUserContext(this.getPool(), ctx, async (client) => {
       await client.query('SAVEPOINT upload_strategy_rls_probe');
       try {
@@ -692,7 +692,7 @@ export class StorageService {
     // INSERT runs through withUserContext for end-user callers, so the RLS
     // WITH CHECK on storage_objects_owner_insert verifies uploaded_by =
     // jwt.sub. Admin/API-key callers use the backend pool.
-    const userId = ctx?.id ?? null;
+    const userId = ctx?.role === 'authenticated' ? ctx.id : null;
     const insertObjectRow = (db: PoolClient) =>
       db.query(
         `INSERT INTO storage.objects (bucket, key, size, mime_type, etag, uploaded_by, uploaded_via)
