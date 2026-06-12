@@ -60,6 +60,7 @@ import { EMAIL_TEMPLATE_TYPES, type EmailTemplate } from '@/types/email.js';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import logger from '@/utils/logger.js';
+import { assertValidWebLogoutCsrf } from './logout-csrf.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
@@ -629,6 +630,10 @@ router.post('/logout', (req: Request, res: Response, next: NextFunction) => {
     const clientType = parseClientType(req.query.client_type);
 
     if (clientType === 'web') {
+      assertValidWebLogoutCsrf({
+        refreshToken: req.cookies?.[REFRESH_TOKEN_COOKIE_NAME],
+        csrfToken: req.headers['x-csrf-token'] as string | undefined,
+      });
       clearRefreshTokenCookie(res);
     }
     // For non-web clients: no server-side cleanup needed.
