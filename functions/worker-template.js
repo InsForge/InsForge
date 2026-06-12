@@ -53,15 +53,61 @@ try {
 // ----------------------------
 
 // ----------------------------
+// EARLY MESSAGE BUFFERING (Race Fix)
+// ----------------------------
+// The runtime (server.ts -> executeInWorker) calls worker.postMessage()
+// immediately after `new Worker()`. Web Workers do NOT queue messages that
+// arrive before an `onmessage` handler is registered, so if we only attached
+// the handler AFTER the top-level `await import(...)` below (cold import can
+// take >200ms), the request message was silently dropped -> 504 timeout.
+//
+// Fix: register a synchronous handler BEFORE any top-level await. It buffers
+// any early message(s). Once imports finish, we drain the buffer through the
+// real handler and swap `self.onmessage` to point at it directly.
+let __readyHandler = null;
+const __earlyMessages = [];
+self.onmessage = (e) => {
+  if (__readyHandler) {
+    __readyHandler(e);
+  } else {
+    __earlyMessages.push(e);
+  }
+};
+
+// ----------------------------
 // LATE IMPORTS (Pre-emptive Mocking)
 // ----------------------------
 // We use dynamic imports AFTER the environment is shadowed.
-const { createClient } = await import('npm:@insforge/sdk');
-const { encodeBase64, decodeBase64 } =
-  await import('https://deno.land/std@0.224.0/encoding/base64.ts');
+//
+// If an import fails (e.g. npm registry unreachable under restricted egress),
+// the worker can never produce a real handler. Without this guard the buffered
+// message would hang until the runtime's 60s timeout -> slow, undiagnosable 504.
+// Instead: respond to the buffered message AND any future message with an
+// explicit 500 (same {success,error,status} shape server.ts onmessage expects),
+// then terminate.
+let createClient, encodeBase64, decodeBase64;
+try {
+  ({ createClient } = await import('npm:@insforge/sdk'));
+  ({ encodeBase64, decodeBase64 } =
+    await import('https://deno.land/std@0.224.0/encoding/base64.ts'));
+} catch (importError) {
+  const failMsg = 'SDK import failed: ' + (importError?.message || importError);
+  console.error(failMsg);
+  const importFailureHandler = () => {
+    self.postMessage({ success: false, error: failMsg, status: 500 });
+  };
+  // Register fallback for any future message, and answer buffered ones now.
+  __readyHandler = importFailureHandler;
+  self.onmessage = importFailureHandler;
+  for (const e of __earlyMessages.splice(0)) {
+    importFailureHandler(e);
+  }
+  self.close();
+  throw new Error(failMsg);
+}
 
 // Handle the single message with code, request data, and secrets
-self.onmessage = async (e) => {
+const handleMessage = async (e) => {
   const { code, requestData, secrets = {} } = e.data;
 
   try {
@@ -165,3 +211,10 @@ self.onmessage = async (e) => {
     }
   }
 };
+
+// Activate the real handler and drain any messages that arrived during import.
+__readyHandler = handleMessage;
+self.onmessage = handleMessage;
+for (const e of __earlyMessages.splice(0)) {
+  handleMessage(e);
+}
