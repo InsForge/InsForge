@@ -404,6 +404,10 @@ export const authConfigAdminResponseSchema = z.object({
  */
 export const getPublicAuthConfigResponseSchema = authConfigAdminResponseSchema.omit({
   allowedRedirectUrls: true,
+  verifyEmailCodeExpiryMinutes: true,
+  verifyEmailLinkExpiryMinutes: true,
+  resetPasswordCodeExpiryMinutes: true,
+  resetPasswordLinkExpiryMinutes: true,
   smtpConfig: true,
 });
 
