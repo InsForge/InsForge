@@ -117,6 +117,14 @@ services:
       - CLOUD_API_HOST=${CLOUD_API_HOST:-}
       # LLM Model API keys
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      # Local email capture (defaults to Mailpit for docker compose dev)
+      - SMTP_HOST=${SMTP_HOST:-mailpit}
+      - SMTP_PORT=${SMTP_PORT:-1025}
+      - SMTP_USERNAME=${SMTP_USERNAME:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_SENDER_EMAIL=${SMTP_SENDER_EMAIL:-noreply@insforge.local}
+      - SMTP_SENDER_NAME=${SMTP_SENDER_NAME:-InsForge}
+      - SMTP_MIN_INTERVAL_SECONDS=${SMTP_MIN_INTERVAL_SECONDS:-0}
       # Stripe Payments Configuration
       - STRIPE_TEST_SECRET_KEY=${STRIPE_TEST_SECRET_KEY:-}
       - STRIPE_LIVE_SECRET_KEY=${STRIPE_LIVE_SECRET_KEY:-}
@@ -166,6 +174,18 @@ services:
       - storage-data:/insforge-storage
     command: sh -c 'npm install && npx turbo run build --filter=@insforge/shared-schemas --filter=@insforge/ui --filter=@insforge/dashboard && cd backend && npm run migrate:up && cd .. && npx concurrently -n backend,frontend -c cyan,magenta "npm run dev:backend" "npm run dev:frontend"'
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - insforge-network
+
+  # Local email capture for auth verification, password reset, and magic-link flows
+  mailpit:
+    image: axllent/mailpit:v1.30.0
+    restart: unless-stopped
+    ports:
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "${MAILPIT_UI_PORT:-7134}:8025"
     security_opt:
       - no-new-privileges:true
     networks:

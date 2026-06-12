@@ -26,6 +26,7 @@
     "migrate:redo": "npm run migrate:bootstrap && node-pg-migrate redo --migrations-dir src/infra/database/migrations --migrations-schema system --migrations-table migrations",
     "migrate:up:local": "dotenv -e ../.env -- npm run migrate:bootstrap && dotenv -e ../.env -- node-pg-migrate up --migrations-dir src/infra/database/migrations --migrations-schema system --migrations-table migrations",
     "migrate:down:local": "dotenv -e ../.env -- node-pg-migrate down --migrations-dir src/infra/database/migrations --migrations-schema system --migrations-table migrations",
+    "seed:run": "dotenv -e ../.env -- tsx src/scripts/seed-backend.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint ."
   },
