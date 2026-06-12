@@ -155,6 +155,9 @@ export default function SQLEditorPage() {
       return;
     }
 
+    // Clear any previous export error when running a new query
+    setExportError(null);
+
     executeSQL({ query: activeTab.query, params: [] });
   };
 
