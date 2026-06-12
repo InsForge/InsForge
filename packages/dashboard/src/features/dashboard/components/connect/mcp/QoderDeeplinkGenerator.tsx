@@ -3,7 +3,7 @@ import { createMCPServerConfig, type PlatformType } from './helpers';
 import QoderLogo from '#assets/logos/qoder.svg?react';
 import { getBackendUrl } from '#lib/utils/utils';
 import { trackEvent, getFeatureFlag } from '#lib/analytics/posthog';
-import { ANALYTICS_EVENTS, FEATURE_FLAGS } from '#lib/analytics/events';
+import { ANALYTICS_EVENTS, FEATURE_FLAGS } from '#lib/analytics/constants';
 
 interface QoderDeeplinkGeneratorProps {
   apiKey?: string;

@@ -12,8 +12,9 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
+  Skeleton,
 } from '@insforge/ui';
-import { CodeEditor, Skeleton, TableHeader } from '#components';
+import { CodeEditor, TableHeader } from '#components';
 import { useConfirm } from '#lib/hooks/useConfirm';
 
 const MAX_FUNCTION_FILE_SIZE_BYTES = 1024 * 1024;

@@ -5,7 +5,7 @@ import { Button } from '@insforge/ui';
 import { useDashboardHost, useDashboardProject } from '#lib/config/DashboardHostContext';
 import { useAuth } from '#lib/contexts/AuthContext';
 import { getFeatureFlag } from '#lib/analytics/posthog';
-import { FEATURE_FLAGS } from '#lib/analytics/events';
+import { FEATURE_FLAGS } from '#lib/analytics/constants';
 import { useMcpUsage } from '#features/logs/hooks/useMcpUsage';
 
 export default function CloudLoginPage() {

@@ -15,7 +15,7 @@ import {
 } from '#lib/hooks/useMetadata';
 import { cn, getBackendUrl } from '#lib/utils/utils';
 import { getFeatureFlag } from '#lib/analytics/posthog';
-import { FEATURE_FLAGS } from '#lib/analytics/events';
+import { FEATURE_FLAGS } from '#lib/analytics/constants';
 
 interface ClientDetailPageProps {
   clientId: ClientId;

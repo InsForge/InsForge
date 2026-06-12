@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Badge, Button } from '@insforge/ui';
-import { Skeleton } from '#components';
+import { Badge, Button, Skeleton } from '@insforge/ui';
 import {
   Braces,
   CheckCircle,

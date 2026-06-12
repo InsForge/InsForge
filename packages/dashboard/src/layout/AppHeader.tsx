@@ -14,7 +14,7 @@ import { useTheme } from '#lib/contexts/ThemeContext';
 import { useAuth } from '#lib/contexts/AuthContext';
 import { useOpenConnectDialog } from './ConnectDialogContext';
 import { getFeatureFlag } from '#lib/analytics/posthog';
-import { FEATURE_FLAGS } from '#lib/analytics/events';
+import { FEATURE_FLAGS } from '#lib/analytics/constants';
 
 // Import SVG icons
 import DiscordIcon from '#assets/logos/discord.svg?react';

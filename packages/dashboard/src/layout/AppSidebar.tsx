@@ -14,7 +14,7 @@ import { cn, isInsForgeCloudProject } from '#lib/utils/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import { ProjectSettingsMenuDialog } from '#features/dashboard/components';
 import { getFeatureFlag } from '#lib/analytics/posthog';
-import { FEATURE_FLAGS } from '#lib/analytics/events';
+import { FEATURE_FLAGS } from '#lib/analytics/constants';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
 
 interface AppSidebarProps extends React.HTMLAttributes<HTMLElement> {

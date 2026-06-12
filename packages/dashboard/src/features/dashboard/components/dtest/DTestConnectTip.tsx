@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { getFeatureFlag } from '#lib/analytics/posthog';
-import { FEATURE_FLAGS } from '#lib/analytics/events';
+import { FEATURE_FLAGS } from '#lib/analytics/constants';
 import { useProjectId } from '#lib/hooks/useMetadata';
 import { useDashboardHost, useDashboardProject } from '#lib/config/DashboardHostContext';
 

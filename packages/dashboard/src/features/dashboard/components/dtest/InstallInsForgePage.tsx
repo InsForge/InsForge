@@ -9,7 +9,7 @@ import {
   type ClientId,
 } from './clientRegistry';
 import { getFeatureFlag } from '#lib/analytics/posthog';
-import { FEATURE_FLAGS } from '#lib/analytics/events';
+import { FEATURE_FLAGS } from '#lib/analytics/constants';
 
 interface InstallInsForgePageProps {
   onSelectClient: (id: ClientId) => void;

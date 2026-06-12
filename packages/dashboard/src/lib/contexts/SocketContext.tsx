@@ -18,7 +18,7 @@ import { databaseTableQueryKeys } from '#features/database/queryKeys';
 import { parseDatabaseTableReference } from '#features/database/helpers';
 import { useMcpUsage } from '#features/logs/hooks/useMcpUsage';
 import { trackEvent, getFeatureFlag } from '#lib/analytics/posthog';
-import { ANALYTICS_EVENTS, FEATURE_FLAGS } from '#lib/analytics/events';
+import { ANALYTICS_EVENTS, FEATURE_FLAGS } from '#lib/analytics/constants';
 
 // ============================================================================
 // Types & Enums

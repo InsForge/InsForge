@@ -1,4 +1,4 @@
-import * as React from 'react';
+import type { ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from './Button';
 import { cn } from '../lib';
@@ -9,7 +9,7 @@ export interface EmptyStateProps {
   /** Image source URL, used when no icon is given. */
   image?: string;
   /** Arbitrary visual (e.g. an inline SVG component), used when no icon or image is given. */
-  visual?: React.ReactNode;
+  visual?: ReactNode;
   title: string;
   description?: string;
   action?: {
