@@ -787,7 +787,8 @@ router.post(
 
       successResponse(res, {
         accessToken: anonKey,
-        message: 'Anon key retrieved successfully (deprecated route, use GET /api/metadata/anon-key)',
+        message:
+          'Anon key retrieved successfully (deprecated route, use GET /api/metadata/anon-key)',
       });
     } catch (error) {
       next(error);
