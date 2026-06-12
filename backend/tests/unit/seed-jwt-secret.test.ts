@@ -3,9 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mockGetSecretByKey = vi.fn();
 const mockCreateSecret = vi.fn();
 const mockInitializeApiKey = vi.fn().mockResolvedValue('api-key');
+const mockInitializeAnonKey = vi.fn().mockResolvedValue('anon_test');
 const mockIsCloudEnvironment = vi.fn();
 const mockGetApiBaseUrl = vi.fn().mockReturnValue('https://api.example.com');
-const mockGenerateAnonToken = vi.fn().mockReturnValue('anon-token');
 const mockClientQuery = vi.fn();
 const mockClientRelease = vi.fn();
 const mockConnect = vi.fn().mockResolvedValue({
@@ -21,6 +21,7 @@ vi.mock('../../src/services/secrets/secret.service.js', () => ({
       getSecretByKey: mockGetSecretByKey,
       createSecret: mockCreateSecret,
       initializeApiKey: mockInitializeApiKey,
+      initializeAnonKey: mockInitializeAnonKey,
     }),
   },
 }));
@@ -28,14 +29,6 @@ vi.mock('../../src/services/secrets/secret.service.js', () => ({
 vi.mock('../../src/utils/environment.js', () => ({
   isCloudEnvironment: mockIsCloudEnvironment,
   getApiBaseUrl: mockGetApiBaseUrl,
-}));
-
-vi.mock('../../src/infra/security/token.manager.js', () => ({
-  TokenManager: {
-    getInstance: () => ({
-      generateAnonToken: mockGenerateAnonToken,
-    }),
-  },
 }));
 
 vi.mock('../../src/infra/database/database.manager.js', () => ({

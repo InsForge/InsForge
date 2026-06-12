@@ -8,7 +8,11 @@ import { RealtimeChannelService } from '@/services/realtime/realtime-channel.ser
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/utils/errors.js';
-import { ERROR_CODES, type ProjectIdResponse } from '@insforge/shared-schemas';
+import {
+  ERROR_CODES,
+  type AnonKeyResponse,
+  type ProjectIdResponse,
+} from '@insforge/shared-schemas';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { CloudDatabaseProvider } from '@/providers/database/cloud.provider.js';
@@ -114,6 +118,26 @@ router.get('/api-key', async (req: AuthRequest, res: Response, next: NextFunctio
   }
 });
 
+// Get anon key (admin only)
+// Opaque, non-secret client identifier (`anon_...`) that maps requests to the
+// `anon` role. Safe to embed in frontend bundles; RLS is the security boundary.
+// Seeded at startup by seedBackend(), so it always exists here.
+router.get('/anon-key', async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const secretService = SecretService.getInstance();
+    const anonKey = await secretService.getSecretByKey('ANON_KEY');
+
+    if (!anonKey) {
+      throw new AppError('Anon key not initialized', 404, ERROR_CODES.SECRET_NOT_FOUND);
+    }
+
+    const response: AnonKeyResponse = { anonKey };
+    successResponse(res, response);
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Get backend project id from environment (admin only)
 router.get('/project-id', (_req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -152,7 +176,7 @@ router.get('/database-password', async (_req: AuthRequest, res: Response, next: 
 });
 
 // get metadata for a table.
-// Notice: must be after fixed endpoints like /api-key and /project-id in case of conflict.
+// Notice: must be after fixed endpoints like /api-key, /anon-key, and /project-id in case of conflict.
 router.get('/:tableName', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { tableName } = req.params;

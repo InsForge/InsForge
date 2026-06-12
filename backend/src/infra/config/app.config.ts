@@ -68,6 +68,7 @@ export interface AppConfig {
     rootAdminUsername: string;
     rootAdminPassword: string;
     accessApiKey: string | undefined;
+    accessAnonKey: string | undefined;
   };
   storage: {
     s3Bucket: string | undefined;
@@ -168,6 +169,7 @@ export function loadConfig(): AppConfig {
       rootAdminUsername: process.env.ROOT_ADMIN_USERNAME || process.env.ADMIN_EMAIL || '',
       rootAdminPassword: process.env.ROOT_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD || '',
       accessApiKey: process.env.ACCESS_API_KEY || undefined,
+      accessAnonKey: process.env.ACCESS_ANON_KEY || undefined,
     },
     storage: {
       s3Bucket: process.env.AWS_S3_BUCKET || undefined,

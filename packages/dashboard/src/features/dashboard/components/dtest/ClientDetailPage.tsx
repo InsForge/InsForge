@@ -9,10 +9,10 @@ import { QuickStartPromptCard } from './QuickStartPromptCard';
 import { CLIENT_ENTRIES, DEFAULT_AGENT_TABS, type AgentTab, type ClientId } from './clientRegistry';
 import {
   useApiKey,
+  useAnonKey,
   useDatabaseConnectionString,
   useDatabasePassword,
 } from '#lib/hooks/useMetadata';
-import { useAnonToken } from '#features/auth/hooks/useAnonToken';
 import { cn, getBackendUrl } from '#lib/utils/utils';
 import { getFeatureFlag } from '#lib/analytics/posthog';
 
@@ -30,7 +30,7 @@ export function ClientDetailPage({ clientId, onBack }: ClientDetailPageProps) {
   const filteredTabs = declaredTabs.filter((t) => variantAllowed.includes(t));
   const availableTabs = filteredTabs.length > 0 ? filteredTabs : declaredTabs;
   const { apiKey, isLoading: isApiKeyLoading } = useApiKey();
-  const { accessToken: anonKey, isLoading: isAnonKeyLoading } = useAnonToken();
+  const { anonKey, isLoading: isAnonKeyLoading } = useAnonKey();
   const { connectionData } = useDatabaseConnectionString();
   const { passwordData } = useDatabasePassword();
   const [tab, setTab] = useState<AgentTab>(availableTabs[0] ?? 'cli');

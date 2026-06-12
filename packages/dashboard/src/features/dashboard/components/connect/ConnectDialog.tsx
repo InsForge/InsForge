@@ -16,8 +16,7 @@ import { MCPSection } from './MCPSection';
 import { APIKeysSection } from './APIKeysSection';
 import { ConnectionStringSection } from './ConnectionStringSection';
 import { CLISection } from './CLISection';
-import { useApiKey } from '#lib/hooks/useMetadata';
-import { useAnonToken } from '#features/auth/hooks/useAnonToken';
+import { useApiKey, useAnonKey } from '#lib/hooks/useMetadata';
 import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
 import { cn, getBackendUrl, isInsForgeCloudProject } from '#lib/utils/utils';
 import { JoinDiscordCta } from '#features/dashboard/components/JoinDiscordCta';
@@ -50,7 +49,7 @@ export function ConnectDialog({ open, onOpenChange }: ConnectDialogProps) {
   const [activeTab, setActiveTab] = useState<ConnectTabId>(canShowCli ? 'cli' : 'mcp');
 
   const { apiKey, isLoading: isApiKeyLoading } = useApiKey();
-  const { accessToken: anonKey, isLoading: isAnonKeyLoading } = useAnonToken();
+  const { anonKey, isLoading: isAnonKeyLoading } = useAnonKey();
   const isApiCredentialsLoading = isApiKeyLoading || isAnonKeyLoading;
   const appUrl = getBackendUrl();
   const visibleTabs = useMemo(

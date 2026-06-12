@@ -55,6 +55,27 @@ export function useApiKey(options?: UseMetadataOptions) {
   };
 }
 
+export function useAnonKey(options?: UseMetadataOptions) {
+  const {
+    data: anonKey,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['metadata', 'anonKey'],
+    queryFn: ({ signal }) => metadataService.fetchAnonKey(signal),
+    staleTime: options?.staleTime ?? 10 * 60 * 1000, // Cache for 10 minutes by default
+    enabled: options?.enabled ?? true,
+  });
+
+  return {
+    anonKey,
+    isLoading,
+    error,
+    refetch,
+  };
+}
+
 export function useProjectId(options?: UseMetadataOptions) {
   const {
     data: projectId,

@@ -933,6 +933,8 @@ spec:
                     default: ""
                 ACCESS_API_KEY:
                     default: ""
+                ACCESS_ANON_KEY:
+                    default: ""
                 OPENROUTER_API_KEY:
                     default: ${OPENROUTER_API_KEY}
                 STRIPE_TEST_SECRET_KEY:
