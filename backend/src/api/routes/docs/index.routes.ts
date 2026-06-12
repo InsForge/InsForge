@@ -17,6 +17,11 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Resolve the documentation root once for the module.
+// PROJECT_ROOT is set in docker-compose.yml. Otherwise, fallback to the monorepo root.
+const PROJECT_ROOT = process.env.PROJECT_ROOT || path.resolve(__dirname, '../../../../..');
+const DOCS_ROOT = path.join(PROJECT_ROOT, 'docs');
+
 const router = Router();
 
 /**
@@ -164,14 +169,11 @@ router.get('/:docType', async (req: Request, res: Response, next: NextFunction) 
     const docFileName = LEGACY_DOCS_MAP[parsed.data];
 
     // Read the documentation file
-    // PROJECT_ROOT is set in the docker-compose.yml file to point to the InsForge directory
-    const projectRoot = process.env.PROJECT_ROOT || path.resolve(__dirname, '../../../../..');
-    const docsRoot = path.join(projectRoot, 'docs');
-    const filePath = path.join(docsRoot, docFileName);
+    const filePath = path.join(DOCS_ROOT, docFileName);
     const rawContent = await readFile(filePath, 'utf-8');
 
     // Process snippet imports and replace component tags with actual content
-    const content = await processSnippets(rawContent, docsRoot);
+    const content = await processSnippets(rawContent, DOCS_ROOT);
 
     // Traditional REST: return documentation directly
     return successResponse(res, {
@@ -211,14 +213,11 @@ router.get('/:docFeature/:docLanguage', async (req: Request, res: Response, next
         : `${parsedFeature.data}-sdk-${parsedLanguage.data}`;
 
     // Read the documentation file
-    // PROJECT_ROOT is set in the docker-compose.yml file to point to the InsForge directory
-    const projectRoot = process.env.PROJECT_ROOT || path.resolve(__dirname, '../../../../..');
-    const docsRoot = path.join(projectRoot, 'docs');
-    const filePath = path.join(docsRoot, docFileName);
+    const filePath = path.join(DOCS_ROOT, docFileName);
     const rawContent = await readFile(filePath, 'utf-8');
 
     // Process snippet imports and replace component tags with actual content
-    const content = await processSnippets(rawContent, docsRoot);
+    const content = await processSnippets(rawContent, DOCS_ROOT);
 
     // Traditional REST: return documentation directly
     return successResponse(res, {
