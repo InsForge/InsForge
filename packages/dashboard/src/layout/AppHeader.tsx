@@ -14,6 +14,7 @@ import { useTheme } from '#lib/contexts/ThemeContext';
 import { useAuth } from '#lib/contexts/AuthContext';
 import { useOpenConnectDialog } from './ConnectDialogContext';
 import { getFeatureFlag } from '#lib/analytics/posthog';
+import { FEATURE_FLAGS } from '#lib/analytics/events';
 
 // Import SVG icons
 import DiscordIcon from '#assets/logos/discord.svg?react';
@@ -25,7 +26,7 @@ export default function AppHeader() {
   const { resolvedTheme } = useTheme();
   const { logout } = useAuth();
   const openConnectDialog = useOpenConnectDialog();
-  const dashboardVariant = getFeatureFlag('dashboard-v4-experiment');
+  const dashboardVariant = getFeatureFlag(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT);
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const isDTest = dashboardVariant === 'd_test';

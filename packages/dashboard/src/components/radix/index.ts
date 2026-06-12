@@ -6,5 +6,5 @@ export * from './Label';
 export * from './Popover';
 export * from './ScrollArea';
 export * from './Separator';
-export * from './Skeleton';
+export { Skeleton } from '@insforge/ui';
 export * from './Textarea';

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { EmptyState, ErrorState, LoadingState } from '#components';
-import { useRetention } from '#features/analytics/hooks/useRetention';
+import { useRetention } from '#features/analytics/hooks/useAnalytics';
 import { formatNumber } from '#features/analytics/lib/format';
 
 interface Cell {

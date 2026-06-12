@@ -1,10 +1,15 @@
-import { LucideIcon } from 'lucide-react';
-import { Button } from '@insforge/ui';
-import { cn } from '#lib/utils/utils';
+import * as React from 'react';
+import type { LucideIcon } from 'lucide-react';
+import { Button } from './Button';
+import { cn } from '../lib';
 
-interface EmptyStateProps {
+export interface EmptyStateProps {
+  /** Lucide icon component, rendered large above the title. */
   icon?: LucideIcon;
+  /** Image source URL, used when no icon is given. */
   image?: string;
+  /** Arbitrary visual (e.g. an inline SVG component), used when no icon or image is given. */
+  visual?: React.ReactNode;
   title: string;
   description?: string;
   action?: {
@@ -17,6 +22,7 @@ interface EmptyStateProps {
 export function EmptyState({
   icon: Icon,
   image,
+  visual,
   title,
   description,
   action,
@@ -33,6 +39,7 @@ export function EmptyState({
       {image && !Icon && (
         <img src={image} alt={title} className="mx-auto h-50 w-50 object-contain" />
       )}
+      {visual && !Icon && !image && visual}
       <h3 className="text-sm font-medium">{title}</h3>
       {description && <p className="text-xs max-w-sm">{description}</p>}
       {action && <Button onClick={action.onClick}>{action.label}</Button>}

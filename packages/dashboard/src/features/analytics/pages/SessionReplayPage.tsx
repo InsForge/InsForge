@@ -6,8 +6,8 @@ import {
   PaginationControls,
   TableHeader,
 } from '#components';
-import { RequirePosthogConnection } from '#features/analytics/components/RequirePosthogConnection';
-import { useRecordings } from '#features/analytics/hooks/useRecordings';
+import { RequireAnalyticsConnection } from '#features/analytics/components/RequireAnalyticsConnection';
+import { useRecordings } from '#features/analytics/hooks/useAnalytics';
 import { SessionRow } from '#features/analytics/components/posthog/SessionRow';
 import { ReplayModal } from '#features/analytics/components/posthog/ReplayModal';
 
@@ -19,9 +19,9 @@ export function SessionReplayPage() {
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-semantic-1">
       <TableHeader title="Session Replay" showSearch={false} />
       <div className="min-h-0 flex-1">
-        <RequirePosthogConnection>
+        <RequireAnalyticsConnection>
           <SessionReplayPageBody />
-        </RequirePosthogConnection>
+        </RequireAnalyticsConnection>
       </div>
     </div>
   );

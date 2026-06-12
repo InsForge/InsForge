@@ -59,10 +59,11 @@ import VisualizerLayout from '#features/visualizer/components/VisualizerLayout';
 import VisualizerPage from '#features/visualizer/pages/VisualizerPage';
 import AppLayout from '#layout/AppLayout';
 import { getFeatureFlag } from '#lib/analytics/posthog';
+import { FEATURE_FLAGS } from '#lib/analytics/events';
 import { useIsCloudHostingMode } from '#lib/config/DashboardHostContext';
 
 function AuthenticatedRoutes() {
-  const dashboardVariant = getFeatureFlag('dashboard-v4-experiment');
+  const dashboardVariant = getFeatureFlag(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT);
   const isDTest = dashboardVariant === 'd_test';
   const DashboardHomePage = isDTest ? DTestDashboardPage : DashboardPage;
   const isCloudHosting = useIsCloudHostingMode();

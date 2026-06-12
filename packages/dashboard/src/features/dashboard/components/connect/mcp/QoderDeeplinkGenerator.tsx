@@ -2,7 +2,8 @@ import { useMemo, useCallback } from 'react';
 import { createMCPServerConfig, type PlatformType } from './helpers';
 import QoderLogo from '#assets/logos/qoder.svg?react';
 import { getBackendUrl } from '#lib/utils/utils';
-import { trackPostHog, getFeatureFlag } from '#lib/analytics/posthog';
+import { trackEvent, getFeatureFlag } from '#lib/analytics/posthog';
+import { ANALYTICS_EVENTS, FEATURE_FLAGS } from '#lib/analytics/events';
 
 interface QoderDeeplinkGeneratorProps {
   apiKey?: string;
@@ -22,8 +23,8 @@ export function QoderDeeplinkGenerator({
   }, [apiKey, os]);
 
   const handleOpenInQoder = useCallback(() => {
-    const variant = getFeatureFlag('onboarding-method-experiment');
-    trackPostHog('onboarding_action_taken', {
+    const variant = getFeatureFlag(FEATURE_FLAGS.ONBOARDING_METHOD_EXPERIMENT);
+    trackEvent(ANALYTICS_EVENTS.ONBOARDING_ACTION_TAKEN, {
       action_type: 'install mcp',
       experiment_variant: variant,
       method: 'terminal',
