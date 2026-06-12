@@ -3,7 +3,7 @@ import ClaudeIcon from '#assets/logos/claude_code.svg?react';
 import GeminiIcon from '#assets/logos/gemini.svg?react';
 
 export type CodeTab = 'sdk' | 'python' | 'http';
-export type QuickStartMode = 'text' | 'image' | 'video';
+export type QuickStartMode = 'text' | 'image' | 'video' | 'embeddings';
 export type ModelModalityFilter = string;
 
 export function getOverviewCodeSnippets(modelId: string): Record<CodeTab, string> {
@@ -89,12 +89,15 @@ export const QUICK_START_MODES: { value: QuickStartMode; label: string }[] = [
   { value: 'text', label: 'Text Generation' },
   { value: 'image', label: 'Image Generation' },
   { value: 'video', label: 'Video Generation' },
+  { value: 'embeddings', label: 'Embeddings' },
 ];
 
 export const PROMPT_CARD_COPY: Record<QuickStartMode, string> = {
   text: 'Copy this prompt for your agent to generate text through the OpenRouter model gateway.',
   image: 'Copy this prompt for your agent to generate images through the OpenRouter model gateway.',
   video: 'Copy this prompt for your agent to generate videos through the OpenRouter model gateway.',
+  embeddings:
+    'Copy this prompt for your agent to generate text embeddings through the OpenRouter model gateway.',
 };
 
 export const QUICK_START_COPY: Record<
@@ -118,6 +121,12 @@ export const QUICK_START_COPY: Record<
     description: 'Submit an asynchronous video generation job and poll until it completes.',
     model: 'google/veo-3.1',
     installCommand: 'npm install dotenv\nnpm install --save-dev @types/node tsx typescript',
+  },
+  embeddings: {
+    projectName: 'ai-embeddings-demo',
+    description: 'Generate text embeddings through OpenRouter with the OpenAI SDK.',
+    model: 'openai/text-embedding-3-small',
+    installCommand: 'npm install openai dotenv\nnpm install --save-dev @types/node tsx typescript',
   },
 };
 
@@ -175,6 +184,25 @@ while (result.status !== 'completed' && result.status !== 'failed') {
 console.log(result);`;
   }
 
+  if (mode === 'embeddings') {
+    return `import OpenAI from 'openai';
+import 'dotenv/config';
+
+const openai = new OpenAI({
+  baseURL: 'https://openrouter.ai/api/v1',
+  apiKey: process.env.OPENROUTER_API_KEY,
+});
+
+const response = await openai.embeddings.create({
+  model: '${model}',
+  input: 'The quick brown fox jumps over the lazy dog.',
+});
+
+console.log('Dimensions:', response.data[0].embedding.length);
+console.log('First 5 values:', response.data[0].embedding.slice(0, 5));
+console.log('Usage:', response.usage);`;
+  }
+
   return `import OpenAI from 'openai';
 import 'dotenv/config';
 
@@ -200,6 +228,8 @@ export function getQuickStartPrompt(mode: QuickStartMode) {
     image: 'an image generation feature that sends a user prompt and renders the returned image',
     video:
       'a video generation feature that submits a prompt, polls the job status, and renders the completed video',
+    embeddings:
+      'a text embedding feature that converts user input into vector embeddings for semantic search or similarity comparison',
   };
   const apiCopy: Record<QuickStartMode, string> = {
     text: 'Use the OpenAI SDK with baseURL set to https://openrouter.ai/api/v1.',
@@ -207,6 +237,8 @@ export function getQuickStartPrompt(mode: QuickStartMode) {
       "Use the OpenAI SDK with baseURL set to https://openrouter.ai/api/v1 and request modalities ['image', 'text'].",
     video:
       'Use fetch with the OpenRouter video endpoint at https://openrouter.ai/api/v1/videos; do not install or use the OpenAI SDK for video.',
+    embeddings:
+      'Use the OpenAI SDK with baseURL set to https://openrouter.ai/api/v1. Call client.embeddings.create() — not chat.completions.create().',
   };
 
   return [

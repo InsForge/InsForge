@@ -108,4 +108,66 @@ describe('AIModelService', () => {
       },
     ]);
   });
+
+  it('includes embedding-only models with correct pricing', async () => {
+    // Advance time past the 1-hour cache TTL so the stale cache from prior tests is bypassed
+    vi.useFakeTimers();
+    vi.advanceTimersByTime(61 * 60 * 1000);
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: [
+            {
+              id: 'openai/text-embedding-3-small',
+              created: 1767225600,
+              architecture: {
+                input_modalities: ['text'],
+                output_modalities: ['embeddings'],
+              },
+              pricing: {
+                prompt: '0.00000002',
+                completion: '0',
+              },
+            },
+            {
+              id: 'google/gemini-embedding-2-preview',
+              created: 1777248000,
+              architecture: {
+                input_modalities: ['text', 'image', 'file', 'audio', 'video'],
+                output_modalities: ['embeddings'],
+              },
+              pricing: {
+                prompt: '0.0000002',
+                completion: '0',
+              },
+            },
+          ],
+        }),
+    });
+
+    const models = await AIModelService.getModels();
+
+    // Both embedding models should be included (not filtered out)
+    expect(models).toHaveLength(2);
+
+    // Embedding-only model: input has text so inputPrice is set, output is embeddings so no outputPrice
+    const smallModel = models.find((m) => m.id === 'openai/text-embedding-3-small');
+    expect(smallModel).toBeDefined();
+    expect(smallModel!.inputModality).toEqual(['text']);
+    expect(smallModel!.outputModality).toEqual(['embeddings']);
+    expect(smallModel!.inputPrice).toBeGreaterThanOrEqual(0);
+    expect(smallModel!.outputPrice).toBeUndefined();
+    expect(smallModel!.outputPriceLabel).toBeUndefined();
+
+    // Multimodal embedding model: input has text (among others) so inputPrice is set
+    const geminiModel = models.find((m) => m.id === 'google/gemini-embedding-2-preview');
+    expect(geminiModel).toBeDefined();
+    expect(geminiModel!.inputModality).toContain('text');
+    expect(geminiModel!.outputModality).toEqual(['embeddings']);
+    expect(geminiModel!.inputPrice).toBeGreaterThanOrEqual(0);
+
+    vi.useRealTimers();
+  });
 });
