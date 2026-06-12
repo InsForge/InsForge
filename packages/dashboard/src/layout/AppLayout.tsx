@@ -8,7 +8,7 @@ import { useDashboardHost } from '#lib/config/DashboardHostContext';
 import { cn } from '#lib/utils/utils';
 import { ConnectDialogProvider } from './ConnectDialogContext';
 import { getFeatureFlag } from '#lib/analytics/posthog';
-import { FEATURE_FLAGS } from '#lib/analytics/constants';
+import { FEATURE_FLAGS, FEATURE_FLAG_VARIANTS } from '#lib/analytics/constants';
 import { DTestConnectTip } from '#features/dashboard/components/dtest/DTestConnectTip';
 
 const CONNECT_DIALOG_MESSAGE_TYPES = new Set(['SHOW_ONBOARDING_OVERLAY', 'SHOW_CONNECT_OVERLAY']);
@@ -41,7 +41,7 @@ function ConnectOverlayBridge({ hostMode, onOpenDialog }: ConnectOverlayBridgePr
         return;
       }
 
-      if (getFeatureFlag(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT) === 'd_test') {
+      if (getFeatureFlag(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT) === FEATURE_FLAG_VARIANTS.D_TEST) {
         void navigate('/dashboard/install');
       } else {
         onOpenDialog();

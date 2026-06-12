@@ -15,3 +15,8 @@ export const FEATURE_FLAGS = {
   ONBOARDING_METHOD_EXPERIMENT: 'onboarding-method-experiment',
   MCP_VS_CLI: 'mcp-vs-cli',
 } as const;
+
+/** Expected variant values returned by the feature flags above. */
+export const FEATURE_FLAG_VARIANTS = {
+  D_TEST: 'd_test',
+} as const;
