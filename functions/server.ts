@@ -234,16 +234,26 @@ async function executeInWorker(code: string, request: Request): Promise<Response
     };
 
     // Prepare request data
-    const body = request.body ? await request.text() : null;
-    const requestData = {
+    // IMPORTANT: preserve raw request bytes for multipart/binary/text payloads.
+    // Do NOT coerce to text, otherwise multipart boundaries and binary payloads corrupt.
+    const requestData: {
+      url: string;
+      method: string;
+      headers: Record<string, string>;
+      // ArrayBuffer is cloneable across worker boundaries.
+      body: ArrayBuffer | null;
+    } = {
       url: request.url,
       method: request.method,
       headers: Object.fromEntries(request.headers),
-      body,
+      body: request.body ? await request.arrayBuffer() : null,
     };
 
-    // Send message with code, request data, and secrets
-    worker.postMessage({ code, requestData, secrets });
+    // Send message with code, request data, and secrets.
+    // Transfer the body ArrayBuffer to avoid a memory copy (zero-copy move).
+    // The original ArrayBuffer is neutered after transfer
+    const transferables: Transferable[] = requestData.body ? [requestData.body] : [];
+    worker.postMessage({ code, requestData, secrets }, transferables);
   });
 }
 

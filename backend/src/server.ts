@@ -197,17 +197,19 @@ export async function createApp() {
       logger.error('Failed to read function proxy request body', { error: error.message });
       next(error);
     };
-    const onAborted = () => {
+    const onClose = () => {
       if (done) {
         return;
       }
-      done = true;
-      next(new Error('Request aborted while reading function proxy body'));
+      if (!req.complete) {
+        done = true;
+        next(new Error('Request aborted while reading function proxy body'));
+      }
     };
     req.on('data', onData);
     req.on('end', onEnd);
     req.on('error', onError);
-    req.on('aborted', onAborted);
+    req.on('close', onClose);
   });
 
   // Mount webhooks with raw body parser BEFORE JSON middleware
