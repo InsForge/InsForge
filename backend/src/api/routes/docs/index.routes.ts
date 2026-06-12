@@ -165,7 +165,7 @@ router.get('/:docType', async (req: Request, res: Response, next: NextFunction) 
 
     // Read the documentation file
     // PROJECT_ROOT is set in the docker-compose.yml file to point to the InsForge directory
-    const projectRoot = process.env.PROJECT_ROOT || path.resolve(__dirname, '../../../..');
+    const projectRoot = process.env.PROJECT_ROOT || path.resolve(__dirname, '../../../../..');
     const docsRoot = path.join(projectRoot, 'docs');
     const filePath = path.join(docsRoot, docFileName);
     const rawContent = await readFile(filePath, 'utf-8');
@@ -212,7 +212,7 @@ router.get('/:docFeature/:docLanguage', async (req: Request, res: Response, next
 
     // Read the documentation file
     // PROJECT_ROOT is set in the docker-compose.yml file to point to the InsForge directory
-    const projectRoot = process.env.PROJECT_ROOT || path.resolve(__dirname, '../../../..');
+    const projectRoot = process.env.PROJECT_ROOT || path.resolve(__dirname, '../../../../..');
     const docsRoot = path.join(projectRoot, 'docs');
     const filePath = path.join(docsRoot, docFileName);
     const rawContent = await readFile(filePath, 'utf-8');
