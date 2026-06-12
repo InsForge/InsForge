@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Plus, X, Link, MoveRight } from 'lucide-react';
@@ -9,6 +9,7 @@ import { tableService } from '#features/database/services/table.service';
 import {
   TableFormColumnSchema,
   TableFormForeignKeySchema,
+  tableFormForeignKeySchema,
   tableFormSchema,
   TableFormSchema,
 } from '#features/database/schema';
@@ -18,6 +19,12 @@ import { ForeignKeyPopover } from './ForeignKeyPopover';
 import { ColumnType, TableSchema, UpdateTableSchemaRequest } from '@insforge/shared-schemas';
 import { parseDatabaseTableReference, SYSTEM_FIELDS } from '#features/database/helpers';
 import { databaseTableQueryKeys } from '#features/database/queryKeys';
+import { useProjectId } from '#lib/hooks/useMetadata';
+import {
+  getLocalStorageJSON,
+  removeLocalStorageItem,
+  setLocalStorageJSON,
+} from '#lib/utils/local-storage';
 
 const newColumn: TableFormColumnSchema = {
   columnName: '',
@@ -27,6 +34,131 @@ const newColumn: TableFormColumnSchema = {
   defaultValue: '',
   isSystemColumn: false,
   isNewColumn: true,
+};
+
+const TABLE_FORM_CREATE_DRAFT_STORAGE_KEY = 'table-form-columns-draft';
+
+export const getTableFormCreateDraftStorageKey = (
+  draftScope?: string,
+  schemaName?: string
+): string => {
+  const keyParts = [TABLE_FORM_CREATE_DRAFT_STORAGE_KEY];
+
+  if (draftScope) {
+    keyParts.push(encodeURIComponent(draftScope));
+  }
+
+  if (schemaName) {
+    keyParts.push(encodeURIComponent(schemaName));
+  }
+
+  return keyParts.join(':');
+};
+
+interface TableFormCreateDraft {
+  schemaName: string;
+  tableName: string;
+  columns: TableFormColumnSchema[];
+  foreignKeys: TableFormForeignKeySchema[];
+}
+
+const createDefaultColumns = (): TableFormColumnSchema[] => [
+  {
+    columnName: 'id',
+    type: ColumnType.UUID,
+    defaultValue: 'gen_random_uuid()',
+    isPrimaryKey: true,
+    isNullable: false,
+    isUnique: true,
+    isSystemColumn: true,
+    isNewColumn: false,
+  },
+  {
+    columnName: 'created_at',
+    type: ColumnType.DATETIME,
+    defaultValue: 'CURRENT_TIMESTAMP',
+    isNullable: true,
+    isUnique: false,
+    isSystemColumn: true,
+    isNewColumn: false,
+  },
+  {
+    columnName: 'updated_at',
+    type: ColumnType.DATETIME,
+    defaultValue: 'CURRENT_TIMESTAMP',
+    isNullable: true,
+    isUnique: false,
+    isSystemColumn: true,
+    isNewColumn: false,
+  },
+  { ...newColumn },
+];
+
+const getRecordValue = (value: unknown, key: string): unknown => {
+  if (typeof value !== 'object' || value === null) {
+    return undefined;
+  }
+
+  return (value as Record<string, unknown>)[key];
+};
+
+const hasColumnDraftData = (column: TableFormColumnSchema): boolean => {
+  return (
+    column.columnName.trim().length > 0 ||
+    (column.defaultValue ?? '').trim().length > 0 ||
+    column.type !== newColumn.type ||
+    column.isNullable !== newColumn.isNullable ||
+    column.isUnique !== newColumn.isUnique
+  );
+};
+
+const hasUserColumnDraftData = (columns: TableFormColumnSchema[]): boolean => {
+  return columns.some((column) => !column.isSystemColumn && hasColumnDraftData(column));
+};
+
+const hasCreateDraftData = (draft: TableFormCreateDraft): boolean => {
+  return (
+    draft.tableName.trim().length > 0 ||
+    hasUserColumnDraftData(draft.columns) ||
+    draft.foreignKeys.length > 0
+  );
+};
+
+const readTableFormCreateDraft = (
+  draftScope?: string,
+  schemaName?: string
+): TableFormCreateDraft | null => {
+  try {
+    const parsedValue = getLocalStorageJSON<unknown>(
+      getTableFormCreateDraftStorageKey(draftScope, schemaName)
+    );
+
+    const schemaNameValue = getRecordValue(parsedValue, 'schemaName');
+    const foreignKeysValue = getRecordValue(parsedValue, 'foreignKeys');
+    const formDraft = tableFormSchema.safeParse(parsedValue);
+
+    if (!formDraft.success) {
+      return null;
+    }
+
+    return {
+      schemaName: typeof schemaNameValue === 'string' ? schemaNameValue : '',
+      tableName: formDraft.data.tableName,
+      columns: formDraft.data.columns,
+      foreignKeys: Array.isArray(foreignKeysValue)
+        ? foreignKeysValue.flatMap((foreignKey) => {
+            const result = tableFormForeignKeySchema.safeParse(foreignKey);
+            return result.success ? [result.data] : [];
+          })
+        : [],
+    };
+  } catch {
+    return null;
+  }
+};
+
+export const clearTableFormCreateDraft = (draftScope?: string, schemaName?: string) => {
+  removeLocalStorageItem(getTableFormCreateDraftStorageKey(draftScope, schemaName));
 };
 
 interface TableFormProps {
@@ -48,11 +180,16 @@ export function TableForm({
   editTable,
   setFormIsDirty,
 }: TableFormProps) {
+  const { projectId, isLoading: isProjectIdLoading } = useProjectId();
+  const draftScope = projectId ? `project:${projectId}` : undefined;
+
   const [error, setError] = useState<string | null>(null);
   const [showForeignKeyDialog, setShowForeignKeyDialog] = useState(false);
   const [editingForeignKey, setEditingForeignKey] = useState<string>();
   const [foreignKeys, setForeignKeys] = useState<TableFormForeignKeySchema[]>([]);
   const [foreignKeysDirty, setForeignKeysDirty] = useState(false);
+  const skipNextDraftSaveRef = useRef(true);
+  const formScrollRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
@@ -60,51 +197,31 @@ export function TableForm({
     resolver: zodResolver(tableFormSchema),
     defaultValues: {
       tableName: '',
-      columns:
-        mode === 'create'
-          ? [
-              {
-                columnName: 'id',
-                type: ColumnType.UUID,
-                defaultValue: 'gen_random_uuid()',
-                isPrimaryKey: true,
-                isNullable: false,
-                isUnique: true,
-                isSystemColumn: true,
-                isNewColumn: false,
-              },
-              {
-                columnName: 'created_at',
-                type: ColumnType.DATETIME,
-                defaultValue: 'CURRENT_TIMESTAMP',
-                isNullable: true,
-                isUnique: false,
-                isSystemColumn: true,
-                isNewColumn: false,
-              },
-              {
-                columnName: 'updated_at',
-                type: ColumnType.DATETIME,
-                defaultValue: 'CURRENT_TIMESTAMP',
-                isNullable: true,
-                isUnique: false,
-                isSystemColumn: true,
-                isNewColumn: false,
-              },
-              {
-                ...newColumn,
-              },
-            ]
-          : [{ ...newColumn }],
+      columns: mode === 'create' ? createDefaultColumns() : [{ ...newColumn }],
     },
   });
 
-  // Reset form when switching between modes or when editTable changes
+  const tableName = useWatch({
+    control: form.control,
+    name: 'tableName',
+  });
+  const columns = useWatch({
+    control: form.control,
+    name: 'columns',
+  });
+
+  useEffect(() => {
+    if (open) {
+      formScrollRef.current?.scrollTo({ top: 0, left: 0 });
+    }
+  }, [editTable?.tableName, mode, open, schemaName]);
+
   useEffect(() => {
     // Clear error when effect runs
     setError(null);
 
     if (open && mode === 'edit' && editTable) {
+      skipNextDraftSaveRef.current = true;
       form.reset({
         tableName: editTable.tableName,
         columns: editTable.columns.map((col) => ({
@@ -138,48 +255,85 @@ export function TableForm({
           };
         });
       setForeignKeys(existingForeignKeys);
-    } else {
+      return;
+    }
+
+    if (open && mode === 'create') {
+      if (isProjectIdLoading) {
+        return;
+      }
+
+      const draft = readTableFormCreateDraft(draftScope, schemaName);
+      if (draft && (!draft.schemaName || draft.schemaName === schemaName)) {
+        skipNextDraftSaveRef.current = true;
+        form.reset({
+          tableName: draft.tableName,
+          columns: draft.columns,
+        });
+        setForeignKeys(draft.foreignKeys);
+        return;
+      }
+
+      skipNextDraftSaveRef.current = true;
       form.reset({
         tableName: '',
-        columns: [
-          {
-            columnName: 'id',
-            type: ColumnType.UUID,
-            defaultValue: 'gen_random_uuid()',
-            isPrimaryKey: true,
-            isNullable: false,
-            isUnique: true,
-            isSystemColumn: true,
-            isNewColumn: false,
-          },
-          {
-            columnName: 'created_at',
-            type: ColumnType.DATETIME,
-            defaultValue: 'CURRENT_TIMESTAMP',
-            isNullable: true,
-            isUnique: false,
-            isSystemColumn: true,
-            isNewColumn: false,
-          },
-          {
-            columnName: 'updated_at',
-            type: ColumnType.DATETIME,
-            defaultValue: 'CURRENT_TIMESTAMP',
-            isNullable: true,
-            isUnique: false,
-            isSystemColumn: true,
-            isNewColumn: false,
-          },
-          { ...newColumn },
-        ],
+        columns: createDefaultColumns(),
       });
       setForeignKeys([]);
     }
-  }, [editTable, form, mode, open, schemaName]);
+  }, [draftScope, editTable, form, isProjectIdLoading, mode, open, schemaName]);
+  useEffect(() => {
+    if (!open || mode !== 'create') {
+      return;
+    }
+
+    if (isProjectIdLoading) {
+      return;
+    }
+
+    if (skipNextDraftSaveRef.current) {
+      skipNextDraftSaveRef.current = false;
+      return;
+    }
+
+    const draft: TableFormCreateDraft = {
+      schemaName,
+      tableName: tableName ?? '',
+      columns: columns ?? createDefaultColumns(),
+      foreignKeys,
+    };
+
+    const draftToSave = {
+      ...draft,
+      columns: draft.columns.filter(
+        (column) => column.isSystemColumn || hasColumnDraftData(column)
+      ),
+    };
+
+    try {
+      if (hasCreateDraftData(draftToSave)) {
+        setLocalStorageJSON(getTableFormCreateDraftStorageKey(draftScope, schemaName), draftToSave);
+      } else {
+        removeLocalStorageItem(getTableFormCreateDraftStorageKey(draftScope, schemaName));
+      }
+    } catch {
+      // Keep the form usable if localStorage is blocked or full.
+    }
+  }, [columns, draftScope, foreignKeys, isProjectIdLoading, mode, open, schemaName, tableName]);
+
+  const currentCreateDraftHasData =
+    mode === 'create' &&
+    hasCreateDraftData({
+      schemaName,
+      tableName: tableName ?? '',
+      columns: columns ?? createDefaultColumns(),
+      foreignKeys,
+    });
+  const formHasChanges = form.formState.isDirty || foreignKeysDirty || currentCreateDraftHasData;
 
   useEffect(() => {
-    setFormIsDirty(form.formState.isDirty);
-  }, [form.formState.isDirty, setFormIsDirty]);
+    setFormIsDirty(formHasChanges);
+  }, [formHasChanges, setFormIsDirty]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -239,6 +393,8 @@ export function TableForm({
 
       showToast('Table created successfully!', 'success');
 
+      clearTableFormCreateDraft(draftScope, schemaName);
+      skipNextDraftSaveRef.current = true;
       form.reset();
       setError(null);
       setForeignKeys([]);
@@ -472,7 +628,7 @@ export function TableForm({
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto px-4 pb-6 sm:px-6 lg:px-10">
+      <div ref={formScrollRef} className="flex-1 overflow-auto px-4 pb-6 sm:px-6 lg:px-10">
         <form
           onSubmit={() => void handleSubmit()}
           className="mx-auto flex w-full max-w-[1024px] flex-col gap-6"
@@ -649,7 +805,7 @@ export function TableForm({
               !form.formState.isValid ||
               createTableMutation.isPending ||
               updateTableMutation.isPending ||
-              (!form.formState.isDirty && !foreignKeysDirty)
+              !formHasChanges
             }
             className="h-9 rounded bg-primary px-3 text-sm font-medium text-[rgb(var(--inverse))] hover:before:bg-[var(--alpha-inverse-8)] disabled:opacity-40"
           >
