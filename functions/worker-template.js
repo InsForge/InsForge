@@ -62,16 +62,12 @@ try {
 // take >200ms), the request message was silently dropped -> 504 timeout.
 //
 // Fix: register a synchronous handler BEFORE any top-level await. It buffers
-// any early message(s). Once imports finish, we drain the buffer through the
-// real handler and swap `self.onmessage` to point at it directly.
-let __readyHandler = null;
+// any early message(s). Once imports finish, we swap `self.onmessage` to the
+// real handler and drain the buffer through it. Single-threaded execution
+// guarantees no message can slip between the swap and the drain.
 const __earlyMessages = [];
 self.onmessage = (e) => {
-  if (__readyHandler) {
-    __readyHandler(e);
-  } else {
-    __earlyMessages.push(e);
-  }
+  __earlyMessages.push(e);
 };
 
 // ----------------------------
@@ -80,30 +76,35 @@ self.onmessage = (e) => {
 // We use dynamic imports AFTER the environment is shadowed.
 //
 // If an import fails (e.g. npm registry unreachable under restricted egress),
-// the worker can never produce a real handler. Without this guard the buffered
-// message would hang until the runtime's 60s timeout -> slow, undiagnosable 504.
-// Instead: respond to the buffered message AND any future message with an
-// explicit 500 (same {success,error,status} shape server.ts onmessage expects),
-// then terminate.
+// the worker can never produce a real handler. Answer the request with an
+// explicit 500 (same {success,error,status} shape server.ts onmessage expects)
+// instead of hanging to the runtime's 60s timeout.
+//
+// The request message may NOT have been delivered yet when the import rejects:
+// literal dynamic imports are prefetched with the module graph, so a failed
+// import rejects before the first event-loop turn. Closing the worker at that
+// point would drop the undelivered request and reproduce the silent 504, so we
+// only close() after a message has been answered (with a deadline as backstop).
 let createClient, encodeBase64, decodeBase64;
+let __importFailed = false;
 try {
   ({ createClient } = await import('npm:@insforge/sdk'));
   ({ encodeBase64, decodeBase64 } =
     await import('https://deno.land/std@0.224.0/encoding/base64.ts'));
 } catch (importError) {
+  __importFailed = true;
   const failMsg = 'SDK import failed: ' + (importError?.message || importError);
   console.error(failMsg);
-  const importFailureHandler = () => {
+  const answerAndClose = () => {
     self.postMessage({ success: false, error: failMsg, status: 500 });
+    self.close();
   };
-  // Register fallback for any future message, and answer buffered ones now.
-  __readyHandler = importFailureHandler;
-  self.onmessage = importFailureHandler;
-  for (const e of __earlyMessages.splice(0)) {
-    importFailureHandler(e);
+  if (__earlyMessages.splice(0).length > 0) {
+    answerAndClose();
+  } else {
+    self.onmessage = answerAndClose;
+    setTimeout(() => self.close(), 10000);
   }
-  self.close();
-  throw new Error(failMsg);
 }
 
 // Handle the single message with code, request data, and secrets
@@ -213,8 +214,9 @@ const handleMessage = async (e) => {
 };
 
 // Activate the real handler and drain any messages that arrived during import.
-__readyHandler = handleMessage;
-self.onmessage = handleMessage;
-for (const e of __earlyMessages.splice(0)) {
-  handleMessage(e);
+if (!__importFailed) {
+  self.onmessage = handleMessage;
+  for (const e of __earlyMessages.splice(0)) {
+    await handleMessage(e);
+  }
 }
