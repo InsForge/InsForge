@@ -33,6 +33,14 @@ export class TableService {
     );
   }
 
+  getSchemaDiagram(
+    schemaName: string = DEFAULT_DATABASE_SCHEMA
+  ): Promise<{ tables: GetTableSchemaResponse[] }> {
+    return apiClient.request(`/database/tables/diagram${buildDatabaseSchemaSearch(schemaName)}`, {
+      headers: apiClient.withAccessToken(),
+    });
+  }
+
   createTable(schemaName: string, tableName: string, columns: ColumnSchema[]) {
     const body: CreateTableRequest = { tableName, columns, rlsEnabled: true };
 

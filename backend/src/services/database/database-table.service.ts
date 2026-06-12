@@ -819,6 +819,150 @@ export class DatabaseTableService {
     }
   }
 
+  /**
+   * Return all tables in a schema with their columns and FK relationships
+   * in a single query — used by the Schema Visualizer page.
+   */
+  async getSchemaDiagram(schemaName: string): Promise<GetTableSchemaResponse[]> {
+    validateSchemaName(schemaName);
+    const pool = this.getPool();
+
+    // One query: columns + FK constraints + PK/unique flags per table
+    const result = await pool.query(
+      `
+        SELECT
+          t.table_name,
+          c.column_name,
+          c.data_type,
+          c.udt_name,
+          c.is_nullable,
+          c.column_default,
+          c.ordinal_position,
+          EXISTS (
+            SELECT 1
+            FROM information_schema.table_constraints tc
+            JOIN information_schema.key_column_usage kcu2
+              ON kcu2.constraint_name = tc.constraint_name
+              AND kcu2.table_schema   = tc.table_schema
+            WHERE tc.constraint_type = 'PRIMARY KEY'
+              AND tc.table_schema    = t.table_schema
+              AND tc.table_name      = t.table_name
+              AND kcu2.column_name   = c.column_name
+          ) AS is_primary_key,
+          EXISTS (
+            SELECT 1
+            FROM information_schema.table_constraints tc
+            JOIN information_schema.key_column_usage kcu2
+              ON kcu2.constraint_name = tc.constraint_name
+              AND kcu2.table_schema   = tc.table_schema
+            WHERE tc.constraint_type = 'UNIQUE'
+              AND tc.table_schema    = t.table_schema
+              AND tc.table_name      = t.table_name
+              AND kcu2.column_name   = c.column_name
+          ) AS is_unique,
+          fk.fk_table_schema,
+          fk.fk_table,
+          fk.fk_column,
+          fk.on_delete,
+          fk.on_update
+        FROM information_schema.tables t
+        JOIN information_schema.columns c
+          ON  c.table_schema = t.table_schema
+          AND c.table_name   = t.table_name
+        LEFT JOIN (
+          SELECT
+            kcu.table_schema,
+            kcu.table_name,
+            kcu.column_name,
+            ccu.table_schema AS fk_table_schema,
+            ccu.table_name   AS fk_table,
+            ccu.column_name  AS fk_column,
+            rc.delete_rule   AS on_delete,
+            rc.update_rule   AS on_update
+          FROM information_schema.table_constraints tc
+          JOIN information_schema.key_column_usage kcu
+            ON kcu.constraint_name = tc.constraint_name
+            AND kcu.table_schema   = tc.table_schema
+          JOIN information_schema.constraint_column_usage ccu
+            ON ccu.constraint_name = tc.constraint_name
+          JOIN information_schema.referential_constraints rc
+            ON rc.constraint_name  = tc.constraint_name
+            AND rc.constraint_schema = tc.table_schema
+          WHERE tc.constraint_type = 'FOREIGN KEY'
+            AND tc.table_schema    = $1
+        ) fk
+          ON  fk.table_schema = c.table_schema
+          AND fk.table_name   = c.table_name
+          AND fk.column_name  = c.column_name
+        WHERE t.table_schema = $1
+          AND t.table_type   = 'BASE TABLE'
+          AND t.table_name NOT LIKE '\\_%' ESCAPE '\\'
+        ORDER BY t.table_name, c.ordinal_position
+      `,
+      [schemaName]
+    );
+
+    // Group rows by table name
+    const tableMap = new Map<
+      string,
+      {
+        columns: ColumnSchema[];
+      }
+    >();
+
+    for (const row of result.rows as Array<{
+      table_name: string;
+      column_name: string;
+      data_type: string;
+      udt_name: string;
+      is_nullable: string;
+      column_default: string | null;
+      is_primary_key: boolean;
+      is_unique: boolean;
+      fk_table_schema: string | null;
+      fk_table: string | null;
+      fk_column: string | null;
+      on_delete: string | null;
+      on_update: string | null;
+    }>) {
+      if (!tableMap.has(row.table_name)) {
+        tableMap.set(row.table_name, { columns: [] });
+      }
+
+      const effectiveType = row.data_type === 'USER-DEFINED' ? row.udt_name : row.data_type;
+
+      const col: ColumnSchema = {
+        columnName: row.column_name,
+        type: convertSqlTypeToColumnType(effectiveType),
+        isNullable: row.is_nullable === 'YES',
+        isPrimaryKey: row.is_primary_key,
+        isUnique: row.is_primary_key || row.is_unique,
+        defaultValue: this.parseDefaultValue(row.column_default),
+      };
+
+      if (row.fk_table) {
+        const referenceTable =
+          row.fk_table_schema && row.fk_table_schema !== 'public'
+            ? `${row.fk_table_schema}.${row.fk_table}`
+            : row.fk_table;
+        col.foreignKey = {
+          referenceTable,
+          referenceColumn: row.fk_column ?? '',
+          onDelete: row.on_delete as OnDeleteActionSchema,
+          onUpdate: row.on_update as OnUpdateActionSchema,
+        };
+      }
+
+      tableMap.get(row.table_name)?.columns.push(col);
+    }
+
+    return Array.from(tableMap.entries()).map(([tableName, { columns }]) => ({
+      schemaName,
+      tableName,
+      columns,
+    }));
+  }
+
   private async getFkeyConstraints(
     schemaName: string,
     table: string

@@ -140,3 +140,19 @@ export function useAllTableSchemas(schemaName: string = DEFAULT_DATABASE_SCHEMA,
     isLoading: isLoadingTables || isLoadingSchemas,
   };
 }
+
+export function useSchemaDiagram(schemaName: string, enabled = true) {
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['database', 'diagram', schemaName],
+    queryFn: () => tableService.getSchemaDiagram(schemaName),
+    staleTime: 2 * 60 * 1000,
+    enabled,
+  });
+
+  return {
+    tables: data?.tables ?? [],
+    isLoading,
+    error,
+    refetch,
+  };
+}

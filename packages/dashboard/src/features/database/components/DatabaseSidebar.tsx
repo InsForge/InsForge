@@ -21,6 +21,12 @@ const DATABASE_STUDIO_SIDEBAR_BASE_ITEMS: Array<{
   sectionEnd?: boolean;
 }> = [
   {
+    id: 'schema',
+    label: 'Schema',
+    href: '/dashboard/database/schema',
+    sectionEnd: true,
+  },
+  {
     id: 'indexes',
     label: 'Indexes',
     href: '/dashboard/database/indexes',
