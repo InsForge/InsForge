@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
 import { useProjectId } from '#lib/hooks/useMetadata';
-import { usePosthogConnection } from '#features/analytics/hooks/usePosthogConnection';
+import { useAnalyticsConnection } from '#features/analytics/hooks/useAnalytics';
 import { EmptyConnectPanel } from './posthog/EmptyConnectPanel';
 
 interface Props {
@@ -11,8 +11,8 @@ interface Props {
 // before this wrapper renders, so the only state we need to handle here is "metadata ready,
 // connection query resolved" — either render the EmptyConnectPanel (not connected) or
 // pass through to the sub-page.
-export function RequirePosthogConnection({ children }: Props) {
-  const conn = usePosthogConnection();
+export function RequireAnalyticsConnection({ children }: Props) {
+  const conn = useAnalyticsConnection();
   const { projectId } = useProjectId();
 
   if (!conn.data) {

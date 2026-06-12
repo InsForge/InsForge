@@ -1,6 +1,6 @@
 import { EmptyState, ErrorState, LoadingState } from '#components';
 import { useTimeframe } from '#features/analytics/context/TimeRangeContext';
-import { useWebStats } from '#features/analytics/hooks/useWebStats';
+import { useWebStats } from '#features/analytics/hooks/useAnalytics';
 import { type Breakdown } from '#features/analytics/services/analytics.service';
 import { flagEmoji, countryName, formatNumber } from '#features/analytics/lib/format';
 

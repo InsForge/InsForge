@@ -6,7 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@insforge/ui';
-import { useShareToken } from '#features/analytics/hooks/useShareToken';
+import { useShareToken } from '#features/analytics/hooks/useAnalytics';
 
 interface Props {
   recordingId: string | null;

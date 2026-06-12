@@ -13,8 +13,9 @@ import {
   SelectValue,
   Badge,
   Input,
+  Skeleton,
 } from '@insforge/ui';
-import { PaginationControls, Skeleton } from '#components';
+import { PaginationControls } from '#components';
 import { useDeployments } from '#features/deployments/hooks/useDeployments';
 import type { DeploymentSchema } from '#features/deployments/services/deployments.service';
 import DeploymentsEmptyState from '#features/deployments/components/DeploymentsEmptyState';
