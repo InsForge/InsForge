@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Info, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { CircleAlert, Info, Loader2, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Button,
@@ -241,6 +241,8 @@ export default function BackupsPage() {
                   {manualBackups.map((backup) => {
                     const savedOnLabel = formatBackupTimestamp(backup.createdAt);
                     const backupLabel = backup.name?.trim() || `${savedOnLabel} (Manual)`;
+                    const showStatus = !isCloudHostingMode && backup.status !== 'completed';
+                    const isRestorable = isCloudHostingMode || backup.status === 'completed';
 
                     return (
                       <div
@@ -260,9 +262,32 @@ export default function BackupsPage() {
                             >
                               <Pencil className="h-4 w-4" />
                             </button>
+                            {showStatus && backup.status === 'running' && (
+                              <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                Backing up…
+                              </span>
+                            )}
+                            {showStatus && backup.status === 'failed' && (
+                              <span
+                                className="flex shrink-0 items-center gap-1 text-xs text-destructive"
+                                title={backup.errorMessage ?? undefined}
+                              >
+                                <CircleAlert className="h-3 w-3" />
+                                Failed
+                              </span>
+                            )}
                           </div>
                           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs leading-4 text-muted-foreground">
                             <span>Saved on: {savedOnLabel}</span>
+                            {showStatus && backup.status === 'failed' && backup.errorMessage && (
+                              <span
+                                className="truncate text-destructive"
+                                title={backup.errorMessage}
+                              >
+                                {backup.errorMessage}
+                              </span>
+                            )}
                           </div>
                         </div>
 
@@ -271,6 +296,7 @@ export default function BackupsPage() {
                             type="button"
                             variant="secondary"
                             size="sm"
+                            disabled={!isRestorable}
                             className="h-7 rounded border-[var(--alpha-8)] px-2 text-sm font-medium text-foreground"
                             onClick={() => {
                               handleOpenRestoreBackupDialog(

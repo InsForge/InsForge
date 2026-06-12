@@ -11,9 +11,17 @@ function toDashboardBackup(backup: DatabaseBackup): DashboardBackup {
     triggerSource: backup.triggerSource,
     status: backup.status,
     sizeBytes: backup.sizeBytes,
+    errorMessage: backup.errorMessage,
     createdAt: backup.createdAt,
     createdBy: backup.createdBy,
   };
+}
+
+export function hasRunningBackup(info: DashboardBackupInfo | null | undefined): boolean {
+  if (!info) {
+    return false;
+  }
+  return [...info.manualBackups, ...info.scheduledBackups].some((b) => b.status === 'running');
 }
 
 async function fetchSelfHostingBackupInfo(): Promise<DashboardBackupInfo> {
@@ -46,6 +54,7 @@ export function useDatabaseBackupInfo() {
     },
     enabled: isBackupInfoQueryEnabled,
     staleTime: 5 * 60 * 1000,
+    refetchInterval: (q) => (hasRunningBackup(q.state.data) ? 5000 : false),
   });
 
   return {

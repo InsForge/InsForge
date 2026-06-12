@@ -4,6 +4,7 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { DashboardHostProvider } from '#lib/config/DashboardHostContext';
 import {
+  hasRunningBackup,
   useDatabaseBackupActions,
   useDatabaseBackupInfo,
 } from '#features/database/hooks/useDatabaseBackup';
@@ -97,6 +98,34 @@ describe('useDatabaseBackupInfo', () => {
 
     expect(onRequestBackupInfo).toHaveBeenCalled();
     expect(listBackupsMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('hasRunningBackup', () => {
+  it('drives the polling interval from backup statuses', () => {
+    expect(hasRunningBackup(null)).toBe(false);
+    expect(hasRunningBackup(undefined)).toBe(false);
+    expect(
+      hasRunningBackup({
+        manualBackups: [
+          { ...makeBackup(), status: 'completed' },
+          { ...makeBackup(), status: 'failed' },
+        ],
+        scheduledBackups: [],
+      })
+    ).toBe(false);
+    expect(
+      hasRunningBackup({
+        manualBackups: [{ ...makeBackup(), status: 'running' }],
+        scheduledBackups: [],
+      })
+    ).toBe(true);
+    expect(
+      hasRunningBackup({
+        manualBackups: [],
+        scheduledBackups: [{ ...makeBackup(), status: 'running' }],
+      })
+    ).toBe(true);
   });
 });
 
