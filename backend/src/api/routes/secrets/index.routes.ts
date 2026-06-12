@@ -159,6 +159,13 @@ router.put('/:key', verifyAdmin, async (req: AuthRequest, res: Response, next: N
       throw new AppError(`Secret not found: ${key}`, 404, ERROR_CODES.SECRET_NOT_FOUND);
     }
 
+    // Reserved secrets (ANON_KEY, API_KEY, JWT_SECRET, ...) are managed by
+    // the platform — seeded at startup, changed only through dedicated flows
+    // like the rotate endpoints. Same rule as DELETE below.
+    if (secret.isReserved) {
+      throw new AppError(`Cannot update reserved secret: ${key}`, 403, ERROR_CODES.FORBIDDEN);
+    }
+
     const success = await secretService.updateSecret(secret.id, {
       value,
       isActive,

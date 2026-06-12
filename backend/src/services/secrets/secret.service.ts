@@ -39,6 +39,7 @@ export class SecretService {
   private static instance: SecretService;
   private pool: Pool | null = null;
   private anonKeyCache: AnonKeyCache | null = null;
+  private anonKeyLoadPromise: Promise<AnonKeyCache> | null = null;
 
   private constructor() {
     // Encryption is now handled by the shared EncryptionManager
@@ -584,31 +585,43 @@ export class SecretService {
   }
 
   /**
-   * Load the active anon key and grace-period keys into the in-memory cache
+   * Load the active anon key and grace-period keys into the in-memory cache.
+   * Concurrent callers share one in-flight load so a TTL expiry under
+   * traffic produces a single database query instead of a stampede.
    */
-  private async loadAnonKeys(): Promise<AnonKeyCache> {
-    const result = await this.getPool().query(
-      `SELECT value_ciphertext, expires_at FROM system.secrets
-       WHERE (key = 'ANON_KEY' OR key LIKE 'ANON_KEY_OLD_%')
-       AND is_active = true
-       AND (expires_at IS NULL OR expires_at > NOW())`,
-      []
-    );
-
-    const keys: AnonKeyCache['keys'] = [];
-    for (const row of result.rows) {
-      try {
-        keys.push({
-          value: EncryptionManager.decrypt(row.value_ciphertext),
-          expiresAt: row.expires_at,
-        });
-      } catch (error) {
-        logger.error('Failed to decrypt anon key', { error });
-      }
+  private loadAnonKeys(): Promise<AnonKeyCache> {
+    if (this.anonKeyLoadPromise) {
+      return this.anonKeyLoadPromise;
     }
 
-    this.anonKeyCache = { keys, loadedAt: Date.now() };
-    return this.anonKeyCache;
+    this.anonKeyLoadPromise = (async () => {
+      const result = await this.getPool().query(
+        `SELECT value_ciphertext, expires_at FROM system.secrets
+         WHERE (key = 'ANON_KEY' OR key LIKE 'ANON_KEY_OLD_%')
+         AND is_active = true
+         AND (expires_at IS NULL OR expires_at > NOW())`,
+        []
+      );
+
+      const keys: AnonKeyCache['keys'] = [];
+      for (const row of result.rows) {
+        try {
+          keys.push({
+            value: EncryptionManager.decrypt(row.value_ciphertext),
+            expiresAt: row.expires_at,
+          });
+        } catch (error) {
+          logger.error('Failed to decrypt anon key', { error });
+        }
+      }
+
+      this.anonKeyCache = { keys, loadedAt: Date.now() };
+      return this.anonKeyCache;
+    })().finally(() => {
+      this.anonKeyLoadPromise = null;
+    });
+
+    return this.anonKeyLoadPromise;
   }
 
   /**
@@ -732,9 +745,9 @@ export class SecretService {
     }
 
     // Seed from environment if provided, ensure it has 'anon_' prefix
-    const envAnonKey = appConfig.auth.accessAnonKey;
-    const fromEnv = !!envAnonKey && envAnonKey.trim() !== '';
-    const anonKey = fromEnv
+    const envAnonKey = appConfig.auth.accessAnonKey?.trim();
+    const fromEnv = !!envAnonKey;
+    const anonKey = envAnonKey
       ? envAnonKey.startsWith('anon_')
         ? envAnonKey
         : 'anon_' + envAnonKey
@@ -766,9 +779,9 @@ export class SecretService {
 
     if (!apiKey) {
       // Check if ACCESS_API_KEY is provided via environment
-      const envApiKey = appConfig.auth.accessApiKey;
+      const envApiKey = appConfig.auth.accessApiKey?.trim();
 
-      if (envApiKey && envApiKey.trim() !== '') {
+      if (envApiKey) {
         // Use the provided API key from environment, ensure it has 'ik_' prefix
         apiKey = envApiKey.startsWith('ik_') ? envApiKey : 'ik_' + envApiKey;
         await this.createSecret({ key: 'API_KEY', value: apiKey, isReserved: true });

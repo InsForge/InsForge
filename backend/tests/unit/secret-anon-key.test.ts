@@ -88,6 +88,29 @@ describe('SecretService anon key', () => {
       await expect(service.verifyAnonKey('anon_wrong')).resolves.toBe(false);
     });
 
+    it('deduplicates concurrent cold-cache loads into one query (no stampede)', async () => {
+      mockPoolQuery.mockImplementation(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(
+              () => resolve({ rows: [{ value_ciphertext: 'enc:anon_active', expires_at: null }] }),
+              20
+            )
+          )
+      );
+      const service = await loadSecretService();
+
+      const results = await Promise.all([
+        service.verifyAnonKey('anon_active'),
+        service.verifyAnonKey('anon_active'),
+        service.verifyAnonKey('anon_wrong'),
+        service.verifyAnonKey('anon_active'),
+      ]);
+
+      expect(results).toEqual([true, true, false, true]);
+      expect(mockPoolQuery).toHaveBeenCalledTimes(1);
+    });
+
     it('serves repeated verifications from the in-memory cache', async () => {
       mockPoolQuery.mockResolvedValue({
         rows: [{ value_ciphertext: 'enc:anon_active', expires_at: null }],
@@ -274,6 +297,24 @@ describe('SecretService anon key', () => {
       vi.spyOn(service, 'createSecret').mockResolvedValue({ id: 'new-id' });
 
       await expect(service.initializeAnonKey()).resolves.toBe('anon_bare-environment-key');
+    });
+
+    it('trims whitespace from the env-provided key before storing', async () => {
+      vi.stubEnv('ACCESS_ANON_KEY', '  anon_padded_key  ');
+      const service = await loadSecretService();
+      vi.spyOn(service, 'getSecretByKey').mockResolvedValue(null);
+      vi.spyOn(service, 'createSecret').mockResolvedValue({ id: 'new-id' });
+
+      await expect(service.initializeAnonKey()).resolves.toBe('anon_padded_key');
+    });
+
+    it('generates a key when the env value is only whitespace', async () => {
+      vi.stubEnv('ACCESS_ANON_KEY', '   ');
+      const service = await loadSecretService();
+      vi.spyOn(service, 'getSecretByKey').mockResolvedValue(null);
+      vi.spyOn(service, 'createSecret').mockResolvedValue({ id: 'new-id' });
+
+      await expect(service.initializeAnonKey()).resolves.toMatch(/^anon_[0-9a-f]{64}$/);
     });
 
     it('prefers the stored key over the environment variable', async () => {
