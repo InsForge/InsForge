@@ -5,6 +5,7 @@ import logger from '@/utils/logger.js';
 import { OAuthProvider } from './base.provider.js';
 import axios from 'axios';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
+import { appConfig } from '@/infra/config/app.config.js';
 
 export class XOAuthProvider implements OAuthProvider {
   private static instance: XOAuthProvider;
@@ -50,7 +51,7 @@ export class XOAuthProvider implements OAuthProvider {
 
     if (config?.useSharedKey) {
       // Use shared keys if configured
-      const cloudBasedUrl = process.env.CLOUD_API_HOST || 'https://api.insforge.dev';
+      const cloudBasedUrl = appConfig.cloud.apiHost;
       const redirectUri = `${selfBaseUrl}/api/auth/oauth/shared/callback/${state}`;
       const response = await axios.get(
         `${cloudBasedUrl}/oauth/twitter?redirect_uri=${encodeURIComponent(redirectUri)}`,

@@ -5,6 +5,7 @@ import { AuthConfigService } from '@/services/auth/auth-config.service.js';
 import { AuthOTPService, OTPPurpose } from '@/services/auth/auth-otp.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { TokenManager, type RefreshTokenPayload } from '@/infra/security/token.manager.js';
+import { SecretService } from '@/services/secrets/secret.service.js';
 import { AppError } from '@/utils/errors.js';
 import { successResponse } from '@/utils/response.js';
 import {
@@ -25,6 +26,7 @@ import {
 import { parseClientType } from '@/utils/utils.js';
 import {
   ERROR_CODES,
+  roleSchema,
   userIdSchema,
   createUserRequestSchema,
   createSessionRequestSchema,
@@ -317,7 +319,7 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
     const config: GetAuthConfigResponse = await authConfigService.updateAuthConfig(input);
 
     await auditService.log({
-      actor: req.user?.email || 'api-key',
+      actor: req.hasApiKey ? 'api-key' : req.user?.id,
       action: 'UPDATE_AUTH_CONFIG',
       module: 'AUTH',
       details: {
@@ -566,7 +568,7 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
       }
     }
 
-    // Fetch current user data from DB (raw record includes is_project_admin)
+    // Fetch current user data from DB.
     const dbUser = await authService.getUserById(payload.sub);
 
     if (!dbUser) {
@@ -578,13 +580,12 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
     }
 
     const user = authService.transformUserRecordToSchema(dbUser);
-    const role = dbUser.is_project_admin ? 'project_admin' : 'authenticated';
 
     // Generate new access token
     const newAccessToken = tokenManager.generateAccessToken({
       sub: user.id,
       email: user.email,
-      role,
+      role: roleSchema.enum.authenticated,
     });
 
     if (clientType === 'web') {
@@ -678,7 +679,7 @@ router.get(
   verifyToken,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      if (!req.user?.id) {
+      if (req.user?.role !== roleSchema.enum.authenticated || !req.user.id) {
         throw new AppError('User not authenticated', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
       }
 
@@ -776,7 +777,7 @@ router.delete(
 
       // Log audit for user deletion
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'DELETE_USERS',
         module: 'AUTH',
         details: {
@@ -798,20 +799,32 @@ router.delete(
   }
 );
 
-// POST /api/auth/tokens/anon - Generate anonymous JWT token (never expires)
-router.post('/tokens/anon', verifyAdmin, (_req: Request, res: Response, next: NextFunction) => {
-  try {
-    const tokenManager = TokenManager.getInstance();
-    const token = tokenManager.generateAnonToken();
+// POST /api/auth/tokens/anon - DEPRECATED: use GET /api/metadata/anon-key
+// Kept for backward compatibility; now returns the opaque anon key instead of
+// minting a non-revocable anon JWT. The opaque key is accepted everywhere the
+// legacy anon JWT was (Authorization: Bearer), so existing callers keep working.
+router.post(
+  '/tokens/anon',
+  verifyAdmin,
+  async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const secretService = SecretService.getInstance();
+      const anonKey = await secretService.getSecretByKey('ANON_KEY');
 
-    successResponse(res, {
-      accessToken: token,
-      message: 'Anonymous token generated successfully (never expires)',
-    });
-  } catch (error) {
-    next(error);
+      if (!anonKey) {
+        throw new AppError('Anon key not initialized', 404, ERROR_CODES.SECRET_NOT_FOUND);
+      }
+
+      successResponse(res, {
+        accessToken: anonKey,
+        message:
+          'Anon key retrieved successfully (deprecated route, use GET /api/metadata/anon-key)',
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // POST /api/auth/email/send-verification - Send email verification (code or link based on config)
 router.post(
@@ -1101,7 +1114,7 @@ router.put(
       const config = await smtpConfigService.upsertSmtpConfig(input);
 
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'UPDATE_SMTP_CONFIG',
         module: 'EMAIL',
         details: {
@@ -1163,7 +1176,7 @@ router.put(
       );
 
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'UPDATE_EMAIL_TEMPLATE',
         module: 'EMAIL',
         details: {

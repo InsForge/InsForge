@@ -15,6 +15,7 @@ import { AppError, hasPgErrorCode } from '@/utils/errors.js';
 import { DenoSubhostingProvider } from '@/providers/functions/deno-subhosting.provider.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
+import { appConfig } from '@/infra/config/app.config.js';
 
 export class FunctionService {
   private static instance: FunctionService;
@@ -72,7 +73,7 @@ export class FunctionService {
         runtimeHealthy = true;
       } else {
         try {
-          const denoUrl = process.env.DENO_RUNTIME_URL || 'http://localhost:7133';
+          const denoUrl = appConfig.functions.denoRuntimeUrl;
           const healthResponse = await fetch(`${denoUrl}/health`, {
             method: 'GET',
             signal: AbortSignal.timeout(2000), // 2 second timeout
@@ -378,14 +379,14 @@ export class FunctionService {
   }
 
   // ============================================
-  // Deno Subhosting Integration
+  // Deno Deploy Integration
   // ============================================
 
   /**
-   * Get the Deno Subhosting project ID for this InsForge instance
+   * Get the Deno Deploy project ID for this InsForge instance
    */
   private getDenoProjectId(): string {
-    return process.env.APP_KEY || 'local';
+    return appConfig.storage.appKey;
   }
 
   /**
@@ -395,7 +396,7 @@ export class FunctionService {
    */
   private async deployAndWait(): Promise<DeploymentResult | null> {
     if (!this.denoSubhostingProvider.isConfigured()) {
-      logger.debug('Deno Subhosting not configured, skipping deployment');
+      logger.debug('Deno Deploy not configured, skipping deployment');
       return null;
     }
 
@@ -407,7 +408,7 @@ export class FunctionService {
       const secrets = await this.getFunctionSecrets();
       const functionSlugs = activeFunctions.map((f) => f.slug);
 
-      logger.info('Deploying to Deno Subhosting (sync)', {
+      logger.info('Deploying to Deno Deploy (sync)', {
         projectId,
         functionCount: activeFunctions.length,
         functions: functionSlugs,
@@ -446,7 +447,7 @@ export class FunctionService {
         this.cachedDeploymentUrl = finalResult.url;
       }
 
-      logger.info('Deno Subhosting deployment completed', {
+      logger.info('Deno Deploy deployment completed', {
         deploymentId: result.id,
         status: finalResult.status,
       });
@@ -460,7 +461,7 @@ export class FunctionService {
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
 
-      logger.error('Deno Subhosting deployment failed', { error: errorMsg, projectId });
+      logger.error('Deno Deploy deployment failed', { error: errorMsg, projectId });
 
       // Update DB record so it doesn't stay stuck in 'pending'
       if (savedDeploymentId) {
@@ -495,12 +496,12 @@ export class FunctionService {
   }
 
   /**
-   * Trigger deployment of all active functions to Deno Subhosting
+   * Trigger deployment of all active functions to Deno Deploy
    * This is called asynchronously after function CRUD operations
    */
   private async triggerDeployment(): Promise<void> {
     if (!this.denoSubhostingProvider.isConfigured()) {
-      logger.debug('Deno Subhosting not configured, skipping deployment');
+      logger.debug('Deno Deploy not configured, skipping deployment');
       return;
     }
 
@@ -511,7 +512,7 @@ export class FunctionService {
       const secrets = await this.getFunctionSecrets();
       const functionSlugs = activeFunctions.map((f) => f.slug);
 
-      logger.info('Deploying to Deno Subhosting', {
+      logger.info('Deploying to Deno Deploy', {
         projectId,
         functionCount: activeFunctions.length,
         functions: functionSlugs,
@@ -532,7 +533,7 @@ export class FunctionService {
         functions: functionSlugs,
       });
 
-      logger.info('Deno Subhosting deployment created', {
+      logger.info('Deno Deploy deployment created', {
         deploymentId: result.id,
         status: result.status,
         url: result.url,
@@ -540,7 +541,7 @@ export class FunctionService {
 
       void this.pollDeploymentStatus(result.id, functionSlugs);
     } catch (error) {
-      logger.error('Deno Subhosting deployment failed', {
+      logger.error('Deno Deploy deployment failed', {
         error: error instanceof Error ? error.message : String(error),
         projectId,
       });
@@ -571,13 +572,13 @@ export class FunctionService {
         if (result.url) {
           this.cachedDeploymentUrl = result.url;
         }
-        logger.info('Deno Subhosting deployment succeeded', {
+        logger.info('Deno Deploy deployment succeeded', {
           deploymentId,
           url: result.url,
           functions,
         });
       } else {
-        logger.error('Deno Subhosting deployment failed', {
+        logger.error('Deno Deploy deployment failed', {
           deploymentId,
           errorMessage,
           buildLogs: result.buildLogs,
@@ -643,7 +644,7 @@ export class FunctionService {
   }
 
   /**
-   * Check if Deno Subhosting is configured
+   * Check if Deno Deploy is configured
    */
   isSubhostingConfigured(): boolean {
     return this.denoSubhostingProvider.isConfigured();
@@ -723,12 +724,12 @@ export class FunctionService {
   }
 
   /**
-   * Sync existing functions to Deno Subhosting on server startup
+   * Sync existing functions to Deno Deploy on server startup
    * Only deploys if there's no existing successful deployment
    */
   async syncDeployment(): Promise<void> {
     if (!this.denoSubhostingProvider.isConfigured()) {
-      logger.debug('Deno Subhosting not configured, skipping sync');
+      logger.debug('Deno Deploy not configured, skipping sync');
       return;
     }
 
@@ -736,7 +737,7 @@ export class FunctionService {
       // Check if there's already a successful deployment
       const existingUrl = await this.getDeploymentUrl();
       if (existingUrl) {
-        logger.info('Existing Deno Subhosting deployment found, skipping sync', {
+        logger.info('Existing Deno Deploy deployment found, skipping sync', {
           url: existingUrl,
         });
         return;
@@ -749,7 +750,7 @@ export class FunctionService {
         return;
       }
 
-      logger.info('No existing deployment found, syncing functions to Deno Subhosting', {
+      logger.info('No existing deployment found, syncing functions to Deno Deploy', {
         functionCount: activeFunctions.length,
         functions: activeFunctions.map((f) => f.slug),
       });
@@ -776,7 +777,7 @@ export class FunctionService {
   /**
    * Get all active secrets for function injection
    * In cloud deployments, INSFORGE_INTERNAL_URL is replaced with INSFORGE_BASE_URL
-   * because the internal container URL is not reachable from Deno Subhosting.
+   * because the internal container URL is not reachable from Deno Deploy.
    */
   private async getFunctionSecrets(): Promise<Record<string, string>> {
     try {

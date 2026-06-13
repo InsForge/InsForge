@@ -46,7 +46,7 @@ export class ImageGenerationService {
         modalities: ['text', 'image'],
       };
 
-      // Send request with automatic renewal and retry logic
+      // Send request with upstream error mapping
       const { result: response } = await this.openRouterProvider.sendRequest((client) =>
         client.chat.completions.create(
           request as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming

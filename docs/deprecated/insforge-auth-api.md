@@ -47,7 +47,7 @@ Returns: `{"user": {"id": "...", "email": "...", "role": "authenticated"}}`
 Request:
 ```json
 {
-  "email": "admin@example.com",
+  "username": "admin",
   "password": "change-this-password"
 }
 ```
@@ -56,11 +56,9 @@ Response:
 ```json
 {
   "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "id": "admin-id",
-    "email": "admin@example.com",
-    "name": "Administrator",
-    "role": "project_admin"
+  "projectAdmin": {
+    "subject": "local:admin",
+    "username": "admin"
   }
 }
 ```
@@ -69,12 +67,12 @@ Response:
 # Mac/Linux
 curl -X POST http://localhost:7130/api/auth/admin/sessions \
   -H 'Content-Type: application/json' \
-  -d '{"email":"admin@example.com","password":"change-this-password"}'
+  -d '{"username":"admin","password":"change-this-password"}'
 
 # Windows PowerShell (use curl.exe)
 curl.exe -X POST http://localhost:7130/api/auth/admin/sessions \
   -H "Content-Type: application/json" \
-  -d '{\"email\":\"admin@example.com\",\"password\":\"change-this-password\"}'
+  -d '{\"username\":\"admin\",\"password\":\"change-this-password\"}'
 ```
 
 ## Error Response Format

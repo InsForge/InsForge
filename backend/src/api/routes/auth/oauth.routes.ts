@@ -123,7 +123,7 @@ router.post(
       const config = await oAuthConfigService.createConfig(input);
 
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'CREATE_OAUTH_CONFIG',
         module: 'AUTH',
         details: {
@@ -175,7 +175,7 @@ router.put(
       const config = await oAuthConfigService.updateConfig(provider, input);
 
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'UPDATE_OAUTH_CONFIG',
         module: 'AUTH',
         details: {
@@ -217,7 +217,7 @@ router.delete(
       }
 
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'DELETE_OAUTH_CONFIG',
         module: 'AUTH',
         details: { provider },

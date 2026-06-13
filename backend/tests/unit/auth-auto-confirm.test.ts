@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Set required env vars before any imports
-process.env.ADMIN_EMAIL = 'admin@test.com';
-process.env.ADMIN_PASSWORD = 'admin-password';
+process.env.ROOT_ADMIN_USERNAME = 'admin';
+process.env.ROOT_ADMIN_PASSWORD = 'admin-password';
 
 const { mockPool, mockClient } = vi.hoisted(() => ({
   mockPool: {
@@ -116,8 +116,8 @@ vi.mock('../../src/providers/oauth/apple.oauth.provider', () => ({
   AppleOAuthProvider: mockOAuthProvider,
 }));
 
-vi.mock('../../src/infra/config/app.config', () => ({
-  config: {
+vi.mock('../../src/infra/config/app.config', () => {
+  const c = {
     app: {
       jwtSecret: 'test-secret',
       name: 'test',
@@ -125,9 +125,17 @@ vi.mock('../../src/infra/config/app.config', () => ({
     cloud: {
       projectId: null,
     },
-  },
-  getApiBaseUrl: () => 'http://localhost:3000',
-}));
+    auth: {
+      rootAdminUsername: 'admin@test.com',
+      rootAdminPassword: 'admin-password',
+    },
+  };
+  return {
+    config: c,
+    appConfig: c,
+    getApiBaseUrl: () => 'http://localhost:3000',
+  };
+});
 
 import { AuthService } from '../../src/services/auth/auth.service';
 
@@ -151,7 +159,8 @@ describe('AuthService.register – autoConfirm', () => {
       email_verified: false,
       created_at: new Date(),
       updated_at: new Date(),
-      auth_metadata: null,
+      metadata: null,
+      is_anonymous: false,
     });
   });
 

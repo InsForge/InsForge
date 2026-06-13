@@ -18,11 +18,14 @@ import { StorageConfigService } from '@/services/storage/storage-config.service.
 import logger from '@/utils/logger.js';
 import { escapeSqlLikePattern, escapeRegexPattern } from '@/utils/validations.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
+import { appConfig } from '@/infra/config/app.config.js';
 
 const DEFAULT_LIST_LIMIT = 100;
 const GIGABYTE_IN_BYTES = 1024 * 1024 * 1024;
 const PUBLIC_BUCKET_EXPIRY = 0; // Public buckets don't expire
 const PRIVATE_BUCKET_EXPIRY = 3600; // Private buckets expire in 1 hour
+const MIN_SIGNED_URL_EXPIRY = 1; // 1 second
+const MAX_SIGNED_URL_EXPIRY = 604800; // 7 days — S3 SigV4 presign ceiling
 
 type StorageObjectResult = {
   file: Buffer;
@@ -35,19 +38,19 @@ export class StorageService {
   private pool: Pool | null = null;
 
   private constructor() {
-    const s3Bucket = process.env.AWS_S3_BUCKET;
-    const appKey = process.env.APP_KEY || 'local';
+    const s3Bucket = appConfig.storage.s3Bucket;
+    const appKey = appConfig.storage.appKey;
     // PARENT_APP_KEY is set by cloud-backend at branch EC2 startup. When
     // present, the S3 provider runs in branch mode: read paths fall back to
     // parent's S3 prefix on 404, write paths target the branch's prefix only.
-    const parentAppKey = process.env.PARENT_APP_KEY?.trim() || undefined;
+    const parentAppKey = appConfig.storage.parentAppKey;
 
     if (s3Bucket) {
       // Use S3 backend
       this.provider = new S3StorageProvider(
         s3Bucket,
         appKey,
-        process.env.AWS_REGION || 'us-east-2',
+        appConfig.storage.awsRegion,
         parentAppKey
       );
       if (parentAppKey) {
@@ -55,8 +58,7 @@ export class StorageService {
       }
     } else {
       // Use local filesystem backend (no fallback support — local installs aren't branched)
-      const baseDir = process.env.STORAGE_DIR || path.resolve(process.cwd(), 'insforge-storage');
-      this.provider = new LocalStorageProvider(baseDir);
+      this.provider = new LocalStorageProvider(appConfig.storage.storageDir);
     }
   }
 
@@ -211,7 +213,7 @@ export class StorageService {
     // Raw-pool dedup sees all rows and avoids silent cross-user blob overwrite.
     const finalKey = await this.generateNextAvailableKey(bucket, originalKey, this.getPool());
 
-    const userId = ctx?.id ?? null;
+    const userId = ctx?.role === 'authenticated' ? ctx.id : null;
     const insertObject = async (db: PoolClient) => {
       // INSERT before provider write so UNIQUE (bucket, key) catches any
       // race-window collision before any blob is touched. Provider write
@@ -544,7 +546,7 @@ export class StorageService {
     if (!ctx) {
       throw new AppError('Forbidden', 403, ERROR_CODES.STORAGE_PERMISSION_DENIED);
     }
-    const userId = ctx.id ?? null;
+    const userId = ctx?.role === 'authenticated' ? ctx.id : null;
     await withUserContext(this.getPool(), ctx, async (client) => {
       await client.query('SAVEPOINT upload_strategy_rls_probe');
       try {
@@ -561,15 +563,25 @@ export class StorageService {
     return this.provider.getUploadStrategy(bucket, key, metadata, maxFileSizeBytes);
   }
 
-  async getDownloadStrategy(bucket: string, key: string) {
+  async getDownloadStrategy(bucket: string, key: string, requestedExpiresIn?: number) {
     this.validateBucketName(bucket);
     this.validateKey(key);
 
     // Check if bucket is public
     const isPublic = await this.isBucketPublic(bucket);
 
-    // Auto-calculate expiry based on bucket visibility if not provided
-    const expiresIn = isPublic ? PUBLIC_BUCKET_EXPIRY : PRIVATE_BUCKET_EXPIRY;
+    // Auto-calculate expiry based on bucket visibility if not provided.
+    // Private buckets honor a caller-supplied TTL (clamped to a safe range) so
+    // `createSignedUrl(key, expiresIn)` can mint short-lived links; public
+    // buckets keep their long, server-decided expiry regardless (the provider
+    // also forces 7 days for public objects).
+    let expiresIn = isPublic ? PUBLIC_BUCKET_EXPIRY : PRIVATE_BUCKET_EXPIRY;
+    if (!isPublic && requestedExpiresIn !== undefined && Number.isFinite(requestedExpiresIn)) {
+      expiresIn = Math.min(
+        Math.max(Math.floor(requestedExpiresIn), MIN_SIGNED_URL_EXPIRY),
+        MAX_SIGNED_URL_EXPIRY
+      );
+    }
 
     // Fetch the version stamp (etag preferred, uploaded_at fallback) and pass
     // it to the provider, which knows whether its URL flavor tolerates an
@@ -680,7 +692,7 @@ export class StorageService {
     // INSERT runs through withUserContext for end-user callers, so the RLS
     // WITH CHECK on storage_objects_owner_insert verifies uploaded_by =
     // jwt.sub. Admin/API-key callers use the backend pool.
-    const userId = ctx?.id ?? null;
+    const userId = ctx?.role === 'authenticated' ? ctx.id : null;
     const insertObjectRow = (db: PoolClient) =>
       db.query(
         `INSERT INTO storage.objects (bucket, key, size, mime_type, etag, uploaded_by, uploaded_via)

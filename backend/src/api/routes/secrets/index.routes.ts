@@ -1,16 +1,17 @@
 import { Router, Response, NextFunction } from 'express';
-import { z } from 'zod';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { FunctionService } from '@/services/functions/function.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/utils/errors.js';
-import { ERROR_CODES } from '@insforge/shared-schemas';
+import {
+  ERROR_CODES,
+  rotateAnonKeyRequestSchema,
+  rotateApiKeyRequestSchema,
+  type RotateAnonKeyResponse,
+  type RotateApiKeyResponse,
+} from '@insforge/shared-schemas';
 import { successResponse } from '@/utils/response.js';
-
-const RotateApiKeySchema = z.object({
-  gracePeriodHours: z.coerce.number().int().nonnegative().max(168).optional(),
-});
 
 const router = Router();
 const secretService = SecretService.getInstance();
@@ -52,7 +53,7 @@ router.get('/:key', verifyAdmin, async (req: AuthRequest, res: Response, next: N
 
     // Log audit
     await auditService.log({
-      actor: req.user?.email || 'api-key',
+      actor: req.hasApiKey ? 'api-key' : req.user?.id,
       action: 'GET_SECRET',
       module: 'SECRETS',
       details: { key },
@@ -117,7 +118,7 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
 
     // Log audit
     await auditService.log({
-      actor: req.user?.email || 'api-key',
+      actor: req.hasApiKey ? 'api-key' : req.user?.id,
       action: 'CREATE_SECRET',
       module: 'SECRETS',
       details: { key, id: result.id },
@@ -158,6 +159,13 @@ router.put('/:key', verifyAdmin, async (req: AuthRequest, res: Response, next: N
       throw new AppError(`Secret not found: ${key}`, 404, ERROR_CODES.SECRET_NOT_FOUND);
     }
 
+    // Reserved secrets (ANON_KEY, API_KEY, JWT_SECRET, ...) are managed by
+    // the platform — seeded at startup, changed only through dedicated flows
+    // like the rotate endpoints. Same rule as DELETE below.
+    if (secret.isReserved) {
+      throw new AppError(`Cannot update reserved secret: ${key}`, 403, ERROR_CODES.FORBIDDEN);
+    }
+
     const success = await secretService.updateSecret(secret.id, {
       value,
       isActive,
@@ -171,7 +179,7 @@ router.put('/:key', verifyAdmin, async (req: AuthRequest, res: Response, next: N
 
     // Log audit
     await auditService.log({
-      actor: req.user?.email || 'api-key',
+      actor: req.hasApiKey ? 'api-key' : req.user?.id,
       action: 'UPDATE_SECRET',
       module: 'SECRETS',
       details: { key, updates: { hasNewValue: !!value, isActive, isReserved, expiresAt } },
@@ -201,7 +209,7 @@ router.post(
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const parseResult = RotateApiKeySchema.safeParse(req.body);
+      const parseResult = rotateApiKeyRequestSchema.safeParse(req.body);
       if (!parseResult.success) {
         throw new AppError(
           `Invalid request: ${parseResult.error.errors.map((e) => e.message).join(', ')}`,
@@ -215,7 +223,7 @@ router.post(
 
       // Log audit
       await auditService.log({
-        actor: req.user?.email || 'api-key',
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
         action: 'ROTATE_API_KEY',
         module: 'SECRETS',
         details: {
@@ -225,12 +233,63 @@ router.post(
         ip_address: req.ip,
       });
 
-      successResponse(res, {
+      const response: RotateApiKeyResponse = {
         success: true,
         message: 'API key rotated successfully. Old key will remain valid during grace period.',
         apiKey: result.newApiKey,
         oldKeyExpiresAt: result.oldKeyExpiresAt.toISOString(),
+      };
+      successResponse(res, response);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * Rotate anon key with grace period
+ * POST /api/secrets/anon-key/rotate
+ */
+router.post(
+  '/anon-key/rotate',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const parseResult = rotateAnonKeyRequestSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        throw new AppError(
+          `Invalid request: ${parseResult.error.errors.map((e) => e.message).join(', ')}`,
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const { gracePeriodHours } = parseResult.data;
+      const result = await secretService.rotateAnonKey(gracePeriodHours);
+
+      // Log audit
+      await auditService.log({
+        actor: req.hasApiKey ? 'api-key' : req.user?.id,
+        action: 'ROTATE_ANON_KEY',
+        module: 'SECRETS',
+        details: {
+          oldKeyExpiresAt: result.oldKeyExpiresAt.toISOString(),
+          gracePeriodHours: gracePeriodHours ?? 168,
+        },
+        ip_address: req.ip,
       });
+
+      // ANON_KEY is injected into edge function environments, so redeploy
+      // with the new value
+      triggerSecretsRedeployment();
+
+      const response: RotateAnonKeyResponse = {
+        success: true,
+        message: 'Anon key rotated successfully. Old key will remain valid during grace period.',
+        anonKey: result.newAnonKey,
+        oldKeyExpiresAt: result.oldKeyExpiresAt.toISOString(),
+      };
+      successResponse(res, response);
     } catch (error) {
       next(error);
     }
@@ -267,7 +326,7 @@ router.delete('/:key', verifyAdmin, async (req: AuthRequest, res: Response, next
 
     // Log audit
     await auditService.log({
-      actor: req.user?.email || 'api-key',
+      actor: req.hasApiKey ? 'api-key' : req.user?.id,
       action: 'DELETE_SECRET',
       module: 'SECRETS',
       details: { key },

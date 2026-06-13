@@ -7,6 +7,7 @@ import {
   type StorageConfigSchema,
   type UpdateStorageConfigRequest,
 } from '@insforge/shared-schemas';
+import { appConfig } from '@/infra/config/app.config.js';
 
 const DEFAULT_MAX_FILE_SIZE_MB = 50;
 
@@ -62,9 +63,9 @@ export class StorageConfigService {
 
       if (!result.rows.length) {
         logger.warn('No storage config found, returning default fallback values');
-        const envValue = parseInt(process.env.MAX_FILE_SIZE || '');
-        const fallbackMb = envValue
-          ? Math.round(envValue / (1024 * 1024))
+        const envBytes = appConfig.server.maxFileSize;
+        const fallbackMb = envBytes
+          ? Math.round(envBytes / (1024 * 1024))
           : DEFAULT_MAX_FILE_SIZE_MB;
         return {
           id: '00000000-0000-0000-0000-000000000000',
@@ -78,9 +79,9 @@ export class StorageConfigService {
     } catch (error) {
       logger.error('Failed to get storage config, returning fallback values', { error });
       // Return the effective fallback so the UI still sees the active cap
-      const envValue = parseInt(process.env.MAX_FILE_SIZE || '');
-      const effectiveMb = envValue
-        ? Math.round(envValue / (1024 * 1024))
+      const envBytes = appConfig.server.maxFileSize;
+      const effectiveMb = envBytes
+        ? Math.round(envBytes / (1024 * 1024))
         : DEFAULT_MAX_FILE_SIZE_MB;
       return {
         id: '00000000-0000-0000-0000-000000000000',
@@ -98,12 +99,11 @@ export class StorageConfigService {
    */
   async getMaxFileSizeBytes(): Promise<number> {
     try {
-      const config = await this.getStorageConfig();
-      return config.maxFileSizeMb * 1024 * 1024;
+      const storageConfig = await this.getStorageConfig();
+      return storageConfig.maxFileSizeMb * 1024 * 1024;
     } catch {
       // Fall back to env if DB is unavailable
-      const envValue = parseInt(process.env.MAX_FILE_SIZE || '');
-      return envValue || DEFAULT_MAX_FILE_SIZE_MB * 1024 * 1024;
+      return appConfig.server.maxFileSize ?? DEFAULT_MAX_FILE_SIZE_MB * 1024 * 1024;
     }
   }
 

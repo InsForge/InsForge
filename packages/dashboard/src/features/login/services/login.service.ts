@@ -1,21 +1,19 @@
 import { apiClient } from '#lib/api/client';
-import type { UserSchema } from '@insforge/shared-schemas';
-
-interface LoginResult {
-  user: UserSchema;
-  accessToken: string;
-  csrfToken?: string;
-}
+import type {
+  CreateAdminSessionResponse,
+  GetCurrentAdminSessionResponse,
+  AdminSchema,
+} from '@insforge/shared-schemas';
 
 export class LoginService {
-  async loginWithPassword(email: string, password: string): Promise<LoginResult> {
-    const response = await apiClient.request('/auth/admin/sessions', {
+  async loginWithPassword(username: string, password: string): Promise<CreateAdminSessionResponse> {
+    const response = (await apiClient.request('/auth/admin/sessions', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ username, password }),
       skipRefresh: true,
-    });
+    })) as CreateAdminSessionResponse;
 
-    if (!response.user || !response.accessToken) {
+    if (!response.admin?.sub || !response.accessToken) {
       throw new Error('Invalid login response');
     }
 
@@ -27,20 +25,20 @@ export class LoginService {
     }
 
     return {
-      user: response.user,
+      admin: response.admin,
       accessToken: response.accessToken,
       csrfToken: response.csrfToken ?? undefined,
     };
   }
 
-  async loginWithAuthorizationCode(code: string): Promise<LoginResult> {
-    const response = await apiClient.request('/auth/admin/sessions/exchange', {
+  async loginWithAuthorizationCode(code: string): Promise<CreateAdminSessionResponse> {
+    const response = (await apiClient.request('/auth/admin/sessions/exchange', {
       method: 'POST',
       body: JSON.stringify({ code }),
       skipRefresh: true,
-    });
+    })) as CreateAdminSessionResponse;
 
-    if (!response.user || !response.accessToken) {
+    if (!response.admin?.sub || !response.accessToken) {
       throw new Error('Invalid authorization code exchange response');
     }
 
@@ -52,7 +50,7 @@ export class LoginService {
     }
 
     return {
-      user: response.user,
+      admin: response.admin,
       accessToken: response.accessToken,
       csrfToken: response.csrfToken ?? undefined,
     };
@@ -76,10 +74,12 @@ export class LoginService {
     apiClient.clearTokens();
   }
 
-  async getCurrentUser(): Promise<UserSchema | null> {
+  async getCurrentUser(): Promise<AdminSchema | null> {
     try {
-      const response = await apiClient.request('/auth/sessions/current');
-      return response.user;
+      const response = (await apiClient.request(
+        '/auth/admin/sessions/current'
+      )) as GetCurrentAdminSessionResponse;
+      return response.admin ?? null;
     } catch {
       return null;
     }

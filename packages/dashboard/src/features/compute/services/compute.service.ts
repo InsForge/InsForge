@@ -10,6 +10,8 @@ interface ListServicesResponse {
 }
 
 type EventEntry = { timestamp: number; message: string };
+type LogLine = { timestamp: number; message: string; instance?: string; region?: string };
+type LogsResponse = { lines: LogLine[]; nextToken: string | null };
 
 class ComputeServicesApiService {
   async list(): Promise<ServiceSchema[]> {
@@ -75,6 +77,26 @@ class ComputeServicesApiService {
     return Array.isArray(response)
       ? response
       : ((response as { events: EventEntry[] })?.events ?? []);
+  }
+
+  /**
+   * Fetch container logs for a service. Pass `nextToken` (returned in the
+   * response) to page forward when live-tailing; `limit` caps the window.
+   */
+  async logs(id: string, opts?: { limit?: number; nextToken?: string }): Promise<LogsResponse> {
+    const params = new URLSearchParams();
+    if (opts?.limit) {
+      params.set('limit', String(opts.limit));
+    }
+    if (opts?.nextToken) {
+      params.set('next_token', opts.nextToken);
+    }
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const response = await apiClient.request(`/compute/services/${id}/logs${qs}`, {
+      headers: apiClient.withAccessToken(),
+    });
+    const r = response as Partial<LogsResponse> | null;
+    return { lines: r?.lines ?? [], nextToken: r?.nextToken ?? null };
   }
 }
 

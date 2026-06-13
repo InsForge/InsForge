@@ -1,0 +1,242 @@
+---
+title: Razorpay Payments SDK
+description: Create Razorpay Orders and Subscriptions from a TypeScript app
+---
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+<Installation />
+
+## Overview
+
+The TypeScript SDK exposes Razorpay runtime helpers for generated app frontends:
+
+- `insforge.payments.razorpay.createOrder(...)`
+- `insforge.payments.razorpay.verifyOrder(...)`
+- `insforge.payments.razorpay.createSubscription(...)`
+- `insforge.payments.razorpay.verifySubscription(...)`
+- `insforge.payments.razorpay.cancelSubscription(...)`
+- `insforge.payments.razorpay.pauseSubscription(...)`
+- `insforge.payments.razorpay.resumeSubscription(...)`
+
+Razorpay does not return a hosted Checkout URL. The backend creates a Razorpay Order or Subscription and returns `checkoutOptions`. The browser loads Razorpay Checkout and opens it with those options.
+
+<Note>
+  See [Razorpay Payments](/core-concepts/payments/razorpay) for provider setup,
+  manual webhooks, database tables, and fulfillment patterns.
+</Note>
+
+## SDK setup
+
+```typescript
+import { createClient } from '@insforge/sdk';
+
+const insforge = createClient({
+  baseUrl: 'https://your-project.insforge.app',
+  anonKey: 'your-anon-key'
+});
+
+declare global {
+  interface Window {
+    Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
+  }
+}
+
+```
+
+The SDK calls Razorpay runtime routes with the current InsForge user token. Do not call these routes with provider secret keys.
+
+## Load Razorpay Checkout
+
+```typescript
+function loadRazorpayCheckout(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (window.Razorpay) {
+      resolve();
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Failed to load Razorpay Checkout'));
+    document.body.appendChild(script);
+  });
+}
+```
+
+## One-time order
+
+Create an app-owned pending order first. Then create the Razorpay Order through InsForge:
+
+Razorpay Orders can be amount-only, but creating Razorpay Items for one-time sellable products is a good practice because synced Items make the catalog visible in InsForge and Razorpay. Treat Orders as payment attempts.
+
+```typescript
+type CreateRazorpayOrderResponse = {
+  order: {
+    id: string;
+    orderId: string | null;
+    status: string;
+  };
+  checkoutOptions: {
+    key: string;
+    amount: number;
+    currency: string;
+    order_id: string;
+    name?: string | null;
+    description?: string | null;
+    callback_url?: string | null;
+    prefill: {
+      name?: string | null;
+      email?: string | null;
+      contact?: string | null;
+    };
+  };
+};
+
+const { data: orderResponse, error } =
+  await insforge.payments.razorpay.createOrder('test', {
+    amount: 50000,
+    currency: 'INR',
+    receipt: order.id,
+    subject: { type: 'team', id: teamId },
+    customerEmail: user.email,
+    notes: { order_id: order.id }
+  });
+
+if (error) throw error;
+if (!orderResponse) throw new Error('Razorpay order creation returned no data');
+```
+
+If your webhook trigger reads `notes.order_id`, pass `notes: { order_id: ... }` when creating the Order.
+
+Open Razorpay Checkout and verify the returned signature:
+
+```typescript
+await loadRazorpayCheckout();
+
+const RazorpayCheckout = window.Razorpay;
+if (!RazorpayCheckout) {
+  throw new Error('Razorpay Checkout failed to load');
+}
+
+const checkout = new RazorpayCheckout({
+  ...orderResponse.checkoutOptions,
+  handler: async (response: {
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+  }) => {
+    const { error } = await insforge.payments.razorpay.verifyOrder('test', {
+      orderId: response.razorpay_order_id,
+      paymentId: response.razorpay_payment_id,
+      signature: response.razorpay_signature
+    });
+
+    if (error) throw error;
+  }
+});
+
+checkout.open();
+```
+
+Signature verification protects the immediate browser callback. Durable fulfillment should still come from verified Razorpay webhook events.
+
+## Subscription
+
+Create or sync a Razorpay Plan first. Then create the subscription through InsForge:
+
+```typescript
+type CreateRazorpaySubscriptionResponse = {
+  subscription: {
+    subscriptionId: string;
+    status: string;
+  };
+  checkoutOptions: {
+    key: string;
+    subscription_id: string;
+    name?: string | null;
+    description?: string | null;
+    callback_url?: string | null;
+    prefill: {
+      name?: string | null;
+      email?: string | null;
+      contact?: string | null;
+    };
+  };
+};
+
+const { data: subscriptionResponse, error } =
+  await insforge.payments.razorpay.createSubscription('test', {
+    planId: 'plan_123',
+    totalCount: 12,
+    subject: { type: 'team', id: teamId },
+    customerEmail: user.email
+  });
+
+if (error) throw error;
+if (!subscriptionResponse) throw new Error('Razorpay subscription creation returned no data');
+```
+
+Pass Razorpay subscription `notes` when webhook triggers need app identifiers later.
+
+Open Razorpay Checkout with the returned subscription ID:
+
+```typescript
+await loadRazorpayCheckout();
+
+const RazorpayCheckout = window.Razorpay;
+if (!RazorpayCheckout) {
+  throw new Error('Razorpay Checkout failed to load');
+}
+
+const checkout = new RazorpayCheckout({
+  ...subscriptionResponse.checkoutOptions,
+  handler: async (response: {
+    razorpay_subscription_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+  }) => {
+    const { error } = await insforge.payments.razorpay.verifySubscription('test', {
+      subscriptionId: response.razorpay_subscription_id,
+      paymentId: response.razorpay_payment_id,
+      signature: response.razorpay_signature
+    });
+
+    if (error) throw error;
+  }
+});
+
+checkout.open();
+```
+
+## Manage subscriptions
+
+Razorpay does not provide a Stripe Billing Portal equivalent. Use backend routes for subscription management:
+
+```typescript
+await insforge.payments.razorpay.cancelSubscription('test', 'sub_123', {
+  cancelAtCycleEnd: false
+});
+
+await insforge.payments.razorpay.pauseSubscription('test', 'sub_123');
+
+await insforge.payments.razorpay.resumeSubscription('test', 'sub_123');
+```
+
+Subscription creation checks `INSERT` policies on `payments.razorpay_subscriptions`. Cancel, pause, and resume check `UPDATE` policies on the same table. PostgreSQL also applies `SELECT` policies to rows returned by `INSERT/UPDATE ... RETURNING`, so add matching `SELECT` visibility for the same billing subject when a policy probe needs to return the row. Add app-specific RLS or server-side membership checks before exposing these controls for shared subjects.
+
+## Fulfillment
+
+Do not mark orders paid, grant credits, or activate subscriptions from the Checkout handler alone. Use verified Razorpay webhook events in `payments.webhook_events`. Do not attach fulfillment triggers to provider mirror tables such as `payments.razorpay_subscriptions`.
+
+Create app-owned fulfillment tables with RLS, then update them from webhook triggers. See [Razorpay Payments](/core-concepts/payments/razorpay) for a trigger example.
+
+## Live/test environment
+
+Pass `'test'` as the first SDK argument while developing. Only switch to `'live'` after the developer explicitly approves production Razorpay changes and live Items, Plans, and webhooks are configured.
+
+<Warning>
+  Never put Razorpay Key Secret or webhook secret in frontend code. The frontend
+  only receives the public Razorpay Key ID as `checkoutOptions.key`.
+</Warning>

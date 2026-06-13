@@ -30,10 +30,10 @@ if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
     exit 0
 fi
 
-# Get admin credentials
+# Get root admin credentials
 admin_token=$(get_admin_token)
 if [ -z "$admin_token" ]; then
-    print_fail "Could not authenticate as admin. Please check admin credentials."
+    print_fail "Could not authenticate as admin. Please check root admin credentials."
     exit 1
 fi
 

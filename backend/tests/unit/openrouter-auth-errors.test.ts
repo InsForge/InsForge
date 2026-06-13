@@ -1,10 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import OpenAI from 'openai';
 
-const { mockGetApiKeyWithSource, mockGetClient, mockRenewCloudApiKey } = vi.hoisted(() => ({
+const { mockGetApiKeyWithSource, mockGetClient } = vi.hoisted(() => ({
   mockGetApiKeyWithSource: vi.fn(),
   mockGetClient: vi.fn(),
-  mockRenewCloudApiKey: vi.fn(),
 }));
 
 vi.mock('../../src/utils/environment.js', () => ({
@@ -34,7 +33,34 @@ describe('OpenRouterProvider authentication error handling', () => {
     const p = provider as Record<string, any>;
     p.getApiKeyWithSource = mockGetApiKeyWithSource;
     p.getClient = mockGetClient.mockResolvedValue(new OpenAI({ apiKey: 'test' }));
-    p.renewCloudApiKey = mockRenewCloudApiKey;
+  });
+
+  it('throws AppError with BILLING_INSUFFICIENT_BALANCE for cloud key 402 without renewing', async () => {
+    mockGetApiKeyWithSource.mockResolvedValue({ apiKey: 'cloud-key', source: 'cloud' });
+
+    await expect(
+      provider.sendRequest(() => {
+        throw createAPIError(402, 'Insufficient credits');
+      })
+    ).rejects.toMatchObject({
+      statusCode: 402,
+      code: ERROR_CODES.BILLING_INSUFFICIENT_BALANCE,
+      nextActions: expect.stringContaining('Upgrade your plan'),
+    });
+  });
+
+  it('throws AppError with BILLING_INSUFFICIENT_BALANCE for env key 402', async () => {
+    mockGetApiKeyWithSource.mockResolvedValue({ apiKey: 'env-key', source: 'env' });
+
+    await expect(
+      provider.sendRequest(() => {
+        throw createAPIError(402, 'Insufficient credits');
+      })
+    ).rejects.toMatchObject({
+      statusCode: 402,
+      code: ERROR_CODES.BILLING_INSUFFICIENT_BALANCE,
+      nextActions: expect.stringContaining('OpenRouter account'),
+    });
   });
 
   it('throws AppError with AI_INVALID_API_KEY for env key 401', async () => {

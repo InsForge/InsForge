@@ -1,6 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import axios from 'axios';
-import { AuthRequest, extractApiKey, verifyUser } from '@/api/middlewares/auth.js';
+import { AuthRequest, verifyUser } from '@/api/middlewares/auth.js';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES } from '@insforge/shared-schemas';
 import { validateFunctionName } from '@/utils/validations.js';
@@ -38,14 +38,20 @@ const forwardRpcToPostgrest = async (req: AuthRequest, res: Response, next: Next
       throw new AppError(`Invalid function name: ${functionName}`, 400, ERROR_CODES.INVALID_INPUT);
     }
 
-    const result = await proxyService.forward({
+    const proxyRequest = {
       method: req.method,
       path: `/rpc/${functionName}`,
       query: req.query as Record<string, unknown>,
       headers: req.headers as Record<string, string | string[] | undefined>,
       body: req.body,
-      apiKey: extractApiKey(req) ?? undefined,
-    });
+    };
+
+    const result =
+      req.user?.role === 'project_admin' || req.hasApiKey === true
+        ? await proxyService.forwardAsAdmin(proxyRequest)
+        : req.user?.role === 'anon'
+          ? await proxyService.forwardAsAnon(proxyRequest)
+          : await proxyService.forward(proxyRequest);
 
     const headers = PostgrestProxyService.filterHeaders(result.headers);
     Object.entries(headers).forEach(([key, value]) => res.setHeader(key, value));

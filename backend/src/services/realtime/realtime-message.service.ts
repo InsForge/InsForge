@@ -54,7 +54,8 @@ export class RealtimeMessageService {
       return null;
     }
 
-    const senderId = userContext.id ?? null;
+    // Anonymous and admin senders have no row identity: sender_id stays NULL
+    const senderId = userContext.role === 'authenticated' ? userContext.id : null;
 
     try {
       await withUserContext(
@@ -65,8 +66,15 @@ export class RealtimeMessageService {
           // No RETURNING clause needed - trigger handles pg_notify.
           await client.query(
             `INSERT INTO realtime.messages (event_name, channel_id, channel_name, payload, sender_type, sender_id)
-             VALUES ($1, $2, $3, $4, 'user', $5)`,
-            [eventName, channel.id, channelName, JSON.stringify(payload), senderId]
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [
+              eventName,
+              channel.id,
+              channelName,
+              JSON.stringify(payload),
+              userContext.role === 'project_admin' ? 'system' : 'user',
+              senderId,
+            ]
           );
         },
         { 'realtime.channel_name': channelName }

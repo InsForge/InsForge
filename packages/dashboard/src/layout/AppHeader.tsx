@@ -14,6 +14,7 @@ import { useTheme } from '#lib/contexts/ThemeContext';
 import { useAuth } from '#lib/contexts/AuthContext';
 import { useOpenConnectDialog } from './ConnectDialogContext';
 import { getFeatureFlag } from '#lib/analytics/posthog';
+import { FEATURE_FLAGS, FEATURE_FLAG_VARIANTS } from '#lib/analytics/constants';
 
 // Import SVG icons
 import DiscordIcon from '#assets/logos/discord.svg?react';
@@ -23,13 +24,14 @@ import InsForgeLogoDark from '#assets/logos/insforge_dark.svg';
 
 export default function AppHeader() {
   const { resolvedTheme } = useTheme();
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const openConnectDialog = useOpenConnectDialog();
-  const dashboardVariant = getFeatureFlag('dashboard-v4-experiment');
+  const dashboardVariant = getFeatureFlag(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT);
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const isDTest = dashboardVariant === 'd_test';
+  const isDTest = dashboardVariant === FEATURE_FLAG_VARIANTS.D_TEST;
   const isConnectDisabled = isDTest && pathname === '/dashboard/install';
+  const adminLabel = 'Administrator';
 
   const handleConnectClick = () => {
     if (isDTest) {
@@ -62,22 +64,22 @@ export default function AppHeader() {
     return count.toString();
   };
 
-  const getUserInitials = (email: string) => {
-    if (!email) {
+  const getUserInitials = (label: string) => {
+    if (!label) {
       return 'U';
     }
-    const parts = email.split('@')[0].split('.');
+    const parts = label.split('@')[0].split('.');
     if (parts.length > 1) {
       return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase();
     }
-    return email.substring(0, 2).toUpperCase();
+    return label.substring(0, 2).toUpperCase();
   };
 
-  const getAvatarColor = (email: string) => {
-    if (!email) {
+  const getAvatarColor = (label: string) => {
+    if (!label) {
       return 'bg-gray-500';
     }
-    const hash = email.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const hash = label.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
     const colors = [
       'bg-blue-500',
       'bg-green-500',
@@ -149,21 +151,16 @@ export default function AppHeader() {
               <button className="w-50 flex items-center gap-3 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[8px] pr-3 transition-all duration-200 group">
                 <Avatar className="h-8 w-8 ring-2 ring-white dark:ring-gray-700 shadow-sm">
                   <AvatarFallback
-                    className={cn(
-                      'text-white font-medium text-sm',
-                      getAvatarColor(user?.email ?? '')
-                    )}
+                    className={cn('text-white font-medium text-sm', getAvatarColor(adminLabel))}
                   >
-                    {getUserInitials(user?.email ?? '')}
+                    {getUserInitials(adminLabel)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="text-left hidden md:block">
                   <p className="text-sm font-medium text-zinc-950 dark:text-zinc-100 leading-tight">
                     Admin
                   </p>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    {user?.email || 'Administrator'}
-                  </p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">{adminLabel}</p>
                 </div>
                 <ChevronDown className="h-5 w-5 text-black dark:text-white hidden md:block ml-auto" />
               </button>

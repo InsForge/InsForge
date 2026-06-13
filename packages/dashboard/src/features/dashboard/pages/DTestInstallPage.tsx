@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Skeleton } from '#components';
+import { Skeleton } from '@insforge/ui';
 import { useMcpUsage } from '#features/logs/hooks/useMcpUsage';
 import { ClientDetailPage } from '#features/dashboard/components/dtest/ClientDetailPage';
 import { InstallInsForgePage } from '#features/dashboard/components/dtest/InstallInsForgePage';

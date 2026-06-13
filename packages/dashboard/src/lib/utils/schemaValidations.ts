@@ -123,8 +123,14 @@ export const emailSchema = z
   .toLowerCase()
   .trim();
 
+export const usernameSchema = z
+  .string()
+  .trim()
+  .min(1, 'Username is required')
+  .max(100, 'Username must be at most 100 characters');
+
 export const loginFormSchema = z.object({
-  email: emailSchema,
+  username: usernameSchema,
   password: z.string(),
 });
 

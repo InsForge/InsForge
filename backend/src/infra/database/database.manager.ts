@@ -5,6 +5,8 @@ import { fileURLToPath } from 'url';
 import { DatabaseMetadataSchema } from '@insforge/shared-schemas';
 import pgFormat from 'pg-format';
 import { buildQualifiedTableKey, DEFAULT_DATABASE_SCHEMA } from '@/services/database/helpers.js';
+import { appConfig } from '@/infra/config/app.config.js';
+import logger from '@/utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -22,9 +24,11 @@ export class DatabaseManager {
   private static readonly COLUMN_TYPE_CACHE_TTL = 5 * 60 * 1000;
   private static columnTypeCache = new Map<string, CacheEntry<Record<string, string>>>();
   private static readonly MAX_CACHE_SIZE = 100;
+  private static readonly TABLE_COUNT_CACHE_TTL = 60 * 1000;
+  private static tableCountCache = new Map<string, { count: number; timestamp: number }>();
 
   private constructor() {
-    this.dataDir = process.env.DATABASE_DIR || path.join(__dirname, '../../data');
+    this.dataDir = appConfig.database.dir;
   }
 
   static getInstance(): DatabaseManager {
@@ -37,13 +41,12 @@ export class DatabaseManager {
   async initialize(): Promise<void> {
     await fs.mkdir(this.dataDir, { recursive: true });
 
-    // PostgreSQL connection configuration
     this.pool = new Pool({
-      host: process.env.POSTGRES_HOST || 'localhost',
-      port: parseInt(process.env.POSTGRES_PORT || '5432'),
-      database: process.env.POSTGRES_DB || 'insforge',
-      user: process.env.POSTGRES_USER || 'postgres',
-      password: process.env.POSTGRES_PASSWORD || 'postgres',
+      host: appConfig.database.host,
+      port: appConfig.database.port,
+      database: appConfig.database.name,
+      user: appConfig.database.user,
+      password: appConfig.database.password,
       max: 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000,
@@ -123,61 +126,65 @@ export class DatabaseManager {
   }
 
   async getMetadata(): Promise<DatabaseMetadataSchema> {
-    const client = await this.pool.connect();
-    try {
-      // Fetch all tables, database size, and record counts in parallel
-      const [allTables, databaseSize, countResults] = await Promise.all([
-        this.getUserTables(),
-        this.getDatabaseSizeInGB(),
-        // Get all counts in a single query using UNION ALL
-        (async () => {
-          try {
-            const tablesResult = await client.query(
-              `
-              SELECT table_name as name
-              FROM information_schema.tables
-              WHERE table_schema = 'public'
-              AND table_type = 'BASE TABLE'
-              ORDER BY table_name
-            `
-            );
-            const tableNames = tablesResult.rows.map((row: { name: string }) => row.name);
+    const [allTables, databaseSize] = await Promise.all([
+      this.getUserTables(),
+      this.getDatabaseSizeInGB(),
+    ]);
 
-            if (tableNames.length === 0) {
-              return [];
-            }
-
-            // Build a UNION ALL query to get all counts in one query
-            const unionQuery = tableNames
-              .map((tableName) =>
-                pgFormat('SELECT %L as table_name, COUNT(*) as count FROM %I', tableName, tableName)
-              )
-              .join(' UNION ALL ');
-
-            const result = await client.query(unionQuery);
-            return result.rows as { table_name: string; count: number }[];
-          } catch {
-            return [];
-          }
-        })(),
-      ]);
-
-      // Map the count results to a lookup object
-      const countMap = new Map(countResults.map((r) => [r.table_name, Number(r.count)]));
-
-      const tableMetadatas = allTables.map((tableName) => ({
-        tableName,
-        recordCount: countMap.get(tableName) || 0,
-      }));
-
-      return {
-        tables: tableMetadatas,
-        totalSizeInGB: databaseSize,
-        hint: 'To retrieve detailed schema information for a specific table, call the get-table-schema tool with the table name.',
-      };
-    } finally {
-      client.release();
+    const now = Date.now();
+    const missingOrExpired: string[] = [];
+    for (const tableName of allTables) {
+      const cacheKey = buildQualifiedTableKey(tableName, 'public');
+      const cached = DatabaseManager.tableCountCache.get(cacheKey);
+      if (!cached || now - cached.timestamp >= DatabaseManager.TABLE_COUNT_CACHE_TTL) {
+        missingOrExpired.push(tableName);
+      }
     }
+
+    if (missingOrExpired.length > 0) {
+      const client = await this.pool.connect();
+      try {
+        const unionQuery = missingOrExpired
+          .map((tableName) =>
+            pgFormat(
+              'SELECT %L as table_name, COUNT(*) as count FROM %I.%I',
+              tableName,
+              'public',
+              tableName
+            )
+          )
+          .join(' UNION ALL ');
+
+        const queryResult = await client.query(unionQuery);
+        const nowAfterQuery = Date.now();
+        for (const row of queryResult.rows) {
+          const cacheKey = buildQualifiedTableKey(row.table_name, 'public');
+          DatabaseManager.tableCountCache.set(cacheKey, {
+            count: Number(row.count),
+            timestamp: nowAfterQuery,
+          });
+        }
+      } catch (error) {
+        logger.error('Failed to batch query exact table counts:', { error });
+      } finally {
+        client.release();
+      }
+    }
+
+    const tableMetadatas = allTables.map((tableName) => {
+      const cacheKey = buildQualifiedTableKey(tableName, 'public');
+      const cached = DatabaseManager.tableCountCache.get(cacheKey);
+      return {
+        tableName,
+        recordCount: cached ? cached.count : 0,
+      };
+    });
+
+    return {
+      tables: tableMetadatas,
+      totalSizeInGB: databaseSize,
+      hint: 'To retrieve detailed schema information for a specific table, call the get-table-schema tool with the table name.',
+    };
   }
 
   async getDatabaseSizeInGB(): Promise<number> {
@@ -204,11 +211,11 @@ export class DatabaseManager {
    */
   createClient(): Client {
     return new Client({
-      host: process.env.POSTGRES_HOST || 'localhost',
-      port: parseInt(process.env.POSTGRES_PORT || '5432'),
-      database: process.env.POSTGRES_DB || 'insforge',
-      user: process.env.POSTGRES_USER || 'postgres',
-      password: process.env.POSTGRES_PASSWORD || 'postgres',
+      host: appConfig.database.host,
+      port: appConfig.database.port,
+      database: appConfig.database.name,
+      user: appConfig.database.user,
+      password: appConfig.database.password,
     });
   }
 

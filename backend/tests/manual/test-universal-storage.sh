@@ -5,7 +5,9 @@
 
 set -e
 
-API_URL="http://localhost:7130"
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source "$SCRIPT_DIR/../test-config.sh"
+API_URL="${TEST_API_BASE%/api}"
 BUCKET_NAME="test-universal-bucket"
 TEST_FILE="test-upload.txt"
 
@@ -24,12 +26,10 @@ FILE_SIZE=$(stat -f%z "$TEST_FILE" 2>/dev/null || stat -c%s "$TEST_FILE" 2>/dev/
 
 # Step 1: Login to get auth token
 echo "1. Logging in..."
-LOGIN_RESPONSE=$(curl -s -X POST $API_URL/api/auth/admin/sessions \
+LOGIN_PAYLOAD=$(build_admin_login_payload "$TEST_ADMIN_USERNAME" "$TEST_ADMIN_PASSWORD")
+LOGIN_RESPONSE=$(curl -s -X POST "$API_URL/api/auth/admin/sessions" \
   -H 'Content-Type: application/json' \
-  -d '{
-    "email": "admin@example.com",
-    "password": "change-this-password"
-  }')
+  -d "$LOGIN_PAYLOAD")
 
 TOKEN=$(echo $LOGIN_RESPONSE | jq -r '.accessToken')
 if [ "$TOKEN" == "null" ] || [ -z "$TOKEN" ]; then
