@@ -9,8 +9,9 @@ import type {
   StripePrice,
   StripeProduct,
 } from '@insforge/shared-schemas';
-import { paymentsService } from '#features/payments/services/payments.service';
+import { stripeService } from '#features/payments/services/stripe.service';
 import { razorpayService } from '#features/payments/services/razorpay.service';
+import { razorpayQueryKeys, stripeQueryKeys } from '#features/payments/queryKeys';
 import type { CatalogPrice, CatalogProduct } from '#features/payments/types/catalog';
 
 const RAZORPAY_RECURRING_INTERVAL_MAP: Record<string, string> = {
@@ -126,8 +127,8 @@ export function usePaymentCatalog(provider: PaymentProvider, environment: Paymen
     refetch: refetchStatus,
     isFetching: isFetchingStatus,
   } = useQuery({
-    queryKey: ['payments', 'status'],
-    queryFn: () => paymentsService.getStatus(),
+    queryKey: stripeQueryKeys.status,
+    queryFn: () => stripeService.getStatus(),
     enabled: isStripeProvider,
     staleTime: 30 * 1000,
   });
@@ -139,7 +140,7 @@ export function usePaymentCatalog(provider: PaymentProvider, environment: Paymen
     refetch: refetchRazorpayStatus,
     isFetching: isFetchingRazorpayStatus,
   } = useQuery({
-    queryKey: ['payments', 'razorpay', 'status'],
+    queryKey: razorpayQueryKeys.status,
     queryFn: () => razorpayService.getStatus(),
     enabled: isRazorpayProvider,
     staleTime: 30 * 1000,
@@ -175,8 +176,8 @@ export function usePaymentCatalog(provider: PaymentProvider, environment: Paymen
     refetch: refetchCatalog,
     isFetching: isFetchingCatalog,
   } = useQuery({
-    queryKey: ['payments', 'stripe', 'catalog', environment],
-    queryFn: () => paymentsService.listCatalog(environment),
+    queryKey: stripeQueryKeys.catalogByEnvironment(environment),
+    queryFn: () => stripeService.listCatalog(environment),
     enabled: isStripeProvider && hasStripeKey,
     staleTime: 30 * 1000,
   });
@@ -188,7 +189,7 @@ export function usePaymentCatalog(provider: PaymentProvider, environment: Paymen
     refetch: refetchRazorpayCatalog,
     isFetching: isFetchingRazorpayCatalog,
   } = useQuery({
-    queryKey: ['payments', 'razorpay', 'catalog', environment],
+    queryKey: razorpayQueryKeys.catalogByEnvironment(environment),
     queryFn: () => razorpayService.listCatalog(environment),
     enabled: isRazorpayProvider && hasRazorpayKey,
     staleTime: 30 * 1000,

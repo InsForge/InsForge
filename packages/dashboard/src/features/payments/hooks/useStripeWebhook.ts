@@ -1,24 +1,23 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { GetStripeStatusResponse, StripeEnvironment } from '@insforge/shared-schemas';
-import { paymentsService } from '#features/payments/services/payments.service';
+import { stripeService } from '#features/payments/services/stripe.service';
+import { stripeQueryKeys } from '#features/payments/queryKeys';
 import { useToast } from '#lib/hooks/useToast';
 
-const PAYMENTS_STATUS_QUERY_KEY = ['payments', 'status'];
-
-export function usePaymentsWebhook() {
+export function useStripeWebhook() {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
   const { data, isLoading, error } = useQuery<GetStripeStatusResponse>({
-    queryKey: PAYMENTS_STATUS_QUERY_KEY,
-    queryFn: () => paymentsService.getStatus(),
+    queryKey: stripeQueryKeys.status,
+    queryFn: () => stripeService.getStatus(),
     staleTime: 30 * 1000,
   });
 
   const configureWebhook = useMutation({
-    mutationFn: (environment: StripeEnvironment) => paymentsService.configureWebhook(environment),
+    mutationFn: (environment: StripeEnvironment) => stripeService.configureWebhook(environment),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: PAYMENTS_STATUS_QUERY_KEY });
+      await queryClient.invalidateQueries({ queryKey: stripeQueryKeys.status });
       showToast('Stripe webhook configured', 'success');
     },
     onError: (err: Error) => {

@@ -5,10 +5,11 @@ import type {
   SyncStripePaymentsRequest,
   SyncStripePaymentsResponse,
 } from '@insforge/shared-schemas';
-import { paymentsService } from '#features/payments/services/payments.service';
+import { stripeService } from '#features/payments/services/stripe.service';
+import { stripeQueryKeys } from '#features/payments/queryKeys';
 import { useToast } from '#lib/hooks/useToast';
 
-interface PaymentsSyncToast {
+interface StripeSyncToast {
   type: 'success' | 'error' | 'info';
   message: string;
 }
@@ -26,7 +27,7 @@ function isFailedSyncResult(result: SyncStripePaymentsEnvironmentResult) {
   return result.connection.status === 'error' || result.connection.lastSyncStatus === 'failed';
 }
 
-function getPaymentsSyncToast(result: SyncStripePaymentsResponse): PaymentsSyncToast {
+function getStripeSyncToast(result: SyncStripePaymentsResponse): StripeSyncToast {
   const attemptedResults = result.results.filter(
     (item) => item.connection.status !== 'unconfigured'
   );
@@ -53,21 +54,21 @@ function getPaymentsSyncToast(result: SyncStripePaymentsResponse): PaymentsSyncT
   };
 }
 
-export function usePaymentsSync() {
+export function useStripeSync() {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
   const syncPayments = useMutation({
-    mutationFn: (input: SyncStripePaymentsRequest) => paymentsService.syncPayments(input),
+    mutationFn: (input: SyncStripePaymentsRequest) => stripeService.syncPayments(input),
     onSuccess: async (result) => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['payments', 'status'] }),
-        queryClient.invalidateQueries({ queryKey: ['payments', 'stripe', 'catalog'] }),
-        queryClient.invalidateQueries({ queryKey: ['payments', 'stripe', 'customers'] }),
-        queryClient.invalidateQueries({ queryKey: ['payments', 'stripe', 'subscriptions'] }),
+        queryClient.invalidateQueries({ queryKey: stripeQueryKeys.status }),
+        queryClient.invalidateQueries({ queryKey: stripeQueryKeys.catalog }),
+        queryClient.invalidateQueries({ queryKey: stripeQueryKeys.customers }),
+        queryClient.invalidateQueries({ queryKey: stripeQueryKeys.subscriptions }),
       ]);
 
-      const toast = getPaymentsSyncToast(result);
+      const toast = getStripeSyncToast(result);
       showToast(toast.message, toast.type);
     },
     onError: (error: Error) => {
