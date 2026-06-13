@@ -163,6 +163,8 @@ export class DatabaseManager {
       }
     }
 
+    const freshCounts = new Map<string, number>();
+
     if (missingOrExpired.length > 0) {
       const client = await this.pool.connect();
       try {
@@ -181,11 +183,13 @@ export class DatabaseManager {
         const nowAfterQuery = Date.now();
         for (const row of queryResult.rows) {
           const cacheKey = buildQualifiedTableKey(row.table_name, 'public');
+          const count = Number(row.count);
+          freshCounts.set(cacheKey, count);
           DatabaseManager.setBoundedCache(
             DatabaseManager.tableCountCache,
             DatabaseManager.MAX_TABLE_COUNT_CACHE_SIZE,
             cacheKey,
-            { count: Number(row.count), timestamp: nowAfterQuery }
+            { count, timestamp: nowAfterQuery }
           );
         }
       } catch (error) {
@@ -197,6 +201,14 @@ export class DatabaseManager {
 
     const tableMetadatas = allTables.map((tableName) => {
       const cacheKey = buildQualifiedTableKey(tableName, 'public');
+
+      // 1. Prioritize freshly fetched counts from this request
+      const freshCount = freshCounts.get(cacheKey);
+      if (freshCount !== undefined) {
+        return { tableName, recordCount: freshCount };
+      }
+
+      // 2. Fallback to the bounded global cache
       const cached = DatabaseManager.tableCountCache.get(cacheKey);
       return {
         tableName,
