@@ -130,7 +130,6 @@ self.onmessage = async (e) => {
       body: requestData.body,
     });
 
-
     // Execute the function
     const response = await functionHandler(request);
 
@@ -152,7 +151,6 @@ self.onmessage = async (e) => {
       } else {
         body = await response.arrayBuffer();
       }
-
     }
 
     const responseData = {
@@ -161,7 +159,6 @@ self.onmessage = async (e) => {
       headers: Object.fromEntries(response.headers),
       body,
     };
-
 
     self.postMessage({ success: true, response: responseData });
   } catch (error) {

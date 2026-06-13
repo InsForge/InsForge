@@ -23,48 +23,47 @@ fi
 print_success "Got admin token"
 echo ""
 
-# Python helper for creating functions (avoids shell escaping hell)
-CREATE_FUNC_PY="/tmp/create_func_$$.py"
-cat > "$CREATE_FUNC_PY" << 'PYEOF'
-import sys, json, urllib.request
+CREATE_FUNC_JS="/tmp/create_func_$$.js"
+cat > "$CREATE_FUNC_JS" << 'JSEOF'
+const slug = process.argv[2];
+const code = process.argv[3];
+const baseUrl = process.argv[4];
+const token = process.argv[5];
 
-slug = sys.argv[1]
-code = sys.argv[2]
-base_url = sys.argv[3]
-token = sys.argv[4]
+const payload = JSON.stringify({
+    name: slug,
+    slug: slug,
+    code: code,
+    status: "active"
+});
 
-payload = json.dumps({
-    "name": slug,
-    "slug": slug,
-    "code": code,
-    "status": "active"
-}).encode()
-
-req = urllib.request.Request(
-    f"{base_url}/functions",
-    data=payload,
-    headers={
-        "Authorization": f"Bearer {token}",
+const url = baseUrl.replace(/\/+$/, '') + '/functions';
+fetch(url, {
+    method: "POST",
+    headers: {
+        "Authorization": `Bearer ${token}`,
         "Content-Type": "application/json"
     },
-    method="POST"
-)
-try:
-    resp = urllib.request.urlopen(req)
-    print(f"Created: {slug} (status={resp.status})", file=sys.stderr)
-except urllib.error.HTTPError as e:
-    body = e.read().decode()
-    if "already exists" in body.lower():
-        print(f"Exists: {slug}", file=sys.stderr)
-    else:
-        print(f"FAILED: {slug} (status={e.code} body={body})", file=sys.stderr)
-        sys.exit(1)
-PYEOF
+    body: payload
+}).then(async resp => {
+    if (resp.ok) {
+        console.error(`Created: ${slug} (status=${resp.status})`);
+    } else {
+        const body = await resp.text();
+        if (body.toLowerCase().includes("already exists")) {
+            console.error(`Exists: ${slug}`);
+        } else {
+            console.error(`FAILED: ${slug} (status=${resp.status} body=${body})`);
+            process.exit(1);
+        }
+    }
+});
+JSEOF
 
 create_function() {
     local slug=$1
     local code=$2
-    python3 "$CREATE_FUNC_PY" "$slug" "$code" "$API_BASE" "$ADMIN_TOKEN" 2>&1
+    node "$CREATE_FUNC_JS" "$slug" "$code" "$API_BASE" "$ADMIN_TOKEN" 2>&1
     return $?
 }
 
@@ -188,7 +187,7 @@ fi
 echo "──────────────────────────────────────────"
 echo "Test 4: Multipart binary file"
 echo "──────────────────────────────────────────"
-python3 -c "open('/tmp/test-body-binary.bin','wb').write(bytes(range(256)))"
+node -e "require('fs').writeFileSync('/tmp/test-body-binary.bin', Buffer.from(Array.from({length:256},(_,i)=>i)))"
 RESP=$(curl -s -w "\n%{http_code}" "$BASE_URL/functions/$MULTI_SLUG" \
     -F "bin=@/tmp/test-body-binary.bin;type=application/octet-stream")
 STATUS=$(echo "$RESP" | tail -n 1)
@@ -240,7 +239,7 @@ echo "Test 7: Binary response"
 echo "──────────────────────────────────────────"
 curl -s -o /tmp/test-binary-response.bin "$BASE_URL/functions/$BIN_SLUG"
 BYTES=$(wc -c < /tmp/test-binary-response.bin)
-EXPECTED=$(python3 -c "print(bytes([0,1,2,3,255,254]) == open('/tmp/test-binary-response.bin','rb').read())")
+EXPECTED=$(node -e "const f=require('fs');const e=Buffer.from([0,1,2,3,255,254]);console.log(f.readFileSync('/tmp/test-binary-response.bin').equals(e)?'True':'False')")
 if [ "$BYTES" = "6" ] && [ "$EXPECTED" = "True" ]; then
     print_success "Binary response (6 bytes, content matches)"
 else
@@ -255,7 +254,7 @@ echo "🧹 Cleaning up..."
 for slug in "${TEST_SLUGS[@]}"; do
     delete_function "$slug"
 done
-rm -f /tmp/test-body-upload.txt /tmp/test-body-binary.bin /tmp/a.txt /tmp/b.txt /tmp/test-binary-response.bin "$CREATE_FUNC_PY"
+rm -f /tmp/test-body-upload.txt /tmp/test-body-binary.bin /tmp/a.txt /tmp/b.txt /tmp/test-binary-response.bin "$CREATE_FUNC_JS"
 print_success "Cleanup done"
 echo ""
 
