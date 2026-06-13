@@ -16,7 +16,7 @@ import type {
 } from '@insforge/shared-schemas';
 import { apiClient } from '#lib/api/client';
 
-export class PaymentsService {
+export class StripeService {
   async getStatus(): Promise<GetStripeStatusResponse> {
     return apiClient.request('/payments/stripe/status', {
       headers: apiClient.withAccessToken(),
@@ -125,4 +125,4 @@ export class PaymentsService {
   }
 }
 
-export const paymentsService = new PaymentsService();
+export const stripeService = new StripeService();

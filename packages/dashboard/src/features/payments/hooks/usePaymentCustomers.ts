@@ -5,8 +5,9 @@ import type {
   PaymentProvider,
   RazorpayConnection,
 } from '@insforge/shared-schemas';
-import { paymentsService } from '#features/payments/services/payments.service';
+import { stripeService } from '#features/payments/services/stripe.service';
 import { razorpayService } from '#features/payments/services/razorpay.service';
+import { razorpayQueryKeys, stripeQueryKeys } from '#features/payments/queryKeys';
 
 export const PAYMENT_CUSTOMERS_LIMIT = 100;
 
@@ -21,8 +22,8 @@ export function usePaymentCustomers(provider: PaymentProvider, environment: Paym
     refetch: refetchStatus,
     isFetching: isFetchingStatus,
   } = useQuery({
-    queryKey: ['payments', 'status'],
-    queryFn: () => paymentsService.getStatus(),
+    queryKey: stripeQueryKeys.status,
+    queryFn: () => stripeService.getStatus(),
     enabled: isStripeProvider,
     staleTime: 30 * 1000,
   });
@@ -34,7 +35,7 @@ export function usePaymentCustomers(provider: PaymentProvider, environment: Paym
     refetch: refetchRazorpayStatus,
     isFetching: isFetchingRazorpayStatus,
   } = useQuery({
-    queryKey: ['payments', 'razorpay', 'status'],
+    queryKey: razorpayQueryKeys.status,
     queryFn: () => razorpayService.getStatus(),
     enabled: isRazorpayProvider,
     staleTime: 30 * 1000,
@@ -70,9 +71,9 @@ export function usePaymentCustomers(provider: PaymentProvider, environment: Paym
     refetch: refetchCustomers,
     isFetching: isFetchingCustomers,
   } = useQuery({
-    queryKey: ['payments', 'stripe', 'customers', environment],
+    queryKey: stripeQueryKeys.customersByEnvironment(environment),
     queryFn: () =>
-      paymentsService.listCustomers({
+      stripeService.listCustomers({
         environment,
         limit: PAYMENT_CUSTOMERS_LIMIT,
       }),
@@ -87,7 +88,7 @@ export function usePaymentCustomers(provider: PaymentProvider, environment: Paym
     refetch: refetchRazorpayCustomers,
     isFetching: isFetchingRazorpayCustomers,
   } = useQuery({
-    queryKey: ['payments', 'razorpay', 'customers', environment],
+    queryKey: razorpayQueryKeys.customersByEnvironment(environment),
     queryFn: () =>
       razorpayService.listCustomers({
         environment,

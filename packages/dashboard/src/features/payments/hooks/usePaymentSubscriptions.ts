@@ -5,8 +5,9 @@ import type {
   PaymentProvider,
   RazorpayConnection,
 } from '@insforge/shared-schemas';
-import { paymentsService } from '#features/payments/services/payments.service';
+import { stripeService } from '#features/payments/services/stripe.service';
 import { razorpayService } from '#features/payments/services/razorpay.service';
+import { razorpayQueryKeys, stripeQueryKeys } from '#features/payments/queryKeys';
 import {
   normalizeRazorpaySubscription,
   normalizeStripeSubscription,
@@ -28,8 +29,8 @@ export function usePaymentSubscriptions(
     refetch: refetchStatus,
     isFetching: isFetchingStatus,
   } = useQuery({
-    queryKey: ['payments', 'status'],
-    queryFn: () => paymentsService.getStatus(),
+    queryKey: stripeQueryKeys.status,
+    queryFn: () => stripeService.getStatus(),
     enabled: isStripeProvider,
     staleTime: 30 * 1000,
   });
@@ -41,7 +42,7 @@ export function usePaymentSubscriptions(
     refetch: refetchRazorpayStatus,
     isFetching: isFetchingRazorpayStatus,
   } = useQuery({
-    queryKey: ['payments', 'razorpay', 'status'],
+    queryKey: razorpayQueryKeys.status,
     queryFn: () => razorpayService.getStatus(),
     enabled: isRazorpayProvider,
     staleTime: 30 * 1000,
@@ -77,9 +78,9 @@ export function usePaymentSubscriptions(
     refetch: refetchSubscriptions,
     isFetching: isFetchingSubscriptions,
   } = useQuery({
-    queryKey: ['payments', 'stripe', 'subscriptions', environment],
+    queryKey: stripeQueryKeys.subscriptionsByEnvironment(environment),
     queryFn: () =>
-      paymentsService.listSubscriptions({
+      stripeService.listSubscriptions({
         environment,
         limit: SUBSCRIPTIONS_LIMIT,
       }),
@@ -94,7 +95,7 @@ export function usePaymentSubscriptions(
     refetch: refetchRazorpaySubscriptions,
     isFetching: isFetchingRazorpaySubscriptions,
   } = useQuery({
-    queryKey: ['payments', 'razorpay', 'subscriptions', environment],
+    queryKey: razorpayQueryKeys.subscriptionsByEnvironment(environment),
     queryFn: () =>
       razorpayService.listSubscriptions({
         environment,
