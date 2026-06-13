@@ -93,13 +93,23 @@ export class DatabaseManager {
     }
   }
 
+  /**
+   * Inserts an entry into a bounded cache with FIFO eviction.
+   * When the cache reaches maxSize, the oldest entry (first insertion-order key) is removed
+   * before adding the new entry, preventing unbounded memory growth.
+   *
+   * @param cache - The Map to insert into
+   * @param maxSize - Maximum number of entries allowed
+   * @param key - Cache key
+   * @param entry - Value to cache
+   */
   private static setBoundedCache<V>(
     cache: Map<string, V>,
     maxSize: number,
     key: string,
     entry: V
   ): void {
-    if (cache.size >= maxSize) {
+    if (cache.size >= maxSize && !cache.has(key)) {
       const first = cache.keys().next().value;
       if (first !== undefined) {
         cache.delete(first);
