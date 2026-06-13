@@ -193,15 +193,36 @@ async function executeInWorker(code: string, request: Request): Promise<Response
       );
     }, WORKER_TIMEOUT_MS);
 
-    // Handle worker response
+    // Prepare request data (raw bytes for multipart/binary support)
+    const requestData: {
+      url: string;
+      method: string;
+      headers: Record<string, string>;
+      body: ArrayBuffer | null;
+    } = {
+      url: request.url,
+      method: request.method,
+      headers: Object.fromEntries(request.headers),
+      body: request.body ? await request.arrayBuffer() : null,
+    };
+
+    // Buffer the work payload — send it only after the worker signals ready
+    const transferables: Transferable[] = requestData.body ? [requestData.body] : [];
+    const workPayload = { code, requestData, secrets };
+
+    // Handle worker messages: first ready signal, then function result
     worker.onmessage = (e) => {
+      if (e.data.ready) {
+        worker.postMessage(workPayload, transferables);
+        return;
+      }
+
       clearTimeout(timeout);
       worker.terminate();
       URL.revokeObjectURL(workerUrl);
 
       if (e.data.success) {
         const { response } = e.data;
-        // The worker now properly sends null for bodyless responses
         resolve(
           new Response(response.body, {
             status: response.status,
@@ -232,28 +253,6 @@ async function executeInWorker(code: string, request: Request): Promise<Response
         })
       );
     };
-
-    // Prepare request data
-    // IMPORTANT: preserve raw request bytes for multipart/binary/text payloads.
-    // Do NOT coerce to text, otherwise multipart boundaries and binary payloads corrupt.
-    const requestData: {
-      url: string;
-      method: string;
-      headers: Record<string, string>;
-      // ArrayBuffer is cloneable across worker boundaries.
-      body: ArrayBuffer | null;
-    } = {
-      url: request.url,
-      method: request.method,
-      headers: Object.fromEntries(request.headers),
-      body: request.body ? await request.arrayBuffer() : null,
-    };
-
-    // Send message with code, request data, and secrets.
-    // Transfer the body ArrayBuffer to avoid a memory copy (zero-copy move).
-    // The original ArrayBuffer is neutered after transfer
-    const transferables: Transferable[] = requestData.body ? [requestData.body] : [];
-    worker.postMessage({ code, requestData, secrets }, transferables);
   });
 }
 

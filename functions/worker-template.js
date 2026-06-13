@@ -60,6 +60,9 @@ const { createClient } = await import('npm:@insforge/sdk');
 const { encodeBase64, decodeBase64 } =
   await import('https://deno.land/std@0.224.0/encoding/base64.ts');
 
+// the host must wait for this before sending the actual work payload.
+self.postMessage({ ready: true });
+
 // Handle the single message with code, request data, and secrets
 self.onmessage = async (e) => {
   const { code, requestData, secrets = {} } = e.data;

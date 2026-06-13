@@ -161,6 +161,7 @@ export async function createApp() {
   app.use('/functions/:slug', (req: Request, res: Response, next: NextFunction) => {
     if (req.method === 'GET' || req.method === 'HEAD') {
       req.rawBody = Buffer.alloc(0);
+      req._body = true;
       next();
       return;
     }
@@ -187,6 +188,7 @@ export async function createApp() {
       }
       done = true;
       req.rawBody = Buffer.concat(chunks);
+      req._body = true;
       next();
     };
     const onError = (error: Error) => {
