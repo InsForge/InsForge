@@ -107,6 +107,9 @@ try {
   }
 }
 
+// the host must wait for this before sending the actual work payload.
+self.postMessage({ ready: true });
+
 // Handle the single message with code, request data, and secrets
 const handleMessage = async (e) => {
   const { code, requestData, secrets = {} } = e.data;
@@ -167,6 +170,7 @@ const handleMessage = async (e) => {
     }
 
     // Create Request object from data
+    // Preserve raw bytes (ArrayBuffer) for multipart/binary payloads.
     const request = new Request(requestData.url, {
       method: requestData.method,
       headers: requestData.headers,
@@ -177,16 +181,30 @@ const handleMessage = async (e) => {
     const response = await functionHandler(request);
 
     // Serialize and send response
+    // Preserve binary responses by using ArrayBuffer when possible.
+    // We still use text() for JSON/text responses for backward compatibility.
     let body = null;
-    if (![204, 205, 304].includes(response.status)) {
-      body = await response.text();
+    const status = response.status;
+    if (![204, 205, 304].includes(status)) {
+      const contentType = response.headers.get('content-type') ?? '';
+      const isLikelyText =
+        contentType.includes('application/json') ||
+        contentType.startsWith('text/') ||
+        contentType.includes('application/xml') ||
+        contentType.includes('application/x-www-form-urlencoded');
+
+      if (isLikelyText) {
+        body = await response.text();
+      } else {
+        body = await response.arrayBuffer();
+      }
     }
 
     const responseData = {
       status: response.status,
       statusText: response.statusText,
       headers: Object.fromEntries(response.headers),
-      body: body,
+      body,
     };
 
     self.postMessage({ success: true, response: responseData });

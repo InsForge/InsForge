@@ -152,6 +152,68 @@ export async function createApp() {
     next();
   });
 
+  //default payload size 10 MB and it can be modified, depending upon the usage.
+  const _rawLimit = parseInt(process.env.FUNCTION_PROXY_MAX_BODY_BYTES ?? '', 10);
+  const maxFunctionProxyBodyBytes =
+    Number.isFinite(_rawLimit) && _rawLimit > 0 ? _rawLimit : 25 * 1024 * 1024;
+
+  // middleware to handle non json body for the function/:slug
+  app.use('/functions/:slug', (req: Request, res: Response, next: NextFunction) => {
+    if (req.method === 'GET' || req.method === 'HEAD') {
+      req.rawBody = Buffer.alloc(0);
+      req._body = true;
+      next();
+      return;
+    }
+    const chunks: Buffer[] = [];
+    let done = false;
+    let totalBytes = 0;
+
+    const onData = (chunk: Buffer) => {
+      if (done) {
+        return;
+      }
+      totalBytes += chunk.length;
+      if (totalBytes > maxFunctionProxyBodyBytes) {
+        done = true;
+        res.status(413).json({ error: 'Payload too large' });
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    };
+    const onEnd = () => {
+      if (done) {
+        return;
+      }
+      done = true;
+      req.rawBody = Buffer.concat(chunks);
+      req._body = true;
+      next();
+    };
+    const onError = (error: Error) => {
+      if (done) {
+        return;
+      }
+      done = true;
+      logger.error('Failed to read function proxy request body', { error: error.message });
+      next(error);
+    };
+    const onClose = () => {
+      if (done) {
+        return;
+      }
+      if (!req.complete) {
+        done = true;
+        next(new Error('Request aborted while reading function proxy body'));
+      }
+    };
+    req.on('data', onData);
+    req.on('end', onEnd);
+    req.on('error', onError);
+    req.on('close', onClose);
+  });
+
   // Mount webhooks with raw body parser BEFORE JSON middleware
   // This ensures signature verification uses the original bytes
   app.use('/api/webhooks', express.raw({ type: 'application/json' }), webhooksRouter);
@@ -237,7 +299,7 @@ export async function createApp() {
       const response = await fetch(targetUrl, {
         method: req.method,
         headers,
-        body: ['GET', 'HEAD'].includes(req.method) ? undefined : JSON.stringify(req.body),
+        body: ['GET', 'HEAD'].includes(req.method) ? undefined : req.rawBody,
       });
 
       // Read response as raw bytes to preserve binary data (images, PDFs, etc.)
