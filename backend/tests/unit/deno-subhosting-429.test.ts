@@ -13,15 +13,15 @@ function jsonResponse(body: unknown, status = 200, headers: Record<string, strin
 describe('Deno Subhosting 429 backoff', () => {
   beforeEach(() => {
     vi.resetModules();
-    process.env.DENO_SUBHOSTING_TOKEN = 't';
-    process.env.DENO_SUBHOSTING_ORG_ID = 'o';
+    process.env.DENO_DEPLOY_TOKEN = 't';
+    process.env.DENO_DEPLOY_ORG_ID = 'o';
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
     vi.doUnmock('node-fetch');
-    delete process.env.DENO_SUBHOSTING_TOKEN;
-    delete process.env.DENO_SUBHOSTING_ORG_ID;
+    delete process.env.DENO_DEPLOY_TOKEN;
+    delete process.env.DENO_DEPLOY_ORG_ID;
   });
 
   it('retries on 429 with exponential backoff and eventually succeeds', async () => {
@@ -36,9 +36,9 @@ describe('Deno Subhosting 429 backoff', () => {
         return jsonResponse({
           id: 'dep-1',
           projectId: 'proj-1',
-          status: 'success',
-          domains: [],
-          createdAt: new Date().toISOString(),
+          status: 'succeeded',
+          failure_reason: null,
+          created_at: new Date().toISOString(),
         });
       }),
       Response,
@@ -65,9 +65,9 @@ describe('Deno Subhosting 429 backoff', () => {
         return jsonResponse({
           id: 'dep-2',
           projectId: 'proj-1',
-          status: 'success',
-          domains: [],
-          createdAt: new Date().toISOString(),
+          status: 'succeeded',
+          failure_reason: null,
+          created_at: new Date().toISOString(),
         });
       }),
       Response,
@@ -138,9 +138,9 @@ describe('Deno Subhosting 429 backoff', () => {
         return jsonResponse({
           id: 'dep-cap',
           projectId: 'proj-1',
-          status: 'success',
-          domains: [],
-          createdAt: new Date().toISOString(),
+          status: 'succeeded',
+          failure_reason: null,
+          created_at: new Date().toISOString(),
         });
       }),
       Response,

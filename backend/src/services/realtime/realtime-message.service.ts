@@ -54,7 +54,8 @@ export class RealtimeMessageService {
       return null;
     }
 
-    const senderId = userContext.role === 'project_admin' ? null : userContext.id;
+    // Anonymous and admin senders have no row identity: sender_id stays NULL
+    const senderId = userContext.role === 'authenticated' ? userContext.id : null;
 
     try {
       await withUserContext(

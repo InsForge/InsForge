@@ -122,8 +122,21 @@ export const migrationSchema = z.object({
   createdAt: z.string(),
 });
 
+export const databaseBackupSchema = z.object({
+  id: z.string(),
+  name: z.string().nullable(),
+  triggerSource: z.enum(['manual', 'scheduled']),
+  status: z.enum(['running', 'completed', 'failed']),
+  sizeBytes: z.number().nullable(),
+  errorMessage: z.string().nullable(),
+  createdAt: z.string(),
+  completedAt: z.string().nullable(),
+  createdBy: z.string().nullable(),
+});
+
 export type DatabaseFunction = z.infer<typeof databaseFunctionSchema>;
 export type DatabaseIndex = z.infer<typeof databaseIndexSchema>;
 export type DatabasePolicy = z.infer<typeof databasePolicySchema>;
 export type DatabaseTrigger = z.infer<typeof databaseTriggerSchema>;
 export type Migration = z.infer<typeof migrationSchema>;
+export type DatabaseBackup = z.infer<typeof databaseBackupSchema>;

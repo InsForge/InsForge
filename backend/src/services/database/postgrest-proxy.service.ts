@@ -63,9 +63,11 @@ export class PostgrestProxyService {
   private static instance: PostgrestProxyService;
   private tokenManager = TokenManager.getInstance();
   private adminToken: string;
+  private anonToken: string;
 
   private constructor() {
     this.adminToken = this.tokenManager.generatePostgrestAdminToken();
+    this.anonToken = this.tokenManager.generatePostgrestAnonToken();
   }
 
   public static getInstance(): PostgrestProxyService {
@@ -105,6 +107,23 @@ export class PostgrestProxyService {
         // Project admin subjects are intentionally dropped before PostgREST
         // because auth.uid() is UUID-based while admin subjects are not.
         authorization: `Bearer ${this.adminToken}`,
+      },
+    });
+  }
+
+  /**
+   * Gateway exchange for anon-role requests: PostgREST derives its role from
+   * a JWT claim, so the client credential (opaque anon key, or a legacy anon
+   * JWT carrying the old shared fake subject) is swapped for an internally-
+   * minted subject-less `anon` JWT that never leaves the server. All anon
+   * traffic therefore reaches the database with identical claims.
+   */
+  async forwardAsAnon(request: ProxyRequest): Promise<ProxyResponse> {
+    return this.forwardRequest({
+      ...request,
+      headers: {
+        ...request.headers,
+        authorization: `Bearer ${this.anonToken}`,
       },
     });
   }

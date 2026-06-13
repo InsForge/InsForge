@@ -17,7 +17,8 @@ import type { SocketMessage } from '@insforge/shared-schemas';
 import { databaseTableQueryKeys } from '#features/database/queryKeys';
 import { parseDatabaseTableReference } from '#features/database/helpers';
 import { useMcpUsage } from '#features/logs/hooks/useMcpUsage';
-import { trackPostHog, getFeatureFlag } from '#lib/analytics/posthog';
+import { trackEvent, getFeatureFlag } from '#lib/analytics/posthog';
+import { ANALYTICS_EVENTS, FEATURE_FLAGS } from '#lib/analytics/constants';
 
 // ============================================================================
 // Types & Enums
@@ -231,9 +232,9 @@ export function SocketProvider({ children }: SocketProviderProps) {
   const onMcpConnectedSuccess = useCallback(
     (toolName: string) => {
       if (mcpUsageCount === 1) {
-        trackPostHog('onboarding_completed', {
-          experiment_variant: getFeatureFlag('dashboard-v4-experiment'),
-          mcp_vs_cli_variant: getFeatureFlag('mcp-vs-cli'),
+        trackEvent(ANALYTICS_EVENTS.ONBOARDING_COMPLETED, {
+          experiment_variant: getFeatureFlag(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT),
+          mcp_vs_cli_variant: getFeatureFlag(FEATURE_FLAGS.MCP_VS_CLI),
           tool_name: toolName,
         });
       }

@@ -29,9 +29,10 @@ export async function withUserContext<T>(
   settings: Record<string, string | undefined> = {}
 ): Promise<T> {
   const claims: Record<string, string> = { role: ctx.role };
-  // Project admin subjects are intentionally not exposed as JWT sub in
-  // database context: auth.uid() is UUID-based, while admin subjects are not.
-  if (ctx.id && ctx.role !== 'project_admin') {
+  // Only authenticated users have a row-ownership identity. Admin subjects
+  // (`cloud:<id>`, local admin ids) and the 'anonymous' sentinel are API-level
+  // labels: auth.uid() casts sub to uuid, so they must never become claims.
+  if (ctx.role === 'authenticated' && ctx.id) {
     claims.sub = ctx.id;
   }
   if (ctx.email) {

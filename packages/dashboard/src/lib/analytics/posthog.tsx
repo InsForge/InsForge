@@ -71,7 +71,7 @@ export const getCurrentDistinctId = (): string | undefined => {
   return posthog.get_distinct_id();
 };
 
-export const trackPostHog = (eventName: string, properties?: Record<string, unknown>) => {
+export const trackEvent = (eventName: string, properties?: Record<string, unknown>) => {
   if (!POSTHOG_KEY) {
     return;
   }

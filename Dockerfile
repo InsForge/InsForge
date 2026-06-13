@@ -97,7 +97,11 @@ RUN npm ci --omit=dev && npm cache clean --force
 FROM node:20-alpine AS runner
 
 # tini: proper PID 1 for signal forwarding and zombie reaping
-RUN apk add --no-cache tini
+# postgresql16-client: pg_dump/pg_restore for database backups. Keep the
+# client major at 16 while the bundled postgres image is on 15 — pg_dump 17+
+# emits settings (e.g. transaction_timeout) that a 15 server rejects, which
+# would make every restore fail.
+RUN apk add --no-cache tini postgresql16-client
 
 WORKDIR /app
 
@@ -162,6 +166,10 @@ CMD ["sh", "-c", "cd backend && npm run migrate:up && cd .. && exec npm start"]
 FROM node:20-alpine AS dev
 
 COPY --from=deno-bin /bin/deno /usr/local/bin/deno
+
+# pg_dump/pg_restore for database backups (see runner stage for the
+# version-pinning rationale)
+RUN apk add --no-cache postgresql16-client
 
 WORKDIR /app
 

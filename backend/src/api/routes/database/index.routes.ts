@@ -4,12 +4,14 @@ import { databaseRecordsRouter } from './records.routes.js';
 import { databaseRpcRouter } from './rpc.routes.js';
 import databaseAdvanceRouter from './advance.routes.js';
 import { databaseMigrationsRouter } from './migrations.routes.js';
+import { databaseBackupsRouter } from './backups.routes.js';
 import { databaseAdminRouter } from './admin.routes.js';
 import { DatabaseService } from '@/services/database/database.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { successResponse } from '@/utils/response.js';
 import logger from '@/utils/logger.js';
 import { normalizeDatabaseSchemaName } from '@/services/database/helpers.js';
+import { isCloudEnvironment } from '@/utils/environment.js';
 
 const router = Router();
 const databaseService = DatabaseService.getInstance();
@@ -20,6 +22,9 @@ router.use('/records', databaseRecordsRouter);
 router.use('/rpc', databaseRpcRouter);
 router.use('/advance', databaseAdvanceRouter);
 router.use('/migrations', databaseMigrationsRouter);
+if (!isCloudEnvironment()) {
+  router.use('/backups', databaseBackupsRouter);
+}
 router.use('/admin', databaseAdminRouter);
 
 router.get(

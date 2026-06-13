@@ -22,13 +22,13 @@ export class EmbeddingService {
 
   /**
    * Generate embeddings for the given input using OpenRouter API
-   * Uses sendRequest for automatic renewal and retry logic
+   * Uses sendRequest for upstream error mapping
    * @param options - Embeddings request options including model, input, and encoding_format
    * @returns Embeddings response with vector data and metadata
    */
   async createEmbeddings(options: EmbeddingsRequest): Promise<EmbeddingsResponse> {
     try {
-      // Send request with automatic renewal and retry logic (same pattern as chat-completion)
+      // Send request with upstream error mapping (same pattern as chat-completion)
       const { result: response } = await this.openRouterProvider.sendRequest((client) =>
         client.embeddings.create({
           model: options.model,

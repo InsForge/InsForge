@@ -59,6 +59,7 @@ KPIs
 linode
 localStorage
 loopback
+lookups
 mcp
 monorepo
 Multiplatform
@@ -86,6 +87,8 @@ presigned
 proxied
 queryable
 rclone
+Razorpay
+Razorpay's
 realtime
 remediations
 repo
@@ -96,6 +99,7 @@ runtimes
 sdk
 SDKs
 select_account
+sellable
 serverless
 Sinch
 skipBrowserRedirect

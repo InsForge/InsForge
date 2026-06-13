@@ -18,9 +18,28 @@ export interface UpdateSecretInput {
   expiresAt?: Date | null;
 }
 
+interface AnonKeyCache {
+  /** Active anon key plus any grace-period keys still valid at load time */
+  keys: { value: string; expiresAt: Date | null }[];
+  loadedAt: number;
+}
+
+// Anon key verification runs on every anonymous request (the hottest public
+// path), so verified keys are cached in memory briefly instead of hitting the
+// database per request. Single-instance server, so no cross-instance
+// invalidation is needed; rotation invalidates the cache directly.
+const ANON_KEY_CACHE_TTL_MS = 60 * 1000;
+
+// Old anon keys are embedded in deployed frontends and mobile binaries that
+// may sit in app-store review, so the default grace period is much longer
+// than the admin API key's 24 hours.
+const ANON_KEY_DEFAULT_GRACE_HOURS = 168;
+
 export class SecretService {
   private static instance: SecretService;
   private pool: Pool | null = null;
+  private anonKeyCache: AnonKeyCache | null = null;
+  private anonKeyLoadPromise: Promise<AnonKeyCache> | null = null;
 
   private constructor() {
     // Encryption is now handled by the shared EncryptionManager
@@ -556,6 +575,202 @@ export class SecretService {
   }
 
   /**
+   * Generate a new anon key with 'anon_' prefix
+   * Opaque, non-secret client identifier that maps requests to the `anon`
+   * Postgres role at the gateway. Possessing it grants nothing beyond what
+   * RLS policies allow the `anon` role.
+   */
+  generateAnonKey(): string {
+    return 'anon_' + crypto.randomBytes(32).toString('hex');
+  }
+
+  /**
+   * Load the active anon key and grace-period keys into the in-memory cache.
+   * Concurrent callers share one in-flight load so a TTL expiry under
+   * traffic produces a single database query instead of a stampede.
+   */
+  private loadAnonKeys(): Promise<AnonKeyCache> {
+    if (this.anonKeyLoadPromise) {
+      return this.anonKeyLoadPromise;
+    }
+
+    this.anonKeyLoadPromise = (async () => {
+      const result = await this.getPool().query(
+        `SELECT value_ciphertext, expires_at FROM system.secrets
+         WHERE (key = 'ANON_KEY' OR key LIKE 'ANON_KEY_OLD_%')
+         AND is_active = true
+         AND (expires_at IS NULL OR expires_at > NOW())`,
+        []
+      );
+
+      const keys: AnonKeyCache['keys'] = [];
+      for (const row of result.rows) {
+        try {
+          keys.push({
+            value: EncryptionManager.decrypt(row.value_ciphertext),
+            expiresAt: row.expires_at,
+          });
+        } catch (error) {
+          logger.error('Failed to decrypt anon key', { error });
+        }
+      }
+
+      this.anonKeyCache = { keys, loadedAt: Date.now() };
+      return this.anonKeyCache;
+    })().finally(() => {
+      this.anonKeyLoadPromise = null;
+    });
+
+    return this.anonKeyLoadPromise;
+  }
+
+  /**
+   * Invalidate the in-memory anon key cache (called on rotation)
+   */
+  invalidateAnonKeyCache(): void {
+    this.anonKeyCache = null;
+  }
+
+  /**
+   * Verify an opaque anon key against the active key and any rotated keys
+   * still inside their grace period. Cache-backed: this runs on every
+   * anonymous request. Plain comparison is fine here — the anon key is a
+   * public identifier, not a secret, so timing leaks reveal nothing.
+   */
+  async verifyAnonKey(anonKey: string): Promise<boolean> {
+    if (!anonKey || !anonKey.startsWith('anon_')) {
+      return false;
+    }
+
+    let cache = this.anonKeyCache;
+    if (!cache || Date.now() - cache.loadedAt > ANON_KEY_CACHE_TTL_MS) {
+      try {
+        cache = await this.loadAnonKeys();
+      } catch (error) {
+        logger.error('Failed to load anon keys for verification', { error });
+        return false;
+      }
+    }
+
+    const now = Date.now();
+    return cache.keys.some(
+      // Grace-period expiry can lapse while the cache entry is still warm
+      (key) => key.value === anonKey && (!key.expiresAt || key.expiresAt.getTime() > now)
+    );
+  }
+
+  /**
+   * Rotate anon key with grace period for the old key.
+   * The old key stays valid for the grace period (default 7 days) so already
+   * deployed clients keep working while the new key ships.
+   */
+  async rotateAnonKey(
+    gracePeriodHours: number = ANON_KEY_DEFAULT_GRACE_HOURS
+  ): Promise<{ newAnonKey: string; oldKeyExpiresAt: Date }> {
+    const isValidHours =
+      typeof gracePeriodHours === 'number' &&
+      Number.isFinite(gracePeriodHours) &&
+      gracePeriodHours >= 0;
+    const validatedHours = isValidHours ? gracePeriodHours : ANON_KEY_DEFAULT_GRACE_HOURS;
+
+    const oldKeyExpiresAt = new Date(Date.now() + validatedHours * 60 * 60 * 1000);
+
+    const client = await this.getPool().connect();
+    try {
+      await client.query('BEGIN');
+
+      const currentResult = await client.query(
+        `SELECT id FROM system.secrets
+         WHERE key = 'ANON_KEY' AND is_active = true`,
+        []
+      );
+
+      if (!currentResult.rows.length) {
+        throw new Error('No active anon key found');
+      }
+
+      const oldKeyId = currentResult.rows[0].id;
+
+      // Rename old key to ANON_KEY_OLD_<timestamp> for grace period
+      const gracePeriodKey = `ANON_KEY_OLD_${Date.now()}`;
+      await client.query(
+        `UPDATE system.secrets
+         SET key = $1, expires_at = $2
+         WHERE id = $3`,
+        [gracePeriodKey, oldKeyExpiresAt, oldKeyId]
+      );
+
+      const newAnonKey = this.generateAnonKey();
+      const newKeyEncrypted = EncryptionManager.encrypt(newAnonKey);
+      await client.query(
+        `INSERT INTO system.secrets (key, value_ciphertext, is_active, is_reserved)
+         VALUES ('ANON_KEY', $1, true, true)`,
+        [newKeyEncrypted]
+      );
+
+      await client.query('COMMIT');
+      this.invalidateAnonKeyCache();
+
+      logger.info('Anon key rotated successfully', {
+        gracePeriodKey,
+        oldKeyExpiresAt: oldKeyExpiresAt.toISOString(),
+      });
+
+      return { newAnonKey, oldKeyExpiresAt };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Failed to rotate anon key', { error });
+      throw new Error('Failed to rotate anon key');
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Initialize the anon key on startup.
+   * Mirrors initializeApiKey: an existing stored key wins, then the
+   * ACCESS_ANON_KEY environment variable, then random generation.
+   * - No ANON_KEY stored: seed from env or generate a fresh opaque key.
+   * - Legacy JWT-format ANON_KEY stored (pre-opaque-key deployments):
+   *   replace it with an opaque key. The legacy anon JWT cannot be revoked
+   *   (it is a valid signature with no expiry), so it keeps verifying through
+   *   the JWT path; this migration only switches what new clients receive.
+   */
+  async initializeAnonKey(): Promise<string> {
+    const existing = await this.getSecretByKey('ANON_KEY');
+
+    if (existing && existing.startsWith('anon_')) {
+      logger.info('✅ Anon key exists in database');
+      return existing;
+    }
+
+    // Seed from environment if provided, ensure it has 'anon_' prefix
+    const envAnonKey = appConfig.auth.accessAnonKey?.trim();
+    const fromEnv = !!envAnonKey;
+    const anonKey = envAnonKey
+      ? envAnonKey.startsWith('anon_')
+        ? envAnonKey
+        : 'anon_' + envAnonKey
+      : this.generateAnonKey();
+
+    if (existing === null) {
+      await this.createSecret({ key: 'ANON_KEY', value: anonKey, isReserved: true });
+      logger.info(
+        fromEnv
+          ? '✅ Anon key initialized from ACCESS_ANON_KEY environment variable'
+          : '✅ Anon key generated and stored'
+      );
+    } else {
+      // Legacy JWT-format value: replace in place
+      await this.updateSecretByKey('ANON_KEY', { value: anonKey, isReserved: true });
+      logger.info('✅ Anon key migrated from legacy JWT format to opaque key');
+    }
+
+    this.invalidateAnonKeyCache();
+    return anonKey;
+  }
+
+  /**
    * Initialize API key on startup
    * Seeds from environment variable if database is empty
    */
@@ -564,9 +779,9 @@ export class SecretService {
 
     if (!apiKey) {
       // Check if ACCESS_API_KEY is provided via environment
-      const envApiKey = appConfig.auth.accessApiKey;
+      const envApiKey = appConfig.auth.accessApiKey?.trim();
 
-      if (envApiKey && envApiKey.trim() !== '') {
+      if (envApiKey) {
         // Use the provided API key from environment, ensure it has 'ik_' prefix
         apiKey = envApiKey.startsWith('ik_') ? envApiKey : 'ik_' + envApiKey;
         await this.createSecret({ key: 'API_KEY', value: apiKey, isReserved: true });

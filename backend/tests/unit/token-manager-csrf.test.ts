@@ -114,13 +114,13 @@ describe('TokenManager refresh CSRF tokens', () => {
     expect(() => tokenManager.verifyRefreshToken(legacyRefreshToken)).toThrow(AppError);
   });
 
-  it('keeps public anon tokens tied to the seeded anonymous user subject', () => {
-    const anonToken = tokenManager.generateAnonToken();
-    const payload = tokenManager.verifyToken(anonToken);
+  it('generates PostgREST anon tokens without a fake anonymous subject', () => {
+    const anonToken = tokenManager.generatePostgrestAnonToken();
+    const payload = jwt.verify(anonToken, process.env.JWT_SECRET ?? '') as Record<string, unknown>;
 
     expect(payload.role).toBe('anon');
-    expect(payload.sub).toBe('12345678-1234-5678-90ab-cdef12345678');
-    expect(payload.email).toBe('anon@insforge.com');
+    expect(payload.sub).toBeUndefined();
+    expect(payload.email).toBeUndefined();
   });
 
   it('generates PostgREST admin tokens without a fake admin subject', () => {

@@ -23,6 +23,7 @@ export interface DashboardBackup {
   triggerSource: 'manual' | 'scheduled';
   status: 'running' | 'completed' | string;
   sizeBytes: number | null;
+  errorMessage?: string | null;
   expiresAt?: string | null;
   createdAt: string;
   createdBy: string | null;

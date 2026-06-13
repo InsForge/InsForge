@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { GetPaymentsStatusResponse, StripeEnvironment } from '@insforge/shared-schemas';
+import type { GetStripeStatusResponse, StripeEnvironment } from '@insforge/shared-schemas';
 import { paymentsService } from '#features/payments/services/payments.service';
 import { useToast } from '#lib/hooks/useToast';
 
@@ -9,7 +9,7 @@ export function usePaymentsWebhook() {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
-  const { data, isLoading, error } = useQuery<GetPaymentsStatusResponse>({
+  const { data, isLoading, error } = useQuery<GetStripeStatusResponse>({
     queryKey: PAYMENTS_STATUS_QUERY_KEY,
     queryFn: () => paymentsService.getStatus(),
     staleTime: 30 * 1000,

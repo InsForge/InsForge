@@ -101,7 +101,9 @@
               {
                 "group": "Payments",
                 "pages": [
-                  "core-concepts/payments/overview"
+                  "core-concepts/payments/overview",
+                  "core-concepts/payments/stripe",
+                  "core-concepts/payments/razorpay"
                 ]
               },
               {
@@ -169,7 +171,14 @@
               "sdks/typescript/ai",
               "sdks/typescript/realtime",
               "sdks/typescript/email",
-              "sdks/typescript/payments",
+              {
+                "group": "Payments",
+                "pages": [
+                  "sdks/typescript/payments",
+                  "sdks/typescript/payments-stripe",
+                  "sdks/typescript/payments-razorpay"
+                ]
+              },
               {
                 "group": "Framework Guides",
                 "pages": [

@@ -1,8 +1,15 @@
 import { useState, useCallback, useRef } from 'react';
 import { ChevronRight } from 'lucide-react';
 import RefreshIcon from '#assets/icons/refresh.svg?react';
-import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
-import { Skeleton, PaginationControls, TableHeader } from '#components';
+import {
+  Button,
+  Skeleton,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@insforge/ui';
+import { PaginationControls, TableHeader } from '#components';
 import { useRealtimeMessages } from '#features/realtime/hooks/useRealtimeMessages';
 import { MessageRow } from '#features/realtime/components/MessageRow';
 import RealtimeEmptyState from '#features/realtime/components/RealtimeEmptyState';

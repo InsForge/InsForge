@@ -15,6 +15,7 @@ import functionsRouter from '@/api/routes/functions/index.routes.js';
 import secretsRouter from '@/api/routes/secrets/index.routes.js';
 import { usageRouter } from '@/api/routes/usage/index.routes.js';
 import { aiRouter } from '@/api/routes/ai/index.routes.js';
+import { memoryRouter } from '@/api/routes/memory/index.routes.js';
 import { realtimeRouter } from '@/api/routes/realtime/index.routes.js';
 import { emailRouter } from '@/api/routes/email/index.routes.js';
 import { deploymentsRouter } from '@/api/routes/deployments/index.routes.js';
@@ -194,6 +195,7 @@ export async function createApp() {
   apiRouter.use('/secrets', secretsRouter);
   apiRouter.use('/usage', usageRouter);
   apiRouter.use('/ai', aiRouter);
+  apiRouter.use('/memory', memoryRouter);
   apiRouter.use('/realtime', realtimeRouter);
   apiRouter.use('/email', emailRouter);
   apiRouter.use('/deployments', deploymentsRouter);
@@ -205,7 +207,7 @@ export async function createApp() {
   // Mount all API routes under /api prefix
   app.use('/api', apiRouter);
 
-  // Proxy function execution to Deno Subhosting or local runtime
+  // Proxy function execution to Deno Deploy or local runtime
   // this logic is used for backward compatibility, we will let the sdk directly call the edge function
   app.all('/functions/:slug', async (req: Request, res: Response) => {
     const { slug } = req.params;
@@ -318,10 +320,10 @@ async function initializeServer() {
     const realtimeManager = RealtimeManager.getInstance();
     await realtimeManager.initialize();
 
-    // Sync existing functions to Deno Subhosting (non-blocking)
+    // Sync existing functions to Deno Deploy (non-blocking)
     const functionService = FunctionService.getInstance();
     functionService.syncDeployment().catch((err) => {
-      logger.error('Failed to sync functions to Deno Subhosting', {
+      logger.error('Failed to sync functions to Deno Deploy', {
         error: err instanceof Error ? err.message : String(err),
       });
     });

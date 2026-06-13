@@ -233,7 +233,7 @@ describe('StripeProvider', () => {
     const provider = new StripeProvider(TEST_STRIPE_SECRET_KEY, 'test', client);
 
     await provider.createPrice({
-      stripeProductId: 'prod_123',
+      productId: 'prod_123',
       currency: 'usd',
       unitAmount: 2000,
       lookupKey: 'pro_monthly',
@@ -370,7 +370,7 @@ describe('StripeProvider', () => {
 
     await provider.createCheckoutSession({
       mode: 'subscription',
-      lineItems: [{ stripePriceId: 'price_123', quantity: 1 }],
+      lineItems: [{ priceId: 'price_123', quantity: 1 }],
       successUrl: 'https://example.com/success',
       cancelUrl: 'https://example.com/cancel',
       customerId: 'cus_123',
@@ -411,7 +411,7 @@ describe('StripeProvider', () => {
 
     await provider.createCheckoutSession({
       mode: 'payment',
-      lineItems: [{ stripePriceId: 'price_123', quantity: 1 }],
+      lineItems: [{ priceId: 'price_123', quantity: 1 }],
       successUrl: 'https://example.com/success',
       cancelUrl: 'https://example.com/cancel',
       customerEmail: 'buyer@example.com',
@@ -457,7 +457,7 @@ describe('StripeProvider', () => {
     });
     await provider.createCheckoutSession({
       mode: 'payment',
-      lineItems: [{ stripePriceId: 'price_123', quantity: 1 }],
+      lineItems: [{ priceId: 'price_123', quantity: 1 }],
       successUrl: 'https://example.com/success',
       cancelUrl: 'https://example.com/cancel',
       idempotencyKey: 'insforge:test:checkout_session:checkout-123',
@@ -467,7 +467,7 @@ describe('StripeProvider', () => {
       idempotencyKey: 'insforge:test:product:agent-123',
     });
     await provider.createPrice({
-      stripeProductId: 'prod_123',
+      productId: 'prod_123',
       currency: 'usd',
       unitAmount: 2000,
       idempotencyKey: 'insforge:test:price:agent-123',

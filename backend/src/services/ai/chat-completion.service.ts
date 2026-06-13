@@ -274,7 +274,7 @@ export class ChatCompletionService {
         parallel_tool_calls: options.parallelToolCalls,
       };
 
-      // Send request with automatic renewal and retry logic
+      // Send request with upstream error mapping
       const { result: response } = await this.openRouterProvider.sendRequest((client) =>
         client.chat.completions.create(
           request as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming
@@ -370,7 +370,7 @@ export class ChatCompletionService {
         parallel_tool_calls: options.parallelToolCalls,
       };
 
-      // Send request with automatic renewal and retry logic
+      // Send request with upstream error mapping
       const { result: stream } = await this.openRouterProvider.sendRequest((client) =>
         client.chat.completions.create(request as OpenAI.Chat.ChatCompletionCreateParamsStreaming)
       );

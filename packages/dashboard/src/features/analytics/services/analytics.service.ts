@@ -1,6 +1,5 @@
 import type {
   GetPosthogConnectionResponse,
-  GetPosthogDashboardsResponse,
   PosthogTimeframe,
   PosthogWebOverviewResponse,
   PosthogWebStatsResponse,
@@ -27,12 +26,6 @@ export const analyticsService = {
       }
       throw err;
     }
-  },
-
-  async getDashboards(): Promise<GetPosthogDashboardsResponse> {
-    return apiClient.request('/analytics/dashboards', {
-      headers: apiClient.withAccessToken({}),
-    }) as Promise<GetPosthogDashboardsResponse>;
   },
 
   async disconnect(): Promise<void> {
