@@ -24,6 +24,10 @@ export class DatabaseManager {
   private static readonly COLUMN_TYPE_CACHE_TTL = 5 * 60 * 1000;
   private static columnTypeCache = new Map<string, CacheEntry<Record<string, string>>>();
   private static readonly MAX_CACHE_SIZE = 100;
+  /**
+   * Maximum entries for table row counts.
+   * Bounded at 1000 per workspace/process to prevent memory leaks in multi-tenant or multi-schema deployments.
+   */
   private static readonly MAX_TABLE_COUNT_CACHE_SIZE = 1000;
   private static readonly TABLE_COUNT_CACHE_TTL = 60 * 1000;
   private static tableCountCache = new Map<string, { count: number; timestamp: number }>();
@@ -77,37 +81,31 @@ export class DatabaseManager {
         map[row.column_name] = dataType === 'user-defined' ? row.udt_name.toLowerCase() : dataType;
       }
 
-      DatabaseManager.setColumnTypeCache(cacheKey, map);
+      DatabaseManager.setBoundedCache(
+        DatabaseManager.columnTypeCache,
+        DatabaseManager.MAX_CACHE_SIZE,
+        cacheKey,
+        { data: map, expiry: Date.now() + DatabaseManager.COLUMN_TYPE_CACHE_TTL }
+      );
       return map;
     } finally {
       client.release();
     }
   }
 
-  private static setColumnTypeCache(cacheKey: string, data: Record<string, string>): void {
-    if (DatabaseManager.columnTypeCache.size >= DatabaseManager.MAX_CACHE_SIZE) {
-      const firstKey = DatabaseManager.columnTypeCache.keys().next().value;
-      if (firstKey) {
-        DatabaseManager.columnTypeCache.delete(firstKey);
-      }
-    }
-    DatabaseManager.columnTypeCache.set(cacheKey, {
-      data,
-      expiry: Date.now() + DatabaseManager.COLUMN_TYPE_CACHE_TTL,
-    });
-  }
-
-  private static setTableCountCache(
-    cacheKey: string,
-    entry: { count: number; timestamp: number }
+  private static setBoundedCache<V>(
+    cache: Map<string, V>,
+    maxSize: number,
+    key: string,
+    entry: V
   ): void {
-    if (DatabaseManager.tableCountCache.size >= DatabaseManager.MAX_TABLE_COUNT_CACHE_SIZE) {
-      const firstKey = DatabaseManager.tableCountCache.keys().next().value;
-      if (firstKey) {
-        DatabaseManager.tableCountCache.delete(firstKey);
+    if (cache.size >= maxSize) {
+      const first = cache.keys().next().value;
+      if (first !== undefined) {
+        cache.delete(first);
       }
     }
-    DatabaseManager.tableCountCache.set(cacheKey, entry);
+    cache.set(key, entry);
   }
 
   static clearColumnTypeCache(
@@ -173,10 +171,12 @@ export class DatabaseManager {
         const nowAfterQuery = Date.now();
         for (const row of queryResult.rows) {
           const cacheKey = buildQualifiedTableKey(row.table_name, 'public');
-          DatabaseManager.setTableCountCache(cacheKey, {
-            count: Number(row.count),
-            timestamp: nowAfterQuery,
-          });
+          DatabaseManager.setBoundedCache(
+            DatabaseManager.tableCountCache,
+            DatabaseManager.MAX_TABLE_COUNT_CACHE_SIZE,
+            cacheKey,
+            { count: Number(row.count), timestamp: nowAfterQuery }
+          );
         }
       } catch (error) {
         logger.error('Failed to batch query exact table counts:', { error });
