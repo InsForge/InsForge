@@ -156,3 +156,51 @@ describe('LocalStorageProvider - getDownloadStrategy versioning', () => {
     expect(s.url).toBe('https://app.test/api/storage/buckets/b/objects/k.png?v=a%20b%26c');
   });
 });
+
+describe('LocalStorageProvider - renameObject', () => {
+  const baseDir = path.join(__dirname, 'test-storage-rename');
+  let provider: LocalStorageProvider;
+
+  beforeEach(async () => {
+    provider = new LocalStorageProvider(baseDir);
+    await provider.initialize();
+    await provider.createBucket('renameBucket');
+  });
+
+  afterEach(async () => {
+    await fs.rm(baseDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  function makeFile(buffer: Buffer): Express.Multer.File {
+    return {
+      buffer,
+      mimetype: 'text/plain',
+      originalname: 'notes.txt',
+      size: buffer.length,
+      fieldname: 'file',
+      encoding: '7bit',
+      stream: undefined as never,
+      destination: '',
+      filename: '',
+      path: '',
+    } as Express.Multer.File;
+  }
+
+  it('renames an object and preserves its contents', async () => {
+    await provider.putObject('renameBucket', 'folder/old.txt', makeFile(Buffer.from('hello')));
+
+    const renamed = await provider.renameObject(
+      'renameBucket',
+      'folder/old.txt',
+      'renameBucket',
+      'folder/new.txt'
+    );
+
+    await expect(provider.getObject('renameBucket', 'folder/old.txt')).resolves.toBeNull();
+    await expect(provider.getObject('renameBucket', 'folder/new.txt')).resolves.toEqual(
+      Buffer.from('hello')
+    );
+    expect(renamed.etag).toBe('5d41402abc4b2a76b9719d911017c592');
+  });
+});

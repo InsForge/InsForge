@@ -137,6 +137,21 @@ export const storageService = {
     return { success, failures };
   },
 
+  async renameObject(
+    bucketName: string,
+    objectKey: string,
+    newKey: string
+  ): Promise<StorageFileSchema> {
+    return apiClient.request(
+      `/storage/buckets/${encodeURIComponent(bucketName)}/objects/${encodeURIComponent(objectKey)}`,
+      {
+        method: 'PATCH',
+        headers: apiClient.withAccessToken(),
+        body: JSON.stringify({ newKey }),
+      }
+    );
+  },
+
   // Create a new bucket
   async createBucket(bucketName: string, isPublic: boolean = true): Promise<void> {
     await apiClient.request('/storage/buckets', {

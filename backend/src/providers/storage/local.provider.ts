@@ -81,6 +81,27 @@ export class LocalStorageProvider implements StorageProvider {
     }
   }
 
+  async renameObject(
+    srcBucket: string,
+    srcKey: string,
+    dstBucket: string,
+    dstKey: string
+  ): Promise<{ etag: string; lastModified: Date }> {
+    const sourcePath = this.getFilePath(srcBucket, srcKey);
+    const destinationPath = this.getFilePath(dstBucket, dstKey);
+
+    await fs.mkdir(path.dirname(destinationPath), { recursive: true });
+    await fs.rename(sourcePath, destinationPath);
+
+    const stats = await fs.stat(destinationPath);
+    const buffer = await fs.readFile(destinationPath);
+
+    return {
+      etag: crypto.createHash('md5').update(buffer).digest('hex'),
+      lastModified: stats.mtime,
+    };
+  }
+
   async createBucket(bucket: string): Promise<void> {
     const bucketPath = this.getValidatedPath(bucket);
     await fs.mkdir(bucketPath, { recursive: true });

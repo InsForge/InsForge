@@ -10,6 +10,10 @@ export const updateBucketRequestSchema = z.object({
   isPublic: z.boolean(),
 });
 
+export const renameObjectRequestSchema = z.object({
+  newKey: z.string().min(1, 'New object key cannot be empty'),
+});
+
 export const listObjectsResponseSchema = z.object({
   objects: z.array(storageFileSchema),
   pagination: z.object({
@@ -65,6 +69,7 @@ export const getStorageConfigResponseSchema = storageConfigSchema;
 
 export type CreateBucketRequest = z.infer<typeof createBucketRequestSchema>;
 export type UpdateBucketRequest = z.infer<typeof updateBucketRequestSchema>;
+export type RenameObjectRequest = z.infer<typeof renameObjectRequestSchema>;
 export type ListObjectsResponseSchema = z.infer<typeof listObjectsResponseSchema>;
 export type UploadStrategyRequest = z.infer<typeof uploadStrategyRequestSchema>;
 export type UploadStrategyResponse = z.infer<typeof uploadStrategyResponseSchema>;

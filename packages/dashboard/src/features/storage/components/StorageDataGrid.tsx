@@ -14,6 +14,7 @@ import {
 import {
   Download,
   Eye,
+  Pencil,
   Trash2,
   Image,
   FileText,
@@ -31,6 +32,7 @@ import { useConfirm } from '#lib/hooks/useConfirm';
 import { useToast } from '#lib/hooks/useToast';
 import { SortColumn } from 'react-data-grid';
 import { usePageSize } from '#lib/hooks/usePageSize';
+import { RenameFileDialog } from './RenameFileDialog';
 
 // Create a type that makes StorageFileSchema compatible with DataGridRowType
 // This allows StorageFileSchema to be used with the generic DataGrid while maintaining type safety
@@ -128,6 +130,7 @@ const UploadedAtRenderer = ({ row, column }: RenderCellProps<StorageDataGridRow>
 export function createStorageColumns(
   onPreview?: (file: StorageFileSchema) => void,
   onDownload?: (file: StorageFileSchema) => void,
+  onRename?: (file: StorageFileSchema) => void,
   onDelete?: (file: StorageFileSchema) => void,
   isDownloading?: (key: string) => boolean
 ): DataGridColumn<StorageDataGridRow>[] {
@@ -171,12 +174,12 @@ export function createStorageColumns(
   ];
 
   // Add actions column if any handlers are provided
-  if (onPreview || onDownload || onDelete) {
+  if (onPreview || onDownload || onRename || onDelete) {
     columns.push({
       key: 'actions',
       name: '',
-      minWidth: 108,
-      maxWidth: 108,
+      minWidth: 140,
+      maxWidth: 140,
       resizable: false,
       sortable: false,
       renderCell: ({ row }: RenderCellProps<StorageDataGridRow>) => {
@@ -215,6 +218,20 @@ export function createStorageColumns(
                 <Download className="h-5 w-5 stroke-[1.5]" />
               </Button>
             )}
+            {onRename && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 rounded p-0 text-muted-foreground hover:bg-[var(--alpha-4)] hover:text-foreground active:bg-[var(--alpha-8)]"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRename(row as StorageFileSchema);
+                }}
+                title="Rename file"
+              >
+                <Pencil className="h-4 w-4 stroke-[1.5]" />
+              </Button>
+            )}
             {onDelete && (
               <Button
                 variant="ghost"
@@ -241,6 +258,7 @@ export function createStorageColumns(
 interface StorageFilesGridProps extends Omit<DataGridProps<StorageDataGridRow>, 'columns'> {
   onPreview?: (file: StorageFileSchema) => void;
   onDownload?: (file: StorageFileSchema) => void;
+  onRename?: (file: StorageFileSchema) => void;
   onDelete?: (file: StorageFileSchema) => void;
   isDownloading?: (key: string) => boolean;
 }
@@ -248,13 +266,14 @@ interface StorageFilesGridProps extends Omit<DataGridProps<StorageDataGridRow>, 
 function StorageFilesGrid({
   onPreview,
   onDownload,
+  onRename,
   onDelete,
   isDownloading,
   ...props
 }: StorageFilesGridProps) {
   const columns = useMemo(
-    () => createStorageColumns(onPreview, onDownload, onDelete, isDownloading),
-    [onPreview, onDownload, onDelete, isDownloading]
+    () => createStorageColumns(onPreview, onDownload, onRename, onDelete, isDownloading),
+    [onPreview, onDownload, onRename, onDelete, isDownloading]
   );
 
   // Ensure each row has an id for selection
@@ -298,6 +317,7 @@ export function StorageDataGrid({
 }: StorageDataGridProps) {
   const [downloadingFiles, setDownloadingFiles] = useState<Set<string>>(new Set());
   const [previewFile, setPreviewFile] = useState<StorageFileSchema | null>(null);
+  const [renameFile, setRenameFile] = useState<StorageFileSchema | null>(null);
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
   const [sortColumns, setSortColumns] = useState<SortColumn[]>([]);
   const { showToast } = useToast();
@@ -313,7 +333,7 @@ export function StorageDataGrid({
     setCurrentPage(1);
   }, [searchQuery, bucketName]);
 
-  const { useListObjects, deleteObjects, downloadObject } = useStorageObjects();
+  const { useListObjects, deleteObjects, downloadObject, renameObject } = useStorageObjects();
   const {
     data: objectsData,
     isLoading: objectsLoading,
@@ -391,6 +411,44 @@ export function StorageDataGrid({
     setShowPreviewDialog(true);
   }, []);
 
+  const handleRename = useCallback((file: StorageFileSchema) => {
+    setRenameFile(file);
+  }, []);
+
+  const handleRenameSave = useCallback(
+    async (nextFileName: string) => {
+      if (!renameFile) {
+        return;
+      }
+
+      if (nextFileName.includes('/')) {
+        showToast('File name cannot include "/"', 'error');
+        throw new Error('File name cannot include "/"');
+      }
+
+      const segments = renameFile.key.split('/');
+      segments[segments.length - 1] = nextFileName;
+      const newKey = segments.join('/');
+      const previousKey = renameFile.key;
+
+      const renamed = await renameObject({
+        bucket: bucketName,
+        key: previousKey,
+        newKey,
+      });
+
+      setRenameFile(renamed);
+
+      if (selectedFiles.has(previousKey)) {
+        const nextSelectedFiles = new Set(selectedFiles);
+        nextSelectedFiles.delete(previousKey);
+        nextSelectedFiles.add(renamed.key);
+        onSelectedFilesChange(nextSelectedFiles);
+      }
+    },
+    [bucketName, onSelectedFilesChange, renameFile, renameObject, selectedFiles, showToast]
+  );
+
   const handleDelete = useCallback(
     async (file: StorageFileSchema) => {
       const confirmOptions = {
@@ -467,6 +525,7 @@ export function StorageDataGrid({
           onSortColumnsChange={setSortColumns}
           onPreview={handlePreview}
           onDownload={(file) => void handleDownload(file)}
+          onRename={handleRename}
           onDelete={(file) => void handleDelete(file)}
           isDownloading={isDownloading}
           emptyState={
@@ -484,6 +543,17 @@ export function StorageDataGrid({
         onOpenChange={setShowPreviewDialog}
         file={previewFile}
         bucket={bucketName}
+      />
+
+      <RenameFileDialog
+        open={renameFile !== null}
+        initialName={renameFile?.key.split('/').pop() ?? ''}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRenameFile(null);
+          }
+        }}
+        onSave={handleRenameSave}
       />
     </div>
   );
