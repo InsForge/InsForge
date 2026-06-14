@@ -1,0 +1,260 @@
+openapi: 3.0.3
+info:
+  title: Insforge RLS Policies API
+  version: 1.0.0
+
+paths:
+  /api/database/policies:
+    get:
+      summary: List RLS Policies
+      description: List row level security policies for a schema.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - in: query
+          name: schema
+          schema:
+            type: string
+            default: public
+          description: Schema to list policies for. Defaults to "public".
+      responses:
+        '200':
+          description: Policies for the schema
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - policies
+                properties:
+                  policies:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Policy'
+
+  /api/database/policies/simulate:
+    post:
+      summary: Simulate RLS Policy Decision
+      description: >
+        Simulate a data operation (SELECT/INSERT/UPDATE/DELETE) on a table as a
+        chosen role and JWT identity, with no side effects, and report whether
+        row level security allows or denies it and which policies apply. The
+        operation runs under a downgraded role inside a transaction that is
+        always rolled back. Admin only.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SimulatePolicyRequest'
+            example:
+              table: todos
+              operation: SELECT
+              role: authenticated
+              claims:
+                sub: 550e8400-e29b-41d4-a716-446655440001
+      responses:
+        '200':
+          description: Simulation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimulatePolicyResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Table not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    Policy:
+      type: object
+      required:
+        - tableName
+        - policyName
+        - cmd
+        - roles
+      properties:
+        tableName:
+          type: string
+        policyName:
+          type: string
+        cmd:
+          type: string
+          description: SELECT, INSERT, UPDATE, DELETE, or ALL
+        roles:
+          type: array
+          items:
+            type: string
+        qual:
+          type: string
+          nullable: true
+          description: The USING expression, if any
+        withCheck:
+          type: string
+          nullable: true
+          description: The WITH CHECK expression, if any
+
+    ApplicablePolicy:
+      allOf:
+        - $ref: '#/components/schemas/Policy'
+        - type: object
+          required:
+            - permissive
+          properties:
+            permissive:
+              type: boolean
+              description: true for PERMISSIVE (combined with OR), false for RESTRICTIVE (AND)
+
+    SimulatePolicyRequest:
+      type: object
+      required:
+        - table
+        - operation
+        - role
+      properties:
+        schema:
+          type: string
+          default: public
+        table:
+          type: string
+        operation:
+          type: string
+          enum: [SELECT, INSERT, UPDATE, DELETE]
+        role:
+          type: string
+          enum: [anon, authenticated, project_admin]
+        claims:
+          type: object
+          additionalProperties: true
+          description: >
+            Custom JWT claims injected as request.jwt.claims (e.g. sub, email,
+            org_id). The simulated role always overrides any role claim here.
+        row:
+          type: object
+          additionalProperties: true
+          description: >
+            Column to value map. INSERT row (optional) or UPDATE SET payload
+            (required for UPDATE).
+        match:
+          type: object
+          additionalProperties: true
+          description: Column to value map building a parameterized WHERE (AND-ed).
+        sampleLimit:
+          type: integer
+          minimum: 0
+          maximum: 50
+          description: Number of visible rows to return as a sample for SELECT.
+
+    SimulatePolicyResponse:
+      type: object
+      required:
+        - schema
+        - table
+        - operation
+        - role
+        - effectiveClaims
+        - rlsEnabled
+        - bypassRls
+        - decision
+        - applicablePolicies
+        - explanation
+        - exampleQuery
+      properties:
+        schema:
+          type: string
+        table:
+          type: string
+        operation:
+          type: string
+          enum: [SELECT, INSERT, UPDATE, DELETE]
+        role:
+          type: string
+          enum: [anon, authenticated, project_admin]
+        effectiveClaims:
+          type: object
+          additionalProperties: true
+        rlsEnabled:
+          type: boolean
+        bypassRls:
+          type: boolean
+        decision:
+          type: string
+          enum: [allowed, denied, partial, bypass]
+        rowsVisible:
+          type: integer
+          nullable: true
+        rowsTotal:
+          type: integer
+          nullable: true
+        rowsAffected:
+          type: integer
+          nullable: true
+        sampleRows:
+          type: array
+          nullable: true
+          items:
+            type: object
+            additionalProperties: true
+        denialReason:
+          type: string
+          nullable: true
+        applicablePolicies:
+          type: array
+          items:
+            $ref: '#/components/schemas/ApplicablePolicy'
+        explanation:
+          type: string
+        exampleQuery:
+          type: string
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+        - statusCode
+      properties:
+        error:
+          type: string
+          description: Error code for programmatic handling
+        message:
+          type: string
+          description: Human-readable error message
+        statusCode:
+          type: integer
+          description: HTTP status code
+        nextActions:
+          type: string
+          description: Suggested action to resolve the error

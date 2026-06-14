@@ -52,6 +52,24 @@ npx @insforge/cli logs postgres.logs
 
 Sources include `insforge.logs`, `postgREST.logs`, `postgres.logs`, `function.logs`, and `function-deploy.logs`.
 
+## Policy simulator
+
+The advisor tells you a policy looks wrong. The policy simulator tells you what a specific identity can actually do, before you deploy. Send a table, an operation, a role, and the JWT claims to test, and the backend runs that exact operation as that identity inside a transaction it always rolls back, then reports whether row level security allowed or denied it and which policies applied.
+
+```http
+POST /api/database/policies/simulate
+{
+  "table": "todos",
+  "operation": "SELECT",
+  "role": "authenticated",
+  "claims": { "sub": "550e8400-e29b-41d4-a716-446655440001" }
+}
+```
+
+The response gives the decision (`allowed`, `denied`, `partial`, or `bypass`), how many rows the role can see versus how many exist, the policies Postgres considered with their `USING` and `WITH CHECK` expressions, and a plain-language explanation. `project_admin` is reported as `bypass` because it has `BYPASSRLS`. No rows are persisted: every simulated statement runs under a downgraded role and is rolled back. See the [policies API spec](https://github.com/InsForge/InsForge/blob/main/openapi/policies.yaml) for the full request and response shape.
+
+This sits between the advisor and [branching](/agent-native/branching): the advisor finds a bad policy, the simulator confirms exactly how it allows or denies a given user, and branching lets you rehearse the fix in isolation.
+
 ## Let the agent interpret it
 
 `diagnose --ai` hands the collected diagnostic data to a model and returns a plain-language analysis:

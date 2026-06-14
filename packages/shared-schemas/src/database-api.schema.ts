@@ -11,6 +11,7 @@ import {
   migrationSchema,
   databaseBackupSchema,
 } from './database.schema.js';
+import { roleSchema } from './auth.schema.js';
 
 export const createTableRequestSchema = tableSchema
   .pick({
@@ -396,6 +397,68 @@ export const databasePoliciesResponseSchema = z.object({
   policies: z.array(databasePolicySchema),
 });
 
+// RLS Policy Simulator Schemas
+//
+// Simulate a data operation as a given role + JWT identity without persisting
+// any rows, and report whether RLS allows or denies it and which policies apply.
+// Roles map 1:1 to the Postgres roles the runtime uses (anon / authenticated /
+// project_admin), so the same `roleSchema` gates this request.
+export const policySimulatorOperationSchema = z.enum(['SELECT', 'INSERT', 'UPDATE', 'DELETE']);
+
+export const simulatePolicyRequestSchema = z.object({
+  // Defaults to "public" on the backend. Internal schemas are rejected there.
+  schema: z.string().min(1).max(64).optional(),
+  table: z.string().min(1).max(64),
+  operation: policySimulatorOperationSchema,
+  role: roleSchema,
+  // Custom JWT claims to inject as request.jwt.claims (e.g. { sub, email, org_id }).
+  // The simulated `role` is always written into the claims, overriding any role key here.
+  claims: z.record(z.string(), z.unknown()).optional(),
+  // Column -> value map. INSERT: the row to insert (optional; omit for DEFAULT VALUES).
+  // UPDATE: the SET payload (required for UPDATE).
+  row: z.record(z.string(), z.unknown()).optional(),
+  // Column -> value map building a parameterized WHERE (AND-ed) to scope which
+  // rows SELECT/UPDATE/DELETE target. null values become "IS NULL".
+  match: z.record(z.string(), z.unknown()).optional(),
+  // Number of visible rows to return as a sample for SELECT (0 disables).
+  sampleLimit: z.number().int().min(0).max(50).optional(),
+});
+
+// A policy that Postgres would consider for this (table, operation, role),
+// surfaced with its permissive/restrictive flag and predicate text.
+export const simulatorPolicySchema = databasePolicySchema.extend({
+  permissive: z.boolean(),
+});
+
+export const policySimulatorDecisionSchema = z.enum(['allowed', 'denied', 'partial', 'bypass']);
+
+export const simulatePolicyResponseSchema = z.object({
+  schema: z.string(),
+  table: z.string(),
+  operation: policySimulatorOperationSchema,
+  role: roleSchema,
+  // The exact claims written into request.jwt.claims for the simulated session.
+  effectiveClaims: z.record(z.string(), z.unknown()),
+  rlsEnabled: z.boolean(),
+  bypassRls: z.boolean(),
+  decision: policySimulatorDecisionSchema,
+  // SELECT: rows visible to the role. UPDATE/DELETE/INSERT: null.
+  rowsVisible: z.number().nullable(),
+  // Baseline rows matched with RLS bypassed (admin view). SELECT/UPDATE/DELETE; null for INSERT.
+  rowsTotal: z.number().nullable(),
+  // INSERT/UPDATE/DELETE: rows the operation would have affected. null for SELECT.
+  rowsAffected: z.number().nullable(),
+  // SELECT: a small sample of rows the role can see. null otherwise.
+  sampleRows: z.array(z.record(z.string(), z.unknown())).nullable(),
+  // Postgres message when the operation was denied by RLS (error 42501).
+  denialReason: z.string().nullable(),
+  applicablePolicies: z.array(simulatorPolicySchema),
+  // Plain-English summary of the decision and why.
+  explanation: z.string(),
+  // A copy-pasteable SQL snippet reproducing the simulated session.
+  exampleQuery: z.string(),
+});
+
 export const databaseTriggersResponseSchema = z.object({
   triggers: z.array(databaseTriggerSchema),
 });
@@ -444,6 +507,11 @@ export type DatabaseFunctionsResponse = z.infer<typeof databaseFunctionsResponse
 export type DatabaseSchemasResponse = z.infer<typeof databaseSchemasResponseSchema>;
 export type DatabaseIndexesResponse = z.infer<typeof databaseIndexesResponseSchema>;
 export type DatabasePoliciesResponse = z.infer<typeof databasePoliciesResponseSchema>;
+export type PolicySimulatorOperation = z.infer<typeof policySimulatorOperationSchema>;
+export type PolicySimulatorDecision = z.infer<typeof policySimulatorDecisionSchema>;
+export type SimulatorPolicy = z.infer<typeof simulatorPolicySchema>;
+export type SimulatePolicyRequest = z.infer<typeof simulatePolicyRequestSchema>;
+export type SimulatePolicyResponse = z.infer<typeof simulatePolicyResponseSchema>;
 export type DatabaseTriggersResponse = z.infer<typeof databaseTriggersResponseSchema>;
 export type DatabaseMigrationsResponse = z.infer<typeof databaseMigrationsResponseSchema>;
 
