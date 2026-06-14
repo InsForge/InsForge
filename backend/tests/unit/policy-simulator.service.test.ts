@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import type { SimulatePolicyResponse, SimulatorPolicy } from '@insforge/shared-schemas';
+import {
+  simulatePolicyRequestSchema,
+  type SimulatePolicyResponse,
+  type SimulatorPolicy,
+} from '@insforge/shared-schemas';
 import {
   mergeClaims,
   buildWhereClause,
@@ -8,6 +12,68 @@ import {
   buildExplanation,
   buildExampleQuery,
 } from '@/services/database/policy-simulator.service.js';
+
+describe('simulatePolicyRequestSchema', () => {
+  it('accepts a minimal valid request', () => {
+    const parsed = simulatePolicyRequestSchema.safeParse({
+      table: 'todos',
+      operation: 'SELECT',
+      role: 'authenticated',
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it('accepts custom claims, row, match, and sampleLimit', () => {
+    const parsed = simulatePolicyRequestSchema.safeParse({
+      schema: 'public',
+      table: 'todos',
+      operation: 'UPDATE',
+      role: 'authenticated',
+      claims: { sub: 'u1', org_id: 'acme' },
+      row: { done: true },
+      match: { user_id: 'u1' },
+      sampleLimit: 10,
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it('rejects an unknown operation', () => {
+    expect(
+      simulatePolicyRequestSchema.safeParse({
+        table: 'todos',
+        operation: 'TRUNCATE',
+        role: 'authenticated',
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects an unknown role', () => {
+    expect(
+      simulatePolicyRequestSchema.safeParse({
+        table: 'todos',
+        operation: 'SELECT',
+        role: 'superuser',
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects a missing table', () => {
+    expect(
+      simulatePolicyRequestSchema.safeParse({ operation: 'SELECT', role: 'anon' }).success
+    ).toBe(false);
+  });
+
+  it('rejects a sampleLimit above the cap', () => {
+    expect(
+      simulatePolicyRequestSchema.safeParse({
+        table: 'todos',
+        operation: 'SELECT',
+        role: 'anon',
+        sampleLimit: 1000,
+      }).success
+    ).toBe(false);
+  });
+});
 
 describe('mergeClaims', () => {
   it('injects the simulated role', () => {
