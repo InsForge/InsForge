@@ -45,16 +45,25 @@ export class MicrosoftOAuthProvider implements OAuthProvider {
       }
       // Use shared keys if configured
       const cloudBaseUrl = process.env.CLOUD_API_HOST || 'https://api.insforge.dev';
-      const redirectUri = `${selfBaseUrl}/api/auth/oauth/shared/callback/${state}`;
-      const response = await axios.get(
-        `${cloudBaseUrl}/auth/v1/shared/microsoft?redirect_uri=${encodeURIComponent(redirectUri)}`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-      const sharedAuthUrl = response.data.auth_url || response.data.url;
+      const redirectUri = `${selfBaseUrl}/api/auth/oauth/shared/callback/${encodeURIComponent(state)}`;
+      
+      let sharedAuthUrl: string;
+      try {
+        const response = await axios.get(
+          `${cloudBaseUrl}/auth/v1/shared/microsoft?redirect_uri=${encodeURIComponent(redirectUri)}`,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            timeout: 5000,
+          }
+        );
+        sharedAuthUrl = response.data.auth_url || response.data.url;
+      } catch (error) {
+        logger.error('Failed to get shared Microsoft OAuth URL:', error);
+        throw new Error(`Failed to initialize shared Microsoft OAuth: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+
       if (!sharedAuthUrl) {
         throw new Error('Shared Microsoft OAuth did not return an authorization URL');
       }
@@ -207,10 +216,10 @@ export class MicrosoftOAuthProvider implements OAuthProvider {
    * Handle shared callback payload transformation
    */
   handleSharedCallback(payloadData: Record<string, unknown>): OAuthUserData {
-    const providerId = String(payloadData.providerId ?? '');
-    const email = String(payloadData.email ?? '');
-    const name = String(payloadData.name ?? '');
-    const avatar = String(payloadData.avatar ?? '');
+    const providerId = typeof payloadData.providerId === 'string' ? payloadData.providerId : '';
+    const email = typeof payloadData.email === 'string' ? payloadData.email : '';
+    const name = typeof payloadData.name === 'string' ? payloadData.name : '';
+    const avatar = typeof payloadData.avatar === 'string' ? payloadData.avatar : '';
 
     return {
       provider: 'microsoft',
