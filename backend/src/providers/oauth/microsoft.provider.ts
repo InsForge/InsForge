@@ -46,7 +46,7 @@ export class MicrosoftOAuthProvider implements OAuthProvider {
       // Use shared keys if configured
       const cloudBaseUrl = process.env.CLOUD_API_HOST || 'https://api.insforge.dev';
       const redirectUri = `${selfBaseUrl}/api/auth/oauth/shared/callback/${encodeURIComponent(state)}`;
-      
+
       let sharedAuthUrl: string;
       try {
         const response = await axios.get(
@@ -61,7 +61,9 @@ export class MicrosoftOAuthProvider implements OAuthProvider {
         sharedAuthUrl = response.data.auth_url || response.data.url;
       } catch (error) {
         logger.error('Failed to get shared Microsoft OAuth URL:', error);
-        throw new Error(`Failed to initialize shared Microsoft OAuth: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        throw new Error(
+          `Failed to initialize shared Microsoft OAuth: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
       }
 
       if (!sharedAuthUrl) {
@@ -217,6 +219,10 @@ export class MicrosoftOAuthProvider implements OAuthProvider {
    */
   handleSharedCallback(payloadData: Record<string, unknown>): OAuthUserData {
     const providerId = typeof payloadData.providerId === 'string' ? payloadData.providerId : '';
+    if (!providerId) {
+      throw new Error('Missing providerId from Microsoft shared callback payload');
+    }
+
     const email = typeof payloadData.email === 'string' ? payloadData.email : '';
     const name = typeof payloadData.name === 'string' ? payloadData.name : '';
     const avatar = typeof payloadData.avatar === 'string' ? payloadData.avatar : '';

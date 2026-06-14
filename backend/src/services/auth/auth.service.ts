@@ -1075,6 +1075,9 @@ export class AuthService {
       case 'apple':
         userData = this.appleOAuthProvider.handleSharedCallback(payloadData);
         break;
+      case 'microsoft':
+        userData = this.microsoftOAuthProvider.handleSharedCallback(payloadData);
+        break;
       default:
         throw new AppError(
           `OAuth provider '${provider}' is not supported for shared callback.`,
