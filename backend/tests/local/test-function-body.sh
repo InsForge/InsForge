@@ -211,8 +211,6 @@ STATUS=$(echo "$RESP" | tail -n 1)
 BODY=$(echo "$RESP" | sed '$d')
 if [ "$STATUS" = "200" ] && echo "$BODY" | grep -q '"files":\['; then
     print_success "Multipart duplicate keys (array via getAll)"
-elif [ "$STATUS" = "200" ]; then
-    print_success "Multipart duplicate keys (single entry, last wins)"
 else
     print_fail "Multipart duplicate keys (status=$STATUS body=$BODY)"
 fi

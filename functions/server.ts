@@ -181,8 +181,11 @@ async function executeInWorker(code: string, request: Request): Promise<Response
       },
     });
 
+    let workerTerminated = false;
+
     // Set timeout for worker execution
     const timeout = setTimeout(() => {
+      workerTerminated = true;
       worker.terminate();
       URL.revokeObjectURL(workerUrl);
       resolve(
@@ -213,6 +216,7 @@ async function executeInWorker(code: string, request: Request): Promise<Response
     // Handle worker messages: first ready signal, then function result
     worker.onmessage = (e) => {
       if (e.data.ready) {
+        if (workerTerminated) return;
         worker.postMessage(workPayload, transferables);
         return;
       }
