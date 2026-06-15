@@ -149,10 +149,12 @@ export class PolicySimulatorService {
         base.effectiveClaims,
         async (client) => {
           const countResult = await client.query(
-            `SELECT count(*)::int AS n FROM ${qualifiedName} ${where.sql}`,
+            // count(*) is bigint; keep it as bigint (pg returns it as a string)
+            // and parse in JS so a table with >2^31 rows can't overflow an int4.
+            `SELECT count(*) AS n FROM ${qualifiedName} ${where.sql}`,
             where.params
           );
-          const visible = countResult.rows[0].n as number;
+          const visible = Number(countResult.rows[0].n);
           let sample: ColumnMap[] | null = null;
           if (sampleLimit > 0) {
             const sampleResult = await client.query(
@@ -572,10 +574,11 @@ async function countAsAdmin(
 ): Promise<number> {
   return runSimulated(pool, 'project_admin', { role: 'project_admin' }, async (client) => {
     const result = await client.query(
-      `SELECT count(*)::int AS n FROM ${qualifiedName} ${where.sql}`,
+      // bigint count parsed in JS — avoids an int4 overflow on very large tables.
+      `SELECT count(*) AS n FROM ${qualifiedName} ${where.sql}`,
       where.params
     );
-    return result.rows[0].n as number;
+    return Number(result.rows[0].n);
   });
 }
 
