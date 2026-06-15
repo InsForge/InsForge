@@ -79,17 +79,26 @@ function getRazorpayKeyValues(
   };
 }
 
+// Hosts that Razorpay's servers can't reach, so a webhook pointed at them would
+// silently never fire. Covers loopback plus the RFC 1918 private and
+// RFC 3927 link-local IPv4 ranges.
+const PRIVATE_OR_LOOPBACK_IPV4_PATTERNS = [
+  /^127\./,
+  /^10\./,
+  /^192\.168\./,
+  /^172\.(1[6-9]|2\d|3[0-1])\./,
+  /^169\.254\./,
+];
+
 function isPublicHttpsWebhookUrl(value: string) {
   try {
     const url = new URL(value);
-    return (
-      url.protocol === 'https:' &&
-      url.hostname !== 'localhost' &&
-      url.hostname !== '127.0.0.1' &&
-      url.hostname !== '::1' &&
-      url.hostname !== '[::1]' &&
-      !url.hostname.startsWith('127.')
-    );
+    const host = url.hostname.toLowerCase();
+    const isLocalhost = host === 'localhost' || host.endsWith('.localhost');
+    const isIpv6Loopback = host === '::1' || host === '[::1]';
+    const isPrivateIpv4 = PRIVATE_OR_LOOPBACK_IPV4_PATTERNS.some((pattern) => pattern.test(host));
+
+    return url.protocol === 'https:' && !isLocalhost && !isIpv6Loopback && !isPrivateIpv4;
   } catch {
     return false;
   }

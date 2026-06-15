@@ -21,7 +21,8 @@ export function useRazorpayWebhook() {
     mutationFn: (environment: RazorpayEnvironment) =>
       razorpayService.rotateWebhookSecret(environment),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: razorpayQueryKeys.status });
+      // `all` (['payments', 'razorpay']) is a prefix of every razorpay key, so
+      // this single invalidation covers status and all per-environment queries.
       await queryClient.invalidateQueries({ queryKey: razorpayQueryKeys.all });
       showToast('Razorpay webhook secret rotated', 'success');
     },

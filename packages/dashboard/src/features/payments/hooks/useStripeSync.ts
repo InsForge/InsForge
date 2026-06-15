@@ -66,6 +66,7 @@ export function useStripeSync() {
         queryClient.invalidateQueries({ queryKey: stripeQueryKeys.catalog }),
         queryClient.invalidateQueries({ queryKey: stripeQueryKeys.customers }),
         queryClient.invalidateQueries({ queryKey: stripeQueryKeys.subscriptions }),
+        queryClient.invalidateQueries({ queryKey: stripeQueryKeys.transactions }),
       ]);
 
       const toast = getStripeSyncToast(result);

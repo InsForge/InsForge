@@ -8,6 +8,17 @@ import { stripeService } from '#features/payments/services/stripe.service';
 import { stripeQueryKeys } from '#features/payments/queryKeys';
 import { useToast } from '#lib/hooks/useToast';
 
+// Every data view that depends on the configured key set; invalidated together
+// whenever a key is saved or removed.
+const STRIPE_CONFIG_DEPENDENT_KEYS = [
+  stripeQueryKeys.config,
+  stripeQueryKeys.status,
+  stripeQueryKeys.catalog,
+  stripeQueryKeys.customers,
+  stripeQueryKeys.subscriptions,
+  stripeQueryKeys.transactions,
+];
+
 export function useStripeConfig() {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
@@ -21,14 +32,9 @@ export function useStripeConfig() {
   const saveKey = useMutation({
     mutationFn: (input: UpsertStripeConfigRequest) => stripeService.upsertConfig(input),
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: stripeQueryKeys.config }),
-        queryClient.invalidateQueries({ queryKey: stripeQueryKeys.status }),
-        queryClient.invalidateQueries({ queryKey: stripeQueryKeys.catalog }),
-        queryClient.invalidateQueries({ queryKey: stripeQueryKeys.customers }),
-        queryClient.invalidateQueries({ queryKey: stripeQueryKeys.subscriptions }),
-        queryClient.invalidateQueries({ queryKey: stripeQueryKeys.transactions }),
-      ]);
+      await Promise.all(
+        STRIPE_CONFIG_DEPENDENT_KEYS.map((queryKey) => queryClient.invalidateQueries({ queryKey }))
+      );
       showToast('Stripe key saved successfully', 'success');
     },
     onError: (err: Error) => {
@@ -39,14 +45,9 @@ export function useStripeConfig() {
   const removeKey = useMutation({
     mutationFn: (environment: StripeEnvironment) => stripeService.removeConfig(environment),
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: stripeQueryKeys.config }),
-        queryClient.invalidateQueries({ queryKey: stripeQueryKeys.status }),
-        queryClient.invalidateQueries({ queryKey: stripeQueryKeys.catalog }),
-        queryClient.invalidateQueries({ queryKey: stripeQueryKeys.customers }),
-        queryClient.invalidateQueries({ queryKey: stripeQueryKeys.subscriptions }),
-        queryClient.invalidateQueries({ queryKey: stripeQueryKeys.transactions }),
-      ]);
+      await Promise.all(
+        STRIPE_CONFIG_DEPENDENT_KEYS.map((queryKey) => queryClient.invalidateQueries({ queryKey }))
+      );
       showToast('Stripe key removed', 'success');
     },
     onError: (err: Error) => {
