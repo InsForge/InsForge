@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { PaymentEnvironment, PaymentProvider } from '@insforge/shared-schemas';
-import { paymentsService } from '#features/payments/services/payments.service';
+import { stripeService } from '#features/payments/services/stripe.service';
 import { razorpayService } from '#features/payments/services/razorpay.service';
+import { razorpayQueryKeys, stripeQueryKeys } from '#features/payments/queryKeys';
 
 export function usePaymentConnectionStatus(
   provider: PaymentProvider,
@@ -16,8 +17,8 @@ export function usePaymentConnectionStatus(
     isLoading: isLoadingStripeStatus,
     error: stripeStatusError,
   } = useQuery({
-    queryKey: ['payments', 'status'],
-    queryFn: () => paymentsService.getStatus(),
+    queryKey: stripeQueryKeys.status,
+    queryFn: () => stripeService.getStatus(),
     enabled: isStripeProvider,
     staleTime: 30 * 1000,
   });
@@ -27,7 +28,7 @@ export function usePaymentConnectionStatus(
     isLoading: isLoadingRazorpayStatus,
     error: razorpayStatusError,
   } = useQuery({
-    queryKey: ['payments', 'razorpay', 'status'],
+    queryKey: razorpayQueryKeys.status,
     queryFn: () => razorpayService.getStatus(),
     enabled: isRazorpayProvider,
     staleTime: 30 * 1000,

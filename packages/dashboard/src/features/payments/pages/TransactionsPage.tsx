@@ -13,9 +13,9 @@ import {
   ErrorState,
   LoadingState,
   PaginationControls,
+  TableHeader,
 } from '#components';
-import { PaymentsKeyMissingState } from '#features/payments/components/PaymentsKeyMissingState';
-import { PaymentsPageHeader } from '#features/payments/components/PaymentsPageHeader';
+import { PaymentsOnboardingState } from '#features/payments/components/PaymentsOnboardingState';
 import type { PaymentsOutletContext } from '#features/payments/components/PaymentsLayout';
 import { usePaymentClientPagination } from '#features/payments/hooks/usePaymentClientPagination';
 import { usePaymentTransactions } from '#features/payments/hooks/usePaymentTransactions';
@@ -295,7 +295,10 @@ export default function TransactionsPage() {
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
       {hasActiveKey && (
-        <PaymentsPageHeader
+        <TableHeader
+          className="h-14 min-h-14"
+          leftClassName="py-0"
+          rightClassName="py-0"
           title="Transactions"
           showSearch
           searchValue={searchQuery}
@@ -312,7 +315,7 @@ export default function TransactionsPage() {
         ) : isLoading ? (
           <LoadingState message="Loading transactions..." />
         ) : !hasActiveKey ? (
-          <PaymentsKeyMissingState
+          <PaymentsOnboardingState
             provider={provider}
             environment={environment}
             onConfigure={openPaymentsSettings}
