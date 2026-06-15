@@ -58,6 +58,10 @@ beforeAll(async () => {
       USING ((current_setting('request.jwt.claims', true)::jsonb ->> 'org_id') = org_id);
     GRANT SELECT ON docs TO authenticated, project_admin;
     INSERT INTO docs (org_id, title) VALUES ('acme', 'acme-doc'), ('globex', 'globex-doc');
+
+    -- A view to prove the simulator rejects non-base-table relations.
+    CREATE VIEW todos_view AS SELECT * FROM todos;
+    GRANT SELECT ON todos_view TO authenticated;
   `);
 
   await db.publish();
@@ -291,5 +295,11 @@ describe('validation', () => {
         pool
       )
     ).rejects.toThrow(/does not exist/i);
+  });
+
+  it('rejects a view (not a base table)', async () => {
+    await expect(
+      simulator.simulate({ table: 'todos_view', operation: 'SELECT', role: 'authenticated' }, pool)
+    ).rejects.toThrow(/not a base table/i);
   });
 });

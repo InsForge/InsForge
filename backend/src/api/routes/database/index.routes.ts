@@ -10,6 +10,7 @@ import { DatabaseService } from '@/services/database/database.service.js';
 import { PolicySimulatorService } from '@/services/database/policy-simulator.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
+import { databaseWriteLimiter } from '@/api/middlewares/rate-limiters.js';
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES, simulatePolicyRequestSchema } from '@insforge/shared-schemas';
@@ -111,6 +112,7 @@ router.get(
 router.post(
   '/policies/simulate',
   verifyAdmin,
+  databaseWriteLimiter,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const validation = simulatePolicyRequestSchema.safeParse(req.body);
@@ -124,19 +126,25 @@ router.post(
 
       const response = await policySimulatorService.simulate(validation.data);
 
-      await auditService.log({
-        actor: req.hasApiKey ? 'api-key' : req.user?.id,
-        action: 'SIMULATE_RLS_POLICY',
-        module: 'DATABASE',
-        details: {
-          schema: response.schema,
-          table: response.table,
-          operation: response.operation,
-          role: response.role,
-          decision: response.decision,
-        },
-        ip_address: req.ip,
-      });
+      // Audit logging must not turn a successful, side-effect-free simulation
+      // into a 500. Log failures are recorded but never propagated.
+      try {
+        await auditService.log({
+          actor: req.hasApiKey ? 'api-key' : req.user?.id,
+          action: 'SIMULATE_RLS_POLICY',
+          module: 'DATABASE',
+          details: {
+            schema: response.schema,
+            table: response.table,
+            operation: response.operation,
+            role: response.role,
+            decision: response.decision,
+          },
+          ip_address: req.ip,
+        });
+      } catch (auditError) {
+        logger.warn('RLS policy simulation audit log failed:', auditError);
+      }
 
       successResponse(res, response);
     } catch (error: unknown) {

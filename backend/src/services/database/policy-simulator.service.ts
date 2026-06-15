@@ -580,19 +580,32 @@ async function countAsAdmin(
 }
 
 async function assertTableExists(pool: Pool, schema: string, table: string): Promise<void> {
+  // Use pg_class.relkind so we can tell "missing" apart from "exists but is not
+  // a base table". RLS policies only apply to ordinary ('r') and partitioned
+  // ('p') tables; views/matviews/foreign tables have no pg_policies, so
+  // simulating against them would silently produce empty, misleading results.
   const result = await pool.query(
-    `SELECT EXISTS (
-       SELECT 1 FROM information_schema.tables
-       WHERE table_schema = $1 AND table_name = $2
-     ) AS present`,
+    `SELECT c.relkind
+       FROM pg_class c
+       JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = $1 AND c.relname = $2`,
     [schema, table]
   );
-  if (!result.rows[0].present) {
+  if (result.rows.length === 0) {
     throw new AppError(
       `Table "${schema}.${table}" does not exist.`,
       404,
       ERROR_CODES.DATABASE_NOT_FOUND,
       NEXT_ACTIONS.CHECK_TABLE_EXISTS
+    );
+  }
+  const relkind = result.rows[0].relkind as string;
+  if (relkind !== 'r' && relkind !== 'p') {
+    throw new AppError(
+      `"${schema}.${table}" is not a base table, so it has no row level security policies to simulate.`,
+      400,
+      ERROR_CODES.INVALID_INPUT,
+      'Simulate against a base table. Views, materialized views, and foreign tables are not supported.'
     );
   }
 }
