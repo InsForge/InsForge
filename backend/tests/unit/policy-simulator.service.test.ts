@@ -290,6 +290,33 @@ describe('buildExplanation', () => {
     );
     expect(text).toContain('Admin baseline unavailable');
   });
+
+  it('does not claim a proven RLS denial when 0 rows + no baseline', () => {
+    const text = buildExplanation(
+      baseResult({
+        decision: 'denied',
+        rowsVisible: 0,
+        rowsTotal: null,
+        denialReason: null,
+        applicablePolicies: [ownerSelect],
+      })
+    );
+    expect(text).toMatch(/may be an empty table/i);
+    expect(text).not.toContain('denied by RLS (no rows pass)');
+  });
+
+  it('prefers the RLS phrase over "permission denied" when both could match', () => {
+    const text = buildExplanation(
+      baseResult({
+        decision: 'denied',
+        rowsVisible: 0,
+        rowsTotal: 3,
+        denialReason: 'new row violates row-level security policy for table "todos"',
+        applicablePolicies: [ownerSelect],
+      })
+    );
+    expect(text).not.toContain('missing table privilege (GRANT)');
+  });
 });
 
 describe('buildExampleQuery', () => {

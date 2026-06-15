@@ -457,14 +457,17 @@ export function buildExplanation(result: SimulatePolicyResponse): string {
       ? `No RLS policy applies to ${operation} for role "${role}", so it is blocked by default.`
       : `${policyCount} polic${policyCount === 1 ? 'y' : 'ies'} apply (${permissiveCount} permissive). Permissive policies are combined with OR, restrictive with AND.`;
 
-  // A 42501 denial can be a missing table GRANT or an RLS policy block. Both look
-  // identical in the decision, so call out the GRANT case (different fix).
-  const isGrantDenial = !!result.denialReason && /permission denied/i.test(result.denialReason);
-  // When the admin baseline could not be computed, the counts were not compared.
-  const baselineNote =
-    result.rowsTotal === null
-      ? ' (Admin baseline unavailable: project_admin lacks SELECT on this table, so visible vs total rows were not compared.)'
-      : '';
+  // A 42501 denial can be a missing table GRANT or an RLS policy block. Both
+  // share the error code, so we read the Postgres message (best-effort, English
+  // defaults). Check the definitive RLS phrase first; only then treat a generic
+  // "permission denied" as a missing GRANT. The raw message is always shown too.
+  const denialReason = result.denialReason;
+  const looksLikeRls = !!denialReason && /row.?level security/i.test(denialReason);
+  const looksLikeGrant = !!denialReason && !looksLikeRls && /permission denied/i.test(denialReason);
+  const baselineUnavailable = result.rowsTotal === null;
+  const baselineNote = baselineUnavailable
+    ? ' (Admin baseline unavailable: project_admin lacks SELECT on this table, so visible vs total rows were not compared.)'
+    : '';
 
   switch (decision) {
     case 'allowed':
@@ -472,12 +475,18 @@ export function buildExplanation(result: SimulatePolicyResponse): string {
     case 'partial':
       return `${operation} as "${role}" on ${table} is partially allowed: ${result.rowsVisible ?? result.rowsAffected} of ${result.rowsTotal} rows pass RLS. ${policySummary}`;
     case 'denied':
-      if (isGrantDenial) {
-        return `${operation} as "${role}" on ${table} is denied: ${result.denialReason}. This is a missing table privilege (GRANT), not an RLS policy.`;
+      if (looksLikeGrant) {
+        return `${operation} as "${role}" on ${table} is denied: ${denialReason}. This is a missing table privilege (GRANT), not an RLS policy.`;
       }
-      return result.denialReason
-        ? `${operation} as "${role}" on ${table} is denied: ${result.denialReason}. ${policySummary}${baselineNote}`
-        : `${operation} as "${role}" on ${table} is denied by RLS (no rows pass). ${policySummary}${baselineNote}`;
+      if (denialReason) {
+        return `${operation} as "${role}" on ${table} is denied: ${denialReason}. ${policySummary}`;
+      }
+      if (baselineUnavailable) {
+        // The role saw 0 rows, but with no admin baseline we cannot prove the
+        // table is non-empty, so this is not necessarily an RLS denial.
+        return `${operation} as "${role}" on ${table} returned no rows for "${role}". The admin baseline was unavailable (project_admin lacks SELECT), so this may be an empty table rather than an RLS denial. ${policySummary}`;
+      }
+      return `${operation} as "${role}" on ${table} is denied by RLS (no rows pass). ${policySummary}`;
     default:
       return policySummary;
   }
