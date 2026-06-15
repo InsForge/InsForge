@@ -11,6 +11,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  Switch,
 } from '@insforge/ui';
 import { ScrollArea } from '#components';
 import { useRecords } from '#features/database/hooks/useRecords';
@@ -36,6 +37,7 @@ export function RecordFormDialog({
   onSuccess,
 }: RecordFormDialogProps) {
   const [error, setError] = useState<string | null>(null);
+  const [addMore, setAddMore] = useState(false);
   const { createRecord, isCreating } = useRecords(tableName);
 
   const displayFields = useMemo(() => {
@@ -66,6 +68,7 @@ export function RecordFormDialog({
   useEffect(() => {
     if (!open) {
       setError(null);
+      setAddMore(false);
     }
   }, [open]);
 
@@ -73,11 +76,13 @@ export function RecordFormDialog({
     async (data) => {
       try {
         await createRecord(data);
-        onOpenChange(false);
         form.reset();
         setError(null);
         if (onSuccess) {
           onSuccess();
+        }
+        if (!addMore) {
+          onOpenChange(false);
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to create record';
@@ -136,6 +141,15 @@ export function RecordFormDialog({
                 <span className="truncate">{error}</span>
               </div>
             )}
+            <label className="mr-auto flex cursor-pointer items-center gap-2 text-sm text-muted-foreground select-none">
+              <Switch
+                size="sm"
+                checked={addMore}
+                onCheckedChange={setAddMore}
+                disabled={isCreating}
+              />
+              Add more
+            </label>
             <Button
               type="button"
               variant="secondary"
