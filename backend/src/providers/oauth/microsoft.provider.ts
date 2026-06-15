@@ -69,7 +69,12 @@ export class MicrosoftOAuthProvider implements OAuthProvider {
       if (!sharedAuthUrl) {
         throw new Error('Shared Microsoft OAuth did not return an authorization URL');
       }
-      const authUrl = new URL(sharedAuthUrl);
+      let authUrl: URL;
+      try {
+        authUrl = new URL(sharedAuthUrl);
+      } catch {
+        throw new Error(`Shared Microsoft OAuth returned an invalid URL: ${sharedAuthUrl}`);
+      }
       Object.entries(additionalParams ?? {}).forEach(([key, value]) => {
         if (!authUrl.searchParams.has(key)) {
           authUrl.searchParams.set(key, value);
@@ -224,6 +229,9 @@ export class MicrosoftOAuthProvider implements OAuthProvider {
     }
 
     const email = typeof payloadData.email === 'string' ? payloadData.email : '';
+    if (!email) {
+      throw new Error('Shared Microsoft callback missing required email');
+    }
     const name = typeof payloadData.name === 'string' ? payloadData.name : '';
     const avatar = typeof payloadData.avatar === 'string' ? payloadData.avatar : '';
 
@@ -231,7 +239,7 @@ export class MicrosoftOAuthProvider implements OAuthProvider {
       provider: 'microsoft',
       providerId,
       email,
-      userName: name || email.split('@')[0],
+      userName: name || email.split('@')[0] || 'user',
       avatarUrl: avatar,
       identityData: payloadData,
     };
