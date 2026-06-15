@@ -13,6 +13,7 @@ import {
 import { NEXT_ACTIONS } from '@/utils/next-actions.js';
 import { normalizeDatabaseSchemaName, quoteIdentifier, quoteQualifiedName } from './helpers.js';
 import { validateIdentifier, validateTableName } from '@/utils/validations.js';
+import logger from '@/utils/logger.js';
 
 /**
  * RLS Policy Simulator
@@ -149,8 +150,9 @@ export class PolicySimulatorService {
         base.effectiveClaims,
         async (client) => {
           const countResult = await client.query(
-            // count(*) is bigint; keep it as bigint (pg returns it as a string)
-            // and parse in JS so a table with >2^31 rows can't overflow an int4.
+            // count(*) is bigint (pg returns it as a string); parse in JS to avoid
+            // an int4 overflow. A Postgres table cannot physically hold 2^53 rows,
+            // so Number() stays within JS safe-integer range.
             `SELECT count(*) AS n FROM ${qualifiedName} ${where.sql}`,
             where.params
           );
@@ -386,11 +388,15 @@ export function buildWhereClause(
 
 export function classifySelect(args: {
   rowsVisible: number;
-  rowsTotal: number;
+  rowsTotal: number | null;
   bypassRls: boolean;
 }): PolicySimulatorDecision {
   if (args.bypassRls) {
     return 'bypass';
+  }
+  if (args.rowsTotal === null) {
+    // Admin baseline unavailable: decide on the role's own visibility alone.
+    return args.rowsVisible > 0 ? 'allowed' : 'denied';
   }
   if (args.rowsTotal === 0) {
     return 'allowed'; // nothing to read; RLS can't be observed but didn't block
@@ -406,11 +412,15 @@ export function classifySelect(args: {
 
 export function classifyMutation(args: {
   rowsAffected: number;
-  rowsTotal: number;
+  rowsTotal: number | null;
   bypassRls: boolean;
 }): PolicySimulatorDecision {
   if (args.bypassRls) {
     return 'bypass';
+  }
+  if (args.rowsTotal === null) {
+    // Admin baseline unavailable: decide on what the role actually affected.
+    return args.rowsAffected > 0 ? 'allowed' : 'denied';
   }
   if (args.rowsTotal === 0) {
     return 'allowed'; // no matching rows to act on
@@ -447,15 +457,27 @@ export function buildExplanation(result: SimulatePolicyResponse): string {
       ? `No RLS policy applies to ${operation} for role "${role}", so it is blocked by default.`
       : `${policyCount} polic${policyCount === 1 ? 'y' : 'ies'} apply (${permissiveCount} permissive). Permissive policies are combined with OR, restrictive with AND.`;
 
+  // A 42501 denial can be a missing table GRANT or an RLS policy block. Both look
+  // identical in the decision, so call out the GRANT case (different fix).
+  const isGrantDenial = !!result.denialReason && /permission denied/i.test(result.denialReason);
+  // When the admin baseline could not be computed, the counts were not compared.
+  const baselineNote =
+    result.rowsTotal === null
+      ? ' (Admin baseline unavailable: project_admin lacks SELECT on this table, so visible vs total rows were not compared.)'
+      : '';
+
   switch (decision) {
     case 'allowed':
-      return `${operation} as "${role}" on ${table} is allowed. ${policySummary}`;
+      return `${operation} as "${role}" on ${table} is allowed. ${policySummary}${baselineNote}`;
     case 'partial':
       return `${operation} as "${role}" on ${table} is partially allowed: ${result.rowsVisible ?? result.rowsAffected} of ${result.rowsTotal} rows pass RLS. ${policySummary}`;
     case 'denied':
+      if (isGrantDenial) {
+        return `${operation} as "${role}" on ${table} is denied: ${result.denialReason}. This is a missing table privilege (GRANT), not an RLS policy.`;
+      }
       return result.denialReason
-        ? `${operation} as "${role}" on ${table} is denied: ${result.denialReason}. ${policySummary}`
-        : `${operation} as "${role}" on ${table} is denied by RLS (no rows pass). ${policySummary}`;
+        ? `${operation} as "${role}" on ${table} is denied: ${result.denialReason}. ${policySummary}${baselineNote}`
+        : `${operation} as "${role}" on ${table} is denied by RLS (no rows pass). ${policySummary}${baselineNote}`;
     default:
       return policySummary;
   }
@@ -560,26 +582,57 @@ async function runSimulated<T>(
     return await fn(client);
   } finally {
     // Roll back unconditionally: the simulator must never persist rows.
-    await client.query('ROLLBACK').catch(() => {});
-    await client.query('RESET ROLE').catch(() => {});
-    client.release();
+    // (statement_timeout does not apply to ROLLBACK/RESET — they are not
+    // ordinary statements.) Surface cleanup failures instead of swallowing
+    // them, and evict any connection we could not cleanly reset so a session
+    // with leftover role/claims state never returns to the pool.
+    let cleanupError: Error | undefined;
+    try {
+      await client.query('ROLLBACK');
+      await client.query('RESET ROLE');
+    } catch (error) {
+      cleanupError = error instanceof Error ? error : new Error(String(error));
+      logger.warn('Policy simulator transaction cleanup failed:', cleanupError);
+    }
+    client.release(cleanupError);
   }
 }
 
-/** Count matching rows with RLS bypassed (the project_admin "total" baseline). */
+/**
+ * Count matching rows with RLS bypassed (the project_admin "total" baseline).
+ *
+ * Returns null when the baseline cannot be computed because project_admin lacks
+ * SELECT on the table (a table created outside the dashboard may not have been
+ * granted to project_admin). The simulation still returns a structured result;
+ * the decision then falls back to the simulated role's own visibility.
+ */
 async function countAsAdmin(
   pool: Pool,
   qualifiedName: string,
   where: { sql: string; params: unknown[] }
-): Promise<number> {
-  return runSimulated(pool, 'project_admin', { role: 'project_admin' }, async (client) => {
-    const result = await client.query(
-      // bigint count parsed in JS — avoids an int4 overflow on very large tables.
-      `SELECT count(*) AS n FROM ${qualifiedName} ${where.sql}`,
-      where.params
-    );
-    return Number(result.rows[0].n);
-  });
+): Promise<number | null> {
+  try {
+    return await runSimulated(pool, 'project_admin', { role: 'project_admin' }, async (client) => {
+      const result = await client.query(
+        // count(*) is bigint (pg returns it as a string); parse in JS to avoid an
+        // int4 overflow. A Postgres table cannot physically hold 2^53 rows, so
+        // Number() stays within JS safe-integer range.
+        `SELECT count(*) AS n FROM ${qualifiedName} ${where.sql}`,
+        where.params
+      );
+      return Number(result.rows[0].n);
+    });
+  } catch (error) {
+    if (hasPgErrorCode(error, RLS_VIOLATION_CODE)) {
+      logger.warn(
+        `Policy simulator admin baseline unavailable for ${qualifiedName}: ${
+          (error as DatabaseError).message
+        }`
+      );
+      return null;
+    }
+    throw error;
+  }
 }
 
 async function assertTableExists(pool: Pool, schema: string, table: string): Promise<void> {
@@ -670,11 +723,13 @@ async function getApplicablePolicies(
  */
 function toSimulationError(error: unknown): AppError {
   if (hasPgErrorCode(error, STATEMENT_TIMEOUT_CODE)) {
+    // A statement timeout is a server-side resource limit, not bad client input.
+    // 503 (retryable) lets clients distinguish it from a 400 validation error.
     return new AppError(
-      'Simulation timed out. The policy or query was too expensive to evaluate.',
-      400,
-      ERROR_CODES.DATABASE_VALIDATION_ERROR,
-      'Narrow the simulation with a "match" filter, or simplify the policy predicate.'
+      'Policy simulation timed out before it could complete.',
+      503,
+      ERROR_CODES.DATABASE_INTERNAL_ERROR,
+      'The policy or query was too expensive to evaluate within the simulation budget. Narrow it with a "match" filter, or simplify the policy predicate, and retry.'
     );
   }
   if (error instanceof DatabaseError) {

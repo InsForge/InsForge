@@ -92,6 +92,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Simulation timed out (server-side resource limit, retryable)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
 components:
   securitySchemes:
@@ -194,6 +200,11 @@ components:
         - rlsEnabled
         - bypassRls
         - decision
+        - rowsVisible
+        - rowsTotal
+        - rowsAffected
+        - sampleRows
+        - denialReason
         - applicablePolicies
         - explanation
         - exampleQuery

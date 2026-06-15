@@ -62,6 +62,19 @@ beforeAll(async () => {
     -- A view to prove the simulator rejects non-base-table relations.
     CREATE VIEW todos_view AS SELECT * FROM todos;
     GRANT SELECT ON todos_view TO authenticated;
+
+    -- A table project_admin cannot read, to prove the admin baseline degrades
+    -- gracefully (rowsTotal=null) instead of failing the whole simulation.
+    CREATE TABLE no_admin_grant (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID NOT NULL,
+      title TEXT NOT NULL
+    );
+    ALTER TABLE no_admin_grant ENABLE ROW LEVEL SECURITY;
+    CREATE POLICY owner_select ON no_admin_grant FOR SELECT TO authenticated USING (auth.uid() = user_id);
+    GRANT SELECT ON no_admin_grant TO authenticated;
+    REVOKE ALL ON no_admin_grant FROM project_admin;
+    INSERT INTO no_admin_grant (user_id, title) VALUES ('${USER_A}', 'private');
   `);
 
   await db.publish();
@@ -301,5 +314,22 @@ describe('validation', () => {
     await expect(
       simulator.simulate({ table: 'todos_view', operation: 'SELECT', role: 'authenticated' }, pool)
     ).rejects.toThrow(/not a base table/i);
+  });
+
+  it('degrades gracefully when project_admin cannot read the table (null baseline)', async () => {
+    // The owner can see their own row, but the admin baseline cannot be computed.
+    const res = await simulator.simulate(
+      {
+        table: 'no_admin_grant',
+        operation: 'SELECT',
+        role: 'authenticated',
+        claims: { sub: USER_A },
+      },
+      pool
+    );
+    expect(res.rowsTotal).toBeNull();
+    expect(res.rowsVisible).toBe(1);
+    expect(res.decision).toBe('allowed');
+    expect(res.explanation).toMatch(/baseline unavailable/i);
   });
 });

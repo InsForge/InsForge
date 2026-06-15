@@ -148,6 +148,10 @@ describe('classifySelect', () => {
   it('allowed (not denied) when the table is empty', () => {
     expect(classifySelect({ rowsVisible: 0, rowsTotal: 0, bypassRls: false })).toBe('allowed');
   });
+  it('falls back to the role visibility when the admin baseline is null', () => {
+    expect(classifySelect({ rowsVisible: 2, rowsTotal: null, bypassRls: false })).toBe('allowed');
+    expect(classifySelect({ rowsVisible: 0, rowsTotal: null, bypassRls: false })).toBe('denied');
+  });
 });
 
 describe('classifyMutation', () => {
@@ -165,6 +169,12 @@ describe('classifyMutation', () => {
   });
   it('allowed when there are no matching rows to act on', () => {
     expect(classifyMutation({ rowsAffected: 0, rowsTotal: 0, bypassRls: false })).toBe('allowed');
+  });
+  it('falls back to rows affected when the admin baseline is null', () => {
+    expect(classifyMutation({ rowsAffected: 1, rowsTotal: null, bypassRls: false })).toBe(
+      'allowed'
+    );
+    expect(classifyMutation({ rowsAffected: 0, rowsTotal: null, bypassRls: false })).toBe('denied');
   });
 });
 
@@ -253,6 +263,32 @@ describe('buildExplanation', () => {
       })
     );
     expect(text).toContain('violates row-level security');
+  });
+
+  it('distinguishes a missing GRANT denial from an RLS policy denial', () => {
+    const text = buildExplanation(
+      baseResult({
+        decision: 'denied',
+        rowsVisible: 0,
+        rowsTotal: 3,
+        denialReason: 'permission denied for table todos',
+        applicablePolicies: [],
+      })
+    );
+    expect(text).toContain('GRANT');
+    expect(text).not.toContain('blocked by default');
+  });
+
+  it('notes when the admin baseline was unavailable', () => {
+    const text = buildExplanation(
+      baseResult({
+        decision: 'allowed',
+        rowsVisible: 2,
+        rowsTotal: null,
+        applicablePolicies: [ownerSelect],
+      })
+    );
+    expect(text).toContain('Admin baseline unavailable');
   });
 });
 

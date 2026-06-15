@@ -443,11 +443,12 @@ export const simulatePolicyResponseSchema = z.object({
   bypassRls: z.boolean(),
   decision: policySimulatorDecisionSchema,
   // SELECT: rows visible to the role. UPDATE/DELETE/INSERT: null.
-  rowsVisible: z.number().nullable(),
-  // Baseline rows matched with RLS bypassed (admin view). SELECT/UPDATE/DELETE; null for INSERT.
-  rowsTotal: z.number().nullable(),
+  rowsVisible: z.number().int().min(0).nullable(),
+  // Baseline rows matched with RLS bypassed (admin view). null for INSERT, or
+  // when project_admin lacks SELECT on the table (baseline unavailable).
+  rowsTotal: z.number().int().min(0).nullable(),
   // INSERT/UPDATE/DELETE: rows the operation would have affected. null for SELECT.
-  rowsAffected: z.number().nullable(),
+  rowsAffected: z.number().int().min(0).nullable(),
   // SELECT: a small sample of rows the role can see. null otherwise.
   sampleRows: z.array(z.record(z.string(), z.unknown())).nullable(),
   // Postgres message when the operation was denied by RLS (error 42501).
