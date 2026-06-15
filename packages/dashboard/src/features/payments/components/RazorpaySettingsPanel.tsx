@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ExternalLink, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Button, ConfirmDialog, CopyButton } from '@insforge/ui';
 import type { PaymentEnvironment, RazorpayKeyConfig } from '@insforge/shared-schemas';
@@ -10,13 +10,12 @@ import {
 } from '#features/payments/hooks/useRazorpayWebhook';
 import {
   DialogSectionDivider,
-  ENVIRONMENTS,
   SettingRow,
-  SyncTabContent,
-  createEmptyEnvironmentValues,
-  hydrateEnvironmentValues,
   type PaymentsSettingsTab,
-} from './PaymentsSettingsShared';
+} from './PaymentsSettingsDialog';
+import { ENVIRONMENTS } from '#features/payments/helpers';
+import { useEnvironmentValueInputs } from '#features/payments/hooks/useEnvironmentValueInputs';
+import { PaymentsSyncTabContent } from './PaymentsSyncTabContent';
 
 const RAZORPAY_PREFIX_BY_ENVIRONMENT: Record<PaymentEnvironment, string> = {
   test: 'rzp_test_',
@@ -114,42 +113,23 @@ export function useRazorpaySettings(open: boolean) {
   const { syncPayments } = useRazorpaySync();
   const { rotateWebhookSecret } = useRazorpayWebhook();
 
-  const [keyIdInputs, setKeyIdInputs] = useState<Record<PaymentEnvironment, string>>(
-    createEmptyEnvironmentValues
-  );
-  const [keySecretInputs, setKeySecretInputs] = useState<Record<PaymentEnvironment, string>>(
-    createEmptyEnvironmentValues
-  );
+  const keyIdInputs = useEnvironmentValueInputs();
+  const keySecretInputs = useEnvironmentValueInputs();
+  const { hydrateFromSaved: hydrateKeyId } = keyIdInputs;
+  const { hydrateFromSaved: hydrateKeySecret } = keySecretInputs;
   const [visibleKeys, setVisibleKeys] = useState<Record<PaymentEnvironment, boolean>>({
     test: false,
     live: false,
   });
   const [errors, setErrors] = useState<Partial<Record<PaymentEnvironment, string>>>({});
-  const previousSavedKeyIds = useRef<Record<PaymentEnvironment, string>>(
-    createEmptyEnvironmentValues()
-  );
-  const previousSavedKeySecrets = useRef<Record<PaymentEnvironment, string>>(
-    createEmptyEnvironmentValues()
-  );
 
   useEffect(() => {
     if (!open) {
       return;
     }
-
-    const nextSavedKeyIds = getRazorpayKeyValues(keys, 'api_key');
-    const nextSavedKeySecrets = getRazorpayKeyValues(keys, 'api_secret');
-
-    setKeyIdInputs((current) =>
-      hydrateEnvironmentValues(current, previousSavedKeyIds.current, nextSavedKeyIds)
-    );
-    setKeySecretInputs((current) =>
-      hydrateEnvironmentValues(current, previousSavedKeySecrets.current, nextSavedKeySecrets)
-    );
-
-    previousSavedKeyIds.current = nextSavedKeyIds;
-    previousSavedKeySecrets.current = nextSavedKeySecrets;
-  }, [open, keys]);
+    hydrateKeyId(getRazorpayKeyValues(keys, 'api_key'));
+    hydrateKeySecret(getRazorpayKeyValues(keys, 'api_secret'));
+  }, [open, keys, hydrateKeyId, hydrateKeySecret]);
 
   const isPending =
     saveKey.isPending ||
@@ -158,8 +138,8 @@ export function useRazorpaySettings(open: boolean) {
     rotateWebhookSecret.isPending;
 
   const reset = () => {
-    setKeyIdInputs(createEmptyEnvironmentValues());
-    setKeySecretInputs(createEmptyEnvironmentValues());
+    keyIdInputs.reset();
+    keySecretInputs.reset();
     setVisibleKeys({ test: false, live: false });
     setErrors({});
 
@@ -170,11 +150,11 @@ export function useRazorpaySettings(open: boolean) {
   };
 
   const handleIdInputChange = (environment: PaymentEnvironment, value: string) => {
-    setKeyIdInputs((current) => ({ ...current, [environment]: value }));
+    keyIdInputs.setValue(environment, value);
   };
 
   const handleSecretInputChange = (environment: PaymentEnvironment, value: string) => {
-    setKeySecretInputs((current) => ({ ...current, [environment]: value }));
+    keySecretInputs.setValue(environment, value);
   };
 
   const handleToggleShowKey = (environment: PaymentEnvironment) => {
@@ -182,8 +162,8 @@ export function useRazorpaySettings(open: boolean) {
   };
 
   const handleSave = (environment: PaymentEnvironment) => {
-    const keyId = keyIdInputs[environment].trim();
-    const secretKey = keySecretInputs[environment].trim();
+    const keyId = keyIdInputs.values[environment].trim();
+    const secretKey = keySecretInputs.values[environment].trim();
     const expectedPrefix = RAZORPAY_PREFIX_BY_ENVIRONMENT[environment];
 
     if (!keyId || !secretKey) {
@@ -210,8 +190,8 @@ export function useRazorpaySettings(open: boolean) {
     setErrors((current) => ({ ...current, [environment]: undefined }));
     try {
       await removeKey.mutateAsync(environment);
-      setKeyIdInputs((current) => ({ ...current, [environment]: '' }));
-      setKeySecretInputs((current) => ({ ...current, [environment]: '' }));
+      keyIdInputs.clear(environment);
+      keySecretInputs.clear(environment);
       setVisibleKeys((current) => ({ ...current, [environment]: false }));
     } catch (err) {
       setErrors((current) => ({
@@ -227,8 +207,8 @@ export function useRazorpaySettings(open: boolean) {
     error,
     syncPayments,
     rotateWebhookSecret,
-    keyIdInputs,
-    keySecretInputs,
+    keyIdInputs: keyIdInputs.values,
+    keySecretInputs: keySecretInputs.values,
     visibleKeys,
     errors,
     configuredKeys: getConfiguredRazorpayApiKeys(keys),
@@ -287,7 +267,7 @@ export function RazorpaySettingsPanel({
   }
 
   return (
-    <SyncTabContent
+    <PaymentsSyncTabContent
       isLoading={state.isLoading}
       error={state.error}
       configuredKeys={state.configuredKeys}

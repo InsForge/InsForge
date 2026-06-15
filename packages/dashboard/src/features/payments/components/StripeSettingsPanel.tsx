@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CheckCircle2, Eye, EyeOff, Loader2, Webhook } from 'lucide-react';
 import { Button } from '@insforge/ui';
 import type {
@@ -11,13 +11,12 @@ import { useStripeSync } from '#features/payments/hooks/useStripeSync';
 import { useStripeWebhook } from '#features/payments/hooks/useStripeWebhook';
 import {
   DialogSectionDivider,
-  ENVIRONMENTS,
   SettingRow,
-  SyncTabContent,
-  createEmptyEnvironmentValues,
-  hydrateEnvironmentValues,
   type PaymentsSettingsTab,
-} from './PaymentsSettingsShared';
+} from './PaymentsSettingsDialog';
+import { ENVIRONMENTS } from '#features/payments/helpers';
+import { useEnvironmentValueInputs } from '#features/payments/hooks/useEnvironmentValueInputs';
+import { PaymentsSyncTabContent } from './PaymentsSyncTabContent';
 
 const KEY_PREFIX_BY_ENVIRONMENT: Record<PaymentEnvironment, string> = {
   test: 'sk_test_',
@@ -50,29 +49,20 @@ export function useStripeSettings(open: boolean) {
     configureWebhook,
   } = useStripeWebhook();
 
-  const [keyInputs, setKeyInputs] = useState<Record<PaymentEnvironment, string>>(
-    createEmptyEnvironmentValues
-  );
+  const secretKey = useEnvironmentValueInputs();
+  const { hydrateFromSaved: hydrateSecretKey } = secretKey;
   const [visibleKeys, setVisibleKeys] = useState<Record<PaymentEnvironment, boolean>>({
     test: false,
     live: false,
   });
   const [errors, setErrors] = useState<Partial<Record<PaymentEnvironment, string>>>({});
-  const previousSavedKeys = useRef<Record<PaymentEnvironment, string>>(
-    createEmptyEnvironmentValues()
-  );
 
   useEffect(() => {
     if (!open) {
       return;
     }
-
-    const nextSaved = getStripeKeyValues(keys);
-    setKeyInputs((current) =>
-      hydrateEnvironmentValues(current, previousSavedKeys.current, nextSaved)
-    );
-    previousSavedKeys.current = nextSaved;
-  }, [keys, open]);
+    hydrateSecretKey(getStripeKeyValues(keys));
+  }, [keys, open, hydrateSecretKey]);
 
   const isPending =
     saveKey.isPending ||
@@ -81,7 +71,7 @@ export function useStripeSettings(open: boolean) {
     configureWebhook.isPending;
 
   const reset = () => {
-    setKeyInputs(createEmptyEnvironmentValues());
+    secretKey.reset();
     setVisibleKeys({ test: false, live: false });
     setErrors({});
 
@@ -92,7 +82,7 @@ export function useStripeSettings(open: boolean) {
   };
 
   const handleInputChange = (environment: PaymentEnvironment, value: string) => {
-    setKeyInputs((current) => ({ ...current, [environment]: value }));
+    secretKey.setValue(environment, value);
   };
 
   const handleToggleShowKey = (environment: PaymentEnvironment) => {
@@ -100,15 +90,15 @@ export function useStripeSettings(open: boolean) {
   };
 
   const handleSave = async (environment: PaymentEnvironment) => {
-    const secretKey = keyInputs[environment].trim();
+    const secretKeyValue = secretKey.values[environment].trim();
     const expectedPrefix = KEY_PREFIX_BY_ENVIRONMENT[environment];
 
-    if (!secretKey) {
+    if (!secretKeyValue) {
       setErrors((current) => ({ ...current, [environment]: 'Please enter a Stripe secret key.' }));
       return;
     }
 
-    if (!secretKey.startsWith(expectedPrefix)) {
+    if (!secretKeyValue.startsWith(expectedPrefix)) {
       setErrors((current) => ({
         ...current,
         [environment]: `The ${environment} key must start with ${expectedPrefix}.`,
@@ -119,7 +109,7 @@ export function useStripeSettings(open: boolean) {
     setErrors((current) => ({ ...current, [environment]: undefined }));
 
     try {
-      await saveKey.mutateAsync({ environment, secretKey });
+      await saveKey.mutateAsync({ environment, secretKey: secretKeyValue });
     } catch (err) {
       setErrors((current) => ({
         ...current,
@@ -132,7 +122,7 @@ export function useStripeSettings(open: boolean) {
     setErrors((current) => ({ ...current, [environment]: undefined }));
     try {
       await removeKey.mutateAsync(environment);
-      setKeyInputs((current) => ({ ...current, [environment]: '' }));
+      secretKey.clear(environment);
       setVisibleKeys((current) => ({ ...current, [environment]: false }));
     } catch (err) {
       setErrors((current) => ({
@@ -159,7 +149,7 @@ export function useStripeSettings(open: boolean) {
     webhooksError,
     syncPayments,
     configureWebhook,
-    keyInputs,
+    keyInputs: secretKey.values,
     visibleKeys,
     errors,
     configuredKeys: keys.filter((key) => Boolean(key.value)),
@@ -222,7 +212,7 @@ export function StripeSettingsPanel({
   }
 
   return (
-    <SyncTabContent
+    <PaymentsSyncTabContent
       isLoading={state.isLoading}
       error={state.error}
       configuredKeys={state.configuredKeys}

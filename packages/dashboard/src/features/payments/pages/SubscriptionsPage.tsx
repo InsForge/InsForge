@@ -10,9 +10,9 @@ import {
   ErrorState,
   LoadingState,
   PaginationControls,
+  TableHeader,
 } from '#components';
-import { PaymentsKeyMissingState } from '#features/payments/components/PaymentsKeyMissingState';
-import { PaymentsPageHeader } from '#features/payments/components/PaymentsPageHeader';
+import { PaymentsOnboardingState } from '#features/payments/components/PaymentsOnboardingState';
 import type { PaymentsOutletContext } from '#features/payments/components/PaymentsLayout';
 import { usePaymentCatalog } from '#features/payments/hooks/usePaymentCatalog';
 import { usePaymentClientPagination } from '#features/payments/hooks/usePaymentClientPagination';
@@ -518,7 +518,10 @@ export default function SubscriptionsPage() {
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
       {hasActiveKey && (
-        <PaymentsPageHeader
+        <TableHeader
+          className="h-14 min-h-14"
+          leftClassName="py-0"
+          rightClassName="py-0"
           title="Subscriptions"
           showDividerAfterTitle
           leftSlot={
@@ -544,7 +547,7 @@ export default function SubscriptionsPage() {
         ) : isLoading ? (
           <LoadingState message="Loading subscriptions..." />
         ) : !hasActiveKey ? (
-          <PaymentsKeyMissingState
+          <PaymentsOnboardingState
             provider={provider}
             environment={environment}
             onConfigure={openPaymentsSettings}

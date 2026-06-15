@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { KeyRound, RefreshCw, Webhook } from 'lucide-react';
 import {
   MenuDialog,
@@ -20,7 +20,8 @@ import type { PaymentProvider } from '@insforge/shared-schemas';
 import { PaymentProviderSelect, PAYMENT_PROVIDER_LABELS } from './PaymentProviderSelect';
 import { StripeSettingsPanel, useStripeSettings } from './StripeSettingsPanel';
 import { RazorpaySettingsPanel, useRazorpaySettings } from './RazorpaySettingsPanel';
-import type { PaymentsSettingsTab } from './PaymentsSettingsShared';
+
+export type PaymentsSettingsTab = 'keys' | 'webhooks' | 'sync';
 
 interface PaymentsSettingsDialogProps {
   open: boolean;
@@ -127,5 +128,61 @@ export function PaymentsSettingsDialog({
         </MenuDialogMain>
       </MenuDialogContent>
     </MenuDialog>
+  );
+}
+
+interface SettingRowProps {
+  label: string;
+  description?: ReactNode;
+  children: ReactNode;
+  orientation?: 'horizontal' | 'vertical';
+}
+
+export function SettingRow({
+  label,
+  description,
+  children,
+  orientation = 'horizontal',
+}: SettingRowProps) {
+  if (orientation === 'vertical') {
+    return (
+      <div className="flex w-full flex-col items-start gap-2">
+        <div className="w-full shrink-0">
+          <div className="py-1 flex items-center">
+            <p className="text-sm font-medium leading-5 text-foreground">{label}</p>
+          </div>
+          {description && (
+            <div className="pb-3 text-[13px] leading-[18px] text-muted-foreground">
+              {description}
+            </div>
+          )}
+        </div>
+        <div className="min-w-0 w-full">{children}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex w-full items-start gap-6">
+      <div className="w-[200px] shrink-0">
+        <div className="py-1.5">
+          <p className="text-sm leading-5 text-foreground">{label}</p>
+        </div>
+        {description && (
+          <div className="pb-2 pt-1 text-[13px] leading-[18px] text-muted-foreground">
+            {description}
+          </div>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
+  );
+}
+
+export function DialogSectionDivider() {
+  return (
+    <div className="flex h-5 items-center justify-center">
+      <div className="h-px w-full bg-[var(--alpha-8)]" />
+    </div>
   );
 }

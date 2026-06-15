@@ -105,7 +105,7 @@ const MODE_LABELS: Record<PaymentEnvironment, string> = {
   live: 'Live',
 };
 
-interface PaymentsKeyMissingStateProps {
+interface PaymentsOnboardingStateProps {
   provider: PaymentProvider;
   environment: PaymentEnvironment;
   onConfigure: () => void;
@@ -205,12 +205,12 @@ function QuickGuideStepItem({
   );
 }
 
-export function PaymentsKeyMissingState({
+export function PaymentsOnboardingState({
   provider,
   environment,
   onConfigure,
   onProviderChange,
-}: PaymentsKeyMissingStateProps) {
+}: PaymentsOnboardingStateProps) {
   const providerLabel = PROVIDER_LABELS[provider];
   const modeLabel = MODE_LABELS[environment];
   const keyLabel = provider === 'stripe' ? 'Key' : 'Keys';

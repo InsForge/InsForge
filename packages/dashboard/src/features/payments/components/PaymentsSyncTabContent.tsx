@@ -1,99 +1,10 @@
-import type { ReactNode } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@insforge/ui';
-import type {
-  PaymentEnvironment,
-  PaymentProvider,
-  RazorpayKeyConfig,
-  StripeKeyConfig,
-} from '@insforge/shared-schemas';
+import type { PaymentProvider, RazorpayKeyConfig, StripeKeyConfig } from '@insforge/shared-schemas';
 
-export const ENVIRONMENTS: PaymentEnvironment[] = ['test', 'live'];
-
-export type PaymentsSettingsTab = 'keys' | 'webhooks' | 'sync';
 export type PaymentKeyConfig = StripeKeyConfig | RazorpayKeyConfig;
 
-export function createEmptyEnvironmentValues(): Record<PaymentEnvironment, string> {
-  return { test: '', live: '' };
-}
-
-export function hydrateEnvironmentValues(
-  current: Record<PaymentEnvironment, string>,
-  previousSaved: Record<PaymentEnvironment, string>,
-  nextSaved: Record<PaymentEnvironment, string>
-): Record<PaymentEnvironment, string> {
-  let changed = false;
-  const next = { ...current };
-
-  for (const environment of ENVIRONMENTS) {
-    const canHydrate =
-      current[environment] === '' || current[environment] === previousSaved[environment];
-    if (canHydrate && current[environment] !== nextSaved[environment]) {
-      next[environment] = nextSaved[environment];
-      changed = true;
-    }
-  }
-
-  return changed ? next : current;
-}
-
-interface SettingRowProps {
-  label: string;
-  description?: ReactNode;
-  children: ReactNode;
-  orientation?: 'horizontal' | 'vertical';
-}
-
-export function SettingRow({
-  label,
-  description,
-  children,
-  orientation = 'horizontal',
-}: SettingRowProps) {
-  if (orientation === 'vertical') {
-    return (
-      <div className="flex w-full flex-col items-start gap-2">
-        <div className="w-full shrink-0">
-          <div className="py-1 flex items-center">
-            <p className="text-sm font-medium leading-5 text-foreground">{label}</p>
-          </div>
-          {description && (
-            <div className="pb-3 text-[13px] leading-[18px] text-muted-foreground">
-              {description}
-            </div>
-          )}
-        </div>
-        <div className="min-w-0 w-full">{children}</div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex w-full items-start gap-6">
-      <div className="w-[200px] shrink-0">
-        <div className="py-1.5">
-          <p className="text-sm leading-5 text-foreground">{label}</p>
-        </div>
-        {description && (
-          <div className="pb-2 pt-1 text-[13px] leading-[18px] text-muted-foreground">
-            {description}
-          </div>
-        )}
-      </div>
-      <div className="min-w-0 flex-1">{children}</div>
-    </div>
-  );
-}
-
-export function DialogSectionDivider() {
-  return (
-    <div className="flex h-5 items-center justify-center">
-      <div className="h-px w-full bg-[var(--alpha-8)]" />
-    </div>
-  );
-}
-
-export function SyncTabContent({
+export function PaymentsSyncTabContent({
   isLoading,
   error,
   configuredKeys,
