@@ -157,7 +157,7 @@ export async function verifyAdmin(req: AuthRequest, res: Response, next: NextFun
     let isRoot = payload.isRoot || false;
     let dbAdminId = payload.adminId || payload.sub;
 
-    if (username && (payload.isRoot === undefined || payload.adminId === undefined)) {
+    if (username) {
       const admin = await adminService.getAdminByUsername(username);
       if (!admin) {
         throw new AppError(
@@ -311,7 +311,7 @@ export async function verifyAnonKey(req: AuthRequest, _res: Response, next: Next
  * Core token verification middleware that handles JWT tokens
  * Sets req.user with the authenticated user information
  */
-export function verifyToken(req: AuthRequest, _res: Response, next: NextFunction) {
+export async function verifyToken(req: AuthRequest, _res: Response, next: NextFunction) {
   try {
     const token = extractBearerToken(req.headers.authorization);
     if (!token) {
@@ -339,11 +339,29 @@ export function verifyToken(req: AuthRequest, _res: Response, next: NextFunction
     // Set user info on request
     if (payload.role === 'project_admin') {
       const username = extractUsernameFromSub(payload.sub);
-      setRequestUser(req, {
-        ...payload,
-        sub: payload.adminId || payload.sub,
-        username: username || undefined,
-      });
+      if (username) {
+        const admin = await adminService.getAdminByUsername(username);
+        if (!admin) {
+          throw new AppError(
+            'Admin account not found',
+            401,
+            ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+            NEXT_ACTIONS.CHECK_TOKEN
+          );
+        }
+        setRequestUser(req, {
+          ...payload,
+          sub: admin.id,
+          username: username || undefined,
+          isRoot: admin.is_root || false,
+        });
+      } else {
+        setRequestUser(req, {
+          ...payload,
+          sub: payload.adminId || payload.sub,
+          username: username || undefined,
+        });
+      }
     } else {
       setRequestUser(req, payload);
     }

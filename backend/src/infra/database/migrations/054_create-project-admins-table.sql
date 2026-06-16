@@ -3,7 +3,7 @@ CREATE SCHEMA IF NOT EXISTS auth;
 
 CREATE TABLE IF NOT EXISTS auth.project_admins (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    username TEXT UNIQUE NOT NULL,
+    username TEXT NOT NULL,
     password_hash TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS auth.project_admins (
 );
 
 -- Indexes for better performance
-CREATE INDEX IF NOT EXISTS idx_project_admins_username ON auth.project_admins(username);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_project_admins_username_active ON auth.project_admins(username) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_project_admins_deleted_at ON auth.project_admins(deleted_at);
 
 -- Trigger to update updated_at automatically
@@ -32,4 +32,4 @@ BEGIN
 END $$;
 
 -- DOWN migration (rollback ke liye)
--- DROP TABLE IF EXISTS auth.project_admins;
+DROP TABLE IF EXISTS auth.project_admins;

@@ -224,7 +224,11 @@ router.post(
     try {
       const validation = createAdminSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ error: validation.error.errors });
+        throw new AppError(
+          validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
       }
 
       const { username, password } = validation.data;
@@ -266,7 +270,11 @@ router.post(
     try {
       const validation = changePasswordSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ error: validation.error.errors });
+        throw new AppError(
+          validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
       }
 
       const username = req.user?.username;
