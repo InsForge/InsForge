@@ -2697,7 +2697,7 @@ describe('Stripe payment services', () => {
 
     expect(mockPool.query).toHaveBeenLastCalledWith(
       expect.stringMatching(/UPDATE payments\.webhook_events/i),
-      ['test', 'evt_apply_fail_123', 'failed', 'activity write failed']
+      ['stripe', 'test', 'evt_apply_fail_123', 'failed', 'activity write failed']
     );
   });
 

@@ -1,4 +1,5 @@
 import { Router, type Response, type NextFunction } from 'express';
+import { normalizeRazorpayError } from '@/providers/payments/razorpay-errors.js';
 import { type AuthRequest } from '@/api/middlewares/auth.js';
 import { AppError } from '@/utils/errors.js';
 import { successResponse } from '@/utils/response.js';
@@ -33,7 +34,7 @@ router.put('/config', async (req: AuthRequest, res: Response, next: NextFunction
     const keys = await configService.getKeyConfig();
     successResponse(res, { keys });
   } catch (error) {
-    next(error);
+    next(normalizeRazorpayError(error));
   }
 });
 
@@ -51,7 +52,7 @@ router.delete('/config', async (req: AuthRequest, res: Response, next: NextFunct
     const keys = await configService.getKeyConfig();
     successResponse(res, { keys });
   } catch (error) {
-    next(error);
+    next(normalizeRazorpayError(error));
   }
 });
 
@@ -61,7 +62,7 @@ router.post('/sync', async (req: AuthRequest, res: Response, next: NextFunction)
     const result = await syncService.syncAll(environment);
     successResponse(res, result);
   } catch (error) {
-    next(error);
+    next(normalizeRazorpayError(error));
   }
 });
 
@@ -71,7 +72,7 @@ router.get('/webhook', async (req: AuthRequest, res: Response, next: NextFunctio
     const result = await configService.getWebhookSetup(environment);
     successResponse(res, result);
   } catch (error) {
-    next(error);
+    next(normalizeRazorpayError(error));
   }
 });
 
@@ -83,7 +84,7 @@ router.post(
       const result = await configService.rotateWebhookSecret(environment);
       successResponse(res, result);
     } catch (error) {
-      next(error);
+      next(normalizeRazorpayError(error));
     }
   }
 );

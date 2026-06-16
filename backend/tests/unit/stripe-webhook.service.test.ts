@@ -78,9 +78,9 @@ describe('StripeWebhookService', () => {
     expect(mockPool.query).toHaveBeenNthCalledWith(
       2,
       expect.stringMatching(
-        /UPDATE payments\.webhook_events[\s\S]*processing_status = 'failed'[\s\S]*OR \(processing_status = 'pending' AND updated_at < \$4\)/i
+        /UPDATE payments\.webhook_events[\s\S]*processing_status = 'failed'[\s\S]*OR \(processing_status = 'pending' AND updated_at < \$5\)/i
       ),
-      ['test', 'evt_123', expect.any(Object), expect.any(Date)]
+      ['stripe', 'test', 'evt_123', expect.any(Object), expect.any(Date)]
     );
   });
 

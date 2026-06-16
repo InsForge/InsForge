@@ -1,4 +1,5 @@
 import { Router, type Response, type NextFunction } from 'express';
+import { normalizeRazorpayError } from '@/providers/payments/razorpay-errors.js';
 import { type AuthRequest } from '@/api/middlewares/auth.js';
 import { RazorpayCatalogService } from '@/services/payments/razorpay/catalog.service.js';
 import { getPaymentEnvironment } from '@/services/payments/helpers.js';
@@ -20,7 +21,7 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
     const catalog = await catalogService.listCatalog(environment);
     successResponse(res, catalog);
   } catch (error) {
-    next(error);
+    next(normalizeRazorpayError(error));
   }
 });
 
@@ -34,7 +35,7 @@ router.post('/items', async (req: AuthRequest, res: Response, next: NextFunction
     });
     successResponse(res, item, 201);
   } catch (error) {
-    next(error);
+    next(normalizeRazorpayError(error));
   }
 });
 
@@ -49,7 +50,7 @@ router.patch('/items/:itemId', async (req: AuthRequest, res: Response, next: Nex
     });
     successResponse(res, item);
   } catch (error) {
-    next(error);
+    next(normalizeRazorpayError(error));
   }
 });
 
@@ -63,7 +64,7 @@ router.post('/plans', async (req: AuthRequest, res: Response, next: NextFunction
     });
     successResponse(res, plan, 201);
   } catch (error) {
-    next(error);
+    next(normalizeRazorpayError(error));
   }
 });
 
