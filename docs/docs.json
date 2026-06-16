@@ -33,10 +33,11 @@
             "group": "Getting Started",
             "pages": [
               "introduction",
+              "products",
               {
                 "group": "Quickstart",
                 "expanded": true,
-                "pages": ["quickstart", "mcp-setup"]
+                "pages": ["quickstart", "mcp-setup", "vscode-extension"]
               }
             ]
           },

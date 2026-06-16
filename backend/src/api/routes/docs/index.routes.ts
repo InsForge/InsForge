@@ -97,18 +97,24 @@ async function processSnippets(content: string, docsRoot: string): Promise<strin
   return processedContent.trim();
 }
 
+// Agent documentation map — files live in .agents/docs/ (not in the public docs/ tree)
+// Served by the MCP server fetch-docs tool; not user-facing Mintlify pages.
+const AGENT_DOCS_MAP: Partial<Record<DocTypeSchema, string>> = {
+  instructions: 'insforge-instructions-sdk.md',
+  'real-time': 'real-time.md',
+  deployment: 'deployment.md',
+  payments: 'payments.md',
+};
+
 // Legacy documentation map for GET /api/docs/:docType endpoint
 // Only contains keys defined in DocTypeSchema for type safety
-const LEGACY_DOCS_MAP: Record<DocTypeSchema, string> = {
-  instructions: 'insforge-instructions-sdk.md',
+// These files live in the public docs/ tree.
+const LEGACY_DOCS_MAP: Partial<Record<DocTypeSchema, string>> = {
   'db-sdk': 'sdks/typescript/database.mdx',
   'auth-sdk': 'sdks/typescript/auth.mdx',
   'storage-sdk': 'sdks/typescript/storage.mdx',
   'functions-sdk': 'sdks/typescript/functions.mdx',
   'ai-integration-sdk': 'sdks/typescript/ai.mdx',
-  'real-time': 'agent-docs/real-time.md',
-  deployment: 'agent-docs/deployment.md',
-  payments: 'agent-docs/payments.md',
 };
 
 // SDK documentation map for GET /api/docs/:docFeature/:docLanguage endpoint
@@ -166,10 +172,19 @@ router.get('/:docType', async (req: Request, res: Response, next: NextFunction) 
       throw new AppError('Documentation not found', 404, ERROR_CODES.DOCS_NOT_FOUND);
     }
 
-    const docFileName = LEGACY_DOCS_MAP[parsed.data];
-
     // Read the documentation file
-    const filePath = path.join(DOCS_ROOT, docFileName);
+    const agentDocsRoot = path.join(PROJECT_ROOT, '.agents', 'docs');
+
+    // Resolve from the correct root: agent docs live in .agents/docs/, public SDK docs in docs/
+    let filePath: string;
+    if (parsed.data in AGENT_DOCS_MAP) {
+      const docFileName = AGENT_DOCS_MAP[parsed.data] as string;
+      filePath = path.join(agentDocsRoot, docFileName);
+    } else {
+      const docFileName = LEGACY_DOCS_MAP[parsed.data] as string;
+      filePath = path.join(DOCS_ROOT, docFileName);
+    }
+
     const rawContent = await readFile(filePath, 'utf-8');
 
     // Process snippet imports and replace component tags with actual content

@@ -1,7 +1,7 @@
 FROM denoland/deno:alpine-2.0.6
 
-# Create non-root user
-RUN addgroup -S deno && adduser -S deno -G deno
+# Create non-root user if not already present
+RUN id -u deno >/dev/null 2>&1 || (addgroup -S deno && adduser -S deno -G deno)
 
 WORKDIR /app/functions
 
