@@ -24,14 +24,7 @@ const authService = AuthService.getInstance();
 
 // Validation schemas for admin management
 const createAdminSchema = z.object({
-  username: z
-    .string()
-    .min(3)
-    .max(50)
-    .regex(
-      /^[a-zA-Z0-9_-]+$/,
-      'Username may only contain letters, numbers, hyphens, and underscores'
-    ),
+  username: z.string().min(3).max(50).regex(/^[a-zA-Z0-9_-]+$/, 'Username may only contain letters, numbers, hyphens, and underscores'),
   password: z.string().min(6),
 });
 
