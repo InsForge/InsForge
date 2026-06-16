@@ -11,6 +11,8 @@ let modelsCache: {
   models: AIModelSchema[];
 } | null = null;
 
+let fetchInFlight: Promise<AIModelSchema[]> | null = null;
+
 export class AIModelService {
   /**
    * Get all available AI models
@@ -22,6 +24,19 @@ export class AIModelService {
       return modelsCache.models;
     }
 
+    if (fetchInFlight) {
+      return fetchInFlight;
+    }
+
+    fetchInFlight = AIModelService.fetchAndCacheModels();
+    try {
+      return await fetchInFlight;
+    } finally {
+      fetchInFlight = null;
+    }
+  }
+
+  private static async fetchAndCacheModels(): Promise<AIModelSchema[]> {
     const response = await fetch(OPENROUTER_MODELS_URL);
 
     if (!response.ok) {
@@ -68,6 +83,7 @@ export class AIModelService {
         return orderDiff !== 0 ? orderDiff : a.id.localeCompare(b.id);
       });
 
+    const now = Date.now();
     modelsCache = {
       expiresAt: now + MODELS_CACHE_TTL_MS,
       models,

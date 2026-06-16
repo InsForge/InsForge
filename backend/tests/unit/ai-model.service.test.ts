@@ -6,11 +6,10 @@ const { mockFetch } = vi.hoisted(() => ({
 
 vi.stubGlobal('fetch', mockFetch);
 
-import { AIModelService } from '../../src/services/ai/ai-model.service';
-
 describe('AIModelService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.resetModules();
   });
 
   it('fetches the public OpenRouter catalog with all output modalities and caches it', async () => {
@@ -61,6 +60,8 @@ describe('AIModelService', () => {
         }),
     });
 
+    const { AIModelService } = await import('../../src/services/ai/ai-model.service');
+
     const firstResult = await AIModelService.getModels();
     const secondResult = await AIModelService.getModels();
 
@@ -107,5 +108,47 @@ describe('AIModelService', () => {
         outputPriceLabel: undefined,
       },
     ]);
+  });
+
+  it('deduplicates concurrent cache-miss fetches (stampede prevention)', async () => {
+    mockFetch.mockImplementation(
+      () =>
+        new Promise((resolve) =>
+          setTimeout(
+            () =>
+              resolve({
+                ok: true,
+                json: () =>
+                  Promise.resolve({
+                    data: [
+                      {
+                        id: 'openai/gpt-4o',
+                        created: 1714608000,
+                        architecture: {
+                          input_modalities: ['text'],
+                          output_modalities: ['text'],
+                        },
+                        pricing: {
+                          prompt: '0.000005',
+                          completion: '0.000015',
+                        },
+                      },
+                    ],
+                  }),
+              }),
+            10
+          )
+        )
+    );
+
+    const { AIModelService } = await import('../../src/services/ai/ai-model.service');
+
+    const [firstResult, secondResult] = await Promise.all([
+      AIModelService.getModels(),
+      AIModelService.getModels(),
+    ]);
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(firstResult).toEqual(secondResult);
   });
 });
