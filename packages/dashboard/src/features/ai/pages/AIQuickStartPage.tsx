@@ -1,4 +1,5 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Button, CopyButton, Tab, Tabs } from '@insforge/ui';
 import { CodeEditor } from '#components';
 import { useOpenRouterKey } from '#features/ai/hooks/useOpenRouterKey';
@@ -9,6 +10,7 @@ import {
   QUICK_START_MODES,
   getQuickStartPrompt,
   getQuickStartScript,
+  isQuickStartMode,
   type QuickStartMode,
 } from '#features/ai/constants';
 
@@ -224,7 +226,9 @@ function StepItem({ step, isLast }: { step: QuickStartStep; isLast: boolean }) {
 }
 
 export default function AIQuickStartPage() {
-  const [mode, setMode] = useState<QuickStartMode>('text');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const modeParam = searchParams.get('mode');
+  const mode: QuickStartMode = isQuickStartMode(modeParam) ? modeParam : 'text';
   const { data: openRouterKey, isLoading: isOpenRouterKeyLoading } = useOpenRouterKey();
   const copy = QUICK_START_COPY[mode];
   const quickStartPrompt = useMemo(() => getQuickStartPrompt(mode), [mode]);
@@ -236,6 +240,21 @@ export default function AIQuickStartPage() {
   const copiedEnvLine = copiedOpenRouterKey
     ? `OPENROUTER_API_KEY=${copiedOpenRouterKey}`
     : displayedEnvLine;
+
+  const handleModeChange = (value: string) => {
+    if (!isQuickStartMode(value)) {
+      return;
+    }
+
+    const nextSearchParams = new URLSearchParams(searchParams);
+    if (value === 'text') {
+      nextSearchParams.delete('mode');
+    } else {
+      nextSearchParams.set('mode', value);
+    }
+
+    setSearchParams(nextSearchParams, { replace: true });
+  };
 
   const steps: QuickStartStep[] = [
     {
@@ -297,11 +316,7 @@ export default function AIQuickStartPage() {
       <div className="mx-auto flex w-full max-w-[1024px] flex-col gap-6 px-10 pb-12 pt-10">
         <h1 className="text-2xl font-medium leading-8 text-foreground">Quick Start</h1>
 
-        <Tabs
-          value={mode}
-          onValueChange={(value) => setMode(value as QuickStartMode)}
-          className="h-8 w-full"
-        >
+        <Tabs value={mode} onValueChange={handleModeChange} className="h-8 w-full">
           {QUICK_START_MODES.map((item) => (
             <Tab key={item.value} value={item.value} className="h-8 flex-1">
               {item.label}

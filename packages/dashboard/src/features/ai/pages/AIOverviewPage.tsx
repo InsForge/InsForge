@@ -25,6 +25,7 @@ import {
   CODE_TAB_LANGUAGE,
   OVERVIEW_QUICK_START_MODELS,
   getOverviewCodeSnippets,
+  getOverviewQuickStartMode,
   type CodeTab,
 } from '#features/ai/constants';
 
@@ -497,6 +498,11 @@ export default function AIOverviewPage() {
   const shouldShowModelCredits = host.mode === 'cloud-hosting' && !!host.onRequestModelCredits;
   const canRotateOpenRouterKey = host.mode === 'cloud-hosting';
   const codeSnippets = useMemo(() => getOverviewCodeSnippets(selectedModelId), [selectedModelId]);
+  const quickStartMode = getOverviewQuickStartMode(selectedModelId);
+  const quickStartPath =
+    quickStartMode === 'embedding'
+      ? '/dashboard/ai/quick-start?mode=embedding'
+      : '/dashboard/ai/quick-start';
 
   const handleRotateOpenRouterKey = async () => {
     const confirmed = await confirm({
@@ -602,7 +608,7 @@ export default function AIOverviewPage() {
                 size="sm"
                 className="h-8 bg-[#68e5a2] px-4 text-black hover:bg-[#68e5a2]/90"
               >
-                <Link to="/dashboard/ai/quick-start">Quick Start</Link>
+                <Link to={quickStartPath}>Quick Start</Link>
               </Button>
             </div>
           </div>
