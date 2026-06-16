@@ -52,8 +52,7 @@ export default function TablesPage() {
   const [isTableFormDirty, setIsTableFormDirty] = useState(false);
   const [showTableForm, setShowTableForm] = useState(false);
   const [editingTable, setEditingTable] = useState<string | null>(null);
-  const [searchValue, setSearchValue] = useState('');
-  const searchQuery = searchValue.trim();
+  const [searchByTable, setSearchByTable] = useState<Record<string, string>>({});
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [sortColumns, setSortColumns] = useState<SortColumn[]>([]);
   const { pageSize, pageSizeOptions, onPageSizeChange } = usePageSize('db-table');
@@ -83,6 +82,15 @@ export default function TablesPage() {
 
     return tables[0];
   }, [isLoadingTables, tables, selectedTableFromQuery]);
+  const tableKey = `${selectedSchema}.${selectedTable ?? ''}`;
+  const searchValue = searchByTable[tableKey] ?? '';
+  const searchQuery = searchValue.trim();
+  const handleSearchChange = useCallback(
+    (value: string) => {
+      setSearchByTable((prev) => ({ ...prev, [tableKey]: value }));
+    },
+    [tableKey]
+  );
   const selectTable = useCallback(
     (tableName: string | null, replace: boolean = false) => {
       const nextSearchParams = new URLSearchParams(searchParams);
@@ -306,7 +314,7 @@ export default function TablesPage() {
       // Reset all state
       setSelectedRows(new Set());
       setSortColumns([]);
-      setSearchValue('');
+      setSearchByTable((prev) => ({ ...prev, [tableKey]: '' }));
       setIsSorting(false);
 
       // Refresh current table data (if table is selected)
@@ -628,7 +636,7 @@ export default function TablesPage() {
                   )
                 }
                 searchValue={searchValue}
-                onSearchChange={setSearchValue}
+                onSearchChange={handleSearchChange}
                 searchDebounceTime={300}
                 searchPlaceholder="Search records"
               />
