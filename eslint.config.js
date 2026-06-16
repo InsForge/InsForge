@@ -94,7 +94,7 @@ const reactPackageRules = {
   curly: ['error', 'all'],
 
   // Prettier integration
-  'prettier/prettier': ['error', { endOfLine: 'auto' }],
+  'prettier/prettier': 'error',
 };
 
 function createReactPackageConfig(packageDir, project) {
@@ -197,7 +197,7 @@ export default defineConfig(
       curly: ['error', 'all'],
 
       // Prettier integration
-      'prettier/prettier': ['error', { endOfLine: 'auto' }],
+      'prettier/prettier': 'error',
     },
   },
   {
@@ -287,7 +287,7 @@ export default defineConfig(
       'prefer-const': 'error',
 
       // Prettier integration
-      'prettier/prettier': ['error', { endOfLine: 'auto' }],
+      'prettier/prettier': 'error',
     },
   },
   // Global ignores
