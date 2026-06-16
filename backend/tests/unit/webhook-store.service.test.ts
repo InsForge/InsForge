@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { PaymentWebhookEventRow, RecordWebhookEventInput } from '../../src/services/payments/webhook-store.service';
+import type {
+  PaymentWebhookEventRow,
+  RecordWebhookEventInput,
+} from '../../src/services/payments/webhook-store.service';
 
 const { mockPool } = vi.hoisted(() => ({
   mockPool: {
