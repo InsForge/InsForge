@@ -128,7 +128,7 @@ export const chatCompletionRequestSchema = z.object({
   model: z.string(),
   messages: z.array(chatMessageSchema),
   temperature: z.number().min(0).max(2).optional(),
-  maxTokens: z.number().positive().max(16384).optional(),
+  maxTokens: z.number().int().positive().max(16384).optional(),
   topP: z.number().min(0).max(1).optional(),
   stream: z.boolean().optional(),
   // Web Search: Incorporate relevant web search results into the response
