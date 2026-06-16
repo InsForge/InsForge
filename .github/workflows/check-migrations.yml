@@ -5,6 +5,10 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ '*' ]
+  # Required by the merge queue: the queue builds a temporary `merge_group` ref
+  # (PR rebased onto the latest main) and waits for this check to report on it.
+  # Without this trigger the check never runs for queued PRs and the queue stalls.
+  merge_group:
 
 jobs:
   check-duplicate-numbers:

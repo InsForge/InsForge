@@ -1,6 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
-import { computeWriteLimiter } from '@/api/middlewares/rate-limiters.js';
+import { computeWriteLimiter, computeLogsRateLimiter } from '@/api/middlewares/rate-limiters.js';
 import { ComputeServicesService } from '@/services/compute/services.service.js';
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/utils/errors.js';
@@ -345,6 +345,34 @@ router.get(
       const events = await svc.getServiceEvents(req.params.id, { limit });
 
       successResponse(res, events);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// Get container stdout/stderr ("application logs") from Fly's logs API.
+// Backfills from Fly's ~7-day retention; pass `next_token` (returned in the
+// response) to page forward for live tailing. Rate-limited because the
+// dashboard polls this every ~2s while live.
+router.get(
+  '/:id/logs',
+  verifyAdmin,
+  computeLogsRateLimiter,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const svc = ComputeServicesService.getInstance();
+      const existing = await svc.getService(req.params.id);
+
+      if (existing.projectId !== getProjectId(req)) {
+        throw new AppError('Service not found', 404, ERROR_CODES.COMPUTE_SERVICE_NOT_FOUND);
+      }
+
+      const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 1000);
+      const nextToken = typeof req.query.next_token === 'string' ? req.query.next_token : undefined;
+      const logs = await svc.getServiceLogs(req.params.id, { limit, nextToken });
+
+      successResponse(res, logs);
     } catch (error) {
       next(error);
     }

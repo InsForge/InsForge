@@ -163,12 +163,21 @@ export class TokenManager {
   }
 
   /**
-   * Generate anonymous JWT token (never expires)
+   * Generate PostgREST anon token (never expires)
+   *
+   * Internal use only: this token is minted at the gateway when a request
+   * authenticates with the opaque anon key (`anon_...`) and is forwarded to
+   * PostgREST, which derives the `anon` Postgres role from the `role` claim.
+   * It must never be handed out to clients — clients use the opaque anon key,
+   * which is rotatable/revocable (see SecretService).
+   *
+   * Like the PostgREST admin token, it carries no subject: anonymous requests
+   * have a role, not an identity, so auth.uid() is NULL and identity-scoped
+   * RLS policies fail closed. Legacy client-held anon JWTs (which carried a
+   * fake subject) keep working through the normal JWT verification path.
    */
-  generateAnonToken(): string {
+  generatePostgrestAnonToken(): string {
     const payload = {
-      sub: '12345678-1234-5678-90ab-cdef12345678',
-      email: 'anon@insforge.com',
       role: 'anon',
     };
     return jwt.sign(payload, JWT_SECRET, {

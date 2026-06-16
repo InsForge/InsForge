@@ -15,6 +15,7 @@ import { useAuth } from '#lib/contexts/AuthContext';
 import { useOpenConnectDialog } from './ConnectDialogContext';
 import { getFeatureFlag } from '#lib/analytics/posthog';
 import AccountSettingsDialog from './AccountSettingsDialog';
+import { FEATURE_FLAGS, FEATURE_FLAG_VARIANTS } from '#lib/analytics/constants';
 
 // Import SVG icons
 import DiscordIcon from '#assets/logos/discord.svg?react';
@@ -26,10 +27,10 @@ export default function AppHeader() {
   const { resolvedTheme } = useTheme();
   const { logout, user } = useAuth();
   const openConnectDialog = useOpenConnectDialog();
-  const dashboardVariant = getFeatureFlag('dashboard-v4-experiment');
+  const dashboardVariant = getFeatureFlag(FEATURE_FLAGS.DASHBOARD_V4_EXPERIMENT);
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const isDTest = dashboardVariant === 'd_test';
+  const isDTest = dashboardVariant === FEATURE_FLAG_VARIANTS.D_TEST;
   const isConnectDisabled = isDTest && pathname === '/dashboard/install';
 
   const username = user?.username || 'Admin';

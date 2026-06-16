@@ -8,8 +8,9 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
+  Skeleton,
 } from '@insforge/ui';
-import { Skeleton, TableHeader } from '#components';
+import { TableHeader } from '#components';
 import { useConfirm } from '#lib/hooks/useConfirm';
 import { useRealtimeChannels } from '#features/realtime/hooks/useRealtimeChannels';
 import { ChannelRow } from '#features/realtime/components/ChannelRow';

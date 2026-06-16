@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
-import { Button, ConfirmDialog } from '@insforge/ui';
-import { Skeleton } from '#components';
+import { Button, ConfirmDialog, Skeleton } from '@insforge/ui';
 import { EnvVarRow } from '#features/deployments/components/EnvVarRow';
 import { EnvVarDialog } from '#features/deployments/components/EnvVarDialog';
 import EnvVarsEmptyState from '#features/deployments/components/EnvVarsEmptyState';

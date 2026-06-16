@@ -1,7 +1,13 @@
 import { useState } from 'react';
 import { ExternalLink, Copy, Check, RefreshCw } from 'lucide-react';
-import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
-import { Skeleton } from '#components';
+import {
+  Button,
+  Skeleton,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@insforge/ui';
 import { useDeployments } from '#features/deployments/hooks/useDeployments';
 import { useDeploymentMetadata } from '#features/deployments/hooks/useDeploymentMetadata';
 import { useCustomDomains } from '#features/deployments/hooks/useCustomDomains';

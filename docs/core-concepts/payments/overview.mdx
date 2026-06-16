@@ -1,169 +1,93 @@
 ---
 title: "Payments"
 sidebarTitle: "Overview"
-description: "Add payments and monetization to your app, powered by Stripe."
+description: "Choose a provider-specific payments integration for Stripe or Razorpay."
 ---
 
-Use InsForge Payments to add checkout, subscriptions, and billing management to your app with your own Stripe account. InsForge keeps Stripe secret keys server-side, creates Stripe-hosted Checkout and Billing Portal sessions from the SDK, and syncs payment state back to your project after Stripe events arrive.
+InsForge Payments lets your app collect money with your own Stripe or Razorpay account. The two providers use different payment models, so the docs are split by provider instead of describing one generic payment flow.
 
-Connect Stripe once in the dashboard or CLI. From there, your app can sell one-time products, start subscriptions, let customers manage billing, and run custom fulfillment logic from synced payment state.
-
-<Frame caption="Payments dashboard: connection, catalog, subscriptions, and history.">
+<Frame caption="Payments dashboard: provider connection, catalog, subscriptions, and transactions.">
   <img src="/images/dashboard-payments.png" alt="InsForge Payments dashboard" />
 </Frame>
 
 <Note>
-  Stripe remains the source of truth for charges, invoices, refunds, disputes,
-  taxes, and account-level financial operations. InsForge is not a payment
-  processor or merchant of record, and it does not replace Stripe Dashboard.
+  Stripe or Razorpay remains the source of truth for charges, invoices, refunds,
+  disputes, taxes, and account-level financial operations. InsForge is not a
+  payment processor or merchant of record, and it does not replace the provider
+  dashboard.
 </Note>
 
-```mermaid
-flowchart TB
-    Admin["Dashboard or CLI"] --> PaymentAPI["Payment API"]
-    App["Frontend App"] --> SDK["TypeScript SDK"]
-    SDK --> PaymentAPI
+## Choose a provider
 
-    PaymentAPI --> Stripe["Stripe"]
-    Stripe --> Hosted["Checkout / Billing Portal"]
-    Stripe --> Sync["Catalog and billing sync"]
-    Stripe --> Events["Billing events"]
-    Events --> Webhooks["Managed Stripe webhooks"]
-    Webhooks --> State["Synced payment state"]
-    Sync --> State
-    State --> Logic["Triggers and business logic"]
-    Logic --> Tables["Public app tables"]
+<CardGroup cols={2}>
+  <Card title="Stripe Payments" icon="stripe" href="/core-concepts/payments/stripe">
+    Use Stripe Checkout, Products, Prices, Subscriptions, and Billing Portal.
+  </Card>
 
-    style Admin fill:#1e293b,stroke:#475569,color:#e2e8f0
-    style App fill:#1e293b,stroke:#475569,color:#e2e8f0
-    style SDK fill:#1e40af,stroke:#3b82f6,color:#dbeafe
-    style PaymentAPI fill:#166534,stroke:#22c55e,color:#dcfce7
-    style Stripe fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
-    style Hosted fill:#c2410c,stroke:#fb923c,color:#fed7aa
-    style Sync fill:#0e7490,stroke:#06b6d4,color:#cffafe
-    style Events fill:#c2410c,stroke:#fb923c,color:#fed7aa
-    style Webhooks fill:#c2410c,stroke:#fb923c,color:#fed7aa
-    style State fill:#0e7490,stroke:#06b6d4,color:#cffafe
-    style Logic fill:#6b21a8,stroke:#a855f7,color:#f3e8ff
-    style Tables fill:#6b21a8,stroke:#a855f7,color:#f3e8ff
-```
+  <Card title="Razorpay Payments" icon="credit-card" href="/core-concepts/payments/razorpay">
+    Use Razorpay Orders, Items, Plans, Subscriptions, and Razorpay Checkout.
+  </Card>
+</CardGroup>
 
-## Features
+## Architecture
 
-### Stripe connection
+Provider-native tables keep provider concepts intact:
 
-Configure `test` and `live` Stripe secret keys from the dashboard, CLI, or admin API. InsForge validates the key, stores it in the secret store, creates a managed webhook when your backend is reachable, and runs the initial sync after setup.
+| Provider | Runtime tables | Catalog tables | Subscription tables |
+|----------|----------------|----------------|---------------------|
+| Stripe | `payments.stripe_checkout_sessions`, `payments.stripe_customer_portal_sessions` | `payments.stripe_products`, `payments.stripe_prices` | `payments.stripe_subscriptions`, `payments.stripe_subscription_items` |
+| Razorpay | `payments.razorpay_orders` | `payments.razorpay_items`, `payments.razorpay_plans` | `payments.razorpay_subscriptions` |
 
-```bash
-npx @insforge/cli payments status
-npx @insforge/cli payments config set test sk_test_xxx
-```
+Shared tables are used only where the durable shape is useful across providers:
 
-### Catalog and prices
+| Table | Purpose |
+|-------|---------|
+| `payments.provider_connections` | Provider key, account, sync, and webhook setup status by `provider` and `environment`. |
+| `payments.customer_mappings` | App billing subject to provider customer ID mapping. |
+| `payments.customers` | Admin/customer mirror for dashboard visibility. |
+| `payments.webhook_events` | Verified provider webhook event ledger. Use this for durable fulfillment triggers. |
+| `payments.transactions` | InsForge dashboard/reporting projection for successful, failed, and refunded payment activity. |
 
-Products and prices sync from Stripe so your dashboard and app can reason about the catalog without making every request call Stripe. You can manage catalog objects in Stripe, the dashboard, or admin CLI/API flows. Product and price mutations call Stripe first, then sync the result into InsForge.
+`payments.transactions` is not the fulfillment contract. It is a projection built from provider events and sync. For business logic, create app-owned tables such as `public.orders`, `public.credit_ledger`, or `public.team_entitlements`, then populate them from verified rows in `payments.webhook_events`.
 
-```bash
-npx @insforge/cli payments sync --environment test
+## Fulfillment
 
-npx @insforge/cli payments products create \
-  --environment test \
-  --name "Pro Plan"
-
-npx @insforge/cli payments prices create \
-  --environment test \
-  --product prod_123 \
-  --currency usd \
-  --unit-amount 1900 \
-  --interval month
-```
-
-### Checkout Sessions
-
-Create one-time payment or subscription Checkout Sessions from the TypeScript SDK. Your frontend receives a Stripe-hosted URL and redirects the user to complete payment.
-
-```javascript
-const { data, error } = await insforge.payments.createCheckoutSession({
-  environment: 'test',
-  mode: 'subscription',
-  subject: { type: 'team', id: teamId },
-  lineItems: [{ stripePriceId: 'price_monthly_123', quantity: 1 }],
-  successUrl: `${window.location.origin}/billing/success`,
-  cancelUrl: `${window.location.origin}/billing`,
-  customerEmail: user.email,
-  idempotencyKey: `team:${teamId}:pro-monthly`
-});
-
-if (error) throw error;
-if (data?.checkoutSession.url) {
-  window.location.assign(data.checkoutSession.url);
-}
-```
-
-Checkout inserts a row in `payments.checkout_sessions` using the caller's InsForge token. Add RLS policies so users can only create Checkout Sessions for subjects they are allowed to bill, such as their own user, team, workspace, or organization. If your app uses idempotency keys, retries also need a matching `SELECT` policy for the same subject.
-
-### Billing Portal
-
-Create Billing Portal sessions for existing customers so users can update payment methods, review invoices, change plans, or cancel subscriptions through Stripe-hosted UI.
-
-```javascript
-const { data, error } = await insforge.payments.createCustomerPortalSession({
-  environment: 'test',
-  subject: { type: 'team', id: teamId },
-  returnUrl: `${window.location.origin}/billing`
-});
-
-if (error) throw error;
-if (data?.customerPortalSession.url) {
-  window.location.assign(data.customerPortalSession.url);
-}
-```
-
-Billing Portal inserts a row in `payments.customer_portal_sessions`. It requires an authenticated user and an existing Stripe customer mapping for the subject. Protect portal creation with RLS or a server-side membership check so users cannot open billing settings for a team or organization they do not manage.
-
-### Managed webhooks
-
-After a Stripe key is connected, InsForge automatically tries to create the managed Stripe webhook endpoint for that environment. Incoming Stripe events for checkout, invoices, payment intents, refunds, customers, and subscriptions are verified, processed, and recorded automatically.
-
-### Payment projections
-
-Synced payment state gives your app structured records for checkout sessions, customer mappings, customers, subscriptions, payment history, refunds, and webhook delivery. Use those rows as operational inputs for dashboards, automation, and fulfillment, not as your public end-user billing API.
-
-### Fulfillment model
-
-Do not fulfill from the Checkout success URL alone. Use the `subject` field to identify the app-owned billing owner, such as `{ type: 'team', id: teamId }`. InsForge copies that subject into Stripe metadata and synced payment state, so your business logic can connect Stripe events back to your app tables.
-
-For durable fulfillment, attach triggers to payment state changes and update tables in `public`, such as `public.orders`, `public.credit_ledger`, or `public.team_entitlements`. Keep the trigger function idempotent, and protect the public tables with your own RLS policies.
+Do not fulfill from a Stripe success URL or a Razorpay Checkout callback alone. Those are user experience signals. Durable fulfillment should run from verified provider webhook events.
 
 ```sql
-CREATE TRIGGER sync_team_entitlement_from_subscription
-  AFTER INSERT OR UPDATE ON payments.subscriptions
+CREATE TRIGGER fulfill_from_payment_webhook
+  AFTER INSERT OR UPDATE ON payments.webhook_events
   FOR EACH ROW
-  EXECUTE FUNCTION public.sync_team_entitlement();
+  EXECUTE FUNCTION public.fulfill_payment_event();
 ```
 
-### Platform boundaries
+If your app accepts multiple providers, keep the trigger idempotent and branch on `NEW.provider` and `NEW.event_type`. Protect your app-owned fulfillment tables with your own RLS policies.
 
-InsForge provides secure session creation, secret storage, managed webhook handling, synced payment state, and dashboard/CLI visibility for your Stripe integration. **InsForge does not handle money movement.** Stripe still owns account operations, including charges, refunds, disputes, invoices, taxes, and compliance workflows.
+Webhook events are processed independently and providers give no ordering guarantee across events. Rows derived from an event are committed before that event is marked `processed`, but rows owned by other events — such as `payments.customer_mappings`, which checkout completion creates — may not exist yet when your trigger fires. Resolve billing subjects from the event payload first and treat lookups into other tables as fallbacks. See the provider guides for subscription fulfillment examples.
 
-InsForge does not provide platform-owned merchant accounts, Stripe Connect account setup, or automatic entitlement logic. Model fulfillment in your own tables and policies so billing state stays explicit in your app.
+<Warning>
+  Older Stripe-only `payments.payment_history` rows are migrated into
+  `payments.transactions` for dashboard and reporting. Triggers on
+  `payment_history` are not rewritten automatically. Move fulfillment logic to
+  `payments.webhook_events`.
+</Warning>
 
 ## Build with it
 
 <CardGroup cols={2}>
-  <Card title="TypeScript SDK" icon="js" href="/sdks/typescript/payments">
-    Create Checkout and Billing Portal sessions from your app.
+  <Card title="TypeScript payments guide" icon="js" href="/sdks/typescript/payments">
+    Pick the Stripe or Razorpay provider module for app code.
   </Card>
 
   <Card title="REST patterns" icon="code" href="/sdks/rest/overview">
-    Use REST client setup patterns for admin tooling and non-TypeScript clients.
+    Review provider-specific Payments API routes and webhook routes.
   </Card>
 </CardGroup>
 
 ## Next steps
 
-- Set up the [CLI](/quickstart) and connect your project.
-- Configure Stripe keys in Dashboard -> Payments -> Settings or with `npx @insforge/cli payments config set test sk_test_xxx`.
-- Add RLS policies for Checkout and Billing Portal session creation.
-- Use the [TypeScript SDK reference](/sdks/typescript/payments) to create Checkout and Billing Portal sessions.
-- Add trigger-backed fulfillment tables that map payment events to your product access model.
+- Read [Stripe Payments](/core-concepts/payments/stripe) if you are using Stripe Checkout or Billing Portal.
+- Read [Razorpay Payments](/core-concepts/payments/razorpay) if you are using Razorpay Orders or Subscriptions.
+- Configure provider keys in Dashboard -> Payments -> Settings.
+- Add app-specific RLS or server-side membership checks for billing subjects.
+- Add trigger-backed fulfillment from `payments.webhook_events`.

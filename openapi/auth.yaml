@@ -794,15 +794,22 @@ paths:
 
   /api/auth/tokens/anon:
     post:
-      summary: Generate anonymous token
-      description: Generate a non-expiring anonymous JWT token for public API access (admin only)
+      summary: Get anon key (deprecated)
+      deprecated: true
+      description: >-
+        Deprecated - use GET /api/metadata/anon-key instead. Returns the
+        project's opaque anon key (`anon_...`) under the legacy `accessToken`
+        field for backward compatibility. The anon key is a non-secret client
+        identifier that maps requests to the `anon` role; it replaces the
+        former non-expiring anonymous JWT and can be rotated via
+        POST /api/secrets/anon-key/rotate (admin only).
       tags:
         - Admin
       security:
         - bearerAuth: []
       responses:
         '200':
-          description: Anonymous token generated successfully
+          description: Anon key retrieved successfully
           content:
             application/json:
               schema:
@@ -810,16 +817,18 @@ paths:
                 properties:
                   accessToken:
                     type: string
-                    description: Non-expiring anonymous JWT token
-                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    description: Opaque anon key (legacy field name kept for compatibility)
+                    example: "anon_1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcd"
                   message:
                     type: string
                     description: Success message
-                    example: "Anonymous token generated successfully (never expires)"
+                    example: "Anon key retrieved successfully (deprecated route, use GET /api/metadata/anon-key)"
         '401':
           description: Unauthorized - requires authentication
         '403':
           description: Forbidden - admin access required
+        '404':
+          description: Anon key not initialized
 
   /api/auth/email/send-verification:
     post:

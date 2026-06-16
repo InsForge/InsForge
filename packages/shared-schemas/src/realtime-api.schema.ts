@@ -69,6 +69,13 @@ export const listMessagesResponseSchema = z.array(realtimeMessageSchema);
 export type ListMessagesRequest = z.infer<typeof listMessagesRequestSchema>;
 export type ListMessagesResponse = z.infer<typeof listMessagesResponseSchema>;
 
+// Clear Messages
+export const clearRealtimeMessagesResponseSchema = z.object({
+  deleted: z.number().int().min(0),
+});
+
+export type ClearRealtimeMessagesResponse = z.infer<typeof clearRealtimeMessagesResponseSchema>;
+
 // Message Stats
 export const messageStatsRequestSchema = z.object({
   channelId: z.string().uuid().optional(),

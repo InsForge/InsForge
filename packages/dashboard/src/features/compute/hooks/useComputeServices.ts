@@ -107,6 +107,21 @@ export function useServiceEvents(serviceId: string | null) {
   });
 }
 
+// Container stdout/stderr for the detail-view Logs panel. When `live` is on we
+// re-pull the recent window every 2s (simple, stateless tail — no cursor
+// accumulation/dedup to get wrong for v1); otherwise it's a one-shot recent
+// fetch the user can refresh manually.
+export function useServiceLogs(serviceId: string | null, opts?: { live?: boolean }) {
+  return useQuery({
+    queryKey: ['compute', 'services', serviceId, 'logs'],
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by enabled
+    queryFn: () => computeServicesApi.logs(serviceId!, { limit: 200 }),
+    enabled: !!serviceId,
+    staleTime: 0,
+    refetchInterval: opts?.live ? 2000 : false,
+  });
+}
+
 // Per-service crash-loop indicator for the grid view. Polls the events
 // endpoint at 30s cadence — same data the detail-view ServiceEvents panel uses,
 // so we don't introduce a new backend surface, and React Query dedupes the

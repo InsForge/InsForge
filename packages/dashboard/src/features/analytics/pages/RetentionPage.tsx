@@ -1,5 +1,5 @@
 import { TableHeader } from '#components';
-import { RequirePosthogConnection } from '#features/analytics/components/RequirePosthogConnection';
+import { RequireAnalyticsConnection } from '#features/analytics/components/RequireAnalyticsConnection';
 import { RetentionCard } from '#features/analytics/components/posthog/RetentionCard';
 
 export function RetentionPage() {
@@ -13,9 +13,9 @@ export function RetentionPage() {
         }
       />
       <div className="min-h-0 flex-1 overflow-auto">
-        <RequirePosthogConnection>
+        <RequireAnalyticsConnection>
           <RetentionCard enabled />
-        </RequirePosthogConnection>
+        </RequireAnalyticsConnection>
       </div>
     </div>
   );

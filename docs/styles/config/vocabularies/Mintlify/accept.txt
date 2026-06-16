@@ -39,6 +39,7 @@ dev
 docker
 dockerfile
 env
+flyctl
 github
 hardcoding
 healthchecks
@@ -58,7 +59,9 @@ KPIs
 linode
 localStorage
 loopback
+lookups
 mcp
+monorepo
 Multiplatform
 namespace
 nginx
@@ -84,6 +87,8 @@ presigned
 proxied
 queryable
 rclone
+Razorpay
+Razorpay's
 realtime
 remediations
 repo
@@ -94,6 +99,7 @@ runtimes
 sdk
 SDKs
 select_account
+sellable
 serverless
 Sinch
 skipBrowserRedirect

@@ -6,11 +6,11 @@ import { useDashboardHost } from '#lib/config/DashboardHostContext';
 import { useProjectId } from '#lib/hooks/useMetadata';
 import { useToast } from '#lib/hooks/useToast';
 import { TimeRangeProvider } from '#features/analytics/context/TimeRangeContext';
-import { usePosthogConnection } from '#features/analytics/hooks/usePosthogConnection';
+import { analyticsQueryKeys, useAnalyticsConnection } from '#features/analytics/hooks/useAnalytics';
 import { AnalyticsSidebar } from './AnalyticsSidebar';
 
 export default function AnalyticsLayout() {
-  const conn = usePosthogConnection();
+  const conn = useAnalyticsConnection();
   const { projectId, isLoading: projectIdLoading, error: projectIdError } = useProjectId();
   const qc = useQueryClient();
   const { showToast } = useToast();
@@ -23,7 +23,7 @@ export default function AnalyticsLayout() {
     }
     return subscribePosthogConnectionStatus((e) => {
       if (e.status === 'connected') {
-        void qc.invalidateQueries({ queryKey: ['posthog'] });
+        void qc.invalidateQueries({ queryKey: analyticsQueryKeys.all });
         void navigate('/dashboard/analytics/traffic', { replace: true });
         return;
       }

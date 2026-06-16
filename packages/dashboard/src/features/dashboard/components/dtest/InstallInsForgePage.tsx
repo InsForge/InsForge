@@ -9,6 +9,7 @@ import {
   type ClientId,
 } from './clientRegistry';
 import { getFeatureFlag } from '#lib/analytics/posthog';
+import { FEATURE_FLAGS } from '#lib/analytics/constants';
 
 interface InstallInsForgePageProps {
   onSelectClient: (id: ClientId) => void;
@@ -16,7 +17,7 @@ interface InstallInsForgePageProps {
 }
 
 export function InstallInsForgePage({ onSelectClient, onDismiss }: InstallInsForgePageProps) {
-  const mcpVsCliVariant = getFeatureFlag('mcp-vs-cli');
+  const mcpVsCliVariant = getFeatureFlag(FEATURE_FLAGS.MCP_VS_CLI);
   const gridEntries = CODING_AGENT_GRID_IDS.map((id) => CLIENT_ENTRIES[id]).filter((entry) => {
     const tabs = entry.tabs ?? DEFAULT_AGENT_TABS;
     if (mcpVsCliVariant === 'mcp') {

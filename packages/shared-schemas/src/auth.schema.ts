@@ -38,7 +38,6 @@ export const verificationMethodSchema = z.enum(['code', 'link']);
 export const profileSchema = z
   .object({
     name: z.string().optional(),
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     avatar_url: z.string().url().optional(),
   })
   .passthrough();

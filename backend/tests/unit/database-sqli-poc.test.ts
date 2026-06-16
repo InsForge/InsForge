@@ -36,7 +36,7 @@ describe('DatabaseTableService - SQL Injection Verification (Fixed)', () => {
       .mockResolvedValueOnce({ rows: [] }) // 2. Fkey constraints (pooled query)
       .mockResolvedValueOnce({ rows: [{ column_name: 'id' }] }) // 3. Primary keys
       .mockResolvedValueOnce({ rows: [] }) // 4. Unique columns
-      .mockResolvedValueOnce({ rows: [{ row_count: 0 }] }); // 5. SAFE row count query
+      .mockResolvedValueOnce({ rows: [{ row_count: 0 }] }); // 5. COUNT(*) query
   });
 
   test('getTableSchema correctly escapes table names to prevent SQL injection', async () => {
@@ -56,7 +56,7 @@ describe('DatabaseTableService - SQL Injection Verification (Fixed)', () => {
     );
 
     expect(injectionQueryCall).toBeDefined();
-    const capturedQuery = injectionQueryCall[0];
+    const capturedQuery = injectionQueryCall![0];
 
     console.log('Captured SQL Query:', capturedQuery);
 

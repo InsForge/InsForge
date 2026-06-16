@@ -7,6 +7,13 @@ import { SecretService } from '@/services/secrets/secret.service.js';
 import { adminService } from '@/services/admin/admin.service.js';
 
 export type UserContext = {
+  /**
+   * Always present at the API level: user UUID for authenticated, admin id
+   * for project_admin, 'anonymous' for anon. Only the authenticated UUID is
+   * a row-ownership identity; database boundaries (claims, owner columns)
+   * gate on role === 'authenticated' so admin/anon labels never reach
+   * uuid-typed claims or columns.
+   */
   id: string;
   email?: string;
   role: RoleSchema;
@@ -48,6 +55,18 @@ export function extractApiKey(req: AuthRequest): string | null {
   return null;
 }
 
+// Helper function to extract the opaque anon key from a request
+// The anon key travels in the Authorization header like every other client
+// credential (Bearer anon_...); signed-in clients replace it with their JWT.
+export function extractAnonKey(req: AuthRequest): string | null {
+  const bearerToken = extractBearerToken(req.headers.authorization);
+  if (bearerToken && bearerToken.startsWith('anon_')) {
+    return bearerToken;
+  }
+
+  return null;
+}
+
 // Helper function to set user on request
 function setRequestUser(
   req: AuthRequest,
@@ -72,7 +91,18 @@ function extractUsernameFromSub(sub: string): string | null {
 }
 
 /**
- * Verifies user authentication (accepts both user and admin tokens)
+ * Verifies user authentication (accepts API keys, anon keys, and JWT tokens)
+ *
+ * All credentials travel in the Authorization header; dispatch is by shape,
+ * never by falling back on failure:
+ * - `ik_...` (Bearer or x-api-key) -> admin API key
+ * - Bearer `anon_...` -> opaque anon key, `anon` role
+ * - any other Bearer -> JWT (role claim decides admin/authenticated/legacy anon)
+ *
+ * Signed-out clients send the anon key as their Bearer credential; signing in
+ * replaces it with the user JWT. Each branch fails closed: an invalid or
+ * expired user JWT must return 401 (so SDK refresh flows trigger) — it must
+ * never silently downgrade to anon.
  */
 export async function verifyUser(req: AuthRequest, res: Response, next: NextFunction) {
   const apiKey = extractApiKey(req);
@@ -80,7 +110,13 @@ export async function verifyUser(req: AuthRequest, res: Response, next: NextFunc
     return verifyApiKey(req, res, next);
   }
 
-  // Use the main verifyToken that handles JWT authentication
+  const bearerToken = extractBearerToken(req.headers.authorization);
+  if (bearerToken && bearerToken.startsWith('anon_')) {
+    return verifyAnonKey(req, res, next);
+  }
+
+  // Anything else (including no credentials) goes through JWT verification,
+  // which produces the canonical 401 when the header is missing or invalid
   return verifyToken(req, res, next);
 }
 
@@ -228,6 +264,43 @@ export async function verifyApiKey(req: AuthRequest, _res: Response, next: NextF
     }
     req.authenticated = true;
     req.hasApiKey = true;
+    next();
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Verifies the opaque anon key (`anon_...`)
+ * Maps the request to the `anon` role; RLS policies are the security boundary.
+ * The request carries 'anonymous' as its API-level subject, but no sub claim
+ * reaches the database (stripped like admin subjects), so auth.uid() is NULL
+ * and identity-scoped policies fail closed.
+ */
+export async function verifyAnonKey(req: AuthRequest, _res: Response, next: NextFunction) {
+  try {
+    const anonKey = extractAnonKey(req);
+
+    if (!anonKey) {
+      throw new AppError(
+        'No anon key provided',
+        401,
+        ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+        NEXT_ACTIONS.CHECK_TOKEN
+      );
+    }
+
+    const isValid = await secretService.verifyAnonKey(anonKey);
+    if (!isValid) {
+      throw new AppError(
+        'Invalid anon key',
+        401,
+        ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+        NEXT_ACTIONS.CHECK_TOKEN
+      );
+    }
+
+    setRequestUser(req, { sub: 'anonymous', role: 'anon' });
     next();
   } catch (error) {
     next(error);

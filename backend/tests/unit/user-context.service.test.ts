@@ -68,16 +68,33 @@ describe('withUserContext', () => {
     expect(client.release).toHaveBeenCalledOnce();
   });
 
-  it('sets anon role in the canonical claims object when id is undefined', async () => {
+  it('strips the anonymous sentinel subject from database claims', async () => {
     const { client, calls } = makeMockClient();
     const pool = makeMockPool(client);
 
-    await withUserContext(pool, { role: 'anon' }, async () => {});
+    await withUserContext(pool, { id: 'anonymous', role: 'anon' }, async () => {});
 
+    // The sentinel is an API-level label: auth.uid() casts sub to uuid, so
+    // it must never reach the database claims
     expect(calls[2].params?.[0]).toBe('request.jwt.claims');
     expect(JSON.parse(calls[2].params![1] as string)).toEqual({ role: 'anon' });
     const setLocalRole = calls.find((c) => c.sql.startsWith('SET LOCAL ROLE'));
     expect(setLocalRole?.sql).toBe('SET LOCAL ROLE anon');
+  });
+
+  it('strips anon subjects even when they are UUIDs (legacy anon JWTs)', async () => {
+    const { client, calls } = makeMockClient();
+    const pool = makeMockPool(client);
+
+    // The legacy shared anon UUID never identified anyone — ownership is an
+    // authenticated-only concept, regardless of the subject's shape
+    await withUserContext(
+      pool,
+      { id: '12345678-1234-5678-90ab-cdef12345678', role: 'anon' },
+      async () => {}
+    );
+
+    expect(JSON.parse(calls[2].params![1] as string)).toEqual({ role: 'anon' });
   });
 
   it('can run as project_admin when the caller wants database policies to decide', async () => {

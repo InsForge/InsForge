@@ -49,6 +49,21 @@ export interface ComputeEvent {
   message: string;
 }
 
+// A single container stdout/stderr line. `timestamp` is epoch milliseconds.
+export interface ComputeLogLine {
+  timestamp: number;
+  message: string;
+  instance?: string;
+  region?: string;
+}
+
+// Result of fetching container logs. `nextToken` is an opaque forward cursor
+// (Fly's `next_token`) for live tailing; null when nothing further is available.
+export interface ComputeLogsResult {
+  lines: ComputeLogLine[];
+  nextToken: string | null;
+}
+
 export interface ComputeProvider {
   isConfigured(): boolean;
   createApp(params: { name: string; network: string; org: string }): Promise<{ appId: string }>;
@@ -65,6 +80,11 @@ export interface ComputeProvider {
     machineId: string,
     options?: { limit?: number }
   ): Promise<ComputeEvent[]>;
+  getLogs(
+    appId: string,
+    machineId: string,
+    options?: { limit?: number; nextToken?: string }
+  ): Promise<ComputeLogsResult>;
   waitForState(
     appId: string,
     machineId: string,
