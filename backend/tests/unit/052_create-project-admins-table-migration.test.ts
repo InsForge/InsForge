@@ -6,10 +6,10 @@ import { fileURLToPath } from 'url';
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const migrationPath = path.resolve(
   currentDir,
-  '../../src/infra/database/migrations/049_create-project-admins-table.sql'
+  '../../src/infra/database/migrations/052_create-project-admins-table.sql'
 );
 
-describe('049_create-project-admins-table migration', () => {
+describe('052_create-project-admins-table migration', () => {
   it('migration file exists', () => {
     expect(fs.existsSync(migrationPath)).toBe(true);
   });
