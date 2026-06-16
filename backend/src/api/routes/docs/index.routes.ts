@@ -1,4 +1,4 @@
-import { Router, Request, Response, NextFunction } from 'express';
+﻿import { Router, Request, Response, NextFunction } from 'express';
 import { readFile } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -265,7 +265,7 @@ router.get('/', (_req: Request, res: Response, next: NextFunction) => {
       endpoint: `/api/docs/${key}`,
     }));
 
-    // List SDK documentation (feature × language combinations)
+    // List SDK documentation (feature Ã— language combinations)
     const sdkDocs: { type: string; filename: string; endpoint: string }[] = [];
     for (const [feature, languages] of Object.entries(SDK_DOCS_MAP)) {
       for (const [language, filename] of Object.entries(languages)) {
