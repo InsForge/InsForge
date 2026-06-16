@@ -39,7 +39,7 @@ describe('Auth Middlewares (verifyAdmin, verifyToken, requireRoot)', () => {
   });
 
   describe('verifyAdmin', () => {
-    it('bypasses database query when isRoot and adminId are present in the JWT payload', async () => {
+    it('queries database and verifies admin even when isRoot and adminId are present in the JWT payload', async () => {
       const req = {
         headers: {
           authorization: 'Bearer valid-modern-token',
@@ -55,17 +55,50 @@ describe('Auth Middlewares (verifyAdmin, verifyToken, requireRoot)', () => {
         adminId: 'operator-uuid',
       });
 
+      vi.mocked(adminService.getAdminByUsername).mockResolvedValue({
+        id: 'operator-uuid-db',
+        username: 'operator1',
+        is_root: false,
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+
       await verifyAdmin(req, res, next);
 
       expect(next).toHaveBeenCalledWith();
       expect(req.user).toEqual({
-        id: 'operator-uuid',
+        id: 'operator-uuid-db',
         email: undefined,
         role: 'project_admin',
         username: 'operator1',
         isRoot: false,
       });
-      expect(adminService.getAdminByUsername).not.toHaveBeenCalled();
+      expect(adminService.getAdminByUsername).toHaveBeenCalledWith('operator1');
+    });
+
+    it('rejects access (calls next with error) if the admin account is missing or soft-deleted', async () => {
+      const req = {
+        headers: {
+          authorization: 'Bearer valid-modern-token',
+        },
+      } as unknown as AuthRequest;
+      const res = {} as Response;
+      const next = vi.fn() as NextFunction;
+
+      vi.mocked(tokenManager.verifyToken).mockReturnValue({
+        sub: 'local:operator1',
+        role: 'project_admin',
+        isRoot: false,
+        adminId: 'operator-uuid',
+      });
+
+      vi.mocked(adminService.getAdminByUsername).mockResolvedValue(null);
+
+      await verifyAdmin(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(expect.any(Error));
+      expect(req.user).toBeUndefined();
+      expect(adminService.getAdminByUsername).toHaveBeenCalledWith('operator1');
     });
 
     it('falls back to database query when isRoot or adminId is missing in the JWT payload', async () => {
@@ -105,7 +138,7 @@ describe('Auth Middlewares (verifyAdmin, verifyToken, requireRoot)', () => {
   });
 
   describe('verifyToken', () => {
-    it('extracts username and maps database ID for project_admin role', async () => {
+    it('extracts username, queries DB, and maps database ID for project_admin role', async () => {
       const req = {
         headers: {
           authorization: 'Bearer valid-admin-token',
@@ -121,16 +154,50 @@ describe('Auth Middlewares (verifyAdmin, verifyToken, requireRoot)', () => {
         adminId: 'admin-uuid',
       });
 
+      vi.mocked(adminService.getAdminByUsername).mockResolvedValue({
+        id: 'admin-uuid-db',
+        username: 'admin1',
+        is_root: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+
       await verifyToken(req, res, next);
 
       expect(next).toHaveBeenCalledWith();
       expect(req.user).toEqual({
-        id: 'admin-uuid',
+        id: 'admin-uuid-db',
         email: undefined,
         role: 'project_admin',
         username: 'admin1',
         isRoot: true,
       });
+      expect(adminService.getAdminByUsername).toHaveBeenCalledWith('admin1');
+    });
+
+    it('rejects access if the admin is missing or soft-deleted', async () => {
+      const req = {
+        headers: {
+          authorization: 'Bearer valid-admin-token',
+        },
+      } as unknown as AuthRequest;
+      const res = {} as Response;
+      const next = vi.fn() as NextFunction;
+
+      vi.mocked(tokenManager.verifyToken).mockReturnValue({
+        sub: 'local:admin1',
+        role: 'project_admin',
+        isRoot: true,
+        adminId: 'admin-uuid',
+      });
+
+      vi.mocked(adminService.getAdminByUsername).mockResolvedValue(null);
+
+      await verifyToken(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(expect.any(Error));
+      expect(req.user).toBeUndefined();
+      expect(adminService.getAdminByUsername).toHaveBeenCalledWith('admin1');
     });
 
     it('passes standard user payload without custom project_admin mapping', async () => {

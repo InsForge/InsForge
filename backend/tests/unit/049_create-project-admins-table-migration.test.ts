@@ -17,8 +17,9 @@ describe('049_create-project-admins-table migration', () => {
   it('contains correct table definition and trigger', () => {
     const sql = fs.readFileSync(migrationPath, 'utf8');
     expect(sql).toContain('CREATE TABLE IF NOT EXISTS auth.project_admins');
-    expect(sql).toContain('username TEXT UNIQUE NOT NULL');
+    expect(sql).toContain('username TEXT NOT NULL');
     expect(sql).toContain('password_hash TEXT NOT NULL');
+    expect(sql).toContain('CREATE UNIQUE INDEX IF NOT EXISTS idx_project_admins_username_active');
     expect(sql).toContain('CREATE TRIGGER update_project_admins_updated_at');
     expect(sql).toContain('system.update_updated_at()');
   });
