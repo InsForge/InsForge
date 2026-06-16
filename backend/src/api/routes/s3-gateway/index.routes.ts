@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { s3Sigv4Middleware, S3AuthenticatedRequest } from '@/api/middlewares/s3-sigv4.js';
 import { dispatchOp, parseBucketAndKey, S3Op } from './dispatch.js';
+import { S3GatewayRequest } from './request.js';
 import { sendS3Error, S3ProtocolError } from './errors.js';
 import { StorageService } from '@/services/storage/storage.service.js';
 import logger from '@/utils/logger.js';
@@ -67,12 +68,11 @@ s3GatewayRouter.use(async (req: Request, res: Response) => {
     return;
   }
   const { bucket, key } = parseBucketAndKey(req.path);
-  (req as Request & { s3Op?: S3Op; s3Bucket?: string | null; s3Key?: string | null }).s3Op = op;
-  (req as Request & { s3Bucket?: string | null }).s3Bucket = bucket;
-  (req as Request & { s3Key?: string | null }).s3Key = key;
+  const authed = req as S3GatewayRequest;
+  authed.s3Op = op;
+  authed.s3Bucket = bucket;
+  authed.s3Key = key;
   logger.debug('S3 gateway dispatch', { op, bucket, key });
-
-  const authed = req as S3AuthenticatedRequest;
   try {
     switch (op) {
       case 'ListBuckets':
