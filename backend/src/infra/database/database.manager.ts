@@ -183,10 +183,17 @@ export class DatabaseManager {
 
         const queryResult = await client.query(unionQuery);
         const nowAfterQuery = Date.now();
+
+        // 1. Resolve all database counts into the request-local map first
         for (const row of queryResult.rows) {
           const cacheKey = buildQualifiedTableKey(row.table_name, 'public');
-          const count = Number(row.count);
-          requestCounts.set(cacheKey, count);
+          requestCounts.set(cacheKey, Number(row.count));
+        }
+
+        // 2. Perform all cache mutations second
+        for (const row of queryResult.rows) {
+          const cacheKey = buildQualifiedTableKey(row.table_name, 'public');
+          const count = requestCounts.get(cacheKey) ?? Number(row.count);
           DatabaseManager.setBoundedCache(
             DatabaseManager.tableCountCache,
             DatabaseManager.MAX_TABLE_COUNT_CACHE_SIZE,
