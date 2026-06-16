@@ -59,5 +59,10 @@ export function normalizeRazorpayError(error: unknown): unknown {
     return new AppError(message, status, ERROR_CODES.PAYMENT_CONFIG_INVALID);
   }
 
+  // `UpstreamError` re-derives its message via `getUpstreamErrorMessage`, which
+  // reads a top-level `error.message` but not Razorpay's nested
+  // `error.error.description`. We pass our extracted description as the fallback
+  // so it surfaces — Razorpay SDK errors carry no top-level `message`, so the
+  // fallback always wins and this stays consistent with the branches above.
   return new UpstreamError(error, message);
 }

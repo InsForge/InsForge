@@ -2,7 +2,7 @@ import type { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { getBillingSubjectFromProviderAttributes } from '@/services/payments/helpers.js';
 import { RazorpayConfigService } from '@/services/payments/razorpay/config.service.js';
-import { PaymentWebhookEventStore } from '@/services/payments/webhook-event-store.js';
+import { WebhookStoreService } from '@/services/payments/webhook-store.service.js';
 import {
   RazorpayTransactionService,
   type RazorpayTransactionStatus,
@@ -48,7 +48,7 @@ export class RazorpayWebhookService {
   private pool: Pool | null = null;
   private readonly configService = RazorpayConfigService.getInstance();
   private readonly transactionService = RazorpayTransactionService.getInstance();
-  private readonly eventStore = PaymentWebhookEventStore.getInstance();
+  private readonly webhookStore = WebhookStoreService.getInstance();
 
   static getInstance(): RazorpayWebhookService {
     if (!RazorpayWebhookService.instance) {
@@ -158,7 +158,7 @@ export class RazorpayWebhookService {
     eventType: string,
     payload: RazorpayWebhookPayload
   ): Promise<ShouldProcessResult> {
-    const result = await this.eventStore.recordStart({
+    const result = await this.webhookStore.recordStart({
       provider: 'razorpay',
       environment,
       eventId,
@@ -184,7 +184,7 @@ export class RazorpayWebhookService {
     status: RazorpayWebhookProcessingStatus,
     error: string | null
   ): Promise<RazorpayWebhookEventRow> {
-    return this.eventStore.mark('razorpay', environment, eventId, status, error);
+    return this.webhookStore.mark('razorpay', environment, eventId, status, error);
   }
 
   private parseWebhookPayload(rawBody: string): RazorpayWebhookPayload {

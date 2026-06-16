@@ -7,7 +7,7 @@ import { PaymentCustomerService } from '@/services/payments/payment-customer.ser
 import { StripeTransactionService } from '@/services/payments/stripe/transaction.service.js';
 import { StripeSubscriptionService } from '@/services/payments/stripe/subscription.service.js';
 import { getStripeWebhookSecretName } from '@/services/payments/stripe/constants.js';
-import { PaymentWebhookEventStore } from '@/services/payments/webhook-event-store.js';
+import { WebhookStoreService } from '@/services/payments/webhook-store.service.js';
 import {
   fromStripeTimestamp,
   getBillingSubjectFromProviderAttributes,
@@ -41,7 +41,7 @@ export class StripeWebhookService {
   private readonly customerService = PaymentCustomerService.getInstance();
   private readonly stripeTransactionService = StripeTransactionService.getInstance();
   private readonly subscriptionService = StripeSubscriptionService.getInstance();
-  private readonly eventStore = PaymentWebhookEventStore.getInstance();
+  private readonly webhookStore = WebhookStoreService.getInstance();
 
   static getInstance(): StripeWebhookService {
     if (!StripeWebhookService.instance) {
@@ -131,7 +131,7 @@ export class StripeWebhookService {
     event: StripeEvent
   ): Promise<{ row: StripeWebhookEventRow; shouldProcess: boolean }> {
     const object = event.data.object as unknown;
-    return this.eventStore.recordStart({
+    return this.webhookStore.recordStart({
       provider: 'stripe',
       environment,
       eventId: event.id,
@@ -150,7 +150,7 @@ export class StripeWebhookService {
     processingStatus: 'processed' | 'failed' | 'ignored',
     error: string | null
   ): Promise<StripeWebhookEventRow> {
-    return this.eventStore.mark('stripe', environment, eventId, processingStatus, error);
+    return this.webhookStore.mark('stripe', environment, eventId, processingStatus, error);
   }
 
   normalizeWebhookEventRow(row: StripeWebhookEventRow): StripeWebhookEvent {

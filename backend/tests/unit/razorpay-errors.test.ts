@@ -53,6 +53,19 @@ describe('normalizeRazorpayError', () => {
     });
   });
 
+  it('maps Razorpay forbidden errors to payment config errors', () => {
+    const normalized = normalizeRazorpayError({
+      statusCode: 403,
+      error: { code: 'BAD_REQUEST_ERROR', description: 'Forbidden' },
+    });
+
+    expect(normalized).toMatchObject({
+      statusCode: 403,
+      code: ERROR_CODES.PAYMENT_CONFIG_INVALID,
+      message: 'Forbidden',
+    });
+  });
+
   it('maps generic Razorpay API errors to upstream failures using the nested description', () => {
     const normalized = normalizeRazorpayError({
       statusCode: 500,
@@ -63,6 +76,33 @@ describe('normalizeRazorpayError', () => {
       statusCode: 500,
       code: ERROR_CODES.UPSTREAM_FAILURE,
       message: 'Razorpay is unavailable',
+    });
+  });
+
+  it('falls back to the top-level message when the nested description is blank', () => {
+    const normalized = normalizeRazorpayError({
+      statusCode: 500,
+      error: { code: 'SERVER_ERROR', description: '   ' },
+      message: 'top-level failure',
+    });
+
+    expect(normalized).toMatchObject({
+      statusCode: 500,
+      code: ERROR_CODES.UPSTREAM_FAILURE,
+      message: 'top-level failure',
+    });
+  });
+
+  it('falls back to a literal message when neither description nor message is usable', () => {
+    const normalized = normalizeRazorpayError({
+      statusCode: 500,
+      error: { code: 'SERVER_ERROR' },
+    });
+
+    expect(normalized).toMatchObject({
+      statusCode: 500,
+      code: ERROR_CODES.UPSTREAM_FAILURE,
+      message: 'Razorpay request failed',
     });
   });
 });

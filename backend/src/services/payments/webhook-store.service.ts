@@ -1,6 +1,8 @@
 import type { Pool } from 'pg';
+import { AppError } from '@/utils/errors.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import type { PaymentEnvironment, PaymentProvider } from '@/types/payments.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 
 /**
  * How long a row may sit in `pending` before another delivery of the same event
@@ -80,15 +82,15 @@ const RETURNING_COLUMNS = `
  * specifics — signature verification, event-id derivation, and event-type
  * dispatch — stay in each provider's webhook service.
  */
-export class PaymentWebhookEventStore {
-  private static instance: PaymentWebhookEventStore;
+export class WebhookStoreService {
+  private static instance: WebhookStoreService;
   private pool: Pool | null = null;
 
-  static getInstance(): PaymentWebhookEventStore {
-    if (!PaymentWebhookEventStore.instance) {
-      PaymentWebhookEventStore.instance = new PaymentWebhookEventStore();
+  static getInstance(): WebhookStoreService {
+    if (!WebhookStoreService.instance) {
+      WebhookStoreService.instance = new WebhookStoreService();
     }
-    return PaymentWebhookEventStore.instance;
+    return WebhookStoreService.instance;
   }
 
   private getPool(): Pool {
@@ -184,7 +186,18 @@ export class PaymentWebhookEventStore {
       [provider, environment, eventId]
     );
 
-    return { row: existingResult.rows[0], shouldProcess: false };
+    const existing = existingResult.rows[0];
+    if (!existing) {
+      // The conflicting row that blocked the INSERT/reclaim should still be
+      // here; if it isn't, it was deleted concurrently and we can't proceed.
+      throw new AppError(
+        `Webhook event ${provider}/${environment}/${eventId} vanished during recording`,
+        500,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    }
+
+    return { row: existing, shouldProcess: false };
   }
 
   /** Transition an event to a terminal status, stamping `processed_at` on success. */
@@ -208,6 +221,17 @@ export class PaymentWebhookEventStore {
       [provider, environment, eventId, status, error]
     );
 
-    return result.rows[0];
+    const row = result.rows[0];
+    if (!row) {
+      // The event is marked only after it was recorded, so the row must exist;
+      // a no-op UPDATE means it was deleted out from under us.
+      throw new AppError(
+        `Webhook event ${provider}/${environment}/${eventId} not found while marking ${status}`,
+        500,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    }
+
+    return row;
   }
 }
