@@ -31,5 +31,5 @@ BEGIN
   END IF;
 END $$;
 
--- DOWN migration (rollback ke liye)
+-- DOWN migration
 DROP TABLE IF EXISTS auth.project_admins;
