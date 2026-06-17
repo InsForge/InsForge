@@ -38,14 +38,15 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
     return;
   }
 
-  let rules = corsConfig.CORSRule;
+  let rules: unknown = corsConfig.CORSRule;
   if (!rules) {
     rules = [];
   } else if (!Array.isArray(rules)) {
     rules = [rules];
   }
+  const normalizedRules = rules as Array<Record<string, unknown>>;
 
-  if (rules.length === 0) {
+  if (normalizedRules.length === 0) {
     sendS3Error(res, 'MalformedXML', 'CORSConfiguration must contain at least one CORSRule', {
       resource: req.path,
       requestId: req.s3Auth.requestId,
@@ -55,7 +56,7 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
 
   const VALID_METHODS = new Set(['GET', 'PUT', 'POST', 'DELETE', 'HEAD']);
 
-  for (const [i, rule] of (rules as Record<string, unknown>[]).entries()) {
+  for (const [i, rule] of normalizedRules.entries()) {
     const methods = normalizeArrayField(rule.AllowedMethod);
     const origins = normalizeArrayField(rule.AllowedOrigin);
 
@@ -105,7 +106,7 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
     }
   }
 
-  await svc.putBucketCorsRules(bucket, rules as Array<Record<string, unknown>>);
+  await svc.putBucketCorsRules(bucket, normalizedRules);
   res.status(200).send();
 }
 

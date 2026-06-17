@@ -3,7 +3,7 @@ import { toXml } from '../xml.js';
 import { StorageService } from '@/services/storage/storage.service.js';
 import { S3GatewayRequest, getS3Bucket } from '../request.js';
 
-export function getBucketLocation(_req: S3GatewayRequest, res: Response): Promise<void> {
+export async function getBucketLocation(_req: S3GatewayRequest, res: Response): Promise<void> {
   res
     .status(200)
     .type('application/xml')
