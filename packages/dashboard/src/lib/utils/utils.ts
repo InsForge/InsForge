@@ -1,6 +1,4 @@
 import { ColumnType } from '@insforge/shared-schemas';
-import { type ClassValue, clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
 import { z } from 'zod';
 import { format, parse, isValid, parseISO } from 'date-fns';
 import {
@@ -17,9 +15,9 @@ import { getDashboardBackendUrl } from '#lib/config/runtime';
 import { v4 as uuidv4 } from 'uuid';
 import type { ConvertedValue, DisplayValue, ValueConversionResult } from '#components/datagrid';
 
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
+// Re-exported from the shared UI package so the dashboard and @insforge/ui use
+// one identical class-merge implementation.
+export { cn } from '@insforge/ui';
 
 /**
  * Convert and validate a string value based on the specified ColumnType
