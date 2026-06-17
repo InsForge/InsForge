@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { modalitySchema } from './ai.schema.js';
 
-declare const process: any;
+declare const process: { env?: Record<string, string> };
 
 export const DEFAULT_MAX_TOKENS_CAP = 16384;
 
