@@ -48,14 +48,7 @@ describe('FilePreviewDialog', () => {
   });
 
   it('hides navigation buttons when no callbacks are provided', () => {
-    render(
-      <FilePreviewDialog
-        open
-        onOpenChange={vi.fn()}
-        file={fileA}
-        bucket="test-bucket"
-      />
-    );
+    render(<FilePreviewDialog open onOpenChange={vi.fn()} file={fileA} bucket="test-bucket" />);
 
     expect(screen.queryByRole('button', { name: 'Previous file' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Next file' })).not.toBeInTheDocument();
