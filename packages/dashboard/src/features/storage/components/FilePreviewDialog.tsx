@@ -101,6 +101,13 @@ export function FilePreviewDialog({
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
+      const target = e.target;
+      if (
+        target instanceof Element &&
+        target.closest('input, textarea, select, button, video, audio, iframe, [contenteditable]')
+      ) {
+        return;
+      }
       if (e.key === 'ArrowLeft' && hasPrevious && onPrevious) {
         e.preventDefault();
         onPrevious();

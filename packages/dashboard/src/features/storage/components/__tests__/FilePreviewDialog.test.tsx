@@ -132,9 +132,8 @@ describe('FilePreviewDialog', () => {
     expect(onPrevious).toHaveBeenCalledTimes(1);
   });
 
-  it('navigates with ArrowRight key when open and hasNext', async () => {
+  it('navigates with ArrowRight key when open and hasNext', () => {
     const onNext = vi.fn();
-    const user = userEvent.setup();
 
     render(
       <FilePreviewDialog
@@ -149,13 +148,12 @@ describe('FilePreviewDialog', () => {
       />
     );
 
-    await user.keyboard('{ArrowRight}');
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
     expect(onNext).toHaveBeenCalledTimes(1);
   });
 
-  it('navigates with ArrowLeft key when open and hasPrevious', async () => {
+  it('navigates with ArrowLeft key when open and hasPrevious', () => {
     const onPrevious = vi.fn();
-    const user = userEvent.setup();
 
     render(
       <FilePreviewDialog
@@ -170,13 +168,12 @@ describe('FilePreviewDialog', () => {
       />
     );
 
-    await user.keyboard('{ArrowLeft}');
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' }));
     expect(onPrevious).toHaveBeenCalledTimes(1);
   });
 
-  it('does not call onNext on ArrowRight when hasNext is false', async () => {
+  it('does not call onNext on ArrowRight when hasNext is false', () => {
     const onNext = vi.fn();
-    const user = userEvent.setup();
 
     render(
       <FilePreviewDialog
@@ -191,13 +188,12 @@ describe('FilePreviewDialog', () => {
       />
     );
 
-    await user.keyboard('{ArrowRight}');
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
     expect(onNext).not.toHaveBeenCalled();
   });
 
-  it('does not call onPrevious on ArrowLeft when hasPrevious is false', async () => {
+  it('does not call onPrevious on ArrowLeft when hasPrevious is false', () => {
     const onPrevious = vi.fn();
-    const user = userEvent.setup();
 
     render(
       <FilePreviewDialog
@@ -212,7 +208,7 @@ describe('FilePreviewDialog', () => {
       />
     );
 
-    await user.keyboard('{ArrowLeft}');
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' }));
     expect(onPrevious).not.toHaveBeenCalled();
   });
 
@@ -234,9 +230,8 @@ describe('FilePreviewDialog', () => {
     expect(screen.getByRole('button', { name: 'Next file' })).toBeDisabled();
   });
 
-  it('does not respond to keyboard navigation when dialog is closed', async () => {
+  it('does not respond to keyboard navigation when dialog is closed', () => {
     const onNext = vi.fn();
-    const user = userEvent.setup();
 
     render(
       <FilePreviewDialog
@@ -251,7 +246,7 @@ describe('FilePreviewDialog', () => {
       />
     );
 
-    await user.keyboard('{ArrowRight}');
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
     expect(onNext).not.toHaveBeenCalled();
   });
 });
