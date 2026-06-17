@@ -234,20 +234,24 @@ describeIf('S3 gateway versioning (integration)', () => {
   });
 
   it('enables versioning', async () => {
-    await s3.send(new PutBucketVersioningCommand({
-      Bucket: bucket,
-      VersioningConfiguration: { Status: 'Enabled' },
-    }));
+    await s3.send(
+      new PutBucketVersioningCommand({
+        Bucket: bucket,
+        VersioningConfiguration: { Status: 'Enabled' },
+      })
+    );
 
     const got = await s3.send(new GetBucketVersioningCommand({ Bucket: bucket }));
     expect(got.Status).toBe('Enabled');
   });
 
   it('suspends versioning', async () => {
-    await s3.send(new PutBucketVersioningCommand({
-      Bucket: bucket,
-      VersioningConfiguration: { Status: 'Suspended' },
-    }));
+    await s3.send(
+      new PutBucketVersioningCommand({
+        Bucket: bucket,
+        VersioningConfiguration: { Status: 'Suspended' },
+      })
+    );
 
     const got = await s3.send(new GetBucketVersioningCommand({ Bucket: bucket }));
     expect(got.Status).toBe('Suspended');

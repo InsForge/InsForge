@@ -14,10 +14,7 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
 
   const rules = await svc.getBucketCorsRules(bucket);
   if (!rules) {
-    throw new S3ProtocolError(
-      'NoSuchCORSConfiguration',
-      'The CORS configuration does not exist'
-    );
+    throw new S3ProtocolError('NoSuchCORSConfiguration', 'The CORS configuration does not exist');
   }
 
   const xml = toXml({

@@ -104,7 +104,9 @@ describe('PutBucketCors — empty CORS config rejection', () => {
 
     expect(status).toHaveBeenCalledWith(400);
     expect(send.mock.calls[0][0] as string).toContain('MalformedXML');
-    expect(send.mock.calls[0][0] as string).toContain('CORSConfiguration must contain at least one CORSRule');
+    expect(send.mock.calls[0][0] as string).toContain(
+      'CORSConfiguration must contain at least one CORSRule'
+    );
   });
 });
 
@@ -113,7 +115,10 @@ describe('PutBucketCors — empty CORS config rejection', () => {
 // ---------------------------------------------------------------------------
 describe('NoSuchCORSConfiguration error', () => {
   it('S3ProtocolError throws with correct code', () => {
-    const err = new S3ProtocolError('NoSuchCORSConfiguration', 'The CORS configuration does not exist');
+    const err = new S3ProtocolError(
+      'NoSuchCORSConfiguration',
+      'The CORS configuration does not exist'
+    );
     expect(err.code).toBe('NoSuchCORSConfiguration');
     expect(err.message).toBe('The CORS configuration does not exist');
   });

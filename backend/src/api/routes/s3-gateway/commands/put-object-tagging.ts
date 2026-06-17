@@ -67,11 +67,7 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
         return;
       }
       if (tagKey.startsWith('aws:')) {
-        sendS3Error(
-          res,
-          'InvalidArgument',
-          'Tag keys must not start with "aws:"'
-        );
+        sendS3Error(res, 'InvalidArgument', 'Tag keys must not start with "aws:"');
         return;
       }
       if (tagValue.length > MAX_TAG_VALUE_LENGTH) {
@@ -87,22 +83,14 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
   }
 
   if (normalizedTags.length > MAX_TAG_COUNT) {
-    sendS3Error(
-      res,
-      'InvalidArgument',
-      `Tags count must not exceed ${MAX_TAG_COUNT}`
-    );
+    sendS3Error(res, 'InvalidArgument', `Tags count must not exceed ${MAX_TAG_COUNT}`);
     return;
   }
 
   const seen = new Set<string>();
   for (const t of normalizedTags) {
     if (seen.has(t.tagKey)) {
-      sendS3Error(
-        res,
-        'InvalidArgument',
-        `Duplicate tag key: ${t.tagKey}`
-      );
+      sendS3Error(res, 'InvalidArgument', `Duplicate tag key: ${t.tagKey}`);
       return;
     }
     seen.add(t.tagKey);

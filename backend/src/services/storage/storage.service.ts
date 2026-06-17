@@ -919,23 +919,17 @@ export class StorageService {
   // S3 CORS support
   // ==========================================================================
 
-  async getBucketCorsRules(
-    bucket: string
-  ): Promise<Array<Record<string, unknown>> | null> {
-    const r = await this.getPool().query(
-      'SELECT cors_rules FROM storage.buckets WHERE name = $1',
-      [bucket]
-    );
+  async getBucketCorsRules(bucket: string): Promise<Array<Record<string, unknown>> | null> {
+    const r = await this.getPool().query('SELECT cors_rules FROM storage.buckets WHERE name = $1', [
+      bucket,
+    ]);
     if (r.rowCount === 0) {
       return null;
     }
     return r.rows[0].cors_rules as Array<Record<string, unknown>> | null;
   }
 
-  async putBucketCorsRules(
-    bucket: string,
-    rules: Array<Record<string, unknown>>
-  ): Promise<void> {
+  async putBucketCorsRules(bucket: string, rules: Array<Record<string, unknown>>): Promise<void> {
     await this.getPool().query(
       `UPDATE storage.buckets SET cors_rules = $1, updated_at = NOW()
        WHERE name = $2`,
@@ -974,10 +968,10 @@ export class StorageService {
     const client = await this.getPool().connect();
     try {
       await client.query('BEGIN');
-      await client.query(
-        'DELETE FROM storage.object_tags WHERE bucket = $1 AND key = $2',
-        [bucket, key]
-      );
+      await client.query('DELETE FROM storage.object_tags WHERE bucket = $1 AND key = $2', [
+        bucket,
+        key,
+      ]);
       for (const t of tags) {
         await client.query(
           'INSERT INTO storage.object_tags (bucket, key, tag_key, tag_value) VALUES ($1, $2, $3, $4)',
@@ -994,10 +988,10 @@ export class StorageService {
   }
 
   async deleteObjectTags(bucket: string, key: string): Promise<void> {
-    await this.getPool().query(
-      'DELETE FROM storage.object_tags WHERE bucket = $1 AND key = $2',
-      [bucket, key]
-    );
+    await this.getPool().query('DELETE FROM storage.object_tags WHERE bucket = $1 AND key = $2', [
+      bucket,
+      key,
+    ]);
   }
 
   // ==========================================================================
