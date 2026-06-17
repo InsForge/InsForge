@@ -4,7 +4,6 @@ import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES, type RoleSchema } from '@insforge/shared-schemas';
 import { NEXT_ACTIONS } from '../../utils/next-actions.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
-import { adminService } from '@/services/admin/admin.service.js';
 
 export type UserContext = {
   /**
@@ -17,8 +16,6 @@ export type UserContext = {
   id: string;
   email?: string;
   role: RoleSchema;
-  username?: string;
-  isRoot?: boolean;
 };
 
 export interface AuthRequest extends Request {
@@ -76,18 +73,7 @@ function setRequestUser(
     id: payload.sub,
     email: payload.email,
     role: payload.role,
-    username: payload.username,
-    isRoot: payload.isRoot,
   };
-}
-
-// Helper to extract admin info from token sub claim
-// Token sub format: "local:username" or "cloud:userId"
-function extractUsernameFromSub(sub: string): string | null {
-  if (sub.startsWith('local:')) {
-    return sub.substring(6);
-  }
-  return null;
 }
 
 /**
@@ -152,31 +138,7 @@ export async function verifyAdmin(req: AuthRequest, res: Response, next: NextFun
       );
     }
 
-    // Extract username from sub (format: "local:username")
-    const username = extractUsernameFromSub(payload.sub);
-    let isRoot = payload.isRoot || false;
-    let dbAdminId = payload.adminId || payload.sub;
-
-    if (username) {
-      const admin = await adminService.getAdminByUsername(username);
-      if (!admin) {
-        throw new AppError(
-          'Admin account not found',
-          401,
-          ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-          NEXT_ACTIONS.CHECK_ADMIN_TOKEN
-        );
-      }
-      isRoot = admin.is_root || false;
-      dbAdminId = admin.id;
-    }
-
-    setRequestUser(req, {
-      ...payload,
-      sub: dbAdminId,
-      username: username || undefined,
-      isRoot,
-    });
+    setRequestUser(req, payload);
     next();
   } catch (error) {
     if (error instanceof AppError) {
@@ -199,40 +161,53 @@ export async function verifyAdmin(req: AuthRequest, res: Response, next: NextFun
  * Must be used after verifyAdmin
  */
 export function requireRoot(req: AuthRequest, res: Response, next: NextFunction) {
-  if (!req.user) {
-    return next(
-      new AppError(
-        'Authentication required',
+  try {
+    const token = extractBearerToken(req.headers.authorization);
+    if (!token) {
+      throw new AppError(
+        'No admin token provided',
         401,
-        ERROR_CODES.AUTH_UNAUTHORIZED,
+        ERROR_CODES.AUTH_INVALID_CREDENTIALS,
         NEXT_ACTIONS.CHECK_TOKEN
-      )
-    );
-  }
+      );
+    }
 
-  if (req.user.role !== 'project_admin') {
-    return next(
-      new AppError(
+    const payload = tokenManager.verifyToken(token);
+
+    if (payload.role !== 'project_admin') {
+      throw new AppError(
         'Admin access required',
         403,
         ERROR_CODES.AUTH_UNAUTHORIZED,
         NEXT_ACTIONS.CHECK_ADMIN_TOKEN
-      )
-    );
-  }
+      );
+    }
 
-  if (!req.user.isRoot) {
-    return next(
-      new AppError(
+    if (payload.sub !== 'local:admin') {
+      throw new AppError(
         'Root admin access required',
         403,
         ERROR_CODES.AUTH_UNAUTHORIZED,
         NEXT_ACTIONS.CHECK_ADMIN_TOKEN
-      )
-    );
-  }
+      );
+    }
 
-  next();
+    setRequestUser(req, payload);
+    next();
+  } catch (error) {
+    if (error instanceof AppError) {
+      next(error);
+    } else {
+      next(
+        new AppError(
+          'Invalid admin token',
+          401,
+          ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+          NEXT_ACTIONS.CHECK_ADMIN_TOKEN
+        )
+      );
+    }
+  }
 }
 
 /**
@@ -311,7 +286,7 @@ export async function verifyAnonKey(req: AuthRequest, _res: Response, next: Next
  * Core token verification middleware that handles JWT tokens
  * Sets req.user with the authenticated user information
  */
-export async function verifyToken(req: AuthRequest, _res: Response, next: NextFunction) {
+export function verifyToken(req: AuthRequest, _res: Response, next: NextFunction) {
   try {
     const token = extractBearerToken(req.headers.authorization);
     if (!token) {
@@ -335,37 +310,8 @@ export async function verifyToken(req: AuthRequest, _res: Response, next: NextFu
         NEXT_ACTIONS.CHECK_TOKEN
       );
     }
-
     // Set user info on request
-    if (payload.role === 'project_admin') {
-      const username = extractUsernameFromSub(payload.sub);
-      if (username) {
-        const admin = await adminService.getAdminByUsername(username);
-        if (!admin) {
-          throw new AppError(
-            'Admin account not found',
-            401,
-            ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-            NEXT_ACTIONS.CHECK_TOKEN
-          );
-        }
-        setRequestUser(req, {
-          ...payload,
-          sub: admin.id,
-          username: username || undefined,
-          isRoot: admin.is_root || false,
-        });
-      } else {
-        setRequestUser(req, {
-          ...payload,
-          sub: payload.adminId || payload.sub,
-          username: username || undefined,
-        });
-      }
-    } else {
-      setRequestUser(req, payload);
-    }
-
+    setRequestUser(req, payload);
     next();
   } catch (error) {
     if (error instanceof AppError) {

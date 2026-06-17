@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Button, Input } from '@insforge/ui';
+import { Button, Input, Dialog, DialogContent, DialogHeader, DialogTitle } from '@insforge/ui';
 import { adminService } from '#features/login/services/admin-management.service';
 import { useAuth } from '#lib/contexts/AuthContext';
 
@@ -19,6 +19,10 @@ export default function AccountSettingsDialog({ open, onOpenChange }: AccountSet
 
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
+
+  // Get username from user object - use sub as fallback display name
+  const displayName = user?.sub || 'Admin';
+  const username = user?.sub || '';
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -63,7 +67,14 @@ export default function AccountSettingsDialog({ open, onOpenChange }: AccountSet
     setLoading(true);
 
     try {
-      await adminService.changePassword({ oldPassword, newPassword });
+      // Use username from the user object
+      // For root admin, this will be 'local:admin'
+      // For DB admins, this will be their UUID
+      await adminService.changePassword({
+        username: username,
+        oldPassword,
+        newPassword,
+      });
       if (!isMountedRef.current) {
         return;
       }
@@ -81,8 +92,20 @@ export default function AccountSettingsDialog({ open, onOpenChange }: AccountSet
       if (!isMountedRef.current) {
         return;
       }
-      const errorResponse = err as { response?: { data?: { error?: string } } };
-      setError(errorResponse.response?.data?.error || 'Failed to change password');
+      const errorResponse = err as {
+        response?: {
+          data?: {
+            error?: string;
+            message?: string;
+          };
+        };
+        message?: string;
+      };
+      setError(
+        errorResponse.response?.data?.message ||
+          errorResponse.message ||
+          'Failed to change password'
+      );
     } finally {
       if (isMountedRef.current) {
         setLoading(false);
@@ -90,18 +113,12 @@ export default function AccountSettingsDialog({ open, onOpenChange }: AccountSet
     }
   };
 
-  if (!open) {
-    return null;
-  }
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div
-        className="absolute inset-0 bg-black bg-opacity-50"
-        onClick={() => onOpenChange(false)}
-      />
-      <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
-        <h2 className="text-xl font-semibold mb-4">Account Settings</h2>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Account Settings</DialogTitle>
+        </DialogHeader>
 
         <form
           onSubmit={(e) => {
@@ -109,15 +126,19 @@ export default function AccountSettingsDialog({ open, onOpenChange }: AccountSet
           }}
           className="space-y-4"
         >
-          {error && <div className="bg-red-50 text-red-600 p-3 rounded text-sm">{error}</div>}
+          {error && (
+            <div className="bg-destructive/10 text-destructive p-3 rounded text-sm">{error}</div>
+          )}
           {success && (
-            <div className="bg-green-50 text-green-600 p-3 rounded text-sm">{success}</div>
+            <div className="bg-primary/10 text-primary p-3 rounded text-sm">{success}</div>
           )}
 
           <div>
-            <label className="block text-sm font-medium mb-1">Username</label>
-            <Input type="text" value={user?.username || ''} disabled className="bg-gray-100" />
-            <p className="text-xs text-gray-500 mt-1">Username cannot be changed</p>
+            <label className="block text-sm font-medium mb-1">User</label>
+            <Input type="text" value={displayName} disabled className="bg-muted" />
+            <p className="text-xs text-muted-foreground mt-1">
+              {username === 'local:admin' ? 'Root Administrator' : 'Admin User'}
+            </p>
           </div>
 
           <div>
@@ -167,7 +188,7 @@ export default function AccountSettingsDialog({ open, onOpenChange }: AccountSet
             </Button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
