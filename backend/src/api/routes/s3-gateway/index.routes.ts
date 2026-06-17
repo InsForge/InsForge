@@ -23,6 +23,7 @@ import * as abortMultipartUpload from './commands/abort-multipart-upload.js';
 import * as listParts from './commands/list-parts.js';
 import * as stubs from './commands/stubs.js';
 import * as getBucketCors from './commands/get-bucket-cors.js';
+import * as putBucketCors from './commands/put-bucket-cors.js';
 
 export const s3GatewayRouter: Router = Router();
 
@@ -132,6 +133,9 @@ s3GatewayRouter.use(async (req: Request, res: Response) => {
         return;
       case 'GetBucketCors':
         await getBucketCors.handle(authed, res);
+        return;
+      case 'PutBucketCors':
+        await putBucketCors.handle(authed, res);
         return;
       default:
         sendS3Error(res, 'NotImplemented', `Operation ${op} not yet implemented`, {
