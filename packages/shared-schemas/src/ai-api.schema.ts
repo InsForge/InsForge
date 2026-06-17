@@ -7,8 +7,8 @@ export const DEFAULT_MAX_TOKENS_CAP = 16384;
 
 const getMaxTokensCap = () => {
   if (typeof process !== 'undefined' && process.env && process.env.MAX_COMPLETION_TOKENS) {
-    const parsed = parseInt(process.env.MAX_COMPLETION_TOKENS, 10);
-    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+    const parsed = Number(process.env.MAX_COMPLETION_TOKENS);
+    if (Number.isInteger(parsed) && parsed > 0) return parsed;
   }
   return DEFAULT_MAX_TOKENS_CAP;
 };

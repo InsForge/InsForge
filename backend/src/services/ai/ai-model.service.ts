@@ -27,7 +27,11 @@ export class AIModelService {
    */
   static async getModels(): Promise<AIModelSchema[]> {
     if (Date.now() < circuitBreakerUntil) {
-      throw new Error('Upstream AI models catalog is temporarily unavailable.');
+      throw new AppError(
+        'Upstream AI models catalog is temporarily unavailable.',
+        500,
+        ERROR_CODES.AI_UPSTREAM_UNAVAILABLE
+      );
     }
 
     if (modelsCache && modelsCache.expiresAt > Date.now()) {
@@ -42,13 +46,17 @@ export class AIModelService {
       let response;
       try {
         response = await fetch(OPENROUTER_MODELS_URL);
-      } catch (error) {
+      } catch {
         if (modelsCache) {
           modelsCache.expiresAt = Date.now() + 5000;
           return modelsCache.models;
         }
         circuitBreakerUntil = Date.now() + 5000;
-        throw error;
+        throw new AppError(
+          'Upstream AI models catalog is temporarily unavailable.',
+          500,
+          ERROR_CODES.AI_UPSTREAM_UNAVAILABLE
+        );
       }
 
       if (!response.ok) {

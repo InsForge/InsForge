@@ -135,13 +135,15 @@ describe('AIModelService', () => {
     const baseTime = Date.now();
     const dateSpy = vi.spyOn(Date, 'now').mockImplementation(() => baseTime + 6000);
 
-    // 3. The next call should trigger a fresh fetch
-    await AIModelService.getModels();
+    try {
+      // 3. The next call should trigger a fresh fetch
+      await AIModelService.getModels();
 
-    // 4. Since the first two shared a fetch, and the third triggered a new one, the total should be 2.
-    expect(mockFetch).toHaveBeenCalledTimes(2);
-
-    dateSpy.mockRestore();
+      // 4. Since the first two shared a fetch, and the third triggered a new one, the total should be 2.
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    } finally {
+      dateSpy.mockRestore();
+    }
   });
 
   it('serves stale cache on upstream failure and updates cache expiration to avoid pounding', async () => {
@@ -174,19 +176,21 @@ describe('AIModelService', () => {
     const baseTime = Date.now();
     const dateSpy = vi.spyOn(Date, 'now').mockImplementation(() => baseTime + 2 * 60 * 60 * 1000);
 
-    // 3. Mock fetch failure for subsequent request
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      statusText: 'Internal Server Error',
-    });
+    try {
+      // 3. Mock fetch failure for subsequent request
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        statusText: 'Internal Server Error',
+      });
 
-    // 4. Retrieve models again - should return stale cache instead of throwing
-    const staleResult = await AIModelService.getModels();
-    expect(staleResult).toEqual(initialResult);
-    expect(mockFetch).toHaveBeenCalledTimes(2);
-
-    // Restore Date.now mock
-    dateSpy.mockRestore();
+      // 4. Retrieve models again - should return stale cache instead of throwing
+      const staleResult = await AIModelService.getModels();
+      expect(staleResult).toEqual(initialResult);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    } finally {
+      // Restore Date.now mock
+      dateSpy.mockRestore();
+    }
   });
 
   it('serves stale cache on genuine network rejection, extends cache expiry, and does not throw', async () => {
@@ -219,15 +223,17 @@ describe('AIModelService', () => {
     const baseTime = Date.now();
     const dateSpy = vi.spyOn(Date, 'now').mockImplementation(() => baseTime + 2 * 60 * 60 * 1000);
 
-    // 3. Mock genuine network rejection for subsequent request
-    mockFetch.mockRejectedValueOnce(new Error('Network timeout'));
+    try {
+      // 3. Mock genuine network rejection for subsequent request
+      mockFetch.mockRejectedValueOnce(new Error('Network timeout'));
 
-    // 4. Retrieve models again - should return stale cache instead of throwing
-    const staleResult = await AIModelService.getModels();
-    expect(staleResult).toEqual(initialResult);
-    expect(mockFetch).toHaveBeenCalledTimes(2);
-
-    // Restore Date.now mock
-    dateSpy.mockRestore();
+      // 4. Retrieve models again - should return stale cache instead of throwing
+      const staleResult = await AIModelService.getModels();
+      expect(staleResult).toEqual(initialResult);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    } finally {
+      // Restore Date.now mock
+      dateSpy.mockRestore();
+    }
   });
 });
