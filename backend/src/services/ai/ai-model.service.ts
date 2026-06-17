@@ -17,6 +17,8 @@ let modelsCache: {
  */
 let fetchInFlight: Promise<AIModelSchema[]> | null = null;
 
+let circuitBreakerUntil = 0;
+
 export class AIModelService {
   /**
    * Retrieves the catalog of available AI models from OpenRouter.
@@ -24,6 +26,10 @@ export class AIModelService {
    * @returns {Promise<AIModelSchema[]>} A promise resolving to an array of available models.
    */
   static async getModels(): Promise<AIModelSchema[]> {
+    if (Date.now() < circuitBreakerUntil) {
+      throw new Error('Upstream AI models catalog is temporarily unavailable.');
+    }
+
     if (modelsCache && modelsCache.expiresAt > Date.now()) {
       return modelsCache.models;
     }
@@ -41,10 +47,7 @@ export class AIModelService {
           modelsCache.expiresAt = Date.now() + 5000;
           return modelsCache.models;
         }
-        modelsCache = {
-          expiresAt: Date.now() + 5000,
-          models: [],
-        };
+        circuitBreakerUntil = Date.now() + 5000;
         throw error;
       }
 
@@ -53,10 +56,7 @@ export class AIModelService {
           modelsCache.expiresAt = Date.now() + 5000;
           return modelsCache.models;
         }
-        modelsCache = {
-          expiresAt: Date.now() + 5000,
-          models: [],
-        };
+        circuitBreakerUntil = Date.now() + 5000;
         throw new AppError(
           `Failed to fetch models: ${response.statusText}`,
           500,
@@ -117,4 +117,5 @@ export class AIModelService {
 export function _resetCacheForTesting() {
   modelsCache = null;
   fetchInFlight = null;
+  circuitBreakerUntil = 0;
 }

@@ -1,17 +1,20 @@
 import { z } from 'zod';
 import { modalitySchema } from './ai.schema.js';
 
+declare const process: any;
+
 export const DEFAULT_MAX_TOKENS_CAP = 16384;
 
 const getMaxTokensCap = () => {
-  const g = (typeof globalThis !== 'undefined' ? globalThis : {}) as {
-    process?: { env?: Record<string, string> };
-  };
-  const env = (g.process && g.process.env) || {};
-  return env.MAX_COMPLETION_TOKENS
-    ? parseInt(env.MAX_COMPLETION_TOKENS, 10)
-    : DEFAULT_MAX_TOKENS_CAP;
+  if (typeof process !== 'undefined' && process.env && process.env.MAX_COMPLETION_TOKENS) {
+    const parsed = parseInt(process.env.MAX_COMPLETION_TOKENS, 10);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return DEFAULT_MAX_TOKENS_CAP;
 };
+
+// This cap is evaluated once at module load time.
+export const CONFIGURED_MAX_TOKENS = getMaxTokensCap();
 
 // ============= Chat Completion Schemas =============
 
@@ -141,7 +144,7 @@ export const chatCompletionRequestSchema = z.object({
   messages: z.array(chatMessageSchema),
   temperature: z.number().min(0).max(2).optional(),
   // Cap output tokens to prevent abuse. Configurable via MAX_COMPLETION_TOKENS, defaults to 16,384.
-  maxTokens: z.number().int().positive().max(getMaxTokensCap()).optional(),
+  maxTokens: z.number().int().positive().max(CONFIGURED_MAX_TOKENS).optional(),
   topP: z.number().min(0).max(1).optional(),
   stream: z.boolean().optional(),
   // Web Search: Incorporate relevant web search results into the response

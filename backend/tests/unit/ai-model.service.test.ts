@@ -188,4 +188,46 @@ describe('AIModelService', () => {
     // Restore Date.now mock
     dateSpy.mockRestore();
   });
+
+  it('serves stale cache on genuine network rejection, extends cache expiry, and does not throw', async () => {
+    // 1. Populate the cache with a successful fetch
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: [
+            {
+              id: 'openai/gpt-image',
+              created: 1767225600,
+              architecture: {
+                input_modalities: ['image', 'text'],
+                output_modalities: ['video', 'text', 'embeddings'],
+              },
+              pricing: {
+                prompt: '0.000001',
+                completion: '0.000002',
+              },
+            },
+          ],
+        }),
+    });
+
+    const initialResult = await AIModelService.getModels();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+
+    // 2. Advance time by 2 hours so cache becomes stale (TTL is 1 hour)
+    const baseTime = Date.now();
+    const dateSpy = vi.spyOn(Date, 'now').mockImplementation(() => baseTime + 2 * 60 * 60 * 1000);
+
+    // 3. Mock genuine network rejection for subsequent request
+    mockFetch.mockRejectedValueOnce(new Error('Network timeout'));
+
+    // 4. Retrieve models again - should return stale cache instead of throwing
+    const staleResult = await AIModelService.getModels();
+    expect(staleResult).toEqual(initialResult);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+
+    // Restore Date.now mock
+    dateSpy.mockRestore();
+  });
 });

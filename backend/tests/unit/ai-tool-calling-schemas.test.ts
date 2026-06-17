@@ -7,7 +7,7 @@ import {
   chatMessageSchema,
   chatCompletionRequestSchema,
   chatCompletionResponseSchema,
-  DEFAULT_MAX_TOKENS_CAP,
+  CONFIGURED_MAX_TOKENS,
 } from '@insforge/shared-schemas';
 
 describe('Tool Calling Schemas', () => {
@@ -191,7 +191,7 @@ describe('Tool Calling Schemas', () => {
     it('accepts maxTokens at the maximum boundary cap', () => {
       const result = chatCompletionRequestSchema.safeParse({
         ...baseRequest,
-        maxTokens: DEFAULT_MAX_TOKENS_CAP,
+        maxTokens: CONFIGURED_MAX_TOKENS,
       });
       expect(result.success).toBe(true);
     });
@@ -199,7 +199,7 @@ describe('Tool Calling Schemas', () => {
     it('rejects maxTokens exceeding the maximum boundary cap', () => {
       const result = chatCompletionRequestSchema.safeParse({
         ...baseRequest,
-        maxTokens: DEFAULT_MAX_TOKENS_CAP + 1,
+        maxTokens: CONFIGURED_MAX_TOKENS + 1,
       });
       expect(result.success).toBe(false);
     });
