@@ -25,6 +25,9 @@ import * as stubs from './commands/stubs.js';
 import * as getBucketCors from './commands/get-bucket-cors.js';
 import * as putBucketCors from './commands/put-bucket-cors.js';
 import * as deleteBucketCors from './commands/delete-bucket-cors.js';
+import * as getObjectTagging from './commands/get-object-tagging.js';
+import * as putObjectTagging from './commands/put-object-tagging.js';
+import * as deleteObjectTagging from './commands/delete-object-tagging.js';
 
 export const s3GatewayRouter: Router = Router();
 
@@ -140,6 +143,15 @@ s3GatewayRouter.use(async (req: Request, res: Response) => {
         return;
       case 'DeleteBucketCors':
         await deleteBucketCors.handle(authed, res);
+        return;
+      case 'GetObjectTagging':
+        await getObjectTagging.handle(authed, res);
+        return;
+      case 'PutObjectTagging':
+        await putObjectTagging.handle(authed, res);
+        return;
+      case 'DeleteObjectTagging':
+        await deleteObjectTagging.handle(authed, res);
         return;
       default:
         sendS3Error(res, 'NotImplemented', `Operation ${op} not yet implemented`, {
