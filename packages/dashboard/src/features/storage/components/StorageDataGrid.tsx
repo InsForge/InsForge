@@ -391,7 +391,9 @@ export function StorageDataGrid({
   }, []);
 
   const previewFileIndex = useMemo(() => {
-    if (!previewFile) return -1;
+    if (!previewFile) {
+      return -1;
+    }
     return processedFiles.findIndex((f) => f.key === previewFile.key);
   }, [previewFile, processedFiles]);
 
