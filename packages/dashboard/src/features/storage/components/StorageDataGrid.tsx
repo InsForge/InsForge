@@ -390,6 +390,26 @@ export function StorageDataGrid({
     setShowPreviewDialog(true);
   }, []);
 
+  const previewFileIndex = useMemo(() => {
+    if (!previewFile) return -1;
+    return processedFiles.findIndex((f) => f.key === previewFile.key);
+  }, [previewFile, processedFiles]);
+
+  const handlePrevious = useCallback(() => {
+    if (previewFileIndex > 0) {
+      setPreviewFile(processedFiles[previewFileIndex - 1]);
+    }
+  }, [previewFileIndex, processedFiles]);
+
+  const handleNext = useCallback(() => {
+    if (previewFileIndex >= 0 && previewFileIndex < processedFiles.length - 1) {
+      setPreviewFile(processedFiles[previewFileIndex + 1]);
+    }
+  }, [previewFileIndex, processedFiles]);
+
+  const hasPrevious = previewFileIndex > 0;
+  const hasNext = previewFileIndex >= 0 && previewFileIndex < processedFiles.length - 1;
+
   const handleDelete = useCallback(
     async (file: StorageFileSchema) => {
       const confirmOptions = {
@@ -483,6 +503,10 @@ export function StorageDataGrid({
         onOpenChange={setShowPreviewDialog}
         file={previewFile}
         bucket={bucketName}
+        onPrevious={handlePrevious}
+        onNext={handleNext}
+        hasPrevious={hasPrevious}
+        hasNext={hasNext}
       />
     </div>
   );
