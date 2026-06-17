@@ -51,11 +51,10 @@ function formatFileSize(bytes: number) {
 
 // Custom cell renderers for storage files
 const FileNameRenderer = ({ row, column }: RenderCellProps<StorageDataGridRow>) => {
-  const fullPath = String(row[column.key] || '');
-  const fileName = fullPath.split('/').pop() || fullPath;
+  const objectKey = String(row[column.key] || '');
   return (
-    <span className="truncate text-[13px] leading-[18px] text-foreground" title={fullPath}>
-      {fileName}
+    <span className="truncate text-[13px] leading-[18px] text-foreground" title={objectKey}>
+      {objectKey}
     </span>
   );
 };

@@ -261,6 +261,7 @@ REST endpoints:
 | `PUT /api/realtime/channels/{id}` | Update channel |
 | `DELETE /api/realtime/channels/{id}` | Delete channel |
 | `GET /api/realtime/messages` | List message history |
+| `DELETE /api/realtime/messages` | Clear all message history |
 | `GET /api/realtime/messages/stats` | Message stats |
 | `GET /api/realtime/permissions` | Realtime RLS policies |
 | `GET /api/realtime/config` | Retention config |

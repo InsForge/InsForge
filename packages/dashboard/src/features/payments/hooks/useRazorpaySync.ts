@@ -8,6 +8,7 @@ import {
   type SyncRazorpayPaymentsRequest,
   type SyncRazorpayPaymentsResponse,
 } from '#features/payments/services/razorpay.service';
+import { razorpayQueryKeys } from '#features/payments/queryKeys';
 import { useToast } from '#lib/hooks/useToast';
 
 const ENVIRONMENT_LABEL: Record<RazorpayEnvironment, string> = {
@@ -58,11 +59,11 @@ export function useRazorpaySync() {
     mutationFn: (input: SyncRazorpayPaymentsRequest) => razorpayService.syncPayments(input),
     onSuccess: async (result) => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['payments', 'razorpay', 'status'] }),
-        queryClient.invalidateQueries({ queryKey: ['payments', 'razorpay', 'catalog'] }),
-        queryClient.invalidateQueries({ queryKey: ['payments', 'razorpay', 'customers'] }),
-        queryClient.invalidateQueries({ queryKey: ['payments', 'razorpay', 'subscriptions'] }),
-        queryClient.invalidateQueries({ queryKey: ['payments', 'razorpay', 'transactions'] }),
+        queryClient.invalidateQueries({ queryKey: razorpayQueryKeys.status }),
+        queryClient.invalidateQueries({ queryKey: razorpayQueryKeys.catalog }),
+        queryClient.invalidateQueries({ queryKey: razorpayQueryKeys.customers }),
+        queryClient.invalidateQueries({ queryKey: razorpayQueryKeys.subscriptions }),
+        queryClient.invalidateQueries({ queryKey: razorpayQueryKeys.transactions }),
       ]);
 
       const toast = getRazorpaySyncToast(result);

@@ -1,4 +1,5 @@
 import { Router, type Response, type NextFunction } from 'express';
+import { normalizeRazorpayError } from '@/providers/payments/razorpay-errors.js';
 import { verifyAdmin, verifyUser, type AuthRequest } from '@/api/middlewares/auth.js';
 import { AppError } from '@/utils/errors.js';
 import { successResponse } from '@/utils/response.js';
@@ -41,7 +42,7 @@ router.get('/status', verifyAdmin, async (_req: AuthRequest, res: Response, next
     const connections = await configService.getRazorpayStatus();
     successResponse(res, { razorpayConnections: connections });
   } catch (error) {
-    next(error);
+    next(normalizeRazorpayError(error));
   }
 });
 
@@ -50,7 +51,7 @@ router.get('/config', verifyAdmin, async (_req: AuthRequest, res: Response, next
     const keys = await configService.getKeyConfig();
     successResponse(res, { keys });
   } catch (error) {
-    next(error);
+    next(normalizeRazorpayError(error));
   }
 });
 
@@ -59,7 +60,7 @@ router.post('/sync', verifyAdmin, async (_req: AuthRequest, res: Response, next:
     const result = await syncService.syncAll('all');
     successResponse(res, result);
   } catch (error) {
-    next(error);
+    next(normalizeRazorpayError(error));
   }
 });
 
@@ -88,7 +89,7 @@ environmentRouter.post(
       );
       successResponse(res, order, 201);
     } catch (error) {
-      next(error);
+      next(normalizeRazorpayError(error));
     }
   }
 );
@@ -115,7 +116,7 @@ environmentRouter.post(
       });
       successResponse(res, result);
     } catch (error) {
-      next(error);
+      next(normalizeRazorpayError(error));
     }
   }
 );
@@ -145,7 +146,7 @@ environmentRouter.post(
       );
       successResponse(res, subscription, 201);
     } catch (error) {
-      next(error);
+      next(normalizeRazorpayError(error));
     }
   }
 );
@@ -172,7 +173,7 @@ environmentRouter.post(
       });
       successResponse(res, result);
     } catch (error) {
-      next(error);
+      next(normalizeRazorpayError(error));
     }
   }
 );
@@ -202,7 +203,7 @@ environmentRouter.post(
       );
       successResponse(res, result);
     } catch (error) {
-      next(error);
+      next(normalizeRazorpayError(error));
     }
   }
 );
@@ -226,7 +227,7 @@ environmentRouter.post(
       const result = await subscriptionService.pauseSubscription(params, req.user);
       successResponse(res, result);
     } catch (error) {
-      next(error);
+      next(normalizeRazorpayError(error));
     }
   }
 );
@@ -250,7 +251,7 @@ environmentRouter.post(
       const result = await subscriptionService.resumeSubscription(params, req.user);
       successResponse(res, result);
     } catch (error) {
-      next(error);
+      next(normalizeRazorpayError(error));
     }
   }
 );
@@ -266,7 +267,7 @@ environmentRouter.get('/customers', async (req: AuthRequest, res: Response, next
     const customers = await customerService.listCustomers({ environment, ...query }, 'razorpay');
     successResponse(res, customers);
   } catch (error) {
-    next(error);
+    next(normalizeRazorpayError(error));
   }
 });
 
@@ -285,7 +286,7 @@ environmentRouter.get(
       );
       successResponse(res, transactions);
     } catch (error) {
-      next(error);
+      next(normalizeRazorpayError(error));
     }
   }
 );
@@ -299,7 +300,7 @@ environmentRouter.get(
       const subscriptions = await subscriptionService.listSubscriptions({ environment, ...query });
       successResponse(res, subscriptions);
     } catch (error) {
-      next(error);
+      next(normalizeRazorpayError(error));
     }
   }
 );

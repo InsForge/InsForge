@@ -312,6 +312,23 @@ paths:
                 error: "INVALID_INPUT"
                 message: "channelId: Invalid uuid"
                 statusCode: 400
+    delete:
+      summary: Clear Messages
+      description: Permanently delete all stored realtime messages
+      tags:
+        - Messages
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      responses:
+        '200':
+          description: Messages cleared
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClearMessagesResponse'
+              example:
+                deleted: 42
 
   /api/realtime/messages/stats:
     get:
@@ -647,6 +664,17 @@ components:
           format: date-time
           description: Timestamp when the message was created
           example: "2024-01-15T10:30:00Z"
+
+    ClearMessagesResponse:
+      type: object
+      required:
+        - deleted
+      properties:
+        deleted:
+          type: integer
+          minimum: 0
+          description: Number of realtime messages deleted
+          example: 42
 
     MessageStats:
       type: object

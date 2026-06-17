@@ -4,6 +4,7 @@ import type {
   RealtimeMessage,
   CreateChannelRequest,
   UpdateChannelRequest,
+  ClearRealtimeMessagesResponse,
   ListMessagesRequest,
   MessageStatsResponse,
   GetRealtimeConfigResponse,
@@ -77,6 +78,13 @@ export class RealtimeService {
     const endpoint = `/realtime/messages${query ? `?${query}` : ''}`;
 
     return apiClient.request(endpoint, {
+      headers: apiClient.withAccessToken(),
+    });
+  }
+
+  async clearMessages(): Promise<ClearRealtimeMessagesResponse> {
+    return apiClient.request('/realtime/messages', {
+      method: 'DELETE',
       headers: apiClient.withAccessToken(),
     });
   }

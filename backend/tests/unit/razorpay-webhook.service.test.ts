@@ -200,10 +200,14 @@ describe('RazorpayWebhookService', () => {
         /INSERT INTO payments\.webhook_events[\s\S]*ON CONFLICT \(provider, environment, provider_event_id\) DO NOTHING/i
       ),
       [
+        'razorpay',
         'test',
         'evt_new_123',
         'payment.captured',
         false,
+        null,
+        null,
+        null,
         expect.objectContaining({
           event: 'payment.captured',
         }),
@@ -245,15 +249,16 @@ describe('RazorpayWebhookService', () => {
     expect(mockPool.query).toHaveBeenNthCalledWith(
       2,
       expect.stringMatching(
-        /UPDATE payments\.webhook_events[\s\S]*processing_status = 'failed'[\s\S]*OR \(processing_status = 'pending' AND updated_at < \$3\)/i
+        /UPDATE payments\.webhook_events[\s\S]*processing_status = 'failed'[\s\S]*OR \(processing_status = 'pending' AND updated_at < \$5\)/i
       ),
       [
+        'razorpay',
         'test',
         'evt_pending_123',
-        expect.any(Date),
         expect.objectContaining({
           event: 'payment.captured',
         }),
+        expect.any(Date),
       ]
     );
   });
