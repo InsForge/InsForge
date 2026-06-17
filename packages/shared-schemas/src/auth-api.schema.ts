@@ -29,6 +29,36 @@ export const paginationSchema = z.object({
   offset: z.string().optional(),
 });
 
+// ============================================================================
+// Admin Management Schemas
+// ============================================================================
+
+/**
+ * POST /api/auth/admin - Create new admin (root only)
+ * Username: 3-50 chars, alphanumeric + underscore + hyphen
+ * Password: min 6 chars
+ */
+export const createAdminSchema = z.object({
+  username: z
+    .string()
+    .min(3, 'Username must be at least 3 characters')
+    .max(50, 'Username must be at most 50 characters')
+    .regex(
+      /^[a-zA-Z0-9_-]+$/,
+      'Username may only contain letters, numbers, hyphens, and underscores'
+    ),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+});
+
+/**
+ * POST /api/auth/admin/change-password - Change admin password (any admin)
+ */
+export const changeAdminPasswordSchema = z.object({
+  username: z.string().min(1, 'Username is required'),
+  oldPassword: z.string().min(1, 'Old password is required'),
+  newPassword: z.string().min(6, 'New password must be at least 6 characters'),
+});
+
 /**
  * POST /api/auth/users - Create user
  * redirectTo is used only for link-based email verification and must be allowlisted.
@@ -509,6 +539,8 @@ export const authErrorResponseSchema = z.object({
 export type CreateUserRequest = z.infer<typeof createUserRequestSchema>;
 export type CreateSessionRequest = z.infer<typeof createSessionRequestSchema>;
 export type CreateAdminSessionRequest = z.infer<typeof createAdminSessionRequestSchema>;
+export type CreateAdminSchema = z.infer<typeof createAdminSchema>;
+export type ChangeAdminPasswordSchema = z.infer<typeof changeAdminPasswordSchema>;
 export type RefreshSessionRequest = z.infer<typeof refreshSessionRequestSchema>;
 export type ListUsersRequest = z.infer<typeof listUsersRequestSchema>;
 export type DeleteUsersRequest = z.infer<typeof deleteUsersRequestSchema>;

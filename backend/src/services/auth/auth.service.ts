@@ -655,32 +655,39 @@ export class AuthService {
   }
 
   /**
-   * Admin login (validates against database auth.project_admins)
+   * Admin login - root admin is env-based, additional admins from DB
+   * Root is identified by sub === 'local:admin'
+   * DB admins use their UUID as sub
    */
   async adminLogin(username: string, password: string): Promise<CreateAdminSessionResponse> {
-    // Use AdminService for verification
-    const admin = await adminService.verifyCredentials(username, password);
+    // 1. Check root admin (env-based)
+    if (username === this.adminUsername && password === this.adminPassword) {
+      const sub = 'local:admin';
+      const accessToken = this.tokenManager.generateAccessToken({
+        sub,
+        role: 'project_admin',
+      });
+      return {
+        admin: { sub },
+        accessToken,
+      };
+    }
 
+    // 2. Check database for additional admins
+    const admin = await adminService.verifyCredentials(username, password);
     if (!admin) {
       throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
-    const sub = `local:${admin.username}`;
-    const isRoot = admin.is_root || false;
+    // Use UUID as sub for DB admins
+    const sub = admin.id;
     const accessToken = this.tokenManager.generateAccessToken({
       sub,
       role: 'project_admin',
-      isRoot,
-      adminId: admin.id,
     });
 
     return {
-      admin: {
-        sub,
-        username: admin.username,
-        isRoot,
-        id: admin.id,
-      },
+      admin: { sub },
       accessToken,
     };
   }
@@ -688,7 +695,6 @@ export class AuthService {
   /**
    * List all project administrators (root only)
    */
-
   async listAdmins(): Promise<{ username: string; createdAt: string; updatedAt: string }[]> {
     const admins = await adminService.listAdmins();
     return admins.map((admin) => ({
@@ -730,13 +736,13 @@ export class AuthService {
     }
 
     // Don't allow deleting root admin
-    if (admin.is_root) {
+    if (username === this.adminUsername) {
       throw new AppError('Cannot delete root admin', 403, ERROR_CODES.FORBIDDEN);
     }
 
     const success = await adminService.deleteAdmin(admin.id, currentAdminId, true);
     if (!success) {
-      throw new AppError('Admin user not found or cannot be deleted', 400, ERROR_CODES.FORBIDDEN);
+      throw new AppError('Cannot delete admin', 400, ERROR_CODES.FORBIDDEN);
     }
   }
 

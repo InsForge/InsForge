@@ -33,8 +33,9 @@ export default function AppHeader() {
   const isDTest = dashboardVariant === FEATURE_FLAG_VARIANTS.D_TEST;
   const isConnectDisabled = isDTest && pathname === '/dashboard/install';
 
-  const username = user?.username || 'Admin';
-  const adminLabel = user?.isRoot ? 'Root Administrator' : 'Administrator';
+  const displayName = user?.sub || 'Admin';
+  const isRoot = user?.sub === 'local:admin';
+  const adminLabel = isRoot ? 'Root Administrator' : 'Administrator';
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
@@ -156,14 +157,14 @@ export default function AppHeader() {
               <button className="w-50 flex items-center gap-3 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[8px] pr-3 transition-all duration-200 group">
                 <Avatar className="h-8 w-8 ring-2 ring-white dark:ring-gray-700 shadow-sm">
                   <AvatarFallback
-                    className={cn('text-white font-medium text-sm', getAvatarColor(username))}
+                    className={cn('text-white font-medium text-sm', getAvatarColor(displayName))}
                   >
-                    {getUserInitials(username)}
+                    {getUserInitials(displayName)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="text-left hidden md:block">
                   <p className="text-sm font-medium text-zinc-950 dark:text-zinc-100 leading-tight">
-                    {username}
+                    {displayName}
                   </p>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">{adminLabel}</p>
                 </div>

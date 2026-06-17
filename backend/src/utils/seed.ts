@@ -6,71 +6,6 @@ import { StripeSyncService } from '@/services/payments/stripe/sync.service.js';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { OAuthProvidersSchema } from '@insforge/shared-schemas';
 import { AuthConfigService } from '@/services/auth/auth-config.service.js';
-import bcrypt from 'bcryptjs';
-import { appConfig } from '@/infra/config/app.config.js';
-
-/**
- * Seeds the root admin into auth.project_admins if it doesn't exist.
- */
-async function seedRootAdmin(): Promise<void> {
-  const dbManager = DatabaseManager.getInstance();
-  const pool = dbManager.getPool();
-  const client = await pool.connect();
-
-  try {
-    const rootUsername = appConfig.auth.rootAdminUsername;
-    const rootPassword = appConfig.auth.rootAdminPassword;
-
-    if (!rootUsername || !rootPassword) {
-      logger.warn(
-        'ROOT_ADMIN_USERNAME or ROOT_ADMIN_PASSWORD not set, skipping root admin seeding'
-      );
-      return;
-    }
-
-    // Check if the root admin exists
-    const result = await client.query(
-      'SELECT id, is_root, password_hash FROM auth.project_admins WHERE username = $1 AND deleted_at IS NULL',
-      [rootUsername]
-    );
-
-    if (result.rows.length > 0) {
-      const admin = result.rows[0];
-      let needsUpdate = false;
-      const updates = [];
-      const values = [];
-
-      if (!admin.is_root) {
-        needsUpdate = true;
-        updates.push('is_root = TRUE');
-      }
-
-      if (needsUpdate) {
-        values.push(admin.id);
-        await client.query(
-          `UPDATE auth.project_admins SET ${updates.join(', ')} WHERE id = $${values.length}`,
-          values
-        );
-        logger.info(' Updated root admin configuration');
-      } else {
-        logger.info(' Root admin configured');
-      }
-    } else {
-      const passwordHash = await bcrypt.hash(rootPassword, 10);
-      await client.query(
-        'INSERT INTO auth.project_admins (username, password_hash, is_root) VALUES ($1, $2, TRUE) ON CONFLICT DO NOTHING',
-        [rootUsername, passwordHash]
-      );
-      logger.info('Root admin seeded successfully');
-    }
-  } catch (error) {
-    logger.error('Failed to seed root admin', {
-      error: error instanceof Error ? error.message : String(error),
-    });
-  } finally {
-    client.release();
-  }
-}
 
 /**
  * Seeds default auth configuration for cloud environments
@@ -243,9 +178,6 @@ export async function seedBackend(): Promise<void> {
   try {
     logger.info(`\n🚀 Insforge Backend Starting...`);
 
-    // Seed root admin user in database-backed auth.project_admins table
-    await seedRootAdmin();
-
     // Initialize API key (from env or generate)
     const apiKey = await secretService.initializeApiKey();
 
@@ -255,7 +187,7 @@ export async function seedBackend(): Promise<void> {
     // Get database stats
     const tables = await dbManager.getUserTables();
 
-    logger.info(`Database connected to PostgreSQL`, {
+    logger.info(`✅ Database connected to PostgreSQL`, {
       host: process.env.POSTGRES_HOST || 'localhost',
       port: process.env.POSTGRES_PORT || '5432',
       database: process.env.POSTGRES_DB || 'insforge',
