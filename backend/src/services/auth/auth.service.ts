@@ -747,14 +747,15 @@ export class AuthService {
   }
 
   /**
-   * Change current admin's password
+   * Change current admin's password using admin ID (sub from token)
    */
   async changeAdminPassword(
-    username: string,
+    adminId: string,
     oldPassword: string,
     newPassword: string
   ): Promise<void> {
-    const admin = await adminService.getAdminByUsername(username);
+    // Use getAdminById since adminId is the sub (UUID or 'local:admin')
+    const admin = await adminService.getAdminById(adminId);
     if (!admin) {
       throw new AppError('Admin user not found', 404, ERROR_CODES.AUTH_USER_NOT_FOUND);
     }

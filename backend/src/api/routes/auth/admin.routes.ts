@@ -235,13 +235,13 @@ router.post(
         );
       }
 
-      const username = req.user?.id;
-      if (!username) {
+      const adminId = req.user?.id;
+      if (!adminId) {
         throw new AppError('Unauthorized', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
       }
 
       const { oldPassword, newPassword } = validation.data;
-      await authService.changeAdminPassword(username, oldPassword, newPassword);
+      await authService.changeAdminPassword(adminId, oldPassword, newPassword);
       successResponse(res, { message: 'Password changed successfully' });
     } catch (error) {
       next(error);

@@ -71,7 +71,7 @@ export default function AccountSettingsDialog({ open, onOpenChange }: AccountSet
       // For root admin, this will be 'local:admin'
       // For DB admins, this will be their UUID
       await adminService.changePassword({
-        username: username,
+        adminId: username,
         oldPassword,
         newPassword,
       });
