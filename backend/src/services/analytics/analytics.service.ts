@@ -1,10 +1,18 @@
 import { PostHogProvider } from '@/providers/analytics/posthog.provider.js';
 
 export class AnalyticsService {
+  private static instance: AnalyticsService;
   private provider: PostHogProvider;
 
   constructor(provider: PostHogProvider = PostHogProvider.getInstance()) {
     this.provider = provider;
+  }
+
+  static getInstance(): AnalyticsService {
+    if (!AnalyticsService.instance) {
+      AnalyticsService.instance = new AnalyticsService();
+    }
+    return AnalyticsService.instance;
   }
 
   getConnection() {
