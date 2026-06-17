@@ -7,6 +7,7 @@ import { S3GatewayRequest, getS3Bucket, getS3Key } from '../request.js';
 const MAX_TAG_COUNT = 10;
 const MAX_TAG_KEY_LENGTH = 128;
 const MAX_TAG_VALUE_LENGTH = 256;
+const MAX_TAGGING_BODY_BYTES = 65536;
 
 export async function handle(req: S3GatewayRequest, res: Response): Promise<void> {
   const bucket = getS3Bucket(req);
@@ -22,8 +23,18 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
   }
 
   const chunks: Buffer[] = [];
+  let bodySize = 0;
   for await (const c of req) {
-    chunks.push(c as Buffer);
+    const chunk = c as Buffer;
+    bodySize += chunk.length;
+    if (bodySize > MAX_TAGGING_BODY_BYTES) {
+      sendS3Error(res, 'EntityTooLarge', 'Tagging body exceeds maximum allowed size', {
+        resource: req.path,
+        requestId: req.s3Auth.requestId,
+      });
+      return;
+    }
+    chunks.push(chunk);
   }
 
   let parsed: unknown;
