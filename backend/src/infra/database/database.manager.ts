@@ -24,6 +24,11 @@ export class DatabaseManager {
   private static readonly COLUMN_TYPE_CACHE_TTL = 5 * 60 * 1000;
   private static columnTypeCache = new Map<string, CacheEntry<Record<string, string>>>();
   private static readonly MAX_CACHE_SIZE = 100;
+  /**
+   * Maximum entries for table row counts.
+   * Bounded at 1000 per workspace/process to prevent memory leaks in multi-tenant or multi-schema deployments.
+   */
+  private static readonly MAX_TABLE_COUNT_CACHE_SIZE = 1000;
   private static readonly TABLE_COUNT_CACHE_TTL = 60 * 1000;
   private static tableCountCache = new Map<string, { count: number; timestamp: number }>();
 
@@ -76,24 +81,41 @@ export class DatabaseManager {
         map[row.column_name] = dataType === 'user-defined' ? row.udt_name.toLowerCase() : dataType;
       }
 
-      DatabaseManager.setColumnTypeCache(cacheKey, map);
+      DatabaseManager.setBoundedCache(
+        DatabaseManager.columnTypeCache,
+        DatabaseManager.MAX_CACHE_SIZE,
+        cacheKey,
+        { data: map, expiry: Date.now() + DatabaseManager.COLUMN_TYPE_CACHE_TTL }
+      );
       return map;
     } finally {
       client.release();
     }
   }
 
-  private static setColumnTypeCache(cacheKey: string, data: Record<string, string>): void {
-    if (DatabaseManager.columnTypeCache.size >= DatabaseManager.MAX_CACHE_SIZE) {
-      const firstKey = DatabaseManager.columnTypeCache.keys().next().value;
-      if (firstKey) {
-        DatabaseManager.columnTypeCache.delete(firstKey);
+  /**
+   * Inserts an entry into a bounded cache with FIFO eviction.
+   * When the cache reaches maxSize, the oldest entry (first insertion-order key) is removed
+   * before adding the new entry, preventing unbounded memory growth.
+   *
+   * @param cache - The Map to insert into
+   * @param maxSize - Maximum number of entries allowed
+   * @param key - Cache key
+   * @param entry - Value to cache
+   */
+  private static setBoundedCache<V>(
+    cache: Map<string, V>,
+    maxSize: number,
+    key: string,
+    entry: V
+  ): void {
+    if (cache.size >= maxSize && !cache.has(key)) {
+      const first = cache.keys().next().value;
+      if (first !== undefined) {
+        cache.delete(first);
       }
     }
-    DatabaseManager.columnTypeCache.set(cacheKey, {
-      data,
-      expiry: Date.now() + DatabaseManager.COLUMN_TYPE_CACHE_TTL,
-    });
+    cache.set(key, entry);
   }
 
   static clearColumnTypeCache(
@@ -132,11 +154,15 @@ export class DatabaseManager {
     ]);
 
     const now = Date.now();
+    const requestCounts = new Map<string, number>();
     const missingOrExpired: string[] = [];
+
     for (const tableName of allTables) {
       const cacheKey = buildQualifiedTableKey(tableName, 'public');
       const cached = DatabaseManager.tableCountCache.get(cacheKey);
-      if (!cached || now - cached.timestamp >= DatabaseManager.TABLE_COUNT_CACHE_TTL) {
+      if (cached && now - cached.timestamp < DatabaseManager.TABLE_COUNT_CACHE_TTL) {
+        requestCounts.set(cacheKey, cached.count);
+      } else {
         missingOrExpired.push(tableName);
       }
     }
@@ -157,12 +183,23 @@ export class DatabaseManager {
 
         const queryResult = await client.query(unionQuery);
         const nowAfterQuery = Date.now();
+
+        // 1. Resolve all database counts into the request-local map first
         for (const row of queryResult.rows) {
           const cacheKey = buildQualifiedTableKey(row.table_name, 'public');
-          DatabaseManager.tableCountCache.set(cacheKey, {
-            count: Number(row.count),
-            timestamp: nowAfterQuery,
-          });
+          requestCounts.set(cacheKey, Number(row.count));
+        }
+
+        // 2. Perform all cache mutations second
+        for (const row of queryResult.rows) {
+          const cacheKey = buildQualifiedTableKey(row.table_name, 'public');
+          const count = requestCounts.get(cacheKey) ?? Number(row.count);
+          DatabaseManager.setBoundedCache(
+            DatabaseManager.tableCountCache,
+            DatabaseManager.MAX_TABLE_COUNT_CACHE_SIZE,
+            cacheKey,
+            { count, timestamp: nowAfterQuery }
+          );
         }
       } catch (error) {
         logger.error('Failed to batch query exact table counts:', { error });
@@ -173,10 +210,9 @@ export class DatabaseManager {
 
     const tableMetadatas = allTables.map((tableName) => {
       const cacheKey = buildQualifiedTableKey(tableName, 'public');
-      const cached = DatabaseManager.tableCountCache.get(cacheKey);
       return {
         tableName,
-        recordCount: cached ? cached.count : 0,
+        recordCount: requestCounts.get(cacheKey) ?? 0,
       };
     });
 
