@@ -1,9 +1,13 @@
 import { Readable } from 'stream';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { toXml } from '@/api/routes/s3-gateway/xml.js';
 import { sendS3Error, S3ProtocolError } from '@/api/routes/s3-gateway/errors.js';
 import { normalizeArrayField } from '@/api/routes/s3-gateway/commands/put-bucket-cors.js';
 import { StorageService } from '@/services/storage/storage.service.js';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 // ---------------------------------------------------------------------------
 // CORS XML output format

@@ -4,6 +4,8 @@ import { parseXml } from '../xml.js';
 import { sendS3Error, S3ProtocolError } from '../errors.js';
 import { S3GatewayRequest, getS3Bucket } from '../request.js';
 
+const MAX_CORS_BODY_BYTES = 65536;
+
 export async function handle(req: S3GatewayRequest, res: Response): Promise<void> {
   const bucket = getS3Bucket(req);
   const svc = StorageService.getInstance();
@@ -13,8 +15,18 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
   }
 
   const chunks: Buffer[] = [];
+  let bodySize = 0;
   for await (const c of req) {
-    chunks.push(c as Buffer);
+    const chunk = c as Buffer;
+    bodySize += chunk.length;
+    if (bodySize > MAX_CORS_BODY_BYTES) {
+      sendS3Error(res, 'EntityTooLarge', 'CORS configuration body exceeds maximum allowed size', {
+        resource: req.path,
+        requestId: req.s3Auth.requestId,
+      });
+      return;
+    }
+    chunks.push(chunk);
   }
 
   let parsed: unknown;
