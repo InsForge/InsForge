@@ -66,6 +66,14 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
         );
         return;
       }
+      if (tagKey.startsWith('aws:')) {
+        sendS3Error(
+          res,
+          'InvalidArgument',
+          'Tag keys must not start with "aws:"'
+        );
+        return;
+      }
       if (tagValue.length > MAX_TAG_VALUE_LENGTH) {
         sendS3Error(
           res,

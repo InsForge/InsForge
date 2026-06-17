@@ -45,6 +45,16 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
     rules = [rules];
   }
 
+  if (rules.length === 0) {
+    sendS3Error(res, 'MalformedXML', 'CORSConfiguration must contain at least one CORSRule', {
+      resource: req.path,
+      requestId: req.s3Auth.requestId,
+    });
+    return;
+  }
+
+  const VALID_METHODS = new Set(['GET', 'PUT', 'POST', 'DELETE', 'HEAD']);
+
   for (const [i, rule] of (rules as Record<string, unknown>[]).entries()) {
     const methods = normalizeArrayField(rule.AllowedMethod);
     const origins = normalizeArrayField(rule.AllowedOrigin);
@@ -55,6 +65,16 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
         requestId: req.s3Auth.requestId,
       });
       return;
+    }
+    for (const m of methods) {
+      if (!VALID_METHODS.has(m)) {
+        sendS3Error(
+          res,
+          'InvalidArgument',
+          `CORSRule ${i} AllowedMethod "${m}" is not a valid HTTP method`
+        );
+        return;
+      }
     }
     if (origins.length === 0) {
       sendS3Error(res, 'InvalidArgument', `CORSRule ${i} must have at least one AllowedOrigin`, {
