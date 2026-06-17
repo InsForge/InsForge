@@ -1,6 +1,8 @@
+import { Readable } from 'stream';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { toXml } from '@/api/routes/s3-gateway/xml.js';
 import { sendS3Error, S3ProtocolError } from '@/api/routes/s3-gateway/errors.js';
+import { normalizeArrayField } from '@/api/routes/s3-gateway/commands/put-bucket-cors.js';
 import { StorageService } from '@/services/storage/storage.service.js';
 
 // ---------------------------------------------------------------------------
@@ -41,6 +43,68 @@ describe('CORS XML output format', () => {
     expect(xml).toContain('<CORSConfiguration');
     const matches = xml.match(/<CORSRule>/g);
     expect(matches).toHaveLength(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// normalizeArrayField
+// ---------------------------------------------------------------------------
+describe('normalizeArrayField', () => {
+  it('converts a single string to a single-element array', () => {
+    expect(normalizeArrayField('GET')).toEqual(['GET']);
+  });
+
+  it('converts a non-array value to a single-element string array', () => {
+    const result = normalizeArrayField(42);
+    expect(result).toEqual(['42']);
+    expect(result).toHaveLength(1);
+  });
+
+  it('maps each element of an array to strings', () => {
+    expect(normalizeArrayField(['GET', 'PUT', 'POST'])).toEqual(['GET', 'PUT', 'POST']);
+  });
+
+  it('returns empty array for null', () => {
+    expect(normalizeArrayField(null)).toEqual([]);
+  });
+
+  it('returns empty array for undefined', () => {
+    expect(normalizeArrayField(undefined)).toEqual([]);
+  });
+
+  it('coerces non-string array elements to strings', () => {
+    expect(normalizeArrayField([1, 2])).toEqual(['1', '2']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Empty CORS configuration rejection
+// ---------------------------------------------------------------------------
+describe('PutBucketCors — empty CORS config rejection', () => {
+  it('rejects CORSConfiguration with no CORSRule via MalformedXML', async () => {
+    const svc = StorageService.getInstance();
+    vi.spyOn(svc, 'bucketExists').mockResolvedValue(true);
+
+    const status = vi.fn().mockReturnThis();
+    const type = vi.fn().mockReturnThis();
+    const send = vi.fn();
+    const res = { status, type, send } as unknown as import('express').Response;
+
+    const body = '<CORSConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/"/>';
+    const req = Object.assign(Readable.from([Buffer.from(body)]), {
+      s3Bucket: 'test-bucket',
+      s3Key: null,
+      s3Op: 'PutBucketCors',
+      s3Auth: { requestId: 'test-req' },
+      path: '/test-bucket?cors',
+    });
+
+    const { handle } = await import('@/api/routes/s3-gateway/commands/put-bucket-cors.js');
+    await handle(req as never, res);
+
+    expect(status).toHaveBeenCalledWith(400);
+    expect(send.mock.calls[0][0] as string).toContain('MalformedXML');
+    expect(send.mock.calls[0][0] as string).toContain('CORSConfiguration must contain at least one CORSRule');
   });
 });
 

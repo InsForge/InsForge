@@ -20,10 +20,7 @@ import {
   DeleteObjectTaggingCommand,
   PutBucketVersioningCommand,
   GetBucketVersioningCommand,
-  NoSuchBucket,
-  NoSuchKey,
 } from '@aws-sdk/client-s3';
-import { S3ProtocolError } from '@/api/routes/s3-gateway/errors.js';
 
 const INTEGRATION = process.env.RUN_S3_GATEWAY_INTEGRATION === '1';
 const describeIf = INTEGRATION ? describe : describe.skip;
@@ -54,7 +51,7 @@ describeIf('S3 gateway CORS (integration)', () => {
   it('returns NoSuchCORSConfiguration when no rules are set', async () => {
     try {
       await s3.send(new GetBucketCorsCommand({ Bucket: bucket }));
-      expect.unreachable('expected NoSuchCORSConfiguration');
+      expect.fail('expected NoSuchCORSConfiguration');
     } catch (err: unknown) {
       const s3Err = err as { name: string; message: string };
       expect(s3Err.name).toBe('NoSuchCORSConfiguration');
@@ -116,7 +113,7 @@ describeIf('S3 gateway CORS (integration)', () => {
 
     try {
       await s3.send(new GetBucketCorsCommand({ Bucket: bucket }));
-      expect.unreachable('expected NoSuchCORSConfiguration after delete');
+      expect.fail('expected NoSuchCORSConfiguration after delete');
     } catch (err: unknown) {
       const s3Err = err as { name: string; message: string };
       expect(s3Err.name).toBe('NoSuchCORSConfiguration');
@@ -210,7 +207,7 @@ describeIf('S3 gateway object tagging (integration)', () => {
           Tagging: { TagSet: [{ Key: 'k', Value: 'v' }] },
         })
       );
-      expect.unreachable('expected NoSuchKey');
+      expect.fail('expected NoSuchKey');
     } catch (err: unknown) {
       const s3Err = err as { name: string };
       expect(s3Err.name).toBe('NoSuchKey');
@@ -264,7 +261,7 @@ describeIf('S3 gateway versioning (integration)', () => {
           VersioningConfiguration: { Status: 'Disabled' },
         })
       );
-      expect.unreachable('expected InvalidArgument for Disabled status');
+      expect.fail('expected InvalidArgument for Disabled status');
     } catch (err: unknown) {
       const s3Err = err as { name: string };
       expect(s3Err.name).toBe('InvalidArgument');

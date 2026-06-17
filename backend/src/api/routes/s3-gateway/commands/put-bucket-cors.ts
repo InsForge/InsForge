@@ -109,7 +109,7 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
   res.status(200).send();
 }
 
-function normalizeArrayField(
+export function normalizeArrayField(
   value: unknown
 ): string[] {
   if (value === undefined || value === null) {
