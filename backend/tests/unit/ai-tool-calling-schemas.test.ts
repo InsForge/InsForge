@@ -7,6 +7,7 @@ import {
   chatMessageSchema,
   chatCompletionRequestSchema,
   chatCompletionResponseSchema,
+  DEFAULT_MAX_TOKENS_CAP,
 } from '@insforge/shared-schemas';
 
 describe('Tool Calling Schemas', () => {
@@ -178,6 +179,37 @@ describe('Tool Calling Schemas', () => {
     it('accepts request without any tool fields (backward compatible)', () => {
       const result = chatCompletionRequestSchema.safeParse(baseRequest);
       expect(result.success).toBe(true);
+    });
+  });
+
+  describe('chatCompletionRequestSchema - maxTokens validation', () => {
+    const baseRequest = {
+      model: 'openai/gpt-4',
+      messages: [{ role: 'user' as const, content: 'Hello' }],
+    };
+
+    it('accepts maxTokens at the maximum boundary cap', () => {
+      const result = chatCompletionRequestSchema.safeParse({
+        ...baseRequest,
+        maxTokens: DEFAULT_MAX_TOKENS_CAP,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects maxTokens exceeding the maximum boundary cap', () => {
+      const result = chatCompletionRequestSchema.safeParse({
+        ...baseRequest,
+        maxTokens: DEFAULT_MAX_TOKENS_CAP + 1,
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects non-integer maxTokens values', () => {
+      const result = chatCompletionRequestSchema.safeParse({
+        ...baseRequest,
+        maxTokens: 100.5,
+      });
+      expect(result.success).toBe(false);
     });
   });
 

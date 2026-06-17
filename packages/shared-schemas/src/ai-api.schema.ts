@@ -1,6 +1,18 @@
 import { z } from 'zod';
 import { modalitySchema } from './ai.schema.js';
 
+export const DEFAULT_MAX_TOKENS_CAP = 16384;
+
+const getMaxTokensCap = () => {
+  const g = (typeof globalThis !== 'undefined' ? globalThis : {}) as {
+    process?: { env?: Record<string, string> };
+  };
+  const env = (g.process && g.process.env) || {};
+  return env.MAX_COMPLETION_TOKENS
+    ? parseInt(env.MAX_COMPLETION_TOKENS, 10)
+    : DEFAULT_MAX_TOKENS_CAP;
+};
+
 // ============= Chat Completion Schemas =============
 
 // OpenAI-compatible content schemas
@@ -128,8 +140,8 @@ export const chatCompletionRequestSchema = z.object({
   model: z.string(),
   messages: z.array(chatMessageSchema),
   temperature: z.number().min(0).max(2).optional(),
-  // Max cap set to 16,384 (standard max output for flagship models) to prevent financial abuse
-  maxTokens: z.number().int().positive().max(16384).optional(),
+  // Cap output tokens to prevent abuse. Configurable via MAX_COMPLETION_TOKENS, defaults to 16,384.
+  maxTokens: z.number().int().positive().max(getMaxTokensCap()).optional(),
   topP: z.number().min(0).max(1).optional(),
   stream: z.boolean().optional(),
   // Web Search: Incorporate relevant web search results into the response

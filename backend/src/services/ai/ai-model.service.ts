@@ -21,7 +21,7 @@ export class AIModelService {
   /**
    * Retrieves the catalog of available AI models from OpenRouter.
    * Utilizes a time-based cache and coalesces concurrent fetches to prevent rate limiting.
-   * * @returns {Promise<AIModelSchema[]>} A promise resolving to an array of available models.
+   * @returns {Promise<AIModelSchema[]>} A promise resolving to an array of available models.
    */
   static async getModels(): Promise<AIModelSchema[]> {
     if (modelsCache && modelsCache.expiresAt > Date.now()) {
@@ -33,12 +33,30 @@ export class AIModelService {
     }
 
     fetchInFlight = (async () => {
-      const response = await fetch(OPENROUTER_MODELS_URL);
+      let response;
+      try {
+        response = await fetch(OPENROUTER_MODELS_URL);
+      } catch (error) {
+        if (modelsCache) {
+          modelsCache.expiresAt = Date.now() + 5000;
+          return modelsCache.models;
+        }
+        modelsCache = {
+          expiresAt: Date.now() + 5000,
+          models: [],
+        };
+        throw error;
+      }
 
       if (!response.ok) {
         if (modelsCache) {
+          modelsCache.expiresAt = Date.now() + 5000;
           return modelsCache.models;
         }
+        modelsCache = {
+          expiresAt: Date.now() + 5000,
+          models: [],
+        };
         throw new AppError(
           `Failed to fetch models: ${response.statusText}`,
           500,
