@@ -45,6 +45,58 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
     rules = [rules];
   }
 
+  for (const [i, rule] of (rules as Record<string, unknown>[]).entries()) {
+    const methods = normalizeArrayField(rule.AllowedMethod);
+    const origins = normalizeArrayField(rule.AllowedOrigin);
+
+    if (methods.length === 0) {
+      sendS3Error(res, 'InvalidArgument', `CORSRule ${i} must have at least one AllowedMethod`, {
+        resource: req.path,
+        requestId: req.s3Auth.requestId,
+      });
+      return;
+    }
+    if (origins.length === 0) {
+      sendS3Error(res, 'InvalidArgument', `CORSRule ${i} must have at least one AllowedOrigin`, {
+        resource: req.path,
+        requestId: req.s3Auth.requestId,
+      });
+      return;
+    }
+    if (rule.MaxAgeSeconds !== undefined) {
+      const maxAge = Number(rule.MaxAgeSeconds);
+      if (!Number.isFinite(maxAge) || maxAge < 0 || !Number.isInteger(maxAge)) {
+        sendS3Error(
+          res,
+          'InvalidArgument',
+          `CORSRule ${i} MaxAgeSeconds must be a non-negative integer`
+        );
+        return;
+      }
+      rule.MaxAgeSeconds = maxAge;
+    }
+    rule.AllowedMethod = methods;
+    rule.AllowedOrigin = origins;
+    if (rule.AllowedHeader !== undefined) {
+      rule.AllowedHeader = normalizeArrayField(rule.AllowedHeader);
+    }
+    if (rule.ExposeHeader !== undefined) {
+      rule.ExposeHeader = normalizeArrayField(rule.ExposeHeader);
+    }
+  }
+
   await svc.putBucketCorsRules(bucket, rules as Array<Record<string, unknown>>);
   res.status(200).send();
+}
+
+function normalizeArrayField(
+  value: unknown
+): string[] {
+  if (value === undefined || value === null) {
+    return [];
+  }
+  if (Array.isArray(value)) {
+    return value.map(String);
+  }
+  return [String(value)];
 }

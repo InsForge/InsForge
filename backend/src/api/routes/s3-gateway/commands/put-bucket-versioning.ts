@@ -4,7 +4,7 @@ import { parseXml } from '../xml.js';
 import { sendS3Error, S3ProtocolError } from '../errors.js';
 import { S3GatewayRequest, getS3Bucket } from '../request.js';
 
-const VALID_STATUSES = new Set(['Enabled', 'Disabled', 'Suspended']);
+const VALID_STATUSES = new Set(['Enabled', 'Suspended']);
 
 export async function handle(req: S3GatewayRequest, res: Response): Promise<void> {
   const bucket = getS3Bucket(req);
