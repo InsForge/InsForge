@@ -1,7 +1,6 @@
-import { CopyButton } from '@insforge/ui';
+import { CopyButton, cn } from '@insforge/ui';
 import { CLI_VERIFY_CONNECTION_PROMPT } from './constants';
 import { useProjectId } from '#lib/hooks/useMetadata';
-import { cn } from '#lib/utils/utils';
 
 interface CLISectionProps {
   className?: string;

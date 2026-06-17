@@ -15,10 +15,6 @@ import { getDashboardBackendUrl } from '#lib/config/runtime';
 import { v4 as uuidv4 } from 'uuid';
 import type { ConvertedValue, DisplayValue, ValueConversionResult } from '#components/datagrid';
 
-// Re-exported from the shared UI package so the dashboard and @insforge/ui use
-// one identical class-merge implementation.
-export { cn } from '@insforge/ui';
-
 /**
  * Convert and validate a string value based on the specified ColumnType
  */

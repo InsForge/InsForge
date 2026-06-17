@@ -1,14 +1,7 @@
 import { ColumnType } from '@insforge/shared-schemas';
 import { describe, expect, it } from 'vitest';
-import {
-  cn,
-  compareVersions,
-  convertValueForColumn,
-  formatDate,
-  formatTime,
-  formatValueForDisplay,
-  isEmptyValue,
-} from '#lib/utils/utils';
+import { cn } from '@insforge/ui';
+import { compareVersions, convertValueForColumn, formatDate, formatTime, formatValueForDisplay, isEmptyValue } from '#lib/utils/utils';
 
 describe('cn', () => {
   it('merges conditional classes and resolves Tailwind conflicts', () => {

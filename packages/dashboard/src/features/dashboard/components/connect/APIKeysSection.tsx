@@ -1,5 +1,4 @@
-import { CopyButton } from '@insforge/ui';
-import { cn } from '#lib/utils/utils';
+import { CopyButton, cn } from '@insforge/ui';
 
 interface CredentialRowProps {
   label: string;

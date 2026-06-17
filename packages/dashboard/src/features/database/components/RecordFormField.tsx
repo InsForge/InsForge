@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { Control, Controller, FieldError, UseFormReturn } from 'react-hook-form';
 import { Calendar, Clock, Link2, X } from 'lucide-react';
-import { Button, Input } from '@insforge/ui';
+import { Button, Input, cn } from '@insforge/ui';
 import {
   BooleanCellEditor,
   DateCellEditor,
@@ -10,7 +10,7 @@ import {
   type ConvertedValue,
 } from '#components';
 import { ColumnSchema, ColumnType } from '@insforge/shared-schemas';
-import { convertValueForColumn, cn, formatValueForDisplay } from '#lib/utils/utils';
+import { convertValueForColumn, formatValueForDisplay } from '#lib/utils/utils';
 import { LinkRecordDialog } from './LinkRecordDialog';
 import { isValid, parseISO } from 'date-fns';
 

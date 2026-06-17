@@ -7,12 +7,13 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
+  cn,
 } from '@insforge/ui';
 import { useDeployments } from '#features/deployments/hooks/useDeployments';
 import { useDeploymentMetadata } from '#features/deployments/hooks/useDeploymentMetadata';
 import { useCustomDomains } from '#features/deployments/hooks/useCustomDomains';
 import { useToast } from '#lib/hooks/useToast';
-import { cn, formatTime } from '#lib/utils/utils';
+import { formatTime } from '#lib/utils/utils';
 
 const statusColors: Record<string, string> = {
   WAITING: 'bg-yellow-600',

@@ -1,8 +1,7 @@
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@insforge/ui';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, cn } from '@insforge/ui';
 import type { PaymentProvider } from '@insforge/shared-schemas';
 import RazorpayIcon from '#assets/logos/razorpay-icon.png';
 import StripeIcon from '#assets/logos/stripe-icon.svg';
-import { cn } from '#lib/utils/utils';
 
 export const PAYMENT_PROVIDER_LABELS: Record<PaymentProvider, string> = {
   stripe: 'Stripe',

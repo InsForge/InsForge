@@ -21,7 +21,7 @@ import { PaymentsOnboardingState } from '#features/payments/components/PaymentsO
 import type { PaymentsOutletContext } from '#features/payments/components/PaymentsLayout';
 import { usePaymentClientPagination } from '#features/payments/hooks/usePaymentClientPagination';
 import { usePaymentCustomers } from '#features/payments/hooks/usePaymentCustomers';
-import { cn } from '#lib/utils/utils';
+import { cn } from '@insforge/ui';
 
 type CustomerBadgeVariant = 'deleted' | 'guest' | null;
 
