@@ -6,11 +6,12 @@ const { mockFetch } = vi.hoisted(() => ({
 
 vi.stubGlobal('fetch', mockFetch);
 
-import { AIModelService } from '../../src/services/ai/ai-model.service';
+import { AIModelService, _resetCacheForTesting } from '../../src/services/ai/ai-model.service';
 
 describe('AIModelService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    _resetCacheForTesting();
   });
 
   it('fetches the public OpenRouter catalog with all output modalities and caches it', async () => {
@@ -61,8 +62,10 @@ describe('AIModelService', () => {
         }),
     });
 
-    const firstResult = await AIModelService.getModels();
-    const secondResult = await AIModelService.getModels();
+    const [firstResult, secondResult] = await Promise.all([
+      AIModelService.getModels(),
+      AIModelService.getModels(),
+    ]);
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(mockFetch).toHaveBeenCalledWith(
@@ -107,5 +110,31 @@ describe('AIModelService', () => {
         outputPriceLabel: undefined,
       },
     ]);
+  });
+
+  it('clears in-flight state after a failed fetch so a later call retries', async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: false,
+        statusText: 'Too Many Requests',
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: [],
+          }),
+      });
+
+    // 1. First batch of concurrent calls should reject
+    await expect(
+      Promise.all([AIModelService.getModels(), AIModelService.getModels()])
+    ).rejects.toThrow();
+
+    // 2. The next call should trigger a fresh fetch
+    await AIModelService.getModels();
+
+    // 3. Since the first two shared a fetch, and the third triggered a new one, the total should be 2.
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 });

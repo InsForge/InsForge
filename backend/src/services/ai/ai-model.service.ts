@@ -11,68 +11,92 @@ let modelsCache: {
   models: AIModelSchema[];
 } | null = null;
 
+/**
+ * Tracks an in-flight request to the OpenRouter model catalog.
+ * Used to deduplicate concurrent cache-miss requests and prevent cache stampedes.
+ */
+let fetchInFlight: Promise<AIModelSchema[]> | null = null;
+
 export class AIModelService {
   /**
-   * Get all available AI models
-   * Fetches the public OpenRouter catalog directly.
+   * Retrieves the catalog of available AI models from OpenRouter.
+   * Utilizes a time-based cache and coalesces concurrent fetches to prevent rate limiting.
+   * * @returns {Promise<AIModelSchema[]>} A promise resolving to an array of available models.
    */
   static async getModels(): Promise<AIModelSchema[]> {
-    const now = Date.now();
-    if (modelsCache && modelsCache.expiresAt > now) {
+    if (modelsCache && modelsCache.expiresAt > Date.now()) {
       return modelsCache.models;
     }
 
-    const response = await fetch(OPENROUTER_MODELS_URL);
-
-    if (!response.ok) {
-      if (modelsCache) {
-        return modelsCache.models;
-      }
-      throw new AppError(
-        `Failed to fetch models: ${response.statusText}`,
-        500,
-        ERROR_CODES.AI_UPSTREAM_UNAVAILABLE
-      );
+    if (fetchInFlight) {
+      return fetchInFlight;
     }
 
-    const data = (await response.json()) as { data: RawOpenRouterModel[] };
-    const rawModels = data.data || [];
+    fetchInFlight = (async () => {
+      const response = await fetch(OPENROUTER_MODELS_URL);
 
-    const models: AIModelSchema[] = rawModels
-      .map((rawModel) => {
-        const inputModality = normalizeModalities(rawModel.architecture?.input_modalities || []);
-        const outputModality = normalizeModalities(rawModel.architecture?.output_modalities || []);
-        const { inputPrice, outputPrice, inputPriceLabel, outputPriceLabel } = calculateTokenPrices(
-          rawModel.pricing,
-          inputModality,
-          outputModality
+      if (!response.ok) {
+        if (modelsCache) {
+          return modelsCache.models;
+        }
+        throw new AppError(
+          `Failed to fetch models: ${response.statusText}`,
+          500,
+          ERROR_CODES.AI_UPSTREAM_UNAVAILABLE
         );
-        return {
-          id: rawModel.id, // OpenRouter provided model ID
-          created: rawModel.created,
-          modelId: rawModel.id,
-          provider: 'openrouter',
-          inputModality,
-          outputModality,
-          inputPrice,
-          outputPrice,
-          inputPriceLabel,
-          outputPriceLabel,
-        };
-      })
-      .filter((model) => model.inputModality.length > 0 && model.outputModality.length > 0)
-      .sort((a, b) => {
-        const [aCompany = '', bCompany = ''] = [a.id.split('/')[0], b.id.split('/')[0]];
+      }
 
-        const orderDiff = getProviderOrder(aCompany) - getProviderOrder(bCompany);
-        return orderDiff !== 0 ? orderDiff : a.id.localeCompare(b.id);
-      });
+      const data = (await response.json()) as { data: RawOpenRouterModel[] };
+      const rawModels = data.data || [];
 
-    modelsCache = {
-      expiresAt: now + MODELS_CACHE_TTL_MS,
-      models,
-    };
+      const models: AIModelSchema[] = rawModels
+        .map((rawModel) => {
+          const inputModality = normalizeModalities(rawModel.architecture?.input_modalities || []);
+          const outputModality = normalizeModalities(
+            rawModel.architecture?.output_modalities || []
+          );
+          const { inputPrice, outputPrice, inputPriceLabel, outputPriceLabel } =
+            calculateTokenPrices(rawModel.pricing, inputModality, outputModality);
+          return {
+            id: rawModel.id, // OpenRouter provided model ID
+            created: rawModel.created,
+            modelId: rawModel.id,
+            provider: 'openrouter',
+            inputModality,
+            outputModality,
+            inputPrice,
+            outputPrice,
+            inputPriceLabel,
+            outputPriceLabel,
+          };
+        })
+        .filter((model) => model.inputModality.length > 0 && model.outputModality.length > 0)
+        .sort((a, b) => {
+          const [aCompany = '', bCompany = ''] = [a.id.split('/')[0], b.id.split('/')[0]];
 
-    return models || [];
+          const orderDiff = getProviderOrder(aCompany) - getProviderOrder(bCompany);
+          return orderDiff !== 0 ? orderDiff : a.id.localeCompare(b.id);
+        });
+
+      modelsCache = {
+        expiresAt: Date.now() + MODELS_CACHE_TTL_MS,
+        models,
+      };
+
+      return models;
+    })().finally(() => {
+      fetchInFlight = null;
+    });
+
+    return fetchInFlight;
   }
+}
+
+/**
+ * Test helper to reset module-level cache and in-flight tracking state.
+ * Strictly for use in unit test isolation.
+ */
+export function _resetCacheForTesting() {
+  modelsCache = null;
+  fetchInFlight = null;
 }
