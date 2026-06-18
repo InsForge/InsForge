@@ -54,7 +54,6 @@ export const createAdminSchema = z.object({
  * POST /api/auth/admin/change-password - Change admin password (any admin)
  */
 export const changeAdminPasswordSchema = z.object({
-  adminId: z.string().min(1, 'AdminId is required'),
   oldPassword: z.string().min(1, 'Old password is required'),
   newPassword: z.string().min(6, 'New password must be at least 6 characters'),
 });
