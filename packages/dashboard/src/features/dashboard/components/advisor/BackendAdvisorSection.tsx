@@ -14,6 +14,7 @@ import type {
 } from '#types';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
 import { useToast } from '#lib/hooks/useToast';
+import { useCopyToClipboard } from '#lib/hooks/useCopyToClipboard';
 import { EmptyState, PaginationControls } from '#components';
 import { AdvisoryItem } from './AdvisoryItem';
 import { AdvisoryTabs, type AdvisoryTabValue } from './AdvisoryTabs';
@@ -102,7 +103,7 @@ export function BackendAdvisorSection() {
   const queryClient = useQueryClient();
 
   const [isScanning, setIsScanning] = useState(false);
-  const [copiedAll, setCopiedAll] = useState(false);
+  const { copied: copiedAll, copy } = useCopyToClipboard();
   const baselineScanIdRef = useRef<string | undefined>(undefined);
   const pollStartRef = useRef<number | null>(null);
   const refetchLatest = latest.refetch;
@@ -252,10 +253,13 @@ export function BackendAdvisorSection() {
         showToast('No remediations available', 'info');
         return;
       }
-      await navigator.clipboard.writeText(formatRemediationPromptBatch(actionable));
-      setCopiedAll(true);
-      setTimeout(() => setCopiedAll(false), 2000);
+      const copiedOk = await copy(formatRemediationPromptBatch(actionable));
+      if (!copiedOk) {
+        showToast('Failed to copy remediations', 'error');
+      }
     } catch {
+      // Guards the paginated advisor fetch above — `copy()` handles its own
+      // failure via the `copiedOk` check, so this only fires for fetch errors.
       showToast('Failed to copy remediations', 'error');
     }
   };
