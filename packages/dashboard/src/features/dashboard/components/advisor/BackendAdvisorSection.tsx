@@ -258,6 +258,8 @@ export function BackendAdvisorSection() {
         showToast('Failed to copy remediations', 'error');
       }
     } catch {
+      // Guards the paginated advisor fetch above — `copy()` handles its own
+      // failure via the `copiedOk` check, so this only fires for fetch errors.
       showToast('Failed to copy remediations', 'error');
     }
   };
