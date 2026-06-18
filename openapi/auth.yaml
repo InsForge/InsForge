@@ -343,10 +343,7 @@ paths:
                   refreshToken:
                     type: string
                     nullable: true
-                    description: Refresh token for mobile/desktop/server clients (null for web clients or if email verification required)
-                  requireEmailVerification:
-                    type: boolean
-                    description: Whether email verification is required before login
+                    description: Refresh token for mobile/desktop/server clients (null for web clients)
         '400':
           description: Invalid request
         '403':
@@ -482,7 +479,7 @@ paths:
         '404':
           description: User not found
 
-/api/auth/anonymous:
+  /api/auth/anonymous:
     post:
       summary: Register anonymous user
       description: Creates a new anonymous user account
@@ -512,7 +509,7 @@ paths:
                   accessToken:
                     type: string
                     nullable: true
-                    description: JWT authentication token (null if email verification required)
+                    description: JWT authentication token
                   csrfToken:
                     type: string
                     nullable: true
@@ -521,9 +518,6 @@ paths:
                     type: string
                     nullable: true
                     description: Refresh token for mobile/desktop/server clients (null for web clients or if email verification required)
-                  requireEmailVerification:
-                    type: boolean
-                    description: Whether email verification is required before login
         '400':
           description: Invalid request
         '403':
@@ -538,7 +532,6 @@ paths:
                 statusCode: 403
         '409':
           description: User already exists
-
 
   /api/auth/sessions:
     post:

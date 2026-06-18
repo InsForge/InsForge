@@ -275,7 +275,6 @@ export class AuthService {
     }
 
     const userId = crypto.randomUUID();
-    const now = new Date().toISOString();
 
     const pool = this.getPool();
     const client = await pool.connect();
@@ -283,7 +282,7 @@ export class AuthService {
       await client.query('BEGIN');
 
       await client.query(
-        `INSERT INTO auth.users (id, is_anonymous, profile, created_at, updated_at)
+        `INSERT INTO auth.users (id, isAnonymous, profile, created_at, updated_at)
          VALUES ($1, true, $2::jsonb, NOW(), NOW())`,
         [userId, JSON.stringify({ name: 'Guest' })]
       );
@@ -309,6 +308,7 @@ export class AuthService {
     // Email verification not required, provide access token for immediate login
     const accessToken = this.tokenManager.generateAccessToken({
       sub: userId,
+      email: user.email, // null for anonymous users; keeps auth.email() consistent in RLS policies
       role: 'authenticated',
     });
 
@@ -931,7 +931,7 @@ export class AuthService {
         updatedAt: new Date().toISOString(),
         profile: { name: userName, avatar_url: avatarUrl },
         metadata: null,
-        is_anonymous: false,
+        isAnonymous: false,
       };
 
       const accessToken = this.tokenManager.generateAccessToken({
@@ -1306,7 +1306,7 @@ export class AuthService {
       providers: providers,
       profile: dbUser.profile,
       metadata: dbUser.metadata,
-      is_anonymous: dbUser.is_anonymous || false,
+      isAnonymous: dbUser.is_anonymous || false,
     };
   }
 
