@@ -22,6 +22,7 @@ import { deploymentsRouter } from '@/api/routes/deployments/index.routes.js';
 import { webhooksRouter } from '@/api/routes/webhooks/index.routes.js';
 import { s3GatewayRouter } from '@/api/routes/s3-gateway/index.routes.js';
 import { paymentsRouter } from '@/api/routes/payments/index.routes.js';
+import { advisorRouter } from '@/api/routes/advisor/index.routes.js';
 import { errorMiddleware } from '@/api/middlewares/error.js';
 import { destroyEmailCooldownInterval } from '@/api/middlewares/rate-limiters.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
@@ -203,6 +204,7 @@ export async function createApp() {
   apiRouter.use('/payments', paymentsRouter);
   apiRouter.use('/compute/services', servicesRouter);
   apiRouter.use('/analytics', analyticsRouter);
+  apiRouter.use('/advisor', advisorRouter);
 
   // Mount all API routes under /api prefix
   app.use('/api', apiRouter);

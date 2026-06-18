@@ -17,6 +17,7 @@ import DashboardLayout from '#features/dashboard/components/DashboardLayout';
 import DashboardPage from '#features/dashboard/pages/DashboardPage';
 import DTestDashboardPage from '#features/dashboard/pages/DTestDashboardPage';
 import DTestInstallPage from '#features/dashboard/pages/DTestInstallPage';
+import AdvisorsPage from '#features/dashboard/pages/AdvisorsPage';
 import DatabaseLayout from '#features/database/components/DatabaseLayout';
 import SQLEditorLayout from '#features/database/components/SQLEditorLayout';
 import BackupsPage from '#features/database/pages/BackupsPage';
@@ -103,6 +104,7 @@ function AuthenticatedRoutes() {
         <Route path="/dashboard/storage" element={<StorageLayout />}>
           <Route index element={<BucketsPage />} />
         </Route>
+        <Route path="/dashboard/advisors" element={<AdvisorsPage />} />
         <Route path="/dashboard/logs" element={<LogsLayout />}>
           <Route index element={<Navigate to="MCP" replace />} />
           <Route path="MCP" element={<MCPLogsPage />} />

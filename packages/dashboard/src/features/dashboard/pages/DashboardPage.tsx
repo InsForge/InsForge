@@ -673,7 +673,6 @@ export default function DashboardPage() {
       {isCloudHostingMode && (
         <div className="flex flex-col gap-12 px-10 py-10">
           <ObservabilitySection />
-          <BackendAdvisorSection />
         </div>
       )}
     </main>

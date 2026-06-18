@@ -30,10 +30,12 @@ export const ADVISOR_QUERY_KEYS = {
 export function useAdvisorLatest() {
   const host = useDashboardHost();
   const fetcher = host.onRequestAdvisorLatest;
+  const isEnabled = !!fetcher;
+
   return useQuery<DashboardAdvisorSummary | null, Error>({
     queryKey: ADVISOR_QUERY_KEYS.latest,
     queryFn: () => (fetcher ? fetcher() : Promise.resolve(null)),
-    enabled: !!fetcher,
+    enabled: isEnabled,
     retry: false,
     staleTime: 60 * 1000,
   });
@@ -42,10 +44,12 @@ export function useAdvisorLatest() {
 export function useAdvisorIssues(query: DashboardAdvisorIssuesQuery) {
   const host = useDashboardHost();
   const fetcher = host.onRequestAdvisorIssues;
+  const isEnabled = !!fetcher;
+
   return useQuery<DashboardAdvisorIssuesResponse, Error>({
     queryKey: ADVISOR_QUERY_KEYS.issues(query),
     queryFn: () => (fetcher ? fetcher(query) : Promise.resolve({ issues: [], total: 0 })),
-    enabled: !!fetcher,
+    enabled: isEnabled,
     retry: false,
     staleTime: 60 * 1000,
     placeholderData: keepPreviousData,
@@ -66,6 +70,8 @@ const ADVISOR_COUNT_PAGE_SIZE = 100;
 export function useAdvisorCategoryCounts() {
   const host = useDashboardHost();
   const fetcher = host.onRequestAdvisorIssues;
+  const isEnabled = !!fetcher;
+
   return useQuery<AdvisorCategorySeverityMatrix, Error>({
     queryKey: ADVISOR_QUERY_KEYS.categoryCounts,
     queryFn: async () => {
@@ -86,7 +92,7 @@ export function useAdvisorCategoryCounts() {
       }
       return matrix;
     },
-    enabled: !!fetcher,
+    enabled: isEnabled,
     retry: false,
     staleTime: 60 * 1000,
   });
@@ -96,6 +102,7 @@ export function useTriggerAdvisorScan() {
   const host = useDashboardHost();
   const trigger = host.onTriggerAdvisorScan;
   const queryClient = useQueryClient();
+
   return useMutation<void, Error, void>({
     mutationFn: () => (trigger ? trigger() : Promise.reject(new Error('Scan unavailable'))),
     onSuccess: () => {
