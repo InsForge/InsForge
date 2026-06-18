@@ -65,7 +65,7 @@ export function Pagination({
   currentPage = 1,
   totalPages = 1,
   totalRecords = 0,
-  pageSize = 100,
+  pageSize = 50,
   pageSizeOptions,
   recordLabel = 'users',
   visiblePageCount = FIXED_CENTER_SLOT_COUNT,
@@ -79,12 +79,7 @@ export function Pagination({
   const endRecord =
     totalRecords === 0 ? 0 : Math.min(normalizedCurrentPage * pageSize, totalRecords);
 
-  // Keep pagination density consistent across the app:
-  // 2 fixed controls on the left + 5 center slots + 2 fixed controls on the right = 9 total items.
-  const enforcedCenterSlotCount = Math.max(
-    FIXED_CENTER_SLOT_COUNT,
-    Math.min(FIXED_CENTER_SLOT_COUNT, visiblePageCount)
-  );
+  const enforcedCenterSlotCount = Math.max(FIXED_CENTER_SLOT_COUNT, visiblePageCount);
 
   const items = React.useMemo(
     () => getVisibleItems(normalizedCurrentPage, normalizedTotalPages, enforcedCenterSlotCount),
