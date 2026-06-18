@@ -82,7 +82,7 @@ export default function TablesPage() {
 
     return tables[0];
   }, [isLoadingTables, tables, selectedTableFromQuery]);
-  const tableKey = `${selectedSchema}.${selectedTable ?? ''}`;
+  const tableKey = `${selectedSchema}\x00${selectedTable ?? ''}`;
   const searchValue = searchByTable[tableKey] ?? '';
   const searchQuery = searchValue.trim();
   const handleSearchChange = useCallback(
@@ -528,6 +528,7 @@ export default function TablesPage() {
           <>
             {selectedTable && (
               <TableHeader
+                key={tableKey}
                 leftContent={
                   selectedRows.size > 0 ? (
                     <div className="flex items-center gap-2">
