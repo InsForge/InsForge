@@ -165,7 +165,7 @@ export class AdminService {
        SET deleted_at = NOW(), updated_at = NOW()
        WHERE id = $1 AND deleted_at IS NULL AND id != $2
        RETURNING id`,
-      [adminId, currentAdminId]
+      [adminId]
     );
 
     return result.rows.length > 0;
