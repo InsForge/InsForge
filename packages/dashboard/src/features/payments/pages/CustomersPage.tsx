@@ -22,6 +22,7 @@ import type { PaymentsOutletContext } from '#features/payments/components/Paymen
 import { usePaymentClientPagination } from '#features/payments/hooks/usePaymentClientPagination';
 import { usePaymentCustomers } from '#features/payments/hooks/usePaymentCustomers';
 import { cn } from '@insforge/ui';
+import { formatCurrencyAmount } from '#features/payments/helpers';
 
 type CustomerBadgeVariant = 'deleted' | 'guest' | null;
 
@@ -153,6 +154,8 @@ const CUSTOMER_COLUMNS: DataGridColumn<CustomerGridRow>[] = [
   },
 ];
 
+// Intentionally NOT the shared formatDateTime — this uses a zero-padded hour
+// ("03:30 PM") where the shared one renders "3:30 PM". Keep it local.
 function formatDateTime(value: string | null) {
   if (!value) {
     return '-';
@@ -170,26 +173,6 @@ function formatDateTime(value: string | null) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(date);
-}
-
-function formatCurrencyAmount(amount: number | null, currency: string | null) {
-  if (amount === null || !currency) {
-    return '-';
-  }
-
-  const normalizedCurrency = currency.toUpperCase();
-  const fractionDigits =
-    new Intl.NumberFormat(undefined, {
-      style: 'currency',
-      currency: normalizedCurrency,
-      currencyDisplay: 'code',
-    }).resolvedOptions().maximumFractionDigits ?? 2;
-
-  return new Intl.NumberFormat(undefined, {
-    style: 'currency',
-    currency: normalizedCurrency,
-    currencyDisplay: 'code',
-  }).format(amount / 10 ** fractionDigits);
 }
 
 function getCustomerLabel(customer: PaymentCustomerListItem) {

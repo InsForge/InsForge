@@ -20,6 +20,7 @@ import type { PaymentsOutletContext } from '#features/payments/components/Paymen
 import { usePaymentClientPagination } from '#features/payments/hooks/usePaymentClientPagination';
 import { usePaymentTransactions } from '#features/payments/hooks/usePaymentTransactions';
 import { cn } from '@insforge/ui';
+import { formatCurrencyAmount } from '#features/payments/helpers';
 
 const TRANSACTIONS_GRID_TEMPLATE =
   'minmax(0,1.45fr) 120px minmax(0,1.1fr) 120px minmax(0,1fr) 180px';
@@ -38,26 +39,6 @@ const PAYMENT_TYPE_LABELS: Record<PaymentTransactionType, string> = {
   refund: 'Refund',
   failed_payment: 'Failed Payment',
 };
-
-function formatAmountValue(amount: number | null, currency: string | null) {
-  if (amount === null || !currency) {
-    return '-';
-  }
-
-  const normalizedCurrency = currency.toUpperCase();
-  const fractionDigits =
-    new Intl.NumberFormat(undefined, {
-      style: 'currency',
-      currency: normalizedCurrency,
-      currencyDisplay: 'code',
-    }).resolvedOptions().maximumFractionDigits ?? 2;
-
-  return new Intl.NumberFormat(undefined, {
-    style: 'currency',
-    currency: normalizedCurrency,
-    currencyDisplay: 'code',
-  }).format(amount / 10 ** fractionDigits);
-}
 
 function formatEventDate(value: string | null) {
   if (!value) {
@@ -209,7 +190,7 @@ function TransactionRow({ payment }: { payment: PaymentTransaction }) {
 
         <div className="min-w-0 px-2 py-3">
           <span className="block truncate text-foreground">
-            {formatAmountValue(payment.amount, payment.currency)}
+            {formatCurrencyAmount(payment.amount, payment.currency)}
           </span>
         </div>
 
