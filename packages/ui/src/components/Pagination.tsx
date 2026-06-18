@@ -39,10 +39,6 @@ function getVisibleItems(
     return Array.from({ length: totalPages }, (_, index) => index + 1);
   }
 
-  // For 5 center slots:
-  // start: 1 2 3 4 ...
-  // middle: ... p-1 p p+1 ...
-  // end: ... n-3 n-2 n-1 n
   const edgePageCount = slots - 1;
   const endStartPage = totalPages - edgePageCount + 1;
 
@@ -57,7 +53,10 @@ function getVisibleItems(
     ];
   }
 
-  return ['ellipsis-left', currentPage - 1, currentPage, currentPage + 1, 'ellipsis-right'];
+  const half = Math.floor((slots - 2) / 2);
+  const rangeStart = currentPage - half;
+  const range = Array.from({ length: slots - 2 }, (_, index) => rangeStart + index);
+  return ['ellipsis-left', ...range, 'ellipsis-right'];
 }
 
 export function Pagination({

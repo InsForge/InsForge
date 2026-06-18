@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '#lib/contexts/ThemeContext';
@@ -149,11 +150,15 @@ describe('FunctionsPage pagination', () => {
     expect(screen.getByText(/Functions per page/i)).toBeInTheDocument();
   });
 
-  it('clamps currentPage when data shrinks below current page', () => {
-    hookMocks.currentPage = 3;
-    hookMocks.functions = createFunctions(30);
+  it('navigates to page 2 when user clicks the page-2 button', async () => {
+    const user = userEvent.setup();
     renderPage();
-    expect(screen.getByText(/Showing 1 to 30 of 30/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Go to page 2' }));
+    expect(screen.getByText(/Showing 51 to 100 of 120/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Go to page 2' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
   });
 
   it('shows single page when data exactly equals pageSize', () => {
