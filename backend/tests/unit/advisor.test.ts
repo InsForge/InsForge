@@ -164,17 +164,22 @@ describe('Database Advisor Unit Tests', () => {
       app = express();
       app.use(express.json());
       app.use('/api/advisor', advisorRouter);
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      app.use((err: { statusCode?: number; message?: string }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-        res.status(err.statusCode || 500).json({ error: err.message });
-      });
+      app.use(
+        (
+          err: { statusCode?: number; message?: string },
+          _req: express.Request,
+          res: express.Response,
+          _next: express.NextFunction
+        ) => {
+          void _next;
+          res.status(err.statusCode || 500).json({ error: err.message });
+        }
+      );
     });
 
     it('POST /api/advisor/scan should start scan', async () => {
       queryMock.mockResolvedValueOnce({ rows: [{ id: 'scan-uuid' }] });
-      const res = await request(app)
-        .post('/api/advisor/scan')
-        .expect(201);
+      const res = await request(app).post('/api/advisor/scan').expect(201);
 
       expect(res.body).toEqual({
         scanId: 'scan-uuid',
@@ -198,17 +203,13 @@ describe('Database Advisor Unit Tests', () => {
         }
         if (sql.includes('advisor_findings')) {
           return Promise.resolve({
-            rows: [
-              { severity: 'critical', count: 2 },
-            ],
+            rows: [{ severity: 'critical', count: 2 }],
           });
         }
         return Promise.resolve({ rows: [] });
       });
 
-      const res = await request(app)
-        .get('/api/advisor/latest')
-        .expect(200);
+      const res = await request(app).get('/api/advisor/latest').expect(200);
 
       expect(res.body.scanId).toBe('scan-uuid');
       expect(res.body.summary.critical).toBe(2);
