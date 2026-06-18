@@ -17,7 +17,11 @@ import {
 import adminRouter from './admin.routes.js';
 import oauthRouter from './oauth.routes.js';
 import customOAuthRouter from './custom-oauth.routes.js';
-import { sendEmailOTPLimiter, verifyOTPLimiter } from '@/api/middlewares/rate-limiters.js';
+import {
+  anonymousAuthRateLimiter,
+  sendEmailOTPLimiter,
+  verifyOTPLimiter,
+} from '@/api/middlewares/rate-limiters.js';
 import {
   REFRESH_TOKEN_COOKIE_NAME,
   setRefreshTokenCookie,
@@ -465,6 +469,41 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
     next(error);
   }
 });
+
+// POST /api/auth/anonymous - Create a new anonymous session
+// Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'
+router.post(
+  '/anonymous',
+  anonymousAuthRateLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const clientType = parseClientType(req.query.client_type);
+
+      // Call the service function you just built!
+      const result: CreateSessionResponse = await authService.anonymousRegister();
+
+      // Set refresh token based on client type (Identical to normal login)
+      const tokenManager = TokenManager.getInstance();
+      if (clientType === 'web' && result.user) {
+        // Web clients: use httpOnly cookie + CSRF token
+        const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
+          result.user.id,
+          'user'
+        );
+        setRefreshTokenCookie(res, refreshToken);
+        result.csrfToken = csrfToken;
+      } else if (result.user) {
+        const refreshToken = tokenManager.generateRefreshToken(result.user.id, 'user');
+        // Non-web clients: return refresh token in response body
+        result.refreshToken = refreshToken;
+      }
+
+      successResponse(res, result);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 // POST /api/auth/id-token - Sign in with ID token from native SDK (Google One Tap, etc.)
 // Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'

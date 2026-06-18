@@ -58,6 +58,7 @@ export const userSchema = z.object({
   updatedAt: z.string(), // PostgreSQL timestamp
   profile: profileSchema.nullable(), // User profile data (name, avatar_url, bio, etc.)
   metadata: z.record(z.unknown()).nullable(), // System metadata (device ID, login IP, etc.)
+  is_anonymous: z.boolean().default(false),
 });
 
 export const adminSchema = z.object({
