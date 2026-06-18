@@ -20,7 +20,7 @@ import type { PaymentsOutletContext } from '#features/payments/components/Paymen
 import { usePaymentClientPagination } from '#features/payments/hooks/usePaymentClientPagination';
 import { usePaymentTransactions } from '#features/payments/hooks/usePaymentTransactions';
 import { cn } from '@insforge/ui';
-import { formatCurrencyAmount } from '#features/payments/format';
+import { formatCurrencyAmount } from '#features/payments/helpers';
 
 const TRANSACTIONS_GRID_TEMPLATE =
   'minmax(0,1.45fr) 120px minmax(0,1.1fr) 120px minmax(0,1fr) 180px';

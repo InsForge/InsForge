@@ -5,7 +5,7 @@ import {
   formatLastSynced,
   formatPriceAmount,
   getCurrencyFractionDigits,
-} from '#features/payments/format';
+} from '#features/payments/helpers';
 import type { CatalogPrice } from '#features/payments/types/catalog';
 
 function makePrice(overrides: Partial<CatalogPrice>): CatalogPrice {

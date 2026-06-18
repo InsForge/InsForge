@@ -22,7 +22,7 @@ import type { PaymentsOutletContext } from '#features/payments/components/Paymen
 import { usePaymentClientPagination } from '#features/payments/hooks/usePaymentClientPagination';
 import { usePaymentCustomers } from '#features/payments/hooks/usePaymentCustomers';
 import { cn } from '@insforge/ui';
-import { formatCurrencyAmount } from '#features/payments/format';
+import { formatCurrencyAmount } from '#features/payments/helpers';
 
 type CustomerBadgeVariant = 'deleted' | 'guest' | null;
 

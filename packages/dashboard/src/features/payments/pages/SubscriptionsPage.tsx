@@ -19,7 +19,7 @@ import { usePaymentClientPagination } from '#features/payments/hooks/usePaymentC
 import { usePaymentCustomers } from '#features/payments/hooks/usePaymentCustomers';
 import type { CatalogPrice, CatalogProduct } from '#features/payments/types/catalog';
 import { usePaymentSubscriptions } from '#features/payments/hooks/usePaymentSubscriptions';
-import { formatDateTime, formatLastSynced, formatPriceAmount } from '#features/payments/format';
+import { formatDateTime, formatLastSynced, formatPriceAmount } from '#features/payments/helpers';
 import type {
   PaymentSubscription,
   PaymentSubscriptionItem,

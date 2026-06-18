@@ -15,7 +15,7 @@ import { PaymentsOnboardingState } from '#features/payments/components/PaymentsO
 import type { PaymentsOutletContext } from '#features/payments/components/PaymentsLayout';
 import { usePaymentCatalog } from '#features/payments/hooks/usePaymentCatalog';
 import { usePaymentClientPagination } from '#features/payments/hooks/usePaymentClientPagination';
-import { formatLastSynced, formatPriceAmount } from '#features/payments/format';
+import { formatLastSynced, formatPriceAmount } from '#features/payments/helpers';
 
 const CATALOG_ROW_GRID_TEMPLATE = '32px minmax(240px,1.5fr) 100px 90px 140px minmax(220px,1fr)';
 
