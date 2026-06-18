@@ -12,10 +12,12 @@ import type { CellClickArgs, CellMouseEvent } from 'react-data-grid';
 // Cell props exposed to a column's renderCell, with the row narrowed to the
 // consumer's row type T. The grid itself operates on the loose DataGridRowType
 // (it needs the index signature); createLogsColumns bridges the two.
-export type LogsCellProps<T> = Omit<RenderCellProps<DataGridRowType>, 'row'> & { row: T };
+export type LogsCellProps<T extends object> = Omit<RenderCellProps<DataGridRowType>, 'row'> & {
+  row: T;
+};
 
 // Column definition type for LogsDataGrid
-export interface LogsColumnDef<T = DataGridRowType> {
+export interface LogsColumnDef<T extends object = DataGridRowType> {
   key: string;
   name: string;
   width?: string;
@@ -27,7 +29,7 @@ export interface LogsColumnDef<T = DataGridRowType> {
 }
 
 // Convert logs data to DataGrid columns with custom renderers
-export function createLogsColumns<T = DataGridRowType>(
+export function createLogsColumns<T extends object = DataGridRowType>(
   columnDefs: LogsColumnDef<T>[]
 ): DataGridColumn<DataGridRowType>[] {
   return columnDefs.map((def) => {
@@ -73,7 +75,7 @@ export function createLogsColumns<T = DataGridRowType>(
 }
 
 // Logs-specific DataGrid props - generic to accept any object type
-export interface LogsDataGridProps<T = Record<string, unknown>> extends Omit<
+export interface LogsDataGridProps<T extends object = Record<string, unknown>> extends Omit<
   DataGridProps<DataGridRowType>,
   'columns' | 'data'
 > {
@@ -86,7 +88,7 @@ export interface LogsDataGridProps<T = Record<string, unknown>> extends Omit<
 }
 
 // Specialized DataGrid for logs
-export function LogsDataGrid<T = Record<string, unknown>>({
+export function LogsDataGrid<T extends object = Record<string, unknown>>({
   columnDefs,
   data,
   noPadding,
