@@ -1,8 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { Button, CopyButton, Tab, Tabs } from '@insforge/ui';
+import { Button, CopyButton, Tab, Tabs, cn } from '@insforge/ui';
 import { CodeEditor } from '#components';
 import { useOpenRouterKey } from '#features/ai/hooks/useOpenRouterKey';
-import { cn } from '#lib/utils/utils';
 import {
   PROMPT_CARD_COPY,
   QUICK_START_COPY,

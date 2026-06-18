@@ -7,7 +7,7 @@ import {
 } from '#features/logs/services/log.service';
 import { LogsDataGrid, type LogsColumnDef } from './LogsDataGrid';
 import { DataGridEmptyState } from '#components';
-import { cn } from '#lib/utils/utils';
+import { cn } from '@insforge/ui';
 import { usePageSize } from '#lib/hooks/usePageSize';
 
 interface BuildLogsViewProps {
@@ -110,14 +110,14 @@ export function BuildLogsView({ className }: BuildLogsViewProps) {
   }, [currentPage, logsWithIds, pageSize]);
 
   // Column definitions for build logs
-  const columns: LogsColumnDef[] = useMemo(
+  const columns: LogsColumnDef<BuildLogRow>[] = useMemo(
     () => [
       {
         key: 'level',
         name: 'Level',
         width: '100px',
         renderCell: ({ row }) => {
-          const level = (row as unknown as BuildLogRow).level;
+          const level = row.level;
           return <span className={cn('text-sm font-medium', getLevelColor(level))}>{level}</span>;
         },
       },
@@ -126,7 +126,7 @@ export function BuildLogsView({ className }: BuildLogsViewProps) {
         name: 'Message',
         width: '1fr',
         renderCell: ({ row }) => {
-          const message = (row as unknown as BuildLogRow).message;
+          const message = row.message;
           return (
             <p className="text-sm text-gray-900 dark:text-white font-normal leading-6 truncate">
               {message}

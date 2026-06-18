@@ -10,7 +10,7 @@ import { AppError } from '@/utils/errors.js';
 import { AnalyticsService } from '@/services/analytics/analytics.service.js';
 
 export const analyticsRouter = Router();
-const service = new AnalyticsService();
+const service = AnalyticsService.getInstance();
 
 const MAX_LIMIT = 100;
 

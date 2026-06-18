@@ -7,12 +7,14 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
+  cn,
 } from '@insforge/ui';
 import { useDeployments } from '#features/deployments/hooks/useDeployments';
 import { useDeploymentMetadata } from '#features/deployments/hooks/useDeploymentMetadata';
+import { useCopyToClipboard } from '#lib/hooks/useCopyToClipboard';
 import { useCustomDomains } from '#features/deployments/hooks/useCustomDomains';
 import { useToast } from '#lib/hooks/useToast';
-import { cn, formatTime } from '#lib/utils/utils';
+import { formatTime } from '#lib/utils/utils';
 
 const statusColors: Record<string, string> = {
   WAITING: 'bg-yellow-600',
@@ -28,7 +30,7 @@ const DEPLOY_PROMPT = 'Deploy my app to InsForge';
 
 export default function DeploymentOverviewPage() {
   const { showToast } = useToast();
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyToClipboard();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [iframeKey, setIframeKey] = useState(0);
   const { deployments, isLoadingDeployments, refetchDeployments } = useDeployments();
@@ -87,11 +89,8 @@ export default function DeploymentOverviewPage() {
   };
 
   const handleCopyPrompt = async () => {
-    try {
-      await navigator.clipboard.writeText(DEPLOY_PROMPT);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
+    const ok = await copy(DEPLOY_PROMPT);
+    if (!ok) {
       showToast('Failed to copy to clipboard', 'error');
     }
   };

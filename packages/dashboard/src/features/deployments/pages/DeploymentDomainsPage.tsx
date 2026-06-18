@@ -25,6 +25,7 @@ import { useDeploymentSlug } from '#features/deployments/hooks/useDeploymentSlug
 import { useDeploymentMetadata } from '#features/deployments/hooks/useDeploymentMetadata';
 import { useCustomDomains } from '#features/deployments/hooks/useCustomDomains';
 import { useToast } from '#lib/hooks/useToast';
+import { useCopyToClipboard } from '#lib/hooks/useCopyToClipboard';
 import type { CustomDomain } from '#features/deployments/services/deployments.service';
 
 /**
@@ -62,16 +63,10 @@ function StatusBadge({ verified, misconfigured }: { verified: boolean; misconfig
  * Small inline copy button used in DNS record tables.
  */
 function CopyIconButton({ value, label }: { value: string; label: string }) {
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyToClipboard(1500);
 
   const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // Keep this non-blocking inside the table UI.
-    }
+    await copy(value);
   };
 
   return (
@@ -304,8 +299,8 @@ function CustomDomainRow({
  * and user-owned custom domains with full DNS verification workflow.
  */
 export default function DeploymentDomainsPage() {
-  const [copiedDefault, setCopiedDefault] = useState(false);
-  const [copiedCustom, setCopiedCustom] = useState(false);
+  const { copied: copiedDefault, copy: copyDefault } = useCopyToClipboard();
+  const { copied: copiedCustom, copy: copyCustom } = useCopyToClipboard();
   const [isEditing, setIsEditing] = useState(false);
   const [customSlug, setCustomSlug] = useState('');
   const [isAddDomainOpen, setIsAddDomainOpen] = useState(false);
@@ -348,11 +343,7 @@ export default function DeploymentDomainsPage() {
     if (!defaultDomain) {
       return;
     }
-    try {
-      await navigator.clipboard.writeText(defaultDomain);
-      setCopiedDefault(true);
-      setTimeout(() => setCopiedDefault(false), 2000);
-    } catch {
+    if (!(await copyDefault(defaultDomain))) {
       showToast('Failed to copy to clipboard', 'error');
     }
   };
@@ -361,11 +352,7 @@ export default function DeploymentDomainsPage() {
     if (!customDomainUrl) {
       return;
     }
-    try {
-      await navigator.clipboard.writeText(customDomainUrl);
-      setCopiedCustom(true);
-      setTimeout(() => setCopiedCustom(false), 2000);
-    } catch {
+    if (!(await copyCustom(customDomainUrl))) {
       showToast('Failed to copy to clipboard', 'error');
     }
   };

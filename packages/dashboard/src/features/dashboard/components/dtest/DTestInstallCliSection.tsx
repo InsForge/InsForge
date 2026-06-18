@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
-import { CopyButton } from '@insforge/ui';
+import { CopyButton, cn } from '@insforge/ui';
 import { useProjectId } from '#lib/hooks/useMetadata';
-import { cn } from '#lib/utils/utils';
 
 interface DTestInstallCliSectionProps {
   className?: string;
