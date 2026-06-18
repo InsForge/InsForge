@@ -163,7 +163,7 @@ export class AdminService {
     const result = await pool.query(
       `UPDATE auth.project_admins
        SET deleted_at = NOW(), updated_at = NOW()
-       WHERE id = $1 AND deleted_at IS NULL AND id != $2
+       WHERE id = $1 AND deleted_at IS NULL
        RETURNING id`,
       [adminId]
     );

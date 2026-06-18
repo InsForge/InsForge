@@ -20,7 +20,7 @@ export default function AccountSettingsDialog({ open, onOpenChange }: AccountSet
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
 
-  const displayName = user?.sub || 'Admin';
+  const displayName = user?.username || user?.sub || 'Admin';
   const isRoot = user?.sub === 'local:admin';
 
   useEffect(() => {

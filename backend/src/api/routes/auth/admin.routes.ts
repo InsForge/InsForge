@@ -105,8 +105,7 @@ router.get(
         // Root admin: use the configured root admin username
         username = appConfig.auth.rootAdminUsername || 'admin';
       } else {
-        // DB admin: lookup by ID
-        // Note: You'll need to import adminService
+        // DB admin: look up the username by ID
         const admin = await adminService.getAdminById(req.user.id);
         if (admin) {
           username = admin.username;
@@ -116,7 +115,7 @@ router.get(
       const response: GetCurrentAdminSessionResponse = {
         admin: {
           sub: req.user.id,
-          username, // Add username field
+          username,
         },
       };
 

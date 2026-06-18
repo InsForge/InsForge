@@ -754,7 +754,17 @@ export class AuthService {
     oldPassword: string,
     newPassword: string
   ): Promise<void> {
-    // Use getAdminById since adminId is the sub (UUID or 'local:admin')
+    // Root admin is env-based and has no DB row; its password is managed via
+    // ROOT_ADMIN_PASSWORD, not the dashboard.
+    if (adminId === 'local:admin') {
+      throw new AppError(
+        'Root admin password is managed via environment variables',
+        403,
+        ERROR_CODES.FORBIDDEN
+      );
+    }
+
+    // adminId is the token sub, which for DB admins is their UUID.
     const admin = await adminService.getAdminById(adminId);
     if (!admin) {
       throw new AppError('Admin user not found', 404, ERROR_CODES.AUTH_USER_NOT_FOUND);
