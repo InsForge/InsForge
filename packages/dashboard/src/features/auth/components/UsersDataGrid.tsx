@@ -28,8 +28,9 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
+  cn,
 } from '@insforge/ui';
-import { cn, formatTime } from '#lib/utils/utils';
+import { formatTime } from '#lib/utils/utils';
 import type { UserSchema } from '@insforge/shared-schemas';
 import { useCustomOAuthConfig } from '#features/auth/hooks/useCustomOAuthConfig';
 

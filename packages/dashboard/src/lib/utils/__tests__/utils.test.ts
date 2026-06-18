@@ -1,7 +1,7 @@
 import { ColumnType } from '@insforge/shared-schemas';
 import { describe, expect, it } from 'vitest';
+import { cn } from '@insforge/ui';
 import {
-  cn,
   compareVersions,
   convertValueForColumn,
   formatDate,

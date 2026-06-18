@@ -10,9 +10,10 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
+  cn,
 } from '@insforge/ui';
 import type { DeploymentEnvVar } from '@insforge/shared-schemas';
-import { cn, formatTime } from '#lib/utils/utils';
+import { formatTime } from '#lib/utils/utils';
 import { useCopyToClipboard } from '#lib/hooks/useCopyToClipboard';
 import { deploymentsService } from '#features/deployments/services/deployments.service';
 

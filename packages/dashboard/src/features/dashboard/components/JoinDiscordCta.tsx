@@ -1,5 +1,5 @@
 import DiscordIcon from '#assets/logos/discord.svg?react';
-import { cn } from '#lib/utils/utils';
+import { cn } from '@insforge/ui';
 
 interface JoinDiscordCtaProps {
   className?: string;
