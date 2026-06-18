@@ -282,7 +282,7 @@ export class AuthService {
       await client.query('BEGIN');
 
       await client.query(
-        `INSERT INTO auth.users (id, isAnonymous, profile, created_at, updated_at)
+        `INSERT INTO auth.users (id, is_anonymous, profile, created_at, updated_at)
          VALUES ($1, true, $2::jsonb, NOW(), NOW())`,
         [userId, JSON.stringify({ name: 'Guest' })]
       );
@@ -931,7 +931,7 @@ export class AuthService {
         updatedAt: new Date().toISOString(),
         profile: { name: userName, avatar_url: avatarUrl },
         metadata: null,
-        isAnonymous: false,
+        is_anonymous: false,
       };
 
       const accessToken = this.tokenManager.generateAccessToken({
@@ -1306,7 +1306,7 @@ export class AuthService {
       providers: providers,
       profile: dbUser.profile,
       metadata: dbUser.metadata,
-      isAnonymous: dbUser.is_anonymous || false,
+      is_anonymous: dbUser.is_anonymous || false,
     };
   }
 
