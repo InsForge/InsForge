@@ -7,7 +7,7 @@ import { usePageSize } from '#lib/hooks/usePageSize';
 import { Button, ConfirmDialog, cn } from '@insforge/ui';
 import { DataGridEmptyState, TableHeader } from '#components';
 import { useAuditLogs, useClearAuditLogs } from '#features/logs/hooks/useAuditLogs';
-import type { GetAuditLogsRequest } from '@insforge/shared-schemas';
+import type { AuditLogSchema, GetAuditLogsRequest } from '@insforge/shared-schemas';
 
 function ModuleBadge({ module }: { module?: string | null }) {
   return (
@@ -73,7 +73,7 @@ export default function AuditsPage() {
   const logsData = logsResponse?.data || [];
   const totalRecords = logsResponse?.pagination?.total || 0;
 
-  const columns: LogsColumnDef[] = useMemo(
+  const columns: LogsColumnDef<AuditLogSchema>[] = useMemo(
     () => [
       {
         key: 'actor',
