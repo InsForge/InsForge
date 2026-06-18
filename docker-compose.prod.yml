@@ -2,10 +2,10 @@ services:
   postgres:
     image: ghcr.io/insforge/postgres:v15.13.4
 
-    command: postgres -c config_file=/etc/postgresql/postgresql.conf -c app.encryption_key='${ENCRYPTION_KEY:-${JWT_SECRET:-dev-secret-please-change-in-production}}'
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf -c app.encryption_key='${ENCRYPTION_KEY:?Set ENCRYPTION_KEY to a unique 32+ character secret}'
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD to a unique strong password}
       - POSTGRES_DB=${POSTGRES_DB:-insforge}
     volumes:
       - postgres-data:/var/lib/postgresql/data
@@ -31,14 +31,11 @@ services:
     security_opt:
       - no-new-privileges:true
     environment:
-      #POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      #POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      #POSTGRES_DB: ${POSTGRES_DB:-insforge}
-      PGRST_DB_URI: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-insforge}
+      PGRST_DB_URI: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD to a unique strong password}@postgres:5432/${POSTGRES_DB:-insforge}
       PGRST_OPENAPI_SERVER_PROXY_URI: http://localhost:3000
       PGRST_DB_SCHEMA: public
       PGRST_DB_ANON_ROLE: anon
-      PGRST_JWT_SECRET: ${JWT_SECRET:-dev-secret-please-change-in-production}
+      PGRST_JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET to a unique 32+ character secret}
     ports:
       - "${POSTGREST_PORT:-5430}:3000"
     depends_on:
@@ -64,14 +61,15 @@ services:
       - "${AUTH_PORT:-7131}:7131"
     environment:
       - PORT=7130
+      - NODE_ENV=production
       - PROJECT_ROOT=/app
       - API_BASE_URL=${API_BASE_URL:-}
-      - JWT_SECRET=${JWT_SECRET:-dev-secret-please-change-in-production}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
+      - JWT_SECRET=${JWT_SECRET:?Set JWT_SECRET to a unique 32+ character secret}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:?Set ENCRYPTION_KEY to a unique 32+ character secret}
       - ROOT_ADMIN_USERNAME=${ROOT_ADMIN_USERNAME:-${ADMIN_EMAIL:-admin}}
-      - ROOT_ADMIN_PASSWORD=${ROOT_ADMIN_PASSWORD:-${ADMIN_PASSWORD:-change-this-password}}
+      - ROOT_ADMIN_PASSWORD=${ROOT_ADMIN_PASSWORD:?Set ROOT_ADMIN_PASSWORD to a unique strong password}
       - ADMIN_EMAIL=${ROOT_ADMIN_USERNAME:-${ADMIN_EMAIL:-admin}}
-      - ADMIN_PASSWORD=${ROOT_ADMIN_PASSWORD:-${ADMIN_PASSWORD:-change-this-password}}
+      - ADMIN_PASSWORD=${ROOT_ADMIN_PASSWORD:?Set ROOT_ADMIN_PASSWORD to a unique strong password}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
       # PostgreSQL connection
@@ -79,8 +77,8 @@ services:
       - POSTGRES_PORT=5432
       - POSTGRES_DB=${POSTGRES_DB:-insforge}
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-insforge}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD to a unique strong password}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD to a unique strong password}@postgres:5432/${POSTGRES_DB:-insforge}
       - POSTGREST_BASE_URL=http://postgrest:3000
       # Deno Runtime URL for serverless functions
       - DENO_RUNTIME_URL=http://deno:7133
@@ -159,13 +157,13 @@ services:
       - POSTGRES_PORT=5432
       - POSTGRES_DB=${POSTGRES_DB:-insforge}
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD to a unique strong password}
       - POSTGREST_BASE_URL=http://postgrest:3000
       # Worker timeout (60 seconds default)
       - WORKER_TIMEOUT_MS=${WORKER_TIMEOUT_MS:-60000}
       # Encryption keys for decrypting function secrets
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
-      - JWT_SECRET=${JWT_SECRET:-dev-secret-please-change-in-production}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:?Set ENCRYPTION_KEY to a unique 32+ character secret}
+      - JWT_SECRET=${JWT_SECRET:?Set JWT_SECRET to a unique 32+ character secret}
     volumes:
       - ./functions:/app/functions
       - deno_cache:/deno-dir

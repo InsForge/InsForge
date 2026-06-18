@@ -103,24 +103,23 @@ This guide provides comprehensive, step-by-step instructions for deploying, mana
 
     ```ini
     # Required
-    JWT_SECRET=your-secret-key-here-must-be-32-char-or-above
+    JWT_SECRET=<output-of-openssl-rand-base64-32>
+    ENCRYPTION_KEY=<different-output-of-openssl-rand-base64-32>
     ROOT_ADMIN_USERNAME=admin
-    ROOT_ADMIN_PASSWORD=change-this-password
-    POSTGRES_PASSWORD=change-this-password
+    ROOT_ADMIN_PASSWORD=<strong-unique-admin-password>
+    POSTGRES_PASSWORD=<strong-unique-database-password>
 
     # API URLs (replace with your VM public IP or domain)
     API_BASE_URL=http://<your-vm-public-ip>:7130
     VITE_API_BASE_URL=http://<your-vm-public-ip>:7130
 
     # Optional
-    # ENCRYPTION_KEY falls back to JWT_SECRET if left empty
-    ENCRYPTION_KEY=
     # OPENROUTER_API_KEY=
     # VERCEL_TOKEN=
     # GOOGLE_CLIENT_ID=
     ```
     The rest of `.env.example` covers optional features (OpenRouter, Vercel deployments, OAuth providers). Leave those blank unless you need them.
-    > **Generate a Secure JWT Secret:** Run this on your VM and paste the result into `JWT_SECRET`:
+    > **Generate Secure Secrets:** Run this twice on your VM and paste different values into `JWT_SECRET` and `ENCRYPTION_KEY`:
     > ```bash
     > openssl rand -base64 32
     > ```

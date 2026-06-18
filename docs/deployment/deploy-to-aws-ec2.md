@@ -128,13 +128,11 @@ The full template lives at `deploy/docker-compose/.env.example`. These are the v
 
 ```env
 # Required
-JWT_SECRET=your-secret-key-here-must-be-32-char-or-above
+JWT_SECRET=<output-of-openssl-rand-base64-32>
+ENCRYPTION_KEY=<different-output-of-openssl-rand-base64-32>
 ROOT_ADMIN_USERNAME=admin
-ROOT_ADMIN_PASSWORD=change-this-password
-POSTGRES_PASSWORD=change-this-password
-
-# Optional: falls back to JWT_SECRET if left blank
-ENCRYPTION_KEY=
+ROOT_ADMIN_PASSWORD=<strong-unique-admin-password>
+POSTGRES_PASSWORD=<strong-unique-database-password>
 
 # Optional: enables AI features
 OPENROUTER_API_KEY=

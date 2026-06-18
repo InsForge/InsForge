@@ -20,6 +20,18 @@ if (envPath) {
   dotenv.config();
 }
 
+const INSECURE_JWT_SECRETS = new Set([
+  'dev-secret-please-change-in-production',
+  'your-secret-key-here-must-be-32-char-or-above',
+  'change-this-jwt-secret-min-32-characters',
+]);
+
+const INSECURE_ROOT_ADMIN_PASSWORDS = new Set(['change-this-password', 'changeme123']);
+const INSECURE_POSTGRES_PASSWORDS = new Set(['postgres', 'change-this-password']);
+const INSECURE_ENCRYPTION_KEYS = new Set(['change-this-encryption-key-32chars']);
+const MIN_SECRET_LENGTH = 32;
+const MIN_PASSWORD_LENGTH = 16;
+
 export interface AppConfig {
   app: {
     port: number;
@@ -107,6 +119,10 @@ function parseEnvInt(val: string | undefined, fallback: number): number {
     return fallback;
   }
   return parsed;
+}
+
+function valueIsOneOf(value: string | undefined, values: Set<string>): boolean {
+  return value !== undefined && values.has(value.trim());
 }
 
 export function loadConfig(): AppConfig {
@@ -206,3 +222,82 @@ export function loadConfig(): AppConfig {
 }
 
 export const appConfig: AppConfig = loadConfig();
+
+export function shouldEnforceDeploymentSecurity(env: NodeJS.ProcessEnv = process.env): boolean {
+  if (env.INSFORGE_ALLOW_INSECURE_DEFAULTS === 'true') {
+    return false;
+  }
+
+  return env.NODE_ENV === 'production' || env.INSFORGE_ENFORCE_SECURE_CONFIG === 'true';
+}
+
+export function getDeploymentSecurityErrors(
+  config: AppConfig,
+  env: NodeJS.ProcessEnv = process.env
+): string[] {
+  const errors: string[] = [];
+  const jwtSecret = config.app.jwtSecret.trim();
+  const rootAdminPassword = config.auth.rootAdminPassword.trim();
+  const postgresPassword = config.database.password.trim();
+  const encryptionKey = env.ENCRYPTION_KEY?.trim() ?? '';
+
+  if (!jwtSecret) {
+    errors.push('JWT_SECRET is required.');
+  } else if (
+    jwtSecret.length < MIN_SECRET_LENGTH ||
+    valueIsOneOf(jwtSecret, INSECURE_JWT_SECRETS)
+  ) {
+    errors.push('JWT_SECRET must be a unique random value with at least 32 characters.');
+  }
+
+  if (!rootAdminPassword) {
+    errors.push('ROOT_ADMIN_PASSWORD is required.');
+  } else if (
+    rootAdminPassword.length < MIN_PASSWORD_LENGTH ||
+    valueIsOneOf(rootAdminPassword, INSECURE_ROOT_ADMIN_PASSWORDS)
+  ) {
+    errors.push('ROOT_ADMIN_PASSWORD must be a unique strong value with at least 16 characters.');
+  }
+
+  if (!postgresPassword) {
+    errors.push('POSTGRES_PASSWORD is required.');
+  } else if (
+    postgresPassword.length < MIN_PASSWORD_LENGTH ||
+    valueIsOneOf(postgresPassword, INSECURE_POSTGRES_PASSWORDS)
+  ) {
+    errors.push('POSTGRES_PASSWORD must be a unique strong value with at least 16 characters.');
+  }
+
+  if (!encryptionKey) {
+    errors.push('ENCRYPTION_KEY is required.');
+  } else if (
+    encryptionKey.length < MIN_SECRET_LENGTH ||
+    valueIsOneOf(encryptionKey, INSECURE_ENCRYPTION_KEYS)
+  ) {
+    errors.push('ENCRYPTION_KEY must be a unique random value with at least 32 characters.');
+  } else if (jwtSecret && encryptionKey === jwtSecret) {
+    errors.push('ENCRYPTION_KEY must be different from JWT_SECRET.');
+  }
+
+  return errors;
+}
+
+export function assertSecureDeploymentConfig(
+  config: AppConfig = appConfig,
+  env: NodeJS.ProcessEnv = process.env
+): void {
+  if (!shouldEnforceDeploymentSecurity(env)) {
+    return;
+  }
+
+  const errors = getDeploymentSecurityErrors(config, env);
+  if (errors.length > 0) {
+    throw new Error(
+      [
+        'Refusing to start InsForge with insecure production configuration:',
+        ...errors.map((error) => `- ${error}`),
+        'Set unique secrets or set INSFORGE_ALLOW_INSECURE_DEFAULTS=true only for isolated local development.',
+      ].join('\n')
+    );
+  }
+}
