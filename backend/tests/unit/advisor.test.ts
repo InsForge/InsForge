@@ -44,7 +44,15 @@ describe('Database Advisor Unit Tests', () => {
   describe('DatabaseAdvisorService', () => {
     it('should trigger a scan and start it in background', async () => {
       const service = DatabaseAdvisorService.getInstance();
-      queryMock.mockResolvedValueOnce({ rows: [{ id: 'scan-uuid' }] });
+      queryMock.mockImplementation((sql: string) => {
+        if (sql.includes('pg_locks')) {
+          return Promise.resolve({ rows: [{ is_locked: false }] });
+        }
+        if (sql.includes('INSERT INTO system.advisor_scans')) {
+          return Promise.resolve({ rows: [{ id: 'scan-uuid' }] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
 
       const scanId = await service.triggerScan('manual');
       expect(scanId).toBe('scan-uuid');
@@ -60,10 +68,26 @@ describe('Database Advisor Unit Tests', () => {
 
     it('should reject concurrent scans with 409 Conflict', async () => {
       const service = DatabaseAdvisorService.getInstance();
-      queryMock.mockResolvedValueOnce({ rows: [{ id: 'scan-uuid-1' }] });
+      queryMock.mockImplementation((sql: string) => {
+        if (sql.includes('pg_locks')) {
+          return Promise.resolve({ rows: [{ is_locked: false }] });
+        }
+        if (sql.includes('INSERT INTO system.advisor_scans')) {
+          return Promise.resolve({ rows: [{ id: 'scan-uuid-1' }] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
 
       const firstScan = await service.triggerScan('manual');
       expect(firstScan).toBe('scan-uuid-1');
+
+      // For the second call, we mock pg_locks returning true (locked)
+      queryMock.mockImplementation((sql: string) => {
+        if (sql.includes('pg_locks')) {
+          return Promise.resolve({ rows: [{ is_locked: true }] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
 
       await expect(service.triggerScan('manual')).rejects.toMatchObject({
         statusCode: 409,
@@ -74,6 +98,22 @@ describe('Database Advisor Unit Tests', () => {
       await vi.waitFor(() => {
         expect(service.isScanInProgress()).toBe(false);
       });
+    });
+
+    it('should reset isScanning lock if DB insert fails in triggerScan', async () => {
+      const service = DatabaseAdvisorService.getInstance();
+      queryMock.mockImplementation((sql: string) => {
+        if (sql.includes('pg_locks')) {
+          return Promise.resolve({ rows: [{ is_locked: false }] });
+        }
+        if (sql.includes('INSERT INTO system.advisor_scans')) {
+          return Promise.reject(new Error('DB connection failure'));
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      await expect(service.triggerScan('manual')).rejects.toThrow('DB connection failure');
+      expect(service.isScanInProgress()).toBe(false);
     });
 
     it('should query latest scan and return summary', async () => {
@@ -178,7 +218,15 @@ describe('Database Advisor Unit Tests', () => {
     });
 
     it('POST /api/advisor/scan should start scan', async () => {
-      queryMock.mockResolvedValueOnce({ rows: [{ id: 'scan-uuid' }] });
+      queryMock.mockImplementation((sql: string) => {
+        if (sql.includes('pg_locks')) {
+          return Promise.resolve({ rows: [{ is_locked: false }] });
+        }
+        if (sql.includes('INSERT INTO system.advisor_scans')) {
+          return Promise.resolve({ rows: [{ id: 'scan-uuid' }] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
       const res = await request(app).post('/api/advisor/scan').expect(201);
 
       expect(res.body).toEqual({
@@ -248,6 +296,19 @@ describe('Database Advisor Unit Tests', () => {
 
       expect(res.body.total).toBe(1);
       expect(res.body.issues[0].ruleId).toBe('rls-disabled');
+    });
+
+    it('GET /api/advisor/issues should return 400 for invalid limit or offset', async () => {
+      const res = await request(app).get('/api/advisor/issues').query({ limit: 'abc' }).expect(400);
+
+      expect(res.body.error).toContain('Invalid limit parameter');
+
+      const res2 = await request(app)
+        .get('/api/advisor/issues')
+        .query({ offset: '-5' })
+        .expect(400);
+
+      expect(res2.body.error).toContain('Invalid offset parameter');
     });
   });
 });

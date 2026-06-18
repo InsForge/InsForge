@@ -53,7 +53,21 @@ export class DatabaseAdvisorService {
    * Trigger a database advisor scan.
    */
   public async triggerScan(scanType: 'manual' | 'scheduled' = 'manual'): Promise<string> {
-    if (this.isScanning) {
+    const pool = this.dbManager.getPool();
+
+    // Check if the advisory lock is currently held globally
+    const lockCheck = await pool.query<{ is_locked: boolean }>(
+      `
+        SELECT EXISTS (
+          SELECT 1 FROM pg_locks
+          WHERE locktype = 'advisory'
+            AND classid = 14589230
+            AND objid = 1
+        ) AS is_locked
+      `
+    );
+
+    if (this.isScanning || lockCheck.rows[0]?.is_locked) {
       throw new AppError(
         'A database advisor scan is already in progress.',
         409,
@@ -62,26 +76,30 @@ export class DatabaseAdvisorService {
     }
 
     this.isScanning = true;
-    const pool = this.dbManager.getPool();
 
-    // 1. Insert scan record with running status
-    const scanResult = await pool.query<{ id: string }>(
-      `
-        INSERT INTO system.advisor_scans (status, scan_type, scanned_at)
-        VALUES ('running', $1, NOW())
-        RETURNING id
-      `,
-      [scanType]
-    );
+    try {
+      // 1. Insert scan record with running status
+      const scanResult = await pool.query<{ id: string }>(
+        `
+          INSERT INTO system.advisor_scans (status, scan_type, scanned_at)
+          VALUES ('running', $1, NOW())
+          RETURNING id
+        `,
+        [scanType]
+      );
 
-    const scanId = scanResult.rows[0].id;
+      const scanId = scanResult.rows[0].id;
 
-    // Run the scan asynchronously to prevent blocking the HTTP response
-    this.runScanAsync(scanId).catch((error) => {
-      logger.error('Database Advisor background scan failed:', { scanId, error });
-    });
+      // Run the scan asynchronously to prevent blocking the HTTP response
+      this.runScanAsync(scanId).catch((error) => {
+        logger.error('Database Advisor background scan failed:', { scanId, error });
+      });
 
-    return scanId;
+      return scanId;
+    } catch (error) {
+      this.isScanning = false;
+      throw error;
+    }
   }
 
   /**
@@ -90,8 +108,29 @@ export class DatabaseAdvisorService {
   private async runScanAsync(scanId: string): Promise<void> {
     const pool = this.dbManager.getPool();
     const client = await pool.connect();
+    let hasLock = false;
 
     try {
+      // Try to acquire the session-level advisory lock
+      const lockResult = await client.query<{ acquired: boolean }>(
+        'SELECT pg_try_advisory_lock(14589230, 1) AS acquired'
+      );
+      const acquired = lockResult.rows[0]?.acquired || false;
+
+      if (!acquired) {
+        logger.warn('Another database advisor scan is already in progress (advisory lock busy).');
+        await client.query(
+          `
+            UPDATE system.advisor_scans
+            SET status = 'failed', error_message = $2
+            WHERE id = $1
+          `,
+          [scanId, 'Another scan is already in progress.']
+        );
+        return;
+      }
+
+      hasLock = true;
       const findings: Omit<AdvisorIssue, 'id' | 'isResolved'>[] = [];
 
       // A. Check if pg_stat_statements is available
@@ -734,6 +773,11 @@ export class DatabaseAdvisorService {
           logger.error('Failed to update scan status to failed:', updateErr);
         });
     } finally {
+      if (hasLock) {
+        await client.query('SELECT pg_advisory_unlock(14589230, 1)').catch((err) => {
+          logger.error('Failed to release database advisor scan lock:', err);
+        });
+      }
       client.release();
       this.isScanning = false;
     }

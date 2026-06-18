@@ -2,6 +2,8 @@ import { Router, Response, NextFunction } from 'express';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { successResponse } from '@/utils/response.js';
 import { DatabaseAdvisorService } from '@/services/database/database-advisor.service.js';
+import { AppError } from '@/utils/errors.js';
+import { ERROR_CODES } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 
 const router = Router();
@@ -39,8 +41,29 @@ router.get('/issues', verifyAdmin, async (req: AuthRequest, res: Response, next:
   try {
     const severity = req.query.severity as string | undefined;
     const category = req.query.category as string | undefined;
-    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
-    const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : undefined;
+    let limit: number | undefined;
+    if (req.query.limit) {
+      limit = parseInt(req.query.limit as string, 10);
+      if (Number.isNaN(limit) || limit < 0) {
+        throw new AppError(
+          'Invalid limit parameter: must be a non-negative integer',
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+    }
+
+    let offset: number | undefined;
+    if (req.query.offset) {
+      offset = parseInt(req.query.offset as string, 10);
+      if (Number.isNaN(offset) || offset < 0) {
+        throw new AppError(
+          'Invalid offset parameter: must be a non-negative integer',
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+    }
 
     const result = await advisorService.getLatestScanIssues({
       severity,
