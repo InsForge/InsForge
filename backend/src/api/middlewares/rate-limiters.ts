@@ -58,7 +58,7 @@ export const sendEmailOTPRateLimiter = rateLimit({
   handler: (_req: Request, _res: Response, next: NextFunction) => {
     next(
       new AppError(
-        'Too many send email verification requests from this IP. Please try again in 15 minutes.',
+        'Too many anonymous sign-in requests from this IP. Please try again in 15 minutes.',
         429,
         ERROR_CODES.TOO_MANY_REQUESTS
       )

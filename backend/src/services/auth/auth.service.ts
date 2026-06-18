@@ -265,7 +265,17 @@ export class AuthService {
    * Anonymous user registration
    */
   async anonymousRegister(): Promise<CreateSessionResponse> {
+    const { disableSignup } = await AuthConfigService.getInstance().getAuthConfig();
+    if (disableSignup) {
+      throw new AppError(
+        'User signups are disabled for this project.',
+        403,
+        ERROR_CODES.AUTH_SIGNUP_DISABLED
+      );
+    }
+
     const userId = crypto.randomUUID();
+    const now = new Date().toISOString();
 
     const pool = this.getPool();
     const client = await pool.connect();
@@ -283,7 +293,7 @@ export class AuthService {
       await client.query('ROLLBACK');
       // Postgres unique_violation
       if (e && typeof e === 'object' && 'code' in e && e.code === '23505') {
-        throw new AppError('User already exists', 409, ERROR_CODES.AUTH_EMAIL_EXISTS);
+        throw new AppError('User already exists', 409, ERROR_CODES.ALREADY_EXISTS);
       }
       throw e;
     } finally {
