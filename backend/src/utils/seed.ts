@@ -195,7 +195,7 @@ export async function seedBackend(): Promise<void> {
     // Database connection info is already logged above
 
     if (tables.length) {
-      logger.info(`Found ${tables.length} user tables`);
+      logger.info(`✅ Found ${tables.length} user tables`);
     }
 
     // seed default configs for cloud environment
@@ -218,7 +218,7 @@ export async function seedBackend(): Promise<void> {
           isReserved: true,
           value: insforgInternalUrl,
         });
-        logger.info('INSFORGE_INTERNAL_URL secret initialized');
+        logger.info('✅ INSFORGE_INTERNAL_URL secret initialized');
       }
     }
 
@@ -236,7 +236,7 @@ export async function seedBackend(): Promise<void> {
         isReserved: true,
         value: getApiBaseUrl(),
       });
-      logger.info('INSFORGE_BASE_URL secret initialized');
+      logger.info('✅ INSFORGE_BASE_URL secret initialized');
     }
 
     // Add JWT_SECRET so CLI/SDK can access it via secrets API
@@ -250,7 +250,7 @@ export async function seedBackend(): Promise<void> {
           isReserved: true,
           value: jwtSecret,
         });
-        logger.info('JWT_SECRET secret initialized');
+        logger.info('✅ JWT_SECRET secret initialized');
       }
     }
 

@@ -20,6 +20,7 @@ import {
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import { appConfig } from '@/infra/config/app.config.js';
+import { adminService } from '@/services/admin/admin.service.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
@@ -92,15 +93,30 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
 router.get(
   '/sessions/current',
   verifyToken,
-  (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       if (req.user?.role !== 'project_admin' || !req.user.id) {
         throw new AppError('Admin access required', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
       }
 
+      // Determine the display name
+      let username: string | undefined;
+      if (req.user.id === 'local:admin') {
+        // Root admin: use the configured root admin username
+        username = appConfig.auth.rootAdminUsername || 'admin';
+      } else {
+        // DB admin: lookup by ID
+        // Note: You'll need to import adminService
+        const admin = await adminService.getAdminById(req.user.id);
+        if (admin) {
+          username = admin.username;
+        }
+      }
+
       const response: GetCurrentAdminSessionResponse = {
         admin: {
           sub: req.user.id,
+          username, // Add username field
         },
       };
 
@@ -112,6 +128,7 @@ router.get(
 );
 
 // POST /api/auth/admin/refresh - Refresh admin dashboard access token
+// Uses a dashboard-specific httpOnly cookie + X-CSRF-Token header.
 router.post('/refresh', (req: Request, res: Response, next: NextFunction) => {
   try {
     const tokenManager = TokenManager.getInstance();
@@ -235,6 +252,7 @@ router.post(
         );
       }
 
+      // Get admin ID from the authenticated token
       const adminId = req.user?.id;
       if (!adminId) {
         throw new AppError('Unauthorized', 401, ERROR_CODES.AUTH_UNAUTHORIZED);

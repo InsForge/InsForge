@@ -717,7 +717,7 @@ export class AuthService {
       throw new AppError('Admin user already exists', 409, ERROR_CODES.AUTH_EMAIL_EXISTS);
     }
 
-    const admin = await adminService.createAdmin(username, password, createdBy, false);
+    const admin = await adminService.createAdmin(username, password, createdBy);
 
     return {
       username: admin.username,
@@ -740,7 +740,7 @@ export class AuthService {
       throw new AppError('Cannot delete root admin', 403, ERROR_CODES.FORBIDDEN);
     }
 
-    const success = await adminService.deleteAdmin(admin.id, currentAdminId, true);
+    const success = await adminService.deleteAdmin(admin.id, currentAdminId);
     if (!success) {
       throw new AppError('Cannot delete admin', 400, ERROR_CODES.FORBIDDEN);
     }

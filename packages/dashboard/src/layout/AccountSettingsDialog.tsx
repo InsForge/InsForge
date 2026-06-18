@@ -20,9 +20,8 @@ export default function AccountSettingsDialog({ open, onOpenChange }: AccountSet
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
 
-  // Get username from user object - use sub as fallback display name
   const displayName = user?.sub || 'Admin';
-  const username = user?.sub || '';
+  const isRoot = user?.sub === 'local:admin';
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -67,11 +66,7 @@ export default function AccountSettingsDialog({ open, onOpenChange }: AccountSet
     setLoading(true);
 
     try {
-      // Use username from the user object
-      // For root admin, this will be 'local:admin'
-      // For DB admins, this will be their UUID
       await adminService.changePassword({
-        adminId: username,
         oldPassword,
         newPassword,
       });
@@ -137,56 +132,72 @@ export default function AccountSettingsDialog({ open, onOpenChange }: AccountSet
             <label className="block text-sm font-medium mb-1">User</label>
             <Input type="text" value={displayName} disabled className="bg-muted" />
             <p className="text-xs text-muted-foreground mt-1">
-              {username === 'local:admin' ? 'Root Administrator' : 'Admin User'}
+              {isRoot ? 'Root Administrator' : 'Admin User'}
             </p>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Current Password</label>
-            <Input
-              type="password"
-              value={oldPassword}
-              onChange={(e) => setOldPassword(e.target.value)}
-              required
-              placeholder="Enter current password"
-            />
-          </div>
+          {!isRoot ? (
+            <>
+              <div>
+                <label className="block text-sm font-medium mb-1">Current Password</label>
+                <Input
+                  type="password"
+                  value={oldPassword}
+                  onChange={(e) => setOldPassword(e.target.value)}
+                  required
+                  placeholder="Enter current password"
+                />
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">New Password</label>
-            <Input
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              required
-              placeholder="Enter new password (min 6 characters)"
-            />
-          </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">New Password</label>
+                <Input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  placeholder="Enter new password (min 6 characters)"
+                />
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Confirm New Password</label>
-            <Input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              placeholder="Confirm new password"
-            />
-          </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Confirm New Password</label>
+                <Input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  placeholder="Confirm new password"
+                />
+              </div>
 
-          <div className="flex gap-3 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              className="flex-1"
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading} className="flex-1">
-              {loading ? 'Updating...' : 'Update Password'}
-            </Button>
-          </div>
+              <div className="flex gap-3 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={loading} className="flex-1">
+                  {loading ? 'Updating...' : 'Update Password'}
+                </Button>
+              </div>
+            </>
+          ) : (
+            <div className="py-4">
+              <div className="text-sm text-muted-foreground mb-3">
+                Root admin password can only be changed via environment variables.
+              </div>
+              <div className="text-xs bg-muted p-3 rounded font-mono break-all">
+                ROOT_ADMIN_PASSWORD=your-new-password
+              </div>
+              <div className="text-xs text-muted-foreground mt-3">
+                After updating, restart the backend for changes to take effect.
+              </div>
+            </div>
+          )}
         </form>
       </DialogContent>
     </Dialog>

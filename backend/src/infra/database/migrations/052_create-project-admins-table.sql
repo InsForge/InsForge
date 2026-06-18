@@ -9,8 +9,7 @@ CREATE TABLE IF NOT EXISTS auth.project_admins (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     created_by UUID,
     last_login_at TIMESTAMPTZ,
-    deleted_at TIMESTAMPTZ,
-    is_root BOOLEAN DEFAULT FALSE
+    deleted_at TIMESTAMPTZ
 );
 
 -- Indexes for better performance

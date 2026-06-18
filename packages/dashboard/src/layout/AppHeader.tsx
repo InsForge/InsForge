@@ -33,7 +33,7 @@ export default function AppHeader() {
   const isDTest = dashboardVariant === FEATURE_FLAG_VARIANTS.D_TEST;
   const isConnectDisabled = isDTest && pathname === '/dashboard/install';
 
-  const displayName = user?.sub || 'Admin';
+  const displayName = user?.username || user?.sub || 'Admin';
   const isRoot = user?.sub === 'local:admin';
   const adminLabel = isRoot ? 'Root Administrator' : 'Administrator';
 
