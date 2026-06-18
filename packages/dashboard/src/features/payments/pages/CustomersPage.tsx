@@ -154,6 +154,8 @@ const CUSTOMER_COLUMNS: DataGridColumn<CustomerGridRow>[] = [
   },
 ];
 
+// Intentionally NOT the shared formatDateTime — this uses a zero-padded hour
+// ("03:30 PM") where the shared one renders "3:30 PM". Keep it local.
 function formatDateTime(value: string | null) {
   if (!value) {
     return '-';
