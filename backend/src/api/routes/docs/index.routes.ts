@@ -178,10 +178,16 @@ router.get('/:docType', async (req: Request, res: Response, next: NextFunction) 
     // Resolve from the correct root: agent docs live in .agents/docs/, public SDK docs in docs/
     let filePath: string;
     if (parsed.data in AGENT_DOCS_MAP) {
-      const docFileName = AGENT_DOCS_MAP[parsed.data] as string;
+      const docFileName = AGENT_DOCS_MAP[parsed.data];
+      if (!docFileName) {
+        throw new AppError('Documentation not found', 404, ERROR_CODES.DOCS_NOT_FOUND);
+      }
       filePath = path.join(agentDocsRoot, docFileName);
     } else {
-      const docFileName = LEGACY_DOCS_MAP[parsed.data] as string;
+      const docFileName = LEGACY_DOCS_MAP[parsed.data];
+      if (!docFileName) {
+        throw new AppError('Documentation not found', 404, ERROR_CODES.DOCS_NOT_FOUND);
+      }
       filePath = path.join(DOCS_ROOT, docFileName);
     }
 
