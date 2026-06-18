@@ -37,7 +37,6 @@ import { useUsers } from '#features/auth';
 import { CLISection, MCPSection } from '#features/dashboard/components/connect';
 import { useOpenConnectDialog } from '#layout/ConnectDialogContext';
 import { ObservabilitySection } from '#features/dashboard/components/observability';
-import { BackendAdvisorSection } from '#features/dashboard/components/advisor';
 const REGION_COUNTRY_CODE_MAP: Record<string, 'us' | 'de' | 'sg'> = {
   'us-test': 'us',
   'us-east': 'us',

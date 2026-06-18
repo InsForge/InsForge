@@ -164,7 +164,8 @@ describe('Database Advisor Unit Tests', () => {
       app = express();
       app.use(express.json());
       app.use('/api/advisor', advisorRouter);
-      app.use((err: any, _req: any, res: any, _next: any) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      app.use((err: { statusCode?: number; message?: string }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
         res.status(err.statusCode || 500).json({ error: err.message });
       });
     });

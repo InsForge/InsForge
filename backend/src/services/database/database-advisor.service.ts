@@ -92,7 +92,7 @@ export class DatabaseAdvisorService {
     const client = await pool.connect();
 
     try {
-      const findings: any[] = [];
+      const findings: Omit<AdvisorIssue, 'id' | 'isResolved'>[] = [];
 
       // A. Check if pg_stat_statements is available
       const pgStatStatementsCheck = await client.query(`
@@ -636,7 +636,7 @@ export class DatabaseAdvisorService {
           JOIN pg_catalog.pg_stat_activity blocking_activity ON blocking_activity.pid = blocking_locks.pid
           WHERE NOT blocked_locks.granted
             AND blocked_activity.query ILIKE '%autovacuum%'
-        `
+        `,
       };
 
       if (hasPgStatStatements) {
@@ -673,7 +673,9 @@ export class DatabaseAdvisorService {
             });
           }
         } catch (queryErr) {
-          logger.warn(`Advisor scan rule query failed for key: ${key}`, { error: String(queryErr) });
+          logger.warn(`Advisor scan rule query failed for key: ${key}`, {
+            error: String(queryErr),
+          });
         }
       }
 
@@ -715,19 +717,22 @@ export class DatabaseAdvisorService {
         await client.query('ROLLBACK');
         throw dbErr;
       }
-    } catch (error: any) {
-      logger.error(`Database Advisor scan execution failed:`, { scanId, error: error.message });
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : String(error);
+      logger.error(`Database Advisor scan execution failed:`, { scanId, error: errMsg });
       // Update scan status to failed
-      await pool.query(
-        `
+      await pool
+        .query(
+          `
           UPDATE system.advisor_scans
           SET status = 'failed', error_message = $2
           WHERE id = $1
         `,
-        [scanId, error.message || String(error)]
-      ).catch((updateErr) => {
-        logger.error('Failed to update scan status to failed:', updateErr);
-      });
+          [scanId, errMsg]
+        )
+        .catch((updateErr) => {
+          logger.error('Failed to update scan status to failed:', updateErr);
+        });
     } finally {
       client.release();
       this.isScanning = false;
@@ -824,7 +829,7 @@ export class DatabaseAdvisorService {
       FROM system.advisor_findings
       WHERE scan_id = $1
     `;
-    const params: any[] = [scanId];
+    const params: unknown[] = [scanId];
     let paramIndex = 2;
 
     if (severity) {
