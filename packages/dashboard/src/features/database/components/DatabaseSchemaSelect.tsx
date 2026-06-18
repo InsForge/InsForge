@@ -1,6 +1,5 @@
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@insforge/ui';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, cn } from '@insforge/ui';
 import type { DatabaseSchemaInfo } from '@insforge/shared-schemas';
-import { cn } from '#lib/utils/utils';
 
 interface DatabaseSchemaSelectProps {
   schemas: DatabaseSchemaInfo[];

@@ -9,8 +9,7 @@ import {
   type FeatureSidebarListItem,
 } from '#components';
 import { ScrollArea } from '#components/radix/ScrollArea';
-import { cn } from '#lib/utils/utils';
-import { Button } from '@insforge/ui';
+import { Button, cn } from '@insforge/ui';
 import { DatabaseSchemaSelect } from '#features/database/components/DatabaseSchemaSelect';
 import type { DatabaseSchemaInfo } from '@insforge/shared-schemas';
 

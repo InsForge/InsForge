@@ -19,7 +19,7 @@ import { PaymentsOnboardingState } from '#features/payments/components/PaymentsO
 import type { PaymentsOutletContext } from '#features/payments/components/PaymentsLayout';
 import { usePaymentClientPagination } from '#features/payments/hooks/usePaymentClientPagination';
 import { usePaymentTransactions } from '#features/payments/hooks/usePaymentTransactions';
-import { cn } from '#lib/utils/utils';
+import { cn } from '@insforge/ui';
 
 const TRANSACTIONS_GRID_TEMPLATE =
   'minmax(0,1.45fr) 120px minmax(0,1.1fr) 120px minmax(0,1fr) 180px';
