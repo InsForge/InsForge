@@ -156,13 +156,13 @@ export interface OAuthUserData {
   userName: string;
   avatarUrl: string;
   identityData:
-  | GoogleUserInfo
-  | GitHubUserInfo
-  | DiscordUserInfo
-  | LinkedInUserInfo
-  | FacebookUserInfo
-  | MicrosoftUserInfo
-  | XUserInfo
-  | AppleUserInfo
-  | Record<string, unknown>;
+    | GoogleUserInfo
+    | GitHubUserInfo
+    | DiscordUserInfo
+    | LinkedInUserInfo
+    | FacebookUserInfo
+    | MicrosoftUserInfo
+    | XUserInfo
+    | AppleUserInfo
+    | Record<string, unknown>;
 }
