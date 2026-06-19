@@ -144,9 +144,10 @@ export class DatabaseAdvisorService {
           JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid
           WHERE c.relkind = 'r'
             AND NOT c.relrowsecurity
-            AND (
-              pg_catalog.has_table_privilege('anon', c.oid, 'SELECT')
-              OR pg_catalog.has_table_privilege('authenticated', c.oid, 'SELECT')
+            AND EXISTS (
+              SELECT 1 FROM pg_catalog.pg_roles r
+              WHERE r.rolname IN ('anon', 'authenticated')
+                AND pg_catalog.has_table_privilege(r.rolname, c.oid, 'SELECT')
             )
             AND n.nspname = ANY(ARRAY(SELECT trim(UNNEST(string_to_array(coalesce(current_setting('pgrst.db_schemas', 't'), 'public'), ',')))))
             AND n.nspname NOT IN (
@@ -273,7 +274,11 @@ export class DatabaseAdvisorService {
               role_name
             FROM pg_catalog.pg_proc p
             JOIN pg_catalog.pg_namespace n ON p.pronamespace = n.oid
-            CROSS JOIN (SELECT unnest(ARRAY['anon', 'authenticated']) AS role_name) r
+            CROSS JOIN (
+              SELECT rolname AS role_name
+              FROM pg_catalog.pg_roles
+              WHERE rolname IN ('anon', 'authenticated')
+            ) r
             WHERE p.prosecdef = true
               AND pg_catalog.has_function_privilege(role_name, p.oid, 'EXECUTE')
               AND n.nspname = ANY(ARRAY(SELECT trim(UNNEST(string_to_array(coalesce(current_setting('pgrst.db_schemas', 't'), 'public'), ',')))))
