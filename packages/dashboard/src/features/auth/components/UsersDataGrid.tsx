@@ -245,7 +245,10 @@ export function createUsersColumns(
       minWidth: 160,
       sortable: true,
       renderCell: ({ row }) => (
-        <span className="truncate text-[13px] leading-[18px] text-foreground" title={row.email}>
+        <span
+          className="truncate text-[13px] leading-[18px] text-foreground"
+          title={row.email ?? 'Anonymous'}
+        >
           {row.email}
         </span>
       ),
