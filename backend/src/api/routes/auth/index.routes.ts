@@ -13,6 +13,7 @@ import {
   verifyAdmin,
   verifyToken,
   extractBearerToken,
+  extractApiKey,
 } from '@/api/middlewares/auth.js';
 import adminRouter from './admin.routes.js';
 import oauthRouter from './oauth.routes.js';
@@ -343,17 +344,23 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
     const clientType = parseClientType(req.query.client_type);
     let adminCreatingUser = false;
 
-    try {
-      const token = extractBearerToken(req.headers.authorization);
-      if (token) {
-        const payload = TokenManager.getInstance().verifyToken(token);
-        adminCreatingUser = payload?.role === 'project_admin';
+    const apiKey = extractApiKey(req);
+    if (apiKey) {
+      const secretService = SecretService.getInstance();
+      adminCreatingUser = await secretService.verifyApiKey(apiKey);
+    } else {
+      try {
+        const token = extractBearerToken(req.headers.authorization);
+        if (token) {
+          const payload = TokenManager.getInstance().verifyToken(token);
+          adminCreatingUser = payload?.role === 'project_admin';
+        }
+      } catch (error) {
+        // Not a valid token; treat as normal registration.
+        logger.debug('[Auth:CreateUser] Admin detection failed', {
+          error: error instanceof Error ? error.message : 'unknown',
+        });
       }
-    } catch (error) {
-      // Not a valid token; treat as normal registration.
-      logger.debug('[Auth:CreateUser] Admin detection failed', {
-        error: error instanceof Error ? error.message : 'unknown',
-      });
     }
 
     const validationResult = createUserRequestSchema.safeParse(req.body);
