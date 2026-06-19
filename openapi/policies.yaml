@@ -159,8 +159,12 @@ components:
         schema:
           type: string
           default: public
+          minLength: 1
+          maxLength: 64
         table:
           type: string
+          minLength: 1
+          maxLength: 64
         operation:
           type: string
           enum: [SELECT, INSERT, UPDATE, DELETE]

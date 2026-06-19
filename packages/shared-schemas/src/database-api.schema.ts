@@ -456,7 +456,8 @@ export const simulatePolicyResponseSchema = z.object({
   applicablePolicies: z.array(simulatorPolicySchema),
   // Plain-English summary of the decision and why.
   explanation: z.string(),
-  // A copy-pasteable SQL snippet reproducing the simulated session.
+  // A copy-pasteable SQL snippet that reproduces the exact simulated operation
+  // — same role, claims, filter, and values — wrapped in BEGIN/ROLLBACK.
   exampleQuery: z.string(),
 });
 

@@ -317,26 +317,135 @@ describe('buildExplanation', () => {
     );
     expect(text).not.toContain('missing table privilege (GRANT)');
   });
+
+  it('does not contradict itself on an empty table (allowed + no rows + no policy)', () => {
+    const text = buildExplanation(
+      baseResult({
+        decision: 'allowed',
+        rowsVisible: 0,
+        rowsTotal: 0,
+        applicablePolicies: [],
+      })
+    );
+    expect(text).toMatch(/matched no rows/i);
+    expect(text).not.toContain('is allowed');
+    expect(text).toContain('denied by default');
+  });
+
+  it('explains an empty table with a policy without claiming a proven allow', () => {
+    const text = buildExplanation(
+      baseResult({
+        decision: 'allowed',
+        rowsVisible: 0,
+        rowsTotal: 0,
+        applicablePolicies: [ownerSelect],
+      })
+    );
+    expect(text).toMatch(/matched no rows/i);
+    expect(text).toContain('OR'); // the permissive/restrictive combination rule still surfaces
+  });
 });
 
 describe('buildExampleQuery', () => {
-  it('produces a runnable, rolled-back snippet with role and claims', () => {
+  it('produces a runnable, rolled-back session scaffold with role and claims', () => {
     const snippet = buildExampleQuery(
       baseResult({ role: 'authenticated', effectiveClaims: { role: 'authenticated', sub: 'u1' } }),
       '"public"."todos"'
     );
+    expect(snippet.startsWith('BEGIN;')).toBe(true);
     expect(snippet).toContain('SET LOCAL ROLE authenticated;');
     expect(snippet).toContain("set_config('request.jwt.claims'");
     expect(snippet).toContain('"public"."todos"');
-    expect(snippet.startsWith('BEGIN;')).toBe(true);
     expect(snippet.trimEnd().endsWith('ROLLBACK;')).toBe(true);
   });
 
-  it('escapes single quotes in the claims JSON', () => {
+  it('dollar-quotes claims so single quotes are not doubled (no escaping needed)', () => {
     const snippet = buildExampleQuery(
       baseResult({ effectiveClaims: { role: 'authenticated', note: "o'brien" } }),
       '"public"."todos"'
     );
-    expect(snippet).toContain("o''brien");
+    expect(snippet).toContain("o'brien"); // verbatim, inside a dollar-quoted literal
+    expect(snippet).not.toContain("o''brien");
+    expect(snippet).toMatch(/set_config\('request\.jwt\.claims', \$\$.*\$\$, true\)/);
+  });
+
+  it('falls back to a collision-free dollar tag when a value contains $$', () => {
+    const snippet = buildExampleQuery(
+      baseResult({ effectiveClaims: { role: 'authenticated', x: 'a$$b' } }),
+      '"public"."todos"'
+    );
+    expect(snippet).toContain('$q1$');
+    expect(snippet).toContain('a$$b');
+  });
+
+  it('backfills the SELECT filter and sample limit', () => {
+    const snippet = buildExampleQuery(baseResult({ operation: 'SELECT' }), '"public"."todos"', {
+      match: { user_id: 'u1', done: true },
+      sampleLimit: 3,
+    });
+    expect(snippet).toContain(
+      'SELECT * FROM "public"."todos" WHERE "user_id" = $$u1$$ AND "done" = true LIMIT 3;'
+    );
+  });
+
+  it('renders a real INSERT with columns and literal values', () => {
+    const snippet = buildExampleQuery(baseResult({ operation: 'INSERT' }), '"public"."todos"', {
+      row: { user_id: 'u1', title: 'hi', done: false },
+    });
+    expect(snippet).toContain(
+      'INSERT INTO "public"."todos" ("user_id", "title", "done") VALUES ($$u1$$, $$hi$$, false);'
+    );
+  });
+
+  it('renders a real UPDATE with SET and WHERE', () => {
+    const snippet = buildExampleQuery(baseResult({ operation: 'UPDATE' }), '"public"."todos"', {
+      row: { done: true },
+      match: { user_id: 'u1' },
+    });
+    expect(snippet).toContain(
+      'UPDATE "public"."todos" SET "done" = true WHERE "user_id" = $$u1$$;'
+    );
+  });
+
+  it('renders a real DELETE with WHERE, and null match as IS NULL', () => {
+    const snippet = buildExampleQuery(baseResult({ operation: 'DELETE' }), '"public"."todos"', {
+      match: { archived_at: null },
+    });
+    expect(snippet).toContain('DELETE FROM "public"."todos" WHERE "archived_at" IS NULL;');
+  });
+
+  it('never emits an invalid literal for a non-finite value (defensive)', () => {
+    // A non-finite number cannot arrive via a JSON request body; this guards the
+    // display path so it renders NULL instead of a broken literal or a throw.
+    const snippet = buildExampleQuery(baseResult({ operation: 'SELECT' }), '"public"."todos"', {
+      match: { score: Number.POSITIVE_INFINITY } as Record<string, unknown>,
+    });
+    expect(snippet).toContain('"score" = NULL');
+  });
+
+  it('escapes a value ending in $ without breaking the dollar-quote (boundary)', () => {
+    // A bare $$ tag would fuse with the trailing $ into $$SAVE20$$$ and close
+    // early; the tag must escalate to a non-empty delimiter. Assert the FULL
+    // literal so a malformed surrounding quote can't pass on a fragment match.
+    const snippet = buildExampleQuery(baseResult({ operation: 'DELETE' }), '"public"."orders"', {
+      match: { promo_code: 'SAVE20$' },
+    });
+    expect(snippet).toContain('WHERE "promo_code" = $q1$SAVE20$$q1$;');
+  });
+
+  it('escapes a lone $ value', () => {
+    const snippet = buildExampleQuery(baseResult({ operation: 'DELETE' }), '"public"."orders"', {
+      match: { code: '$' },
+    });
+    expect(snippet).toContain('WHERE "code" = $q1$$$q1$;');
+  });
+
+  it('reproduces a count(*) when sampling is disabled (sampleLimit 0)', () => {
+    const snippet = buildExampleQuery(baseResult({ operation: 'SELECT' }), '"public"."todos"', {
+      match: { user_id: 'u1' },
+      sampleLimit: 0,
+    });
+    expect(snippet).toContain('SELECT count(*) FROM "public"."todos" WHERE "user_id" = $$u1$$;');
+    expect(snippet).not.toContain('SELECT *');
   });
 });

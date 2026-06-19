@@ -140,6 +140,11 @@ export class PolicySimulatorService {
     const where = buildWhereClause(input.match);
     const sampleLimit = input.sampleLimit ?? DEFAULT_SAMPLE_LIMIT;
 
+    // Snapshot the admin baseline BEFORE the role's read so SELECT and mutation
+    // simulations share the same race window relative to concurrent writes
+    // (simulateMutation also counts before it runs).
+    const rowsTotal = await countAsAdmin(pool, qualifiedName, where);
+
     let rowsVisible: number;
     let sampleRows: ColumnMap[] | null;
 
@@ -170,7 +175,10 @@ export class PolicySimulatorService {
       ));
     } catch (error) {
       if (hasPgErrorCode(error, RLS_VIOLATION_CODE)) {
-        // No SELECT privilege at all — the role can't read the table.
+        // No SELECT privilege at all — the role can't read the table. Keep
+        // rowsTotal null here (not the admin baseline) so a privilege-denied
+        // read returns the same shape it always has — the baseline is only
+        // meaningful for the visible-vs-total comparison, which never runs.
         const reason = (error as DatabaseError).message;
         return finalize({
           ...base,
@@ -182,12 +190,12 @@ export class PolicySimulatorService {
           denialReason: reason,
           qualifiedName,
           whereSql: where.sql,
+          request: input,
         });
       }
       throw toSimulationError(error);
     }
 
-    const rowsTotal = await countAsAdmin(pool, qualifiedName, where);
     const decision = classifySelect({ rowsVisible, rowsTotal, bypassRls: base.bypassRls });
 
     return finalize({
@@ -200,6 +208,7 @@ export class PolicySimulatorService {
       denialReason: null,
       qualifiedName,
       whereSql: where.sql,
+      request: input,
     });
   }
 
@@ -239,6 +248,7 @@ export class PolicySimulatorService {
         denialReason: null,
         qualifiedName,
         whereSql: '',
+        request: input,
       });
     } catch (error) {
       if (hasPgErrorCode(error, RLS_VIOLATION_CODE)) {
@@ -252,6 +262,7 @@ export class PolicySimulatorService {
           denialReason: (error as DatabaseError).message,
           qualifiedName,
           whereSql: '',
+          request: input,
         });
       }
       throw toSimulationError(error);
@@ -316,6 +327,7 @@ export class PolicySimulatorService {
         denialReason: null,
         qualifiedName,
         whereSql: where.sql,
+        request: input,
       });
     } catch (error) {
       if (hasPgErrorCode(error, RLS_VIOLATION_CODE)) {
@@ -329,6 +341,7 @@ export class PolicySimulatorService {
           denialReason: (error as DatabaseError).message,
           qualifiedName,
           whereSql: where.sql,
+          request: input,
         });
       }
       throw toSimulationError(error);
@@ -471,6 +484,17 @@ export function buildExplanation(result: SimulatePolicyResponse): string {
 
   switch (decision) {
     case 'allowed':
+      if (result.rowsTotal === 0) {
+        // Empty table (or a filter that matched nothing): the operation was not
+        // denied, but with no rows present RLS could not actually be observed.
+        // Say so honestly instead of appending the default policy summary, which
+        // would read "is allowed ... blocked by default" and contradict itself.
+        const consequence =
+          policyCount === 0
+            ? `No RLS policy currently applies to ${operation} for role "${role}", so once matching rows exist they would be denied by default.`
+            : policySummary;
+        return `${operation} as "${role}" on ${table} matched no rows, so row level security could not be observed (nothing was denied, but whether future rows would pass is not proven). ${consequence}`;
+      }
       return `${operation} as "${role}" on ${table} is allowed. ${policySummary}${baselineNote}`;
     case 'partial':
       return `${operation} as "${role}" on ${table} is partially allowed: ${result.rowsVisible ?? result.rowsAffected} of ${result.rowsTotal} rows pass RLS. ${policySummary}`;
@@ -492,29 +516,157 @@ export function buildExplanation(result: SimulatePolicyResponse): string {
   }
 }
 
-export function buildExampleQuery(result: SimulatePolicyResponse, qualifiedName: string): string {
-  const claims = JSON.stringify(result.effectiveClaims).replace(/'/g, "''");
+/**
+ * A faithful, copy-pasteable reproduction of the simulated session: the same
+ * role, the same JWT claims, and the same data statement the simulator actually
+ * ran — the filter from `match`, the values from `row`, and the SELECT sample
+ * limit — wrapped in BEGIN/ROLLBACK so running it persists nothing.
+ *
+ * This text is display-only (the backend never executes it), but it must be
+ * unambiguous and safe to paste: identifiers are quoted, and values render as
+ * SQL literals with strings/JSON dollar-quoted using a collision-free tag, so
+ * single quotes and backslashes are safe regardless of the server's
+ * `standard_conforming_strings` setting.
+ */
+export function buildExampleQuery(
+  result: SimulatePolicyResponse,
+  qualifiedName: string,
+  request?: Pick<SimulatePolicyRequest, 'match' | 'row' | 'sampleLimit'>
+): string {
   const lines = [
     'BEGIN;',
-    `SET LOCAL ROLE ${result.role};`,
-    `SELECT set_config('request.jwt.claims', '${claims}', true);`,
+    // Reuse the same role allowlist the simulator executes with, so the snippet
+    // can never render a role outside {anon, authenticated, project_admin}.
+    `${ROLE_SQL[result.role]};`,
+    `SELECT set_config('request.jwt.claims', ${dollarQuote(
+      JSON.stringify(result.effectiveClaims)
+    )}, true);`,
   ];
+
+  const row = request?.row;
+  const where = renderExampleWhere(request?.match);
+
   switch (result.operation) {
-    case 'SELECT':
-      lines.push(`SELECT * FROM ${qualifiedName};`);
+    case 'SELECT': {
+      const sampleLimit = request?.sampleLimit ?? DEFAULT_SAMPLE_LIMIT;
+      if (Number.isInteger(sampleLimit) && sampleLimit > 0) {
+        lines.push(`SELECT * FROM ${qualifiedName}${where} LIMIT ${sampleLimit};`);
+      } else {
+        // sampleLimit 0: the simulator only counted visible rows (no sample
+        // read), so reproduce the count rather than an unbounded SELECT *.
+        lines.push(`SELECT count(*) FROM ${qualifiedName}${where};`);
+      }
       break;
-    case 'INSERT':
-      lines.push(`INSERT INTO ${qualifiedName} (...) VALUES (...);`);
+    }
+    case 'INSERT': {
+      const columns = row ? Object.keys(row) : [];
+      if (columns.length === 0) {
+        lines.push(`INSERT INTO ${qualifiedName} DEFAULT VALUES;`);
+      } else {
+        const cols = columns.map(quoteIdentifier).join(', ');
+        const vals = columns.map((c) => toSqlLiteral((row as ColumnMap)[c])).join(', ');
+        lines.push(`INSERT INTO ${qualifiedName} (${cols}) VALUES (${vals});`);
+      }
       break;
-    case 'UPDATE':
-      lines.push(`UPDATE ${qualifiedName} SET ... WHERE ...;`);
+    }
+    case 'UPDATE': {
+      const columns = row ? Object.keys(row) : [];
+      if (columns.length === 0) {
+        // Unreachable in practice: simulateMutation rejects an UPDATE without a
+        // `row` before finalize runs. Emit a comment, never a non-runnable
+        // statement, so the snippet always pastes cleanly.
+        lines.push(`-- UPDATE ${qualifiedName}: provide a row payload (SET values) to simulate.`);
+      } else {
+        const setSql = columns
+          .map((c) => `${quoteIdentifier(c)} = ${toSqlLiteral((row as ColumnMap)[c])}`)
+          .join(', ');
+        lines.push(`UPDATE ${qualifiedName} SET ${setSql}${where};`);
+      }
       break;
-    case 'DELETE':
-      lines.push(`DELETE FROM ${qualifiedName} WHERE ...;`);
+    }
+    case 'DELETE': {
+      lines.push(`DELETE FROM ${qualifiedName}${where};`);
       break;
+    }
   }
+
   lines.push('ROLLBACK;');
   return lines.join('\n');
+}
+
+/** Render a `match` map as a literal WHERE clause (empty string when absent). */
+function renderExampleWhere(match: Record<string, unknown> | undefined): string {
+  if (!match) {
+    return '';
+  }
+  const keys = Object.keys(match);
+  if (keys.length === 0) {
+    return '';
+  }
+  const clauses = keys.map((key) => {
+    const value = match[key];
+    return value === null
+      ? `${quoteIdentifier(key)} IS NULL`
+      : `${quoteIdentifier(key)} = ${toSqlLiteral(value)}`;
+  });
+  return ` WHERE ${clauses.join(' AND ')}`;
+}
+
+/**
+ * Render a JS value as a SQL literal for the example query. Primitives render
+ * bare; null/undefined render as NULL; strings and JSON (objects/arrays) are
+ * dollar-quoted so embedded quotes and backslashes never need escaping.
+ */
+function toSqlLiteral(value: unknown): string {
+  if (value === null || value === undefined) {
+    return 'NULL';
+  }
+  if (typeof value === 'boolean') {
+    return value ? 'true' : 'false';
+  }
+  if (typeof value === 'number') {
+    // Non-finite numbers cannot come from a JSON request body, but guard anyway
+    // so the display path can never emit an invalid literal.
+    return Number.isFinite(value) ? String(value) : 'NULL';
+  }
+  if (typeof value === 'bigint') {
+    return value.toString();
+  }
+  if (typeof value === 'string') {
+    return dollarQuote(value);
+  }
+  // Objects/arrays render as a JSON string literal Postgres can coerce. We do
+  // not add a ::type cast: the simulator does not introspect column types, and
+  // a wrong cast (e.g. ::jsonb on a text column) would be less faithful than a
+  // plain literal. JSON.stringify can return undefined (functions, symbols) or
+  // throw (circular refs, nested BigInt) for exotic values a JSON request can't
+  // contain; either way, fall back to NULL so the display path never fails the
+  // simulation it is only annotating.
+  let json: string | undefined;
+  try {
+    json = JSON.stringify(value);
+  } catch {
+    return 'NULL';
+  }
+  return json === undefined ? 'NULL' : dollarQuote(json);
+}
+
+/**
+ * Wrap `text` in a dollar-quoted SQL string literal, so the value needs no
+ * escaping and is safe under any `standard_conforming_strings` setting. We pick
+ * a tag whose closing delimiter first appears in `text + delimiter` exactly at
+ * the join. That rules out not just a delimiter embedded in the body, but also
+ * boundary merges — e.g. a value ending in `$` ("SAVE20$") would otherwise fuse
+ * with a bare `$$` delimiter into `$$SAVE20$$$` and terminate early. `$$` is
+ * tried first (clean for the common case), then `$q1$`, `$q2$`, …
+ */
+function dollarQuote(text: string): string {
+  for (let i = 0; ; i += 1) {
+    const delim = i === 0 ? '$$' : `$q${i}$`;
+    if ((text + delim).indexOf(delim) === text.length) {
+      return `${delim}${text}${delim}`;
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -541,6 +693,9 @@ interface FinalizeArgs extends SimulationBase {
   denialReason: string | null;
   qualifiedName: string;
   whereSql: string;
+  // The original request, so the example query can faithfully reproduce the
+  // exact filter (`match`), values (`row`), and SELECT sample limit.
+  request: SimulatePolicyRequest;
 }
 
 function finalize(args: FinalizeArgs): SimulatePolicyResponse {
@@ -563,7 +718,7 @@ function finalize(args: FinalizeArgs): SimulatePolicyResponse {
     exampleQuery: '',
   };
   response.explanation = buildExplanation(response);
-  response.exampleQuery = buildExampleQuery(response, args.qualifiedName);
+  response.exampleQuery = buildExampleQuery(response, args.qualifiedName, args.request);
   return response;
 }
 
