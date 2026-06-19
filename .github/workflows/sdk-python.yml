@@ -1,0 +1,63 @@
+name: Python SDK
+
+on:
+  pull_request:
+    branches: [main, master, develop]
+    paths:
+      - 'sdks/python/**'
+  push:
+    branches: [main, master]
+    paths:
+      - 'sdks/python/**'
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Python SDK Tests
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        working-directory: sdks/python
+        run: |
+          pip install --upgrade pip
+          pip install ".[realtime]"
+          pip install pytest responses
+
+      - name: Run tests
+        working-directory: sdks/python
+        run: pytest tests/ -v
+
+  lint:
+    name: Python SDK Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install lint tools
+        run: pip install ruff
+
+      - name: Lint
+        working-directory: sdks/python
+        run: ruff check insforge/
