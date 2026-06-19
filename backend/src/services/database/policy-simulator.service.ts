@@ -196,7 +196,13 @@ export class PolicySimulatorService {
       throw toSimulationError(error);
     }
 
-    const decision = classifySelect({ rowsVisible, rowsTotal, bypassRls: base.bypassRls });
+    const decision = classifySelect({
+      rowsVisible,
+      rowsTotal,
+      bypassRls: base.bypassRls,
+      rlsEnabled: base.rlsEnabled,
+      applicablePermissiveCount: countPermissivePolicies(base.applicablePolicies),
+    });
 
     return finalize({
       ...base,
@@ -316,6 +322,8 @@ export class PolicySimulatorService {
         rowsAffected,
         rowsTotal,
         bypassRls: base.bypassRls,
+        rlsEnabled: base.rlsEnabled,
+        applicablePermissiveCount: countPermissivePolicies(base.applicablePolicies),
       });
       return finalize({
         ...base,
@@ -399,10 +407,21 @@ export function buildWhereClause(
   return { sql: `WHERE ${clauses.join(' AND ')}`, params };
 }
 
+/**
+ * Count applicable PERMISSIVE policies. RLS is permissive-OR: a non-bypass role
+ * sees a row only if at least one permissive policy passes, so zero permissive
+ * policies means deny-all regardless of how many restrictive policies exist.
+ */
+function countPermissivePolicies(policies: SimulatorPolicy[]): number {
+  return policies.filter((p) => p.permissive).length;
+}
+
 export function classifySelect(args: {
   rowsVisible: number;
   rowsTotal: number | null;
   bypassRls: boolean;
+  rlsEnabled: boolean;
+  applicablePermissiveCount: number;
 }): PolicySimulatorDecision {
   if (args.bypassRls) {
     return 'bypass';
@@ -412,7 +431,20 @@ export function classifySelect(args: {
     return args.rowsVisible > 0 ? 'allowed' : 'denied';
   }
   if (args.rowsTotal === 0) {
-    return 'allowed'; // nothing to read; RLS can't be observed but didn't block
+    // No row existed to test, so RLS could not be observed.
+    // If RLS is not enforced on the table, no policy can deny — access is governed
+    // by table GRANTs (the role's read already succeeded), so an empty read is
+    // allowed, consistent with a populated RLS-disabled table that reads every row.
+    if (!args.rlsEnabled) {
+      return 'allowed';
+    }
+    // RLS enforced: apply Postgres's deterministic default-deny instead of
+    // pretending certainty. With no applicable PERMISSIVE policy, RLS lets no row
+    // through for a non-bypass role (permissive-OR), so the role would be denied
+    // once rows exist — the same outcome a populated table gives (rowsVisible
+    // 0 < rowsTotal => denied). A permissive policy means the real outcome is
+    // genuinely unobserved, so don't infer a denial.
+    return args.applicablePermissiveCount === 0 ? 'denied' : 'allowed';
   }
   if (args.rowsVisible === 0) {
     return 'denied';
@@ -427,6 +459,8 @@ export function classifyMutation(args: {
   rowsAffected: number;
   rowsTotal: number | null;
   bypassRls: boolean;
+  rlsEnabled: boolean;
+  applicablePermissiveCount: number;
 }): PolicySimulatorDecision {
   if (args.bypassRls) {
     return 'bypass';
@@ -436,7 +470,13 @@ export function classifyMutation(args: {
     return args.rowsAffected > 0 ? 'allowed' : 'denied';
   }
   if (args.rowsTotal === 0) {
-    return 'allowed'; // no matching rows to act on
+    // No matching row to act on, so RLS could not be observed. Mirror
+    // classifySelect: RLS-disabled => allowed (GRANT-governed); RLS-enforced with
+    // no applicable permissive policy => denied by default; with one => unobserved.
+    if (!args.rlsEnabled) {
+      return 'allowed';
+    }
+    return args.applicablePermissiveCount === 0 ? 'denied' : 'allowed';
   }
   if (args.rowsAffected === 0) {
     return 'denied';
@@ -464,7 +504,7 @@ export function buildExplanation(result: SimulatePolicyResponse): string {
   }
 
   const policyCount = result.applicablePolicies.length;
-  const permissiveCount = result.applicablePolicies.filter((p) => p.permissive).length;
+  const permissiveCount = countPermissivePolicies(result.applicablePolicies);
   const policySummary =
     policyCount === 0
       ? `No RLS policy applies to ${operation} for role "${role}", so it is blocked by default.`
@@ -482,19 +522,24 @@ export function buildExplanation(result: SimulatePolicyResponse): string {
     ? ' (Admin baseline unavailable: project_admin lacks SELECT on this table, so visible vs total rows were not compared.)'
     : '';
 
+  // Empty result (empty table, or a filter that matched nothing): no row existed
+  // to test, so RLS could not be *observed*. Report the deterministic outcome
+  // instead of pretending certainty. With no applicable permissive policy, RLS
+  // lets no row through for a non-bypass role (permissive-OR), so access is denied
+  // by default — the same outcome a populated table gives, and what
+  // classifySelect/classifyMutation return here. With a permissive policy present
+  // the real outcome is genuinely unobserved, so the decision stays 'allowed' and
+  // we say so. (rowsTotal is null, not 0, when the admin baseline is unavailable,
+  // so this never collides with baselineNote.)
+  if (result.rowsTotal === 0) {
+    if (permissiveCount === 0) {
+      return `${operation} as "${role}" on ${table} matched no rows, and no applicable permissive RLS policy grants row access to ${operation} for role "${role}", so access is denied by default.`;
+    }
+    return `${operation} as "${role}" on ${table} matched no rows, so row level security could not be observed: nothing was denied, but whether any future row would pass is not proven (the applicable policy may still evaluate false, e.g. for unmet claims). ${policySummary}`;
+  }
+
   switch (decision) {
     case 'allowed':
-      if (result.rowsTotal === 0) {
-        // Empty table (or a filter that matched nothing): the operation was not
-        // denied, but with no rows present RLS could not actually be observed.
-        // Say so honestly instead of appending the default policy summary, which
-        // would read "is allowed ... blocked by default" and contradict itself.
-        const consequence =
-          policyCount === 0
-            ? `No RLS policy currently applies to ${operation} for role "${role}", so once matching rows exist they would be denied by default.`
-            : policySummary;
-        return `${operation} as "${role}" on ${table} matched no rows, so row level security could not be observed (nothing was denied, but whether future rows would pass is not proven). ${consequence}`;
-      }
       return `${operation} as "${role}" on ${table} is allowed. ${policySummary}${baselineNote}`;
     case 'partial':
       return `${operation} as "${role}" on ${table} is partially allowed: ${result.rowsVisible ?? result.rowsAffected} of ${result.rowsTotal} rows pass RLS. ${policySummary}`;

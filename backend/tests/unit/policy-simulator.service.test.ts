@@ -134,47 +134,201 @@ describe('buildWhereClause', () => {
 
 describe('classifySelect', () => {
   it('reports bypass for BYPASSRLS roles', () => {
-    expect(classifySelect({ rowsVisible: 3, rowsTotal: 3, bypassRls: true })).toBe('bypass');
+    expect(
+      classifySelect({
+        rowsVisible: 3,
+        rowsTotal: 3,
+        bypassRls: true,
+        rlsEnabled: true,
+        applicablePermissiveCount: 0,
+      })
+    ).toBe('bypass');
   });
   it('allowed when the role sees every row', () => {
-    expect(classifySelect({ rowsVisible: 3, rowsTotal: 3, bypassRls: false })).toBe('allowed');
+    expect(
+      classifySelect({
+        rowsVisible: 3,
+        rowsTotal: 3,
+        bypassRls: false,
+        rlsEnabled: true,
+        applicablePermissiveCount: 1,
+      })
+    ).toBe('allowed');
   });
   it('partial when the role sees some rows', () => {
-    expect(classifySelect({ rowsVisible: 1, rowsTotal: 3, bypassRls: false })).toBe('partial');
+    expect(
+      classifySelect({
+        rowsVisible: 1,
+        rowsTotal: 3,
+        bypassRls: false,
+        rlsEnabled: true,
+        applicablePermissiveCount: 1,
+      })
+    ).toBe('partial');
   });
   it('denied when the role sees no rows but rows exist', () => {
-    expect(classifySelect({ rowsVisible: 0, rowsTotal: 3, bypassRls: false })).toBe('denied');
+    expect(
+      classifySelect({
+        rowsVisible: 0,
+        rowsTotal: 3,
+        bypassRls: false,
+        rlsEnabled: true,
+        applicablePermissiveCount: 0,
+      })
+    ).toBe('denied');
   });
-  it('allowed (not denied) when the table is empty', () => {
-    expect(classifySelect({ rowsVisible: 0, rowsTotal: 0, bypassRls: false })).toBe('allowed');
+  it('denied (default-deny) on an empty table when no permissive policy applies', () => {
+    expect(
+      classifySelect({
+        rowsVisible: 0,
+        rowsTotal: 0,
+        bypassRls: false,
+        rlsEnabled: true,
+        applicablePermissiveCount: 0,
+      })
+    ).toBe('denied');
+  });
+  it('allowed (outcome unobserved) on an empty table when a permissive policy applies', () => {
+    expect(
+      classifySelect({
+        rowsVisible: 0,
+        rowsTotal: 0,
+        bypassRls: false,
+        rlsEnabled: true,
+        applicablePermissiveCount: 1,
+      })
+    ).toBe('allowed');
+  });
+  it('allowed on an empty table when RLS is disabled (no policy can deny)', () => {
+    expect(
+      classifySelect({
+        rowsVisible: 0,
+        rowsTotal: 0,
+        bypassRls: false,
+        rlsEnabled: false,
+        applicablePermissiveCount: 0,
+      })
+    ).toBe('allowed');
   });
   it('falls back to the role visibility when the admin baseline is null', () => {
-    expect(classifySelect({ rowsVisible: 2, rowsTotal: null, bypassRls: false })).toBe('allowed');
-    expect(classifySelect({ rowsVisible: 0, rowsTotal: null, bypassRls: false })).toBe('denied');
+    expect(
+      classifySelect({
+        rowsVisible: 2,
+        rowsTotal: null,
+        bypassRls: false,
+        rlsEnabled: true,
+        applicablePermissiveCount: 1,
+      })
+    ).toBe('allowed');
+    expect(
+      classifySelect({
+        rowsVisible: 0,
+        rowsTotal: null,
+        bypassRls: false,
+        rlsEnabled: true,
+        applicablePermissiveCount: 0,
+      })
+    ).toBe('denied');
   });
 });
 
 describe('classifyMutation', () => {
   it('reports bypass for BYPASSRLS roles', () => {
-    expect(classifyMutation({ rowsAffected: 2, rowsTotal: 2, bypassRls: true })).toBe('bypass');
+    expect(
+      classifyMutation({
+        rowsAffected: 2,
+        rowsTotal: 2,
+        bypassRls: true,
+        rlsEnabled: true,
+        applicablePermissiveCount: 0,
+      })
+    ).toBe('bypass');
   });
   it('allowed when every matching row is affected', () => {
-    expect(classifyMutation({ rowsAffected: 2, rowsTotal: 2, bypassRls: false })).toBe('allowed');
+    expect(
+      classifyMutation({
+        rowsAffected: 2,
+        rowsTotal: 2,
+        bypassRls: false,
+        rlsEnabled: true,
+        applicablePermissiveCount: 1,
+      })
+    ).toBe('allowed');
   });
   it('partial when only some matching rows are affected', () => {
-    expect(classifyMutation({ rowsAffected: 1, rowsTotal: 2, bypassRls: false })).toBe('partial');
+    expect(
+      classifyMutation({
+        rowsAffected: 1,
+        rowsTotal: 2,
+        bypassRls: false,
+        rlsEnabled: true,
+        applicablePermissiveCount: 1,
+      })
+    ).toBe('partial');
   });
   it('denied when matching rows exist but none are affected', () => {
-    expect(classifyMutation({ rowsAffected: 0, rowsTotal: 2, bypassRls: false })).toBe('denied');
+    expect(
+      classifyMutation({
+        rowsAffected: 0,
+        rowsTotal: 2,
+        bypassRls: false,
+        rlsEnabled: true,
+        applicablePermissiveCount: 0,
+      })
+    ).toBe('denied');
   });
-  it('allowed when there are no matching rows to act on', () => {
-    expect(classifyMutation({ rowsAffected: 0, rowsTotal: 0, bypassRls: false })).toBe('allowed');
+  it('denied (default-deny) on an empty match when no permissive policy applies', () => {
+    expect(
+      classifyMutation({
+        rowsAffected: 0,
+        rowsTotal: 0,
+        bypassRls: false,
+        rlsEnabled: true,
+        applicablePermissiveCount: 0,
+      })
+    ).toBe('denied');
+  });
+  it('allowed (outcome unobserved) on an empty match when a permissive policy applies', () => {
+    expect(
+      classifyMutation({
+        rowsAffected: 0,
+        rowsTotal: 0,
+        bypassRls: false,
+        rlsEnabled: true,
+        applicablePermissiveCount: 1,
+      })
+    ).toBe('allowed');
+  });
+  it('allowed on an empty match when RLS is disabled (no policy can deny)', () => {
+    expect(
+      classifyMutation({
+        rowsAffected: 0,
+        rowsTotal: 0,
+        bypassRls: false,
+        rlsEnabled: false,
+        applicablePermissiveCount: 0,
+      })
+    ).toBe('allowed');
   });
   it('falls back to rows affected when the admin baseline is null', () => {
-    expect(classifyMutation({ rowsAffected: 1, rowsTotal: null, bypassRls: false })).toBe(
-      'allowed'
-    );
-    expect(classifyMutation({ rowsAffected: 0, rowsTotal: null, bypassRls: false })).toBe('denied');
+    expect(
+      classifyMutation({
+        rowsAffected: 1,
+        rowsTotal: null,
+        bypassRls: false,
+        rlsEnabled: true,
+        applicablePermissiveCount: 1,
+      })
+    ).toBe('allowed');
+    expect(
+      classifyMutation({
+        rowsAffected: 0,
+        rowsTotal: null,
+        bypassRls: false,
+        rlsEnabled: true,
+        applicablePermissiveCount: 0,
+      })
+    ).toBe('denied');
   });
 });
 
@@ -208,6 +362,18 @@ const ownerSelect: SimulatorPolicy = {
   qual: '(auth.uid() = user_id)',
   withCheck: null,
   permissive: true,
+};
+
+// A restrictive policy with NO accompanying permissive policy: RLS is
+// permissive-OR, so this configuration denies every row for the role.
+const restrictiveSelect: SimulatorPolicy = {
+  tableName: 'todos',
+  policyName: 'tenant_restrict',
+  cmd: 'SELECT',
+  roles: ['authenticated'],
+  qual: "(tenant_id = current_setting('app.tenant', true))",
+  withCheck: null,
+  permissive: false,
 };
 
 describe('buildExplanation', () => {
@@ -318,10 +484,10 @@ describe('buildExplanation', () => {
     expect(text).not.toContain('missing table privilege (GRANT)');
   });
 
-  it('does not contradict itself on an empty table (allowed + no rows + no policy)', () => {
+  it('reports default-deny on an empty table when no permissive policy applies', () => {
     const text = buildExplanation(
       baseResult({
-        decision: 'allowed',
+        decision: 'denied',
         rowsVisible: 0,
         rowsTotal: 0,
         applicablePolicies: [],
@@ -329,10 +495,25 @@ describe('buildExplanation', () => {
     );
     expect(text).toMatch(/matched no rows/i);
     expect(text).not.toContain('is allowed');
+    expect(text).toMatch(/no applicable permissive/i);
     expect(text).toContain('denied by default');
   });
 
-  it('explains an empty table with a policy without claiming a proven allow', () => {
+  it('reports default-deny on an empty table with only a restrictive policy', () => {
+    const text = buildExplanation(
+      baseResult({
+        decision: 'denied',
+        rowsVisible: 0,
+        rowsTotal: 0,
+        applicablePolicies: [restrictiveSelect],
+      })
+    );
+    expect(text).toMatch(/matched no rows/i);
+    expect(text).toMatch(/no applicable permissive/i);
+    expect(text).toContain('denied by default');
+  });
+
+  it('explains an empty table with a permissive policy without claiming a proven allow', () => {
     const text = buildExplanation(
       baseResult({
         decision: 'allowed',
@@ -342,6 +523,7 @@ describe('buildExplanation', () => {
       })
     );
     expect(text).toMatch(/matched no rows/i);
+    expect(text).toMatch(/could not be observed/i);
     expect(text).toContain('OR'); // the permissive/restrictive combination rule still surfaces
   });
 });
@@ -447,5 +629,23 @@ describe('buildExampleQuery', () => {
     });
     expect(snippet).toContain('SELECT count(*) FROM "public"."todos" WHERE "user_id" = $$u1$$;');
     expect(snippet).not.toContain('SELECT *');
+  });
+
+  it('renders DEFAULT VALUES for an INSERT with no row payload', () => {
+    const snippet = buildExampleQuery(baseResult({ operation: 'INSERT' }), '"public"."todos"');
+    expect(snippet).toContain('INSERT INTO "public"."todos" DEFAULT VALUES;');
+  });
+
+  it('emits a comment, never a broken statement, for an UPDATE with no row payload', () => {
+    const snippet = buildExampleQuery(baseResult({ operation: 'UPDATE' }), '"public"."todos"');
+    expect(snippet).toContain('-- UPDATE "public"."todos"');
+    expect(snippet).not.toMatch(/UPDATE "public"\."todos" SET/);
+  });
+
+  it('renders an object value as a dollar-quoted JSON literal', () => {
+    const snippet = buildExampleQuery(baseResult({ operation: 'INSERT' }), '"public"."todos"', {
+      row: { meta: { a: 1, b: "it's" } },
+    });
+    expect(snippet).toContain('VALUES ($${"a":1,"b":"it\'s"}$$);');
   });
 });

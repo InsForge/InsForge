@@ -75,6 +75,29 @@ beforeAll(async () => {
     GRANT SELECT ON no_admin_grant TO authenticated;
     REVOKE ALL ON no_admin_grant FROM project_admin;
     INSERT INTO no_admin_grant (user_id, title) VALUES ('${USER_A}', 'private');
+
+    -- An empty RLS table to prove the empty-result default-deny: with no rows to
+    -- observe, the decision must follow Postgres's default-deny — denied when no
+    -- permissive policy applies, unobserved-but-allowed when one does.
+    CREATE TABLE empty_todos (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID NOT NULL,
+      title TEXT NOT NULL
+    );
+    ALTER TABLE empty_todos ENABLE ROW LEVEL SECURITY;
+    CREATE POLICY owner_select ON empty_todos FOR SELECT TO authenticated USING (auth.uid() = user_id);
+    GRANT SELECT ON empty_todos TO anon, authenticated, project_admin;
+    -- intentionally no rows inserted
+
+    -- An empty table with RLS DISABLED: access is GRANT-governed, so an empty read
+    -- is allowed (no policy can deny). Proves the empty-result default-deny does
+    -- NOT fire when RLS is off.
+    CREATE TABLE empty_no_rls (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      title TEXT NOT NULL
+    );
+    GRANT SELECT ON empty_no_rls TO anon, authenticated, project_admin;
+    -- RLS intentionally NOT enabled; no rows inserted
   `);
 
   await db.publish();
@@ -331,5 +354,44 @@ describe('validation', () => {
     expect(res.rowsVisible).toBe(1);
     expect(res.decision).toBe('allowed');
     expect(res.explanation).toMatch(/baseline unavailable/i);
+  });
+});
+
+describe('empty-table default-deny', () => {
+  it('denies a role with no applicable permissive policy on an empty table', async () => {
+    // anon can reach empty_todos (table GRANT) but owner_select targets
+    // authenticated, so no permissive policy applies. With zero rows to observe,
+    // the simulator must still report the default-deny, not a misleading 'allowed'.
+    const res = await simulator.simulate(
+      { table: 'empty_todos', operation: 'SELECT', role: 'anon' },
+      pool
+    );
+    expect(res.rowsTotal).toBe(0);
+    expect(res.rowsVisible).toBe(0);
+    expect(res.applicablePolicies).toHaveLength(0);
+    expect(res.decision).toBe('denied');
+    expect(res.explanation).toMatch(/no applicable permissive/i);
+  });
+
+  it('reports allowed-but-unobserved when a permissive policy applies on an empty table', async () => {
+    const res = await simulator.simulate(
+      { table: 'empty_todos', operation: 'SELECT', role: 'authenticated', claims: { sub: USER_A } },
+      pool
+    );
+    expect(res.rowsTotal).toBe(0);
+    expect(res.decision).toBe('allowed');
+    expect(res.applicablePolicies.map((p) => p.policyName)).toContain('owner_select');
+    expect(res.explanation).toMatch(/could not be observed/i);
+  });
+
+  it('reports allowed on an empty table with RLS disabled (GRANT-governed, no policy can deny)', async () => {
+    const res = await simulator.simulate(
+      { table: 'empty_no_rls', operation: 'SELECT', role: 'anon' },
+      pool
+    );
+    expect(res.rlsEnabled).toBe(false);
+    expect(res.rowsTotal).toBe(0);
+    expect(res.decision).toBe('allowed');
+    expect(res.explanation).toMatch(/not enabled/i);
   });
 });
