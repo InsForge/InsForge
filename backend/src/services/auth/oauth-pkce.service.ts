@@ -114,7 +114,7 @@ export class OAuthPKCEService {
 
     const accessToken = tokenManager.generateAccessToken({
       sub: user.id,
-      email: user.email || 'Anonymous',
+      email: user.email ?? undefined,
       role: 'authenticated',
     });
 

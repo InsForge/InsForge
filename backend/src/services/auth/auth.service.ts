@@ -308,7 +308,7 @@ export class AuthService {
     // Email verification not required, provide access token for immediate login
     const accessToken = this.tokenManager.generateAccessToken({
       sub: userId,
-      email: user.email || 'Anonymous', // null for anonymous users; keeps auth.email() consistent in RLS policies
+      email: user.email ?? undefined, // null for anonymous users; keeps auth.email() consistent in RLS policies
       role: 'authenticated',
     });
 
@@ -349,7 +349,7 @@ export class AuthService {
     const user = this.transformUserRecordToSchema(dbUser);
     const accessToken = this.tokenManager.generateAccessToken({
       sub: dbUser.id,
-      email: dbUser.email || 'AnonymousLogin',
+      email: dbUser.email ?? undefined,
       role: 'authenticated',
     });
 
@@ -473,7 +473,7 @@ export class AuthService {
       const user = this.transformUserRecordToSchema(dbUser);
       const accessToken = this.tokenManager.generateAccessToken({
         sub: dbUser.id,
-        email: dbUser.email || 'Anonymous',
+        email: dbUser.email ?? undefined,
         role: 'authenticated',
       });
 
@@ -534,7 +534,7 @@ export class AuthService {
       const user = this.transformUserRecordToSchema(dbUser);
       const accessToken = this.tokenManager.generateAccessToken({
         sub: dbUser.id,
-        email: dbUser.email || 'Anonymous',
+        email: dbUser.email ?? undefined,
         role: 'authenticated',
       });
 
@@ -799,7 +799,7 @@ export class AuthService {
       const user = this.transformUserRecordToSchema(dbUser);
       const accessToken = this.tokenManager.generateAccessToken({
         sub: user.id,
-        email: user.email || 'Anonymous',
+        email: user.email ?? undefined,
         role: 'authenticated',
       });
 
@@ -1299,14 +1299,14 @@ export class AuthService {
 
     return {
       id: dbUser.id,
-      email: dbUser.email || 'Anonymous',
+      email: dbUser.email ?? null,
       emailVerified: dbUser.email_verified,
       createdAt: dbUser.created_at,
       updatedAt: dbUser.updated_at,
       providers: providers,
       profile: dbUser.profile,
       metadata: dbUser.metadata,
-      isAnonymous: dbUser.is_anonymous || false,
+      isAnonymous: dbUser.is_anonymous,
     };
   }
 
