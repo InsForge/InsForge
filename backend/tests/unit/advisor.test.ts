@@ -44,9 +44,9 @@ describe('Database Advisor Unit Tests', () => {
   describe('DatabaseAdvisorService', () => {
     it('should trigger a scan and start it in background', async () => {
       const service = DatabaseAdvisorService.getInstance();
-      queryMock.mockImplementation((sql: string) => {
-        if (sql.includes('pg_locks')) {
-          return Promise.resolve({ rows: [{ is_locked: false }] });
+      clientQueryMock.mockImplementation((sql: string) => {
+        if (sql.includes('pg_try_advisory_lock')) {
+          return Promise.resolve({ rows: [{ acquired: true }] });
         }
         if (sql.includes('INSERT INTO system.advisor_scans')) {
           return Promise.resolve({ rows: [{ id: 'scan-uuid' }] });
@@ -68,9 +68,9 @@ describe('Database Advisor Unit Tests', () => {
 
     it('should reject concurrent scans with 409 Conflict', async () => {
       const service = DatabaseAdvisorService.getInstance();
-      queryMock.mockImplementation((sql: string) => {
-        if (sql.includes('pg_locks')) {
-          return Promise.resolve({ rows: [{ is_locked: false }] });
+      clientQueryMock.mockImplementation((sql: string) => {
+        if (sql.includes('pg_try_advisory_lock')) {
+          return Promise.resolve({ rows: [{ acquired: true }] });
         }
         if (sql.includes('INSERT INTO system.advisor_scans')) {
           return Promise.resolve({ rows: [{ id: 'scan-uuid-1' }] });
@@ -81,10 +81,10 @@ describe('Database Advisor Unit Tests', () => {
       const firstScan = await service.triggerScan('manual');
       expect(firstScan).toBe('scan-uuid-1');
 
-      // For the second call, we mock pg_locks returning true (locked)
-      queryMock.mockImplementation((sql: string) => {
-        if (sql.includes('pg_locks')) {
-          return Promise.resolve({ rows: [{ is_locked: true }] });
+      // For the second call, we mock pg_try_advisory_lock returning false (locked)
+      clientQueryMock.mockImplementation((sql: string) => {
+        if (sql.includes('pg_try_advisory_lock')) {
+          return Promise.resolve({ rows: [{ acquired: false }] });
         }
         return Promise.resolve({ rows: [] });
       });
@@ -102,9 +102,9 @@ describe('Database Advisor Unit Tests', () => {
 
     it('should reset isScanning lock if DB insert fails in triggerScan', async () => {
       const service = DatabaseAdvisorService.getInstance();
-      queryMock.mockImplementation((sql: string) => {
-        if (sql.includes('pg_locks')) {
-          return Promise.resolve({ rows: [{ is_locked: false }] });
+      clientQueryMock.mockImplementation((sql: string) => {
+        if (sql.includes('pg_try_advisory_lock')) {
+          return Promise.resolve({ rows: [{ acquired: true }] });
         }
         if (sql.includes('INSERT INTO system.advisor_scans')) {
           return Promise.reject(new Error('DB connection failure'));
@@ -218,9 +218,9 @@ describe('Database Advisor Unit Tests', () => {
     });
 
     it('POST /api/advisor/scan should start scan', async () => {
-      queryMock.mockImplementation((sql: string) => {
-        if (sql.includes('pg_locks')) {
-          return Promise.resolve({ rows: [{ is_locked: false }] });
+      clientQueryMock.mockImplementation((sql: string) => {
+        if (sql.includes('pg_try_advisory_lock')) {
+          return Promise.resolve({ rows: [{ acquired: true }] });
         }
         if (sql.includes('INSERT INTO system.advisor_scans')) {
           return Promise.resolve({ rows: [{ id: 'scan-uuid' }] });
