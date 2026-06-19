@@ -2,7 +2,7 @@
 
 export interface UserRecord {
   id: string;
-  email: string;
+  email: string | null;
   profile: Record<string, unknown> | null;
   metadata: Record<string, unknown> | null;
   email_verified: boolean;
@@ -29,7 +29,7 @@ export interface OAuthIdentityData {
 // Auth database record
 export interface AuthRecord {
   id: string;
-  email: string;
+  email: string | null;
   password_hash: string;
   created_at: string;
   updated_at: string;
@@ -50,7 +50,7 @@ export interface IdentifiesRecord {
 // Superuser auth record
 export interface SuperUserAuthRecord {
   id: string;
-  email: string;
+  email: string | null;
   password_hash: string;
   created_at: string;
   updated_at: string;
@@ -156,13 +156,13 @@ export interface OAuthUserData {
   userName: string;
   avatarUrl: string;
   identityData:
-    | GoogleUserInfo
-    | GitHubUserInfo
-    | DiscordUserInfo
-    | LinkedInUserInfo
-    | FacebookUserInfo
-    | MicrosoftUserInfo
-    | XUserInfo
-    | AppleUserInfo
-    | Record<string, unknown>;
+  | GoogleUserInfo
+  | GitHubUserInfo
+  | DiscordUserInfo
+  | LinkedInUserInfo
+  | FacebookUserInfo
+  | MicrosoftUserInfo
+  | XUserInfo
+  | AppleUserInfo
+  | Record<string, unknown>;
 }

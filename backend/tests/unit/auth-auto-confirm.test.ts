@@ -160,7 +160,7 @@ describe('AuthService.register – autoConfirm', () => {
       created_at: new Date(),
       updated_at: new Date(),
       metadata: null,
-      is_anonymous: false,
+      isAnonymous: false,
     });
   });
 

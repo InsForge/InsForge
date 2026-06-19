@@ -623,7 +623,7 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
     // Generate new access token
     const newAccessToken = tokenManager.generateAccessToken({
       sub: user.id,
-      email: user.email,
+      email: user.email || 'Anonymous',
       role: roleSchema.enum.authenticated,
     });
 

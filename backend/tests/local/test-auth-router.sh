@@ -157,7 +157,7 @@ if echo "$anon_response" | grep -q '"accessToken"'; then
         -H "Authorization: Bearer $ANON_TOKEN" \
         -H "Content-Type: application/json")
         
-    if echo "$anon_me_response" | grep -q '"is_anonymous":true'; then
+    if echo "$anon_me_response" | grep -q '"isAnonymous":true'; then
         print_success "Anonymous token works and user is marked anonymous!"
     else
         print_fail "Failed to verify anonymous token"
