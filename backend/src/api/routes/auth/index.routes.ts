@@ -344,7 +344,7 @@ router.post(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const clientType = parseClientType(req.query.client_type);
-      // verifyUser has already authenticated the caller by credential shape.
+      // verifyOptionalUser has already authenticated the caller by credential shape.
       // API keys set req.hasApiKey; project_admin JWTs set req.user.role.
       const adminCreatingUser = req.hasApiKey === true || req.user?.role === 'project_admin';
 

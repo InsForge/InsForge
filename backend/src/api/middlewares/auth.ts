@@ -4,6 +4,7 @@ import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES, type RoleSchema } from '@insforge/shared-schemas';
 import { NEXT_ACTIONS } from '../../utils/next-actions.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
+import logger from '@/utils/logger.js';
 
 export type UserContext = {
   /**
@@ -119,11 +120,21 @@ export async function verifyOptionalUser(req: AuthRequest, res: Response, next: 
   }
 
   const bearerToken = extractBearerToken(req.headers.authorization);
-  if (bearerToken && bearerToken.startsWith('anon_')) {
-    return verifyAnonKey(req, res, next);
+  if (bearerToken) {
+    if (bearerToken.startsWith('anon_')) {
+      return verifyAnonKey(req, res, next);
+    }
+    try {
+      const payload = tokenManager.verifyToken(bearerToken);
+      setRequestUser(req, payload);
+    } catch (error) {
+      logger.debug('JWT verification failed in verifyOptionalUser, proceeding without auth', {
+        error,
+      });
+    }
   }
 
-  // No credentials → proceed as unauthenticated (anonymous registration)
+  // No credentials or auth failed → proceed as unauthenticated (anonymous registration)
   next();
 }
 
