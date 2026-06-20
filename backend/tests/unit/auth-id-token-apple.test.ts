@@ -115,8 +115,8 @@ vi.mock('../../src/infra/config/app.config', () => ({
   getApiBaseUrl: () => 'http://localhost:3000',
 }));
 
-import { AuthService } from '../../src/services/auth/auth.service';
-import { AppError } from '../../src/api/middlewares/error';
+import { AuthService } from '@/services/auth/auth.service.js';
+import { AppError } from '@/api/middlewares/error.js';
 
 describe('AuthService.signInWithIdToken – apple', () => {
   let authService: AuthService;
