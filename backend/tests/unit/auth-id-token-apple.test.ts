@@ -242,7 +242,9 @@ describe('AuthService.signInWithIdToken – apple', () => {
     process.env.APPLE_ALLOWED_AUDIENCES = 'com.allowed.bundle';
     await expect(
       authService.signInWithIdToken('apple', 'valid-apple-token', 'com.bad.app')
-    ).rejects.toThrow(new AppError('Audience is not allowed for Apple ID token', 400, 'INVALID_INPUT'));
+    ).rejects.toThrow(
+      new AppError('Audience is not allowed for Apple ID token', 400, 'INVALID_INPUT')
+    );
   });
   it('rejects when provider returns sub literal "undefined"', async () => {
     mockVerifyIdToken.mockResolvedValue({
