@@ -1156,6 +1156,17 @@ export class AuthService {
       }
 
       case 'apple': {
+        const requestedAudience = audience?.trim();
+        if (requestedAudience) {
+          const allowed = (process.env.APPLE_ALLOWED_AUDIENCES || '')
+            .split(',')
+            .map((s: string) => s.trim())
+            .filter(Boolean);
+          if (!allowed.includes(requestedAudience)) {
+            throw new AppError('Audience is not allowed for Apple ID token', 400, ERROR_CODES.INVALID_INPUT);
+          }
+        }
+
         let appleUserInfo;
         try {
           appleUserInfo = await this.appleOAuthProvider.verifyIdToken(idToken, audience);
@@ -1164,7 +1175,8 @@ export class AuthService {
           throw new AppError('Failed to verify Apple ID token', 400, ERROR_CODES.INVALID_INPUT);
         }
 
-        if (!appleUserInfo.sub) {
+        const sub = appleUserInfo.sub?.trim();
+        if (!sub || sub === 'undefined' || sub === 'null') {
           throw new AppError(
             'Invalid Apple ID token: missing sub claim',
             400,
@@ -1172,11 +1184,11 @@ export class AuthService {
           );
         }
 
-        const email = appleUserInfo.email || `apple-${appleUserInfo.sub}@placeholder.local`;
+        const email = appleUserInfo.email || `apple-${sub}@placeholder.local`;
         const userName = email.split('@')[0];
         userData = {
           provider: 'apple',
-          providerId: appleUserInfo.sub,
+          providerId: sub,
           email,
           userName,
           avatarUrl: '',

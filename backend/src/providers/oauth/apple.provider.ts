@@ -204,7 +204,7 @@ export class AppleOAuthProvider implements OAuthProvider {
       });
 
       return {
-        sub: String(payload.sub),
+        sub: typeof payload.sub === 'string' && payload.sub.trim() ? payload.sub : '',
         email: (payload.email as string) || '',
         email_verified: payload.email_verified === 'true' || payload.email_verified === true,
         is_private_email: payload.is_private_email === 'true' || payload.is_private_email === true,

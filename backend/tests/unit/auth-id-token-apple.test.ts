@@ -228,4 +228,29 @@ describe('AuthService.signInWithIdToken – apple', () => {
 
     expect(result.user.email).toBe('privaterelay@appleid.apple.com');
   });
+  it('passes allowed audience to Apple verification', async () => {
+    process.env.APPLE_ALLOWED_AUDIENCES = 'com.example.ios,com.other.app';
+    mockVerifyIdToken.mockResolvedValue({
+      sub: 'apple-sub-aud',
+      email: 'aud@example.com',
+    });
+    mockPool.query.mockResolvedValue({ rows: [] });
+    await authService.signInWithIdToken('apple', 'valid-apple-token', 'com.example.ios');
+    expect(mockVerifyIdToken).toHaveBeenCalledWith('valid-apple-token', 'com.example.ios');
+  });
+  it('rejects unallowed audience', async () => {
+    process.env.APPLE_ALLOWED_AUDIENCES = 'com.allowed.bundle';
+    await expect(
+      authService.signInWithIdToken('apple', 'valid-apple-token', 'com.bad.app')
+    ).rejects.toThrow(new AppError('Audience is not allowed for Apple ID token', 400, 'INVALID_INPUT'));
+  });
+  it('rejects when provider returns sub literal "undefined"', async () => {
+    mockVerifyIdToken.mockResolvedValue({
+      sub: 'undefined',
+      email: 'x@example.com',
+    });
+    await expect(authService.signInWithIdToken('apple', 'valid-apple-token')).rejects.toThrow(
+      new AppError('Invalid Apple ID token: missing sub claim', 400, 'INVALID_INPUT')
+    );
+  });
 });

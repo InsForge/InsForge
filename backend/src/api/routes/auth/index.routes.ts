@@ -488,6 +488,16 @@ router.post('/id-token', async (req: Request, res: Response, next: NextFunction)
       throw new AppError('Audience must be a string', 400, ERROR_CODES.INVALID_INPUT);
     }
 
+    if (provider === 'apple' && audience !== undefined) {
+      const allowed = (process.env.APPLE_ALLOWED_AUDIENCES || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (!allowed.includes(audience)) {
+        throw new AppError('Audience is not allowed for Apple ID token', 400, ERROR_CODES.INVALID_INPUT);
+      }
+    }
+
     // Sign in with ID token
     const result: CreateSessionResponse = await authService.signInWithIdToken(
       provider,
