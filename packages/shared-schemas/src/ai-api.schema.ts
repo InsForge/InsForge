@@ -13,9 +13,6 @@ const getMaxTokensCap = () => {
   return DEFAULT_MAX_TOKENS_CAP;
 };
 
-// This cap is evaluated once at module load time.
-export const CONFIGURED_MAX_TOKENS = getMaxTokensCap();
-
 // ============= Chat Completion Schemas =============
 
 // OpenAI-compatible content schemas
@@ -143,8 +140,16 @@ export const chatCompletionRequestSchema = z.object({
   model: z.string(),
   messages: z.array(chatMessageSchema),
   temperature: z.number().min(0).max(2).optional(),
-  // Cap output tokens to prevent abuse. Configurable via MAX_COMPLETION_TOKENS, defaults to 16,384.
-  maxTokens: z.number().int().positive().max(CONFIGURED_MAX_TOKENS).optional(),
+  // Cap output tokens to prevent abuse. Configurable via MAX_COMPLETION_TOKENS env var, defaults to 16,384.
+  // Evaluated lazily per-request so dotenv loading order does not affect the cap.
+  maxTokens: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .refine((val) => val === undefined || val <= getMaxTokensCap(), {
+      message: 'Exceeds configured maximum token cap.',
+    }),
   topP: z.number().min(0).max(1).optional(),
   stream: z.boolean().optional(),
   // Web Search: Incorporate relevant web search results into the response

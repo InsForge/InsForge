@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import {
   toolFunctionSchema,
   toolSchema,
@@ -7,7 +7,7 @@ import {
   chatMessageSchema,
   chatCompletionRequestSchema,
   chatCompletionResponseSchema,
-  CONFIGURED_MAX_TOKENS,
+  DEFAULT_MAX_TOKENS_CAP,
 } from '@insforge/shared-schemas';
 
 describe('Tool Calling Schemas', () => {
@@ -188,10 +188,14 @@ describe('Tool Calling Schemas', () => {
       messages: [{ role: 'user' as const, content: 'Hello' }],
     };
 
+    afterEach(() => {
+      delete process.env.MAX_COMPLETION_TOKENS;
+    });
+
     it('accepts maxTokens at the maximum boundary cap', () => {
       const result = chatCompletionRequestSchema.safeParse({
         ...baseRequest,
-        maxTokens: CONFIGURED_MAX_TOKENS,
+        maxTokens: DEFAULT_MAX_TOKENS_CAP,
       });
       expect(result.success).toBe(true);
     });
@@ -199,7 +203,7 @@ describe('Tool Calling Schemas', () => {
     it('rejects maxTokens exceeding the maximum boundary cap', () => {
       const result = chatCompletionRequestSchema.safeParse({
         ...baseRequest,
-        maxTokens: CONFIGURED_MAX_TOKENS + 1,
+        maxTokens: DEFAULT_MAX_TOKENS_CAP + 1,
       });
       expect(result.success).toBe(false);
     });
@@ -210,6 +214,22 @@ describe('Tool Calling Schemas', () => {
         maxTokens: 100.5,
       });
       expect(result.success).toBe(false);
+    });
+
+    it('respects MAX_COMPLETION_TOKENS env var when set', () => {
+      process.env.MAX_COMPLETION_TOKENS = '1000';
+
+      const rejected = chatCompletionRequestSchema.safeParse({
+        ...baseRequest,
+        maxTokens: 1001,
+      });
+      expect(rejected.success).toBe(false);
+
+      const accepted = chatCompletionRequestSchema.safeParse({
+        ...baseRequest,
+        maxTokens: 1000,
+      });
+      expect(accepted.success).toBe(true);
     });
   });
 
