@@ -107,6 +107,27 @@ export async function verifyUser(req: AuthRequest, res: Response, next: NextFunc
 }
 
 /**
+ * Like verifyUser but doesn't require credentials.
+ * - API key / anon key: verified same as verifyUser
+ * - No credentials or invalid: proceeds without auth (adminCreatingUser = false)
+ * - JWT: verified and proceeds (authenticated user)
+ */
+export async function verifyOptionalUser(req: AuthRequest, res: Response, next: NextFunction) {
+  const apiKey = extractApiKey(req);
+  if (apiKey) {
+    return verifyApiKey(req, res, next);
+  }
+
+  const bearerToken = extractBearerToken(req.headers.authorization);
+  if (bearerToken && bearerToken.startsWith('anon_')) {
+    return verifyAnonKey(req, res, next);
+  }
+
+  // No credentials → proceed as unauthenticated (anonymous registration)
+  next();
+}
+
+/**
  * Verifies admin authentication (requires admin token)
  */
 export async function verifyAdmin(req: AuthRequest, res: Response, next: NextFunction) {

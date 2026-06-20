@@ -8,7 +8,12 @@ import { TokenManager } from '@/infra/security/token.manager.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { AppError } from '@/utils/errors.js';
 import { successResponse } from '@/utils/response.js';
-import { AuthRequest, verifyAdmin, verifyToken, verifyUser } from '@/api/middlewares/auth.js';
+import {
+  AuthRequest,
+  verifyAdmin,
+  verifyOptionalUser,
+  verifyToken,
+} from '@/api/middlewares/auth.js';
 import adminRouter from './admin.routes.js';
 import oauthRouter from './oauth.routes.js';
 import customOAuthRouter from './custom-oauth.routes.js';
@@ -333,81 +338,85 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
 // Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'
 // When called with a valid admin token (e.g. dashboard adding a user), we do NOT set session
 // cookie or return csrf/refresh tokens, so the admin's session is not overwritten.
-router.post('/users', verifyUser, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const clientType = parseClientType(req.query.client_type);
-    // verifyUser has already authenticated the caller by credential shape.
-    // API keys set req.hasApiKey; project_admin JWTs set req.user.role.
-    const adminCreatingUser = req.hasApiKey === true || req.user?.role === 'project_admin';
+router.post(
+  '/users',
+  verifyOptionalUser,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const clientType = parseClientType(req.query.client_type);
+      // verifyUser has already authenticated the caller by credential shape.
+      // API keys set req.hasApiKey; project_admin JWTs set req.user.role.
+      const adminCreatingUser = req.hasApiKey === true || req.user?.role === 'project_admin';
 
-    const validationResult = createUserRequestSchema.safeParse(req.body);
-    if (!validationResult.success) {
-      throw new AppError(
-        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
-    }
-
-    if (!adminCreatingUser) {
-      const { disableSignup } = await authConfigService.getAuthConfig();
-      if (disableSignup) {
+      const validationResult = createUserRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
         throw new AppError(
-          'User signups are disabled for this project.',
-          403,
-          ERROR_CODES.AUTH_SIGNUP_DISABLED
+          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
         );
       }
-    }
 
-    const {
-      email,
-      password,
-      name,
-      redirectTo,
-      autoConfirm: bodyAutoConfirm,
-    } = validationResult.data;
-    const autoConfirm = adminCreatingUser ? bodyAutoConfirm : false;
-    const result: CreateUserResponse = await authService.register(
-      email,
-      password,
-      name,
-      redirectTo,
-      { isAdminCreation: adminCreatingUser, autoConfirm }
-    );
-
-    // Set refresh token based on client type (skip when admin is adding a user)
-    if (result.accessToken && result.user && !adminCreatingUser) {
-      const tokenManager = TokenManager.getInstance();
-      if (clientType === 'web') {
-        // Web clients: use httpOnly cookie + CSRF token
-        const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
-          result.user.id,
-          'user'
-        );
-        setRefreshTokenCookie(res, refreshToken);
-        result.csrfToken = csrfToken;
-      } else {
-        const refreshToken = tokenManager.generateRefreshToken(result.user.id, 'user');
-        // Non-web clients (mobile, desktop, server): return refresh token in response body.
-        // Server clients cannot rely on browser cookies, so they follow the native-app flow.
-        result.refreshToken = refreshToken;
+      if (!adminCreatingUser) {
+        const { disableSignup } = await authConfigService.getAuthConfig();
+        if (disableSignup) {
+          throw new AppError(
+            'User signups are disabled for this project.',
+            403,
+            ERROR_CODES.AUTH_SIGNUP_DISABLED
+          );
+        }
       }
+
+      const {
+        email,
+        password,
+        name,
+        redirectTo,
+        autoConfirm: bodyAutoConfirm,
+      } = validationResult.data;
+      const autoConfirm = adminCreatingUser ? bodyAutoConfirm : false;
+      const result: CreateUserResponse = await authService.register(
+        email,
+        password,
+        name,
+        redirectTo,
+        { isAdminCreation: adminCreatingUser, autoConfirm }
+      );
+
+      // Set refresh token based on client type (skip when admin is adding a user)
+      if (result.accessToken && result.user && !adminCreatingUser) {
+        const tokenManager = TokenManager.getInstance();
+        if (clientType === 'web') {
+          // Web clients: use httpOnly cookie + CSRF token
+          const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
+            result.user.id,
+            'user'
+          );
+          setRefreshTokenCookie(res, refreshToken);
+          result.csrfToken = csrfToken;
+        } else {
+          const refreshToken = tokenManager.generateRefreshToken(result.user.id, 'user');
+          // Non-web clients (mobile, desktop, server): return refresh token in response body.
+          // Server clients cannot rely on browser cookies, so they follow the native-app flow.
+          result.refreshToken = refreshToken;
+        }
+      }
+
+      const socket = SocketManager.getInstance();
+      socket.broadcastToRoom(
+        'role:project_admin',
+        ServerEvents.DATA_UPDATE,
+        { resource: DataUpdateResourceType.USERS },
+        'system'
+      );
+
+      successResponse(res, result);
+    } catch (error) {
+      next(error);
     }
-
-    const socket = SocketManager.getInstance();
-    socket.broadcastToRoom(
-      'role:project_admin',
-      ServerEvents.DATA_UPDATE,
-      { resource: DataUpdateResourceType.USERS },
-      'system'
-    );
-
-    successResponse(res, result);
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // POST /api/auth/sessions - Create a new session (login)
 // Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'
