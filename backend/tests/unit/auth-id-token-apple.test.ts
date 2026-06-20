@@ -116,7 +116,6 @@ vi.mock('../../src/infra/config/app.config', () => ({
 }));
 
 import { AuthService } from '@/services/auth/auth.service.js';
-import { AppError } from '@/api/middlewares/error.js';
 
 describe('AuthService.signInWithIdToken – apple', () => {
   let authService: AuthService;
@@ -194,7 +193,7 @@ describe('AuthService.signInWithIdToken – apple', () => {
     });
 
     await expect(authService.signInWithIdToken('apple', 'bad-token')).rejects.toThrow(
-      new AppError('Invalid Apple ID token: missing sub claim', 400, 'INVALID_INPUT')
+      'Invalid Apple ID token: missing sub claim'
     );
   });
 
@@ -215,7 +214,7 @@ describe('AuthService.signInWithIdToken – apple', () => {
     mockVerifyIdToken.mockRejectedValue(new Error('invalid signature'));
 
     await expect(authService.signInWithIdToken('apple', 'invalid-token')).rejects.toThrow(
-      new AppError('Failed to verify Apple ID token', 400, 'INVALID_INPUT')
+      'Failed to verify Apple ID token'
     );
   });
 
@@ -247,9 +246,7 @@ describe('AuthService.signInWithIdToken – apple', () => {
     process.env.APPLE_ALLOWED_AUDIENCES = 'com.allowed.bundle';
     await expect(
       authService.signInWithIdToken('apple', 'valid-apple-token', 'com.bad.app')
-    ).rejects.toThrow(
-      new AppError('Audience is not allowed for Apple ID token', 400, 'INVALID_INPUT')
-    );
+    ).rejects.toThrow('Audience is not allowed for Apple ID token');
   });
   it('rejects when provider returns sub literal "undefined"', async () => {
     mockVerifyIdToken.mockResolvedValue({
@@ -257,7 +254,7 @@ describe('AuthService.signInWithIdToken – apple', () => {
       email: 'x@example.com',
     });
     await expect(authService.signInWithIdToken('apple', 'valid-apple-token')).rejects.toThrow(
-      new AppError('Invalid Apple ID token: missing sub claim', 400, 'INVALID_INPUT')
+      'Invalid Apple ID token: missing sub claim'
     );
   });
 });
