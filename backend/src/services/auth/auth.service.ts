@@ -1163,7 +1163,11 @@ export class AuthService {
             .map((s: string) => s.trim())
             .filter(Boolean);
           if (!allowed.includes(requestedAudience)) {
-            throw new AppError('Audience is not allowed for Apple ID token', 400, ERROR_CODES.INVALID_INPUT);
+            throw new AppError(
+              'Audience is not allowed for Apple ID token',
+              400,
+              ERROR_CODES.INVALID_INPUT
+            );
           }
         }
 

@@ -494,7 +494,11 @@ router.post('/id-token', async (req: Request, res: Response, next: NextFunction)
         .map((s) => s.trim())
         .filter(Boolean);
       if (!allowed.includes(audience)) {
-        throw new AppError('Audience is not allowed for Apple ID token', 400, ERROR_CODES.INVALID_INPUT);
+        throw new AppError(
+          'Audience is not allowed for Apple ID token',
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
       }
     }
 
