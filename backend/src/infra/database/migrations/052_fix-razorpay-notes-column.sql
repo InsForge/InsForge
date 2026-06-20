@@ -16,6 +16,7 @@ BEGIN
       WHERE table_schema = 'payments' AND table_name = 'razorpay_plans' AND column_name = 'notes'
     ) THEN
       ALTER TABLE payments.razorpay_plans RENAME COLUMN metadata TO notes;
+      UPDATE payments.razorpay_plans SET notes = '{}'::JSONB WHERE notes IS NULL;
       ALTER TABLE payments.razorpay_plans
         ALTER COLUMN notes SET NOT NULL,
         ALTER COLUMN notes SET DEFAULT '{}'::JSONB;
@@ -37,6 +38,7 @@ BEGIN
       WHERE table_schema = 'payments' AND table_name = 'razorpay_subscriptions' AND column_name = 'notes'
     ) THEN
       ALTER TABLE payments.razorpay_subscriptions RENAME COLUMN metadata TO notes;
+      UPDATE payments.razorpay_subscriptions SET notes = '{}'::JSONB WHERE notes IS NULL;
       ALTER TABLE payments.razorpay_subscriptions
         ALTER COLUMN notes SET NOT NULL,
         ALTER COLUMN notes SET DEFAULT '{}'::JSONB;
@@ -58,6 +60,7 @@ BEGIN
       WHERE table_schema = 'payments' AND table_name = 'razorpay_orders' AND column_name = 'notes'
     ) THEN
       ALTER TABLE payments.razorpay_orders RENAME COLUMN metadata TO notes;
+      UPDATE payments.razorpay_orders SET notes = '{}'::JSONB WHERE notes IS NULL;
       ALTER TABLE payments.razorpay_orders
         ALTER COLUMN notes SET NOT NULL,
         ALTER COLUMN notes SET DEFAULT '{}'::JSONB;
