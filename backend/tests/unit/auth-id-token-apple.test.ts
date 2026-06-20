@@ -107,6 +107,11 @@ vi.mock('../../src/infra/config/app.config', () => ({
     app: { jwtSecret: 'test-secret', name: 'test' },
     cloud: { projectId: null },
   },
+  appConfig: {
+    auth: { rootAdminUsername: 'admin@test.com', rootAdminPassword: 'admin-password' },
+    app: { jwtSecret: 'test-secret', name: 'test' },
+    cloud: { projectId: null },
+  },
   getApiBaseUrl: () => 'http://localhost:3000',
 }));
 
