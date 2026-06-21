@@ -79,6 +79,11 @@ services:
       - POSTGREST_BASE_URL=http://postgrest:3000
       # LLM Model API keys
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      # Optional prompt-compression sidecar (see the "compression" service and
+      # ../compression/README.md). Empty = off; enable: http://compression:8459
+      - AI_COMPRESSION_URL=${AI_COMPRESSION_URL:-}
+      - AI_COMPRESSION_TIMEOUT_MS=${AI_COMPRESSION_TIMEOUT_MS:-}
+      - AI_COMPRESSION_MIN_CHARS=${AI_COMPRESSION_MIN_CHARS:-}
       # Stripe Payments Configuration
       - STRIPE_TEST_SECRET_KEY=${STRIPE_TEST_SECRET_KEY:-}
       - STRIPE_LIVE_SECRET_KEY=${STRIPE_LIVE_SECRET_KEY:-}
@@ -147,6 +152,24 @@ services:
       retries: 5
       start_period: 15s
     restart: unless-stopped
+    networks:
+      - insforge-network
+
+  # Optional leanctx prompt-compression sidecar for the Model Gateway.
+  # Off by default — started only via the "compression" profile:
+  #   docker compose --profile compression up -d --build compression
+  # Then set AI_COMPRESSION_URL=http://compression:8459 in your .env.
+  # See ../compression/README.md.
+  compression:
+    build:
+      context: ../compression
+    image: insforge-compression
+    profiles: ["compression"]
+    ports:
+      - "${AI_COMPRESSION_PORT:-8459}:8459"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     networks:
       - insforge-network
 
