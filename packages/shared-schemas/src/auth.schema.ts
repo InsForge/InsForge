@@ -21,6 +21,12 @@ export const nameSchema = z
   .max(100, 'Name must be less than 100 characters')
   .trim();
 
+export const usernameSchema = z
+  .string()
+  .trim()
+  .min(1, 'Username is required')
+  .max(100, 'Username must be at most 100 characters');
+
 export const roleSchema = z.enum(['anon', 'authenticated', 'project_admin']);
 
 export const verificationMethodSchema = z.enum(['code', 'link']);
@@ -32,7 +38,6 @@ export const verificationMethodSchema = z.enum(['code', 'link']);
 export const profileSchema = z
   .object({
     name: z.string().optional(),
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     avatar_url: z.string().url().optional(),
   })
   .passthrough();
@@ -53,6 +58,10 @@ export const userSchema = z.object({
   updatedAt: z.string(), // PostgreSQL timestamp
   profile: profileSchema.nullable(), // User profile data (name, avatar_url, bio, etc.)
   metadata: z.record(z.unknown()).nullable(), // System metadata (device ID, login IP, etc.)
+});
+
+export const adminSchema = z.object({
+  sub: z.string().min(1),
 });
 
 /**
@@ -166,8 +175,8 @@ export const emailTemplateSchema = z.object({
  * JWT token payload schema
  */
 export const tokenPayloadSchema = z.object({
-  sub: userIdSchema, // Subject (user ID)
-  email: emailSchema,
+  sub: z.string().min(1), // Subject: user ID for users, namespaced subject for project admins
+  email: emailSchema.optional(),
   role: roleSchema,
   iat: z.number().optional(), // Issued at
   exp: z.number().optional(), // Expiration
@@ -180,10 +189,12 @@ export const tokenPayloadSchema = z.object({
 export type UserIdSchema = z.infer<typeof userIdSchema>;
 export type EmailSchema = z.infer<typeof emailSchema>;
 export type PasswordSchema = z.infer<typeof passwordSchema>;
+export type UsernameSchema = z.infer<typeof usernameSchema>;
 export type RoleSchema = z.infer<typeof roleSchema>;
 export type VerificationMethodSchema = z.infer<typeof verificationMethodSchema>;
 export type ProfileSchema = z.infer<typeof profileSchema>;
 export type UserSchema = z.infer<typeof userSchema>;
+export type AdminSchema = z.infer<typeof adminSchema>;
 export type TokenPayloadSchema = z.infer<typeof tokenPayloadSchema>;
 export type OAuthConfigSchema = z.infer<typeof oAuthConfigSchema>;
 export type OAuthProvidersSchema = z.infer<typeof oAuthProvidersSchema>;
