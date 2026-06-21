@@ -10,6 +10,7 @@ import {
 import logger from '@/utils/logger.js';
 import { ChatCompletionOptions } from '@/types/ai.js';
 import { AppError } from '@/utils/errors.js';
+import { compressMessages } from '@/services/ai/prompt-compression.service.js';
 
 // OpenRouter plugin type for web search
 interface OpenRouterWebPlugin {
@@ -258,7 +259,9 @@ export class ChatCompletionService {
       // Build model ID with optional :thinking suffix
       const modelId = this.buildModelId(options.model, options.thinking);
 
-      const formattedMessages = this.formatMessages(messages);
+      // Optionally shrink prompt prose via the leanctx sidecar before the
+      // upstream call (no-op unless AI_COMPRESSION_URL is set; always fail-open).
+      const formattedMessages = await compressMessages(this.formatMessages(messages));
 
       // Build request with optional plugins (web search, file parser)
       const request: OpenRouterChatCompletionRequest = {
@@ -354,7 +357,9 @@ export class ChatCompletionService {
       // Build model ID with optional :thinking suffix
       const modelId = this.buildModelId(options.model, options.thinking);
 
-      const formattedMessages = this.formatMessages(messages);
+      // Optionally shrink prompt prose via the leanctx sidecar before the
+      // upstream call (no-op unless AI_COMPRESSION_URL is set; always fail-open).
+      const formattedMessages = await compressMessages(this.formatMessages(messages));
 
       // Build request with optional plugins (web search, file parser)
       const request: OpenRouterChatCompletionStreamingRequest = {

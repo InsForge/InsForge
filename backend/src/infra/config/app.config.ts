@@ -97,6 +97,12 @@ export interface AppConfig {
   };
   ai: {
     openrouterApiKey: string | undefined;
+    /** Optional leanctx compression sidecar base URL; unset → compression off. */
+    compressionUrl: string | undefined;
+    /** Per-request timeout (ms) for the compression sidecar call. */
+    compressionTimeoutMs: number;
+    /** Skip the sidecar unless the request's string content exceeds this many chars. */
+    compressionMinChars: number;
   };
 }
 
@@ -201,6 +207,10 @@ export function loadConfig(): AppConfig {
     },
     ai: {
       openrouterApiKey: process.env.OPENROUTER_API_KEY || undefined,
+      // Optional leanctx compression sidecar for the Model Gateway (default off).
+      compressionUrl: process.env.AI_COMPRESSION_URL || undefined,
+      compressionTimeoutMs: parseEnvInt(process.env.AI_COMPRESSION_TIMEOUT_MS, 2000),
+      compressionMinChars: parseEnvInt(process.env.AI_COMPRESSION_MIN_CHARS, 6000),
     },
   };
 }
