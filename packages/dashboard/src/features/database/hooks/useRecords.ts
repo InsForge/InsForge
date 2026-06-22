@@ -53,13 +53,14 @@ export function useRecords(tableName: string, schemaName: string = DEFAULT_DATAB
     });
   };
 
-  // Hook to fetch a single record by foreign key value
-  const useRecordByForeignKey = (columnName: string, value: string, enabled = true) => {
+  // Hook to fetch a single record by foreign key value(s).
+  // Supports composite foreign keys via parallel arrays of columns and values.
+  const useRecordByForeignKey = (columns: string[], values: string[], enabled = true) => {
     return useQuery({
-      queryKey: ['records', schemaName, tableName, 'foreignKey', columnName, value],
+      queryKey: ['records', schemaName, tableName, 'foreignKey', ...columns, ...values],
       queryFn: () =>
-        recordService.getRecordByForeignKeyValue(tableName, columnName, value, schemaName),
-      enabled: enabled && !!tableName && !!columnName && !!value,
+        recordService.getRecordByForeignKeyValue(tableName, columns, values, schemaName),
+      enabled: enabled && !!tableName && columns.length > 0 && columns.length === values.length,
       staleTime: 30 * 1000,
     });
   };

@@ -9,6 +9,7 @@ import {
   PopoverTrigger,
   ConvertedValue,
   DataGrid,
+  type DatabaseRecord,
 } from '#components';
 import { useTables } from '#features/database/hooks/useTables';
 import { useRecords } from '#features/database/hooks/useRecords';
@@ -25,12 +26,13 @@ interface ForeignKeyCellProps {
   value: string;
   foreignKey: {
     table: string;
-    column: string;
+    columns: { sourceColumn: string; referenceColumn: string }[];
   };
+  row: DatabaseRecord;
   onJumpToTable?: (tableName: string, schemaName?: string) => void;
 }
 
-export function ForeignKeyCell({ value, foreignKey, onJumpToTable }: ForeignKeyCellProps) {
+export function ForeignKeyCell({ value, foreignKey, row, onJumpToTable }: ForeignKeyCellProps) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const isAuthUsers = foreignKey.table === AUTH_USERS_TABLE;
@@ -48,21 +50,33 @@ export function ForeignKeyCell({ value, foreignKey, onJumpToTable }: ForeignKeyC
     return formatValueForDisplay(val);
   };
 
-  // Fetch the referenced record when popover opens
-  const searchValue = value ? renderValue(value) : '';
+  // Guard: all FK column entries must have both sourceColumn and referenceColumn
+  const hasValidColumns = foreignKey.columns.every(
+    (c) => c.sourceColumn && c.referenceColumn
+  );
 
-  // For auth.users, fetch user by ID
+  // Collect all FK column values from the current row for multi-column lookup
+  const lookupColumns = hasValidColumns ? foreignKey.columns.map((c) => c.referenceColumn) : [];
+  const lookupValues = hasValidColumns
+    ? foreignKey.columns.map((c) => {
+        const raw = row[c.sourceColumn];
+        return raw !== null && raw !== undefined ? String(raw) : '';
+      })
+    : [];
+
+  // For auth.users, fetch user by ID (single-column lookup)
+  const searchValue = value ? renderValue(value) : '';
   const { data: authUserData, error: authUserError } = useQuery({
     queryKey: ['user', searchValue],
     queryFn: () => getUser(searchValue),
     enabled: isAuthUsers && open && !!value,
   });
 
-  // For regular tables, fetch by foreign key
+  // For regular tables, fetch by foreign key (supports composite)
   const { data: recordData, error: recordError } = recordsHook.useRecordByForeignKey(
-    foreignKey.column,
-    searchValue,
-    !isAuthUsers && open && !!value
+    lookupColumns,
+    lookupValues,
+    !isAuthUsers && open && hasValidColumns && lookupValues.every((v) => !!v)
   );
 
   // Use appropriate data source based on table type
@@ -143,7 +157,7 @@ export function ForeignKeyCell({ value, foreignKey, onJumpToTable }: ForeignKeyC
                   Referencing record from
                 </span>
                 <TypeBadge
-                  type={`${foreignKey.table}.${foreignKey.column}`}
+                  type={`${foreignKey.table}.${foreignKey.columns.map((c) => c.referenceColumn).join(',')}`}
                   className="dark:bg-neutral-800"
                 />
               </div>

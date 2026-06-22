@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Control, Controller, FieldError, UseFormReturn } from 'react-hook-form';
+import { Control, Controller, FieldError, UseFormReturn, UseFormSetValue } from 'react-hook-form';
 import { Calendar, Clock, Link2, X } from 'lucide-react';
 import { Button, Input, cn } from '@insforge/ui';
 import {
@@ -244,10 +244,11 @@ function FieldLabel({ field, tableName }: { field: ColumnSchema; tableName: stri
 interface FieldWithLinkProps {
   field: ColumnSchema;
   control: Control<DatabaseRecord>;
+  setValue: UseFormSetValue<DatabaseRecord>;
   children: ReactNode;
 }
 
-function FieldWithLink({ field, control, children }: FieldWithLinkProps) {
+function FieldWithLink({ field, control, setValue, children }: FieldWithLinkProps) {
   if (!field.foreignKey) {
     return <>{children}</>;
   }
@@ -272,7 +273,14 @@ function FieldWithLink({ field, control, children }: FieldWithLinkProps) {
                 type="button"
                 variant="secondary"
                 size="icon"
-                onClick={() => formField.onChange('')}
+                onClick={() => {
+                  formField.onChange('');
+                  for (const refCol of foreignKey.referenceColumns) {
+                    if (refCol.sourceColumn !== field.columnName) {
+                      setValue(refCol.sourceColumn, '');
+                    }
+                  }
+                }}
                 className="h-8 w-8 shrink-0 rounded border border-[var(--alpha-8)] bg-card p-0"
                 title="Clear linked record"
               >
@@ -281,14 +289,17 @@ function FieldWithLink({ field, control, children }: FieldWithLinkProps) {
             )}
             <LinkRecordDialog
               referenceTable={foreignKey.referenceTable}
-              referenceColumn={foreignKey.referenceColumn}
+              fkColumns={foreignKey.referenceColumns}
               onSelectRecord={(record: DatabaseRecord) => {
-                const referenceValue = record[foreignKey.referenceColumn];
-                const result = convertValueForColumn(field.type, String(referenceValue || ''));
-                if (result.success) {
-                  formField.onChange(result.value);
-                } else {
-                  formField.onChange(String(referenceValue || ''));
+                for (const refCol of foreignKey.referenceColumns) {
+                  const refValue = record[refCol.referenceColumn];
+                  const converted = convertValueForColumn(field.type, String(refValue || ''));
+                  const val = converted.success ? converted.value : String(refValue || '');
+                  if (refCol.sourceColumn === field.columnName) {
+                    formField.onChange(val);
+                  } else {
+                    setValue(refCol.sourceColumn, val);
+                  }
                 }
               }}
             >
@@ -319,6 +330,7 @@ function FieldWithLink({ field, control, children }: FieldWithLinkProps) {
 export function RecordFormField({ field, form, tableName }: RecordFormFieldProps) {
   const {
     control,
+    setValue,
     formState: { errors },
   } = form;
 
@@ -452,7 +464,7 @@ export function RecordFormField({ field, form, tableName }: RecordFormFieldProps
       <FieldLabel field={field} tableName={tableName} />
 
       <div className="min-w-0 space-y-1">
-        <FieldWithLink field={field} control={control}>
+        <FieldWithLink field={field} control={control} setValue={setValue}>
           {renderInput()}
         </FieldWithLink>
 
@@ -460,7 +472,7 @@ export function RecordFormField({ field, form, tableName }: RecordFormFieldProps
           <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
             <span className="truncate">Has a Foreign Key relation to</span>
             <FormMetaBadge>
-              {field.foreignKey.referenceTable}.{field.foreignKey.referenceColumn}
+              {field.foreignKey.referenceTable}.{field.foreignKey.referenceColumns.map((c) => c.referenceColumn).join(',')}
             </FormMetaBadge>
           </div>
         )}
