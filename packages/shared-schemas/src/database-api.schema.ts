@@ -275,10 +275,22 @@ export const adminTableRecordsListQuerySchema = z
     }
   );
 
-export const adminTableRecordLookupQuerySchema = z.object({
-  column: z.string().trim().min(1, 'Column is required'),
-  value: z.string(),
-});
+export const adminTableRecordLookupQuerySchema = z
+  .object({
+    column: z.union([z.string().trim().min(1), z.array(z.string().trim().min(1))]),
+    value: z.union([z.string().trim().min(1), z.array(z.string().trim().min(1))]),
+  })
+  .refine(
+    (data) => {
+      const cols = Array.isArray(data.column) ? data.column : [data.column];
+      const vals = Array.isArray(data.value) ? data.value : [data.value];
+      return cols.length === vals.length;
+    },
+    {
+      message: 'column and value must have the same number of entries',
+      path: ['value'],
+    }
+  );
 
 export const adminTableRecordsCreateRequestSchema = z
   .array(adminTableRecordSchema)
