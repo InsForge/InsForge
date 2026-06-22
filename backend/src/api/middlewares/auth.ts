@@ -4,7 +4,6 @@ import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES, type RoleSchema } from '@insforge/shared-schemas';
 import { NEXT_ACTIONS } from '../../utils/next-actions.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
-import logger from '@/utils/logger.js';
 
 export type UserContext = {
   /**
@@ -105,37 +104,6 @@ export async function verifyUser(req: AuthRequest, res: Response, next: NextFunc
   // Anything else (including no credentials) goes through JWT verification,
   // which produces the canonical 401 when the header is missing or invalid
   return verifyToken(req, res, next);
-}
-
-/**
- * Like verifyUser but doesn't require credentials.
- * - API key / anon key: verified same as verifyUser
- * - No credentials or invalid: proceeds without auth (adminCreatingUser = false)
- * - JWT: verified and proceeds (authenticated user)
- */
-export async function verifyOptionalUser(req: AuthRequest, res: Response, next: NextFunction) {
-  const apiKey = extractApiKey(req);
-  if (apiKey) {
-    return verifyApiKey(req, res, next);
-  }
-
-  const bearerToken = extractBearerToken(req.headers.authorization);
-  if (bearerToken) {
-    if (bearerToken.startsWith('anon_')) {
-      return verifyAnonKey(req, res, next);
-    }
-    try {
-      const payload = tokenManager.verifyToken(bearerToken);
-      setRequestUser(req, payload);
-    } catch (error) {
-      logger.debug('JWT verification failed in verifyOptionalUser, proceeding without auth', {
-        error,
-      });
-    }
-  }
-
-  // No credentials or auth failed → proceed as unauthenticated (anonymous registration)
-  next();
 }
 
 /**

@@ -118,15 +118,31 @@ register_test_bucket() {
     TEST_BUCKETS_CREATED+=("$bucket_name")
 }
 
+# Function to get the public anon key from the metadata endpoint (requires admin auth)
+get_anon_key() {
+    local admin_token
+    admin_token=$(get_admin_token)
+    if [ -z "$admin_token" ]; then
+        echo ""
+        return 1
+    fi
+    local response
+    response=$(curl -s "$TEST_API_BASE/metadata/anon-key" \
+        -H "Authorization: Bearer $admin_token")
+    echo "$response" | grep -o '"anonKey":"[^"]*"' | cut -d'"' -f4
+}
+
 # Function to register a user with Better Auth
 register_user() {
     local email=$1
     local password=$2
     local name=${3:-"Test User"}
+    local anon_key="${4:-${ACCESS_ANON_KEY:-$(get_anon_key)}}"
     
-    # Use JWT registration
+    # Use JWT registration (requires anon key in Authorization header)
     curl -s -X POST "$TEST_API_BASE/auth/users" \
         -H "Content-Type: application/json" \
+        -H "Authorization: Bearer $anon_key" \
         -d "{\"email\":\"$email\",\"password\":\"$password\",\"name\":\"$name\"}"
 }
 

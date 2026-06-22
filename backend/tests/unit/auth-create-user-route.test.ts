@@ -190,6 +190,22 @@ describe('POST /api/auth/users – disableSignup gate', () => {
     expect(mocks.register.mock.calls[0][4]).toMatchObject({ isAdminCreation: false });
   });
 
+  it('returns 401 when no credentials are provided', async () => {
+    mocks.verifyUser.mockImplementation((_req, res) => {
+      res.status(401).json({
+        error: 'AUTH_INVALID_CREDENTIALS',
+        message: 'No token provided',
+        statusCode: 401,
+      });
+    });
+
+    const response = await callRoute(router, { body: validBody });
+
+    expect(response.statusCode).toBe(401);
+    expect((response.body as Record<string, unknown>).error).toBe('AUTH_INVALID_CREDENTIALS');
+    expect(mocks.register).not.toHaveBeenCalled();
+  });
+
   it('returns 400 for invalid request body', async () => {
     mocks.verifyUser.mockImplementation((req, _res, next) => {
       req.user = { id: 'anonymous', role: 'anon' };
