@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { DataGridEmptyState, EmptyState, TableHeader } from '#components';
 import { LogsDataGrid, type LogsColumnDef } from '#features/logs/components';
 import { useMcpUsage } from '#features/logs/hooks/useMcpUsage';
+import type { McpUsageRecord } from '#features/logs/services/usage.service';
 import { formatTime } from '#lib/utils/utils';
 import { usePageSize } from '#lib/hooks/usePageSize';
 
@@ -24,7 +25,7 @@ export default function MCPLogsPage() {
     error: mcpError,
   } = useMcpUsage({ successFilter: null, pageSize });
 
-  const mcpColumns: LogsColumnDef[] = useMemo(
+  const mcpColumns: LogsColumnDef<McpUsageRecord>[] = useMemo(
     () => [
       {
         key: 'tool_name',

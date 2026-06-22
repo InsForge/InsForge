@@ -5,8 +5,9 @@ import type {
   PaymentProvider,
   RazorpayConnection,
 } from '@insforge/shared-schemas';
-import { paymentsService } from '#features/payments/services/payments.service';
+import { stripeService } from '#features/payments/services/stripe.service';
 import { razorpayService } from '#features/payments/services/razorpay.service';
+import { razorpayQueryKeys, stripeQueryKeys } from '#features/payments/queryKeys';
 
 const TRANSACTIONS_LIMIT = 100;
 
@@ -21,8 +22,8 @@ export function usePaymentTransactions(provider: PaymentProvider, environment: P
     refetch: refetchStatus,
     isFetching: isFetchingStatus,
   } = useQuery({
-    queryKey: ['payments', 'status'],
-    queryFn: () => paymentsService.getStatus(),
+    queryKey: stripeQueryKeys.status,
+    queryFn: () => stripeService.getStatus(),
     enabled: isStripeProvider,
     staleTime: 30 * 1000,
   });
@@ -34,7 +35,7 @@ export function usePaymentTransactions(provider: PaymentProvider, environment: P
     refetch: refetchRazorpayStatus,
     isFetching: isFetchingRazorpayStatus,
   } = useQuery({
-    queryKey: ['payments', 'razorpay', 'status'],
+    queryKey: razorpayQueryKeys.status,
     queryFn: () => razorpayService.getStatus(),
     enabled: isRazorpayProvider,
     staleTime: 30 * 1000,
@@ -70,9 +71,9 @@ export function usePaymentTransactions(provider: PaymentProvider, environment: P
     refetch: refetchStripeTransactions,
     isFetching: isFetchingStripeTransactions,
   } = useQuery({
-    queryKey: ['payments', 'stripe', 'transactions', environment],
+    queryKey: stripeQueryKeys.transactionsByEnvironment(environment),
     queryFn: () =>
-      paymentsService.listTransactions({
+      stripeService.listTransactions({
         environment,
         limit: TRANSACTIONS_LIMIT,
       }),
@@ -87,7 +88,7 @@ export function usePaymentTransactions(provider: PaymentProvider, environment: P
     refetch: refetchRazorpayTransactions,
     isFetching: isFetchingRazorpayTransactions,
   } = useQuery({
-    queryKey: ['payments', 'razorpay', 'transactions', environment],
+    queryKey: razorpayQueryKeys.transactionsByEnvironment(environment),
     queryFn: () =>
       razorpayService.listTransactions({
         environment,

@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { Button, ConfirmDialog } from '@insforge/ui';
+import { Button, ConfirmDialog, cn } from '@insforge/ui';
 import {
   DataGrid,
   type DataGridProps,
@@ -24,7 +24,7 @@ import {
   Folder,
 } from 'lucide-react';
 import { StorageFileSchema } from '@insforge/shared-schemas';
-import { cn, formatTime } from '#lib/utils/utils';
+import { formatTime } from '#lib/utils/utils';
 import { useStorageObjects } from '#features/storage/hooks/useStorageObjects';
 import { FilePreviewDialog } from './FilePreviewDialog';
 import { useConfirm } from '#lib/hooks/useConfirm';
@@ -51,11 +51,10 @@ function formatFileSize(bytes: number) {
 
 // Custom cell renderers for storage files
 const FileNameRenderer = ({ row, column }: RenderCellProps<StorageDataGridRow>) => {
-  const fullPath = String(row[column.key] || '');
-  const fileName = fullPath.split('/').pop() || fullPath;
+  const objectKey = String(row[column.key] || '');
   return (
-    <span className="truncate text-[13px] leading-[18px] text-foreground" title={fullPath}>
-      {fileName}
+    <span className="truncate text-[13px] leading-[18px] text-foreground" title={objectKey}>
+      {objectKey}
     </span>
   );
 };

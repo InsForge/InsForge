@@ -1,5 +1,5 @@
 import emptyStateUrl from '#assets/images/empty_state.png';
-import { cn } from '#lib/utils/utils';
+import { cn } from '@insforge/ui';
 
 interface EmptyStateIllustrationProps {
   className?: string;

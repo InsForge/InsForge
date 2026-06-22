@@ -1,5 +1,5 @@
 import { Box, Rocket, Settings } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@insforge/ui';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, cn } from '@insforge/ui';
 import type { PaymentEnvironment, PaymentProvider } from '@insforge/shared-schemas';
 import {
   FeatureSidebar,
@@ -8,7 +8,6 @@ import {
 } from '#components';
 import { PaymentProviderSelect } from './PaymentProviderSelect';
 import { usePaymentConnectionStatus } from '#features/payments/hooks/usePaymentConnectionStatus';
-import { cn } from '#lib/utils/utils';
 
 const PAYMENT_ENVIRONMENT_LABELS: Record<PaymentEnvironment, string> = {
   test: 'Test Environment',

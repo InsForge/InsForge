@@ -17,6 +17,7 @@ import { SQLModal, SQLCellButton } from '#features/database/components/SQLModal'
 import { DatabaseStudioSidebarPanel } from '#features/database/components/DatabaseSidebar';
 import { type DatabaseTriggersResponse } from '@insforge/shared-schemas';
 import { DatabaseSchemaSelect } from '#features/database/components/DatabaseSchemaSelect';
+import { usePageSize } from '#lib/hooks/usePageSize';
 import { DEFAULT_DATABASE_SCHEMA, getDatabaseSchemaInfo } from '#features/database/helpers';
 
 interface TriggerRow extends DataGridRowType {
@@ -60,6 +61,8 @@ export default function TriggersPage() {
   const selectedSchemaInfo = getDatabaseSchemaInfo(schemas, selectedSchema);
   const { data, isLoading, error, refetch } = useTriggers(selectedSchema, true);
   const [sqlModal, setSqlModal] = useState({ open: false, title: '', value: '' });
+  const { pageSize, pageSizeOptions, onPageSizeChange } = usePageSize('db-triggers');
+  const [currentPage, setCurrentPage] = useState(1);
 
   const allTriggers = useMemo(() => parseTriggersFromResponse(data), [data]);
 
@@ -76,10 +79,23 @@ export default function TriggersPage() {
     );
   }, [allTriggers, searchQuery]);
 
+  const totalPages = Math.ceil(filteredTriggers.length / pageSize);
+  const safeCurrentPage = Math.min(currentPage, Math.max(1, totalPages));
+
+  const paginatedTriggers = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filteredTriggers.slice(start, start + pageSize);
+  }, [filteredTriggers, safeCurrentPage, pageSize]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedSchema, pageSize]);
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
       setSearchQuery('');
+      setCurrentPage(1);
       await refetch();
     } finally {
       setIsRefreshing(false);
@@ -229,6 +245,7 @@ export default function TriggersPage() {
                 value={selectedSchemaInfo.name}
                 onValueChange={(schemaName) => {
                   setSearchQuery('');
+                  setCurrentPage(1);
                   setSelectedSchema(schemaName, { replace: true });
                 }}
                 disabled={isLoadingSchemas}
@@ -247,10 +264,18 @@ export default function TriggersPage() {
         ) : (
           <div className="min-h-0 flex-1 overflow-hidden">
             <DataGrid
-              data={filteredTriggers}
+              data={paginatedTriggers}
               columns={columns}
               showSelection={false}
-              showPagination={false}
+              showPagination={true}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              pageSizeOptions={pageSizeOptions}
+              totalRecords={filteredTriggers.length}
+              paginationRecordLabel="triggers"
+              onPageChange={setCurrentPage}
+              onPageSizeChange={onPageSizeChange}
               noPadding={true}
               className="h-full"
               isRefreshing={isRefreshing}

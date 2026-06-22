@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import RefreshIcon from '#assets/icons/refresh.svg?react';
 import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -11,6 +11,7 @@ import {
   type DataGridRowType,
 } from '#components';
 import { formatTime } from '#lib/utils/utils';
+import { usePageSize } from '#lib/hooks/usePageSize';
 import type { DatabaseMigrationsResponse } from '@insforge/shared-schemas';
 import { DatabaseStudioSidebarPanel } from '#features/database/components/DatabaseSidebar';
 import { SQLCellButton, SQLModal } from '#features/database/components/SQLModal';
@@ -55,6 +56,8 @@ export default function MigrationsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [sqlModal, setSqlModal] = useState({ open: false, title: '', value: '' });
   const { data, isLoading, error, refetch } = useMigrations(true);
+  const { pageSize, pageSizeOptions, onPageSizeChange } = usePageSize('db-migrations');
+  const [currentPage, setCurrentPage] = useState(1);
 
   const allMigrations = useMemo(() => parseMigrationsFromResponse(data), [data]);
 
@@ -70,10 +73,23 @@ export default function MigrationsPage() {
     );
   }, [allMigrations, searchQuery]);
 
+  const totalPages = Math.ceil(filteredMigrations.length / pageSize);
+  const safeCurrentPage = Math.min(currentPage, Math.max(1, totalPages));
+
+  const paginatedMigrations = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filteredMigrations.slice(start, start + pageSize);
+  }, [filteredMigrations, safeCurrentPage, pageSize]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, pageSize]);
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
       setSearchQuery('');
+      setCurrentPage(1);
       await refetch();
     } finally {
       setIsRefreshing(false);
@@ -202,10 +218,18 @@ export default function MigrationsPage() {
         ) : (
           <div className="min-h-0 flex-1 overflow-hidden">
             <DataGrid
-              data={filteredMigrations}
+              data={paginatedMigrations}
               columns={columns}
               showSelection={false}
-              showPagination={false}
+              showPagination={true}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              pageSizeOptions={pageSizeOptions}
+              totalRecords={filteredMigrations.length}
+              paginationRecordLabel="migrations"
+              onPageChange={setCurrentPage}
+              onPageSizeChange={onPageSizeChange}
               noPadding={true}
               className="h-full"
               isRefreshing={isRefreshing}

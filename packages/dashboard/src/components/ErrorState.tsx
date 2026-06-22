@@ -1,7 +1,6 @@
 import { AlertCircle } from 'lucide-react';
-import { Button } from '@insforge/ui';
+import { Button, cn } from '@insforge/ui';
 import { Alert, AlertTitle, AlertDescription } from './';
-import { cn } from '#lib/utils/utils';
 
 interface ErrorStateProps {
   error: Error | string;

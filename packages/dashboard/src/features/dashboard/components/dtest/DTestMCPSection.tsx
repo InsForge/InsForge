@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { CopyButton } from '@insforge/ui';
+import { CopyButton, cn } from '@insforge/ui';
 import {
   MCP_AGENTS,
   GenerateInstallCommand,
@@ -10,7 +10,6 @@ import {
 } from '#features/dashboard/components/connect/mcp/helpers';
 import { MCP_VERIFY_CONNECTION_PROMPT } from '#features/dashboard/components/connect/constants';
 import { QuickStartPromptCard } from './QuickStartPromptCard';
-import { cn } from '#lib/utils/utils';
 
 function buildMcpDeeplink(agentId: string, apiKey: string, appUrl: string): string | null {
   const config = createMCPServerConfig(apiKey, 'macos-linux' as PlatformType, appUrl);

@@ -2,6 +2,7 @@ import type { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { getBillingSubjectFromProviderAttributes } from '@/services/payments/helpers.js';
 import { RazorpayConfigService } from '@/services/payments/razorpay/config.service.js';
+import { WebhookStoreService } from '@/services/payments/webhook-store.service.js';
 import {
   RazorpayTransactionService,
   type RazorpayTransactionStatus,
@@ -28,8 +29,8 @@ export interface RazorpayWebhookEventRow {
   processingStatus: RazorpayWebhookProcessingStatus;
   attemptCount: number;
   lastError: string | null;
-  receivedAt: string;
-  processedAt: string | null;
+  receivedAt: Date | string;
+  processedAt: Date | string | null;
 }
 
 interface ShouldProcessResult {
@@ -47,6 +48,7 @@ export class RazorpayWebhookService {
   private pool: Pool | null = null;
   private readonly configService = RazorpayConfigService.getInstance();
   private readonly transactionService = RazorpayTransactionService.getInstance();
+  private readonly webhookStore = WebhookStoreService.getInstance();
 
   static getInstance(): RazorpayWebhookService {
     if (!RazorpayWebhookService.instance) {
@@ -156,91 +158,24 @@ export class RazorpayWebhookService {
     eventType: string,
     payload: RazorpayWebhookPayload
   ): Promise<ShouldProcessResult> {
-    const pendingReclaimCutoff = new Date(Date.now() - 5 * 60 * 1000); // 5 minutes
-
-    const insertResult = await this.getPool().query<RazorpayWebhookEventRow>(
-      `INSERT INTO payments.webhook_events
-         (provider, environment, provider_event_id, event_type, livemode,
-          processing_status, attempt_count, received_at, payload)
-       VALUES ('razorpay', $1, $2, $3, $4, 'pending', 1, NOW(), $5)
-       ON CONFLICT (provider, environment, provider_event_id) DO NOTHING
-       RETURNING
-         id,
-         environment,
-         provider_event_id  AS "eventId",
-         event_type         AS "eventType",
-         processing_status  AS "processingStatus",
-         attempt_count      AS "attemptCount",
-         last_error         AS "lastError",
-         received_at        AS "receivedAt",
-         processed_at       AS "processedAt"`,
-      [environment, eventId, eventType, environment === 'live', payload]
-    );
-
-    const inserted = insertResult.rows[0];
-    if (inserted) {
-      return { row: inserted, shouldProcess: true };
-    }
-
-    const retryResult = await this.getPool().query<RazorpayWebhookEventRow>(
-      `UPDATE payments.webhook_events
-       SET processing_status = 'pending',
-           attempt_count = attempt_count + 1,
-           last_error = NULL,
-           processed_at = NULL,
-           payload = $4,
-           updated_at = NOW()
-       WHERE environment = $1
-         AND provider = 'razorpay'
-         AND provider_event_id = $2
-         AND (
-           processing_status = 'failed'
-           OR (processing_status = 'pending' AND updated_at < $3)
-         )
-       RETURNING
-         id,
-         environment,
-         provider_event_id  AS "eventId",
-         event_type         AS "eventType",
-         processing_status  AS "processingStatus",
-         attempt_count      AS "attemptCount",
-         last_error         AS "lastError",
-         received_at        AS "receivedAt",
-         processed_at       AS "processedAt"`,
-      [environment, eventId, pendingReclaimCutoff, payload]
-    );
-
-    const retried = retryResult.rows[0];
-    if (retried) {
-      return { row: retried, shouldProcess: true };
-    }
-
-    const existingResult = await this.getPool().query<RazorpayWebhookEventRow>(
-      `SELECT
-         id,
-         environment,
-         provider_event_id  AS "eventId",
-         event_type         AS "eventType",
-         processing_status  AS "processingStatus",
-         attempt_count      AS "attemptCount",
-         last_error         AS "lastError",
-         received_at        AS "receivedAt",
-         processed_at       AS "processedAt"
-       FROM payments.webhook_events
-       WHERE provider = 'razorpay'
-         AND environment = $1
-         AND provider_event_id = $2`,
-      [environment, eventId]
-    );
-
-    const row = existingResult.rows[0] as RazorpayWebhookEventRow;
-    logger.info('Razorpay webhook event already processed or currently processing; skipping', {
+    const result = await this.webhookStore.recordStart({
+      provider: 'razorpay',
       environment,
       eventId,
       eventType,
+      livemode: environment === 'live',
+      payload,
     });
 
-    return { shouldProcess: false, row };
+    if (!result.shouldProcess) {
+      logger.info('Razorpay webhook event already processed or currently processing; skipping', {
+        environment,
+        eventId,
+        eventType,
+      });
+    }
+
+    return result;
   }
 
   async markWebhookEvent(
@@ -249,29 +184,7 @@ export class RazorpayWebhookService {
     status: RazorpayWebhookProcessingStatus,
     error: string | null
   ): Promise<RazorpayWebhookEventRow> {
-    const result = await this.getPool().query<RazorpayWebhookEventRow>(
-      `UPDATE payments.webhook_events
-       SET processing_status = $3,
-           last_error        = $4,
-           processed_at      = CASE WHEN $3 IN ('processed', 'ignored') THEN NOW() ELSE processed_at END,
-           updated_at        = NOW()
-       WHERE provider = 'razorpay'
-         AND environment = $1
-         AND provider_event_id = $2
-       RETURNING
-         id,
-         environment,
-         provider_event_id  AS "eventId",
-         event_type         AS "eventType",
-         processing_status  AS "processingStatus",
-         attempt_count      AS "attemptCount",
-         last_error         AS "lastError",
-         received_at        AS "receivedAt",
-         processed_at       AS "processedAt"`,
-      [environment, eventId, status, error]
-    );
-
-    return result.rows[0] as RazorpayWebhookEventRow;
+    return this.webhookStore.mark('razorpay', environment, eventId, status, error);
   }
 
   private parseWebhookPayload(rawBody: string): RazorpayWebhookPayload {

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
 import type { PaymentCustomer } from '@insforge/shared-schemas';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, cn } from '@insforge/ui';
 import {
   Alert,
   AlertDescription,
@@ -10,21 +10,21 @@ import {
   ErrorState,
   LoadingState,
   PaginationControls,
+  TableHeader,
 } from '#components';
-import { PaymentsKeyMissingState } from '#features/payments/components/PaymentsKeyMissingState';
-import { PaymentsPageHeader } from '#features/payments/components/PaymentsPageHeader';
+import { PaymentsOnboardingState } from '#features/payments/components/PaymentsOnboardingState';
 import type { PaymentsOutletContext } from '#features/payments/components/PaymentsLayout';
 import { usePaymentCatalog } from '#features/payments/hooks/usePaymentCatalog';
 import { usePaymentClientPagination } from '#features/payments/hooks/usePaymentClientPagination';
 import { usePaymentCustomers } from '#features/payments/hooks/usePaymentCustomers';
 import type { CatalogPrice, CatalogProduct } from '#features/payments/types/catalog';
 import { usePaymentSubscriptions } from '#features/payments/hooks/usePaymentSubscriptions';
+import { formatDateTime, formatLastSynced, formatPriceAmount } from '#features/payments/helpers';
 import type {
   PaymentSubscription,
   PaymentSubscriptionItem,
   PaymentSubscriptionStatus,
 } from '#features/payments/types/subscriptions';
-import { cn } from '#lib/utils/utils';
 
 type SubscriptionDisplayStatus = PaymentSubscriptionStatus | 'cancelling';
 
@@ -44,26 +44,6 @@ const SUBSCRIPTION_ROW_GRID_TEMPLATE =
   '32px minmax(0, 1.3fr) minmax(0, 1fr) 100px minmax(0, 1.2fr) minmax(0, 0.75fr)';
 
 const SUBSCRIPTION_ITEM_GRID_TEMPLATE = 'minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) 100px';
-
-function formatDate(value: string | null) {
-  if (!value) {
-    return '-';
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(date);
-}
-
-function formatLastSynced(value: string | null) {
-  return value ? formatDate(value) : 'Never';
-}
 
 function formatShortDate(value: string | null) {
   if (!value) {
@@ -96,7 +76,7 @@ function getSubscriptionStatusDisplay(subscription: PaymentSubscription) {
     return {
       label: 'Cancelling',
       className: SUBSCRIPTION_STATUS_CLASSES.cancelling,
-      tooltip: `Cancels on ${formatDate(subscription.cancelAt)}`,
+      tooltip: `Cancels on ${formatDateTime(subscription.cancelAt)}`,
     };
   }
 
@@ -106,7 +86,7 @@ function getSubscriptionStatusDisplay(subscription: PaymentSubscription) {
     return {
       label: formatStatusLabel(subscription.status),
       className: SUBSCRIPTION_STATUS_CLASSES[subscription.status],
-      tooltip: canceledAt ? `Canceled on ${formatDate(canceledAt)}` : null,
+      tooltip: canceledAt ? `Canceled on ${formatDateTime(canceledAt)}` : null,
     };
   }
 
@@ -125,34 +105,6 @@ function formatPeriod(subscription: PaymentSubscription) {
   return `${formatShortDate(subscription.currentPeriodStart)} - ${formatShortDate(
     subscription.currentPeriodEnd
   )}`;
-}
-
-function getCurrencyFractionDigits(currency: string) {
-  return (
-    new Intl.NumberFormat(undefined, {
-      style: 'currency',
-      currency: currency.toUpperCase(),
-      currencyDisplay: 'code',
-    }).resolvedOptions().maximumFractionDigits ?? 2
-  );
-}
-
-function formatPriceAmount(price: CatalogPrice) {
-  const rawAmount =
-    price.unitAmount ?? (price.unitAmountDecimal ? Number(price.unitAmountDecimal) : null);
-
-  if (rawAmount === null || Number.isNaN(rawAmount)) {
-    return 'Custom';
-  }
-
-  const currency = price.currency.toUpperCase();
-  const fractionDigits = getCurrencyFractionDigits(currency);
-
-  return new Intl.NumberFormat(undefined, {
-    style: 'currency',
-    currency,
-    currencyDisplay: 'code',
-  }).format(rawAmount / 10 ** fractionDigits);
 }
 
 function getCustomerLabel(customer: PaymentCustomer | null, subscription: PaymentSubscription) {
@@ -518,7 +470,10 @@ export default function SubscriptionsPage() {
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
       {hasActiveKey && (
-        <PaymentsPageHeader
+        <TableHeader
+          className="h-14 min-h-14"
+          leftClassName="py-0"
+          rightClassName="py-0"
           title="Subscriptions"
           showDividerAfterTitle
           leftSlot={
@@ -544,7 +499,7 @@ export default function SubscriptionsPage() {
         ) : isLoading ? (
           <LoadingState message="Loading subscriptions..." />
         ) : !hasActiveKey ? (
-          <PaymentsKeyMissingState
+          <PaymentsOnboardingState
             provider={provider}
             environment={environment}
             onConfigure={openPaymentsSettings}

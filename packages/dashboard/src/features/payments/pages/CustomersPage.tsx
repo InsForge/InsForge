@@ -15,13 +15,14 @@ import {
   LoadingState,
   type DataGridColumn,
   type DataGridRowType,
+  TableHeader,
 } from '#components';
-import { PaymentsKeyMissingState } from '#features/payments/components/PaymentsKeyMissingState';
-import { PaymentsPageHeader } from '#features/payments/components/PaymentsPageHeader';
+import { PaymentsOnboardingState } from '#features/payments/components/PaymentsOnboardingState';
 import type { PaymentsOutletContext } from '#features/payments/components/PaymentsLayout';
 import { usePaymentClientPagination } from '#features/payments/hooks/usePaymentClientPagination';
 import { usePaymentCustomers } from '#features/payments/hooks/usePaymentCustomers';
-import { cn } from '#lib/utils/utils';
+import { cn } from '@insforge/ui';
+import { formatCurrencyAmount } from '#features/payments/helpers';
 
 type CustomerBadgeVariant = 'deleted' | 'guest' | null;
 
@@ -153,6 +154,8 @@ const CUSTOMER_COLUMNS: DataGridColumn<CustomerGridRow>[] = [
   },
 ];
 
+// Intentionally NOT the shared formatDateTime — this uses a zero-padded hour
+// ("03:30 PM") where the shared one renders "3:30 PM". Keep it local.
 function formatDateTime(value: string | null) {
   if (!value) {
     return '-';
@@ -170,26 +173,6 @@ function formatDateTime(value: string | null) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(date);
-}
-
-function formatCurrencyAmount(amount: number | null, currency: string | null) {
-  if (amount === null || !currency) {
-    return '-';
-  }
-
-  const normalizedCurrency = currency.toUpperCase();
-  const fractionDigits =
-    new Intl.NumberFormat(undefined, {
-      style: 'currency',
-      currency: normalizedCurrency,
-      currencyDisplay: 'code',
-    }).resolvedOptions().maximumFractionDigits ?? 2;
-
-  return new Intl.NumberFormat(undefined, {
-    style: 'currency',
-    currency: normalizedCurrency,
-    currencyDisplay: 'code',
-  }).format(amount / 10 ** fractionDigits);
 }
 
 function getCustomerLabel(customer: PaymentCustomerListItem) {
@@ -494,7 +477,10 @@ export default function CustomersPage() {
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
       {hasActiveKey && (
-        <PaymentsPageHeader
+        <TableHeader
+          className="h-14 min-h-14"
+          leftClassName="py-0"
+          rightClassName="py-0"
           title="Customers"
           showSearch
           searchValue={searchQuery}
@@ -511,7 +497,7 @@ export default function CustomersPage() {
         ) : isLoading ? (
           <LoadingState message="Loading customers..." />
         ) : !hasActiveKey ? (
-          <PaymentsKeyMissingState
+          <PaymentsOnboardingState
             provider={provider}
             environment={environment}
             onConfigure={openPaymentsSettings}

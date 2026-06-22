@@ -9,62 +9,15 @@ import {
   ErrorState,
   LoadingState,
   PaginationControls,
+  TableHeader,
 } from '#components';
-import { PaymentsKeyMissingState } from '#features/payments/components/PaymentsKeyMissingState';
-import { PaymentsPageHeader } from '#features/payments/components/PaymentsPageHeader';
+import { PaymentsOnboardingState } from '#features/payments/components/PaymentsOnboardingState';
 import type { PaymentsOutletContext } from '#features/payments/components/PaymentsLayout';
 import { usePaymentCatalog } from '#features/payments/hooks/usePaymentCatalog';
 import { usePaymentClientPagination } from '#features/payments/hooks/usePaymentClientPagination';
+import { formatLastSynced, formatPriceAmount } from '#features/payments/helpers';
 
 const CATALOG_ROW_GRID_TEMPLATE = '32px minmax(240px,1.5fr) 100px 90px 140px minmax(220px,1fr)';
-
-function formatDate(value: string | null) {
-  if (!value) {
-    return '-';
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(date);
-}
-
-function formatLastSynced(value: string | null) {
-  return value ? formatDate(value) : 'Never';
-}
-
-function getCurrencyFractionDigits(currency: string) {
-  return (
-    new Intl.NumberFormat(undefined, {
-      style: 'currency',
-      currency: currency.toUpperCase(),
-      currencyDisplay: 'code',
-    }).resolvedOptions().maximumFractionDigits ?? 2
-  );
-}
-
-function formatAmount(price: CatalogPrice) {
-  const rawAmount =
-    price.unitAmount ?? (price.unitAmountDecimal ? Number(price.unitAmountDecimal) : null);
-
-  if (rawAmount === null || Number.isNaN(rawAmount)) {
-    return 'Custom';
-  }
-
-  const currency = price.currency.toUpperCase();
-  const fractionDigits = getCurrencyFractionDigits(currency);
-
-  return new Intl.NumberFormat(undefined, {
-    style: 'currency',
-    currency,
-    currencyDisplay: 'code',
-  }).format(rawAmount / 10 ** fractionDigits);
-}
 
 function formatBilling(price: CatalogPrice) {
   if (price.type !== 'recurring' || !price.recurringInterval) {
@@ -183,7 +136,7 @@ function ProductPricesTable({
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="truncate text-foreground">{formatAmount(price)}</span>
+                  <span className="truncate text-foreground">{formatPriceAmount(price)}</span>
                   {isDefault && <StatusBadge label="Default" tone="info" />}
                 </div>
               </div>
@@ -266,7 +219,7 @@ function CatalogRow({
 
           <div className="min-w-0 px-2 py-3">
             {summaryPrice ? (
-              <span className="truncate text-foreground">{formatAmount(summaryPrice)}</span>
+              <span className="truncate text-foreground">{formatPriceAmount(summaryPrice)}</span>
             ) : (
               <span className="text-muted-foreground">-</span>
             )}
@@ -411,7 +364,10 @@ export default function CatalogPage() {
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
       {hasActiveKey && (
-        <PaymentsPageHeader
+        <TableHeader
+          className="h-14 min-h-14"
+          leftClassName="py-0"
+          rightClassName="py-0"
           title="Catalog"
           showDividerAfterTitle
           leftSlot={
@@ -434,7 +390,7 @@ export default function CatalogPage() {
         ) : isLoading ? (
           <LoadingState message="Loading catalog..." />
         ) : !hasActiveKey ? (
-          <PaymentsKeyMissingState
+          <PaymentsOnboardingState
             provider={provider}
             environment={environment}
             onConfigure={openPaymentsSettings}

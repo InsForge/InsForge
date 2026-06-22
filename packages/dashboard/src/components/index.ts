@@ -20,6 +20,7 @@ export { DeleteActionButton } from './DeleteActionButton';
 export { EmptyState, type EmptyStateProps } from '@insforge/ui';
 export { EmptyStateIllustration } from './EmptyStateIllustration';
 export { ErrorState } from './ErrorState';
+export { ListRow, ListRowCell } from './ListRow';
 export { LoadingState, type LoadingStateProps } from '@insforge/ui';
 export { PaginationControls, type PaginationControlsProps } from './PaginationControls';
 export { SelectionClearButton } from './SelectionClearButton';
