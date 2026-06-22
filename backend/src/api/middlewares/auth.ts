@@ -4,6 +4,7 @@ import { AppError } from '@/utils/errors.js';
 import { ERROR_CODES, type RoleSchema } from '@insforge/shared-schemas';
 import { NEXT_ACTIONS } from '../../utils/next-actions.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
+import { appConfig } from '@/infra/config/app.config.js';
 
 export type UserContext = {
   /**
@@ -27,6 +28,10 @@ export interface AuthRequest extends Request {
 
 const tokenManager = TokenManager.getInstance();
 const secretService = SecretService.getInstance();
+
+function getRootAdminSubject(): string {
+  return `local:${appConfig.auth.rootAdminUsername}`;
+}
 
 // Helper function to extract Bearer token (exported for optional auth checks)
 export function extractBearerToken(authHeader: string | undefined): string | null {
@@ -183,7 +188,7 @@ export function requireRoot(req: AuthRequest, res: Response, next: NextFunction)
       );
     }
 
-    if (payload.sub !== 'local:admin') {
+    if (payload.sub !== getRootAdminSubject()) {
       throw new AppError(
         'Root admin access required',
         403,

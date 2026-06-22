@@ -1,4 +1,4 @@
-import { DatabaseManager } from '../../infra/database/database.manager';
+import { DatabaseManager } from '../../infra/database/database.manager.js';
 import bcrypt from 'bcryptjs';
 
 /**

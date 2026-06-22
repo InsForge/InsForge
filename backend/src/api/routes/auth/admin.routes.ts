@@ -19,8 +19,6 @@ import {
   changeAdminPasswordSchema,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
-import { appConfig } from '@/infra/config/app.config.js';
-import { adminService } from '@/services/admin/admin.service.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
@@ -99,24 +97,8 @@ router.get(
         throw new AppError('Admin access required', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
       }
 
-      // Determine the display name
-      let username: string | undefined;
-      if (req.user.id === 'local:admin') {
-        // Root admin: use the configured root admin username
-        username = appConfig.auth.rootAdminUsername || 'admin';
-      } else {
-        // DB admin: look up the username by ID
-        const admin = await adminService.getAdminById(req.user.id);
-        if (admin) {
-          username = admin.username;
-        }
-      }
-
       const response: GetCurrentAdminSessionResponse = {
-        admin: {
-          sub: req.user.id,
-          username,
-        },
+        admin: await authService.getActiveAdminSessionFromSubject(req.user.id),
       };
 
       successResponse(res, response);
@@ -128,7 +110,7 @@ router.get(
 
 // POST /api/auth/admin/refresh - Refresh admin dashboard access token
 // Uses a dashboard-specific httpOnly cookie + X-CSRF-Token header.
-router.post('/refresh', (req: Request, res: Response, next: NextFunction) => {
+router.post('/refresh', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tokenManager = TokenManager.getInstance();
     const refreshToken = req.cookies?.[ADMIN_REFRESH_TOKEN_COOKIE_NAME];
@@ -148,18 +130,18 @@ router.post('/refresh', (req: Request, res: Response, next: NextFunction) => {
       throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
+    const admin = await authService.getActiveAdminSessionFromSubject(payload.sub);
+
     const newAccessToken = tokenManager.generateAccessToken({
-      sub: payload.sub,
+      sub: admin.sub,
       role: 'project_admin',
     });
     const { refreshToken: newRefreshToken, csrfToken: newCsrfToken } =
-      tokenManager.generateRefreshTokenWithCsrf(payload.sub, 'admin', payload.csrfNonce);
+      tokenManager.generateRefreshTokenWithCsrf(admin.sub, 'admin', payload.csrfNonce);
     setAdminRefreshTokenCookie(res, newRefreshToken);
 
     successResponse(res, {
-      admin: {
-        sub: payload.sub,
-      },
+      admin,
       accessToken: newAccessToken,
       csrfToken: newCsrfToken,
     });
@@ -208,7 +190,7 @@ router.post('/', requireRoot, async (req: AuthRequest, res: Response, next: Next
     }
 
     const { username, password } = validation.data;
-    const admin = await authService.createAdmin(username, password, req.user?.id);
+    const admin = await authService.createAdmin(username, password);
     successResponse(res, { admin }, 201);
   } catch (error) {
     next(error);
@@ -222,11 +204,6 @@ router.delete(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { username } = req.params;
-
-      // Prevent self-deletion
-      if (username === appConfig.auth.rootAdminUsername) {
-        throw new AppError('Cannot delete root admin', 400, ERROR_CODES.FORBIDDEN);
-      }
 
       await authService.deleteAdmin(username, req.user?.id || '');
       res.status(204).send();
@@ -251,14 +228,13 @@ router.post(
         );
       }
 
-      // Get admin ID from the authenticated token
-      const adminId = req.user?.id;
-      if (!adminId) {
+      const adminSubject = req.user?.id;
+      if (!adminSubject) {
         throw new AppError('Unauthorized', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
       }
 
       const { oldPassword, newPassword } = validation.data;
-      await authService.changeAdminPassword(adminId, oldPassword, newPassword);
+      await authService.changeAdminPassword(adminSubject, oldPassword, newPassword);
       successResponse(res, { message: 'Password changed successfully' });
     } catch (error) {
       next(error);

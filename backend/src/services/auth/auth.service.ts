@@ -38,6 +38,7 @@ import { getApiBaseUrl } from '@/utils/environment.js';
 import { appConfig } from '@/infra/config/app.config.js';
 import {
   ERROR_CODES,
+  type AdminSchema,
   type AuthMetadataSchema,
   type CreateAdminSessionResponse,
   type CreateSessionResponse,
@@ -109,6 +110,60 @@ export class AuthService {
       this.pool = dbManager.getPool();
     }
     return this.pool;
+  }
+
+  private getLocalAdminSubject(username: string): string {
+    return `local:${username}`;
+  }
+
+  private getRootAdminSubject(): string {
+    return this.getLocalAdminSubject(this.adminUsername);
+  }
+
+  private getLocalAdminUsernameFromSubject(subject: string): string | null {
+    if (!subject.startsWith('local:')) {
+      return null;
+    }
+    const username = subject.slice('local:'.length);
+    return username.length > 0 ? username : null;
+  }
+
+  private isCloudAdminSubject(subject: string): boolean {
+    return subject.startsWith('cloud:');
+  }
+
+  private isRootAdminSubject(subject: string): boolean {
+    return subject === this.getRootAdminSubject();
+  }
+
+  async getActiveAdminSessionFromSubject(subject: string): Promise<AdminSchema> {
+    if (this.isRootAdminSubject(subject)) {
+      return {
+        sub: subject,
+        username: this.adminUsername,
+        isRoot: true,
+      };
+    }
+
+    if (this.isCloudAdminSubject(subject)) {
+      return { sub: subject, isRoot: false };
+    }
+
+    const username = this.getLocalAdminUsernameFromSubject(subject);
+    if (!username) {
+      throw new AppError('Invalid admin session', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+    }
+
+    const admin = await adminService.getAdminByUsername(username);
+    if (!admin) {
+      throw new AppError('Admin user not found', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+    }
+
+    return {
+      sub: subject,
+      username: admin.username,
+      isRoot: false,
+    };
   }
 
   /**
@@ -655,22 +710,25 @@ export class AuthService {
   }
 
   /**
-   * Admin login - root admin is env-based, additional admins from DB
-   * Root is identified by sub === 'local:admin'
-   * DB admins use their UUID as sub
+   * Admin login - root admin is env-based, additional admins from DB.
+   * Self-hosted admin subjects are stable, readable `local:<username>` values.
    */
   async adminLogin(username: string, password: string): Promise<CreateAdminSessionResponse> {
     // 1. Check root admin (env-based)
     if (username === this.adminUsername && password === this.adminPassword) {
-      const sub = 'local:admin';
+      const sub = this.getRootAdminSubject();
       const accessToken = this.tokenManager.generateAccessToken({
         sub,
         role: 'project_admin',
       });
       return {
-        admin: { sub },
+        admin: { sub, username: this.adminUsername, isRoot: true },
         accessToken,
       };
+    }
+
+    if (username === this.adminUsername) {
+      throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
     // 2. Check database for additional admins
@@ -679,15 +737,14 @@ export class AuthService {
       throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
-    // Use UUID as sub for DB admins
-    const sub = admin.id;
+    const sub = this.getLocalAdminSubject(admin.username);
     const accessToken = this.tokenManager.generateAccessToken({
       sub,
       role: 'project_admin',
     });
 
     return {
-      admin: { sub },
+      admin: { sub, username: admin.username, isRoot: false },
       accessToken,
     };
   }
@@ -712,6 +769,10 @@ export class AuthService {
     password: string,
     createdBy?: string
   ): Promise<{ username: string; createdAt: string; updatedAt: string }> {
+    if (username === this.adminUsername) {
+      throw new AppError('Admin user already exists', 409, ERROR_CODES.AUTH_EMAIL_EXISTS);
+    }
+
     const existing = await adminService.getAdminByUsername(username);
     if (existing) {
       throw new AppError('Admin user already exists', 409, ERROR_CODES.AUTH_EMAIL_EXISTS);
@@ -747,16 +808,16 @@ export class AuthService {
   }
 
   /**
-   * Change current admin's password using admin ID (sub from token)
+   * Change current admin's password using the token subject.
    */
   async changeAdminPassword(
-    adminId: string,
+    adminSubject: string,
     oldPassword: string,
     newPassword: string
   ): Promise<void> {
     // Root admin is env-based and has no DB row; its password is managed via
     // ROOT_ADMIN_PASSWORD, not the dashboard.
-    if (adminId === 'local:admin') {
+    if (this.isRootAdminSubject(adminSubject)) {
       throw new AppError(
         'Root admin password is managed via environment variables',
         403,
@@ -764,8 +825,20 @@ export class AuthService {
       );
     }
 
-    // adminId is the token sub, which for DB admins is their UUID.
-    const admin = await adminService.getAdminById(adminId);
+    if (this.isCloudAdminSubject(adminSubject)) {
+      throw new AppError(
+        'Cloud admin password is managed outside this self-hosted instance',
+        403,
+        ERROR_CODES.FORBIDDEN
+      );
+    }
+
+    const username = this.getLocalAdminUsernameFromSubject(adminSubject);
+    if (!username) {
+      throw new AppError('Invalid admin session', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+    }
+
+    const admin = await adminService.getAdminByUsername(username);
     if (!admin) {
       throw new AppError('Admin user not found', 404, ERROR_CODES.AUTH_USER_NOT_FOUND);
     }
@@ -788,7 +861,7 @@ export class AuthService {
     });
 
     return {
-      admin: { sub },
+      admin: { sub, isRoot: false },
       accessToken,
     };
   }

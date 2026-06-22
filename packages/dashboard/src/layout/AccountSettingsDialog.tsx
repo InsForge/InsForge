@@ -21,7 +21,7 @@ export default function AccountSettingsDialog({ open, onOpenChange }: AccountSet
   const isMountedRef = useRef(true);
 
   const displayName = user?.username || user?.sub || 'Admin';
-  const isRoot = user?.sub === 'local:admin';
+  const isRoot = user?.isRoot === true;
 
   useEffect(() => {
     isMountedRef.current = true;
