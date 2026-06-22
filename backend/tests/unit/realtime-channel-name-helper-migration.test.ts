@@ -5,14 +5,14 @@ import { fileURLToPath } from 'url';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const migrationDir = path.resolve(currentDir, '../../src/infra/database/migrations');
-const migrationFile = '052_fix-realtime-channel-name-helper.sql';
+const migrationFile = '053_fix-realtime-channel-name-helper.sql';
 const migrationPath = path.resolve(migrationDir, migrationFile);
 
 function readSql(): string {
   return fs.readFileSync(migrationPath, 'utf8');
 }
 
-describe('052_fix-realtime-channel-name-helper migration', () => {
+describe('053_fix-realtime-channel-name-helper migration', () => {
   it('migration file exists', () => {
     expect(fs.existsSync(migrationPath)).toBe(true);
   });
@@ -26,23 +26,25 @@ describe('052_fix-realtime-channel-name-helper migration', () => {
     );
   });
 
-  it('keeps function execute grants for runtime roles', () => {
+  it('relies on CREATE OR REPLACE to preserve grants rather than re-issuing them', () => {
     const sql = readSql();
 
-    expect(sql).toMatch(
-      /GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+realtime\.channel_name\(\)\s+TO\s+authenticated,\s*anon,\s*project_admin/i
-    );
+    // CREATE OR REPLACE preserves the existing ACL, so the grants from 017/045
+    // carry over. Re-issuing an unguarded GRANT ... TO project_admin would abort
+    // the migration wherever that role is absent (045-048 guard it for a reason).
+    expect(sql).not.toMatch(/GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+realtime\.channel_name/i);
   });
 
-  it('runs after database backups without editing historical migrations', () => {
+  it('runs after existing migrations without editing historical migrations', () => {
     const migrations = fs
       .readdirSync(migrationDir)
       .filter((file) => file.endsWith('.sql'))
       .sort();
 
-    expect(migrations.indexOf(migrationFile)).toBeGreaterThan(
-      migrations.indexOf('051_create-database-backups.sql')
-    );
+    const prerequisite = '052_add-s3-cors-tagging-versioning.sql';
+    expect(migrations).toContain(migrationFile);
+    expect(migrations).toContain(prerequisite);
+    expect(migrations.indexOf(migrationFile)).toBeGreaterThan(migrations.indexOf(prerequisite));
 
     expect(readSql()).not.toMatch(/017_create-realtime-schema/i);
   });
