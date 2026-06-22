@@ -458,7 +458,24 @@ export function TableForm({
   };
 
   const handleRemoveForeignKey = (columnName?: string) => {
-    setForeignKeys(foreignKeys.filter((fk) => fk.columnName !== columnName));
+    const removed = foreignKeys.find((fk) => fk.columnName === columnName);
+    if (!removed) {
+      return;
+    }
+
+    // Removing any one column must remove all sibling columns atomically.
+    const constraintKey = removed.referenceColumns
+      .map((rc) => `${rc.sourceColumn}\x00${rc.referenceColumn}`)
+      .join('\x01');
+
+    setForeignKeys(
+      foreignKeys.filter((fk) => {
+        const key = fk.referenceColumns
+          .map((rc) => `${rc.sourceColumn}\x00${rc.referenceColumn}`)
+          .join('\x01');
+        return key !== constraintKey;
+      })
+    );
     setForeignKeysDirty(true);
   };
 

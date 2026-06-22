@@ -524,10 +524,12 @@ export class DatabaseTableService {
           // Execute operations
 
           // Drop foreign key constraints
+          const droppedConstraints = new Set<string>();
           if (dropForeignKeys && Array.isArray(dropForeignKeys)) {
             for (const col of dropForeignKeys) {
               const constraintName = foreignKeyMap.get(col)?.constraint_name;
-              if (constraintName) {
+              if (constraintName && !droppedConstraints.has(constraintName)) {
+                droppedConstraints.add(constraintName);
                 await client.query(
                   `
                   ALTER TABLE ${safeQualifiedTableName}
