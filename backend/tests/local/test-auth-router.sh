@@ -13,6 +13,7 @@ echo "🧪 Testing auth router..."
 # Use configuration from test-config.sh
 API_BASE="$TEST_API_BASE"
 AUTH_TOKEN=""
+ANON_KEY=$(get_anon_key)
 
 # Test function
 # $1: method, $2: endpoint, $3: data, $4: description, $5: extra header
@@ -63,6 +64,7 @@ register_test_user "$USER_EMAIL"
 echo "📝 Registering new user..."
 register_response=$(curl -s -X POST "$API_BASE/auth/users" \
     -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $ANON_KEY" \
     -d '{"email":"'$USER_EMAIL'","password":"'$USER_PASS'","name":"'$USER_NAME'"}')
 
 if echo "$register_response" | grep -q '"accessToken"'; then
@@ -113,6 +115,7 @@ echo ""
 echo "📝 Registering with duplicate email..."
 duplicate_register_response=$(curl -s -X POST "$API_BASE/auth/users" \
     -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $ANON_KEY" \
     -d '{"email":"'$USER_EMAIL'","password":"'$USER_PASS'","name":"'$USER_NAME' duplicate"}')
 
 if echo "$duplicate_register_response" | grep -q '"User already exists"'; then

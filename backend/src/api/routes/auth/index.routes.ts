@@ -8,12 +8,7 @@ import { TokenManager } from '@/infra/security/token.manager.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { AppError } from '@/utils/errors.js';
 import { successResponse } from '@/utils/response.js';
-import {
-  AuthRequest,
-  verifyAdmin,
-  verifyToken,
-  extractBearerToken,
-} from '@/api/middlewares/auth.js';
+import { AuthRequest, verifyAdmin, verifyUser, verifyToken } from '@/api/middlewares/auth.js';
 import adminRouter from './admin.routes.js';
 import oauthRouter from './oauth.routes.js';
 import customOAuthRouter from './custom-oauth.routes.js';
@@ -338,23 +333,12 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
 // Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'
 // When called with a valid admin token (e.g. dashboard adding a user), we do NOT set session
 // cookie or return csrf/refresh tokens, so the admin's session is not overwritten.
-router.post('/users', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/users', verifyUser, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const clientType = parseClientType(req.query.client_type);
-    let adminCreatingUser = false;
-
-    try {
-      const token = extractBearerToken(req.headers.authorization);
-      if (token) {
-        const payload = TokenManager.getInstance().verifyToken(token);
-        adminCreatingUser = payload?.role === 'project_admin';
-      }
-    } catch (error) {
-      // Not a valid token; treat as normal registration.
-      logger.debug('[Auth:CreateUser] Admin detection failed', {
-        error: error instanceof Error ? error.message : 'unknown',
-      });
-    }
+    // verifyUser has already authenticated the caller by credential shape.
+    // API keys set req.hasApiKey; project_admin JWTs set req.user.role.
+    const adminCreatingUser = req.hasApiKey === true || req.user?.role === 'project_admin';
 
     const validationResult = createUserRequestSchema.safeParse(req.body);
     if (!validationResult.success) {

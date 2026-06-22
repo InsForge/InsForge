@@ -19,6 +19,7 @@ API_BASE="$TEST_API_BASE"
 TEST_USER_EMAIL="testuser_rest_$(date +%s)@example.com"
 TEST_USER_PASSWORD="TestPass123!"
 AUTH_TOKEN=""
+ANON_KEY=$(get_anon_key)
 
 # Function to test response format
 test_response_format() {
@@ -85,6 +86,7 @@ ADMIN_TOKEN=$(get_admin_token)
 print_info "5. Creating test user for authenticated tests"
 auth_response=$(curl -s -X POST "$API_BASE/auth/users" \
     -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $ANON_KEY" \
     -d "{
         \"email\": \"$TEST_USER_EMAIL\",
         \"password\": \"$TEST_USER_PASSWORD\",

@@ -3,11 +3,15 @@
 # Comprehensive curl tests for Traditional REST format
 # Tests all major endpoints to verify response formats
 
-BASE_URL="http://localhost:7130/api"
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source "$SCRIPT_DIR/../test-config.sh"
+
+BASE_URL="$TEST_API_BASE"
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 BLUE='\033[0;34m'
 NC='\033[0m'
+ANON_KEY=$(get_anon_key)
 
 echo "🧪 Comprehensive Traditional REST Format Tests"
 echo "============================================="
@@ -27,6 +31,7 @@ echo "Creating test user: $EMAIL"
 echo -e "\n${BLUE}2a. Register (Object Response)${NC}"
 REGISTER_RESPONSE=$(curl -s -X POST "$BASE_URL/auth/users" \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ANON_KEY" \
   -d "{\"email\": \"$EMAIL\", \"password\": \"Test123!\", \"name\": \"Test User\"}")
 echo "$REGISTER_RESPONSE" | jq '.'
 TOKEN=$(echo "$REGISTER_RESPONSE" | jq -r '.accessToken')
