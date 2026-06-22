@@ -804,18 +804,24 @@ export class DatabaseTableService {
     if (!col.foreignKey) {
       return '';
     }
-    // Store foreign_key in a const to avoid repeated non-null assertions
     const fk = col.foreignKey;
-    // Use "auth_users" in constraint name for auth.users references
+    if (!fk.referenceColumns || fk.referenceColumns.length === 0) {
+      return '';
+    }
+    const sourceCols = fk.referenceColumns.map((r) => r.sourceColumn);
+    const refCols = fk.referenceColumns.map((r) => r.referenceColumn);
     const safeTableName = fk.referenceTable.replace(/\./g, '_');
-    const constraintName = `fk_${col.columnName}_${safeTableName}_${fk.referenceColumn}`;
+    const constraintName = `fk_${sourceCols.join('_')}_${safeTableName}_${refCols.join('_')}`;
     const onDelete = fk.onDelete || 'RESTRICT';
     const onUpdate = fk.onUpdate || 'RESTRICT';
 
+    const sourcePart = sourceCols.map((c) => this.quoteIdentifier(c)).join(', ');
+    const refPart = refCols.map((c) => this.quoteIdentifier(c)).join(', ');
+
     if (include_source_column) {
-      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} FOREIGN KEY (${this.quoteIdentifier(col.columnName)}) REFERENCES ${this.quoteTableReference(fk.referenceTable, defaultSchemaName)}(${this.quoteIdentifier(fk.referenceColumn)}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
+      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} FOREIGN KEY (${sourcePart}) REFERENCES ${this.quoteTableReference(fk.referenceTable, defaultSchemaName)}(${refPart}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
     } else {
-      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} REFERENCES ${this.quoteTableReference(fk.referenceTable, defaultSchemaName)}(${this.quoteIdentifier(fk.referenceColumn)}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
+      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} REFERENCES ${this.quoteTableReference(fk.referenceTable, defaultSchemaName)}(${refPart}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
     }
   }
 
@@ -831,42 +837,81 @@ export class DatabaseTableService {
           ccu.table_schema AS foreign_schema,
           ccu.table_name AS foreign_table,
           ccu.column_name AS foreign_column,
+          kcu.ordinal_position,
           rc.delete_rule as on_delete,
           rc.update_rule as on_update
         FROM information_schema.table_constraints AS tc
         JOIN information_schema.key_column_usage AS kcu
           ON tc.constraint_name = kcu.constraint_name
           AND tc.table_schema = kcu.table_schema
-        JOIN information_schema.constraint_column_usage AS ccu
-          ON ccu.constraint_name = tc.constraint_name
+        JOIN information_schema.key_column_usage AS ccu
+          ON tc.unique_constraint_name = ccu.constraint_name
+          AND kcu.ordinal_position = ccu.ordinal_position
         JOIN information_schema.referential_constraints AS rc
           ON rc.constraint_name = tc.constraint_name
           AND rc.constraint_schema = tc.table_schema
         WHERE tc.constraint_type = 'FOREIGN KEY'
         AND tc.table_schema = $1
         AND tc.table_name = $2
+        ORDER BY tc.constraint_name, kcu.ordinal_position
       `,
       [schemaName, table]
     );
 
     const foreignKeys = result.rows;
 
-    // Create a map of column names to their foreign key info
-    const foreignKeyMap = new Map<string, ForeignKeyInfo>();
-    foreignKeys.forEach((fk: ForeignKeyRow) => {
-      // Prefix table name with schema if not public (e.g., "auth.users")
+    // Group rows by constraint_name, then map each source column to its FK info
+    const constraintGroups = new Map<string, {
+      constraintName: string;
+      referenceTable: string;
+      fromColumns: { name: string; foreignColumn: string; ordinal: number }[];
+      onDelete: string;
+      onUpdate: string;
+    }>();
+
+    for (const fk of foreignKeys as ForeignKeyRow[]) {
       const referenceTable =
         fk.foreign_schema !== 'public'
           ? `${fk.foreign_schema}.${fk.foreign_table}`
           : fk.foreign_table;
-      foreignKeyMap.set(fk.from_column, {
-        constraint_name: fk.constraint_name,
-        referenceTable,
-        referenceColumn: fk.foreign_column,
-        onDelete: fk.on_delete as OnDeleteActionSchema,
-        onUpdate: fk.on_update as OnUpdateActionSchema,
-      });
-    });
+
+      let group = constraintGroups.get(fk.constraint_name);
+      if (!group) {
+        group = {
+          constraintName: fk.constraint_name,
+          referenceTable,
+          fromColumns: [],
+          onDelete: fk.on_delete,
+          onUpdate: fk.on_update,
+        };
+        constraintGroups.set(fk.constraint_name, group);
+      }
+      group.fromColumns.push({ name: fk.from_column, foreignColumn: fk.foreign_column, ordinal: fk.ordinal_position });
+    }
+
+    const foreignKeyMap = new Map<string, ForeignKeyInfo>();
+
+    for (const group of constraintGroups.values()) {
+      group.fromColumns.sort((a, b) => a.ordinal - b.ordinal);
+
+      const referenceColumns = group.fromColumns.map((c) => ({
+        sourceColumn: c.name,
+        referenceColumn: c.foreignColumn,
+      }));
+
+      const info: ForeignKeyInfo = {
+        constraint_name: group.constraintName,
+        referenceTable: group.referenceTable,
+        referenceColumns,
+        onDelete: group.onDelete as OnDeleteActionSchema,
+        onUpdate: group.onUpdate as OnUpdateActionSchema,
+      };
+
+      for (const c of group.fromColumns) {
+        foreignKeyMap.set(c.name, { ...info });
+      }
+    }
+
     return foreignKeyMap;
   }
 }

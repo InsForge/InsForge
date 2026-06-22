@@ -76,19 +76,32 @@ export class AdminRecordService {
   async lookupRecord(
     schemaName: string,
     tableName: string,
-    columnName: string,
-    value: string
+    columns: string[],
+    values: string[]
   ): Promise<DatabaseRecord | null> {
     validateTableName(tableName);
 
+    if (columns.length === 0 || columns.length !== values.length) {
+      throw new AppError(
+        'Columns and values must have the same non-zero length',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
     return this.withAdminTransaction(async (client) => {
       const metadata = await this.getTableColumnMetadata(schemaName, tableName, client);
-      this.assertColumnExists(metadata, columnName);
+      for (const col of columns) {
+        this.assertColumnExists(metadata, col);
+      }
 
       const qualifiedTableName = quoteQualifiedName(schemaName, tableName);
+      const whereClauses = columns.map(
+        (col, i) => `${quoteIdentifier(col)} = $${i + 1}`
+      );
       const result = await client.query<DatabaseRecord>(
-        `SELECT * FROM ${qualifiedTableName} WHERE ${quoteIdentifier(columnName)} = $1 LIMIT 1`,
-        [value]
+        `SELECT * FROM ${qualifiedTableName} WHERE ${whereClauses.join(' AND ')} LIMIT 1`,
+        values
       );
 
       return result.rows[0] ?? null;
