@@ -51,9 +51,7 @@ export function ForeignKeyCell({ value, foreignKey, row, onJumpToTable }: Foreig
   };
 
   // Guard: all FK column entries must have both sourceColumn and referenceColumn
-  const hasValidColumns = foreignKey.columns.every(
-    (c) => c.sourceColumn && c.referenceColumn
-  );
+  const hasValidColumns = foreignKey.columns.every((c) => c.sourceColumn && c.referenceColumn);
 
   // Collect all FK column values from the current row for multi-column lookup
   const lookupColumns = hasValidColumns ? foreignKey.columns.map((c) => c.referenceColumn) : [];

@@ -12,7 +12,6 @@ import {
   DataGrid,
   DataGridEmptyState,
   TypeBadge,
-  type CellMouseEvent,
   type CellClickArgs,
   type RenderCellProps,
   type RenderHeaderCellProps,
@@ -99,7 +98,9 @@ export function LinkRecordDialog({
     if (!schema?.columns) {
       return [] as string[];
     }
-    const explicitPks = schema.columns.filter((c: any) => c.isPrimaryKey).map((c: any) => c.columnName);
+    const explicitPks = schema.columns
+      .filter((c: any) => c.isPrimaryKey)
+      .map((c: any) => c.columnName);
     return explicitPks.length > 0 ? explicitPks : ['id'];
   }, [schema]);
 
@@ -157,12 +158,9 @@ export function LinkRecordDialog({
   }, [selectedRecord, getRowKey]);
 
   // Handle cell click to select record
-  const handleCellClick = useCallback(
-    (args: CellClickArgs<DataGridRowType>, event: CellMouseEvent) => {
-      setSelectedRecord(args.row as DatabaseRecord);
-    },
-    []
-  );
+  const handleCellClick = useCallback((args: CellClickArgs<DataGridRowType>) => {
+    setSelectedRecord(args.row as DatabaseRecord);
+  }, []);
 
   // Convert schema to columns for the DataGrid with visual distinction
   const columns = useMemo(() => {

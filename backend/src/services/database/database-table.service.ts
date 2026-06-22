@@ -832,28 +832,37 @@ export class DatabaseTableService {
     const result = await this.getPool().query(
       `
         SELECT
-          tc.constraint_name,
-          kcu.column_name as from_column,
-          ccu.table_schema AS foreign_schema,
-          ccu.table_name AS foreign_table,
-          ccu.column_name AS foreign_column,
-          kcu.ordinal_position,
-          rc.delete_rule as on_delete,
-          rc.update_rule as on_update
-        FROM information_schema.table_constraints AS tc
-        JOIN information_schema.key_column_usage AS kcu
-          ON tc.constraint_name = kcu.constraint_name
-          AND tc.table_schema = kcu.table_schema
-        JOIN information_schema.key_column_usage AS ccu
-          ON tc.unique_constraint_name = ccu.constraint_name
-          AND kcu.ordinal_position = ccu.ordinal_position
-        JOIN information_schema.referential_constraints AS rc
-          ON rc.constraint_name = tc.constraint_name
-          AND rc.constraint_schema = tc.table_schema
-        WHERE tc.constraint_type = 'FOREIGN KEY'
-        AND tc.table_schema = $1
-        AND tc.table_name = $2
-        ORDER BY tc.constraint_name, kcu.ordinal_position
+          c.conname AS constraint_name,
+          a1.attname AS from_column,
+          nf.nspname AS foreign_schema,
+          cf.relname AS foreign_table,
+          a2.attname AS foreign_column,
+          u.pos AS ordinal_position,
+          CASE c.confdeltype
+            WHEN 'a' THEN 'NO ACTION' WHEN 'r' THEN 'RESTRICT'
+            WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL'
+            WHEN 'd' THEN 'SET DEFAULT'
+          END AS on_delete,
+          CASE c.confupdtype
+            WHEN 'a' THEN 'NO ACTION' WHEN 'r' THEN 'RESTRICT'
+            WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL'
+            WHEN 'd' THEN 'SET DEFAULT'
+          END AS on_update
+        FROM pg_catalog.pg_constraint c
+        JOIN pg_catalog.pg_class ct ON c.conrelid = ct.oid
+        JOIN pg_catalog.pg_namespace nt ON ct.relnamespace = nt.oid
+        JOIN pg_catalog.pg_class cf ON c.confrelid = cf.oid
+        JOIN pg_catalog.pg_namespace nf ON cf.relnamespace = nf.oid
+        CROSS JOIN LATERAL unnest(c.conkey, c.confkey)
+          WITH ORDINALITY AS u(src_attnum, ref_attnum, pos)
+        JOIN pg_catalog.pg_attribute a1
+          ON a1.attnum = u.src_attnum AND a1.attrelid = c.conrelid
+        JOIN pg_catalog.pg_attribute a2
+          ON a2.attnum = u.ref_attnum AND a2.attrelid = c.confrelid
+        WHERE c.contype = 'f'
+          AND nt.nspname = $1
+          AND ct.relname = $2
+        ORDER BY c.conname, u.pos
       `,
       [schemaName, table]
     );
@@ -861,13 +870,16 @@ export class DatabaseTableService {
     const foreignKeys = result.rows;
 
     // Group rows by constraint_name, then map each source column to its FK info
-    const constraintGroups = new Map<string, {
-      constraintName: string;
-      referenceTable: string;
-      fromColumns: { name: string; foreignColumn: string; ordinal: number }[];
-      onDelete: string;
-      onUpdate: string;
-    }>();
+    const constraintGroups = new Map<
+      string,
+      {
+        constraintName: string;
+        referenceTable: string;
+        fromColumns: { name: string; foreignColumn: string; ordinal: number }[];
+        onDelete: string;
+        onUpdate: string;
+      }
+    >();
 
     for (const fk of foreignKeys as ForeignKeyRow[]) {
       const referenceTable =
@@ -886,7 +898,11 @@ export class DatabaseTableService {
         };
         constraintGroups.set(fk.constraint_name, group);
       }
-      group.fromColumns.push({ name: fk.from_column, foreignColumn: fk.foreign_column, ordinal: fk.ordinal_position });
+      group.fromColumns.push({
+        name: fk.from_column,
+        foreignColumn: fk.foreign_column,
+        ordinal: fk.ordinal_position,
+      });
     }
 
     const foreignKeyMap = new Map<string, ForeignKeyInfo>();

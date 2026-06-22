@@ -472,7 +472,8 @@ export function RecordFormField({ field, form, tableName }: RecordFormFieldProps
           <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
             <span className="truncate">Has a Foreign Key relation to</span>
             <FormMetaBadge>
-              {field.foreignKey.referenceTable}.{field.foreignKey.referenceColumns.map((c) => c.referenceColumn).join(',')}
+              {field.foreignKey.referenceTable}.
+              {field.foreignKey.referenceColumns.map((c) => c.referenceColumn).join(',')}
             </FormMetaBadge>
           </div>
         )}

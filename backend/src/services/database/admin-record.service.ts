@@ -96,9 +96,7 @@ export class AdminRecordService {
       }
 
       const qualifiedTableName = quoteQualifiedName(schemaName, tableName);
-      const whereClauses = columns.map(
-        (col, i) => `${quoteIdentifier(col)} = $${i + 1}`
-      );
+      const whereClauses = columns.map((col, i) => `${quoteIdentifier(col)} = $${i + 1}`);
       const result = await client.query<DatabaseRecord>(
         `SELECT * FROM ${qualifiedTableName} WHERE ${whereClauses.join(' AND ')} LIMIT 1`,
         values

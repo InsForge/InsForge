@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { columnSchema, foreignKeySchema, foreignKeyReferenceSchema } from '@insforge/shared-schemas';
+import { columnSchema, foreignKeySchema } from '@insforge/shared-schemas';
 
 // Foreign key form schema — single-column FK creation from the UI
 // Uses referenceColumns array (always 1 entry for dashboard-created FKs)

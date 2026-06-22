@@ -38,7 +38,9 @@ export const foreignKeyReferenceSchema = z.object({
 
 export const foreignKeySchema = z.object({
   referenceTable: z.string().min(1, 'Target table cannot be empty'),
-  referenceColumns: z.array(foreignKeyReferenceSchema).min(1, 'At least one column mapping is required'),
+  referenceColumns: z
+    .array(foreignKeyReferenceSchema)
+    .min(1, 'At least one column mapping is required'),
   onDelete: onDeleteActionSchema,
   onUpdate: onUpdateActionSchema,
 });

@@ -113,8 +113,8 @@ export function ForeignKeyPopover({
   // Calculate if the button should be enabled
   const isAddButtonEnabled = Boolean(
     newForeignKey.columnName &&
-      newForeignKey.referenceTable &&
-      newForeignKey.referenceColumns[0]?.referenceColumn
+    newForeignKey.referenceTable &&
+    newForeignKey.referenceColumns[0]?.referenceColumn
   );
 
   const handleAddForeignKey = () => {
@@ -217,7 +217,9 @@ export function ForeignKeyPopover({
                   setNewForeignKey((prev) => ({
                     ...prev,
                     referenceTable: value,
-                    referenceColumns: [{ sourceColumn: prev.columnName || '', referenceColumn: '' }],
+                    referenceColumns: [
+                      { sourceColumn: prev.columnName || '', referenceColumn: '' },
+                    ],
                   }));
                 }}
               >
@@ -261,7 +263,8 @@ export function ForeignKeyPopover({
                     <span
                       className={cn(
                         'text-sm text-muted-foreground dark:text-neutral-400',
-                        newForeignKey.referenceColumns[0]?.referenceColumn && 'text-black dark:text-white'
+                        newForeignKey.referenceColumns[0]?.referenceColumn &&
+                          'text-black dark:text-white'
                       )}
                     >
                       {newForeignKey.referenceColumns[0]?.referenceColumn || 'Select column'}
