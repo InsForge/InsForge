@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { AppError } from '@/utils/errors.js';
@@ -811,7 +812,12 @@ export class DatabaseTableService {
     const sourceCols = fk.referenceColumns.map((r) => r.sourceColumn);
     const refCols = fk.referenceColumns.map((r) => r.referenceColumn);
     const safeTableName = fk.referenceTable.replace(/\./g, '_');
-    const constraintName = `fk_${sourceCols.join('_')}_${safeTableName}_${refCols.join('_')}`;
+    const baseName = `fk_${sourceCols.join('_')}_${safeTableName}_${refCols.join('_')}`;
+    const MAX_IDENTIFIER_LENGTH = 63;
+    const constraintName =
+      baseName.length > MAX_IDENTIFIER_LENGTH
+        ? `${baseName.slice(0, MAX_IDENTIFIER_LENGTH - 9)}_${createHash('sha256').update(baseName).digest('hex').slice(0, 8)}`
+        : baseName;
     const onDelete = fk.onDelete || 'RESTRICT';
     const onUpdate = fk.onUpdate || 'RESTRICT';
 

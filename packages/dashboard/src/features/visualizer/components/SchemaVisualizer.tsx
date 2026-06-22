@@ -319,14 +319,17 @@ export function SchemaVisualizer({
               },
             });
           } else {
-            // Regular table-to-table edge — use first reference column for handle
-            const firstRefCol = column.foreignKey.referenceColumns[0]?.referenceColumn || '';
+            // Regular table-to-table edge — match target column to the current source column
+            const matchingRef = column.foreignKey.referenceColumns.find(
+              (r) => r.sourceColumn === column.columnName
+            );
+            const targetHandle = `${matchingRef?.referenceColumn || ''}-target`;
             edges.push({
               id: edgeId,
               source: table.tableName,
               target: column.foreignKey.referenceTable,
               sourceHandle: `${column.columnName}-source`,
-              targetHandle: `${firstRefCol}-target`,
+              targetHandle,
               type: 'smoothstep',
               animated: true,
               style: { stroke: edgeColor, strokeWidth: 2, zIndex: 1000 },

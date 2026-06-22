@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Control, Controller, FieldError, UseFormReturn, UseFormSetValue } from 'react-hook-form';
 import { Calendar, Clock, Link2, X } from 'lucide-react';
 import { Button, Input, cn } from '@insforge/ui';
@@ -222,6 +222,7 @@ function FormJsonEditor({ value, nullable, onChange }: FormJsonEditorProps) {
 
 interface RecordFormFieldProps {
   field: ColumnSchema;
+  columns: ColumnSchema[];
   form: UseFormReturn<DatabaseRecord>;
   tableName: string;
 }
@@ -243,12 +244,22 @@ function FieldLabel({ field, tableName }: { field: ColumnSchema; tableName: stri
 
 interface FieldWithLinkProps {
   field: ColumnSchema;
+  columns: ColumnSchema[];
   control: Control<DatabaseRecord>;
   setValue: UseFormSetValue<DatabaseRecord>;
   children: ReactNode;
 }
 
-function FieldWithLink({ field, control, setValue, children }: FieldWithLinkProps) {
+function FieldWithLink({ field, columns, control, setValue, children }: FieldWithLinkProps) {
+  // Build type lookup for all columns (needed for sibling FK column coercion)
+  const columnTypeMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const col of columns) {
+      map[col.columnName] = col.type;
+    }
+    return map;
+  }, [columns]);
+
   if (!field.foreignKey) {
     return <>{children}</>;
   }
@@ -293,8 +304,10 @@ function FieldWithLink({ field, control, setValue, children }: FieldWithLinkProp
               onSelectRecord={(record: DatabaseRecord) => {
                 for (const refCol of foreignKey.referenceColumns) {
                   const refValue = record[refCol.referenceColumn];
-                  const converted = convertValueForColumn(field.type, String(refValue || ''));
-                  const val = converted.success ? converted.value : String(refValue || '');
+                  const rawValue = String(refValue ?? '');
+                  const sourceType = columnTypeMap[refCol.sourceColumn] || field.type;
+                  const converted = convertValueForColumn(sourceType, rawValue);
+                  const val = converted.success ? converted.value : rawValue;
                   if (refCol.sourceColumn === field.columnName) {
                     formField.onChange(val);
                   } else {
@@ -327,7 +340,7 @@ function FieldWithLink({ field, control, setValue, children }: FieldWithLinkProp
   );
 }
 
-export function RecordFormField({ field, form, tableName }: RecordFormFieldProps) {
+export function RecordFormField({ field, columns, form, tableName }: RecordFormFieldProps) {
   const {
     control,
     setValue,
@@ -464,7 +477,7 @@ export function RecordFormField({ field, form, tableName }: RecordFormFieldProps
       <FieldLabel field={field} tableName={tableName} />
 
       <div className="min-w-0 space-y-1">
-        <FieldWithLink field={field} control={control} setValue={setValue}>
+        <FieldWithLink field={field} columns={columns} control={control} setValue={setValue}>
           {renderInput()}
         </FieldWithLink>
 

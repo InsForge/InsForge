@@ -277,8 +277,8 @@ export const adminTableRecordsListQuerySchema = z
 
 export const adminTableRecordLookupQuerySchema = z
   .object({
-    column: z.union([z.string().trim().min(1), z.array(z.string().trim().min(1))]),
-    value: z.union([z.string().trim().min(1), z.array(z.string().trim().min(1))]),
+    column: z.union([z.string().trim().min(1), z.array(z.string().trim().min(1)).min(1)]),
+    value: z.union([z.string().trim().min(1), z.array(z.string().trim().min(1)).min(1)]),
   })
   .refine(
     (data) => {
