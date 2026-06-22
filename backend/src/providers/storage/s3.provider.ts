@@ -92,8 +92,9 @@ export class S3StorageProvider implements StorageProvider {
     // Support MinIO or other S3-compatible endpoints
     if (appConfig.storage.s3EndpointUrl) {
       s3Config.endpoint = appConfig.storage.s3EndpointUrl;
-      // MinIO requires path-style URLs
-      s3Config.forcePathStyle = true;
+      // MinIO needs path-style; Tencent COS / Aliyun OSS need virtual-hosted-style.
+      // Configurable via S3_FORCE_PATH_STYLE (default true, backward-compatible).
+      s3Config.forcePathStyle = appConfig.storage.s3ForcePathStyle;
     }
 
     this.s3Client = new S3Client(s3Config);
