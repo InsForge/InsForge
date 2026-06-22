@@ -25,6 +25,8 @@ CLAUDE.md
 .agents/skills/*
 !.agents/skills/insforge-dev/
 !.agents/skills/insforge-dev/**
+!.agents/docs/
+!.agents/docs/**
 deno.lock
 better-auth/
 .mcp.json
