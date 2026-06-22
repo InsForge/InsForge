@@ -80,7 +80,7 @@ export const crmSystemTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'companies',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'company_id', referenceColumn: 'id' }],
             onDelete: 'SET NULL',
             onUpdate: 'CASCADE',
           },
@@ -148,7 +148,7 @@ export const crmSystemTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'companies',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'company_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -161,7 +161,7 @@ export const crmSystemTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'contacts',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'contact_id', referenceColumn: 'id' }],
             onDelete: 'SET NULL',
             onUpdate: 'CASCADE',
           },
@@ -222,7 +222,7 @@ export const crmSystemTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'contacts',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'contact_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -235,7 +235,7 @@ export const crmSystemTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'deals',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'deal_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },

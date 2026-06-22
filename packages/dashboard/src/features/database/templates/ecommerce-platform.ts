@@ -95,7 +95,7 @@ export const ecommercePlatformTemplate: DatabaseTemplate = {
           isUnique: true,
           foreignKey: {
             referenceTable: 'auth.users',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'user_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -170,7 +170,7 @@ export const ecommercePlatformTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'customers',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'customer_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -224,7 +224,7 @@ export const ecommercePlatformTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'orders',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'order_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -237,7 +237,7 @@ export const ecommercePlatformTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'products',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'product_id', referenceColumn: 'id' }],
             onDelete: 'RESTRICT',
             onUpdate: 'CASCADE',
           },
@@ -277,7 +277,7 @@ export const ecommercePlatformTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'products',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'product_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -290,7 +290,7 @@ export const ecommercePlatformTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'customers',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'customer_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },

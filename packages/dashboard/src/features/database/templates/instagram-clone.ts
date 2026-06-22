@@ -18,7 +18,7 @@ export const instagramCloneTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'auth.users',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'user_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -58,7 +58,7 @@ export const instagramCloneTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'posts',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'post_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -71,7 +71,7 @@ export const instagramCloneTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'auth.users',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'user_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -104,7 +104,7 @@ export const instagramCloneTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'auth.users',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'user_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -117,7 +117,7 @@ export const instagramCloneTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'posts',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'post_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -143,7 +143,7 @@ export const instagramCloneTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'auth.users',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'follower_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -156,7 +156,7 @@ export const instagramCloneTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'auth.users',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'following_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },

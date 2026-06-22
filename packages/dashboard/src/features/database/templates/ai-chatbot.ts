@@ -19,7 +19,7 @@ export const aiChatbotTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'auth.users',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'user_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -66,7 +66,7 @@ export const aiChatbotTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'conversations',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'conversation_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -113,7 +113,7 @@ export const aiChatbotTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'messages',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'message_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -126,7 +126,7 @@ export const aiChatbotTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'auth.users',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'user_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -166,7 +166,7 @@ export const aiChatbotTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'auth.users',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'user_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
