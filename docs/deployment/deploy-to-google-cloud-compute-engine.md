@@ -1,3 +1,8 @@
+---
+title: "Deploy InsForge to Google Cloud Compute Engine"
+description: "Deploy InsForge on a Google Cloud Compute Engine VM with Docker Compose, covering firewall rules, SSH access, custom domains, and HTTPS setup."
+---
+
 # Deploy InsForge to Google Cloud Compute Engine
 
 This guide will walk you through deploying InsForge on Google Cloud Compute Engine using Docker Compose.
