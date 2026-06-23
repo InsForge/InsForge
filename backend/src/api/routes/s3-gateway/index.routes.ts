@@ -31,6 +31,36 @@ import * as putObjectTagging from './commands/put-object-tagging.js';
 import * as deleteObjectTagging from './commands/delete-object-tagging.js';
 import * as putBucketVersioning from './commands/put-bucket-versioning.js';
 
+type Handler = (req: S3GatewayRequest, res: Response) => Promise<void>;
+
+const handlers: Record<S3Op, Handler> = {
+  ListBuckets: listBuckets.handle,
+  HeadBucket: headBucket.handle,
+  CreateBucket: createBucket.handle,
+  DeleteBucket: deleteBucket.handle,
+  ListObjectsV2: listObjectsV2.handle,
+  HeadObject: headObject.handle,
+  GetObject: getObject.handle,
+  PutObject: putObject.handle,
+  DeleteObject: deleteObject.handle,
+  DeleteObjects: deleteObjects.handle,
+  CopyObject: copyObject.handle,
+  CreateMultipartUpload: createMultipartUpload.handle,
+  UploadPart: uploadPart.handle,
+  CompleteMultipartUpload: completeMultipartUpload.handle,
+  AbortMultipartUpload: abortMultipartUpload.handle,
+  ListParts: listParts.handle,
+  GetBucketLocation: getBucketLocation.handle,
+  GetBucketVersioning: getBucketVersioning.handle,
+  PutBucketVersioning: putBucketVersioning.handle,
+  GetBucketCors: getBucketCors.handle,
+  PutBucketCors: putBucketCors.handle,
+  DeleteBucketCors: deleteBucketCors.handle,
+  GetObjectTagging: getObjectTagging.handle,
+  PutObjectTagging: putObjectTagging.handle,
+  DeleteObjectTagging: deleteObjectTagging.handle,
+};
+
 export const s3GatewayRouter: Router = Router();
 
 // 1) Refuse at mount if backend isn't S3-compatible.
@@ -82,89 +112,15 @@ s3GatewayRouter.use(async (req: Request, res: Response) => {
   authed.s3Key = key;
   logger.debug('S3 gateway dispatch', { op, bucket, key });
   try {
-    switch (op) {
-      case 'ListBuckets':
-        await listBuckets.handle(authed, res);
-        return;
-      case 'HeadBucket':
-        await headBucket.handle(authed, res);
-        return;
-      case 'CreateBucket':
-        await createBucket.handle(authed, res);
-        return;
-      case 'DeleteBucket':
-        await deleteBucket.handle(authed, res);
-        return;
-      case 'ListObjectsV2':
-        await listObjectsV2.handle(authed, res);
-        return;
-      case 'HeadObject':
-        await headObject.handle(authed, res);
-        return;
-      case 'GetObject':
-        await getObject.handle(authed, res);
-        return;
-      case 'PutObject':
-        await putObject.handle(authed, res);
-        return;
-      case 'DeleteObject':
-        await deleteObject.handle(authed, res);
-        return;
-      case 'DeleteObjects':
-        await deleteObjects.handle(authed, res);
-        return;
-      case 'CopyObject':
-        await copyObject.handle(authed, res);
-        return;
-      case 'CreateMultipartUpload':
-        await createMultipartUpload.handle(authed, res);
-        return;
-      case 'UploadPart':
-        await uploadPart.handle(authed, res);
-        return;
-      case 'CompleteMultipartUpload':
-        await completeMultipartUpload.handle(authed, res);
-        return;
-      case 'AbortMultipartUpload':
-        await abortMultipartUpload.handle(authed, res);
-        return;
-      case 'ListParts':
-        await listParts.handle(authed, res);
-        return;
-      case 'GetBucketLocation':
-        await getBucketLocation.handle(authed, res);
-        return;
-      case 'GetBucketVersioning':
-        await getBucketVersioning.handle(authed, res);
-        return;
-      case 'GetBucketCors':
-        await getBucketCors.handle(authed, res);
-        return;
-      case 'PutBucketCors':
-        await putBucketCors.handle(authed, res);
-        return;
-      case 'DeleteBucketCors':
-        await deleteBucketCors.handle(authed, res);
-        return;
-      case 'GetObjectTagging':
-        await getObjectTagging.handle(authed, res);
-        return;
-      case 'PutObjectTagging':
-        await putObjectTagging.handle(authed, res);
-        return;
-      case 'DeleteObjectTagging':
-        await deleteObjectTagging.handle(authed, res);
-        return;
-      case 'PutBucketVersioning':
-        await putBucketVersioning.handle(authed, res);
-        return;
-      default:
-        sendS3Error(res, 'NotImplemented', `Operation ${op} not yet implemented`, {
-          resource: req.path,
-          requestId: authed.s3Auth?.requestId,
-        });
-        return;
+    const handler = handlers[op];
+    if (!handler) {
+      sendS3Error(res, 'NotImplemented', `Operation ${op} not yet implemented`, {
+        resource: req.path,
+        requestId: authed.s3Auth?.requestId,
+      });
+      return;
     }
+    await handler(authed, res);
   } catch (err) {
     if (res.headersSent) {
       logger.error('S3 gateway handler error after headers sent', { op, err });
