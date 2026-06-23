@@ -21,7 +21,7 @@ import * as uploadPart from './commands/upload-part.js';
 import * as completeMultipartUpload from './commands/complete-multipart-upload.js';
 import * as abortMultipartUpload from './commands/abort-multipart-upload.js';
 import * as listParts from './commands/list-parts.js';
-import * as getBucketLocation from './commands/stub-get-bucket-location.js';
+import * as getBucketLocation from './commands/get-bucket-location.js';
 import * as getBucketVersioning from './commands/get-bucket-versioning.js';
 import * as getBucketCors from './commands/get-bucket-cors.js';
 import * as putBucketCors from './commands/put-bucket-cors.js';
