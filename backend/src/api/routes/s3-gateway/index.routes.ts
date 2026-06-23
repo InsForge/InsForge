@@ -21,7 +21,8 @@ import * as uploadPart from './commands/upload-part.js';
 import * as completeMultipartUpload from './commands/complete-multipart-upload.js';
 import * as abortMultipartUpload from './commands/abort-multipart-upload.js';
 import * as listParts from './commands/list-parts.js';
-import * as stubs from './commands/stubs.js';
+import * as getBucketLocation from './commands/stub-get-bucket-location.js';
+import * as getBucketVersioning from './commands/get-bucket-versioning.js';
 import * as getBucketCors from './commands/get-bucket-cors.js';
 import * as putBucketCors from './commands/put-bucket-cors.js';
 import * as deleteBucketCors from './commands/delete-bucket-cors.js';
@@ -131,10 +132,10 @@ s3GatewayRouter.use(async (req: Request, res: Response) => {
         await listParts.handle(authed, res);
         return;
       case 'GetBucketLocation':
-        await stubs.getBucketLocation(authed, res);
+        await getBucketLocation.handle(authed, res);
         return;
       case 'GetBucketVersioning':
-        await stubs.getBucketVersioning(authed, res);
+        await getBucketVersioning.handle(authed, res);
         return;
       case 'GetBucketCors':
         await getBucketCors.handle(authed, res);
