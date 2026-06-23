@@ -1,3 +1,8 @@
+---
+title: "VPS deployment and security guide"
+description: "Deploy InsForge on a generic Linux VPS, harden it with firewall, SSH, and TLS best practices, and maintain it with safe updates and rollbacks."
+---
+
 # Deployment & Security Guide for VPS Installation
 
 This comprehensive guide covers deploying InsForge on a generic VPS (Virtual Private Server) for production, hardening your instance with security best practices, and maintaining it over time with safe updates and rollback procedures.
