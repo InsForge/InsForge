@@ -872,8 +872,28 @@ export function useCloudHosting() {
             return;
           }
           case 'ADVISOR_CATEGORY_COUNTS': {
-            const counts = message.counts as DashboardAdvisorCategoryCountsResponse;
-            resolvePendingRequest('advisorCategoryCounts', counts);
+            const rawCounts = message.counts as Record<string, Record<string, unknown>> | undefined;
+            const matrix: DashboardAdvisorCategoryCountsResponse = {
+              security: { critical: 0, warning: 0, info: 0 },
+              performance: { critical: 0, warning: 0, info: 0 },
+              health: { critical: 0, warning: 0, info: 0 },
+            };
+
+            if (rawCounts && typeof rawCounts === 'object') {
+              for (const cat of VALID_ADVISOR_CATEGORIES) {
+                const catGroup = rawCounts[cat];
+                if (catGroup && typeof catGroup === 'object') {
+                  for (const sev of VALID_ADVISOR_SEVERITIES) {
+                    const countVal = catGroup[sev];
+                    if (typeof countVal === 'number' && Number.isFinite(countVal)) {
+                      matrix[cat][sev] = countVal;
+                    }
+                  }
+                }
+              }
+            }
+
+            resolvePendingRequest('advisorCategoryCounts', matrix);
             return;
           }
           case 'ADVISOR_CATEGORY_COUNTS_ERROR': {

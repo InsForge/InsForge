@@ -744,9 +744,11 @@ export class DatabaseAdvisorService {
         }
 
         // Update scan status
-        const finalStatus = failedRules.length > 0 ? 'failed' : 'completed';
+        const finalStatus = 'completed';
         const finalErrorMessage =
-          failedRules.length > 0 ? `Scan failed for rules: ${failedRules.join(', ')}` : null;
+          failedRules.length > 0
+            ? `Scan completed with warnings. Failed rules: ${failedRules.join(', ')}`
+            : null;
 
         await client.query(
           `
