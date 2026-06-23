@@ -112,15 +112,7 @@ s3GatewayRouter.use(async (req: Request, res: Response) => {
   authed.s3Key = key;
   logger.debug('S3 gateway dispatch', { op, bucket, key });
   try {
-    const handler = handlers[op];
-    if (!handler) {
-      sendS3Error(res, 'NotImplemented', `Operation ${op} not yet implemented`, {
-        resource: req.path,
-        requestId: authed.s3Auth?.requestId,
-      });
-      return;
-    }
-    await handler(authed, res);
+    await handlers[op](authed, res);
   } catch (err) {
     if (res.headersSent) {
       logger.error('S3 gateway handler error after headers sent', { op, err });
