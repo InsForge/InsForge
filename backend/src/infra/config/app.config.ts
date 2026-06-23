@@ -81,6 +81,7 @@ export interface AppConfig {
     awsAccessKeyId: string | undefined;
     awsSecretAccessKey: string | undefined;
     s3EndpointUrl: string | undefined;
+    s3ForcePathStyle: boolean;
     awsConfigBucket: string;
     awsConfigRegion: string;
   };
@@ -182,6 +183,9 @@ export function loadConfig(): AppConfig {
       awsAccessKeyId: process.env.AWS_ACCESS_KEY_ID || undefined,
       awsSecretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || undefined,
       s3EndpointUrl: process.env.S3_ENDPOINT_URL || undefined,
+      // Default true (MinIO etc.). Set S3_FORCE_PATH_STYLE=false for providers
+      // that require virtual-hosted-style addressing (Tencent COS, Aliyun OSS).
+      s3ForcePathStyle: process.env.S3_FORCE_PATH_STYLE !== 'false',
       awsConfigBucket: process.env.AWS_CONFIG_BUCKET || 'insforge-config',
       awsConfigRegion: process.env.AWS_CONFIG_REGION || 'us-east-2',
     },

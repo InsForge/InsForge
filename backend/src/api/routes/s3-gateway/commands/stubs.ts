@@ -1,11 +1,10 @@
 import { Response } from 'express';
 import { toXml } from '../xml.js';
-import { S3AuthenticatedRequest } from '@/api/middlewares/s3-sigv4.js';
+import { S3ProtocolError } from '../errors.js';
+import { StorageService } from '@/services/storage/storage.service.js';
+import { S3GatewayRequest, getS3Bucket } from '../request.js';
 
-// These stubs don't need async work but the router awaits every handler
-// uniformly. Declaring them as Promise-returning (rather than async) keeps
-// the call-site shape consistent without tripping require-await.
-export function getBucketLocation(_req: S3AuthenticatedRequest, res: Response): Promise<void> {
+export function getBucketLocation(_req: S3GatewayRequest, res: Response): Promise<void> {
   res
     .status(200)
     .type('application/xml')
@@ -20,7 +19,14 @@ export function getBucketLocation(_req: S3AuthenticatedRequest, res: Response): 
   return Promise.resolve();
 }
 
-export function getBucketVersioning(_req: S3AuthenticatedRequest, res: Response): Promise<void> {
+export async function getBucketVersioning(req: S3GatewayRequest, res: Response): Promise<void> {
+  const bucket = getS3Bucket(req);
+  const svc = StorageService.getInstance();
+  if (!(await svc.bucketExists(bucket))) {
+    throw new S3ProtocolError('NoSuchBucket', `The specified bucket does not exist: ${bucket}`);
+  }
+  const status = await svc.getBucketVersioningStatus(bucket);
+
   res
     .status(200)
     .type('application/xml')
@@ -28,9 +34,8 @@ export function getBucketVersioning(_req: S3AuthenticatedRequest, res: Response)
       toXml({
         VersioningConfiguration: {
           $: { xmlns: 'http://s3.amazonaws.com/doc/2006-03-01/' },
-          Status: 'Disabled',
+          Status: status ?? 'Disabled',
         },
       })
     );
-  return Promise.resolve();
 }

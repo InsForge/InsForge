@@ -8,6 +8,7 @@ export type S3ErrorCode =
   | 'AuthorizationHeaderMalformed'
   | 'NoSuchBucket'
   | 'NoSuchKey'
+  | 'NoSuchCORSConfiguration'
   | 'BucketAlreadyOwnedByYou'
   | 'BucketNotEmpty'
   | 'InvalidBucketName'
@@ -28,6 +29,7 @@ const statusMap: Record<S3ErrorCode, number> = {
   AuthorizationHeaderMalformed: 400,
   NoSuchBucket: 404,
   NoSuchKey: 404,
+  NoSuchCORSConfiguration: 404,
   BucketAlreadyOwnedByYou: 409,
   BucketNotEmpty: 409,
   InvalidBucketName: 400,

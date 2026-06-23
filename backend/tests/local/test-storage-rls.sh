@@ -32,6 +32,7 @@ PASS="testpass123"
 
 ALICE_EMAIL="alice-rls-$TS@example.com"
 BOB_EMAIL="bob-rls-$TS@example.com"
+ANON_KEY=$(get_anon_key)
 
 # === helpers ============================================================
 
@@ -128,8 +129,10 @@ curl -sS -X POST "$API/storage/buckets" \
 print_success "Bucket created: $BUCKET"
 
 curl -sS -X POST "$API/auth/users" -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ANON_KEY" \
   -d "{\"email\":\"$ALICE_EMAIL\",\"password\":\"$PASS\",\"name\":\"Alice\"}" > /dev/null
 curl -sS -X POST "$API/auth/users" -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ANON_KEY" \
   -d "{\"email\":\"$BOB_EMAIL\",\"password\":\"$PASS\",\"name\":\"Bob\"}" > /dev/null
 register_test_user "$ALICE_EMAIL"
 register_test_user "$BOB_EMAIL"

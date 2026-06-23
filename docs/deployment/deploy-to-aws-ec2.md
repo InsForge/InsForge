@@ -494,4 +494,4 @@ effective_cache_size = 3GB
 
 **Congratulations! 🎉** Your InsForge instance is now running on AWS EC2. You can start building applications by connecting AI agents to your backend platform.
 
-For other production deployment strategies, check out our [deployment guides](./README.md).
+For other production deployment strategies, check out our [deployment guides](/deployment/deployment-security-guide).

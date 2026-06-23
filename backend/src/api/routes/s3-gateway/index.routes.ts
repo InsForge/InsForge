@@ -22,6 +22,13 @@ import * as completeMultipartUpload from './commands/complete-multipart-upload.j
 import * as abortMultipartUpload from './commands/abort-multipart-upload.js';
 import * as listParts from './commands/list-parts.js';
 import * as stubs from './commands/stubs.js';
+import * as getBucketCors from './commands/get-bucket-cors.js';
+import * as putBucketCors from './commands/put-bucket-cors.js';
+import * as deleteBucketCors from './commands/delete-bucket-cors.js';
+import * as getObjectTagging from './commands/get-object-tagging.js';
+import * as putObjectTagging from './commands/put-object-tagging.js';
+import * as deleteObjectTagging from './commands/delete-object-tagging.js';
+import * as putBucketVersioning from './commands/put-bucket-versioning.js';
 
 export const s3GatewayRouter: Router = Router();
 
@@ -128,6 +135,27 @@ s3GatewayRouter.use(async (req: Request, res: Response) => {
         return;
       case 'GetBucketVersioning':
         await stubs.getBucketVersioning(authed, res);
+        return;
+      case 'GetBucketCors':
+        await getBucketCors.handle(authed, res);
+        return;
+      case 'PutBucketCors':
+        await putBucketCors.handle(authed, res);
+        return;
+      case 'DeleteBucketCors':
+        await deleteBucketCors.handle(authed, res);
+        return;
+      case 'GetObjectTagging':
+        await getObjectTagging.handle(authed, res);
+        return;
+      case 'PutObjectTagging':
+        await putObjectTagging.handle(authed, res);
+        return;
+      case 'DeleteObjectTagging':
+        await deleteObjectTagging.handle(authed, res);
+        return;
+      case 'PutBucketVersioning':
+        await putBucketVersioning.handle(authed, res);
         return;
       default:
         sendS3Error(res, 'NotImplemented', `Operation ${op} not yet implemented`, {

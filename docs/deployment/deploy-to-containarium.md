@@ -70,7 +70,7 @@ API_BASE_URL=https://<your-subdomain>
 VITE_API_BASE_URL=https://<your-subdomain>
 ```
 
-See [`deploy/docker-compose/.env.example`](../../deploy/docker-compose/.env.example) for the full list (OpenRouter, OAuth providers, Stripe, Vercel).
+See [`deploy/docker-compose/.env.example`](https://github.com/insforge/insforge/blob/main/deploy/docker-compose/.env.example) for the full list (OpenRouter, OAuth providers, Stripe, Vercel).
 
 > **Secrets handling:** for production, prefer Containarium's tmpfs secrets (`--delivery=file`; see [Containarium's secrets ops doc](https://github.com/footprintai/Containarium/blob/main/docs/SECRETS-OPERATIONS.md)). These are delivered as 0440 files on tmpfs and never appear in `/proc/<pid>/environ`. Wire them into the compose stack via a compose override using `env_file:`.
 
@@ -282,4 +282,4 @@ containarium sleep insforge && containarium wake insforge
 
 ---
 
-For other deployment strategies, see the [deployment guides](./README.md).
+For other deployment strategies, see the [deployment guides](/deployment/deployment-security-guide).
