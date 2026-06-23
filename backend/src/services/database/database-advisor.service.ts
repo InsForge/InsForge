@@ -9,6 +9,7 @@ export interface AdvisorSummary {
   status: 'running' | 'completed' | 'failed';
   scanType: 'manual' | 'scheduled';
   scannedAt: string;
+  errorMessage?: string | null;
   summary: {
     total: number;
     critical: number;
@@ -26,7 +27,6 @@ export interface AdvisorIssue {
   description: string;
   affectedObject?: string;
   recommendation?: string;
-  isResolved: boolean;
 }
 
 export class DatabaseAdvisorService {
@@ -57,6 +57,7 @@ export class DatabaseAdvisorService {
     const pool = this.dbManager.getPool();
     const client = await pool.connect();
     let acquired = false;
+    let startedScan = false;
 
     try {
       // Try to acquire the session-level advisory lock atomically
@@ -73,7 +74,11 @@ export class DatabaseAdvisorService {
         );
       }
 
+      // Set statement timeout (e.g. 15 seconds) for this scan session to avoid hanging queries
+      await client.query("SET statement_timeout = '15s'");
+
       this.isScanning = true;
+      startedScan = true;
 
       // 1. Insert scan record with running status
       const scanResult = await client.query<{ id: string }>(
@@ -102,8 +107,13 @@ export class DatabaseAdvisorService {
           );
         });
       }
+      await client.query('RESET statement_timeout').catch((err) => {
+        logger.error('Failed to reset statement_timeout during early error cleanup:', err);
+      });
       client.release();
-      this.isScanning = false;
+      if (startedScan) {
+        this.isScanning = false;
+      }
       throw error;
     }
   }
@@ -686,6 +696,7 @@ export class DatabaseAdvisorService {
       }
 
       // Execute each query and record findings
+      const failedRules: string[] = [];
       for (const [key, sql] of Object.entries(queries)) {
         try {
           const result = await client.query(sql);
@@ -695,7 +706,7 @@ export class DatabaseAdvisorService {
               severity: row.severity,
               category: row.category,
               title: row.title,
-              description: row.description,
+              description: row.detail || row.description,
               affectedObject: row.affected_object || null,
               recommendation: row.remediation || null,
             });
@@ -704,6 +715,7 @@ export class DatabaseAdvisorService {
           logger.warn(`Advisor scan rule query failed for key: ${key}`, {
             error: String(queryErr),
           });
+          failedRules.push(key);
         }
       }
 
@@ -731,14 +743,18 @@ export class DatabaseAdvisorService {
           );
         }
 
-        // Update scan status to completed
+        // Update scan status
+        const finalStatus = failedRules.length > 0 ? 'failed' : 'completed';
+        const finalErrorMessage =
+          failedRules.length > 0 ? `Scan failed for rules: ${failedRules.join(', ')}` : null;
+
         await client.query(
           `
             UPDATE system.advisor_scans
-            SET status = 'completed'
+            SET status = $2, error_message = $3
             WHERE id = $1
           `,
-          [scanId]
+          [scanId, finalStatus, finalErrorMessage]
         );
         await client.query('COMMIT');
       } catch (dbErr) {
@@ -762,6 +778,9 @@ export class DatabaseAdvisorService {
           logger.error('Failed to update scan status to failed:', updateErr);
         });
     } finally {
+      await client.query('RESET statement_timeout').catch((err) => {
+        logger.error('Failed to reset statement_timeout:', err);
+      });
       await client.query('SELECT pg_advisory_unlock(14589230, 1)').catch((err) => {
         logger.error('Failed to release database advisor scan lock:', err);
       });
@@ -781,9 +800,10 @@ export class DatabaseAdvisorService {
       status: 'running' | 'completed' | 'failed';
       scan_type: 'manual' | 'scheduled';
       scanned_at: Date;
+      error_message: string | null;
     }>(
       `
-        SELECT id, status, scan_type, scanned_at
+        SELECT id, status, scan_type, scanned_at, error_message
         FROM system.advisor_scans
         ORDER BY scanned_at DESC
         LIMIT 1
@@ -820,6 +840,7 @@ export class DatabaseAdvisorService {
       status: scan.status,
       scanType: scan.scan_type,
       scannedAt: scan.scanned_at.toISOString(),
+      errorMessage: scan.error_message || null,
       summary: {
         total,
         critical: counts.critical || 0,
@@ -843,6 +864,7 @@ export class DatabaseAdvisorService {
     const latestScan = await pool.query<{ id: string }>(
       `
         SELECT id FROM system.advisor_scans
+        WHERE status = 'completed'
         ORDER BY scanned_at DESC
         LIMIT 1
       `
@@ -856,7 +878,7 @@ export class DatabaseAdvisorService {
     const { severity, category, limit = 50, offset = 0 } = filters;
 
     let query = `
-      SELECT id, rule_id AS "ruleId", severity, category, title, description, affected_object AS "affectedObject", recommendation, is_resolved AS "isResolved"
+      SELECT id, rule_id AS "ruleId", severity, category, title, description, affected_object AS "affectedObject", recommendation
       FROM system.advisor_findings
       WHERE scan_id = $1
     `;
@@ -890,5 +912,55 @@ export class DatabaseAdvisorService {
       issues: issuesResult.rows,
       total,
     };
+  }
+
+  /**
+   * Get category and severity count matrix for the latest completed scan.
+   */
+  public async getLatestScanCategoryCounts(): Promise<Record<string, Record<string, number>>> {
+    const pool = this.dbManager.getPool();
+
+    // 1. Get latest completed scan
+    const latestScan = await pool.query<{ id: string }>(
+      `
+        SELECT id FROM system.advisor_scans
+        WHERE status = 'completed'
+        ORDER BY scanned_at DESC
+        LIMIT 1
+      `
+    );
+
+    const matrix: Record<string, Record<string, number>> = {
+      security: { critical: 0, warning: 0, info: 0 },
+      performance: { critical: 0, warning: 0, info: 0 },
+      health: { critical: 0, warning: 0, info: 0 },
+    };
+
+    if (latestScan.rows.length === 0) {
+      return matrix;
+    }
+
+    const scanId = latestScan.rows[0].id;
+
+    // 2. Query counts grouped by category and severity
+    const countResult = await pool.query<{ category: string; severity: string; count: string }>(
+      `
+        SELECT category, severity, count(*)::int AS count
+        FROM system.advisor_findings
+        WHERE scan_id = $1
+        GROUP BY category, severity
+      `,
+      [scanId]
+    );
+
+    for (const row of countResult.rows) {
+      const cat = row.category;
+      const sev = row.severity;
+      if (matrix[cat] && matrix[cat][sev] !== undefined) {
+        matrix[cat][sev] = parseInt(row.count, 10);
+      }
+    }
+
+    return matrix;
   }
 }

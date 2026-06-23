@@ -40,6 +40,7 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
     onRequestProjectMetrics,
     onRequestAdvisorLatest,
     onRequestAdvisorIssues,
+    onRequestAdvisorCategoryCounts,
     onTriggerAdvisorScan,
     onConnectPosthog,
     subscribePosthogConnectionStatus,
@@ -78,6 +79,9 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
       onRequestAdvisorIssues:
         onRequestAdvisorIssues ??
         (mode === 'self-hosting' ? (q) => advisorService.getIssues(q) : undefined),
+      onRequestAdvisorCategoryCounts:
+        onRequestAdvisorCategoryCounts ??
+        (mode === 'self-hosting' ? () => advisorService.getCategoryCounts() : undefined),
       onTriggerAdvisorScan:
         onTriggerAdvisorScan ??
         (mode === 'self-hosting' ? () => advisorService.triggerScan() : undefined),
@@ -109,6 +113,7 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
       onRequestProjectMetrics,
       onRequestAdvisorLatest,
       onRequestAdvisorIssues,
+      onRequestAdvisorCategoryCounts,
       onTriggerAdvisorScan,
       onConnectPosthog,
       subscribePosthogConnectionStatus,

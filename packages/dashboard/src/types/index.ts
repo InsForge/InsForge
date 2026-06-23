@@ -98,6 +98,7 @@ export interface DashboardAdvisorSummary {
   status: 'running' | 'completed' | 'failed';
   scanType: 'scheduled' | 'manual';
   scannedAt: string; // ISO
+  errorMessage?: string | null;
   summary: { total: number; critical: number; warning: number; info: number };
 }
 
@@ -110,13 +111,17 @@ export interface DashboardAdvisorIssue {
   description: string;
   affectedObject?: string;
   recommendation?: string;
-  isResolved: boolean;
 }
 
 export interface DashboardAdvisorIssuesResponse {
   issues: DashboardAdvisorIssue[];
   total: number;
 }
+
+export type DashboardAdvisorCategoryCountsResponse = Record<
+  DashboardAdvisorCategory,
+  Record<DashboardAdvisorSeverity, number>
+>;
 
 export interface DashboardAdvisorIssuesQuery {
   severity?: DashboardAdvisorSeverity;
@@ -163,6 +168,7 @@ export interface DashboardProps {
   onRequestAdvisorIssues?: (
     query: DashboardAdvisorIssuesQuery
   ) => Promise<DashboardAdvisorIssuesResponse>;
+  onRequestAdvisorCategoryCounts?: () => Promise<DashboardAdvisorCategoryCountsResponse>;
   onTriggerAdvisorScan?: () => Promise<void>;
   /** Cloud-hosting only: ask the parent shell to start the PostHog OAuth flow. */
   onConnectPosthog?: (projectId: string) => void;

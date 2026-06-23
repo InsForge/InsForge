@@ -42,11 +42,11 @@ router.get('/issues', verifyAdmin, async (req: AuthRequest, res: Response, next:
     const severity = req.query.severity as string | undefined;
     const category = req.query.category as string | undefined;
     let limit: number | undefined;
-    if (req.query.limit) {
+    if (req.query.limit !== undefined && req.query.limit !== '') {
       limit = parseInt(req.query.limit as string, 10);
-      if (Number.isNaN(limit) || limit < 0) {
+      if (Number.isNaN(limit) || limit <= 0) {
         throw new AppError(
-          'Invalid limit parameter: must be a non-negative integer',
+          'Invalid limit parameter: must be a positive integer',
           400,
           ERROR_CODES.INVALID_INPUT
         );
@@ -54,7 +54,7 @@ router.get('/issues', verifyAdmin, async (req: AuthRequest, res: Response, next:
     }
 
     let offset: number | undefined;
-    if (req.query.offset) {
+    if (req.query.offset !== undefined && req.query.offset !== '') {
       offset = parseInt(req.query.offset as string, 10);
       if (Number.isNaN(offset) || offset < 0) {
         throw new AppError(
@@ -78,5 +78,23 @@ router.get('/issues', verifyAdmin, async (req: AuthRequest, res: Response, next:
     next(error);
   }
 });
+
+/**
+ * Get category and severity counts for the latest scan.
+ * GET /api/advisor/category-counts
+ */
+router.get(
+  '/category-counts',
+  verifyAdmin,
+  async (_req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const counts = await advisorService.getLatestScanCategoryCounts();
+      successResponse(res, counts);
+    } catch (error: unknown) {
+      logger.warn('Get advisor category counts error:', error);
+      next(error);
+    }
+  }
+);
 
 export { router as advisorRouter };

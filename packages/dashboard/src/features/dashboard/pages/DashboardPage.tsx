@@ -37,6 +37,7 @@ import { useUsers } from '#features/auth';
 import { CLISection, MCPSection } from '#features/dashboard/components/connect';
 import { useOpenConnectDialog } from '#layout/ConnectDialogContext';
 import { ObservabilitySection } from '#features/dashboard/components/observability';
+import { BackendAdvisorSection } from '#features/dashboard/components/advisor';
 const REGION_COUNTRY_CODE_MAP: Record<string, 'us' | 'de' | 'sg'> = {
   'us-test': 'us',
   'us-east': 'us',
@@ -542,12 +543,8 @@ export default function DashboardPage() {
   }
 
   return (
-    <main
-      className={`h-full min-h-0 min-w-0 overflow-y-auto bg-semantic-0${isCloudHostingMode ? '' : ' lg:overflow-hidden'}`}
-    >
-      <div
-        className={`flex min-w-0 flex-col lg:flex-row${isCloudHostingMode ? '' : ' min-h-full lg:h-full lg:min-h-0'}`}
-      >
+    <main className="h-full min-h-0 min-w-0 overflow-y-auto bg-semantic-0">
+      <div className="flex min-w-0 flex-col lg:flex-row">
         <section className="insforge-dashboard-home-sidebar lg:h-full min-w-0 shrink-0 lg:overflow-y-auto border-b border-[var(--alpha-8)] px-10 py-10 lg:border-r lg:border-b-0">
           <div className="mx-auto flex w-full max-w-[400px] flex-col gap-12">
             <div className="flex flex-col gap-12">
@@ -669,11 +666,10 @@ export default function DashboardPage() {
           </div>
         </section>
       </div>
-      {isCloudHostingMode && (
-        <div className="flex flex-col gap-12 px-10 py-10">
-          <ObservabilitySection />
-        </div>
-      )}
+      <div className="flex flex-col gap-12 px-10 py-10">
+        {isCloudHostingMode && <ObservabilitySection />}
+        <BackendAdvisorSection />
+      </div>
     </main>
   );
 }

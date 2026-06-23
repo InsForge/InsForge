@@ -127,6 +127,7 @@ describe('Database Advisor Unit Tests', () => {
                 status: 'completed',
                 scan_type: 'manual',
                 scanned_at: new Date('2026-06-18T10:00:00Z'),
+                error_message: null,
               },
             ],
           });
@@ -149,6 +150,7 @@ describe('Database Advisor Unit Tests', () => {
         status: 'completed',
         scanType: 'manual',
         scannedAt: '2026-06-18T10:00:00.000Z',
+        errorMessage: null,
         summary: {
           total: 5,
           critical: 2,
@@ -179,7 +181,6 @@ describe('Database Advisor Unit Tests', () => {
                 description: 'Enable RLS',
                 affectedObject: 'users',
                 recommendation: 'ALTER TABLE',
-                isResolved: false,
               },
             ],
           });
@@ -281,7 +282,6 @@ describe('Database Advisor Unit Tests', () => {
                 category: 'security',
                 title: 'RLS disabled',
                 description: 'Enable RLS',
-                isResolved: false,
               },
             ],
           });
@@ -309,6 +309,29 @@ describe('Database Advisor Unit Tests', () => {
         .expect(400);
 
       expect(res2.body.error).toContain('Invalid offset parameter');
+    });
+
+    it('GET /api/advisor/category-counts should return category/severity matrix', async () => {
+      queryMock.mockImplementation((sql: string) => {
+        if (sql.includes('advisor_scans')) {
+          return Promise.resolve({ rows: [{ id: 'scan-uuid' }] });
+        }
+        if (sql.includes('advisor_findings')) {
+          return Promise.resolve({
+            rows: [
+              { category: 'security', severity: 'critical', count: '2' },
+              { category: 'performance', severity: 'warning', count: '1' },
+            ],
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const res = await request(app).get('/api/advisor/category-counts').expect(200);
+
+      expect(res.body.security.critical).toBe(2);
+      expect(res.body.performance.warning).toBe(1);
+      expect(res.body.health.info).toBe(0);
     });
   });
 });

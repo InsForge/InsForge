@@ -16,7 +16,6 @@ import {
   Download,
   BookOpen,
   CreditCard,
-  Lightbulb,
 } from 'lucide-react';
 
 export interface DashboardSecondaryMenuItem {
@@ -77,12 +76,6 @@ export const dashboardStaticMenuItems: DashboardPrimaryMenuItem[] = [
     label: 'Storage',
     href: '/dashboard/storage',
     icon: HardDrive,
-  },
-  {
-    id: 'advisors',
-    label: 'Advisors',
-    href: '/dashboard/advisors',
-    icon: Lightbulb,
     sectionEnd: true,
   },
   {

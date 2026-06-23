@@ -65,33 +65,14 @@ function emptyMatrix(): AdvisorCategorySeverityMatrix {
   return { security: empty(), performance: empty(), health: empty() };
 }
 
-const ADVISOR_COUNT_PAGE_SIZE = 100;
-
 export function useAdvisorCategoryCounts() {
   const host = useDashboardHost();
-  const fetcher = host.onRequestAdvisorIssues;
+  const fetcher = host.onRequestAdvisorCategoryCounts;
   const isEnabled = !!fetcher;
 
   return useQuery<AdvisorCategorySeverityMatrix, Error>({
     queryKey: ADVISOR_QUERY_KEYS.categoryCounts,
-    queryFn: async () => {
-      if (!fetcher) {
-        return emptyMatrix();
-      }
-      const matrix = emptyMatrix();
-      let offset = 0;
-      while (true) {
-        const page = await fetcher({ limit: ADVISOR_COUNT_PAGE_SIZE, offset });
-        for (const issue of page.issues) {
-          matrix[issue.category][issue.severity] += 1;
-        }
-        offset += page.issues.length;
-        if (page.issues.length < ADVISOR_COUNT_PAGE_SIZE || offset >= page.total) {
-          break;
-        }
-      }
-      return matrix;
-    },
+    queryFn: () => (fetcher ? fetcher() : Promise.resolve(emptyMatrix())),
     enabled: isEnabled,
     retry: false,
     staleTime: 60 * 1000,
