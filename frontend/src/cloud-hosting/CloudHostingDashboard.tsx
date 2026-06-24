@@ -28,6 +28,8 @@ export function CloudHostingDashboard() {
     connectPosthog,
     openPosthog,
     subscribePosthogConnectionStatus,
+    connectApify,
+    subscribeApifyConnectionStatus,
   } = useCloudHosting();
 
   return (
@@ -59,6 +61,8 @@ export function CloudHostingDashboard() {
       onConnectPosthog={connectPosthog}
       onOpenPosthog={openPosthog}
       subscribePosthogConnectionStatus={subscribePosthogConnectionStatus}
+      onConnectApify={connectApify}
+      subscribeApifyConnectionStatus={subscribeApifyConnectionStatus}
     />
   );
 }

@@ -32,5 +32,6 @@ export type {
   DashboardAdvisorIssuesResponse,
   DashboardPosthogConnectionStatus,
   DashboardPosthogOpenResult,
+  DashboardApifyConnectionStatus,
 } from './types';
 export type { DashboardPrimaryMenuItem } from './navigation/menuItems';
