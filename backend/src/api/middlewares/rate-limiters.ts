@@ -58,33 +58,7 @@ export const sendEmailOTPRateLimiter = rateLimit({
   handler: (_req: Request, _res: Response, next: NextFunction) => {
     next(
       new AppError(
-        'Too many anonymous sign-in requests from this IP. Please try again in 15 minutes.',
-        429,
-        ERROR_CODES.TOO_MANY_REQUESTS
-      )
-    );
-  },
-  // Count all requests (both successes and failures) to prevent resource exhaustion and enumeration
-  skipSuccessfulRequests: false,
-  skipFailedRequests: false,
-});
-
-/**
- * Per-IP rate limiter for anonymous auth requests
- * Prevents brute-force attacks, resource exhaustion, and enumeration from single IP
- *
- * Limits: 5 requests per 15 minutes per IP
- * Counts ALL requests (both successful and failed) to prevent abuse
- */
-export const anonymousAuthRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 requests per windowMs
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  handler: (_req: Request, _res: Response, next: NextFunction) => {
-    next(
-      new AppError(
-        'Too many anonymous authentication requests from this IP. Please try again in 15 minutes.',
+        'Too many send email verification requests from this IP. Please try again in 15 minutes.',
         429,
         ERROR_CODES.TOO_MANY_REQUESTS
       )

@@ -17,11 +17,7 @@ import {
 import adminRouter from './admin.routes.js';
 import oauthRouter from './oauth.routes.js';
 import customOAuthRouter from './custom-oauth.routes.js';
-import {
-  anonymousAuthRateLimiter,
-  sendEmailOTPLimiter,
-  verifyOTPLimiter,
-} from '@/api/middlewares/rate-limiters.js';
+import { sendEmailOTPLimiter, verifyOTPLimiter } from '@/api/middlewares/rate-limiters.js';
 import {
   REFRESH_TOKEN_COOKIE_NAME,
   setRefreshTokenCookie,
@@ -83,6 +79,38 @@ function buildRedirectUrl(baseUrl: string, params: Record<string, string>): stri
     url.searchParams.set(key, value);
   });
   return url.toString();
+}
+
+/**
+ * Attaches refresh token credentials to a session response in-place.
+ * - Web clients: sets an httpOnly refresh-token cookie and writes csrfToken into the result.
+ * - Non-web clients (mobile, desktop, server): writes refreshToken into the result body.
+ *
+ * Accepts both CreateSessionResponse and CreateUserResponse — the early return on
+ * !result.user safely handles the cases where user may be absent (e.g. email-verification flow).
+ * Call this once per route that returns a session so the logic stays in one place.
+ */
+function attachSessionTokens(
+  res: Response,
+  result: CreateSessionResponse | CreateUserResponse,
+  clientType: ReturnType<typeof parseClientType>
+): void {
+  if (!result.user) {
+    return;
+  }
+  const tokenManager = TokenManager.getInstance();
+  if (clientType === 'web') {
+    const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
+      result.user.id,
+      'user'
+    );
+    setRefreshTokenCookie(res, refreshToken);
+    result.csrfToken = csrfToken;
+  } else {
+    // Non-web clients (mobile, desktop, server): return refresh token in response body.
+    // Server clients cannot rely on browser cookies, so they follow the native-app flow.
+    result.refreshToken = tokenManager.generateRefreshToken(result.user.id, 'user');
+  }
 }
 
 // Mount OAuth routes
@@ -398,21 +426,7 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
 
     // Set refresh token based on client type (skip when admin is adding a user)
     if (result.accessToken && result.user && !adminCreatingUser) {
-      const tokenManager = TokenManager.getInstance();
-      if (clientType === 'web') {
-        // Web clients: use httpOnly cookie + CSRF token
-        const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
-          result.user.id,
-          'user'
-        );
-        setRefreshTokenCookie(res, refreshToken);
-        result.csrfToken = csrfToken;
-      } else {
-        const refreshToken = tokenManager.generateRefreshToken(result.user.id, 'user');
-        // Non-web clients (mobile, desktop, server): return refresh token in response body.
-        // Server clients cannot rely on browser cookies, so they follow the native-app flow.
-        result.refreshToken = refreshToken;
-      }
+      attachSessionTokens(res, result, clientType);
     }
 
     const socket = SocketManager.getInstance();
@@ -448,21 +462,7 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
     const result: CreateSessionResponse = await authService.login(email, password);
 
     // Set refresh token based on client type
-    const tokenManager = TokenManager.getInstance();
-    if (clientType === 'web') {
-      // Web clients: use httpOnly cookie + CSRF token
-      const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
-        result.user.id,
-        'user'
-      );
-      setRefreshTokenCookie(res, refreshToken);
-      result.csrfToken = csrfToken;
-    } else {
-      const refreshToken = tokenManager.generateRefreshToken(result.user.id, 'user');
-      // Non-web clients (mobile, desktop, server): return refresh token in response body.
-      // Server clients cannot rely on browser cookies, so they follow the native-app flow.
-      result.refreshToken = refreshToken;
-    }
+    attachSessionTokens(res, result, clientType);
 
     successResponse(res, result);
   } catch (error) {
@@ -470,40 +470,22 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
   }
 });
 
-// POST /api/auth/anonymous - Create a new anonymous session
+// POST /api/auth/users/anonymous - Create a new anonymous user
 // Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'
-router.post(
-  '/anonymous',
-  anonymousAuthRateLimiter,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const clientType = parseClientType(req.query.client_type);
+router.post('/users/anonymous', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const clientType = parseClientType(req.query.client_type);
 
-      // Call the service function you just built!
-      const result: CreateSessionResponse = await authService.anonymousRegister();
+    const result: CreateSessionResponse = await authService.anonymousRegister();
 
-      // Set refresh token based on client type (Identical to normal login)
-      const tokenManager = TokenManager.getInstance();
-      if (clientType === 'web' && result.user) {
-        // Web clients: use httpOnly cookie + CSRF token
-        const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
-          result.user.id,
-          'user'
-        );
-        setRefreshTokenCookie(res, refreshToken);
-        result.csrfToken = csrfToken;
-      } else if (result.user) {
-        const refreshToken = tokenManager.generateRefreshToken(result.user.id, 'user');
-        // Non-web clients: return refresh token in response body
-        result.refreshToken = refreshToken;
-      }
+    // Set refresh token based on client type (Identical to normal login)
+    attachSessionTokens(res, result, clientType);
 
-      successResponse(res, result);
-    } catch (error) {
-      next(error);
-    }
+    successResponse(res, result);
+  } catch (error) {
+    next(error);
   }
-);
+});
 
 // POST /api/auth/id-token - Sign in with ID token from native SDK (Google One Tap, etc.)
 // Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'
@@ -534,21 +516,7 @@ router.post('/id-token', async (req: Request, res: Response, next: NextFunction)
     const result: CreateSessionResponse = await authService.signInWithIdToken(provider, token);
 
     // Set refresh token based on client type
-    const tokenManager = TokenManager.getInstance();
-    if (clientType === 'web') {
-      // Web clients: use httpOnly cookie + CSRF token
-      const { refreshToken, csrfToken } = tokenManager.generateRefreshTokenWithCsrf(
-        result.user.id,
-        'user'
-      );
-      setRefreshTokenCookie(res, refreshToken);
-      result.csrfToken = csrfToken;
-    } else {
-      const refreshToken = tokenManager.generateRefreshToken(result.user.id, 'user');
-      // Non-web clients (mobile, desktop, server): return refresh token in response body.
-      // Server clients cannot rely on browser cookies, so they follow the native-app flow.
-      result.refreshToken = refreshToken;
-    }
+    attachSessionTokens(res, result, clientType);
 
     successResponse(res, result);
   } catch (error) {

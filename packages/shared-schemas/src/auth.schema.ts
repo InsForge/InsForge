@@ -51,7 +51,7 @@ export const profileSchema = z
  */
 export const userSchema = z.object({
   id: userIdSchema,
-  email: emailSchema.nullable(),
+  email: emailSchema,
   emailVerified: z.boolean(),
   providers: z.array(z.string()).optional(),
   createdAt: z.string(), // PostgreSQL timestamp

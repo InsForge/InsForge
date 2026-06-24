@@ -275,6 +275,7 @@ export class AuthService {
     }
 
     const userId = crypto.randomUUID();
+    const syntheticEmail = `anon+${userId}@anonymous.insforge.dev`;
 
     const pool = this.getPool();
     const client = await pool.connect();
@@ -282,9 +283,9 @@ export class AuthService {
       await client.query('BEGIN');
 
       await client.query(
-        `INSERT INTO auth.users (id, is_anonymous, profile, created_at, updated_at)
-         VALUES ($1, true, $2::jsonb, NOW(), NOW())`,
-        [userId, JSON.stringify({ name: 'Guest' })]
+        `INSERT INTO auth.users (id, email, is_anonymous, profile, created_at, updated_at)
+         VALUES ($1, $2, true, $3::jsonb, NOW(), NOW())`,
+        [userId, syntheticEmail, JSON.stringify({ name: 'Guest' })]
       );
 
       await client.query('COMMIT');
@@ -308,7 +309,7 @@ export class AuthService {
     // Email verification not required, provide access token for immediate login
     const accessToken = this.tokenManager.generateAccessToken({
       sub: userId,
-      email: user.email ?? undefined, // null for anonymous users; keeps auth.email() consistent in RLS policies
+      email: syntheticEmail,
       role: 'authenticated',
     });
 
@@ -1299,7 +1300,7 @@ export class AuthService {
 
     return {
       id: dbUser.id,
-      email: dbUser.email ?? null,
+      email: dbUser.email,
       emailVerified: dbUser.email_verified,
       createdAt: dbUser.created_at,
       updatedAt: dbUser.updated_at,

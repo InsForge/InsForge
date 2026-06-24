@@ -479,7 +479,7 @@ paths:
         '404':
           description: User not found
 
-  /api/auth/anonymous:
+  /api/auth/users/anonymous:
     post:
       summary: Register anonymous user
       description: Creates a new anonymous user account
@@ -513,11 +513,11 @@ paths:
                   csrfToken:
                     type: string
                     nullable: true
-                    description: CSRF token for use with refresh endpoint (web clients only, null if email verification required)
+                    description: CSRF token for use with refresh endpoint (web clients only)
                   refreshToken:
                     type: string
                     nullable: true
-                    description: Refresh token for mobile/desktop/server clients (null for web clients or if email verification required)
+                    description: Refresh token for mobile/desktop/server clients (null for web clients)
         '400':
           description: Invalid request
         '403':

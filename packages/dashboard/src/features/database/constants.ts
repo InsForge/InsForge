@@ -14,7 +14,7 @@ export const authUsersSchema = {
     { columnName: 'providers', type: 'json', isUnique: false, isNullable: true },
     { columnName: 'createdAt', type: 'timestamp', isUnique: false, isNullable: false },
     { columnName: 'updatedAt', type: 'timestamp', isUnique: false, isNullable: false },
-    { columnName: 'is_anonymous', type: 'boolean', isUnique: false, isNullable: false },
+    { columnName: 'isAnonymous', type: 'boolean', isUnique: false, isNullable: false },
   ],
 };
 
