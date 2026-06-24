@@ -143,7 +143,7 @@ fi
 
 # 6. Anonymous sign in
 echo "👻 Testing anonymous sign in..."
-anon_response=$(curl -s -X POST "$API_BASE/auth/anonymous" \
+anon_response=$(curl -s -X POST "$API_BASE/auth/users/anonymous" \
     -H "Content-Type: application/json")
 
 if echo "$anon_response" | grep -q '"accessToken"'; then
