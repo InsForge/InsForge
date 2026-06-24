@@ -86,9 +86,18 @@ s3GatewayRouter.use((req, res, next) => {
 });
 
 // 3) Early Content-Length check for body-consuming operations.
+// For aws-chunked streaming uploads the wire Content-Length includes
+// chunk framing overhead; use x-amz-decoded-content-length instead.
 s3GatewayRouter.use((req: Request, res: Response, next) => {
+  const rawDecoded = req.headers['x-amz-decoded-content-length'];
+  const isStreaming =
+    typeof rawDecoded === 'string' && /^\d+$/.test(rawDecoded);
   const rawCl = req.headers['content-length'];
-  const contentLength = typeof rawCl === 'string' && /^\d+$/.test(rawCl) ? Number(rawCl) : null;
+  const contentLength = isStreaming
+    ? Number(rawDecoded)
+    : typeof rawCl === 'string' && /^\d+$/.test(rawCl)
+      ? Number(rawCl)
+      : null;
   if (contentLength === null || contentLength <= appConfig.storage.maxS3UploadSize) {
     next();
     return;

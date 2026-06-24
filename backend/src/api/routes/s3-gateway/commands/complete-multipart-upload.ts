@@ -46,8 +46,6 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
           requestId: req.s3Auth.requestId,
         }
       );
-      req.unpipe?.();
-      req.destroy?.();
       return;
     }
     chunks.push(b);
