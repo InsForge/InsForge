@@ -8,7 +8,7 @@ import { useTables } from '#features/database/hooks/useTables';
 import { useRecords } from '#features/database/hooks/useRecords';
 import { DatabaseSidebar } from '#features/database/components/DatabaseSidebar';
 import { RecordFormDialog } from '#features/database/components/RecordFormDialog';
-import { TableForm } from '#features/database/components/TableForm';
+import { clearTableFormCreateDraft, TableForm } from '#features/database/components/TableForm';
 import { TablesEmptyState } from '#features/database/components/TablesEmptyState';
 import { TemplatePreview } from '#features/database/components/TemplatePreview';
 import { DATABASE_TEMPLATES, DatabaseTemplate } from '#features/database/templates';
@@ -40,6 +40,7 @@ import { useTablePreferences } from '#features/database/hooks/useTablePreference
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { usePageSize } from '#lib/hooks/usePageSize';
 import { DEFAULT_DATABASE_SCHEMA, getDatabaseSchemaInfo } from '#features/database/helpers';
+import { useProjectId } from '#lib/hooks/useMetadata';
 
 export default function TablesPage() {
   const location = useLocation();
@@ -64,7 +65,10 @@ export default function TablesPage() {
   const { confirm, confirmDialogProps } = useConfirm();
   const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pendingCreateDraftClearSchemasRef = useRef<Set<string>>(new Set());
   const { schemas, isLoading: isLoadingSchemas } = useDatabaseSchemas();
+  const { projectId, isLoading: isProjectIdLoading } = useProjectId();
+  const tableFormDraftScope = projectId ? `project:${projectId}` : undefined;
   const selectedSchemaInfo = useMemo(
     () => getDatabaseSchemaInfo(schemas, selectedSchema),
     [schemas, selectedSchema]
@@ -327,6 +331,16 @@ export default function TablesPage() {
     }
   };
 
+  const clearCreateDraftForSelectedSchema = useCallback(() => {
+    if (isProjectIdLoading) {
+      pendingCreateDraftClearSchemasRef.current.add(selectedSchema);
+      return;
+    }
+
+    pendingCreateDraftClearSchemasRef.current.delete(selectedSchema);
+    clearTableFormCreateDraft(tableFormDraftScope, selectedSchema);
+  }, [isProjectIdLoading, selectedSchema, tableFormDraftScope]);
+
   const handleTableFormClose = async (): Promise<boolean> => {
     if (isTableFormDirty) {
       const confirmOptions = {
@@ -338,6 +352,9 @@ export default function TablesPage() {
 
       const shouldDiscard = await confirm(confirmOptions);
       if (shouldDiscard) {
+        if (!editingTable) {
+          clearCreateDraftForSelectedSchema();
+        }
         setShowTableForm(false);
         setEditingTable(null);
         return true;
@@ -345,7 +362,11 @@ export default function TablesPage() {
         return false;
       }
     } else {
+      if (!editingTable) {
+        clearCreateDraftForSelectedSchema();
+      }
       setShowTableForm(false);
+      setEditingTable(null);
       return true;
     }
   };
@@ -376,6 +397,7 @@ export default function TablesPage() {
   };
 
   const handleCreateTable = () => {
+    pendingCreateDraftClearSchemasRef.current.delete(selectedSchema);
     setEditingTable(null);
     setShowTableForm(true);
   };
@@ -473,6 +495,17 @@ export default function TablesPage() {
   // Show empty state when there are no tables and not loading
   const showEmptyState = !isLoadingTables && tables?.length === 0 && !showTableForm;
   const canMutateSelectedSchema = !selectedSchemaInfo.isProtected;
+
+  useEffect(() => {
+    if (isProjectIdLoading || pendingCreateDraftClearSchemasRef.current.size === 0) {
+      return;
+    }
+
+    pendingCreateDraftClearSchemasRef.current.forEach((schemaName) => {
+      clearTableFormCreateDraft(tableFormDraftScope, schemaName);
+    });
+    pendingCreateDraftClearSchemasRef.current.clear();
+  }, [isProjectIdLoading, tableFormDraftScope]);
 
   // Show template preview - takes full width without sidebar
   if (previewingTemplate) {
