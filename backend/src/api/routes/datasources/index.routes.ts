@@ -39,7 +39,9 @@ datasourcesRouter.delete(
 
 function parseLimit(raw: unknown, fallback: number, max: number): number {
   const n = parseInt(String(raw ?? fallback), 10);
-  if (!Number.isFinite(n) || n <= 0) return fallback;
+  if (!Number.isFinite(n) || n <= 0) {
+    return fallback;
+  }
   return Math.min(n, max);
 }
 

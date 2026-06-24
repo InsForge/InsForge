@@ -28,7 +28,9 @@ export default function DatasourceLayout() {
       }
       if (e.status === 'error') {
         showToast(
-          e.reason ? `Apify connection failed: ${e.reason}` : 'Apify connection failed. Please try again.',
+          e.reason
+            ? `Apify connection failed: ${e.reason}`
+            : 'Apify connection failed. Please try again.',
           'error'
         );
         return;

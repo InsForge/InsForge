@@ -16,13 +16,15 @@ import {
 const APIFY_CONSOLE_URL = 'https://console.apify.com';
 
 function fmtTime(iso: string | null): string {
-  if (!iso) return '—';
+  if (!iso) {
+    return '—';
+  }
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
 }
 
 function fmtCost(usd: number | null): string {
-  return usd == null ? '—' : `$${usd.toFixed(2)}`;
+  return usd === null ? '—' : `$${usd.toFixed(2)}`;
 }
 
 function statusMark(status: string | null): string {
@@ -127,7 +129,11 @@ export function ApifyConnectedPanel({
           >
             Open in Apify ↗
           </a>
-          <Button variant="secondary" disabled={disconnecting} onClick={handleDisconnect}>
+          <Button
+            variant="secondary"
+            disabled={disconnecting}
+            onClick={() => void handleDisconnect()}
+          >
             Disconnect
           </Button>
         </div>
@@ -170,9 +176,7 @@ export function ApifyConnectedPanel({
               variant="secondary"
               className="shrink-0"
               onClick={() => {
-                void navigator.clipboard.writeText(
-                  buildImportPrompt(datasetId, previewItems[0])
-                );
+                void navigator.clipboard.writeText(buildImportPrompt(datasetId, previewItems[0]));
                 showToast('Import prompt copied — paste it into your coding agent.', 'info');
               }}
             >

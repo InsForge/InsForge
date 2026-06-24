@@ -123,7 +123,9 @@ export class ApifyProvider {
     return this.proxyGet('/apify/runs', { limit }) as Promise<{ runs: unknown[] } | null>;
   }
 
-  async getLatestData(limit: number): Promise<{ datasetId: string | null; items: unknown[] } | null> {
+  async getLatestData(
+    limit: number
+  ): Promise<{ datasetId: string | null; items: unknown[] } | null> {
     return this.proxyGet('/apify/data', { limit }) as Promise<{
       datasetId: string | null;
       items: unknown[];
@@ -148,7 +150,11 @@ export class ApifyProvider {
         return null;
       }
       const msg = err instanceof Error ? err.message : 'unknown';
-      throw new AppError(`Failed to fetch Apify ${path}: ${msg}`, 502, ERROR_CODES.UPSTREAM_FAILURE);
+      throw new AppError(
+        `Failed to fetch Apify ${path}: ${msg}`,
+        502,
+        ERROR_CODES.UPSTREAM_FAILURE
+      );
     }
   }
 }
