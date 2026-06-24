@@ -191,7 +191,7 @@ export class DatabaseAdvanceService {
         'ALTER TABLE ' || quote_ident(ct.relname) ||
         ' ADD CONSTRAINT ' || quote_ident(c.conname) ||
         ' FOREIGN KEY (' || string_agg(quote_ident(a1.attname), ', ' ORDER BY u.pos) || ')' ||
-        ' REFERENCES ' || quote_ident(cf.relname) ||
+        ' REFERENCES ' || CASE WHEN nf.nspname = 'public' THEN quote_ident(cf.relname) ELSE quote_ident(nf.nspname) || '.' || quote_ident(cf.relname) END ||
         ' (' || string_agg(quote_ident(a2.attname), ', ' ORDER BY u.pos) || ')' ||
         CASE
           WHEN c.confdeltype = 'c' THEN ' ON DELETE CASCADE'
@@ -556,7 +556,7 @@ export class DatabaseAdvanceService {
             SELECT
               c.conname as "constraintName",
               a1.attname as "columnName",
-              cf.relname as "foreignTableName",
+              CASE WHEN nf.nspname = 'public' THEN cf.relname ELSE nf.nspname || '.' || cf.relname END as "foreignTableName",
               a2.attname as "foreignColumnName",
               u.pos as "ordinalPosition",
               CASE c.confdeltype
