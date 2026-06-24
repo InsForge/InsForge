@@ -1,8 +1,7 @@
 import { useMemo, useState } from 'react';
-import { CopyButton } from '@insforge/ui';
+import { CopyButton, cn } from '@insforge/ui';
 import { ShowPasswordButton } from './ShowPasswordButton';
 import { useDatabaseConnectionString, useDatabasePassword } from '#lib/hooks/useMetadata';
-import { cn } from '#lib/utils/utils';
 
 interface ConnectionParameter {
   label: string;

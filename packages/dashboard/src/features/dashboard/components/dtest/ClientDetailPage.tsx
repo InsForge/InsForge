@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
-import { Button } from '@insforge/ui';
+import { Button, cn } from '@insforge/ui';
 import { ConnectionStringSectionV2 } from '#features/dashboard/components/connect/ConnectionStringSectionV2';
 import { APIKeysSectionV2 } from '#features/dashboard/components/connect/APIKeysSectionV2';
 import { DTestMCPSection } from './DTestMCPSection';
@@ -13,7 +13,7 @@ import {
   useDatabaseConnectionString,
   useDatabasePassword,
 } from '#lib/hooks/useMetadata';
-import { cn, getBackendUrl } from '#lib/utils/utils';
+import { getBackendUrl } from '#lib/utils/utils';
 import { getFeatureFlag } from '#lib/analytics/posthog';
 import { FEATURE_FLAGS } from '#lib/analytics/constants';
 

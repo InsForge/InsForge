@@ -1,5 +1,4 @@
-import { CopyButton } from '@insforge/ui';
-import { cn } from '#lib/utils/utils';
+import { CopyButton, cn } from '@insforge/ui';
 import { type ReactNode } from 'react';
 import LinkChainIcon from '#assets/icons/link_chain.svg?react';
 import KeyHorizontalIcon from '#assets/icons/key_horizontal.svg?react';

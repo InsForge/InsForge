@@ -1,5 +1,5 @@
 import type { HTMLAttributes, ReactNode } from 'react';
-import { cn } from '#lib/utils/utils';
+import { cn } from '@insforge/ui';
 
 interface ListRowProps {
   children: ReactNode;

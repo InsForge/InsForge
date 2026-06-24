@@ -5,7 +5,7 @@ import AppHeader from './AppHeader';
 import { ThemeProvider } from '#lib/contexts/ThemeContext';
 import { ConnectDialog } from '#features/dashboard/components/connect';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
-import { cn } from '#lib/utils/utils';
+import { cn } from '@insforge/ui';
 import { ConnectDialogProvider } from './ConnectDialogContext';
 import { getFeatureFlag } from '#lib/analytics/posthog';
 import { FEATURE_FLAGS, FEATURE_FLAG_VARIANTS } from '#lib/analytics/constants';

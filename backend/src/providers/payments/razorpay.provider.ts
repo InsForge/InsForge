@@ -294,6 +294,12 @@ interface RazorpayMutationClient {
   };
 }
 
+/** Shape of a Razorpay `<collection>.all()` page; the OSS SDK types it loosely. */
+interface RazorpayListResponse<T> {
+  items?: T[];
+  count?: number;
+}
+
 export class RazorpayProvider {
   private readonly client: Razorpay;
 
@@ -359,21 +365,7 @@ export class RazorpayProvider {
   }
 
   async listPlans(): Promise<RazorpayPlan[]> {
-    const all: RazorpayPlan[] = [];
-    let skip = 0;
-    const count = 100;
-    while (true) {
-      const response = (await this.client.plans.all({ count, skip })) as unknown as {
-        items: RazorpayPlan[];
-      };
-      const items = response.items ?? [];
-      all.push(...items);
-      if (items.length < count) {
-        break;
-      }
-      skip += count;
-    }
-    return all;
+    return this.fetchAllPaginated<RazorpayPlan>((params) => this.client.plans.all(params));
   }
 
   async createPlan(input: RazorpayPlanCreateInput): Promise<RazorpayPlan> {
@@ -396,21 +388,7 @@ export class RazorpayProvider {
   }
 
   async listItems(): Promise<RazorpayItem[]> {
-    const all: RazorpayItem[] = [];
-    let skip = 0;
-    const count = 100;
-    while (true) {
-      const response = (await this.client.items.all({ count, skip })) as unknown as {
-        items: RazorpayItem[];
-      };
-      const items = response.items ?? [];
-      all.push(...items);
-      if (items.length < count) {
-        break;
-      }
-      skip += count;
-    }
-    return all;
+    return this.fetchAllPaginated<RazorpayItem>((params) => this.client.items.all(params));
   }
 
   async createItem(input: RazorpayItemCreateInput): Promise<RazorpayItem> {
@@ -447,43 +425,13 @@ export class RazorpayProvider {
   }
 
   async listCustomers(): Promise<RazorpayCustomer[]> {
-    const all: RazorpayCustomer[] = [];
-    let skip = 0;
-    const count = 100;
-    while (true) {
-      const response = (await this.client.customers.all({ count, skip })) as unknown as {
-        items: RazorpayCustomer[];
-      };
-      const items = response.items ?? [];
-      all.push(...items);
-      if (items.length < count) {
-        break;
-      }
-      skip += count;
-    }
-    return all;
+    return this.fetchAllPaginated<RazorpayCustomer>((params) => this.client.customers.all(params));
   }
 
   async listSubscriptions(): Promise<RazorpaySubscription[]> {
-    const all: RazorpaySubscription[] = [];
-    let skip = 0;
-    const count = 100;
-
-    // Razorpay returns at most 100 records per call.
-    while (true) {
-      const response = (await this.client.subscriptions.all({ count, skip })) as unknown as {
-        items: RazorpaySubscription[];
-        count: number;
-      };
-      const items = response.items ?? [];
-      all.push(...items);
-      if (items.length < count) {
-        break;
-      }
-      skip += count;
-    }
-
-    return all;
+    return this.fetchAllPaginated<RazorpaySubscription>((params) =>
+      this.client.subscriptions.all(params)
+    );
   }
 
   async createOrder(input: RazorpayOrderCreateInput): Promise<RazorpayOrder> {
@@ -554,45 +502,11 @@ export class RazorpayProvider {
   }
 
   async listPayments(): Promise<RazorpayPayment[]> {
-    const all: RazorpayPayment[] = [];
-    let skip = 0;
-    const count = 100;
-
-    while (true) {
-      const response = (await this.client.payments.all({ count, skip })) as unknown as {
-        items: RazorpayPayment[];
-        count: number;
-      };
-      const items = response.items ?? [];
-      all.push(...items);
-      if (items.length < count) {
-        break;
-      }
-      skip += count;
-    }
-
-    return all;
+    return this.fetchAllPaginated<RazorpayPayment>((params) => this.client.payments.all(params));
   }
 
   async listInvoices(): Promise<RazorpayInvoice[]> {
-    const all: RazorpayInvoice[] = [];
-    let skip = 0;
-    const count = 100;
-
-    while (true) {
-      const response = (await this.client.invoices.all({ count, skip })) as unknown as {
-        items: RazorpayInvoice[];
-        count: number;
-      };
-      const items = response.items ?? [];
-      all.push(...items);
-      if (items.length < count) {
-        break;
-      }
-      skip += count;
-    }
-
-    return all;
+    return this.fetchAllPaginated<RazorpayInvoice>((params) => this.client.invoices.all(params));
   }
 
   async createCustomer(input: {
@@ -646,5 +560,27 @@ export class RazorpayProvider {
 
   private getMutationClient(): RazorpayMutationClient {
     return this.client as unknown as RazorpayMutationClient;
+  }
+
+  /**
+   * Walk a Razorpay list endpoint to completion. Razorpay caps each page at 100
+   * records and exposes no total, so we page until a short page signals the end.
+   */
+  private async fetchAllPaginated<T>(
+    fetchPage: (params: { count: number; skip: number }) => Promise<unknown>
+  ): Promise<T[]> {
+    const all: T[] = [];
+    const count = 100;
+    let skip = 0;
+    while (true) {
+      const response = (await fetchPage({ count, skip })) as RazorpayListResponse<T>;
+      const items = response.items ?? [];
+      all.push(...items);
+      if (items.length < count) {
+        break;
+      }
+      skip += count;
+    }
+    return all;
   }
 }

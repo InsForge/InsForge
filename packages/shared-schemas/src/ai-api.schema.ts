@@ -1,6 +1,18 @@
 import { z } from 'zod';
 import { modalitySchema } from './ai.schema.js';
 
+declare const process: { env?: Record<string, string> };
+
+export const DEFAULT_MAX_TOKENS_CAP = 16384;
+
+const getMaxTokensCap = () => {
+  if (typeof process !== 'undefined' && process.env && process.env.MAX_COMPLETION_TOKENS) {
+    const parsed = Number(process.env.MAX_COMPLETION_TOKENS);
+    if (Number.isInteger(parsed) && parsed > 0) return parsed;
+  }
+  return DEFAULT_MAX_TOKENS_CAP;
+};
+
 // ============= Chat Completion Schemas =============
 
 // OpenAI-compatible content schemas
@@ -128,7 +140,16 @@ export const chatCompletionRequestSchema = z.object({
   model: z.string(),
   messages: z.array(chatMessageSchema),
   temperature: z.number().min(0).max(2).optional(),
-  maxTokens: z.number().positive().optional(),
+  // Cap output tokens to prevent abuse. Configurable via MAX_COMPLETION_TOKENS env var, defaults to 16,384.
+  // Evaluated lazily per-request so dotenv loading order does not affect the cap.
+  maxTokens: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .refine((val) => val === undefined || val <= getMaxTokensCap(), {
+      message: 'Exceeds configured maximum token cap.',
+    }),
   topP: z.number().min(0).max(1).optional(),
   stream: z.boolean().optional(),
   // Web Search: Incorporate relevant web search results into the response

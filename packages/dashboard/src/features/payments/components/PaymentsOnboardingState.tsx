@@ -1,9 +1,8 @@
 import { Settings } from 'lucide-react';
-import { Button } from '@insforge/ui';
+import { Button, cn } from '@insforge/ui';
 import type { PaymentEnvironment, PaymentProvider } from '@insforge/shared-schemas';
 import RazorpayWordmark from '#assets/logos/razorpay-wordmark.svg?react';
 import StripeWordmark from '#assets/logos/stripe-wordmark.svg?react';
-import { cn } from '#lib/utils/utils';
 
 interface QuickGuideStep {
   title: string;

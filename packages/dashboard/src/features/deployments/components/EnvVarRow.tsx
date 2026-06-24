@@ -10,9 +10,11 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
+  cn,
 } from '@insforge/ui';
 import type { DeploymentEnvVar } from '@insforge/shared-schemas';
-import { cn, formatTime } from '#lib/utils/utils';
+import { formatTime } from '#lib/utils/utils';
+import { useCopyToClipboard } from '#lib/hooks/useCopyToClipboard';
 import { deploymentsService } from '#features/deployments/services/deployments.service';
 
 interface EnvVarRowProps {
@@ -27,7 +29,7 @@ export function EnvVarRow({ envVar, onEdit, onDelete, className }: EnvVarRowProp
   const [fetchedValue, setFetchedValue] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyToClipboard();
 
   // Reset cached value when the env var is updated (e.g., after an edit)
   useEffect(() => {
@@ -76,13 +78,7 @@ export function EnvVarRow({ envVar, onEdit, onDelete, className }: EnvVarRowProp
     if (fetchedValue === null) {
       return;
     }
-    try {
-      await navigator.clipboard.writeText(fetchedValue);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
+    await copy(fetchedValue);
   };
 
   const maskedValue = '••••••••••••••';

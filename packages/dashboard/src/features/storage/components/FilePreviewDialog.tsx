@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Download, ExternalLink } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { ChevronLeft, ChevronRight, Download, ExternalLink } from 'lucide-react';
 import { Button, Dialog, DialogContent, DialogDescription, DialogTitle } from '@insforge/ui';
 import { LoadingState, TypeBadge } from '#components';
 import { useStorageObjects } from '#features/storage/hooks/useStorageObjects';
@@ -10,9 +10,22 @@ interface FilePreviewDialogProps {
   onOpenChange: (open: boolean) => void;
   file: StorageFileSchema | null;
   bucket: string;
+  onPrevious?: () => void;
+  onNext?: () => void;
+  hasPrevious?: boolean;
+  hasNext?: boolean;
 }
 
-export function FilePreviewDialog({ open, onOpenChange, file, bucket }: FilePreviewDialogProps) {
+export function FilePreviewDialog({
+  open,
+  onOpenChange,
+  file,
+  bucket,
+  onPrevious,
+  onNext,
+  hasPrevious = false,
+  hasNext = false,
+}: FilePreviewDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -85,6 +98,33 @@ export function FilePreviewDialog({ open, onOpenChange, file, bucket }: FilePrev
       window.open(previewUrl, '_blank');
     }
   };
+
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      const target = e.target;
+      if (
+        target instanceof Element &&
+        target.closest('input, textarea, select, button, video, audio, iframe, [contenteditable]')
+      ) {
+        return;
+      }
+      if (e.key === 'ArrowLeft' && hasPrevious && onPrevious) {
+        e.preventDefault();
+        onPrevious();
+      } else if (e.key === 'ArrowRight' && hasNext && onNext) {
+        e.preventDefault();
+        onNext();
+      }
+    },
+    [hasPrevious, hasNext, onPrevious, onNext]
+  );
+
+  useEffect(() => {
+    if (open) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [open, handleKeyDown]);
 
   const isPreviewable = (mimeType?: string): boolean => {
     if (!mimeType) {
@@ -205,7 +245,9 @@ export function FilePreviewDialog({ open, onOpenChange, file, bucket }: FilePrev
           {/* Header */}
           <div className="px-6 py-3">
             <div className="flex flex-col items-start gap-1">
-              <h2 className="text-lg font-semibold text-zinc-950 dark:text-white">{fileName}</h2>
+              <h2 className="text-lg font-semibold text-zinc-950 dark:text-white truncate">
+                {fileName}
+              </h2>
               <div className="flex items-center gap-1.5">
                 <span className="text-xs font-medium text-zinc-500 dark:text-neutral-400">
                   {formatFileSize(file.size)}
@@ -218,21 +260,47 @@ export function FilePreviewDialog({ open, onOpenChange, file, bucket }: FilePrev
           </div>
 
           {/* Preview Content */}
-          <div className="flex flex-1 min-h-0 overflow-hidden p-6 border-y border-zinc-200 dark:border-neutral-600">
-            {isLoading ? (
-              <div className="flex items-center justify-center w-full h-full min-h-0">
-                <LoadingState />
-              </div>
-            ) : error ? (
-              <div
-                className="flex w-full h-full items-center justify-center rounded bg-neutral-100 dark:bg-neutral-700 px-4 text-center"
-                role="alert"
-                aria-live="polite"
-              >
-                <p className="text-sm text-zinc-600 dark:text-neutral-200">{error}</p>
-              </div>
-            ) : (
-              renderPreview()
+          <div className="relative flex flex-1 min-h-0 overflow-hidden border-y border-zinc-200 dark:border-neutral-600">
+            <div className="flex flex-1 p-6">
+              {isLoading ? (
+                <div className="flex items-center justify-center w-full h-full min-h-0">
+                  <LoadingState />
+                </div>
+              ) : error ? (
+                <div
+                  className="flex w-full h-full items-center justify-center rounded bg-neutral-100 dark:bg-neutral-700 px-4 text-center"
+                  role="alert"
+                  aria-live="polite"
+                >
+                  <p className="text-sm text-zinc-600 dark:text-neutral-200">{error}</p>
+                </div>
+              ) : (
+                renderPreview()
+              )}
+            </div>
+            {(onPrevious || onNext) && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-black/40 text-white hover:bg-black/60 hover:text-white disabled:opacity-0"
+                  onClick={onPrevious}
+                  disabled={!hasPrevious}
+                  aria-label="Previous file"
+                >
+                  <ChevronLeft className="h-6 w-6" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-black/40 text-white hover:bg-black/60 hover:text-white disabled:opacity-0"
+                  onClick={onNext}
+                  disabled={!hasNext}
+                  aria-label="Next file"
+                >
+                  <ChevronRight className="h-6 w-6" />
+                </Button>
+              </>
             )}
           </div>
 

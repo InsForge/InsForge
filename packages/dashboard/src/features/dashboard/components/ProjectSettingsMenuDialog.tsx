@@ -22,6 +22,7 @@ import {
   MenuDialogBody,
   MenuDialogFooter,
   MenuDialogCloseButton,
+  cn,
 } from '@insforge/ui';
 import type { InstanceInfoEvent } from '@insforge/shared-schemas';
 import { useApiKey } from '#lib/hooks/useMetadata';
@@ -34,7 +35,7 @@ import {
 } from '#lib/hooks/useCloudProjectInfo';
 import { useConfirm } from '#lib/hooks/useConfirm';
 import { useToast } from '#lib/hooks/useToast';
-import { cn, compareVersions, getBackendUrl, isInsForgeCloudProject } from '#lib/utils/utils';
+import { compareVersions, getBackendUrl, isInsForgeCloudProject } from '#lib/utils/utils';
 import { MCPSection, CLISection, ConnectionStringSection } from './connect';
 import { metadataService } from '#lib/services/metadata.service';
 
