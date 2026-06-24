@@ -114,6 +114,7 @@ ENV STORAGE_DIR=/insforge-storage
 ENV LOGS_DIR=/insforge-logs
 ENV MAX_JSON_BODY_SIZE=100mb
 ENV MAX_URLENCODED_BODY_SIZE=10mb
+ENV NODE_ENV=production
 
 RUN mkdir -p /data /insforge-storage /insforge-logs && \
     chown node:node /data /insforge-storage /insforge-logs

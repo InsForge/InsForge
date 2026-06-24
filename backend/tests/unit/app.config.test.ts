@@ -22,7 +22,12 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { loadConfig } from '../../src/infra/config/app.config';
+import {
+  assertSecureDeploymentConfig,
+  getDeploymentSecurityErrors,
+  loadConfig,
+  shouldEnforceDeploymentSecurity,
+} from '../../src/infra/config/app.config';
 
 // ---------------------------------------------------------------------------
 // Helper — save / restore process.env around each test
@@ -378,6 +383,123 @@ describe('config.auth', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 // Section: storage
 // ═══════════════════════════════════════════════════════════════════════════
+
+describe('deployment security validation', () => {
+  it('does not enforce production secret checks during local development by default', () => {
+    unsetEnvKeys('NODE_ENV', 'INSFORGE_ENFORCE_SECURE_CONFIG');
+
+    expect(shouldEnforceDeploymentSecurity()).toBe(false);
+  });
+
+  it('enforces production secret checks when NODE_ENV is production', () => {
+    process.env.NODE_ENV = 'production';
+
+    expect(shouldEnforceDeploymentSecurity()).toBe(true);
+  });
+
+  it('enforces production secret checks when explicitly requested', () => {
+    unsetEnvKeys('NODE_ENV');
+    process.env.INSFORGE_ENFORCE_SECURE_CONFIG = 'true';
+
+    expect(shouldEnforceDeploymentSecurity()).toBe(true);
+  });
+
+  it('allows an explicit local escape hatch for isolated development', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.INSFORGE_ALLOW_INSECURE_DEFAULTS = 'true';
+
+    expect(shouldEnforceDeploymentSecurity()).toBe(false);
+  });
+
+  it('rejects known production placeholder credentials', () => {
+    process.env.JWT_SECRET = 'dev-secret-please-change-in-production';
+    process.env.ENCRYPTION_KEY = 'change-this-encryption-key-32chars';
+    process.env.ROOT_ADMIN_PASSWORD = 'change-this-password';
+    process.env.POSTGRES_PASSWORD = 'postgres';
+
+    const errors = getDeploymentSecurityErrors(loadConfig());
+
+    expect(errors).toContain(
+      'JWT_SECRET must be a unique random value with at least 32 characters.'
+    );
+    expect(errors).toContain(
+      'ENCRYPTION_KEY must be a unique random value with at least 32 characters.'
+    );
+    expect(errors).toContain(
+      'ROOT_ADMIN_PASSWORD must be a unique strong value with at least 16 characters.'
+    );
+    expect(errors).toContain(
+      'POSTGRES_PASSWORD must be a unique strong value with at least 16 characters.'
+    );
+  });
+
+  it('rejects short production passwords', () => {
+    process.env.JWT_SECRET = 'u53-strong-random-jwt-secret-for-prod';
+    process.env.ENCRYPTION_KEY = 'u53-strong-random-encryption-key-for-prod';
+    process.env.ROOT_ADMIN_PASSWORD = 'short';
+    process.env.POSTGRES_PASSWORD = 'weak';
+
+    const errors = getDeploymentSecurityErrors(loadConfig());
+
+    expect(errors).toContain(
+      'ROOT_ADMIN_PASSWORD must be a unique strong value with at least 16 characters.'
+    );
+    expect(errors).toContain(
+      'POSTGRES_PASSWORD must be a unique strong value with at least 16 characters.'
+    );
+  });
+
+  it('uses the caller-provided env when asserting deployment security', () => {
+    unsetEnvKeys('NODE_ENV', 'INSFORGE_ENFORCE_SECURE_CONFIG', 'ENCRYPTION_KEY');
+
+    const baseConfig = loadConfig();
+    const config = {
+      ...baseConfig,
+      app: {
+        ...baseConfig.app,
+        jwtSecret: 'u53-strong-random-jwt-secret-for-prod',
+      },
+      auth: {
+        ...baseConfig.auth,
+        rootAdminPassword: 'correct-horse-admin-password-2026',
+      },
+      database: {
+        ...baseConfig.database,
+        password: 'correct-horse-postgres-password-2026',
+      },
+    };
+
+    expect(() =>
+      assertSecureDeploymentConfig(config, {
+        NODE_ENV: 'production',
+        ENCRYPTION_KEY: 'u53-strong-random-encryption-key-for-prod',
+      })
+    ).not.toThrow();
+  });
+
+  it('throws before startup when production credentials are insecure', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.JWT_SECRET = 'your-secret-key-here-must-be-32-char-or-above';
+    process.env.ENCRYPTION_KEY = 'your-secret-key-here-must-be-32-char-or-above';
+    process.env.ROOT_ADMIN_PASSWORD = 'change-this-password';
+    process.env.POSTGRES_PASSWORD = 'postgres';
+
+    expect(() => assertSecureDeploymentConfig(loadConfig())).toThrow(
+      /Refusing to start InsForge with insecure production configuration/
+    );
+  });
+
+  it('accepts unique production credentials', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.JWT_SECRET = 'u53-strong-random-jwt-secret-for-prod';
+    process.env.ENCRYPTION_KEY = 'u53-strong-random-encryption-key-for-prod';
+    process.env.ROOT_ADMIN_PASSWORD = 'correct-horse-admin-password-2026';
+    process.env.POSTGRES_PASSWORD = 'correct-horse-postgres-password-2026';
+
+    expect(getDeploymentSecurityErrors(loadConfig())).toEqual([]);
+    expect(() => assertSecureDeploymentConfig(loadConfig())).not.toThrow();
+  });
+});
 
 describe('config.storage', () => {
   it('uses defaults when no env vars are set', () => {

@@ -40,7 +40,7 @@ import packageJson from '../../package.json';
 import { schedulesRouter } from '@/api/routes/schedules/index.routes.js';
 import { servicesRouter } from '@/api/routes/compute/services.routes.js';
 import { analyticsRouter } from '@/api/routes/analytics/index.routes.js';
-import { appConfig } from '@/infra/config/app.config.js';
+import { appConfig, assertSecureDeploymentConfig } from '@/infra/config/app.config.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -307,6 +307,8 @@ const PORT = appConfig.app.port;
 
 async function initializeServer() {
   try {
+    assertSecureDeploymentConfig();
+
     const app = await createApp();
     const server = app.listen(PORT, () => {
       logger.info(`Backend API service listening on port ${PORT}`);

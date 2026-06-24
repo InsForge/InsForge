@@ -128,6 +128,8 @@ Or run from source:
 git clone https://github.com/InsForge/InsForge.git
 cd insforge
 cp .env.example .env
+# Edit .env and set unique JWT_SECRET, ENCRYPTION_KEY, ROOT_ADMIN_PASSWORD,
+# and POSTGRES_PASSWORD before starting the production compose file.
 docker compose -f docker-compose.prod.yml up
 ```
 
@@ -158,7 +160,7 @@ cp .env.example .env.project1
 cp .env.example .env.project2
 ```
 
-Edit `.env.project2` with different ports:
+Edit each env file with its own `JWT_SECRET`, `ENCRYPTION_KEY`, `ROOT_ADMIN_PASSWORD`, and `POSTGRES_PASSWORD`. Then edit `.env.project2` with different ports:
 ```
 POSTGRES_PORT=5442
 POSTGREST_PORT=5440

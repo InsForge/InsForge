@@ -174,23 +174,20 @@ At a minimum, set these values:
 ```env
 # Authentication (required)
 # IMPORTANT: Generate a strong random secret for production (32+ characters)
-JWT_SECRET=your-secret-key-here-must-be-32-char-or-above
+JWT_SECRET=<output-of-openssl-rand-base64-32>
+ENCRYPTION_KEY=<different-output-of-openssl-rand-base64-32>
 
 # Admin account (used for initial setup)
 ROOT_ADMIN_USERNAME=admin
-ROOT_ADMIN_PASSWORD=change-this-password
+ROOT_ADMIN_PASSWORD=<strong-unique-admin-password>
 
 # Database (required)
-POSTGRES_PASSWORD=your-secure-postgres-password
+POSTGRES_PASSWORD=<strong-unique-database-password>
 ```
 
 Optional values you may want to set:
 
 ```env
-# Encryption key for secrets and database encryption.
-# Falls back to JWT_SECRET if left empty.
-ENCRYPTION_KEY=
-
 # AI/LLM (get a key from https://openrouter.ai/keys)
 OPENROUTER_API_KEY=
 

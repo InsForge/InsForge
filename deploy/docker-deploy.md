@@ -39,7 +39,9 @@ cp .env.example .env.project1
 cp .env.example .env.project2
 ```
 
-### Step 2: Edit each env file with unique ports
+### Step 2: Edit each env file with unique secrets and ports
+
+Set a different `JWT_SECRET`, `ENCRYPTION_KEY`, `ROOT_ADMIN_PASSWORD`, and `POSTGRES_PASSWORD` in each env file. Do not reuse `.env.example` placeholders in production.
 
 **.env.project1** (default ports):
 ```

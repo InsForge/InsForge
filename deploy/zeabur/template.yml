@@ -19,7 +19,15 @@ spec:
         - key: ROOT_ADMIN_PASSWORD
           type: STRING
           name: Root Admin Password
-          description: Password for the root admin. Must be at least 8 characters.
+          description: Password for the root admin. Must be at least 16 characters.
+        - key: JWT_SECRET
+          type: STRING
+          name: JWT Secret
+          description: Random 32+ character secret used to sign auth tokens.
+        - key: ENCRYPTION_KEY
+          type: STRING
+          name: Encryption Key
+          description: Random 32+ character secret for stored secrets. Use a different value from JWT Secret.
         - key: OPENROUTER_API_KEY
           type: STRING
           name: OpenRouter API Key
@@ -139,7 +147,7 @@ spec:
                     default: postgres
                     expose: true
                 JWT_SECRET:
-                    default: ${PASSWORD}
+                    default: ${JWT_SECRET}
                     expose: true
                     readonly: true
                 JWT_EXP:
@@ -350,7 +358,7 @@ spec:
                 PORT:
                     default: "7133"
                 DENO_ENV:
-                    default: development
+                    default: production
                 DENO_DIR:
                     default: /deno-dir
                 POSTGRES_HOST:
@@ -368,7 +376,7 @@ spec:
                 WORKER_TIMEOUT_MS:
                     default: "60000"
                 ENCRYPTION_KEY:
-                    default: ${PASSWORD}
+                    default: ${ENCRYPTION_KEY}
                 JWT_SECRET:
                     default: ${PGRST_JWT_SECRET}
             configs:
@@ -889,10 +897,14 @@ spec:
                     default: ${ZEABUR_WEB_URL}
                 JWT_SECRET:
                     default: ${PGRST_JWT_SECRET}
+                ENCRYPTION_KEY:
+                    default: ${ENCRYPTION_KEY}
                 ROOT_ADMIN_USERNAME:
                     default: ${ROOT_ADMIN_USERNAME}
                 ROOT_ADMIN_PASSWORD:
                     default: ${ROOT_ADMIN_PASSWORD}
+                NODE_ENV:
+                    default: production
                 # PostgreSQL connection
                 POSTGRES_HOST:
                     default: postgres
@@ -902,7 +914,7 @@ spec:
                     default: insforge
                 POSTGRES_USER:
                     default: postgres
-                POSTGRESDB_PASSWORD:
+                POSTGRES_PASSWORD:
                     default: ${PGPASSWORD}
                 DATABASE_URL:
                     default: postgres://postgres:${PGPASSWORD}@postgres:5432/insforge
