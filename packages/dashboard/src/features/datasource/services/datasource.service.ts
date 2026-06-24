@@ -50,7 +50,9 @@ export const datasourceService = {
     const res = await apiClient.request(`/datasources/apify/runs?limit=${limit}`, {
       headers: apiClient.withAccessToken({}),
     });
-    return (res?.runs ?? []) as ApifyRun[];
+    // Drop items without a stable id — they break React keys and would produce
+    // bogus `/actors/runs/undefined` links.
+    return ((res?.runs ?? []) as ApifyRun[]).filter((r) => typeof r?.id === 'string' && r.id);
   },
 
   async getApifyLatestData(limit = 5): Promise<ApifyLatestData> {

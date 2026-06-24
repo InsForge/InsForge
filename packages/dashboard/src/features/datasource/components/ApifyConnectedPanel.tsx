@@ -70,8 +70,9 @@ export function ApifyConnectedPanel({
   const { showToast } = useToast();
   const { onConnectApify } = useDashboardHost();
   const [disconnecting, setDisconnecting] = useState(false);
-  const runs = useApifyRuns(true);
-  const latest = useApifyLatestData(true);
+  const isActive = connection.status === 'active';
+  const runs = useApifyRuns(isActive);
+  const latest = useApifyLatestData(isActive);
 
   const handleDisconnect = async () => {
     setDisconnecting(true);
@@ -89,7 +90,19 @@ export function ApifyConnectedPanel({
   const runItems = runs.data ?? [];
   const previewItems = latest.data?.items ?? [];
   const datasetId = latest.data?.datasetId ?? null;
-  const unhealthy = connection.status !== 'active';
+  const unhealthy = !isActive;
+
+  const handleCopyPrompt = async () => {
+    if (!datasetId || previewItems.length === 0) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(buildImportPrompt(datasetId, previewItems[0]));
+      showToast('Import prompt copied — paste it into your coding agent.', 'info');
+    } catch {
+      showToast('Could not copy to clipboard.', 'error');
+    }
+  };
 
   return (
     <div className="flex flex-col gap-4 self-stretch">
@@ -142,8 +155,12 @@ export function ApifyConnectedPanel({
       {/* Recent runs */}
       <div className="flex flex-col gap-3 rounded border border-[var(--alpha-8)] bg-card p-6">
         <p className="text-sm font-medium leading-6 text-foreground">Recent runs</p>
-        {runs.isLoading ? (
+        {!isActive ? (
+          <p className="text-sm text-muted-foreground">Reconnect to load runs.</p>
+        ) : runs.isLoading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : runs.isError ? (
+          <p className="text-sm text-warning">Could not load runs. Try refreshing.</p>
         ) : runItems.length === 0 ? (
           <p className="text-sm text-muted-foreground">No runs yet.</p>
         ) : (
@@ -175,17 +192,18 @@ export function ApifyConnectedPanel({
             <Button
               variant="secondary"
               className="shrink-0"
-              onClick={() => {
-                void navigator.clipboard.writeText(buildImportPrompt(datasetId, previewItems[0]));
-                showToast('Import prompt copied — paste it into your coding agent.', 'info');
-              }}
+              onClick={() => void handleCopyPrompt()}
             >
               Copy import prompt
             </Button>
           )}
         </div>
-        {latest.isLoading ? (
+        {!isActive ? (
+          <p className="text-sm text-muted-foreground">Reconnect to load data.</p>
+        ) : latest.isLoading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : latest.isError ? (
+          <p className="text-sm text-warning">Could not load data. Try refreshing.</p>
         ) : previewItems.length === 0 ? (
           <p className="text-sm text-muted-foreground">No data yet.</p>
         ) : (

@@ -1,5 +1,5 @@
 import { Router, Response, NextFunction } from 'express';
-import { verifyUser, AuthRequest } from '@/api/middlewares/auth.js';
+import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { DatasourceService } from '@/services/datasource/datasource.service.js';
 
 export const datasourcesRouter = Router();
@@ -8,7 +8,7 @@ const service = DatasourceService.getInstance();
 // GET /api/datasources/apify/connection
 datasourcesRouter.get(
   '/apify/connection',
-  verifyUser,
+  verifyAdmin,
   async (_req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const conn = await service.getApifyConnection();
@@ -26,7 +26,7 @@ datasourcesRouter.get(
 // DELETE /api/datasources/apify/connection
 datasourcesRouter.delete(
   '/apify/connection',
-  verifyUser,
+  verifyAdmin,
   async (_req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       await service.disconnectApify();
@@ -45,11 +45,13 @@ function parseLimit(raw: unknown, fallback: number, max: number): number {
   return Math.min(n, max);
 }
 
-// GET /api/datasources/apify/token — runtime token accessor for edge functions
-// (verifyUser accepts the project ik_ admin key that functions get injected).
+// GET /api/datasources/apify/token — runtime token accessor. Admin-gated: it
+// returns the user's live Apify OAuth token, so it must NOT be reachable with an
+// anon key. verifyAdmin accepts the project `ik_` admin key that edge functions
+// get injected, plus project_admin JWTs.
 datasourcesRouter.get(
   '/apify/token',
-  verifyUser,
+  verifyAdmin,
   async (_req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const tok = await service.getApifyToken();
@@ -67,7 +69,7 @@ datasourcesRouter.get(
 // GET /api/datasources/apify/runs?limit=
 datasourcesRouter.get(
   '/apify/runs',
-  verifyUser,
+  verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const data = await service.getApifyRuns(parseLimit(req.query.limit, 10, 50));
@@ -85,7 +87,7 @@ datasourcesRouter.get(
 // GET /api/datasources/apify/data?limit= — latest run's dataset preview
 datasourcesRouter.get(
   '/apify/data',
-  verifyUser,
+  verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const data = await service.getApifyLatestData(parseLimit(req.query.limit, 5, 20));

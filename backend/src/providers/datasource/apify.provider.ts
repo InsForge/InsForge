@@ -16,6 +16,16 @@ export const apifyConnectionSchema = z.object({
 });
 export type ApifyConnection = z.infer<typeof apifyConnectionSchema>;
 
+// Envelopes returned by the cloud-backend project routes. Run/dataset item
+// shapes are Apify-defined, so items stay `unknown` — we validate the envelope,
+// not every field.
+const apifyTokenSchema = z.object({ accessToken: z.string() });
+const apifyRunsSchema = z.object({ runs: z.array(z.unknown()) });
+const apifyLatestDataSchema = z.object({
+  datasetId: z.string().nullable(),
+  items: z.array(z.unknown()),
+});
+
 export class ApifyProvider {
   private static instance: ApifyProvider;
   private constructor() {}
@@ -109,6 +119,11 @@ export class ApifyProvider {
         timeout: 10000,
       });
     } catch (err: unknown) {
+      // 404 = already gone on the cloud side; treat as success (idempotent),
+      // mirroring getConnection()'s 404 handling.
+      if (axios.isAxiosError(err) && err.response?.status === 404) {
+        return;
+      }
       const msg = err instanceof Error ? err.message : 'unknown';
       throw new AppError(`Failed to disconnect Apify: ${msg}`, 502, ERROR_CODES.UPSTREAM_FAILURE);
     }
@@ -116,24 +131,42 @@ export class ApifyProvider {
 
   // Currently-valid (lazily refreshed) access token for the user's own compute.
   async getToken(): Promise<{ accessToken: string } | null> {
-    return this.proxyGet('/apify/token') as Promise<{ accessToken: string } | null>;
+    return this.validatedGet('/apify/token', apifyTokenSchema);
   }
 
   async getRuns(limit: number): Promise<{ runs: unknown[] } | null> {
-    return this.proxyGet('/apify/runs', { limit }) as Promise<{ runs: unknown[] } | null>;
+    return this.validatedGet('/apify/runs', apifyRunsSchema, { limit });
   }
 
   async getLatestData(
     limit: number
   ): Promise<{ datasetId: string | null; items: unknown[] } | null> {
-    return this.proxyGet('/apify/data', { limit }) as Promise<{
-      datasetId: string | null;
-      items: unknown[];
-    } | null>;
+    return this.validatedGet('/apify/data', apifyLatestDataSchema, { limit });
   }
 
-  // Shared GET proxy: 404 (not connected) → null; other errors → 502. Responses
-  // are passed through verbatim (run/dataset shapes are Apify-defined).
+  // proxyGet + Zod validation: 404 → null; bad 200 shape → 502 (don't leak an
+  // unvalidated upstream response through the datasource contract).
+  private async validatedGet<T>(
+    path: string,
+    schema: z.ZodType<T>,
+    params?: Record<string, unknown>
+  ): Promise<T | null> {
+    const data = await this.proxyGet(path, params);
+    if (data === null) {
+      return null;
+    }
+    const parsed = schema.safeParse(data);
+    if (!parsed.success) {
+      throw new AppError(
+        `Invalid Apify ${path} response: ${parsed.error.message}`,
+        502,
+        ERROR_CODES.UPSTREAM_FAILURE
+      );
+    }
+    return parsed.data;
+  }
+
+  // Shared GET proxy: 404 (not connected) → null; other errors → 502.
   private async proxyGet(path: string, params?: Record<string, unknown>): Promise<unknown> {
     if (!this.isEnabled()) {
       this.throwUnsupported();
