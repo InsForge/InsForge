@@ -88,8 +88,7 @@ s3GatewayRouter.use((req, res, next) => {
 // 3) Early Content-Length check for body-consuming operations.
 s3GatewayRouter.use((req: Request, res: Response, next) => {
   const rawCl = req.headers['content-length'];
-  const contentLength =
-    typeof rawCl === 'string' && /^\d+$/.test(rawCl) ? Number(rawCl) : null;
+  const contentLength = typeof rawCl === 'string' && /^\d+$/.test(rawCl) ? Number(rawCl) : null;
   if (contentLength === null || contentLength <= appConfig.storage.maxS3UploadSize) {
     next();
     return;
@@ -99,13 +98,17 @@ s3GatewayRouter.use((req: Request, res: Response, next) => {
   const q = new Set(Object.keys(req.query));
   const hasKey = p.replace(/^\/+/, '').includes('/');
   const isLargeBodyOp =
-    (m === 'PUT' && hasKey && !q.has('tagging') && !req.headers['x-amz-copy-source']) ||
-    (m === 'POST' && hasKey && q.has('uploadId'));
+    m === 'PUT' && hasKey && !q.has('tagging') && !req.headers['x-amz-copy-source'];
   if (isLargeBodyOp) {
-    sendS3Error(res, 'EntityTooLarge', `Object exceeds max upload size (${appConfig.storage.maxS3UploadSize} bytes)`, {
-      resource: req.path,
-      requestId: (req as S3AuthenticatedRequest).s3Auth?.requestId,
-    });
+    sendS3Error(
+      res,
+      'EntityTooLarge',
+      `Object exceeds max upload size (${appConfig.storage.maxS3UploadSize} bytes)`,
+      {
+        resource: req.path,
+        requestId: (req as S3AuthenticatedRequest).s3Auth?.requestId,
+      }
+    );
     return;
   }
   next();

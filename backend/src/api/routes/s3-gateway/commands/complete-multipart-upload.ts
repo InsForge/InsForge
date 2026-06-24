@@ -37,10 +37,15 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
     const b = c as Buffer;
     received += b.length;
     if (received > MAX_COMPLETE_MPU_BODY_BYTES) {
-      sendS3Error(res, 'EntityTooLarge', 'CompleteMultipartUpload body exceeds maximum allowed size', {
-        resource: req.path,
-        requestId: req.s3Auth.requestId,
-      });
+      sendS3Error(
+        res,
+        'EntityTooLarge',
+        'CompleteMultipartUpload body exceeds maximum allowed size',
+        {
+          resource: req.path,
+          requestId: req.s3Auth.requestId,
+        }
+      );
       req.unpipe?.();
       req.destroy?.();
       return;

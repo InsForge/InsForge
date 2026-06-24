@@ -111,13 +111,16 @@ function parseEnvInt(val: string | undefined, fallback: number): number {
   return parsed;
 }
 
+const AWS_MAX_SINGLE_PUT_BYTES = 5 * 1024 * 1024 * 1024;
+
 function parseEnvBytes(val: string | undefined, fallback: number): number {
   if (!val) return fallback;
-  const parsed = parseInt(val, 10);
-  if (isNaN(parsed) || parsed <= 0 || !Number.isSafeInteger(parsed)) {
+  if (!/^\d+$/.test(val)) return fallback;
+  const parsed = Number(val);
+  if (!Number.isFinite(parsed) || !Number.isSafeInteger(parsed) || parsed <= 0) {
     return fallback;
   }
-  return parsed;
+  return Math.min(parsed, AWS_MAX_SINGLE_PUT_BYTES);
 }
 
 export function loadConfig(): AppConfig {
