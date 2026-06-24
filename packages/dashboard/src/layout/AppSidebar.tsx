@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   dashboardAnalyticsMenuItem,
+  dashboardDatasourceMenuItem,
   dashboardDeploymentsMenuItem,
   dashboardDTestDocMenuItem,
   dashboardDTestInstallMenuItem,
@@ -47,6 +48,7 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
       }
 
       items.push({ ...dashboardAnalyticsMenuItem });
+      items.push({ ...dashboardDatasourceMenuItem });
     }
 
     return items;

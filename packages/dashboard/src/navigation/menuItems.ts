@@ -144,6 +144,13 @@ export const dashboardAnalyticsMenuItem: DashboardPrimaryMenuItem = {
   icon: BarChart3,
 };
 
+export const dashboardDatasourceMenuItem: DashboardPrimaryMenuItem = {
+  id: 'datasources',
+  label: 'Data Sources',
+  href: '/dashboard/datasources',
+  icon: Database,
+};
+
 // d_test + cloud-hosting only: navigates to the Install InsForge route.
 export const dashboardDTestInstallMenuItem: DashboardPrimaryMenuItem = {
   id: 'dtest-install',
