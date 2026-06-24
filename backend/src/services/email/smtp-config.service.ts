@@ -88,6 +88,51 @@ function toSmtpConfigSchema(row: Record<string, unknown>): SmtpConfigSchema {
   };
 }
 
+function toSmtpConfigSchemaFromRaw(config: RawSmtpConfig): SmtpConfigSchema {
+  const now = new Date().toISOString();
+  return {
+    id: config.id,
+    enabled: config.enabled,
+    host: config.host,
+    port: config.port,
+    username: config.username,
+    hasPassword: !!config.password,
+    senderEmail: config.senderEmail,
+    senderName: config.senderName,
+    minIntervalSeconds: config.minIntervalSeconds,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function parsePositiveInteger(value: string | undefined, fallback: number): number {
+  if (!value) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function parseNonNegativeInteger(value: string | undefined, fallback: number): number {
+  if (!value) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function hasStoredSmtpConfig(row: Record<string, unknown>): boolean {
+  return Boolean(
+    row.host || row.username || row.password_encrypted || row.senderEmail || row.senderName
+  );
+}
+
+function shouldUseEnvironmentSmtpConfig(row: Record<string, unknown>): boolean {
+  return !row.enabled && !hasStoredSmtpConfig(row);
+}
+
 const EMPTY_CONFIG: SmtpConfigSchema = {
   id: '00000000-0000-0000-0000-000000000000',
   enabled: false,
@@ -156,6 +201,25 @@ export class SmtpConfigService {
     }
   }
 
+  private getEnvironmentSmtpConfig(): RawSmtpConfig | null {
+    const host = process.env.SMTP_HOST?.trim();
+    if (!host) {
+      return null;
+    }
+
+    return {
+      id: 'env-smtp',
+      enabled: true,
+      host,
+      port: parsePositiveInteger(process.env.SMTP_PORT, 587),
+      username: process.env.SMTP_USERNAME ?? '',
+      password: process.env.SMTP_PASSWORD ?? '',
+      senderEmail: process.env.SMTP_SENDER_EMAIL || process.env.ADMIN_EMAIL || 'admin@example.com',
+      senderName: process.env.SMTP_SENDER_NAME || 'InsForge',
+      minIntervalSeconds: parseNonNegativeInteger(process.env.SMTP_MIN_INTERVAL_SECONDS, 60),
+    };
+  }
+
   // -------------------------------------------------------------------------
   // Reads
   // -------------------------------------------------------------------------
@@ -166,11 +230,33 @@ export class SmtpConfigService {
         `SELECT ${SMTP_CONFIG_COLUMNS} FROM email.config LIMIT 1`
       );
       if (!result.rows.length) {
+        const envConfig = this.getEnvironmentSmtpConfig();
+        if (envConfig) {
+          return toSmtpConfigSchemaFromRaw(envConfig);
+        }
+
         const now = new Date().toISOString();
         return { ...EMPTY_CONFIG, createdAt: now, updatedAt: now };
       }
+
+      const row = result.rows[0];
+      if (shouldUseEnvironmentSmtpConfig(row)) {
+        const envConfig = this.getEnvironmentSmtpConfig();
+        if (envConfig) {
+          return toSmtpConfigSchemaFromRaw(envConfig);
+        }
+      }
+
       return toSmtpConfigSchema(result.rows[0]);
     } catch (error) {
+      const envConfig = this.getEnvironmentSmtpConfig();
+      if (envConfig) {
+        logger.warn('Failed to read SMTP config from database, using environment SMTP config', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return toSmtpConfigSchemaFromRaw(envConfig);
+      }
+
       logger.error('Failed to get SMTP config', { error });
       throw new AppError('Failed to get SMTP configuration', 500, ERROR_CODES.INTERNAL_ERROR);
     }
@@ -182,12 +268,15 @@ export class SmtpConfigService {
         `SELECT ${SMTP_CONFIG_COLUMNS} FROM email.config LIMIT 1`
       );
       if (!result.rows.length) {
-        return null;
+        return this.getEnvironmentSmtpConfig();
       }
 
       const row = result.rows[0];
       if (!row.enabled) {
-        return null;
+        // Delivery is intentionally stricter than settings reads: if a user
+        // explicitly disabled a stored SMTP config, do not silently send via the
+        // environment fallback. Only empty bootstrap rows may fall back to env.
+        return shouldUseEnvironmentSmtpConfig(row) ? this.getEnvironmentSmtpConfig() : null;
       }
 
       const password = this.getDecryptedPassword(row.password_encrypted);
@@ -209,7 +298,7 @@ export class SmtpConfigService {
       };
     } catch (error) {
       logger.error('Failed to get raw SMTP config', { error });
-      return null;
+      return this.getEnvironmentSmtpConfig();
     }
   }
 
@@ -367,21 +456,14 @@ export class SmtpConfigService {
     existingPasswordEncrypted: string
   ): Promise<void> {
     const password = input.password ?? this.getDecryptedPassword(existingPasswordEncrypted) ?? '';
-
-    if (!password) {
-      throw new AppError(
-        'SMTP password is required when enabling SMTP',
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
-    }
+    const auth = input.username || password ? { user: input.username, pass: password } : undefined;
 
     try {
       const transporter = nodemailer.createTransport({
         host: input.host,
         port: input.port,
         secure: input.port === 465,
-        auth: { user: input.username, pass: password },
+        auth,
         connectionTimeout: 10000,
       });
       await transporter.verify();
