@@ -90,8 +90,7 @@ s3GatewayRouter.use((req, res, next) => {
 // chunk framing overhead; use x-amz-decoded-content-length instead.
 s3GatewayRouter.use((req: Request, res: Response, next) => {
   const rawDecoded = req.headers['x-amz-decoded-content-length'];
-  const isStreaming =
-    typeof rawDecoded === 'string' && /^\d+$/.test(rawDecoded);
+  const isStreaming = typeof rawDecoded === 'string' && /^\d+$/.test(rawDecoded);
   const rawCl = req.headers['content-length'];
   const contentLength = isStreaming
     ? Number(rawDecoded)
