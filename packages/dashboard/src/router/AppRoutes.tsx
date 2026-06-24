@@ -155,9 +155,7 @@ function AuthenticatedRoutes() {
             <Route path="session-replay" element={<SessionReplayPage />} />
           </Route>
         )}
-        {isCloudHosting && (
-          <Route path="/dashboard/datasources" element={<DatasourceLayout />} />
-        )}
+        {isCloudHosting && <Route path="/dashboard/datasources" element={<DatasourceLayout />} />}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </AppLayout>

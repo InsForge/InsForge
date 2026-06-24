@@ -295,9 +295,9 @@ export function useCloudHosting() {
   const posthogStatusSubscribersRef = useRef<
     Set<(event: DashboardPosthogConnectionStatus) => void>
   >(new Set());
-  const apifyStatusSubscribersRef = useRef<
-    Set<(event: DashboardApifyConnectionStatus) => void>
-  >(new Set());
+  const apifyStatusSubscribersRef = useRef<Set<(event: DashboardApifyConnectionStatus) => void>>(
+    new Set()
+  );
 
   const setPendingRequest = useCallback(
     <K extends PendingRequestKey>(
