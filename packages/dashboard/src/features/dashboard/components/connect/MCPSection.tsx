@@ -14,6 +14,8 @@ import { MCP_AGENTS, GenerateInstallCommand, createMCPConfig, type MCPAgent } fr
 import { MCP_VERIFY_CONNECTION_PROMPT } from './constants';
 import { cn } from '#lib/utils/utils';
 
+type InstallMode = 'install' | 'cli';
+
 interface MCPSectionProps {
   apiKey: string;
   appUrl: string;
@@ -30,6 +32,7 @@ export function MCPSection({
   onAgentChange,
 }: MCPSectionProps) {
   const [selectedAgent, setSelectedAgent] = useState<MCPAgent>(MCP_AGENTS[0]);
+  const [installMode, setInstallMode] = useState<InstallMode>('install');
 
   const handleAgentChange = (agent: MCPAgent) => {
     setSelectedAgent(agent);
@@ -40,40 +43,86 @@ export function MCPSection({
     return GenerateInstallCommand(selectedAgent, apiKey);
   }, [selectedAgent, apiKey]);
 
+  const cliConnectCommand = useMemo(() => {
+    return `npx @insforge/cli connect ${selectedAgent.id}`;
+  }, [selectedAgent]);
+
   const mcpJsonConfig = useMemo(() => {
     const config = createMCPConfig(apiKey, 'macos-linux', appUrl);
     return JSON.stringify(config, null, 2);
   }, [apiKey, appUrl]);
 
+  const showCursorDeeplink = installMode === 'install' && selectedAgent.id === 'cursor';
+  const showQoderDeeplink = installMode === 'install' && selectedAgent.id === 'qoder';
+  const showDeeplink = showCursorDeeplink || showQoderDeeplink;
+  const showMcpJson = installMode === 'install' && selectedAgent.id === 'mcp';
+  const showInstallCommand = installMode === 'install' && !showDeeplink && !showMcpJson;
+  const showCliCommand = installMode === 'cli' && selectedAgent.id !== 'mcp';
+
   return (
     <div className={cn('flex flex-col gap-6', className)}>
       <div className="flex w-full flex-col gap-3">
-        <div className="flex flex-col">
-          <p className="text-sm font-medium leading-6 text-foreground">
-            <span>Step 1 - Install InsForge</span>
-          </p>
-          {(selectedAgent.id === 'cursor' || selectedAgent.id === 'qoder') && (
-            <p className="text-sm leading-6 text-muted-foreground">Install in one click</p>
-          )}
-          {selectedAgent.id === 'mcp' && (
-            <p className="text-sm leading-6 text-muted-foreground">
-              Add this configuration to your MCP settings
+        <div className="flex items-start justify-between">
+          <div className="flex flex-col">
+            <p className="text-sm font-medium leading-6 text-foreground">
+              <span>Step 1 - Install InsForge</span>
             </p>
-          )}
-          {selectedAgent.id !== 'cursor' &&
-            selectedAgent.id !== 'qoder' &&
-            selectedAgent.id !== 'mcp' && (
+            {showDeeplink && (
+              <p className="text-sm leading-6 text-muted-foreground">Install in one click</p>
+            )}
+            {showMcpJson && (
+              <p className="text-sm leading-6 text-muted-foreground">
+                Add this configuration to your MCP settings
+              </p>
+            )}
+            {showInstallCommand && (
               <p className="text-sm leading-6 text-muted-foreground">
                 Run the following command in terminal to install InsForge MCP Server
               </p>
             )}
+            {showCliCommand && (
+              <p className="text-sm leading-6 text-muted-foreground">
+                Run this command after linking your project with the InsForge CLI
+              </p>
+            )}
+            {installMode === 'cli' && selectedAgent.id === 'mcp' && (
+              <p className="text-sm leading-6 text-muted-foreground">
+                CLI connect is not available for generic MCP JSON — select a specific agent
+              </p>
+            )}
+          </div>
+
+          {/* Install / CLI toggle */}
+          <div className="flex shrink-0 items-center rounded border border-[var(--alpha-8)] bg-semantic-0 p-0.5">
+            <button
+              onClick={() => setInstallMode('install')}
+              className={cn(
+                'rounded px-2 py-0.5 text-xs font-medium transition-colors',
+                installMode === 'install'
+                  ? 'bg-[var(--alpha-8)] text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              Install
+            </button>
+            <button
+              onClick={() => setInstallMode('cli')}
+              className={cn(
+                'rounded px-2 py-0.5 text-xs font-medium transition-colors',
+                installMode === 'cli'
+                  ? 'bg-[var(--alpha-8)] text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              CLI
+            </button>
+          </div>
         </div>
+
         <div
           className={cn(
             'flex w-full',
-            selectedAgent.id === 'cursor' || selectedAgent.id === 'qoder'
-              ? 'items-start gap-3'
-              : 'flex-col gap-3'
+            showDeeplink ? 'items-start gap-3' : 'flex-col gap-3'
           )}
         >
           <DropdownMenu>
@@ -108,15 +157,18 @@ export function MCPSection({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {selectedAgent.id === 'cursor' ? (
+          {/* Install mode content */}
+          {showCursorDeeplink && (
             <div className="w-fit">
               <CursorDeeplinkGenerator apiKey={apiKey} os="macos-linux" />
             </div>
-          ) : selectedAgent.id === 'qoder' ? (
+          )}
+          {showQoderDeeplink && (
             <div className="w-fit">
               <QoderDeeplinkGenerator apiKey={apiKey} os="macos-linux" />
             </div>
-          ) : selectedAgent.id === 'mcp' ? (
+          )}
+          {showMcpJson && (
             <div className="flex h-[320px] w-full flex-col overflow-hidden rounded border border-[var(--alpha-8)] bg-semantic-0">
               {/* Header - fixed at top */}
               <div className="flex items-center justify-between border-b border-[var(--alpha-8)] bg-semantic-0 p-3">
@@ -132,12 +184,35 @@ export function MCPSection({
                 </pre>
               </div>
             </div>
-          ) : (
+          )}
+          {showInstallCommand && (
             <CodeBlock
               code={installCommand}
               label="Terminal Command"
               className={cn('bg-semantic-0', isLoading && 'animate-pulse')}
             />
+          )}
+
+          {/* CLI mode content */}
+          {showCliCommand && (
+            <div className="flex flex-col gap-2">
+              <CodeBlock
+                code={cliConnectCommand}
+                label="Connect"
+                className="bg-semantic-0"
+              />
+              <p className="text-xs text-muted-foreground">
+                To disconnect, run:{' '}
+                <code className="rounded bg-[var(--alpha-8)] px-1 py-0.5 font-mono text-xs">
+                  npx @insforge/cli disconnect {selectedAgent.id}
+                </code>
+              </p>
+            </div>
+          )}
+          {installMode === 'cli' && selectedAgent.id === 'mcp' && (
+            <p className="text-xs text-muted-foreground">
+              Select a specific agent from the dropdown above to use the CLI connect command.
+            </p>
           )}
         </div>
       </div>
@@ -166,3 +241,4 @@ export function MCPSection({
     </div>
   );
 }
+

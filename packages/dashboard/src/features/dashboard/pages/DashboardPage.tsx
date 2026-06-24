@@ -379,7 +379,7 @@ export default function DashboardPage() {
   const { projectInfo, isLoading: isProjectInfoLoading } = useCloudProjectInfo();
   const project = useDashboardProject();
   const { totalUsers } = useUsers();
-  const { hasCompletedOnboarding, recordsCount, isLoading: isMcpUsageLoading } = useMcpUsage();
+  const { isMcpConnected, recordsCount, isLoading: isMcpUsageLoading } = useMcpUsage();
   const isBranch = project?.isBranch === true;
   const [previewFitVersion, setPreviewFitVersion] = useState(0);
   const previewContainerRef = useRef<HTMLDivElement | null>(null);
@@ -388,7 +388,7 @@ export default function DashboardPage() {
   const tableCount = tables?.length ?? 0;
   // Branches inherit data from the parent, so treat them as already-connected
   // to skip the "Getting Started / install" block on the dashboard.
-  const agentConnected = hasCompletedOnboarding || isBranch;
+  const agentConnected = isMcpConnected || isBranch;
   const shouldShowLoadingState =
     isMetadataLoading || isMcpUsageLoading || (isCloudProject && isProjectInfoLoading);
   const projectName = isCloudProject ? projectInfo.name : 'My InsForge Project';

@@ -1,7 +1,11 @@
 import { useMemo, useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '#lib/contexts/AuthContext';
-import { usageService, McpUsageRecord } from '#features/logs/services/usage.service';
+import {
+  usageService,
+  McpUsageRecord,
+  McpConnectionStatus,
+} from '#features/logs/services/usage.service';
 import { LOGS_PAGE_SIZE } from '#features/logs/helpers';
 
 // ============================================================================
@@ -48,6 +52,15 @@ export function useMcpUsage(options: UseMcpUsageOptions = {}) {
     refetchOnWindowFocus: false,
   });
 
+  // Query to fetch MCP connection status from DB
+  const { data: mcpStatus = 'disconnected' } = useQuery<McpConnectionStatus>({
+    queryKey: ['mcp-status'],
+    queryFn: ({ signal }) => usageService.getMcpConnectionStatus(signal),
+    enabled: isAuthenticated,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+  });
+
   // Filter records by search query
   const filteredRecords = useMemo(() => {
     if (!searchQuery) {
@@ -76,6 +89,7 @@ export function useMcpUsage(options: UseMcpUsageOptions = {}) {
   );
 
   // Computed values
+  const isMcpConnected = mcpStatus === 'connected';
   const hasCompletedOnboarding = useMemo(() => !!records.length, [records]);
   const recordsCount = useMemo(() => records.length, [records]);
   const filteredRecordsCount = useMemo(() => filteredRecords.length, [filteredRecords.length]);
@@ -86,6 +100,7 @@ export function useMcpUsage(options: UseMcpUsageOptions = {}) {
     records: paginatedRecords,
     allRecords: records,
     filteredRecords,
+    isMcpConnected,
     hasCompletedOnboarding,
     latestRecord,
     recordsCount,

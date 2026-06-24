@@ -10,6 +10,7 @@ export enum ServerEvents {
   NOTIFICATION = 'notification',
   DATA_UPDATE = 'data:update',
   MCP_CONNECTED = 'mcp:connected',
+  MCP_STATUS_CHANGED = 'mcp:status_changed',
   // Realtime events
   REALTIME_ERROR = 'realtime:error',
   // Presence events
