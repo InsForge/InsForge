@@ -7,10 +7,9 @@ BEGIN
     EXECUTE 'GRANT SELECT ON TABLE system.database_backups TO project_admin';
   END IF;
 
-  -- Future-proof: set default privileges only for postgres
-  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'postgres')
-     AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'project_admin') THEN
-    EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA system GRANT SELECT ON TABLES TO project_admin';
+  -- Future-proof: set default privileges for the migration runner (no FOR ROLE)
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'project_admin') THEN
+    EXECUTE 'ALTER DEFAULT PRIVILEGES IN SCHEMA system GRANT SELECT ON TABLES TO project_admin';
   END IF;
 END $$;
 
@@ -23,10 +22,8 @@ BEGIN
     EXECUTE 'REVOKE SELECT ON TABLE system.database_backups FROM project_admin';
   END IF;
 
-  -- Revoke default privileges for postgres
-  IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'system')
-     AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'project_admin')
-     AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'postgres') THEN
-    EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA system REVOKE SELECT ON TABLES FROM project_admin';
+  -- Revoke default privileges for the migration runner (no FOR ROLE)
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'project_admin') THEN
+    EXECUTE 'ALTER DEFAULT PRIVILEGES IN SCHEMA system REVOKE SELECT ON TABLES FROM project_admin';
   END IF;
 END $$;

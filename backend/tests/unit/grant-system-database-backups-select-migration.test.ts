@@ -29,17 +29,16 @@ describe('054_grant-system-database-backups-select migration', () => {
     expect(upBody).toMatch(grantPattern);
   });
 
-  it('sets default privileges for future system tables for postgres only', () => {
+  it('sets default privileges for future system tables (no FOR ROLE)', () => {
     const sql = readMigration();
     expect(sql).toMatch(
-      /ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA system GRANT SELECT ON TABLES TO project_admin/
+      /ALTER DEFAULT PRIVILEGES IN SCHEMA system GRANT SELECT ON TABLES TO project_admin/
     );
-
-    expect(sql).not.toMatch(/FOR ROLE current_user/);
+    expect(sql).not.toMatch(/FOR ROLE postgres/);
     expect(sql).not.toMatch(/format\('ALTER DEFAULT PRIVILEGES FOR ROLE %I/);
   });
 
-  it('DOWN migration has conditional REVOKE guards and revokes default privileges for postgres only', () => {
+  it('DOWN migration has conditional REVOKE guards and revokes default privileges', () => {
     const sql = readMigration();
     const downSection = sql.split('-- DOWN migration')[1];
     expect(downSection).toBeDefined();
@@ -49,11 +48,10 @@ describe('054_grant-system-database-backups-select migration', () => {
     );
 
     expect(downSection).toContain(
-      'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA system REVOKE SELECT ON TABLES FROM project_admin'
+      'ALTER DEFAULT PRIVILEGES IN SCHEMA system REVOKE SELECT ON TABLES FROM project_admin'
     );
 
-    expect(downSection).not.toMatch(/FOR ROLE current_user/);
-    expect(downSection).not.toMatch(/format\('ALTER DEFAULT PRIVILEGES FOR ROLE %I/);
+    expect(downSection).not.toMatch(/FOR ROLE postgres/);
   });
 
   it('should run after migration 045 which creates project_admin', () => {
