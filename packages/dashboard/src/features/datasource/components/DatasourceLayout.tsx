@@ -72,10 +72,15 @@ export default function DatasourceLayout() {
             Connect external data sources to your backend. Apify first; more to come.
           </p>
         </div>
-        {connection ? (
-          <ApifyConnectedPanel connection={connection} projectId={projectId ?? ''} />
+        {!projectId ? (
+          <ErrorState
+            title="Project ID unavailable"
+            error="Please refresh, or contact support if the problem persists."
+          />
+        ) : connection ? (
+          <ApifyConnectedPanel connection={connection} projectId={projectId} />
         ) : (
-          <ApifyConnectPanel projectId={projectId ?? ''} />
+          <ApifyConnectPanel projectId={projectId} />
         )}
       </div>
     </div>
