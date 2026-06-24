@@ -7,8 +7,8 @@ import {
 } from '@/services/storage/s3-signature.js';
 import { sendS3Error, S3ProtocolError } from '../errors.js';
 import { S3GatewayRequest, getS3Bucket, getS3Key } from '../request.js';
+import { appConfig } from '@/infra/config/app.config.js';
 
-const MAX_PART_BYTES = 5 * 1024 * 1024 * 1024;
 const MAX_PART_NUMBER = 10_000;
 
 class ByteLimitStream extends Transform {
@@ -117,7 +117,7 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
     });
     return;
   }
-  if (contentLength > MAX_PART_BYTES) {
+  if (contentLength > appConfig.storage.maxS3UploadSize) {
     sendS3Error(res, 'EntityTooLarge', `Part too large: ${contentLength}`, {
       resource: req.path,
       requestId: req.s3Auth.requestId,
@@ -134,13 +134,13 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
       scope: req.s3Auth.scope,
       acceptTrailer: isSignedStreamTrailer,
     });
-    const limiter = new ByteLimitStream(MAX_PART_BYTES);
+    const limiter = new ByteLimitStream(appConfig.storage.maxS3UploadSize);
     const coalesce = new MinChunkSizeStream(MIN_UPSTREAM_CHUNK_BYTES);
     req.pipe(parser).pipe(limiter).pipe(coalesce);
     body = coalesce;
   } else if (isUnsignedStreamTrailer) {
     const parser = new AwsChunkedPayloadParser();
-    const limiter = new ByteLimitStream(MAX_PART_BYTES);
+    const limiter = new ByteLimitStream(appConfig.storage.maxS3UploadSize);
     const coalesce = new MinChunkSizeStream(MIN_UPSTREAM_CHUNK_BYTES);
     req.pipe(parser).pipe(limiter).pipe(coalesce);
     body = coalesce;

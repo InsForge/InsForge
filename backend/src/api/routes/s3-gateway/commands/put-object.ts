@@ -8,17 +8,7 @@ import {
   AwsChunkedPayloadParser,
   ChunkSignatureV4Parser,
 } from '@/services/storage/s3-signature.js';
-
-const AWS_MAX_PUT_OBJECT_GB = 5;
-
-function capBytes(): number {
-  const override = Number(process.env.S3_PROTOCOL_MAX_OBJECT_SIZE_GB);
-  const effective =
-    Number.isFinite(override) && override > 0 && override < AWS_MAX_PUT_OBJECT_GB
-      ? override
-      : AWS_MAX_PUT_OBJECT_GB;
-  return effective * 1024 * 1024 * 1024;
-}
+import { appConfig } from '@/infra/config/app.config.js';
 
 /**
  * Transform that counts bytes and errors if it exceeds the cap. Used on the
@@ -124,7 +114,7 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
       ? plainLen
       : null;
 
-  const cap = capBytes();
+  const cap = appConfig.storage.maxS3UploadSize;
   if (contentLength !== null && contentLength > cap) {
     sendS3Error(res, 'EntityTooLarge', `Object too large: ${contentLength} > ${cap}`, {
       resource: req.path,
