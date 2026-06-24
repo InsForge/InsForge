@@ -187,36 +187,43 @@ export class DatabaseAdvanceService {
     // Export foreign key constraints
     const foreignKeysResult = await client.query(
       `
-      SELECT DISTINCT
-        'ALTER TABLE ' || quote_ident(tc.table_name) ||
-        ' ADD CONSTRAINT ' || quote_ident(tc.constraint_name) ||
-        ' FOREIGN KEY (' || quote_ident(kcu.column_name) || ')' ||
-        ' REFERENCES ' || quote_ident(ccu.table_name) ||
-        ' (' || quote_ident(ccu.column_name) || ')' ||
+      SELECT
+        'ALTER TABLE ' || quote_ident(ct.relname) ||
+        ' ADD CONSTRAINT ' || quote_ident(c.conname) ||
+        ' FOREIGN KEY (' || string_agg(quote_ident(a1.attname), ', ' ORDER BY u.pos) || ')' ||
+        ' REFERENCES ' || quote_ident(cf.relname) ||
+        ' (' || string_agg(quote_ident(a2.attname), ', ' ORDER BY u.pos) || ')' ||
         CASE
-          WHEN rc.delete_rule != 'NO ACTION' THEN ' ON DELETE ' || rc.delete_rule
+          WHEN c.confdeltype = 'c' THEN ' ON DELETE CASCADE'
+          WHEN c.confdeltype = 'n' THEN ' ON DELETE SET NULL'
+          WHEN c.confdeltype = 'r' THEN ' ON DELETE RESTRICT'
+          WHEN c.confdeltype = 'd' THEN ' ON DELETE SET DEFAULT'
           ELSE ''
         END ||
         CASE
-          WHEN rc.update_rule != 'NO ACTION' THEN ' ON UPDATE ' || rc.update_rule
+          WHEN c.confupdtype = 'c' THEN ' ON UPDATE CASCADE'
+          WHEN c.confupdtype = 'n' THEN ' ON UPDATE SET NULL'
+          WHEN c.confupdtype = 'r' THEN ' ON UPDATE RESTRICT'
+          WHEN c.confupdtype = 'd' THEN ' ON UPDATE SET DEFAULT'
           ELSE ''
         END || ';' as fk_statement,
-        tc.constraint_name
-      FROM information_schema.table_constraints AS tc
-      JOIN information_schema.key_column_usage AS kcu
-        ON tc.constraint_name = kcu.constraint_name
-        AND tc.table_schema = kcu.table_schema
-        AND kcu.table_name = tc.table_name
-      JOIN information_schema.constraint_column_usage AS ccu
-        ON ccu.constraint_name = tc.constraint_name
-        AND ccu.table_schema = tc.table_schema
-      LEFT JOIN information_schema.referential_constraints AS rc
-        ON tc.constraint_name = rc.constraint_name
-        AND tc.table_schema = rc.constraint_schema
-      WHERE tc.constraint_type = 'FOREIGN KEY'
-      AND tc.table_name = $1
-      AND tc.table_schema = 'public'
-      ORDER BY tc.constraint_name
+        c.conname as constraint_name
+      FROM pg_catalog.pg_constraint c
+      JOIN pg_catalog.pg_class ct ON c.conrelid = ct.oid
+      JOIN pg_catalog.pg_namespace nt ON ct.relnamespace = nt.oid
+      JOIN pg_catalog.pg_class cf ON c.confrelid = cf.oid
+      JOIN pg_catalog.pg_namespace nf ON cf.relnamespace = nf.oid
+      CROSS JOIN LATERAL unnest(c.conkey, c.confkey)
+        WITH ORDINALITY AS u(src_attnum, ref_attnum, pos)
+      JOIN pg_catalog.pg_attribute a1
+        ON a1.attnum = u.src_attnum AND a1.attrelid = c.conrelid
+      JOIN pg_catalog.pg_attribute a2
+        ON a2.attnum = u.ref_attnum AND a2.attrelid = c.confrelid
+      WHERE c.contype = 'f'
+        AND nt.nspname = 'public'
+        AND ct.relname = $1
+      GROUP BY c.conname, ct.relname, nf.nspname, cf.relname, c.confdeltype, c.confupdtype
+      ORDER BY c.conname
     `,
       [table]
     );
@@ -546,28 +553,37 @@ export class DatabaseAdvanceService {
           // Get foreign keys
           const foreignKeysResult = await client.query(
             `
-            SELECT DISTINCT
-              tc.constraint_name as "constraintName",
-              kcu.column_name as "columnName",
-              ccu.table_name as "foreignTableName",
-              ccu.column_name as "foreignColumnName",
-              rc.delete_rule as "deleteRule",
-              rc.update_rule as "updateRule"
-            FROM information_schema.table_constraints AS tc
-            JOIN information_schema.key_column_usage AS kcu
-              ON tc.constraint_name = kcu.constraint_name
-              AND tc.table_schema = kcu.table_schema
-              AND kcu.table_name = tc.table_name
-            JOIN information_schema.constraint_column_usage AS ccu
-              ON ccu.constraint_name = tc.constraint_name
-              AND ccu.table_schema = tc.table_schema
-            LEFT JOIN information_schema.referential_constraints AS rc
-              ON tc.constraint_name = rc.constraint_name
-              AND tc.table_schema = rc.constraint_schema
-            WHERE tc.constraint_type = 'FOREIGN KEY'
-            AND tc.table_name = $1
-            AND tc.table_schema = 'public'
-            ORDER BY "constraintName", "columnName"
+            SELECT
+              c.conname as "constraintName",
+              a1.attname as "columnName",
+              cf.relname as "foreignTableName",
+              a2.attname as "foreignColumnName",
+              u.pos as "ordinalPosition",
+              CASE c.confdeltype
+                WHEN 'a' THEN 'NO ACTION' WHEN 'r' THEN 'RESTRICT'
+                WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL'
+                WHEN 'd' THEN 'SET DEFAULT'
+              END as "deleteRule",
+              CASE c.confupdtype
+                WHEN 'a' THEN 'NO ACTION' WHEN 'r' THEN 'RESTRICT'
+                WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL'
+                WHEN 'd' THEN 'SET DEFAULT'
+              END as "updateRule"
+            FROM pg_catalog.pg_constraint c
+            JOIN pg_catalog.pg_class ct ON c.conrelid = ct.oid
+            JOIN pg_catalog.pg_namespace nt ON ct.relnamespace = nt.oid
+            JOIN pg_catalog.pg_class cf ON c.confrelid = cf.oid
+            JOIN pg_catalog.pg_namespace nf ON cf.relnamespace = nf.oid
+            CROSS JOIN LATERAL unnest(c.conkey, c.confkey)
+              WITH ORDINALITY AS u(src_attnum, ref_attnum, pos)
+            JOIN pg_catalog.pg_attribute a1
+              ON a1.attnum = u.src_attnum AND a1.attrelid = c.conrelid
+            JOIN pg_catalog.pg_attribute a2
+              ON a2.attnum = u.ref_attnum AND a2.attrelid = c.confrelid
+            WHERE c.contype = 'f'
+              AND nt.nspname = 'public'
+              AND ct.relname = $1
+            ORDER BY c.conname, u.pos
           `,
             [table]
           );

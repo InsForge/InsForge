@@ -588,7 +588,8 @@ export function TableForm({
                         <MoveRight className="size-5 shrink-0 text-muted-foreground" />
                         <span className="truncate">
                           {fk.referenceTable}.
-                          {fk.referenceColumns.map((c) => c.referenceColumn).join(',')}
+                          {fk.referenceColumns.find((c) => c.sourceColumn === fk.columnName)
+                            ?.referenceColumn ?? ''}
                         </span>
                       </div>
                       <div className="truncate px-2.5 text-[13px] leading-[18px]">

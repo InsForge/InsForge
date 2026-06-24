@@ -259,6 +259,7 @@ export function LinkRecordDialog({
               data={records}
               columns={columns}
               loading={isLoading && !records.length}
+              rowKeyGetter={getRowKey}
               selectedRows={selectedRows}
               onSelectedRowsChange={(newSelectedRows) => {
                 const selectedId = Array.from(newSelectedRows)[0];
