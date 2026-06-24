@@ -119,12 +119,7 @@ export function MCPSection({
           </div>
         </div>
 
-        <div
-          className={cn(
-            'flex w-full',
-            showDeeplink ? 'items-start gap-3' : 'flex-col gap-3'
-          )}
-        >
+        <div className={cn('flex w-full', showDeeplink ? 'items-start gap-3' : 'flex-col gap-3')}>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex w-40 cursor-pointer items-center justify-between rounded border border-[var(--alpha-8)] bg-semantic-0 px-2 py-1 transition-colors hover:bg-[var(--alpha-4)]">
@@ -196,11 +191,7 @@ export function MCPSection({
           {/* CLI mode content */}
           {showCliCommand && (
             <div className="flex flex-col gap-2">
-              <CodeBlock
-                code={cliConnectCommand}
-                label="Connect"
-                className="bg-semantic-0"
-              />
+              <CodeBlock code={cliConnectCommand} label="Connect" className="bg-semantic-0" />
               <p className="text-xs text-muted-foreground">
                 To disconnect, run:{' '}
                 <code className="rounded bg-[var(--alpha-8)] px-1 py-0.5 font-mono text-xs">
@@ -241,4 +232,3 @@ export function MCPSection({
     </div>
   );
 }
-

@@ -1,4 +1,4 @@
--- Migration: 052 - Create mcp_status table for tracking connection state
+-- Migration: 055 - Create mcp_status table for tracking connection state
 
 CREATE TABLE IF NOT EXISTS system.mcp_status (
   id INT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
