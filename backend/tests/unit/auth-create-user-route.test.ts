@@ -20,6 +20,7 @@ vi.mock('@/api/middlewares/auth.js', () => ({
   verifyUser: mocks.verifyUser,
   verifyOptionalUser: mocks.verifyUser,
   verifyAdmin: vi.fn((_req, _res, next: NextFunction) => next()),
+  requireRoot: vi.fn((_req, _res, next: NextFunction) => next()),
   verifyToken: vi.fn((_req, _res, next: NextFunction) => next()),
 }));
 

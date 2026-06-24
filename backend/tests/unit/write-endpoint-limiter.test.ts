@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import express, { type RequestHandler } from 'express';
+import express, {
+  type NextFunction,
+  type Request,
+  type RequestHandler,
+  type Response,
+} from 'express';
 import request from 'supertest';
 import {
   functionsWriteLimiter,
@@ -21,12 +26,30 @@ function resetLimiter(limiter: RequestHandler): void {
   (limiter as unknown as { resetKey: (k: string) => void }).resetKey(DEFAULT_KEY);
 }
 
+function getErrorStatusCode(error: unknown): number {
+  if (typeof error === 'object' && error !== null && 'statusCode' in error) {
+    const statusCode = (error as { statusCode: unknown }).statusCode;
+    if (typeof statusCode === 'number') {
+      return statusCode;
+    }
+  }
+  return 500;
+}
+
+function attachErrorHandler(app: express.Express): void {
+  app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
+    void _next;
+    res.status(getErrorStatusCode(error)).json({ ok: false });
+  });
+}
+
 function buildApp(limiter: RequestHandler) {
   const app = express();
   app.use(express.json());
   app.post('/x', limiter, (_req, res) => {
     res.json({ ok: true });
   });
+  attachErrorHandler(app);
   return app;
 }
 
@@ -98,6 +121,7 @@ describe('within a category the bucket is shared across routes', () => {
     app.use(express.json());
     app.post('/a', deploymentsWriteLimiter, (_req, res) => res.json({ ok: true }));
     app.post('/b', deploymentsWriteLimiter, (_req, res) => res.json({ ok: true }));
+    attachErrorHandler(app);
 
     // Spread the budget across the two routes.
     for (let i = 0; i < budget; i++) {
