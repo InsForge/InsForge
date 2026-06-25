@@ -41,6 +41,7 @@ import { schedulesRouter } from '@/api/routes/schedules/index.routes.js';
 import { servicesRouter } from '@/api/routes/compute/services.routes.js';
 import { analyticsRouter } from '@/api/routes/analytics/index.routes.js';
 import { appConfig } from '@/infra/config/app.config.js';
+import { TelemetryService } from '@/services/telemetry/telemetry.service.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -327,6 +328,8 @@ async function initializeServer() {
         error: err instanceof Error ? err.message : String(err),
       });
     });
+
+    TelemetryService.getInstance().start();
   } catch (error) {
     logger.error('Failed to initialize server', {
       error: error instanceof Error ? error.message : String(error),
@@ -364,6 +367,14 @@ async function cleanup() {
     oAuthPKCEService.destroy();
   } catch (error) {
     logger.error('Error closing OAuthPKCEService', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  try {
+    TelemetryService.getInstance().stop();
+  } catch (error) {
+    logger.error('Error closing TelemetryService', {
       error: error instanceof Error ? error.message : String(error),
     });
   }

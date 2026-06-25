@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import express, { type RequestHandler } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import request from 'supertest';
 import { computeLogsRateLimiter } from '@/api/middlewares/rate-limiters.js';
 
@@ -17,6 +18,14 @@ function buildApp() {
   // logs is a GET endpoint — model it as such.
   app.get('/logs', computeLogsRateLimiter, (_req, res) => {
     res.json({ ok: true });
+  });
+  app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+    void _next;
+    const status =
+      (err as { statusCode?: number; status?: number }).statusCode ??
+      (err as { status?: number }).status ??
+      500;
+    res.status(status).json({ error: err.message });
   });
   return app;
 }
