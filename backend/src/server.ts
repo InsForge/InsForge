@@ -382,7 +382,8 @@ async function cleanup() {
 // (e.g. by tests that build the app via createApp()). Importing this module
 // previously bound the port and started realtime/seed logic as a side effect.
 // Fixes #1299.
-const isMainModule = !!process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+const isMainModule =
+  !!process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href;
 
 if (isMainModule) {
   void initializeServer();
