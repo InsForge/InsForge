@@ -16,6 +16,7 @@ export const createTableRequestSchema = tableSchema
   .pick({
     tableName: true,
     columns: true,
+    foreignKeys: true,
   })
   .extend({
     rlsEnabled: z.boolean().default(true),
@@ -36,13 +37,7 @@ export const createTableResponseSchema = tableSchema
 export const getTableSchemaResponseSchema = tableSchema;
 
 export const updateTableSchemaRequestSchema = z.object({
-  addColumns: z
-    .array(
-      columnSchema.omit({
-        foreignKey: true,
-      })
-    )
-    .optional(),
+  addColumns: z.array(columnSchema).optional(),
   dropColumns: z.array(z.string()).optional(),
   updateColumns: z
     .array(
@@ -57,14 +52,9 @@ export const updateTableSchemaRequestSchema = z.object({
       })
     )
     .optional(),
-  addForeignKeys: z
-    .array(
-      z.object({
-        columnName: z.string().min(1, 'Column name is required for adding foreign key'),
-        foreignKey: foreignKeySchema,
-      })
-    )
-    .optional(),
+  // Each entry is a full foreign-key constraint (composite keys are one entry).
+  addForeignKeys: z.array(foreignKeySchema).optional(),
+  // Constraint names to drop.
   dropForeignKeys: z.array(z.string()).optional(),
   renameTable: z
     .object({

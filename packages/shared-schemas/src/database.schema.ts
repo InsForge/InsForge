@@ -36,7 +36,12 @@ export const foreignKeyReferenceSchema = z.object({
   referenceColumn: z.string().min(1, 'Reference column cannot be empty'),
 });
 
+// A foreign key is a table-level constraint: one entity per constraint, with an
+// ordered list of (source -> reference) column pairs. Composite keys are a single
+// entity with multiple pairs, never duplicated across columns.
 export const foreignKeySchema = z.object({
+  // Constraint identity. Populated when reading schema; derived by the backend on create.
+  constraintName: z.string().optional(),
   referenceTable: z.string().min(1, 'Target table cannot be empty'),
   referenceColumns: z
     .array(foreignKeyReferenceSchema)
@@ -55,7 +60,6 @@ export const columnSchema = z.object({
   isPrimaryKey: z.boolean().optional(),
   isNullable: z.boolean(),
   isUnique: z.boolean(),
-  foreignKey: foreignKeySchema.optional(),
 });
 
 export const tableSchema = z.object({
@@ -65,6 +69,8 @@ export const tableSchema = z.object({
     .min(1, 'Table name cannot be empty')
     .max(64, 'Table name must be less than 64 characters'),
   columns: z.array(columnSchema).min(1, 'At least one column is required'),
+  // Foreign keys are table-level, one entry per constraint.
+  foreignKeys: z.array(foreignKeySchema).optional(),
   recordCount: z.number().optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),

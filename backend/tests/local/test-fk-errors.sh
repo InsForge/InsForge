@@ -61,20 +61,20 @@ main_test() {
     
     # Test our error handling
     test_fk "PATCH" "/database/tables/$POSTS_TABLE/schema" \
-        "{\"addForeignKeys\":[{\"columnName\":\"author_id\",\"foreignKey\":{\"referenceTable\":\"fake_table\",\"referenceColumns\":[{\"sourceColumn\":\"author_id\",\"referenceColumn\":\"id\"}],\"onDelete\":\"CASCADE\",\"onUpdate\":\"CASCADE\"}}]}" \
+        "{\"addForeignKeys\":[{\"referenceTable\":\"fake_table\",\"referenceColumns\":[{\"sourceColumn\":\"author_id\",\"referenceColumn\":\"id\"}],\"onDelete\":\"CASCADE\",\"onUpdate\":\"CASCADE\"}]}" \
         "Non-existent table → 400" 400
     
     test_fk "PATCH" "/database/tables/$POSTS_TABLE/schema" \
-        "{\"addForeignKeys\":[{\"columnName\":\"author_id\",\"foreignKey\":{\"referenceTable\":\"$USERS_TABLE\",\"referenceColumns\":[{\"sourceColumn\":\"author_id\",\"referenceColumn\":\"name\"}],\"onDelete\":\"CASCADE\",\"onUpdate\":\"CASCADE\"}}]}" \
+        "{\"addForeignKeys\":[{\"referenceTable\":\"$USERS_TABLE\",\"referenceColumns\":[{\"sourceColumn\":\"author_id\",\"referenceColumn\":\"name\"}],\"onDelete\":\"CASCADE\",\"onUpdate\":\"CASCADE\"}]}" \
         "Type mismatch → 400" 400
     
     test_fk "PATCH" "/database/tables/$POSTS_TABLE/schema" \
-        "{\"addColumns\":[{\"columnName\":\"cat_id\",\"type\":\"uuid\",\"isNullable\":true,\"isUnique\":false}],\"addForeignKeys\":[{\"columnName\":\"cat_id\",\"foreignKey\":{\"referenceTable\":\"fake_cats\",\"referenceColumns\":[{\"sourceColumn\":\"cat_id\",\"referenceColumn\":\"id\"}],\"onDelete\":\"CASCADE\",\"onUpdate\":\"CASCADE\"}}]}" \
+        "{\"addColumns\":[{\"columnName\":\"cat_id\",\"type\":\"uuid\",\"isNullable\":true,\"isUnique\":false}],\"addForeignKeys\":[{\"referenceTable\":\"fake_cats\",\"referenceColumns\":[{\"sourceColumn\":\"cat_id\",\"referenceColumn\":\"id\"}],\"onDelete\":\"CASCADE\",\"onUpdate\":\"CASCADE\"}]}" \
         "New column with non-existent table → 400" 400
     
     # Valid FK should work
     test_fk "PATCH" "/database/tables/$POSTS_TABLE/schema" \
-        "{\"addForeignKeys\":[{\"columnName\":\"author_id\",\"foreignKey\":{\"referenceTable\":\"$USERS_TABLE\",\"referenceColumns\":[{\"sourceColumn\":\"author_id\",\"referenceColumn\":\"id\"}],\"onDelete\":\"CASCADE\",\"onUpdate\":\"CASCADE\"}}]}" \
+        "{\"addForeignKeys\":[{\"referenceTable\":\"$USERS_TABLE\",\"referenceColumns\":[{\"sourceColumn\":\"author_id\",\"referenceColumn\":\"id\"}],\"onDelete\":\"CASCADE\",\"onUpdate\":\"CASCADE\"}]}" \
         "Valid FK constraint → 200" 200
     
     # Summary

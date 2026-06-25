@@ -14,7 +14,11 @@ import {
 } from '#components/datagrid';
 import { ColumnSchema, ColumnType, TableSchema } from '@insforge/shared-schemas';
 import { ForeignKeyCell } from './ForeignKeyCell';
-import { encodeRecordKey, getPrimaryKeyColumns } from '#features/database/helpers';
+import {
+  encodeRecordKey,
+  getForeignKeyByColumn,
+  getPrimaryKeyColumns,
+} from '#features/database/helpers';
 
 // Create a type adapter for database records
 // Database records are dynamic and must have string id for DataGrid compatibility
@@ -185,11 +189,13 @@ export function convertSchemaToColumns(
   }
 
   const primaryKeyColumns = getPrimaryKeyColumns(schema.columns);
+  const foreignKeyByColumn = getForeignKeyByColumn(schema.foreignKeys);
 
   // Create typed cell renderers
   const cellRenderers = createDefaultCellRenderer<DatabaseDataGridRow>();
 
   return schema.columns.map((col: ColumnSchema) => {
+    const foreignKey = foreignKeyByColumn.get(col.columnName);
     const savedColumnWidth = columnWidths?.[col.columnName];
     const width =
       typeof savedColumnWidth === 'number' &&
@@ -227,14 +233,14 @@ export function convertSchemaToColumns(
     };
 
     // Set custom renderers - check for foreign key first (highest priority)
-    if (col.foreignKey) {
+    if (foreignKey) {
       // Foreign key column - show reference popover, disable editing
       column.renderCell = (props: RenderCellProps<DatabaseDataGridRow>) => (
         <ForeignKeyCell
           value={String(props.row[col.columnName] || '')}
           foreignKey={{
-            table: col.foreignKey?.referenceTable || '',
-            columns: col.foreignKey?.referenceColumns || [],
+            table: foreignKey.referenceTable,
+            columns: foreignKey.referenceColumns,
           }}
           row={props.row}
           onJumpToTable={onJumpToTable}

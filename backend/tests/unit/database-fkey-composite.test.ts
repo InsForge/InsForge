@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ForeignKeySchema } from '@insforge/shared-schemas';
 import { AppError } from '../../src/utils/errors';
 
 // ---------------------------------------------------------------------------
@@ -34,6 +35,19 @@ import { DatabaseTableService } from '../../src/services/database/database-table
 // ---------------------------------------------------------------------------
 function makeService() {
   return DatabaseTableService.getInstance();
+}
+
+// Typed accessor for the private getFkeyConstraints method under test (no `any`).
+type FkeyConstraintsAccessor = {
+  getFkeyConstraints(schemaName: string, table: string): Promise<ForeignKeySchema[]>;
+};
+
+function getFkeyConstraints(
+  service: DatabaseTableService,
+  schemaName: string,
+  table: string
+): Promise<ForeignKeySchema[]> {
+  return (service as unknown as FkeyConstraintsAccessor).getFkeyConstraints(schemaName, table);
 }
 
 function makeAdminService() {
@@ -75,27 +89,17 @@ describe('DatabaseTableService – getFkeyConstraints', () => {
     poolQueryMock.mockResolvedValueOnce({ rows: fkRows });
 
     const service = makeService();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const map = await (service as any).getFkeyConstraints('public', 'composite_test');
+    const fks = await getFkeyConstraints(service, 'public', 'composite_test');
 
-    expect(map.size).toBe(2);
-
-    // Each source column should map to the full composite FK info
-    for (const col of ['tenant_id', 'item_id']) {
-      const entry = map.get(col);
-      expect(entry).toBeDefined();
-      expect(entry!.constraint_name).toBe('fk_composite_test_ref_composite_tenant_id_item_id');
-      expect(entry!.referenceTable).toBe('ref_composite');
-      expect(entry!.referenceColumns).toHaveLength(2);
-      expect(entry!.referenceColumns[0]).toEqual({
-        sourceColumn: 'tenant_id',
-        referenceColumn: 'tenant_id',
-      });
-      expect(entry!.referenceColumns[1]).toEqual({
-        sourceColumn: 'item_id',
-        referenceColumn: 'item_id',
-      });
-    }
+    // One entity per constraint, carrying all column pairs in ordinal order.
+    expect(fks).toHaveLength(1);
+    const entry = fks[0];
+    expect(entry.constraintName).toBe('fk_composite_test_ref_composite_tenant_id_item_id');
+    expect(entry.referenceTable).toBe('ref_composite');
+    expect(entry.referenceColumns).toEqual([
+      { sourceColumn: 'tenant_id', referenceColumn: 'tenant_id' },
+      { sourceColumn: 'item_id', referenceColumn: 'item_id' },
+    ]);
   });
 
   it('does not cross-join columns when reference column values are duplicated across tuples', async () => {
@@ -130,23 +134,14 @@ describe('DatabaseTableService – getFkeyConstraints', () => {
     poolQueryMock.mockResolvedValueOnce({ rows: fkRows });
 
     const service = makeService();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const map = await (service as any).getFkeyConstraints('public', 'child');
+    const fks = await getFkeyConstraints(service, 'public', 'child');
 
-    const tenantEntry = map.get('tenant_id');
-    const itemEntry = map.get('item_id');
-
-    expect(tenantEntry).toBeDefined();
-    expect(itemEntry).toBeDefined();
-
-    // Both entries must carry the same full referenceColumns array
-    const expectedPairs = [
+    // The positional join must pair tenant_id→tenant_id and item_id→item_id.
+    expect(fks).toHaveLength(1);
+    expect(fks[0].referenceColumns).toEqual([
       { sourceColumn: 'tenant_id', referenceColumn: 'tenant_id' },
       { sourceColumn: 'item_id', referenceColumn: 'item_id' },
-    ];
-
-    expect(tenantEntry!.referenceColumns).toEqual(expectedPairs);
-    expect(itemEntry!.referenceColumns).toEqual(expectedPairs);
+    ]);
   });
 
   it('handles single-column FKs without breaking', async () => {
@@ -166,29 +161,23 @@ describe('DatabaseTableService – getFkeyConstraints', () => {
     poolQueryMock.mockResolvedValueOnce({ rows: fkRows });
 
     const service = makeService();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const map = await (service as any).getFkeyConstraints('public', 'orders');
+    const fks = await getFkeyConstraints(service, 'public', 'orders');
 
-    expect(map.size).toBe(1);
-    const entry = map.get('user_id');
-    expect(entry!.referenceColumns).toHaveLength(1);
-    expect(entry!.referenceColumns[0]).toEqual({
-      sourceColumn: 'user_id',
-      referenceColumn: 'id',
-    });
-    expect(entry!.referenceTable).toBe('users');
-    expect(entry!.onDelete).toBe('CASCADE');
-    expect(entry!.onUpdate).toBe('CASCADE');
+    expect(fks).toHaveLength(1);
+    const entry = fks[0];
+    expect(entry.referenceColumns).toEqual([{ sourceColumn: 'user_id', referenceColumn: 'id' }]);
+    expect(entry.referenceTable).toBe('users');
+    expect(entry.onDelete).toBe('CASCADE');
+    expect(entry.onUpdate).toBe('CASCADE');
   });
 
-  it('returns empty map when table has no foreign keys', async () => {
+  it('returns an empty list when table has no foreign keys', async () => {
     poolQueryMock.mockResolvedValueOnce({ rows: [] });
 
     const service = makeService();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const map = await (service as any).getFkeyConstraints('public', 'no_fk_table');
+    const fks = await getFkeyConstraints(service, 'public', 'no_fk_table');
 
-    expect(map.size).toBe(0);
+    expect(fks).toEqual([]);
   });
 });
 

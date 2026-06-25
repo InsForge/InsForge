@@ -9,7 +9,7 @@ import {
   type DatabaseRecord,
   type ConvertedValue,
 } from '#components';
-import { ColumnSchema, ColumnType } from '@insforge/shared-schemas';
+import { ColumnSchema, ColumnType, type ForeignKeySchema } from '@insforge/shared-schemas';
 import { convertValueForColumn, formatValueForDisplay } from '#lib/utils/utils';
 import { LinkRecordDialog } from './LinkRecordDialog';
 import { isValid, parseISO } from 'date-fns';
@@ -225,6 +225,8 @@ interface RecordFormFieldProps {
   columns: ColumnSchema[];
   form: UseFormReturn<DatabaseRecord>;
   tableName: string;
+  // Foreign key whose source column is this field, if any (table-level FK).
+  foreignKey?: ForeignKeySchema;
 }
 
 function FieldLabel({ field, tableName }: { field: ColumnSchema; tableName: string }) {
@@ -247,10 +249,18 @@ interface FieldWithLinkProps {
   columns: ColumnSchema[];
   control: Control<DatabaseRecord>;
   setValue: UseFormSetValue<DatabaseRecord>;
+  foreignKey?: ForeignKeySchema;
   children: ReactNode;
 }
 
-function FieldWithLink({ field, columns, control, setValue, children }: FieldWithLinkProps) {
+function FieldWithLink({
+  field,
+  columns,
+  control,
+  setValue,
+  foreignKey,
+  children,
+}: FieldWithLinkProps) {
   // Build type lookup for all columns (needed for sibling FK column coercion)
   const columnTypeMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -260,11 +270,9 @@ function FieldWithLink({ field, columns, control, setValue, children }: FieldWit
     return map;
   }, [columns]);
 
-  if (!field.foreignKey) {
+  if (!foreignKey) {
     return <>{children}</>;
   }
-
-  const foreignKey = field.foreignKey;
 
   return (
     <Controller
@@ -340,7 +348,13 @@ function FieldWithLink({ field, columns, control, setValue, children }: FieldWit
   );
 }
 
-export function RecordFormField({ field, columns, form, tableName }: RecordFormFieldProps) {
+export function RecordFormField({
+  field,
+  columns,
+  form,
+  tableName,
+  foreignKey,
+}: RecordFormFieldProps) {
   const {
     control,
     setValue,
@@ -477,16 +491,22 @@ export function RecordFormField({ field, columns, form, tableName }: RecordFormF
       <FieldLabel field={field} tableName={tableName} />
 
       <div className="min-w-0 space-y-1">
-        <FieldWithLink field={field} columns={columns} control={control} setValue={setValue}>
+        <FieldWithLink
+          field={field}
+          columns={columns}
+          control={control}
+          setValue={setValue}
+          foreignKey={foreignKey}
+        >
           {renderInput()}
         </FieldWithLink>
 
-        {field.foreignKey && (
+        {foreignKey && (
           <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
             <span className="truncate">Has a Foreign Key relation to</span>
             <FormMetaBadge>
-              {field.foreignKey.referenceTable}.
-              {field.foreignKey.referenceColumns.map((c) => c.referenceColumn).join(',')}
+              {foreignKey.referenceTable}.
+              {foreignKey.referenceColumns.map((c) => c.referenceColumn).join(',')}
             </FormMetaBadge>
           </div>
         )}

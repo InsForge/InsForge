@@ -17,12 +17,6 @@ export const aiChatbotTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: true,
           isUnique: false,
-          foreignKey: {
-            referenceTable: 'auth.users',
-            referenceColumns: [{ sourceColumn: 'user_id', referenceColumn: 'id' }],
-            onDelete: 'CASCADE',
-            onUpdate: 'CASCADE',
-          },
         },
         {
           columnName: 'title',
@@ -53,6 +47,14 @@ export const aiChatbotTemplate: DatabaseTemplate = {
           isUnique: false,
         },
       ],
+      foreignKeys: [
+        {
+          referenceTable: 'auth.users',
+          referenceColumns: [{ sourceColumn: 'user_id', referenceColumn: 'id' }],
+          onDelete: 'CASCADE',
+          onUpdate: 'CASCADE',
+        },
+      ],
     },
     {
       tableName: 'messages',
@@ -64,12 +66,6 @@ export const aiChatbotTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: true,
           isUnique: false,
-          foreignKey: {
-            referenceTable: 'conversations',
-            referenceColumns: [{ sourceColumn: 'conversation_id', referenceColumn: 'id' }],
-            onDelete: 'CASCADE',
-            onUpdate: 'CASCADE',
-          },
         },
         {
           columnName: 'role',
@@ -100,6 +96,14 @@ export const aiChatbotTemplate: DatabaseTemplate = {
           isUnique: false,
         },
       ],
+      foreignKeys: [
+        {
+          referenceTable: 'conversations',
+          referenceColumns: [{ sourceColumn: 'conversation_id', referenceColumn: 'id' }],
+          onDelete: 'CASCADE',
+          onUpdate: 'CASCADE',
+        },
+      ],
     },
     {
       tableName: 'feedback',
@@ -111,12 +115,6 @@ export const aiChatbotTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: true,
           isUnique: false,
-          foreignKey: {
-            referenceTable: 'messages',
-            referenceColumns: [{ sourceColumn: 'message_id', referenceColumn: 'id' }],
-            onDelete: 'CASCADE',
-            onUpdate: 'CASCADE',
-          },
         },
         {
           columnName: 'user_id',
@@ -124,12 +122,6 @@ export const aiChatbotTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: true,
           isUnique: false,
-          foreignKey: {
-            referenceTable: 'auth.users',
-            referenceColumns: [{ sourceColumn: 'user_id', referenceColumn: 'id' }],
-            onDelete: 'CASCADE',
-            onUpdate: 'CASCADE',
-          },
         },
         {
           columnName: 'rating',
@@ -153,6 +145,20 @@ export const aiChatbotTemplate: DatabaseTemplate = {
           isUnique: false,
         },
       ],
+      foreignKeys: [
+        {
+          referenceTable: 'messages',
+          referenceColumns: [{ sourceColumn: 'message_id', referenceColumn: 'id' }],
+          onDelete: 'CASCADE',
+          onUpdate: 'CASCADE',
+        },
+        {
+          referenceTable: 'auth.users',
+          referenceColumns: [{ sourceColumn: 'user_id', referenceColumn: 'id' }],
+          onDelete: 'CASCADE',
+          onUpdate: 'CASCADE',
+        },
+      ],
     },
     {
       tableName: 'prompts',
@@ -164,12 +170,6 @@ export const aiChatbotTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: true,
           isUnique: false,
-          foreignKey: {
-            referenceTable: 'auth.users',
-            referenceColumns: [{ sourceColumn: 'user_id', referenceColumn: 'id' }],
-            onDelete: 'CASCADE',
-            onUpdate: 'CASCADE',
-          },
         },
         {
           columnName: 'title',
@@ -219,6 +219,14 @@ export const aiChatbotTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: true,
           isUnique: false,
+        },
+      ],
+      foreignKeys: [
+        {
+          referenceTable: 'auth.users',
+          referenceColumns: [{ sourceColumn: 'user_id', referenceColumn: 'id' }],
+          onDelete: 'CASCADE',
+          onUpdate: 'CASCADE',
         },
       ],
     },

@@ -23,12 +23,6 @@ export const notionCloneTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: false,
           isUnique: false,
-          foreignKey: {
-            referenceTable: 'auth.users',
-            referenceColumns: [{ sourceColumn: 'owner_id', referenceColumn: 'id' }],
-            onDelete: 'CASCADE',
-            onUpdate: 'CASCADE',
-          },
         },
         {
           columnName: 'icon',
@@ -52,6 +46,14 @@ export const notionCloneTemplate: DatabaseTemplate = {
           isUnique: false,
         },
       ],
+      foreignKeys: [
+        {
+          referenceTable: 'auth.users',
+          referenceColumns: [{ sourceColumn: 'owner_id', referenceColumn: 'id' }],
+          onDelete: 'CASCADE',
+          onUpdate: 'CASCADE',
+        },
+      ],
     },
     {
       tableName: 'pages',
@@ -63,12 +65,6 @@ export const notionCloneTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: false,
           isUnique: false,
-          foreignKey: {
-            referenceTable: 'workspaces',
-            referenceColumns: [{ sourceColumn: 'workspace_id', referenceColumn: 'id' }],
-            onDelete: 'CASCADE',
-            onUpdate: 'CASCADE',
-          },
         },
         {
           columnName: 'parent_page_id',
@@ -76,12 +72,6 @@ export const notionCloneTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: true,
           isUnique: false,
-          foreignKey: {
-            referenceTable: 'pages',
-            referenceColumns: [{ sourceColumn: 'parent_page_id', referenceColumn: 'id' }],
-            onDelete: 'CASCADE',
-            onUpdate: 'CASCADE',
-          },
         },
         {
           columnName: 'creator_id',
@@ -89,12 +79,6 @@ export const notionCloneTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: false,
           isUnique: false,
-          foreignKey: {
-            referenceTable: 'auth.users',
-            referenceColumns: [{ sourceColumn: 'creator_id', referenceColumn: 'id' }],
-            onDelete: 'CASCADE',
-            onUpdate: 'CASCADE',
-          },
         },
         {
           columnName: 'title',
@@ -153,6 +137,26 @@ export const notionCloneTemplate: DatabaseTemplate = {
           isUnique: false,
         },
       ],
+      foreignKeys: [
+        {
+          referenceTable: 'workspaces',
+          referenceColumns: [{ sourceColumn: 'workspace_id', referenceColumn: 'id' }],
+          onDelete: 'CASCADE',
+          onUpdate: 'CASCADE',
+        },
+        {
+          referenceTable: 'pages',
+          referenceColumns: [{ sourceColumn: 'parent_page_id', referenceColumn: 'id' }],
+          onDelete: 'CASCADE',
+          onUpdate: 'CASCADE',
+        },
+        {
+          referenceTable: 'auth.users',
+          referenceColumns: [{ sourceColumn: 'creator_id', referenceColumn: 'id' }],
+          onDelete: 'CASCADE',
+          onUpdate: 'CASCADE',
+        },
+      ],
     },
     {
       tableName: 'page_shares',
@@ -164,12 +168,6 @@ export const notionCloneTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: false,
           isUnique: false,
-          foreignKey: {
-            referenceTable: 'pages',
-            referenceColumns: [{ sourceColumn: 'page_id', referenceColumn: 'id' }],
-            onDelete: 'CASCADE',
-            onUpdate: 'CASCADE',
-          },
         },
         {
           columnName: 'user_id',
@@ -177,12 +175,6 @@ export const notionCloneTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: false,
           isUnique: false,
-          foreignKey: {
-            referenceTable: 'auth.users',
-            referenceColumns: [{ sourceColumn: 'user_id', referenceColumn: 'id' }],
-            onDelete: 'CASCADE',
-            onUpdate: 'CASCADE',
-          },
         },
         {
           columnName: 'permission',
@@ -199,6 +191,20 @@ export const notionCloneTemplate: DatabaseTemplate = {
           isUnique: false,
         },
       ],
+      foreignKeys: [
+        {
+          referenceTable: 'pages',
+          referenceColumns: [{ sourceColumn: 'page_id', referenceColumn: 'id' }],
+          onDelete: 'CASCADE',
+          onUpdate: 'CASCADE',
+        },
+        {
+          referenceTable: 'auth.users',
+          referenceColumns: [{ sourceColumn: 'user_id', referenceColumn: 'id' }],
+          onDelete: 'CASCADE',
+          onUpdate: 'CASCADE',
+        },
+      ],
     },
     {
       tableName: 'attachments',
@@ -210,12 +216,6 @@ export const notionCloneTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: false,
           isUnique: false,
-          foreignKey: {
-            referenceTable: 'pages',
-            referenceColumns: [{ sourceColumn: 'page_id', referenceColumn: 'id' }],
-            onDelete: 'CASCADE',
-            onUpdate: 'CASCADE',
-          },
         },
         {
           columnName: 'user_id',
@@ -223,12 +223,6 @@ export const notionCloneTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: false,
           isUnique: false,
-          foreignKey: {
-            referenceTable: 'auth.users',
-            referenceColumns: [{ sourceColumn: 'user_id', referenceColumn: 'id' }],
-            onDelete: 'CASCADE',
-            onUpdate: 'CASCADE',
-          },
         },
         {
           columnName: 'file_name',
@@ -264,6 +258,20 @@ export const notionCloneTemplate: DatabaseTemplate = {
           isPrimaryKey: false,
           isNullable: true,
           isUnique: false,
+        },
+      ],
+      foreignKeys: [
+        {
+          referenceTable: 'pages',
+          referenceColumns: [{ sourceColumn: 'page_id', referenceColumn: 'id' }],
+          onDelete: 'CASCADE',
+          onUpdate: 'CASCADE',
+        },
+        {
+          referenceTable: 'auth.users',
+          referenceColumns: [{ sourceColumn: 'user_id', referenceColumn: 'id' }],
+          onDelete: 'CASCADE',
+          onUpdate: 'CASCADE',
         },
       ],
     },

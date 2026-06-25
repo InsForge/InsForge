@@ -1,10 +1,36 @@
 import { jsonSchema } from '#lib/utils/schemaValidations';
-import { ColumnSchema, ColumnType, type DatabaseSchemaInfo } from '@insforge/shared-schemas';
+import {
+  ColumnSchema,
+  ColumnType,
+  type DatabaseSchemaInfo,
+  type ForeignKeySchema,
+} from '@insforge/shared-schemas';
 import { z } from 'zod';
 
 export const DEFAULT_DATABASE_SCHEMA = 'public' as const;
 
 export const SYSTEM_FIELDS = ['id', 'created_at', 'updated_at'];
+
+/**
+ * Derives a source-column -> foreign-key lookup from a table's table-level
+ * foreign keys. Each participating source column maps to its (shared) constraint,
+ * so a composite key resolves the same entity from any of its columns. This is a
+ * computed view for per-column rendering; the table's `foreignKeys` list stays the
+ * single source of truth.
+ */
+export function getForeignKeyByColumn(
+  foreignKeys?: ForeignKeySchema[]
+): Map<string, ForeignKeySchema> {
+  const byColumn = new Map<string, ForeignKeySchema>();
+  for (const fk of foreignKeys ?? []) {
+    for (const ref of fk.referenceColumns) {
+      if (!byColumn.has(ref.sourceColumn)) {
+        byColumn.set(ref.sourceColumn, fk);
+      }
+    }
+  }
+  return byColumn;
+}
 
 /**
  * A record's primary key as a map of column name -> value.

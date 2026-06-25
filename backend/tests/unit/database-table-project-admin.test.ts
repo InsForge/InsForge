@@ -85,6 +85,7 @@ describe('DatabaseTableService project_admin DDL context', () => {
       'public',
       'posts',
       [{ columnName: 'title', type: ColumnType.STRING, isNullable: false }],
+      [],
       true
     );
 
@@ -145,6 +146,7 @@ describe('DatabaseTableService project_admin DDL context', () => {
       'auth',
       'users_copy',
       [{ columnName: 'email', type: ColumnType.STRING, isNullable: false }],
+      [],
       true
     );
 
