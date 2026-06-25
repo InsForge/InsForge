@@ -80,6 +80,10 @@ describe('AdminRecordService', () => {
     expect(resetRoleIndex).toBeGreaterThan(dataQueryIndex);
     expect(commitIndex).toBeGreaterThan(resetRoleIndex);
     expect(clientQueryMock.mock.calls[dataQueryIndex]?.[1]).toEqual(['%demo%', 10, 0]);
+    // Read paths must not pay for the primary-key metadata query.
+    expect(sqlCalls.some((sql) => sql.includes('information_schema.table_constraints'))).toBe(
+      false
+    );
   });
 
   it('delegates protected-schema writes to project_admin privileges', async () => {
@@ -93,7 +97,6 @@ describe('AdminRecordService', () => {
           { column_name: 'email', data_type: 'text', is_nullable: 'NO', udt_name: 'text' },
         ],
       }) // metadata
-      .mockResolvedValueOnce({ rows: [{ column_name: 'id' }] }) // primary key columns
       .mockResolvedValueOnce({
         rows: [{ id: 'u1', email: 'demo@example.com' }],
       }) // INSERT
@@ -186,7 +189,6 @@ describe('AdminRecordService', () => {
           },
         ],
       }) // metadata
-      .mockResolvedValueOnce({ rows: [{ column_name: 'id' }] }) // primary key columns
       .mockResolvedValueOnce({
         rows: [{ id: 'r1', name: '' }],
       }) // INSERT

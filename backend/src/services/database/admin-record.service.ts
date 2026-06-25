@@ -157,7 +157,7 @@ export class AdminRecordService {
     }
 
     return this.withAdminTransaction(async (client) => {
-      const metadata = await this.getTableColumnMetadata(schemaName, tableName, client);
+      const metadata = await this.getTableColumnMetadata(schemaName, tableName, client, true);
       keyEntries.forEach(([columnName]) => this.assertColumnExists(metadata, columnName));
       this.assertCompletePrimaryKey(
         metadata,
@@ -217,7 +217,7 @@ export class AdminRecordService {
     validateTableName(tableName);
 
     return this.withAdminTransaction(async (client) => {
-      const metadata = await this.getTableColumnMetadata(schemaName, tableName, client);
+      const metadata = await this.getTableColumnMetadata(schemaName, tableName, client, true);
 
       if (primaryKeys.length === 0) {
         return 0;
@@ -300,7 +300,8 @@ export class AdminRecordService {
   private async getTableColumnMetadata(
     schemaName: string,
     tableName: string,
-    client?: PoolClient
+    client?: PoolClient,
+    includePrimaryKey = false
   ): Promise<TableColumnMetadata> {
     const queryable = client ?? this.dbManager.getPool();
     const result = await queryable.query<{
@@ -349,8 +350,11 @@ export class AdminRecordService {
       }
     }
 
-    const primaryKeyResult = await queryable.query<{ column_name: string }>(
-      `
+    // Only update/delete need the primary key, so skip this query on read/create paths.
+    let primaryKeyColumns: string[] = [];
+    if (includePrimaryKey) {
+      const primaryKeyResult = await queryable.query<{ column_name: string }>(
+        `
         SELECT kcu.column_name
         FROM information_schema.table_constraints tc
         JOIN information_schema.key_column_usage kcu
@@ -362,14 +366,16 @@ export class AdminRecordService {
           AND tc.table_name = $2
         ORDER BY kcu.ordinal_position
       `,
-      [schemaName, tableName]
-    );
+        [schemaName, tableName]
+      );
+      primaryKeyColumns = primaryKeyResult.rows.map((row) => row.column_name);
+    }
 
     return {
       columnTypeMap,
       nullableColumns,
       searchableColumns,
-      primaryKeyColumns: primaryKeyResult.rows.map((row) => row.column_name),
+      primaryKeyColumns,
     };
   }
 
