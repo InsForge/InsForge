@@ -648,16 +648,18 @@ export class DatabaseAdvisorService {
         `,
         'autovacuum-blocked': `
           SELECT
-            blocked_activity.relname AS affected_object,
+            c.relname AS affected_object,
             'autovacuum-blocked' AS rule_id,
             'critical' AS severity,
             'health' AS category,
             'Autovacuum Blocked' AS title,
             'An autovacuum process is blocked by locks held by another active database transaction.' AS description,
             format('Autovacuum on table "%s.%s" (PID %s) is blocked by PID %s executing: "%s".',
-              blocked_activity.schemaname, blocked_activity.relname, blocked_locks.pid, blocking_locks.pid, substring(blocking_activity.query from 1 for 100)) AS detail,
+              n.nspname, c.relname, blocked_locks.pid, blocking_locks.pid, substring(blocking_activity.query from 1 for 100)) AS detail,
             format('SELECT pg_terminate_backend(%s);', blocking_locks.pid) AS remediation
           FROM pg_catalog.pg_locks blocked_locks
+          JOIN pg_catalog.pg_class c ON c.oid = blocked_locks.relation
+          JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
           JOIN pg_catalog.pg_stat_activity blocked_activity ON blocked_activity.pid = blocked_locks.pid
           JOIN pg_catalog.pg_locks blocking_locks
             ON blocking_locks.locktype = blocked_locks.locktype
@@ -866,7 +868,6 @@ export class DatabaseAdvisorService {
     const latestScan = await pool.query<{ id: string }>(
       `
         SELECT id FROM system.advisor_scans
-        WHERE status = 'completed'
         ORDER BY scanned_at DESC
         LIMIT 1
       `
@@ -922,11 +923,10 @@ export class DatabaseAdvisorService {
   public async getLatestScanCategoryCounts(): Promise<Record<string, Record<string, number>>> {
     const pool = this.dbManager.getPool();
 
-    // 1. Get latest completed scan
+    // 1. Get latest scan
     const latestScan = await pool.query<{ id: string }>(
       `
         SELECT id FROM system.advisor_scans
-        WHERE status = 'completed'
         ORDER BY scanned_at DESC
         LIMIT 1
       `
