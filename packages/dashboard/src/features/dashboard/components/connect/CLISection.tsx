@@ -6,10 +6,10 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  cn,
 } from '@insforge/ui';
 import { CLI_VERIFY_CONNECTION_PROMPT } from './constants';
 import { useProjectId } from '#lib/hooks/useMetadata';
-import { cn } from '#lib/utils/utils';
 import { MCP_AGENTS, type MCPAgent } from './mcp/helpers';
 
 interface CLISectionProps {
