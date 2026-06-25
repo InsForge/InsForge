@@ -43,6 +43,8 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
     onConnectPosthog,
     subscribePosthogConnectionStatus,
     onOpenPosthog,
+    onConnectApify,
+    subscribeApifyConnectionStatus,
   } = props;
   const getAuthorizationCode =
     props.mode === 'cloud-hosting' ? props.getAuthorizationCode : undefined;
@@ -77,6 +79,8 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
       onConnectPosthog,
       subscribePosthogConnectionStatus,
       onOpenPosthog,
+      onConnectApify,
+      subscribeApifyConnectionStatus,
     }),
     [
       backendUrl,
@@ -106,6 +110,8 @@ export function InsForgeDashboard(props: InsForgeDashboardProps) {
       onConnectPosthog,
       subscribePosthogConnectionStatus,
       onOpenPosthog,
+      onConnectApify,
+      subscribeApifyConnectionStatus,
     ]
   );
   const [queryClient] = useState(
