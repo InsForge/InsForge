@@ -38,11 +38,55 @@ export class MicrosoftOAuthProvider implements OAuthProvider {
 
     const selfBaseUrl = getApiBaseUrl();
 
+    if (config?.useSharedKey) {
+      if (!state) {
+        logger.warn('Shared Microsoft OAuth called without state parameter');
+        throw new Error('State parameter is required for shared Microsoft OAuth');
+      }
+      // Use shared keys if configured
+      const cloudBaseUrl = process.env.CLOUD_API_HOST || 'https://api.insforge.dev';
+      const redirectUri = `${selfBaseUrl}/api/auth/oauth/shared/callback/${encodeURIComponent(state)}`;
+
+      let sharedAuthUrl: string;
+      try {
+        const response = await axios.get(
+          `${cloudBaseUrl}/auth/v1/shared/microsoft?redirect_uri=${encodeURIComponent(redirectUri)}`,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            timeout: 5000,
+          }
+        );
+        sharedAuthUrl = response.data.auth_url || response.data.url;
+      } catch (error) {
+        logger.error('Failed to get shared Microsoft OAuth URL:', error);
+        throw new Error(
+          `Failed to initialize shared Microsoft OAuth: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
+      }
+
+      if (!sharedAuthUrl) {
+        throw new Error('Shared Microsoft OAuth did not return an authorization URL');
+      }
+      let authUrl: URL;
+      try {
+        authUrl = new URL(sharedAuthUrl);
+      } catch {
+        throw new Error(`Shared Microsoft OAuth returned an invalid URL: ${sharedAuthUrl}`);
+      }
+      Object.entries(additionalParams ?? {}).forEach(([key, value]) => {
+        if (!authUrl.searchParams.has(key)) {
+          authUrl.searchParams.set(key, value);
+        }
+      });
+      return authUrl.toString();
+    }
+
     logger.debug('Microsoft OAuth Config (fresh from DB):', {
       clientId: config.clientId ? 'SET' : 'NOT SET',
     });
 
-    // Note: shared-keys path not implemented for Microsoft; configure local keys
     const authUrl = new URL('https://login.microsoftonline.com/common/oauth2/v2.0/authorize');
     authUrl.searchParams.set('client_id', config.clientId ?? '');
     authUrl.searchParams.set('response_type', 'code');
@@ -172,6 +216,32 @@ export class MicrosoftOAuthProvider implements OAuthProvider {
       userName,
       avatarUrl: '', // Microsoft doesn't provide avatar in basic profile
       identityData: microsoftUserInfo,
+    };
+  }
+
+  /**
+   * Handle shared callback payload transformation
+   */
+  handleSharedCallback(payloadData: Record<string, unknown>): OAuthUserData {
+    const providerId = typeof payloadData.providerId === 'string' ? payloadData.providerId : '';
+    if (!providerId) {
+      throw new Error('Missing providerId from Microsoft shared callback payload');
+    }
+
+    const email = typeof payloadData.email === 'string' ? payloadData.email : '';
+    if (!email) {
+      throw new Error('Shared Microsoft callback missing required email');
+    }
+    const name = typeof payloadData.name === 'string' ? payloadData.name : '';
+    const avatar = typeof payloadData.avatar === 'string' ? payloadData.avatar : '';
+
+    return {
+      provider: 'microsoft',
+      providerId,
+      email,
+      userName: name || email.split('@')[0] || 'user',
+      avatarUrl: avatar,
+      identityData: payloadData,
     };
   }
 }
