@@ -3,7 +3,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import fs from 'fs';
 import authRouter from '@/api/routes/auth/index.routes.js';
 import databaseRouter from '@/api/routes/database/index.routes.js';
@@ -336,8 +336,6 @@ async function initializeServer() {
   }
 }
 
-void initializeServer();
-
 async function cleanup() {
   logger.info('Shutting down gracefully...');
 
@@ -379,5 +377,15 @@ async function cleanup() {
   process.exit(0);
 }
 
-process.on('SIGINT', () => void cleanup());
-process.on('SIGTERM', () => void cleanup());
+// Only start the HTTP server and register process-level handlers when this
+// file is run directly (e.g. `node dist/server.js`), NOT when it is imported
+// (e.g. by tests that build the app via createApp()). Importing this module
+// previously bound the port and started realtime/seed logic as a side effect.
+// Fixes #1299.
+const isMainModule = !!process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isMainModule) {
+  void initializeServer();
+  process.on('SIGINT', () => void cleanup());
+  process.on('SIGTERM', () => void cleanup());
+}
