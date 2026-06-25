@@ -25,7 +25,7 @@ export const notionCloneTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'auth.users',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'owner_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -65,7 +65,7 @@ export const notionCloneTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'workspaces',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'workspace_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -78,7 +78,7 @@ export const notionCloneTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'pages',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'parent_page_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -91,7 +91,7 @@ export const notionCloneTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'auth.users',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'creator_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -166,7 +166,7 @@ export const notionCloneTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'pages',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'page_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -179,7 +179,7 @@ export const notionCloneTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'auth.users',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'user_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -212,7 +212,7 @@ export const notionCloneTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'pages',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'page_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -225,7 +225,7 @@ export const notionCloneTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'auth.users',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'user_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },

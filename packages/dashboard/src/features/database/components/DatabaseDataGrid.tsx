@@ -233,8 +233,9 @@ export function convertSchemaToColumns(
           value={String(props.row[col.columnName] || '')}
           foreignKey={{
             table: col.foreignKey?.referenceTable || '',
-            column: col.foreignKey?.referenceColumn || '',
+            columns: col.foreignKey?.referenceColumns || [],
           }}
+          row={props.row}
           onJumpToTable={onJumpToTable}
         />
       );

@@ -83,23 +83,28 @@ export class RecordService {
   }
 
   /**
-   * Get a single record by foreign key value.
-   * Specifically designed for foreign key lookups.
+   * Get a single record by foreign key value(s).
+   * Supports composite foreign keys via multiple columns/values.
    *
    * @param tableName - Name of the table to search in
-   * @param columnName - Name of the column to filter by
-   * @param value - Value to match
+   * @param columns - Column name(s) to filter by
+   * @param values - Value(s) to match (parallel array to columns)
    * @returns Single record or null if not found
    */
   async getRecordByForeignKeyValue(
     tableName: string,
-    columnName: string,
-    value: string,
+    columns: string[],
+    values: string[],
     schemaName: string = DEFAULT_DATABASE_SCHEMA
   ) {
-    const params = new URLSearchParams({
-      column: columnName,
-      value,
+    if (columns.length === 0 || columns.length !== values.length) {
+      throw new Error('Columns and values must have the same non-zero length');
+    }
+
+    const params = new URLSearchParams();
+    columns.forEach((col, i) => {
+      params.append('column', col);
+      params.append('value', values[i]);
     });
 
     return apiClient.request(this.buildAdminRecordsPath(tableName, schemaName, '/lookup', params), {

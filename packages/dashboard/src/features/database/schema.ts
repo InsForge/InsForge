@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { columnSchema, foreignKeySchema } from '@insforge/shared-schemas';
 
-// Foreign key schema
+// Foreign key form schema — single-column FK creation from the UI
+// Uses referenceColumns array (always 1 entry for dashboard-created FKs)
 export const tableFormForeignKeySchema = foreignKeySchema.extend({
   columnName: z.string(),
 });

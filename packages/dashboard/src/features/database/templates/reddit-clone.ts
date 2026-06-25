@@ -39,7 +39,7 @@ export const redditCloneTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'auth.users',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'creator_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -79,7 +79,7 @@ export const redditCloneTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'communities',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'community_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -92,7 +92,7 @@ export const redditCloneTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'auth.users',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'user_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -160,7 +160,7 @@ export const redditCloneTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'posts',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'post_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -173,7 +173,7 @@ export const redditCloneTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'auth.users',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'user_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -186,7 +186,7 @@ export const redditCloneTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'comments',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'parent_comment_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -233,7 +233,7 @@ export const redditCloneTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'auth.users',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'user_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -246,7 +246,7 @@ export const redditCloneTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'posts',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'post_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -259,7 +259,7 @@ export const redditCloneTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'comments',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'comment_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -292,7 +292,7 @@ export const redditCloneTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'communities',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'community_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },
@@ -305,7 +305,7 @@ export const redditCloneTemplate: DatabaseTemplate = {
           isUnique: false,
           foreignKey: {
             referenceTable: 'auth.users',
-            referenceColumn: 'id',
+            referenceColumns: [{ sourceColumn: 'user_id', referenceColumn: 'id' }],
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
           },

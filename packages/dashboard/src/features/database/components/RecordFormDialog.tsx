@@ -123,7 +123,12 @@ export function RecordFormDialog({
                       <div className="h-px w-full bg-[var(--alpha-8)]" />
                     </div>
                   )}
-                  <RecordFormField field={field} form={form} tableName={tableName} />
+                  <RecordFormField
+                    field={field}
+                    columns={displayFields}
+                    form={form}
+                    tableName={tableName}
+                  />
                 </div>
               ))}
             </div>

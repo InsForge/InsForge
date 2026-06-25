@@ -297,14 +297,26 @@ paths:
                         type: object
                         required:
                           - referenceTable
-                          - referenceColumn
+                          - referenceColumns
                         properties:
                           referenceTable:
                             type: string
                             description: Table being referenced
-                          referenceColumn:
-                            type: string
-                            description: Column being referenced
+                          referenceColumns:
+                            type: array
+                            description: Column mappings (source → reference)
+                            items:
+                              type: object
+                              required:
+                                - sourceColumn
+                                - referenceColumn
+                              properties:
+                                sourceColumn:
+                                  type: string
+                                  description: Column in the current table
+                                referenceColumn:
+                                  type: string
+                                  description: Column in the referenced table
                           onDelete:
                             type: string
                             enum: [CASCADE, SET NULL, NO ACTION, RESTRICT]

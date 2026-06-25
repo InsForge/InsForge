@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { AppError } from '@/utils/errors.js';
@@ -523,10 +524,12 @@ export class DatabaseTableService {
           // Execute operations
 
           // Drop foreign key constraints
+          const droppedConstraints = new Set<string>();
           if (dropForeignKeys && Array.isArray(dropForeignKeys)) {
             for (const col of dropForeignKeys) {
               const constraintName = foreignKeyMap.get(col)?.constraint_name;
-              if (constraintName) {
+              if (constraintName && !droppedConstraints.has(constraintName)) {
+                droppedConstraints.add(constraintName);
                 await client.query(
                   `
                   ALTER TABLE ${safeQualifiedTableName}
@@ -804,18 +807,29 @@ export class DatabaseTableService {
     if (!col.foreignKey) {
       return '';
     }
-    // Store foreign_key in a const to avoid repeated non-null assertions
     const fk = col.foreignKey;
-    // Use "auth_users" in constraint name for auth.users references
+    if (!fk.referenceColumns || fk.referenceColumns.length === 0) {
+      return '';
+    }
+    const sourceCols = fk.referenceColumns.map((r) => r.sourceColumn);
+    const refCols = fk.referenceColumns.map((r) => r.referenceColumn);
     const safeTableName = fk.referenceTable.replace(/\./g, '_');
-    const constraintName = `fk_${col.columnName}_${safeTableName}_${fk.referenceColumn}`;
+    const baseName = `fk_${sourceCols.join('_')}_${safeTableName}_${refCols.join('_')}`;
+    const MAX_IDENTIFIER_LENGTH = 63;
+    const constraintName =
+      baseName.length > MAX_IDENTIFIER_LENGTH
+        ? `${baseName.slice(0, MAX_IDENTIFIER_LENGTH - 9)}_${createHash('sha256').update(baseName).digest('hex').slice(0, 8)}`
+        : baseName;
     const onDelete = fk.onDelete || 'RESTRICT';
     const onUpdate = fk.onUpdate || 'RESTRICT';
 
+    const sourcePart = sourceCols.map((c) => this.quoteIdentifier(c)).join(', ');
+    const refPart = refCols.map((c) => this.quoteIdentifier(c)).join(', ');
+
     if (include_source_column) {
-      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} FOREIGN KEY (${this.quoteIdentifier(col.columnName)}) REFERENCES ${this.quoteTableReference(fk.referenceTable, defaultSchemaName)}(${this.quoteIdentifier(fk.referenceColumn)}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
+      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} FOREIGN KEY (${sourcePart}) REFERENCES ${this.quoteTableReference(fk.referenceTable, defaultSchemaName)}(${refPart}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
     } else {
-      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} REFERENCES ${this.quoteTableReference(fk.referenceTable, defaultSchemaName)}(${this.quoteIdentifier(fk.referenceColumn)}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
+      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} REFERENCES ${this.quoteTableReference(fk.referenceTable, defaultSchemaName)}(${refPart}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
     }
   }
 
@@ -826,47 +840,102 @@ export class DatabaseTableService {
     const result = await this.getPool().query(
       `
         SELECT
-          tc.constraint_name,
-          kcu.column_name as from_column,
-          ccu.table_schema AS foreign_schema,
-          ccu.table_name AS foreign_table,
-          ccu.column_name AS foreign_column,
-          rc.delete_rule as on_delete,
-          rc.update_rule as on_update
-        FROM information_schema.table_constraints AS tc
-        JOIN information_schema.key_column_usage AS kcu
-          ON tc.constraint_name = kcu.constraint_name
-          AND tc.table_schema = kcu.table_schema
-        JOIN information_schema.constraint_column_usage AS ccu
-          ON ccu.constraint_name = tc.constraint_name
-        JOIN information_schema.referential_constraints AS rc
-          ON rc.constraint_name = tc.constraint_name
-          AND rc.constraint_schema = tc.table_schema
-        WHERE tc.constraint_type = 'FOREIGN KEY'
-        AND tc.table_schema = $1
-        AND tc.table_name = $2
+          c.conname AS constraint_name,
+          a1.attname AS from_column,
+          nf.nspname AS foreign_schema,
+          cf.relname AS foreign_table,
+          a2.attname AS foreign_column,
+          u.pos AS ordinal_position,
+          CASE c.confdeltype
+            WHEN 'a' THEN 'NO ACTION' WHEN 'r' THEN 'RESTRICT'
+            WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL'
+            WHEN 'd' THEN 'SET DEFAULT'
+          END AS on_delete,
+          CASE c.confupdtype
+            WHEN 'a' THEN 'NO ACTION' WHEN 'r' THEN 'RESTRICT'
+            WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL'
+            WHEN 'd' THEN 'SET DEFAULT'
+          END AS on_update
+        FROM pg_catalog.pg_constraint c
+        JOIN pg_catalog.pg_class ct ON c.conrelid = ct.oid
+        JOIN pg_catalog.pg_namespace nt ON ct.relnamespace = nt.oid
+        JOIN pg_catalog.pg_class cf ON c.confrelid = cf.oid
+        JOIN pg_catalog.pg_namespace nf ON cf.relnamespace = nf.oid
+        CROSS JOIN LATERAL unnest(c.conkey, c.confkey)
+          WITH ORDINALITY AS u(src_attnum, ref_attnum, pos)
+        JOIN pg_catalog.pg_attribute a1
+          ON a1.attnum = u.src_attnum AND a1.attrelid = c.conrelid
+        JOIN pg_catalog.pg_attribute a2
+          ON a2.attnum = u.ref_attnum AND a2.attrelid = c.confrelid
+        WHERE c.contype = 'f'
+          AND nt.nspname = $1
+          AND ct.relname = $2
+        ORDER BY c.conname, u.pos
       `,
       [schemaName, table]
     );
 
     const foreignKeys = result.rows;
 
-    // Create a map of column names to their foreign key info
-    const foreignKeyMap = new Map<string, ForeignKeyInfo>();
-    foreignKeys.forEach((fk: ForeignKeyRow) => {
-      // Prefix table name with schema if not public (e.g., "auth.users")
+    // Group rows by constraint_name, then map each source column to its FK info
+    const constraintGroups = new Map<
+      string,
+      {
+        constraintName: string;
+        referenceTable: string;
+        fromColumns: { name: string; foreignColumn: string; ordinal: number }[];
+        onDelete: string;
+        onUpdate: string;
+      }
+    >();
+
+    for (const fk of foreignKeys as ForeignKeyRow[]) {
       const referenceTable =
         fk.foreign_schema !== 'public'
           ? `${fk.foreign_schema}.${fk.foreign_table}`
           : fk.foreign_table;
-      foreignKeyMap.set(fk.from_column, {
-        constraint_name: fk.constraint_name,
-        referenceTable,
-        referenceColumn: fk.foreign_column,
-        onDelete: fk.on_delete as OnDeleteActionSchema,
-        onUpdate: fk.on_update as OnUpdateActionSchema,
+
+      let group = constraintGroups.get(fk.constraint_name);
+      if (!group) {
+        group = {
+          constraintName: fk.constraint_name,
+          referenceTable,
+          fromColumns: [],
+          onDelete: fk.on_delete,
+          onUpdate: fk.on_update,
+        };
+        constraintGroups.set(fk.constraint_name, group);
+      }
+      group.fromColumns.push({
+        name: fk.from_column,
+        foreignColumn: fk.foreign_column,
+        ordinal: fk.ordinal_position,
       });
-    });
+    }
+
+    const foreignKeyMap = new Map<string, ForeignKeyInfo>();
+
+    for (const group of constraintGroups.values()) {
+      group.fromColumns.sort((a, b) => a.ordinal - b.ordinal);
+
+      const referenceColumns = group.fromColumns.map((c) => ({
+        sourceColumn: c.name,
+        referenceColumn: c.foreignColumn,
+      }));
+
+      const info: ForeignKeyInfo = {
+        constraint_name: group.constraintName,
+        referenceTable: group.referenceTable,
+        referenceColumns,
+        onDelete: group.onDelete as OnDeleteActionSchema,
+        onUpdate: group.onUpdate as OnUpdateActionSchema,
+      };
+
+      for (const c of group.fromColumns) {
+        foreignKeyMap.set(c.name, { ...info });
+      }
+    }
+
     return foreignKeyMap;
   }
 }

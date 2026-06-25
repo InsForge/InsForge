@@ -124,11 +124,15 @@ router.get(
         throw new AppError(getValidationMessage(validation.error), 400, ERROR_CODES.INVALID_INPUT);
       }
 
+      const { column, value } = validation.data;
+      const columns = Array.isArray(column) ? column : [column];
+      const values = Array.isArray(value) ? value : [value];
+
       const record = await recordsService.lookupRecord(
         schemaName,
         req.params.tableName,
-        validation.data.column,
-        validation.data.value
+        columns,
+        values
       );
 
       successResponse(res, record);

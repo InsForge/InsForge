@@ -228,14 +228,14 @@ export function SchemaVisualizer({
       table.columns.forEach((column) => {
         if (column.foreignKey) {
           const targetTable = column.foreignKey.referenceTable;
-          const targetColumn = column.foreignKey.referenceColumn;
-
-          if (!referencedColumnsByTable[targetTable]) {
-            referencedColumnsByTable[targetTable] = [];
-          }
-          if (!referencedColumnsByTable[targetTable].includes(targetColumn)) {
-            referencedColumnsByTable[targetTable].push(targetColumn);
-          }
+          column.foreignKey.referenceColumns.forEach((ref) => {
+            if (!referencedColumnsByTable[targetTable]) {
+              referencedColumnsByTable[targetTable] = [];
+            }
+            if (!referencedColumnsByTable[targetTable].includes(ref.referenceColumn)) {
+              referencedColumnsByTable[targetTable].push(ref.referenceColumn);
+            }
+          });
         }
       });
     });
@@ -268,7 +268,7 @@ export function SchemaVisualizer({
         (column) =>
           column.foreignKey &&
           column.foreignKey.referenceTable === 'auth.users' &&
-          column.foreignKey.referenceColumn === 'id'
+          column.foreignKey.referenceColumns.some((r) => r.referenceColumn === 'id')
       )
     );
 
@@ -298,7 +298,7 @@ export function SchemaVisualizer({
           // Check if this is a reference to users.id
           const isAuthReference =
             column.foreignKey.referenceTable === 'auth.users' &&
-            column.foreignKey.referenceColumn === 'id';
+            column.foreignKey.referenceColumns.some((r) => r.referenceColumn === 'id');
 
           const edgeId = `${table.tableName}-${column.columnName}-${column.foreignKey.referenceTable}`;
 
@@ -319,13 +319,17 @@ export function SchemaVisualizer({
               },
             });
           } else {
-            // Regular table-to-table edge
+            // Regular table-to-table edge — match target column to the current source column
+            const matchingRef = column.foreignKey.referenceColumns.find(
+              (r) => r.sourceColumn === column.columnName
+            );
+            const targetHandle = `${matchingRef?.referenceColumn || ''}-target`;
             edges.push({
               id: edgeId,
               source: table.tableName,
               target: column.foreignKey.referenceTable,
               sourceHandle: `${column.columnName}-source`,
-              targetHandle: `${column.foreignKey.referenceColumn}-target`,
+              targetHandle,
               type: 'smoothstep',
               animated: true,
               style: { stroke: edgeColor, strokeWidth: 2, zIndex: 1000 },

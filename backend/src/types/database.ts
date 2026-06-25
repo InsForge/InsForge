@@ -105,6 +105,7 @@ export interface ForeignKeyRow {
   foreign_schema: string;
   foreign_table: string;
   foreign_column: string;
+  ordinal_position: number;
   on_delete: string;
   on_update: string;
 }

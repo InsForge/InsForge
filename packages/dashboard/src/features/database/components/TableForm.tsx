@@ -132,7 +132,9 @@ export function TableForm({
             columnName: col.columnName,
             referenceTable:
               referenceSchemaName === schemaName ? referenceTableName : referenceTableValue,
-            referenceColumn: col.foreignKey?.referenceColumn ?? '',
+            referenceColumns: col.foreignKey?.referenceColumns ?? [
+              { sourceColumn: col.columnName, referenceColumn: '' },
+            ],
             onDelete: col.foreignKey?.onDelete || 'NO ACTION',
             onUpdate: col.foreignKey?.onUpdate || 'NO ACTION',
           };
@@ -222,7 +224,7 @@ export function TableForm({
           ...(foreignKey && {
             foreignKey: {
               referenceTable: foreignKey.referenceTable,
-              referenceColumn: foreignKey.referenceColumn,
+              referenceColumns: foreignKey.referenceColumns,
               onDelete: foreignKey.onDelete,
               onUpdate: foreignKey.onUpdate,
             },
@@ -327,7 +329,9 @@ export function TableForm({
             columnName: col.columnName,
             referenceTable:
               referenceSchemaName === schemaName ? referenceTableName : referenceTableValue,
-            referenceColumn: col.foreignKey?.referenceColumn ?? '',
+            referenceColumns: col.foreignKey?.referenceColumns ?? [
+              { sourceColumn: col.columnName, referenceColumn: '' },
+            ],
             onDelete: col.foreignKey?.onDelete || 'NO ACTION',
             onUpdate: col.foreignKey?.onUpdate || 'NO ACTION',
           };
@@ -342,7 +346,7 @@ export function TableForm({
             columnName: fk.columnName,
             foreignKey: {
               referenceTable: fk.referenceTable,
-              referenceColumn: fk.referenceColumn,
+              referenceColumns: fk.referenceColumns,
               onDelete: fk.onDelete,
               onUpdate: fk.onUpdate,
             },
@@ -454,7 +458,24 @@ export function TableForm({
   };
 
   const handleRemoveForeignKey = (columnName?: string) => {
-    setForeignKeys(foreignKeys.filter((fk) => fk.columnName !== columnName));
+    const removed = foreignKeys.find((fk) => fk.columnName === columnName);
+    if (!removed) {
+      return;
+    }
+
+    // Removing any one column must remove all sibling columns atomically.
+    const constraintKey = removed.referenceColumns
+      .map((rc) => `${rc.sourceColumn}\x00${rc.referenceColumn}`)
+      .join('\x01');
+
+    setForeignKeys(
+      foreignKeys.filter((fk) => {
+        const key = fk.referenceColumns
+          .map((rc) => `${rc.sourceColumn}\x00${rc.referenceColumn}`)
+          .join('\x01');
+        return key !== constraintKey;
+      })
+    );
     setForeignKeysDirty(true);
   };
 
@@ -566,7 +587,9 @@ export function TableForm({
                         <span className="truncate">{fk.columnName}</span>
                         <MoveRight className="size-5 shrink-0 text-muted-foreground" />
                         <span className="truncate">
-                          {fk.referenceTable}.{fk.referenceColumn}
+                          {fk.referenceTable}.
+                          {fk.referenceColumns.find((c) => c.sourceColumn === fk.columnName)
+                            ?.referenceColumn ?? ''}
                         </span>
                       </div>
                       <div className="truncate px-2.5 text-[13px] leading-[18px]">

@@ -31,9 +31,16 @@ export const columnTypeSchema = z.enum([
   ColumnType.JSON,
 ]);
 
+export const foreignKeyReferenceSchema = z.object({
+  sourceColumn: z.string().min(1, 'Source column cannot be empty'),
+  referenceColumn: z.string().min(1, 'Reference column cannot be empty'),
+});
+
 export const foreignKeySchema = z.object({
   referenceTable: z.string().min(1, 'Target table cannot be empty'),
-  referenceColumn: z.string().min(1, 'Target column cannot be empty'),
+  referenceColumns: z
+    .array(foreignKeyReferenceSchema)
+    .min(1, 'At least one column mapping is required'),
   onDelete: onDeleteActionSchema,
   onUpdate: onUpdateActionSchema,
 });
@@ -65,6 +72,7 @@ export const tableSchema = z.object({
 
 export type TableSchema = z.infer<typeof tableSchema>;
 export type ColumnSchema = z.infer<typeof columnSchema>;
+export type ForeignKeyReferenceSchema = z.infer<typeof foreignKeyReferenceSchema>;
 export type ForeignKeySchema = z.infer<typeof foreignKeySchema>;
 export type OnUpdateActionSchema = z.infer<typeof onUpdateActionSchema>;
 export type OnDeleteActionSchema = z.infer<typeof onDeleteActionSchema>;
