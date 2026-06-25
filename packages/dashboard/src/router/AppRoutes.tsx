@@ -27,6 +27,7 @@ import PoliciesPage from '#features/database/pages/PoliciesPage';
 import SQLEditorPage from '#features/database/pages/SQLEditorPage';
 import TablesPage from '#features/database/pages/TablesPage';
 import TemplatesPage from '#features/database/pages/TemplatesPage';
+import SchemaPage from '#features/database/pages/SchemaPage';
 import TriggersPage from '#features/database/pages/TriggersPage';
 import DeploymentsLayout from '#features/deployments/components/DeploymentsLayout';
 import DeploymentDomainsPage from '#features/deployments/pages/DeploymentDomainsPage';
@@ -88,6 +89,7 @@ function AuthenticatedRoutes() {
         <Route path="/dashboard/database" element={<DatabaseLayout />}>
           <Route index element={<Navigate to="tables" replace />} />
           <Route path="tables" element={<TablesPage />} />
+          <Route path="schema" element={<SchemaPage />} />
           <Route path="indexes" element={<IndexesPage />} />
           <Route path="functions" element={<DatabaseFunctionsPage />} />
           <Route path="triggers" element={<TriggersPage />} />
