@@ -298,12 +298,9 @@ export const adminTableRecordsCreateRequestSchema = z
 
 // A primary-key value. Restricted to scalar types that survive a JSON round-trip
 // through the query string and that node-postgres can bind as a query parameter.
-export const adminTableRecordPkValueSchema = z.union([
-  z.string(),
-  z.number(),
-  z.boolean(),
-  z.null(),
-]);
+// `null` is excluded: PK columns are NOT NULL, and `WHERE col = NULL` never matches,
+// so a null key would silently affect zero rows instead of failing loudly.
+export const adminTableRecordPkValueSchema = z.union([z.string(), z.number(), z.boolean()]);
 
 // A single record's primary key as a map of pk column name -> value.
 // Supports composite primary keys (more than one column).

@@ -63,7 +63,11 @@ export function encodeRecordKey(row: Record<string, unknown>, primaryKeyColumns:
  * primary-key tuple to send to the record update/delete APIs.
  */
 export function decodeRecordKey(encodedKey: string): RecordPrimaryKey {
-  return JSON.parse(encodedKey) as RecordPrimaryKey;
+  try {
+    return JSON.parse(encodedKey) as RecordPrimaryKey;
+  } catch {
+    throw new Error(`Invalid record key: ${encodedKey}`);
+  }
 }
 
 // Helper function to build dynamic Zod schema based on column definitions
