@@ -84,6 +84,7 @@ export interface AppConfig {
     s3ForcePathStyle: boolean;
     awsConfigBucket: string;
     awsConfigRegion: string;
+    maxS3UploadSize: number;
   };
   functions: {
     denoRuntimeUrl: string;
@@ -108,6 +109,18 @@ function parseEnvInt(val: string | undefined, fallback: number): number {
     return fallback;
   }
   return parsed;
+}
+
+const AWS_MAX_SINGLE_PUT_BYTES = 5 * 1024 * 1024 * 1024;
+
+function parseEnvBytes(val: string | undefined, fallback: number): number {
+  if (!val) return fallback;
+  if (!/^\d+$/.test(val)) return fallback;
+  const parsed = Number(val);
+  if (!Number.isFinite(parsed) || !Number.isSafeInteger(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  return Math.min(parsed, AWS_MAX_SINGLE_PUT_BYTES);
 }
 
 export function loadConfig(): AppConfig {
@@ -188,6 +201,7 @@ export function loadConfig(): AppConfig {
       s3ForcePathStyle: process.env.S3_FORCE_PATH_STYLE !== 'false',
       awsConfigBucket: process.env.AWS_CONFIG_BUCKET || 'insforge-config',
       awsConfigRegion: process.env.AWS_CONFIG_REGION || 'us-east-2',
+      maxS3UploadSize: parseEnvBytes(process.env.S3_MAX_OBJECT_SIZE_BYTES, 5 * 1024 * 1024 * 1024),
     },
     functions: {
       denoRuntimeUrl: process.env.DENO_RUNTIME_URL || 'http://localhost:7133',

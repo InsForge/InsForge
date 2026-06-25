@@ -5,6 +5,8 @@ import { parseXml, toXml } from '../xml.js';
 import { sendS3Error } from '../errors.js';
 import { S3GatewayRequest, getS3Bucket, getS3Key } from '../request.js';
 
+const MAX_COMPLETE_MPU_BODY_BYTES = 1024 * 1024;
+
 const partSchema = z.object({
   PartNumber: z.coerce.number().int().positive().max(10_000),
   ETag: z.string().min(1),
@@ -30,8 +32,23 @@ export async function handle(req: S3GatewayRequest, res: Response): Promise<void
   }
 
   const chunks: Buffer[] = [];
+  let received = 0;
   for await (const c of req) {
-    chunks.push(c as Buffer);
+    const b = c as Buffer;
+    received += b.length;
+    if (received > MAX_COMPLETE_MPU_BODY_BYTES) {
+      sendS3Error(
+        res,
+        'EntityTooLarge',
+        'CompleteMultipartUpload body exceeds maximum allowed size',
+        {
+          resource: req.path,
+          requestId: req.s3Auth.requestId,
+        }
+      );
+      return;
+    }
+    chunks.push(b);
   }
 
   let parsed: unknown;

@@ -4,6 +4,7 @@ import { dispatchOp, parseBucketAndKey, S3Op } from './dispatch.js';
 import { S3GatewayRequest } from './request.js';
 import { sendS3Error, S3ProtocolError } from './errors.js';
 import { StorageService } from '@/services/storage/storage.service.js';
+import { appConfig } from '@/infra/config/app.config.js';
 import logger from '@/utils/logger.js';
 import * as listBuckets from './commands/list-buckets.js';
 import * as headBucket from './commands/head-bucket.js';
@@ -84,7 +85,44 @@ s3GatewayRouter.use((req, res, next) => {
   s3Sigv4Middleware(req, res, next).catch(next);
 });
 
-// 3) Dispatch to the operation handler.
+// 3) Early Content-Length check for body-consuming operations.
+// For aws-chunked streaming uploads the wire Content-Length includes
+// chunk framing overhead; use x-amz-decoded-content-length instead.
+s3GatewayRouter.use((req: Request, res: Response, next) => {
+  const rawDecoded = req.headers['x-amz-decoded-content-length'];
+  const isStreaming = typeof rawDecoded === 'string' && /^\d+$/.test(rawDecoded);
+  const rawCl = req.headers['content-length'];
+  const contentLength = isStreaming
+    ? Number(rawDecoded)
+    : typeof rawCl === 'string' && /^\d+$/.test(rawCl)
+      ? Number(rawCl)
+      : null;
+  if (contentLength === null || contentLength <= appConfig.storage.maxS3UploadSize) {
+    next();
+    return;
+  }
+  const m = req.method.toUpperCase();
+  const p = req.path;
+  const q = new Set(Object.keys(req.query));
+  const hasKey = p.replace(/^\/+/, '').includes('/');
+  const isLargeBodyOp =
+    m === 'PUT' && hasKey && !q.has('tagging') && !req.headers['x-amz-copy-source'];
+  if (isLargeBodyOp) {
+    sendS3Error(
+      res,
+      'EntityTooLarge',
+      `Object exceeds max upload size (${appConfig.storage.maxS3UploadSize} bytes)`,
+      {
+        resource: req.path,
+        requestId: (req as S3AuthenticatedRequest).s3Auth?.requestId,
+      }
+    );
+    return;
+  }
+  next();
+});
+
+// 4) Dispatch to the operation handler.
 s3GatewayRouter.use(async (req: Request, res: Response) => {
   const query: Record<string, string | string[] | undefined> = {};
   for (const [k, v] of Object.entries(req.query)) {
