@@ -1,3 +1,8 @@
+---
+title: "Deploy InsForge to Containarium"
+description: "Run InsForge on a Containarium LXC host with per-tenant containers, ZFS snapshots, and MCP-driven provisioning for agent-native deployments."
+---
+
 # Deploy InsForge to Containarium
 
 This guide walks through deploying InsForge on a [Containarium](https://github.com/footprintai/containarium) host. Containarium is an open-source, self-hostable platform that gives each tenant a persistent Linux container (LXC) with first-class SSH, MCP, and TLS-on-a-hostname primitives — a natural fit for agent-driven InsForge deployments.

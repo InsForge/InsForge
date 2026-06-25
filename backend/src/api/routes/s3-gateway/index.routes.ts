@@ -4,6 +4,7 @@ import { dispatchOp, parseBucketAndKey, S3Op } from './dispatch.js';
 import { S3GatewayRequest } from './request.js';
 import { sendS3Error, S3ProtocolError } from './errors.js';
 import { StorageService } from '@/services/storage/storage.service.js';
+import { appConfig } from '@/infra/config/app.config.js';
 import logger from '@/utils/logger.js';
 import * as listBuckets from './commands/list-buckets.js';
 import * as headBucket from './commands/head-bucket.js';
@@ -21,7 +22,8 @@ import * as uploadPart from './commands/upload-part.js';
 import * as completeMultipartUpload from './commands/complete-multipart-upload.js';
 import * as abortMultipartUpload from './commands/abort-multipart-upload.js';
 import * as listParts from './commands/list-parts.js';
-import * as stubs from './commands/stubs.js';
+import * as getBucketLocation from './commands/get-bucket-location.js';
+import * as getBucketVersioning from './commands/get-bucket-versioning.js';
 import * as getBucketCors from './commands/get-bucket-cors.js';
 import * as putBucketCors from './commands/put-bucket-cors.js';
 import * as deleteBucketCors from './commands/delete-bucket-cors.js';
@@ -29,6 +31,36 @@ import * as getObjectTagging from './commands/get-object-tagging.js';
 import * as putObjectTagging from './commands/put-object-tagging.js';
 import * as deleteObjectTagging from './commands/delete-object-tagging.js';
 import * as putBucketVersioning from './commands/put-bucket-versioning.js';
+
+type Handler = (req: S3GatewayRequest, res: Response) => Promise<void>;
+
+const handlers: Record<S3Op, Handler> = {
+  ListBuckets: listBuckets.handle,
+  HeadBucket: headBucket.handle,
+  CreateBucket: createBucket.handle,
+  DeleteBucket: deleteBucket.handle,
+  ListObjectsV2: listObjectsV2.handle,
+  HeadObject: headObject.handle,
+  GetObject: getObject.handle,
+  PutObject: putObject.handle,
+  DeleteObject: deleteObject.handle,
+  DeleteObjects: deleteObjects.handle,
+  CopyObject: copyObject.handle,
+  CreateMultipartUpload: createMultipartUpload.handle,
+  UploadPart: uploadPart.handle,
+  CompleteMultipartUpload: completeMultipartUpload.handle,
+  AbortMultipartUpload: abortMultipartUpload.handle,
+  ListParts: listParts.handle,
+  GetBucketLocation: getBucketLocation.handle,
+  GetBucketVersioning: getBucketVersioning.handle,
+  PutBucketVersioning: putBucketVersioning.handle,
+  GetBucketCors: getBucketCors.handle,
+  PutBucketCors: putBucketCors.handle,
+  DeleteBucketCors: deleteBucketCors.handle,
+  GetObjectTagging: getObjectTagging.handle,
+  PutObjectTagging: putObjectTagging.handle,
+  DeleteObjectTagging: deleteObjectTagging.handle,
+};
 
 export const s3GatewayRouter: Router = Router();
 
@@ -53,7 +85,44 @@ s3GatewayRouter.use((req, res, next) => {
   s3Sigv4Middleware(req, res, next).catch(next);
 });
 
-// 3) Dispatch to the operation handler.
+// 3) Early Content-Length check for body-consuming operations.
+// For aws-chunked streaming uploads the wire Content-Length includes
+// chunk framing overhead; use x-amz-decoded-content-length instead.
+s3GatewayRouter.use((req: Request, res: Response, next) => {
+  const rawDecoded = req.headers['x-amz-decoded-content-length'];
+  const isStreaming = typeof rawDecoded === 'string' && /^\d+$/.test(rawDecoded);
+  const rawCl = req.headers['content-length'];
+  const contentLength = isStreaming
+    ? Number(rawDecoded)
+    : typeof rawCl === 'string' && /^\d+$/.test(rawCl)
+      ? Number(rawCl)
+      : null;
+  if (contentLength === null || contentLength <= appConfig.storage.maxS3UploadSize) {
+    next();
+    return;
+  }
+  const m = req.method.toUpperCase();
+  const p = req.path;
+  const q = new Set(Object.keys(req.query));
+  const hasKey = p.replace(/^\/+/, '').includes('/');
+  const isLargeBodyOp =
+    m === 'PUT' && hasKey && !q.has('tagging') && !req.headers['x-amz-copy-source'];
+  if (isLargeBodyOp) {
+    sendS3Error(
+      res,
+      'EntityTooLarge',
+      `Object exceeds max upload size (${appConfig.storage.maxS3UploadSize} bytes)`,
+      {
+        resource: req.path,
+        requestId: (req as S3AuthenticatedRequest).s3Auth?.requestId,
+      }
+    );
+    return;
+  }
+  next();
+});
+
+// 4) Dispatch to the operation handler.
 s3GatewayRouter.use(async (req: Request, res: Response) => {
   const query: Record<string, string | string[] | undefined> = {};
   for (const [k, v] of Object.entries(req.query)) {
@@ -81,89 +150,7 @@ s3GatewayRouter.use(async (req: Request, res: Response) => {
   authed.s3Key = key;
   logger.debug('S3 gateway dispatch', { op, bucket, key });
   try {
-    switch (op) {
-      case 'ListBuckets':
-        await listBuckets.handle(authed, res);
-        return;
-      case 'HeadBucket':
-        await headBucket.handle(authed, res);
-        return;
-      case 'CreateBucket':
-        await createBucket.handle(authed, res);
-        return;
-      case 'DeleteBucket':
-        await deleteBucket.handle(authed, res);
-        return;
-      case 'ListObjectsV2':
-        await listObjectsV2.handle(authed, res);
-        return;
-      case 'HeadObject':
-        await headObject.handle(authed, res);
-        return;
-      case 'GetObject':
-        await getObject.handle(authed, res);
-        return;
-      case 'PutObject':
-        await putObject.handle(authed, res);
-        return;
-      case 'DeleteObject':
-        await deleteObject.handle(authed, res);
-        return;
-      case 'DeleteObjects':
-        await deleteObjects.handle(authed, res);
-        return;
-      case 'CopyObject':
-        await copyObject.handle(authed, res);
-        return;
-      case 'CreateMultipartUpload':
-        await createMultipartUpload.handle(authed, res);
-        return;
-      case 'UploadPart':
-        await uploadPart.handle(authed, res);
-        return;
-      case 'CompleteMultipartUpload':
-        await completeMultipartUpload.handle(authed, res);
-        return;
-      case 'AbortMultipartUpload':
-        await abortMultipartUpload.handle(authed, res);
-        return;
-      case 'ListParts':
-        await listParts.handle(authed, res);
-        return;
-      case 'GetBucketLocation':
-        await stubs.getBucketLocation(authed, res);
-        return;
-      case 'GetBucketVersioning':
-        await stubs.getBucketVersioning(authed, res);
-        return;
-      case 'GetBucketCors':
-        await getBucketCors.handle(authed, res);
-        return;
-      case 'PutBucketCors':
-        await putBucketCors.handle(authed, res);
-        return;
-      case 'DeleteBucketCors':
-        await deleteBucketCors.handle(authed, res);
-        return;
-      case 'GetObjectTagging':
-        await getObjectTagging.handle(authed, res);
-        return;
-      case 'PutObjectTagging':
-        await putObjectTagging.handle(authed, res);
-        return;
-      case 'DeleteObjectTagging':
-        await deleteObjectTagging.handle(authed, res);
-        return;
-      case 'PutBucketVersioning':
-        await putBucketVersioning.handle(authed, res);
-        return;
-      default:
-        sendS3Error(res, 'NotImplemented', `Operation ${op} not yet implemented`, {
-          resource: req.path,
-          requestId: authed.s3Auth?.requestId,
-        });
-        return;
-    }
+    await handlers[op](authed, res);
   } catch (err) {
     if (res.headersSent) {
       logger.error('S3 gateway handler error after headers sent', { op, err });
