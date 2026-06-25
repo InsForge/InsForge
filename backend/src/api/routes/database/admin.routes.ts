@@ -4,12 +4,14 @@ import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { AppError } from '@/utils/errors.js';
 import {
   ERROR_CODES,
+  adminTableRecordPrimaryKeySchema,
   adminTableRecordUpdateQuerySchema,
   adminTableRecordUpdateRequestSchema,
   adminTableRecordLookupQuerySchema,
   adminTableRecordsCreateRequestSchema,
   adminTableRecordsDeleteQuerySchema,
   adminTableRecordsListQuerySchema,
+  type AdminTableRecordPrimaryKey,
   type AdminTableRecordsSortClause,
 } from '@insforge/shared-schemas';
 import { AdminRecordService } from '@/services/database/admin-record.service.js';
@@ -63,6 +65,41 @@ function parseSort(sort: string | undefined): AdminTableRecordsSortClause[] {
         direction: normalizedDirection as AdminTableRecordsSortClause['direction'],
       };
     });
+}
+
+function parseJsonQueryParam(raw: string): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new AppError(
+      'Invalid pkKeys parameter.',
+      400,
+      ERROR_CODES.INVALID_INPUT,
+      'pkKeys must be a JSON-encoded primary key.'
+    );
+  }
+}
+
+// Parses the `pkKeys` query param for an update: a single JSON object mapping each
+// primary-key column to its value.
+function parsePrimaryKey(raw: string): AdminTableRecordPrimaryKey {
+  const validation = adminTableRecordPrimaryKeySchema.safeParse(parseJsonQueryParam(raw));
+  if (!validation.success) {
+    throw new AppError(getValidationMessage(validation.error), 400, ERROR_CODES.INVALID_INPUT);
+  }
+  return validation.data;
+}
+
+// Parses the `pkKeys` query param for a delete: a JSON array of primary-key objects.
+function parsePrimaryKeys(raw: string): AdminTableRecordPrimaryKey[] {
+  const validation = z
+    .array(adminTableRecordPrimaryKeySchema)
+    .min(1, 'At least one primary key is required.')
+    .safeParse(parseJsonQueryParam(raw));
+  if (!validation.success) {
+    throw new AppError(getValidationMessage(validation.error), 400, ERROR_CODES.INVALID_INPUT);
+  }
+  return validation.data;
 }
 
 function broadcastRecordChange(schemaName: string, tableName: string): void {
@@ -163,7 +200,7 @@ router.post(
 );
 
 router.patch(
-  '/tables/:tableName/records/:recordId',
+  '/tables/:tableName/records',
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const schemaName = normalizeDatabaseSchemaName(req.query.schema);
@@ -175,6 +212,8 @@ router.patch(
           ERROR_CODES.INVALID_INPUT
         );
       }
+
+      const primaryKey = parsePrimaryKey(queryValidation.data.pkKeys);
 
       const bodyValidation = adminTableRecordUpdateRequestSchema.safeParse(req.body);
       if (!bodyValidation.success) {
@@ -188,8 +227,7 @@ router.patch(
       const updatedRecord = await recordsService.updateRecord(
         schemaName,
         req.params.tableName,
-        queryValidation.data.pkColumn,
-        req.params.recordId,
+        primaryKey,
         bodyValidation.data as DatabaseRecord
       );
 
@@ -211,25 +249,12 @@ router.delete(
         throw new AppError(getValidationMessage(validation.error), 400, ERROR_CODES.INVALID_INPUT);
       }
 
-      const pkValues = validation.data.pkValues
-        .split(',')
-        .map((value) => value.trim())
-        .filter(Boolean);
-
-      if (pkValues.length === 0) {
-        throw new AppError(
-          'pkValues must include at least one primary key value.',
-          400,
-          ERROR_CODES.INVALID_INPUT,
-          'Provide at least one non-empty primary key value.'
-        );
-      }
+      const primaryKeys = parsePrimaryKeys(validation.data.pkKeys);
 
       const deletedCount = await recordsService.deleteRecords(
         schemaName,
         req.params.tableName,
-        validation.data.pkColumn,
-        pkValues
+        primaryKeys
       );
 
       if (deletedCount > 0) {

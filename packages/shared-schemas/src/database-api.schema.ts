@@ -284,8 +284,27 @@ export const adminTableRecordsCreateRequestSchema = z
   .array(adminTableRecordSchema)
   .min(1, 'At least one record is required');
 
+// A primary-key value. Restricted to scalar types that survive a JSON round-trip
+// through the query string and that node-postgres can bind as a query parameter.
+export const adminTableRecordPkValueSchema = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+  z.null(),
+]);
+
+// A single record's primary key as a map of pk column name -> value.
+// Supports composite primary keys (more than one column).
+export const adminTableRecordPrimaryKeySchema = z
+  .record(z.string().trim().min(1, 'Primary key column is required'), adminTableRecordPkValueSchema)
+  .refine((key) => Object.keys(key).length > 0, {
+    message: 'Primary key must include at least one column.',
+  });
+
+// `pkKeys` is a JSON-encoded object mapping each primary-key column to its value
+// for the record being updated, e.g. {"tenant_id":"t1","item_id":"i2"}.
 export const adminTableRecordUpdateQuerySchema = z.object({
-  pkColumn: z.string().trim().min(1, 'Primary key column is required'),
+  pkKeys: z.string().trim().min(1, 'Primary key is required'),
 });
 
 export const adminTableRecordUpdateRequestSchema = adminTableRecordSchema.refine(
@@ -295,9 +314,10 @@ export const adminTableRecordUpdateRequestSchema = adminTableRecordSchema.refine
   }
 );
 
+// `pkKeys` is a JSON-encoded array of primary-key objects, one per record to delete,
+// e.g. [{"tenant_id":"t1","item_id":"i2"},{"tenant_id":"t1","item_id":"i3"}].
 export const adminTableRecordsDeleteQuerySchema = z.object({
-  pkColumn: z.string().trim().min(1, 'Primary key column is required'),
-  pkValues: z.string().trim().min(1, 'At least one primary key value is required'),
+  pkKeys: z.string().trim().min(1, 'At least one primary key is required'),
 });
 
 export const adminTableRecordResponseSchema = adminTableRecordSchema;
@@ -368,6 +388,7 @@ export type AdminTableRecordsSortClause = z.infer<typeof adminTableRecordsSortCl
 export type AdminTableRecordsListQuery = z.infer<typeof adminTableRecordsListQuerySchema>;
 export type AdminTableRecordLookupQuery = z.infer<typeof adminTableRecordLookupQuerySchema>;
 export type AdminTableRecordsCreateRequest = z.infer<typeof adminTableRecordsCreateRequestSchema>;
+export type AdminTableRecordPrimaryKey = z.infer<typeof adminTableRecordPrimaryKeySchema>;
 export type AdminTableRecordUpdateQuery = z.infer<typeof adminTableRecordUpdateQuerySchema>;
 export type AdminTableRecordUpdateRequest = z.infer<typeof adminTableRecordUpdateRequestSchema>;
 export type AdminTableRecordsDeleteQuery = z.infer<typeof adminTableRecordsDeleteQuerySchema>;

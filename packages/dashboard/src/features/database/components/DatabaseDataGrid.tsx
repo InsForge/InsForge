@@ -14,6 +14,7 @@ import {
 } from '#components/datagrid';
 import { ColumnSchema, ColumnType, TableSchema } from '@insforge/shared-schemas';
 import { ForeignKeyCell } from './ForeignKeyCell';
+import { encodeRecordKey, getPrimaryKeyColumns } from '#features/database/helpers';
 
 // Create a type adapter for database records
 // Database records are dynamic and must have string id for DataGrid compatibility
@@ -26,24 +27,24 @@ function DatabaseTextCellEditor({
   onRowChange,
   onClose,
   onCellEdit,
-  primaryKeyColumn,
+  primaryKeyColumns,
 }: RenderEditCellProps<DatabaseDataGridRow> & {
   onCellEdit?: (rowId: string, columnKey: string, newValue: string) => Promise<void>;
-  primaryKeyColumn: string;
+  primaryKeyColumns: string[];
 }) {
   const handleValueChange = React.useCallback(
     (newValue: string) => {
       const oldValue = row[column.key];
 
       if (onCellEdit && String(oldValue ?? '') !== String(newValue)) {
-        void onCellEdit(String(row[primaryKeyColumn] || ''), column.key, newValue);
+        void onCellEdit(encodeRecordKey(row, primaryKeyColumns), column.key, newValue);
       }
 
       const updatedRow = { ...row, [column.key]: newValue };
       onRowChange(updatedRow);
       onClose();
     },
-    [row, column.key, onCellEdit, onRowChange, onClose, primaryKeyColumn]
+    [row, column.key, onCellEdit, onRowChange, onClose, primaryKeyColumns]
   );
 
   return (
@@ -63,25 +64,25 @@ function DatabaseBooleanCellEditor({
   onClose,
   onCellEdit,
   columnSchema,
-  primaryKeyColumn,
+  primaryKeyColumns,
 }: RenderEditCellProps<DatabaseDataGridRow> & {
   onCellEdit?: (rowId: string, columnKey: string, newValue: string) => Promise<void>;
   columnSchema: ColumnSchema;
-  primaryKeyColumn: string;
+  primaryKeyColumns: string[];
 }) {
   const handleValueChange = React.useCallback(
     (newValue: string) => {
       const value: boolean | null = newValue === 'null' ? null : newValue === 'true';
 
       if (onCellEdit && row[column.key] !== value) {
-        void onCellEdit(String(row[primaryKeyColumn] || ''), column.key, newValue);
+        void onCellEdit(encodeRecordKey(row, primaryKeyColumns), column.key, newValue);
       }
 
       const updatedRow = { ...row, [column.key]: value };
       onRowChange(updatedRow);
       onClose();
     },
-    [row, column.key, onRowChange, onClose, onCellEdit, primaryKeyColumn]
+    [row, column.key, onRowChange, onClose, onCellEdit, primaryKeyColumns]
   );
 
   return (
@@ -102,11 +103,11 @@ function DatabaseDateCellEditor({
   onClose,
   onCellEdit,
   columnSchema,
-  primaryKeyColumn,
+  primaryKeyColumns,
 }: RenderEditCellProps<DatabaseDataGridRow> & {
   onCellEdit?: (rowId: string, columnKey: string, newValue: string) => Promise<void>;
   columnSchema: ColumnSchema;
-  primaryKeyColumn: string;
+  primaryKeyColumns: string[];
 }) {
   const handleValueChange = React.useCallback(
     (newValue: string | null) => {
@@ -114,14 +115,14 @@ function DatabaseDateCellEditor({
         onCellEdit &&
         new Date(row[column.key] as string).getTime() !== new Date(newValue ?? '').getTime()
       ) {
-        void onCellEdit(String(row[primaryKeyColumn] || ''), column.key, newValue ?? '');
+        void onCellEdit(encodeRecordKey(row, primaryKeyColumns), column.key, newValue ?? '');
       }
 
       const updatedRow = { ...row, [column.key]: newValue };
       onRowChange(updatedRow);
       onClose();
     },
-    [onCellEdit, row, column.key, onRowChange, onClose, primaryKeyColumn]
+    [onCellEdit, row, column.key, onRowChange, onClose, primaryKeyColumns]
   );
 
   return (
@@ -142,23 +143,23 @@ function DatabaseJsonCellEditor({
   onClose,
   onCellEdit,
   columnSchema,
-  primaryKeyColumn,
+  primaryKeyColumns,
 }: RenderEditCellProps<DatabaseDataGridRow> & {
   onCellEdit?: (rowId: string, columnKey: string, newValue: string) => Promise<void>;
   columnSchema: ColumnSchema;
-  primaryKeyColumn: string;
+  primaryKeyColumns: string[];
 }) {
   const handleValueChange = React.useCallback(
     (newValue: string) => {
       if (onCellEdit && row[column.key] !== newValue) {
-        void onCellEdit(String(row[primaryKeyColumn] || ''), column.key, newValue);
+        void onCellEdit(encodeRecordKey(row, primaryKeyColumns), column.key, newValue);
       }
 
       const updatedRow = { ...row, [column.key]: newValue };
       onRowChange(updatedRow);
       onClose();
     },
-    [column.key, onCellEdit, row, onRowChange, onClose, primaryKeyColumn]
+    [column.key, onCellEdit, row, onRowChange, onClose, primaryKeyColumns]
   );
 
   return (
@@ -183,7 +184,7 @@ export function convertSchemaToColumns(
     return [];
   }
 
-  const primaryKeyColumn = schema.columns.find((col) => col.isPrimaryKey)?.columnName || '';
+  const primaryKeyColumns = getPrimaryKeyColumns(schema.columns);
 
   // Create typed cell renderers
   const cellRenderers = createDefaultCellRenderer<DatabaseDataGridRow>();
@@ -238,7 +239,7 @@ export function convertSchemaToColumns(
           onJumpToTable={onJumpToTable}
         />
       );
-    } else if (col.columnName === primaryKeyColumn) {
+    } else if (col.isPrimaryKey) {
       column.renderCell = cellRenderers.id;
     } else if (col.type === ColumnType.BOOLEAN) {
       column.renderCell = cellRenderers.boolean;
@@ -247,7 +248,7 @@ export function convertSchemaToColumns(
           {...props}
           columnSchema={col}
           onCellEdit={onCellEdit}
-          primaryKeyColumn={primaryKeyColumn}
+          primaryKeyColumns={primaryKeyColumns}
         />
       );
     } else if (col.type === ColumnType.DATE) {
@@ -257,7 +258,7 @@ export function convertSchemaToColumns(
           {...props}
           columnSchema={col}
           onCellEdit={onCellEdit}
-          primaryKeyColumn={primaryKeyColumn}
+          primaryKeyColumns={primaryKeyColumns}
         />
       );
     } else if (col.type === ColumnType.DATETIME) {
@@ -267,7 +268,7 @@ export function convertSchemaToColumns(
           {...props}
           columnSchema={col}
           onCellEdit={onCellEdit}
-          primaryKeyColumn={primaryKeyColumn}
+          primaryKeyColumns={primaryKeyColumns}
         />
       );
     } else if (col.type === ColumnType.JSON) {
@@ -277,7 +278,7 @@ export function convertSchemaToColumns(
           {...props}
           columnSchema={col}
           onCellEdit={onCellEdit}
-          primaryKeyColumn={primaryKeyColumn}
+          primaryKeyColumns={primaryKeyColumns}
         />
       );
     } else {
@@ -286,7 +287,7 @@ export function convertSchemaToColumns(
         <DatabaseTextCellEditor
           {...props}
           onCellEdit={onCellEdit}
-          primaryKeyColumn={primaryKeyColumn}
+          primaryKeyColumns={primaryKeyColumns}
         />
       );
     }

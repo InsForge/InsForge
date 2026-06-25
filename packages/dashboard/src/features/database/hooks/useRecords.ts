@@ -1,7 +1,10 @@
 import { ConvertedValue } from '#components/datagrid/datagridTypes';
 import { DEFAULT_DATABASE_SCHEMA } from '#features/database/helpers';
 import { databaseTableQueryKeys } from '#features/database/queryKeys';
-import { recordService } from '#features/database/services/record.service';
+import {
+  recordService,
+  type RecordPrimaryKey,
+} from '#features/database/services/record.service';
 import { useToast } from '#lib/hooks/useToast';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -101,14 +104,12 @@ export function useRecords(tableName: string, schemaName: string = DEFAULT_DATAB
   // Mutation to update a record
   const updateRecordMutation = useMutation({
     mutationFn: ({
-      pkColumn,
-      pkValue,
+      primaryKey,
       data,
     }: {
-      pkColumn: string;
-      pkValue: string;
+      primaryKey: RecordPrimaryKey;
       data: { [key: string]: ConvertedValue };
-    }) => recordService.updateRecord(tableName, pkColumn, pkValue, data, schemaName),
+    }) => recordService.updateRecord(tableName, primaryKey, data, schemaName),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: recordsQueryKeyPrefix });
       void queryClient.invalidateQueries({
@@ -124,14 +125,14 @@ export function useRecords(tableName: string, schemaName: string = DEFAULT_DATAB
 
   // Mutation to delete a record
   const deleteRecordsMutation = useMutation({
-    mutationFn: (variables: { pkColumn: string; pkValues: string[] }) =>
-      recordService.deleteRecords(tableName, variables.pkColumn, variables.pkValues, schemaName),
+    mutationFn: (variables: { primaryKeys: RecordPrimaryKey[] }) =>
+      recordService.deleteRecords(tableName, variables.primaryKeys, schemaName),
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: recordsQueryKeyPrefix });
       void queryClient.invalidateQueries({
         queryKey: databaseTableQueryKeys.tableSchema(schemaName, tableName),
       });
-      const count = variables.pkValues.length;
+      const count = variables.primaryKeys.length;
       if (count === 1) {
         showToast('Record deleted successfully', 'success');
       } else {
@@ -139,7 +140,7 @@ export function useRecords(tableName: string, schemaName: string = DEFAULT_DATAB
       }
     },
     onError: (error: Error, variables) => {
-      const count = variables.pkValues.length;
+      const count = variables.primaryKeys.length;
       const recordText = count === 1 ? 'record' : 'records';
       const errorMessage =
         error instanceof Error ? error.message : `Failed to delete ${recordText}`;

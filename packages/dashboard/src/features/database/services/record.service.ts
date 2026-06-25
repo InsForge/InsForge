@@ -1,5 +1,5 @@
 import { ConvertedValue } from '#components/datagrid/datagridTypes';
-import { DEFAULT_DATABASE_SCHEMA } from '#features/database/helpers';
+import { DEFAULT_DATABASE_SCHEMA, type RecordPrimaryKey } from '#features/database/helpers';
 import { apiClient } from '#lib/api/client';
 import { BulkUpsertResponse } from '@insforge/shared-schemas';
 import { convertToCSV, getExportFilename } from '#lib/utils/data-export';
@@ -8,6 +8,8 @@ interface AdminRecordListResponse {
   data: { [key: string]: ConvertedValue }[];
   pagination: { offset: number; limit: number; total: number };
 }
+
+export type { RecordPrimaryKey };
 
 export class RecordService {
   private buildAdminRecordsPath(
@@ -208,38 +210,32 @@ export class RecordService {
 
   updateRecord(
     table: string,
-    pkColumn: string,
-    pkValue: string,
+    primaryKey: RecordPrimaryKey,
     data: { [key: string]: ConvertedValue },
     schemaName: string = DEFAULT_DATABASE_SCHEMA
   ) {
-    const params = new URLSearchParams({ pkColumn });
+    // pkKeys carries the full primary-key tuple so composite keys target one row.
+    const params = new URLSearchParams({ pkKeys: JSON.stringify(primaryKey) });
 
-    return apiClient.request(
-      this.buildAdminRecordsPath(table, schemaName, `/${encodeURIComponent(pkValue)}`, params),
-      {
-        method: 'PATCH',
-        headers: apiClient.withAccessToken({
-          'Content-Type': 'application/json',
-        }),
-        body: JSON.stringify(data),
-      }
-    );
+    return apiClient.request(this.buildAdminRecordsPath(table, schemaName, '', params), {
+      method: 'PATCH',
+      headers: apiClient.withAccessToken({
+        'Content-Type': 'application/json',
+      }),
+      body: JSON.stringify(data),
+    });
   }
 
   deleteRecords(
     table: string,
-    pkColumn: string,
-    pkValues: string[],
+    primaryKeys: RecordPrimaryKey[],
     schemaName: string = DEFAULT_DATABASE_SCHEMA
   ) {
-    if (!pkValues.length) {
+    if (!primaryKeys.length) {
       return Promise.resolve();
     }
-    const params = new URLSearchParams({
-      pkColumn,
-      pkValues: pkValues.join(','),
-    });
+    // pkKeys is a JSON array of primary-key tuples so each selected row is matched exactly.
+    const params = new URLSearchParams({ pkKeys: JSON.stringify(primaryKeys) });
 
     return apiClient.request(this.buildAdminRecordsPath(table, schemaName, '', params), {
       method: 'DELETE',

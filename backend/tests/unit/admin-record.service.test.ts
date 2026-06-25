@@ -136,10 +136,15 @@ describe('AdminRecordService', () => {
     });
 
     const service = AdminRecordService.getInstance();
-    const record = await service.updateRecord('public', 'projects', 'id', 'p1', {
-      owner_id: '',
-      name: 'Renamed project',
-    });
+    const record = await service.updateRecord(
+      'public',
+      'projects',
+      { id: 'p1' },
+      {
+        owner_id: '',
+        name: 'Renamed project',
+      }
+    );
 
     expect(record).toEqual({ id: 'p1', owner_id: null, name: 'Renamed project' });
     const updateCall = clientQueryMock.mock.calls.find(
@@ -218,9 +223,14 @@ describe('AdminRecordService', () => {
     });
 
     const service = AdminRecordService.getInstance();
-    const record = await service.updateRecord('public', 'projects', 'id', 'p1', {
-      priority: '',
-    });
+    const record = await service.updateRecord(
+      'public',
+      'projects',
+      { id: 'p1' },
+      {
+        priority: '',
+      }
+    );
 
     expect(record).toEqual({ id: 'p1', priority: null });
     const updateCall = clientQueryMock.mock.calls.find(
@@ -250,9 +260,14 @@ describe('AdminRecordService', () => {
     const service = AdminRecordService.getInstance();
 
     await expect(
-      service.updateRecord('public', 'projects', 'id', 'p1', {
-        priority: '',
-      })
+      service.updateRecord(
+        'public',
+        'projects',
+        { id: 'p1' },
+        {
+          priority: '',
+        }
+      )
     ).rejects.toBeInstanceOf(AppError);
 
     const sqlCalls = clientQueryMock.mock.calls.map(([sql]) => sql as string);
@@ -276,7 +291,10 @@ describe('AdminRecordService', () => {
     });
 
     const service = AdminRecordService.getInstance();
-    const deletedCount = await service.deleteRecords('public', 'projects', 'id', ['p1', 'p2']);
+    const deletedCount = await service.deleteRecords('public', 'projects', [
+      { id: 'p1' },
+      { id: 'p2' },
+    ]);
 
     expect(deletedCount).toBe(2);
 
@@ -290,6 +308,110 @@ describe('AdminRecordService', () => {
     expect(sqlCalls[0]).toBe('BEGIN');
     expect(deleteIndex).toBeGreaterThan(setRoleIndex);
     expect(commitIndex).toBeGreaterThan(deleteIndex);
+  });
+
+  it('updates a composite-key row using the full primary-key tuple', async () => {
+    clientQueryMock.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM information_schema.columns')) {
+        return {
+          rows: [
+            { column_name: 'tenant_id', data_type: 'text', is_nullable: 'NO', udt_name: 'text' },
+            { column_name: 'item_id', data_type: 'text', is_nullable: 'NO', udt_name: 'text' },
+            { column_name: 'label', data_type: 'text', is_nullable: 'YES', udt_name: 'text' },
+          ],
+        };
+      }
+      if (sql.includes('UPDATE "public"."composite_pk_test"')) {
+        return {
+          rows: [{ tenant_id: 'tenant_a', item_id: 'item_2', label: 'second-updated' }],
+        };
+      }
+      return { rows: [] };
+    });
+
+    const service = AdminRecordService.getInstance();
+    const record = await service.updateRecord(
+      'public',
+      'composite_pk_test',
+      { tenant_id: 'tenant_a', item_id: 'item_2' },
+      { label: 'second-updated' }
+    );
+
+    expect(record).toEqual({ tenant_id: 'tenant_a', item_id: 'item_2', label: 'second-updated' });
+
+    const updateCall = clientQueryMock.mock.calls.find(
+      ([sql]) => typeof sql === 'string' && sql.includes('UPDATE "public"."composite_pk_test"')
+    );
+    // The WHERE clause must match both key columns, not just the (duplicated) first one.
+    expect(updateCall?.[0]).toContain(
+      'SET "label" = $1 WHERE "tenant_id" = $2 AND "item_id" = $3 RETURNING *'
+    );
+    expect(updateCall?.[1]).toEqual(['second-updated', 'tenant_a', 'item_2']);
+  });
+
+  it('deletes only the selected composite-key tuples', async () => {
+    clientQueryMock.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM information_schema.columns')) {
+        return {
+          rows: [
+            { column_name: 'tenant_id', data_type: 'text', is_nullable: 'NO', udt_name: 'text' },
+            { column_name: 'item_id', data_type: 'text', is_nullable: 'NO', udt_name: 'text' },
+            { column_name: 'label', data_type: 'text', is_nullable: 'YES', udt_name: 'text' },
+          ],
+        };
+      }
+      if (sql.includes('DELETE FROM "public"."composite_pk_test"')) {
+        return { rowCount: 1, rows: [] };
+      }
+      return { rows: [], rowCount: 0 };
+    });
+
+    const service = AdminRecordService.getInstance();
+    // tenant_a is duplicated across rows; deleting must target the exact tuple only.
+    const deletedCount = await service.deleteRecords('public', 'composite_pk_test', [
+      { tenant_id: 'tenant_a', item_id: 'item_2' },
+    ]);
+
+    expect(deletedCount).toBe(1);
+
+    const deleteCall = clientQueryMock.mock.calls.find(
+      ([sql]) => typeof sql === 'string' && sql.includes('DELETE FROM "public"."composite_pk_test"')
+    );
+    expect(deleteCall?.[0]).toContain('WHERE ("tenant_id" = $1 AND "item_id" = $2)');
+    expect(deleteCall?.[1]).toEqual(['tenant_a', 'item_2']);
+  });
+
+  it('matches each selected composite tuple independently when deleting many rows', async () => {
+    clientQueryMock.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM information_schema.columns')) {
+        return {
+          rows: [
+            { column_name: 'tenant_id', data_type: 'text', is_nullable: 'NO', udt_name: 'text' },
+            { column_name: 'item_id', data_type: 'text', is_nullable: 'NO', udt_name: 'text' },
+          ],
+        };
+      }
+      if (sql.includes('DELETE FROM "public"."composite_pk_test"')) {
+        return { rowCount: 2, rows: [] };
+      }
+      return { rows: [], rowCount: 0 };
+    });
+
+    const service = AdminRecordService.getInstance();
+    const deletedCount = await service.deleteRecords('public', 'composite_pk_test', [
+      { tenant_id: 'tenant_a', item_id: 'item_1' },
+      { tenant_id: 'tenant_a', item_id: 'item_2' },
+    ]);
+
+    expect(deletedCount).toBe(2);
+
+    const deleteCall = clientQueryMock.mock.calls.find(
+      ([sql]) => typeof sql === 'string' && sql.includes('DELETE FROM "public"."composite_pk_test"')
+    );
+    expect(deleteCall?.[0]).toContain(
+      'WHERE ("tenant_id" = $1 AND "item_id" = $2) OR ("tenant_id" = $3 AND "item_id" = $4)'
+    );
+    expect(deleteCall?.[1]).toEqual(['tenant_a', 'item_1', 'tenant_a', 'item_2']);
   });
 
   it('discards the pooled client when admin transaction cleanup fails', async () => {
@@ -316,9 +438,14 @@ describe('AdminRecordService', () => {
     const service = AdminRecordService.getInstance();
 
     await expect(
-      service.updateRecord('public', 'projects', 'id', 'p1', {
-        name: 'Renamed project',
-      })
+      service.updateRecord(
+        'public',
+        'projects',
+        { id: 'p1' },
+        {
+          name: 'Renamed project',
+        }
+      )
     ).rejects.toBe(resetError);
 
     expect(clientQueryMock.mock.calls.map(([sql]) => sql as string)).toContain('ROLLBACK');

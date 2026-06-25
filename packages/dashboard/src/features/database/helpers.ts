@@ -6,6 +6,69 @@ export const DEFAULT_DATABASE_SCHEMA = 'public' as const;
 
 export const SYSTEM_FIELDS = ['id', 'created_at', 'updated_at'];
 
+/**
+ * A record's primary key as a map of column name -> value.
+ * Supports composite (multi-column) primary keys.
+ */
+export type RecordPrimaryKey = Record<string, string | number | boolean | null>;
+
+/**
+ * Returns the primary-key column names for a table, in schema (ordinal) order.
+ * Falls back to `['id']` when the schema reports no primary key, preserving the
+ * previous single-column behavior for tables that don't expose key metadata.
+ */
+export function getPrimaryKeyColumns(columns?: ColumnSchema[]): string[] {
+  const primaryKeyColumns =
+    columns?.filter((column) => column.isPrimaryKey).map((column) => column.columnName) ?? [];
+  return primaryKeyColumns.length > 0 ? primaryKeyColumns : ['id'];
+}
+
+/**
+ * Builds the primary-key tuple for a row from the given primary-key columns.
+ * Missing values are coerced to null and non-scalar values to their string form,
+ * since primary keys are always scalar.
+ */
+export function getRecordPrimaryKey(
+  row: Record<string, unknown>,
+  primaryKeyColumns: string[]
+): RecordPrimaryKey {
+  const key: RecordPrimaryKey = {};
+  for (const columnName of primaryKeyColumns) {
+    const value = row[columnName];
+    if (value === undefined || value === null) {
+      key[columnName] = null;
+    } else if (
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean'
+    ) {
+      key[columnName] = value;
+    } else {
+      key[columnName] = String(value);
+    }
+  }
+  return key;
+}
+
+/**
+ * Encodes a row's full primary-key tuple into a stable string usable as a React
+ * grid row key. Two rows with the same key tuple encode identically (same identity).
+ */
+export function encodeRecordKey(
+  row: Record<string, unknown>,
+  primaryKeyColumns: string[]
+): string {
+  return JSON.stringify(getRecordPrimaryKey(row, primaryKeyColumns));
+}
+
+/**
+ * Decodes a grid row key produced by {@link encodeRecordKey} back into the
+ * primary-key tuple to send to the record update/delete APIs.
+ */
+export function decodeRecordKey(encodedKey: string): RecordPrimaryKey {
+  return JSON.parse(encodedKey) as RecordPrimaryKey;
+}
+
 // Helper function to build dynamic Zod schema based on column definitions
 export function buildDynamicSchema(columns: ColumnSchema[]) {
   const schemaFields: Record<string, z.ZodTypeAny> = {};
