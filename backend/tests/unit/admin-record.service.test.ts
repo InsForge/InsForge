@@ -93,6 +93,7 @@ describe('AdminRecordService', () => {
           { column_name: 'email', data_type: 'text', is_nullable: 'NO', udt_name: 'text' },
         ],
       }) // metadata
+      .mockResolvedValueOnce({ rows: [{ column_name: 'id' }] }) // primary key columns
       .mockResolvedValueOnce({
         rows: [{ id: 'u1', email: 'demo@example.com' }],
       }) // INSERT
@@ -126,6 +127,9 @@ describe('AdminRecordService', () => {
             { column_name: 'name', data_type: 'text', is_nullable: 'NO', udt_name: 'text' },
           ],
         };
+      }
+      if (sql.includes('information_schema.table_constraints')) {
+        return { rows: [{ column_name: 'id' }] };
       }
       if (sql.includes('UPDATE "public"."projects"')) {
         return {
@@ -182,6 +186,7 @@ describe('AdminRecordService', () => {
           },
         ],
       }) // metadata
+      .mockResolvedValueOnce({ rows: [{ column_name: 'id' }] }) // primary key columns
       .mockResolvedValueOnce({
         rows: [{ id: 'r1', name: '' }],
       }) // INSERT
@@ -213,6 +218,9 @@ describe('AdminRecordService', () => {
             },
           ],
         };
+      }
+      if (sql.includes('information_schema.table_constraints')) {
+        return { rows: [{ column_name: 'id' }] };
       }
       if (sql.includes('UPDATE "public"."projects"')) {
         return {
@@ -284,6 +292,9 @@ describe('AdminRecordService', () => {
           ],
         };
       }
+      if (sql.includes('information_schema.table_constraints')) {
+        return { rows: [{ column_name: 'id' }] };
+      }
       if (sql.includes('DELETE FROM "public"."projects"')) {
         return { rowCount: 2, rows: [] };
       }
@@ -297,6 +308,13 @@ describe('AdminRecordService', () => {
     ]);
 
     expect(deletedCount).toBe(2);
+
+    const deleteCall = clientQueryMock.mock.calls.find(
+      ([sql]) => typeof sql === 'string' && sql.includes('DELETE FROM "public"."projects"')
+    );
+    // Each selected single-column key is matched as its own AND-group, OR'd together.
+    expect(deleteCall?.[0]).toContain('WHERE ("id" = $1) OR ("id" = $2)');
+    expect(deleteCall?.[1]).toEqual(['p1', 'p2']);
 
     const sqlCalls = clientQueryMock.mock.calls.map(([sql]) => sql as string);
     const setRoleIndex = sqlCalls.indexOf('SET LOCAL ROLE project_admin');
@@ -320,6 +338,9 @@ describe('AdminRecordService', () => {
             { column_name: 'label', data_type: 'text', is_nullable: 'YES', udt_name: 'text' },
           ],
         };
+      }
+      if (sql.includes('information_schema.table_constraints')) {
+        return { rows: [{ column_name: 'tenant_id' }, { column_name: 'item_id' }] };
       }
       if (sql.includes('UPDATE "public"."composite_pk_test"')) {
         return {
@@ -360,6 +381,9 @@ describe('AdminRecordService', () => {
           ],
         };
       }
+      if (sql.includes('information_schema.table_constraints')) {
+        return { rows: [{ column_name: 'tenant_id' }, { column_name: 'item_id' }] };
+      }
       if (sql.includes('DELETE FROM "public"."composite_pk_test"')) {
         return { rowCount: 1, rows: [] };
       }
@@ -391,6 +415,9 @@ describe('AdminRecordService', () => {
           ],
         };
       }
+      if (sql.includes('information_schema.table_constraints')) {
+        return { rows: [{ column_name: 'tenant_id' }, { column_name: 'item_id' }] };
+      }
       if (sql.includes('DELETE FROM "public"."composite_pk_test"')) {
         return { rowCount: 2, rows: [] };
       }
@@ -414,6 +441,47 @@ describe('AdminRecordService', () => {
     expect(deleteCall?.[1]).toEqual(['tenant_a', 'item_1', 'tenant_a', 'item_2']);
   });
 
+  it('rejects a partial composite key instead of mutating unintended rows', async () => {
+    clientQueryMock.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM information_schema.columns')) {
+        return {
+          rows: [
+            { column_name: 'tenant_id', data_type: 'text', is_nullable: 'NO', udt_name: 'text' },
+            { column_name: 'item_id', data_type: 'text', is_nullable: 'NO', udt_name: 'text' },
+            { column_name: 'label', data_type: 'text', is_nullable: 'YES', udt_name: 'text' },
+          ],
+        };
+      }
+      if (sql.includes('information_schema.table_constraints')) {
+        return { rows: [{ column_name: 'tenant_id' }, { column_name: 'item_id' }] };
+      }
+      return { rows: [], rowCount: 0 };
+    });
+
+    const service = AdminRecordService.getInstance();
+
+    // Supplying only the first PK column of a composite key must be rejected, not
+    // turned into a broad DELETE that removes every row sharing that value.
+    await expect(
+      service.deleteRecords('public', 'composite_pk_test', [{ tenant_id: 'tenant_a' }])
+    ).rejects.toBeInstanceOf(AppError);
+
+    const sqlCalls = clientQueryMock.mock.calls.map(([sql]) => sql as string);
+    expect(sqlCalls.some((sql) => sql.includes('DELETE FROM'))).toBe(false);
+    expect(sqlCalls).toContain('ROLLBACK');
+
+    // The same partial key must also be rejected on update.
+    await expect(
+      service.updateRecord('public', 'composite_pk_test', { tenant_id: 'tenant_a' }, { label: 'x' })
+    ).rejects.toBeInstanceOf(AppError);
+
+    expect(
+      clientQueryMock.mock.calls.some(
+        ([sql]) => typeof sql === 'string' && sql.includes('UPDATE "public"."composite_pk_test"')
+      )
+    ).toBe(false);
+  });
+
   it('discards the pooled client when admin transaction cleanup fails', async () => {
     const resetError = new Error('reset failed');
 
@@ -425,6 +493,9 @@ describe('AdminRecordService', () => {
             { column_name: 'name', data_type: 'text', is_nullable: 'NO', udt_name: 'text' },
           ],
         };
+      }
+      if (sql.includes('information_schema.table_constraints')) {
+        return { rows: [{ column_name: 'id' }] };
       }
       if (sql.includes('UPDATE "public"."projects"')) {
         return { rows: [{ id: 'p1', name: 'Renamed project' }] };

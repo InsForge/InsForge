@@ -78,7 +78,9 @@ describe('database helpers', () => {
       ])
     ).toEqual(['tenant_id', 'item_id']);
 
-    expect(getPrimaryKeyColumns([column({ columnName: 'id', isPrimaryKey: true })])).toEqual(['id']);
+    expect(getPrimaryKeyColumns([column({ columnName: 'id', isPrimaryKey: true })])).toEqual([
+      'id',
+    ]);
 
     // No primary key metadata -> fall back to the conventional `id` column.
     expect(getPrimaryKeyColumns([column({ columnName: 'name' })])).toEqual(['id']);

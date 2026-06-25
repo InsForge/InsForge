@@ -1,10 +1,7 @@
 import { ConvertedValue } from '#components/datagrid/datagridTypes';
 import { DEFAULT_DATABASE_SCHEMA } from '#features/database/helpers';
 import { databaseTableQueryKeys } from '#features/database/queryKeys';
-import {
-  recordService,
-  type RecordPrimaryKey,
-} from '#features/database/services/record.service';
+import { recordService, type RecordPrimaryKey } from '#features/database/services/record.service';
 import { useToast } from '#lib/hooks/useToast';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 

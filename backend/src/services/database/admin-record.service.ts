@@ -26,6 +26,7 @@ interface TableColumnMetadata {
   columnTypeMap: Record<string, string>;
   nullableColumns: Set<string>;
   searchableColumns: string[];
+  primaryKeyColumns: string[];
 }
 
 // A record's primary key as a map of column name -> value. Supports composite keys.
@@ -158,6 +159,10 @@ export class AdminRecordService {
     return this.withAdminTransaction(async (client) => {
       const metadata = await this.getTableColumnMetadata(schemaName, tableName, client);
       keyEntries.forEach(([columnName]) => this.assertColumnExists(metadata, columnName));
+      this.assertCompletePrimaryKey(
+        metadata,
+        keyEntries.map(([columnName]) => columnName)
+      );
 
       const sanitizedRecord = this.sanitizeUpdateRecord(data, metadata);
       const entries = Object.entries(sanitizedRecord);
@@ -232,8 +237,13 @@ export class AdminRecordService {
           );
         }
 
+        keyEntries.forEach(([columnName]) => this.assertColumnExists(metadata, columnName));
+        this.assertCompletePrimaryKey(
+          metadata,
+          keyEntries.map(([columnName]) => columnName)
+        );
+
         const columnClauses = keyEntries.map(([columnName, value]) => {
-          this.assertColumnExists(metadata, columnName);
           values.push(value);
           return `${quoteIdentifier(columnName)} = $${values.length}`;
         });
@@ -339,11 +349,55 @@ export class AdminRecordService {
       }
     }
 
+    const primaryKeyResult = await queryable.query<{ column_name: string }>(
+      `
+        SELECT kcu.column_name
+        FROM information_schema.table_constraints tc
+        JOIN information_schema.key_column_usage kcu
+          ON tc.constraint_name = kcu.constraint_name
+          AND tc.table_schema = kcu.table_schema
+          AND tc.table_name = kcu.table_name
+        WHERE tc.constraint_type = 'PRIMARY KEY'
+          AND tc.table_schema = $1
+          AND tc.table_name = $2
+        ORDER BY kcu.ordinal_position
+      `,
+      [schemaName, tableName]
+    );
+
     return {
       columnTypeMap,
       nullableColumns,
       searchableColumns,
+      primaryKeyColumns: primaryKeyResult.rows.map((row) => row.column_name),
     };
+  }
+
+  /**
+   * Ensures the supplied key columns are exactly the table's primary key, so a
+   * partial composite key (e.g. only `tenant_id` of a `(tenant_id, item_id)` key)
+   * can't match and mutate more rows than intended. Tables with no detected
+   * primary key fall back to the caller-provided columns (validated for existence).
+   */
+  private assertCompletePrimaryKey(metadata: TableColumnMetadata, suppliedColumns: string[]): void {
+    const { primaryKeyColumns } = metadata;
+    if (primaryKeyColumns.length === 0) {
+      return;
+    }
+
+    const suppliedSet = new Set(suppliedColumns);
+    const matchesFullKey =
+      suppliedSet.size === primaryKeyColumns.length &&
+      primaryKeyColumns.every((column) => suppliedSet.has(column));
+
+    if (!matchesFullKey) {
+      throw new AppError(
+        'Primary key does not match the table primary key.',
+        400,
+        ERROR_CODES.INVALID_INPUT,
+        `Provide exactly these primary key columns: ${primaryKeyColumns.join(', ')}.`
+      );
+    }
   }
 
   private buildWhereClause(

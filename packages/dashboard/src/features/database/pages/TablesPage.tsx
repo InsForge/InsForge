@@ -227,10 +227,7 @@ export default function TablesPage() {
 
   // Full primary-key tuple (supports composite keys) used for row identity,
   // updates, and deletes.
-  const primaryKeyColumns = useMemo(
-    () => getPrimaryKeyColumns(schemaData?.columns),
-    [schemaData]
-  );
+  const primaryKeyColumns = useMemo(() => getPrimaryKeyColumns(schemaData?.columns), [schemaData]);
 
   const {
     mutate: importCSV,

@@ -54,10 +54,7 @@ export function getRecordPrimaryKey(
  * Encodes a row's full primary-key tuple into a stable string usable as a React
  * grid row key. Two rows with the same key tuple encode identically (same identity).
  */
-export function encodeRecordKey(
-  row: Record<string, unknown>,
-  primaryKeyColumns: string[]
-): string {
+export function encodeRecordKey(row: Record<string, unknown>, primaryKeyColumns: string[]): string {
   return JSON.stringify(getRecordPrimaryKey(row, primaryKeyColumns));
 }
 
