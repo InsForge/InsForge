@@ -484,6 +484,55 @@ describe('AdminRecordService', () => {
     ).toBe(false);
   });
 
+  it('falls back to the caller-provided key when the table has no primary key', async () => {
+    clientQueryMock.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM information_schema.columns')) {
+        return {
+          rows: [
+            { column_name: 'id', data_type: 'uuid', is_nullable: 'NO', udt_name: 'uuid' },
+            { column_name: 'name', data_type: 'text', is_nullable: 'YES', udt_name: 'text' },
+          ],
+        };
+      }
+      if (sql.includes('information_schema.table_constraints')) {
+        return { rows: [] }; // table has no primary key
+      }
+      if (sql.includes('UPDATE "public"."pkless"')) {
+        return { rows: [{ id: 'p1', name: 'Renamed' }] };
+      }
+      if (sql.includes('DELETE FROM "public"."pkless"')) {
+        return { rowCount: 1, rows: [] };
+      }
+      return { rows: [], rowCount: 0 };
+    });
+
+    const service = AdminRecordService.getInstance();
+
+    // With no detectable primary key, the supplied key columns are used as-is.
+    const updated = await service.updateRecord(
+      'public',
+      'pkless',
+      { id: 'p1' },
+      { name: 'Renamed' }
+    );
+    expect(updated).toEqual({ id: 'p1', name: 'Renamed' });
+
+    const updateCall = clientQueryMock.mock.calls.find(
+      ([sql]) => typeof sql === 'string' && sql.includes('UPDATE "public"."pkless"')
+    );
+    expect(updateCall?.[0]).toContain('WHERE "id" = $2 RETURNING *');
+    expect(updateCall?.[1]).toEqual(['Renamed', 'p1']);
+
+    const deletedCount = await service.deleteRecords('public', 'pkless', [{ id: 'p1' }]);
+    expect(deletedCount).toBe(1);
+
+    const deleteCall = clientQueryMock.mock.calls.find(
+      ([sql]) => typeof sql === 'string' && sql.includes('DELETE FROM "public"."pkless"')
+    );
+    expect(deleteCall?.[0]).toContain('WHERE ("id" = $1)');
+    expect(deleteCall?.[1]).toEqual(['p1']);
+  });
+
   it('discards the pooled client when admin transaction cleanup fails', async () => {
     const resetError = new Error('reset failed');
 

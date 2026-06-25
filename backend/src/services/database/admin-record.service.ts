@@ -26,7 +26,6 @@ interface TableColumnMetadata {
   columnTypeMap: Record<string, string>;
   nullableColumns: Set<string>;
   searchableColumns: string[];
-  primaryKeyColumns: string[];
 }
 
 // A record's primary key as a map of column name -> value. Supports composite keys.
@@ -157,10 +156,11 @@ export class AdminRecordService {
     }
 
     return this.withAdminTransaction(async (client) => {
-      const metadata = await this.getTableColumnMetadata(schemaName, tableName, client, true);
+      const metadata = await this.getTableColumnMetadata(schemaName, tableName, client);
+      const primaryKeyColumns = await this.getPrimaryKeyColumns(schemaName, tableName, client);
       keyEntries.forEach(([columnName]) => this.assertColumnExists(metadata, columnName));
-      this.assertCompletePrimaryKey(
-        metadata,
+      this.assertKeyMatchesPrimaryKey(
+        primaryKeyColumns,
         keyEntries.map(([columnName]) => columnName)
       );
 
@@ -217,7 +217,8 @@ export class AdminRecordService {
     validateTableName(tableName);
 
     return this.withAdminTransaction(async (client) => {
-      const metadata = await this.getTableColumnMetadata(schemaName, tableName, client, true);
+      const metadata = await this.getTableColumnMetadata(schemaName, tableName, client);
+      const primaryKeyColumns = await this.getPrimaryKeyColumns(schemaName, tableName, client);
 
       if (primaryKeys.length === 0) {
         return 0;
@@ -238,8 +239,8 @@ export class AdminRecordService {
         }
 
         keyEntries.forEach(([columnName]) => this.assertColumnExists(metadata, columnName));
-        this.assertCompletePrimaryKey(
-          metadata,
+        this.assertKeyMatchesPrimaryKey(
+          primaryKeyColumns,
           keyEntries.map(([columnName]) => columnName)
         );
 
@@ -300,8 +301,7 @@ export class AdminRecordService {
   private async getTableColumnMetadata(
     schemaName: string,
     tableName: string,
-    client?: PoolClient,
-    includePrimaryKey = false
+    client?: PoolClient
   ): Promise<TableColumnMetadata> {
     const queryable = client ?? this.dbManager.getPool();
     const result = await queryable.query<{
@@ -350,11 +350,25 @@ export class AdminRecordService {
       }
     }
 
-    // Only update/delete need the primary key, so skip this query on read/create paths.
-    let primaryKeyColumns: string[] = [];
-    if (includePrimaryKey) {
-      const primaryKeyResult = await queryable.query<{ column_name: string }>(
-        `
+    return {
+      columnTypeMap,
+      nullableColumns,
+      searchableColumns,
+    };
+  }
+
+  /**
+   * Fetches a table's primary-key columns (ordinal order). Returns an empty array
+   * only when the table genuinely has no primary key. Mutations call this directly,
+   * so an empty result can never be confused with "metadata wasn't loaded".
+   */
+  private async getPrimaryKeyColumns(
+    schemaName: string,
+    tableName: string,
+    client: PoolClient
+  ): Promise<string[]> {
+    const result = await client.query<{ column_name: string }>(
+      `
         SELECT kcu.column_name
         FROM information_schema.table_constraints tc
         JOIN information_schema.key_column_usage kcu
@@ -366,27 +380,20 @@ export class AdminRecordService {
           AND tc.table_name = $2
         ORDER BY kcu.ordinal_position
       `,
-        [schemaName, tableName]
-      );
-      primaryKeyColumns = primaryKeyResult.rows.map((row) => row.column_name);
-    }
+      [schemaName, tableName]
+    );
 
-    return {
-      columnTypeMap,
-      nullableColumns,
-      searchableColumns,
-      primaryKeyColumns,
-    };
+    return result.rows.map((row) => row.column_name);
   }
 
   /**
    * Ensures the supplied key columns are exactly the table's primary key, so a
    * partial composite key (e.g. only `tenant_id` of a `(tenant_id, item_id)` key)
    * can't match and mutate more rows than intended. Tables with no detected
-   * primary key fall back to the caller-provided columns (validated for existence).
+   * primary key (empty `primaryKeyColumns`) fall back to the caller-provided
+   * columns (validated for existence elsewhere).
    */
-  private assertCompletePrimaryKey(metadata: TableColumnMetadata, suppliedColumns: string[]): void {
-    const { primaryKeyColumns } = metadata;
+  private assertKeyMatchesPrimaryKey(primaryKeyColumns: string[], suppliedColumns: string[]): void {
     if (primaryKeyColumns.length === 0) {
       return;
     }
