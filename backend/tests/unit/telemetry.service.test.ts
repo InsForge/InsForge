@@ -176,6 +176,15 @@ describe('TelemetryService', () => {
       expectedIsCi: false,
     },
     {
+      name: 'development NODE_ENV',
+      setup: () => {
+        clearRuntimeEnvironment();
+        process.env.NODE_ENV = 'development';
+      },
+      expectedRuntimeEnvironment: 'development',
+      expectedIsCi: false,
+    },
+    {
       name: 'test NODE_ENV',
       setup: () => {
         clearRuntimeEnvironment();
