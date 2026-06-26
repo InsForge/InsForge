@@ -14,29 +14,35 @@ export interface TelemetryConfig {
   disabled: boolean;
   debug: boolean;
   endpoint: string;
+  posthogApiKey: string;
   installationIdPath: string;
   heartbeatIntervalMs: number;
   requestTimeoutMs: number;
 }
 
-interface TelemetryEvent {
-  eventName: TelemetryEventName;
-  installationId: string;
+interface PostHogTelemetryEvent {
+  api_key: string;
+  event: string;
+  distinct_id: string;
   timestamp: string;
-  version: string;
   properties: {
-    hostingMode: 'cloud' | 'self-hosted';
-    deploymentMethod: string;
+    $process_person_profile: false;
+    installation_id: string;
+    telemetry_source: 'insforge_oss';
+    telemetry_event_name: TelemetryEventName;
+    version: string;
+    hosting_mode: 'cloud' | 'self-hosted';
+    deployment_method: string;
     platform: NodeJS.Platform;
     arch: string;
-    nodeVersion: string;
-    isCi: boolean;
-    storageBackend: 'local' | 's3' | 's3-compatible';
+    node_version: string;
+    is_ci: boolean;
+    storage_backend: 'local' | 's3' | 's3-compatible';
     features: {
-      siteDeploymentsConfigured: boolean;
-      functionsConfigured: boolean;
-      computeConfigured: boolean;
-      openRouterConfigured: boolean;
+      site_deployments_configured: boolean;
+      functions_configured: boolean;
+      compute_configured: boolean;
+      openrouter_configured: boolean;
     };
   };
 }
@@ -45,6 +51,10 @@ type FetchFunction = typeof fetch;
 type TimerHandle = ReturnType<typeof setInterval>;
 
 const CI_ENV_KEYS = ['CI', 'GITHUB_ACTIONS', 'GITLAB_CI', 'BUILDKITE', 'CIRCLECI', 'JENKINS_URL'];
+const POSTHOG_EVENT_NAMES: Record<TelemetryEventName, string> = {
+  instance_started: 'oss_instance_started',
+  heartbeat: 'oss_heartbeat',
+};
 
 export class TelemetryService {
   private static instance: TelemetryService | undefined;
@@ -153,31 +163,36 @@ export class TelemetryService {
     }
   }
 
-  private buildEvent(eventName: TelemetryEventName, installationId: string): TelemetryEvent {
+  private buildEvent(eventName: TelemetryEventName, installationId: string): PostHogTelemetryEvent {
     return {
-      eventName,
-      installationId,
+      api_key: this.config.posthogApiKey,
+      event: POSTHOG_EVENT_NAMES[eventName],
+      distinct_id: installationId,
       timestamp: new Date().toISOString(),
-      version: packageJson.version,
       properties: {
-        hostingMode: isCloudEnvironment() ? 'cloud' : 'self-hosted',
-        deploymentMethod: detectDeploymentMethod(),
+        $process_person_profile: false,
+        installation_id: installationId,
+        telemetry_source: 'insforge_oss',
+        telemetry_event_name: eventName,
+        version: packageJson.version,
+        hosting_mode: isCloudEnvironment() ? 'cloud' : 'self-hosted',
+        deployment_method: detectDeploymentMethod(),
         platform: os.platform(),
         arch: os.arch(),
-        nodeVersion: process.version,
-        isCi: CI_ENV_KEYS.some((key) => !!process.env[key]),
-        storageBackend: detectStorageBackend(),
+        node_version: process.version,
+        is_ci: CI_ENV_KEYS.some((key) => !!process.env[key]),
+        storage_backend: detectStorageBackend(),
         features: {
-          siteDeploymentsConfigured: Boolean(
+          site_deployments_configured: Boolean(
             appConfig.deployments.vercelToken &&
             appConfig.deployments.vercelTeamId &&
             appConfig.deployments.vercelProjectId
           ),
-          functionsConfigured: Boolean(
+          functions_configured: Boolean(
             appConfig.denoSubhosting.token && appConfig.denoSubhosting.organizationId
           ),
-          computeConfigured: Boolean(appConfig.fly.apiToken && appConfig.fly.org),
-          openRouterConfigured: Boolean(appConfig.ai.openrouterApiKey),
+          compute_configured: Boolean(appConfig.fly.apiToken && appConfig.fly.org),
+          openrouter_configured: Boolean(appConfig.ai.openrouterApiKey),
         },
       },
     };

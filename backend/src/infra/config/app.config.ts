@@ -104,6 +104,7 @@ export interface AppConfig {
     disabled: boolean;
     debug: boolean;
     endpoint: string;
+    posthogApiKey: string;
     installationIdPath: string;
     heartbeatIntervalMs: number;
     requestTimeoutMs: number;
@@ -238,8 +239,10 @@ export function loadConfig(): AppConfig {
     telemetry: {
       disabled: parseEnvBool(process.env.INSFORGE_TELEMETRY_DISABLED),
       debug: parseEnvBool(process.env.INSFORGE_TELEMETRY_DEBUG),
-      endpoint:
-        process.env.INSFORGE_TELEMETRY_ENDPOINT || 'https://telemetry.insforge.dev/v1/events',
+      endpoint: process.env.INSFORGE_TELEMETRY_ENDPOINT || 'https://b.insforge.dev/capture/',
+      posthogApiKey:
+        process.env.INSFORGE_TELEMETRY_POSTHOG_API_KEY ||
+        'phc_ueV1ii62wdBTkH7E70ugyeqHIHu8dFDdjs0qq3TZhJz',
       installationIdPath:
         process.env.INSFORGE_TELEMETRY_INSTALLATION_ID_PATH ||
         path.join(logsDir, '.insforge-installation-id'),

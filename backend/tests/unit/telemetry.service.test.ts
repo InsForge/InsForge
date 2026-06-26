@@ -32,6 +32,7 @@ function makeConfig(overrides: Partial<TelemetryConfig> = {}): TelemetryConfig {
     disabled: false,
     debug: false,
     endpoint: 'https://telemetry.test/v1/events',
+    posthogApiKey: 'phc_test',
     installationIdPath: path.join(tempRoot, '.insforge-installation-id'),
     heartbeatIntervalMs: 60_000,
     requestTimeoutMs: 500,
@@ -77,8 +78,9 @@ describe('TelemetryService', () => {
       'InsForge telemetry event',
       expect.objectContaining({
         event: expect.objectContaining({
-          eventName: 'instance_started',
-          installationId: expect.any(String),
+          event: 'oss_instance_started',
+          distinct_id: expect.any(String),
+          api_key: 'phc_test',
         }),
       })
     );
@@ -96,7 +98,7 @@ describe('TelemetryService', () => {
     const secondBody = getPostedBody(fetchMock);
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(secondBody.installationId).toBe(installationId);
+    expect(secondBody.distinct_id).toBe(installationId);
     expect(installationId).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
     );
@@ -121,23 +123,28 @@ describe('TelemetryService', () => {
 
     const body = getPostedBody(fetchMock);
     expect(body).toEqual({
-      eventName: 'heartbeat',
-      installationId: expect.any(String),
+      api_key: 'phc_test',
+      event: 'oss_heartbeat',
+      distinct_id: expect.any(String),
       timestamp: expect.any(String),
-      version: expect.any(String),
       properties: {
-        hostingMode: expect.stringMatching(/^(cloud|self-hosted)$/),
-        deploymentMethod: expect.any(String),
+        $process_person_profile: false,
+        installation_id: expect.any(String),
+        telemetry_source: 'insforge_oss',
+        telemetry_event_name: 'heartbeat',
+        version: expect.any(String),
+        hosting_mode: expect.stringMatching(/^(cloud|self-hosted)$/),
+        deployment_method: expect.any(String),
         platform: process.platform,
         arch: process.arch,
-        nodeVersion: process.version,
-        isCi: expect.any(Boolean),
-        storageBackend: expect.stringMatching(/^(local|s3|s3-compatible)$/),
+        node_version: process.version,
+        is_ci: expect.any(Boolean),
+        storage_backend: expect.stringMatching(/^(local|s3|s3-compatible)$/),
         features: {
-          siteDeploymentsConfigured: expect.any(Boolean),
-          functionsConfigured: expect.any(Boolean),
-          computeConfigured: expect.any(Boolean),
-          openRouterConfigured: expect.any(Boolean),
+          site_deployments_configured: expect.any(Boolean),
+          functions_configured: expect.any(Boolean),
+          compute_configured: expect.any(Boolean),
+          openrouter_configured: expect.any(Boolean),
         },
       },
     });

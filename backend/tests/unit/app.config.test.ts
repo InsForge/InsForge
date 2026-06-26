@@ -98,6 +98,7 @@ describe('config.telemetry', () => {
       'INSFORGE_TELEMETRY_DISABLED',
       'INSFORGE_TELEMETRY_DEBUG',
       'INSFORGE_TELEMETRY_ENDPOINT',
+      'INSFORGE_TELEMETRY_POSTHOG_API_KEY',
       'INSFORGE_TELEMETRY_INSTALLATION_ID_PATH',
       'INSFORGE_TELEMETRY_HEARTBEAT_INTERVAL_MS',
       'INSFORGE_TELEMETRY_REQUEST_TIMEOUT_MS',
@@ -107,7 +108,8 @@ describe('config.telemetry', () => {
 
     expect(c.telemetry.disabled).toBe(false);
     expect(c.telemetry.debug).toBe(false);
-    expect(c.telemetry.endpoint).toBe('https://telemetry.insforge.dev/v1/events');
+    expect(c.telemetry.endpoint).toBe('https://b.insforge.dev/capture/');
+    expect(c.telemetry.posthogApiKey).toBe('phc_ueV1ii62wdBTkH7E70ugyeqHIHu8dFDdjs0qq3TZhJz');
     expect(c.telemetry.installationIdPath.endsWith('/logs/.insforge-installation-id')).toBe(true);
     expect(c.telemetry.heartbeatIntervalMs).toBe(24 * 60 * 60 * 1000);
     expect(c.telemetry.requestTimeoutMs).toBe(3000);
@@ -117,6 +119,7 @@ describe('config.telemetry', () => {
     process.env.INSFORGE_TELEMETRY_DISABLED = 'true';
     process.env.INSFORGE_TELEMETRY_DEBUG = '1';
     process.env.INSFORGE_TELEMETRY_ENDPOINT = 'https://events.example.com/v1';
+    process.env.INSFORGE_TELEMETRY_POSTHOG_API_KEY = 'phc_custom';
     process.env.INSFORGE_TELEMETRY_INSTALLATION_ID_PATH = '/tmp/insforge-id';
     process.env.INSFORGE_TELEMETRY_HEARTBEAT_INTERVAL_MS = '60000';
     process.env.INSFORGE_TELEMETRY_REQUEST_TIMEOUT_MS = '500';
@@ -125,6 +128,7 @@ describe('config.telemetry', () => {
     expect(c.telemetry.disabled).toBe(true);
     expect(c.telemetry.debug).toBe(true);
     expect(c.telemetry.endpoint).toBe('https://events.example.com/v1');
+    expect(c.telemetry.posthogApiKey).toBe('phc_custom');
     expect(c.telemetry.installationIdPath).toBe('/tmp/insforge-id');
     expect(c.telemetry.heartbeatIntervalMs).toBe(60000);
     expect(c.telemetry.requestTimeoutMs).toBe(500);
