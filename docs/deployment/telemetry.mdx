@@ -48,21 +48,4 @@ For Docker Compose deployments, add the variable to your `.env` file:
 INSFORGE_TELEMETRY_DISABLED=1
 ```
 
-## Inspect telemetry without sending it
-
-Set `INSFORGE_TELEMETRY_DEBUG=1` to print telemetry payloads in the backend logs without sending them:
-
-```bash
-INSFORGE_TELEMETRY_DEBUG=1
-```
-
-## Use a custom endpoint
-
-Maintainers and downstream distributors can send events to another collector:
-
-```bash
-INSFORGE_TELEMETRY_ENDPOINT=https://events.example.com/capture/
-INSFORGE_TELEMETRY_POSTHOG_API_KEY=phc_your_project_key
-```
-
-The endpoint receives PostHog capture JSON `POST` requests. The PostHog `phc_` project key is public and can be safely embedded in self-hosted clients. Network failures are logged and ignored so telemetry never blocks startup or normal requests.
+Network failures are logged and ignored so telemetry never blocks startup or normal requests.

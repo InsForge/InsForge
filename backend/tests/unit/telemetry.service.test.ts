@@ -30,7 +30,6 @@ function makeConfig(overrides: Partial<TelemetryConfig> = {}): TelemetryConfig {
 
   return {
     disabled: false,
-    debug: false,
     endpoint: 'https://telemetry.test/v1/events',
     posthogApiKey: 'phc_test',
     installationIdPath: path.join(tempRoot, '.insforge-installation-id'),
@@ -64,26 +63,6 @@ describe('TelemetryService', () => {
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(fs.existsSync(config.installationIdPath)).toBe(false);
-  });
-
-  it('prints the event and skips the network request in debug mode', async () => {
-    const config = makeConfig({ debug: true });
-    const fetchMock = makeFetchMock();
-    const infoSpy = vi.spyOn(logger, 'info').mockImplementation(() => logger);
-
-    await new TelemetryService(config, fetchMock).sendEvent('instance_started');
-
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(infoSpy).toHaveBeenCalledWith(
-      'InsForge telemetry event',
-      expect.objectContaining({
-        event: expect.objectContaining({
-          event: 'oss_instance_started',
-          distinct_id: expect.any(String),
-          api_key: 'phc_test',
-        }),
-      })
-    );
   });
 
   it('persists one anonymous installation id and reuses it across events', async () => {

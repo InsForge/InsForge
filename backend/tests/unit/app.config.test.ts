@@ -93,7 +93,7 @@ describe('config.app', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('config.telemetry', () => {
-  it('uses privacy-friendly defaults when telemetry env vars are absent', () => {
+  it('enables anonymous telemetry by default', () => {
     unsetEnvKeys(
       'INSFORGE_TELEMETRY_DISABLED',
       'INSFORGE_TELEMETRY_DEBUG',
@@ -106,16 +106,10 @@ describe('config.telemetry', () => {
     );
     const c = loadConfig();
 
-    expect(c.telemetry.disabled).toBe(false);
-    expect(c.telemetry.debug).toBe(false);
-    expect(c.telemetry.endpoint).toBe('https://b.insforge.dev/capture/');
-    expect(c.telemetry.posthogApiKey).toBe('phc_ueV1ii62wdBTkH7E70ugyeqHIHu8dFDdjs0qq3TZhJz');
-    expect(c.telemetry.installationIdPath.endsWith('/logs/.insforge-installation-id')).toBe(true);
-    expect(c.telemetry.heartbeatIntervalMs).toBe(24 * 60 * 60 * 1000);
-    expect(c.telemetry.requestTimeoutMs).toBe(3000);
+    expect(c.telemetry).toEqual({ disabled: false });
   });
 
-  it('reads telemetry overrides from env', () => {
+  it('only exposes the telemetry disabled env var', () => {
     process.env.INSFORGE_TELEMETRY_DISABLED = 'true';
     process.env.INSFORGE_TELEMETRY_DEBUG = '1';
     process.env.INSFORGE_TELEMETRY_ENDPOINT = 'https://events.example.com/v1';
@@ -125,31 +119,7 @@ describe('config.telemetry', () => {
     process.env.INSFORGE_TELEMETRY_REQUEST_TIMEOUT_MS = '500';
     const c = loadConfig();
 
-    expect(c.telemetry.disabled).toBe(true);
-    expect(c.telemetry.debug).toBe(true);
-    expect(c.telemetry.endpoint).toBe('https://events.example.com/v1');
-    expect(c.telemetry.posthogApiKey).toBe('phc_custom');
-    expect(c.telemetry.installationIdPath).toBe('/tmp/insforge-id');
-    expect(c.telemetry.heartbeatIntervalMs).toBe(60000);
-    expect(c.telemetry.requestTimeoutMs).toBe(500);
-  });
-
-  it('stores the installation id under LOGS_DIR by default', () => {
-    process.env.LOGS_DIR = '/var/log/insforge';
-    unsetEnvKeys('INSFORGE_TELEMETRY_INSTALLATION_ID_PATH');
-
-    expect(loadConfig().telemetry.installationIdPath).toBe(
-      '/var/log/insforge/.insforge-installation-id'
-    );
-  });
-
-  it('falls back to safe telemetry intervals for invalid numeric env vars', () => {
-    process.env.INSFORGE_TELEMETRY_HEARTBEAT_INTERVAL_MS = '-1';
-    process.env.INSFORGE_TELEMETRY_REQUEST_TIMEOUT_MS = 'not-a-number';
-    const c = loadConfig();
-
-    expect(c.telemetry.heartbeatIntervalMs).toBe(24 * 60 * 60 * 1000);
-    expect(c.telemetry.requestTimeoutMs).toBe(3000);
+    expect(c.telemetry).toEqual({ disabled: true });
   });
 });
 
