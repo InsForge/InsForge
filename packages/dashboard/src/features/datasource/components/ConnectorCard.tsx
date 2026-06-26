@@ -1,14 +1,5 @@
 import { useState } from 'react';
-import {
-  Button,
-  CodeBlock,
-  Dialog,
-  DialogBody,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@insforge/ui';
+import { Button, CodeBlock } from '@insforge/ui';
 import { useDashboardHost } from '#lib/config/DashboardHostContext';
 import { useProjectId } from '#lib/hooks/useMetadata';
 import { useApifyConnection } from '#features/datasource/hooks/useDatasource';
@@ -16,7 +7,6 @@ import type { ConnectorDef } from '#features/datasource/connectors';
 import { ApifyDisconnectDialog } from './ApifyDisconnectDialog';
 
 export function ConnectorCard({ connector }: { connector: ConnectorDef }) {
-  const [promptOpen, setPromptOpen] = useState(false);
   const [disconnectOpen, setDisconnectOpen] = useState(false);
   const { projectId } = useProjectId();
   const { onConnectApify } = useDashboardHost();
@@ -25,23 +15,7 @@ export function ConnectorCard({ connector }: { connector: ConnectorDef }) {
 
   return (
     <>
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={() => setPromptOpen(true)}
-        onKeyDown={(e) => {
-          // Only act when the card itself is focused, so Enter/Space on the
-          // inner Connect/Disconnect button doesn't also open the prompt dialog.
-          if (e.target !== e.currentTarget) {
-            return;
-          }
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            setPromptOpen(true);
-          }
-        }}
-        className="flex cursor-pointer flex-col gap-3 rounded border border-[var(--alpha-8)] bg-card p-6 transition-colors hover:border-[var(--alpha-16)] hover:bg-[var(--alpha-4)]"
-      >
+      <div className="flex flex-col gap-3 rounded border border-[var(--alpha-8)] bg-card p-6">
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium text-foreground">{connector.name}</span>
           <span className="rounded bg-[var(--alpha-8)] px-2 py-0.5 text-xs text-muted-foreground">
@@ -49,6 +23,10 @@ export function ConnectorCard({ connector }: { connector: ConnectorDef }) {
           </span>
         </div>
         <p className="text-sm text-muted-foreground">{connector.tagline}</p>
+
+        {/* Prompt shown inline so users can copy it without an extra click. */}
+        <CodeBlock code={connector.examplePrompt} label="prompt" />
+
         {conn.isError ? (
           // A non-404 lookup failure means the connection state is unknown, so
           // don't render a misleading Connect button that would start OAuth.
@@ -56,10 +34,7 @@ export function ConnectorCard({ connector }: { connector: ConnectorDef }) {
         ) : connection ? (
           <Button
             variant="secondary"
-            onClick={(e) => {
-              e.stopPropagation();
-              setDisconnectOpen(true);
-            }}
+            onClick={() => setDisconnectOpen(true)}
             className="self-start"
           >
             Disconnect
@@ -68,30 +43,13 @@ export function ConnectorCard({ connector }: { connector: ConnectorDef }) {
           <Button
             variant="primary"
             disabled={!onConnectApify || !projectId || conn.isLoading}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (projectId) {
-                onConnectApify?.(projectId);
-              }
-            }}
+            onClick={() => projectId && onConnectApify?.(projectId)}
             className="self-start"
           >
             Connect
           </Button>
         )}
       </div>
-
-      <Dialog open={promptOpen} onOpenChange={setPromptOpen}>
-        <DialogContent className="w-[560px] max-w-[560px]">
-          <DialogHeader>
-            <DialogTitle>{connector.name}</DialogTitle>
-            <DialogDescription className="sr-only">{connector.tagline}</DialogDescription>
-          </DialogHeader>
-          <DialogBody>
-            <CodeBlock code={connector.examplePrompt} label="prompt" />
-          </DialogBody>
-        </DialogContent>
-      </Dialog>
 
       <ApifyDisconnectDialog open={disconnectOpen} onClose={() => setDisconnectOpen(false)} />
     </>
