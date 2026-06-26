@@ -28,7 +28,7 @@ import { convertSchemaToColumns } from './DatabaseDataGrid';
 import { formatValueForDisplay } from '#lib/utils/utils';
 import { ColumnType } from '@insforge/shared-schemas';
 import { AUTH_USERS_TABLE, authUsersSchema } from '#features/database/constants';
-import { parseDatabaseTableReference } from '#features/database/helpers';
+import { getPrimaryKeyColumns, parseDatabaseTableReference } from '#features/database/helpers';
 
 const PAGE_SIZE = 50;
 
@@ -93,21 +93,17 @@ export function LinkRecordDialog({
     !isAuthUsers && open
   );
 
-  // Determine PK columns for stable row key derivation
-  const pkColumns = useMemo(() => {
-    if (!schema?.columns) {
-      return [] as string[];
-    }
-    const explicitPks = schema.columns
-      .filter((c: any) => c.isPrimaryKey)
-      .map((c: any) => c.columnName);
-    return explicitPks.length > 0 ? explicitPks : ['id'];
-  }, [schema]);
+  // Determine PK columns for stable row key derivation. auth.users is keyed by id;
+  // DB tables reuse the shared PK helper (full composite key, falling back to id).
+  const pkColumns = useMemo(
+    () => (isAuthUsers ? ['id'] : getPrimaryKeyColumns(fetchedSchema?.columns)),
+    [isAuthUsers, fetchedSchema]
+  );
 
   // Build a stable encoded key from a record's PK column values.
   // Uses \x00 as delimiter since PG text cannot contain null bytes.
   const getRowKey = useCallback(
-    (record: any): string => {
+    (record: DatabaseRecord): string => {
       return pkColumns.map((col) => String(record[col] ?? '')).join(ROW_KEY_DELIMITER);
     },
     [pkColumns]
@@ -264,7 +260,7 @@ export function LinkRecordDialog({
               onSelectedRowsChange={(newSelectedRows) => {
                 const selectedId = Array.from(newSelectedRows)[0];
                 if (selectedId) {
-                  const record = records.find((r: any) => getRowKey(r) === selectedId);
+                  const record = records.find((r) => getRowKey(r) === selectedId);
                   if (record) {
                     setSelectedRecord(record);
                   }

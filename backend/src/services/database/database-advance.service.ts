@@ -605,7 +605,7 @@ export class DatabaseAdvanceService {
               a1.attname as "columnName",
               CASE WHEN nf.nspname = 'public' THEN cf.relname ELSE nf.nspname || '.' || cf.relname END as "foreignTableName",
               a2.attname as "foreignColumnName",
-              u.pos as "ordinalPosition",
+              u.pos::int as "ordinalPosition",
               CASE c.confdeltype
                 WHEN 'a' THEN 'NO ACTION' WHEN 'r' THEN 'RESTRICT'
                 WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL'

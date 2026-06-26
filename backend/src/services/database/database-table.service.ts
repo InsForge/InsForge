@@ -859,7 +859,7 @@ export class DatabaseTableService {
           nf.nspname AS foreign_schema,
           cf.relname AS foreign_table,
           a2.attname AS foreign_column,
-          u.pos AS ordinal_position,
+          u.pos::int AS ordinal_position,
           CASE c.confdeltype
             WHEN 'a' THEN 'NO ACTION' WHEN 'r' THEN 'RESTRICT'
             WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL'

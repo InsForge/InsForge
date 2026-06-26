@@ -1,5 +1,6 @@
 import { jsonSchema } from '#lib/utils/schemaValidations';
 import {
+  type AdminTableRecordPrimaryKey,
   ColumnSchema,
   ColumnType,
   type DatabaseSchemaInfo,
@@ -33,10 +34,11 @@ export function getForeignKeyByColumn(
 }
 
 /**
- * A record's primary key as a map of column name -> value.
- * Supports composite (multi-column) primary keys.
+ * A record's primary key as a map of column name -> value. Supports composite keys.
+ * Aliased to the backend contract so the dashboard and API can't drift; PK columns
+ * are NOT NULL, so values are non-null scalars.
  */
-export type RecordPrimaryKey = Record<string, string | number | boolean | null>;
+export type RecordPrimaryKey = AdminTableRecordPrimaryKey;
 
 /**
  * Returns the primary-key column names for a table, in schema (ordinal) order.
@@ -73,7 +75,9 @@ export function getRecordPrimaryKey(
   for (const columnName of primaryKeyColumns) {
     const value = row[columnName];
     if (value === undefined || value === null) {
-      key[columnName] = null;
+      // PK columns are NOT NULL; this branch is defensive for pathological rows
+      // (e.g. the no-PK fallback). Use '' to stay a non-null scalar and a stable key.
+      key[columnName] = '';
     } else if (
       typeof value === 'string' ||
       typeof value === 'number' ||
@@ -105,10 +109,7 @@ function isRecordPrimaryKey(value: unknown): value is RecordPrimaryKey {
   }
   return Object.values(value).every(
     (item) =>
-      item === null ||
-      typeof item === 'string' ||
-      typeof item === 'number' ||
-      typeof item === 'boolean'
+      typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean'
   );
 }
 

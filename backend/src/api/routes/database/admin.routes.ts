@@ -4,14 +4,11 @@ import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { AppError } from '@/utils/errors.js';
 import {
   ERROR_CODES,
-  adminTableRecordPrimaryKeySchema,
-  adminTableRecordUpdateQuerySchema,
   adminTableRecordUpdateRequestSchema,
   adminTableRecordLookupQuerySchema,
   adminTableRecordsCreateRequestSchema,
-  adminTableRecordsDeleteQuerySchema,
+  adminTableRecordsDeleteRequestSchema,
   adminTableRecordsListQuerySchema,
-  type AdminTableRecordPrimaryKey,
   type AdminTableRecordsSortClause,
 } from '@insforge/shared-schemas';
 import { AdminRecordService } from '@/services/database/admin-record.service.js';
@@ -65,41 +62,6 @@ function parseSort(sort: string | undefined): AdminTableRecordsSortClause[] {
         direction: normalizedDirection as AdminTableRecordsSortClause['direction'],
       };
     });
-}
-
-function parseJsonQueryParam(raw: string): unknown {
-  try {
-    return JSON.parse(raw);
-  } catch {
-    throw new AppError(
-      'Invalid pkKeys parameter.',
-      400,
-      ERROR_CODES.INVALID_INPUT,
-      'pkKeys must be a JSON-encoded primary key.'
-    );
-  }
-}
-
-// Parses the `pkKeys` query param for an update: a single JSON object mapping each
-// primary-key column to its value.
-function parsePrimaryKey(raw: string): AdminTableRecordPrimaryKey {
-  const validation = adminTableRecordPrimaryKeySchema.safeParse(parseJsonQueryParam(raw));
-  if (!validation.success) {
-    throw new AppError(getValidationMessage(validation.error), 400, ERROR_CODES.INVALID_INPUT);
-  }
-  return validation.data;
-}
-
-// Parses the `pkKeys` query param for a delete: a JSON array of primary-key objects.
-function parsePrimaryKeys(raw: string): AdminTableRecordPrimaryKey[] {
-  const validation = z
-    .array(adminTableRecordPrimaryKeySchema)
-    .min(1, 'At least one primary key is required.')
-    .safeParse(parseJsonQueryParam(raw));
-  if (!validation.success) {
-    throw new AppError(getValidationMessage(validation.error), 400, ERROR_CODES.INVALID_INPUT);
-  }
-  return validation.data;
 }
 
 function broadcastRecordChange(schemaName: string, tableName: string): void {
@@ -208,16 +170,6 @@ router.patch(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const schemaName = normalizeDatabaseSchemaName(req.query.schema);
-      const queryValidation = adminTableRecordUpdateQuerySchema.safeParse(req.query);
-      if (!queryValidation.success) {
-        throw new AppError(
-          getValidationMessage(queryValidation.error),
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
-      }
-
-      const primaryKey = parsePrimaryKey(queryValidation.data.pkKeys);
 
       const bodyValidation = adminTableRecordUpdateRequestSchema.safeParse(req.body);
       if (!bodyValidation.success) {
@@ -231,8 +183,8 @@ router.patch(
       const updatedRecord = await recordsService.updateRecord(
         schemaName,
         req.params.tableName,
-        primaryKey,
-        bodyValidation.data as DatabaseRecord
+        bodyValidation.data.pkKeys,
+        bodyValidation.data.data as DatabaseRecord
       );
 
       broadcastRecordChange(schemaName, req.params.tableName);
@@ -248,17 +200,15 @@ router.delete(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const schemaName = normalizeDatabaseSchemaName(req.query.schema);
-      const validation = adminTableRecordsDeleteQuerySchema.safeParse(req.query);
+      const validation = adminTableRecordsDeleteRequestSchema.safeParse(req.body);
       if (!validation.success) {
         throw new AppError(getValidationMessage(validation.error), 400, ERROR_CODES.INVALID_INPUT);
       }
 
-      const primaryKeys = parsePrimaryKeys(validation.data.pkKeys);
-
       const deletedCount = await recordsService.deleteRecords(
         schemaName,
         req.params.tableName,
-        primaryKeys
+        validation.data.pkKeys
       );
 
       if (deletedCount > 0) {

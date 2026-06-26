@@ -293,23 +293,28 @@ export const adminTableRecordPrimaryKeySchema = z
     message: 'Primary key must include at least one column.',
   });
 
-// `pkKeys` is a JSON-encoded object mapping each primary-key column to its value
-// for the record being updated, e.g. {"tenant_id":"t1","item_id":"i2"}.
-export const adminTableRecordUpdateQuerySchema = z.object({
-  pkKeys: z.string().trim().min(1, 'Primary key is required'),
-});
-
-export const adminTableRecordUpdateRequestSchema = adminTableRecordSchema.refine(
+// The columns to set on update (at least one).
+export const adminTableRecordUpdateDataSchema = adminTableRecordSchema.refine(
   (record) => Object.keys(record).length > 0,
   {
     message: 'At least one field is required.',
   }
 );
 
-// `pkKeys` is a JSON-encoded array of primary-key objects, one per record to delete,
-// e.g. [{"tenant_id":"t1","item_id":"i2"},{"tenant_id":"t1","item_id":"i3"}].
-export const adminTableRecordsDeleteQuerySchema = z.object({
-  pkKeys: z.string().trim().min(1, 'At least one primary key is required'),
+// Update request body: the primary-key tuple identifying the row plus the columns
+// to set. Carried in the body (not the query string) so composite keys are
+// validated structurally, e.g. { "pkKeys": {"tenant_id":"t1","item_id":"i2"}, "data": {...} }.
+export const adminTableRecordUpdateRequestSchema = z.object({
+  pkKeys: adminTableRecordPrimaryKeySchema,
+  data: adminTableRecordUpdateDataSchema,
+});
+
+// Delete request body: one primary-key tuple per record to delete,
+// e.g. { "pkKeys": [{"tenant_id":"t1","item_id":"i2"},{"tenant_id":"t1","item_id":"i3"}] }.
+export const adminTableRecordsDeleteRequestSchema = z.object({
+  pkKeys: z
+    .array(adminTableRecordPrimaryKeySchema)
+    .min(1, 'At least one primary key is required'),
 });
 
 export const adminTableRecordResponseSchema = adminTableRecordSchema;
@@ -381,9 +386,8 @@ export type AdminTableRecordsListQuery = z.infer<typeof adminTableRecordsListQue
 export type AdminTableRecordLookupQuery = z.infer<typeof adminTableRecordLookupQuerySchema>;
 export type AdminTableRecordsCreateRequest = z.infer<typeof adminTableRecordsCreateRequestSchema>;
 export type AdminTableRecordPrimaryKey = z.infer<typeof adminTableRecordPrimaryKeySchema>;
-export type AdminTableRecordUpdateQuery = z.infer<typeof adminTableRecordUpdateQuerySchema>;
 export type AdminTableRecordUpdateRequest = z.infer<typeof adminTableRecordUpdateRequestSchema>;
-export type AdminTableRecordsDeleteQuery = z.infer<typeof adminTableRecordsDeleteQuerySchema>;
+export type AdminTableRecordsDeleteRequest = z.infer<typeof adminTableRecordsDeleteRequestSchema>;
 export type AdminTableRecordResponse = z.infer<typeof adminTableRecordResponseSchema>;
 export type AdminTableRecordLookupResponse = z.infer<typeof adminTableRecordLookupResponseSchema>;
 export type AdminTableRecordsCreateResponse = z.infer<typeof adminTableRecordsCreateResponseSchema>;

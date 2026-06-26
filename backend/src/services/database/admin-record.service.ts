@@ -28,9 +28,6 @@ interface TableColumnMetadata {
   searchableColumns: string[];
 }
 
-// A record's primary key as a map of column name -> value. Supports composite keys.
-type PrimaryKey = AdminTableRecordPrimaryKey;
-
 export class AdminRecordService {
   private static instance: AdminRecordService;
   private dbManager = DatabaseManager.getInstance();
@@ -151,7 +148,7 @@ export class AdminRecordService {
   async updateRecord(
     schemaName: string,
     tableName: string,
-    primaryKey: PrimaryKey,
+    primaryKey: AdminTableRecordPrimaryKey,
     data: DatabaseRecord
   ): Promise<DatabaseRecord> {
     validateTableName(tableName);
@@ -223,7 +220,7 @@ export class AdminRecordService {
   async deleteRecords(
     schemaName: string,
     tableName: string,
-    primaryKeys: PrimaryKey[]
+    primaryKeys: AdminTableRecordPrimaryKey[]
   ): Promise<number> {
     validateTableName(tableName);
 

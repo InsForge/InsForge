@@ -9,8 +9,6 @@ interface AdminRecordListResponse {
   pagination: { offset: number; limit: number; total: number };
 }
 
-export type { RecordPrimaryKey };
-
 export class RecordService {
   private buildAdminRecordsPath(
     tableName: string,
@@ -219,15 +217,14 @@ export class RecordService {
     data: { [key: string]: ConvertedValue },
     schemaName: string = DEFAULT_DATABASE_SCHEMA
   ) {
-    // pkKeys carries the full primary-key tuple so composite keys target one row.
-    const params = new URLSearchParams({ pkKeys: JSON.stringify(primaryKey) });
-
-    return apiClient.request(this.buildAdminRecordsPath(table, schemaName, '', params), {
+    // pkKeys (the full primary-key tuple) and data travel in the body so composite
+    // keys are validated structurally instead of being crammed into the query string.
+    return apiClient.request(this.buildAdminRecordsPath(table, schemaName, ''), {
       method: 'PATCH',
       headers: apiClient.withAccessToken({
         'Content-Type': 'application/json',
       }),
-      body: JSON.stringify(data),
+      body: JSON.stringify({ pkKeys: primaryKey, data }),
     });
   }
 
@@ -239,12 +236,14 @@ export class RecordService {
     if (!primaryKeys.length) {
       return Promise.resolve();
     }
-    // pkKeys is a JSON array of primary-key tuples so each selected row is matched exactly.
-    const params = new URLSearchParams({ pkKeys: JSON.stringify(primaryKeys) });
-
-    return apiClient.request(this.buildAdminRecordsPath(table, schemaName, '', params), {
+    // pkKeys (one tuple per record) travels in the body so each selected row is
+    // matched exactly without a length-limited query string.
+    return apiClient.request(this.buildAdminRecordsPath(table, schemaName, ''), {
       method: 'DELETE',
-      headers: apiClient.withAccessToken(),
+      headers: apiClient.withAccessToken({
+        'Content-Type': 'application/json',
+      }),
+      body: JSON.stringify({ pkKeys: primaryKeys }),
     });
   }
 
