@@ -13,8 +13,8 @@ function readMigration(): string {
   return fs.readFileSync(migrationPath, 'utf8');
 }
 
-// Schemas 055 manages. `system` is deliberately excluded (migration 054 owns its
-// default privilege); `ai`/`public` are excluded too.
+// Schemas 055 manages. `system` is excluded (migration 054 owns its default
+// privilege); `ai` is dropped here; `public` is excluded too.
 const MANAGED_SCHEMAS = [
   'auth',
   'compute',
@@ -33,13 +33,11 @@ describe('055_grant-internal-schema-select-defaults migration', () => {
     expect(fs.existsSync(migrationPath)).toBe(true);
   });
 
-  it('UP backfills SELECT and sets default privileges for every managed schema', () => {
+  it('backfills SELECT and sets default privileges for every managed schema', () => {
     const sql = readMigration();
-    const upBlock = sql.split('-- DOWN migration')[0];
-
     for (const schema of MANAGED_SCHEMAS) {
-      expect(upBlock).toContain(`GRANT SELECT ON ALL TABLES IN SCHEMA ${schema} TO project_admin`);
-      expect(upBlock).toContain(
+      expect(sql).toContain(`GRANT SELECT ON ALL TABLES IN SCHEMA ${schema} TO project_admin`);
+      expect(sql).toContain(
         `ALTER DEFAULT PRIVILEGES IN SCHEMA ${schema} GRANT SELECT ON TABLES TO project_admin`
       );
     }
@@ -47,19 +45,21 @@ describe('055_grant-internal-schema-select-defaults migration', () => {
 
   it('grants schema USAGE on memory so its SELECT grant is usable', () => {
     const sql = readMigration();
-    const upBlock = sql.split('-- DOWN migration')[0];
-    expect(upBlock).toContain('GRANT USAGE ON SCHEMA memory TO project_admin');
+    expect(sql).toContain('GRANT USAGE ON SCHEMA memory TO project_admin');
   });
 
-  it('does not touch the system schema (owned by migration 054)', () => {
+  it('does not touch the system schema (owned by migration 054) or public', () => {
     const sql = readMigration();
     expect(sql).not.toMatch(/SCHEMA system\b/);
+    expect(sql).not.toMatch(/SCHEMA public\b/);
   });
 
-  it('does not touch the ai schema (dropped in migration 056) or public', () => {
+  it('drops the deprecated ai schema without CASCADE', () => {
     const sql = readMigration();
-    expect(sql).not.toMatch(/SCHEMA ai\b/);
-    expect(sql).not.toMatch(/SCHEMA public\b/);
+    expect(sql).toMatch(/DROP SCHEMA IF EXISTS ai;/);
+    expect(sql).not.toMatch(/DROP SCHEMA IF EXISTS ai CASCADE/);
+    // No SELECT/default grants for ai -- it is being removed.
+    expect(sql).not.toMatch(/ON ALL TABLES IN SCHEMA ai\b/);
   });
 
   it('default privileges are role-agnostic (no FOR ROLE) so they apply to the migration runner', () => {
@@ -67,20 +67,10 @@ describe('055_grant-internal-schema-select-defaults migration', () => {
     expect(sql).not.toMatch(/DEFAULT PRIVILEGES FOR ROLE/);
   });
 
-  it('DOWN revokes only the default-privilege rule, leaving table grants intact', () => {
+  it('is forward-only with no down migration', () => {
     const sql = readMigration();
-    const downSection = sql.split('-- DOWN migration')[1];
-    expect(downSection).toBeDefined();
-
-    for (const schema of MANAGED_SCHEMAS) {
-      expect(downSection).toContain(
-        `ALTER DEFAULT PRIVILEGES IN SCHEMA ${schema} REVOKE SELECT ON TABLES FROM project_admin`
-      );
-    }
-    // Table-level grants must NOT be revoked on rollback.
-    expect(downSection).not.toMatch(/REVOKE SELECT ON ALL TABLES/);
-    // system must not be revoked here -- 054 owns it.
-    expect(downSection).not.toMatch(/SCHEMA system\b/);
+    expect(sql).not.toMatch(/--\s*down migration/i);
+    expect(sql).not.toMatch(/REVOKE/i);
   });
 
   it('runs after migrations 045 (creates project_admin) and 050 (creates memory)', () => {

@@ -19,17 +19,15 @@
 -- (catching missed grants such as memory.memories); each ALTER DEFAULT
 -- PRIVILEGES covers tables created later.
 --
--- `system` is intentionally excluded: migration 054 already owns its default
--- privilege, and PostgreSQL stores a single pg_default_acl entry per
--- (schema, role), so re-granting and later revoking it here would strip what
--- 054 established on rollback. `public` is excluded too -- it is the developer
--- data surface and already receives ALL default privileges in migration 045.
+-- The `system` schema is excluded: migration 054 already set its default
+-- privilege. `public` is excluded too -- it is the developer data surface and
+-- already receives ALL default privileges in migration 045.
 --
 -- Schemas are not individually existence-guarded: all of these are created by
 -- earlier migrations and exist by the time 055 runs, matching migration 045's
--- role-only guard.
+-- role-only guard. Forward-only: there is no down migration -- the grants are
+-- the intended steady state and reverting them would regress migration 045.
 
--- UP migration
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'project_admin') THEN
@@ -70,22 +68,9 @@ BEGIN
   END IF;
 END $$;
 
--- DOWN migration
--- Only remove the default-privilege rule. Existing table-level SELECT grants are
--- left in place because they match the intended access model established in
--- migration 045; revoking them here would regress that migration.
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'project_admin') THEN
-    ALTER DEFAULT PRIVILEGES IN SCHEMA auth REVOKE SELECT ON TABLES FROM project_admin;
-    ALTER DEFAULT PRIVILEGES IN SCHEMA compute REVOKE SELECT ON TABLES FROM project_admin;
-    ALTER DEFAULT PRIVILEGES IN SCHEMA deployments REVOKE SELECT ON TABLES FROM project_admin;
-    ALTER DEFAULT PRIVILEGES IN SCHEMA email REVOKE SELECT ON TABLES FROM project_admin;
-    ALTER DEFAULT PRIVILEGES IN SCHEMA functions REVOKE SELECT ON TABLES FROM project_admin;
-    ALTER DEFAULT PRIVILEGES IN SCHEMA memory REVOKE SELECT ON TABLES FROM project_admin;
-    ALTER DEFAULT PRIVILEGES IN SCHEMA payments REVOKE SELECT ON TABLES FROM project_admin;
-    ALTER DEFAULT PRIVILEGES IN SCHEMA realtime REVOKE SELECT ON TABLES FROM project_admin;
-    ALTER DEFAULT PRIVILEGES IN SCHEMA schedules REVOKE SELECT ON TABLES FROM project_admin;
-    ALTER DEFAULT PRIVILEGES IN SCHEMA storage REVOKE SELECT ON TABLES FROM project_admin;
-  END IF;
-END $$;
+-- Drop the deprecated, empty `ai` schema while we are cleaning up internal-schema
+-- privileges. Its tables (ai.configs, ai.usage) were removed in migration 043;
+-- the schema was left behind, is referenced nowhere in application code, and
+-- still surfaces in the dashboard schema list. No CASCADE, so an unexpected
+-- leftover object fails loudly instead of being silently dropped.
+DROP SCHEMA IF EXISTS ai;
